@@ -223,3 +223,63 @@ test('confermando, il link sospetto viene poi aperto davvero', async ({ app, tes
   expect(second.executed).toBe(true);
   await expect.poll(() => !!findWindow(app, url), { timeout: 8_000 }).toBe(true);
 });
+
+// ── #587 giro 2 ─────────────────────────────────────────────────────────────
+// Il bersaglio di una lettura non è quello che c'è scritto nel comando. Al giro
+// 1 a nasconderlo erano uno spostamento di cartella e una lettura ricorsiva;
+// qui sono un CARATTERE JOLLY (che la shell espande dopo che il livello è già
+// stato deciso) e un COLLEGAMENTO (che non porta addosso il nome di dove
+// punta). Questi due casi passano dal gate vero dell'app, non dal solo
+// classificatore: è lì che si vede se la difesa è davvero montata.
+
+test('#587 un jolly che può prendere le chiavi chiede un OK, e dice perché', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+
+  for (const comando of ['cat ~/.*', 'cat ~/.s?h/*', 'head -c 2000 ~/.ss*/id_rsa']) {
+    const r = await runAction(page, { type: 'ESEGUI_COMANDO', comando });
+    expect(r.executed, `«${comando}» non deve partire da solo`).toBe(false);
+    expect(r.needsConfirm, `«${comando}» deve chiedere un OK`).toBe(2);
+    expect(String(r.describe || ''), 'il popup deve dire perché si ferma')
+      .toMatch(/può aprire le tue chiavi/);
+  }
+
+  // E leggere i propri file con un modello resta senza attrito: una conferma che
+  // compare sempre è una conferma che si accetta sempre.
+  const ok = await runAction(page, { type: 'ESEGUI_COMANDO', comando: 'ls ~/*.txt' });
+  expect(ok.needsConfirm, 'elencare i propri .txt non deve chiedere niente').toBeFalsy();
+});
+
+test('#587 un collegamento alla cartella delle chiavi non regala la lettura', async ({ app, openTab }) => {
+  // Il classificatore vive fuori dal processo principale e non ha filesystem: il
+  // percorso reale glielo passa il main. Se quel collegamento saltasse, un
+  // collegamento chiamato «scorciatoia» tornerebbe a essere una lettura gratis.
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+
+  const casa = cartellaTemporanea('filo-587-link-');
+  fs.mkdirSync(path.join(casa, '.ssh'), { recursive: true });
+  fs.writeFileSync(path.join(casa, '.ssh', 'config'), 'Host segreto\n');
+  fs.mkdirSync(path.join(casa, 'Documenti'), { recursive: true });
+  fs.writeFileSync(path.join(casa, 'Documenti', 'note.txt'), 'la spesa\n');
+  fs.symlinkSync(path.join(casa, '.ssh'), path.join(casa, 'scorciatoia'),
+    process.platform === 'win32' ? 'junction' : 'dir');
+
+  const esito = await app.evaluate((_e, dir) => {
+    const dove = { perimetro: dir, home: dir, cwd: dir };
+    const C = globalThis.SN_CMD_CLASSIFY;
+    return {
+      collegamento: C.classify('cat scorciatoia/config', dove),
+      collegamentoJolly: C.classify('cat scorciatoia/*', dove),
+      motivo: C.readReason('cat scorciatoia/config', dove),
+      normale: C.classify('cat Documenti/note.txt', dove),
+      collegare: C.classify('ln -s .ssh scorciatoia2', dove),
+    };
+  }, casa);
+
+  expect(esito.collegamento, 'leggere dentro il collegamento deve chiedere un OK').toBe(2);
+  expect(esito.collegamentoJolly, 'anche con un jolly').toBe(2);
+  expect(esito.motivo, 'e il popup deve nominare la cartella vera').toContain('.ssh');
+  expect(esito.normale, 'un file proprio resta senza attrito').toBe(1);
+  expect(esito.collegare, 'e fare il collegamento costa un «conferma», non un OK').toBe(3);
+});
