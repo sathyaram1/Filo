@@ -442,22 +442,23 @@
 
       SpellCheck.init(settings);
 
-    // window + capture: fase più precoce possibile, così intercettiamo il
-    // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
-    // — es. iframe artifact di claude.ai — gestiscono il tasto destro su certi
-    // SVG e lasciavano comparire il menu nativo del browser; feedback alpha).
-    //
-    // Su pagine web esterne il page-preload ha già registrato a document_start
-    // un listener window+capture (PRIMA di ogni script di pagina): gli passiamo
-    // il nostro handler così siamo i primi a ricevere l'evento anche sui siti che
-    // bloccano il contextmenu con stopImmediatePropagation (YouTube, Reddit…).
-    // Sulle pagine filo:// (nessun preload-bridge) registriamo in BUBBLE, non
-    // in capture: le pagine interne sono NOSTRE e alcune hanno un menu
-    // contestuale proprio (chip dell'archivio, card dei mazzi) attaccato agli
-    // elementi. In capture + stopPropagation il nostro handler li soffocava
-    // (il tasto destro sulle pagine interne apriva solo il menu di Filo). In
-    // bubble l'handler della pagina scatta per primo: se ha già gestito il
-    // click (e.preventDefault()), il menu di Filo si fa da parte.
+      // window + capture: fase più precoce possibile, così intercettiamo il
+      // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
+      // — es. iframe artifact di claude.ai — gestiscono il tasto destro su certi
+      // SVG e lasciavano comparire il menu nativo del browser; feedback alpha).
+      //
+      // Su pagine web esterne il page-preload ha già registrato a document_start
+      // un listener window+capture (PRIMA di ogni script di pagina): gli passiamo
+      // il nostro handler così siamo i primi a ricevere l'evento anche sui siti che
+      // bloccano il contextmenu con stopImmediatePropagation (YouTube, Reddit…).
+      // Sulle pagine filo:// (nessun preload-bridge) registriamo in BUBBLE, non
+      // in capture: le pagine interne sono NOSTRE e alcune hanno un menu
+      // contestuale proprio (chip dell'archivio, card dei mazzi) attaccato agli
+      // elementi. In capture + stopPropagation il nostro handler li soffocava
+      // (il tasto destro sulle pagine interne apriva solo il menu di Filo). In
+      // bubble l'handler della pagina scatta per primo: se ha già gestito il
+      // click (e.preventDefault()), il menu di Filo si fa da parte.
+      //
       // Il controllo "l'utente ha escluso questo sito?" si rifà QUI, a ogni
       // tasto destro, non una volta al caricamento: così escludere il sito
       // mentre la scheda è aperta spegne il menu subito.
