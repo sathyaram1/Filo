@@ -384,19 +384,30 @@ function registerIpcHandlers() {
       return require('./services/permessiSito').rispondi(id, scelta, { ricorda: ricorda !== false });
     } catch (_) { return { ok: false }; }
   });
-  // Cosa si è già deciso per un sito: serve al menu del tasto destro sulla
-  // scheda, che mostra le voci solo se c'è qualcosa da revocare.
-  ipcMain.handle('permissions:for-origin', (event, { origine } = {}) => {
+  // Quale schermo o finestra si condivide: la seconda mezza domanda, dopo il
+  // «Consenti» sulla cattura dello schermo. Senza risposta si annulla.
+  ipcMain.handle('permissions:pick-source', (event, { id, fonteId } = {}) => {
     void event;
-    try { return { ok: true, voci: require('./services/permessiSito').perOrigine(origine) }; }
-    catch (_) { return { ok: false, voci: [] }; }
+    try { return require('./services/permessiSito').scegliFonteRisposta(id, fonteId || null); }
+    catch (_) { return { ok: false }; }
+  });
+  // Cosa si è già deciso per un sito: serve al menu del tasto destro sulla
+  // scheda, che mostra le voci solo se c'è qualcosa da revocare. La memoria
+  // dipende dalla finestra che chiede: in incognito le scelte stanno in RAM, e
+  // vanno mostrate lo stesso, altrimenti lì non si possono togliere.
+  ipcMain.handle('permissions:for-origin', (event, { origine } = {}) => {
+    try {
+      const P = require('./services/permessiSito');
+      return { ok: true, voci: P.perOrigine(origine, P.contesto(event.sender)) };
+    } catch (_) { return { ok: false, voci: [] }; }
   });
   // Revoca una scelta ricordata (o tutte quelle del sito): la prossima volta il
   // sito richiede e l'utente risceglie.
   ipcMain.handle('permissions:revoke', (event, { origine, chiave } = {}) => {
-    void event;
-    try { return { ok: require('./services/permessiSito').revoca(origine, chiave || null) }; }
-    catch (_) { return { ok: false }; }
+    try {
+      const P = require('./services/permessiSito');
+      return { ok: P.revoca(origine, chiave || null, P.contesto(event.sender)) };
+    } catch (_) { return { ok: false }; }
   });
 
   // ─── popup menu custom (sopra le WebContentsView) ────────────────────────
