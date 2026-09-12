@@ -1532,3 +1532,106 @@ test('smettere di chiedere vale per la cosa chiusa, e si può tornare indietro',
   await shell.locator('.perm-chip .perm-chip-allow').click();
   expect(await ripresa, 'ripreso a chiedere, il Consenti deve valere').toBe('ok');
 });
+
+// ─── Quello che il sito nasconde, e le due memorie dell'incognito (#586) ─────
+
+const HTML_DUE_STRADE = `<!doctype html><html><body style="margin:0"><p>pagina</p>
+<script>
+  window.__prima = null;
+  window.__nascosta = null;
+  window.__apri = async () => {
+    const a = await navigator.mediaDevices.getUserMedia({ audio: true });
+    window.__prima = a.getTracks()[0];
+    // La stessa richiesta, presa dalla funzione dello stampo invece che da
+    // quella che il sito si trova addosso: è la via con cui un sito si teneva
+    // il microfono aperto a permesso tolto.
+    const grezza = MediaDevices.prototype.getUserMedia;
+    const b = await grezza.call(navigator.mediaDevices, { audio: true });
+    window.__nascosta = b.getTracks()[0];
+    return 'ok';
+  };
+  window.__stato = () => ({
+    prima: window.__prima ? window.__prima.readyState : 'niente',
+    nascosta: window.__nascosta ? window.__nascosta.readyState : 'niente',
+  });
+</script></body></html>`;
+
+test('togliere il permesso chiude anche il microfono che il sito si è preso per un\'altra via', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, HTML_DUE_STRADE);
+
+  const apertura = page.evaluate(() => window.__apri());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await apertura, 'le due tracce devono aprirsi dopo il Consenti').toBe('ok');
+  expect((await page.evaluate(() => window.__stato())).nascosta).toBe('live');
+
+  // «Interrompi» sul cartello: la stessa strada della revoca dalle Impostazioni.
+  const cartello = shell.locator('.perm-live:not([data-notizia])').first();
+  await expect(cartello).toHaveCount(1, { timeout: 20_000 });
+  await cartello.locator('.perm-chip-btn').first().click();
+
+  await expect.poll(async () => {
+    try {
+      const s = await page.evaluate(() => window.__stato());
+      return s.nascosta;
+    } catch (_) { return 'niente'; } // pagina ricaricata: chiusa per forza
+  }, {
+    timeout: 20_000,
+    message: 'tolto il permesso, il microfono che il sito aveva aperto per una seconda via continua '
+      + 'ad ascoltare: il cartello sparisce, in Impostazioni non resta niente da togliere, e chi '
+      + 'ha appena tolto il permesso crede di aver chiuso il microfono',
+  }).not.toBe('live');
+});
+
+test('in incognito le Impostazioni elencano anche le risposte delle finestre normali', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const origine = 'https://due-memorie.test';
+  await app.evaluate(async (_e, o) => {
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { security: { sitePermissions: { [o]: { microfono: 'allow' } } } } },
+      { url: 'filo://security/security.html' },
+    );
+  }, origine);
+
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  let shellIncognito = null;
+  const fine = Date.now() + 15_000;
+  while (Date.now() < fine && !shellIncognito) {
+    shellIncognito = app.windows().find((w) => {
+      try { return w.url().includes('shell.html?incognito=1'); } catch (_) { return false; }
+    }) || null;
+    if (!shellIncognito) await new Promise((r) => setTimeout(r, 200));
+  }
+  expect(shellIncognito).toBeTruthy();
+  await shellIncognito.waitForLoadState('domcontentloaded').catch(() => {});
+  await shellIncognito.waitForFunction(() => !!window.filoShell, null, { timeout: 8000 });
+
+  await shellIncognito.evaluate(() => window.filoShell.tabs.open('filo://security/'));
+  let sicurezza = null;
+  const scadenza = Date.now() + 15_000;
+  while (Date.now() < scadenza && !sicurezza) {
+    sicurezza = app.windows().find((w) => {
+      try { return w.url().startsWith('filo://security/'); } catch (_) { return false; }
+    }) || null;
+    if (!sicurezza) await new Promise((r) => setTimeout(r, 150));
+  }
+  expect(sicurezza).toBeTruthy();
+  await sicurezza.waitForSelector('#perms-list', { timeout: 8_000 });
+
+  const riga = sicurezza.locator('#perms-list li').filter({ hasText: 'due-memorie.test' }).first();
+  await expect(
+    riga,
+    'le Impostazioni aperte da una finestra in incognito non elencano le risposte date nelle '
+    + 'finestre normali: dicono che nessun sito ne ha mai ricevuta una, e da lì non se ne può '
+    + 'togliere nessuna',
+  ).toHaveCount(1, { timeout: 10_000 });
+  await expect(riga).toContainText('finestre normali');
+
+  // E da lì si toglie davvero, dalla memoria giusta.
+  await riga.locator('button').nth(1).click();
+  await expect.poll(async () => {
+    const s = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions);
+    return Object.keys(s || {}).length;
+  }, { timeout: 10_000 }).toBe(0);
+});
