@@ -113,9 +113,9 @@ test('la voce scelta nella pagina non deve rimettere la velocità di lettura di 
   const ttsC = await pagina.locator('#ttsRate').count();
   test.skip(!ttsC, 'la pagina non espone le manopole della lettura ad alta voce');
 
-  await pagina.selectOption('#theme', 'dark');
-  await pagina.waitForTimeout(1200);
-  expect(await chiHaIlFuoco(pagina)).toBe('theme');
+  // L'utente sta scrivendo nel riquadro dello stile: il cursore è lì dentro.
+  await pagina.click('#agentStyleText');
+  expect(await chiHaIlFuoco(pagina)).toBe('agentStyleText');
 
   await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'velocita_voce', valore: '1.6' });
   await pagina.waitForTimeout(1200);
