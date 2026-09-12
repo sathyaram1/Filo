@@ -138,6 +138,25 @@
     return null;
   }
 
+  // Un pezzo di indirizzo "da parola": lettere sole (una parola di uno slug, di
+  // un titolo, di una ricerca) o cifre sole abbastanza corte da essere una data,
+  // un anno o un identificativo.
+  function pezzoDaParola(p) {
+    return p === '' || /^[A-Za-z]{1,14}$/.test(p) || /^[0-9]{1,12}$/.test(p);
+  }
+
+  // Il tratto di indirizzo è OPACO, cioè non si legge come parole? È la domanda
+  // che il ripiego strutturale deve porsi, e per un po' non se l'è posta: contava
+  // i caratteri e basta, e visto che i separatori umani (`/`, `-`, `_`, `+`)
+  // restavano dentro, `/wiki/Storia_della_matematica` era «un blocco di dati
+  // codificato» lungo 28. Con il contesto non fidato acceso — cioè dal primo
+  // comando o dalla prima ricerca in poi — quell'avviso compariva su quasi ogni
+  // link vero (#587, giro 1), e un avviso che compare sempre si clicca senza
+  // leggerlo. Un payload vero resta opaco: base64, esadecimale, testo cifrato.
+  function opaco(tratto) {
+    return !String(tratto).split(/[-_/+=.]/).every(pezzoDaParola);
+  }
+
   // Fallback strutturale: payload corposo / blob opaco in un URL nato mentre nel
   // contesto c'era materiale NON FIDATO. Copre i dati cifrati o spezzati che il
   // taint-match non riconosce. Attivo solo con fromUntrusted per non infastidire
@@ -150,7 +169,11 @@
     const search = u.search || '';
     const hash = u.hash || '';
     const path = (u.pathname && u.pathname !== '/') ? u.pathname : '';
-    const carrier = search.length + hash.length + path.length;
+    const tratti = (search + hash + path).split(/[^A-Za-z0-9+/_=-]+/);
+    // Quanto materiale illeggibile porta il link: le parole non contano, altrimenti
+    // il conto lo fa il titolo dell'articolo invece del payload.
+    let carrier = 0;
+    for (const t of tratti) if (opaco(t)) carrier += t.length;
     if (carrier >= STRUCT_CARRIER) {
       return { reason: 'porta una grande quantità di dati nel link' };
     }
@@ -158,10 +181,10 @@
     const host = u.hostname || '';
     const labels = host.split('.');
     for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) {
-      if (lbl.length >= STRUCT_BLOB) return { reason: 'usa un sottodominio anomalo' };
+      if (lbl.length >= STRUCT_BLOB && opaco(lbl)) return { reason: 'usa un sottodominio anomalo' };
     }
-    for (const seg of (search + hash + path).split(/[^A-Za-z0-9+/_=-]+/)) {
-      if (seg.length >= STRUCT_BLOB && !/^https?$/i.test(seg)) {
+    for (const seg of tratti) {
+      if (seg.length >= STRUCT_BLOB && opaco(seg) && !/^https?$/i.test(seg)) {
         return { reason: 'contiene un blocco di dati codificato' };
       }
     }
