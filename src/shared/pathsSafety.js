@@ -128,7 +128,9 @@
   // riga, tagliamo a MAX_INTENT_LEN.
   function sanitizeIntent(text) {
     if (typeof text !== 'string') return '';
-    let s = neutralizzaMarcature(text).trim();
+    // La frase la scrive un modello, ma leggendo gli elementi toccati e la
+    // sezione di partenza: quello che ha visto lì può ricopiarlo qui dentro.
+    let s = neutralizzaMarcature(redigiDatiPersonali(text)).trim();
     if (!s) return '';
     s = s.replace(/^["'`]+|["'`]+$/g, '').trim();
     s = s.replace(/^[*_]+|[*_]+$/g, '').trim();
