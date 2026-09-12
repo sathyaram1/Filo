@@ -792,8 +792,23 @@
     ultimoInviato = raccogli().valori;
   }
 
+  // Le impostazioni MAI scritte in memoria (profilo nuovo di zecca): lì il
+  // valore mostrato è un predefinito che nessuno ha ancora scelto, quindi
+  // scriverlo non può disfare la scelta di nessuno. Serve perché un campo
+  // rimesso a mano sul suo predefinito (una durata fuori scala che si
+  // riallinea a 5) non risulti "invariato" e quindi non venga mai salvato.
+  async function chiaviGiaInMemoria() {
+    try {
+      const r = await chrome.storage.local.get('settings');
+      return new Set(Object.keys((r && r.settings) || {}));
+    } catch (_) {
+      return null; // in dubbio si resta prudenti: conta solo quello che è cambiato
+    }
+  }
+
   async function persist() {
     const { valori, styleCheck } = raccogli();
+    const presenti = await chiaviGiaInMemoria();
 
     // Solo i campi che l'utente ha davvero cambiato da quando la pagina li ha
     // letti (o li ha scritti l'ultima volta). Tutto il resto non si tocca:
@@ -802,7 +817,9 @@
     const partial = {};
     for (const [chiave, valore] of Object.entries(valori)) {
       const prima = ultimoInviato ? ultimoInviato[chiave] : undefined;
-      if (JSON.stringify(prima) !== JSON.stringify(valore)) partial[chiave] = valore;
+      const cambiato = JSON.stringify(prima) !== JSON.stringify(valore);
+      const maiScritto = !!presenti && !presenti.has(chiave);
+      if (cambiato || maiScritto) partial[chiave] = valore;
     }
 
     // La resa a schermo è locale e non dipende dal salvataggio.
