@@ -2020,6 +2020,20 @@
     return s.trim();
   }
 
+  // «Togli lo stile», detto in tutti i modi in cui lo si dice. Una di queste
+  // parole, da sola, vuol dire "nessuno stile", non "il mio stile è la parola
+  // normale". Sta qui, e non dentro il setter della chat, perché la stessa
+  // lettura deve valere anche nel riquadro delle Preferenze: chi ci scrive
+  // «normale» vuole la stessa cosa di chi lo dice a Filo, e prima si ritrovava
+  // invece uno stile che diceva «normale» al modello.
+  const AGENT_STYLE_REMOVAL_WORDS = [
+    '', 'nessuno', 'nessuna', 'niente', 'togli', 'toglilo', 'rimuovi', 'cancella',
+    'default', 'predefinito', 'normale', 'standard', 'nulla', 'none', 'no',
+  ];
+  function isAgentStyleRemoval(text) {
+    return AGENT_STYLE_REMOVAL_WORDS.includes(String(text == null ? '' : text).trim().toLowerCase());
+  }
+
   // Controlla uno stile prima di salvarlo. Ritorna
   // { ok, value, length, error }: `error` è la frase da mostrare a chi ha
   // provato a scriverlo (utente o modello), col numero esatto.
