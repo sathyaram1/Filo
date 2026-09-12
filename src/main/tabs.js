@@ -2326,7 +2326,11 @@ class TabManager {
   // Chiamato da IPC quando l'utente clicca "Apri" sulla chip — il popup era
   // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco.
   openBlockedPopup(url) {
-    this.openTab(url, { activate: true });
+    // overrideSiteBlock (#590): è l'UNICO scavalco della lista dei siti
+    // bloccati, e lo sceglie l'utente cliccando "Apri comunque" sulla
+    // notifica. Senza, openTab ribloccherebbe l'apertura e il bottone non
+    // farebbe niente.
+    this.openTab(url, { activate: true, overrideSiteBlock: true });
   }
 
   // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova
