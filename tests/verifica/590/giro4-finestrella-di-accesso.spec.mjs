@@ -292,9 +292,43 @@ test('P — il sito della lista dentro un riquadro incorporato', async () => {
   expect(p, 'la pagina che incorpora deve aprirsi').not.toBeNull();
   await p.waitForSelector('#f', { timeout: 8000 });
   await shell.waitForTimeout(2500);
-  const dentro = await p.evaluate(() => {
-    const f = document.getElementById('f');
-    try { return !!(f.contentDocument && f.contentDocument.getElementById('t')); } catch (_) { return 'cross'; }
-  });
-  expect(dentro, 'il contenuto del sito della lista non deve comparire nel riquadro').toBe(false);
+  // Il riquadro è di un altro sito, quindi dal documento che lo ospita non si
+  // può guardare dentro: lo si chiede a chi vede i riquadri per davvero.
+  let testo = '';
+  for (const f of p.frames()) {
+    let host = '';
+    try { host = new URL(f.url()).hostname; } catch (_) { /* about:blank */ }
+    if (host !== LISTA) continue;
+    testo = await f.evaluate(() => (document.body ? document.body.innerText : '')).catch(() => '');
+  }
+  expect(testo.trim(), 'il contenuto del sito della lista non deve comparire nel riquadro').toBe('');
+});
+
+// ─── Porta Q: il permesso dato a mano si vede e si toglie? ───────────────────
+
+test('Q — dopo «Apri comunque» il permesso si deve poter ritrovare e togliere', async () => {
+  await metti(LISTA);
+  // L'utente prova ad aprirlo, e sulla notifica dice di sì.
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${LISTA}:${srv.porta}/arrivo`);
+  const avviso = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  await expect(avviso).toBeVisible({ timeout: 6000 });
+  await avviso.getByText('Apri comunque', { exact: true }).first().click();
+  const aperta = await aspettaFinestraSu(LISTA);
+  expect(aperta, '«Apri comunque» deve aprire davvero').not.toBeNull();
+
+  // Il sì vale per tutta la sessione. Passata la notifica che lo annuncia,
+  // l'utente deve poterlo ritrovare: la pagina delle Preferenze da cui ha
+  // scritto la lista è l'unico posto dove andrebbe a cercarlo.
+  await shell.evaluate(() => document.querySelectorAll('.shell-notif').forEach((n) => n.remove()));
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), 'filo://security/security.html');
+  const pref = await aspettaFinestraSu(''); // le pagine interne non hanno hostname http
+  const prefPage = pref || app.windows().find((w) => w.url().includes('security.html'));
+  expect(prefPage, 'la pagina Sicurezza deve aprirsi').toBeTruthy();
+  await prefPage.waitForLoadState('domcontentloaded');
+  await prefPage.waitForTimeout(1200);
+  const corpo = await prefPage.evaluate(() => document.body.innerText);
+  expect(
+    corpo.includes(LISTA) && /aperto|permess|comunque|consentit/i.test(corpo),
+    'il permesso dato a mano deve essere visibile (e revocabile) dove l\'utente ha scritto la lista',
+  ).toBe(true);
 });
