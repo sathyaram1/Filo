@@ -1594,12 +1594,20 @@ class TabManager {
     const [w, h] = this.win.getContentSize();
     for (const tab of this.tabs) {
       if (tab.id === this.activeId) {
-        // Altezza di chrome riservata in alto: 0 a tutto schermo, solo la fila
-        // di tab se in chrome compatto (barra indirizzi nascosta), altrimenti
-        // l'intera shell. A questo si somma l'eventuale topInset dei dropdown.
-        const chrome = this.contentFullscreen
+        // Altezza di chrome riservata in alto: a tutto schermo niente cornice,
+        // solo la fila di tab se in chrome compatto (barra indirizzi nascosta),
+        // altrimenti l'intera shell. A questo si somma sempre il topInset.
+        //
+        // Il topInset vale ANCHE a tutto schermo, e non è un dettaglio: ciò che
+        // lo chiede sono le cose che la pagina deve poter vedere per forza (la
+        // domanda di un permesso, la scelta di cosa condividere). Lasciandolo
+        // fuori, un sito che si prendeva lo schermo intero e poi chiedeva la
+        // fotocamera faceva comparire la domanda sotto la propria pagina, dove
+        // nessuno poteva rispondere. Fuori da quei casi il topInset è 0 e qui
+        // non cambia niente.
+        const chrome = (this.contentFullscreen
           ? 0
-          : ((this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset);
+          : (this.chromeCompact ? this.tabRowHeight : this.shellHeight)) + this.topInset;
         const top = chrome;
         const b = { x: 0, y: top, width: w, height: Math.max(0, h - top) };
         tab.view.setBounds(b);
