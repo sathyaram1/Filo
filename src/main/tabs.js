@@ -2531,14 +2531,22 @@ class TabManager {
   }
 
   // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque".
-  // L'azione riusa il percorso openBlockedPopup (apertura programmatica, che
-  // bypassa il blocco).
+  // L'azione è DICHIARATA a parte (`openAnywayUrl`, non il generico `openUrl`)
+  // perché è l'unica che scavalca la lista: gli altri bottoni "apri" che
+  // passano da un toast — la scheda-ponte richiusa, la chip dei popup —
+  // aprono e basta (#590, terzo giro).
+  //
+  // Il nome del sito si mostra come l'utente lo scriverebbe: un indirizzo in
+  // cirillico o in giapponese viaggia sulla rete come "xn--…", e una notifica
+  // che dice "Sito bloccato: xn--80aswg.xn--p1ai" non nomina niente.
   _notifyBlocked(host, url) {
     try {
-      const label = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+      const grezzo = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+      const NAV = globalThis.SN_URL_NAV;
+      const label = (NAV && NAV.hostLeggibile(grezzo)) || grezzo;
       this.win.webContents.send('shell:toast', {
         text: `Sito bloccato: ${label}`,
-        opts: { actions: [{ label: 'Apri comunque', openUrl: url }] },
+        opts: { actions: [{ label: 'Apri comunque', openAnywayUrl: url }] },
       });
     } catch (_) {}
   }
