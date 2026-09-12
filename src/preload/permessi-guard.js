@@ -336,17 +336,17 @@ function buildCatturaSicuraSource() {
             ));
           }
         } catch (_) {}
-        return vera(vincoli).then((s) => registra(s, schermo ? 'schermo' : null));
+        return vera.call(this || md, vincoli).then((s) => registra(s, schermo ? 'schermo' : null));
       },
     });
 
-    if (typeof md.getDisplayMedia === 'function') {
-      const veraD = md.getDisplayMedia.bind(md);
-      Object.defineProperty(md, 'getDisplayMedia', {
+    if (typeof stampo.getDisplayMedia === 'function') {
+      const veraD = stampo.getDisplayMedia;
+      Object.defineProperty(stampo, 'getDisplayMedia', {
         configurable: true,
         writable: true,
         value: function getDisplayMedia(vincoli) {
-          return veraD(vincoli).then((s) => registra(s, 'schermo'));
+          return veraD.call(this || md, vincoli).then((s) => registra(s, 'schermo'));
         },
       });
     }
