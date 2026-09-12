@@ -279,8 +279,11 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   // server, il link cliccato dentro il sito, la ricarica, la scheda nuova.
   if (matchesSuffix(host, allowedBySite)) return res;
 
-  // Unica eccezione — la navigazione proviene da un motore di ricerca.
-  if (fromUrl && isSearchEngineHost(hostnameOf(fromUrl))) return res;
+  // Unica eccezione — si arriva da una pagina di risultati di un motore di
+  // ricerca: l'utente l'ha cercato apposta. Il solo NOME del motore non basta
+  // (vedi SEARCH_PATHS): sui suoi indirizzi si pubblicano anche pagine di
+  // chiunque, e una di quelle aprirebbe qualunque sito della lista da sola.
+  if (fromUrl && isSearchEngineUrl(fromUrl)) return res;
 
   if (!isBlacklistedHost(host)) return res;
 
