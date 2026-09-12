@@ -12,8 +12,10 @@ test('sweep: cosa ottiene una pagina web chiedendo', async ({ app, shell, openTa
 
   // Un utente connesso, simulato nel main: l'accesso Google vero non si fa qui.
   await app.evaluate(() => {
-    const k = Object.keys(require.cache).find((p) => p.includes('google-auth'));
-    const m = require.cache[k].exports;
+    const req = process.mainModule.require.bind(process.mainModule);
+    const cache = req('node:module')._cache || {};
+    const k = Object.keys(cache).find((p) => p.includes('google-auth'));
+    const m = cache[k].exports;
     globalThis.__origAuth = { isSignedIn: m.isSignedIn, getProfile: m.getProfile, isAdmin: m.isAdmin, getUid: m.getUid };
     m.isSignedIn = () => true;
     m.getProfile = () => ({ email: 'ANNA@example.com', name: 'Anna Verifica', picture: 'https://x/foto.png' });
