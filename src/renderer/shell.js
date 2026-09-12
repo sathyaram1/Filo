@@ -1589,19 +1589,29 @@
     // misura il contenitore intero, perché le cose che ci stanno dentro
     // (domanda, scelta della fonte, segno della ripresa) possono essere più
     // d'una insieme e la riserva deve coprirle tutte. Vedi `riservaTop`.
+    function misuraRiserva() {
+      let fondo = 0;
+      for (const n of permHost.children) {
+        if (n.classList.contains('uscita')) continue;
+        const r = n.getBoundingClientRect();
+        // Un nodo nascosto (il segno di una ripresa che appartiene a un'altra
+        // scheda) è alto zero: non deve tenere giù la pagina.
+        if (r.height <= 0) continue;
+        fondo = Math.max(fondo, r.bottom);
+      }
+      riservaTop('permessi', fondo > 0 ? Math.ceil(fondo) + 6 : 0);
+    }
+
+    // Due misure, e la prima è quella che conta: SUBITO, perché il nodo è già
+    // nel documento e la pagina deve scendere nello stesso istante in cui la
+    // domanda compare. Il giro dopo serve solo a raccogliere ciò che cambia
+    // dopo il primo disegno (le anteprime della condivisione, una frase che va
+    // a capo) — e da solo non basta: mentre i test tengono la finestra
+    // nascosta il frame può non arrivare per un pezzo, e in quel buco la
+    // domanda finiva dietro alla pagina.
     function sincronizzaRiserva() {
-      requestAnimationFrame(() => {
-        let fondo = 0;
-        for (const n of permHost.children) {
-          if (n.classList.contains('uscita')) continue;
-          const r = n.getBoundingClientRect();
-          // Un nodo nascosto (il segno di una ripresa che appartiene a
-          // un'altra scheda) è alto zero: non deve tenere giù la pagina.
-          if (r.height <= 0) continue;
-          fondo = Math.max(fondo, r.bottom);
-        }
-        riservaTop('permessi', fondo > 0 ? Math.ceil(fondo) + 6 : 0);
-      });
+      misuraRiserva();
+      requestAnimationFrame(misuraRiserva);
     }
 
     // Una fila PER SCHEDA. Le domande e le scelte di una scheda compaiono solo
