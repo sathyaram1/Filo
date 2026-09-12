@@ -59,7 +59,7 @@ test('consentire lo schermo non deve consegnare di nascosto l\'audio del compute
   const segno = (await live.textContent()) || '';
 
   const traccia = audioDiSistema(esito);
-  const nominato = /audio|sent[eiì]|ascolt/i.test(`${domanda} ${riquadro} ${segno}`);
+  const nominato = /audio|suono|si sente|ascolt/i.test(`${domanda} ${riquadro} ${segno}`);
 
   expect(
     !traccia || nominato,
@@ -85,7 +85,7 @@ test('e nemmeno passando dalla strada vecchia dello schermo', async ({ shell, op
   const segno = (await live.textContent()) || '';
 
   const traccia = audioDiSistema(esito);
-  const nominato = /audio|sent[eiì]|ascolt/i.test(`${domanda} ${segno}`);
+  const nominato = /audio|suono|si sente|ascolt/i.test(`${domanda} ${segno}`);
   expect(
     !traccia || nominato,
     'dalla strada vecchia il sito ha ricevuto l\'audio del computer '
