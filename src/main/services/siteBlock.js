@@ -168,6 +168,39 @@ function matchesSuffix(host, set) {
   return false;
 }
 
+// Il nome di sito a cui vale la pena legare il sì dell'utente: la VOCE DI LISTA
+// che ha fermato l'apertura, non l'host preciso di quel momento. Se l'utente ha
+// scritto "esempio.com" e il blocco è scattato su "www.esempio.com", il sì vale
+// per esempio.com: altrimenti il primo salto fra www e nome nudo (che fanno
+// quasi tutti i siti) ricadrebbe nel blocco un istante dopo. Se a fermare sono
+// state le liste pubbliche, non c'è una voce scritta dall'utente: vale l'host.
+function blacklistEntryFor(host) {
+  let h = host;
+  while (h) {
+    if (userBlacklist.has(h)) return h;
+    const dot = h.indexOf('.');
+    if (dot < 0) break;
+    h = h.slice(dot + 1);
+  }
+  return host;
+}
+
+// L'utente ha cliccato "Apri comunque" su questo indirizzo: da qui in poi, per
+// questa sessione, quel sito si apre. Ritorna il nome di sito registrato.
+function allowHost(rawHost) {
+  const host = canonicalHost(rawHost);
+  if (!host) return '';
+  const entry = blacklistEntryFor(host);
+  allowedBySite.add(entry);
+  return entry;
+}
+
+function isAllowedHost(rawHost) {
+  const host = canonicalHost(rawHost);
+  if (!host) return false;
+  return matchesSuffix(host, allowedBySite);
+}
+
 function isSearchEngineHost(host) {
   if (!host) return false;
   return SEARCH_ENGINE_PATTERNS.some((re) => re.test(host));
