@@ -83,14 +83,21 @@ test('togliere la scelta in Impostazioni deve togliere anche il microfono che è
   console.log('[586 g4] elenco dopo la revoca:',
     JSON.stringify(await sicurezza.locator('#perms-list li').allTextContents()));
 
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(2500);
+  // Chiudere davvero una traccia già consegnata vuol dire ricaricare la scheda:
+  // è l'unica strada, ed è la stessa dell'«Interrompi» sul cartello. Dopo la
+  // ricarica del microfono del sito non resta niente.
   const stato = await page.evaluate(() => window.__stato());
+  const vive = stato.filter((s) => s.endsWith(':live'));
   console.log('[586 g4] il microfono dopo la revoca:', JSON.stringify(stato));
+  console.log('[586 g4] cartelli dopo la revoca:',
+    JSON.stringify(await shell.locator('.perm-live').allTextContents()));
 
   expect(
-    stato,
-    'tolta la scelta dalle Impostazioni, il sito continua ad ascoltare: la revoca vale solo '
-    + 'per la volta dopo. Se si può dare si deve poter togliere, e qui togliere non toglie niente '
-    + 'finché la scheda resta aperta',
-  ).toEqual(['audio:ended']);
+    vive,
+    'tolta la scelta dalle Impostazioni, il sito continua ad ascoltare: la revoca varrebbe solo '
+    + 'per la volta dopo. Se si può dare si deve poter togliere, e togliere deve togliere anche '
+    + 'quello che il sito ha già in mano',
+  ).toEqual([]);
+  await expect(shell.locator('.perm-live')).toHaveCount(0, { timeout: 10_000 });
 });
