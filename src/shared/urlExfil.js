@@ -36,7 +36,8 @@
   // tratto illeggibile non è più il modo in cui un sito nomina le sue cose: è
   // roba che qualcuno ci ha messo dentro.
   const STRUCT_CARRIER = 96; // somma dei pezzi illeggibili → payload spezzato
-  const STRUCT_BLOB = 48;   // singolo pezzo illeggibile in path/query → payload
+  const STRUCT_BLOB = 56;   // singolo pezzo illeggibile e indecifrabile → payload
+  const STRUCT_TESTO = 16;  // pezzo illeggibile che però si RIAPRE come testo
   const STRUCT_HOST_BLOB = 24; // etichetta opaca nel sottodominio: nessun sito vero
 
   // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
