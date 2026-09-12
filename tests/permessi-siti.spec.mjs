@@ -502,3 +502,237 @@ test('in incognito la scelta si può anche togliere ─────────�
   });
   expect(suDisco[origine]).toBeUndefined();
 });
+
+// ─── la strada VECCHIA per prendersi lo schermo (giro di verifica 2) ────────
+//
+// Chromium consegna lo schermo a una pagina in due modi. Quello moderno,
+// `getDisplayMedia()`, passa dal gestore della cattura schermo, dove Filo
+// chiede e fa scegliere la fonte. Quello vecchio, `getUserMedia()` con
+// `chromeMediaSource: 'desktop'` fra i vincoli, da quel gestore NON passa:
+// appena il permesso è concesso consegna lo schermo intero, e il suono del
+// computer se lo chiede.
+//
+// Le due richieste arrivano IDENTICHE: permesso «media» con la lista dei tipi
+// vuota. Lasciarle passare per far arrivare la prima alla sua domanda apre
+// anche la seconda, che domanda non ne incontra nessuna. Senza questa prova,
+// una pagina qualunque si riprendeva schermo e audio senza un clic e senza
+// che comparisse niente.
+
+const HTML_SCHERMO = `<!doctype html><html><body style="margin:0">
+<button id="share" style="padding:14px">condividi</button>
+<script>
+  const descrivi = (s) => s.getTracks().map((t) => ({ kind: t.kind, label: t.label }));
+  const vecchia = (conAudio) => navigator.mediaDevices.getUserMedia({
+    audio: conAudio ? { mandatory: { chromeMediaSource: 'desktop' } } : false,
+    video: { mandatory: { chromeMediaSource: 'desktop' } },
+  }).then((s) => { const d = descrivi(s); try { s.getTracks().forEach((t) => t.stop()); } catch (_) {} return d; },
+          (e) => 'rifiutato:' + ((e && e.name) || 'errore'));
+  window.__schermoVecchiaManiera = () => vecchia(false);
+  window.__schermoEAudioVecchiaManiera = () => vecchia(true);
+  window.__r = null;
+  document.getElementById('share').addEventListener('click', () => {
+    navigator.mediaDevices.getDisplayMedia({ video: true }).then(
+      (s) => { try { s.getTracks().forEach((t) => t.stop()); } catch (_) {} window.__r = 'ok'; },
+      (e) => { window.__r = 'no:' + ((e && e.name) || 'errore'); });
+  });
+</script></body></html>`;
+
+// Una traccia vera dello schermo (o del suono del computer), non la webcam
+// finta dei test (`fake_device_0`).
+function traccia(esito, tipo) {
+  if (!Array.isArray(esito)) return null;
+  return esito.find((t) => t.kind === tipo && !/fake_device/i.test(String(t.label || ''))) || null;
+}
+
+test('anche la strada vecchia per lo schermo passa dalla domanda ──────────', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, HTML_SCHERMO);
+  const origine = new URL(page.url()).origin;
+
+  // Nessun clic: la pagina chiama e basta.
+  const promessa = page.evaluate(() => window.__schermoVecchiaManiera());
+  await expect(
+    pastiglia(shell),
+    'la pagina ha chiesto lo schermo alla vecchia maniera e non è comparsa nessuna domanda',
+  ).toHaveCount(1, { timeout: 15_000 });
+  await expect(pastiglia(shell)).toContainText('schermo');
+  await expect(pastiglia(shell)).not.toContainText('fotocamera');
+
+  // Chiuso senza decidere: alla pagina non arriva niente.
+  await shell.locator('.perm-chip .perm-chip-x').first().click();
+  expect(traccia(await promessa, 'video'), 'senza un sì non deve arrivare nessuna immagine dello schermo').toBeNull();
+  await expect(pastiglia(shell)).toHaveCount(0, { timeout: 15_000 });
+
+  // Nemmeno il suono del computer.
+  const conAudio = page.evaluate(() => window.__schermoEAudioVecchiaManiera());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.locator('.perm-chip .perm-chip-x').first().click();
+  const esito = await conAudio;
+  expect(traccia(esito, 'video'), 'nessuna immagine dello schermo senza un sì').toBeNull();
+  expect(traccia(esito, 'audio'), 'nessun audio del computer senza un sì').toBeNull();
+
+  // Non è rimasto scritto niente: nessuno ha deciso.
+  const ricordato = await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return (s.security && s.security.sitePermissions) || {};
+  });
+  expect(ricordato[origine]).toBeUndefined();
+
+  // Detto sì, lo schermo arriva: la difesa non spegne la funzione.
+  await expect(pastiglia(shell)).toHaveCount(0, { timeout: 15_000 });
+  const terza = page.evaluate(() => window.__schermoVecchiaManiera());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  expect(traccia(await terza, 'video'), 'chi dice sì deve ottenere lo schermo').not.toBeNull();
+
+  // E anche qui non resta scritto niente: lo schermo si richiede ogni volta.
+  await page.waitForTimeout(800);
+  const dopo = await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return (s.security && s.security.sitePermissions) || {};
+  });
+  expect(dopo[origine], 'lo schermo non si ricorda mai').toBeUndefined();
+});
+
+test('la scelta di cosa condividere resta con la sua scheda ───────────────', async ({ app, shell, testServer }) => {
+  test.setTimeout(120_000);
+  const urlA = testServer.html(HTML_SCHERMO);
+  const urlB = testServer.html(HTML_SCHERMO);
+  const apri = async (u) => {
+    await shell.evaluate((x) => window.filoShell.tabs.open(x), u);
+    const fine = Date.now() + 12_000;
+    while (Date.now() < fine) {
+      const p = app.windows().find((w) => { try { return w.url() === u; } catch (_) { return false; } });
+      if (p) {
+        await p.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+        return p;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('scheda non trovata: ' + u);
+  };
+  const idDi = (u) => app.evaluate(({ BrowserWindow }, x) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm || !Array.isArray(tm.tabs)) continue;
+      const t = tm.tabs.find((y) => { try { return y.view.webContents.getURL() === x; } catch (_) { return false; } });
+      if (t) return t.id;
+    }
+    return null;
+  }, u);
+
+  const a = await apri(urlA);
+  await apri(urlB);
+  const idA = await idDi(urlA);
+  const idB = await idDi(urlB);
+  const scelta = shell.locator('.perm-source');
+
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), idA);
+  await a.click('#share');
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  await expect(scelta).toHaveCount(1, { timeout: 15_000 });
+
+  // Le cose fra cui scegliere hanno un nome in italiano: dal sistema arrivano
+  // «Entire screen», «Screen 1».
+  for (const n of await scelta.locator('.perm-source-item').allTextContents()) {
+    expect(n, `«${n}» è il nome che dà il sistema, in inglese`).not.toMatch(/Entire screen|Screen \d|Whole screen/i);
+  }
+
+  // Passando su un'altra scheda la scelta non resta lì sopra: col nome di un
+  // sito che non è quello davanti agli occhi, un clic consegnerebbe lo schermo
+  // a una pagina che non si sta nemmeno guardando.
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), idB);
+  await expect(scelta, 'la scelta è rimasta sopra un\'altra scheda').toHaveCount(0, { timeout: 10_000 });
+
+  // E non è persa: tornando indietro è ancora lì da fare.
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), idA);
+  await expect(scelta).toHaveCount(1, { timeout: 10_000 });
+  await scelta.locator('.perm-source-cancel').click();
+  await expect.poll(() => a.evaluate(() => window.__r), { timeout: 15_000 }).not.toBe(null);
+});
+
+test('mentre un sito può vedere lo schermo, Filo lo dice e lo si interrompe ─', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, HTML_SCHERMO);
+  const host = new URL(page.url()).host;
+  const vivo = shell.locator('.perm-live');
+
+  // Prima di scegliere la fonte il sito non vede ancora niente: nessun segno.
+  await page.click('#share');
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  await expect(shell.locator('.perm-source')).toHaveCount(1, { timeout: 15_000 });
+  await expect(vivo).toHaveCount(0);
+
+  // Scelta la fonte, il segno compare: una webcam accesa si vede, uno schermo
+  // ripreso non lascia nessun segno se non lo mette Filo.
+  await shell.locator('.perm-source-item').first().click();
+  await expect(vivo).toHaveCount(1, { timeout: 15_000 });
+  await expect(vivo).toContainText(host);
+  await expect(vivo).toContainText('schermo');
+
+  // «Interrompi» chiude la ripresa: è l'unico modo di chiuderla per davvero.
+  await vivo.locator('.perm-chip-btn').click();
+  await expect(vivo).toHaveCount(0, { timeout: 15_000 });
+});
+
+test('in incognito le scelte si vedono e si tolgono anche dalle Impostazioni', async ({ app, shell, testServer }) => {
+  test.setTimeout(120_000);
+  // Le scelte dell'incognito vivono in RAM, non nelle impostazioni. La pagina
+  // Sicurezza le leggeva dallo storage e lì non c'era niente: chi andava a
+  // cercare la scelta appena fatta trovava un elenco che sembrava completo e
+  // non lo era, e toglierla si poteva solo dal tasto destro sulla scheda.
+  const url = testServer.html(HTML);
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  let shellIncognito = null;
+  const fine = Date.now() + 15_000;
+  while (Date.now() < fine && !shellIncognito) {
+    shellIncognito = app.windows().find((w) => {
+      try { return w.url().includes('shell.html?incognito=1'); } catch (_) { return false; }
+    }) || null;
+    if (!shellIncognito) await new Promise((r) => setTimeout(r, 200));
+  }
+  expect(shellIncognito).toBeTruthy();
+  await shellIncognito.waitForLoadState('domcontentloaded').catch(() => {});
+  await shellIncognito.waitForFunction(() => !!window.filoShell, null, { timeout: 8000 });
+
+  const apriDentro = async (u) => {
+    await shellIncognito.evaluate((x) => window.filoShell.tabs.open(x), u);
+    const scadenza = Date.now() + 15_000;
+    while (Date.now() < scadenza) {
+      const p = app.windows().find((w) => { try { return w.url().startsWith(u); } catch (_) { return false; } });
+      if (p) { await p.waitForLoadState('domcontentloaded').catch(() => {}); return p; }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    throw new Error('scheda non trovata in incognito: ' + u);
+  };
+
+  const page = await apriDentro(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  await page.evaluate(() => window.__chiediFotocamera());
+  await expect(shellIncognito.locator('.perm-chip')).toHaveCount(1, { timeout: 10_000 });
+  await shellIncognito.locator('.perm-chip .perm-chip-allow').click();
+  await expect.poll(() => page.evaluate(() => window.__stato('camera')), { timeout: 8000 }).toBe('granted');
+
+  const sicurezza = await apriDentro('filo://security/');
+  await sicurezza.waitForSelector('#perms-list', { timeout: 8_000 });
+  const riga = sicurezza.locator('#perms-list li').first();
+  await expect(
+    riga,
+    'in incognito le Impostazioni non elencano la scelta appena fatta: un elenco che sembra completo e non lo è',
+  ).toContainText(new URL(url).host, { timeout: 10_000 });
+  await expect(riga).toContainText('Fotocamera');
+
+  // E da qui si toglie: la × è la stessa invariante del tasto destro.
+  await riga.locator('button').nth(1).click();
+  await expect(sicurezza.locator('#perms-list li').first()).toContainText('Nessun sito', { timeout: 10_000 });
+  await expect.poll(() => page.evaluate(() => window.__stato('camera')), { timeout: 10_000 }).toBe('prompt');
+
+  // E su disco non è finito niente: l'incognito resta senza tracce.
+  const suDisco = await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return (s.security && s.security.sitePermissions) || {};
+  });
+  expect(suDisco[new URL(url).origin]).toBeUndefined();
+});
