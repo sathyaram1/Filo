@@ -795,6 +795,9 @@ function imposta(origine, chiave, scelta, ctx) {
   const c = ctx || {};
   const nuova = P().conScelta(memoriaDi(c), origine, [chiave], scelta);
   scriviMappa(c.incognito ? c.ses : null, !!c.incognito, nuova);
+  // Ribaltare a «negato» vale quanto togliere: se il sito lo sta usando adesso,
+  // gli si chiude.
+  if (scelta === 'deny') chiudiUsi(origine, chiave, !!c.incognito);
   return true;
 }
 
