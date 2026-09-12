@@ -537,9 +537,11 @@ const scelteFonte = new Map();
 let prossimaScelta = 1;
 
 // Dopo il «Consenti» arriva la seconda mezza domanda: tutto lo schermo, o una
-// finestra sola? Torna la fonte scelta, oppure null (annullato, nessuna fonte,
-// nessuna shell a cui chiedere, o due minuti senza risposta).
-async function scegliFonte(wc, frame) {
+// finestra sola? E, se il sito ha chiesto anche l'audio, gli si fa sentire
+// quello che si sente sul computer? Torna { fonte, audio }, oppure null
+// (annullato, nessuna fonte, nessuna shell a cui chiedere, o due minuti senza
+// risposta).
+async function scegliFonte(wc, frame, audioChiesto) {
   const { win, tab } = posizione(wc);
   const shell = win && !win.isDestroyed() ? win.webContents : null;
   if (!shell || shell.isDestroyed()) return null;
