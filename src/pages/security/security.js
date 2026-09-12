@@ -470,16 +470,20 @@
     // essere state cambiate altrove mentre la pagina era aperta: rimandarle
     // col valore vecchio riaccenderebbe o spegnerebbe una difesa senza che
     // nessuno l'abbia chiesto.
-    const security = {};
-    for (const [chiave, valore] of Object.entries(valori)) {
-      const prima = ultimoInviato ? ultimoInviato[chiave] : undefined;
-      if (JSON.stringify(prima) !== JSON.stringify(valore)) security[chiave] = valore;
-    }
+    //
+    // Il confronto scende fino alla singola spunta, non si ferma al gruppo: il
+    // rilevamento dei siti pericolosi e le sue sotto-opzioni sono un gruppo
+    // solo, e fermandosi lì bastava toccare una sotto-opzione per riaccendere
+    // il rilevamento spento un minuto prima (#592, giro 3).
+    const security = Storage.partialCambiato(ultimoInviato || {}, valori);
+
+    // Il riferimento è sempre quello che le spunte MOSTRANO adesso.
+    ultimoInviato = valori;
+
     if (!Object.keys(security).length) return;
 
     ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security } });
-    ultimoInviato = { ...(ultimoInviato || {}), ...security };
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);
