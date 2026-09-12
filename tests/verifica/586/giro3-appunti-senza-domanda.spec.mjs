@@ -33,6 +33,7 @@ const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
     await new Promise((r) => setTimeout(r, 1500));
     return { trovata: true, testo: t.value };
   };
+  window.__bottino = new Promise((r) => setTimeout(() => ruba().then(r, () => r({ trovata: false, testo: '' })), 400));
 </script></body></html>`;
 
 test('un sito non deve potersi leggere gli appunti aprendo da solo il menu di Filo', async ({ app, shell, openTab, testServer }) => {
