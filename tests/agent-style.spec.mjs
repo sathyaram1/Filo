@@ -141,6 +141,38 @@ test('lo stile ha un tetto visibile: oltre, il salvataggio si ferma e lo dice', 
   ).toBe('');
 });
 
+// #592 (giro 3) — «normale», «nessuno», «no» e le altre parole che vogliono
+// dire "nessuno stile" tolgono lo stile appena le scrivi, ed è giusto. Quello
+// che non può succedere è che il riquadro continui a mostrarle come se fossero
+// lo stile in vigore: chi chiude la scheda lì se ne va convinto di avere uno
+// stile che non ha. Senza il fix la tendina dice «Personalizzato», la nota non
+// c'è, e sullo schermo non resta niente che smentisca la parola nel riquadro.
+test('«normale» nel riquadro: lo schermo dice che di stile non ce n’è nessuno', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForSelector('#agentStyleText', { timeout: 8_000 });
+
+  await page.fill('#agentStyleText', 'Rispondi con frasi brevi.');
+  await expect.poll(
+    () => page.evaluate(() => window.SN_STORAGE.getSettings().then((s) => s.agentStyle || '')),
+    { timeout: 6_000 },
+  ).toBe('Rispondi con frasi brevi.');
+
+  // L'utente lo sostituisce con «normale» e resta nel riquadro.
+  await page.fill('#agentStyleText', 'normale');
+  await expect.poll(
+    () => page.evaluate(() => window.SN_STORAGE.getSettings().then((s) => s.agentStyle || '')),
+    { timeout: 6_000 },
+  ).toBe('');
+
+  await expect(page.locator('#agentStyleNote')).toBeVisible();
+  await expect(page.locator('#agentStyleNote')).toContainText('nessuno stile');
+  expect(await page.evaluate(() => document.getElementById('agentStylePreset').value)).toBe('');
+
+  // Uno stile vero non tira fuori la nota.
+  await page.fill('#agentStyleText', 'Parla come un pirata.');
+  await expect(page.locator('#agentStyleNote')).toBeHidden();
+});
+
 // #592 — Il cammino dell'attacco: qualcosa in contesto convince il modello a
 // «salvare come preferenza» un'istruzione. Da oggi quell'azione è di livello 2
 // e il popup mostra il testo esatto: senza l'OK dell'utente non si scrive
