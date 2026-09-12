@@ -238,6 +238,14 @@ async function decidi(wc, permesso, dettagli) {
 
   if (Pp.innocuo(permesso)) return true;
 
+  // Il preambolo della condivisione dello schermo (permesso 'media' con la
+  // lista dei tipi vuota) non è una richiesta di fotocamera e microfono: si
+  // lascia passare perché la domanda vera la fa il gestore della cattura
+  // schermo, qui sotto, che sa cosa sta per essere consegnato. Senza questo
+  // ramo, a chi premeva «condividi lo schermo» comparivano due domande e la
+  // prima gli faceva consentire per sempre due sensori che non aveva chiesto.
+  if (Pp.preamboloSchermo(permesso, dettagli)) return true;
+
   const origine = Pp.origineDi(url);
   if (!origine) return false; // origine opaca (data:, blob:, file:): si nega
 
