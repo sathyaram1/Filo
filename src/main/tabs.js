@@ -2209,11 +2209,11 @@ class TabManager {
       }
       // #170.3 — link verso un sito in blacklist aperto in una nuova scheda
       // (target=_blank / window.open): stesso blocco di will-navigate. Il
-      // referrer è la pagina che ha originato l'apertura.
+      // referrer è la pagina che ha originato l'apertura, e va PASSATO a
+      // openTab (#590), che è il punto in cui la lista viene applicata: senza,
+      // l'eccezione "arrivo da un motore di ricerca" non varrebbe per i
+      // risultati aperti in una scheda nuova.
       const fromUrl = (details.referrer && details.referrer.url) || wc.getURL();
-      if (this._maybeBlockNavigation(tab, url, { fromUrl })) {
-        return { action: 'deny' };
-      }
       // #376 — parità con qualsiasi browser: Ctrl+click / click centrale su un
       // link ("aprilo dietro, io continuo a leggere qui") arriva con
       // disposition 'background-tab' e NON deve rubare il primo piano. Prima
