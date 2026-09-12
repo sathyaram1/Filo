@@ -93,6 +93,65 @@
     try { return !!(el && el.getAttribute && el.getAttribute(ATTR) !== null); } catch (_) { return false; }
   }
 
+  // ── «Questo tasto l'ha premuto una persona?» (#586) ───────────────────────
+  //
+  // La UI di Filo dentro una pagina web vive nel DOM del sito, quindi il codice
+  // del sito la vede e la può premere: `elemento.click()`, o un evento di tasto
+  // destro fabbricato. Per Filo quel gesto sembrava dell'utente, e due voci del
+  // menu saltano la domanda del permesso proprio perché «l'ha chiesto l'utente»:
+  // l'Incolla, che legge gli appunti, e la dettatura, che accende il microfono.
+  // Un sito apriva il menu da solo, premeva Incolla e si portava via quello che
+  // c'era negli appunti, senza che comparisse niente.
+  //
+  // Il confine è `isTrusted`: lo mette il browser e la pagina non lo può
+  // falsificare. Qui sotto un guardiano in cattura butta via i gesti finti che
+  // cadono sulla UI NOSTRA — riconosciuta dall'elenco di `mark()`, non
+  // dall'attributo, che il sito si può scrivere addosso. Sulla pagina del sito
+  // non tocca niente: un sito che si preme i propri bottoni fa affari suoi.
+  const GESTI = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'auxclick', 'dblclick'];
+
+  // Filo stesso a volte preme un proprio bottone (il sotto-menu che si apre
+  // passandoci sopra con qualcosa in mano, il selettore di file dell'allega).
+  // Quei gesti sono finti ma sono nostri: passano da qui, e solo per la durata
+  // della loro consegna il guardiano li lascia stare.
+  let gestoNostro = false;
+
+  function nostra(el) {
+    try {
+      let n = el;
+      for (let i = 0; n && i < 200; i++) {
+        if (nostre.has(n)) return true;
+        n = n.parentNode || n.host || null;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function premi(el) {
+    if (!el || typeof el.click !== 'function') return false;
+    const prima = gestoNostro;
+    gestoNostro = true;
+    try { el.click(); return true; } catch (_) { return false; } finally { gestoNostro = prima; }
+  }
+
+  function guardiaGesti(doc) {
+    const d = doc || (typeof document !== 'undefined' ? document : null);
+    if (!d || !d.addEventListener || d.__snGuardiaGesti) return () => {};
+    d.__snGuardiaGesti = true;
+    const blocca = (e) => {
+      if (!e || e.isTrusted || gestoNostro) return;
+      if (!nostra(e.target)) return;
+      try { e.preventDefault(); } catch (_) {}
+      try { e.stopPropagation(); } catch (_) {}
+      try { e.stopImmediatePropagation(); } catch (_) {}
+    };
+    for (const t of GESTI) { try { d.addEventListener(t, blocca, true); } catch (_) {} }
+    return () => {
+      d.__snGuardiaGesti = false;
+      for (const t of GESTI) { try { d.removeEventListener(t, blocca, true); } catch (_) {} }
+    };
+  }
+
   // Anche gli antenati: un nodo che compare in fondo a un nostro popup è
   // nostro quanto il popup. `closest` si ferma al confine di un componente
   // isolato, che è esattamente ciò che vogliamo — dentro lo shadow di un
