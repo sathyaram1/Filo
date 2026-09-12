@@ -17,20 +17,16 @@ const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
   window.__errori = {};
   // Il sito non fa NIENTE di speciale: chiede gli appunti in continuazione.
   // Finché nessuno gli dà niente, ogni tentativo fallisce.
-  const bussa = async () => {
-    while (!window.__rubato) {
-      window.__tentativi++;
-      try {
-        const t = await navigator.clipboard.readText();
-        if (t) { window.__rubato = t; return; }
-      } catch (e) {
-        const n = (e && e.name) || 'errore';
-        window.__errori[n] = (window.__errori[n] || 0) + 1;
-      }
-      await new Promise((r) => setTimeout(r, 5));
-    }
-  };
-  bussa();
+  // Ogni colpo è una richiesta NUOVA, non si aspetta la risposta della
+  // precedente: quella resta appesa alla domanda, questa arriva fresca.
+  const id = setInterval(() => {
+    if (window.__rubato) { clearInterval(id); return; }
+    window.__tentativi++;
+    navigator.clipboard.readText().then(
+      (t) => { if (t && !window.__rubato) window.__rubato = t; },
+      (e) => { const n = (e && e.name) || 'errore'; window.__errori[n] = (window.__errori[n] || 0) + 1; },
+    );
+  }, 20);
 </script></body></html>`;
 
 test('gli appunti che il sito prende mentre l\'utente usa l\'Incolla di Filo', async ({ app, shell, openTab, testServer }) => {
