@@ -1149,6 +1149,8 @@
   const PROCESSI = 'Elenca i programmi aperti e i comandi con cui sono partiti, che a volte contengono password.';
   const VARIABILE = 'Usa una variabile d’ambiente, quindi dal comando non si vede quale file apre.';
   const TUTTA = 'Passa in rassegna tutta la tua cartella, chiavi e password comprese.';
+  const SALTO = 'Punta a una cartella di prima, quindi dal comando non si vede quale file apre.';
+  const CONFIGURAZIONE = 'Stampa la configurazione salvata, dove a volte stanno utente e password di un repository.';
 
   // Il primo segmento riservato di un percorso già spezzato, o ''. Un segmento
   // con un carattere jolly non è un nome: vale se PUÒ acchiappare un bersaglio
