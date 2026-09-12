@@ -285,6 +285,14 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.setTopInset(px);
     return { ok: true };
   });
+  // "La pagina deve cominciare almeno a questa altezza": quello che la shell
+  // disegna sotto la fila delle schede finisce sennò dietro l'area della
+  // pagina, che il sistema compone sopra la cornice. Vedi setTopFloor.
+  ipcMain.handle('tabs:reserve-floor', (event, { px } = {}) => {
+    const win = winFor(event);
+    if (win?._filoTabs) win._filoTabs.setTopFloor(px);
+    return { ok: true };
+  });
   // Chrome compatto: la shell nasconde la barra indirizzi fuori dalla home, e
   // chiede al main di far risalire la WebContentsView a coprire quello spazio.
   ipcMain.handle('tabs:set-chrome-compact', (event, { on } = {}) => {
