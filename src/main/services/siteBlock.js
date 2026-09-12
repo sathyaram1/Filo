@@ -140,12 +140,14 @@ function normalizeDomain(raw) {
   return canonicalHost(s);
 }
 
-// Un dominio è valido come voce di blacklist solo se ha un'estensione (almeno
-// un punto + TLD alfabetico). Allineato al campo "siti fidati": una voce come
-// "facebook" o un IP non è mai un host reale, quindi non deve entrare nel Set
-// (matcherebbe "facebook.com/com", non "facebook") dando falsa sicurezza.
+// Un dominio è valido come voce di blacklist solo se ha un'estensione. Una voce
+// come "facebook" o un indirizzo numerico non è mai un nome di sito reale,
+// quindi non deve entrare nel Set (matcherebbe "facebook.com/com", non
+// "facebook") dando falsa sicurezza. La regola vive in SN_URL_NAV perché la
+// usa anche il campo delle Preferenze che avvisa sulle righe scartate: quando
+// erano due copie, le Preferenze accettavano righe che qui venivano buttate.
 function isValidDomain(host) {
-  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
+  return globalThis.SN_URL_NAV.isListableDomain(host);
 }
 
 // Da lista grezza (settings) → Set di domini normalizzati E validi.
