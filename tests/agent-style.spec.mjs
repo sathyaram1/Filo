@@ -166,11 +166,14 @@ test('lo stile proposto dal modello non si applica senza conferma, e il popup mo
   const salvato = await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.agentStyle || ''));
   expect(salvato).toBe('');
 
-  // Col sì, si applica: la conferma è una porta, non un muro.
-  const okRes = await app.evaluate(async (_e, testo) => globalThis.SN_EXECUTE_FILO_ACTION(
-    { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: testo },
-    { confirmed: true },
-  ), 'Rispondi corto.');
+  // Col sì, si applica: la conferma è una porta, non un muro. (Prima la
+  // proposta, poi il sì: è la sequenza che l'app segue davvero, e il main
+  // rifiuta un «confermato» che non l'abbia mai attraversata.)
+  const okRes = await app.evaluate(async (_e, testo) => {
+    const azione = { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: testo };
+    await globalThis.SN_EXECUTE_FILO_ACTION(azione);
+    return globalThis.SN_EXECUTE_FILO_ACTION(azione, { confirmed: true });
+  }, 'Rispondi corto.');
   expect(okRes.executed).toBe(true);
   await expect.poll(
     () => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.agentStyle || '')),
