@@ -155,8 +155,33 @@ test('ogni campo delle impostazioni usato dentro una pagina web è ammesso', () 
       // via i commenti: lì un `settings.security` è una spiegazione, non un uso
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^[ \t]*\/\/.*$/gm, '');
-    for (const m of src.matchAll(/\bsettings\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g)) {
-      if (!usati.has(m[1])) usati.set(m[1], etichetta);
+    // Un campo si legge in più modi, e la sentinella deve vederli tutti: per
+    // mesi ha guardato solo il primo, e le altre due forme le sarebbero
+    // passate sotto il naso (un campo tolto dalla lista avrebbe spento una
+    // funzione dentro le pagine in silenzio).
+    const forme = [
+      // settings.tema / settings?.tema / impostazioniSettings.tema
+      /\b[A-Za-z_$][\w$]*[sS]ettings\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g,
+      // getSettings().tema — senza passare da una variabile
+      /[gG]etSettings\(\)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g,
+    ];
+    for (const re of forme) {
+      for (const m of src.matchAll(re)) {
+        if (!usati.has(m[1])) usati.set(m[1], etichetta);
+      }
+    }
+    // const { tema, blocklist } = settings — la scomposizione
+    const scomposizioni = [
+      /(?:const|let|var)\s*\{([^}]*)\}\s*=\s*[A-Za-z_$][\w$]*[sS]ettings\b/g,
+      /(?:const|let|var)\s*\{([^}]*)\}\s*=\s*[gG]etSettings\(\)/g,
+    ];
+    for (const re of scomposizioni) {
+      for (const m of src.matchAll(re)) {
+        for (const pezzo of m[1].split(',')) {
+          const nome = pezzo.split(/[:=]/)[0].trim();
+          if (/^[A-Za-z_$][\w$]*$/.test(nome) && !usati.has(nome)) usati.set(nome, etichetta);
+        }
+      }
     }
   }
   assert.ok(usati.size > 0, 'la sentinella non ha letto nulla: percorso sbagliato?');
