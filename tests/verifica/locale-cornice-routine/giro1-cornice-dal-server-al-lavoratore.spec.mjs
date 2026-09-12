@@ -25,9 +25,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 // Il repo del server sta accanto a quello pubblico (la cartella Filo/ del
 // Desktop); nei contenitori delle routine non c'è, e lì queste prove si
 // dichiarano saltate invece di fingere un rosso.
-const SECURITY = resolve(ROOT, '..', '..', '..', 'filo-security');
-const PAYLOAD_SERVER = resolve(SECURITY, 'functions', 'src', 'routine', 'payload.js');
-const serverPresente = existsSync(PAYLOAD_SERVER);
+// Dal checkout principale è `../filo-security`; da un worktree sotto
+// `.claude/worktrees/<nome>` sono tre livelli in più.
+const PAYLOAD_SERVER = [
+  resolve(ROOT, '..', 'filo-security'),
+  resolve(ROOT, '..', '..', '..', '..', 'filo-security'),
+].map((d) => resolve(d, 'functions', 'src', 'routine', 'payload.js')).find((f) => existsSync(f)) || '';
+const serverPresente = !!PAYLOAD_SERVER;
 
 // dispatch legge STATE_DIR e le radici a import-time: si isolano PRIMA.
 const TMP = cartellaTemporanea('filo-verifica-cornice-');
