@@ -974,25 +974,85 @@
     '.zsh_history', '.psql_history',
   ];
 
+  // ── La parentesi quadra di un modello (#587, giro 7) ──────────────────────
+  //
+  // Dentro le quadre la shell scrive due cose che un'espressione regolare non
+  // legge allo stesso modo, e il contenuto veniva ricopiato tale e quale:
+  //   • la NEGAZIONE si scrive col punto esclamativo — `[!x]` è «un carattere
+  //     qualsiasi tranne la x» — mentre per un'espressione regolare quello è il
+  //     punto esclamativo alla lettera. Così `.[!x]sh`, che apre `.ssh`, non
+  //     somigliava a niente di riservato, e con lui `.[!x]etrc`, `.s[!a-r]h` e
+  //     `.[!x]onfig/Filo/storage.json`. La scrittura gemella col cappelletto
+  //     (`[^x]`, che bash accetta uguale) veniva invece fermata: stessa lettura,
+  //     due risposte diverse;
+  //   • le CLASSI POSIX (`[[:lower:]]`, `[[:alpha:]]`) sono il nome di un
+  //     insieme di caratteri, non i caratteri che ci sono scritti.
+  // Le due forme di parentesi che non sappiamo leggere — equivalenze `[[=a=]]` e
+  // sequenze di collazione `[[.x.]]` — fanno tornare null, cioè prudenza a chi
+  // chiama.
+  const CLASSI_POSIX = {
+    alpha: 'A-Za-z', digit: '0-9', alnum: 'A-Za-z0-9', lower: 'a-z',
+    upper: 'A-Z', space: ' \\t\\n\\r\\f\\v', blank: ' \\t',
+    punct: '!-/:-@\\[-`{-~', xdigit: '0-9A-Fa-f', word: 'A-Za-z0-9_',
+    print: ' -~', graph: '!-~', cntrl: '\\x00-\\x1f\\x7f',
+  };
+  // La quadra che inizia in `i`, tradotta. Ritorna { re, fine } o null.
+  function classeShell(pat, i) {
+    let j = i + 1;
+    let nega = false;
+    // In una shell la negazione si scrive `!`; bash accetta anche `^`.
+    if (pat[j] === '!' || pat[j] === '^') { nega = true; j += 1; }
+    let corpo = '';
+    // Una quadra chiusa messa per PRIMA è il carattere `]`, non la fine.
+    if (pat[j] === ']') { corpo += '\\]'; j += 1; }
+    while (j < pat.length && pat[j] !== ']') {
+      if (pat[j] === '[' && (pat[j + 1] === ':' || pat[j + 1] === '=' || pat[j + 1] === '.')) {
+        const tipo = pat[j + 1];
+        const fine = pat.indexOf(`${tipo}]`, j + 2);
+        if (fine < 0) return null;
+        if (tipo !== ':') return null; // equivalenze e collazione: non le leggiamo
+        const nome = pat.slice(j + 2, fine).toLowerCase();
+        if (!CLASSI_POSIX[nome]) return null;
+        corpo += CLASSI_POSIX[nome];
+        j = fine + 2;
+        continue;
+      }
+      const c = pat[j];
+      // `-` resta com'è: dentro le quadre è l'intervallo, in tutte e due le
+      // lingue. `\`, `^` e `]` vanno protetti.
+      corpo += (c === '\\' || c === '^' || c === ']') ? `\\${c}` : c;
+      j += 1;
+    }
+    if (j >= pat.length) return null; // quadra mai chiusa
+    if (!corpo) return null;          // quadra vuota: non sappiamo cosa prende
+    return { re: `[${nega ? '^' : ''}${corpo}]`, fine: j };
+  }
+
   // Un modello di shell tradotto in espressione regolare. `*` e `?` non
   // attraversano i separatori di percorso (come in ogni shell), le graffe sono
   // un'alternativa, le parentesi quadre una classe di caratteri. Se ne esce
   // qualcosa che non si compila, chi chiama sta dalla parte prudente.
   function globRe(pat) {
+    const s = String(pat);
     let out = '';
     let graffe = 0;
-    let classe = false;
-    for (const ch of String(pat)) {
-      if (classe) { out += ch; if (ch === ']') classe = false; continue; }
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (ch === '[') {
+        const cl = classeShell(s, i);
+        if (!cl) return null; // quadra che non sappiamo leggere: prudenza
+        out += cl.re;
+        i = cl.fine;
+        continue;
+      }
       if (ch === '*') out += '[^/\\\\]*';
       else if (ch === '?') out += '[^/\\\\]';
       else if (ch === '{') { out += '('; graffe++; }
       else if (ch === '}') { out += graffe ? ')' : '\\}'; if (graffe) graffe--; }
       else if (ch === ',' && graffe) out += '|';
-      else if (ch === '[') { out += ch; classe = true; }
       else out += ch.replace(/[.+^$()|\\\]{}]/g, '\\$&');
     }
-    if (graffe || classe) return null; // modello monco: prudenza a chi chiama
+    if (graffe) return null; // modello monco: prudenza a chi chiama
     try { return new RegExp(`^${out}$`, 'i'); } catch (_) { return null; }
   }
 
