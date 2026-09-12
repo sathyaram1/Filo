@@ -31,13 +31,6 @@ test('i caratteri del computer: o il sito li ottiene, o almeno la domanda arriva
   test.setTimeout(180_000);
   const page = await testServer.openReady(openTab, HTML);
 
-  // Quanti caratteri ci sono davvero su questa macchina: si misura togliendo di
-  // mezzo il gestore di Filo, così il numero non dipende dal contenitore.
-  await app.evaluate(({ session }) => {
-    globalThis.__vistiDalGestore = [];
-    globalThis.__gestoreFilo = true;
-  });
-
   await page.click('#b');
   await shell.waitForTimeout(2500);
   const domande = await shell.locator('.perm-chip').allTextContents();
