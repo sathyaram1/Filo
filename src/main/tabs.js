@@ -2447,8 +2447,10 @@ class TabManager {
   // Ogni cambio di indirizzo di una scheda passa di qui, da qualunque strada
   // arrivi: link cliccato (will-navigate), popup/target=_blank
   // (setWindowOpenHandler), apertura programmatica (openTab: barra della home,
-  // azione NAVIGA del modello, IPC, shim chrome.tabs) e rinavigazione
-  // programmatica (navigate: barra degli indirizzi della shell).
+  // azione NAVIGA del modello, IPC, shim chrome.tabs), rinavigazione
+  // programmatica (navigate: barra degli indirizzi della shell), RIMBALZO del
+  // server (will-redirect: 301/302, dove si finisce lo decide il server e non
+  // l'indirizzo cliccato) e la finestrella di accesso (_hardenAuthPopup).
   //
   // Prima erano solo le prime due: chi scriveva l'indirizzo a mano e il
   // modello che emetteva NAVIGA non incontravano nessun controllo, quindi una
