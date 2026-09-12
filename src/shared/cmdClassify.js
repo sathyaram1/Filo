@@ -820,6 +820,10 @@
   // l'utente, non in un log. «Fuori dal perimetro dichiarato» non dice niente a
   // chi deve decidere in due secondi se cliccare OK.
   const FUORI = 'È fuori dalla tua cartella.';
+  const AMBIENTE = 'Legge le variabili d’ambiente, dove spesso stanno chiavi e password.';
+  const PROCESSI = 'Elenca i programmi aperti e i comandi con cui sono partiti, che a volte contengono password.';
+  const VARIABILE = 'Usa una variabile d’ambiente, quindi dal comando non si vede quale file apre.';
+
   function operandReason(op, cwd, perim, home, soloRiservati) {
     const raw = String(op || '');
     // Drive PowerShell dell'ambiente: `Get-ChildItem Env:`, `Get-Item Env:\PATH`.
