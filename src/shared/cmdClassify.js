@@ -1185,8 +1185,39 @@
   // più il freno strutturale sui percorsi assoluti e su `..`.
   function classify(cmd, opts) {
     const lvl = classifyBase(cmd);
-    if (lvl !== 1) return lvl;
-    return readReason(dequote(String(cmd)), opts) ? 2 : 1;
+    const testo = dequote(String(cmd));
+    if (lvl === 1) return readReason(testo, opts) ? 2 : 1;
+    if (lvl === 2 && spostaBersaglioRiservato(testo, opts)) return 3;
+    return lvl;
+  }
+
+  // Copiare, spostare o collegare un BERSAGLIO RISERVATO non è un gesto da un
+  // clic: sposta il bersaglio dove il freno sulla lettura non lo riconosce più.
+  // «Fammi un collegamento alla cartella delle chiavi» costava un solo OK su una
+  // frase che sembra innocua, e da lì in poi ogni lettura dentro quel
+  // collegamento era gratis per sempre (#587, giro 2). Il collegamento adesso lo
+  // segue anche il freno sulla lettura (`setRealPath`); una copia invece è un
+  // file nuovo davvero, e nessun controllo può riconoscerla dopo. Quindi il
+  // prezzo si alza prima: si digita "conferma", come per tutto ciò che non si
+  // torna indietro. Solo i bersagli riservati — copiare da una chiavetta o da un
+  // disco esterno resta un OK.
+  const SPOSTA_PERCORSI = new Set([
+    'cp', 'copy', 'xcopy', 'robocopy', 'mv', 'move', 'ln', 'tar', 'zip', 'gzip',
+  ]);
+  function spostaBersaglioRiservato(raw, opts) {
+    const o = opts || {};
+    const perim = o.perimetro ? pathParts(o.perimetro) : null;
+    const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
+    const home = o.home || o.perimetro || '';
+    const cwd = o.cwd || o.perimetro || '';
+    for (const part of (splitSafeSequence(raw) || [raw])) {
+      const t = dequote(part);
+      if (!t || !SPOSTA_PERCORSI.has(programOf(t))) continue;
+      for (const op of operandsOf(t)) {
+        if (operandReason(op, cwd, perimOk, home, true, false)) return true;
+      }
+    }
+    return false;
   }
 
   // Livello "di forma" del comando, senza il perimetro di lettura.
