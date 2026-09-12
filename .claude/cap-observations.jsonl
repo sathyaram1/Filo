@@ -1,1 +1,2 @@
 {"ts":"2026-09-12T08:47:32Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":"routine-worker","last_msg":"You've hit your weekly limit · resets Sep 15, 5pm (UTC)"}
+{"ts":"2026-09-12T08:47:32Z","event":"StopFailure","error_type":null,"error_message":null,"stop_reason":null,"agent_type":null,"last_msg":"You've hit your weekly limit · resets Sep 15, 5pm (UTC)"}
