@@ -943,7 +943,9 @@ async function applySettingsUpdate(partial) {
     partial = { ...partial, themeTokens: globalThis.SN_THEME_TOKENS.sanitize(partial.themeTokens).clean };
   }
   const merged = await Storage.updateSettings(partial);
-  broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
+  // Ogni superficie riceve ciò che la sua origine può vedere: le pagine web solo
+  // i campi ammessi, le pagine filo:// l'oggetto intero (vedi la funzione).
+  broadcastSettingsUpdated(merged);
   try {
     const { nativeTheme } = require('electron');
     const t = merged.theme;
