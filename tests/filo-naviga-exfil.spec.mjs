@@ -15,6 +15,9 @@
 // il fix, il primo assert (needsConfirm) diventerebbe rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import path from 'node:path';
+import fs from 'node:fs';
 
 const NEWTAB = 'filo://newtab/';
 
