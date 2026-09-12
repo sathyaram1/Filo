@@ -22,17 +22,18 @@ const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
   // Il sito chiede gli appunti in continuazione e aspetta il momento buono.
   window.__bottino = '';
   window.__tentativi = 0;
-  const gira = async () => {
-    for (let i = 0; i < 4000; i++) {
-      window.__tentativi++;
-      try {
-        const t = await navigator.clipboard.readText();
-        if (t) { window.__bottino = t; document.getElementById('spia').textContent = 'preso'; return; }
-      } catch (_) {}
-      await new Promise((r) => setTimeout(r, 20));
-    }
+  // In PARALLELO, senza aspettare la risposta della precedente: una richiesta
+  // che resta appesa alla domanda non deve fermare la corsa.
+  const prova = () => {
+    window.__tentativi++;
+    try {
+      navigator.clipboard.readText().then((t) => {
+        if (t) { window.__bottino = t; document.getElementById('spia').textContent = 'preso'; }
+      }, () => {});
+    } catch (_) {}
   };
-  gira();
+  for (let i = 0; i < 50; i++) prova();
+  window.__giro = setInterval(() => { for (let i = 0; i < 10; i++) prova(); }, 25);
 </script></body></html>`;
 
 test('un sito che chiede gli appunti in continuazione non deve prendersi la concessione dell\'Incolla di Filo', async ({ app, shell, openTab, testServer }) => {
