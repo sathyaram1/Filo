@@ -122,6 +122,8 @@
     'storage-access': 'Cookie dentro altri siti',
     'top-level-storage-access': 'Cookie dentro altri siti',
     openExternal: 'Apertura di altre applicazioni',
+    sensors: 'Movimento del computer',
+    'local-fonts': 'Caratteri installati',
   };
 
   const SCELTE = new Set(['allow', 'deny']);
