@@ -737,7 +737,11 @@ html[data-feedback-dim="1"] .shell {
   pointer-events: none;
   max-width: calc(100vw - 24px);
 }
-.perm-chip {
+/* La pastiglia che chiede e il segno «può vedere il tuo schermo» hanno la
+   stessa forma. Classi diverse di proposito: una è una domanda a cui si deve
+   rispondere, l'altro è una cosa in corso che si può fermare, e chi le cerca
+   (a partire dai test) non deve trovarle mescolate. */
+.perm-chip, .perm-live {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -753,7 +757,7 @@ html[data-feedback-dim="1"] .shell {
   pointer-events: auto;
   animation: permChipIn 0.16s ease-out;
 }
-.perm-chip.uscita { opacity: 0; transform: translateY(-4px); transition: opacity 0.14s ease, transform 0.14s ease; }
+.perm-chip.uscita, .perm-live.uscita { opacity: 0; transform: translateY(-4px); transition: opacity 0.14s ease, transform 0.14s ease; }
 @keyframes permChipIn {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -800,10 +804,10 @@ html[data-feedback-dim="1"] .shell {
    ripresa. Non è una domanda, quindi niente bordo d'accento come la pastiglia
    che chiede: un rosso caldo, lo stesso che Filo usa per le cose in corso da
    fermare, e un punto che pulsa piano. */
-.perm-chip.perm-live {
+.perm-live {
   border-left-color: var(--pericolo);
 }
-.perm-chip.perm-live .perm-chip-text::before {
+.perm-live .perm-chip-text::before {
   content: '';
   display: inline-block;
   width: 7px;
@@ -819,7 +823,7 @@ html[data-feedback-dim="1"] .shell {
   50% { opacity: 0.35; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .perm-chip.perm-live .perm-chip-text::before { animation: none; }
+  .perm-live .perm-chip-text::before { animation: none; }
 }
 
 /* Che cosa si condivide: tutto lo schermo o una finestra sola. Compare dopo il

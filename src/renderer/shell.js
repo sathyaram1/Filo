@@ -1846,7 +1846,7 @@
         const host = info.host || 'Questo sito';
 
         const chip = document.createElement('div');
-        chip.className = 'perm-chip perm-live';
+        chip.className = 'perm-live';
         chip.setAttribute('role', 'status');
         chip.dataset.id = id;
         chip.setAttribute('aria-label', `${host} può vedere il tuo schermo`);
