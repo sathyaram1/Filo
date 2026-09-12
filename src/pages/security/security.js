@@ -433,6 +433,8 @@
   // quello che l'utente ha toccato, se no una protezione cambiata altrove
   // mentre la pagina restava aperta tornava indietro al primo tocco.
   let ultimoInviato = null;
+  // Stessa cosa per il blocco dei cookie, che ha un salvataggio suo.
+  let ultimiCookie = null;
   // Quando abbiamo salvato noi: l'annuncio che rimbalza indietro subito dopo è
   // il nostro, non una modifica arrivata da fuori.
   let ecoDaIgnorare = 0;
