@@ -2849,6 +2849,22 @@ require('./handlers/misc')(on, handlerCtx);
 
 async function handleMessage(msg, sender = {}) {
   const origin = sender?.tab?.url || sender?.url || '';
+  // Confine d'origine, una volta per tutti: dalla pagina di un sito passano
+  // solo i messaggi che il codice dentro le pagine usa davvero
+  // (src/shared/webMessageScope.js). Prima il confine stava sui singoli
+  // handler, e quelli senza consegnavano a un sito che li chiedeva la memoria
+  // di Filo sull'utente, le pagine salvate, lo stato della home e l'uscita
+  // dall'account. Rumoroso di proposito: un messaggio che serve davvero e
+  // finisse fuori lista spegnerebbe una funzione dentro le pagine.
+  const W = globalThis.SN_WEB_MESSAGE_SCOPE;
+  if (W && !W.allowed(msg?.type, origin)) {
+    console.warn(
+      `[Filo] messaggio "${msg?.type}" rifiutato a un'origine web (${origin}). `
+      + 'Se serve al codice che gira dentro le pagine, va aggiunto a WEB_MESSAGE_TYPES '
+      + '(src/shared/webMessageScope.js).',
+    );
+    return { ok: false, error: 'forbidden' };
+  }
   const fn = registry.get(msg.type);
   if (fn) return fn(msg, sender, origin);
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };
