@@ -1299,15 +1299,25 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           ?? action.secondo_piano ?? action.sfondo ?? action.inBackground);
         let opened = false;
         let tabId = null;
+        let bloccato = null; // host bloccato dalla lista dei siti (#590)
         try {
           const win = winOf(sender);
           const tm = win && win._filoTabs;
-          if (tm && typeof tm.openTab === 'function') {
-            tabId = tm.openTab(url, { activate: !background });
-            opened = true;
+          if (tm && typeof tm.openTabResult === 'function') {
+            const esito = tm.openTabResult(url, { activate: !background });
+            tabId = esito.id;
+            // #590 — la lista dei siti bloccati vale ANCHE per NAVIGA: è
+            // un'azione di livello 1 proposta dal modello, quindi una pagina
+            // ostile poteva usarla per aprire un indirizzo della lista. Se
+            // scatta, la chat lo DICE: un blocco muto sembra un guasto (#482).
+            if (esito.blocked === 'site') bloccato = esito.host || '';
+            opened = !!tabId;
           }
         } catch (e) {
           console.warn('[Filo] apertura link fallita', e?.message || e);
+        }
+        if (bloccato !== null) {
+          return { executed: false, kept: true, output: { blocked: 'site', host: bloccato } };
         }
         // In secondo piano l'apertura è quasi invisibile: passiamo al client
         // l'id della scheda, così il chip in chat ci PORTA (non ne apre una
