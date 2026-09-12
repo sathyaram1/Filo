@@ -207,16 +207,78 @@ function buildCatturaSicuraSource() {
     // Le tracce consegnate, con la chiave di Filo che le copre. Un insieme
     // debole non va bene: qui ci serve scorrerle.
     const consegnate = new Set(); // { traccia, chiave }
+    // Quante ne abbiamo viste passare, da sempre. Se è zero mentre Filo sa di
+    // aver concesso qualcosa, vuol dire che la pagina non è passata di qui: chi
+    // chiede non deve crederci e deve prendere la strada dura (#586, giro 6).
+    let viste = 0;
+    const segna = (t, k) => {
+      if (!t) return t;
+      for (const v of consegnate) if (v.t === t) return t;
+      viste++;
+      const voce = { t, k };
+      consegnate.add(voce);
+      try { t.addEventListener('ended', () => { consegnate.delete(voce); }); } catch (_) {}
+      return t;
+    };
+    const chiaveDi = (t, chiave) => chiave || (t.kind === 'audio' ? 'microfono' : 'fotocamera');
     const registra = (stream, chiave) => {
       try {
-        for (const t of stream.getTracks()) {
-          const k = chiave || (t.kind === 'audio' ? 'microfono' : 'fotocamera');
-          consegnate.add({ t, k });
-          try { t.addEventListener('ended', () => { for (const v of consegnate) if (v.t === t) consegnate.delete(v); }); } catch (_) {}
-        }
+        for (const t of stream.getTracks()) segna(t, chiaveDi(t, chiave));
       } catch (_) {}
       return stream;
     };
+
+    // Una traccia CLONATA è una traccia in più, viva per conto suo: fermare
+    // l'originale non la ferma. Chi si metteva da parte una copia continuava ad
+    // ascoltare a permesso tolto, e Filo, visto che l'originale si era fermato,
+    // concludeva che non fosse rimasto niente (#586, giro 6).
+    const avvolgiClone = (proto, quali) => {
+      try {
+        if (!proto || typeof proto.clone !== 'function') return;
+        const vero = proto.clone;
+        Object.defineProperty(proto, 'clone', {
+          configurable: true,
+          writable: true,
+          value: function clone() {
+            const out = vero.call(this);
+            try {
+              const mia = [...consegnate].find((v) => v.t === this);
+              if (quali === 'stream') {
+                for (const t of out.getTracks()) segna(t, chiaveDi(t, null));
+              } else if (mia) segna(out, mia.k);
+            } catch (_) {}
+            return out;
+          },
+        });
+      } catch (_) {}
+    };
+    avvolgiClone(window.MediaStreamTrack && window.MediaStreamTrack.prototype, 'traccia');
+    // Una copia dello stream copia le sue tracce: vanno registrate anche quelle,
+    // con la chiave che avevano le originali quando si riesce a risalirci.
+    try {
+      const protoS = window.MediaStream && window.MediaStream.prototype;
+      if (protoS && typeof protoS.clone === 'function') {
+        const veroS = protoS.clone;
+        Object.defineProperty(protoS, 'clone', {
+          configurable: true,
+          writable: true,
+          value: function clone() {
+            const out = veroS.call(this);
+            try {
+              const mie = this.getTracks();
+              const nuove = out.getTracks();
+              nuove.forEach((t, i) => {
+                const vecchia = mie[i];
+                const voce = vecchia ? [...consegnate].find((v) => v.t === vecchia) : null;
+                segna(t, voce ? voce.k : chiaveDi(t, null));
+              });
+            } catch (_) {}
+            return out;
+          },
+        });
+      }
+    } catch (_) {}
+
     document.addEventListener(${ferma}, (e) => {
       let vive = 0;
       try {
@@ -233,7 +295,7 @@ function buildCatturaSicuraSource() {
       } catch (_) {}
       try {
         document.dispatchEvent(new CustomEvent(${fermato}, {
-          detail: { id: (e && e.detail && e.detail.id) || null, vive },
+          detail: { id: (e && e.detail && e.detail.id) || null, vive, viste },
         }));
       } catch (_) {}
     }, true);
