@@ -70,11 +70,16 @@ test('dopo il «Consenti» il sito legge davvero gli appunti, e prima no', async
   await sicurezza.waitForTimeout(1200);
   const riga = sicurezza.locator('#perms-list li').filter({ hasText: host }).first();
   console.log('[586 g6] riga in Impostazioni:', JSON.stringify(await riga.innerText().catch(() => '')));
-  // Il comando che ribalta la scelta: quello che non è il «togli».
-  const bottoni = riga.locator('button');
-  const quanti = await bottoni.count();
-  for (let i = 0; i < quanti; i++) {
-    const t = (await bottoni.nth(i).getAttribute('aria-label')) || '';
-    console.log('[586 g6] comando', i, JSON.stringify(t));
-  }
+  // Il comando che RIBALTA la scelta è quello che dice lo stato; il × la toglie.
+  await riga.locator('button').filter({ hasText: /^(Negato|Denied)$/ }).first().click();
+  await sicurezza.waitForTimeout(1500);
+  console.log('[586 g6] riga dopo il ribaltamento:', JSON.stringify(await riga.innerText().catch(() => '')));
+
+  const secondo = await page.evaluate(() => window.__appunti());
+  console.log('[586 g6] appunti dopo il ribaltamento a «consentito»:', secondo);
+  expect(
+    String(secondo),
+    'ribaltata la scelta a «consentito» dalle Impostazioni, il sito deve ottenere gli appunti '
+    + 'senza dover richiedere e senza che ricompaia la domanda',
+  ).toContain('testo-negli-appunti-33');
 });
