@@ -20,6 +20,7 @@
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
         'Lo stile con cui Filo ti risponde non cambia più alle tue spalle. Se è lui a proporlo, prima ti mostra il testo esatto e aspetta il tuo sì. In Preferenze vedi quanto è lungo e fin dove puoi arrivare.',
+        'Un\'impostazione cambiata chiedendolo a Filo non torna più indietro da sola. Con Preferenze, Opzioni o Sicurezza aperte in una scheda, bastava toccare un campo qualunque perché quelle pagine rimettessero i valori che avevano letto all\'apertura: la modalità terminale appena spenta si riaccendeva, la chiave OpenRouter appena cambiata tornava quella di prima. Adesso ogni pagina salva solo quello che hai toccato lì, e si aggiorna da sola quando qualcosa cambia altrove.',
       ],
     },
     {
