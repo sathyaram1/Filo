@@ -26,7 +26,9 @@ const RADICE = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..'
 require(resolve(RADICE, 'src/shared/urlExfil.js'));
 const E = globalThis.SN_URL_EXFIL;
 
-const chiede = (url, corpus) => E.assess(url, { corpus, fromUntrusted: true }).exfil;
+// Come lo vede Filo: un documento aperto dal disco entra fra il materiale
+// LETTO, non fra la memoria (profilo e preferenze).
+const chiede = (url, letto) => E.assess(url, { letto, fromUntrusted: true }).exfil;
 
 const VIAGGIO = `Viaggio a Firenze 3-6 ottobre. Hotel Duomo prenotato.
 Visitare la galleria degli Uffizi e il giardino di Boboli.

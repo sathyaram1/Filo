@@ -120,7 +120,9 @@ test.describe('#587 — i programmi che leggono e non vengono misurati', () => {
       mkdirSync(join(casa, '.aws'), { recursive: true });
       mkdirSync(join(casa, 'vuota'), { recursive: true });
       mkdirSync(join(casa, 'Documenti'), { recursive: true });
-      writeFileSync(join(casa, '.ssh', 'id_rsa'), '-----BEGIN OPENSSH PRIVATE KEY-----\nCHIAVEPRIVATAFINTA\n');
+      // Il segreto sta sulla stessa riga della parola cercata: una ricerca
+      // stampa la riga che combacia, e vogliamo vedere se il segreto esce.
+      writeFileSync(join(casa, '.ssh', 'id_rsa'), '-----BEGIN OPENSSH PRIVATE KEY CHIAVEPRIVATAFINTA-----\n');
       writeFileSync(join(casa, '.ssh', 'config'), 'Host lavoro\nPASSWORDSSHCONFIG\n');
       writeFileSync(join(casa, '.aws', 'credentials'), '[default]\naws_access_key_id = CHIAVEAWSFINTA\n');
       writeFileSync(join(casa, 'appunti.txt'), 'la lista della spesa\n');
