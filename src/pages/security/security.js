@@ -37,6 +37,7 @@
     $('sec-siteblock-desc').textContent = I18n.t('options_security_siteblock_desc');
     $('sec-siteblock-lists-label').textContent = I18n.t('options_security_siteblock_lists');
     $('sec-siteblock-blacklist-label').textContent = I18n.t('options_security_siteblock_blacklist_label');
+    $('sec-siteblock-allowed-label').textContent = I18n.t('options_security_siteblock_allowed_label');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
