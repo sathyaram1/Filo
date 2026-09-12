@@ -1113,3 +1113,184 @@ test('togliere il permesso chiude anche il microfono che il sito ha già aperto'
     .toBe(0);
   await expect(shell.locator('.perm-live')).toHaveCount(0, { timeout: 15_000 });
 });
+
+// ─── La revoca non deve costare quello che stavi scrivendo (#586) ────────────
+//
+// Chiudere davvero una traccia già consegnata si faceva ricaricando la pagina,
+// che è l'unica strada che il processo principale ha da solo. E ricaricare
+// butta via quello che chi naviga stava facendo lì: il commento a metà, il
+// modulo compilato, il punto in cui era arrivato a leggere. Chi va a togliere
+// un permesso lo fa per una questione di privacy e non si aspetta di pagarla
+// così. Ora la traccia la chiude la pagina, su richiesta di Filo, senza
+// ricaricare niente.
+
+const HTML_SCRITTO = `<!doctype html><html><body style="margin:0">
+<input id="campo" style="font-size:18px;width:340px">
+<script>
+  window.__tracce = null;
+  window.__microfono = () => navigator.mediaDevices.getUserMedia({ audio: true }).then(
+    (s) => { window.__tracce = s.getTracks(); return s.getTracks().map((t) => t.kind + ':' + t.readyState); },
+    (e) => 'rifiutato:' + ((e && e.name) || 'errore'));
+  window.__vive = () => (window.__tracce || []).filter((t) => t.readyState === 'live').length;
+</script></body></html>`;
+
+const SCRITTO = 'una risposta lunga che sto scrivendo da dieci minuti';
+
+test('togliere il permesso non butta via quello che chi naviga stava scrivendo', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, HTML_SCRITTO);
+  const origine = new URL(page.url()).origin;
+
+  const esito = page.evaluate(() => window.__microfono());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await esito).toEqual(['audio:live']);
+
+  await page.fill('#campo', SCRITTO);
+  await shell.evaluate((o) => window.filoShell.permissions.revoke(o, 'microfono'), origine);
+
+  // Il microfono si chiude sul serio (la garanzia che non si scuce)…
+  await expect
+    .poll(() => page.evaluate(() => window.__vive()).catch(() => 0), { timeout: 20_000 })
+    .toBe(0);
+  // …e quello che c'era scritto è ancora lì.
+  expect(
+    await page.inputValue('#campo').catch(() => '(scheda ricaricata)'),
+    'togliere un permesso ha ricaricato la pagina e ha buttato via quello che chi usa Filo '
+    + 'stava scrivendo: niente lo avvisa prima e niente lo può recuperare',
+  ).toBe(SCRITTO);
+});
+
+test('anche «Interrompi» chiude senza portarsi via la pagina', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, HTML_SCRITTO);
+
+  const esito = page.evaluate(() => window.__microfono());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await esito).toEqual(['audio:live']);
+  await page.fill('#campo', SCRITTO);
+
+  const vivo = shell.locator('.perm-live');
+  await expect(vivo).toHaveCount(1, { timeout: 15_000 });
+  await vivo.locator('.perm-chip-btn').click();
+
+  await expect
+    .poll(() => page.evaluate(() => window.__vive()).catch(() => 0), { timeout: 20_000 })
+    .toBe(0);
+  expect(await page.inputValue('#campo').catch(() => '(scheda ricaricata)')).toBe(SCRITTO);
+});
+
+// ─── L'altra richiesta impossibile che ammazza la scheda (#586) ──────────────
+//
+// La strada vecchia della cattura schermo non si mescola: o viene dal desktop
+// tutto quello che si chiede, o Chromium chiude il processo della pagina. Le
+// forme che ammazzano sono due e sono speculari; qui c'è quella che manca
+// sopra, cioè l'immagine dello schermo chiesta insieme a un microfono vero. È
+// quello che fanno i siti di videochiamata rimasti indietro quando condividono
+// schermo e voce insieme.
+
+test('chiedere lo schermo alla vecchia maniera col microfono non fa morire la scheda', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<p id="p">viva</p>
+<script>
+  window.__mista = () => navigator.mediaDevices.getUserMedia({
+    video: { mandatory: { chromeMediaSource: 'desktop' } },
+    audio: true,
+  }).then(() => 'concesso', (e) => 'rifiutato:' + ((e && e.name) || 'errore'));
+</script></body></html>`);
+
+  const esito = await page.evaluate(() => window.__mista())
+    .catch((e) => 'scheda morta: ' + e.message);
+  expect(
+    String(esito),
+    'la scheda è morta per una riga di una pagina qualunque, invece di ricevere un errore',
+  ).toContain('rifiutato');
+  expect(
+    await page.evaluate(() => document.getElementById('p').textContent).catch(() => '(morta)'),
+    'la pagina deve essere ancora lì',
+  ).toBe('viva');
+  await shell.waitForTimeout(500);
+});
+
+// ─── Guardare non è chiedere (#586) ─────────────────────────────────────────
+//
+// Una pagina che legge i propri stati dei permessi prima di decidere se
+// mostrarti un bottone è la cosa più educata che un sito possa fare. Faceva
+// comparire una pastiglia col nome del sito, senza che nessuno avesse cliccato
+// niente, a ogni caricamento. E sui caratteri installati leggeva «negato» su
+// una cosa che nessuno aveva negato, quindi smetteva lì.
+
+const HTML_SGUARDO = `<!doctype html><html><body style="margin:0">
+<script>
+  window.__stati = {};
+  window.__fatto = false;
+  (async () => {
+    for (const n of ['camera', 'microphone', 'geolocation', 'notifications', 'local-fonts']) {
+      try { const s = await navigator.permissions.query({ name: n }); window.__stati[n] = s.state; }
+      catch (e) { window.__stati[n] = 'no:' + e.name; }
+    }
+    window.__fatto = true;
+  })();
+</script></body></html>`;
+
+test('leggere i propri permessi non fa comparire nessuna domanda', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML_SGUARDO);
+  await page.waitForFunction(() => window.__fatto === true, null, { timeout: 15_000 });
+  await shell.waitForTimeout(2000);
+
+  const stati = await page.evaluate(() => window.__stati);
+  expect(
+    await pastiglia(shell).allTextContents(),
+    'una pagina che si è limitata a leggere i propri stati ha fatto comparire una domanda: '
+    + 'chi naviga si vede chiedere un permesso per un gesto che non ha fatto',
+  ).toEqual([]);
+  for (const [nome, stato] of Object.entries(stati)) {
+    expect(
+      stato,
+      `prima che qualcuno scelga, «${nome}» deve leggersi «da chiedere»: un sito che legge `
+      + '«negato» si ferma lì e non chiederà mai',
+    ).toBe('prompt');
+  }
+});
+
+// ─── Il sito che non la smette (#586) ───────────────────────────────────────
+//
+// La × chiude senza ricordare niente, ed è giusto: chi l'ha premuta non ha
+// deciso. Ma il sito poteva richiedere subito, e la pastiglia tornava: una
+// pagina che richiede ogni decimo di secondo teneva la domanda incollata sotto
+// le schede, e l'unica uscita era andarsene dal sito.
+
+test('dopo tre domande chiuse senza rispondere, il sito smette di poterne fare', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<script>
+  window.__tentativi = 0;
+  window.__insisti = () => {
+    window.__tentativi++;
+    return navigator.mediaDevices.getUserMedia({ video: true })
+      .then(() => 'ok', () => { setTimeout(window.__insisti, 100); return 'no'; });
+  };
+</script></body></html>`);
+  page.evaluate(() => window.__insisti()).catch(() => {});
+
+  // Chi naviga chiude la domanda tre volte con la ×.
+  for (let i = 0; i < 3; i++) {
+    await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+    await shell.locator('.perm-chip .perm-chip-x').first().click();
+    await shell.waitForTimeout(300);
+  }
+  // Il sito continua a richiedere: da qui in poi non deve più comparire niente.
+  await expect(pastiglia(shell)).toHaveCount(0, { timeout: 20_000 });
+  await shell.waitForTimeout(3000);
+  expect(
+    await pastiglia(shell).count(),
+    'il sito richiede e la domanda torna: chi naviga non ha nessun modo di dire «smettila»',
+  ).toBe(0);
+  expect(
+    await page.evaluate(() => window.__tentativi),
+    'il sito deve aver continuato a chiedere: se avesse smesso lui, la prova non direbbe niente',
+  ).toBeGreaterThan(3);
+});

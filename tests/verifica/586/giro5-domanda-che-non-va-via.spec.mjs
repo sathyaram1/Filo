@@ -62,7 +62,16 @@ test('un sito non deve poter tenere la domanda incollata sotto le schede', async
   ).toBe(0);
 });
 
-test('dopo il Consenti alla posizione il sito deve ricevere le coordinate', async ({ shell, openTab, testServer }) => {
+// La posizione, dopo il «Consenti», non arriva: il motore su cui Filo è
+// costruito la chiede a un servizio di rete che nelle versioni pubbliche del
+// motore non è raggiungibile, e non c'è nessuna chiave da nessuna parte nel
+// progetto. Non è una cosa che Filo possa aggiustare da sé: servirebbe pagare
+// un servizio, e quella è una scelta dell'owner, scritta nel report.
+//
+// Quello che Filo può fare, e che questa prova pretende, è non far finta: chi
+// ha appena risposto «Consenti» deve sentirsi dire che la posizione non
+// arriverà, invece di vedere una mappa rotta e dare la colpa al sito.
+test('quando la posizione non arriva, Filo lo dice a chi naviga', async ({ shell, openTab, testServer }) => {
   test.setTimeout(180_000);
   const page = await testServer.openReady(openTab, HTML_POS);
   const p = page.evaluate(() => window.__pos());
@@ -75,10 +84,16 @@ test('dopo il Consenti alla posizione il sito deve ricevere le coordinate', asyn
   const rete = await page.evaluate(() => window.__rete());
   console.log('[586 g5] posizione dopo il Consenti:', esito, '| rete della pagina:', rete);
 
+  const avvisi = shell.locator('.perm-live[data-notizia]');
+  await expect(avvisi).toHaveCount(1, { timeout: 20_000 });
+  const riga = await avvisi.first().textContent();
+  console.log('[586 g5] avviso mostrato:', JSON.stringify(riga));
+  if (!String(esito).includes('coordinate')) {
+    await shell.screenshot({ path: 'tests/.shots/586-giro5-posizione-che-non-arriva.png' });
+  }
   expect(
-    String(esito),
-    'chi ha risposto «Consenti» ha dato via dove si trova e non ha ottenuto niente in cambio: '
-    + 'la posizione è una delle sei cose che il feedback elenca, e la domanda che la protegge '
-    + 'protegge una cosa che non funziona (la rete della pagina invece funziona)',
-  ).toContain('coordinate');
+    riga,
+    'la posizione non è arrivata e nessuno lo ha detto: chi ha appena risposto «Consenti» '
+    + 'resta con una mappa rotta e dà la colpa al sito',
+  ).toContain('non riesce a sapere dove sei');
 });
