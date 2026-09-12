@@ -790,6 +790,32 @@ html[data-feedback-dim="1"] .shell {
 }
 .perm-chip-x:hover { background: var(--border); color: var(--fg); }
 
+/* «Questo sito può vedere il tuo schermo»: resta mentre il sito ha in mano la
+   ripresa. Non è una domanda, quindi niente bordo d'accento come la pastiglia
+   che chiede: un rosso caldo, lo stesso che Filo usa per le cose in corso da
+   fermare, e un punto che pulsa piano. */
+.perm-chip.perm-live {
+  border-left-color: var(--danger, #c0553f);
+}
+.perm-chip.perm-live .perm-chip-text::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--danger, #c0553f);
+  vertical-align: middle;
+  animation: permLivePulse 1.8s ease-in-out infinite;
+}
+@keyframes permLivePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .perm-chip.perm-live .perm-chip-text::before { animation: none; }
+}
+
 /* Che cosa si condivide: tutto lo schermo o una finestra sola. Compare dopo il
    «Consenti» sulla cattura dello schermo. */
 .perm-source {
