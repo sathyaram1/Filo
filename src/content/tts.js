@@ -569,6 +569,10 @@
       return;
     }
     let stream;
+    // #586 — da qui in poi il microfono lo chiede Filo, non il sito: annunciarsi
+    // al main evita la pastiglia "<sito> vuole usare il microfono" per una cosa
+    // che ha chiesto l'utente a Filo (la concessione vale una volta sola).
+    try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_DI_FILO, chiave: 'microfono' }); } catch (_) {}
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (_) {

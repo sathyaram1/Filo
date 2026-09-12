@@ -7,6 +7,8 @@
   const { MSG } = window.SN_MSG;
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
+  const Permessi = window.SN_PERMESSI_SITI;
+  const ConfirmUi = window.SN_CONFIRM_UI;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
 
   function $(id) { return document.getElementById(id); }
@@ -72,6 +74,9 @@
     $('fp-mode-privacy-desc').textContent = I18n.t('options_fp_mode_privacy_desc');
     $('sec-auto-feedback-label').textContent = I18n.t('options_security_auto_feedback');
     $('sec-auto-feedback-desc').textContent = I18n.t('options_security_auto_feedback_desc');
+    $('sec-perms-title').textContent = I18n.t('options_perms_title');
+    $('sec-perms-desc').textContent = I18n.t('options_perms_desc');
+    $('perms-clear-btn').textContent = I18n.t('options_perms_clear');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('sec-import-btn').textContent = I18n.t('security_import_btn');
@@ -231,6 +236,116 @@
 
     // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
     $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
+
+    permessi = Permessi.normalizza(sec.sitePermissions);
+    renderPermessi();
+  }
+
+  // ─── permessi dei siti (#586) ─────────────────────────────────────────────
+  //
+  // Le scelte prese dalla pastiglia mentre si naviga finiscono qui, e da qui si
+  // cambiano o si tolgono: è la regola di personalizzazione di Filo (tutto ciò
+  // che Filo decide dev'essere rivedibile) e l'invariante "se si può dare si
+  // può togliere". Salvare rimanda la mappa INTERA: la chiave è fra le
+  // REPLACE_KEYS dello storage, quindi togliere una voce la cancella davvero.
+
+  let permessi = {};
+
+  async function savePermessi() {
+    await chrome.runtime.sendMessage({
+      type: MSG.UPDATE_SETTINGS,
+      settings: { security: { sitePermissions: permessi } },
+    });
+    const hint = $('savedHint');
+    hint.classList.add('sn-show');
+    clearTimeout(savePermessi._t);
+    savePermessi._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+  }
+
+  function renderPermessi() {
+    const list = $('perms-list');
+    list.innerHTML = '';
+    const righe = Permessi.elenco(permessi);
+    $('perms-clear-btn').style.display = righe.length ? '' : 'none';
+    if (!righe.length) {
+      const li = document.createElement('li');
+      li.className = 'sn-muted';
+      li.style.border = 'none';
+      li.textContent = I18n.t('options_perms_empty');
+      list.appendChild(li);
+      return;
+    }
+    for (const riga of righe) {
+      const li = document.createElement('li');
+      li.style.display = 'flex';
+      li.style.flexWrap = 'wrap';
+      li.style.alignItems = 'center';
+      li.style.gap = '8px';
+
+      const host = document.createElement('span');
+      host.textContent = riga.host;
+      host.style.fontWeight = '600';
+      li.appendChild(host);
+
+      for (const voce of riga.voci) {
+        const gruppo = document.createElement('span');
+        gruppo.style.display = 'inline-flex';
+        gruppo.style.alignItems = 'center';
+        gruppo.style.gap = '4px';
+
+        const nome = document.createElement('span');
+        nome.className = 'sn-muted';
+        nome.textContent = voce.nome;
+        gruppo.appendChild(nome);
+
+        // Un solo bottone che DICE lo stato e, premuto, lo ribalta: consentito
+        // ↔ negato, senza aspettare che il sito richieda.
+        const stato = document.createElement('button');
+        stato.type = 'button';
+        stato.className = 'sn-btn-secondary';
+        stato.textContent = voce.scelta === 'allow'
+          ? I18n.t('options_perms_allowed') : I18n.t('options_perms_denied');
+        stato.title = I18n.t('options_perms_toggle_tip');
+        stato.addEventListener('click', () => {
+          permessi = Permessi.conScelta(
+            permessi, riga.origine, [voce.chiave],
+            voce.scelta === 'allow' ? 'deny' : 'allow',
+          );
+          renderPermessi();
+          savePermessi();
+        });
+        gruppo.appendChild(stato);
+
+        const togli = document.createElement('button');
+        togli.type = 'button';
+        togli.className = 'sn-btn-secondary';
+        togli.textContent = '×';
+        togli.setAttribute('aria-label', I18n.t('options_perms_remove'));
+        togli.title = I18n.t('options_perms_remove_tip');
+        togli.addEventListener('click', () => {
+          permessi = Permessi.senza(permessi, riga.origine, voce.chiave);
+          renderPermessi();
+          savePermessi();
+        });
+        gruppo.appendChild(togli);
+
+        li.appendChild(gruppo);
+      }
+
+      list.appendChild(li);
+    }
+  }
+
+  async function clearPermessi() {
+    const ok = await ConfirmUi.confirm({
+      title: I18n.t('options_perms_clear'),
+      text: I18n.t('options_perms_clear_confirm'),
+      okLabel: I18n.t('options_perms_clear'),
+    });
+    if (!ok) return;
+    permessi = {};
+    renderPermessi();
+    savePermessi();
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
@@ -478,6 +593,7 @@
     });
     // Mentre l'utente corregge il valore, togli l'avviso d'errore precedente.
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
+    $('perms-clear-btn').addEventListener('click', clearPermessi);
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
   });

@@ -13,6 +13,7 @@
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/permessiSiti.js"></script>
 </head>
 <body>
   <main class="sn-page" id="page">
@@ -185,6 +186,16 @@
             </span>
           </label>
         </div>
+      </section>
+
+      <!-- #586 — permessi che i siti hanno chiesto e che hai deciso. Ogni voce
+           si può cambiare (consenti ↔ nega) o togliere: tolta, la volta dopo il
+           sito richiede. -->
+      <section id="sec-permissions" style="margin-top:28px">
+        <h2 id="sec-perms-title" style="font-size:1.05rem;margin-bottom:4px"></h2>
+        <p class="sn-muted" id="sec-perms-desc" style="margin-top:0"></p>
+        <ul id="perms-list" style="list-style:none;padding:0;margin:0"></ul>
+        <button type="button" id="perms-clear-btn" class="sn-btn-secondary" style="margin-top:10px;display:none"></button>
       </section>
 
       <div class="sn-toggle-row" id="sec-export-row" style="margin-top:28px">

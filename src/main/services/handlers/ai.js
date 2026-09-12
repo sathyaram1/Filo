@@ -70,6 +70,21 @@ module.exports = function register(on, ctx) {
     }
   }
 
+  // #586 — la dettatura di Filo sta per chiedere il microfono dentro una
+  // pagina web: la richiesta è di Filo, non del sito, e non deve comparire una
+  // pastiglia col nome del sito. La concessione vale UNA volta e per pochi
+  // secondi (vedi services/permessiSito.js); un sito non può chiederla perché
+  // questo canale vive nel mondo isolato del preload, dove il codice della
+  // pagina non arriva.
+  on(MSG.PERMESSO_DI_FILO, async (msg, sender) => {
+    try {
+      const chiave = String((msg && msg.chiave) || '');
+      if (chiave !== 'microfono') return { ok: false };
+      require('../permessiSito').concessioneUnaTantum(sender && sender.wc, chiave);
+      return { ok: true };
+    } catch (_) { return { ok: false }; }
+  });
+
   on(MSG.TTS_READING_STATE, async (msg, sender) => {
     markReading(sender && sender.wc, !!(msg && msg.reading));
     return { ok: true };

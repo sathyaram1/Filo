@@ -1783,6 +1783,14 @@
     security: {
       protectIpLeak: true,
       blockPopups: true,
+      // #586 — permessi che i siti hanno chiesto e che l'utente ha deciso:
+      // { "<origine>": { "<chiave>": "allow" | "deny" } }, con le chiavi di
+      // src/shared/permessiSiti.js (fotocamera, microfono, posizione,
+      // notifiche, appunti, schermo, …). Vuoto = nessuno ha ancora chiesto
+      // niente, e senza una riga qui il permesso si chiede. La mappa è
+      // SOSTITUITA a ogni scrittura (vedi REPLACE_KEYS in shared/storage.js):
+      // togliere un sito deve cancellarlo, non lasciarlo in vita nel merge.
+      sitePermissions: {},
       // Rilevamento siti pericolosi (phishing/impersonazione/malware). Vedi
       // src/main/services/safebrowse/. Tutti i controlli locali (omoglifi,
       // typo, combosquat, trasporto) sono gratuiti e attivi di default. I

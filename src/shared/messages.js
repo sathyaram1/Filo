@@ -17,6 +17,12 @@
     // legge segnala l'avvio/arresto al main ({ reading: bool }); il main tiene il
     // conteggio globale e ribroadcast TTS_GLOBAL_READING a TUTTE le schede, così
     // anche una scheda diversa da quella che legge mostra "Interrompi lettura".
+    // #586 — Filo si annuncia PRIMA di chiedere un permesso dentro una pagina
+    // web (oggi: il microfono della dettatura). Senza, all'utente comparirebbe
+    // "esempio.it vuole usare il microfono" per una cosa che ha chiesto lui a
+    // Filo, col nome del sito sbagliato sopra. Vale una volta sola e per pochi
+    // secondi. { chiave: 'microfono' } → { ok }
+    PERMESSO_DI_FILO: 'permesso_di_filo',
     TTS_READING_STATE: 'tts_reading_state',        // content→main { reading: bool }
     // Richiesta di fermare la lettura attiva ovunque sia (anche in un'altra
     // scheda). Il main inoltra TTS_STOP a tutte le schede.
