@@ -91,8 +91,34 @@
 
   const SCELTE = new Set(['allow', 'deny']);
 
+  // Permessi che NON si ricordano: si richiedono ogni volta.
+  //
+  // Lo schermo è l'unico, e non è una scelta di gusto. Una webcam accesa si
+  // vede (la spia, il riquadro che parte), un microfono aperto prima o poi si
+  // sente; una ripresa dello schermo non lascia nessun segno. Un «sempre» lì
+  // significa che il sito riprende quello che stai facendo quando gli pare e
+  // tu non lo sai mai. Nessun browser lo ricorda, per questo.
+  const SOLO_UNA_VOLTA = new Set([CHIAVI.SCHERMO]);
+
+  function siRicorda(chiave) {
+    return !SOLO_UNA_VOLTA.has(String(chiave || ''));
+  }
+
   function innocuo(permesso) {
     return INNOCUI.has(String(permesso || ''));
+  }
+
+  // La richiesta che Chromium fa PRIMA di una condivisione dello schermo:
+  // permesso 'media' con la lista dei tipi VUOTA. Non è una richiesta di
+  // fotocamera e microfono, e non va trattata come tale: chiedere «vuole usare
+  // la fotocamera e il microfono» a chi ha premuto «condividi lo schermo» gli
+  // fa consentire due sensori che nessuno gli ha nominato, e glieli lascia
+  // consentiti per sempre. La domanda vera arriva subito dopo, dal gestore
+  // della cattura schermo, che sa cosa sta per essere consegnato.
+  function preambiloSchermo(permesso, dettagli) {
+    if (String(permesso || '') !== 'media') return false;
+    const tipi = (dettagli || {}).mediaTypes;
+    return Array.isArray(tipi) && tipi.length === 0;
   }
 
   // Da (permesso, dettagli di Electron) alle chiavi di memoria coinvolte.
