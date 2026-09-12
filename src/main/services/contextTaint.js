@@ -77,7 +77,10 @@ function newLedger() {
 function paroleDi(text) {
   const s = String(text || '');
   const out = [];
-  const emailRe = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+  // I pezzi dell'indirizzo email hanno una lunghezza MASSIMA: senza, su un testo
+  // lungo senza chiocciole (l'output di un comando su un file compatto) il
+  // motore torna indietro a ogni posizione e il conto arriva a costare secondi.
+  const emailRe = /[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,255}\.[a-z]{2,24}/gi;
   let m;
   while ((m = emailRe.exec(s))) out.push(m[0]);
   for (const w of s.split(/[^A-Za-z0-9]+/)) {

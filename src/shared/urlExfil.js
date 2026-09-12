@@ -190,7 +190,11 @@
     const text = String(corpus || '');
     const out = new Set();
     // email: forti, le aggiungiamo intere e come parte locale.
-    const emailRe = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+    // I pezzi dell'indirizzo email hanno una lunghezza MASSIMA: senza, su un
+    // testo lungo senza chiocciole (l'output di un comando su un file compatto)
+    // il motore torna indietro a ogni posizione e il controllo di un link arriva
+    // a costare secondi interi.
+    const emailRe = /[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,255}\.[a-z]{2,24}/gi;
     let m;
     while ((m = emailRe.exec(text))) {
       const e = m[0].toLowerCase();
