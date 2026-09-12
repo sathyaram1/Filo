@@ -222,9 +222,15 @@ function isSearchEngineHost(host) {
 //   /web             ask
 //   /s               baidu
 //   /html            la versione leggera di duckduckgo
-//   /                duckduckgo e qwant mettono i risultati sulla radice (?q=)
 // Nessuno di questi è un percorso su cui si possa pubblicare una pagina propria.
-const SEARCH_PATHS = /^\/(?:search|sp\/search|web|s|html)?\/?$/;
+const SEARCH_PATHS = /^\/(?:search|sp\/search|web|s|html)\/?$/;
+
+// Duckduckgo e qwant mettono i risultati sulla RADICE (`/?q=…`), che da sola è
+// solo la pagina iniziale del motore. Lì l'eccezione la apre la domanda scritta
+// nell'indirizzo, non il percorso: è anche quello che tiene fuori un referrer
+// ridotto alla sola origine (`https://sito.esempio/`), che è la forma in cui
+// quasi tutti i siti lo mandano fuori dal proprio dominio.
+const SEARCH_PARAMS = ['q', 'p', 'text', 'wd', 'query', 'k'];
 
 // La pagina da cui si parte è una pagina di RISULTATI di un motore di ricerca?
 // (È l'unica eccezione alla lista dei siti bloccati che non passi dall'utente.)
@@ -237,7 +243,12 @@ function isSearchEngineUrl(url) {
   }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
   if (!isSearchEngineHost(canonicalHost(u.hostname))) return false;
-  return SEARCH_PATHS.test(u.pathname);
+  if (SEARCH_PATHS.test(u.pathname)) return true;
+  if (u.pathname !== '/') return false;
+  return SEARCH_PARAMS.some((k) => {
+    const v = u.searchParams.get(k);
+    return !!(v && v.trim());
+  });
 }
 
 // L'host è in blacklist? (blacklist dedicata dell'utente, oppure — se

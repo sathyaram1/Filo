@@ -544,3 +544,24 @@ test('#590 il tasto indietro non riporta su un sito messo in lista dopo', async 
   expect(suBloccato.length, 'il tasto indietro non deve riportare sul sito della lista').toBe(0);
   await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toBeVisible({ timeout: 6000 });
 });
+
+test('#590 dopo «Apri comunque» Filo dice quanto dura il sì, e lo si può togliere', async ({ shell, testServer }) => {
+  await enableBlock(shell);
+  const url = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">DENTRO</h1>');
+  await apriComunque(shell, url);
+
+  // Il permesso dura tutta la sessione: chi l'ha dato deve saperlo, e deve
+  // poterci ripensare senza rimettere mano all'elenco dei siti bloccati.
+  const avviso = shell.locator('.shell-notif', { hasText: 'fino alla chiusura di Filo' });
+  await expect(avviso).toBeVisible({ timeout: 6000 });
+  await expect(avviso).toContainText(BLOCKED_HOST);
+  await avviso.locator('.shell-notif-action', { hasText: 'Rimetti il blocco' }).click();
+  await shell.waitForTimeout(500);
+
+  // Tolto il sì, il sito torna bloccato come gli altri della lista.
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toBeVisible({ timeout: 6000 });
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const aperte = snap.tabs.filter((t) => t.url === url);
+  expect(aperte.length, 'dopo «Rimetti il blocco» il sito non deve riaprirsi').toBe(1);
+});
