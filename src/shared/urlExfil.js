@@ -153,16 +153,30 @@
     return p === '' || /^[A-Za-z]{1,14}$/.test(p) || /^[0-9]{1,12}$/.test(p);
   }
 
-  // Il tratto di indirizzo è OPACO, cioè non si legge come parole? È la domanda
-  // che il ripiego strutturale deve porsi, e per un po' non se l'è posta: contava
-  // i caratteri e basta, e visto che i separatori umani (`/`, `-`, `_`, `+`)
-  // restavano dentro, `/wiki/Storia_della_matematica` era «un blocco di dati
-  // codificato» lungo 28. Con il contesto non fidato acceso — cioè dal primo
-  // comando o dalla prima ricerca in poi — quell'avviso compariva su quasi ogni
-  // link vero (#587, giro 1), e un avviso che compare sempre si clicca senza
-  // leggerlo. Un payload vero resta opaco: base64, esadecimale, testo cifrato.
+  // I PEZZI illeggibili di un tratto di indirizzo, cioè quelli che non si leggono
+  // come parole. È la domanda che il ripiego strutturale deve porsi, e per due
+  // volte non se l'è posta bene.
+  //
+  // La prima volta contava i caratteri e basta: visto che i separatori umani
+  // (`/`, `-`, `_`, `+`) restavano dentro, `/wiki/Storia_della_matematica` era
+  // «un blocco di dati codificato» lungo 28 (#587, giro 1).
+  //
+  // La seconda volta guardava il TRATTO intero appena un pezzo era illeggibile,
+  // e misurava con un metro da 24 caratteri: così bastava l'identificativo che
+  // ogni sito mette nei suoi indirizzi — un documento di Google, una scheda di
+  // Amazon, un brano di Spotify, un post su X — perché l'avviso comparisse su due
+  // link veri su cinque (#587, giro 2). E un avviso che compare su link innocui
+  // si clicca senza leggerlo: si perde proprio la protezione che deve restare.
+  //
+  // Adesso si contano SOLO i pezzi illeggibili, e col metro tarato sugli
+  // indirizzi veri (vedi le soglie in cima). Quello che resta fuori è il payload
+  // in chiaro o in base64, che però non passa di qui: lo prende il taint-match,
+  // che lo riconosce per quello che è invece che per la sua forma.
+  function pezziOpachi(tratto) {
+    return String(tratto).split(/[-_/+=.]/).filter((p) => !pezzoDaParola(p));
+  }
   function opaco(tratto) {
-    return !String(tratto).split(/[-_/+=.]/).every(pezzoDaParola);
+    return pezziOpachi(tratto).length > 0;
   }
 
   // Fallback strutturale: payload corposo / blob opaco in un URL nato mentre nel
@@ -178,23 +192,30 @@
     const hash = u.hash || '';
     const path = (u.pathname && u.pathname !== '/') ? u.pathname : '';
     const tratti = (search + hash + path).split(/[^A-Za-z0-9+/_=-]+/);
-    // Quanto materiale illeggibile porta il link: le parole non contano, altrimenti
-    // il conto lo fa il titolo dell'articolo invece del payload.
+    // Quanto materiale illeggibile porta il link. Le parole non contano — se no
+    // il conto lo fa il titolo dell'articolo invece del payload — e nemmeno i
+    // pezzi leggibili che stanno accanto a uno illeggibile.
     let carrier = 0;
-    for (const t of tratti) if (opaco(t)) carrier += t.length;
+    let piuLungo = '';
+    for (const t of tratti) {
+      for (const p of pezziOpachi(t)) {
+        if (/^https?$/i.test(p)) continue;
+        carrier += p.length;
+        if (p.length > piuLungo.length) piuLungo = p;
+      }
+    }
+    if (piuLungo.length >= STRUCT_BLOB) {
+      return { reason: 'contiene un blocco di dati codificato' };
+    }
     if (carrier >= STRUCT_CARRIER) {
       return { reason: 'porta una grande quantità di dati nel link' };
     }
-    // Blob opaco singolo (no separatori umani) in sottodominio o segmenti.
+    // Etichetta opaca nel sottodominio: un sito vero non ci mette mai un blocco
+    // illeggibile, quindi qui il metro resta stretto.
     const host = u.hostname || '';
     const labels = host.split('.');
     for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) {
-      if (lbl.length >= STRUCT_BLOB && opaco(lbl)) return { reason: 'usa un sottodominio anomalo' };
-    }
-    for (const seg of tratti) {
-      if (seg.length >= STRUCT_BLOB && opaco(seg) && !/^https?$/i.test(seg)) {
-        return { reason: 'contiene un blocco di dati codificato' };
-      }
+      if (lbl.length >= STRUCT_HOST_BLOB && opaco(lbl)) return { reason: 'usa un sottodominio anomalo' };
     }
     return null;
   }
