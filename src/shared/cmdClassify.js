@@ -509,8 +509,15 @@
   // mai scendere sotto quello che si vedrebbe altrimenti. Gli spazi dentro le
   // virgolette non ci sfuggono: `tokens()` spezza comunque su spazi, e un
   // comando così finisce nei rami cauti (più operandi = livello 3).
+  // Il `$` incollato PRIMA di una virgoletta (`$'...'`, `$"..."`) è, in bash, un
+  // altro modo di scrivere la stessa stringa: `cat $'.ssh/config'` apre
+  // esattamente `~/.ssh/config`. Toglierlo insieme alle virgolette serve a non
+  // lasciare in mano al bersaglio un nome diverso da quello vero (`$.ssh`, che
+  // non somiglia a niente di riservato, #587 giro 3). Il `$` altrove — `$HOME`,
+  // `$env:APPDATA` — resta al suo posto: lì è una variabile, e il suo controllo
+  // è un altro.
   function unquote(tok) {
-    return String(tok).replace(/['"]/g, '');
+    return String(tok).replace(/\$(?=['"])/g, '').replace(/['"]/g, '');
   }
 
   // Comando con le virgolette rimosse token per token: la forma su cui girano
