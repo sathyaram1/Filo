@@ -949,7 +949,11 @@
       }
       persist();
     });
-    $('agentStyleText').addEventListener('input', () => { syncPresetSelect(); persistDebounced(); });
+    $('agentStyleText').addEventListener('input', () => {
+      syncPresetSelect();
+      refreshStyleLimit();
+      persistDebounced();
+    });
 
     // Token estetici: reset globale ai predefiniti.
     $('resetAllTokens').addEventListener('click', resetAllTokens);
