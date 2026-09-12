@@ -83,7 +83,7 @@ test('lo stile scritto dal modello arriva nel prompt DELIMITATO, non come istruz
   expect(sicurezza).toBeGreaterThan(chiusura);
 });
 
-test('anche una preferenza scritta da una pagina web non tocca lo stile', async ({ openTab, server }) => {
+test('anche una preferenza scritta da una pagina web non tocca lo stile', async ({ openTab, testServer }) => {
   // Il canale delle pagine web non deve poter cambiare lo stile dell'agente:
   // sarebbe la stessa scrittura permanente, senza nemmeno un modello di mezzo.
   const page = await openTab(NEWTAB);
@@ -91,8 +91,7 @@ test('anche una preferenza scritta da una pagina web non tocca lo stile', async 
     chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }),
   { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'Tono asciutto.' });
 
-  const web = await openTab(`${server.origin}/vuota.html`).catch(() => null);
-  if (!web) test.skip(true, 'nessun mini server disponibile in questo ambiente');
+  const web = await testServer.openReady(openTab, '<!doctype html><title>ostile</title><p>ciao');
   const esito = await web.evaluate(async () => {
     try {
       return await chrome.runtime.sendMessage({
