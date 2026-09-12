@@ -1376,6 +1376,11 @@
     // non un separatore.
     const partenza = o.cwd || o.perimetro || '';
     let cwds = esc === true ? lettureDi(partenza, true) : [partenza];
+    // Uno spostamento verso una cartella che il comando non nomina (`cd ~-`,
+    // `cd ~1`): da lì in poi, dentro questa sequenza, non sappiamo più dove si
+    // legge. Lo spostamento da solo non costa niente — non legge — ma la prima
+    // lettura che segue va confermata.
+    let cwdIgnota = '';
     const parts = splitSafeSequence(raw) || splitSafePipeline(raw) || [raw];
     for (const part of parts) {
       const t = dequote(part);
