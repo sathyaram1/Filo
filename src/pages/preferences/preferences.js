@@ -771,15 +771,42 @@
       sound: $('notifSound').value || 'default',
     };
 
-    await chrome.runtime.sendMessage({
-      type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive, notifications },
-    });
+    return {
+      valori: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive, notifications },
+      styleCheck,
+    };
+  }
 
-    savedAgentStyle = agentStyle;
-    window.SN_PAGE_THEME = theme;
-    Bootstrap.applyTheme(theme);
-    Bootstrap.applyTextScale(textScale);
+  // Ribattezza il punto di partenza: da qui in poi "toccato dall'utente"
+  // vuol dire "diverso da questo".
+  function ribasa() {
+    ultimoInviato = raccogli().valori;
+  }
+
+  async function persist() {
+    const { valori, styleCheck } = raccogli();
+
+    // Solo i campi che l'utente ha davvero cambiato da quando la pagina li ha
+    // letti (o li ha scritti l'ultima volta). Tutto il resto non si tocca:
+    // potrebbe essere cambiato altrove mentre questa pagina stava aperta, e
+    // riscriverlo col valore vecchio disferebbe una scelta già confermata.
+    const partial = {};
+    for (const [chiave, valore] of Object.entries(valori)) {
+      const prima = ultimoInviato ? ultimoInviato[chiave] : undefined;
+      if (JSON.stringify(prima) !== JSON.stringify(valore)) partial[chiave] = valore;
+    }
+
+    // La resa a schermo è locale e non dipende dal salvataggio.
+    savedAgentStyle = valori.agentStyle;
+    window.SN_PAGE_THEME = valori.theme;
+    Bootstrap.applyTheme(valori.theme);
+    Bootstrap.applyTextScale(valori.textScale);
+
+    if (!Object.keys(partial).length) return;
+
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    ultimoInviato = { ...(ultimoInviato || {}), ...partial };
+
     // Il "Salvato" mentirebbe su uno stile che non è stato salvato: lì parla
     // il messaggio rosso sotto il textarea.
     if (styleCheck.ok) flashSaved();
