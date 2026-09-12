@@ -113,6 +113,50 @@ module.exports = function register(on, ctx) {
     return { ok: true, settings: merged };
   });
 
+  // ── permessi dei siti, come li vede la pagina Sicurezza (#586) ──────────
+  //
+  // Non li legge dalle impostazioni, e non è un giro inutile: in incognito
+  // quelle scelte NON stanno nelle impostazioni. Vivono in memoria e muoiono
+  // con la finestra, come i cookie. Leggendo lo storage, in una finestra in
+  // incognito l'elenco tornava vuoto e chi andava a cercare lì la scelta
+  // appena fatta trovava un elenco che sembrava completo e non lo era: dare
+  // si poteva, togliere solo dal tasto destro sulla scheda. Passando di qui la
+  // memoria giusta la sceglie il main, guardando da quale finestra arriva la
+  // domanda.
+  //
+  // Solo dalle pagine filo://: una pagina web che potesse scrivere qui si
+  // darebbe da sola la fotocamera, scavalcando la domanda.
+  const permessiSito = () => require('../permessiSito');
+
+  on(MSG.PERMESSI_SITI_LISTA, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden', voci: [] };
+    const P = permessiSito();
+    const ctx = P.contesto(sender && sender.wc);
+    return { ok: true, voci: P.elenco(ctx), incognito: !!ctx.incognito };
+  });
+
+  on(MSG.PERMESSI_SITI_IMPOSTA, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const P = permessiSito();
+    const ctx = P.contesto(sender && sender.wc);
+    const ok = P.imposta(msg && msg.origine, msg && msg.chiave, msg && msg.scelta, ctx);
+    return { ok, voci: P.elenco(ctx), incognito: !!ctx.incognito };
+  });
+
+  on(MSG.PERMESSI_SITI_REVOCA, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const P = permessiSito();
+    const ctx = P.contesto(sender && sender.wc);
+    // Senza origine: toglie tutto. È il «cancella tutte le scelte» della
+    // pagina Sicurezza, che deve valere anche dove le scelte stanno in memoria.
+    if (!msg || !msg.origine) {
+      for (const riga of P.elenco(ctx)) P.revoca(riga.origine, null, ctx);
+    } else {
+      P.revoca(msg.origine, (msg && msg.chiave) || null, ctx);
+    }
+    return { ok: true, voci: P.elenco(ctx), incognito: !!ctx.incognito };
+  });
+
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     // Ripristino completo (#184): riscrive TUTTE le impostazioni ai valori
