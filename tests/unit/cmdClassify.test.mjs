@@ -1253,3 +1253,127 @@ test('#587 — il testo cercato non è un file, e non deve far chiedere niente',
     assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" deve chiedere un OK`);
   }
 });
+
+// ── #587, giro 3 — il bersaglio scritto in un'altra forma ────────────────────
+//
+// Stessa causa dei due giri prima (quello che viene misurato non è quello che il
+// comando aprirà), terza strada: il percorso scritto in un modo che la SHELL
+// scioglie e il controllo no. In bash — la shell di Filo su Mac e Linux — la
+// barra rovesciata non separa le cartelle, annulla il carattere dopo: `cat
+// .ss\h/config` apre `~/.ssh/config` e `cat .netr\c` apre `~/.netrc`. Le
+// virgolette col dollaro davanti (`$'…'`) sono un altro modo di scrivere la
+// stessa stringa. Su Windows un percorso può viaggiare attaccato al nome del
+// parametro (`-Path:…`), dove veniva scartato come se fosse un'opzione.
+//
+// Senza il fix ognuno di questi assert torna 1 al posto di 2.
+
+test('#587 — una barra rovesciata dentro il nome non nasconde il bersaglio', () => {
+  for (const cmd of [
+    'cat .ss\\h/config',
+    'cat .\\ssh/config',
+    'cat .ss\\h/known_hosts',
+    'head -5 .ss\\h/*',
+    'cat .confi\\g/Filo/storage.json',
+    'cat .netr\\c',
+    'cat .git-credential\\s',
+    'cat .pgpas\\s',
+    'cat .bash_histor\\y',
+    'cat .npmr\\c',
+    'cd .ss\\h && cat config',
+    'cd .ss\\h ; cat known_hosts',
+    'ls .ss\\h',
+    'cp .ss\\h/id_rsa /tmp/x',
+  ]) {
+    assert.ok(C.classify(cmd, dove()) >= 2, `"${cmd}" non può partire senza chiedere niente`);
+  }
+  // Con una shell Unix dichiarata vale anche la cartella di lavoro.
+  assert.equal(
+    C.classify('cat config', { perimetro: HOME, home: HOME, cwd: '/home/mario/.ss\\h', shell: 'bash' }),
+    2,
+    'lo spostamento del turno prima, letto come lo legge bash',
+  );
+});
+
+test('#587 — le virgolette col dollaro davanti non nascondono il bersaglio', () => {
+  for (const cmd of [
+    "cat $'.ssh/config'",
+    "cat $'.netrc'",
+    "cat $'.config/Filo/storage.json'",
+    "cd $'.ssh' && cat config",
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" deve chiedere un OK`);
+  }
+});
+
+test('#587 — il percorso attaccato al nome dell’opzione viene misurato', () => {
+  for (const cmd of [
+    'Get-Content -Path:.ssh\\config',
+    'Get-Content -LiteralPath:.ssh\\id_rsa',
+    'Select-String -Path:.ssh\\* PRIVATE',
+    'gc -Path:AppData\\Roaming\\Filo\\storage.json',
+    'grep --file=.ssh/id_rsa .',
+    'grep -f.ssh/id_rsa .',
+  ]) {
+    assert.equal(C.classify(cmd, dove(WIN, WIN)), 2, `"${cmd}" deve chiedere un OK`);
+  }
+  // …ma il MODELLO cercato non è un file, nemmeno quando arriva da un'opzione:
+  // chiedere un OK spiegando «"credentials" contiene chiavi o password» sarebbe
+  // di nuovo una spiegazione falsa (il rilievo chiuso al giro 2).
+  for (const cmd of [
+    'grep -e credentials appunti.txt',
+    'grep --regexp=passwd appunti.txt',
+    'Select-String -Pattern:shadow appunti.txt',
+    'findstr /C:password appunti.txt',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 1, `"${cmd}" non deve chiedere niente`);
+  }
+});
+
+test('#587 — i drive di PowerShell non sono cartelle dentro la home', () => {
+  for (const cmd of [
+    'Get-ItemProperty HKCU:\\Software\\Filo',
+    'Get-ChildItem HKLM:\\SOFTWARE',
+    'Get-Content Env:\\PATH',
+    'Get-ChildItem Env:',
+    'Get-ChildItem Cert:\\CurrentUser',
+  ]) {
+    assert.equal(C.classify(cmd, dove(WIN, WIN)), 2, `"${cmd}" deve chiedere un OK`);
+  }
+  // Un disco vero e un file con i due punti nel nome restano letture normali.
+  assert.equal(C.classify('type C:\\Users\\mario\\note.txt', dove(WIN, WIN)), 1);
+  assert.equal(C.classify('cat nota:2026.txt', dove()), 1);
+});
+
+test('#587 — con una shell Windows dichiarata la barra resta un separatore', () => {
+  const win = { perimetro: WIN, home: WIN, cwd: WIN, shell: 'powershell' };
+  for (const cmd of [
+    'type .\\ssh',                    // una cartella che si chiama "ssh", senza punto
+    'dir .\\config',
+    'type Documenti\\note.txt',
+    'gc App\\Data',
+  ]) {
+    assert.equal(C.classify(cmd, win), 1, `"${cmd}" su PowerShell non deve chiedere niente`);
+  }
+  // La stessa riga con bash dichiarata apre davvero un bersaglio riservato.
+  assert.equal(C.classify('type .\\ssh', { perimetro: HOME, home: HOME, cwd: HOME, shell: 'bash' }), 2);
+});
+
+test('#587 — le letture di tutti i giorni non chiedono niente (giro 3)', () => {
+  for (const cmd of [
+    'cat appunti.txt',
+    'cat *.txt',
+    'head -5 Documenti/*.csv',
+    'ls -la',
+    'ls -R progetto',
+    'grep credentials appunti.txt',
+    'wc -l Documenti/bilancio.csv',
+    'cat progetto/src/index.js',
+    'Get-Content -Raw log.txt',
+    'gci -Filter *.js -Force',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 1, `"${cmd}" non deve chiedere niente`);
+  }
+  for (const cmd of ['type Documenti\\note.txt', 'dir progetto\\src']) {
+    assert.equal(C.classify(cmd, dove(WIN, WIN)), 1, `"${cmd}" non deve chiedere niente`);
+  }
+});

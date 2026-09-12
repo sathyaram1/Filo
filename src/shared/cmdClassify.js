@@ -1150,11 +1150,20 @@
   // darne e contro OGNI cartella di lavoro possibile. Basta che una sola lettura
   // apra un bersaglio riservato perché la lettura chieda un OK: il livello non
   // può dipendere da quale delle due forme abbiamo deciso di credere.
+  // La lettura SCRITTA si misura per intero (bersagli riservati e perimetro). Le
+  // letture ALTERNATIVE — quelle che nascono dallo sciogliere una barra
+  // rovesciata — servono solo a scoprire un bersaglio riservato che la prima
+  // forma nascondeva: sul perimetro non votano. Altrimenti, con la shell non
+  // dichiarata, un percorso Windows normalissimo (`C:\Users\mario\note.txt`, che
+  // sciolto diventa una parola sola) risulterebbe "fuori dalla tua cartella" e
+  // ogni lettura chiederebbe un OK.
   function operandReason(op, cwds, perim, home, soloRiservati, ricorsivo, esc) {
     const basi = Array.isArray(cwds) ? cwds : [cwds];
-    for (const lettura of lettureDi(op, esc)) {
+    const letture = lettureDi(op, esc);
+    for (let i = 0; i < letture.length; i++) {
+      const solo = i === 0 ? soloRiservati : true;
       for (const base of basi) {
-        const why = operandReasonUno(lettura, base, perim, home, soloRiservati, ricorsivo);
+        const why = operandReasonUno(letture[i], base, perim, home, solo, ricorsivo);
         if (why) return why;
       }
     }
