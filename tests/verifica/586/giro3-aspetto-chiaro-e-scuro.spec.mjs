@@ -65,6 +65,9 @@ for (const tema of ['light', 'dark']) {
         // altrimenti le due fotografie uscirebbero identiche.
         await shell.waitForTimeout(800);
         await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, tema);
+        // Nel contenitore senza schermo il tema di sistema non si muove: la
+        // manopola del pilota è l'unica che arriva davvero alla pagina.
+        await shell.emulateMedia({ colorScheme: tema }).catch(() => {});
         await shell.waitForTimeout(400);
         console.log(`[586 g3] tema ${tema} → scuro in pagina:`,
           await shell.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches));
