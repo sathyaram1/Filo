@@ -493,7 +493,13 @@ test('in incognito la scelta si può anche togliere ─────────�
   expect((voci && voci.voci || []).length, 'la scelta dell\'incognito deve comparire fra quelle da togliere')
     .toBeGreaterThan(0);
   await shellIncognito.evaluate((o) => window.filoShell.permissions.revoke(o, null), origine);
-  await expect.poll(() => page.evaluate(() => window.__stato('camera')), { timeout: 8000 }).toBe('prompt');
+  // Togliere il permesso chiude anche la fotocamera che il sito ha già in mano,
+  // e l'unico modo di chiuderla è ricaricare la scheda (#586, giro 4): mentre
+  // la pagina rinasce una lettura può cadere, quindi si riprova finché non
+  // risponde di nuovo.
+  await expect
+    .poll(() => page.evaluate(() => window.__stato('camera')).catch(() => null), { timeout: 20_000 })
+    .toBe('prompt');
 
   // E su disco non è finito niente: l'incognito resta senza tracce.
   const suDisco = await app.evaluate(async () => {
@@ -948,4 +954,161 @@ test('una pagina che chiede l\'audio del computer senza l\'immagine non fa morir
     await page.evaluate(() => document.getElementById('p').textContent).catch(() => '(morta)'),
     'la pagina deve essere ancora lì',
   ).toBe('viva');
+});
+
+// ─── Le domande che nessun browser fa, e quelle scritte in inglese (#586) ────
+//
+// La lista degli innocui era ferma a sei voci, e fuori di lì finivano anche
+// cose che nessun browser chiede mai e che i siti normali usano di continuo:
+// tenere acceso lo schermo mentre va un video, e non farsi buttare via i propri
+// dati. Compariva una pastiglia col nome tecnico inglese del permesso
+// («vuole usare «screen-wake-lock»»), e chi rispondeva Nega si ritrovava lo
+// schermo spento a metà film.
+
+const HTML_COMUNI = `<!doctype html><html><body style="margin:0">
+<script>
+  window.__schermoAcceso = () => navigator.wakeLock.request('screen')
+    .then(() => 'ok', (e) => 'no: ' + ((e && e.name) || 'errore'));
+  window.__spazio = () => navigator.storage.persist().then((v) => 'persist=' + v, () => 'no');
+  window.__sensore = () => new Promise((r) => {
+    try {
+      const a = new Accelerometer({ frequency: 10 });
+      a.addEventListener('error', () => r('no'));
+      a.addEventListener('reading', () => r('ok'));
+      a.start();
+      setTimeout(() => r('niente'), 3000);
+    } catch (_) { r('no'); }
+  });
+</script></body></html>`;
+
+test('tenere acceso lo schermo durante un video non passa da nessuna domanda', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML_COMUNI);
+
+  expect(
+    await page.evaluate(() => window.__schermoAcceso()),
+    'un video che tiene acceso lo schermo non deve fermarsi davanti a una domanda',
+  ).toBe('ok');
+  await shell.waitForTimeout(800);
+  await expect(pastiglia(shell)).toHaveCount(0);
+
+  await page.evaluate(() => window.__spazio());
+  await shell.waitForTimeout(800);
+  await expect(pastiglia(shell)).toHaveCount(0);
+});
+
+test('nessuna domanda mostra il nome tecnico del permesso', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML_COMUNI);
+
+  // I sensori di movimento una domanda la meritano (sono un sensore), ma
+  // scritta in modo che si capisca.
+  page.evaluate(() => window.__sensore()).catch(() => {});
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  const testo = await pastiglia(shell).first().textContent();
+  expect(testo, 'la domanda deve dire in italiano cosa il sito sta chiedendo').toContain('inclini');
+  expect(
+    testo,
+    'una domanda scritta col nome tecnico del permesso non la capisce nessuno: '
+    + `chi la legge non sa cosa sta per dare. Qui c'era scritto: ${testo}`,
+  ).not.toMatch(/«[a-z-]+»/);
+});
+
+// ─── Quello che si poteva solo negare, mai consentire (#586) ─────────────────
+//
+// Per l'elenco dei caratteri installati Chromium non fa mai la richiesta:
+// chiede solo cosa è già stato deciso. Con un no il sito riceveva un elenco
+// vuoto e nessuna pastiglia compariva, quindi nessuna scelta veniva registrata,
+// quindi in Impostazioni quel sito non c'era e non c'era niente da ribaltare.
+
+test('i caratteri del computer si possono anche consentire, non solo negare', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<button id="b">scegli un carattere</button>
+<script>
+  window.__esito = null;
+  document.getElementById('b').addEventListener('click', async () => {
+    try { const f = await window.queryLocalFonts(); window.__esito = f.length; }
+    catch (e) { window.__esito = 'no: ' + e.name; }
+  });
+</script></body></html>`);
+
+  await page.click('#b');
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await expect(pastiglia(shell)).toContainText('caratteri installati');
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  await shell.waitForTimeout(600);
+
+  await page.click('#b');
+  await expect
+    .poll(() => page.evaluate(() => window.__esito), { timeout: 15_000 })
+    .not.toBe(null);
+  expect(
+    await page.evaluate(() => window.__esito),
+    'dopo il Consenti il sito deve ricevere i caratteri: una domanda che non cambia niente '
+    + 'è peggio di nessuna domanda',
+  ).toBeGreaterThan(0);
+});
+
+// ─── Il microfono aperto: un cartello, e una revoca che chiude (#586) ────────
+//
+// Per lo schermo il cartello c'era, per fotocamera e microfono no: la ragione
+// scritta allora era che una webcam accesa si vede e un microfono aperto prima
+// o poi si sente, ma su un fisso e su quasi tutti i portatili il microfono non
+// accende nessuna spia. E togliere la scelta in Impostazioni valeva solo per la
+// volta dopo: il sito continuava ad ascoltare.
+
+const HTML_MICROFONO = `<!doctype html><html><body style="margin:0">
+<script>
+  window.__tracce = null;
+  window.__microfono = () => navigator.mediaDevices.getUserMedia({ audio: true }).then(
+    (s) => { window.__tracce = s.getTracks(); return s.getTracks().map((t) => t.kind + ':' + t.readyState); },
+    (e) => 'rifiutato:' + ((e && e.name) || 'errore'));
+  window.__vive = () => (window.__tracce || []).filter((t) => t.readyState === 'live').length;
+</script></body></html>`;
+
+test('mentre un sito ascolta col microfono, Filo lo dice', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, HTML_MICROFONO);
+  const host = new URL(page.url()).host;
+
+  const esito = page.evaluate(() => window.__microfono());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await esito, 'chi consente deve ottenere il microfono').toEqual(['audio:live']);
+
+  const vivo = shell.locator('.perm-live');
+  await expect(vivo).toHaveCount(1, { timeout: 15_000 });
+  await expect(vivo).toContainText(host);
+  await expect(vivo).toContainText('microfono');
+  // Un avviso vero non si mette a tacere: qui la × non c'è, c'è «Interrompi».
+  await expect(vivo.locator('.perm-chip-x')).toHaveCount(0);
+
+  await vivo.locator('.perm-chip-btn').click();
+  await expect(vivo).toHaveCount(0, { timeout: 15_000 });
+  await expect
+    .poll(() => page.evaluate(() => window.__vive()).catch(() => 0), { timeout: 15_000 })
+    .toBe(0);
+});
+
+test('togliere il permesso chiude anche il microfono che il sito ha già aperto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, HTML_MICROFONO);
+  const origine = new URL(page.url()).origin;
+
+  const esito = page.evaluate(() => window.__microfono());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await esito).toEqual(['audio:live']);
+  await expect(shell.locator('.perm-live')).toHaveCount(1, { timeout: 15_000 });
+
+  // La revoca, dalla stessa porta delle Impostazioni e del tasto destro.
+  await app.evaluate((_e, o) => {
+    require('./src/main/services/permessiSito').revoca(o, 'microfono', {});
+  }, origine);
+
+  await expect
+    .poll(() => page.evaluate(() => window.__vive()).catch(() => 0), { timeout: 20_000 })
+    .toBe(0);
+  await expect(shell.locator('.perm-live')).toHaveCount(0, { timeout: 15_000 });
 });
