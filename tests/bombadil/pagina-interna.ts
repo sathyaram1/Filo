@@ -84,7 +84,7 @@ const tema = extract((state) => {
     : "";
   return {
     sfondoGettone: stile.getPropertyValue("--sn-bg").trim(),
-    testoGettone: stile.getPropertyValue("--sn-text").trim(),
+    testoGettone: stile.getPropertyValue("--sn-fg").trim(),
     sfondoCorpo,
   };
 });
