@@ -290,7 +290,7 @@
     // un sito con l'estensione in caratteri non latini (.рф, .テスト, e le
     // altre, che esistono e si usano) veniva accettato da una e buttato
     // dall'altra, quindi restava in elenco senza bloccare niente.
-    return SN_URL_NAV.isListableDomain(s) ? s : '';
+    return UrlNav.isListableDomain(s) ? s : '';
   }
 
   function renderWhitelist() {
