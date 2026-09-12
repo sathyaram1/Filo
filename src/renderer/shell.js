@@ -1809,6 +1809,25 @@
         titolo.appendChild(document.createTextNode(' vedrà quello che scegli qui'));
         box.appendChild(titolo);
 
+        // L'audio del computer: una scelta a parte, e spenta di suo. Non è lo
+        // schermo. È la musica, un video, la chiamata che stai facendo in
+        // un'altra finestra, la voce di chi ti parla: prima arrivava insieme
+        // all'immagine senza che niente lo nominasse, e non c'era modo di dare
+        // l'una senza l'altra (#586). Compare solo se il sito l'ha chiesto.
+        let audioBox = null;
+        if (info.audio) {
+          const riga = document.createElement('label');
+          riga.className = 'perm-source-audio';
+          audioBox = document.createElement('input');
+          audioBox.type = 'checkbox';
+          riga.appendChild(audioBox);
+          const t = document.createElement('span');
+          t.textContent = 'Fagli sentire anche l\'audio del computer';
+          t.dataset.tip = 'Tutto quello che si sente sul computer, non solo questa pagina';
+          riga.appendChild(t);
+          box.appendChild(riga);
+        }
+
         const griglia = document.createElement('div');
         griglia.className = 'perm-source-grid';
         for (const v of info.voci) {
