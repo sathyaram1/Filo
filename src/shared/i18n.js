@@ -537,6 +537,11 @@
     options_perms_remove: 'Togli',
     options_perms_remove_tip: 'Togli la risposta: il sito tornerà a chiedere',
     options_perms_clear: 'Togli tutte le risposte',
+    // In incognito le memorie sono due, e la riga dice a quale appartiene: senza,
+    // questa pagina aperta da una finestra in incognito diceva che nessun sito
+    // aveva mai ricevuto una risposta a chi ne aveva date dieci (#586, giro 7).
+    options_perms_incognito: 'solo in questa finestra in incognito',
+    options_perms_normale: 'finestre normali',
     options_perms_clear_confirm:
       'Vuoi togliere tutte le risposte che hai dato ai siti? Chi ne aveva bisogno tornerà a chiedere.',
     options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
