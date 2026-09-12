@@ -377,31 +377,61 @@ function consumaPreambolo(wc) {
   return null;
 }
 
-// Riprese dello schermo in corso. Una webcam accesa si vede e un microfono
-// aperto prima o poi si sente; lo schermo ripreso non lascia nessun segno, e
-// senza questo un sito continua a filmare e chi usa Filo non ha modo di
-// saperlo né di fermarlo. Il segno dice «può vedere», non «sta vedendo»,
-// perché quando il sito smette da solo nessuno ce lo dice: la sola cosa certa
-// è che finché quella pagina è lì il permesso ce l'ha ancora. «Interrompi»
-// ricarica la pagina, che è l'unico modo di chiudere la ripresa per davvero.
-const riprese = new Map(); // id → { wc, shell, pulisci }
-let prossimaRipresa = 1;
+// Quello che un sito PUÒ fare adesso, mentre lo può fare: la ripresa dello
+// schermo, la fotocamera, il microfono.
+//
+// Lo schermo ripreso non lascia nessun segno, e senza questo cartello un sito
+// continua a filmare e chi usa Filo non ha modo di saperlo né di fermarlo. Per
+// fotocamera e microfono valeva la stessa cosa: qui c'era scritto che «una
+// webcam accesa si vede e un microfono aperto prima o poi si sente», ma su un
+// fisso e su quasi tutti i portatili il microfono non accende nessuna spia, e
+// il sito ascoltava finché la pagina restava aperta senza che comparisse niente
+// (#586, giro 4). Adesso il cartello vale per tutte e tre.
+//
+// Il cartello dice «può», non «sta»: quando il sito smette da solo nessuno ce
+// lo dice, e la sola cosa certa è che finché quella pagina è lì il permesso ce
+// l'ha ancora. «Interrompi» ricarica la pagina, che è l'unico modo di chiudere
+// per davvero: da qui non si spegne una traccia già consegnata.
+const usi = new Map(); // id → { wc, shell, origine, chiavi, incognito, pulisci }
+let prossimoUso = 1;
 
-function iniziaRipresa(wc, origine, opzioni) {
+// Un cartello per ogni combinazione scheda + sito + cosa: un sito che riapre il
+// microfono dieci volte non impila dieci cartelli identici.
+function usoEsistente(wc, origine, chiavi) {
+  const firma = chiavi.slice().sort().join(',');
+  for (const [id, u] of usi) {
+    if (u.wc === wc && u.origine === origine && u.chiavi.slice().sort().join(',') === firma) return id;
+  }
+  return null;
+}
+
+// `chiudibile`: il cartello si può togliere con una ×. Vale solo dove Filo sta
+// TIRANDO A INDOVINARE, cioè sulla strada vecchia dello schermo, che non passa
+// da nessun gestore e non dice mai se la cattura sia partita davvero. Lì il
+// cartello si accendeva anche quando al sito non era arrivato niente, e non se
+// ne andava più (#586, giro 4). Dove Filo sa (la fotocamera, il microfono, la
+// cattura moderna) la × non c'è: un avviso vero non si toglie di mezzo.
+function iniziaUso(wc, origine, chiavi, opzioni) {
   try {
+    const o = opzioni || {};
     const { win, tab } = posizione(wc);
     const shell = win && !win.isDestroyed() ? win.webContents : null;
     if (!shell || shell.isDestroyed()) return null;
-    const id = String(prossimaRipresa++);
+    const gia = usoEsistente(wc, origine, chiavi);
+    if (gia) return gia;
+    const id = String(prossimoUso++);
     const suNavigazione = (_e, _url, inPlace, isMainFrame) => {
-      if (isMainFrame && !inPlace) fineRipresa(id);
+      if (isMainFrame && !inPlace) fineUso(id);
     };
-    const suMorte = () => fineRipresa(id);
+    const suMorte = () => fineUso(id);
     try { wc.on('did-start-navigation', suNavigazione); } catch (_) {}
     try { wc.once('destroyed', suMorte); } catch (_) {}
-    riprese.set(id, {
+    usi.set(id, {
       wc,
       shell,
+      origine,
+      chiavi: chiavi.slice(),
+      incognito: !!(win && win._filoIncognito),
       pulisci: () => {
         try { wc.off('did-start-navigation', suNavigazione); } catch (_) {}
         try { wc.off('destroyed', suMorte); } catch (_) {}
@@ -411,31 +441,50 @@ function iniziaRipresa(wc, origine, opzioni) {
       id,
       tabId: tab ? tab.id : null,
       host: P().host(origine),
-      // 'no' = solo l'immagine; 'si' = anche l'audio del computer, e l'utente
-      // l'ha scelto; 'forse' = strada vecchia, dove non si può sapere.
-      audio: (opzioni && opzioni.audio) || 'no',
+      frase: P().frasePotere(chiavi, !!o.audioSistema),
+      chiudibile: !!o.chiudibile,
     });
     return id;
   } catch (_) { return null; }
 }
 
-function fineRipresa(id) {
-  const r = riprese.get(String(id));
+function fineUso(id) {
+  const r = usi.get(String(id));
   if (!r) return { ok: false };
-  riprese.delete(String(id));
+  usi.delete(String(id));
   try { r.pulisci(); } catch (_) {}
   try { if (r.shell && !r.shell.isDestroyed()) r.shell.send('permissions:capture-end', { id: String(id) }); } catch (_) {}
   return { ok: true };
 }
 
 // «Interrompi»: ricaricare la pagina distrugge il documento e con lui la
-// ripresa. È brutale e lo dice il suggerimento del bottone, ma è l'unica via
-// che chiude davvero: da qui non si può spegnere una traccia già consegnata.
-function interrompiRipresa(id) {
-  const r = riprese.get(String(id));
+// ripresa o la traccia del microfono.
+function interrompiUso(id) {
+  const r = usi.get(String(id));
   if (!r) return { ok: false, error: 'finita' };
   try { if (r.wc && !r.wc.isDestroyed()) r.wc.reload(); } catch (_) {}
-  return fineRipresa(id);
+  return fineUso(id);
+}
+
+// La × sul cartello incerto: toglie l'avviso e basta, senza toccare la pagina.
+function chiudiAvviso(id) {
+  return fineUso(id);
+}
+
+// Togliere il permesso deve togliere anche quello che il sito ha già in mano.
+// Prima la revoca valeva solo per la volta dopo: si toglieva la scelta dalle
+// Impostazioni, l'elenco si svuotava e il microfono restava aperto (#586,
+// giro 4). Da qui si chiude sul serio, che vuol dire ricaricare quella scheda:
+// è l'unica strada, ed è la stessa dell'«Interrompi» del cartello.
+function chiudiUsi(origine, chiave, incognito) {
+  const o = P().origineDi(origine);
+  if (!o) return;
+  for (const [id, u] of [...usi]) {
+    if (u.origine !== o) continue;
+    if (!!u.incognito !== !!incognito) continue;
+    if (chiave && !u.chiavi.includes(String(chiave))) continue;
+    interrompiUso(id);
+  }
 }
 
 // Controllo SINCRONO (navigator.permissions.query, Notification.permission,
