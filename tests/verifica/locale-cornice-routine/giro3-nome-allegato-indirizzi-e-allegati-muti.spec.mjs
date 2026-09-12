@@ -13,6 +13,9 @@
 //   · un allegato che non è testo (un PDF) sparisce dal fascicolo senza una
 //     riga che lo dica: il lavoratore non sa che l'utente ha allegato qualcosa.
 //
+// Le tre porte sono state trovate aperte nel giro 3 e chiuse nella sua fase di
+// correzione: queste prove restano come guardia del giro.
+//
 // Come nei giri prima: fascicolo costruito dal codice vero del server (repo
 // filo-security accanto a questo), stampato dal dispatch vero di questo ramo.
 
