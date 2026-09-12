@@ -156,7 +156,16 @@
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     // La lista dei siti bloccati ha fermato un'apertura. Dirlo, col sito: un
     // blocco muto sembra un guasto (#482).
-    if (o.blocked === 'site') return o.host ? `sito bloccato: ${o.host}` : 'sito bloccato';
+    // Il nome del sito come l'utente lo scriverebbe (#590): un indirizzo in
+    // cirillico o in giapponese viaggia come "xn--80aswg.xn--p1ai", e la
+    // notifica in basso a destra lo chiama già col suo nome. Due posti che
+    // nominano lo stesso sito nello stesso istante devono chiamarlo uguale.
+    if (o.blocked === 'site') {
+      if (!o.host) return 'sito bloccato';
+      const NAV = globalThis.SN_URL_NAV;
+      const nome = (NAV && NAV.hostLeggibile && NAV.hostLeggibile(o.host)) || o.host;
+      return `sito bloccato: ${nome}`;
+    }
     if (o.blocked === 'address') return 'indirizzo non valido';
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
