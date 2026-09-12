@@ -723,14 +723,31 @@
     input.value = String(clampNotifDurationSec(parseInt(input.value, 10)));
   }
 
-  async function persist() {
+  // Quello che questa pagina ha scritto per ultimo (all'apertura: quello che
+  // ci ha trovato). Serve a mandare al salvataggio SOLO i campi che l'utente
+  // ha toccato davvero: senza, la pagina rimandava tutto il blocco a ogni
+  // tocco, e un'impostazione cambiata altrove — da Filo in chat, dopo una
+  // conferma — tornava indietro in silenzio appena si sfiorava un altro campo.
+  // Il caso peggiore che ha fatto nascere questo controllo: la modalità
+  // terminale spenta a voce si riaccendeva cambiando il tema.
+  let ultimoInviato = null;
+
+  // Legge dai controlli l'INTERO blocco di impostazioni di questa pagina.
+  // Non scrive niente: dice solo cosa mostrano i campi adesso.
+  function raccogli() {
     const theme = $('theme').value;
     const textScale = parseFloat($('textScale').value) || 1;
     const showHomeMessage = $('showHomeMessage').checked;
     // Oltre il tetto non si salva e non si taglia: resta quello di prima, e il
     // perché è già scritto sotto il textarea (refreshStyleLimit).
     const styleCheck = refreshStyleLimit();
-    const agentStyle = styleCheck.ok ? styleCheck.value : savedAgentStyle;
+    // «normale», «nessuno», «no»: da sole vogliono dire "nessuno stile", come
+    // quando lo si dice a Filo. La lettura sta qui e non solo nell'uscita dal
+    // campo, se no chi scriveva quella parola e chiudeva la scheda senza
+    // cliccare altrove se la ritrovava salvata come stile.
+    const agentStyle = styleCheck.ok
+      ? (isAgentStyleRemoval(styleCheck.value) ? '' : styleCheck.value)
+      : savedAgentStyle;
     const timerRingtone = $('timerRingtone').value || 'default';
     const terminal = {
       enabled: $('terminalEnabled').checked,
