@@ -850,6 +850,9 @@ function posizioneNonDisponibile(wc) {
 }
 
 function chiudiNotizia(id) {
+  // La × toglie l'avviso e basta. Su «ho smesso di chiedere» non rimette il
+  // conto a zero: quello lo fa il «Chiedimelo di nuovo», che è una scelta.
+  if (anelliDetti.delete(String(id))) return { ok: true };
   for (const [wcId, v] of [...avvisiPosizione]) {
     if (v === String(id)) { avvisiPosizione.delete(wcId); return { ok: true }; }
   }
