@@ -953,8 +953,16 @@ async function applySettingsUpdate(partial) {
       && typeof globalThis.SN_CONST.validateAgentStyle === 'function') {
     const check = globalThis.SN_CONST.validateAgentStyle(partial.agentStyle);
     partial = { ...partial };
-    if (check.ok) partial.agentStyle = check.value;
-    else {
+    if (check.ok) {
+      // «normale», «nessuno», «no» e le altre parole di rimozione vogliono
+      // dire "nessuno stile" da qualunque strada arrivino: a voce, dal
+      // riquadro delle Preferenze o da qui. Prima la lettura viveva solo nel
+      // setter della chat, e chi scriveva quella parola nel riquadro si
+      // ritrovava uno stile che diceva «normale» al modello.
+      const rimozione = typeof globalThis.SN_CONST.isAgentStyleRemoval === 'function'
+        && globalThis.SN_CONST.isAgentStyleRemoval(check.value);
+      partial.agentStyle = rimozione ? '' : check.value;
+    } else {
       console.warn('[Filo] stile dell\'agente scartato: %d caratteri, il tetto è %d',
         check.length, globalThis.SN_CONST.AGENT_STYLE_MAX);
       delete partial.agentStyle;
