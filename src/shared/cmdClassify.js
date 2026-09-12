@@ -846,7 +846,6 @@
     if (!insidePerimeter(target, perim)) return FUORI;
     return '';
   }
-  const AMBIENTE = 'Legge le variabili d’ambiente, dove spesso stanno chiavi e password.';
 
   // Perché un comando altrimenti di livello 1 deve comunque chiedere un OK?
   // Ritorna '' se non deve. Segue i `cd` dentro la sequenza, così il bersaglio
