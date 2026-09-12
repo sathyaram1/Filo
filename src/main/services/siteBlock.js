@@ -281,11 +281,15 @@ function configureFromSettings(settings) {
 }
 
 // Per i test: imposta stato senza passare da settings.
-function setForTest({ enabled: en, useAdblockLists: ual, blacklist } = {}) {
+function setForTest({ enabled: en, useAdblockLists: ual, blacklist, allowed } = {}) {
   if (en !== undefined) enabled = !!en;
   if (ual !== undefined) useAdblockLists = !!ual;
   if (Array.isArray(blacklist)) {
     userBlacklist = toBlacklistSet(blacklist);
+    allowedBySite = new Set();
+  }
+  if (Array.isArray(allowed)) {
+    allowedBySite = new Set(allowed.map(canonicalHost).filter(Boolean));
   }
 }
 
@@ -294,6 +298,7 @@ function status() {
     enabled,
     useAdblockLists,
     blacklistSize: userBlacklist.size,
+    allowedSize: allowedBySite.size,
   };
 }
 
@@ -304,6 +309,8 @@ module.exports = {
   isBlacklistedHost,
   normalizeDomain,
   canonicalHost,
+  allowHost,
+  isAllowedHost,
   setForTest,
   status,
 };
