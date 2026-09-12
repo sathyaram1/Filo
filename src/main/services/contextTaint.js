@@ -82,19 +82,31 @@ function clip(text) {
 
 // Registra del materiale entrato nel contesto del modello.
 //   source    — etichetta della provenienza ('comando', 'ricerca web', …)
-//   text      — il testo entrato, che va protetto dall'esfiltrazione
+//   text      — il testo entrato
 //   untrusted — se quel materiale può contenere istruzioni ostili (default sì).
 //               I documenti dell'utente entrano nel corpus ma non accendono il
 //               ripiego strutturale: sono roba sua, non di un attaccante.
-function record(sender, source, text, { untrusted = true } = {}) {
+//   proteggi  — se quel materiale è roba dell'UTENTE, da fermare se un link prova
+//               a portarla fuori (default sì).
+//
+// Le due domande sono diverse e vanno tenute separate, perché i risultati di una
+// ricerca rispondono sì alla prima e no alla seconda: sono testo pubblico preso
+// da pagine che non controlliamo, quindi rendono il contesto pilotabile, ma non
+// sono dati dell'utente. Metterli fra le cose da proteggere faceva combaciare
+// ogni risultato con se stesso: «cerca la carbonara e aprimi il primo» apriva un
+// avviso di furto di dati sul link che la ricerca aveva appena restituito
+// (#587, giro 1). È la stessa ragione per cui gli indirizzi delle schede aperte
+// non entrano nel corpus.
+function record(sender, source, text, { untrusted = true, proteggi = true } = {}) {
   const body = String(text == null ? '' : text).trim();
   if (!body) return;
   const led = ledgerFor(sender, true);
   if (!led) return;
+  if (untrusted && source) led.sources.add(String(source));
+  if (!proteggi) return;
   const entry = clip(body);
   led.entries.push(entry);
   led.chars += entry.length;
-  if (untrusted && source) led.sources.add(String(source));
   while (led.entries.length > MAX_ENTRIES || (led.chars > MAX_CHARS && led.entries.length > 1)) {
     const gone = led.entries.shift();
     led.chars -= gone.length;
