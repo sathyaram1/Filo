@@ -2281,7 +2281,15 @@ class TabManager {
       // openTab (#590), che è il punto in cui la lista viene applicata: senza,
       // l'eccezione "arrivo da un motore di ricerca" non varrebbe per i
       // risultati aperti in una scheda nuova.
-      const fromUrl = (details.referrer && details.referrer.url) || wc.getURL();
+      // #590 (terzo giro) — la pagina di partenza è quella su cui sta la
+      // scheda, non il referrer che la richiesta si porta dietro. Il referrer
+      // fuori dal proprio dominio arriva quasi sempre ridotto alla sola origine
+      // ("https://motore.esempio/"), cioè senza la domanda che rende quella
+      // pagina un risultato di ricerca, e l'eccezione andava concessa a
+      // qualunque pagina di quel sito. Ed è anche il valore più solido: dentro
+      // un riquadro incorporato il referrer è del riquadro, mentre a comandare
+      // la scheda è la pagina che lo ospita.
+      const fromUrl = wc.getURL() || (details.referrer && details.referrer.url) || '';
       // #376 — parità con qualsiasi browser: Ctrl+click / click centrale su un
       // link ("aprilo dietro, io continuo a leggere qui") arriva con
       // disposition 'background-tab' e NON deve rubare il primo piano. Prima
