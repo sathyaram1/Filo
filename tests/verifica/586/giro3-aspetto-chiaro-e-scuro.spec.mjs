@@ -58,6 +58,9 @@ for (const tema of ['light', 'dark']) {
         env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
       });
       try {
+        // Il tema della cornice segue il tema di sistema: lo forziamo di là,
+        // altrimenti le due fotografie uscirebbero identiche.
+        await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, tema);
         const shell = await app.firstWindow();
         await shell.waitForLoadState('domcontentloaded');
         const page = await apriScheda(app, shell, url);
