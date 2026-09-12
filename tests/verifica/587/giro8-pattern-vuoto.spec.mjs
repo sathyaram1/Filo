@@ -75,7 +75,13 @@ function fintaCasa() {
 function esegue(cmd, cwd) {
   try {
     return execFileSync('bash', ['-c', cmd], {
-      cwd, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'pipe'],
+      cwd,
+      encoding: 'utf8',
+      timeout: 10000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // `~` deve sciogliersi nella finta cartella dell'utente, non in quella
+      // vera di chi lancia i test.
+      env: { ...process.env, HOME: cwd },
     });
   } catch (e) { return String((e.stdout || '') + (e.stderr || '')); }
 }
