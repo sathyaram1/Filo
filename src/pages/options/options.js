@@ -405,6 +405,24 @@
     // sono già renderizzati); con quella condivisa lo ricalcola loadDefaultModels
     // appena il main risponde.
     renderOpenWeightsImpact();
+
+    // Punto di partenza del confronto: quello che i campi mostrano adesso è
+    // quello che c'è in memoria, quindi non c'è niente da salvare.
+    ribasa();
+  }
+
+  // Un'impostazione può cambiare mentre questa pagina è aperta (Filo in chat,
+  // un'altra scheda). Se l'utente non sta scrivendo la pagina si rilegge, così
+  // non mostra un valore che non è più vero; se sta scrivendo non si tocca
+  // niente, e il confronto dentro `save` basta a non disfare l'altrui lavoro.
+  function ascoltaCambiamentiAltrove() {
+    if (!chrome.runtime?.onMessage?.addListener) return;
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
+      const el = document.activeElement;
+      if (el && el !== document.body && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
+      load().catch(() => {});
+    });
   }
 
   // Normalizza una entry del registry (nuovo schema o vecchio duale) in
