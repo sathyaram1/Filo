@@ -110,7 +110,7 @@ test.describe('parole del mittente ancora fuori cornice', () => {
     if (docs.length) fb.documents = docs;
     for (const role of RUOLI) {
       const out = stampaPerRuolo(role, fb);
-      expect(out, `${role}: il fascicolo non dice che c'era un allegato non letto`).toMatch(/relazione\.pdf|allegato/i);
+      expect(out, `${role}: il fascicolo non dice che c'era un allegato non letto`).toMatch(/relazione\.pdf/);
     }
   });
 });
