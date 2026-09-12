@@ -1618,9 +1618,12 @@ class TabManager {
         // fotocamera faceva comparire la domanda sotto la propria pagina, dove
         // nessuno poteva rispondere. Fuori da quei casi il topInset è 0 e qui
         // non cambia niente.
-        const chrome = (this.contentFullscreen
-          ? 0
-          : (this.chromeCompact ? this.tabRowHeight : this.shellHeight)) + this.topInset;
+        const chrome = Math.max(
+          (this.contentFullscreen
+            ? 0
+            : (this.chromeCompact ? this.tabRowHeight : this.shellHeight)) + this.topInset,
+          this.topFloor,
+        );
         const top = chrome;
         const b = { x: 0, y: top, width: w, height: Math.max(0, h - top) };
         tab.view.setBounds(b);
