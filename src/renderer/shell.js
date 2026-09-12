@@ -1591,11 +1591,16 @@
     // d'una insieme e la riserva deve coprirle tutte. Vedi `riservaTop`.
     function sincronizzaRiserva() {
       requestAnimationFrame(() => {
-        const vive = [...permHost.children].filter((n) => !n.classList.contains('uscita'));
-        if (!vive.length) { riservaTop('permessi', 0); return; }
         let fondo = 0;
-        for (const n of vive) fondo = Math.max(fondo, n.getBoundingClientRect().bottom);
-        riservaTop('permessi', Math.ceil(fondo) + 6);
+        for (const n of permHost.children) {
+          if (n.classList.contains('uscita')) continue;
+          const r = n.getBoundingClientRect();
+          // Un nodo nascosto (il segno di una ripresa che appartiene a
+          // un'altra scheda) è alto zero: non deve tenere giù la pagina.
+          if (r.height <= 0) continue;
+          fondo = Math.max(fondo, r.bottom);
+        }
+        riservaTop('permessi', fondo > 0 ? Math.ceil(fondo) + 6 : 0);
       });
     }
 
