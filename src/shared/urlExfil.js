@@ -250,8 +250,12 @@
     while (i < tok.length) {
       if (j < exposed.length && exposed[j] === tok[i]) { i++; j++; continue; }
       if (buchi >= maxBuchi) return false;
-      const prossimo = tok.slice(i, i + Math.min(SPEZZ_RUN, tok.length - i));
-      if (prossimo.length < SPEZZ_RUN) return false; // coda troppo corta per contare
+      // Coda più corta di un troncone: del dato è già stato ritrovato tutto
+      // tranne un paio di caratteri, con i tagli e la spazzatura già contati.
+      // Pretendere un altro troncone intero qui vorrebbe dire lasciar passare
+      // proprio i dati spezzettati fino in fondo.
+      if (tok.length - i < SPEZZ_RUN) return true;
+      const prossimo = tok.slice(i, i + SPEZZ_RUN);
       let salto = -1;
       for (let k = 1; k <= maxJunk - junk; k++) {
         if (exposed.startsWith(prossimo, j + k)) { salto = k; break; }
