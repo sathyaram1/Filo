@@ -731,6 +731,37 @@
   // partenza. Non alzano il livello da soli (spostarsi non legge niente).
   const CHDIR = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd']);
 
+  // ── Letture RICORSIVE ──────────────────────────────────────────────────────
+  //
+  // Una lettura ricorsiva non ha un bersaglio: ha un SOTTOALBERO. `grep -r chiave .`
+  // lanciato dalla cartella dell'utente non nomina `.ssh` da nessuna parte eppure
+  // lo attraversa, insieme a `.aws`, `.gnupg` e alla cartella di Filo. Misurarla
+  // sul percorso scritto vuol dire non misurarla affatto: il bersaglio vero è
+  // tutto quello che sta sotto.
+  //
+  // La regola: se il sottoalbero è la cartella dichiarata stessa (o qualcosa che
+  // la contiene) la lettura chiede un OK, perché è lì che stanno i bersagli
+  // riservati. Una ricorsiva su una SOTTOcartella (`grep -r x progetti`) resta
+  // senza attrito: è il caso normale di chi cerca nel proprio lavoro.
+  const RECURSE_SEMPRE = new Set(['tree', 'du']); // ricorsivi per natura
+  const RECURSE_RE = {
+    // In grep l'unica `r` fra i flag corti è la ricorsione (-r, -R, -rn, -rli…).
+    grep: /(^|\s)(-[A-Za-z]*[rR][A-Za-z]*|--recursive|--dereference-recursive)(\s|$)/,
+    // findstr usa gli switch Windows: /S (e i bundle tipo /SI).
+    findstr: /(^|\s)\/[A-Za-z]*[sS][A-Za-z]*(\s|$)/,
+  };
+  // Per tutti gli altri vale solo la forma esplicita: `-R` (maiuscola, come in
+  // `ls -lR`), `--recursive`, `-Recurse` di PowerShell. La minuscola `-r` NON
+  // conta qui, altrimenti `ls -lart` (ordina al contrario) passerebbe per una
+  // ricorsiva e chiederebbe un OK a chi elenca la sua cartella.
+  const RECURSE_GENERIC_RE = /(^|\s)(-[A-Za-z]*R[A-Za-z]*|--recursive|-recurse)(\s|$)/i;
+  function isRecursive(prog, cmd) {
+    if (RECURSE_SEMPRE.has(prog)) return true;
+    const re = RECURSE_RE[prog];
+    if (re) return re.test(cmd);
+    return RECURSE_GENERIC_RE.test(cmd);
+  }
+
   // Riferimento a una variabile d'ambiente: `$HOME`, `${HOME}`, `$env:APPDATA`,
   // `%APPDATA%`. `$_` di PowerShell (l'oggetto della pipeline) NON combacia — il
   // nome deve iniziare con una lettera — così le pipeline di lettura restano 1.
