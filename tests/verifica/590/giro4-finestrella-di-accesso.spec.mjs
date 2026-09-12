@@ -22,6 +22,10 @@
 //           pagina) verso un sito messo in lista nel frattempo.
 //
 // Porta P — il sito della lista mostrato dentro un riquadro incorporato.
+//
+// Porta Q — il sì dato su «Apri comunque» vale tutta la sessione: dopo che la
+//           notifica che lo annuncia se n'è andata, si riesce ancora a vedere
+//           che è stato dato, e a toglierlo?
 
 import { test, expect, _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
