@@ -1939,7 +1939,10 @@ class TabManager {
       try { corrente = wc.getURL() || ''; } catch (_) { return; }
       if (!corrente || url !== corrente) return;
       if (!this._maybeBlockNavigation(url)) return;
-      try { wc.stop(); } catch (_) {}
+      // Fermare un caricamento mentre si sta ancora annunciando fa cadere tutto
+      // (la scheda muore, e con lei la finestra): la fermata va rimandata di un
+      // giro, come la chiusura della scheda rimasta vuota qui sotto.
+      setImmediate(() => { try { wc.stop(); } catch (_) {} });
     });
     // SICUREZZA (#590, quarto giro) — I RIQUADRI INCORPORATI. La lista guardava
     // solo l'indirizzo della scheda, quindi un sito della lista messo dentro un
