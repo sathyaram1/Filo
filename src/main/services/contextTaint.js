@@ -231,6 +231,6 @@ function reset(rawSender) {
 }
 
 module.exports = {
-  record, corpusText, isTainted, sourcesOf, reset,
-  _limits: { MAX_ENTRIES, MAX_CHARS, MAX_ENTRY_CHARS },
+  record, corpusText, isTainted, sourcesOf, reset, ricordaLink, carichiLink,
+  _limits: { MAX_ENTRIES, MAX_CHARS, MAX_ENTRY_CHARS, MAX_LINK },
 };
