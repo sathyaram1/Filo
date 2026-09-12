@@ -223,7 +223,7 @@ module.exports = function register(on, ctx) {
   on(MSG.AUTH_SIGNOUT, async () => {
     try {
       auth.signOut();
-      broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
+      broadcastToFiloPages({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
