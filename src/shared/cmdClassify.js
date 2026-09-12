@@ -764,10 +764,12 @@
   // URL. Il freno non è vietare la lettura — è chiedere un OK quando esce dal
   // perimetro dichiarato o punta a un bersaglio riservato.
 
-  // Programmi che leggono (o elencano) un PERCORSO passato come operando. Solo
-  // questi vengono misurati sul perimetro: `echo`, `basename`, `dirname`,
-  // `Split-Path`, `Join-Path` fanno aritmetica sulle stringhe e non aprono niente,
-  // `where`/`which` cercano un NOME nel PATH.
+  // Programmi che leggono (o elencano) un PERCORSO passato come operando.
+  //
+  // Questo elenco NON decide più chi viene misurato: è la lista dei lettori noti,
+  // tenuta per leggibilità. A decidere è il suo contrario, `NON_APRE_PERCORSI`
+  // (vedi lì il perché): un elenco di lettori da tenere aggiornato è un elenco
+  // che prima o poi dimentica qualcuno, e chi manca non viene misurato affatto.
   const READS_PATHS = new Set([
     'cat', 'tac', 'type', 'more', 'less', 'head', 'tail', 'grep', 'findstr',
     'wc', 'nl', 'cut', 'uniq', 'column', 'file', 'stat', 'du', 'df', 'tree',
