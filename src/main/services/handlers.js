@@ -1595,10 +1595,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           // dentro gli indirizzi dei risultati. Proteggendoli, il link che l'utente
           // chiede di aprire subito dopo («aprimi il primo») combaciava con se
           // stesso e faceva comparire un avviso di furto di dati su ogni ricerca.
+          // La distinzione la tiene contextTaint, per provenienza: qui basta
+          // dichiarare da dove arriva.
           try {
             require('./contextTaint').record(sender, 'ricerca web',
-              results.map((x) => `${x?.title || ''} ${x?.url || ''} ${x?.snippet || ''}`).join('\n'),
-              { proteggi: false });
+              results.map((x) => `${x?.title || ''} ${x?.url || ''} ${x?.snippet || ''}`).join('\n'));
           } catch (_) {}
           return { executed: results.length > 0, kept: true, output: { search: query, results, provider: r?.provider || '', reason: r?.reason || '' } };
         } catch (e) {
