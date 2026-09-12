@@ -188,7 +188,7 @@ function consumaUnaTantum(wc, chiavi) {
 function chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile = true }) {
   return new Promise((resolve) => {
     const shell = win && !win.isDestroyed() ? win.webContents : null;
-    if (!shell || shell.isDestroyed()) { resolve(false); return; }
+    if (!shell || shell.isDestroyed()) { resolve({ ok: false, deciso: true }); return; }
 
     const chiaveAttesa = `${wc.id}|${origine}|${chiavi.slice().sort().join(',')}`;
     for (const att of attese.values()) {
@@ -212,7 +212,7 @@ function chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile = true
       try {
         if (shell && !shell.isDestroyed()) shell.send('permissions:closed', { id });
       } catch (_) {}
-      for (const cb of att.callbacks) { try { cb(ok); } catch (_) {} }
+      for (const cb of att.callbacks) { try { cb({ ok: !!ok, deciso: !!deciso }); } catch (_) {} }
     };
     att.chiudi = finisci;
 
@@ -243,7 +243,7 @@ function chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile = true
         tecnici: Pp.tecnici(chiavi),
         ricordabile,
       });
-    } catch (_) { finisci(false); }
+    } catch (_) { finisci(false, true); }
   });
 }
 
@@ -356,13 +356,21 @@ async function decidi(wc, permesso, dettagli) {
   // (la × della pastiglia, o l'attesa scaduta) non lascia niente nello storage.
   // I permessi che non si ricordano (lo schermo) non hanno niente da scrivere:
   // lì la pastiglia lo dice, così chi risponde sa che vale per questa volta.
+  // Il sito ha già fatto comparire tre domande che chi naviga ha chiuso senza
+  // rispondere: su questa pagina non se ne fanno altre (vedi l'anello qui
+  // sotto). Non resta scritto niente: la pagina che riparte ricomincia da capo.
+  if (troppeSenzaRisposta(wc, origine)) return false;
+
   const memorizzabili = chiavi.filter((k) => Pp.siRicorda(k));
   const salvaScelta = memorizzabili.length ? (scelta) => {
     try {
       scriviMappa(ses, incognito, Pp.conScelta(mappaDi(ses, incognito), origine, memorizzabili, scelta));
     } catch (_) {}
   } : null;
-  const ok = await chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile: !!salvaScelta });
+  const esito = await chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile: !!salvaScelta });
+  const ok = !!(esito && esito.ok);
+  if (esito && !esito.deciso) segnaSenzaRisposta(wc, origine);
+  else senzaRisposta.delete(chiaveAnello(wc, origine));
 
   // Il sì al preambolo vale per la cattura schermo che segue, qualunque delle
   // due strade prenda: la moderna passa dal gestore qui sotto e lì non si
