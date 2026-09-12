@@ -123,6 +123,9 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('permissions:notice-end', wrapped);
     },
     dismissNotice: (id) => ipcRenderer.invoke('permissions:notice-dismiss', { id }),
+    // Il bottone della riga, quando ce l'ha: oggi «Chiedimelo di nuovo» sul
+    // «ho smesso di chiedere per questo sito».
+    noticeAction: (id) => ipcRenderer.invoke('permissions:notice-action', { id }),
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
