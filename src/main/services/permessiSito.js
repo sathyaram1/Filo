@@ -159,7 +159,7 @@ function consumaUnaTantum(wc, chiavi) {
 // Nega subito se non c'è nessuna shell a cui chiedere (finestra isolata del
 // safebrowse, finestre di servizio): una richiesta che nessuno può vedere non
 // può essere concessa.
-function chiedi({ wc, win, tab, origine, chiavi, salvaScelta }) {
+function chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile = true }) {
   return new Promise((resolve) => {
     const shell = win && !win.isDestroyed() ? win.webContents : null;
     if (!shell || shell.isDestroyed()) { resolve(false); return; }
