@@ -179,15 +179,26 @@ async function probeServerAdmin(claims) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, broadcastToTabs } = ctx;
+  const { MSG, broadcastToFiloPages } = ctx;
+  const Scope = globalThis.SN_SETTINGS_SCOPE;
+  const isFilo = (origin) => Scope.isFiloOrigin(origin);
 
   // I token restano nel main process: qui torniamo solo il profilo pubblico
   // + se l'utente è admin (può triagiare i feedback). `uid` è il claim
   // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
   // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
   // propri voti nella mappa `votes` autorevole letta da Firestore.
-  on(MSG.AUTH_STATUS, async () => {
+  //
+  // Verso una pagina WEB resta solo `signedIn`. Di questo stato, dentro un
+  // sito, serve una cosa sola: il modulo del red team chiede "sono connesso?"
+  // per sapere se può inviare. L'indirizzo email dell'utente, la sua identità
+  // Firebase e il contrassegno di amministratore non li usa nessuno lì, e sono
+  // esattamente il tipo di dato che non deve attraversare quel confine — la
+  // stessa regola delle impostazioni (src/shared/settingsScope.js): verso un
+  // sito passa quello che serve lì, non quello che non fa danno.
+  on(MSG.AUTH_STATUS, async (msg, sender, origin) => {
     const signedIn = auth.isSignedIn();
+    if (!isFilo(origin)) return { ok: true, signedIn };
     const uid = signedIn ? await auth.getUid() : null;
     return { ok: true, signedIn, isAdmin: auth.isAdmin(), profile: auth.getProfile(), uid };
   });
@@ -195,7 +206,10 @@ module.exports = function register(on, ctx) {
   on(MSG.AUTH_SIGNIN, async () => {
     try {
       const profile = await auth.signIn();
-      broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
+      // Alle sole pagine di Filo: il messaggio porta profilo e contrassegno di
+      // amministratore, e un sito non lo ascolta nemmeno. Se un sito non lo può
+      // chiedere, non glielo si manda da soli.
+      broadcastToFiloPages({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.
