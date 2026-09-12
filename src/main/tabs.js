@@ -1820,7 +1820,7 @@ class TabManager {
       // #170.3 — Blocco apertura siti in blacklist. Click su un link generico
       // (o window.location) verso un sito in blacklist: blocca, TRANNE se la
       // pagina di partenza è un motore di ricerca (l'utente l'ha cercato).
-      if (this._maybeBlockNavigation(tab, url, { fromUrl: wc.getURL() })) {
+      if (this._maybeBlockNavigation(url, { fromUrl: wc.getURL() })) {
         event.preventDefault();
         return;
       }
