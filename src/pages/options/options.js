@@ -866,21 +866,24 @@
     // salvato tutto.
     const { valori, registry, missingNickRows, dupRows } = raccogli();
 
-    // Solo i campi cambiati da quando la pagina li ha letti (o li ha scritti
-    // l'ultima volta): il resto può essere cambiato altrove mentre la pagina
-    // era aperta, e riscriverlo col valore vecchio disferebbe una scelta già
-    // presa. Le chiavi API sono il caso che conta: sono un segreto, e tornare
-    // a quella di prima significa spendere sul conto sbagliato.
-    const partial = {};
-    for (const [chiave, valore] of Object.entries(valori)) {
-      const prima = ultimoInviato ? ultimoInviato[chiave] : undefined;
-      if (JSON.stringify(prima) !== JSON.stringify(valore)) partial[chiave] = valore;
-    }
+    // Solo i valori cambiati da quando la pagina li ha letti: il resto può
+    // essere cambiato altrove mentre la pagina era aperta, e riscriverlo col
+    // valore vecchio disferebbe una scelta già presa. Le chiavi API sono il
+    // caso che conta: sono un segreto, e tornare a quella di prima significa
+    // spendere sul conto sbagliato.
+    //
+    // Il confronto scende fino alla singola chiave, non si ferma al gruppo: le
+    // due chiavi API stanno nello stesso gruppo, e fermandosi lì bastava
+    // scrivere quella di Tavily per rimettere la chiave OpenRouter di prima
+    // (#592, giro 3).
+    const partial = Storage.partialCambiato(ultimoInviato || {}, valori);
+
+    // Il riferimento è sempre quello che la pagina MOSTRA adesso.
+    ultimoInviato = valori;
 
     if (Object.keys(partial).length) {
       ecoDaIgnorare = Date.now();
       await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
-      ultimoInviato = { ...(ultimoInviato || {}), ...partial };
     }
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
