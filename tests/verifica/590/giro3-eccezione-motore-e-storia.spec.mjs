@@ -218,13 +218,13 @@ test('I — «Apri» sulla chip dei popup toglie il sito dalla lista per tutta l
   });
   expect(p, 'la pagina che apre il popup deve esserci').toBeTruthy();
   await p.waitForSelector('#b', { timeout: 8000 });
-  await p.evaluate(() => document.getElementById('b').click());
+  await p.click('#b');
 
   // La chip dei popup parla SOLO di popup: non nomina la lista dei siti bloccati.
-  const chip = shell.locator('.shell-notif', { hasText: 'popup' });
+  const chip = shell.locator('.popup-chip');
   await expect(chip).toBeVisible({ timeout: 6000 });
   const testoChip = await chip.innerText();
-  await chip.getByText('Apri', { exact: false }).first().click();
+  await chip.getByText('Apri', { exact: true }).first().click();
   await shell.waitForTimeout(2000);
 
   // Dopo quel clic, il sito della lista si apre da OGNI strada — compresa
