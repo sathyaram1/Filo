@@ -1188,9 +1188,16 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       const Exfil = globalThis.SN_URL_EXFIL;
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
       if (Exfil && url) {
+        // "Contenuto non fidato nel contesto", non "mittente non fidato" (#587).
+        // L'origine `http(s)` resta UNA delle sorgenti — l'agente che gira su una
+        // pagina web ha il testo di quella pagina (e il suo llms.txt) davanti —
+        // ma non è più l'unica: un output di comando o dei risultati di ricerca
+        // rendono non fidato anche il contesto di una chat `filo://`.
         const origin = sender?.tab?.url || sender?.url || '';
-        const fromUntrusted = /^https?:/i.test(origin);
-        const corpus = await navExfilCorpus();
+        let tainted = false;
+        try { tainted = require('./contextTaint').isTainted(sender); } catch (_) {}
+        const fromUntrusted = /^https?:/i.test(origin) || tainted;
+        const corpus = await navExfilCorpus(sender);
         const v = Exfil.assess(url, { corpus, fromUntrusted });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
       }
