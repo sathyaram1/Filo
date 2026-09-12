@@ -3247,7 +3247,10 @@ function broadcastSettingsUpdated(merged) {
     console.error('[Filo] settingsScope non caricato: alle pagine web non va nulla', e);
     web = { type: MSG.SETTINGS_UPDATED, settings: {} };
   }
-  const messageFor = (url) => (Scope && Scope.isFiloOrigin(url) ? full : web);
+  // Chi è interno lo riconosciamo comunque, anche nel caso rotto qui sopra:
+  // altrimenti le pagine di Filo resterebbero senza impostazioni.
+  const interna = (url) => (Scope ? Scope.isFiloOrigin(url) : String(url || '').startsWith('filo://'));
+  const messageFor = (url) => (interna(url) ? full : web);
   try {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win._filoTabs) {
