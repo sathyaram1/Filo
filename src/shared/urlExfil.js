@@ -117,10 +117,7 @@
       const pezzi = [valoriUniti(url)];
       const labels = String(u.hostname || '').split('.');
       for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) pezzi.push(lbl);
-      const testo = pezzi.filter(Boolean).join(' ');
-      let dec = testo;
-      try { dec = decodeURIComponent(testo.replace(/\+/g, ' ')); } catch (_) {}
-      return `${testo} ${dec}`.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      return sciogliEUnisci(pezzi);
     } catch (_) { return ''; }
   }
 
