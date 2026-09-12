@@ -91,7 +91,15 @@ function registerIpcHandlers() {
   ipcMain.on('filo:permessi-noti', (event, href) => {
     try {
       const P = require('./services/permessiSito');
-      const voci = P.perOrigine(href, P.contesto(event.sender));
+      // Un riquadro scritto dalla pagina (about:blank, srcdoc) non ha un
+      // indirizzo suo: per il browser è lo stesso sito di chi lo ospita, e le
+      // scelte che deve leggere sono quelle (#586, giro 6).
+      const Pp = globalThis.SN_PERMESSI_SITI;
+      let quale = href;
+      try {
+        if (!Pp || !Pp.origineDi(String(href || ''))) quale = event.sender.getURL();
+      } catch (_) {}
+      const voci = P.perOrigine(quale, P.contesto(event.sender));
       const out = {};
       for (const v of voci) out[v.chiave] = v.scelta;
       event.returnValue = out;
