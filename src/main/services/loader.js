@@ -63,11 +63,21 @@ require(path.join(SHARED, 'cmdClassify.js'));
 // di Windows; su un percorso che non esiste (o che il sistema non sa risolvere)
 // si torna a quello dato, così un file assente non fa morire la classificazione.
 try {
-  const { realpathSync } = require('node:fs');
+  const { realpathSync, readdirSync } = require('node:fs');
   globalThis.SN_CMD_CLASSIFY.setRealPath((p) => {
     try { return realpathSync.native(String(p)); } catch (_) {}
     try { return realpathSync(String(p)); } catch (_) {}
     return p;
+  });
+  // …e il modo di sapere quali NOMI ci sono dentro una cartella. Il percorso
+  // vero si può chiedere solo a un nome che esiste, e con un carattere jolly il
+  // nome scritto non esiste: `cat pacco/*.txt` apriva un collegamento alla
+  // configurazione SSH senza che niente lo misurasse (#587, giro 6). Stessa cosa
+  // per una ricerca ricorsiva, che i collegamenti li attraversa senza nominarli.
+  // Una cartella che non si può leggere non fa morire la classificazione: torna
+  // un elenco vuoto e il resto dei controlli vale come prima.
+  globalThis.SN_CMD_CLASSIFY.setListDir((p) => {
+    try { return readdirSync(String(p)); } catch (_) { return []; }
   });
 } catch (_) {}
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard

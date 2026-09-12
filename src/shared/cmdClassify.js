@@ -1534,6 +1534,7 @@
   // Ritorna '' se non deve. Segue i `cd` dentro la sequenza, così il bersaglio
   // misurato è quello vero.
   function readReason(raw, opts) {
+    memoria = new Map(); // le risposte del filesystem valgono una classificazione
     const o = opts || {};
     const perim = o.perimetro ? pathParts(o.perimetro) : null;
     const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
@@ -1739,6 +1740,7 @@
     'cp', 'copy', 'xcopy', 'robocopy', 'mv', 'move', 'ln', 'tar', 'zip', 'gzip',
   ]);
   function spostaBersaglioRiservato(raw, opts) {
+    memoria = new Map(); // le risposte del filesystem valgono una classificazione
     const o = opts || {};
     const perim = o.perimetro ? pathParts(o.perimetro) : null;
     const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
@@ -1799,6 +1801,7 @@
   // e il contenuto di ciò che si legge entra comunque nel corpus
   // anti-esfiltrazione, dove ferma il link che proverebbe a portarlo fuori.
   function pathReason(percorso, opts) {
+    memoria = new Map(); // le risposte del filesystem valgono una classificazione
     const p = String(percorso || '').trim();
     if (!p) return '';
     const o = opts || {};
@@ -1810,5 +1813,7 @@
     return operandReason(p, [o.cwd || o.perimetro || ''], perimOk, o.home || o.perimetro || '', !!o.soloRiservati, false, false);
   }
 
-  global.SN_CMD_CLASSIFY = { classify, readReason, pathReason, programOf, subcommandOf, setRealPath };
+  global.SN_CMD_CLASSIFY = {
+    classify, readReason, pathReason, programOf, subcommandOf, setRealPath, setListDir,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
