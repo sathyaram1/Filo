@@ -6,7 +6,9 @@
 // esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
 //
 // Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS }.
-// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk }
+// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk },
+// oppure { error } quando il setter RIFIUTA il valore con una spiegazione (il
+// tetto di lunghezza dello stile dell'agente, #592: mai un taglio muto),
 // oppure null se chiave/valore non sono validi. Solo le preferenze qui elencate
 // sono scrivibili. Dal #146.5 l'elenco copre TUTTE le impostazioni della pagina
 // Opzioni (modelli, provider, chiavi API, sicurezza/privacy, limite di spesa,
