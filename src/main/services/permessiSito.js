@@ -203,6 +203,9 @@ function scadiUnaTantum() {
 function concessioneUnaTantum(wc, chiave) {
   if (!wc || !chiave) return false;
   scadiUnaTantum();
+  // Qualcuno sta già aspettando quella cosa in questa scheda: la concessione non
+  // si arma, o se la prenderebbe lui (#586, giro 6).
+  if (qualcunoInAttesaDi(wc, chiave)) return false;
   unaTantum.set(`${wc.id}|${chiave}`, Date.now() + UNA_TANTUM_MS);
   return true;
 }
