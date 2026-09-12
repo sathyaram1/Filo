@@ -874,7 +874,9 @@
   // `/C:` è il modo NORMALE di cercare una frase con findstr, e senza di lui
   // `findstr /C:BEGIN .ssh\id_rsa` scartava il file come se fosse il testo
   // cercato e stampava la chiave privata senza chiedere niente (#587, giro 6).
-  const CERCA_DA_FLAG_RE = /(^|\s)(--regexp|--file|\/[A-Za-z]*[gGfFcC]:|-[a-z]*[ef])(=|:|\s|$)/;
+  // Gli switch di Windows portano il valore ATTACCATO (`/C:parola`, `/G:file`):
+  // pretendere un separatore dopo i due punti voleva dire non riconoscerli mai.
+  const CERCA_DA_FLAG_RE = /(^|\s)(?:(?:--regexp|--file|-[a-z]*[ef])(?:=|:|\s|$)|\/[A-Za-z]*[gGfFcC]:)/;
   // Le opzioni che portano il MODELLO come token successivo (`grep -e credentials
   // appunti.txt`, `Select-String -Pattern shadow appunti.txt`): quel token è il
   // testo cercato, non un file, e va saltato. `-f`/`--file` NON stanno qui: lì il
