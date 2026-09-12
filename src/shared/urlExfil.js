@@ -148,37 +148,43 @@
     } catch (_) { return ''; }
   }
 
-  function exposedAlnum(url) {
-    const raw = String(url || '');
-    const pieces = [raw];
-    const valori = valoriUniti(raw);
-    if (valori) {
-      pieces.push(valori);
-      try {
-        const dec = decodeURIComponent(valori.replace(/\+/g, ' '));
-        if (dec !== valori) pieces.push(dec);
-      } catch (_) {}
+  // Da una manciata di pezzi di indirizzo al testo su cui si fa il confronto:
+  // urldecode (anche doppio), decodifica dei blocchi base64 ed esadecimali, poi
+  // sola forma alfanumerica minuscola. Vale sia per l'indirizzo intero sia per il
+  // solo carico: lo stesso travestimento va sciolto dalle due parti, o un dato in
+  // base64 dentro un parametro sparirebbe dal conto delle parole comuni.
+  function sciogliEUnisci(pezzi) {
+    const out = [];
+    for (const p of pezzi) {
+      if (!p) continue;
+      out.push(p);
+      let cur = p;
+      for (let i = 0; i < 3; i++) {
+        let dec = cur;
+        try { dec = decodeURIComponent(cur.replace(/\+/g, ' ')); } catch (_) { dec = cur; }
+        if (dec === cur) break;
+        out.push(dec);
+        cur = dec;
+      }
     }
-    let cur = raw;
-    for (let i = 0; i < 3; i++) {
-      let dec = cur;
-      try { dec = decodeURIComponent(cur.replace(/\+/g, ' ')); } catch (_) { dec = cur; }
-      if (dec === cur) break;
-      pieces.push(dec);
-      cur = dec;
-    }
-    // Decodifica base64 dei token lunghi (sulla forma già urldecodata). `=` è un
-    // separatore qui (es. "p=<base64>"): il padding lo ripristina tryBase64.
-    const joined = pieces.join(' ');
+    // Blocchi base64 ed esadecimali dei token lunghi (sulla forma già
+    // urldecodata). `=` è un separatore qui (es. "p=<base64>"): il padding lo
+    // ripristina tryBase64.
+    const joined = out.join(' ');
     for (const tok of joined.split(/[^A-Za-z0-9+/_-]+/)) {
       if (tok.length >= 16) {
         const b = tryBase64(tok);
-        if (b) pieces.push(b);
+        if (b) out.push(b);
         const h = tryHex(tok);
-        if (h) pieces.push(h);
+        if (h) out.push(h);
       }
     }
-    return pieces.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return out.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+
+  function exposedAlnum(url) {
+    const raw = String(url || '');
+    return sciogliEUnisci([raw, valoriUniti(raw)]);
   }
 
   // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) + indirizzi
