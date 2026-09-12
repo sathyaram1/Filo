@@ -1071,12 +1071,22 @@ test('livello 2 — npm/pip config che SCRIVE (registry incluso) non è lettura'
   }
 });
 
-test('livello 1 — npm/pip config che LEGGE resta lettura', () => {
+test('livello 1 — npm config che LEGGE resta lettura', () => {
   for (const cmd of [
     'npm config get registry', 'npm config list', 'npm config ls', 'npm config',
-    'pip config list', 'pip config get global.index-url', 'pip config debug',
   ]) {
     assert.equal(lvl(cmd), 1, `"${cmd}" (legge config) dovrebbe essere livello 1`);
+  }
+});
+
+// #587, giro 5: `pip config list` stampa l'indirizzo del repository di pacchetti,
+// che porta dentro utente e password in chiaro (`https://mario:PWD@pypi.…`).
+// Aprire lo stesso file col suo nome (`.config/pip/pip.conf`) chiede già un OK:
+// stessa cosa, stessa risposta. npm non è qui perché i suoi segreti li stampa
+// come «protected», quindi non c'è niente da fermare.
+test('#587 — leggere la configurazione di pip chiede un OK (ci sono dentro le password)', () => {
+  for (const cmd of ['pip config list', 'pip config get global.index-url', 'pip config debug', 'pip3 config list']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" stampa utente e password del repository: deve chiedere un OK`);
   }
 });
 
