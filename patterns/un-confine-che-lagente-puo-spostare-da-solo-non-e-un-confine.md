@@ -221,6 +221,8 @@ lo stesso livello, oppure la più economica è l'unica che verrà usata.
 - `src/shared/cmdClassify.js` — `perimetro`, `readReason`, `pathReason`.
 - `src/main/services/contextTaint.js` — il registro del materiale non fidato.
 - `src/main/services/handlers.js` — `navExfilCorpus`, l'iniezione di
-  `_perimetro`/`_cwdReale`/`_motivoPerimetro` prima del gate dei livelli.
+  `_perimetro`/`_cwdReale`/`_shell`/`_motivoPerimetro` prima del gate dei livelli.
+- `src/shared/urlExfil.js` — `valoriUniti` e `combaciaSpezzato` (il dato tagliato
+  dentro l'indirizzo), le soglie del ripiego strutturale.
 - `tests/unit/cmdClassify.test.mjs`, `tests/unit/contextTaint.test.mjs`,
   `tests/filo-naviga-exfil.spec.mjs`.
