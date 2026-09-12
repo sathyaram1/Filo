@@ -139,6 +139,23 @@
 //       (`Get-Content -Path:.ssh\config`, `grep --file=…`, `grep -f…`): scartare
 //       ogni token che inizia con un trattino voleva dire non misurarlo affatto
 //       (vedi `valoreDiFlag`);
+//     Al giro 5 ne sono arrivate altre due, e la prima cambia il verso della
+//     regola:
+//     — SI MISURA TUTTO, NON SOLO I LETTORI CHE CI SIAMO SCRITTI. Il bersaglio
+//       veniva misurato solo per i programmi elencati in `READS_PATHS`; per tutti
+//       gli altri nessuno guardava cosa aprissero. `git diff --no-index /dev/null
+//       ~/.ssh/id_rsa` stampava la chiave privata, `git diff --no-index vuota
+//       ~/.ssh` la cartella intera, `git grep --no-index` cercava dentro tutti i
+//       file dell'utente e `pip config list` stampava utente e password del
+//       repository privato: tutto a livello 1. Adesso la domanda è rovesciata
+//       come nel resto del file — si misura ogni comando e si tace solo su chi
+//       NON PUÒ aprire un percorso (`NON_APRE_PERCORSI`), così un programma nuovo
+//       sbaglia dalla parte della conferma;
+//     — LA TILDE NON È SOLO LA CARTELLA DELL'UTENTE. In bash `~-` è la cartella
+//       di prima e `~1` una di quelle messe da parte con `pushd`: nessuna delle
+//       due porta addosso il nome di dove punta, ed erano lette come una cartella
+//       qualunque dentro la home. «vai in .ssh», «torna a casa», «mostrami
+//       ~-/config» apriva la configurazione SSH senza un clic (vedi `formaTilde`);
 //     — UN "DRIVE" DI POWERSHELL NON È UNA CARTELLA: `HKCU:`/`HKLM:` sono il
 //       registro di sistema, dove diversi programmi tengono password salvate;
 //       `Cert:`, `Variable:`, `Function:` altre parti interne. Venivano scambiati
