@@ -1924,6 +1924,50 @@ class TabManager {
         if (!tab._everNavigated) this._chiudiSchedaRimastaVuota(tab);
       }
     });
+    // SICUREZZA (#590, quarto giro) — LA RICARICA CHIESTA DALLA PAGINA.
+    // `location.reload()` e il meta refresh non emettono will-navigate: per
+    // Chromium la scheda resta dov'era. Una pagina che si aggiorna da sola
+    // (caselle di posta, cruscotti, risultati in diretta) continuava quindi a
+    // ricaricare un sito finito in lista nel frattempo, senza che servisse
+    // nemmeno un clic. Qui guardiamo solo le ricariche, cioè le navigazioni
+    // verso l'indirizzo su cui la scheda si trova già: le prime aperture non
+    // entrano (le ha già filtrate openTab, ed è così che il ripristino della
+    // sessione e "Apri comunque" restano quello che sono).
+    wc.on('did-start-navigation', (_e, url, isInPlace, isMainFrame) => {
+      if (!isMainFrame || isInPlace) return;
+      let corrente = '';
+      try { corrente = wc.getURL() || ''; } catch (_) { return; }
+      if (!corrente || url !== corrente) return;
+      if (!this._maybeBlockNavigation(url)) return;
+      try { wc.stop(); } catch (_) {}
+    });
+    // SICUREZZA (#590, quarto giro) — I RIQUADRI INCORPORATI. La lista guardava
+    // solo l'indirizzo della scheda, quindi un sito della lista messo dentro un
+    // riquadro da un'altra pagina si vedeva per intero, e il riquadro lo sceglie
+    // la pagina, non l'utente: bastava farlo grande quanto lo schermo. I siti
+    // che uno si mette in lista sono anche quelli che mezzo web incorpora a
+    // pezzi. Il riferimento per l'eccezione "arrivo da un motore di ricerca"
+    // resta la pagina che OSPITA il riquadro, come per i popup.
+    if (typeof wc.on === 'function') {
+      wc.on('will-frame-navigate', (event) => {
+        if (!event || event.isMainFrame) return; // il frame principale ha già i suoi gate
+        const url = event.url;
+        if (isWebUnsafeNav(url)) { event.preventDefault(); return; }
+        let decisione = null;
+        try {
+          decisione = require('./services/siteBlock').shouldBlockNavigation(url, { fromUrl: wc.getURL() });
+        } catch (_) { return; }
+        if (!decisione || !decisione.block) return;
+        event.preventDefault();
+        // Una pagina può incorporare venti riquadri dello stesso sito: la
+        // notifica si dice UNA volta per sito e per scheda, altrimenti al
+        // posto di una spiegazione arriva una raffica che copre tutto.
+        if (!tab._sitiIncorporatiDetti) tab._sitiIncorporatiDetti = new Set();
+        if (tab._sitiIncorporatiDetti.has(decisione.host)) return;
+        tab._sitiIncorporatiDetti.add(decisione.host);
+        this._notifyBlockedFrame(decisione.host);
+      });
+    }
     // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
       wc.on('console-message', (_e, level, message, line, source) => {
