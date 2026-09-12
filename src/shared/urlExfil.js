@@ -86,6 +86,34 @@
     } catch (_) { return ''; }
   }
 
+  // Decodifica un blob BASE32 che si riapre come testo stampabile. Base64 ed
+  // esadecimale si sciolgono già; base32 è la terza delle codifiche standard e
+  // l'unica che mancava, cioè la prima che prova chi ha visto cadere le altre
+  // due (#587, giro 7). Costa poco anche quando sbaglia: una decodifica a vuoto
+  // aggiunge rumore al pagliaio, e il rumore non contiene le parole del corpus.
+  function tryBase32(tok) {
+    const s = String(tok).replace(/=+$/, '');
+    if (s.length < 16) return '';
+    if (!/^[A-Za-z2-7]+$/.test(s)) return '';
+    const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let bits = '';
+    for (const c of s.toUpperCase()) {
+      const i = A.indexOf(c);
+      if (i < 0) return '';
+      bits += i.toString(2).padStart(5, '0');
+    }
+    let out = '';
+    let printable = 0;
+    let n = 0;
+    for (let i = 0; i + 8 <= bits.length; i += 8) {
+      const c = parseInt(bits.slice(i, i + 8), 2);
+      out += String.fromCharCode(c);
+      n += 1;
+      if (c >= 32 && c < 127) printable += 1;
+    }
+    return n && printable / n > 0.85 ? out : '';
+  }
+
   // Decodifica un blob ESADECIMALE che si riapre come testo stampabile. È il
   // travestimento più a portata di mano dopo il base64 — `?d=5365677265746f…` —
   // e sotto i 56 caratteri il ripiego strutturale non lo vedeva nemmeno, quindi
