@@ -321,6 +321,7 @@
     etichetta,
     etichettaRichiesta,
     nome,
+    nomiDegliSchermi,
     origineDi,
     interno,
     host,
