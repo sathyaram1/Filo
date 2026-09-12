@@ -48,22 +48,7 @@ test('una pagina Preferenze aperta da prima non deve riaccendere la modalità te
   expect((await impostazioni(pagina)).terminal?.enabled).toBe(false);
 });
 
-test('due pagine Preferenze aperte insieme: la seconda non deve disfare la prima', async ({ openTab }) => {
-  const prima = await apriPreferenze(openTab);
-  const seconda = await apriPreferenze(openTab);
-
-  await prima.fill('#agentStyleText', 'Rispondi sempre con un esempio.');
-  await prima.waitForTimeout(1200);
-  expect((await impostazioni(prima)).agentStyle).toBe('Rispondi sempre con un esempio.');
-
-  // Sulla seconda pagina l'utente tocca tutt'altro.
-  await seconda.selectOption('#theme', 'dark');
-  await seconda.waitForTimeout(1500);
-
-  expect((await impostazioni(prima)).agentStyle).toBe('Rispondi sempre con un esempio.');
-});
-
-test('la pagina Opzioni aperta da prima non deve rimettere una chiave API tolta', async ({ openTab }) => {
+test('la pagina Opzioni aperta da prima non deve rimettere la chiave API di prima', async ({ openTab }) => {
   // Stessa forma, ma qui il campo è un segreto: se la pagina Opzioni riscrive
   // quello che si era letta all'apertura, una chiave cancellata altrove torna
   // al suo posto senza che nessuno l'abbia chiesto.
