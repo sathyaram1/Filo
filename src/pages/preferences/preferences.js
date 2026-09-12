@@ -796,8 +796,10 @@
     $('showHomeMessage').checked = settings.showHomeMessage !== false;
 
     buildPresetOptions();
-    $('agentStyleText').value = settings.agentStyle || '';
+    savedAgentStyle = settings.agentStyle || '';
+    $('agentStyleText').value = savedAgentStyle;
     syncPresetSelect();
+    refreshStyleLimit();
 
     const aa = settings.autoArchive || {};
     $('autoArchiveEnabled').checked = aa.enabled !== false;
