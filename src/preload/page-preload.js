@@ -174,6 +174,17 @@ if (!IS_SUBFRAME) try {
 // al main costa, e su una pagina con trenta riquadri pubblicitari sarebbe
 // trenta volte. Il cancello vero non cambia: la richiesta di un riquadro passa
 // lo stesso dal processo principale, con l'origine del riquadro.
+// #586 — la richiesta di cattura schermo impossibile che fa morire la scheda.
+// In OGNI riquadro, non solo nel principale: il processo che muore è lo stesso,
+// e qui non si chiede niente al main, quindi non costa nulla ripeterlo.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) {
+    const { buildCatturaSicuraSource } = require('./permessi-guard.js');
+    webFrame.executeJavaScript(buildCatturaSicuraSource(), true).catch(() => {});
+  }
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
 if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
