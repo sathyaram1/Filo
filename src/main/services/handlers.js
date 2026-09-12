@@ -1072,20 +1072,35 @@ function displayCwd(cwd) {
 // NON entra lo stato delle schede né le loro URL: un legittimo "riapri la scheda
 // X" porterebbe quell'URL nel link e matcherebbe lo stato → falso positivo.
 // Quelli non sono segreti da proteggere.
+// Il corpus arriva diviso in due, e la divisione conta (#587, giro 5):
+//   `memoria` — profilo, preferenze, espansioni. Una manciata di parole che
+//     identificano l'utente: due di quelle dentro un link sono un dump, quindi lì
+//     vale anche la regola delle parole comuni.
+//   `letto` — appunti, documenti aperti dal disco, file dell'editor, output dei
+//     comandi. Sono migliaia di parole sull'argomento del documento, e i link di
+//     quell'argomento le contengono per forza: dopo «leggi l'appunto del viaggio»
+//     l'avviso di furto di dati compariva su sei link veri su sette, compreso
+//     l'hotel scritto nell'appunto. Qui contano solo i dati riconoscibili
+//     (lunghi, o con cifre dentro), che è la protezione che serve davvero:
+//     password, chiavi e token restano fermati esattamente come prima.
 async function navExfilCorpus(sender) {
-  const pezzi = [];
+  const memoria = [];
+  const letto = [];
   try {
     const mem = await FiloMem.getMemory();
     const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(mem);
+    memoria.push(profilo, preferenze, espansioni);
     // Gli appunti ora SONO file dell'editor (#379.10): il materiale personale da
     // proteggere è il loro CONTENUTO, letto dalla collezione dell'editor — non più
-    // dal vecchio archivio `filo_notes`, che dopo la migrazione resta vuoto.
-    let notes = '';
-    try { const EF = require('./editorFiles'); notes = await EF.notesCorpusText(); } catch (_) {}
-    pezzi.push(profilo, preferenze, espansioni, notes);
+    // dal vecchio archivio `filo_notes`, che dopo la migrazione resta vuoto. Un
+    // appunto è un documento, non un profilo: sta con ciò che Filo ha letto.
+    try { const EF = require('./editorFiles'); letto.push(await EF.notesCorpusText()); } catch (_) {}
   } catch (_) {}
-  try { pezzi.push(require('./contextTaint').corpusText(sender)); } catch (_) {}
-  return pezzi.filter(Boolean).join('\n');
+  try { letto.push(require('./contextTaint').corpusText(sender)); } catch (_) {}
+  return {
+    memoria: memoria.filter(Boolean).join('\n'),
+    letto: letto.filter(Boolean).join('\n'),
+  };
 }
 
 // ── Difesa in profondità sulle azioni confermate (#250) ─────────────────────
