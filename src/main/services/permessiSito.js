@@ -1174,11 +1174,17 @@ function perOrigine(origine, ctx) {
 // sito richiede, e l'utente risceglie. E, se il sito sta usando quella cosa
 // ADESSO, gliela chiude: prima la revoca valeva solo per la volta dopo, e un
 // microfono aperto restava aperto (#586, giro 4).
-function revoca(origine, chiave, ctx) {
+// `effimera`: da quale delle due memorie, quando chi chiama sta in una finestra
+// in incognito e l'elenco gliele mostra tutte e due. Chi non lo dice (il menu
+// del tasto destro sulla scheda, che parla della scheda che ha davanti) tocca
+// quella della finestra, come prima.
+function revoca(origine, chiave, ctx, effimera) {
   const c = ctx || {};
-  const nuova = P().senza(memoriaDi(c), origine, chiave || null);
-  scriviMappa(c.incognito ? c.ses : null, !!c.incognito, nuova);
-  chiudiUsi(origine, chiave || null, !!c.incognito);
+  const suEffimera = !!c.incognito && effimera !== false;
+  const ses = suEffimera ? c.ses : null;
+  const nuova = P().senza(mappaDi(ses, suEffimera), origine, chiave || null);
+  scriviMappa(ses, suEffimera, nuova);
+  chiudiUsi(origine, chiave || null, suEffimera);
   return true;
 }
 
