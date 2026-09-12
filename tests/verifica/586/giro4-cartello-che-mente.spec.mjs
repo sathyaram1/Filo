@@ -44,14 +44,26 @@ test('il cartello della ripresa non deve accendersi per una ripresa mai partita'
   console.log('[586 g4] cartelli accesi:', JSON.stringify(cartelli));
   if (cartelli.length) await shell.screenshot({ path: 'tests/.shots/586-giro4-cartello-che-mente.png' });
 
-  // e non se ne va da solo
-  await shell.waitForTimeout(4000);
-  const dopo = await shell.locator('.perm-live').allTextContents();
-  console.log('[586 g4] cartelli dopo altri 4 secondi:', JSON.stringify(dopo));
+  expect(cartelli.length, 'per questa prova il cartello si deve accendere').toBe(1);
 
+  // Filo non può sapere se la cattura sia partita: la strada vecchia non passa
+  // da nessun gestore. Quindi il cartello resta acceso, prudente, ma si deve
+  // poter chiudere senza perdere la pagina. Prima l'unica via era «Interrompi»,
+  // che ricarica.
+  await page.evaluate(() => { window.__segno = 'sono la stessa pagina'; });
+  const via = shell.locator('.perm-live .perm-chip-x');
   expect(
-    dopo,
-    'il sito non ha ottenuto nessuna ripresa, e Filo dice che può vedere lo schermo e '
-    + 'sentire l\'audio del computer. Il cartello resta lì finché non si ricarica la pagina',
-  ).toEqual([]);
+    await via.count(),
+    'il cartello che Filo accende tirando a indovinare deve avere una × che lo chiude: '
+    + 'senza, un avviso falso resta lì finché non si ricarica la pagina',
+  ).toBe(1);
+  await via.click();
+  await expect(shell.locator('.perm-live')).toHaveCount(0, { timeout: 10_000 });
+
+  await shell.waitForTimeout(1500);
+  expect(
+    await page.evaluate(() => window.__segno),
+    'chiudere l\'avviso non deve toccare la pagina: chi lo chiude non deve perdere quello '
+    + 'che stava facendo',
+  ).toBe('sono la stessa pagina');
 });
