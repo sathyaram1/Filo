@@ -513,7 +513,7 @@ async function decidi(wc, permesso, dettagli) {
   // Il sito ha già fatto comparire tre domande che chi naviga ha chiuso senza
   // rispondere: su questa pagina non se ne fanno altre (vedi l'anello qui
   // sotto). Non resta scritto niente: la pagina che riparte ricomincia da capo.
-  if (troppeSenzaRisposta(wc, origine)) return false;
+  if (troppeSenzaRisposta(wc, origine, chiavi)) { diciCheHoSmesso(wc, origine, chiavi); return false; }
 
   const memorizzabili = chiavi.filter((k) => Pp.siRicorda(k));
   const salvaScelta = memorizzabili.length ? (scelta) => {
