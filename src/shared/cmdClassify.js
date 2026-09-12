@@ -994,5 +994,5 @@
     return classifyOne(trimmed);
   }
 
-  global.SN_CMD_CLASSIFY = { classify, programOf, subcommandOf };
+  global.SN_CMD_CLASSIFY = { classify, readReason, programOf, subcommandOf };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
