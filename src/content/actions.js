@@ -112,9 +112,18 @@
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
+    // #586 — gli appunti li legge FILO perché l'utente ha premuto "Incolla",
+    // non il sito: senza questo annuncio comparirebbe la pastiglia «<sito>
+    // vuole leggere i tuoi appunti» per un gesto suo, e un "Nega" spegnerebbe
+    // l'Incolla di Filo su quel sito per sempre. La concessione vale una volta
+    // sola, quindi si annuncia prima di OGNI lettura.
+    const annunciaAppunti = async () => {
+      try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_DI_FILO, chiave: 'appunti' }); } catch (_) {}
+    };
     // Tenta lettura strutturata (testo + immagini)
     try {
       if (navigator.clipboard.read) {
+        await annunciaAppunti();
         const items = await navigator.clipboard.read();
         for (const it of items) {
           // Cerca un'immagine
@@ -167,6 +176,7 @@
     }
     // Fallback: solo testo
     try {
+      await annunciaAppunti();
       const text = await navigator.clipboard.readText();
       if (!text) return;
       deps.restorePasteContext();

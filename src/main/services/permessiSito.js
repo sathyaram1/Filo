@@ -19,9 +19,11 @@
 // Cosa NON passa dalla domanda:
 //   - le superfici di Filo (filo://, devtools): è l'app stessa che chiede;
 //   - i permessi innocui (schermo intero, cursore, scrittura appunti, DRM);
-//   - la dettatura di Filo dentro una pagina web, che si annuncia prima di
-//     chiedere il microfono (concessioneUnaTantum): la richiesta è di Filo,
-//     non del sito, e una pastiglia col nome del sito sarebbe una bugia.
+//   - le funzioni di Filo che dentro una pagina web chiedono un permesso per
+//     conto di chi le ha attivate — la dettatura (microfono) e l'Incolla
+//     (appunti) — che si annunciano prima (concessioneUnaTantum): la richiesta
+//     è di Filo, non del sito, e una pastiglia col nome del sito sarebbe una
+//     bugia; per giunta un "Nega" spegnerebbe la funzione di Filo su quel sito.
 
 const { BrowserWindow, desktopCapturer } = require('electron');
 
@@ -397,6 +399,8 @@ function _reset() {
 
 module.exports = {
   installaSuSessione,
+  // Solo per i test: la decisione su una richiesta, senza passare da Electron.
+  _decidi: decidi,
   configureFromSettings,
   concessioneUnaTantum,
   rispondi,

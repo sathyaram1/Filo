@@ -210,6 +210,36 @@ test('senza risposta ricordata il controllo sincrono dice NO, e per filo:// dice
   modulo._reset();
 });
 
+test('senza nessuno a cui chiedere si NEGA; e la concessione di Filo vale una volta sola', async () => {
+  const modulo = require_(join(RADICE, 'src', 'main', 'services', 'permessiSito.js'));
+  modulo._reset();
+  const wc = { id: 7, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
+  const richiesta = { requestingUrl: 'https://esempio.it/x', mediaTypes: ['audio'] };
+
+  // Nessuna finestra a cui mostrare la pastiglia (qui non c'è Electron; nell'app
+  // è la finestra isolata del safebrowse): il default è negare, mai concedere.
+  assert.equal(await modulo._decidi(wc, 'media', richiesta), false);
+
+  // La dettatura di Filo si annuncia: quella richiesta passa…
+  modulo.concessioneUnaTantum(wc, 'microfono');
+  assert.equal(await modulo._decidi(wc, 'media', richiesta), true);
+  // …una volta sola. La seconda è di nuovo una richiesta del sito.
+  assert.equal(await modulo._decidi(wc, 'media', richiesta), false);
+
+  // L'annuncio del microfono non apre la fotocamera.
+  modulo.concessioneUnaTantum(wc, 'microfono');
+  assert.equal(
+    await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: ['audio', 'video'] }),
+    false,
+  );
+
+  // E non vale per un'altra scheda.
+  modulo.concessioneUnaTantum(wc, 'microfono');
+  const altra = { id: 8, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
+  assert.equal(await modulo._decidi(altra, 'media', richiesta), false);
+  modulo._reset();
+});
+
 test('le impostazioni predefinite partono senza nessuna risposta ricordata', () => {
   const costanti = readFileSync(join(RADICE, 'src', 'shared', 'constants.js'), 'utf8');
   assert.match(costanti, /sitePermissions:\s*\{\s*\}/);
