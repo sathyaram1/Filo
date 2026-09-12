@@ -534,17 +534,19 @@ function controlla(wc, permesso, origineRichiedente, dettagli) {
     // poteva solo negare, mai consentire (#586, giro 4). La domanda la facciamo
     // partire di qui, e intanto rispondiamo no: quando l'utente consente, il
     // controllo dopo dice sì e il sito, riprovando, ottiene la sua roba.
-    if (detto === null && Pp.soloControllo(permesso)) chiediDaControllo(wc, permesso, dettagli);
+    if (detto === null && Pp.soloControllo(permesso)) chiediDaControllo(wc, permesso, url, dettagli);
     return detto === 'allow';
   } catch (_) { return false; }
 }
 
 // La domanda fatta partire da un CONTROLLO. Non aspetta nessuno (il controllo è
-// sincrono e ha già risposto no) e non si ripete: finché la pastiglia è aperta
-// `chiedi` riconosce la richiesta gemella e non ne impila un'altra.
-function chiediDaControllo(wc, permesso, dettagli) {
+// sincrono e ha già risposto no) e non si impila: finché la pastiglia è aperta
+// `chiedi` riconosce la richiesta gemella e le si attacca invece di aprirne
+// un'altra. L'origine gliela passiamo noi, perché quella del controllo arriva
+// per una strada diversa da quella della richiesta.
+function chiediDaControllo(wc, permesso, url, dettagli) {
   Promise.resolve()
-    .then(() => decidi(wc, permesso, dettagli))
+    .then(() => decidi(wc, permesso, { ...(dettagli || {}), requestingUrl: url }))
     .catch(() => {});
 }
 
