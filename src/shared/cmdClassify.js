@@ -1211,9 +1211,12 @@
       // una cartella corrente non è testo del comando.
       let scritti = operandsOf(t);
       if (CERCA_PRIMA.has(prog) && scritti.length && !CERCA_DA_FLAG_RE.test(t)) scritti = scritti.slice(1);
-      const bersagli = scritti.length ? scritti : (perimOk ? [cwd || '.'] : []);
+      // Un percorso può stare attaccato al nome di un'opzione (`-Path:…`,
+      // `--file=…`): vale come un operando scritto a parte.
+      scritti = scritti.concat(valoriDeiFlag(t));
+      const bersagli = scritti.length ? scritti : (perimOk ? cwds.map((c) => c || '.') : []);
       for (const op of bersagli) {
-        const why = operandReason(op, cwd, perimOk, home, false, ricorsivo);
+        const why = operandReason(op, cwds, perimOk, home, false, ricorsivo, esc);
         if (why) return why;
       }
     }
