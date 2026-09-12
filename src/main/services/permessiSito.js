@@ -1144,7 +1144,23 @@ function memoriaDi(ctx) {
   return c.incognito ? mappaDi(c.ses, true) : mappa;
 }
 
-function elenco(ctx) { return P().elenco(memoriaDi(ctx)); }
+// L'elenco per le liste (Impostazioni → Sicurezza). In una finestra normale
+// sono le scelte di sempre. In una finestra in incognito le memorie sono DUE:
+// quella della finestra, che muore con lei, e quella di sempre, che resta.
+// Mostrarne una sola voleva dire che la pagina Sicurezza aperta da lì scriveva
+// «Nessun sito ha ancora ricevuto una risposta» a chi ne aveva date dieci, e da
+// lì una scelta normale non si poteva togliere: l'elenco sembrava completo e
+// non lo era (#586, giro 7). Ogni riga dice a quale delle due appartiene, così
+// chi la legge sa cosa sta guardando e chi la toglie la toglie dal posto
+// giusto.
+function elenco(ctx) {
+  const c = ctx || {};
+  const Pp = P();
+  const fisse = Pp.elenco(mappa).map((r) => ({ ...r, effimera: false }));
+  if (!c.incognito) return fisse;
+  const effimere = Pp.elenco(mappaDi(c.ses, true)).map((r) => ({ ...r, effimera: true }));
+  return [...effimere, ...fisse];
+}
 
 function perOrigine(origine, ctx) {
   const Pp = P();
