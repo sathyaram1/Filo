@@ -882,3 +882,15 @@ html[data-feedback-dim="1"] .shell {
 }
 .perm-source-item.schermo { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .perm-source-cancel { margin-top: 10px; }
+/* L'audio del computer: una scelta a parte, spenta di suo, sopra le cose fra
+   cui scegliere (si legge prima di cliccare, non dopo). */
+.perm-source-audio {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 9px;
+  cursor: pointer;
+  color: var(--fg);
+}
+.perm-source-audio input { accent-color: var(--accent); cursor: pointer; margin: 0; }
+.perm-source-audio:hover { color: var(--accent); }

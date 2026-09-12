@@ -97,4 +97,54 @@ function buildPermessiGuardSource(noti) {
 })();`;
 }
 
-module.exports = { buildPermessiGuardSource, CANALE, NOMI };
+// ── La richiesta che ammazza la scheda (#586) ───────────────────────────────
+//
+// Chiedere l'audio del computer con la strada vecchia della cattura schermo
+// (`chromeMediaSource: 'desktop'` fra i vincoli) SENZA chiedere anche
+// l'immagine dallo stesso posto non è una richiesta valida, e Chromium non la
+// rifiuta: chiude il processo della pagina. Per chi naviga la scheda muore
+// all'istante e al suo posto compare la pagina di errore di Filo, senza che
+// abbia toccato niente e senza una riga che lo spieghi. Basta una riga di una
+// pagina qualunque, anche per sbaglio.
+//
+// Qui la richiesta impossibile viene rifiutata come la rifiuterebbe un browser,
+// con un errore che il sito può gestire, prima che Chromium la veda. Non è un
+// cancello di sicurezza (una pagina ostile può sempre far fuori il proprio
+// processo in altri modi): è la differenza fra un errore e una scheda morta.
+function buildCatturaSicuraSource() {
+  return `(() => {
+  try {
+    const md = navigator.mediaDevices;
+    if (!md || typeof md.getUserMedia !== 'function') return;
+    const desktop = (v) => {
+      try {
+        if (!v || typeof v !== 'object') return false;
+        const m = v.mandatory || v.optional;
+        if (v.chromeMediaSource === 'desktop') return true;
+        if (m && m.chromeMediaSource === 'desktop') return true;
+        if (Array.isArray(m)) return m.some((o) => o && o.chromeMediaSource === 'desktop');
+        return false;
+      } catch (_) { return false; }
+    };
+    const vera = md.getUserMedia.bind(md);
+    Object.defineProperty(md, 'getUserMedia', {
+      configurable: true,
+      writable: true,
+      value: function getUserMedia(vincoli) {
+        try {
+          const c = vincoli || {};
+          if (desktop(c.audio) && !desktop(c.video)) {
+            return Promise.reject(new DOMException(
+              "L'audio del computer si può chiedere solo insieme all'immagine dello schermo.",
+              'NotSupportedError',
+            ));
+          }
+        } catch (_) {}
+        return vera(vincoli);
+      },
+    });
+  } catch (_) {}
+})();`;
+}
+
+module.exports = { buildPermessiGuardSource, buildCatturaSicuraSource, CANALE, NOMI };
