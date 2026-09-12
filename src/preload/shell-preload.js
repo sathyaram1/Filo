@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     navigate: (id, url) => ipcRenderer.invoke('tabs:navigate', { id, url }),
     move: (id, toIndex) => ipcRenderer.invoke('tabs:move', { id, toIndex }),
     reserveTop: (px) => ipcRenderer.invoke('tabs:reserve-top', { px }),
+    // "La pagina comincia almeno a questa altezza" (coordinate della shell).
+    reserveFloor: (px) => ipcRenderer.invoke('tabs:reserve-floor', { px }),
     setChromeCompact: (on) => ipcRenderer.invoke('tabs:set-chrome-compact', { on }),
     back: (id) => ipcRenderer.invoke('tabs:back', { id }),
     forward: (id) => ipcRenderer.invoke('tabs:forward', { id }),
