@@ -1110,10 +1110,40 @@
     return out;
   }
 
+  // ── Le altre tildi di bash (#587, giro 5) ─────────────────────────────────
+  //
+  // `~` è la cartella dell'utente, e quella si sa risolvere. Ma in bash la tilde
+  // ha altre quattro forme, e nessuna di loro porta addosso il nome di dove
+  // punta: `~-` è la CARTELLA DI PRIMA (lo stesso identico gesto di `$OLDPWD`,
+  // che invece veniva già fermato), `~1`/`~+2`/`~-3` sono le cartelle messe da
+  // parte con `pushd`, `~mario` è la cartella di un altro utente. Il controllo le
+  // leggeva come il nome di una cartella qualunque dentro quella dell'utente:
+  // bastava «vai in .ssh», «torna a casa», «mostrami ~-/config» perché la
+  // configurazione SSH uscisse senza un clic, e con `~-/Filo/storage.json` ne
+  // usciva il file dove Filo tiene le chiavi API e il portafoglio.
+  //   'home'    — `~`, `~/…`: si risolve.
+  //   'cwd'     — `~+`, `~+/…`: è la cartella corrente, che si sa già misurare.
+  //   'salto'   — `~-`, `~1`, `~+2`, `~-3`: dove punti non si vede dal comando.
+  //   'altrove' — `~mario`: la cartella di un altro utente, fuori dalla nostra.
+  function formaTilde(raw) {
+    const m = String(raw || '').match(/^~([^/\\]*)/);
+    if (!m) return '';
+    const q = m[1];
+    if (q === '') return 'home';
+    if (q === '+') return 'cwd';
+    if (/^[-+]?\d*$/.test(q)) return 'salto';
+    return 'altrove';
+  }
+
   // Percorso dell'operando risolto contro la cartella di lavoro. `~` diventa la
   // home quando il main ce l'ha passata; senza home resta "non risolvibile".
   function resolveTarget(op, cwd, home) {
     let raw = String(op || '');
+    // `~+` è la cartella corrente: si risolve contro quella, non contro la home.
+    if (/^~\+($|[/\\])/.test(raw)) {
+      if (!cwd) return null;
+      raw = String(cwd).replace(/\\/g, '/') + '/' + raw.slice(2).replace(/^[/\\]+/, '');
+    }
     if (/^~($|[/\\])/.test(raw)) {
       if (!home) return null; // non sappiamo dov'è: fuori per prudenza
       raw = String(home).replace(/\\/g, '/') + '/' + raw.slice(1).replace(/^[/\\]+/, '');
