@@ -816,12 +816,16 @@
   // riservati: serve a chi legge documenti per mestiere (LEGGI_DOCUMENTO), dove
   // "fuori dalla home" è il caso normale (una chiavetta, un disco esterno, il
   // NAS) e non un segnale di niente.
+  // I motivi sono FRASI INTERE, seconda persona: finiscono nel popup che legge
+  // l'utente, non in un log. «Fuori dal perimetro dichiarato» non dice niente a
+  // chi deve decidere in due secondi se cliccare OK.
+  const FUORI = 'È fuori dalla tua cartella.';
   function operandReason(op, cwd, perim, home, soloRiservati) {
     const raw = String(op || '');
     // Drive PowerShell dell'ambiente: `Get-ChildItem Env:`, `Get-Item Env:\PATH`.
-    if (/^env:/i.test(raw)) return 'legge le variabili d’ambiente';
+    if (/^env:/i.test(raw)) return AMBIENTE;
     for (const seg of raw.replace(/\\/g, '/').split('/')) {
-      if (seg && SENSITIVE_SEG_RE.test(unquote(seg))) return `punta a “${seg}”, che contiene dati riservati`;
+      if (seg && SENSITIVE_SEG_RE.test(unquote(seg))) return `“${seg}” contiene chiavi o password.`;
     }
     if (soloRiservati) return '';
     const target = resolveTarget(raw, cwd, home);
@@ -829,15 +833,16 @@
       // Nessun perimetro dichiarato (classificatore usato da solo): resta la
       // lettura strutturale — assoluto, risalita con `..`, o `~` = fuori.
       const t = pathParts(raw);
-      if (/^~($|[/\\])/.test(raw)) return 'esce dalla cartella di lavoro';
-      if (t.root !== null) return 'esce dalla cartella di lavoro';
-      if (collapse(t.segs)[0] === '..') return 'esce dalla cartella di lavoro';
+      if (/^~($|[/\\])/.test(raw)) return FUORI;
+      if (t.root !== null) return FUORI;
+      if (collapse(t.segs)[0] === '..') return FUORI;
       return '';
     }
-    if (!target) return 'esce dalla cartella di lavoro';
-    if (!insidePerimeter(target, perim)) return 'esce dalla cartella dell’utente';
+    if (!target) return FUORI;
+    if (!insidePerimeter(target, perim)) return FUORI;
     return '';
   }
+  const AMBIENTE = 'Legge le variabili d’ambiente, dove spesso stanno chiavi e password.';
 
   // Perché un comando altrimenti di livello 1 deve comunque chiedere un OK?
   // Ritorna '' se non deve. Segue i `cd` dentro la sequenza, così il bersaglio
