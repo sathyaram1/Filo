@@ -26,6 +26,9 @@
       ],
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
+        'I video non si fermano più davanti a una domanda: tenere acceso lo schermo mentre guardi non te lo chiede nessuno, come in ogni altro browser.',
+        'Le domande sui permessi sono scritte in italiano anche quando riguardano cose poco comuni. Prima capitava di leggere il nome tecnico in inglese e di non capire cosa si stava per dare.',
+        'I siti che ti fanno scegliere un carattere del tuo computer (gli editor grafici sul web) ora te lo possono chiedere, e tu puoi dire di sì. Prima ricevevano sempre un elenco vuoto e non c\'era modo di rimediare.',
       ],
     },
     {
