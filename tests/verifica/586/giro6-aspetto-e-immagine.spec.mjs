@@ -16,12 +16,20 @@ const PAGINA = `<!doctype html><html><head>
 
 test('un\'immagine negli appunti si incolla anche dove il sito è severo', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
-  // Un PNG minuscolo vero, messo negli appunti come immagine.
-  await app.evaluate(({ clipboard, nativeImage }) => {
+  // Un PNG minuscolo vero, messo negli appunti come immagine. Se gli appunti
+  // del computer non tengono un'immagine — nel contenitore senza schermo delle
+  // routine non la tengono, e la prova era rossa lì e verde altrove senza che
+  // nessuno l'avesse scritto (#586, giro 7) — non c'è niente da guardare e la
+  // prova si ferma qui invece di mentire.
+  const appunti = await app.evaluate(({ clipboard, nativeImage }) => {
     const png = 'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFklEQVR4nGP8//8/AzZgYsAB'
       + 'RiQGABGvAgP1L1XAAAAAAElFTkSuQmCC';
     clipboard.writeImage(nativeImage.createFromDataURL('data:image/png;base64,' + png));
+    const letta = clipboard.readImage();
+    return { vuota: !letta || letta.isEmpty() };
   });
+  console.log('[586 g6] gli appunti tengono un\'immagine:', !appunti.vuota);
+  test.skip(appunti.vuota, 'gli appunti di questo computer non tengono un\'immagine');
 
   const page = await testServer.openReady(openTab, PAGINA);
   await page.click('#ce');
