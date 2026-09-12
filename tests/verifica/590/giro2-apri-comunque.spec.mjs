@@ -130,6 +130,52 @@ test('D — dopo «Apri comunque», un link dentro il sito deve funzionare', asy
   }
 });
 
+test('D2 — dopo «Apri comunque», ricaricare la pagina deve funzionare', async ({ app, shell }) => {
+  await abilitaBlocco(shell, HOST);
+  const s = await sitoConRimbalzo();
+  try {
+    const url = `http://${HOST}:${s.porta}/ingresso`;
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+    await expect(card).toBeVisible({ timeout: 6000 });
+    await card.getByText('Apri comunque').click();
+
+    const page = await paginaSuHost(app, HOST);
+    expect(page).not.toBeNull();
+    await expect(page.locator('#ingresso')).toBeVisible({ timeout: 8000 });
+
+    // Ricaricare è l'azione più banale che esista su una pagina aperta.
+    await page.evaluate(() => window.location.reload());
+    await expect(page.locator('#ingresso')).toBeVisible({ timeout: 8000 });
+  } finally {
+    await s.chiudi();
+  }
+});
+
+test('D3 — dopo «Apri comunque», un link che apre una nuova scheda dentro il sito', async ({ app, shell }) => {
+  await abilitaBlocco(shell, HOST);
+  const s = await sitoConRimbalzo();
+  try {
+    const url = `http://${HOST}:${s.porta}/ingresso`;
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+    await expect(card).toBeVisible({ timeout: 6000 });
+    await card.getByText('Apri comunque').click();
+
+    const page = await paginaSuHost(app, HOST);
+    expect(page).not.toBeNull();
+    await expect(page.locator('#ingresso')).toBeVisible({ timeout: 8000 });
+
+    await page.evaluate((p) => window.open(`http://blocked.test:${p}/dentro`, '_blank'), s.porta);
+    await shell.evaluate(() => new Promise((r) => setTimeout(r, 2000)));
+    const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+    const dentro = snap.tabs.filter((t) => String(t.url).endsWith('/dentro'));
+    expect(dentro.length, 'la nuova scheda dentro il sito già autorizzato deve nascere').toBe(1);
+  } finally {
+    await s.chiudi();
+  }
+});
+
 test('E — un indirizzo senza schema davanti si apre ancora (non solo si controlla)', async ({ app, shell, testServer }) => {
   await abilitaBlocco(shell, 'altro.esempio');
   const url = testServer.html('<!doctype html><meta charset="utf-8"><h1 id="ok">APERTA</h1>');
