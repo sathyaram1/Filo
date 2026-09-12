@@ -40,8 +40,8 @@
 //   destra (#170.1) col sito bloccato e l'opzione "Apri comunque".
 //
 // API: configureFromSettings, shouldBlockNavigation, isSearchEngineUrl,
-//      isBlacklistedHost, canonicalHost, allowHost, isAllowedHost, setForTest,
-//      status.
+//      isBlacklistedHost, canonicalHost, allowHost, isAllowedHost, revokeHost,
+//      allowedHosts, setForTest, status.
 
 require('../../shared/urlNav'); // #590 — la regola di cosa è un nome di sito valido, in un posto solo
 
