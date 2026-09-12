@@ -46,12 +46,9 @@ test('la shell toccata non deve riaccendere la modalità terminale spenta altrov
   await pagina.waitForTimeout(1200);
   expect((await impostazioni(pagina)).terminal?.enabled).toBe(true);
 
-  // 2. cambia il tema. Da qui in poi il fuoco resta su quella tendina: è
-  //    l'ultimo elemento che ha toccato, e ci resta anche passando ad
-  //    un'altra scheda.
-  await pagina.selectOption('#theme', 'dark');
-  await pagina.waitForTimeout(1200);
-  expect(await chiHaIlFuoco(pagina)).toBe('theme');
+  // Il fuoco resta sulla spunta che ha appena toccato, e ci resta anche
+  //    mentre l'utente va in un'altra scheda a parlare con Filo.
+  expect(await chiHaIlFuoco(pagina)).toBe('terminalEnabled');
 
   // 3. ci ripensa e spegne la modalità terminale parlando con Filo (livello 2:
   //    passa da una conferma che mostra i rischi).
