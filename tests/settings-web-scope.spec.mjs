@@ -138,3 +138,34 @@ test('anche la lettura a richiesta da una pagina web è ridotta ai campi ammessi
   });
   expect(rispostaInterna?.settings?.apiKeys?.openrouter).toBe(CHIAVE);
 });
+
+test('da una pagina web non si può chiedere TUTTO lo storage in un colpo solo', async ({ app, openTab, testServer }) => {
+  const web = await testServer.openReady(openTab, '<h1>pagina esterna</h1>');
+  const url = web.url();
+
+  // Senza chiavi = "dammi tutto": cronologia AI, memoria, pagine salvate, costi.
+  const tutto = await app.evaluate(async ({}, pageUrl) => {
+    const H = globalThis.__filoHandlers;
+    return H.handleMessage({ type: '_storage:get', keys: null }, { url: pageUrl });
+  }, url);
+  expect(tutto?.ok, 'una pagina web non deve poter svuotare lo storage in lettura').toBe(false);
+  expect(tutto?.value).toBeUndefined();
+
+  // Quello che i content script fanno davvero — chiedere le loro chiavi per
+  // nome — continua a funzionare.
+  const perNome = await app.evaluate(async ({}, pageUrl) => {
+    const H = globalThis.__filoHandlers;
+    return H.handleMessage({ type: '_storage:get', keys: ['settings'] }, { url: pageUrl });
+  }, url);
+  expect(perNome?.ok).toBe(true);
+  expect(perNome?.value?.settings?.theme, 'il tema arriva comunque al content script').toBeTruthy();
+  expect(JSON.stringify(perNome?.value ?? null)).not.toContain(CHIAVE);
+
+  // E dalle pagine interne la lettura completa resta possibile (Opzioni, export).
+  const interna = await app.evaluate(async () => {
+    const H = globalThis.__filoHandlers;
+    return H.handleMessage({ type: '_storage:get', keys: null }, { url: 'filo://options/options.html' });
+  });
+  expect(interna?.ok).toBe(true);
+  expect(interna?.value?.settings).toBeTruthy();
+});
