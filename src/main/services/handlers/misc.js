@@ -225,7 +225,18 @@ module.exports = function register(on, ctx) {
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
     const win = winOf(sender);
     if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
-    const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
+    // La foto è di CHI LA CHIEDE, non della scheda attiva. Chi la chiede è
+    // sempre il codice che gira nella pagina da fotografare (il feedback, le
+    // azioni di pagina), quindi per gli usi veri non cambia niente. Guardando
+    // la scheda attiva invece, un sito lasciato aperto in una scheda di
+    // sfondo si faceva dare l'immagine a piena risoluzione di quello che
+    // l'utente aveva davanti in quel momento: la posta, la banca, una pagina
+    // di Filo. Senza mittente (una scorciatoia, la shell) resta la scheda
+    // attiva, che lì è la cosa giusta.
+    const idMittente = sender?.tab?.id;
+    const tab = idMittente
+      ? win._filoTabs.tabs.find((t) => t.id === idMittente)
+      : win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
     if (!tab) return { ok: false, error: 'no active tab' };
     const img = await tab.view.webContents.capturePage();
     return { ok: true, dataUrl: img.toDataURL() };
