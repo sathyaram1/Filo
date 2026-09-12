@@ -94,7 +94,7 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('permissions:source-closed', wrapped);
       return () => ipcRenderer.removeListener('permissions:source-closed', wrapped);
     },
-    pickSource: (id, fonteId) => ipcRenderer.invoke('permissions:pick-source', { id, fonteId }),
+    pickSource: (id, fonteId, audio) => ipcRenderer.invoke('permissions:pick-source', { id, fonteId, audio }),
     // Il segno che un sito può vedere lo schermo, mentre può vederlo. Parte
     // quando la fonte viene consegnata e finisce quando la pagina se ne va,
     // muore, o si preme «Interrompi».

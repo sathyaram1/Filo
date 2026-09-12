@@ -1789,9 +1789,9 @@
     // restava ad aspettare due minuti prima di vedersi negare.
     let filaFonti = null;
     if (api.permissions.onPickSource) {
-      function rispondiScelta(id, fonteId) {
+      function rispondiScelta(id, fonteId, audio) {
         filaFonti.chiudi(id);
-        try { api.permissions.pickSource(id, fonteId); } catch (_) {}
+        try { api.permissions.pickSource(id, fonteId, !!audio); } catch (_) {}
       }
 
       function disegnaScelta(info) {

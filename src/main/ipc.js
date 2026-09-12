@@ -408,9 +408,9 @@ function registerIpcHandlers() {
   });
   // Quale schermo o finestra si condivide: la seconda mezza domanda, dopo il
   // «Consenti» sulla cattura dello schermo. Senza risposta si annulla.
-  ipcMain.handle('permissions:pick-source', (event, { id, fonteId } = {}) => {
+  ipcMain.handle('permissions:pick-source', (event, { id, fonteId, audio } = {}) => {
     void event;
-    try { return require('./services/permessiSito').scegliFonteRisposta(id, fonteId || null); }
+    try { return require('./services/permessiSito').scegliFonteRisposta(id, fonteId || null, !!audio); }
     catch (_) { return { ok: false }; }
   });
   // «Interrompi» sul segno che dice che un sito può vedere lo schermo. Da qui
