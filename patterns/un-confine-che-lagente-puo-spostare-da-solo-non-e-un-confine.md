@@ -230,6 +230,31 @@ tutto ciò che il confronto col link usa davvero e costa una frazione dello
 spazio. Vale ogni volta che una difesa tiene una coda: chiediti quanto costa a
 chi attacca farla traboccare.
 
+## Due modi di non misurare affatto
+
+Le porte dei primi giri nascondevano il bersaglio. Al giro 6 ne sono arrivate due
+che il bersaglio non lo nascondono: lo tolgono di mano al controllo.
+
+La prima è una **regola di comodo applicata al contrario**. Per una ricerca la
+prima parola scritta è il testo cercato, non un file, e va scartata: senza quella
+regola chi cerca «credentials» nei propri appunti si sente dire che i suoi
+appunti contengono chiavi. Ma in PowerShell il file si lega con `-Path`, e allora
+la prima parola scritta è già il modello: a essere scartato era il file. Stessa
+cosa con `/C:` di findstr, che porta il testo cercato. Ogni scorciatoia del tipo
+«il primo operando è X» va scritta insieme al suo rovescio: se qualcos'altro nel
+comando dichiara chi è X, la scorciatoia non si applica.
+
+La seconda è una **misura che pretende un nome esistente**. Seguire un
+collegamento vuol dire chiedere al disco il percorso vero, e il disco risponde
+solo a un nome che esiste: `pacco/*.txt` non esiste, quindi il collegamento
+tornava invisibile e la lettura costava zero, mentre lo stesso file chiamato per
+nome costava un OK. Vale uguale per una ricerca ricorsiva, che i collegamenti li
+attraversa senza nominarli. E il collegamento non deve mettercelo l'utente:
+scompattare un archivio o clonare un deposito costano un solo OK, e dentro ci sta
+quello che vuole chi li ha preparati. Quando una difesa interroga il filesystem,
+chiediti su quale nome: se è quello scritto, un modello o una ricorsione la
+spengono.
+
 ## Regola operativa
 
 Quando aggiungi una difesa, scrivi accanto **a cosa è agganciata** e chiediti chi
