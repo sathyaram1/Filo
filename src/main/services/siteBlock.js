@@ -165,9 +165,7 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   const host = u.hostname.toLowerCase();
   res.host = host;
 
-  // Eccezione b) — Filo apre direttamente (NAVIGA / navigazione interna).
-  if (viaFilo) return res;
-  // Eccezione a) — la navigazione proviene da un motore di ricerca.
+  // Unica eccezione — la navigazione proviene da un motore di ricerca.
   if (fromUrl && isSearchEngineHost(hostnameOf(fromUrl))) return res;
 
   if (!isBlacklistedHost(host)) return res;
