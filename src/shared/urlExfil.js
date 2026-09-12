@@ -28,8 +28,16 @@
   // nell'URL", li mette in chiaro o base64; non in forme cifrate sofisticate).
   const MIN_TOKEN = 5;      // lunghezza minima di un token del corpus per contare
   const STRONG_TOKEN = 12;  // un solo token così lungo che combacia → già sospetto
-  const STRUCT_CARRIER = 80; // payload (query+fragment+path) per il fallback strutturale
-  const STRUCT_BLOB = 24;   // singolo token opaco (sottodominio/segmento) → sospetto
+  // Soglie del ripiego strutturale. Si contano SOLO i pezzi illeggibili, e si
+  // misurano contro gli indirizzi veri: il pezzo opaco più lungo che un sito
+  // normale mette in un link è l'identificativo di un documento di Google, 44
+  // caratteri (un ASIN di Amazon ne fa 10, un brano di Spotify 22, un post su X
+  // 19, un identificativo di sessione di Booking 32). Sopra quella misura un
+  // tratto illeggibile non è più il modo in cui un sito nomina le sue cose: è
+  // roba che qualcuno ci ha messo dentro.
+  const STRUCT_CARRIER = 96; // somma dei pezzi illeggibili → payload spezzato
+  const STRUCT_BLOB = 48;   // singolo pezzo illeggibile in path/query → payload
+  const STRUCT_HOST_BLOB = 24; // etichetta opaca nel sottodominio: nessun sito vero
 
   // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
   // evitano che un URL legittimo che le contiene scateni il match a token singolo.
