@@ -380,7 +380,7 @@ function consumaPreambolo(wc) {
   preamboli.delete(wc.id);
   clearTimeout(v.timer);
   if (v.fino > Date.now()) return v;
-  if (v.ripresaId) fineRipresa(v.ripresaId);
+  if (v.ripresaId) fineUso(v.ripresaId);
   return null;
 }
 
@@ -571,7 +571,7 @@ function installaSuSessione(ses) {
         if (!scelta) {
           // Annullato qui: il sì di un attimo fa non vale più niente, e un
           // eventuale segno della ripresa va tolto o resterebbe a mentire.
-          if (pre && pre.ripresaId) fineRipresa(pre.ripresaId);
+          if (pre && pre.ripresaId) fineUso(pre.ripresaId);
           nega();
           return;
         }
@@ -580,8 +580,10 @@ function installaSuSessione(ses) {
         // segno prudente della strada vecchia era già partito (il sito ci ha
         // messo più di un attimo ad arrivare qui), lo rifacciamo: adesso
         // sappiamo per certo se l'audio c'è o no, e il segno lo deve dire.
-        if (pre && pre.ripresaId) fineRipresa(pre.ripresaId);
-        iniziaRipresa(bersaglio, P().origineDi(url) || url, { audio: scelta.audio ? 'si' : 'no' });
+        if (pre && pre.ripresaId) fineUso(pre.ripresaId);
+        iniziaUso(bersaglio, P().origineDi(url) || url, [P().CHIAVI.SCHERMO], {
+          audioSistema: !!scelta.audio,
+        });
         callback({ video: scelta.fonte, ...(scelta.audio ? { audio: 'loopback' } : {}) });
       } catch (_) { nega(); }
     });
@@ -764,7 +766,7 @@ function _reset() {
   unaTantum.clear();
   scelteFonte.clear();
   preamboli.clear();
-  for (const id of [...riprese.keys()]) fineRipresa(id);
+  for (const id of [...usi.keys()]) fineUso(id);
 }
 
 module.exports = {
