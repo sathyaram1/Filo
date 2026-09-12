@@ -520,7 +520,12 @@
     if (!key) return null;
     const withLevel = (setter) => {
       const r = setter.build(rawVal);
-      return r ? { ...r, level: setter.level || 1, risk: setter.risk || '' } : null;
+      if (!r) return null;
+      // Rifiuto esplicito del setter (es. lo stile dell'agente oltre il tetto
+      // di lunghezza): non c'è un partial da applicare né un livello da
+      // chiedere — c'è una frase da riferire a chi ha provato a scriverlo.
+      if (r.error) return { error: String(r.error) };
+      return { ...r, level: setter.level || 1, risk: setter.risk || '' };
     };
     for (const setter of PREF_SETTERS) {
       if (setter.keys.includes(key)) return withLevel(setter);
