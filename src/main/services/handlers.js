@@ -3197,13 +3197,55 @@ function broadcastToFiloPages(message) {
 // ospita. Raggiungiamo ogni frame vivo della scheda; se l'enumerazione non è
 // disponibile (frame in navigazione) si ripiega sul comportamento di prima.
 function sendToAllFrames(wc, message) {
+  sendToEachFrame(wc, () => message);
+}
+
+// Come sopra, ma il messaggio lo decide il FRAME che lo riceve: `messageFor`
+// riceve l'indirizzo del frame e torna ciò che quel frame può vedere. Serve
+// alle impostazioni, dove una pagina filo:// riceve l'oggetto intero e un sito
+// esterno solo i campi ammessi — e i due possono stare nella stessa scheda
+// (una pagina web che incorpora un riquadro, o viceversa).
+function sendToEachFrame(wc, messageFor) {
   if (!wc || wc.isDestroyed?.()) return;
   let frames = null;
   try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
-  if (!frames || !frames.length) { try { wc.send('filo:broadcast', message); } catch (_) {} return; }
-  for (const f of frames) {
-    try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
+  if (!frames || !frames.length) {
+    let url = '';
+    try { url = wc.getURL() || ''; } catch (_) { url = ''; }
+    try { wc.send('filo:broadcast', messageFor(url)); } catch (_) {}
+    return;
   }
+  for (const f of frames) {
+    try { if (!f.detached) f.send('filo:broadcast', messageFor(f.url || '')); } catch (_) {}
+  }
+}
+
+// Spinge le impostazioni aggiornate a tutte le superfici aperte.
+//
+// NON passa da broadcastToTabs di proposito: quello manda lo STESSO oggetto a
+// ogni frame di ogni scheda, siti esterni compresi, e dentro le impostazioni ci
+// sono le chiavi dei servizi a pagamento e le credenziali del proxy. Ogni frame
+// riceve ciò che la sua origine può vedere, con la stessa funzione che usano le
+// letture a richiesta (src/shared/settingsScope.js): se un giorno divergono, a
+// divergere sarà una funzione sola e non due strade indipendenti.
+function broadcastSettingsUpdated(merged) {
+  const Scope = globalThis.SN_SETTINGS_SCOPE;
+  const full = { type: MSG.SETTINGS_UPDATED, settings: merged };
+  let web = full;
+  try { web = { type: MSG.SETTINGS_UPDATED, settings: Scope.settingsForWeb(merged) }; }
+  catch (_) { web = { type: MSG.SETTINGS_UPDATED, settings: {} }; }
+  const messageFor = (url) => (Scope && Scope.isFiloOrigin(url) ? full : web);
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win._filoTabs) {
+        for (const t of win._filoTabs.tabs) {
+          try { sendToEachFrame(t.view.webContents, messageFor); } catch (_) {}
+        }
+      }
+      // La shell è una superficie interna di Filo (filo://shell): oggetto intero.
+      try { win.webContents.send('filo:broadcast', full); } catch (_) {}
+    }
+  } catch (_) {}
 }
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) con chiavi e
