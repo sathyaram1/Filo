@@ -776,6 +776,11 @@
   // file da misurare. Le maiuscole no: `-E`/`-F` di grep sono il tipo di
   // espressione, non un modello che arriva da fuori.
   const CERCA_DA_FLAG_RE = /(^|\s)(--regexp|--file|\/[A-Za-z]*[gGfF]:|-[a-z]*[ef])(=|:|\s|$)/;
+  // Le opzioni che portano il MODELLO come token successivo (`grep -e credentials
+  // appunti.txt`, `Select-String -Pattern shadow appunti.txt`): quel token è il
+  // testo cercato, non un file, e va saltato. `-f`/`--file` NON stanno qui: lì il
+  // token dopo è un file vero, che si apre e si misura.
+  const CERCA_MODELLO_FLAG_RE = /^(-[A-Za-z]*e|--regexp?|-{1,2}pattern|-{1,2}simplematch)$/i;
 
   // Comandi che spostano la cartella di lavoro: dentro una sequenza li SEGUIAMO,
   // così `cd /etc && cat passwd` misura `passwd` in `/etc` e non nella cartella di
