@@ -239,3 +239,41 @@ test('ogni azione registrata ha un livello valido e una describe', () => {
     assert.equal(typeof entry.describe, 'function', `${type} senza describe`);
   }
 });
+
+// ── #587: leggere un file dal disco ha lo stesso prezzo su tutte le strade ───
+
+test('#587 — LEGGI_DOCUMENTO su un bersaglio riservato chiede un OK, come il `cat`', () => {
+  // Il perimetro lo calcola il main con la stessa regola del classificatore dei
+  // comandi e lo passa come `_motivoPerimetro`; mai l'LLM. Senza questa parità,
+  // chiudere il terminale avrebbe solo spostato la porta: questa azione apre
+  // dal disco esattamente gli stessi file.
+  const riservato = {
+    type: 'LEGGI_DOCUMENTO',
+    percorso: '/home/mario/.ssh/id_rsa',
+    _motivoPerimetro: 'punta a “.ssh”, che contiene dati riservati',
+  };
+  assert.equal(AL.levelFor(riservato), 2);
+  const d = AL.describe(riservato);
+  assert.match(d, /\.ssh/);
+  assert.match(d, /entra nella conversazione/);
+
+  // Un documento qualunque — anche su una chiavetta, fuori dalla cartella
+  // dell'utente — resta livello 1: è il caso d'uso dell'azione.
+  const bolletta = { type: 'LEGGI_DOCUMENTO', percorso: '/media/usb/bolletta.pdf', _motivoPerimetro: '' };
+  assert.equal(AL.levelFor(bolletta), 1);
+  assert.equal(AL.describe(bolletta), 'Leggere il documento /media/usb/bolletta.pdf');
+});
+
+test('#587 — il perimetro del comando arriva dal main e cambia il livello', () => {
+  // Stesso identico comando, due perimetri: dentro non chiede niente, fuori sì.
+  const dentro = {
+    type: 'ESEGUI_COMANDO', comando: 'cat note.txt',
+    _cwdReale: '/home/mario', _perimetro: '/home/mario', _home: '/home/mario',
+  };
+  assert.equal(AL.levelFor(dentro), 1);
+  const fuori = { ...dentro, comando: 'cat /etc/hosts' };
+  assert.equal(AL.levelFor(fuori), 2);
+  assert.match(AL.describe(fuori), /cartella dell’utente/);
+  // E il popup continua a dire il comando e la cartella.
+  assert.match(AL.describe({ ...fuori, _cwd: '~' }), /cat \/etc\/hosts/);
+});
