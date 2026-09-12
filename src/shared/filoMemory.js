@@ -102,9 +102,30 @@
     return getRaw(KEYS.FILO_LESSONS_BUFFER, []);
   }
 
+  // Una lezione vale in ogni conversazione e sopravvive al riavvio, come lo
+  // stile dell'agente: stesso tetto, e i marcatori del recinto tolti dal
+  // testo. Il controllo sta QUI, che è il punto unico da cui una lezione entra
+  // in memoria: prima esisteva solo sulla strada "l'utente chiede a Filo di
+  // ricordare", mentre l'agente che si scrive le lezioni da solo dopo ogni
+  // scambio scriveva senza tetto, sulla stessa memoria e con la stessa
+  // portata.
   async function appendLesson(lesson) {
+    const C = global.SN_CONST;
+    const grezza = String(lesson || '').trim();
+    const controllo = C && typeof C.validateLesson === 'function'
+      ? C.validateLesson(grezza)
+      : { ok: true, value: grezza };
+    if (!controllo.ok) {
+      // Non si accorcia di nascosto: la lezione non entra, e resta scritto
+      // perché. Chi la propone a nome dell'utente (SALVA_LEZIONE) riceve la
+      // frase e gliela riferisce.
+      console.warn('[Filo] lezione scartata: %d caratteri, il tetto è %d',
+        controllo.length, C && C.LESSON_MAX);
+      return getLessonsBuffer();
+    }
+    if (!controllo.value) return getLessonsBuffer();
     const buf = await getLessonsBuffer();
-    buf.push({ ts: new Date().toISOString(), text: String(lesson || '').trim() });
+    buf.push({ ts: new Date().toISOString(), text: controllo.value });
     await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
     return buf;
   }
