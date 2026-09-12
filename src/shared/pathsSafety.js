@@ -287,7 +287,7 @@
     LIMITI: { MAX_STEPS, MAX_SELECTOR_LEN, MAX_INTENT_LEN, MAX_DOMAIN_LEN, MAX_URL_LEN, MAX_UA_LEN, KNOWN_PATHS_BUDGET_CHARS, MAX_PATH_CHARS },
     // Esposti per i test e per chi riusa i singoli pezzi.
     _internal: {
-      neutralizzaMarcature, redactSelector, sanitizeSteps, sanitizeIntent,
+      neutralizzaMarcature, redigiDatiPersonali, redactSelector, sanitizeSteps, sanitizeIntent,
       domainOf, normalizedPath, sanitizeDomain, sanitizeInitialUrl, clusterKey,
     },
   };
