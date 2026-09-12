@@ -824,7 +824,7 @@ test('livello 1 — pipeline in cui OGNI segmento è una lettura', () => {
     'Get-Content log.txt | Select-String errore',
     'Get-ChildItem | Measure-Object -Sum Length',
     'Get-ChildItem | Group-Object Extension | Sort-Object Count',
-    'Get-Process | Sort-Object CPU | Select-Object -First 3 | Format-Table',
+    'Get-ChildItem | Sort-Object Length | Select-Object -First 3 | Format-Table',
     'Get-ChildItem | Out-String',
     'gci | select -First 3',
     // le pipeline delle altre shell valgono lo stesso: incanalare una lettura
