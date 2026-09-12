@@ -2190,6 +2190,8 @@
     AGENT_STYLE_OPEN,
     AGENT_STYLE_CLOSE,
     AGENT_STYLE_SLOT,
+    AGENT_STYLE_REMOVAL_WORDS,
+    isAgentStyleRemoval,
     sanitizeAgentStyle,
     validateAgentStyle,
     agentStyleBlock,
