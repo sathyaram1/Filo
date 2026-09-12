@@ -338,9 +338,94 @@ test('le shell dirette restano sempre 3, anche con flag di versione', () => {
 });
 
 test('livello 1 — comandi di diagnostica di sola lettura aggiunti', () => {
-  for (const cmd of ['ps', 'ps aux', 'free -h', 'lscpu', 'lsblk', 'printenv PATH', 'whereis node', 'who', 'sha256sum file']) {
+  for (const cmd of ['free -h', 'lscpu', 'lsblk', 'whereis node', 'who', 'sha256sum file']) {
     assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
   }
+});
+
+// ── #587: leggere non è gratis ───────────────────────────────────────────────
+// Il contenuto letto entra nel contesto del modello, e da lì una pagina ostile
+// che lo pilota può riscriverlo dentro un URL. Le letture che espongono materiale
+// personale chiedono un OK (livello 2): non sono vietate, sono dichiarate.
+
+test('livello 2 — ambiente e processi non sono livello 1 (#587)', () => {
+  for (const cmd of [
+    'printenv', 'printenv PATH',              // token e percorsi del profilo
+    'ps', 'ps aux', 'ps -ef',                 // righe di comando altrui: password in chiaro
+    'Get-Process', 'Get-Process -Name filo', 'gps', // stessa cosa, altra shell → stesso livello
+    'Get-ChildItem Env:', 'Get-Item Env:\\PATH',
+    'echo $HOME', 'cat $HOME/note.txt', 'Get-Content $env:USERPROFILE\\note.txt',
+    'type %APPDATA%\\Filo\\storage.json',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" non deve essere livello 1 (#587)`);
+  }
+});
+
+test('livello 1 — l’interrogazione di versione resta lettura pura anche qui', () => {
+  assert.equal(lvl('ps --version'), 1);
+  assert.equal(lvl('printenv --version'), 1);
+});
+
+test('livello 2 — la lettura FUORI dal perimetro dichiarato chiede un OK (#587)', () => {
+  const dentro = { perimetro: '/home/mario', cwd: '/home/mario/progetto', home: '/home/mario' };
+  // Dentro la cartella dell'utente: zero attrito, come prima.
+  for (const cmd of ['cat appunti.txt', 'head -n 20 log.txt', 'grep errore src/app.js', 'ls', 'cat ../note.txt']) {
+    assert.equal(C.classify(cmd, dentro), 1, `"${cmd}" dentro il perimetro resta livello 1`);
+  }
+  // Fuori: percorsi assoluti altrove, risalite che escono, `~` che punta altrove.
+  for (const cmd of [
+    'cat /etc/passwd', 'head -n 5 /etc/shadow', 'grep -r token /var/log',
+    'cat ../../../etc/hosts', 'Get-Content C:\\Windows\\System32\\drivers\\etc\\hosts',
+    'ls /root', 'tail -f /var/log/syslog',
+  ]) {
+    assert.equal(C.classify(cmd, dentro), 2, `"${cmd}" esce dal perimetro → livello 2`);
+  }
+});
+
+test('livello 2 — i bersagli riservati non sono livello 1 nemmeno dentro il perimetro (#587)', () => {
+  const scope = { perimetro: '/home/mario', cwd: '/home/mario', home: '/home/mario' };
+  for (const cmd of [
+    'cat ~/.ssh/id_rsa', 'cat .ssh/id_ed25519', 'ls ~/.aws', 'cat .aws/credentials',
+    'cat .env', 'cat .env.local', 'grep KEY .npmrc', 'cat .git-credentials',
+    'cat .bash_history', 'type AppData\\Roaming\\Filo\\storage.json',
+    'Get-Content .config/filo/segreti.json',
+  ]) {
+    assert.equal(C.classify(cmd, scope), 2, `"${cmd}" punta a dati riservati → livello 2`);
+  }
+});
+
+test('SICUREZZA — il `cd` non sposta il perimetro, dentro e fra i turni (#587)', () => {
+  const scope = { perimetro: '/home/mario', cwd: '/home/mario', home: '/home/mario' };
+  // Nella stessa sequenza il `cd` viene SEGUITO: `passwd` è /etc/passwd, non
+  // /home/mario/passwd. Senza questo, concatenare basterebbe a evadere il freno.
+  assert.equal(C.classify('cd /etc && cat passwd', scope), 2);
+  assert.equal(C.classify('cd /etc; head -n 3 shadow', scope), 2);
+  // E fra un turno e l'altro: il main passa la cartella corrente VERA, quindi il
+  // comando successivo viene misurato lì.
+  assert.equal(C.classify('cat passwd', { ...scope, cwd: '/etc' }), 2);
+  // Spostarsi non legge niente: `cd` da solo resta livello 1 (senza conferma non
+  // sarebbe più usabile — è la primitiva di navigazione dell'assistente).
+  assert.equal(C.classify('cd /etc', scope), 1);
+  assert.equal(C.classify('cd ..', scope), 1);
+  assert.equal(C.classify('cd sub && ls', scope), 1);
+});
+
+test('senza perimetro dichiarato resta il freno strutturale (#587)', () => {
+  // Il classificatore usato da solo (nessuna cartella nota) non può risolvere i
+  // relativi: assoluti e risalite valgono comunque "fuori".
+  assert.equal(lvl('cat /etc/passwd'), 2);
+  assert.equal(lvl('cat ../segreti.txt'), 2);
+  assert.equal(lvl('cat ~/.ssh/id_rsa'), 2);
+  assert.equal(lvl('cat package.json'), 1);
+  assert.equal(lvl('grep foo src/app.js'), 1);
+});
+
+test('il motivo della conferma è leggibile (finisce nel popup) (#587)', () => {
+  const scope = { perimetro: '/home/mario', cwd: '/home/mario', home: '/home/mario' };
+  assert.match(C.readReason('cat /etc/passwd', scope), /cartella dell’utente/);
+  assert.match(C.readReason('cat ~/.ssh/id_rsa', scope), /\.ssh/);
+  assert.match(C.readReason('printenv', scope), /variabili d’ambiente/);
+  assert.equal(C.readReason('cat appunti.txt', scope), '');
 });
 
 test('livello 1 — date/hostname senza argomenti mutanti restano lettura', () => {
