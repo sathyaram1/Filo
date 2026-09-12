@@ -219,8 +219,99 @@
     return TLD_VALIDO.test(parti[parti.length - 1]);
   }
 
+  // #590 — IL NOME DI UN SITO COME LO SCRIVE CHI LO LEGGE. Un indirizzo in
+  // cirillico, giapponese o cinese viaggia sulla rete nella forma punycode
+  // ("сайт.рф" → "xn--80aswg.xn--p1ai"): è la forma giusta per confrontarlo con
+  // una lista, ed è quella sbagliata da mettere sotto gli occhi di qualcuno.
+  // Chi aveva scritto la sua voce in cirillico se la ritrovava in Preferenze
+  // trasformata in una stringa che non somiglia a niente, e poteva cancellarla
+  // credendola spazzatura. La conversione all'indietro non la sa fare né
+  // `new URL` né `decodeURIComponent`: è l'algoritmo di RFC 3492, qui sotto.
+  const P_BASE = 36;
+  const P_TMIN = 1;
+  const P_TMAX = 26;
+  const P_SKEW = 38;
+  const P_DAMP = 700;
+  const P_BIAS0 = 72;
+  const P_N0 = 128;
+  const P_MAX = 0x7fffffff;
+
+  function punyAdapt(delta, punti, prima) {
+    let d = prima ? Math.floor(delta / P_DAMP) : delta >> 1;
+    d += Math.floor(d / punti);
+    let k = 0;
+    while (d > ((P_BASE - P_TMIN) * P_TMAX) >> 1) {
+      d = Math.floor(d / (P_BASE - P_TMIN));
+      k += P_BASE;
+    }
+    return k + Math.floor(((P_BASE - P_TMIN + 1) * d) / (d + P_SKEW));
+  }
+
+  // Una sola etichetta, già senza il prefisso "xn--". Torna null se non è
+  // punycode valido: chi chiama tiene allora la forma che aveva.
+  function punyDecodeLabel(input) {
+    const out = [];
+    let n = P_N0;
+    let i = 0;
+    let bias = P_BIAS0;
+    const delim = input.lastIndexOf('-');
+    if (delim > 0) {
+      for (let j = 0; j < delim; j++) {
+        const c = input.charCodeAt(j);
+        if (c > 0x7f) return null; // la parte "base" è ASCII per definizione
+        out.push(c);
+      }
+    }
+    let idx = delim > 0 ? delim + 1 : 0;
+    if (idx >= input.length) return null;
+    while (idx < input.length) {
+      const oldi = i;
+      let w = 1;
+      for (let k = P_BASE; ; k += P_BASE) {
+        if (idx >= input.length) return null;
+        const c = input.charCodeAt(idx++);
+        let cifra;
+        if (c >= 0x30 && c <= 0x39) cifra = c - 0x30 + 26;
+        else if (c >= 0x61 && c <= 0x7a) cifra = c - 0x61;
+        else if (c >= 0x41 && c <= 0x5a) cifra = c - 0x41;
+        else return null;
+        if (cifra >= Math.floor((P_MAX - i) / w)) return null;
+        i += cifra * w;
+        const t = k <= bias ? P_TMIN : (k >= bias + P_TMAX ? P_TMAX : k - bias);
+        if (cifra < t) break;
+        if (w > Math.floor(P_MAX / (P_BASE - t))) return null;
+        w *= P_BASE - t;
+      }
+      const lung = out.length + 1;
+      bias = punyAdapt(i - oldi, lung, oldi === 0);
+      if (Math.floor(i / lung) > P_MAX - n) return null;
+      n += Math.floor(i / lung);
+      i %= lung;
+      if (n < 0x20 || (n >= 0x7f && n <= 0x9f) || n > 0x10ffff) return null;
+      out.splice(i, 0, n);
+      i++;
+    }
+    try {
+      return String.fromCodePoint(...out);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Il nome di un sito nella forma da mostrare. Su un nome già leggibile (o su
+  // qualcosa che non è punycode valido) non tocca niente.
+  function hostLeggibile(raw) {
+    const h = String(raw || '').trim();
+    if (!h || !/(^|\.)xn--/i.test(h)) return h;
+    return h.split('.').map((p) => {
+      if (!/^xn--/i.test(p)) return p;
+      const d = punyDecodeLabel(p.slice(4).toLowerCase());
+      return d || p;
+    }).join('.');
+  }
+
   global.SN_URL_NAV = {
     isLocalHost, isLocalNetworkName, isIpv4, normalizeUrl, looksLikeAddress,
-    canonicalizeFiloUrl, isShareableAddress, isListableDomain,
+    canonicalizeFiloUrl, isShareableAddress, isListableDomain, hostLeggibile,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
