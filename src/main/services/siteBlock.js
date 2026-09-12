@@ -364,6 +364,7 @@ module.exports = {
   allowHost,
   isAllowedHost,
   revokeHost,
+  allowedHosts,
   setForTest,
   status,
 };
