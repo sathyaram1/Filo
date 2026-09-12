@@ -172,7 +172,7 @@ test('ogni campo delle impostazioni usato dentro una pagina web è ammesso', () 
     }
     // const { tema, blocklist } = settings — la scomposizione
     const scomposizioni = [
-      /(?:const|let|var)\s*\{([^}]*)\}\s*=\s*[A-Za-z_$][\w$]*[sS]ettings\b/g,
+      /(?:const|let|var)\s*\{([^}]*)\}\s*=\s*(?:[A-Za-z_$][\w$]*\s*\.\s*)?settings\b/g,
       /(?:const|let|var)\s*\{([^}]*)\}\s*=\s*[gG]etSettings\(\)/g,
     ];
     for (const re of scomposizioni) {
