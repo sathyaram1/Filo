@@ -998,10 +998,21 @@
     // Drive PowerShell dell'ambiente: `Get-ChildItem Env:`, `Get-Item Env:\PATH`.
     if (/^env:/i.test(raw)) return AMBIENTE;
     const target = resolveTarget(raw, cwd, home);
-    const scritto = segRiservato(raw.replace(/\\/g, '/').split('/'));
-    if (scritto) return `“${scritto}” contiene chiavi o password.`;
-    const risolto = target ? segRiservato(target.segs) : '';
-    if (risolto) return `“${risolto}” contiene chiavi o password.`;
+    // I modelli che prendono tutto quello che c'è lì (`*`, `*.*`) si potano
+    // PRIMA di cercare i bersagli riservati: non allargano niente, e trattarli
+    // come bersagli farebbe chiedere un OK a chi legge i propri file.
+    const scritto = segRiservato(potaJolly(raw.replace(/\\/g, '/').split('/')));
+    if (scritto) return riservatoPerche(scritto);
+    const segsTarget = target ? potaJolly(target.segs) : [];
+    const risolto = target ? segRiservato(segsTarget) : '';
+    if (risolto) return riservatoPerche(risolto);
+    // Un collegamento non porta addosso il nome di dove punta: se il processo
+    // principale sa risolverlo, il bersaglio si misura anche nella forma reale.
+    const reali = target ? segmentiReali(target) : null;
+    if (reali) {
+      const vero = segRiservato(potaJolly(reali));
+      if (vero) return riservatoPerche(vero);
+    }
     if (soloRiservati) return '';
     if (!perim) {
       // Nessun perimetro dichiarato (classificatore usato da solo): resta la
