@@ -367,6 +367,27 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
+  // ── Spazio riservato in alto ──────────────────────────────────────────────
+  //
+  // L'area della pagina è una vista nativa che il sistema disegna SOPRA la
+  // cornice di Filo: lo z-index non la scavalca. Tutto ciò che la shell mostra
+  // sotto la fila delle schede deve quindi far scendere la pagina, altrimenti
+  // esiste nel documento e non lo vede nessuno. Il pannello dei download lo
+  // faceva già per conto suo; la domanda di un permesso no, e restava dietro
+  // la pagina: chi navigava non vedeva niente e la richiesta scadeva da sola.
+  //
+  // Con un solo numero condiviso l'ultimo che chiude azzererebbe anche la
+  // riserva di chi è ancora aperto. Qui ognuno tiene la sua, e al main va la
+  // più alta.
+  const riserveTop = new Map();
+  function riservaTop(chi, px) {
+    const n = Math.max(0, Math.round(Number(px) || 0));
+    if (n) riserveTop.set(chi, n); else riserveTop.delete(chi);
+    let massimo = 0;
+    for (const v of riserveTop.values()) if (v > massimo) massimo = v;
+    try { api.tabs.reserveTop && api.tabs.reserveTop(massimo); } catch (_) {}
+  }
+
   // ── Drag & drop per riordinare le tab ─────────────────────────────────────
   // Implementazione a pointer (mousedown/mousemove/mouseup) invece di HTML5
   // draggable: il drag nativo è inaffidabile in Electron sopra le
