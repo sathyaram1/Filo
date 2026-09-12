@@ -309,6 +309,17 @@
       host.style.fontWeight = '600';
       li.appendChild(host);
 
+      // Solo dove le memorie sono due: in una finestra normale ce n'è una sola
+      // e scriverlo sarebbe rumore.
+      if (inIncognito) {
+        const dove = document.createElement('span');
+        dove.className = 'sn-muted';
+        dove.style.fontSize = '12px';
+        dove.textContent = riga.effimera
+          ? I18n.t('options_perms_incognito') : I18n.t('options_perms_normale');
+        li.appendChild(dove);
+      }
+
       for (const voce of riga.voci) {
         const gruppo = document.createElement('span');
         gruppo.style.display = 'inline-flex';
