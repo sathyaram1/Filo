@@ -220,9 +220,18 @@ try {
 if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
-    const { buildPermessiGuardSource, CANALE } = require('./permessi-guard.js');
+    const {
+      buildPermessiGuardSource, buildPosizioneSinceraSource, CANALE, CANALE_POSIZIONE_KO,
+    } = require('./permessi-guard.js');
     const noti = ipcRenderer.sendSync('filo:permessi-noti', loc) || {};
     webFrame.executeJavaScript(buildPermessiGuardSource(noti), true).catch(() => {});
+    // #586 — la posizione che dopo il «Consenti» non arriva mai. Filo non la sa
+    // produrre da sé, ma non deve far finta: quando il sistema non sa dire dove
+    // si è, chi naviga se lo sente dire invece di dare la colpa al sito.
+    webFrame.executeJavaScript(buildPosizioneSinceraSource(), true).catch(() => {});
+    document.addEventListener(CANALE_POSIZIONE_KO, () => {
+      try { ipcRenderer.send('filo:posizione-non-disponibile'); } catch (_) {}
+    }, true);
     // Una scelta presa mentre la pagina è aperta (la pastiglia, o le
     // impostazioni) vale subito: senza questo, "nega per sempre" tornava a
     // leggersi "da chiedere" fino al ricaricamento.
