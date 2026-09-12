@@ -250,7 +250,7 @@ test('#587 — LEGGI_DOCUMENTO su un bersaglio riservato chiede un OK, come il `
   const riservato = {
     type: 'LEGGI_DOCUMENTO',
     percorso: '/home/mario/.ssh/id_rsa',
-    _motivoPerimetro: 'punta a “.ssh”, che contiene dati riservati',
+    _motivoPerimetro: '“.ssh” contiene chiavi o password.',
   };
   assert.equal(AL.levelFor(riservato), 2);
   const d = AL.describe(riservato);
@@ -273,7 +273,7 @@ test('#587 — il perimetro del comando arriva dal main e cambia il livello', ()
   assert.equal(AL.levelFor(dentro), 1);
   const fuori = { ...dentro, comando: 'cat /etc/hosts' };
   assert.equal(AL.levelFor(fuori), 2);
-  assert.match(AL.describe(fuori), /cartella dell’utente/);
+  assert.match(AL.describe(fuori), /fuori dalla tua cartella/);
   // E il popup continua a dire il comando e la cartella.
   assert.match(AL.describe({ ...fuori, _cwd: '~' }), /cat \/etc\/hosts/);
 });

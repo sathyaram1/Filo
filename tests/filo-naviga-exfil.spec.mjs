@@ -126,7 +126,7 @@ const confirmAction = (page, action) =>
 const enableTerminal = (page) =>
   confirmAction(page, { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' });
 
-test('#587 leggere un file fuori dalla cartella dell’utente chiede un OK, e quel contenuto blocca il link che lo porterebbe fuori', async ({ app, openTab }) => {
+test('#587 leggere un file fuori dalla tua cartella chiede un OK, e quel contenuto blocca il link che lo porterebbe fuori', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
 
@@ -144,7 +144,7 @@ test('#587 leggere un file fuori dalla cartella dell’utente chiede un OK, e qu
     const sospesa = await runAction(page, letturaAzione);
     expect(sospesa.executed).toBe(false);
     expect(sospesa.needsConfirm).toBe(2);
-    expect(String(sospesa.describe || '')).toMatch(/cartella dell’utente/);
+    expect(String(sospesa.describe || '')).toMatch(/fuori dalla tua cartella/);
 
     // L'utente conferma: la lettura avviene davvero e il contenuto entra nella
     // conversazione.

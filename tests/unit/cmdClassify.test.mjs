@@ -426,7 +426,7 @@ test('senza perimetro dichiarato resta il freno strutturale (#587)', () => {
 
 test('il motivo della conferma è leggibile (finisce nel popup) (#587)', () => {
   const scope = { perimetro: '/home/mario', cwd: '/home/mario', home: '/home/mario' };
-  assert.match(C.readReason('tail -n 50 /var/log/syslog', scope), /cartella dell’utente/);
+  assert.match(C.readReason('tail -n 50 /var/log/syslog', scope), /fuori dalla tua cartella/);
   assert.match(C.readReason('cat ~/.ssh/id_rsa', scope), /\.ssh/);
   assert.match(C.readReason('printenv', scope), /variabili d’ambiente/);
   assert.equal(C.readReason('cat appunti.txt', scope), '');
