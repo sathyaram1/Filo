@@ -312,6 +312,7 @@
       // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
       describeDone: (a) => {
         const built = prefBuilt(a);
+        if (built && built.error) return built.error;
         return built ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
       },
     },
