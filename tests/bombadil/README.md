@@ -62,3 +62,13 @@ Note sul perché di queste opzioni:
   ```
 
 I risultati si guardano con `bombadil browser inspect /tmp/bombadil-filo`.
+
+## Il limite da sapere prima di cominciare
+
+**Bombadil non ha un eseguibile per Windows.** Il pacchetto npm porta tre binari
+— Linux x64, Linux arm64, macOS arm64 — e il suo lanciatore su Windows risponde
+`unsupported platform win32-x64`. Su una macchina Windows servono quindi WSL con
+una distribuzione installata, oppure Docker, oppure una macchina Linux in rete
+che arrivi al debugger di Electron. Su questa macchina la distribuzione WSL non
+c'era e scaricarla da Canonical è rimasto appeso: l'impianto qui dentro è pronto
+e provato fino al debugger, ma il fuzzer non ha ancora girato.
