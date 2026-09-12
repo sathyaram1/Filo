@@ -954,7 +954,20 @@
   }
 
   // Livello di sicurezza del comando: 1 | 2 | 3. Mai null: l'ignoto è 3.
-  function classify(cmd) {
+  //
+  // `opts` porta il perimetro di lettura (#587), sempre calcolato dal main e mai
+  // dall'LLM: `perimetro` (la cartella dichiarata, = home), `cwd` (la cartella di
+  // lavoro corrente dell'assistente, per risolvere i percorsi relativi) e `home`
+  // (per sciogliere `~`). Senza `opts` il classificatore resta quello di prima,
+  // più il freno strutturale sui percorsi assoluti e su `..`.
+  function classify(cmd, opts) {
+    const lvl = classifyBase(cmd);
+    if (lvl !== 1) return lvl;
+    return readReason(dequote(String(cmd)), opts) ? 2 : 1;
+  }
+
+  // Livello "di forma" del comando, senza il perimetro di lettura.
+  function classifyBase(cmd) {
     if (typeof cmd !== 'string') return 3;
     const trimmed = cmd.trim();
     if (!trimmed) return 3;
