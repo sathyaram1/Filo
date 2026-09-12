@@ -92,7 +92,8 @@
 //     È la home: senza questa regola «dentro la home» vorrebbe dire «ovunque
 //     contino i segreti».
 //   • IL BERSAGLIO È QUELLO CHE IL COMANDO APRIRÀ, non quello che c'è scritto.
-//     Tre conseguenze, e sono tre porte che erano aperte (#587, giro 1):
+//     Sei conseguenze: le prime tre erano porte aperte al giro 1, le altre tre al
+//     giro 2 — stessa causa, strade diverse (#587):
 //     — il controllo sui bersagli riservati gira sul percorso RISOLTO contro la
 //       cartella corrente. Spostarsi non chiede niente e resta valido anche nei
 //       turni dopo, quindi `cd ~/.ssh` seguito da `cat config` apriva un file
