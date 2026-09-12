@@ -165,6 +165,27 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
 
+// #586 — quello che il sito legge sul proprio stato dei permessi. Finché
+// nessuno ha scelto, deve leggere "da chiedere", non "negato": altrimenti i
+// siti che guardano prima di chiedere non chiedono mai, e il pulsante "attiva
+// le notifiche" non fa niente. Vedi src/preload/permessi-guard.js.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) {
+    const { buildPermessiGuardSource, CANALE } = require('./permessi-guard.js');
+    const noti = ipcRenderer.sendSync('filo:permessi-noti', loc) || {};
+    webFrame.executeJavaScript(buildPermessiGuardSource(noti), true).catch(() => {});
+    // Una scelta presa mentre la pagina è aperta (la pastiglia, o le
+    // impostazioni) vale subito: senza questo, "nega per sempre" tornava a
+    // leggersi "da chiedere" fino al ricaricamento.
+    ipcRenderer.on('filo:permessi-noti', (_e, mappa) => {
+      try {
+        document.dispatchEvent(new CustomEvent(CANALE, { detail: mappa || {} }));
+      } catch (_) {}
+    });
+  }
+} catch (e) { /* come sopra: mai bloccare la pagina */ }
+
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //
 // Gira nel preload context (mondo isolato), invisibile alla pagina. I content
