@@ -123,6 +123,7 @@ function configureFromSettings(settings) {
   try {
     mappa = P().normalizza(((settings || {}).security || {}).sitePermissions);
   } catch (_) { mappa = {}; }
+  annunciaAiSiti();
 }
 
 // Dove vive una WebContents: la finestra che la possiede e la scheda, se è una
