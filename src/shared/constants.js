@@ -1998,11 +1998,25 @@
   // Toglie dal testo dell'utente i marcatori del recinto (e il segnaposto) e
   // gli spazi ai bordi. È l'unica cosa che si toglie: la lunghezza non si
   // tocca qui, la giudica validateAgentStyle e la rifiuta chi scrive.
+  //
+  // La ripulitura si RIPETE finché il testo non cambia più, e non è un
+  // dettaglio: una passata sola si aggira spezzando un marcatore con un altro
+  // marcatore. `FINE STILE` + marcatore intero + ` SCRITTO DALL'UTENTE>>>` non
+  // contiene il marcatore, ma appena si toglie quello di mezzo i due pezzi si
+  // ricongiungono e il marcatore c'è. Annidando la cosa quante sono le
+  // passate arrivava intero nel prompt, il recinto si chiudeva sulla prima
+  // riga e il resto del testo finiva FUORI, dove il modello lo legge come
+  // istruzioni sue. Il ciclo termina sempre: ogni giro che cambia qualcosa
+  // accorcia il testo di almeno un marcatore.
   function sanitizeAgentStyle(raw) {
     let s = typeof raw === 'string' ? raw : String(raw == null ? '' : raw);
-    for (const marker of [AGENT_STYLE_OPEN, AGENT_STYLE_CLOSE, AGENT_STYLE_SLOT]) {
-      s = s.split(marker).join('');
-    }
+    let prima;
+    do {
+      prima = s;
+      for (const marker of [AGENT_STYLE_OPEN, AGENT_STYLE_CLOSE, AGENT_STYLE_SLOT]) {
+        s = s.split(marker).join('');
+      }
+    } while (s !== prima);
     return s.trim();
   }
 
