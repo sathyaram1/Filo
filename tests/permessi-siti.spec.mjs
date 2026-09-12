@@ -1091,7 +1091,7 @@ test('mentre un sito ascolta col microfono, Filo lo dice', async ({ shell, openT
     .toBe(0);
 });
 
-test('togliere il permesso chiude anche il microfono che il sito ha già aperto', async ({ app, shell, openTab, testServer }) => {
+test('togliere il permesso chiude anche il microfono che il sito ha già aperto', async ({ shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const page = await testServer.openReady(openTab, HTML_MICROFONO);
   const origine = new URL(page.url()).origin;
@@ -1102,11 +1102,12 @@ test('togliere il permesso chiude anche il microfono che il sito ha già aperto'
   expect(await esito).toEqual(['audio:live']);
   await expect(shell.locator('.perm-live')).toHaveCount(1, { timeout: 15_000 });
 
-  // La revoca, dalla stessa porta delle Impostazioni e del tasto destro.
-  await app.evaluate((_e, o) => {
-    require('./src/main/services/permessiSito').revoca(o, 'microfono', {});
-  }, origine);
+  // La revoca, dalla porta del tasto destro sulla scheda: la stessa che usano
+  // le Impostazioni.
+  await shell.evaluate((o) => window.filoShell.permissions.revoke(o, 'microfono'), origine);
 
+  // Il microfono si chiude davvero, e l'unico modo è ricaricare la scheda:
+  // dopo, del microfono che il sito aveva in mano non resta niente.
   await expect
     .poll(() => page.evaluate(() => window.__vive()).catch(() => 0), { timeout: 20_000 })
     .toBe(0);
