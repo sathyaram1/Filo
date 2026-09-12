@@ -95,9 +95,15 @@ test('chat della home: il riordino non ha perso informazioni', () => {
   for (const data of ['gemini-3.1-flash-lite', 'Si chiama Mario', 'Risposte brevi', 'TEMPO: 10:04', '[f-1] Appunti']) {
     assert.ok(p.includes(data), `il prompt completo non contiene più: ${data}`);
   }
-  for (const section of ['PROFILO UTENTE:', 'PREFERENZE:', 'LEZIONI RECENTI:', 'STATO:', "FILE DELL'EDITOR"]) {
+  for (const section of ['PROFILO UTENTE:', 'PREFERENZE:', 'LEZIONI RECENTI', 'STATO:', "FILE DELL'EDITOR"]) {
     assert.ok(p.includes(section), `manca la sezione: ${section}`);
   }
+  // #592 — le lezioni entrano dentro un recinto, come lo stile dell'agente:
+  // sono regole che Filo si appunta da sé e ci si arriva dalle stesse vie
+  // ordinarie, quindi nel prompt sono materiale, non istruzioni.
+  assert.ok(p.includes(C.LESSONS_OPEN) && p.includes(C.LESSONS_CLOSE), 'le lezioni non sono recintate');
+  const dentro = p.split(C.LESSONS_OPEN)[1].split(C.LESSONS_CLOSE)[0];
+  assert.ok(dentro.includes('Risposte brevi'), 'la lezione deve stare dentro il recinto');
   // I rimandi interni non devono più mandare il modello a cercare "sopra" un
   // blocco che ora sta sotto.
   assert.ok(!/STATO sopra/.test(p), 'rimando posizionale rimasto indietro: "STATO sopra"');
