@@ -213,6 +213,10 @@
       const pulite = {};
       for (const [chiave, scelta] of Object.entries(voci)) {
         if (!chiave || !SCELTE.has(scelta)) continue;
+        // Un permesso che non si ricorda non resta scritto nemmeno se lo
+        // trovassimo già sul disco (una versione precedente lo salvava): qui
+        // sparisce da solo alla prima lettura.
+        if (!siRicorda(chiave)) continue;
         pulite[chiave] = scelta;
       }
       if (Object.keys(pulite).length) out[o] = pulite;
