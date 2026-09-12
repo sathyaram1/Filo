@@ -238,6 +238,8 @@ class TabManager {
     // (es. menu App) deve restare visibile sopra la WebContentsView attiva. Si
     // abbassa la view invece di nasconderla, evitando l'area vuota/bianca.
     this.topInset = 0;
+    // "La pagina comincia almeno qui" (vedi setTopFloor).
+    this.topFloor = 0;
     // Modalità "contenuto a tutto schermo": la WebContentsView attiva copre
     // l'intera finestra, nascondendo la barra (tab + indirizzo) della shell.
     // Attivata dal menu (voce "Schermo intero"); si esce con Esc.
