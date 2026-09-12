@@ -317,10 +317,9 @@
     // Ogni forma in cui lo stesso dato può comparire nell'indirizzo: com'è, e
     // scritto all'indietro.
     const forme = [exposed, rovescia(exposed)];
-    const carico = caricoAlnum(url);
-    const caricoForme = carico ? [carico, rovescia(carico)] : [];
+    const parole = caricoParole(url);
     const dentro = (t) => forme.some((f) => f.includes(t));
-    const nelCarico = (t) => caricoForme.some((f) => f.includes(t));
+    const nelCarico = (t) => parole.some((p) => p.includes(t) || rovescia(p).includes(t));
     let scorse = null;
     const dentroScorso = (t) => {
       if (!scorse) {
