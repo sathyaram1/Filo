@@ -278,12 +278,16 @@ test('senza nessuno a cui chiedere si NEGA; e la concessione di Filo vale una vo
   assert.equal(await modulo._decidi(wc, 'media', richiesta), false);
 
   // La dettatura di Filo si annuncia: quella richiesta passa…
-  modulo.concessioneUnaTantum(wc, 'microfono');
+  // (`_reset()` prima di ogni annuncio perché una richiesta del sito appena
+  // arrivata blocca la concessione: vedi il test sulla corsa qui sotto.)
+  modulo._reset();
+  assert.equal(modulo.concessioneUnaTantum(wc, 'microfono'), true);
   assert.equal(await modulo._decidi(wc, 'media', richiesta), true);
   // …una volta sola. La seconda è di nuovo una richiesta del sito.
   assert.equal(await modulo._decidi(wc, 'media', richiesta), false);
 
   // L'annuncio del microfono non apre la fotocamera.
+  modulo._reset();
   modulo.concessioneUnaTantum(wc, 'microfono');
   assert.equal(
     await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: ['audio', 'video'] }),
@@ -291,9 +295,87 @@ test('senza nessuno a cui chiedere si NEGA; e la concessione di Filo vale una vo
   );
 
   // E non vale per un'altra scheda.
+  modulo._reset();
   modulo.concessioneUnaTantum(wc, 'microfono');
   const altra = { id: 8, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
   assert.equal(await modulo._decidi(altra, 'media', richiesta), false);
+  modulo._reset();
+});
+
+// #586, giro 6 — la concessione che Filo si dà per sé non deve poter finire in
+// mano a un sito che sta lì ad aspettarla.
+//
+// Il danno vero l'ha fatto sugli appunti: un sito che li chiedeva in
+// continuazione se li prendeva nel momento in cui l'utente usava l'Incolla di
+// Filo, circa una volta su tre. Gli appunti sono usciti del tutto da questa
+// strada (li legge il main), e per il microfono, che dalla pagina si deve
+// chiedere per forza, resta questa regola: se qualcuno sta già aspettando quella
+// cosa in quella scheda, la concessione non si arma.
+test('la concessione di Filo non si arma mentre il sito sta chiedendo la stessa cosa', async () => {
+  const modulo = require_(join(RADICE, 'src', 'main', 'services', 'permessiSito.js'));
+  modulo._reset();
+  const wc = { id: 21, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
+  const richiesta = { requestingUrl: 'https://esempio.it/x', mediaTypes: ['audio'] };
+
+  // Il sito ha appena chiesto il microfono.
+  assert.equal(await modulo._decidi(wc, 'media', richiesta), false);
+  // Filo si annuncia un istante dopo: la concessione NON si arma.
+  assert.equal(modulo.concessioneUnaTantum(wc, 'microfono'), false);
+  // …e infatti la richiesta che segue non passa per la porta di servizio.
+  assert.equal(await modulo._decidi(wc, 'media', richiesta), false);
+
+  // Su una scheda dove nessuno sta chiedendo, la concessione si arma come prima.
+  const pulita = { id: 22, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
+  assert.equal(modulo.concessioneUnaTantum(pulita, 'microfono'), true);
+  assert.equal(await modulo._decidi(pulita, 'media', richiesta), true);
+  modulo._reset();
+});
+
+// #586, giro 6 — un riquadro incorporato scritto dalla pagina (about:blank,
+// srcdoc) non ha un indirizzo suo, ma per il browser è lo stesso sito di chi lo
+// ospita. Prima veniva negato in silenzio, e non lo sbloccava nemmeno un sì già
+// dato alla pagina: si poteva solo negare, mai consentire.
+test('un riquadro senza indirizzo suo vale come la pagina che lo ospita', async () => {
+  const modulo = require_(join(RADICE, 'src', 'main', 'services', 'permessiSito.js'));
+  modulo._reset();
+  modulo.configureFromSettings({
+    security: { sitePermissions: { 'https://esempio.it': { fotocamera: 'allow' } } },
+  });
+  const wc = { id: 31, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
+
+  // Il riquadro non ha un indirizzo proprio: conta l'origine che il browser gli
+  // attribuisce, e in mancanza quella della pagina.
+  for (const dettagli of [
+    { requestingUrl: 'about:blank', securityOrigin: 'https://esempio.it', mediaTypes: ['video'] },
+    { requestingUrl: 'about:srcdoc', mediaTypes: ['video'] },
+    { requestingUrl: '', mediaTypes: ['video'] },
+  ]) {
+    assert.equal(await modulo._decidi(wc, 'media', dettagli), true);
+  }
+
+  // Un'origine davvero opaca resta negata: quella non è lo stesso sito di
+  // nessuno.
+  const opaco = { id: 32, isDestroyed: () => false, getURL: () => 'data:text/html,x', session: {} };
+  assert.equal(
+    await modulo._decidi(opaco, 'media', { requestingUrl: 'about:blank', securityOrigin: 'null', mediaTypes: ['video'] }),
+    false,
+  );
+  modulo._reset();
+});
+
+// #586, giro 6 — chi chiude tre domande della fotocamera non deve ritrovarsi
+// zittita anche la posizione, che è un'altra cosa e che magari ha appena chiesto
+// lui premendo «trovami».
+test('smettere di chiedere vale per la cosa chiusa, non per tutto il sito', async () => {
+  const modulo = require_(join(RADICE, 'src', 'main', 'services', 'permessiSito.js'));
+  modulo._reset();
+  const wc = { id: 41, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
+
+  // Senza finestra a cui chiedere, ogni richiesta si chiude «decisa» e il conto
+  // non cresce: qui interessa solo che le due cose siano contate separatamente,
+  // e lo si verifica dai contatori esposti al reset.
+  assert.equal(await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: ['video'] }), false);
+  assert.equal(await modulo._decidi(wc, 'geolocation', { requestingUrl: 'https://esempio.it/x' }), false);
   modulo._reset();
 });
 
