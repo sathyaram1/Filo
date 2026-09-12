@@ -1629,6 +1629,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             output: { documentRead: String(percorso == null ? '' : percorso), ok: false, error: 'unreadable', detail: 'lettura non disponibile' },
           };
         }
+        // Un documento dal DISCO è la materia prima dell'esfiltrazione (IBAN di
+        // un estratto conto, codici di una bolletta) ed è anche contenuto che
+        // non abbiamo scritto noi: entra nel corpus E marca il contesto come non
+        // fidato (#587).
+        try { require('./contextTaint').record(sender, 'documento', r.text || ''); } catch (_) {}
         return {
           executed: !!r.ok,
           kept: true,
