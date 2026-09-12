@@ -80,3 +80,40 @@ test('un sito che chiede gli appunti in continuazione non deve prendersi la conc
     + 'per la prima richiesta che arriva in quella scheda, e la prima può essere quella del sito',
   ).not.toContain(SEGRETO);
 });
+
+test('nemmeno un sito a cui gli appunti sono già stati NEGATI deve prendersi la concessione dell\'Incolla', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+
+  const page = await testServer.openReady(openTab, HTML);
+
+  // Chi naviga vede la domanda del sito e risponde NEGA: da qui in poi quel
+  // sito gli appunti non li deve vedere mai più.
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  console.log('[586 g6] domanda del sito:', JSON.stringify(await shell.locator('.perm-chip').innerText()));
+  await shell.locator('.perm-chip .perm-chip-btn:not(.perm-chip-allow)').first().click();
+  await page.waitForTimeout(1500);
+  const primaDelMenu = await page.evaluate(() => window.__bottino);
+  console.log('[586 g6] bottino subito dopo il Nega:', JSON.stringify(primaDelMenu));
+  expect(String(primaDelMenu || ''), 'il Nega deve valere subito').not.toContain(SEGRETO);
+
+  // Poi l'utente usa l'Incolla di Filo nella stessa pagina, che è una cosa sua
+  // e non c'entra niente col sito.
+  await page.click('#ta');
+  await page.click('#ta', { button: 'right' });
+  await page.waitForTimeout(900);
+  const voce = page.locator('.sn-menu-paste-main').first();
+  if (await voce.count()) await voce.click();
+  await page.waitForTimeout(2500);
+
+  const dopo = await page.evaluate(() => ({ campo: document.getElementById('ta').value, bottino: window.__bottino }));
+  console.log('[586 g6] dopo l\'Incolla — campo:', JSON.stringify(dopo.campo), 'bottino:', JSON.stringify(dopo.bottino));
+
+  expect(
+    String(dopo.bottino || ''),
+    'al sito gli appunti erano stati NEGATI, e se li è presi lo stesso: la concessione che Filo '
+    + 'si dà per l\'Incolla arriva prima della memoria delle scelte, quindi vale anche per chi un '
+    + 'no se l\'era già preso. Non resta traccia di niente e in Impostazioni la scelta risulta '
+    + 'ancora «Negato»',
+  ).not.toContain(SEGRETO);
+});
