@@ -336,11 +336,14 @@
     return String(s).replace(/[a-z]/g, (c) => String.fromCharCode(((c.charCodeAt(0) - 97 + k) % 26) + 97));
   }
 
-  // Un token combacia "forte" da solo? (lungo, NON stopword) oppure contiene una
-  // cifra (nomi+numeri, token, id) → segnale specifico, non parola comune.
+  // Un token combacia "forte" da solo, cioè è un DATO e non una parola? La
+  // misura dipende da di che cosa è fatto (vedi le soglie in cima).
   function isStrong(tok) {
-    if (/[0-9]/.test(tok) && tok.length >= MIN_TOKEN) return true;
-    return tok.length >= STRONG_TOKEN && !STOPWORDS.has(tok);
+    const cifre = /[0-9]/.test(tok);
+    const lettere = /[a-z]/.test(tok);
+    if (cifre && lettere) return tok.length >= STRONG_MISTO;
+    if (cifre) return tok.length >= STRONG_CIFRE;
+    return tok.length >= STRONG_LETTERE && !STOPWORDS.has(tok);
   }
 
   // ── Il dato spezzettato dentro l'indirizzo ────────────────────────────────
