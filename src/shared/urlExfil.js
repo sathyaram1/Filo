@@ -310,8 +310,105 @@
     return false;
   }
 
+  // ── Il dato spedito con PIÙ link (#587, giro 5) ───────────────────────────
+  //
+  // Tutto quello che c'è sopra guarda UN indirizzo alla volta. Chi lo compone è
+  // però la pagina ostile che detta al modello cosa aprire, e può dettargliene
+  // due: metà password nel primo, metà nel secondo. Nessuno dei due contiene un
+  // dato intero, quindi nessuno dei due chiedeva niente, e chi riceve le due
+  // richieste rimette insieme la password.
+  //
+  // Il rimedio è ricordare cosa hanno già portato via i link di questa scheda
+  // (il registro sta in src/main/services/contextTaint.js) e chiedersi se, messi
+  // insieme, coprono un dato intero. Il confronto qui è più stretto di quello su
+  // un indirizzo solo, perché su una stringa lunga la tolleranza costa falsi
+  // allarmi: si pretende che il dato sia LUNGO e che si ricomponga in pochi pezzi
+  // interi, ognuno abbastanza lungo da non essere un caso.
+  const SPED_MIN_PEZZO = 4;   // ogni pezzo ritrovato, almeno tanti caratteri
+  const SPED_MAX_PEZZI = 4;   // il dato ricomposto in non più di tanti pezzi
+  const SPED_MAX_TOKEN = 200; // oltre non è più una cosa che sta in un indirizzo
+  const SPED_MAX_CANDIDATI = 200;
+  function copertoDaPezzi(carichi, tok) {
+    let i = 0;
+    let pezzi = 0;
+    while (i < tok.length) {
+      if (pezzi >= SPED_MAX_PEZZI) return false;
+      let preso = 0;
+      for (let len = tok.length - i; len >= SPED_MIN_PEZZO; len--) {
+        const frammento = tok.slice(i, i + len);
+        if (carichi.some((c) => c.includes(frammento))) { preso = len; break; }
+      }
+      if (!preso) return false;
+      i += preso;
+      pezzi++;
+    }
+    return pezzi >= 2; // un pezzo solo l'ha già visto il confronto normale
+  }
+  // `carichi` = il CARICO di ogni link (vedi caricoUnito), il più recente per
+  // ultimo. Ritorna il motivo se, messi insieme, portano fuori un dato intero.
+  function taintSpedizione(carichi, corpus) {
+    const pezzi = (carichi || []).filter(Boolean);
+    if (pezzi.length < 2) return null;
+    const ultimo = pezzi[pezzi.length - 1];
+    const forme = pezzi.concat(pezzi.map(rovescia));
+    const candidati = [];
+    for (const t of corpusTokens(corpus)) {
+      if (t.length < STRONG_TOKEN || t.length > SPED_MAX_TOKEN) continue;
+      if (STOPWORDS.has(t)) continue;
+      // Prefiltro a due confronti: la testa e la coda del dato devono stare da
+      // qualche parte, e l'ULTIMO link deve portarne un pezzo — se no non è lui
+      // a completare la spedizione e l'avviso arriverebbe sul link sbagliato.
+      const testa = t.slice(0, SPED_MIN_PEZZO);
+      const coda = t.slice(-SPED_MIN_PEZZO);
+      if (!forme.some((f) => f.includes(testa))) continue;
+      if (!forme.some((f) => f.includes(coda))) continue;
+      if (!ultimo.includes(testa) && !ultimo.includes(coda)
+        && !rovescia(ultimo).includes(testa) && !rovescia(ultimo).includes(coda)) continue;
+      candidati.push(t);
+      if (candidati.length >= SPED_MAX_CANDIDATI) break;
+    }
+    for (const t of candidati) {
+      if (copertoDaPezzi(pezzi, t) || copertoDaPezzi(pezzi.map(rovescia), t)) {
+        return { reason: `contiene un tuo dato, spedito un pezzo per volta ("${t}…")` };
+      }
+    }
+    return null;
+  }
+
+  // Il CARICO di un indirizzo in una stringa sola (pezzi del percorso, valori dei
+  // parametri, frammento, etichette del sottodominio), già sciolto e normalizzato.
+  // Senza il nome del sito: fra un link e l'altro è lui a spezzare il dato.
+  function caricoUnito(url) {
+    try {
+      const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`);
+      const pezzi = [];
+      for (const seg of String(u.pathname || '').split('/')) if (seg) pezzi.push(seg);
+      try {
+        for (const [, v] of u.searchParams) if (v) pezzi.push(v);
+      } catch (_) {}
+      const frammento = String(u.hash || '').replace(/^#/, '');
+      if (frammento) pezzi.push(frammento);
+      const labels = String(u.hostname || '').split('.');
+      for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) pezzi.push(lbl);
+      return sciogli(pezzi).join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    } catch (_) { return ''; }
+  }
+
   // Taint-match: l'URL contiene dati del corpus sensibile?
-  function taint(url, corpus) {
+  //
+  // `letto` è il materiale che Filo ha APERTO in questa scheda — documenti,
+  // appunti, file dell'editor, output dei comandi — e conta solo per i dati
+  // RICONOSCIBILI (lunghi, o con cifre dentro). La regola delle due parole comuni
+  // vale solo per `corpus`, cioè la memoria: profilo, preferenze, espansioni.
+  // Il motivo è la dimensione. Il profilo è una manciata di parole che
+  // identificano l'utente, e due di quelle dentro un link sono un dump. Un
+  // documento sono migliaia di parole sul suo argomento, e i link di
+  // quell'argomento le contengono per forza: dopo «leggi l'appunto del viaggio»
+  // l'avviso di furto di dati compariva su sei link veri su sette, compreso
+  // l'hotel scritto nell'appunto (#587, giro 5). Un avviso che compare sul
+  // cammino normale si clicca senza leggerlo, e con lui si perde la protezione
+  // vera — che sui dati riconoscibili resta identica.
+  function taint(url, corpus, letto) {
     const exposed = exposedAlnum(url);
     if (!exposed) return null;
     // Ogni forma in cui lo stesso dato può comparire nell'indirizzo: com'è, e
