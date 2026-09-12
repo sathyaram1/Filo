@@ -733,7 +733,7 @@ class TabManager {
           // così l'intento (evidenziare l'elemento appena salvato) si applica.
           if (existing.url !== url) this.navigate(existing.id, url);
           this.activate(existing.id);
-          return existing.id;
+          return { id: existing.id, blocked: '', host: '' };
         }
       }
     }
