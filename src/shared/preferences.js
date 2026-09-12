@@ -121,10 +121,43 @@
     },
     {
       keys: ['stile_agente', 'stile agente', "stile dell'agente", 'agentstyle', 'stile'],
+      // #592 — lo stile finisce nel messaggio di sistema di OGNI agente
+      // conversazionale, vale in tutte le conversazioni future e sopravvive ai
+      // riavvii: è l'unica preferenza a testo libero con questa portata. Se lo
+      // propone Filo, il popup mostra il testo ESATTO che sta per diventare
+      // permanente — un inganno arrivato in contesto per vie ordinarie (titolo
+      // di una scheda, risultato web, riassunto di un file) durava un turno,
+      // qui durerebbe per sempre.
+      level: 2,
+      risk: "Lo stile dell'agente è un'istruzione che Filo si porta dietro in ogni conversazione, "
+        + 'da adesso in poi, anche dopo un riavvio. Leggi il testo qui sopra: deve essere una richiesta '
+        + 'su COME vuoi che ti risponda (tono, lunghezza, lingua). Se dice altro — di ignorare le sue '
+        + 'regole, di non dirti qualcosa, di fare cose per conto suo — non è una cosa che hai chiesto tu: '
+        + "annulla. Lo stile resta comunque scritto in Preferenze → Stile dell'agente, dove puoi "
+        + 'rileggerlo e cancellarlo quando vuoi.',
       build(v) {
-        const s = String(v == null ? '' : v).trim();
-        if (!s) return null;
-        return { partial: { agentStyle: s }, label: "Stile dell'agente aggiornato" };
+        const C = global.SN_CONST;
+        const raw = String(v == null ? '' : v);
+        const check = C && typeof C.validateAgentStyle === 'function'
+          ? C.validateAgentStyle(raw)
+          : { ok: true, value: raw.trim() };
+        // Testo oltre il tetto: rifiuto SPIEGATO, col numero. Mai un taglio
+        // muto — accorciando noi mangeremmo proprio la parte che contava.
+        if (!check.ok) return { error: check.error };
+        const s = check.value;
+        // «togli lo stile», «nessuno», o un valore vuoto: si CANCELLA. Se si
+        // può mettere si deve poter togliere, anche a voce e non solo dalla
+        // pagina Preferenze.
+        const removal = ['', 'nessuno', 'nessuna', 'niente', 'togli', 'toglilo', 'rimuovi', 'cancella',
+          'default', 'predefinito', 'normale', 'standard', 'nulla', 'none', 'no'];
+        if (removal.includes(s.toLowerCase())) {
+          return { partial: { agentStyle: '' }, label: "Stile dell'agente → nessuno (predefinito)" };
+        }
+        // L'etichetta porta il testo INTERO: è quello che il popup di conferma
+        // mostra, e un consenso su un testo che non si può leggere per intero
+        // non è un consenso (se è lungo scorre il popup, non si accorcia il
+        // testo).
+        return { partial: { agentStyle: s }, label: `Stile dell'agente → «${s}»` };
       },
     },
     {
