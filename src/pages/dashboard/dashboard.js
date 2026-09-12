@@ -1208,19 +1208,13 @@
     if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
     return null;
   }
-  // La ragione del fallimento, quando il main la conosce.
+  // La ragione del fallimento, quando il main la conosce. Le parole stanno in
+  // SN_CHAT_ERRORS (#590): la chat che si apre sopra una pagina web deve dire
+  // la stessa cosa con le stesse parole, e prima diceva solo "non riuscita".
   function motivoFallimento(a) {
     const o = a && a._output;
     if (!o) return '';
-    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
-    // #590 — la lista dei siti bloccati ha fermato un'apertura chiesta dal
-    // modello. Dirlo, col sito: un blocco muto sembra un guasto (#482).
-    if (o.blocked === 'site') return o.host ? `sito bloccato: ${o.host}` : 'sito bloccato';
-    if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
-    if (o.found === false) return 'non trovato';
-    if (o.ok === false && o.detail) return String(o.detail);
-    if (o.error) return String(o.error);
-    return '';
+    return (self.SN_CHAT_ERRORS && self.SN_CHAT_ERRORS.actionFailure(o)) || '';
   }
 
   // Una riga o un esito di comando nel blocco di attività, per un'azione già
