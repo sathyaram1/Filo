@@ -413,6 +413,14 @@ function registerIpcHandlers() {
     try { return require('./services/permessiSito').scegliFonteRisposta(id, fonteId || null); }
     catch (_) { return { ok: false }; }
   });
+  // «Interrompi» sul segno che dice che un sito può vedere lo schermo. Da qui
+  // non si spegne una traccia già consegnata: si ricarica la pagina, che
+  // distrugge il documento e con lui la ripresa.
+  ipcMain.handle('permissions:capture-stop', (event, { id } = {}) => {
+    void event;
+    try { return require('./services/permessiSito').interrompiRipresa(id); }
+    catch (_) { return { ok: false }; }
+  });
   // Cosa si è già deciso per un sito: serve al menu del tasto destro sulla
   // scheda, che mostra le voci solo se c'è qualcosa da revocare. La memoria
   // dipende dalla finestra che chiede: in incognito le scelte stanno in RAM, e
