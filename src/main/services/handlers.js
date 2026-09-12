@@ -1674,6 +1674,13 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const cwd = getAssistantCwd(sender);
         const out = await runCommand(cmd, { shell, cwd, trackCwd: true });
         if (out.cwd) setAssistantCwd(sender, out.cwd);
+        // L'output entra nel contesto del modello (commandOutputsForPrompt lo
+        // re-immette anche nei turni successivi): da qui in poi è materiale da
+        // proteggere dall'esfiltrazione via URL, ed è materiale NON FIDATO — un
+        // file letto può contenere istruzioni scritte da chi l'ha messo lì (#587).
+        try {
+          require('./contextTaint').record(sender, 'comando', `${out.stdout || ''}\n${out.stderr || ''}`);
+        } catch (_) {}
         return { executed: out.code === 0, kept: true, output: out };
       }
       // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
