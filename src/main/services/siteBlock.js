@@ -192,7 +192,7 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   // sempre lecite (le pagine interne di Filo non si bloccano mai).
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return res;
 
-  const host = u.hostname.toLowerCase();
+  const host = canonicalHost(u.hostname);
   res.host = host;
 
   // Unica eccezione — la navigazione proviene da un motore di ricerca.
