@@ -3274,8 +3274,13 @@ function broadcastSettingsUpdated(merged) {
           try { sendToEachFrame(t.view.webContents, messageFor); } catch (_) {}
         }
       }
-      // La shell è una superficie interna di Filo (filo://shell): oggetto intero.
-      try { win.webContents.send('filo:broadcast', full); } catch (_) {}
+      // La finestra stessa. Di solito è la shell di Filo (filo://shell), e lì
+      // va l'oggetto intero — ma NON tutte le finestre sono superfici di Filo:
+      // i popup di accesso («Continua con Google») sono finestre vere con
+      // dentro la pagina di un sito, e ci gira il nostro codice come su ogni
+      // pagina. Dandolo per scontato, lì finivano chiavi e credenziali del
+      // proxy. Stessa scelta per frame delle schede: decide l'indirizzo.
+      try { sendToEachFrame(win.webContents, messageFor); } catch (_) {}
     }
   } catch (_) {}
 }
