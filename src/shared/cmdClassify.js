@@ -756,6 +756,20 @@
     'printenv', 'ps', 'get-process', 'gps', 'get-variable',
   ]);
 
+  // Programmi il cui PRIMO operando è il TESTO CERCATO, non un file: in
+  // `grep credentials appunti.txt` il file che viene aperto è `appunti.txt`.
+  // Misurare anche la parola cercata faceva chiedere un OK a chi cerca «shadow»
+  // o «credentials» nei propri appunti, spiegandolo per giunta con una frase
+  // falsa («“credentials” contiene chiavi o password»): la spiegazione è tutto
+  // ciò che l'utente ha per decidere in due secondi (#587, giro 2).
+  const CERCA_PRIMA = new Set(['grep', 'egrep', 'fgrep', 'findstr', 'select-string', 'sls', 'rg']);
+  // …ma solo quando il modello è DAVVERO il primo operando. Con `-e`/`-f` (anche
+  // dentro un gruppo di flag corti), `--regexp`/`--file` o gli switch `/G:`,
+  // `/F:` di findstr, il modello arriva da un flag e il primo operando è già un
+  // file da misurare. Le maiuscole no: `-E`/`-F` di grep sono il tipo di
+  // espressione, non un modello che arriva da fuori.
+  const CERCA_DA_FLAG_RE = /(^|\s)(--regexp|--file|\/[A-Za-z]*[gGfF]:|-[a-z]*[ef])(=|:|\s|$)/;
+
   // Comandi che spostano la cartella di lavoro: dentro una sequenza li SEGUIAMO,
   // così `cd /etc && cat passwd` misura `passwd` in `/etc` e non nella cartella di
   // partenza. Non alzano il livello da soli (spostarsi non legge niente).
