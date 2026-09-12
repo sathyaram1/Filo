@@ -315,3 +315,187 @@ test('ogni partizione nuova nasce col gestore dei permessi addosso', async ({ ap
   }));
   expect(esiti).toEqual({ predefinita: true, effimera: true, persistente: true });
 });
+
+// ─── giro di verifica 1 ─────────────────────────────────────────────────────
+//
+// Quattro difetti trovati provando a rompere la difesa, e le guardie che li
+// tengono chiusi. Stanno qui, accanto alle altre, perché la suite le rilanci
+// per sempre: nella cartella del giro sarebbero verdi il giorno che le scrivo e
+// mai più.
+
+const SCHERMO_HTML = `<!doctype html><html><body style="margin:0">
+<button id="b" style="font:16px sans-serif;padding:20px">condividi lo schermo</button>
+<script>
+  document.getElementById('b').addEventListener('click', () => {
+    navigator.mediaDevices.getDisplayMedia({ video: true }).then(
+      (s) => { try { s.getTracks().forEach((t) => t.stop()); } catch (_) {} window.__r = 'ok'; },
+      (e) => { window.__r = (e && e.name) ? e.name : 'errore'; });
+  });
+  window.__stato = async (n) => {
+    try { return (await navigator.permissions.query({ name: n })).state; } catch (_) { return 'n/d'; }
+  };
+</script></body></html>`;
+
+test('condividere lo schermo non regala fotocamera e microfono ────────────', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  // Prima di una condivisione dello schermo Chromium manda una richiesta
+  // audio/video con la lista dei tipi VUOTA. Letta come "tipo non dichiarato",
+  // faceva comparire «vuole usare la fotocamera e il microfono» a chi aveva
+  // premuto «condividi lo schermo»: il suo «Consenti» lasciava quei due sensori
+  // concessi per SEMPRE, e da lì il sito li accendeva senza chiedere più nulla.
+  const page = await testServer.openReady(openTab, SCHERMO_HTML);
+  const origine = new URL(page.url()).origin;
+
+  await page.click('#b');
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await expect(pastiglia(shell)).toContainText('schermo');
+  await expect(pastiglia(shell)).not.toContainText('fotocamera');
+
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  // Consentito: si sceglie COSA far vedere, invece di consegnare sempre tutto.
+  await expect(shell.locator('.perm-source')).toHaveCount(1, { timeout: 15_000 });
+  expect(await shell.locator('.perm-source .perm-source-item').count()).toBeGreaterThan(0);
+  await shell.locator('.perm-source .perm-source-cancel').click();
+  await page.waitForTimeout(800);
+
+  // Niente resta scritto: nemmeno lo schermo (si richiede ogni volta), e men
+  // che meno fotocamera e microfono.
+  const ricordate = await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return (s.security && s.security.sitePermissions) || {};
+  });
+  expect(ricordate[origine]).toBeUndefined();
+  expect(await page.evaluate(() => window.__stato('camera'))).toBe('prompt');
+});
+
+test('la domanda non finisce sotto l\'area della pagina ──────────────────', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  // L'area della pagina è una vista nativa composta SOPRA la cornice di Filo.
+  // La pastiglia nasce dentro quella zona: se non fa scendere la pagina esiste
+  // nel documento e non la vede nessuno, e dopo due minuti la richiesta viene
+  // negata da sola — cioè fotocamera, microfono, posizione, notifiche, appunti
+  // e schermo non funzionano su nessun sito, senza una riga che lo spieghi.
+  const page = await testServer.openReady(openTab, HTML);
+  const cima = () => app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm) continue;
+      const t = tm.tabs.find((x) => x.id === tm.activeId);
+      if (t) return t.view.getBounds().y;
+    }
+    return null;
+  });
+
+  const prima = await cima();
+  await page.evaluate(() => window.__chiediFotocamera());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 10_000 });
+  await shell.waitForTimeout(500);
+  const box = await pastiglia(shell).boundingBox();
+  expect(await cima(), 'la pagina deve scendere sotto la domanda').toBeGreaterThanOrEqual(box.y + box.height);
+
+  // E risale quando si risponde: la riserva non resta appesa.
+  await shell.locator('.perm-chip .perm-chip-x').click();
+  await expect(pastiglia(shell)).toHaveCount(0, { timeout: 8_000 });
+  await expect.poll(cima, { timeout: 8_000 }).toBe(prima);
+});
+
+test('la domanda resta legata alla scheda che l\'ha fatta ─────────────────', async ({ app, shell, testServer }) => {
+  test.setTimeout(90_000);
+  // Con una fila sola per tutta la finestra, una scheda in secondo piano teneva
+  // il posto: la richiesta della scheda che si stava guardando non compariva, e
+  // chi premeva «trovami» non otteneva niente.
+  const urlA = testServer.html(HTML);
+  const urlB = testServer.html(HTML);
+  const apri = async (url) => {
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    const fine = Date.now() + 10_000;
+    while (Date.now() < fine) {
+      const p = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+      if (p) {
+        await p.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+        return p;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('scheda non trovata: ' + url);
+  };
+  const pageA = await apri(urlA);
+  const pageB = await apri(urlB);
+
+  // A sta in secondo piano e chiede: nessuna domanda sopra la scheda B.
+  await pageA.evaluate(() => window.__chiediFotocamera());
+  await shell.waitForTimeout(2000);
+  expect(await pastiglia(shell).count()).toBe(0);
+
+  // B, la scheda che si sta guardando, chiede: la sua domanda compare.
+  await pageB.evaluate(() => window.__chiediPosizione());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 10_000 });
+  await expect(pastiglia(shell)).toContainText('dove sei');
+});
+
+test('prima di scegliere, al sito risulta "da chiedere" e non "negato" ────', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  // Molti siti guardano lo stato PRIMA di chiedere: se leggono "negato" non
+  // chiedono mai, e il pulsante «attiva le notifiche» non fa niente. In Filo
+  // quel sito non compare nemmeno nelle impostazioni, perché nessuna scelta è
+  // stata presa: chi ci finisce resta senza via d'uscita.
+  const page = await testServer.openReady(openTab, HTML);
+  for (const n of ['camera', 'microphone', 'geolocation', 'notifications']) {
+    expect(await page.evaluate((x) => window.__stato(x), n), `stato di ${n}`).toBe('prompt');
+  }
+  expect(await page.evaluate(() => Notification.permission)).toBe('default');
+
+  // Un no detto davvero resta un no, subito, senza ricaricare la pagina.
+  await page.evaluate(() => window.__chiediNotifiche());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 10_000 });
+  await shell.locator('.perm-chip .perm-chip-btn', { hasText: 'Nega' }).click();
+  await expect(pastiglia(shell)).toHaveCount(0, { timeout: 8_000 });
+  await expect.poll(() => page.evaluate(() => Notification.permission), { timeout: 8_000 }).toBe('denied');
+});
+
+test('in incognito la scelta si può anche togliere ────────────────────────', async ({ app, shell, testServer }) => {
+  test.setTimeout(90_000);
+  // Le scelte dell'incognito vivono in RAM e muoiono con la finestra, ma finché
+  // la finestra è aperta si devono poter rivedere e togliere: se si può dare si
+  // può togliere. Prima l'elenco leggeva solo il disco e tornava vuoto, quindi
+  // l'unico modo di disdire era chiudere tutta la finestra.
+  const url = testServer.html(HTML);
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  let shellIncognito = null;
+  const fine = Date.now() + 15_000;
+  while (Date.now() < fine && !shellIncognito) {
+    shellIncognito = app.windows().find((w) => {
+      try { return w.url().includes('shell.html?incognito=1'); } catch (_) { return false; }
+    }) || null;
+    if (!shellIncognito) await new Promise((r) => setTimeout(r, 200));
+  }
+  expect(shellIncognito).toBeTruthy();
+  await shellIncognito.evaluate((u) => window.filoShell.tabs.open(u), url);
+  let page = null;
+  const fine2 = Date.now() + 15_000;
+  while (Date.now() < fine2 && !page) {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
+    if (!page) await new Promise((r) => setTimeout(r, 200));
+  }
+  expect(page).toBeTruthy();
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+
+  await page.evaluate(() => window.__chiediFotocamera());
+  await expect(shellIncognito.locator('.perm-chip')).toHaveCount(1, { timeout: 10_000 });
+  await shellIncognito.locator('.perm-chip .perm-chip-allow').click();
+  await expect.poll(() => page.evaluate(() => window.__stato('camera')), { timeout: 8000 }).toBe('granted');
+
+  const origine = new URL(url).origin;
+  const voci = await shellIncognito.evaluate((o) => window.filoShell.permissions.forOrigin(o), origine);
+  expect((voci && voci.voci || []).length, 'la scelta dell\'incognito deve comparire fra quelle da togliere')
+    .toBeGreaterThan(0);
+  await shellIncognito.evaluate((o) => window.filoShell.permissions.revoke(o, null), origine);
+  await expect.poll(() => page.evaluate(() => window.__stato('camera')), { timeout: 8000 }).toBe('prompt');
+
+  // E su disco non è finito niente: l'incognito resta senza tracce.
+  const suDisco = await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return (s.security && s.security.sitePermissions) || {};
+  });
+  expect(suDisco[origine]).toBeUndefined();
+});
