@@ -740,6 +740,11 @@
   // Il caso peggiore che ha fatto nascere questo controllo: la modalità
   // terminale spenta a voce si riaccendeva cambiando il tema.
   let ultimoInviato = null;
+  // Quando abbiamo salvato noi: l'annuncio che rimbalza indietro subito dopo è
+  // il nostro, non una modifica arrivata da fuori, e rileggere la pagina in
+  // quel momento cancellerebbe gli avvisi appena mostrati.
+  let ecoDaIgnorare = 0;
+  const ECO_MS = 1500;
 
   // Legge dai controlli l'INTERO blocco di impostazioni di questa pagina.
   // Non scrive niente: dice solo cosa mostrano i campi adesso.
