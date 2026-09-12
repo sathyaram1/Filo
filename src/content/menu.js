@@ -1172,7 +1172,10 @@
         if (opener && !isSubMenuOpen()) {
           hoverOpenTimer = setTimeout(() => {
             if (lastHoverOpener === opener && !isSubMenuOpen()) {
-              try { opener.click(); } catch (_) {}
+              // Gesto NOSTRO su un bottone nostro: passa dal guardiano dei
+              // gesti finti (#586), che altrimenti lo butterebbe via insieme a
+              // quelli fabbricati dal sito.
+              try { global.SN_FILO_UI?.premi(opener); } catch (_) {}
             }
           }, HOVER_OPEN_DELAY);
         }
