@@ -178,3 +178,22 @@ test('actionFailure(): motivo ignoto → stringa vuota, e chi chiama resta sul g
     assert.equal(CE.actionFailure(v), '', `nessun motivo per ${JSON.stringify(v)}`);
   }
 });
+
+// #590 (quarto giro) — il nome del sito fermato, come l'utente lo scriverebbe.
+// La notifica in basso a destra lo chiama già col suo nome; la riga in chat lo
+// chiamava "xn--80aswg.xn--p1ai". Due posti che nominano lo stesso sito nello
+// stesso istante devono chiamarlo uguale.
+test('#590: in chat il sito bloccato si chiama col suo nome, non in punycode', () => {
+  // Il nome leggibile lo sa SN_URL_NAV, che nelle pagine e nei content script
+  // viene caricato prima di questo modulo.
+  require('../../src/shared/urlNav.js');
+  assert.equal(
+    CE.actionFailure({ blocked: 'site', host: 'xn--80aswg.xn--p1ai' }),
+    'sito bloccato: сайт.рф',
+  );
+  assert.equal(
+    CE.actionFailure({ blocked: 'site', host: 'esempio.com' }),
+    'sito bloccato: esempio.com',
+  );
+  assert.equal(CE.actionFailure({ blocked: 'site' }), 'sito bloccato');
+});

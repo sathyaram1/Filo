@@ -565,3 +565,111 @@ test('#590 dopo «Apri comunque» Filo dice quanto dura il sì, e lo si può tog
   const aperte = snap.tabs.filter((t) => t.url === url);
   expect(aperte.length, 'dopo «Rimetti il blocco» il sito non deve riaprirsi').toBe(1);
 });
+
+// ─── #590 giro 4 — le superfici che decidevano prima di chiedere alla lista ──
+
+test('#590 la finestrella di accesso verso un sito della lista non nasce nemmeno', async ({ app, shell, openTab, testServer }) => {
+  // Il giro 3 chiudeva gli spostamenti DENTRO la finestrella; il suo primo
+  // indirizzo no. "Somiglia a un accesso" lo decide l'indirizzo che scrive la
+  // pagina (un percorso /login basta), quindi qualunque pagina poteva far
+  // comparire un sito della lista dentro una finestra. Fermare il primo
+  // caricamento non bastava: la finestra era già nata e restava a schermo
+  // vuota, senza indirizzo né titolo, da chiudere a mano.
+  await enableBlock(shell);
+  const login = `${blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">NON DEVE ARRIVARE</h1>')}/login`;
+  const apri = testServer.html(
+    `<!doctype html><meta charset="utf-8"><button id="b" onclick="window.open('${login}','_blank','width=520,height=640')">accedi</button>`,
+  );
+  const page = await openTab(apri);
+  await page.click('#b');
+  await shell.waitForTimeout(2000);
+
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
+  const vuote = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => !w.webContents.getURL()).length);
+  expect(vuote, 'non deve restare aperta una finestra senza indirizzo').toBe(0);
+  for (const w of app.windows()) {
+    expect(w.isClosed() ? '' : new URL(w.url()).hostname).not.toBe(BLOCKED_HOST);
+  }
+});
+
+test('#590 ricaricare non riapre un sito finito in lista mentre era a schermo', async ({ shell, openTab, testServer }) => {
+  // Il tasto indietro lo ferma dal giro 3; ricarica, che è la strada gemella,
+  // no. Vale sia per il comando dell'utente sia per la pagina che si ricarica
+  // da sola (caselle di posta, cruscotti, risultati in diretta), che non passa
+  // nemmeno da will-navigate.
+  await shell.evaluate(() => window.filoShell.message({
+    type: 'update_settings',
+    settings: { security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: [] } } },
+  }));
+  await shell.waitForTimeout(300);
+
+  const url = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">DENTRO</h1>');
+  const page = await openTab(url);
+  await expect(page.locator('#t')).toBeVisible({ timeout: 8000 });
+  // Un segno che solo un caricamento nuovo può cancellare.
+  await page.evaluate(() => { window.__segno = 'vecchio'; });
+
+  await enableBlock(shell);
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const id = snap.tabs[snap.tabs.length - 1].id;
+
+  await shell.evaluate((i) => window.filoShell.tabs.reload(i), id);
+  await shell.waitForTimeout(1500);
+  expect(await page.evaluate(() => window.__segno).catch(() => null),
+    'il tasto ricarica non deve richiedere di nuovo un sito in lista').toBe('vecchio');
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
+
+  await page.evaluate(() => { location.reload(); }).catch(() => {});
+  await shell.waitForTimeout(1500);
+  expect(await page.evaluate(() => window.__segno).catch(() => null),
+    'nemmeno la pagina deve potersi ricaricare da sola').toBe('vecchio');
+});
+
+test('#590 un riquadro incorporato verso un sito della lista non carica', async ({ shell, openTab, testServer }) => {
+  // La lista guardava solo l'indirizzo della scheda, quindi bastava che una
+  // pagina si incorporasse il sito della lista in un riquadro (grande quanto lo
+  // schermo, se voleva) perché si vedesse per intero.
+  await enableBlock(shell);
+  const dentro = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">DENTRO IL RIQUADRO</h1>');
+  const fuori = testServer.html(
+    `<!doctype html><meta charset="utf-8"><h1 id="fuori">FUORI</h1><iframe id="f" src="${dentro}" style="width:100%;height:300px"></iframe>`,
+  );
+  const page = await openTab(fuori);
+  await expect(page.locator('#fuori')).toBeVisible({ timeout: 8000 });
+  await shell.waitForTimeout(2000);
+
+  for (const f of page.frames()) {
+    let host = '';
+    try { host = new URL(f.url()).hostname; } catch (_) { continue; }
+    if (host !== BLOCKED_HOST) continue;
+    const testo = await f.evaluate(() => (document.body ? document.body.innerText : '')).catch(() => '');
+    expect(testo.trim(), 'il contenuto del sito della lista non deve comparire nel riquadro').toBe('');
+  }
+  await expect(shell.locator('.shell-notif', { hasText: 'riquadro' }).first()).toBeVisible({ timeout: 6000 });
+});
+
+test('#590 il sì dato a mano si vede e si toglie dalle Preferenze', async ({ app, shell, openTab, testServer }) => {
+  // "Apri comunque" concede un permesso che vale tutta la sessione e su ogni
+  // strada. Finora si vedeva solo nella notifica che lo annunciava: passata
+  // quella, non restava modo né di sapere che c'era né di toglierlo, se non
+  // riscrivendo l'elenco dei siti bloccati (che li azzera tutti insieme).
+  await enableBlock(shell);
+  const url = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">DENTRO</h1>');
+  await apriComunque(shell, url);
+  await expect.poll(async () => (await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)) > 0,
+    { timeout: 6000 }).toBe(true);
+  // La notifica se ne va: quello che resta deve bastare.
+  await shell.evaluate(() => document.querySelectorAll('.shell-notif').forEach((n) => n.remove()));
+
+  const pref = await openTab('filo://security/security.html');
+  await expect(pref.locator('#sec-siteblock-allowed-box')).toBeVisible({ timeout: 8000 });
+  await expect(pref.locator('#sec-siteblock-allowed-list')).toContainText(BLOCKED_HOST);
+
+  await pref.locator('#sec-siteblock-allowed-list button').first().click();
+  await expect(pref.locator('#sec-siteblock-allowed-box')).toBeHidden({ timeout: 6000 });
+
+  // Tolto il sì, il sito torna bloccato come gli altri della lista.
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
+});

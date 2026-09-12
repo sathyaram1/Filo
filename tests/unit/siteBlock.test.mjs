@@ -424,3 +424,32 @@ test('#590: «Apri comunque» si può togliere senza rimettere mano alla lista',
   assert.equal(SB.revokeHost('mai.dato.example'), false);
   assert.equal(SB.revokeHost(''), false);
 });
+
+// #590 (quarto giro) — i sì dati a mano si devono poter ELENCARE, non solo
+// dare. Il permesso vale tutta la sessione e su ogni strada: se l'unico posto
+// dove si vede è la notifica che lo annuncia, dopo pochi secondi non esiste più
+// nessun modo di sapere che c'è né di toglierlo.
+test('#590: i siti sbloccati a mano si possono elencare e togliere uno per uno', () => {
+  reset();
+  assert.deepEqual(SB.allowedHosts(), [], 'si parte senza permessi');
+
+  SB.allowHost('www.evil.example');
+  SB.allowHost('ads.test');
+  assert.deepEqual(SB.allowedHosts(), ['ads.test', 'evil.example'],
+    'si elenca la VOCE DI LISTA a cui il sì è stato dato, non l\'host preciso di quel momento');
+
+  assert.equal(SB.revokeHost('evil.example'), true);
+  assert.deepEqual(SB.allowedHosts(), ['ads.test'], 'si toglie quello, non tutti');
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/page').block, true,
+    'tolto il sì, il sito torna bloccato');
+  assert.equal(SB.shouldBlockNavigation('https://ads.test/page').block, false,
+    'l\'altro sì resta');
+});
+
+test('#590: cambiare le voci della lista azzera i sì, e l\'elenco lo racconta', () => {
+  reset();
+  SB.allowHost('evil.example');
+  assert.equal(SB.allowedHosts().length, 1);
+  SB.configureFromSettings({ security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: ['altro.example'] } } });
+  assert.deepEqual(SB.allowedHosts(), [], 'rimettere mano alla lista li azzera tutti');
+});

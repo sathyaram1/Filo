@@ -248,7 +248,7 @@ test('N — ricaricare una scheda ferma su un sito messo in lista nel frattempo'
 
   const segno = await p.evaluate(() => window.__segno).catch(() => null);
   expect(segno, 'la pagina non deve essere stata richiesta di nuovo').toBe('vecchio');
-  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }))
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first())
     .toBeVisible({ timeout: 4000 });
 });
 
@@ -271,7 +271,7 @@ test('N2 — la pagina che si ricarica DA SOLA non deve scavalcare la lista', as
 
   const segno = await p.evaluate(() => window.__segno).catch(() => null);
   expect(segno, 'la pagina non deve potersi richiedere di nuovo da sola').toBe('vecchio');
-  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }))
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first())
     .toBeVisible({ timeout: 4000 });
 });
 
@@ -298,7 +298,7 @@ test('O — history.back() scritto nella pagina riporta sul sito della lista', a
 
   // Che il salto sia AVVENUTO e sia stato fermato lo dice la notifica: senza,
   // questa prova sarebbe verde anche se history.back() non partisse affatto.
-  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }))
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first())
     .toBeVisible({ timeout: 4000 });
   const ancora = finestreSu(LISTA);
   const viva = ancora.length
