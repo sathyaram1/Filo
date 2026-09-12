@@ -1806,10 +1806,10 @@
   // sotto la barra indirizzi: "Bloccato popup da <host>  [Apri] [×]".
   // - Click "Apri": apre il popup come nuovo tab (bypass blocco).
   // - Click "×" o auto-dismiss dopo 8s: chip svanisce.
-  // Riusiamo `reserveTop` (lo stesso meccanismo che già si usa per i menu
-  // dropdown) per evitare che la chip finisca sopra l'area WebContentsView
-  // di un'altra tab: la posizioniamo dentro la shell (DOM HTML), quindi non
-  // serve riservare spazio extra — è già sopra l'area pagina.
+  // La chip nasce a 52 pixel dal bordo alto, cioè dentro l'area della pagina,
+  // che il sistema disegna sopra la cornice di Filo. Come la domanda di un
+  // permesso, deve far scendere la pagina finché è lì, altrimenti esiste nel
+  // documento e non la vede nessuno (vedi `riservaTop`).
   if (api.tabs.onPopupBlocked) {
     const chipHost = document.createElement('div');
     chipHost.id = 'popup-chips';
