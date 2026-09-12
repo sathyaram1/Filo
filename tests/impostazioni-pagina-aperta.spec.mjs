@@ -116,3 +116,66 @@ test('una pagina aperta si rilegge da sola quando l\'impostazione cambia altrove
   await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'Tono squillante.' });
   await expect(pagina.locator('#agentStyleText')).toHaveValue('Tono squillante.', { timeout: 8_000 });
 });
+
+// #592 (giro 3) — la stessa porta, un passo più in là: il campo ACCANTO,
+// dentro lo stesso gruppo. Modalità terminale e shell sono un gruppo solo, le
+// due chiavi API sono un gruppo solo, velocità e tono della voce sono un
+// gruppo solo. Finché il confronto si fermava al gruppo, toccare un pezzo
+// rimandava anche il fratello col valore vecchio, e il permesso della shell
+// spento un minuto prima tornava acceso.
+
+test('la shell cambiata nella pagina non riaccende la modalità terminale spenta a voce', async ({ openTab }) => {
+  const pagina = await apriPreferenze(openTab);
+
+  await pagina.check('#terminalEnabled');
+  await pagina.waitForTimeout(1200);
+  expect((await impostazioni(pagina)).terminal?.enabled).toBe(true);
+
+  await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'modalita_terminale', valore: 'no' });
+  await pagina.waitForTimeout(1200);
+  expect((await impostazioni(pagina)).terminal?.enabled).toBe(false);
+
+  // Le shell offerte cambiano col sistema: si prende la prima diversa.
+  const altra = await pagina.evaluate(() => {
+    const sel = document.getElementById('terminalShell');
+    const opt = [...sel.options].find((o) => o.value !== sel.value);
+    return opt ? opt.value : '';
+  });
+  expect(altra).not.toBe('');
+  await pagina.selectOption('#terminalShell', altra);
+  await pagina.waitForTimeout(1800);
+
+  const dopo = (await impostazioni(pagina)).terminal || {};
+  expect(dopo.shell).toBe(altra);
+  expect(dopo.enabled).toBe(false);
+});
+
+test('la chiave Tavily scritta nella pagina non rimette la chiave OpenRouter di prima', async ({ openTab }) => {
+  const opzioni = await openTab(OPZIONI);
+  await opzioni.waitForSelector('#apiKey', { state: 'attached', timeout: 25_000 });
+  if (await opzioni.isChecked('#useDefaultModels')) {
+    await opzioni.uncheck('#useDefaultModels');
+    await opzioni.waitForTimeout(800);
+  }
+  await opzioni.waitForSelector('#apiKey', { timeout: 25_000 });
+
+  await opzioni.click('#apiKey');
+  await opzioni.type('#apiKey', 'sk-or-v1-VECCHIA-0001');
+  await opzioni.locator('#apiKey').blur();
+  await opzioni.waitForTimeout(1500);
+  expect((await impostazioni(opzioni)).apiKeys?.openrouter).toBe('sk-or-v1-VECCHIA-0001');
+
+  // Il cursore resta dentro l'ALTRO campo mentre la chiave cambia in chat.
+  await opzioni.click('#apiKeyTavily');
+  await opzioni.type('#apiKeyTavily', 'tvly-NUOVA-0002');
+  await confermaInChat(opzioni,
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-NUOVA-0002' });
+  await opzioni.waitForTimeout(1200);
+
+  await opzioni.locator('#apiKeyTavily').blur();
+  await opzioni.waitForTimeout(1800);
+
+  const chiavi = (await impostazioni(opzioni)).apiKeys || {};
+  expect(chiavi.tavily).toBe('tvly-NUOVA-0002');
+  expect(chiavi.openrouter).toBe('sk-or-v1-NUOVA-0002');
+});
