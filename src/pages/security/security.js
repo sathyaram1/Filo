@@ -358,6 +358,7 @@
           type: MSG.PERMESSI_SITI_REVOCA,
           origine: riga.origine,
           chiave: voce.chiave,
+          effimera: !!riga.effimera,
         }));
         gruppo.appendChild(togli);
 
