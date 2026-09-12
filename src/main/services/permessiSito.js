@@ -491,7 +491,14 @@ function installaSuSessione(ses) {
         // Consentito: ora CHE COSA. Consegnare sempre lo schermo intero
         // significa mostrare anche le notifiche che arrivano e tutto quello
         // che c'è aperto dietro, a chi voleva far vedere una diapositiva.
-        const scelta = await scegliFonte(bersaglio, frame);
+        //
+        // E QUANTO. Un sito che chiede lo schermo può chiedere anche l'audio
+        // del computer, che non è lo schermo: è la musica, un video, la
+        // chiamata che stai facendo in un'altra finestra, la voce di chi ti
+        // parla. Prima arrivava insieme all'immagine senza che niente lo
+        // nominasse e senza un modo di dare l'una senza l'altro (#586). Ora è
+        // una scelta a parte dentro il riquadro, e parte da spenta.
+        const scelta = await scegliFonte(bersaglio, frame, !!(richiesta && richiesta.audioRequested));
         if (!scelta) {
           // Annullato qui: il sì di un attimo fa non vale più niente, e un
           // eventuale segno della ripresa va tolto o resterebbe a mentire.
@@ -500,9 +507,13 @@ function installaSuSessione(ses) {
           return;
         }
         // Il segno parte ADESSO, che è quando il sito comincia davvero a
-        // vedere: prima della scelta della fonte non vede ancora niente.
-        if (!pre || !pre.ripresaId) iniziaRipresa(bersaglio, P().origineDi(url) || url);
-        callback({ video: scelta, ...(richiesta && richiesta.audioRequested ? { audio: 'loopback' } : {}) });
+        // vedere: prima della scelta della fonte non vede ancora niente. Se il
+        // segno prudente della strada vecchia era già partito (il sito ci ha
+        // messo più di un attimo ad arrivare qui), lo rifacciamo: adesso
+        // sappiamo per certo se l'audio c'è o no, e il segno lo deve dire.
+        if (pre && pre.ripresaId) fineRipresa(pre.ripresaId);
+        iniziaRipresa(bersaglio, P().origineDi(url) || url, { audio: scelta.audio ? 'si' : 'no' });
+        callback({ video: scelta.fonte, ...(scelta.audio ? { audio: 'loopback' } : {}) });
       } catch (_) { nega(); }
     });
   } catch (_) {}
