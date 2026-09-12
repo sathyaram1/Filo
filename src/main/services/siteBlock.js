@@ -118,14 +118,6 @@ function canonicalHost(raw) {
   return h;
 }
 
-function hostnameOf(url) {
-  try {
-    return canonicalHost(new URL(url).hostname);
-  } catch (_) {
-    return '';
-  }
-}
-
 // Normalizza un dominio inserito dall'utente: toglie schema, path, porta, www.
 function normalizeDomain(raw) {
   if (!raw) return '';
