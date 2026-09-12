@@ -154,10 +154,13 @@
   // Per il matching futuro vogliamo URL "stabili": teniamo il path (no query,
   // no hash) perché query e fragment di solito contengono parametri specifici
   // dell'utente o stato di UI; il path invece identifica la sezione del sito.
+  // La query e il frammento si buttano, ma il percorso di una pagina porta
+  // spesso addosso chi sei (/clienti/IT60…/estratto, /utente/998877/impostazioni):
+  // passa dalla stessa cancellazione degli elementi toccati.
   function normalizedPath(rawUrl) {
     const u = parseUrl(rawUrl);
     if (!u) return '';
-    let path = u.pathname || '/';
+    let path = redigiDatiPersonali(u.pathname || '/') || '/';
     if (path.length > MAX_URL_LEN) path = path.slice(0, MAX_URL_LEN);
     return path;
   }
