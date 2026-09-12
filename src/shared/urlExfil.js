@@ -663,7 +663,7 @@
       // l'avviso proprio sul link di cui il documento parla (#587, giro 8). Vale
       // già per le parole comuni: vale per gli stessi motivi qui.
       if (isStrong(t)) {
-        if (!nelCarico(t)) continue;
+        if (!nelCaricoIncollato(t)) continue;
         strong = true; sample = t; continue;
       }
       if (!debolePermesso) continue;
