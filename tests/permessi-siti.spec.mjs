@@ -1629,13 +1629,11 @@ test('in incognito le Impostazioni elencano anche le risposte delle finestre nor
   await expect(riga).toContainText('finestre normali');
 
   // E da lì si toglie davvero, dalla memoria giusta.
-  console.log('[586] bottoni della riga:', await riga.locator('button').allTextContents());
   await riga.locator('button').nth(1).click();
-  await sicurezza.waitForTimeout(1500);
-  console.log('[586] elenco dopo il togli:', await sicurezza.locator('#perms-list li').allTextContents());
-  console.log('[586] su disco dopo il togli:', JSON.stringify(await app.evaluate(
-    async () => (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions,
-  )));
+  await sicurezza.waitForTimeout(1200);
+  // E sul DISCO, non solo nell'elenco: in una finestra in incognito ogni
+  // scrittura finisce in un deposito che muore con la finestra, e la revoca
+  // spariva dalla lista ma restava sul disco, tornando al riavvio.
   await expect.poll(async () => {
     const s = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions);
     return Object.keys(s || {}).length;
