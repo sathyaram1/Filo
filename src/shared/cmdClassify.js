@@ -1638,8 +1638,35 @@
       if (READS_SENSITIVE.has(prog)) {
         return (prog === 'ps' || prog === 'get-process' || prog === 'gps') ? PROCESSI : AMBIENTE;
       }
-      if (CHDIR.has(prog)) {
+      if (CHDIR.has(prog) || prog === 'popd') {
+        const spostaA = (nuove) => {
+          if (!nuove || !nuove.length) return false;
+          precedenti = cwds;
+          cwds = nuove.slice(0, 4);
+          cwdIgnota = '';
+          return true;
+        };
+        // `popd` torna dove `pushd` era partito: lo sappiamo solo se quel
+        // `pushd` sta in questa stessa sequenza.
+        if (prog === 'popd') {
+          if (!spostaA(pila.pop())) cwdIgnota = SALTO;
+          continue;
+        }
+        const scritti = tokens(t).slice(1).map(unquote).filter(Boolean);
+        // `cd -` (e `cd +` di PowerShell): la cartella di prima, che nel
+        // comando non è scritta.
+        if (scritti.includes('-') || scritti.includes('+')) {
+          if (!(scritti.includes('-') && spostaA(precedenti))) cwdIgnota = SALTO;
+          continue;
+        }
         const dest = operandsOf(t)[0] || valoriDeiFlag(t)[0];
+        // `pushd` mette da parte la cartella di adesso; senza destinazione
+        // scambia con quella in cima alla pila.
+        if (prog === 'pushd') {
+          const cima = cwds;
+          if (!dest) { if (!spostaA(pila.pop())) cwdIgnota = SALTO; pila.push(cima); continue; }
+          pila.push(cima);
+        }
         if (dest) {
           const tl = formaTilde(dest);
           if (tl === 'salto' || tl === 'altrove') { cwdIgnota = tl === 'salto' ? SALTO : FUORI; continue; }
@@ -1652,7 +1679,7 @@
               if (!nuove.includes(s)) nuove.push(s);
             }
           }
-          if (nuove.length) { cwds = nuove.slice(0, 4); cwdIgnota = ''; }
+          spostaA(nuove);
         }
         continue;
       }
