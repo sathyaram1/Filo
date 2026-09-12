@@ -3238,9 +3238,15 @@ function sendToEachFrame(wc, messageFor) {
 function broadcastSettingsUpdated(merged) {
   const Scope = globalThis.SN_SETTINGS_SCOPE;
   const full = { type: MSG.SETTINGS_UPDATED, settings: merged };
-  let web = full;
-  try { web = { type: MSG.SETTINGS_UPDATED, settings: Scope.settingsForWeb(merged) }; }
-  catch (_) { web = { type: MSG.SETTINGS_UPDATED, settings: {} }; }
+  let web;
+  try {
+    web = { type: MSG.SETTINGS_UPDATED, settings: Scope.settingsForWeb(merged) };
+  } catch (e) {
+    // Senza il modulo non sappiamo cosa è lecito far uscire: non esce niente.
+    // Rumoroso di proposito — è una build rotta, non un caso da gestire.
+    console.error('[Filo] settingsScope non caricato: alle pagine web non va nulla', e);
+    web = { type: MSG.SETTINGS_UPDATED, settings: {} };
+  }
   const messageFor = (url) => (Scope && Scope.isFiloOrigin(url) ? full : web);
   try {
     for (const win of BrowserWindow.getAllWindows()) {
