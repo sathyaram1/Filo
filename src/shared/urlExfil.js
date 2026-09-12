@@ -39,8 +39,8 @@
   // segreto si distingue da una parola:
   //   • lettere E cifre insieme — la forma di quasi ogni chiave, password o
   //     token («segretonetrc2026», «casamia2026xy», «ab12cd34ef56gh78»);
-  //   • sole cifre — numeri di carta, di conto, identificativi lunghi. Sotto le
-  //     dieci cifre sono date, anni e codici di avviamento postale;
+  //   • sole cifre — numeri di carta, di conto, di cliente, identificativi.
+  //     Sotto le sette cifre sono anni, prezzi e codici di avviamento postale;
   //   • sole lettere — solo se molto lunga: una passphrase, non una parola. In
   //     italiano le parole lunghe abbondano, e sotto questa misura ci stanno
   //     tutte («amministrazione», «elettrodomestici», «giallozafferano»).
