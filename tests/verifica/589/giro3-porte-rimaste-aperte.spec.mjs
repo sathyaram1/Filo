@@ -222,16 +222,18 @@ test('una scheda di sfondo non fotografa la scheda che l\'utente sta guardando',
   const dataUrl = scatto.risposta?.dataUrl || '';
   if (!dataUrl) return; // niente foto: niente da far uscire.
 
-  const colore = await altra.evaluate(async (u) => {
-    const img = new Image();
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = u; });
-    const c = document.createElement('canvas');
-    c.width = img.width; c.height = img.height;
-    const ctx = c.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    const d = ctx.getImageData(Math.floor(img.width / 2), Math.floor(img.height / 2), 1, 1).data;
-    return { r: d[0], g: d[1], b: d[2] };
+  // Che cosa c'è nella foto: il pixel al centro, letto dal processo principale
+  // (nessuna pagina di mezzo, così la lettura non dipende da quello che una
+  // pagina può caricare).
+  const colore = await app.evaluate(({ nativeImage }, u) => {
+    const img = nativeImage.createFromDataURL(u);
+    const { width, height } = img.getSize();
+    if (!width || !height) return null;
+    const bmp = img.toBitmap(); // BGRA
+    const i = ((Math.floor(height / 2) * width) + Math.floor(width / 2)) * 4;
+    return { r: bmp[i + 2], g: bmp[i + 1], b: bmp[i] };
   }, dataUrl);
+  if (!colore) return;
 
   expect(
     colore.r > 200 && colore.g < 60 && colore.b < 60,
