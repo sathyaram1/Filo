@@ -109,5 +109,7 @@
     getRaw,
     setRaw,
     deepMerge,
+    partialCambiato,
+    REPLACE_KEYS,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
