@@ -190,6 +190,25 @@ function corpusText(sender) {
   return pezzi.join('\n');
 }
 
+// Il carico dei link già aperti in questa scheda, il più recente per ultimo.
+// Serve a riconoscere un dato spedito un pezzo per volta: due link che presi da
+// soli non portano fuori niente e insieme portano fuori una password intera
+// (#587, giro 5).
+function ricordaLink(sender, carico) {
+  const c = String(carico || '');
+  if (!c) return;
+  const led = ledgerFor(sender, true);
+  if (!led) return;
+  if (!Array.isArray(led.links)) led.links = [];
+  led.links.push(c.slice(0, MAX_LINK_CHARS));
+  while (led.links.length > MAX_LINK) led.links.shift();
+}
+
+function carichiLink(sender) {
+  const led = ledgerFor(sender, false);
+  return led && Array.isArray(led.links) ? led.links.slice() : [];
+}
+
 // Il contesto contiene materiale non fidato? (accende il ripiego strutturale)
 function isTainted(sender) {
   const led = ledgerFor(sender, false);
