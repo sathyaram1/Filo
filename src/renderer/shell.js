@@ -1575,17 +1575,35 @@
     permHost.id = 'permission-chips';
     document.body.appendChild(permHost);
 
-    // UNA domanda alla volta. Le altre aspettano in coda: la fascia sotto la
-    // barra è alta una pastiglia, e una pagina che chiede cinque permessi di
-    // fila ne impilerebbe cinque, spingendo le ultime dietro all'area della
-    // pagina, dove nessuno le vedrebbe né potrebbe rispondere (e una domanda
-    // invisibile, col default che nega, è un rifiuto muto).
+    // UNA domanda alla volta PER SCHEDA. Le altre aspettano in coda: la fascia
+    // sotto la barra è alta una pastiglia, e una pagina che chiede cinque
+    // permessi di fila ne impilerebbe cinque, spingendo le ultime dietro
+    // all'area della pagina, dove nessuno le vedrebbe né potrebbe rispondere
+    // (e una domanda invisibile, col default che nega, è un rifiuto muto).
+    //
+    // "Per scheda" non è un dettaglio. Con una fila sola per tutta la finestra,
+    // una scheda lasciata in secondo piano teneva il posto e la richiesta della
+    // scheda che si stava guardando non compariva: chi premeva «trovami» non
+    // otteneva niente, e dopo due minuti gli veniva negato. E una domanda nata
+    // altrove compariva sopra il sito che si stava leggendo, senza un segno che
+    // venisse da un'altra parte.
     const coda = [];
-    let mostrata = null; // { id, nodo }
+    let mostrata = null; // { id, nodo, tabId }
 
     function rimuoviNodo(nodo) {
       nodo.classList.add('uscita');
       setTimeout(() => { try { nodo.remove(); } catch (_) {} }, 140);
+    }
+
+    // La pastiglia cade nell'area della pagina, che il sistema disegna sopra la
+    // cornice: senza riserva non la vedrebbe nessuno. Vedi `riservaTop`.
+    function sincronizzaRiserva() {
+      if (!mostrata) { riservaTop('permessi', 0); return; }
+      requestAnimationFrame(() => {
+        if (!mostrata) { riservaTop('permessi', 0); return; }
+        const r = mostrata.nodo.getBoundingClientRect();
+        riservaTop('permessi', Math.ceil(r.bottom) + 6);
+      });
     }
 
     function chiudiPastiglia(id) {
