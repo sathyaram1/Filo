@@ -250,8 +250,24 @@
       const header = `## "${intent}" (da ${init})`;
       const stepLines = steps.map((s, i) =>
         `  ${i + 1}. ${s.action} su ${s.selector}${s.retracted ? ' [poi corretto]' : ''}`);
-      const block = [header, ...stepLines].join('\n');
-      if (chars + block.length + 2 > KNOWN_PATHS_BUDGET_CHARS) break;
+      let block = [header, ...stepLines].join('\n');
+      // Nessun percorso da solo si prende più di una fetta del tetto: trenta
+      // passi con etichette lunghe fanno un blocco da quindicimila caratteri,
+      // e tutti gli altri percorsi di quel dominio resterebbero fuori. Quello
+      // che non ci sta si taglia dicendolo, invece di sparire in silenzio.
+      if (block.length > MAX_PATH_CHARS) {
+        const tenute = [];
+        let usati = header.length;
+        for (const riga of stepLines) {
+          if (usati + riga.length + 1 > MAX_PATH_CHARS) break;
+          tenute.push(riga);
+          usati += riga.length + 1;
+        }
+        block = [header, ...tenute, '  (percorso più lungo: il resto dei passi non è riportato)'].join('\n');
+      }
+      // Il percorso che non ci sta si SALTA, non chiude la fila: fermarsi al
+      // primo buttava via anche tutti quelli dopo, che nel tetto ci stavano.
+      if (chars + block.length + 2 > KNOWN_PATHS_BUDGET_CHARS) continue;
       blocchi.push(block);
       chars += block.length + 2;
     }
