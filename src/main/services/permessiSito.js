@@ -265,18 +265,31 @@ async function decidi(wc, permesso, dettagli) {
 
   if (Pp.innocuo(permesso)) return true;
 
-  // Il preambolo della condivisione dello schermo (permesso 'media' con la
-  // lista dei tipi vuota) non è una richiesta di fotocamera e microfono: si
-  // lascia passare perché la domanda vera la fa il gestore della cattura
-  // schermo, qui sotto, che sa cosa sta per essere consegnato. Senza questo
-  // ramo, a chi premeva «condividi lo schermo» comparivano due domande e la
-  // prima gli faceva consentire per sempre due sensori che non aveva chiesto.
-  if (Pp.preamboloSchermo(permesso, dettagli)) return true;
-
   const origine = Pp.origineDi(url);
   if (!origine) return false; // origine opaca (data:, blob:, file:): si nega
 
-  const chiavi = Pp.chiaviRichieste(permesso, dettagli);
+  // Il preambolo della cattura schermo: permesso 'media' con la lista dei tipi
+  // VUOTA. Non è una richiesta di fotocamera e microfono, e non va trattata
+  // come tale: chiedere «vuole usare la fotocamera e il microfono» a chi ha
+  // premuto «condividi lo schermo» gli fa consentire due sensori che nessuno
+  // gli ha nominato. È la domanda dello SCHERMO, e va fatta qui.
+  //
+  // Qui non basta lasciarla passare, ed è il buco che questo ramo chiude:
+  // Chromium manda questa stessa identica richiesta per DUE strade. Quella
+  // moderna (`getDisplayMedia`) passa subito dopo dal gestore della cattura
+  // schermo, dove Filo fa scegliere la fonte. Quella vecchia (`getUserMedia`
+  // con `chromeMediaSource: 'desktop'` fra i vincoli) da quel gestore NON
+  // passa: consegna lo schermo intero, e il suono del computer se lo chiede,
+  // appena il permesso è concesso. Le due sono indistinguibili quando
+  // arrivano, quindi la domanda si fa ADESSO, prima di concedere: chi apre
+  // qui apre anche la strada vecchia, e lì non chiede più niente nessuno.
+  // Negarla e basta non è un'uscita: spegne anche la condivisione vera,
+  // perché il gestore della cattura schermo non viene nemmeno chiamato.
+  const preambolo = Pp.preamboloSchermo(permesso, dettagli);
+
+  const chiavi = preambolo
+    ? [Pp.CHIAVI.SCHERMO]
+    : Pp.chiaviRichieste(permesso, dettagli);
   if (!chiavi.length) return false;
 
   // La dettatura di Filo dentro una pagina web (vedi concessioneUnaTantum).
