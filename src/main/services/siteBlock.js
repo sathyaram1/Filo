@@ -204,6 +204,15 @@ function revokeHost(rawHost) {
   return allowedBySite.delete(host);
 }
 
+// I sì di questa sessione, per mostrarli. Un permesso che dura e non si vede da
+// nessuna parte è mezzo permesso: il bottone sulla notifica vale finché quella
+// notifica è a schermo, cioè pochi secondi, e dopo non resta niente (#590,
+// quarto giro). Le Preferenze, dove l'utente la lista l'ha scritta, sono il
+// posto dove andrebbe a cercarli.
+function allowedHosts() {
+  return [...allowedBySite].sort();
+}
+
 function isSearchEngineHost(host) {
   if (!host) return false;
   return SEARCH_ENGINE_PATTERNS.some((re) => re.test(host));
