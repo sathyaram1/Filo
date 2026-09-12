@@ -84,6 +84,8 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && (msg.keys === null || msg.keys === undefined)) {
       return { ok: false, error: 'forbidden' };
     }
+    const vietati = scompartiVietati(origin, msg.keys);
+    if (vietati) return vietati;
     const value = await globalThis.chrome.storage.local.get(msg.keys ?? null);
     return { ok: true, value: isFilo(origin) ? value : redactForWeb(value) };
   });
