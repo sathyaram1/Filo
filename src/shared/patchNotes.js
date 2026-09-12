@@ -23,7 +23,7 @@
         'Il bottone «Apri» su una finestrella bloccata ora apre solo quella finestrella. Prima toglieva il sito dalla lista di quelli bloccati fino alla chiusura di Filo, senza dirtelo.',
         'Quando chiedi a Filo di aprire una pagina, a volte nasceva una scheda bianca e la chat diceva comunque di averla aperta. Ora la pagina si apre davvero, e se l\'indirizzo non sta in piedi Filo te lo dice.',
         '«Apri comunque», sulla notifica di un sito bloccato, ora apre il sito per davvero e ti lascia girarci dentro: link, ricarica, schede nuove. Prima quasi ogni sito ti lasciava una scheda vuota e non c\'era nessun altro modo di arrivarci.',
-        'Anche i siti con l\'estensione in caratteri non latini (.рф, .テスト e le altre) si possono mettere fra quelli da bloccare: prima la riga spariva dall\'elenco e il sito si apriva lo stesso.',
+        'Anche i siti con l\'estensione in caratteri non latini (.рф, .テスト e le altre) si possono mettere fra quelli da bloccare, e nell\'elenco restano scritti come li hai scritti tu: prima la riga spariva e il sito si apriva lo stesso.',
       ],
     },
     {
