@@ -833,9 +833,6 @@
   }
 
   async function save() {
-    const apiKey = $('apiKey').value.trim();
-    const apiKeyTavily = $('apiKeyTavily').value.trim();
-
     // Auto-save: persistiamo solo le righe valide. Le righe incomplete
     // (nickname mancante) o duplicate vengono ignorate finché non sono
     // complete — niente alert bloccanti che interromperebbero la digitazione,
