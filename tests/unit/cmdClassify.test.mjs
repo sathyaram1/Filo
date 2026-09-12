@@ -1459,3 +1459,73 @@ test('#587 — le sequenze di escape di bash non nascondono il bersaglio', () =>
     assert.equal(C.classify(cmd, dovunque), 1, `"${cmd}" non deve chiedere niente`);
   }
 });
+
+// ── #587, giro 5 — chi legge e non veniva misurato, e le altre tildi ─────────
+//
+// Due porte, stesso danno: chiavi e password che escono senza un clic.
+//
+// La prima è un cambio di verso. Il bersaglio veniva misurato solo per i
+// programmi scritti in un elenco di lettori; chi non c'era passava senza che
+// nessuno guardasse cosa aprisse. `git diff --no-index /dev/null ~/.ssh/id_rsa`
+// stampa la chiave privata, `git diff --no-index vuota ~/.ssh` la cartella
+// intera, `git grep --no-index` cerca dentro tutti i file dell'utente: tutto a
+// livello 1. Adesso si misura tutto e si tace solo su chi NON PUÒ aprire un
+// percorso, così un programma nuovo sbaglia dalla parte della conferma.
+//
+// La seconda è la stessa causa dei quattro giri prima — il bersaglio misurato
+// non è quello che il comando aprirà — affacciata sulle tildi che non sono la
+// cartella dell'utente: `~-` è la cartella di PRIMA, `~1` una di quelle messe da
+// parte con `pushd`. «vai in .ssh», «torna a casa», «mostrami ~-/config» apriva
+// la configurazione SSH senza chiedere niente.
+//
+// Senza il fix i primi assert tornano 1.
+test('#587 — anche i programmi fuori dall’elenco dei lettori vengono misurati', () => {
+  const dovunque = { perimetro: HOME, home: HOME, cwd: HOME, shell: 'bash' };
+  for (const cmd of [
+    'git diff --no-index /dev/null .ssh/id_rsa',
+    'git diff --no-index /dev/null ~/.ssh/id_rsa',
+    'git diff --no-index /dev/null .netrc',
+    'git diff --no-index /dev/null .config/Filo/storage.json',
+    'git diff --no-index vuota .ssh',
+    'git diff --no-index vuota .aws',
+    'git diff --no-index /dev/null /etc/passwd',
+    'git grep --no-index -e PRIVATE',
+    'git grep --no-index -e AKIA -- .aws',
+    'git grep --no-index password',
+  ]) {
+    assert.equal(C.classify(cmd, dovunque), 2, `"${cmd}" apre file riservati: deve chiedere un OK`);
+  }
+});
+
+test('#587 — l’uso di tutti i giorni di git non chiede niente', () => {
+  const dovunque = { perimetro: HOME, home: HOME, cwd: HOME, shell: 'bash' };
+  for (const cmd of [
+    'git status', 'git log', 'git log -p', 'git log --oneline', 'git diff',
+    'git diff --stat', 'git diff HEAD~1', 'git show HEAD', 'git branch',
+    'git blame src/main.js', 'git log --grep=passwd', 'npm ls', 'npm config get registry',
+    'git diff --no-index vecchio.txt nuovo.txt',
+  ]) {
+    assert.equal(C.classify(cmd, dovunque), 1, `"${cmd}" è lavoro di tutti i giorni: non deve chiedere niente`);
+  }
+});
+
+test('#587 — la cartella di prima (`~-`, `~1`) non nasconde il bersaglio', () => {
+  const dovunque = { perimetro: HOME, home: HOME, cwd: HOME, shell: 'bash' };
+  for (const cmd of [
+    'cat ~-/config',
+    'cat ~-/Filo/storage.json',
+    'ls ~-',
+    'cat ~1/config',
+    'cat ~+1/config',
+    'cat ~-2/id_ed25519',
+    'cd .ssh && cd ~ && cat ~-/config',
+    'cd ~- && cat config',
+    'cat ~altroutente/Documenti/nota.txt',
+  ]) {
+    assert.equal(C.classify(cmd, dovunque), 2, `"${cmd}" deve chiedere un OK`);
+  }
+  // Spostarsi e basta non legge niente: non deve costare nulla.
+  assert.equal(C.classify('cd ~-', dovunque), 1, 'spostarsi non deve chiedere niente');
+  // `~+` è la cartella corrente, che si sa già misurare.
+  assert.equal(C.classify('cat ~+/appunti.txt', dovunque), 1, '`~+` è dove siamo: non deve chiedere niente');
+});
