@@ -956,13 +956,40 @@
     if (SHELL_UNIX_RE.test(s)) return true;
     return null;
   }
+  // Dentro `$'…'` bash non si limita a togliere le barre rovesciate: SCIOGLIE le
+  // sequenze di escape. `\x68`, `\150` e `h` sono tutte e tre la lettera
+  // «h», quindi `cat $'.ss\x68/config'` apre `~/.ssh/config` mentre il controllo
+  // leggeva `.ssx68`, che non somiglia a niente di riservato (#587, giro 4). Il
+  // giro 3 aveva tolto la buccia — le virgolette — senza leggere il contenuto.
+  const ANSI_C_RE = /\\(x[0-9A-Fa-f]{1,2}|u[0-9A-Fa-f]{1,4}|U[0-9A-Fa-f]{1,8}|[0-7]{1,3}|[abefnrtv'"?\\])/g;
+  const ANSI_C_SEMPLICI = {
+    a: '\x07', b: '\b', e: '\x1b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v',
+    "'": "'", '"': '"', '?': '?', '\\': '\\',
+  };
+  function sciogliAnsiC(s) {
+    const a = String(s || '');
+    if (a.indexOf('\\') === -1) return a;
+    return a.replace(ANSI_C_RE, (tutto, g) => {
+      try {
+        const c = g[0];
+        if (c === 'x') return String.fromCharCode(parseInt(g.slice(1), 16));
+        if (c === 'u' || c === 'U') return String.fromCodePoint(parseInt(g.slice(1), 16));
+        if (c >= '0' && c <= '7') return String.fromCharCode(parseInt(g, 8) & 0xff);
+        return ANSI_C_SEMPLICI[c] !== undefined ? ANSI_C_SEMPLICI[c] : tutto;
+      } catch (_) { return tutto; }
+    });
+  }
+
   // Le letture possibili di un percorso scritto dentro un comando.
   function lettureDi(raw, esc) {
     const a = String(raw || '');
     const out = [a];
+    const aggiungi = (s) => { if (s && out.indexOf(s) === -1) out.push(s); };
     if (esc !== false && a.indexOf('\\') !== -1) {
-      const sciolto = a.replace(/\\(.)/g, '$1');
-      if (sciolto && sciolto !== a) out.push(sciolto);
+      // La barra rovesciata come escape: `.ss\h` → `.ssh`.
+      aggiungi(a.replace(/\\(.)/g, '$1'));
+      // Le sequenze di escape di `$'…'`: `.ss\x68` → `.ssh`.
+      aggiungi(sciogliAnsiC(a));
     }
     return out;
   }
