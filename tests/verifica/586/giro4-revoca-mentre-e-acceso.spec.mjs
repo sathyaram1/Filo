@@ -62,10 +62,13 @@ test('fotocamera e microfono accesi: che segno c\'è, e cosa fa la revoca', asyn
   await sicurezza.waitForTimeout(1200);
   const righe = await sicurezza.locator('#perms-list li').allTextContents();
   console.log('[586 g4] elenco in Impostazioni:', JSON.stringify(righe));
-  const riga = sicurezza.locator('#perms-list li').filter({ hasText: host }).first();
-  const bottoni = await riga.locator('button').count();
-  for (let i = 0; i < bottoni; i++) {
-    try { await riga.locator('button').first().click(); await sicurezza.waitForTimeout(500); } catch (_) { break; }
+  const riga = () => sicurezza.locator('#perms-list li').filter({ hasText: host }).first();
+  // Il × toglie la voce: prima la fotocamera, poi il microfono.
+  while (await sicurezza.locator('#perms-list li').filter({ hasText: host }).count()) {
+    const x = riga().locator('button[aria-label]').first();
+    if (!(await x.count())) break;
+    await x.click();
+    await sicurezza.waitForTimeout(600);
   }
   await sicurezza.waitForTimeout(1200);
   console.log('[586 g4] elenco dopo la revoca:', JSON.stringify(await sicurezza.locator('#perms-list li').allTextContents()));
