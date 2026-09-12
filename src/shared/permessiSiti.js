@@ -258,8 +258,9 @@
     const out = normalizza(mappa);
     const voci = { ...(out[o] || {}) };
     for (const k of (Array.isArray(chiavi) ? chiavi : [chiavi])) {
-      if (k) voci[String(k)] = scelta;
+      if (k && siRicorda(k)) voci[String(k)] = scelta;
     }
+    if (!Object.keys(voci).length) { delete out[o]; return out; }
     out[o] = voci;
     return out;
   }
