@@ -97,7 +97,15 @@ function clip(text) {
 // avviso di furto di dati sul link che la ricerca aveva appena restituito
 // (#587, giro 1). È la stessa ragione per cui gli indirizzi delle schede aperte
 // non entrano nel corpus.
-function record(sender, source, text, { untrusted = true, proteggi = true } = {}) {
+//
+// La risposta sta QUI e non in chi chiama: è una proprietà della provenienza, e
+// se la decidesse ogni chiamante basterebbe dimenticarsene una volta per
+// rimettere in circolo l'avviso falso. Il default protegge, così una provenienza
+// nuova sbaglia dalla parte prudente.
+function record(sender, source, text, opts) {
+  const o = opts || {};
+  const untrusted = o.untrusted !== false;
+  const proteggi = o.proteggi === undefined ? !NON_PROTETTE.has(String(source)) : !!o.proteggi;
   const body = String(text == null ? '' : text).trim();
   if (!body) return;
   const led = ledgerFor(sender, true);
