@@ -220,21 +220,26 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
-if (!IS_SUBFRAME) try {
+// In OGNI riquadro, non solo nel principale. Un widget dentro un riquadro
+// incorporato — la finestra della videochiamata, il lettore che chiede le
+// notifiche, la mappa dentro la pagina di un negozio — guarda cosa può fare
+// prima di mostrare il suo bottone: è la riga più educata che un sito possa
+// scrivere. Lì dentro leggeva «negato» su cose che nessuno aveva negato,
+// smetteva e mostrava «sbloccalo dalle impostazioni del browser», dove non
+// c'era niente da sbloccare (#586, giro 6). La domanda sincrona al main costa
+// una frazione di millesimo di secondo per riquadro, e si paga una volta sola
+// al caricamento.
+try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https?:/i.test(loc)) {
-    const {
-      buildPermessiGuardSource, buildPosizioneSinceraSource, CANALE, CANALE_POSIZIONE_KO,
-    } = require('./permessi-guard.js');
+  const dentroUnSito = /^https?:/i.test(loc)
+    // Un riquadro scritto dalla pagina non ha un indirizzo suo: per il browser è
+    // lo stesso sito di chi lo ospita, e il main risponde con le scelte di
+    // quello.
+    || (IS_SUBFRAME && /^(about:blank|about:srcdoc|)$/i.test(loc));
+  if (dentroUnSito) {
+    const { buildPermessiGuardSource, CANALE } = require('./permessi-guard.js');
     const noti = ipcRenderer.sendSync('filo:permessi-noti', loc) || {};
     webFrame.executeJavaScript(buildPermessiGuardSource(noti), true).catch(() => {});
-    // #586 — la posizione che dopo il «Consenti» non arriva mai. Filo non la sa
-    // produrre da sé, ma non deve far finta: quando il sistema non sa dire dove
-    // si è, chi naviga se lo sente dire invece di dare la colpa al sito.
-    webFrame.executeJavaScript(buildPosizioneSinceraSource(), true).catch(() => {});
-    document.addEventListener(CANALE_POSIZIONE_KO, () => {
-      try { ipcRenderer.send('filo:posizione-non-disponibile'); } catch (_) {}
-    }, true);
     // Una scelta presa mentre la pagina è aperta (la pastiglia, o le
     // impostazioni) vale subito: senza questo, "nega per sempre" tornava a
     // leggersi "da chiedere" fino al ricaricamento.
@@ -243,6 +248,20 @@ if (!IS_SUBFRAME) try {
         document.dispatchEvent(new CustomEvent(CANALE, { detail: mappa || {} }));
       } catch (_) {}
     });
+  }
+} catch (e) { /* come sopra: mai bloccare la pagina */ }
+
+if (!IS_SUBFRAME) try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) {
+    const { buildPosizioneSinceraSource, CANALE_POSIZIONE_KO } = require('./permessi-guard.js');
+    // #586 — la posizione che dopo il «Consenti» non arriva mai. Filo non la sa
+    // produrre da sé, ma non deve far finta: quando il sistema non sa dire dove
+    // si è, chi naviga se lo sente dire invece di dare la colpa al sito.
+    webFrame.executeJavaScript(buildPosizioneSinceraSource(), true).catch(() => {});
+    document.addEventListener(CANALE_POSIZIONE_KO, () => {
+      try { ipcRenderer.send('filo:posizione-non-disponibile'); } catch (_) {}
+    }, true);
   }
 } catch (e) { /* come sopra: mai bloccare la pagina */ }
 
