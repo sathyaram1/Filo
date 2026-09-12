@@ -305,7 +305,7 @@ async function decidi(wc, permesso, dettagli) {
   const memoria = mappaDi(ses, incognito);
 
   const gia = Pp.decisione(memoria, origine, chiavi);
-  if (gia === 'allow') return true;
+  if (gia === 'allow') { segnaSensori(wc, origine, chiavi); return true; }
   if (gia === 'deny') return false;
 
   // La scrittura della memoria passa da qui: una risposta "solo per stavolta"
