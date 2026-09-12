@@ -118,6 +118,37 @@ test('è una lista di ciò che passa: il messaggio aggiunto domani resta fuori d
   assert.equal(W.isWebMessage('sincronizza_tutto_il_disco'), false);
 });
 
+// ── Il magazzino dei dati, scomparto per scomparto ─────────────────────────
+// Chiedere tutto in un colpo era già vietato. Chiederli per nome, uno alla
+// volta, no: ne usciva la stessa roba, e dalla stessa porta si riscriveva.
+test('gli scomparti dei dati personali non si aprono da una pagina web', () => {
+  for (const chiave of [
+    'filo_memory',      // quello che Filo ha imparato sull'utente
+    'savedPages',       // le pagine messe da parte, con indirizzi e titoli
+    'aiHistory',        // le richieste ai modelli
+    'downloads',        // percorso su disco, e quindi il nome utente del computer
+    'archivedTabs', 'costs', 'credits', 'filo_notes', 'filo_timers',
+    'filo_proxy_rules', 'filo_onboarding', 'clipboardHistory', 'filo_raw_log',
+    'filo_session', 'categories', 'decks',
+  ]) {
+    assert.equal(W.isWebStorageKey(chiave), false, `una pagina web può ancora aprire "${chiave}"`);
+  }
+});
+
+test('quello che il codice dentro le pagine tiene nel magazzino continua a passare', () => {
+  for (const chiave of [
+    'settings',                   // ridotto ai campi ammessi, non intero
+    'sn_personal_dict', 'sn_autocorrect',
+    'sn_icon_layout', 'sn_feedback_draft_text', 'sn_feedback_client_id',
+  ]) {
+    assert.equal(W.isWebStorageKey(chiave), true, `il codice dentro le pagine non può più aprire "${chiave}"`);
+  }
+});
+
+test('anche gli scomparti sono una lista di ciò che passa', () => {
+  assert.equal(W.isWebStorageKey('scomparto_nuovo_di_domani'), false);
+});
+
 // ── Sentinella: la lista ammette tutto ciò che le pagine mandano davvero ────
 // Ogni file che finisce dentro una pagina web: i content script, i moduli
 // condivisi che page-preload.js carica insieme a loro e il preload stesso (lo
