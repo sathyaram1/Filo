@@ -252,8 +252,50 @@ function rispondi(id, scelta, { ricorda = true } = {}) {
   if (!att) return { ok: false, error: 'scaduta' };
   const ok = scelta === 'allow';
   if (ricorda && typeof att.salva === 'function') att.salva(ok ? 'allow' : 'deny');
-  att.chiudi(ok);
+  att.chiudi(ok, ricorda);
   return { ok: true };
+}
+
+// ─── il sito che non la smette ──────────────────────────────────────────────
+//
+// La × chiude senza ricordare niente, ed è giusto: chi l'ha premuta non ha
+// deciso. Ma il sito può richiedere subito, e la pastiglia torna. Una pagina
+// che richiede ogni decimo di secondo tiene la domanda incollata sotto le
+// schede: spinge giù il sito, non si toglie, e l'unica uscita era andarsene
+// (#586, giro 5).
+//
+// Dopo tre domande chiuse senza rispondere, Filo smette di chiedere per quel
+// sito su QUELLA pagina. Non è un «no per sempre»: niente resta scritto, e la
+// pagina che riparte (un ricaricamento, un link) ricomincia da capo. È la via
+// d'uscita, ed è quella che si trova da sé.
+const senzaRisposta = new Map(); // `${wcId}|${origine}` → numero
+const SENZA_RISPOSTA_MAX = 3;
+
+function chiaveAnello(wc, origine) { return `${wc.id}|${origine}`; }
+
+function segnaSenzaRisposta(wc, origine) {
+  const k = chiaveAnello(wc, origine);
+  senzaRisposta.set(k, (senzaRisposta.get(k) || 0) + 1);
+  if (wc._filoPermessiAnello) return;
+  wc._filoPermessiAnello = true;
+  const pulisci = (_e, _url, inPlace, isMainFrame) => {
+    if (!isMainFrame || inPlace) return;
+    for (const key of [...senzaRisposta.keys()]) {
+      if (key.startsWith(`${wc.id}|`)) senzaRisposta.delete(key);
+    }
+  };
+  try { wc.on('did-start-navigation', pulisci); } catch (_) {}
+  try {
+    wc.once('destroyed', () => {
+      for (const key of [...senzaRisposta.keys()]) {
+        if (key.startsWith(`${wc.id}|`)) senzaRisposta.delete(key);
+      }
+    });
+  } catch (_) {}
+}
+
+function troppeSenzaRisposta(wc, origine) {
+  return (senzaRisposta.get(chiaveAnello(wc, origine)) || 0) >= SENZA_RISPOSTA_MAX;
 }
 
 // ─── il gestore ─────────────────────────────────────────────────────────────
