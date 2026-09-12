@@ -47,7 +47,17 @@ function newLedger() {
   return { entries: [], chars: 0, sources: new Set() };
 }
 
-function ledgerFor(sender, create) {
+// Il "mittente" che arriva agli handler è un oggetto DESCRITTIVO ricostruito a
+// ogni messaggio (src/main/ipc.js → senderInfo): appendergli qualcosa sopra
+// significa perderlo al messaggio dopo. Il registro va appeso al webContents
+// vero (`sender.wc`), che vive quanto la scheda.
+function hostOf(sender) {
+  if (!sender) return null;
+  try { return sender.wc || sender; } catch (_) { return sender; }
+}
+
+function ledgerFor(rawSender, create) {
+  const sender = hostOf(rawSender);
   if (!sender) {
     if (!fallback && create) fallback = newLedger();
     return fallback;
