@@ -11,11 +11,11 @@ const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
 </script></body></html>`;
 
 for (const tema of ['light', 'dark']) {
-  test(`l'avviso della posizione si legge col tema ${tema}`, async ({ shell, openTab, testServer }) => {
+  test(`l'avviso della posizione si legge col tema ${tema}`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(180_000);
-    await shell.evaluate((t) => {
-      document.documentElement.setAttribute('data-theme', t);
-    }, tema);
+    await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, tema);
+    await shell.emulateMedia({ colorScheme: tema }).catch(() => {});
+    await shell.waitForTimeout(600);
     const page = await testServer.openReady(openTab, HTML);
     page.evaluate(() => window.__pos()).catch(() => {});
     await shell.waitForTimeout(2000);
