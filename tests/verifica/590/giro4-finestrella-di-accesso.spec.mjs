@@ -50,11 +50,11 @@ async function alzaServer() {
 
     // Pagine SUL SITO DELLA LISTA.
     if (host === LISTA) {
-      if (path === '/apri-secondo') {
-        // Dentro la finestrella di accesso: ne apre una seconda, sempre
-        // verso il sito della lista e sempre con un indirizzo da "accesso".
+      if (path === '/da-solo') {
+        // La pagina che si ricarica DA SOLA: lo fa mezzo web (cruscotti,
+        // risultati sportivi, caselle di posta).
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(pagina(`<h1 id="t">SONO IL SITO DELLA LISTA</h1><button id="b" onclick="window.open('${bloccato}/signin','_blank','width=480,height=420')">ancora</button>`));
+        res.end(pagina('<h1 id="t">SONO IL SITO DELLA LISTA</h1><button id="b" onclick="location.reload()">ricarica</button>'));
         return;
       }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
