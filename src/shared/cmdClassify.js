@@ -1142,6 +1142,21 @@
     return '';
   }
 
+  // Il motivo di un operando, misurato in OGNI lettura che la shell potrebbe
+  // darne e contro OGNI cartella di lavoro possibile. Basta che una sola lettura
+  // apra un bersaglio riservato perché la lettura chieda un OK: il livello non
+  // può dipendere da quale delle due forme abbiamo deciso di credere.
+  function operandReason(op, cwds, perim, home, soloRiservati, ricorsivo, esc) {
+    const basi = Array.isArray(cwds) ? cwds : [cwds];
+    for (const lettura of lettureDi(op, esc)) {
+      for (const base of basi) {
+        const why = operandReasonUno(lettura, base, perim, home, soloRiservati, ricorsivo);
+        if (why) return why;
+      }
+    }
+    return '';
+  }
+
   // Perché un comando altrimenti di livello 1 deve comunque chiedere un OK?
   // Ritorna '' se non deve. Segue i `cd` dentro la sequenza, così il bersaglio
   // misurato è quello vero.
