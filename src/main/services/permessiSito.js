@@ -340,7 +340,14 @@ function segnaSensori(wc, origine, chiavi) {
     const Pp = P();
     const sensori = chiavi.filter((k) => k === Pp.CHIAVI.FOTOCAMERA || k === Pp.CHIAVI.MICROFONO);
     if (!sensori.length) return;
-    iniziaUso(wc, origine, sensori, {});
+    // Un sito che prima ottiene il microfono e poi anche la fotocamera deve
+    // ritrovarsi un cartello solo che le nomina tutte e due, non due cartelli
+    // accanto né uno che ne dice metà.
+    const gia = usoEsistente(wc, origine, 'sensori');
+    const tutte = gia
+      ? [...usi.get(gia).chiavi, ...sensori.filter((k) => !usi.get(gia).chiavi.includes(k))]
+      : sensori;
+    iniziaUso(wc, origine, tutte, { tipo: 'sensori' });
   } catch (_) {}
 }
 
