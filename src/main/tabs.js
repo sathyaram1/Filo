@@ -2369,6 +2369,17 @@ class TabManager {
     // bloccati, e lo sceglie l'utente cliccando "Apri comunque" sulla
     // notifica. Senza, openTab ribloccherebbe l'apertura e il bottone non
     // farebbe niente.
+    //
+    // E il sì si REGISTRA (#590, secondo giro), non vale solo per la richiesta
+    // che parte adesso. Un sito che risponde "vai qui" invece di dare la
+    // pagina — il salto da http a https, la barra iniziale che porta alla
+    // home: quasi ogni sito vero — finiva contro il controllo del rimbalzo,
+    // che del sì non sapeva niente: la scheda restava vuota e il sito non si
+    // apriva più in nessun modo. Lo stesso al primo link cliccato dentro il
+    // sito, alla ricarica, e a una scheda nuova aperta da lì.
+    try {
+      require('./services/siteBlock').allowHost(new URL(url).hostname);
+    } catch (_) { /* indirizzo non analizzabile: resta il solo scavalco qui sotto */ }
     this.openTab(url, { activate: true, overrideSiteBlock: true });
   }
 
