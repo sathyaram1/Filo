@@ -254,16 +254,23 @@
     LEGGI_DOCUMENTO: {
       // Filo legge un documento dal DISCO dell'utente — un PDF (bolletta,
       // estratto conto, contratto) o un file di testo — perché l'utente gli ha
-      // chiesto di leggerlo. Livello 1, per le stesse ragioni per cui un comando
-      // di sola lettura nel terminale è livello 1: non modifica niente, non
-      // esegue niente, non manda niente fuori dal computer — il testo entra solo
-      // nel contesto del modello. Una conferma a ogni documento sarebbe attrito
-      // su una cosa che l'utente ha appena chiesto, e una conferma che si accetta
-      // sempre smette di essere un controllo.
-      level: 1,
+      // chiesto di leggerlo. Livello 1 dentro il perimetro dichiarato (la
+      // cartella dell'utente): non modifica niente, non esegue niente, e una
+      // conferma a ogni documento sarebbe attrito su una cosa appena chiesta —
+      // una conferma che si accetta sempre smette di essere un controllo.
+      // FUORI dal perimetro, o su un bersaglio riservato (`.ssh`, `.aws`, `.env`,
+      // cronologie), sale a 2 come il `cat` equivalente nel terminale (#587):
+      // questa azione legge gli stessi file, e lasciarla a 1 avrebbe solo
+      // spostato la porta invece di chiuderla. Il motivo lo calcola il main con
+      // la STESSA regola del classificatore dei comandi; mai l'LLM.
+      level: (a) => (a && a._motivoPerimetro ? 2 : 1),
       describe: (a) => {
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
-        return `Leggere il documento ${p || ''}`.trim();
+        const base = `Leggere il documento ${p || ''}`.trim();
+        const perche = String((a && a._motivoPerimetro) || '').trim();
+        return perche
+          ? `${base}\n\nQuesto file ${perche}: il contenuto entra nella conversazione con Filo.`
+          : base;
       },
     },
     LEGGI_TRASPARENZA: {
