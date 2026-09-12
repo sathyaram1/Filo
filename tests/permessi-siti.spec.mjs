@@ -1294,3 +1294,35 @@ test('dopo tre domande chiuse senza rispondere, il sito smette di poterne fare',
     'il sito deve aver continuato a chiedere: se avesse smesso lui, la prova non direbbe niente',
   ).toBeGreaterThan(3);
 });
+
+test('togliere il microfono a un sito non gli spegne anche la fotocamera', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<script>
+  window.__t = { audio: null, video: null };
+  window.__prendi = (kind) => navigator.mediaDevices
+    .getUserMedia(kind === 'audio' ? { audio: true } : { video: true })
+    .then((s) => { window.__t[kind] = s.getTracks()[0]; return 'ok'; }, (e) => 'no:' + e.name);
+  window.__stato = (k) => (window.__t[k] ? window.__t[k].readyState : 'niente');
+</script></body></html>`);
+  const origine = new URL(page.url()).origin;
+
+  for (const kind of ['audio', 'video']) {
+    const p = page.evaluate((k) => window.__prendi(k), kind);
+    await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+    await shell.locator('.perm-chip .perm-chip-allow').click();
+    expect(await p, `il sito deve ottenere ${kind}`).toBe('ok');
+  }
+
+  await shell.evaluate((o) => window.filoShell.permissions.revoke(o, 'microfono'), origine);
+  await expect
+    .poll(() => page.evaluate(() => window.__stato('audio')).catch(() => '?'), { timeout: 20_000 })
+    .toBe('ended');
+  expect(
+    await page.evaluate(() => window.__stato('video')),
+    'tolto il microfono, al sito è stata spenta anche la fotocamera, che nessuno gli aveva tolto',
+  ).toBe('live');
+  // E il cartello resta, a dire quello che il sito può ancora fare.
+  await expect(shell.locator('.perm-live')).toHaveCount(1, { timeout: 15_000 });
+  await expect(shell.locator('.perm-live')).toContainText('fotocamera');
+});

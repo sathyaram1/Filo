@@ -599,12 +599,23 @@ function rispostaFermata(id, vive) {
 
 // «Interrompi», e la revoca. Prima si chiede alla pagina; se qualcosa resta
 // vivo, si ricarica come prima.
-function interrompiUso(id) {
+//
+// `solo`: la chiave da chiudere, quando chi chiama ne ha tolta una sola. Un
+// cartello solo può nominare la fotocamera E il microfono insieme, e chi toglie
+// il microfono non deve ritrovarsi spenta anche la webcam. Senza, la ricarica
+// li portava via tutti e due comunque: qui si può fare meglio.
+function interrompiUso(id, solo) {
   const r = usi.get(String(id));
   if (!r) return { ok: false, error: 'finita' };
   const wc = r.wc;
-  const chiavi = r.chiavi.slice();
+  const tutte = r.chiavi.slice();
+  const chiavi = solo && tutte.includes(String(solo)) ? [String(solo)] : tutte;
+  const restano = tutte.filter((k) => !chiavi.includes(k));
   fineUso(id);
+  // Al sito resta qualcosa (gli si è tolto il microfono ma tiene la
+  // fotocamera): il cartello deve restare, con la frase di quello che gli
+  // rimane.
+  if (restano.length) iniziaUso(wc, r.origine, restano, { tipo: r.tipo });
   chiediAllaPaginaDiFermare(wc, chiavi).then((vive) => {
     if (!vive) return;
     try { if (wc && !wc.isDestroyed()) wc.reload(); } catch (_) {}
@@ -676,7 +687,7 @@ function chiudiUsi(origine, chiave, incognito) {
     if (u.origine !== o) continue;
     if (!!u.incognito !== !!incognito) continue;
     if (chiave && !u.chiavi.includes(String(chiave))) continue;
-    interrompiUso(id);
+    interrompiUso(id, chiave || null);
   }
 }
 

@@ -223,7 +223,10 @@ function buildCatturaSicuraSource() {
         const chiavi = (e && e.detail && Array.isArray(e.detail.chiavi)) ? e.detail.chiavi : null;
         for (const v of [...consegnate]) {
           if (v.t.readyState !== 'live') { consegnate.delete(v); continue; }
-          if (chiavi && !chiavi.includes(v.k)) { vive++; continue; }
+          // Quello che non è stato chiesto non si tocca e non si conta: chi
+          // toglie il microfono non deve ritrovarsi la pagina ricaricata
+          // perché la fotocamera, che non aveva tolto, è ancora accesa.
+          if (chiavi && !chiavi.includes(v.k)) continue;
           try { v.t.stop(); } catch (_) {}
           if (v.t.readyState === 'live') vive++; else consegnate.delete(v);
         }
