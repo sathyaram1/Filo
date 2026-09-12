@@ -103,11 +103,11 @@ test('un sito non può far uscire l\'utente dal suo account', async ({ app, open
   const web = await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
   const chiedi = comeIlSito(app, web.url());
 
+  // (L'accesso, al contrario, un sito lo può CHIEDERE per disegno: il modulo
+  // del red team vive dentro le pagine e propone di connettersi. È l'USCITA
+  // che nessun codice dentro una pagina chiede mai.)
   const uscita = await chiedi({ type: 'auth_signout' });
   expect(uscita?.ok, 'un sito ha potuto chiudere la sessione dell\'account dell\'utente').not.toBe(true);
-
-  const ingresso = await chiedi({ type: 'auth_signin' });
-  expect(ingresso?.ok, 'un sito ha potuto avviare l\'accesso all\'account').not.toBe(true);
 });
 
 // ── Porta del giro 1: da ri-provare a ogni giro ────────────────────────────
