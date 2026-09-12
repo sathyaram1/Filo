@@ -1844,7 +1844,7 @@
           n.textContent = v.nome;
           n.dataset.tip = v.nome;
           b.appendChild(n);
-          b.addEventListener('click', () => rispondiScelta(id, v.id));
+          b.addEventListener('click', () => rispondiScelta(id, v.id, audioBox && audioBox.checked));
           griglia.appendChild(b);
         }
         box.appendChild(griglia);
@@ -1853,7 +1853,7 @@
         annulla.type = 'button';
         annulla.className = 'perm-chip-btn perm-source-cancel';
         annulla.textContent = 'Annulla';
-        annulla.addEventListener('click', () => rispondiScelta(id, null));
+        annulla.addEventListener('click', () => rispondiScelta(id, null, false));
         box.appendChild(annulla);
 
         permHost.appendChild(box);
@@ -1900,20 +1900,28 @@
         if (!info || !info.id || riprese.has(String(info.id))) return;
         const id = String(info.id);
         const host = info.host || 'Questo sito';
+        // Se il sito si sta prendendo anche l'audio del computer, il segno lo
+        // dice: è la cosa che non si vede e non si sente arrivare. 'forse' è la
+        // strada vecchia dello schermo, dove Filo non lo può sapere e allora
+        // dice la più grande delle due (il segno parla già di ciò che il sito
+        // PUÒ fare, non di ciò che sta facendo).
+        const cosa = info.audio === 'no'
+          ? ' può vedere il tuo schermo'
+          : ' può vedere il tuo schermo e sentire l\'audio del computer';
 
         const chip = document.createElement('div');
         chip.className = 'perm-live';
         chip.setAttribute('role', 'status');
         chip.dataset.id = id;
-        chip.setAttribute('aria-label', `${host} può vedere il tuo schermo`);
+        chip.setAttribute('aria-label', `${host}${cosa}`);
 
         const testo = document.createElement('span');
         testo.className = 'perm-chip-text';
         const sito = document.createElement('strong');
         sito.textContent = host;
         testo.appendChild(sito);
-        testo.appendChild(document.createTextNode(' può vedere il tuo schermo'));
-        testo.dataset.tip = `${host} può vedere il tuo schermo`;
+        testo.appendChild(document.createTextNode(cosa));
+        testo.dataset.tip = `${host}${cosa}`;
         chip.appendChild(testo);
 
         const stop = document.createElement('button');
