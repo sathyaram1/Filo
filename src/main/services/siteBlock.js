@@ -146,8 +146,9 @@ function isBlacklistedHost(host) {
 // Decisione centrale. Ritorna { block, host, reason }.
 //   targetUrl: dove si vuole andare.
 //   fromUrl:   pagina di partenza / referrer (per l'eccezione "ricerca").
-//   viaFilo:   true se l'apertura è originata da Filo (eccezione "Filo").
-function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}) {
+// Non esistono altri parametri: CHI apre (utente, link, popup, modello) non
+// cambia la decisione — vedi l'intestazione del file.
+function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   const res = { block: false, host: '', reason: '' };
   if (!enabled) return res;
 
