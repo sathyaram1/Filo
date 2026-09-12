@@ -41,6 +41,11 @@ const MAX_CHARS = 200 * 1024;
 // dati identificabili, e la cosa viene detta nel testo.
 const MAX_ENTRY_CHARS = 32 * 1024;
 
+// Provenienze che rendono il contesto pilotabile ma NON sono dati dell'utente da
+// proteggere: testo pubblico, che il modello ha appena scaricato e che contiene
+// gli indirizzi che l'utente chiederà di aprire subito dopo.
+const NON_PROTETTE = new Set(['ricerca web']);
+
 let fallback = null; // registro condiviso quando non c'è un mittente
 
 function newLedger() {
