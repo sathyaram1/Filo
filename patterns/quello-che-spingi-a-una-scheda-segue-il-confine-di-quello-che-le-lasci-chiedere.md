@@ -19,8 +19,22 @@ Se un sito non lo può **chiedere**, non glielo si può nemmeno **mandare**.
   di esclusioni protegge solo i segreti che qualcuno si è ricordato di
   elencare; il prossimo campo aggiunto alle impostazioni esce da solo. Con una
   lista di campi ammessi (`src/shared/settingsScope.js`) resta fuori da solo, e
-  una sentinella negli unit test legge `src/content/*.js` per accorgersi del
-  caso opposto — un campo che ai content script serve e la lista non ammette.
+  una sentinella negli unit test legge tutto il codice che gira dentro una
+  pagina web — `src/content/*.js` **più** i moduli di `src/shared` che
+  `page-preload.js` carica lì accanto — per accorgersi del caso opposto: un
+  campo che a quel codice serve e la lista non ammette. L'elenco dei condivisi
+  si ricava da `page-preload.js`, non si scrive a mano, o la sentinella resta
+  indietro al primo modulo nuovo.
+- **La stessa regola vale su ogni messaggio, non solo sulle impostazioni.** Il
+  primo giro di verifica del #589 ha trovato la porta gemella ancora aperta: il
+  cambio di stato dell'account (profilo Google e contrassegno di
+  amministratore) e i movimenti del saldo crediti partivano con
+  `broadcastToTabs` verso ogni sito aperto, e nessun content script li ascolta.
+  Quando chiudi una porta di questa famiglia, passa in rassegna **tutti** i
+  `broadcastToTabs` e chiediti per ciascuno chi lo legge davvero dentro una
+  pagina: quello che non legge nessuno va su `broadcastToFiloPages`. E guarda
+  anche il verso della richiesta — `AUTH_STATUS` rispondeva a un sito con
+  email, identità Firebase e poteri, quando lì serve solo «c'è un accesso?».
 - **Il destinatario è il FRAME, non la scheda.** Una scheda web può ospitare un
   riquadro, e la pagina e il riquadro possono avere origini diverse: il payload
   si sceglie per frame (`sendToEachFrame` in `src/main/services/handlers.js`),
