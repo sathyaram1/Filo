@@ -1900,14 +1900,12 @@
         if (!info || !info.id || riprese.has(String(info.id))) return;
         const id = String(info.id);
         const host = info.host || 'Questo sito';
-        // Se il sito si sta prendendo anche l'audio del computer, il segno lo
-        // dice: è la cosa che non si vede e non si sente arrivare. 'forse' è la
-        // strada vecchia dello schermo, dove Filo non lo può sapere e allora
-        // dice la più grande delle due (il segno parla già di ciò che il sito
-        // PUÒ fare, non di ciò che sta facendo).
-        const cosa = info.audio === 'no'
-          ? ' può vedere il tuo schermo'
-          : ' può vedere il tuo schermo e sentire l\'audio del computer';
+        // La frase la compone il main dalle stesse parole della domanda: «può
+        // vedere il tuo schermo», «può usare il microfono», e con l'audio del
+        // computer nominato quando c'è. Vale per la ripresa dello schermo come
+        // per la fotocamera e il microfono: anche quelli restano aperti finché
+        // la pagina è lì, e il microfono non accende nessuna spia.
+        const cosa = ` può ${info.frase || 'usare qualcosa del tuo computer'}`;
 
         const chip = document.createElement('div');
         chip.className = 'perm-live';
