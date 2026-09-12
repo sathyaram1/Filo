@@ -1,5 +1,7 @@
 # Quello che la shell disegna sotto le schede fa scendere la pagina
 
+[← Tutti i pattern](../PATTERNS.md)
+
 **Regola.** Tutto ciò che la cornice di Filo mostra sotto la fila delle schede e
 che chi naviga deve poter vedere e premere dichiara il proprio bordo basso con
 `riservaTop('<nome>', fondo)`: l'area della pagina scende sotto di lui. Vale
