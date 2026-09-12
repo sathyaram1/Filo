@@ -1398,7 +1398,10 @@
     const o = opts || {};
     const perim = o.perimetro ? pathParts(o.perimetro) : null;
     const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
-    return operandReason(p, o.cwd || o.perimetro || '', perimOk, o.home || o.perimetro || '', !!o.soloRiservati);
+    // Qui il percorso NON viene da una riga di comando: è già il percorso vero,
+    // quello che verrà aperto. Nessuna lettura alternativa da fare — le barre
+    // rovesciate sono separatori, non escape (`esc: false`).
+    return operandReason(p, [o.cwd || o.perimetro || ''], perimOk, o.home || o.perimetro || '', !!o.soloRiservati, false, false);
   }
 
   global.SN_CMD_CLASSIFY = { classify, readReason, pathReason, programOf, subcommandOf, setRealPath };
