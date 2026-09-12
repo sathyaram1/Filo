@@ -233,6 +233,9 @@
     if (!lista.length) return null;
     let tutte = true;
     for (const k of lista) {
+      // Un permesso che non si ricorda si richiede sempre, qualunque cosa ci
+      // sia scritto.
+      if (!siRicorda(k)) return null;
       const v = voci[k];
       if (v === 'deny') return 'deny';
       if (v !== 'allow') tutte = false;
