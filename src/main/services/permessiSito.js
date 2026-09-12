@@ -51,8 +51,50 @@ let prossimoId = 1;
 // Concessioni una tantum chieste da Filo stesso dentro una pagina web (la
 // dettatura). Valgono per UN solo uso e per pochi secondi: passata la finestra
 // la richiesta torna a essere quella di un sito qualunque.
+//
+// Resta solo il microfono. Gli appunti dell'Incolla sono usciti di qui: li legge
+// il main e li consegna a chi ha premuto Incolla, perché una concessione che non
+// porta il nome di chi l'ha chiesta vale per la PRIMA richiesta che arriva in
+// quella scheda, e un sito che chiedeva gli appunti in continuazione se la
+// prendeva lui (#586, giro 6). Per il microfono la stessa corsa resta possibile
+// in teoria, e qui sotto si chiude togliendo la concessione quando qualcuno la
+// sta aspettando: vedi `qualcunoInAttesaDi`.
 const unaTantum = new Map(); // `${wcId}|${chiave}` → scadenza (ms)
-const UNA_TANTUM_MS = 15_000;
+// Stretta al minimo: chi si annuncia chiama sull'istante, e ogni secondo in più
+// è un secondo in cui qualcun altro può passare per primo.
+const UNA_TANTUM_MS = 4_000;
+
+// Quando un sito ha chiesto l'ultima volta quella cosa, in quella scheda. Serve
+// solo a capire se c'è una corsa in corso nel momento in cui Filo si annuncia.
+const ultimaRichiesta = new Map(); // `${wcId}|${chiave}` → ms
+const CORSA_MS = 1_500;
+
+function segnaRichiesta(wc, chiavi) {
+  if (!wc) return;
+  const ora = Date.now();
+  for (const k of chiavi) ultimaRichiesta.set(`${wc.id}|${k}`, ora);
+  // L'elenco non cresce all'infinito: si pota quello che è vecchio.
+  for (const [key, quando] of [...ultimaRichiesta]) {
+    if (ora - quando > 60_000) ultimaRichiesta.delete(key);
+  }
+}
+
+// C'è già qualcuno che aspetta quella cosa in quella scheda? Due segnali: una
+// domanda aperta adesso, o una richiesta arrivata un attimo fa. In tutt'e due i
+// casi la concessione di Filo NON si arma: se si armasse, il primo a chiedere se
+// la prenderebbe, e il primo può essere il sito che sta lì ad aspettarla. Senza
+// concessione non si perde niente di garantito — la richiesta di Filo passa dalla
+// domanda come le altre — e soprattutto nessuno si porta via un sensore senza che
+// l'utente abbia risposto.
+function qualcunoInAttesaDi(wc, chiave) {
+  if (!wc) return false;
+  const ultima = ultimaRichiesta.get(`${wc.id}|${chiave}`) || 0;
+  if (Date.now() - ultima < CORSA_MS) return true;
+  for (const att of attese.values()) {
+    if (att.chiave && att.chiave.startsWith(`${wc.id}|`) && att.chiavi.includes(chiave)) return true;
+  }
+  return false;
+}
 
 // Quanto resta in piedi una pastiglia senza risposta prima di negare. Generoso
 // di proposito (chi legge una pagina non è un cronometro), ma non infinito: una
