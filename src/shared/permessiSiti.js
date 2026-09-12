@@ -89,7 +89,18 @@
     'storage-access': 'usare i suoi cookie dentro un altro sito',
     'top-level-storage-access': 'usare i suoi cookie dentro un altro sito',
     openExternal: 'aprire un\'altra applicazione del computer',
+    sensors: 'sentire come muovi e inclini il computer',
+    'local-fonts': 'vedere i caratteri installati sul tuo computer',
   };
+
+  // Come si legge una domanda per un permesso che Filo non ha in elenco. Prima
+  // qui finiva il nome tecnico dentro le virgolette, e la domanda diventava
+  // «vuole usare «screen-wake-lock»»: chi la legge non sa cosa sta per dare
+  // (#586, giro 4). Il nome tecnico non sparisce, si sposta: `tecnici()` lo dà
+  // a chi lo può mettere dove non dà fastidio (il suggerimento della pastiglia,
+  // l'elenco delle Impostazioni, dove due sconosciuti vanno distinti).
+  const ETICHETTA_IGNOTA = 'usare una funzione che Filo non conosce';
+  const NOME_IGNOTO = 'Funzione sconosciuta';
 
   // Nome breve della chiave per le liste (Impostazioni, menu del tasto destro).
   const NOMI = {
