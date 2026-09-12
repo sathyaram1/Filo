@@ -31,7 +31,7 @@ import { createRequire } from 'node:module';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync,
+  mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync, readdirSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';

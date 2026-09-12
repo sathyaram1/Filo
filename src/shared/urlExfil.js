@@ -301,11 +301,22 @@
     }
     return true;
   }
+  // L'aggancio parte dalla TESTA del dato, e la testa dev'essere un troncone
+  // intero. Se però la spazzatura cade proprio lì (`...v19` + `x` + `f3bd2...`)
+  // di testa ne resta un carattere, e il dato non si aggancia più da nessuna
+  // parte: bastava mettere un separatore nel punto giusto (#587, giro 6). Quindi
+  // si prova ad agganciare anche lasciando indietro uno o due caratteri: un dato
+  // lungo meno due caratteri è ancora quel dato.
+  const SPEZZ_TESTA_PERSA = 2;
   function combaciaSpezzato(exposed, tok) {
     if (tok.length < SPEZZ_MIN) return false;
-    const testa = tok.slice(0, SPEZZ_RUN);
-    for (let da = exposed.indexOf(testa); da >= 0; da = exposed.indexOf(testa, da + 1)) {
-      if (daPosizione(exposed, tok, da)) return true;
+    for (let salta = 0; salta <= SPEZZ_TESTA_PERSA; salta++) {
+      const resto = tok.slice(salta);
+      if (resto.length < SPEZZ_MIN) break;
+      const testa = resto.slice(0, SPEZZ_RUN);
+      for (let da = exposed.indexOf(testa); da >= 0; da = exposed.indexOf(testa, da + 1)) {
+        if (daPosizione(exposed, resto, da)) return true;
+      }
     }
     return false;
   }
@@ -332,9 +343,10 @@
   // Dove tagliare lo sceglie la pagina ostile, quindi la domanda non può essere
   // «si ricompone COSÌ?» ma «si ricompone in QUALCHE modo?». Adesso si prova ogni
   // taglio possibile, e i pezzi possono essere quanti servono.
-  const SPED_MIN_PEZZO = 3;   // ogni pezzo ritrovato, almeno tanti caratteri
-  const SPED_MAX_TOKEN = 96;  // oltre non è più una cosa che sta in un indirizzo
+  const SPED_MIN_PEZZO = 4;   // ogni pezzo ritrovato, almeno tanti caratteri
+  const SPED_MAX_TOKEN = 200; // oltre non è più una cosa che sta in un indirizzo
   const SPED_MAX_CANDIDATI = 200;
+  const SPED_MAX_UNITO = 8192; // quanto dei carichi incollati si guarda
   // Si ricompone il dato intero con pezzi presi dai carichi, in ordine? Ogni
   // taglio viene provato una volta sola (la risposta per una coda non cambia).
   function copertoDaPezzi(carichi, tok) {
@@ -358,6 +370,32 @@
     }
     return copre[0] && pezzi[0] >= 2; // un pezzo solo l'ha già visto il confronto normale
   }
+  // I carichi incollati nell'ordine in cui i link sono partiti, e la stessa
+  // stringa all'indietro.
+  function incollati(carichi) {
+    if (!carichi.length) return [];
+    const u = carichi.join('').slice(-SPED_MAX_UNITO);
+    return [u, rovescia(u)];
+  }
+  // Incollare i carichi cancella i confini fra un link e l'altro, e questo vale
+  // in tutte e due le direzioni: rimette insieme la chiave tagliata dove vuole
+  // chi attacca, ma può anche rimettere insieme per caso un numero lungo pescando
+  // le cifre dagli identificativi di link veri (provato: un numero di dodici
+  // cifre si ricompone da solo dopo una ventina di indirizzi normali). Quindi qui
+  // il metro è più alto che su un link solo: o il dato è lungo, o mescola lettere
+  // e cifre, cioè ha una forma che le cifre di un indirizzo non riproducono.
+  const SPED_UNITO_LUNGO = 16;
+  function datoDaIncollato(tok) {
+    if (tok.length >= SPED_UNITO_LUNGO) return true;
+    return /[a-z]/.test(tok) && /[0-9]/.test(tok);
+  }
+  // Il dato dentro i carichi incollati, anche con qualche carattere di troppo in
+  // mezzo: è la stessa tolleranza di un indirizzo solo (vedi combaciaSpezzato).
+  function dentroIncollati(uniti, tok) {
+    if (!datoDaIncollato(tok)) return false;
+    return uniti.some((u) => u.includes(tok) || combaciaSpezzato(u, tok));
+  }
+
   // `carichi` = il CARICO di ogni link (vedi caricoUnito), il più recente per
   // ultimo. Ritorna il motivo se, messi insieme, portano fuori un dato intero.
   function taintSpedizione(carichi, corpus, letto) {
@@ -375,33 +413,47 @@
     // separatore che lì dentro non può comparire fa una sola stringa da cercare
     // senza creare vicinanze che non c'erano.
     const pagliaio = forme.join(' ');
+    // I carichi INCOLLATI nell'ordine in cui i link sono partiti. Chi taglia il
+    // dato sceglie anche DOVE tagliarlo, e un taglio che lascia al primo link
+    // meno di un pezzo intero non si ricompone pezzo per pezzo: `?d=sk-or-v1-9`
+    // seguito da `?d=f3bd2a71c4e8b60` porta fuori la stessa chiave di qualunque
+    // altro taglio, e prima passava (#587, giro 6). Incollati nell'ordine la
+    // chiave torna intera, qualunque sia il taglio e quanti che siano i link.
+    // Le vicinanze inventate dall'incollatura non fanno danno: qui si cercano
+    // solo dati lunghi e riconoscibili.
+    const uniti = incollati(pezzi);
+    const unitiPrima = incollati(pezzi.slice(0, -1));
     const codaUltimo = [pezzi[pezzi.length - 1], rovescia(pezzi[pezzi.length - 1])].join(' ');
     const candidati = [];
     for (const t of (altri.size ? [...toks, ...altri] : toks)) {
       if (t.length < STRONG_TOKEN || t.length > SPED_MAX_TOKEN) continue;
       if (STOPWORDS.has(t)) continue;
-      // Prefiltro: la testa e la coda del dato devono stare da qualche parte (il
+      if (dentroIncollati(uniti, t)) {
+        // L'avviso va sul link che COMPLETA la spedizione: se il dato si
+        // ricomponeva già senza l'ultimo, l'avviso è già comparso allora.
+        if (!dentroIncollati(unitiPrima, t)) {
+          return { reason: `contiene un tuo dato, spedito un pezzo per volta (“${t}…”)` };
+        }
+        continue;
+      }
+      // Prefiltro: la testa e la coda del dato devono stare da qualche parte. Il
       // primo pezzo parte dall'inizio e l'ultimo finisce alla fine, quindi senza
-      // di loro non si ricompone niente), e l'ULTIMO link deve portare un pezzo
-      // del dato — se no non è lui a completare la spedizione e l'avviso
-      // arriverebbe sul link sbagliato. Quale pezzo porti non conta: chi taglia
-      // decide anche l'ordine, e pretendere la testa o la coda proprio lì
-      // lasciava passare la spedizione che finisce con un pezzo di mezzo.
+      // di loro non si ricompone niente.
+      // Ricomporre un dato da pezzi sparsi su link diversi è un'accusa forte: si
+      // fa solo sui dati che una manciata di identificativi veri non riproduce
+      // per caso (vedi datoDaIncollato).
+      if (!datoDaIncollato(t)) continue;
       const testa = t.slice(0, SPED_MIN_PEZZO);
       const coda = t.slice(-SPED_MIN_PEZZO);
       if (!pagliaio.includes(testa) || !pagliaio.includes(coda)) continue;
-      let porta = false;
-      for (let i = 0; i + SPED_MIN_PEZZO <= t.length && !porta; i++) {
-        if (codaUltimo.includes(t.slice(i, i + SPED_MIN_PEZZO))) porta = true;
-      }
-      if (!porta) continue;
       candidati.push(t);
       if (candidati.length >= SPED_MAX_CANDIDATI) break;
     }
+    const prima = pezzi.slice(0, -1);
     for (const t of candidati) {
-      if (copertoDaPezzi(pezzi, t) || copertoDaPezzi(pezzi.map(rovescia), t)) {
-        return { reason: `contiene un tuo dato, spedito un pezzo per volta ("${t}…")` };
-      }
+      if (!copertoDaPezzi(pezzi, t) && !copertoDaPezzi(pezzi.map(rovescia), t)) continue;
+      if (prima.length >= 2 && (copertoDaPezzi(prima, t) || copertoDaPezzi(prima.map(rovescia), t))) continue;
+      return { reason: `contiene un tuo dato, spedito un pezzo per volta ("${t}…")` };
     }
     return null;
   }
