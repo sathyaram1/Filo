@@ -57,10 +57,41 @@ const MAX_ENTRY_CHARS = 32 * 1024;
 // gli indirizzi che l'utente chiederà di aprire subito dopo.
 const NON_PROTETTE = new Set(['ricerca web']);
 
+// Il riassunto di ciò che è uscito dal registro: parole distinte, quindi molto
+// più capiente del testo da cui nasce. Oltre il tetto escono le più vecchie.
+const MAX_DIGEST = 40000;
+// Una "parola" più lunga di così non può stare in un indirizzo: tenerla vorrebbe
+// dire riempire il riassunto con l'output binario di un comando.
+const MAX_TOKEN_CHARS = 512;
+
 let fallback = null; // registro condiviso quando non c'è un mittente
 
 function newLedger() {
-  return { entries: [], chars: 0, sources: new Set() };
+  return { entries: [], chars: 0, sources: new Set(), digest: new Set() };
+}
+
+// Le parole che rendono riconoscibile un testo: indirizzi email interi e parole
+// alfanumeriche di almeno cinque caratteri. È la stessa materia che il confronto
+// col link estrae dal corpus (src/shared/urlExfil.js → corpusTokens): tenere
+// questa vuol dire non perdere nessun confronto.
+function paroleDi(text) {
+  const s = String(text || '');
+  const out = [];
+  const emailRe = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+  let m;
+  while ((m = emailRe.exec(s))) out.push(m[0]);
+  for (const w of s.split(/[^A-Za-z0-9]+/)) {
+    if (w.length >= 5 && w.length <= MAX_TOKEN_CHARS) out.push(w);
+  }
+  return out;
+}
+
+function ricorda(led, entry) {
+  for (const w of paroleDi(entry)) led.digest.add(w);
+  while (led.digest.size > MAX_DIGEST) {
+    const primo = led.digest.values().next().value;
+    led.digest.delete(primo);
+  }
 }
 
 // Il "mittente" che arriva agli handler è un oggetto DESCRITTIVO ricostruito a
