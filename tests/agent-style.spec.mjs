@@ -182,10 +182,11 @@ test('lo stile proposto dal modello non si applica senza conferma, e il popup mo
 
   // Oltre il tetto: rifiutato con la spiegazione, e niente resta scritto a metà.
   const max = await app.evaluate(() => globalThis.SN_CONST.AGENT_STYLE_MAX);
-  const troppo = await app.evaluate(async (_e, n) => globalThis.SN_EXECUTE_FILO_ACTION(
-    { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'y'.repeat(n + 1) },
-    { confirmed: true },
-  ), max);
+  const troppo = await app.evaluate(async (_e, n) => {
+    const azione = { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'y'.repeat(n + 1) };
+    await globalThis.SN_EXECUTE_FILO_ACTION(azione);
+    return globalThis.SN_EXECUTE_FILO_ACTION(azione, { confirmed: true });
+  }, max);
   expect(troppo.executed).toBe(false);
   expect(String(troppo.output && troppo.output.rifiutata)).toContain(String(max));
   const dopo = await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.agentStyle || ''));
