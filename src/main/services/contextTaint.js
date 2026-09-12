@@ -165,13 +165,18 @@ function record(sender, source, text, opts) {
   while (led.entries.length > MAX_ENTRIES || (led.chars > MAX_CHARS && led.entries.length > 1)) {
     const gone = led.entries.shift();
     led.chars -= gone.length;
+    ricorda(led, gone); // esce il testo, restano le parole
   }
 }
 
-// Il materiale registrato, come testo unico per il taint-match.
+// Il materiale registrato, come testo unico per il taint-match: le voci intere
+// più il riassunto di quelle uscite.
 function corpusText(sender) {
   const led = ledgerFor(sender, false);
-  return led ? led.entries.join('\n') : '';
+  if (!led) return '';
+  const pezzi = led.entries.slice();
+  if (led.digest.size) pezzi.push(Array.from(led.digest).join(' '));
+  return pezzi.join('\n');
 }
 
 // Il contesto contiene materiale non fidato? (accende il ripiego strutturale)
