@@ -116,6 +116,7 @@ test('due schede che chiedono lo schermo: nessuna delle due resta appesa', async
   const a = await apriPerUrl(app, shell, urlA);
   const b = await apriPerUrl(app, shell, urlB);
   const idA = await schedaDiUrl(app, urlA);
+  const idB = await schedaDiUrl(app, urlB);
   const chip = shell.locator('.perm-chip');
   const scelta = shell.locator('.perm-source');
 
@@ -125,21 +126,32 @@ test('due schede che chiedono lo schermo: nessuna delle due resta appesa', async
   await chip.locator('.perm-chip-allow').click();
   await expect(scelta).toHaveCount(1, { timeout: 20_000 });
 
-  // Ora chiede anche A, e ci si passa sopra e si consente.
+  // Ora chiede anche A, ci si passa sopra e si consente: la scelta di A prende
+  // il posto, quella di B aspetta il suo turno invece di essere buttata via.
   await a.click('#share');
   await shell.evaluate((id) => window.filoShell.tabs.activate(id), idA);
-  await shell.waitForTimeout(900);
-  if (await chip.count()) await chip.first().locator('.perm-chip-allow').click();
-  await shell.waitForTimeout(1500);
+  await expect(chip).toHaveCount(1, { timeout: 20_000 });
+  await chip.locator('.perm-chip-allow').click();
+  await expect(scelta).toHaveCount(1, { timeout: 20_000 });
+  await expect(scelta, 'la scelta mostrata è quella della scheda che si sta guardando')
+    .toContainText('vedrà quello che scegli qui');
+  await scelta.locator('.perm-source-cancel').click();
+  await expect(scelta).toHaveCount(0, { timeout: 20_000 });
 
-  // La richiesta di B non deve essere sparita nel nulla: o la sua scelta è
-  // ancora da fare (e la si ritrova tornando su B), o le è stato risposto.
-  const esitoB = await b.evaluate(() => window.__r);
-  expect(
-    esitoB,
-    'la richiesta della prima scheda è stata scalzata senza risposta: chi aveva premuto «condividi» '
-    + 'e detto sì resta ad aspettare due minuti e poi si vede negare, senza nessun segno',
-  ).not.toBe(null);
+  // Tornando su B la sua scelta deve essere ancora lì da fare. Prima veniva
+  // scalzata senza risposta: chi aveva premuto «condividi» e detto sì restava
+  // ad aspettare due minuti e poi si vedeva negare, senza nessun segno.
+  expect(await b.evaluate(() => window.__r), 'la richiesta di B non doveva ancora avere risposta').toBe(null);
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), idB);
+  await expect(
+    scelta,
+    'tornando sulla scheda che aveva chiesto per prima, la scelta di cosa condividere non c\'è più: '
+    + 'è stata scalzata dalla seconda senza risponderle, e quella pagina resta ad aspettare due minuti',
+  ).toHaveCount(1, { timeout: 20_000 });
+  await scelta.locator('.perm-source-cancel').click();
+  await expect
+    .poll(() => b.evaluate(() => window.__r), { timeout: 20_000 })
+    .not.toBe(null);
 });
 
 test('le cose fra cui scegliere hanno un nome in italiano', async ({ shell, openTab, testServer }) => {
