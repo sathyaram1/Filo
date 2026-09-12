@@ -130,11 +130,9 @@ test('la sezione dello stile si legge su tema chiaro e su tema scuro', async ({ 
   await expect(pagina.locator('#agentStyleError')).toBeVisible({ timeout: 6_000 });
 
   for (const tema of ['light', 'dark']) {
-    await pagina.evaluate((t) => {
-      document.documentElement.setAttribute('data-theme', t);
-      if (window.Bootstrap && window.Bootstrap.applyTheme) window.Bootstrap.applyTheme(t);
-    }, tema);
-    await pagina.waitForTimeout(250);
+    // La strada vera: la tendina del tema della pagina stessa.
+    await pagina.selectOption('#theme', tema);
+    await pagina.waitForTimeout(400);
     const sezione = pagina.locator('#agentStyleText').locator('xpath=ancestor::section[1]');
     await sezione.screenshot({ path: `tests/.shots/592-giro2-stile-${tema}.png` });
 
