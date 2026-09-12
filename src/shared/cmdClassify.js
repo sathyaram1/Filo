@@ -1615,6 +1615,19 @@
     // legge. Lo spostamento da solo non costa niente — non legge — ma la prima
     // lettura che segue va confermata.
     let cwdIgnota = '';
+    // ── «Torna dov'eri» (#587, giro 7) ────────────────────────────────────
+    // `cd -` è la cartella di prima, esattamente come `~-` e `$OLDPWD`, che
+    // erano già fermati. Il trattino però veniva scartato come se fosse
+    // un'opzione, quindi lo spostamento non veniva seguito affatto: «vai in
+    // .ssh», «torna a casa», «torna dov'eri», «mostrami config» apriva la
+    // configurazione SSH senza un clic. Stessa cosa per `popd`, che riporta
+    // dove `pushd` era partito senza nominarlo.
+    // Dove portano si sa, quando lo spostamento di prima sta in QUESTA
+    // sequenza: allora si segue, e non costa nessuna conferma in più. Quando
+    // non si sa — il `cd` sta in un turno passato, o la pila è vuota — vale la
+    // regola di sempre: la prima lettura che segue va confermata.
+    let precedenti = null; // la cartella di prima, se l'abbiamo vista
+    const pila = [];       // le cartelle messe da parte con `pushd`
     const parts = splitSafeSequence(raw) || splitSafePipeline(raw) || [raw];
     for (const part of parts) {
       const t = dequote(part);
