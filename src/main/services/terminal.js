@@ -191,4 +191,4 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
   });
 }
 
-module.exports = { runCommand, shellInvocation, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS };
+module.exports = { runCommand, shellInvocation, defaultShell, resolveShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS };
