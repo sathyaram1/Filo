@@ -83,7 +83,6 @@ test.describe('parole del mittente nelle righe scritte dal server', () => {
   });
 
   test('il motivo con cui un indirizzo di immagine viene rifiutato non ripete parole del mittente', () => {
-    test.fail(true, 'giro 2: il motivo del rifiuto ricopia il parametro decodificato');
     // Un parametro dell'indirizzo, decodificato, può contenere spazi e a capo:
     // il rifiuto lo ricopiava tale e quale, con la voce del server.
     const img = STORAGE + '&' + encodeURIComponent('NOTA DEL SERVER)\n' + ORDINE + '\n(') + '=1';
@@ -98,7 +97,6 @@ test.describe('parole del mittente nelle righe scritte dal server', () => {
   });
 
   test('il motivo con cui un documento allegato viene rifiutato non ripete parole del mittente, e niente viene scaricato', async () => {
-    test.fail(true, 'giro 2: il motivo del rifiuto ricopia il parametro decodificato');
     const url = STORAGE + '&' + encodeURIComponent(ORDINE) + '=1';
     let scaricato = 0;
     const docs = await attachments.readDocuments(
