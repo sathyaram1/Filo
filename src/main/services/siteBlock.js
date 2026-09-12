@@ -27,7 +27,7 @@
 //   destra (#170.1) col sito bloccato e l'opzione "Apri comunque".
 //
 // API: configureFromSettings, shouldBlockNavigation, isSearchEngineUrl,
-//      isBlacklistedHost, setForTest, status.
+//      isBlacklistedHost, canonicalHost, setForTest, status.
 
 let enabled = true;
 let useAdblockLists = true;
