@@ -201,6 +201,35 @@ Quello che resta fuori è dichiarato, non dimenticato: un dato **cifrato o in
 esadecimale** non lo riconosce nessun confronto: lì la difesa è il ripiego
 strutturale, che guarda quanta roba illeggibile porta il link.
 
+## Un elenco di nomi è un elenco per una piattaforma sola
+
+I bersagli riservati si riconoscono dal **nome** — `.ssh`, `.config`, `.mozilla`,
+`AppData`, `NTUSER.DAT` — e i nomi cambiano col sistema. Su macOS i segreti non
+stanno in cartelle nascoste: stanno tutti in `~/Library` (le chiavi API e il
+portafoglio di Filo in `Application Support/Filo/storage.json`, il portachiavi,
+le password dei browser, la posta, i messaggi). L'elenco scritto guardando una
+macchina Windows e un contenitore Linux lasciava quindi una piattaforma intera
+senza freno: lo stesso file di Filo chiedeva un OK su due sistemi e su un Mac
+no. `Library` però non può entrare nell'elenco generale — è un nome comune, e
+`progetto/Library` è una cartella qualunque: vale nel punto in cui è la cassetta
+dei segreti, cioè come primo segmento sotto la home (`riservatoSottoHome`).
+
+Quindi, quando scrivi un elenco di nomi: **fai il giro delle tre piattaforme** e
+chiediti dove sta la stessa cosa su ciascuna. La sentinella che tiene in piedi la
+risposta per il Mac è `tests/unit/macSupport.test.mjs`.
+
+## Una difesa con un tetto ha una scadenza, e la sceglie chi attacca
+
+Il registro del materiale entrato nel contesto ha un tetto, e oltre quello le
+voci più vecchie uscivano. Bastavano allora **sette letture di riempimento** —
+sette comandi di sola lettura, nessuno dei quali chiede niente — perché la chiave
+letta prima non fosse più fra i dati da proteggere, e il link che la portava
+fuori partisse in chiaro senza avviso. Un tetto ci vuole, ma quello che esce deve
+lasciare un **riassunto**: le parole che rendono riconoscibile il testo, che è
+tutto ciò che il confronto col link usa davvero e costa una frazione dello
+spazio. Vale ogni volta che una difesa tiene una coda: chiediti quanto costa a
+chi attacca farla traboccare.
+
 ## Regola operativa
 
 Quando aggiungi una difesa, scrivi accanto **a cosa è agganciata** e chiediti chi
