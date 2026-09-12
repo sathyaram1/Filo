@@ -2109,6 +2109,9 @@
     }
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
+      // L'utente ha appena escluso questo sito: se un menu di Filo è aperto in
+      // questo momento, se ne va con tutto il resto invece di restare lì.
+      if (isBlocked()) { try { Menu.close(); } catch (_) {} }
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
       // Colore identità delle tab: i parametri di estrazione possono essere
