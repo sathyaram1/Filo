@@ -3208,7 +3208,14 @@ function broadcastToFiloPages(message) {
           } catch (_) {}
         }
       }
-      try { win.webContents.send('filo:broadcast', message); } catch (_) {}
+      // La finestra stessa solo se è una superficie di Filo: un popup di
+      // accesso aperto da un sito è una finestra come le altre, e qui passano
+      // il profilo dell'account e i dati dell'owner.
+      try {
+        if (String(win.webContents.getURL() || '').startsWith('filo://')) {
+          win.webContents.send('filo:broadcast', message);
+        }
+      } catch (_) {}
     }
   } catch (_) {}
 }
