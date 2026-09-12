@@ -1506,10 +1506,7 @@
     filoDashboard: ({ profilo, preferenze, espansioni, lezioni, stato, notifiche, appunti, salvati, ultimoMessaggio, tabAperte, momento }) =>
       `Sei Filo, un assistente personale. Il tuo compito è preparare la dashboard che l'utente vedrà aprendo un nuovo tab.\n\n` +
       (momento ? `ADESSO È: ${momento}. Conosci quindi il giorno esatto della settimana e la data: usali quando sono rilevanti (routine settimanali, scadenze, "è già venerdì", weekend imminente…) e per scegliere saluto e tono (es. "Buongiorno" solo di mattina). NON citare l'ora o il minuto esatti: il messaggio resta in cache per tutta la fascia oraria, un orario preciso diventerebbe stale.\n\n` : '') +
-      `MEMORIE UTENTE:\n` +
-      `PROFILO:\n${profilo || '(vuoto)'}\n\n` +
-      `PREFERENZE:\n${preferenze || '(vuoto)'}\n\n` +
-      (espansioni ? `${espansioni}\n\n` : '') +
+      memoryBlock({ profilo, preferenze, espansioni }) +
       lessonsBlock(lezioni) +
       `FILO STATE:\n${stato || '(vuoto)'}\n\n` +
       `NOTIFICHE IN CODA:\n${notifiche || '(nessuna)'}\n\n` +
