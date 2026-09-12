@@ -1452,7 +1452,7 @@
       // sparisce (injectAgentStyle).
       `${AGENT_STYLE_SLOT}` +
       `═══ TONO E STILE ═══\n` +
-      `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze di TONO dell'utente hanno priorità su queste indicazioni di stile — non sulle regole qui sopra, che valgono comunque.\n\n`,
+      `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze di TONO dell'utente hanno priorità su queste indicazioni di stile, ma non sulle regole qui sopra, che valgono comunque.\n\n`,
 
     // Parte VARIABILE del prompt della chat: cambia da un utente all'altro e da
     // un messaggio all'altro (il nome del modello cambia perfino col ripiego fra
