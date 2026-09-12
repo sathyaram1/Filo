@@ -1226,9 +1226,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         let tainted = false;
         try { tainted = require('./contextTaint').isTainted(sender); } catch (_) {}
         const fromUntrusted = /^https?:/i.test(origin) || tainted;
-        const corpus = await navExfilCorpus(sender);
-        const v = Exfil.assess(url, { corpus, fromUntrusted });
+        const { memoria, letto } = await navExfilCorpus(sender);
+        // I link già aperti in questa scheda: un dato spezzato fra due richieste
+        // esce intero se ogni richiesta viene giudicata da sola (#587, giro 5).
+        let carichiPrima = [];
+        try { carichiPrima = require('./contextTaint').carichiLink(sender); } catch (_) {}
+        const v = Exfil.assess(url, { corpus: memoria, letto, fromUntrusted, carichiPrima });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
+        // Il carico di questo link entra nel registro comunque: se l'utente
+        // conferma il dato è uscito, se annulla la pagina ostile ci riprova con il
+        // pezzo dopo, e in entrambi i casi il conto va tenuto.
+        try { require('./contextTaint').ricordaLink(sender, Exfil.caricoUnito(url)); } catch (_) {}
       }
     } catch (_) {}
   }
