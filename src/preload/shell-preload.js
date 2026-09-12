@@ -95,6 +95,20 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('permissions:source-closed', wrapped);
     },
     pickSource: (id, fonteId) => ipcRenderer.invoke('permissions:pick-source', { id, fonteId }),
+    // Il segno che un sito può vedere lo schermo, mentre può vederlo. Parte
+    // quando la fonte viene consegnata e finisce quando la pagina se ne va,
+    // muore, o si preme «Interrompi».
+    onCaptureStart: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('permissions:capture-start', wrapped);
+      return () => ipcRenderer.removeListener('permissions:capture-start', wrapped);
+    },
+    onCaptureEnd: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('permissions:capture-end', wrapped);
+      return () => ipcRenderer.removeListener('permissions:capture-end', wrapped);
+    },
+    stopCapture: (id) => ipcRenderer.invoke('permissions:capture-stop', { id }),
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
