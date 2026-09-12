@@ -14,10 +14,14 @@
 // qualcuno aggiunge domani resta fuori da solo, e per restare dentro deve
 // essere una cosa che il codice dentro le pagine usa davvero.
 //
-// Il confine è l'ORIGINE http/https, non «tutto ciò che non è filo://»: le
-// finestre che Filo si disegna da sé (i menu nativi del tasto destro vivono su
-// un indirizzo `data:`) e le chiamate interne del main, che origine non hanno,
-// restano quelle di prima. La minaccia è la pagina di un sito.
+// Il confine è scritto AL CONTRARIO di come sembrerebbe naturale: interne sono
+// le sole pagine `filo://` e le chiamate che il cuore di Filo fa a se stesso
+// (nessuna origine e nessuna pagina dietro). Tutto il resto è una pagina.
+// Cercare invece «comincia per http» lasciava fuori mezzo mondo: una pagina di
+// un sito si compone da sé una pagina e ci si porta sopra (l'indirizzo comincia
+// per `blob:`), oppure apre una scheda vuota (`about:blank`), e in tutti e due
+// i casi resta suo codice con il nostro montato sopra — ma l'indirizzo non
+// comincia più per http e il confine si spegneva del tutto.
 //
 // Chi rifiuta lo DICE nel log: un messaggio necessario che finisse fuori lista
 // spegnerebbe una funzione dentro le pagine, e un taglio silenzioso lo si
