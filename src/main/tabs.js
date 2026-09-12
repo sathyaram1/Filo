@@ -2368,21 +2368,32 @@ class TabManager {
     } catch (_) {}
   }
 
-  // #170.3 — decide se bloccare una navigazione top-level verso un sito in
-  // blacklist e, in caso, mostra la notifica. Ritorna true se ha bloccato.
-  // Le aperture originate da Filo (openTab dell'azione NAVIGA, navigazione
-  // interna filo://) non passano da qui (loadURL programmatico non emette
-  // will-navigate), quindi sono naturalmente consentite.
-  _maybeBlockNavigation(tab, url, { fromUrl = '' } = {}) {
+  // #170.3/#590 — IL PUNTO DI PASSAGGIO UNICO della lista dei siti bloccati.
+  // Ogni cambio di indirizzo di una scheda passa di qui, da qualunque strada
+  // arrivi: link cliccato (will-navigate), popup/target=_blank
+  // (setWindowOpenHandler), apertura programmatica (openTab: barra della home,
+  // azione NAVIGA del modello, IPC, shim chrome.tabs) e rinavigazione
+  // programmatica (navigate: barra degli indirizzi della shell).
+  //
+  // Prima erano solo le prime due: chi scriveva l'indirizzo a mano e il
+  // modello che emetteva NAVIGA non incontravano nessun controllo, quindi una
+  // pagina ostile che convinceva il modello (NAVIGA è livello 1, senza
+  // conferma) apriva qualunque sito della lista.
+  //
+  // Quando blocca mostra la notifica con "Apri comunque" e ritorna la
+  // decisione ({ block, host, reason }) — truthy, così i chiamanti possono
+  // usarla come booleano e chi deve SPIEGARE il rifiuto (la chat) ha l'host.
+  // Ritorna null quando la navigazione è consentita.
+  _maybeBlockNavigation(url, { fromUrl = '', notify = true } = {}) {
     let decision;
     try {
       decision = require('./services/siteBlock').shouldBlockNavigation(url, { fromUrl });
     } catch (_) {
-      return false;
+      return null;
     }
-    if (!decision || !decision.block) return false;
-    this._notifyBlocked(decision.host, url);
-    return true;
+    if (!decision || !decision.block) return null;
+    if (notify) this._notifyBlocked(decision.host, url);
+    return decision;
   }
 
   // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque".
