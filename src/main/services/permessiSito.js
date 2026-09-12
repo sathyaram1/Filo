@@ -499,7 +499,7 @@ let prossimaScelta = 1;
 // finestra sola? Torna la fonte scelta, oppure null (annullato, nessuna fonte,
 // nessuna shell a cui chiedere, o due minuti senza risposta).
 async function scegliFonte(wc, frame) {
-  const { win } = posizione(wc);
+  const { win, tab } = posizione(wc);
   const shell = win && !win.isDestroyed() ? win.webContents : null;
   if (!shell || shell.isDestroyed()) return null;
 
