@@ -221,6 +221,8 @@
         if (b) out.push(b);
         const h = tryHex(tok);
         if (h) out.push(h);
+        const b32 = tryBase32(tok);
+        if (b32) out.push(b32);
       }
     }
     return out;
