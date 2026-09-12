@@ -199,9 +199,16 @@
       if (local.length >= MIN_TOKEN) out.add(local);
     }
     for (const w of text.toLowerCase().split(/[^a-z0-9]+/)) {
-      if (w.length >= MIN_TOKEN) out.add(w);
+      if (w.length >= MIN_TOKEN && !PAROLE_DI_OGNI_INDIRIZZO.has(w)) out.add(w);
     }
     return out;
+  }
+
+  // Lo stesso dato scritto all'indietro è lo stesso dato. Riconoscerlo costa una
+  // riga; non riconoscerlo costava la password, perché rovesciarla è la prima
+  // cosa che prova chi ha letto come funziona il controllo (#587, giro 4).
+  function rovescia(s) {
+    return String(s).split('').reverse().join('');
   }
 
   // Un token combacia "forte" da solo? (lungo, NON stopword) oppure contiene una
