@@ -221,6 +221,19 @@ function dentroLeParentesi(src, apertura) {
   return '';
 }
 
+// Solo il PRIMO argomento: il secondo è la funzione che riceve la risposta, e
+// dentro ci sta di tutto (stringhe che non sono nomi di scomparti).
+function primoArgomento(testo) {
+  let profondita = 0;
+  for (let i = 0; i < testo.length; i += 1) {
+    const c = testo[i];
+    if ('([{'.includes(c)) profondita += 1;
+    else if (')]}'.includes(c)) profondita -= 1;
+    else if (c === ',' && profondita === 0) return testo.slice(0, i);
+  }
+  return testo;
+}
+
 function scompartiApertiDa(src) {
   const costanti = new Map();
   for (const m of src.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*'([^']*)'/g)) costanti.set(m[1], m[2]);
