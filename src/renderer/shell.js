@@ -1926,11 +1926,29 @@
         stop.type = 'button';
         stop.className = 'perm-chip-btn';
         stop.textContent = 'Interrompi';
-        stop.dataset.tip = 'Ricarica la pagina e chiude la ripresa';
+        stop.dataset.tip = 'Ricarica la pagina e chiude quello che il sito ha aperto';
         stop.addEventListener('click', () => {
           try { api.permissions.stopCapture(id); } catch (_) {}
         });
         chip.appendChild(stop);
+
+        // La × c'è solo sul cartello che Filo accende tirando a indovinare: la
+        // strada vecchia della cattura schermo, che non dice mai se sia partita
+        // davvero. Lì il cartello restava acceso anche quando al sito non era
+        // arrivato niente, e non se ne andava più. Sugli altri la × non c'è: un
+        // avviso vero non si mette a tacere.
+        if (info.chiudibile) {
+          const via = document.createElement('button');
+          via.type = 'button';
+          via.className = 'perm-chip-x';
+          via.textContent = '×';
+          via.setAttribute('aria-label', 'Chiudi l\'avviso');
+          via.dataset.tip = 'Chiudi l\'avviso senza toccare la pagina';
+          via.addEventListener('click', () => {
+            try { api.permissions.dismissCapture(id); } catch (_) {}
+          });
+          chip.appendChild(via);
+        }
 
         permHost.appendChild(chip);
         riprese.set(id, { tabId: info.tabId, nodo: chip });
