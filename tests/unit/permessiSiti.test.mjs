@@ -249,3 +249,84 @@ test('le impostazioni predefinite partono senza nessuna risposta ricordata', () 
     'la mappa dei permessi va SOSTITUITA, non fusa: senza, togliere una risposta non la cancella',
   );
 });
+
+// ─── la condivisione dello schermo (giro di verifica 1) ─────────────────────
+//
+// Il difetto che questi controlli impediscono di riaprire: prima di una
+// condivisione dello schermo Chromium manda al browser una richiesta
+// audio/video con la lista dei tipi VUOTA. Filo la leggeva come "tipo non
+// dichiarato" e chiedeva fotocamera più microfono: a chi premeva «condividi lo
+// schermo» compariva «vuole usare la fotocamera e il microfono», e il suo
+// «Consenti» lasciava quei due sensori concessi per sempre. Da lì il sito li
+// accendeva senza che comparisse più niente.
+
+test('la richiesta che precede una condivisione dello schermo non è fotocamera e microfono', () => {
+  // Lista dei tipi VUOTA: è il preambolo della cattura schermo.
+  assert.equal(P.preamboloSchermo('media', { mediaTypes: [] }), true);
+  // Una richiesta vera di webcam o microfono NON lo è.
+  assert.equal(P.preamboloSchermo('media', { mediaTypes: ['video'] }), false);
+  assert.equal(P.preamboloSchermo('media', { mediaTypes: ['audio', 'video'] }), false);
+  // E nemmeno un tipo non dichiarato del tutto (il controllo sincrono).
+  assert.equal(P.preamboloSchermo('media', {}), false);
+  assert.equal(P.preamboloSchermo('media', { mediaType: 'video' }), false);
+  assert.equal(P.preamboloSchermo('geolocation', { mediaTypes: [] }), false);
+});
+
+test('lo schermo non si ricorda mai: si richiede ogni volta', () => {
+  assert.equal(P.siRicorda(P.CHIAVI.SCHERMO), false);
+  for (const k of ['fotocamera', 'microfono', 'posizione', 'notifiche', 'appunti']) {
+    assert.equal(P.siRicorda(k), true, `${k} si ricorda`);
+  }
+
+  // Un «Consenti» sullo schermo non lascia scritto niente.
+  const dopo = P.conScelta({}, 'https://esempio.it', [P.CHIAVI.SCHERMO], 'allow');
+  assert.deepEqual(dopo, {});
+
+  // Anche se qualcosa fosse rimasto scritto da una versione precedente, non
+  // vale: alla lettura sparisce, e la decisione resta "da chiedere".
+  const vecchia = { 'https://esempio.it': { schermo: 'allow', fotocamera: 'allow' } };
+  assert.deepEqual(P.normalizza(vecchia), { 'https://esempio.it': { fotocamera: 'allow' } });
+  assert.equal(P.decisione(vecchia, 'https://esempio.it', [P.CHIAVI.SCHERMO]), null);
+  assert.equal(P.decisione(vecchia, 'https://esempio.it', ['fotocamera']), 'allow');
+});
+
+test('il preambolo della cattura schermo passa senza chiedere fotocamera e microfono', async () => {
+  const modulo = require_(join(RADICE, 'src', 'main', 'services', 'permessiSito.js'));
+  modulo._reset();
+  const wc = { id: 21, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
+  // Passa (la domanda vera la fa il gestore della cattura schermo)...
+  assert.equal(await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: [] }), true);
+  // ...e non ha concesso niente alla webcam: senza nessuno a cui chiedere si nega.
+  assert.equal(
+    await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: ['video'] }),
+    false,
+  );
+  modulo._reset();
+});
+
+// ─── quello che la shell disegna sotto le schede (giro di verifica 1) ───────
+//
+// L'area della pagina è una vista nativa composta SOPRA la cornice di Filo. La
+// domanda di un permesso nasceva a 50 pixel dal bordo alto, cioè dentro quella
+// zona: esisteva nel documento e non la vedeva nessuno, e dopo due minuti la
+// richiesta veniva negata da sola.
+
+test('la shell fa scendere la pagina sotto quello che disegna in alto', () => {
+  const shell = readFileSync(join(RADICE, 'src', 'renderer', 'shell.js'), 'utf8');
+  // Una riserva sola, condivisa: chi chiude non azzera quella di chi resta.
+  assert.match(shell, /function riservaTop\(/);
+  for (const chi of ['permessi', 'fonte-schermo', 'download', 'popup']) {
+    assert.match(
+      shell, new RegExp(`riservaTop\\('${chi}'`),
+      `«${chi}» disegna sotto le schede e deve riservare lo spazio, o finisce dietro la pagina`,
+    );
+  }
+  const tabs = readFileSync(join(RADICE, 'src', 'main', 'tabs.js'), 'utf8');
+  assert.match(tabs, /setTopFloor\s*\(/);
+  // La riserva vale ANCHE a tutto schermo: un sito che si prende lo schermo e
+  // poi chiede la fotocamera deve far comparire la domanda sopra la pagina.
+  assert.match(
+    tabs, /Math\.max\(\s*\n?\s*\(this\.contentFullscreen/,
+    'il layout deve tenere il pavimento anche a contenuto a tutto schermo',
+  );
+});
