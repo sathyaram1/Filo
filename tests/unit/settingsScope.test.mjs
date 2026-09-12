@@ -160,8 +160,8 @@ test('ogni campo delle impostazioni usato dentro una pagina web è ammesso', () 
     // passate sotto il naso (un campo tolto dalla lista avrebbe spento una
     // funzione dentro le pagine in silenzio).
     const forme = [
-      // settings.tema / settings?.tema / impostazioniSettings.tema
-      /\b[A-Za-z_$][\w$]*[sS]ettings\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g,
+      // settings.tema / settings?.tema / msg.settings.tema
+      /\bsettings\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g,
       // getSettings().tema — senza passare da una variabile
       /[gG]etSettings\(\)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g,
     ];
