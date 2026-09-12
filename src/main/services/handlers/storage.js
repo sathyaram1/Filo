@@ -42,6 +42,15 @@ module.exports = function register(on, ctx) {
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {
+    // "Dammi TUTTO lo storage" (keys assenti o null) è la stessa operazione
+    // tutto-o-niente di `_storage:clear`, vista dal verso della lettura:
+    // porterebbe via cronologia AI, memoria, pagine salvate, costi e bozze in
+    // un colpo solo. Nessun content script lo fa — chiedono sempre le loro
+    // chiavi per nome — quindi da un'origine web si rifiuta e lo si dice,
+    // invece di consegnare tutto o di tagliare in silenzio.
+    if (!isFilo(origin) && (msg.keys === null || msg.keys === undefined)) {
+      return { ok: false, error: 'forbidden' };
+    }
     const value = await globalThis.chrome.storage.local.get(msg.keys ?? null);
     return { ok: true, value: isFilo(origin) ? value : redactForWeb(value) };
   });
