@@ -380,13 +380,21 @@
     for (const t of (altri.size ? [...toks, ...altri] : toks)) {
       if (t.length < STRONG_TOKEN || t.length > SPED_MAX_TOKEN) continue;
       if (STOPWORDS.has(t)) continue;
-      // Prefiltro: la testa e la coda del dato devono stare da qualche parte, e
-      // l'ULTIMO link deve portarne un pezzo — se no non è lui a completare la
-      // spedizione e l'avviso arriverebbe sul link sbagliato.
+      // Prefiltro: la testa e la coda del dato devono stare da qualche parte (il
+      // primo pezzo parte dall'inizio e l'ultimo finisce alla fine, quindi senza
+      // di loro non si ricompone niente), e l'ULTIMO link deve portare un pezzo
+      // del dato — se no non è lui a completare la spedizione e l'avviso
+      // arriverebbe sul link sbagliato. Quale pezzo porti non conta: chi taglia
+      // decide anche l'ordine, e pretendere la testa o la coda proprio lì
+      // lasciava passare la spedizione che finisce con un pezzo di mezzo.
       const testa = t.slice(0, SPED_MIN_PEZZO);
       const coda = t.slice(-SPED_MIN_PEZZO);
       if (!pagliaio.includes(testa) || !pagliaio.includes(coda)) continue;
-      if (!codaUltimo.includes(testa) && !codaUltimo.includes(coda)) continue;
+      let porta = false;
+      for (let i = 0; i + SPED_MIN_PEZZO <= t.length && !porta; i++) {
+        if (codaUltimo.includes(t.slice(i, i + SPED_MIN_PEZZO))) porta = true;
+      }
+      if (!porta) continue;
       candidati.push(t);
       if (candidati.length >= SPED_MAX_CANDIDATI) break;
     }
