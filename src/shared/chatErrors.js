@@ -162,7 +162,7 @@
     // nominano lo stesso sito nello stesso istante devono chiamarlo uguale.
     if (o.blocked === 'site') {
       if (!o.host) return 'sito bloccato';
-      const NAV = globalThis.SN_URL_NAV;
+      const NAV = global.SN_URL_NAV;
       const nome = (NAV && NAV.hostLeggibile && NAV.hostLeggibile(o.host)) || o.host;
       return `sito bloccato: ${nome}`;
     }
