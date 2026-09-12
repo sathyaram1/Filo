@@ -291,11 +291,18 @@
       // (tanto il dispatch non la eseguirà comunque).
       level: (a) => {
         const built = prefBuilt(a);
+        // Valore RIFIUTATO dal setter con una spiegazione (#592: stile
+        // dell'agente oltre il tetto): livello 1, cioè nessun popup. Chiedere
+        // all'utente di confermare una cosa che verrà comunque respinta è
+        // attrito su un vicolo cieco: il dispatch la ferma e restituisce al
+        // modello la frase da riferire.
+        if (built && built.error) return 1;
         return (built && built.level) || (built ? 1 : 2);
       },
       describe: (a) => {
         const built = prefBuilt(a);
         if (!built) return 'Modificare una preferenza';
+        if (built.error) return built.error;
         // Il popup di conferma spiega COSA Filo sta per fare e, per le
         // impostazioni sensibili (livello 2), anche i RISCHI (#183). Il `risk`
         // arriva dal setter in preferences.js: è obbligatorio per il livello 2.
