@@ -27,6 +27,17 @@
 // riaprirebbe la porta al turno dopo. Cresce con un tetto: oltre quello escono
 // le voci più VECCHIE, che sono anche quelle che il modello ha più probabilmente
 // perso dal contesto.
+//
+// Uscire dal registro però non vuol dire SPARIRE. Finché il testo intero usciva
+// e basta, bastava far leggere a Filo sette file grossi qualunque — sette
+// comandi di sola lettura, nessuno dei quali chiede niente — perché la chiave
+// letta prima non fosse più fra i dati da proteggere, e da lì l'indirizzo che la
+// portava fuori partiva senza avviso, in chiaro (#587, giro 4). Di una voce che
+// esce si tiene il RIASSUNTO: le parole che la rendono riconoscibile (parole di
+// almeno cinque caratteri e indirizzi email), senza ripetizioni. È tutto ciò che
+// il confronto col link usa davvero, e costa una frazione del testo: perdere
+// qualcosa adesso richiede di leggere decine di migliaia di parole diverse, non
+// sette file.
 
 'use strict';
 
