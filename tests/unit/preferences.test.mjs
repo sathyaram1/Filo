@@ -125,7 +125,7 @@ test('valori non validi → null (niente scrittura accidentale)', () => {
 test('il livello di default è 1 quando il setter non lo dichiara', () => {
   // I setter estetici storici non hanno `level` esplicito.
   assert.equal(build('dimensione_testo', 'grande').level, 1);
-  assert.equal(build('stile_agente', 'professionale').level, 1);
+  assert.equal(build('commento_home', 'no').level, 1);
 });
 
 // ── #183: il popup di livello 2 spiega cosa Filo fa E i rischi ───────────────
