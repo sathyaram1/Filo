@@ -386,7 +386,7 @@
         } catch (_) { perche = ''; }
         return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
           + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
-          + (perche ? `\n\nQuesto comando ${perche}: il contenuto entra nella conversazione con Filo.` : '');
+          + (perche ? `\n\n${perche} Quello che legge entra nella conversazione con Filo.` : '');
       },
     },
     // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────
