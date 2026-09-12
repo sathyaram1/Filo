@@ -282,4 +282,6 @@ test('#587 un collegamento alla cartella delle chiavi non regala la lettura', as
   expect(esito.motivo, 'e il popup deve nominare la cartella vera').toContain('.ssh');
   expect(esito.normale, 'un file proprio resta senza attrito').toBe(1);
   expect(esito.collegare, 'e fare il collegamento costa un «conferma», non un OK').toBe(3);
+
+  try { fs.rmSync(casa, { recursive: true, force: true }); } catch (_) {}
 });
