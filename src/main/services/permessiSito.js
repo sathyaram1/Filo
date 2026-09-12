@@ -523,8 +523,8 @@ async function decidi(wc, permesso, dettagli) {
   } : null;
   const esito = await chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile: !!salvaScelta });
   const ok = !!(esito && esito.ok);
-  if (esito && !esito.deciso) segnaSenzaRisposta(wc, origine);
-  else senzaRisposta.delete(chiaveAnello(wc, origine));
+  if (esito && !esito.deciso) segnaSenzaRisposta(wc, origine, chiavi);
+  else scordaRisposte(wc, origine, chiavi);
 
   // Il sì al preambolo vale per la cattura schermo che segue, qualunque delle
   // due strade prenda: la moderna passa dal gestore qui sotto e lì non si
