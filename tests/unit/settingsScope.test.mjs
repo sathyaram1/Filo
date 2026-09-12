@@ -156,14 +156,14 @@ test('ogni campo delle impostazioni usato dentro una pagina web è ammesso', () 
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^[ \t]*\/\/.*$/gm, '');
     for (const m of src.matchAll(/\bsettings\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g)) {
-      if (!usati.has(m[1])) usati.set(m[1], f);
+      if (!usati.has(m[1])) usati.set(m[1], etichetta);
     }
   }
   assert.ok(usati.size > 0, 'la sentinella non ha letto nulla: percorso sbagliato?');
   for (const [campo, file] of usati) {
     assert.ok(
       S.isWebField(campo),
-      `src/content/${file} legge settings.${campo}, ma il campo non è fra quelli ammessi verso le pagine web `
+      `${file} legge settings.${campo}, ma il campo non è fra quelli ammessi verso le pagine web `
       + '(aggiungilo a WEB_SETTINGS_FIELDS in src/shared/settingsScope.js, oppure smetti di leggerlo lì)',
     );
   }
