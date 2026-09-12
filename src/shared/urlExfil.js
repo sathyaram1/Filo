@@ -628,7 +628,16 @@
         if (dentroScorso(t)) return { reason: `contiene un tuo dato, mascherato ("${t}…")` };
         continue;
       }
-      if (isStrong(t)) { strong = true; sample = t; continue; }
+      // Anche un dato riconoscibile conta solo se sta nel CARICO del link. Nel
+      // NOME DEL SITO non porta fuori niente: è il sito stesso a chiamarsi così,
+      // e un documento che lo cita — la ricetta che dice da dove è presa, la
+      // bolletta che scrive l'indirizzo dell'area clienti — faceva comparire
+      // l'avviso proprio sul link di cui il documento parla (#587, giro 8). Vale
+      // già per le parole comuni: vale per gli stessi motivi qui.
+      if (isStrong(t)) {
+        if (!nelCarico(t)) continue;
+        strong = true; sample = t; continue;
+      }
       if (!debolePermesso) continue;
       // Una parola comune conta solo se sta nel CARICO del link: nel nome del
       // sito non porta fuori niente (vedi caricoAlnum).
