@@ -458,21 +458,22 @@
     // (il tasto destro sulle pagine interne apriva solo il menu di Filo). In
     // bubble l'handler della pagina scatta per primo: se ha già gestito il
     // click (e.preventDefault()), il menu di Filo si fa da parte.
-    if (typeof self.__snSetContextMenuHandler === 'function') {
-      self.__snSetContextMenuHandler(onContextMenu);
-    } else {
-      window.addEventListener('contextmenu', (e) => {
-        if (e.defaultPrevented) return; // la pagina interna ha il SUO menu
-        onContextMenu(e);
-      });
+      // Il controllo "l'utente ha escluso questo sito?" si rifà QUI, a ogni
+      // tasto destro, non una volta al caricamento: così escludere il sito
+      // mentre la scheda è aperta spegne il menu subito.
+      const seAcceso = (e) => { if (!isBlocked()) onContextMenu(e); };
+      if (typeof self.__snSetContextMenuHandler === 'function') {
+        self.__snSetContextMenuHandler(seAcceso);
+      } else {
+        window.addEventListener('contextmenu', (e) => {
+          if (e.defaultPrevented) return; // la pagina interna ha il SUO menu
+          seAcceso(e);
+        });
+      }
+      // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
+      // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
+      document.addEventListener('selectionchange', Actions.schedulePrefetchExplain);
     }
-    // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
-    // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
-    document.addEventListener('selectionchange', Actions.schedulePrefetchExplain);
-    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-      onRuntimeMessage(msg, sender, sendResponse);
-      return true; // mantieni il canale aperto per sendResponse asincrono
-    });
 
     // Marker DOM per i test: `filoReady` (impostato dal preload) segnala solo che
     // i moduli sono CARICATI, ma init() è async e setta quel flag PRIMA di
