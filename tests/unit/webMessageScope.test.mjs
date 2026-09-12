@@ -68,13 +68,10 @@ test('quello che serve al codice dentro le pagine continua a passare', () => {
   }
 });
 
-test('il confine è la pagina di un sito: le superfici di Filo e le chiamate interne restano intere', () => {
+test('interne sono le pagine di Filo e le chiamate che il main fa a se stesso', () => {
   for (const origine of [
     'filo://newtab/',
     'filo://shell/shell.html',
-    // I menu nativi del tasto destro sono finestre disegnate da Filo su un
-    // indirizzo `data:`: non sono la pagina di un sito.
-    'data:text/html;charset=utf-8,%3Ch1%3Emenu%3C/h1%3E',
     '',            // chiamata interna del main (una scorciatoia da tastiera)
     undefined,
   ]) {
@@ -86,6 +83,34 @@ test('un\'origine che imita filo:// resta un sito', () => {
   for (const finta of ['https://filo.example/filo://', 'http://filo/newtab', 'https://filo://x']) {
     assert.equal(W.allowed(MSG.FILO_GET_MEMORY, finta), false, `${finta} è passata per interna`);
   }
+});
+
+// Il confine è scritto al contrario di come sembrerebbe naturale, e questo è il
+// motivo: cercare «comincia per http» lasciava fuori tutti gli indirizzi che una
+// pagina di un sito sa darsi da sola, e lì il confine si spegneva del tutto.
+test('gli indirizzi che una pagina si dà da sola non sono superfici di Filo', () => {
+  for (const origine of [
+    'blob:https://sito.example/6b2f-4c1a',        // pagina composta dal sito
+    'blob:http://127.0.0.1:8080/1a2b',
+    'about:blank',                                 // scheda vuota aperta dal sito
+    'about:srcdoc',
+    'data:text/html;charset=utf-8,%3Ch1%3Ex%3C/h1%3E',
+    'filesystem:https://sito.example/temporary/x',
+  ]) {
+    assert.equal(
+      W.allowed(MSG.FILO_GET_MEMORY, origine), false,
+      `da "${origine}" si chiede ancora quello che Filo ha imparato sull'utente`,
+    );
+    assert.equal(W.allowed(MSG.AUTH_SIGNOUT, origine), false, `da "${origine}" si chiude ancora la sessione`);
+  }
+});
+
+test('una pagina viva senza indirizzo non è una chiamata interna', () => {
+  // Durante un caricamento l'indirizzo può mancare per un istante: quell'istante
+  // non deve valere come lasciapassare.
+  assert.equal(W.allowed(MSG.FILO_GET_MEMORY, '', { fromPage: true }), false);
+  assert.equal(W.allowed(MSG.FILO_GET_MEMORY, '', { fromPage: false }), true);
+  assert.equal(W.isInternalSurface('filo://newtab/', { fromPage: true }), true);
 });
 
 test('è una lista di ciò che passa: il messaggio aggiunto domani resta fuori da solo', () => {
