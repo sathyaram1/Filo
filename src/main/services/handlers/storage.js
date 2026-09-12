@@ -88,10 +88,20 @@ module.exports = function register(on, ctx) {
     // toccare le chiavi API: le strippiamo prima del merge, così una pagina
     // ostile non può iniettare/sovrascrivere una apiKey (es. dirottare i
     // prompt su una chiave attaccante). Dalle pagine interne filo:// passa tutto.
+    // Stessa cosa per `agentStyle` (#592): è testo libero che entra nel
+    // messaggio di sistema di ogni agente conversazionale e ci resta dopo il
+    // riavvio. Cambiarlo passa dalla pagina Preferenze (dove l'utente lo vede)
+    // o dall'azione della chat (che chiede conferma mostrando il testo): da una
+    // pagina web non ha nessuna ragione legittima di arrivare.
+    const VIETATE_DA_WEB = ['apiKeys', 'agentStyle'];
     let incoming = msg.settings;
-    if (!isFilo(origin) && incoming && typeof incoming === 'object' && 'apiKeys' in incoming) {
-      incoming = { ...incoming };
-      delete incoming.apiKeys;
+    if (!isFilo(origin) && incoming && typeof incoming === 'object') {
+      for (const campo of VIETATE_DA_WEB) {
+        if (campo in incoming) {
+          if (incoming === msg.settings) incoming = { ...incoming };
+          delete incoming[campo];
+        }
+      }
     }
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
