@@ -1425,7 +1425,10 @@
       // è quella del TESTO del comando (percorso assoluto, risalita con `..`), e
       // una cartella corrente non è testo del comando.
       let scritti = operandsOf(t);
-      if (CERCA_PRIMA.has(prog)) {
+      // Il sotto-comando è il primo operando e non è un percorso: via, o
+      // `git grep` risulterebbe una lettura della cartella «grep».
+      if (sub && scritti.length && scritti[0].toLowerCase() === sub) scritti = scritti.slice(1);
+      if (CERCA_PRIMA.has(prog) || (sub && SOTTO_CERCA[prog] && SOTTO_CERCA[prog].has(sub))) {
         // Il modello cercato non è un file: o è il primo operando, o arriva dal
         // token che segue `-e`/`--regexp`/`-Pattern`.
         const dopoFlag = [];
