@@ -195,12 +195,12 @@
         if (h) out.push(h);
       }
     }
-    return out.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return out;
   }
 
   function exposedAlnum(url) {
     const raw = String(url || '');
-    return sciogliEUnisci([raw, valoriUniti(raw)]);
+    return sciogli([raw, valoriUniti(raw)]).join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
   }
 
   // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) + indirizzi
