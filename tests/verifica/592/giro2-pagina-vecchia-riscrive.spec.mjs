@@ -82,9 +82,11 @@ test('la pagina Opzioni aperta da prima non deve rimettere una chiave API tolta'
   await opzioni.waitForTimeout(1500);
   expect((await impostazioni(opzioni)).apiKeys?.openrouter).toBe('sk-or-v1-CHIAVE-DI-PROVA-0001');
 
-  // L'utente la toglie parlando con Filo (livello 2, quindi con conferma).
-  await confermaInChat(opzioni, { type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: '' });
+  // L'utente la CAMBIA parlando con Filo (livello 2, quindi con conferma).
+  await confermaInChat(opzioni,
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-CHIAVE-NUOVA-0002' });
   const dopoChat = (await impostazioni(opzioni)).apiKeys?.openrouter || '';
+  expect(dopoChat).toBe('sk-or-v1-CHIAVE-NUOVA-0002');
 
   // Poi torna sulla pagina Opzioni, ancora aperta, e tocca un'altra spunta.
   await opzioni.click('#openWeightsOnly');
