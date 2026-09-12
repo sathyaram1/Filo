@@ -200,7 +200,9 @@ function chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile = true
     attese.set(id, att);
 
     let finito = false;
-    const finisci = (ok) => {
+    // `deciso`: l'utente ha premuto Consenti o Nega. La × e l'attesa scaduta
+    // chiudono senza decidere, e sono quelle che contano per l'anello.
+    const finisci = (ok, deciso) => {
       if (finito) return;
       finito = true;
       attese.delete(id);
