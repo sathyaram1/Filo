@@ -357,8 +357,18 @@
         // dove sovrascrive una chiave. La cartella la inietta il main come
         // `_cwd` (mai l'LLM); il livello non ci si appoggia mai.
         const cwd = String((a && a._cwd) || '').trim();
+        // Se la conferma nasce dal perimetro di lettura (#587), il popup dice
+        // PERCHÉ: «esce dalla cartella dell'utente», «punta a ".ssh"», «legge le
+        // variabili d'ambiente». Senza il motivo l'utente vede un `cat` e non ha
+        // idea di cosa stia approvando.
+        let perche = '';
+        try {
+          const C = global.SN_CMD_CLASSIFY;
+          if (C && C.readReason && cmd) perche = C.readReason(cmd, cmdScope(a)) || '';
+        } catch (_) { perche = ''; }
         return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
-          + (cwd ? `\nCartella di lavoro: ${cwd}` : '');
+          + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
+          + (perche ? `\n\nQuesto comando ${perche}: il contenuto entra nella conversazione con Filo.` : '');
       },
     },
     // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────
