@@ -2017,7 +2017,7 @@
         value: '',
         length: value.length,
         error: `Lo stile dell'agente può essere lungo al massimo ${AGENT_STYLE_MAX} caratteri, e questo ne ha ${value.length}. `
-          + 'Non lo accorcio io: riscrivilo più corto tenendo quello che conta.',
+          + 'Non lo accorcio io. Riscrivilo più corto tenendo quello che conta.',
       };
     }
     return { ok: true, value, length: value.length, error: '' };
