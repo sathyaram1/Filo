@@ -1237,6 +1237,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         action._motivoPerimetro = C.pathReason(abs, {
           perimetro: defaultCwd(),
           home: require('node:os').homedir() || '',
+          // I documenti veri stanno spesso fuori dalla cartella dell'utente
+          // (chiavetta, disco esterno, NAS): qui il perimetro non dice niente e
+          // chiedere un OK a ogni bolletta sarebbe una conferma che si accetta
+          // sempre. Resta il controllo che conta: chiavi, credenziali, `.env`,
+          // cronologie — che non sono documenti da leggere.
+          soloRiservati: true,
         }) || '';
       }
     } catch (_) { action._motivoPerimetro = ''; }
