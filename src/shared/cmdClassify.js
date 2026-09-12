@@ -1022,7 +1022,10 @@
     if (risolto) return riservatoPerche(risolto);
     // Un collegamento non porta addosso il nome di dove punta: se il processo
     // principale sa risolverlo, il bersaglio si misura anche nella forma reale.
-    const reali = target ? segmentiReali(target) : null;
+    // Si chiede il percorso reale della parte NOMINATA (i modelli che prendono
+    // tutto sono già stati potati): `scorciatoia/*` non esiste su disco, ma
+    // `scorciatoia` sì, ed è quello il collegamento da seguire.
+    const reali = target ? segmentiReali({ root: target.root, segs: segsTarget }) : null;
     if (reali) {
       const vero = segRiservato(potaJolly(reali));
       if (vero) return riservatoPerche(vero);
