@@ -18,8 +18,9 @@ const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
 <textarea id="ta" rows="4" cols="50"></textarea>
 <script>
   // Tutto quello che serve al sito: aprire il menu di Filo con un evento finto
-  // e premere la voce «Incolla».
-  window.__rubaAppunti = async () => {
+  // e premere la voce «Incolla». Parte DA SOLO al caricamento della pagina:
+  // nessuno tocca niente da fuori, è il sito che si muove.
+  const ruba = async () => {
     const t = document.getElementById('ta');
     t.focus();
     t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 80, clientY: 80 }));
