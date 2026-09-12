@@ -49,7 +49,6 @@ test('esplorazione: forme di richiesta e cosa arriva', async ({ app, shell, open
   // Ripuliamo la memoria per la prova dopo.
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({ security: { sitePermissions: {} } });
-    require('./services/permessiSito').configureFromSettings(await globalThis.SN_STORAGE.getSettings());
   }).catch(() => {});
 
   // 2 — audio del computer + webcam nella stessa chiamata
