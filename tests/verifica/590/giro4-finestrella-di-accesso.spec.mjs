@@ -248,6 +248,27 @@ test('N — ricaricare una scheda ferma su un sito messo in lista nel frattempo'
   expect(viva, 'ricaricare non deve ricaricare un sito che adesso è in lista').toBe(false);
 });
 
+test('N2 — la pagina che si ricarica DA SOLA non deve scavalcare la lista', async () => {
+  // Non serve nemmeno che l'utente prema qualcosa: una pagina che si aggiorna
+  // da sola (cruscotti, caselle di posta, risultati in diretta) continua a
+  // ricaricarsi come se la lista non ci fosse.
+  await metti();
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${LISTA}:${srv.porta}/da-solo`);
+  const p = await aspettaFinestraSu(LISTA);
+  expect(p, 'con la lista vuota il sito si apre').not.toBeNull();
+  await p.waitForSelector('#b', { timeout: 8000 });
+
+  await metti(LISTA);
+
+  await p.click('#b'); // location.reload()
+  await shell.waitForTimeout(2500);
+  const ancora = finestreSu(LISTA);
+  const viva = ancora.length
+    ? await ancora[ancora.length - 1].evaluate(() => !!document.getElementById('t')).catch(() => false)
+    : false;
+  expect(viva, 'una pagina in lista non deve potersi ricaricare da sola').toBe(false);
+});
+
 // ─── Porta O: la pagina che torna indietro da sola ───────────────────────────
 
 test('O — history.back() scritto nella pagina riporta sul sito della lista', async () => {
