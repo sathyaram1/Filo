@@ -1326,3 +1326,209 @@ test('togliere il microfono a un sito non gli spegne anche la fotocamera', async
   await expect(shell.locator('.perm-live')).toHaveCount(1, { timeout: 15_000 });
   await expect(shell.locator('.perm-live')).toContainText('fotocamera');
 });
+
+// ── #586, giro 6 ────────────────────────────────────────────────────────────
+
+test('un sito che chiede gli appunti in continuazione non si prende l\'Incolla di Filo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const SEGRETO = 'codice-che-il-sito-non-deve-vedere-8842';
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+
+  // Il sito chiede gli appunti senza aspettare la risposta e senza fermarsi:
+  // aspetta il momento in cui chi naviga usa l'Incolla del menu di Filo.
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:20px">
+<textarea id="ta" rows="4" cols="50" style="width:90%;height:120px"></textarea>
+<script>
+  window.__bottino = '';
+  const prova = () => {
+    try {
+      navigator.clipboard.readText().then((t) => { if (t) window.__bottino = t; }, () => {});
+    } catch (_) {}
+  };
+  for (let i = 0; i < 50; i++) prova();
+  setInterval(() => { for (let i = 0; i < 10; i++) prova(); }, 25);
+</script></body></html>`);
+  await page.waitForTimeout(800);
+
+  // Il gesto è vero: il tasto destro e la voce «Incolla» li preme chi naviga.
+  await page.click('#ta');
+  await page.click('#ta', { button: 'right' });
+  await page.waitForTimeout(900);
+  await page.locator('.sn-menu-paste-main').first().click();
+  await page.waitForTimeout(2500);
+
+  expect(
+    await page.evaluate(() => document.getElementById('ta').value),
+    'l\'Incolla di Filo deve incollare quello che c\'è negli appunti',
+  ).toContain(SEGRETO);
+  expect(
+    await page.evaluate(() => window.__bottino),
+    'il sito si è preso quello che c\'era negli appunti nel momento in cui chi naviga ha usato '
+    + 'l\'Incolla di Filo: gli appunti non devono mai passare dal mondo della pagina',
+  ).not.toContain(SEGRETO);
+});
+
+test('togliere il permesso chiude anche il microfono preso da un riquadro incorporato', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const dentro = testServer.html(`<!doctype html><html><body><p>widget</p>
+<script>
+  window.__t = null;
+  window.addEventListener('message', async (e) => {
+    if (e.data === 'chiedi') {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        window.__t = s.getTracks()[0];
+        parent.postMessage({ esito: 'ok' }, '*');
+      } catch (err) { parent.postMessage({ esito: 'no:' + err.name }, '*'); }
+    }
+    if (e.data === 'stato') parent.postMessage({ stato: window.__t ? window.__t.readyState : 'niente' }, '*');
+  });
+</script></body></html>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<iframe id="f" src="${dentro}" allow="microphone" style="width:300px;height:120px"></iframe>
+<script>
+  window.__r = [];
+  window.addEventListener('message', (e) => window.__r.push(e.data));
+  window.__manda = (m) => document.getElementById('f').contentWindow.postMessage(m, '*');
+  window.__ultimo = (k) => {
+    for (let i = window.__r.length - 1; i >= 0; i--) if (window.__r[i] && window.__r[i][k] !== undefined) return window.__r[i][k];
+    return null;
+  };
+</script></body></html>`);
+  const origine = new URL(page.url()).origin;
+
+  await page.evaluate(() => window.__manda('chiedi'));
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  await expect.poll(() => page.evaluate(() => window.__ultimo('esito')), { timeout: 20_000 }).toBe('ok');
+
+  await shell.evaluate((o) => window.filoShell.permissions.revoke(o, 'microfono'), origine);
+  await expect.poll(async () => {
+    await page.evaluate(() => window.__manda('stato')).catch(() => {});
+    await page.waitForTimeout(300);
+    return page.evaluate(() => window.__ultimo('stato')).catch(() => '?');
+  }, { timeout: 25_000 }).toBe('ended');
+});
+
+test('togliere il permesso chiude anche la copia della traccia che il sito si è messo da parte', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<script>
+  window.__copia = null;
+  window.__prendi = () => navigator.mediaDevices.getUserMedia({ audio: true })
+    .then((s) => { window.__copia = s.getTracks()[0].clone(); return 'ok'; }, (e) => 'no:' + e.name);
+  window.__stato = () => (window.__copia ? window.__copia.readyState : 'niente');
+</script></body></html>`);
+  const origine = new URL(page.url()).origin;
+
+  const p = page.evaluate(() => window.__prendi());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await p).toBe('ok');
+  expect(await page.evaluate(() => window.__stato())).toBe('live');
+
+  await shell.evaluate((o) => window.filoShell.permissions.revoke(o, 'microfono'), origine);
+  await expect
+    .poll(() => page.evaluate(() => window.__stato()).catch(() => '?'), { timeout: 25_000 })
+    .toBe('ended');
+});
+
+test('un riquadro senza indirizzo suo passa dalla domanda, e vale il sì dato al sito', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<iframe id="f" srcdoc="<body>widget</body>" style="width:300px;height:120px"></iframe>
+<script>
+  window.__dalRiquadro = () => document.getElementById('f').contentWindow.navigator.mediaDevices
+    .getUserMedia({ video: true })
+    .then((s) => { try { s.getTracks().forEach((t) => t.stop()); } catch (_) {} return 'ok'; },
+          (e) => 'no:' + e.name);
+</script></body></html>`);
+
+  // La domanda compare, col nome del sito che ospita il riquadro.
+  const p = page.evaluate(() => window.__dalRiquadro());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await p, 'il riquadro deve ottenere la fotocamera dopo il Consenti').toBe('ok');
+
+  // E la scelta vale anche per le volte successive, senza ridisturbare.
+  expect(await page.evaluate(() => window.__dalRiquadro())).toBe('ok');
+  await expect(pastiglia(shell)).toHaveCount(0);
+});
+
+test('dentro un riquadro incorporato i permessi mai scelti si leggono «da chiedere»', async ({ openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const dentro = testServer.html(`<!doctype html><html><body><p>widget</p>
+<script>
+  window.addEventListener('message', async (e) => {
+    if (e.data !== 'leggi') return;
+    const out = {};
+    for (const n of ['camera', 'microphone', 'geolocation', 'notifications']) {
+      try { out[n] = (await navigator.permissions.query({ name: n })).state; } catch (err) { out[n] = 'errore'; }
+    }
+    out.notifica = Notification.permission;
+    parent.postMessage({ stati: out }, '*');
+  });
+</script></body></html>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<iframe id="f" src="${dentro}" style="width:320px;height:140px"></iframe>
+<script>
+  window.__stati = null;
+  window.addEventListener('message', (e) => { if (e.data && e.data.stati) window.__stati = e.data.stati; });
+  window.__leggi = () => document.getElementById('f').contentWindow.postMessage('leggi', '*');
+</script></body></html>`);
+
+  await page.evaluate(() => window.__leggi());
+  await expect.poll(() => page.evaluate(() => window.__stati), { timeout: 15_000 }).not.toBeNull();
+  const stati = await page.evaluate(() => window.__stati);
+  expect(
+    Object.entries(stati).filter(([, v]) => v === 'denied').map(([k]) => k),
+    'un widget dentro un riquadro incorporato legge «negato» su cose che nessuno ha negato: si '
+    + 'ferma lì e manda chi naviga a sbloccare una cosa che non è bloccata',
+  ).toEqual([]);
+});
+
+test('smettere di chiedere vale per la cosa chiusa, e si può tornare indietro', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<script>
+  window.__fotocamera = () => navigator.mediaDevices.getUserMedia({ video: true })
+    .then((s) => { try { s.getTracks().forEach((t) => t.stop()); } catch (_) {} return 'ok'; },
+          (e) => 'no:' + e.name);
+  window.__trovami = () => new Promise((res) => navigator.geolocation.getCurrentPosition(
+    () => res('ok'), (e) => res('no:' + e.code), { timeout: 8000 }));
+</script></body></html>`);
+
+  for (let i = 0; i < 3; i++) {
+    const p = page.evaluate(() => window.__fotocamera());
+    await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+    await shell.locator('.perm-chip .perm-chip-x').click();
+    await p;
+    await shell.waitForTimeout(300);
+  }
+
+  // Un'altra cosa, chiesta da chi naviga: la domanda deve comparire lo stesso.
+  page.evaluate(() => window.__trovami()).catch(() => {});
+  await expect(
+    pastiglia(shell),
+    'chiuse tre volte la domanda della fotocamera, anche «trovami» resta zitto: il silenzio vale '
+    + 'per la cosa chiusa, non per tutto il sito',
+  ).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-x').click();
+  await shell.waitForTimeout(300);
+
+  // La fotocamera invece non si chiede più, e Filo lo DICE, con la strada per
+  // tornare indietro.
+  await page.evaluate(() => window.__fotocamera());
+  const avviso = shell.locator('.perm-live[data-notizia]').filter({ hasText: /smesso di chiedere/i });
+  await expect(
+    avviso,
+    'Filo ha smesso di chiedere e non lo dice a nessuno: il gesto appena fatto non produce niente '
+    + 'e l\'unica via d\'uscita è ricaricare la pagina, che nessuno può indovinare',
+  ).toHaveCount(1, { timeout: 20_000 });
+
+  await avviso.locator('button').filter({ hasText: /chiedimelo/i }).click();
+  const ripresa = page.evaluate(() => window.__fotocamera());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await ripresa, 'ripreso a chiedere, il Consenti deve valere').toBe('ok');
+});
