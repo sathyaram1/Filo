@@ -2171,7 +2171,14 @@
   function injectAgentStyle(messages, action, styleText) {
     if (!Array.isArray(messages)) return messages;
     const style = sanitizeAgentStyle(styleText);
-    const wanted = !!style && STYLE_AWARE_ACTIONS.includes(action);
+    // Il tetto vale anche in LETTURA. Le tre strade di scrittura lo fanno già
+    // rispettare, ma uno stile lungo può essere rimasto in memoria da una
+    // versione precedente, quando una pagina web poteva scriverlo e il modello
+    // non chiedeva niente: quello continuava a entrare intero in ogni prompt.
+    // Non si accorcia (sarebbe il taglio muto che il tetto vuole evitare): non
+    // si usa, e la pagina Preferenze lo dice a chi lo apre.
+    const dentroIlTetto = style.length <= AGENT_STYLE_MAX;
+    const wanted = !!style && dentroIlTetto && STYLE_AWARE_ACTIONS.includes(action);
     const block = wanted ? agentStyleBlock(style) : '';
     // Il segnaposto si toglie SEMPRE, anche senza stile e anche su un'azione
     // che lo stile non lo riceve: lasciarlo lì lo farebbe leggere al modello
