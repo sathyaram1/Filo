@@ -91,6 +91,18 @@
 //     `.git-credentials`, cronologie della shell… — perché il perimetro dichiarato
 //     È la home: senza questa regola «dentro la home» vorrebbe dire «ovunque
 //     contino i segreti».
+//   • IL BERSAGLIO È QUELLO CHE IL COMANDO APRIRÀ, non quello che c'è scritto.
+//     Tre conseguenze, e sono tre porte che erano aperte (#587, giro 1):
+//     — il controllo sui bersagli riservati gira sul percorso RISOLTO contro la
+//       cartella corrente. Spostarsi non chiede niente e resta valido anche nei
+//       turni dopo, quindi `cd ~/.ssh` seguito da `cat config` apriva un file
+//       riservato senza che `.ssh` comparisse nel comando che legge;
+//     — un comando che non nomina nessun percorso legge DOVE SI TROVA, e si misura
+//       sulla cartella corrente: `ls` dopo `cd /etc` elenca `/etc`;
+//     — una lettura RICORSIVA non ha un file per bersaglio, ha un sottoalbero:
+//       `grep -r chiave .` dalla home attraversa `.ssh`, `.aws` e la cartella di
+//       Filo senza nominarne nessuna. Se il sottoalbero è la cartella dichiarata
+//       (o qualcosa che la contiene) chiede un OK; su una sottocartella no.
 //   • VARIABILI D'AMBIENTE: `printenv`, `ps`, `Get-Process`, `Get-ChildItem Env:` e
 //     qualunque comando che nomini una variabile (`$HOME`, `$env:USERPROFILE`,
 //     `%APPDATA%`) non sono livello 1. Contengono token e percorsi personali, e
