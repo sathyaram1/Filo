@@ -343,6 +343,7 @@ module.exports = {
   canonicalHost,
   allowHost,
   isAllowedHost,
+  revokeHost,
   setForTest,
   status,
 };
