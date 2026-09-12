@@ -1338,11 +1338,12 @@
     const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
     const home = o.home || o.perimetro || '';
     const cwd = o.cwd || o.perimetro || '';
+    const esc = barraEscape(o.shell);
     for (const part of (splitSafeSequence(raw) || [raw])) {
       const t = dequote(part);
       if (!t || !SPOSTA_PERCORSI.has(programOf(t))) continue;
-      for (const op of operandsOf(t)) {
-        if (operandReason(op, cwd, perimOk, home, true, false)) return true;
+      for (const op of operandsOf(t).concat(valoriDeiFlag(t))) {
+        if (operandReason(op, [cwd], perimOk, home, true, false, esc)) return true;
       }
     }
     return false;
