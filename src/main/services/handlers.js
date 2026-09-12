@@ -2851,6 +2851,18 @@ require('./handlers/misc')(on, handlerCtx);
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
+// Questa richiesta arriva da una superficie INTERNA di Filo? Il confine è uno
+// solo (src/shared/webMessageScope.js): le pagine `filo://` e le chiamate che
+// il main fa a se stesso, cioè senza mittente. Una pagina viva senza indirizzo
+// non è interna: durante un caricamento l'indirizzo manca per un istante, e
+// quell'istante non deve valere come lasciapassare.
+function daSuperficieInterna(sender, origin) {
+  const W = globalThis.SN_WEB_MESSAGE_SCOPE;
+  const daUnaPagina = !!(sender && (sender.tab || sender.wc || sender.frame));
+  if (!W) return !daUnaPagina && !origin;
+  return W.isInternalSurface(origin, { fromPage: daUnaPagina });
+}
+
 async function handleMessage(msg, sender = {}) {
   const origin = sender?.tab?.url || sender?.url || '';
   // Confine d'origine, una volta per tutti: dalla pagina di un sito passano
