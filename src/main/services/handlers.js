@@ -1294,15 +1294,22 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     // solo a risolvere i percorsi relativi. Tutti e tre calcolati QUI, mai
     // dall'LLM: l'assegnazione è incondizionata, quindi un valore che arrivasse
     // dal modello per allargare il perimetro viene sovrascritto.
+    // `_shell` dice COME la shell che eseguirà il comando legge un percorso: in
+    // bash la barra rovesciata annulla il carattere dopo (`.ss\h` è `.ssh`), su
+    // PowerShell e cmd separa le cartelle. Senza saperlo il controllo leggeva
+    // sempre e solo la forma Windows, e su Mac e Linux bastava una barra
+    // rovesciata in mezzo a un nome riservato per farlo sparire (#587, giro 3).
     try {
       const { defaultCwd } = require('./shell');
       action._cwdReale = getAssistantCwd(sender);
       action._perimetro = defaultCwd();
       action._home = require('node:os').homedir() || '';
+      action._shell = require('./terminal').resolveShell(s.terminal && s.terminal.shell);
     } catch (_) {
       action._cwdReale = '';
       action._perimetro = '';
       action._home = '';
+      action._shell = '';
     }
   }
 
