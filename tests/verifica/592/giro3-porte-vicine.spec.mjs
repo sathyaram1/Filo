@@ -215,7 +215,14 @@ test('«normale» scritto nel riquadro: quello che si vede e quello che è salva
 
   const salvato = (await impostazioni(pagina)).agentStyle;
   const mostrato = await pagina.inputValue('#agentStyleText');
-  // O si salva quello che si vede, o si vede quello che si è salvato: le due
-  // cose non possono divergere senza dirlo.
-  expect({ salvato, mostrato }).toEqual({ salvato, mostrato: salvato });
+  if (mostrato === salvato) return; // il riquadro mostra quello che c'è: a posto
+
+  // Se il riquadro tiene la parola che l'utente ha appena scritto (e tenerla è
+  // giusto: cancellargliela sotto le dita mentre scrive sarebbe peggio), allora
+  // lo schermo deve dire che in vigore non c'è nessuno stile. Altrimenti chi
+  // chiude la scheda qui se ne va convinto di avere uno stile che non ha.
+  expect(salvato).toBe('');
+  expect(await pagina.inputValue('#agentStylePreset')).toBe('');
+  await expect(pagina.locator('#agentStyleNote')).toBeVisible();
+  expect(await pagina.textContent('#agentStyleNote')).toContain('nessuno stile');
 });
