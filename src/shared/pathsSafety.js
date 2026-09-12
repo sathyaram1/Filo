@@ -34,6 +34,10 @@
 
   // Quanto spazio del prompt possono occupare in tutto i percorsi noti.
   const KNOWN_PATHS_BUDGET_CHARS = 20 * 1024;
+  // E quanto ne può prendere UNO solo. Senza questo tetto un percorso lungo si
+  // mangia quasi tutto il resto, e sulla stessa pagina gli altri non arrivano
+  // più al modello.
+  const MAX_PATH_CHARS = Math.floor(KNOWN_PATHS_BUDGET_CHARS / 4);
 
   // Le due righe che delimitano il blocco nel messaggio di sistema. Il testo
   // dei percorsi non può contenerle (vedi `neutralizzaMarcature`): senza questa
