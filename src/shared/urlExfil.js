@@ -111,14 +111,30 @@
   // la bolletta che Filo ha appena letto non vuol dire che la stia portando
   // fuori. Serve alla regola delle parole comuni, non a quella dei dati forti:
   // un dato riconoscibile va fermato dovunque stia nell'indirizzo.
-  function caricoAlnum(url) {
+  // Le PAROLE del carico, una per una. Non la stringa incollata: togliendo i
+  // separatori, due parole vicine ne formano una terza che nel testo non c'era —
+  // `servizi-online` diventa `servizionline`, che contiene «servizio», e dopo una
+  // bolletta letta il sito delle poste risultava portare fuori i tuoi dati (#587,
+  // giro 4). Le parole comuni si confrontano quindi dentro una parola sola del
+  // carico; i dati riconoscibili no, per quelli l'incollato serve (è così che si
+  // ritrova un dato tagliato fra due parametri).
+  function caricoParole(url) {
     try {
       const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`);
-      const pezzi = [valoriUniti(url)];
+      const pezzi = [];
+      for (const seg of String(u.pathname || '').split('/')) if (seg) pezzi.push(seg);
+      try {
+        for (const [, v] of u.searchParams) if (v) pezzi.push(v);
+      } catch (_) {}
+      const frammento = String(u.hash || '').replace(/^#/, '');
+      if (frammento) pezzi.push(frammento);
       const labels = String(u.hostname || '').split('.');
       for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) pezzi.push(lbl);
-      return sciogliEUnisci(pezzi);
-    } catch (_) { return ''; }
+      // Anche i valori incollati fra loro: un dato spezzato fra due parametri è
+      // una parola sola, e deve poter combaciare come tale.
+      if (pezzi.length > 1) pezzi.push(pezzi.join(''));
+      return sciogli(pezzi).join(' ').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    } catch (_) { return []; }
   }
 
   // Tutto il testo "esposto" da un URL: stringa grezza + urldecode (anche doppio)
