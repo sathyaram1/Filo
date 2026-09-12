@@ -95,6 +95,33 @@ const scheda = await attendi(() => contesto.pages().find((p) => {
   try { return new URL(p.url()).hostname === atteso; } catch (_) { return false; }
 }) || null);
 
+// Bombadil, quando si aggancia a un debugger che non ha aperto lui, prende la
+// PRIMA pagina che il debugger elenca (`find_page` in bombadil-browser) e avvisa
+// soltanto che ce n'erano altre. Quindi qui restano in piedi due sole pagine: la
+// shell (che È la finestra, non si può chiudere) e quella da provare. L'ordine
+// si controlla prima di dichiarare pronto: se in testa c'è la shell, Bombadil
+// andrebbe a fuzzare la barra delle schede credendo di provare la pagina.
+const istantanea = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+const schede = istantanea?.tabs || istantanea || [];
+for (const t of schede) {
+  const u = String(t.url || '');
+  if (u === URL_INTERNA || u.startsWith(URL_INTERNA)) continue;
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), t.id).catch(() => {});
+}
+
+const sessione = await browser.newBrowserCDPSession();
+const pagine = await attendi(async () => {
+  const r = await sessione.send('Target.getTargets', { filter: [{ type: 'page' }] });
+  const lista = r.targetInfos.filter((t) => t.url !== 'filo://shell/shell.html');
+  return lista.length === 1 ? r.targetInfos : null;
+}, 10_000).catch(() => null);
+
+const prima = pagine?.[0]?.url;
+if (prima !== undefined && prima !== URL_INTERNA) {
+  console.warn(`\n[apri-filo] ATTENZIONE: la prima pagina per il debugger è ${prima},`
+    + ` non ${URL_INTERNA}. Bombadil proverebbe quella.`);
+}
+
 console.log(`\n[apri-filo] scheda pronta: ${scheda.url()}`);
 console.log(`[apri-filo] debugger: http://127.0.0.1:${PORTA}`);
 console.log('[apri-filo] in piedi. Ctrl+C per chiudere.\n');
