@@ -174,3 +174,80 @@ test('da una pagina web non si può chiedere TUTTO lo storage in un colpo solo',
   expect(interna?.ok).toBe(true);
   expect(interna?.value?.settings).toBeTruthy();
 });
+
+// ── La stessa strada, l'altro carico (#589, giro 1 di verifica) ─────────────
+// Le impostazioni non sono l'unica cosa che Filo spinge a tutte le schede: sulla
+// stessa strada viaggia il cambio di stato dell'account, che porta il profilo
+// Google dell'utente (email, nome, foto) e il contrassegno di amministratore.
+// Dentro i siti non lo usa nessuno. Senza il fix il primo controllo è rosso:
+// quel messaggio arrivava anche alle pagine dei siti aperti.
+
+async function spiaBroadcast(app) {
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__spiaTutti589 = [];
+    const nota = (url, m) => {
+      if (m && m.type) globalThis.__spiaTutti589.push({ url: String(url || ''), tipo: m.type });
+    };
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!globalThis.__spiaTutti589Fr) {
+      globalThis.__spiaTutti589Fr = true;
+      const fr = win.webContents.mainFrame;
+      const frProto = Object.getPrototypeOf(fr);
+      const orig = frProto.send;
+      frProto.send = function (ch, ...a) {
+        if (ch === 'filo:broadcast') { let u = ''; try { u = this.url; } catch (_) {} nota(u, a[0]); }
+        return orig.call(this, ch, ...a);
+      };
+    }
+    if (!globalThis.__spiaTutti589Wc) {
+      globalThis.__spiaTutti589Wc = true;
+      const wcProto = Object.getPrototypeOf(win.webContents);
+      const orig = wcProto.send;
+      wcProto.send = function (ch, ...a) {
+        if (ch === 'filo:broadcast') { let u = ''; try { u = this.getURL(); } catch (_) {} nota(u, a[0]); }
+        return orig.call(this, ch, ...a);
+      };
+    }
+  });
+}
+
+test('il cambio di stato dell\'account non viene spinto nelle pagine dei siti', async ({ app, shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<h1>sito qualunque</h1>');
+  const interna = await openTab('filo://newtab/');
+  await spiaBroadcast(app);
+
+  await shell.evaluate(() => window.filoShell.message({ type: 'auth_signout' }));
+
+  const tutti = await app.evaluate(() => globalThis.__spiaTutti589 || []);
+  const cambiStato = tutti.filter((c) => c.tipo === 'auth_changed');
+  expect(cambiStato.length, 'il cambio di stato non è partito affatto').toBeGreaterThan(0);
+  expect(
+    cambiStato.filter((c) => /^https?:/.test(c.url)).map((c) => c.url),
+    'lo stato dell\'account è stato spinto anche nelle pagine dei siti aperti',
+  ).toEqual([]);
+  // Ma le superfici di Filo lo ricevono: è lì che serve.
+  expect(cambiStato.some((c) => c.url.startsWith('filo://') || c.url === ''),
+    'le pagine di Filo devono continuare a sapere che l\'account è cambiato').toBe(true);
+  expect(interna).toBeTruthy();
+});
+
+test('un sito che chiede lo stato dell\'account sa solo se c\'è un accesso', async ({ app, openTab, testServer }) => {
+  const web = await testServer.openReady(openTab, '<h1>sito</h1>');
+  const url = web.url();
+
+  const dalSito = await app.evaluate(async ({}, u) => {
+    const H = globalThis.__filoHandlers;
+    return H.handleMessage({ type: 'auth_status' }, { url: u, tab: { url: u } });
+  }, url);
+  // Quello che il modulo del red team usa davvero, dentro una pagina: c'è.
+  expect(typeof dalSito?.signedIn, 'al sito serve sapere se c\'è un accesso').toBe('boolean');
+  // Identità e poteri dell'utente: no.
+  expect(Object.keys(dalSito).sort()).toEqual(['ok', 'signedIn']);
+
+  // Dalle pagine di Filo la risposta resta intera (la bacheca riconosce i voti).
+  const daFilo = await app.evaluate(async () => {
+    const H = globalThis.__filoHandlers;
+    return H.handleMessage({ type: 'auth_status' }, { url: 'filo://board/board.html' });
+  });
+  expect(Object.keys(daFilo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']);
+});
