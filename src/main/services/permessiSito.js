@@ -440,8 +440,16 @@ function iniziaUso(wc, origine, chiavi, opzioni) {
     const { win, tab } = posizione(wc);
     const shell = win && !win.isDestroyed() ? win.webContents : null;
     if (!shell || shell.isDestroyed()) return null;
-    const gia = usoEsistente(wc, origine, chiavi);
-    if (gia) return gia;
+    const tipo = o.tipo || 'schermo';
+    const frase = P().frasePotere(chiavi, !!o.audioSistema);
+    // Ce n'è già uno per questa scheda, questo sito e questo tipo: se dice
+    // ancora la cosa giusta lo si lascia stare, se il sito nel frattempo ha
+    // ottenuto di più lo si rifà con la frase nuova.
+    const gia = usoEsistente(wc, origine, tipo);
+    if (gia) {
+      if (usi.get(gia).frase === frase) return gia;
+      fineUso(gia);
+    }
     const id = String(prossimoUso++);
     const suNavigazione = (_e, _url, inPlace, isMainFrame) => {
       if (isMainFrame && !inPlace) fineUso(id);
