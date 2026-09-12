@@ -96,7 +96,7 @@ test('C — «Apri comunque» su un sito che rimbalza: il sito deve aprirsi', as
     //    dello STESSO sito: è dove l'utente ha detto di voler andare.
     await shell.evaluate(() => new Promise((r) => setTimeout(r, 2500)));
     const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
-    const scheda = snap.tabs.find((t) => { try { return new URL(t.url).hostname === HOST_ATTESO; } catch (_) { return false; } });
+    const scheda = snap.tabs.find((t) => { try { return new URL(t.url).hostname === HOST; } catch (_) { return false; } });
     expect(scheda, 'la scheda dopo «Apri comunque» deve esistere').toBeTruthy();
 
     const page = await paginaSuHost(app, HOST);
