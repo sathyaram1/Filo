@@ -736,3 +736,216 @@ test('in incognito le scelte si vedono e si tolgono anche dalle Impostazioni', a
   });
   expect(suDisco[new URL(url).origin]).toBeUndefined();
 });
+
+// ─── Le scorciatoie che saltano la domanda, e chi le può premere (#586) ──────
+//
+// Due voci del menu di Filo leggono gli appunti e accendono il microfono senza
+// far comparire la pastiglia, perché lì a chiedere è l'utente a Filo e non il
+// sito. Il menu però vive dentro la pagina del sito, e il codice del sito lo
+// può aprire e premere da solo: un evento di tasto destro fabbricato e un
+// `click()` su una voce. Così un sito qualunque si leggeva gli appunti (una
+// password appena copiata) e accendeva il microfono senza che comparisse
+// niente, e senza lasciare niente da revocare in Impostazioni.
+//
+// Qui si asserisce il successo dal punto di vista di chi naviga: gli appunti
+// restano suoi e il microfono resta spento. Senza il guardiano dei gesti finti
+// il primo assert è rosso, col segreto dentro il campo del sito.
+
+const SEGRETO_APPUNTI = 'password-negli-appunti-7Q4';
+
+const HTML_GESTI_FINTI = `<!doctype html><html><body style="margin:0;padding:20px">
+<textarea id="ta" rows="4" cols="50"></textarea>
+<script>
+  const apriMenuDaSolo = async () => {
+    const t = document.getElementById('ta');
+    t.focus();
+    t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 80, clientY: 80 }));
+    await new Promise((r) => setTimeout(r, 600));
+  };
+  window.__rubaAppunti = async () => {
+    await apriMenuDaSolo();
+    const incolla = document.querySelector('.sn-menu-paste-main');
+    if (!incolla) return { trovata: false, testo: document.getElementById('ta').value };
+    incolla.click();
+    await new Promise((r) => setTimeout(r, 1500));
+    return { trovata: true, testo: document.getElementById('ta').value };
+  };
+  window.__accendiMicrofono = async () => {
+    await apriMenuDaSolo();
+    const detta = [...document.querySelectorAll('button')].find((n) => /🎤/.test(n.textContent || ''));
+    if (!detta) return { trovata: false };
+    detta.click();
+    await new Promise((r) => setTimeout(r, 2000));
+    return { trovata: true };
+  };
+</script></body></html>`;
+
+test('un sito non si legge gli appunti premendo da solo il menu di Filo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO_APPUNTI);
+  const page = await testServer.openReady(openTab, HTML_GESTI_FINTI);
+
+  const esito = await page.evaluate(() => window.__rubaAppunti());
+  expect(esito.trovata, 'il menu di Filo non si è aperto: la prova non sta provando niente').toBe(true);
+  expect(
+    String(esito.testo || ''),
+    'il sito si è preso gli appunti da solo, aprendo e premendo il menu di Filo, '
+    + 'senza che comparisse nessuna domanda',
+  ).not.toContain(SEGRETO_APPUNTI);
+  expect(await pastiglia(shell).count()).toBe(0);
+});
+
+test('un sito non accende il microfono premendo da solo il menu di Filo', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML_GESTI_FINTI);
+
+  const esito = await page.evaluate(() => window.__accendiMicrofono());
+  expect(esito.trovata, 'la voce della dettatura non si è trovata: la prova non sta provando niente').toBe(true);
+  const spie = await page.evaluate(() => document.querySelectorAll('.sn-dictate-pill').length);
+  expect(
+    spie,
+    'il sito ha fatto partire da solo la dettatura di Filo, cioè ha aperto il microfono, '
+    + 'senza che comparisse nessuna domanda',
+  ).toBe(0);
+  expect(await pastiglia(shell).count()).toBe(0);
+});
+
+// Ma il menu, premuto da una persona, deve continuare a funzionare: il
+// guardiano butta via i gesti finti, non l'Incolla di chi lo usa.
+test('premuto da una persona, l\'Incolla del menu di Filo incolla ancora', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO_APPUNTI);
+  const page = await testServer.openReady(openTab, HTML_GESTI_FINTI);
+
+  await page.locator('#ta').click();
+  await page.locator('#ta').click({ button: 'right' });
+  await expect(page.locator('.sn-menu-paste-main')).toBeVisible({ timeout: 10_000 });
+  await page.locator('.sn-menu-paste-main').click();
+  await expect
+    .poll(() => page.evaluate(() => document.getElementById('ta').value), { timeout: 10_000 })
+    .toContain(SEGRETO_APPUNTI);
+});
+
+// ─── L'audio del computer non viene dietro allo schermo di nascosto (#586) ───
+//
+// Un sito che chiede lo schermo può chiedere anche l'audio del computer: la
+// musica, un video, la chiamata in un'altra finestra, la voce di chi ti parla.
+// Arrivava insieme all'immagine senza che la domanda, il riquadro della scelta
+// o il segno che resta lo nominassero, e senza un modo di dare l'una senza
+// l'altro.
+
+const HTML_SCHERMO_AUDIO = `<!doctype html><html><body style="margin:0"><p>prova</p>
+<script>
+  window.__schermoConAudio = () => navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).then(
+    (s) => { const d = s.getTracks().map((t) => ({ kind: t.kind, label: t.label }));
+             try { s.getTracks().forEach((t) => t.stop()); } catch (_) {} return d; },
+    (e) => 'rifiutato:' + ((e && e.name) || 'errore'));
+</script></body></html>`;
+
+const audioDiSistema = (esito) => (Array.isArray(esito)
+  ? esito.find((t) => t.kind === 'audio' && !/fake_device/i.test(String(t.label || ''))) || null
+  : null);
+
+test('lo schermo condiviso non porta con sé l\'audio del computer se non lo si accende', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML_SCHERMO_AUDIO);
+
+  const promessa = page.evaluate(() => window.__schermoConAudio());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await pastiglia(shell).locator('.perm-chip-allow').click();
+
+  const box = shell.locator('.perm-source');
+  await expect(box).toHaveCount(1, { timeout: 15_000 });
+  // La scelta dell'audio c'è, è nominata, ed è spenta: chi non la tocca dà solo
+  // l'immagine.
+  const scelta = box.locator('.perm-source-audio input');
+  await expect(scelta, 'il sito ha chiesto l\'audio e niente lo nomina').toHaveCount(1);
+  expect(await scelta.isChecked(), 'l\'audio del computer non può essere acceso di suo').toBe(false);
+  await box.locator('.perm-source-item').first().click();
+
+  const esito = await promessa;
+  expect(
+    audioDiSistema(esito),
+    `senza accendere la scelta, al sito non deve arrivare l'audio del computer: ha ricevuto ${JSON.stringify(esito)}`,
+  ).toBeNull();
+  await expect(shell.locator('.perm-live')).toHaveCount(1, { timeout: 15_000 });
+  await expect(shell.locator('.perm-live')).not.toContainText('audio');
+});
+
+test('acceso, l\'audio del computer arriva, e il segno della ripresa lo dice', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML_SCHERMO_AUDIO);
+
+  const promessa = page.evaluate(() => window.__schermoConAudio());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await pastiglia(shell).locator('.perm-chip-allow').click();
+
+  const box = shell.locator('.perm-source');
+  await expect(box).toHaveCount(1, { timeout: 15_000 });
+  await box.locator('.perm-source-audio input').check();
+  await box.locator('.perm-source-item').first().click();
+
+  expect(
+    audioDiSistema(await promessa),
+    'chi accende la scelta deve ottenere anche l\'audio del computer',
+  ).not.toBeNull();
+  await expect(shell.locator('.perm-live')).toContainText('audio del computer', { timeout: 15_000 });
+});
+
+// ─── Gli avvisi della scheda stanno in colonna, non uno sopra l'altro (#586) ──
+
+const HTML_DUE_AVVISI = `<!doctype html><html><body style="margin:0"><p>pagina</p>
+<script>
+  window.__apri = () => { try { window.open('https://esempio.invalido/x', '_blank', 'width=420,height=320'); } catch (_) {} };
+  window.__cam = () => navigator.mediaDevices.getUserMedia({ video: true }).catch(() => {});
+</script></body></html>`;
+
+test('la domanda di un permesso non copre l\'avviso della finestra bloccata', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML_DUE_AVVISI);
+
+  await page.evaluate(() => window.__apri());
+  const avviso = shell.locator('.popup-chip');
+  await expect(avviso).toHaveCount(1, { timeout: 15_000 });
+
+  page.evaluate(() => window.__cam()).catch(() => {});
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
+  await shell.waitForTimeout(300);
+
+  const a = await avviso.first().boundingBox();
+  const d = await pastiglia(shell).first().boundingBox();
+  const sovrapposti = !!a && !!d
+    && a.x < d.x + d.width && d.x < a.x + a.width
+    && a.y < d.y + d.height && d.y < a.y + a.height;
+  expect(
+    sovrapposti,
+    `i due avvisi della scheda si coprono: finestra bloccata a ${JSON.stringify(a)}, `
+    + `domanda del permesso a ${JSON.stringify(d)}`,
+  ).toBe(false);
+  // E l'«Apri» dell'avviso coperto si deve poter premere.
+  await expect(avviso.locator('button', { hasText: 'Apri' })).toBeVisible();
+});
+
+// ─── La richiesta impossibile non fa morire la scheda (#586) ─────────────────
+
+test('una pagina che chiede l\'audio del computer senza l\'immagine non fa morire la scheda', async ({ openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<p id="p">viva</p>
+<script>
+  window.__impossibile = () => navigator.mediaDevices.getUserMedia({
+    audio: { mandatory: { chromeMediaSource: 'desktop' } },
+  }).then(() => 'concesso', (e) => 'rifiutato:' + ((e && e.name) || 'errore'));
+</script></body></html>`);
+
+  const esito = await page.evaluate(() => window.__impossibile())
+    .catch((e) => 'scheda morta: ' + e.message);
+  expect(
+    String(esito),
+    'la scheda è morta per una riga di una pagina qualunque, invece di ricevere un errore',
+  ).toContain('rifiutato');
+  expect(
+    await page.evaluate(() => document.getElementById('p').textContent).catch(() => '(morta)'),
+    'la pagina deve essere ancora lì',
+  ).toBe('viva');
+});
