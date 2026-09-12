@@ -11,6 +11,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import {
+  mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync, readdirSync,
+} from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1528,4 +1532,85 @@ test('#587 — la cartella di prima (`~-`, `~1`) non nasconde il bersaglio', () 
   assert.equal(C.classify('cd ~-', dovunque), 1, 'spostarsi non deve chiedere niente');
   // `~+` è la cartella corrente, che si sa già misurare.
   assert.equal(C.classify('cat ~+/appunti.txt', dovunque), 1, '`~+` è dove siamo: non deve chiedere niente');
+});
+
+// ── #587, giro 6 ───────────────────────────────────────────────────────────
+// Per una ricerca la prima parola scritta è il testo cercato, non un file. Su
+// Windows però il file può arrivare da `-Path`/`-LiteralPath` (o il testo da
+// `/C:` di findstr), e allora a essere scartato era PROPRIO il file: la stessa
+// ricerca dentro `.ssh\config` chiedeva un OK scritta in un modo e non
+// nell'altro.
+test('#587 — il file legato a -Path si misura anche se il modello sta dopo', () => {
+  const casa = 'C:/Users/mario';
+  const suWindows = { perimetro: casa, home: casa, cwd: casa, shell: 'powershell' };
+  for (const cmd of [
+    'Select-String -Path .ssh\\config SEGRETO',
+    'Select-String -Path .ssh\\id_rsa PRIVATE',
+    'Select-String -Path .netrc password',
+    'Select-String -Path AppData\\Roaming\\Filo\\storage.json apiKey',
+    'Select-String -LiteralPath .ssh\\config Host',
+    'sls -Path .aws\\credentials aws_secret',
+    'sls -LiteralPath AppData\\Roaming\\Filo\\storage.json key',
+    'Select-String -Path .ssh\\* PRIVATE',
+    'sls -Path .s?h\\config SEGRETO',
+    'Select-String -Path C:\\Windows\\System32\\config\\SAM pwd',
+    'findstr /C:SEGRETO .ssh\\config',
+    'findstr /I /C:key AppData\\Roaming\\Filo\\storage.json',
+    'findstr /R /C:BEGIN .ssh\\id_rsa',
+    'findstr /C:pwd C:\\Windows\\System32\\config\\SAM',
+  ]) {
+    assert.equal(C.classify(cmd, suWindows), 2, `"${cmd}" apre un file riservato: deve chiedere un OK`);
+  }
+  // …e cercare una parola nei propri file resta gratis, in tutte le scritture.
+  for (const cmd of [
+    'Select-String -Path appunti.txt spesa',
+    'Select-String spesa -Path appunti.txt',
+    'Select-String -Path Documenti\\*.txt nota',
+    'findstr /C:spesa appunti.txt',
+    'findstr spesa appunti.txt',
+    'Select-String credentials appunti.txt',
+  ]) {
+    assert.equal(C.classify(cmd, suWindows), 1, `"${cmd}" cerca nei propri file: non deve chiedere niente`);
+  }
+});
+
+// Un collegamento non porta addosso il nome di dove punta, e il percorso vero si
+// può chiedere solo a un nome che esiste. Con un carattere jolly il nome scritto
+// non esiste, quindi il collegamento tornava invisibile e `cat pacco/*.txt`
+// stampava `~/.ssh/config` senza chiedere niente.
+test('#587 — un collegamento dietro un jolly (o sotto una ricorsiva) chiede un OK', () => {
+  const casa = cartellaTemporanea('587-g6-jolly-');
+  try {
+    mkdirSync(join(casa, '.ssh'), { recursive: true });
+    writeFileSync(join(casa, '.ssh', 'config'), 'Host prod\n');
+    mkdirSync(join(casa, 'pacco'), { recursive: true });
+    mkdirSync(join(casa, 'Documenti'), { recursive: true });
+    writeFileSync(join(casa, 'Documenti', 'vero.txt'), 'documento normale\n');
+    writeFileSync(join(casa, 'appunti.txt'), 'spesa\n');
+    try {
+      symlinkSync(join(casa, '.ssh', 'config'), join(casa, 'pacco', 'leggimi.txt'));
+    } catch (_) { return; } // niente collegamenti su questo sistema: non c'è nulla da provare
+    C.setRealPath((p) => {
+      try { return realpathSync.native(String(p)); } catch (_) {}
+      try { return realpathSync(String(p)); } catch (_) {}
+      return p;
+    });
+    C.setListDir((p) => { try { return readdirSync(String(p)); } catch (_) { return []; } });
+    const dove = { perimetro: casa, home: casa, cwd: casa, shell: 'bash' };
+    for (const cmd of [
+      'cat pacco/*.txt', 'cat pacco/*', 'head -n 5 pacco/*', 'tail -n 3 pacco/*.txt',
+      'grep -R SEGRETO pacco', 'cat pacco/leggimi.txt',
+    ]) {
+      assert.equal(C.classify(cmd, dove), 2, `"${cmd}" apre un collegamento a un file riservato`);
+    }
+    for (const cmd of [
+      'cat Documenti/*.txt', 'head -n 2 Documenti/*', 'cat *.txt', 'cat appunti.txt',
+      'ls', 'grep -r documento Documenti',
+    ]) {
+      assert.equal(C.classify(cmd, dove), 1, `"${cmd}" legge i propri file: non deve chiedere niente`);
+    }
+  } finally {
+    C.setListDir(null);
+    rmSync(casa, { recursive: true, force: true });
+  }
 });
