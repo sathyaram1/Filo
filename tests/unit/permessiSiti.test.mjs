@@ -111,9 +111,66 @@ test('la mappa che arriva dallo storage viene ripulita senza buttare via il rest
 test('le etichette sono frasi da leggere, anche per un permesso sconosciuto', () => {
   assert.equal(P.etichetta('fotocamera'), 'usare la fotocamera');
   assert.equal(P.etichettaRichiesta(['fotocamera', 'microfono']), 'usare la fotocamera e il microfono');
-  assert.match(P.etichetta('quantum-teleport'), /quantum-teleport/);
-  assert.equal(P.nome('quantum-teleport'), 'quantum-teleport');
   assert.equal(P.nome('posizione'), 'Posizione');
+});
+
+// La domanda diceva «vuole usare «screen-wake-lock»»: chi la legge non sa cosa
+// sta per dare, e la risposta più probabile è a caso (#586, giro 4). Il nome
+// tecnico non sparisce, cambia posto.
+test('la domanda non mostra mai il nome tecnico del permesso', () => {
+  for (const ignoto of ['quantum-teleport', 'screen-capture-2', 'qualcosa-di-nuovo']) {
+    assert.doesNotMatch(P.etichetta(ignoto), new RegExp(ignoto),
+      'il nome tecnico non deve finire nella frase che l\'utente legge');
+    assert.match(P.etichetta(ignoto), /Filo non conosce/);
+    // Nelle Impostazioni invece serve, per distinguere due sconosciuti dello
+    // stesso sito: lì sta dopo le parole in italiano.
+    assert.match(P.nome(ignoto), new RegExp(ignoto));
+    assert.deepEqual(P.tecnici(['fotocamera', ignoto]), [ignoto]);
+  }
+  assert.deepEqual(P.tecnici(['fotocamera', 'microfono', 'schermo', 'posizione']), []);
+  assert.equal(P.ignoto('fotocamera'), false);
+  assert.equal(P.ignoto('sensors'), false, 'i sensori di movimento adesso hanno un nome in italiano');
+  assert.equal(P.ignoto('local-fonts'), false, 'i caratteri installati adesso hanno un nome in italiano');
+});
+
+// Tenere acceso lo schermo mentre va un video, e non farsi buttare via i propri
+// dati: nessun browser le domanda, e Filo ci fermava un film con una domanda
+// incomprensibile (#586, giro 4).
+test('le cose che nessun browser chiede passano senza domanda', () => {
+  for (const p of ['screen-wake-lock', 'persistent-storage', 'durable-storage']) {
+    assert.equal(P.innocuo(p), true, `${p} non deve fermare chi guarda un video`);
+  }
+  // I sensori di movimento invece restano una domanda: sono un sensore, che è
+  // esattamente la famiglia di cui parla questo feedback. Quello che cambia è
+  // che adesso la domanda si legge.
+  assert.equal(P.innocuo('sensors'), false);
+  assert.equal(P.etichetta('sensors'), 'sentire come muovi e inclini il computer');
+});
+
+// Chromium per certi permessi non fa mai la richiesta: chiede solo cosa è già
+// stato deciso, e con un no consegna al sito un risultato vuoto. Senza
+// richiesta non compariva nessuna pastiglia, quindi nessuna scelta veniva
+// registrata, quindi in Impostazioni non c'era niente da ribaltare: si poteva
+// solo negare, mai consentire (#586, giro 4).
+test('i permessi che arrivano solo dal controllo sono dichiarati', () => {
+  assert.equal(P.soloControllo('local-fonts'), true);
+  assert.equal(P.soloControllo('media'), false);
+  assert.equal(P.soloControllo(''), false);
+  for (const p of P.SOLO_CONTROLLO) {
+    assert.equal(P.innocuo(p), false, `${p} passa dal controllo, quindi una scelta ci deve stare`);
+    assert.equal(P.ignoto(p), false, `${p} deve avere un nome in italiano, o la domanda non si capisce`);
+  }
+});
+
+// Il cartello che resta acceso mentre un sito può usare qualcosa. Prima c'era
+// solo per lo schermo, e il microfono restava aperto senza che niente lo
+// dicesse (#586, giro 4).
+test('la frase del cartello dice cosa il sito può fare', () => {
+  assert.equal(P.frasePotere(['microfono'], false), 'usare il microfono');
+  assert.equal(P.frasePotere(['fotocamera', 'microfono'], false), 'usare la fotocamera e il microfono');
+  assert.equal(P.frasePotere(['schermo'], false), 'vedere il tuo schermo');
+  assert.equal(P.frasePotere(['schermo'], true), 'vedere il tuo schermo e sentire l\'audio del computer');
+  assert.equal(P.frasePotere([], false), '');
 });
 
 // ─── le sentinelle ──────────────────────────────────────────────────────────
