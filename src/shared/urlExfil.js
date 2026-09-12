@@ -363,7 +363,7 @@
     const pagliaio = forme.join(' ');
     const codaUltimo = [pezzi[pezzi.length - 1], rovescia(pezzi[pezzi.length - 1])].join(' ');
     const candidati = [];
-    for (const t of corpusTokens(corpus)) {
+    for (const t of (altri.size ? [...toks, ...altri] : toks)) {
       if (t.length < STRONG_TOKEN || t.length > SPED_MAX_TOKEN) continue;
       if (STOPWORDS.has(t)) continue;
       // Prefiltro: la testa e la coda del dato devono stare da qualche parte, e
