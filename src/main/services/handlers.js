@@ -2081,6 +2081,12 @@ function toolResultText({ action, res, rendered }) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
+  // Valore rifiutato con una spiegazione (#592): la frase è già scritta per
+  // essere letta da un umano, e il modello deve riferirla, non reinventarla.
+  if (res.output && res.output.rifiutata) {
+    return `Azione ${type} NON eseguita: ${res.output.rifiutata} Riferisci all'utente questa spiegazione `
+      + 'e non riprovare con lo stesso testo.';
+  }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
   if (res.output && res.output.blocked === 'disabled') {
