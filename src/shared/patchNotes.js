@@ -19,7 +19,7 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
-        'Filo chiede il tuo OK prima di leggere un file fuori dalla tua cartella, prima di aprire le tue chiavi e password anche se stanno dentro, e prima di aprire un link che porta con sé qualcosa che ha appena letto. Una pagina web non può più fargli spedire fuori i tuoi dati senza che tu lo veda.',
+        'Filo chiede il tuo OK prima di leggere un file fuori dalla tua cartella, prima di aprire le tue chiavi e password anche se stanno dentro, e prima di aprire un link o fare una ricerca sul web che porta con sé qualcosa che ha appena letto. Una pagina web non può più fargli spedire fuori i tuoi dati senza che tu lo veda.',
       ],
     },
     {
