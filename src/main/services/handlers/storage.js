@@ -150,9 +150,12 @@ module.exports = function register(on, ctx) {
     // Senza origine: toglie tutto. È il «cancella tutte le scelte» della
     // pagina Sicurezza, che deve valere anche dove le scelte stanno in memoria.
     if (!msg || !msg.origine) {
-      for (const riga of P.elenco(ctx)) P.revoca(riga.origine, null, ctx);
+      // In incognito l'elenco porta le scelte di questa finestra E quelle di
+      // sempre: «cancella tutto» le toglie da tutte e due, ciascuna dal posto
+      // suo.
+      for (const riga of P.elenco(ctx)) P.revoca(riga.origine, null, ctx, riga.effimera);
     } else {
-      P.revoca(msg.origine, (msg && msg.chiave) || null, ctx);
+      P.revoca(msg.origine, (msg && msg.chiave) || null, ctx, msg.effimera);
     }
     return { ok: true, voci: P.elenco(ctx), incognito: !!ctx.incognito };
   });
