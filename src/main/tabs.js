@@ -340,6 +340,19 @@ class TabManager {
     this.layout();
   }
 
+  // "La pagina deve cominciare almeno a questa altezza": la usa la shell per
+  // tutto ciò che disegna sotto la fila delle schede e che chi naviga DEVE
+  // poter vedere e premere (la domanda di un permesso, la scelta di cosa
+  // condividere, il pannello dei download, l'avviso di un popup bloccato).
+  //
+  // È diverso da setTopInset, che chiede "tot pixel IN PIÙ": chi disegna un
+  // riquadro sa dove finisce il riquadro, non quanto è alta la cornice sotto a
+  // cui sta, e quel conto sbagliato lasciava metà pannello dietro la pagina.
+  setTopFloor(px) {
+    this.topFloor = Math.max(0, Math.round(Number(px) || 0));
+    this.layout();
+  }
+
   // Entra/esce dalla modalità "contenuto a tutto schermo": la view attiva copre
   // tutta la finestra (top=0), così la barra di tab+indirizzo della shell resta
   // sotto e non è visibile. Porta anche la finestra in fullscreen OS per
