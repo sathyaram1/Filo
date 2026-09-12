@@ -11,10 +11,15 @@
 // fix (lista di esclusioni con dentro le sole apiKeys) i controlli sul proxy e
 // sulla chiave di Safe Browsing sono rossi.
 //
-// L'ultimo test è la sentinella nell'altro verso: legge src/content/*.js e
-// pretende che ogni campo delle impostazioni usato da un content script sia fra
-// quelli ammessi. Restringere la lista senza accorgersene spegnerebbe una
-// funzione sulle pagine web in silenzio.
+// L'ultimo test è la sentinella nell'altro verso: legge TUTTO il codice che
+// gira dentro una pagina web — src/content/*.js e i moduli di src/shared che
+// page-preload.js carica lì accanto — e pretende che ogni campo delle
+// impostazioni usato da uno di loro sia fra quelli ammessi. Restringere la
+// lista senza accorgersene spegnerebbe una funzione sulle pagine web in
+// silenzio. I moduli condivisi contano quanto i content script: stanno nello
+// stesso mondo isolato e leggono lo stesso oggetto. La lista dei condivisi non
+// si scrive a mano — si ricava da page-preload.js — altrimenti la sentinella
+// resterebbe indietro il giorno in cui qualcuno ne carica uno nuovo.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
