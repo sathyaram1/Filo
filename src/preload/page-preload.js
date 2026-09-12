@@ -169,7 +169,12 @@ if (!IS_SUBFRAME) try {
 // nessuno ha scelto, deve leggere "da chiedere", non "negato": altrimenti i
 // siti che guardano prima di chiedere non chiedono mai, e il pulsante "attiva
 // le notifiche" non fa niente. Vedi src/preload/permessi-guard.js.
-try {
+//
+// Solo nel frame principale, come la protezione qui sopra: la domanda sincrona
+// al main costa, e su una pagina con trenta riquadri pubblicitari sarebbe
+// trenta volte. Il cancello vero non cambia: la richiesta di un riquadro passa
+// lo stesso dal processo principale, con l'origine del riquadro.
+if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
     const { buildPermessiGuardSource, CANALE } = require('./permessi-guard.js');
