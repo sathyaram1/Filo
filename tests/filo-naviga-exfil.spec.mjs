@@ -170,6 +170,31 @@ test('#587 leggere un file fuori dalla tua cartella chiede un OK, e quel contenu
   }
 });
 
+test('#587 traccia visiva: il popup dice perché si ferma, in chiaro e in scuro', async ({ app, openTab }) => {
+  // La spiegazione nuova è un paragrafo in più dentro il popup che c'era già.
+  // Va guardato in tutti e due i temi: un testo che deborda o che sparisce sul
+  // fondo scuro vale quanto non averlo scritto.
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  const r = await runAction(page, { type: 'ESEGUI_COMANDO', comando: 'cat /etc/hosts' });
+  const testo = String(r.describe || '');
+  expect(testo).toMatch(/fuori dalla tua cartella/);
+
+  try { mkdirSync(SHOTS, { recursive: true }); } catch (_) {}
+  for (const tema of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: tema });
+    await page.evaluate((t) => {
+      window.SN_CONFIRM_UI.confirm({ title: 'Comando da terminale', text: t });
+    }, testo);
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+    const s = await confirmState(page);
+    expect(s.text, 'il motivo sta nel box, non solo nei log').toContain('fuori dalla tua cartella');
+    await page.screenshot({ path: `${SHOTS}/587-conferma-lettura-${tema}.png` });
+    await page.keyboard.press('Escape');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  }
+});
+
 test('#587 le variabili d’ambiente non sono livello 1', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
