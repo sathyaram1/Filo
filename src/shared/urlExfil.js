@@ -313,9 +313,11 @@
     for (const t of toks) {
       if (t.length < MIN_TOKEN) continue;
       if (!dentro(t)) {
-        if (isStrong(t) && forme.some((f) => combaciaSpezzato(f, t))) {
+        if (!isStrong(t)) continue;
+        if (forme.some((f) => combaciaSpezzato(f, t))) {
           return { reason: `contiene un tuo dato, spezzettato ("${t}…")` };
         }
+        if (dentroScorso(t)) return { reason: `contiene un tuo dato, mascherato ("${t}…")` };
         continue;
       }
       if (isStrong(t)) { strong = true; sample = t; continue; }
