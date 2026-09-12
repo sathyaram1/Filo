@@ -78,15 +78,25 @@ test('dopo tre chiusure, la stessa cosa richiesta con un gesto deve almeno dire 
   await shell.waitForTimeout(1500);
   const visibile = await shell.evaluate(() => ({
     chip: document.querySelectorAll('.perm-chip').length,
-    note: document.querySelectorAll('.perm-notice').length,
-    live: document.querySelectorAll('.perm-live').length,
+    avvisi: [...document.querySelectorAll('.perm-live[data-notizia]')].map((n) => n.innerText),
   }));
   console.log('[586 g6] quarta richiesta:', quarto, 'cosa si vede:', JSON.stringify(visibile));
+  await shell.screenshot({ path: 'tests/.shots/586-giro6-ho-smesso-di-chiedere.png' });
 
   expect(
-    visibile.chip + visibile.note,
+    visibile.avvisi.length,
     'alla quarta richiesta il sito si vede negare in silenzio e nella cornice non compare '
     + 'niente: chi ha chiuso le domande non sa che Filo ha smesso di chiedere, e se adesso '
     + 'volesse consentire non ha nessun posto dove farlo',
   ).toBeGreaterThan(0);
+
+  // E da lì si deve poter tornare indietro senza ricaricare la pagina.
+  const avviso = shell.locator('.perm-live[data-notizia]').first();
+  await avviso.locator('button').filter({ hasText: /chiedimelo/i }).first().click();
+  await shell.waitForTimeout(500);
+  const quinto = page.evaluate(() => window.__fotocamera());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  console.log('[586 g6] dopo «Chiedimelo di nuovo»:', await quinto);
+  expect(await quinto, 'ripreso a chiedere, il Consenti deve valere').toBe('ok');
 });
