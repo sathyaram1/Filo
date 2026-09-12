@@ -56,6 +56,14 @@
     'https', 'http', 'index', 'html', 'htm', 'shtml', 'aspx', 'jsp', 'php',
   ]);
 
+  // Le parole del corpus che sono INDIRIZZI o nomi di file: uno schema, una
+  // barra, una chiocciola, o un nome che finisce con un suffisso di sole
+  // lettere (`.it`, `.com`, `.json`). Restano fuori dall'incollatura: vedi
+  // corpusTokens.
+  const SEMBRA_INDIRIZZO = /^[a-z][a-z0-9+.-]*:\/\/|[/@]|^[a-z0-9][a-z0-9.-]*\.[a-z]{2,24}$/i;
+  const MAX_INCOLLATO = 200;   // oltre non è più una cosa che sta in un indirizzo
+  const SOLO_CIFRE_MIN = 12;   // sotto, un numero incollato è una data
+
   // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
   // evitano che un URL legittimo che le contiene scateni il match a token singolo.
   const STOPWORDS = new Set([
