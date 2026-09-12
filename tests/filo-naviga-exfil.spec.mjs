@@ -111,6 +111,14 @@ test('un URL che esfiltra il CONTENUTO di un appunto CHIEDE conferma (appunti or
 // e il corpus anti-esfiltrazione non conteneva l'output dei comandi appena
 // eseguiti. Qui proviamo che entrambi i passi si fermano.
 
+// Le azioni di questa prova passano dalla PAGINA, non dal main: il registro del
+// materiale non fidato vive sul webContents della scheda che parla con Filo, e
+// leggere in una scheda e navigare da un'altra sono due contesti diversi. È
+// anche il cammino vero dell'utente.
+const runAction = (page, action) =>
+  page.evaluate(async (a) =>
+    chrome.runtime.sendMessage({ type: 'filo_run_action', action: a }), action);
+
 const confirmAction = (page, action) =>
   page.evaluate(async (a) =>
     chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), action);
