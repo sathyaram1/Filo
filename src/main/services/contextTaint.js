@@ -122,7 +122,8 @@ function sourcesOf(sender) {
 // Svuota il registro di un mittente. Non lo chiama il flusso normale (il
 // materiale resta nel contesto finché la scheda vive): serve ai test e a un
 // eventuale "ricomincia da capo".
-function reset(sender) {
+function reset(rawSender) {
+  const sender = hostOf(rawSender);
   if (!sender) { fallback = null; return; }
   try { sender._filoContextTaint = null; } catch (_) {}
 }
