@@ -497,13 +497,69 @@ function fineUso(id) {
   return { ok: true };
 }
 
-// «Interrompi»: ricaricare la pagina distrugge il documento e con lui la
-// ripresa o la traccia del microfono.
+// ─── chiudere quello che il sito ha già in mano ─────────────────────────────
+//
+// Prima qui c'era solo `wc.reload()`: l'unica strada che il main ha per far
+// sparire una traccia già consegnata. Funziona, e costa tutto quello che chi
+// naviga stava facendo in quella pagina — il commento a metà, il modulo
+// compilato, il punto in cui era arrivato a leggere (#586, giro 5). Chi va a
+// togliere un permesso lo fa per una questione di privacy e non si aspetta di
+// pagarla così.
+//
+// Adesso si chiede prima alla pagina di fermare le proprie tracce
+// (src/preload/permessi-guard.js tiene il conto di quelle che le sono state
+// consegnate). Per un sito qualunque le tracce muoiono e non si perde niente.
+// La ricarica resta per chi non risponde o resta vivo lo stesso, cioè per una
+// pagina che ha fatto di tutto per non passare di lì: la garanzia del giro 4
+// («togliere deve togliere anche quello che ha già in mano») non si scuce.
+const fermate = new Map(); // id richiesta → risolvi
+let prossimaFermata = 1;
+const FERMATA_MS = 900;
+
+function chiediAllaPaginaDiFermare(wc, chiavi) {
+  return new Promise((resolve) => {
+    if (!wc || wc.isDestroyed()) { resolve(0); return; }
+    const id = `f${prossimaFermata++}`;
+    let finito = false;
+    const finisci = (vive) => {
+      if (finito) return;
+      finito = true;
+      fermate.delete(id);
+      clearTimeout(timer);
+      resolve(Number(vive) || 0);
+    };
+    // Nessuna risposta entro la finestra = "è rimasto tutto vivo": si ricarica.
+    const timer = setTimeout(() => finisci(1), FERMATA_MS);
+    if (timer.unref) timer.unref();
+    fermate.set(id, finisci);
+    try { wc.send('filo:permessi-ferma', { id, chiavi: chiavi && chiavi.length ? chiavi : null }); }
+    catch (_) { finisci(1); }
+  });
+}
+
+// La risposta della pagina, inoltrata da src/main/ipc.js.
+function rispostaFermata(id, vive) {
+  const f = fermate.get(String(id || ''));
+  if (!f) return { ok: false };
+  f(vive);
+  return { ok: true };
+}
+
+// «Interrompi», e la revoca. Prima si chiede alla pagina; se qualcosa resta
+// vivo, si ricarica come prima.
 function interrompiUso(id) {
   const r = usi.get(String(id));
   if (!r) return { ok: false, error: 'finita' };
-  try { if (r.wc && !r.wc.isDestroyed()) r.wc.reload(); } catch (_) {}
-  return fineUso(id);
+  const wc = r.wc;
+  const chiavi = r.chiavi.slice();
+  fineUso(id);
+  chiediAllaPaginaDiFermare(wc, chiavi).then((vive) => {
+    if (!vive) return;
+    try { if (wc && !wc.isDestroyed()) wc.reload(); } catch (_) {}
+  }).catch(() => {
+    try { if (wc && !wc.isDestroyed()) wc.reload(); } catch (_) {}
+  });
+  return { ok: true };
 }
 
 // La × sul cartello incerto: toglie l'avviso e basta, senza toccare la pagina.
