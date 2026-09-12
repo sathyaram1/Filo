@@ -1882,6 +1882,13 @@ class TabManager {
       // pagina da cui siamo partiti, come in will-navigate.
       if (this._maybeBlockNavigation(url, { fromUrl: wc.getURL() })) {
         event.preventDefault();
+        // La scheda era già nata per questo indirizzo e non ha mai caricato
+        // niente: fermare il rimbalzo la lascia vuota, senza indirizzo, senza
+        // titolo e senza contenuto, e l'utente deve chiuderla a mano quando la
+        // notifica se n'è già andata. Se invece la scheda aveva una pagina
+        // (l'utente ha cliccato un link da lì), quella pagina resta dov'era e
+        // non c'è niente da chiudere.
+        if (!tab._everNavigated) this._chiudiSchedaRimastaVuota(tab);
       }
     });
     // Debug helper: in dev relay i log della pagina al main.
