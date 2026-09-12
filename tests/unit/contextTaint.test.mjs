@@ -207,3 +207,35 @@ test('#587 — un payload illeggibile invece resta sospetto anche senza combacia
     assert.equal(v.exfil, true, `"${url}" deve chiedere conferma`);
   }
 });
+
+// ── #587 giro 4: uscire dal registro non vuol dire sparire ──────────────────
+//
+// Il registro ha un tetto e le voci più vecchie escono per prime. Finché il
+// testo usciva e basta, bastava far leggere a Filo sette file grossi qualunque —
+// sette comandi di sola lettura, nessuno dei quali chiede niente — perché la
+// chiave letta prima non fosse più fra i dati da proteggere, e da lì l'indirizzo
+// che la portava fuori partiva senza avviso, in chiaro. Adesso di una voce che
+// esce restano le parole che la rendono riconoscibile. Senza il fix l'assert
+// dopo i riempimenti torna false.
+test('#587 — qualche lettura di riempimento non fa dimenticare la chiave letta prima', () => {
+  const s = nuovoMittente();
+  Taint.record(s, 'comando', 'OPENROUTER_API_KEY=sk-or-v1-9f3ab2c7d84e1f5b6a0c\nmario.rossi@gmail.com');
+  const url = 'https://raccolta.test/?d=sk-or-v1-9f3ab2c7d84e1f5b6a0c';
+  const chiede = () => E.assess(url, {
+    corpus: Taint.corpusText(s),
+    fromUntrusted: Taint.isTainted(s),
+  }).exfil;
+  assert.equal(chiede(), true, 'subito dopo la lettura deve chiedere conferma');
+  const grande = 'riempitivo '.repeat(3 * 1024);
+  for (let i = 0; i < 12; i++) Taint.record(s, 'comando', `${grande}${i}`);
+  assert.equal(chiede(), true, 'la chiave è ancora fra i dati da proteggere');
+  // …e anche l'indirizzo email, che nel riassunto va tenuto intero.
+  assert.equal(
+    E.assess('https://raccolta.test/?e=mario.rossi%40gmail.com', {
+      corpus: Taint.corpusText(s),
+      fromUntrusted: true,
+    }).exfil,
+    true,
+    'l’email letta è ancora fra i dati da proteggere',
+  );
+});

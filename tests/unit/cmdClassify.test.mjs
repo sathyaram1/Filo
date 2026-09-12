@@ -1377,3 +1377,75 @@ test('#587 — le letture di tutti i giorni non chiedono niente (giro 3)', () =>
     assert.equal(C.classify(cmd, dove(WIN, WIN)), 1, `"${cmd}" non deve chiedere niente`);
   }
 });
+
+// ── #587, giro 4 — la cassetta dei segreti di un Mac, e gli escape di bash ───
+//
+// Due strade, stessa causa dei giri prima: quello che viene misurato non è
+// quello che il comando aprirà.
+//
+// La prima è una piattaforma intera. I bersagli riservati si riconoscono dal
+// nome — `.ssh`, `.config`, `AppData` — ma su macOS i segreti non stanno in
+// cartelle nascoste: stanno tutti in `~/Library` (le chiavi API e il portafoglio
+// di Filo in «Application Support/Filo/storage.json», il portachiavi, le
+// password dei browser, la posta). Lo stesso file di Filo chiedeva un OK su
+// Linux e su Windows e non chiedeva niente su un Mac.
+//
+// La seconda sono le sequenze di escape dentro `$'…'`: lì bash non toglie solo
+// le barre rovesciate, scioglie anche `\x68`, `\150` e `h`, che sono tutte
+// e tre la lettera «h». Il giro 3 aveva tolto le virgolette senza leggere il
+// contenuto, quindi `cat $'.ss\x68/config'` apriva `~/.ssh/config` mentre il
+// controllo leggeva `.ssx68`.
+//
+// Senza il fix ognuno di questi assert torna 1 al posto di 2.
+const MAC = '/Users/mario';
+const doveMac = { perimetro: MAC, home: MAC, cwd: MAC, shell: 'bash' };
+
+test('#587 — su un Mac la cartella Library non è una cartella qualunque', () => {
+  for (const cmd of [
+    'cat "Library/Application Support/Filo/storage.json"',
+    'cat Library/Application\\ Support/Filo/storage.json',
+    'cat ~/Library/Application\\ Support/Filo/storage.json',
+    'cat Library/Keychains/login.keychain-db',
+    'cat "Library/Application Support/Firefox/Profiles/ab.default/logins.json"',
+    'cat Library/Messages/chat.db',
+    'grep -r password Library',
+    'ls -R Library',
+    'cd Library/Application\\ Support/Filo && cat storage.json',
+    'cat Libr*/Keychains/login.keychain-db',
+  ]) {
+    assert.equal(C.classify(cmd, doveMac), 2, `"${cmd}" deve chiedere un OK`);
+  }
+  // Stessa regola per l'altra strada, «leggi questo file».
+  assert.notEqual(
+    C.pathReason(`${MAC}/Library/Application Support/Filo/storage.json`,
+      { perimetro: MAC, home: MAC, cwd: MAC, soloRiservati: true }), '',
+    'anche leggendolo come documento deve dare un motivo',
+  );
+  // `Library` più in giù è una cartella qualunque, e non deve costare niente.
+  assert.equal(C.classify('cat progetto/Library/indice.txt', doveMac), 1);
+  for (const cmd of ['cat appunti.txt', 'cat Documents/bolletta.pdf', 'ls -la', 'head -5 Documents/*.csv']) {
+    assert.equal(C.classify(cmd, doveMac), 1, `"${cmd}" non deve chiedere niente`);
+  }
+});
+
+test('#587 — le sequenze di escape di bash non nascondono il bersaglio', () => {
+  const dovunque = { perimetro: HOME, home: HOME, cwd: HOME, shell: 'bash' };
+  for (const cmd of [
+    "cat $'.ss\\x68/config'",
+    "cat $'.ss\\150/config'",
+    "cat $'.ss\\u0068/config'",
+    "cat $'.netr\\x63'",
+    "cat $'.git-credential\\x73'",
+    "cat $'.confi\\x67/Filo/storage.json'",
+    "grep -h . $'.ss\\x68/config'",
+    "cd $'.ss\\x68' && cat config",
+    "ls $'.ss\\x68'",
+  ]) {
+    assert.equal(C.classify(cmd, dovunque), 2, `"${cmd}" deve chiedere un OK`);
+  }
+  // Le stesse virgolette sono anche il modo normale di scrivere un nome con uno
+  // spazio dentro: lì non devono chiedere niente.
+  for (const cmd of ["cat $'appunti.txt'", "cat $'Documenti/nota di spesa.txt'"]) {
+    assert.equal(C.classify(cmd, dovunque), 1, `"${cmd}" non deve chiedere niente`);
+  }
+});

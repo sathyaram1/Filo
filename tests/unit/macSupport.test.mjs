@@ -779,3 +779,36 @@ test('quello che si legge sul salto di scheda è quello che succede', () => {
   assert.ok(!/Cmd\+0/.test(cap.invoke) || /100%/.test(cap.invoke),
     'il manifesto promette ancora una scheda su Cmd+0, che su Mac è lo zoom');
 });
+
+// ── I segreti di un Mac stanno in una cartella che non è nascosta ────────────
+//
+// Il freno sulle letture (#587) tiene fuori dal «niente conferma» i posti dove
+// stanno chiavi e password. Quei posti si riconoscono dal nome — `.ssh`,
+// `.config`, `.mozilla` su Linux, `AppData` e `NTUSER.DAT` su Windows — e su
+// macOS quel modo di riconoscerli non funziona: lì è tutto dentro `~/Library`,
+// che non è nemmeno una cartella nascosta. Il file dove Filo tiene le chiavi API
+// e il portafoglio dell'utente chiedeva un OK su Linux e su Windows e non
+// chiedeva niente su un Mac: stessa lettura, tre risposte diverse (#587, giro 4).
+test('su Mac ~/Library resta un bersaglio riservato come .config e AppData', () => {
+  require(join(ROOT, 'src', 'shared', 'cmdClassify.js'));
+  const C = globalThis.SN_CMD_CLASSIFY;
+  const MAC = '/Users/mario';
+  const suMac = { perimetro: MAC, home: MAC, cwd: MAC, shell: 'bash' };
+  for (const cmd of [
+    'cat "Library/Application Support/Filo/storage.json"',
+    'cat Library/Keychains/login.keychain-db',
+    'grep -r password Library',
+  ]) {
+    assert.equal(C.classify(cmd, suMac), 2, `su Mac "${cmd}" passa senza chiedere niente`);
+  }
+  // Lo stesso file di Filo sulle altre due piattaforme: è il confronto che dice
+  // se la regola è ancora simmetrica.
+  assert.equal(C.classify('cat .config/Filo/storage.json',
+    { perimetro: '/home/mario', home: '/home/mario', cwd: '/home/mario', shell: 'bash' }), 2);
+  assert.equal(C.classify('type AppData\\Roaming\\Filo\\storage.json',
+    { perimetro: 'C:\\Users\\mario', home: 'C:\\Users\\mario', cwd: 'C:\\Users\\mario', shell: 'powershell' }), 2);
+  // E le letture di tutti i giorni su un Mac non devono costare un clic.
+  for (const cmd of ['cat appunti.txt', 'ls -la', 'cat Documents/bolletta.pdf']) {
+    assert.equal(C.classify(cmd, suMac), 1, `su Mac "${cmd}" chiede una conferma di troppo`);
+  }
+});

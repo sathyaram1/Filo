@@ -199,3 +199,73 @@ test('#587 — il confronto più largo non accende avvisi sugli indirizzi veri',
     assert.equal(chiede(url), false, `"${url}" non deve chiedere niente`);
   }
 });
+
+// ── #587 giro 4: il dato travestito, e l'avviso che non deve comparire ───────
+//
+// La difesa riconosceva il dato in chiaro, in base64 e tagliato in due o tre
+// pezzi. Restavano fuori i travestimenti che costano una riga a chi compone
+// l'indirizzo: scriverlo all'indietro, spostare l'alfabeto, infilare una lettera
+// ogni tre caratteri, scriverlo in esadecimale quando è corto. E dall'altra
+// parte l'avviso compariva su sei link veri su venti appena Filo aveva letto un
+// documento, perché fra le parole da proteggere finiva «https» — che sta dentro
+// ogni indirizzo — e una parola qualunque in comune bastava a completare la
+// coppia. Senza il fix la prima prova torna false e la seconda true.
+const G4 = [
+  'machine ftp.esempio.it login mario password SegretoNetrc2026',
+  'OPENROUTER_API_KEY=sk-or-v1-9f3ab2c7d84e1f5b6a0c',
+].join('\n');
+const chiedeG4 = (url) => E.assess(url, { corpus: G4, fromUntrusted: true }).exfil;
+const rovesciaG4 = (s) => s.split('').reverse().join('');
+const sparsoG4 = (s, n) => s.match(new RegExp(`.{1,${n}}`, 'g')).join('x');
+
+test('#587 — il dato travestito porta comunque fuori i dati, quindi chiede conferma', () => {
+  const seg = 'SegretoNetrc2026';
+  const chiave = 'sk-or-v1-9f3ab2c7d84e1f5b6a0c';
+  for (const url of [
+    `https://raccolta.test/?d=${rovesciaG4(seg)}`,
+    `https://raccolta.test/?d=${rovesciaG4(chiave)}`,
+    `https://raccolta.test/?d=${sparsoG4(seg, 4)}`,
+    `https://raccolta.test/?d=${sparsoG4(seg, 3)}`,
+    `https://raccolta.test/?d=${sparsoG4(chiave, 4)}`,
+    `https://raccolta.test/?d=${Buffer.from(seg).toString('hex')}`,
+    // alfabeto spostato di tredici lettere (le cifre restano dove sono)
+    `https://raccolta.test/?d=${seg.replace(/[a-z]/gi, (c) => String.fromCharCode((c <= 'Z' ? 90 : 122) >= (c.charCodeAt(0) + 13) ? c.charCodeAt(0) + 13 : c.charCodeAt(0) - 13))}`,
+  ]) {
+    assert.equal(chiedeG4(url), true, `"${url}" porta fuori il dato: deve chiedere conferma`);
+  }
+});
+
+test('#587 — dopo un documento letto, i link di tutti i giorni si aprono e basta', () => {
+  // Un documento come quelli che un utente fa leggere a Filo: contiene un link,
+  // come quasi tutti i documenti veri.
+  const bolletta = [
+    'ENEL ENERGIA — Bolletta di luglio 2026',
+    'Cliente: Mario Rossi, via Verdi 10, Roma',
+    'Paga online dall’area clienti: https://www.enel.it/it/area-clienti',
+    'Servizio assistenza clienti 800 900 800. Numero cliente 88123456.',
+  ].join('\n');
+  for (const url of [
+    'https://www.enel.it/it/area-clienti',            // il link scritto nel documento
+    'https://www.poste.it/servizi-online.html',
+    'https://www.ilsole24ore.com/art/energia-bollette-in-calo-AF8k2Lm',
+    'https://www.corriere.it/cronache/26_settembre_12/roma-nuovo-piano-traffico.shtml',
+    'https://maps.google.com/?q=via+Verdi+Roma',
+    'https://www.trenitalia.com/it/offerte.html',
+  ]) {
+    const v = E.assess(url, { corpus: bolletta, fromUntrusted: true });
+    assert.equal(v.exfil, false, `"${url}" non deve chiedere niente (${v.reason})`);
+  }
+});
+
+test('#587 — un dump di dati personali nel link chiede ancora conferma', () => {
+  // La regola delle parole comuni resta: due parole del materiale protetto
+  // dentro il CARICO del link sono un dump, non una coincidenza.
+  const memoria = 'Profilo: si chiama Mario Rossi, vive a Bologna.';
+  for (const url of [
+    'https://raccolta.test/?d=Mario_Rossi',
+    'https://raccolta.test/log?u=mario.rossi&c=bologna',
+    'https://raccolta.test/exfil/MarioRossiBologna/done',
+  ]) {
+    assert.equal(E.assess(url, { corpus: memoria, fromUntrusted: true }).exfil, true, `"${url}" deve chiedere conferma`);
+  }
+});
