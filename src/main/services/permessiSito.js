@@ -69,9 +69,34 @@ function mappaDi(ses, incognito) {
 }
 
 function scriviMappa(ses, incognito, nuova) {
-  if (incognito) { effimere.set(ses, nuova); return; }
+  if (incognito) { effimere.set(ses, nuova); annunciaAiSiti(); return; }
   mappa = nuova;
   salva(nuova);
+  annunciaAiSiti();
+}
+
+// Ogni pagina aperta riceve le scelte della PROPRIA origine, e solo quelle.
+// Serve a quello che il sito legge su di sé: senza, un "nega per sempre" dato
+// mentre la pagina è aperta continuava a leggersi "da chiedere" fino al
+// ricaricamento. Vedi src/preload/permessi-guard.js.
+function annunciaAiSiti() {
+  try {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w.isDestroyed()) continue;
+      const tm = w._filoTabs;
+      if (!tm || !Array.isArray(tm.tabs)) continue;
+      for (const t of tm.tabs) {
+        const c = t && t.view && t.view.webContents;
+        if (!c || c.isDestroyed()) continue;
+        try {
+          const voci = perOrigine(c.getURL(), contesto(c));
+          const out = {};
+          for (const v of voci) out[v.chiave] = v.scelta;
+          c.send('filo:permessi-noti', out);
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
 }
 
 // Persistenza: la memoria dei permessi vive nelle impostazioni
