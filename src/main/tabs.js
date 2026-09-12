@@ -1870,6 +1870,18 @@ class TabManager {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
         openExternalScheme(url);
+        return;
+      }
+      // #590 — e la LISTA DEI SITI BLOCCATI, per lo stesso identico motivo. Il
+      // gate di will-navigate guarda l'indirizzo CHIESTO; dove si finisce
+      // davvero lo decide il server, e un rimbalzo 301/302 (gli accorciatori di
+      // link, i contatori di clic, mezzo web) portava la scheda sul sito della
+      // lista senza incontrare nessun controllo. Non serviva nemmeno far
+      // scrivere al modello l'indirizzo della lista: bastava un accorciatore.
+      // Il referrer per l'eccezione "arrivo da un motore di ricerca" è la
+      // pagina da cui siamo partiti, come in will-navigate.
+      if (this._maybeBlockNavigation(url, { fromUrl: wc.getURL() })) {
+        event.preventDefault();
       }
     });
     // Debug helper: in dev relay i log della pagina al main.
