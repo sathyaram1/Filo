@@ -326,7 +326,22 @@ async function decidi(wc, permesso, dettagli) {
   // i casi da qui parte il segno che la ripresa è in corso: è l'unica cosa che
   // la strada vecchia lascia vedere a chi usa Filo.
   if (preambolo && ok) segnaPreambolo(wc, origine);
+  if (ok) segnaSensori(wc, origine, chiavi);
   return ok;
+}
+
+// Fotocamera e microfono appena concessi: accendi il cartello che lo dice.
+// Vale sia per il sì appena dato sia per una scelta ricordata da prima, perché
+// il sito sta chiedendo il sensore adesso in tutti e due i casi. Il cartello
+// muore con la pagina (navigazione, scheda chiusa), con «Interrompi» o con la
+// revoca del permesso.
+function segnaSensori(wc, origine, chiavi) {
+  try {
+    const Pp = P();
+    const sensori = chiavi.filter((k) => k === Pp.CHIAVI.FOTOCAMERA || k === Pp.CHIAVI.MICROFONO);
+    if (!sensori.length) return;
+    iniziaUso(wc, origine, sensori, {});
+  } catch (_) {}
 }
 
 // ─── il preambolo consentito, e il segno che lo schermo è ripreso ───────────
