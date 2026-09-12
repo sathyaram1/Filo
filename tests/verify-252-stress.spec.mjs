@@ -97,13 +97,26 @@ test('doppio click rapido sulla conferma apre UNA sola lista', async ({ app, ope
   await savePage(page);
   const pill = page.locator('.sn-save-confirm');
   await expect(pill).toBeVisible({ timeout: 5000 });
-  // Due click sincroni back-to-back: se la conferma non è idempotente
-  // aprirebbe due liste. Sparati insieme prima che il DOM si aggiorni.
-  await page.evaluate(() => {
-    const el = document.querySelector('.sn-save-confirm');
-    el.click();
-    el.click();
-  });
+  // Due click ravvicinati: se la conferma non è idempotente aprirebbe due liste.
+  //
+  // Devono essere click VERI, non `elemento.click()` dal mondo della pagina:
+  // dal #586 la UI di Filo dentro una pagina web butta via i gesti che il
+  // codice della pagina si fabbrica (un sito apriva il menu di Filo e premeva
+  // «Incolla» per portarsi via gli appunti). Con un click fabbricato questo
+  // controllo non premeva più niente: nessuna lista si apriva, e falliva senza
+  // aver guardato quello che doveva guardare.
+  const box = await pill.boundingBox();
+  const cx = Math.round(box.x + box.width / 2);
+  const cy = Math.round(box.y + box.height / 2);
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.up();
+  // Il primo click chiude la scheda: il secondo può cadere nel vuoto, ed è
+  // proprio il caso che si vuole provare.
+  try {
+    await page.mouse.down();
+    await page.mouse.up();
+  } catch (_) { /* scheda già chiusa dal primo click */ }
 
   await new Promise((r) => setTimeout(r, 2500));
   const homes = app.windows().filter((w) => {
