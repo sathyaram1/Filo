@@ -440,7 +440,7 @@
       if (funzioniInstallate) return;
       funzioniInstallate = true;
 
-    SpellCheck.init(settings);
+      SpellCheck.init(settings);
 
     // window + capture: fase più precoce possibile, così intercettiamo il
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
