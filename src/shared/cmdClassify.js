@@ -854,16 +854,39 @@
   const AMBIENTE = 'Legge le variabili d’ambiente, dove spesso stanno chiavi e password.';
   const PROCESSI = 'Elenca i programmi aperti e i comandi con cui sono partiti, che a volte contengono password.';
   const VARIABILE = 'Usa una variabile d’ambiente, quindi dal comando non si vede quale file apre.';
+  const TUTTA = 'Passa in rassegna tutta la tua cartella, chiavi e password comprese.';
 
-  function operandReason(op, cwd, perim, home, soloRiservati) {
+  // Il primo segmento riservato di un percorso già spezzato, o ''.
+  function segRiservato(segs) {
+    for (const seg of segs) {
+      if (seg && SENSITIVE_SEG_RE.test(unquote(seg))) return seg;
+    }
+    return '';
+  }
+
+  // Perché questo bersaglio non è una lettura di livello 1? '' = lo è.
+  //
+  // Il bersaglio si misura DUE volte: com'è scritto nel comando e com'è una
+  // volta risolto contro la cartella corrente. La seconda misura è quella che
+  // conta, ed è la ragione per cui questa funzione esiste in questa forma:
+  // spostarsi di cartella non chiede niente e resta valido nei turni dopo,
+  // quindi `cd ~/.ssh` + `cat config` apre un file riservato senza che la
+  // parola `.ssh` compaia nel comando che legge. Guardare solo il testo scritto
+  // significa lasciare quella porta aperta (#587, giro 1).
+  //
+  // `ricorsivo` dice che il bersaglio non è un file ma tutto ciò che sta sotto:
+  // allora non basta che il percorso scritto sia pulito, deve essere anche
+  // abbastanza stretto da non contenere i bersagli riservati.
+  function operandReason(op, cwd, perim, home, soloRiservati, ricorsivo) {
     const raw = String(op || '');
     // Drive PowerShell dell'ambiente: `Get-ChildItem Env:`, `Get-Item Env:\PATH`.
     if (/^env:/i.test(raw)) return AMBIENTE;
-    for (const seg of raw.replace(/\\/g, '/').split('/')) {
-      if (seg && SENSITIVE_SEG_RE.test(unquote(seg))) return `“${seg}” contiene chiavi o password.`;
-    }
-    if (soloRiservati) return '';
     const target = resolveTarget(raw, cwd, home);
+    const scritto = segRiservato(raw.replace(/\\/g, '/').split('/'));
+    if (scritto) return `“${scritto}” contiene chiavi o password.`;
+    const risolto = target ? segRiservato(target.segs) : '';
+    if (risolto) return `“${risolto}” contiene chiavi o password.`;
+    if (soloRiservati) return '';
     if (!perim) {
       // Nessun perimetro dichiarato (classificatore usato da solo): resta la
       // lettura strutturale — assoluto, risalita con `..`, o `~` = fuori.
@@ -875,6 +898,9 @@
     }
     if (!target) return FUORI;
     if (!insidePerimeter(target, perim)) return FUORI;
+    // Dentro il perimetro, ma ricorsivo: se il sottoalbero È la cartella
+    // dichiarata, sotto ci stanno tutti i bersagli riservati.
+    if (ricorsivo && target.segs.length <= perim.segs.length) return TUTTA;
     return '';
   }
 
@@ -906,8 +932,14 @@
         continue;
       }
       if (!READS_PATHS.has(prog)) continue;
-      for (const op of operandsOf(t)) {
-        const why = operandReason(op, cwd, perimOk, home);
+      const ricorsivo = isRecursive(prog, t);
+      // Un comando che non nomina nessun percorso legge DOVE SI TROVA: `ls` e
+      // `grep -r chiave` dicono la stessa cosa di `ls .` e `grep -r chiave .`,
+      // e vanno misurati sulla cartella corrente. Senza questo, spostarsi e
+      // basta bastava a leggere fuori dalla cartella dell'utente.
+      const bersagli = operandsOf(t);
+      for (const op of (bersagli.length ? bersagli : [cwd || '.'])) {
+        const why = operandReason(op, cwd, perimOk, home, false, ricorsivo);
         if (why) return why;
       }
     }
