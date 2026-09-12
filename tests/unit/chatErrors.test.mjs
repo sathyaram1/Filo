@@ -14,9 +14,9 @@ const CE = globalThis.SN_CHAT_ERRORS;
 
 const SCRY = { dataSource: 'Scryfall (l\'archivio delle carte)' };
 
-test('SN_CHAT_ERRORS si registra con friendly/sentence/isTransientNetwork', () => {
+test('SN_CHAT_ERRORS si registra con friendly/sentence/isTransientNetwork/actionFailure', () => {
   assert.ok(CE);
-  for (const fn of ['friendly', 'sentence', 'isTransientNetwork']) {
+  for (const fn of ['friendly', 'sentence', 'isTransientNetwork', 'actionFailure']) {
     assert.equal(typeof CE[fn], 'function', `manca ${fn}`);
   }
 });
@@ -150,4 +150,31 @@ test('sentence(): stessa frase con l\'iniziale maiuscola, per la bolla da sola',
   const sentence = CE.sentence(new TypeError('fetch failed'));
   assert.equal(sentence.slice(1), clause.slice(1));
   assert.equal(sentence[0], clause[0].toUpperCase());
+});
+
+// ── #590: perché un'azione di Filo non è riuscita ─────────────────────────────
+//
+// Le stesse parole per TUTTE le chat: la chat della home lo diceva già, quella
+// che si apre sopra una pagina web diceva solo "non riuscita" e il nome del
+// sito bloccato arrivava soltanto dalla notifica.
+
+test('actionFailure(): la lista dei siti bloccati dice QUALE sito', () => {
+  assert.equal(CE.actionFailure({ blocked: 'site', host: 'esempio.test' }), 'sito bloccato: esempio.test');
+  // Senza host la frase resta sensata invece di finire con due punti nel vuoto.
+  assert.equal(CE.actionFailure({ blocked: 'site' }), 'sito bloccato');
+});
+
+test('actionFailure(): gli altri motivi che il main conosce', () => {
+  assert.equal(CE.actionFailure({ blocked: 'scheme' }), 'indirizzo non ammesso');
+  assert.equal(CE.actionFailure({ blocked: 'address' }), 'indirizzo non valido');
+  assert.equal(CE.actionFailure({ restyle: 'no-page' }), 'nessuna pagina web aperta');
+  assert.equal(CE.actionFailure({ found: false }), 'non trovato');
+  assert.equal(CE.actionFailure({ ok: false, detail: 'il file è vuoto' }), 'il file è vuoto');
+  assert.equal(CE.actionFailure({ error: 'rotto' }), 'rotto');
+});
+
+test('actionFailure(): motivo ignoto → stringa vuota, e chi chiama resta sul generico', () => {
+  for (const v of [undefined, null, '', 0, 'testo', {}, { ok: true }]) {
+    assert.equal(CE.actionFailure(v), '', `nessun motivo per ${JSON.stringify(v)}`);
+  }
 });
