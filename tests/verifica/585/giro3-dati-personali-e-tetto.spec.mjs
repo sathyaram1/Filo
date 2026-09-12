@@ -172,6 +172,21 @@ test('un passo eseguito come comando di Filo non si racconta come un click', () 
   }
 });
 
+test('la domanda che l\'Aiuto fa alla raccolta si può davvero fare', () => {
+  // L'Aiuto chiede alla raccolta i percorsi di QUESTO dominio, quelli riusciti,
+  // dal più recente. Una domanda fatta così — due campi da confrontare e un
+  // terzo su cui ordinare — la raccolta la rifiuta se non le è stato dichiarato
+  // prima come tenere in ordine quei tre campi insieme, e la dichiarazione sta
+  // in questo repo. Oggi non c'è: la raccolta risponde «non posso», la risposta
+  // viene ingoiata e all'Aiuto non arriva mai nessun percorso — né buono né
+  // avvelenato. Provato anche contro la raccolta vera: risponde 400.
+  const indici = require(join(ROOT, 'firestore.indexes.json')).indexes || [];
+  const perPercorsi = indici.filter((i) => i.collectionGroup === 'paths');
+  const campi = perPercorsi.map((i) => (i.fields || []).map((f) => f.fieldPath).join(','));
+  expect(campi, 'nessun ordinamento dichiarato per la domanda dell\'Aiuto')
+    .toContain('domain,success,createdAt');
+});
+
 test('un\'azione inventata da un documento ostile non arriva al modello', () => {
   // L'altra metà della stessa regola, e questa tiene: il testo che un
   // attaccante scrive al posto dell'azione non deve comparire nel prompt.
