@@ -104,7 +104,7 @@ function registerIpcHandlers() {
   ipcMain.on('filo:permessi-fermato', (event, msg) => {
     try {
       require('./services/permessiSito').rispostaFermata(
-        (msg && msg.id) || '', (msg && msg.vive) || 0,
+        (msg && msg.id) || '', (msg && msg.vive) || 0, (msg && msg.viste) || 0,
       );
     } catch (_) {}
   });
