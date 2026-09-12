@@ -419,7 +419,42 @@
     return { valid, invalid };
   }
 
-  async function save() {
+  // Quello che questa pagina ha scritto per ultimo (all'apertura: quello che
+  // ci ha trovato). Come nelle Preferenze e nelle Opzioni: si manda solo
+  // quello che l'utente ha toccato, se no una protezione cambiata altrove
+  // mentre la pagina restava aperta tornava indietro al primo tocco.
+  let ultimoInviato = null;
+
+  function raccogli() {
+    const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
+    return {
+      invalid,
+      valori: {
+        protectIpLeak: !!$('sec-protect-ip').checked,
+        blockPopups: !!$('sec-block-popups').checked,
+        adblock: { enabled: !!$('sec-adblock').checked },
+        siteBlock: {
+          enabled: !!$('sec-siteblock').checked,
+          useAdblockLists: !!$('sec-siteblock-lists').checked,
+          blacklist,
+        },
+        safeBrowse: {
+          enabled: !!$('sec-safebrowse').checked,
+          networkSignals: !!$('sec-safebrowse-network').checked,
+          llmJudge: !!$('sec-safebrowse-llm').checked,
+          sandbox: !!$('sec-safebrowse-sandbox').checked,
+        },
+        // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
+        autoFeedback: !!$('sec-auto-feedback').checked,
+      },
+    };
+  }
+
+  function ribasa() {
+    try { ultimoInviato = raccogli().valori; } catch (_) { ultimoInviato = null; }
+  }
+
+  async function saveVecchia() {
     const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
     setBlacklistError(invalid);
     const partial = {
