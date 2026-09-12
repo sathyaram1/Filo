@@ -81,6 +81,18 @@ contextBridge.exposeInMainWorld('filoShell', {
     answer: (id, scelta, ricorda) => ipcRenderer.invoke('permissions:answer', { id, scelta, ricorda }),
     forOrigin: (origine) => ipcRenderer.invoke('permissions:for-origin', { origine }),
     revoke: (origine, chiave) => ipcRenderer.invoke('permissions:revoke', { origine, chiave }),
+    // Quale schermo o finestra condividere, dopo il «Consenti» sulla cattura.
+    onPickSource: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('permissions:pick-source', wrapped);
+      return () => ipcRenderer.removeListener('permissions:pick-source', wrapped);
+    },
+    onSourceClosed: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('permissions:source-closed', wrapped);
+      return () => ipcRenderer.removeListener('permissions:source-closed', wrapped);
+    },
+    pickSource: (id, fonteId) => ipcRenderer.invoke('permissions:pick-source', { id, fonteId }),
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
