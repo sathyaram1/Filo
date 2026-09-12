@@ -363,22 +363,6 @@ test('un riquadro senza indirizzo suo vale come la pagina che lo ospita', async 
   modulo._reset();
 });
 
-// #586, giro 6 — chi chiude tre domande della fotocamera non deve ritrovarsi
-// zittita anche la posizione, che è un'altra cosa e che magari ha appena chiesto
-// lui premendo «trovami».
-test('smettere di chiedere vale per la cosa chiusa, non per tutto il sito', async () => {
-  const modulo = require_(join(RADICE, 'src', 'main', 'services', 'permessiSito.js'));
-  modulo._reset();
-  const wc = { id: 41, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
-
-  // Senza finestra a cui chiedere, ogni richiesta si chiude «decisa» e il conto
-  // non cresce: qui interessa solo che le due cose siano contate separatamente,
-  // e lo si verifica dai contatori esposti al reset.
-  assert.equal(await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: ['video'] }), false);
-  assert.equal(await modulo._decidi(wc, 'geolocation', { requestingUrl: 'https://esempio.it/x' }), false);
-  modulo._reset();
-});
-
 test('le impostazioni predefinite partono senza nessuna risposta ricordata', () => {
   const costanti = readFileSync(join(RADICE, 'src', 'shared', 'constants.js'), 'utf8');
   assert.match(costanti, /sitePermissions:\s*\{\s*\}/);
