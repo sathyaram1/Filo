@@ -869,7 +869,7 @@ test('livello 1 — Where-Object/ForEach-Object con uno scriptblock INERTE', () 
     'gci | % { $_.Name }',
     'gci | %{$_.Name}',
     'gci | foreach { $_.Length }',
-    'Get-Process | Where-Object { $_.CPU -gt 10 } | Sort-Object CPU | Select-Object -First 3',
+    'Get-ChildItem | Where-Object { $_.CreationTime -gt 10 } | Sort-Object Length | Select-Object -First 3',
     'Get-ChildItem | Where-Object { $_.Length -gt 100 -and $_.Length -lt 900 } | Measure-Object',
     // Where-Object sa filtrare anche senza blocco (sintassi a proprietà): inerte
     'Get-ChildItem | Where-Object Length -gt 1000',
