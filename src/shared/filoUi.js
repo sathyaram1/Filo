@@ -163,5 +163,5 @@
     } catch (_) { return false; }
   }
 
-  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark };
+  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark, nostra, premi, guardiaGesti };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
