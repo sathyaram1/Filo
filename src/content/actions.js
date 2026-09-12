@@ -112,77 +112,66 @@
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
-    // #586 — gli appunti li legge FILO perché l'utente ha premuto "Incolla",
-    // non il sito: senza questo annuncio comparirebbe la pastiglia «<sito>
-    // vuole leggere i tuoi appunti» per un gesto suo, e un "Nega" spegnerebbe
-    // l'Incolla di Filo su quel sito per sempre. La concessione vale una volta
-    // sola, quindi si annuncia prima di OGNI lettura.
-    const annunciaAppunti = async () => {
-      try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_DI_FILO, chiave: 'appunti' }); } catch (_) {}
-    };
-    // Tenta lettura strutturata (testo + immagini)
-    try {
-      if (navigator.clipboard.read) {
-        await annunciaAppunti();
-        const items = await navigator.clipboard.read();
-        for (const it of items) {
-          // Cerca un'immagine
-          const imgType = it.types.find((t) => t.startsWith('image/'));
-          if (imgType) {
-            const blob = await it.getType(imgType);
-            const dataUrl = await blobToDataUrl(blob);
-            deps.restorePasteContext();
-            const ctx = deps.getPasteContext();
-            const targetKind = ctx?.kind;
-            if (targetKind === 'input') {
-              // input/textarea non supportano immagini: prova a delegare ad
-              // un handler custom (es. il modal feedback) via evento bubbling.
-              const pasteEvt = new CustomEvent('filo:paste-image', {
-                bubbles: true, cancelable: true, detail: { blob },
-              });
-              if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
-                return;
-              }
-              // Nessun handler ha accettato: ricadi sul testo se presente
-              const textType = it.types.find((t) => t === 'text/plain');
-              if (textType) {
-                const text = await (await it.getType(textType)).text();
-                insertTextAtSelection(text);
-                pushClipboardEntry({ type: 'text', text });
-              } else {
-                Popup.showToast(I18n.t('toast_cannot_paste_image'));
-              }
-              return;
-            }
-            if (targetKind !== 'ce') {
-              // Nessun target editabile valido per un'immagine.
-              Popup.showToast(I18n.t('toast_cannot_paste_image'));
-              return;
-            }
-            const ok = insertImageInEditable(blob, dataUrl);
-            if (!ok) {
-              Popup.showToast(I18n.t('toast_paste_failed'));
-              return;
-            }
-            const description = await describeImage(blob);
-            pushClipboardEntry({ type: 'image', dataUrl, description });
-            Popup.showToast(I18n.t('toast_pasted_image'));
-            return;
-          }
-        }
-      }
-    } catch (_) {
-      // Permessi negati o API non disponibile: ricadi sul testo
-    }
-    // Fallback: solo testo
-    try {
-      await annunciaAppunti();
-      const text = await navigator.clipboard.readText();
-      if (!text) return;
+    // #586 — gli appunti li legge FILO, nel processo principale, e non la
+    // pagina. Prima li leggeva il mondo del sito con una concessione al volo che
+    // saltava la domanda del permesso, perché a premere "Incolla" è l'utente e
+    // non il sito. Quella concessione però valeva per la prima richiesta di
+    // appunti che arrivava in quella scheda: un sito che li chiedeva in
+    // continuazione se la prendeva lui, e quello che l'utente aveva copiato
+    // finiva a lui invece che nel campo. Passando dal main quella corsa non
+    // esiste — il contenuto non tocca mai il mondo della pagina — e un sito che
+    // vuole gli appunti per conto suo passa dalla domanda come tutti.
+    let appunti = null;
+    try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) {}
+    if (!appunti || !appunti.ok) { Popup.showToast(I18n.t('toast_paste_failed')); return; }
+
+    const testo = String(appunti.testo || '');
+    const dataUrl = String(appunti.immagine || '');
+
+    if (dataUrl) {
+      let blob = null;
+      try { blob = await (await fetch(dataUrl)).blob(); } catch (_) {}
       deps.restorePasteContext();
-      insertTextAtSelection(text);
-      pushClipboardEntry({ type: 'text', text });
-    } catch (_) {}
+      const ctx = deps.getPasteContext();
+      const targetKind = ctx?.kind;
+      if (targetKind === 'input') {
+        // input/textarea non supportano immagini: prova a delegare ad
+        // un handler custom (es. il modal feedback) via evento bubbling.
+        if (blob) {
+          const pasteEvt = new CustomEvent('filo:paste-image', {
+            bubbles: true, cancelable: true, detail: { blob },
+          });
+          if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) return;
+        }
+        // Nessun handler ha accettato: ricadi sul testo se presente
+        if (testo) {
+          insertTextAtSelection(testo);
+          pushClipboardEntry({ type: 'text', text: testo });
+        } else {
+          Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        }
+        return;
+      }
+      if (targetKind !== 'ce' || !blob) {
+        // Nessun target editabile valido per un'immagine.
+        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        return;
+      }
+      const ok = insertImageInEditable(blob, dataUrl);
+      if (!ok) {
+        Popup.showToast(I18n.t('toast_paste_failed'));
+        return;
+      }
+      const description = await describeImage(blob);
+      pushClipboardEntry({ type: 'image', dataUrl, description });
+      Popup.showToast(I18n.t('toast_pasted_image'));
+      return;
+    }
+
+    if (!testo) return;
+    deps.restorePasteContext();
+    insertTextAtSelection(testo);
+    pushClipboardEntry({ type: 'text', text: testo });
   }
 
   async function pasteHistoryEntry(entry) {
