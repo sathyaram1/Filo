@@ -137,9 +137,9 @@
     return null;
   }
 
-  // Fallback strutturale: payload corposo / blob opaco in un URL nato da
-  // contenuto NON fidato (es. l'agente sulla pagina). Copre i dati cifrati che
-  // il taint-match non riconosce. Attivo solo con fromUntrusted per non infastidire
+  // Fallback strutturale: payload corposo / blob opaco in un URL nato mentre nel
+  // contesto c'era materiale NON FIDATO. Copre i dati cifrati o spezzati che il
+  // taint-match non riconosce. Attivo solo con fromUntrusted per non infastidire
   // sui link legittimi con query lunghe (tracking, OAuth) nati da input diretto.
   function structural(url) {
     let u;
