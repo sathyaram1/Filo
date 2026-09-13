@@ -1049,7 +1049,7 @@
     righe.push(riga('Chi ha deciso', 'il filtro automatico, prima dei giudici'));
     if (azione) righe.push(riga('Cosa ha fatto', L1_AZIONI[azione] || azione.replace(/_/g, ' ')));
     return forma('l1', 'triangolo', titolo, cat.classe, cat.esito, {
-      titolo, righe, testo: '', azioni: [],
+      titolo, righe: righe.concat(righeStato(fb)), testo: '', azioni: [],
     });
   }
 
