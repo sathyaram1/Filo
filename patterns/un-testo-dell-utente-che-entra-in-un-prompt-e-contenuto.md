@@ -105,6 +105,7 @@ segnaposto dentro `PROMPTS.helpStatic` / `PROMPTS.filoChatStatic`),
 `src/shared/actionLevels.js` (il rifiuto non apre popup),
 `src/main/services/handlers.js` (`applySettingsUpdate`, dispatch di
 `IMPOSTA_PREFERENZA`, `toolResultText`),
-`src/main/services/handlers/storage.js` (campi vietati da origine web),
+`src/main/services/handlers/storage.js` (`AMMESSE_DA_WEB`: da un'origine web
+passa solo l'elenco di ciò che è lecito),
 `src/pages/preferences/preferences.js` (conteggio e rifiuto).
 Prove: `tests/unit/agentStyle.test.mjs`, `tests/agent-style.spec.mjs`.
