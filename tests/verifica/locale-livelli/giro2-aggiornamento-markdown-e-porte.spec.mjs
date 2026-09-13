@@ -224,7 +224,7 @@ test('porta B: nel rombo «## Problema» è un titolo e «- A» una voce, anche 
 
 // ── C. Scartare dal quadrato; il pannello segue l'elenco delle fusioni ──────
 
-test('porta C: «Scarta» dal pannello del quadrato chiede conferma e manda il comando sull’id giusto; quando la richiesta sparisce il pannello resta aperto e lo dice', async ({ openTab }) => {
+test('porta C: «Scarta» dal pannello del quadrato manda il comando sull’id giusto (un click: si rifà gratis, come in Automazioni); quando la richiesta sparisce il pannello resta aperto e lo dice', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fb = pratica({ status: 'design', statusReason: 'l5' });
   await apri(page, { fbs: [fb], pending: [richiesta()] });
@@ -234,9 +234,6 @@ test('porta C: «Scarta» dal pannello del quadrato chiede conferma e manda il c
   const scarta = sideBody(page).locator('button', { hasText: /scarta/i }).first();
   await expect(scarta).toBeVisible();
   await scarta.click();
-  expect(await page.evaluate(() => window.__calls.length)).toBe(0);
-  await expect(sideBody(page).locator('button', { hasText: /confermi|sicuro/i }).first()).toBeVisible();
-  await sideBody(page).locator('button', { hasText: /confermi|sicuro/i }).first().click();
   await expect.poll(async () => page.evaluate(() => window.__calls.map((c) => c.type))).toContain('merge_approval_discard');
   const call = await page.evaluate(() => window.__calls.find((c) => c.type === 'merge_approval_discard'));
   expect(call.id).toBe('req-0001-abcdef');
