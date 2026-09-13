@@ -62,6 +62,31 @@
     return out;
   }
 
+  // Per le mappe che si salvano INTERE — quelle di REPLACE_KEYS, il cui
+  // contratto è «questa è la lista completa, chi manca è stato rimosso»: lì
+  // `partialCambiato` non serve a niente, perché mandarne un pezzo cancella il
+  // resto. Allora si parte da quello che c'è in memoria ADESSO e ci si applica
+  // SOLO le voci che l'utente ha toccato da quando la pagina le ha lette,
+  // comprese quelle che ha togliere.
+  //
+  // Senza questo, una pagina di impostazioni rimandava la mappa com'era
+  // all'apertura e cancellava quello che era cambiato altrove nel frattempo: un
+  // colore chiesto a Filo spariva del tutto al primo ritocco di una misura
+  // (#592, giro 5). Vale la stessa regola di `partialCambiato`: quello che
+  // l'utente non ha toccato non si rimanda mai.
+  function mappaRibasata(inMemoria, letta, mostrata) {
+    const isMappa = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+    const out = isMappa(inMemoria) ? { ...inMemoria } : {};
+    const prima = isMappa(letta) ? letta : {};
+    const adesso = isMappa(mostrata) ? mostrata : {};
+    for (const k of new Set([...Object.keys(prima), ...Object.keys(adesso)])) {
+      if (JSON.stringify(prima[k]) === JSON.stringify(adesso[k])) continue;
+      if (adesso[k] === undefined) delete out[k];
+      else out[k] = adesso[k];
+    }
+    return out;
+  }
+
   async function getSettings() {
     const res = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
     const stored = res[STORAGE_KEYS.SETTINGS] || {};
