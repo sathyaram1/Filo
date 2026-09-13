@@ -2140,11 +2140,6 @@
     // Bolle chat
     renderThread(fb);
 
-    // L'etichetta di stato: le stesse parole della gemella, lette dal modulo
-    // condiviso. Senza, questa pagina non diceva da nessuna parte che una
-    // segnalazione era, per esempio, un attacco confermato.
-    renderDetailState(fb);
-
     // Azioni di stato (owner-only). QUALI sono NON lo decide più questa pagina:
     // le legge da MR.ownerActions, la stessa tabella che disegna i pulsanti
     // della pagina dei feedback. Prima erano due insiemi costruiti a mano, e
