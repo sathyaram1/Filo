@@ -1170,11 +1170,25 @@
     const pending = lista('pending');
     const failed = lista('failed');
     const preapproved = lista('preapproved');
-    const { status } = normalizeStatus(fb);
+    const { status, statusReason } = normalizeStatus(fb);
+
+    // Il server segna sul documento che la pratica è ferma al cancello
+    // (`design` / `l5`). Vale da solo: gli elenchi delle richieste possono non
+    // essere ancora arrivati, o essere vuoti perché questo computer non è
+    // quello dell'owner — e un quadrato grigio direbbe il falso.
+    const fermaDaStato = status === 'design' && statusReason === 'l5';
 
     // Una fusione approvata che non è avvenuta (conflitto) pesa quanto una
     // richiesta ferma: è un sì già dato che non ha prodotto niente.
     const ferme = failed.concat(pending);
+    if (!ferme.length && fermaDaStato) {
+      return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
+        titolo,
+        righe: [],
+        testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
+        azioni: [],
+      }, { richiesta: null, richieste: [], conflitto: false });
+    }
     if (ferme.length) {
       const req = ferme[0];
       const inConflitto = failed.length > 0;
