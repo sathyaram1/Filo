@@ -59,11 +59,24 @@ test('quello che gli script delle pagine visitate usano davvero sta nell\'elenco
   for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
     const src = readFileSync(join(dir, file), 'utf8');
     if (!/chrome\.storage\.local\.(get|set|remove)/.test(src)) continue;
-    // Nomi di chiave scritti per esteso ('sn_feedback_draft_text').
-    for (const m of src.matchAll(/['"](sn_[a-z0-9_]+|filo_[a-z0-9_]+)['"]/g)) usate.add(m[1]);
-    // Chiavi prese da STORAGE_KEYS (STORAGE_KEYS.PERSONAL_DICT).
-    for (const m of src.matchAll(/STORAGE_KEYS\.([A-Z0-9_]+)/g)) {
-      if (K[m[1]]) usate.add(K[m[1]]);
+    // I nomi di chiave stanno spesso in una costante del file
+    // (`const DRAFT_KEY = 'sn_feedback_draft_text'`): la si risolve qui.
+    const costanti = new Map();
+    for (const m of src.matchAll(/\b([A-Za-z0-9_$]+)\s*=\s*['"]([a-z0-9_]+)['"]/g)) {
+      costanti.set(m[1], m[2]);
+    }
+    // Si guarda SOLO dentro le chiamate allo storage: un'altra stringa che
+    // comincia per sn_ nel file (una classe CSS, un id) non è una chiave, e
+    // farla passare per tale renderebbe questa sentinella rumorosa.
+    for (const m of src.matchAll(/chrome\.storage\.local\.(?:get|set|remove)\s*\(/g)) {
+      const dentro = src.slice(m.index + m[0].length, m.index + m[0].length + 300);
+      for (const s of dentro.matchAll(/['"]([a-z0-9_]+)['"]/g)) usate.add(s[1]);
+      for (const s of dentro.matchAll(/STORAGE_KEYS\.([A-Z0-9_]+)/g)) {
+        if (K[s[1]]) usate.add(K[s[1]]);
+      }
+      for (const s of dentro.matchAll(/\b([A-Za-z0-9_$]+)\b/g)) {
+        if (costanti.has(s[1])) usate.add(costanti.get(s[1]));
+      }
     }
   }
   assert.ok(usate.size >= 5, `trovate solo ${usate.size} chiavi negli script: la prova non sta provando niente`);
