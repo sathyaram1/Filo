@@ -124,6 +124,12 @@ module.exports = function register(on, ctx) {
           if (valore !== undefined) filtrato[campo] = valore;
         }
       }
+      // Niente di ammesso: non si scrive e non si annuncia niente. Un annuncio
+      // a vuoto farebbe rileggere tutte le pagine di impostazioni aperte.
+      if (!Object.keys(filtrato).length) {
+        const attuali = await Storage.getSettings();
+        return { ok: true, settings: { ...attuali, apiKeys: undefined } };
+      }
       incoming = filtrato;
     }
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
