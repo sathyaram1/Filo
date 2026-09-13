@@ -81,6 +81,39 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
 
+  // ── Quello che Filo si è appuntato, dal lato dell'utente (#592) ───────────
+  //
+  // Una lezione entra in memoria senza chiedere niente, vale in ogni
+  // conversazione e sopravvive al riavvio: la sola cosa che la tiene a bada è
+  // che l'utente possa rileggerla e toglierla. Questi tre messaggi sono quella
+  // strada; la pagina Preferenze li usa accanto allo stile dell'agente.
+  // Leggono e riscrivono la memoria dell'utente, quindi solo da filo://.
+  on(MSG.FILO_LIST_MEMORY, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, memory: await FiloMem.getMemory(), lessons: await FiloMem.getLessonsBuffer() };
+  });
+
+  on(MSG.FILO_FORGET_LESSON, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const r = await FiloMem.forgetLesson({ ts: msg?.ts, text: msg?.text });
+    if (r.tolta) broadcastLiveUpdate();
+    return { ok: true, tolta: r.tolta, lessons: r.lessons };
+  });
+
+  on(MSG.FILO_FORGET_MEMORY_LINE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const r = await FiloMem.forgetMemoryLine({ module: msg?.module, index: msg?.index, atteso: msg?.atteso });
+    if (r.tolta) broadcastLiveUpdate();
+    return { ok: true, tolta: r.tolta, memory: r.memory };
+  });
+
+  on(MSG.FILO_FORGET_MEMORY_MODULE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const r = await FiloMem.forgetMemoryModule(msg?.module);
+    if (r.tolta) broadcastLiveUpdate();
+    return { ok: true, tolta: r.tolta, memory: r.memory };
+  });
+
   // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
   // PROFILO/PREFERENZE senza aspettare la soglia. Prima non esisteva alcun modo
   // di chiederla — la chiusura dell'intervista di benvenuto (#524) ne aveva
