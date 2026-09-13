@@ -3,13 +3,26 @@
 [← Tutti i pattern](../PATTERNS.md)
 
 Il canale `filo:message` è **uno solo** e ci arrivano sia le pagine interne
-(shell, `filo://`) sia i content script delle pagine web esterne. Registrare un
-handler senza dire nulla significa **aprirlo a qualunque sito visitato**: è il
-default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
+(shell, `filo://`) sia i content script delle pagine web esterne.
+
+**Il default è stato invertito** (#592, giro 9): il gate non sta più dentro i
+singoli handler, sta nel dispatch centrale, e legge l'elenco di ciò che è LECITO
+(`SN_MSG.WEB_ALLOWED` in `src/shared/messages.js`). Un messaggio nuovo nasce
+**vietato** alle pagine visitate. Per tre anni il default era l'opposto — chi
+registrava un handler lo apriva a qualunque sito senza accorgersene — e il conto
+si è visto tutto insieme: da un indirizzo web si leggeva lo stato che il modello
+legge a ogni messaggio (schede aperte con indirizzo e titolo, sveglie,
+notifiche, registro delle azioni delle ultime 24 ore, messaggio della home), si
+**scriveva** una sveglia il cui nome finisce dentro ogni prompt senza recinto, si
+leggeva l'archivio delle schede chiuse e le pagine messe da parte, e si svuotava
+l'archivio.
 
 - **Domanda obbligatoria** per ogni `MSG.*` nuovo: *"ha senso che un sito
   qualsiasi lo chiami?"*. Se la risposta è no — e lo è per tutto ciò che legge
-  dati dell'utente, tocca il disco, o aziona il sistema operativo — gattalo:
+  dati dell'utente, tocca il disco, o aziona il sistema operativo — **non fare
+  niente**: è già vietato. Se la risposta è sì, aggiungilo a `WEB_ALLOWED` col
+  motivo accanto, nel gruppo che gli somiglia.
+- Il gate dentro l'handler resta **seconda barriera** dove c'è, e si scrive così:
   ```js
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
   on(MSG.X, async (msg, sender, origin) => {
@@ -18,6 +31,24 @@ default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
   });
   ```
   (`origin` è il terzo argomento dell'handler; la shell è `filo://shell/shell.html`.)
+- Una chiamata che parte **dal main** (una scorciatoia da tastiera, un timer) non
+  ha mittente, e un'origine vuota conta come pagina web: quelle si dichiarano,
+  `handleMessage(msg, { internal: true })`.
+- Il gate centrale è provato in `tests/messaggi-origine-web.spec.mjs`, e la
+  sentinella `tests/unit/webMessagesAllow.test.mjs` tiene l'elenco onesto nei due
+  versi: niente memoria, stato del prompt, cronologie o dati messi da parte
+  dentro; e ogni messaggio che gli script sotto `src/content/` **mandano
+  davvero** dentro — un messaggio che manca farebbe smettere di funzionare quella
+  cosa su ogni sito, in silenzio.
+- **Quello che a un sito visitato serve è poco**, e vale la pena saperlo a
+  memoria: le funzioni di Filo sulla pagina (spiega, traduci, leggi, cerca), le
+  azioni dell'agente «Aiuto» con la loro conferma, i bottoni del menu del tasto
+  destro (navigazione, schede, download, mettere da parte), il correttore, il
+  menu «Incolla» con la cronologia degli appunti — compreso svuotarla, perché è
+  un gesto dell'utente in quel menu — le impostazioni in lettura, il riquadro del
+  feedback col saldo dei crediti, e gli avvisi sul sito che si sta guardando.
+  Rileggere o togliere quello che l'utente ha messo da parte, no: quello si fa
+  dalle pagine interne.
 - **Due bandiere rosse** che rendono il gate non negoziabile: la risposta
   contiene **percorsi assoluti su disco** (rivelano lo username e la struttura
   del computer), oppure il comando fa **aprire/eseguire qualcosa** al sistema
