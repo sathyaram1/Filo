@@ -164,8 +164,18 @@ test('una sotto-opzione toccata non deve riaccendere il rilevamento siti pericol
   await pagina.waitForTimeout(1200);
   expect((await impostazioni(pagina)).security?.safeBrowse?.enabled).toBe(false);
 
-  // Poi tocca un'altra SOTTO-opzione del rilevamento nella pagina.
-  await pagina.click('#sec-safebrowse-llm');
+  // Dal giro 5 la pagina si rilegge sempre, anche subito dopo un suo
+  // salvataggio, quindi adesso mostra il rilevamento spento e le sue
+  // sotto-opzioni spente con lui: la strada del giro 3 (cliccare la
+  // sotto-opzione accanto) non esiste più, perché la pagina non mente.
+  await expect.poll(
+    async () => pagina.$eval('#sec-safebrowse-llm', (el) => el.disabled),
+    { timeout: 5000 },
+  ).toBe(true);
+
+  // L'invariante resta la stessa e si prova dal vicino raggiungibile: un'altra
+  // protezione della stessa pagina non deve riaccendere il rilevamento.
+  await pagina.click('#sec-protect-ip');
   await pagina.waitForTimeout(1800);
 
   expect((await impostazioni(pagina)).security?.safeBrowse?.enabled).toBe(false);
