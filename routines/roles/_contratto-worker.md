@@ -24,7 +24,10 @@ REGISTRATO con gli script, mentre lavori:
   `--record-verifier`): è il rombo che l'owner vede nella scheda, in
   dashboard. Nel report da solo si perde;
 - l'esito del controllo di sicurezza → sempre con la sua nota
-  (`--record-secaudit … --nota <file.md>`), anche quando passa;
+  (`--record-secaudit … --nota <file.md>`), anche quando passa. I file di
+  `--segnala` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
+  del sistema (per esempio `../segnala-<numero>.md`): la consegna rifiuta una
+  directory con file non committati;
 - il claim → il rilascio, quando hai finito;
 - un guasto che ti impedisce di lavorare → dichiaralo AL CANALE nel rilascio,
   col motivo (`node scripts/routine-channel.mjs release <biglietto>
