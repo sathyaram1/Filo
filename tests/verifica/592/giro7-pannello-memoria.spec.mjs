@@ -107,7 +107,13 @@ test('il pannello della memoria si legge in tema chiaro e in tema scuro', async 
   }
 });
 
+// I due che seguono documentano difetti VERI che questo giro non corregge: il
+// server ha mandato entrambi i rilievi a un feedback a parte. `test.fail()` dice
+// «mi aspetto che non passi»: la corsa resta verde, la prova resta scritta, e il
+// giorno in cui il difetto viene chiuso è questa riga a diventare rossa, per
+// dire che il `test.fail()` va tolto.
 test('il × dice «Dimenticato» solo se ha dimenticato qualcosa', async ({ app, openTab }) => {
+  test.fail();
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Vive a Lisbona\nHa due gatti', PREFERENZE: '' });
   });
