@@ -1447,9 +1447,13 @@
           regola i parametri delle routine.
         </p>
 
-        <!-- Le fusioni in attesa NON stanno più qui: sono salite in cima alla
-             pagina, sopra le schede, perché sono la cosa che aspetta una tua
-             decisione. Qui resta la traccia di quelle già decise. -->
+        <!-- Le fusioni ferme che NON nascono da una segnalazione (un ramo
+             locale chiuso con `npm run finish`, senza numero): non hanno una
+             scheda dove vivere, e senza questo elenco sparirebbero. Stessi
+             tasti Approva / Scarta delle altre. -->
+        <div class="mg-merge-approvals" id="mgMergeApprovalsOrphans" hidden></div>
+
+        <!-- La traccia delle fusioni già decise. -->
         <div class="mg-merge-approvals-recent" id="mgMergeApprovalsRecent" hidden></div>
 
         <!-- Le fusioni avvenute SENZA chiedere: l'owner aveva messo il segno
