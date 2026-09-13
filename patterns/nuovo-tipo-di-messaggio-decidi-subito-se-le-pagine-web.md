@@ -138,7 +138,13 @@ contesto che il modello legge a ogni messaggio, e la cronologia delle
 conversazioni con Filo.
 
 Quindi, per un dato che le pagine web non devono toccare, le porte sono due e si
-chiudono insieme: i suoi messaggi, e la sua chiave. Sul canale dello storage
+chiudono insieme: i suoi messaggi, e la sua chiave. Chiuderne una e non l'altra è
+successo in tutti i due versi: al giro 8 era chiusa la fila dei messaggi e aperta
+la chiave; al giro 9, chiusa la chiave, erano aperti i messaggi che servono lo
+stesso dato — lo stato del prompt, le sveglie, le notifiche, l'archivio delle
+schede. È la ragione per cui il gate adesso è centrale: due elenchi di ciò che è
+lecito, uno per i messaggi e uno per le chiavi, invece di N gate scritti a mano
+che si dimenticano a turno. Sul canale dello storage
 vale la stessa regola del canale mezzo aperto, l'elenco di ciò che è lecito
 (`SN_CONST.WEB_STORAGE_KEYS`): le pagine visitate ci tengono il dizionario
 personale, l'autocorrezione, la disposizione delle icone del menu e la bozza di
