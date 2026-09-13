@@ -2021,6 +2021,29 @@
     return togliMarcatori(raw, [AGENT_STYLE_OPEN, AGENT_STYLE_CLOSE, AGENT_STYLE_SLOT]);
   }
 
+  // ── L'id del modello: l'altra impostazione a testo libero dentro un prompt ──
+  //
+  // Nelle Opzioni il campo dell'id è libero per scelta: deve accettare anche un
+  // modello che non è nell'elenco del fornitore. Quel testo poi entra parola
+  // per parola nel messaggio di sistema della chat, nella riga che dice al
+  // modello come si chiama. È la stessa portata dello stile — vale in ogni
+  // conversazione e sopravvive al riavvio — quindi ha le stesse cautele
+  // (#592, giro 4).
+  //
+  // Un id vero è corto e sta su una riga: `moonshotai/kimi-k2.6`. Quindi qui si
+  // tolgono i marcatori dei recinti e il segnaposto, si buttano gli a capo, e
+  // sopra il tetto la riga NON si accorcia: sparisce del tutto. Meglio un
+  // modello che non sa dire il proprio nome che un paragrafo di istruzioni
+  // travestito da nome.
+  const MODEL_NAME_MAX = 120;
+  function sanitizeModelName(raw) {
+    const pulito = togliMarcatori(raw, [
+      AGENT_STYLE_OPEN, AGENT_STYLE_CLOSE, AGENT_STYLE_SLOT,
+      LESSONS_OPEN, LESSONS_CLOSE, MEMORY_OPEN, MEMORY_CLOSE,
+    ]).replace(/\s+/g, ' ').trim();
+    return pulito.length > MODEL_NAME_MAX ? '' : pulito;
+  }
+
   // «Togli lo stile», detto in tutti i modi in cui lo si dice. Una di queste
   // parole, da sola, vuol dire "nessuno stile", non "il mio stile è la parola
   // normale". Sta qui, e non dentro il setter della chat, perché la stessa
