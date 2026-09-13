@@ -725,6 +725,7 @@
         titolo: 'Appunti recenti',
         aiuto: 'Regole che Filo si è appuntato e non ha ancora riordinato nel profilo.',
         quante: lezioni.length,
+        cosaSvuota: 'Filo dimentica tutte le regole che si è appuntato e non ha ancora riordinato nel profilo.',
         svuota: async () => {
           for (const l of lezioni.slice()) {
             await chrome.runtime.sendMessage({ type: MSG.FILO_FORGET_LESSON, ts: l.ts, text: l.text });
