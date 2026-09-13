@@ -79,7 +79,16 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
-  on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
+  // Restituisce gli STESSI moduli di FILO_LIST_MEMORY qui sotto (profilo,
+  // preferenze apprese, capitoli aperti da Filo): chi c'è dentro Filo lo chiama
+  // per avere il contesto su chi scrive. Quindi la guardia è la stessa. Senza,
+  // la chiusura messa sui messaggi nuovi era aggirabile chiedendo la stessa
+  // cosa col nome vecchio: da un indirizzo web tornava il profilo per intero
+  // (#592, giro 7). L'unico chiamante è l'Editor, che è una pagina filo://.
+  on(MSG.FILO_GET_MEMORY, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, memory: await FiloMem.getMemory() };
+  });
 
   // ── Quello che Filo si è appuntato, dal lato dell'utente (#592) ───────────
   //
