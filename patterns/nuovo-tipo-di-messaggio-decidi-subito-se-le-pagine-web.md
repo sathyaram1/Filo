@@ -108,7 +108,7 @@ conversazioni con Filo.
 
 Quindi, per un dato che le pagine web non devono toccare, le porte sono due e si
 chiudono insieme: i suoi messaggi, e la sua chiave. Sul canale dello storage
-vale la regola del paragrafo qui sopra, l'elenco di ciò che è lecito
+vale la stessa regola del canale mezzo aperto, l'elenco di ciò che è lecito
 (`SN_CONST.WEB_STORAGE_KEYS`): le pagine visitate ci tengono il dizionario
 personale, l'autocorrezione, la disposizione delle icone del menu e la bozza di
 un feedback, e leggono le impostazioni. Tutto il resto è vietato, e una chiave
