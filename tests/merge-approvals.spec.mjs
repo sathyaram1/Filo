@@ -555,3 +555,94 @@ test('una richiesta di un’automazione non manda l’owner a lanciare la pubbli
   await expect(esito).toBeVisible({ timeout: 8_000 });
   await expect(esito).not.toContainText('npm run finish');
 });
+
+// ── 7. Il riallineamento fatto dal server ───────────────────────────────────
+//
+// Approvata, ma main era andato avanti: il server fonde main nel ramo, rifà i
+// controlli e o fonde, o chiude la richiesta `stale` e ne apre una nuova per la
+// punta riallineata coi soli blocchi nuovi. L'elenco delle decise deve dirlo:
+// prima una `stale` consumata compariva come «approvata».
+
+const RIA = { from: SHA, to: 'e'.repeat(40), mainSha: 'd'.repeat(40) };
+
+test('Automazioni: una richiesta riallineata dal server NON compare come «approvata»', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriAutomazioni(page, {
+    pending: [],
+    recent: [
+      richiesta({ id: '33'.repeat(12), branch: 'worker/riallineata', used: true, outcome: 'stale', realigned: RIA, newRequestId: '44'.repeat(12), decidedAtMs: Date.now() - 3 * 60 * 1000 }),
+      richiesta({ id: '55'.repeat(12), branch: 'worker/decaduta', used: true, outcome: 'stale', decidedAtMs: Date.now() - 5 * 60 * 1000 }),
+      richiesta({ id: '66'.repeat(12), branch: 'worker/fusa-dopo', used: true, outcome: 'merged', realigned: RIA, decidedAtMs: Date.now() - 9 * 60 * 1000 }),
+    ],
+  });
+  const recenti = page.locator('#mgMergeApprovalsRecent');
+  await expect(recenti).toBeVisible({ timeout: 8_000 });
+  const riga = (branch) => recenti.locator('.sn-mac-recent-row', { hasText: branch }).locator('.sn-mac-recent-what');
+  await expect(riga('worker/riallineata')).toHaveText('riallineata, chiede di nuovo');
+  await expect(riga('worker/decaduta')).toHaveText('decaduta');
+  await expect(riga('worker/fusa-dopo')).toHaveText('approvata, riallineata e fusa');
+});
+
+test('Ricevuti: la richiesta nata dal riallineamento dice che è la punta riallineata e mostra solo il nuovo', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const nuova = richiesta({
+    id: '44'.repeat(12), sha: RIA.to, supersedes: '33'.repeat(12), realigned: RIA,
+    blocks: [{ gate: 'guard_the_guards', label: 'Tocca aree protette (guardie, regole del database, chiavi, automatismi)', items: ['scripts/lib/owner-merge.mjs'], more: 0 }],
+  });
+  await apriGestione(page, { pending: [nuova] });
+  const card = page.locator('#mgMergeApprovals .sn-mac-card');
+  await expect(card).toHaveCount(1, { timeout: 8_000 });
+  await expect(card.locator('.sn-mac-realigned')).toContainText('Punta riallineata su main dal server (era ' + SHA.slice(0, 8) + ')');
+  await expect(card.locator('.sn-mac-realigned')).toContainText('solo ciò che non avevi ancora visto');
+  await expect(card.locator('.sn-mac-why')).toContainText('solo il nuovo');
+  await expect(card.locator('.sn-mac-block')).toHaveCount(1);
+  await expect(card.locator('.sn-mac-block')).toContainText('scripts/lib/owner-merge.mjs');
+  // Una richiesta normale non ha la riga.
+  await apriGestione(page, { pending: [richiesta()] });
+  await expect(page.locator('#mgMergeApprovals .sn-mac-realigned')).toHaveCount(0);
+});
+
+test('approvare una richiesta che il server riallinea con blocchi nuovi: l’esito lo dice, e l’elenco si ricarica con la nuova', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const vecchia = richiesta();
+  const nuova = richiesta({ id: '44'.repeat(12), sha: RIA.to, supersedes: vecchia.id, realigned: RIA });
+  await apriGestione(page, {
+    pending: [vecchia],
+    approveReply: { ok: true, result: 'stale', headSha: RIA.to, realigned: RIA, newRequest: nuova.id, newBlocks: nuova.blocks },
+  });
+  // Dopo l'approvazione il server elenca la richiesta nuova al posto della vecchia.
+  await page.evaluate((n) => {
+    const orig = window.filo.message;
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'merge_approvals_get' && window.__macCalls.some((c) => c.op === 'approve')) {
+        return { ok: true, pending: [n], failed: [], recent: [], ttlMs: 7 * 24 * 60 * 60 * 1000 };
+      }
+      return orig(msg);
+    };
+  }, nuova);
+  const btn = page.locator('#mgMergeApprovals .sn-mac-btn-go');
+  await btn.click();
+  await btn.click();
+  const status = page.locator('#mgMergeApprovals .sn-mac-status');
+  await expect(status).toContainText(/riallineato il ramo/, { timeout: 8_000 });
+  await expect(status).toContainText(/richiesta nuova/);
+  await expect(status).not.toContainText(/decade/);
+  await expect(status).not.toContainText(/npm run finish/);
+  // …e la scheda nuova prende il posto della vecchia, con la riga del riallineamento.
+  await expect(page.locator('#mgMergeApprovals .sn-mac-realigned')).toHaveCount(1, { timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovals .sn-mac-card')).toHaveAttribute('data-request-id', nuova.id);
+});
+
+test('approvata ma non avvenuta: se il server ha provato a riallineare, la scheda dice perché non ci è riuscito', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const conflitto = richiesta({
+    id: 'ff12cd34ef56ab12cd34ef56', origin: 'routine', num: '#582', used: true, outcome: 'conflict',
+    realignReason: 'riallineamento automatico non riuscito: realign_branch_moved (genitori: abc)',
+    decidedAtMs: Date.now() - 60 * 1000,
+  });
+  await apriGestione(page, { pending: [], failed: [conflitto] });
+  const why = page.locator('#mgMergeApprovals .sn-mac-card-failed .sn-mac-why');
+  await expect(why).toContainText('Il server ha provato a riallineare da sé, senza riuscirci: ', { timeout: 8_000 });
+  await expect(why).toContainText('si era mosso');
+  await expect(why).not.toContainText('realign_branch_moved');
+});
