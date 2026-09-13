@@ -1516,6 +1516,7 @@
       mgListEmpty.textContent = TAB_EMPTY.inbox;
       setListHead(SENZA_SEZIONI_LABEL, dataLoaded ? currentList.length : null);
       renderListBody();
+      renderFusioniOrfane();
       return;
     }
 
