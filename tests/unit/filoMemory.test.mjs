@@ -270,3 +270,43 @@ test('una riga con caratteri speciali si toglie per quello che è', () => {
   assert.equal(r.tolta, 'Usa <script>alert(1)</script>');
   assert.equal(r.testo, 'Dice sempre «grazie» 🙂');
 });
+
+// ── Sentinella: chi si fa dare la memoria la mette nel recinto ──────────────
+//
+// #592, giro 7 — il profilo e le preferenze apprese le scrive Filo ascoltando
+// le conversazioni, e ci si arriva anche di traverso: basta che il titolo di
+// una scheda, un risultato web o il riassunto di un file lo convincano a
+// «ricordarsi» una regola. Da quel momento quella riga sta in memoria e
+// sopravvive al riavvio, come lo stile dell'agente. Quindi nei prompt è
+// contenuto, e il recinto condiviso (`memoryBlock`) è l'unica cosa che lo dice
+// al modello.
+//
+// La chat, la home, l'agente delle lezioni e il compattatore lo usavano.
+// L'Editor no: se la costruiva da sé («Profilo: …») e la memoria arrivava nuda
+// nei prompt del titolo e del riassunto del file. Questa sentinella è lì perché
+// la prossima pagina che chiede la memoria non rifaccia la stessa cosa: chi
+// manda il messaggio che se la fa dare deve anche chiamare il recinto.
+test('ogni pagina che si fa dare la memoria di Filo la passa dal recinto condiviso', () => {
+  const { readdirSync, readFileSync, statSync } = require('node:fs');
+  const pagine = join(root, 'src', 'pages');
+  const file = [];
+  const scava = (dir) => {
+    for (const nome of readdirSync(dir)) {
+      const p = join(dir, nome);
+      if (statSync(p).isDirectory()) scava(p);
+      else if (nome.endsWith('.js')) file.push(p);
+    }
+  };
+  scava(pagine);
+
+  const nudi = [];
+  for (const p of file) {
+    const src = readFileSync(p, 'utf8');
+    // Chi chiede la memoria per metterla in un prompt (non chi la elenca per
+    // mostrarla all'utente, che passa da FILO_LIST_MEMORY).
+    if (!/FILO_GET_MEMORY/.test(src)) continue;
+    if (!/memoryBlock/.test(src)) nudi.push(p.slice(root.length + 1));
+  }
+
+  assert.deepEqual(nudi, [], `queste pagine si fanno dare la memoria e non la recintano: ${nudi.join(', ')}`);
+});
