@@ -129,6 +129,10 @@ Due o tre righe: cosa hai incontrato e perché non spetta a te deciderlo.
 La strada che hai preso per consegnare, e cosa cambia se l'owner sceglie l'altra.
 ```
 
+Il file va scritto FUORI dal repo, nella cartella temporanea del sistema (per
+esempio `../segnala-<numero>.md`, sopra la radice del repo): la consegna rifiuta
+una directory con file non committati, e quel file non deve entrare nel ramo.
+
 Una segnalazione per consegna: se ne hai due, stanno nello stesso file. Se
 segnali di nuovo in un giro dopo, il rombo mostra l'ultima; la storia resta in
 chat. Il tetto è largo (12.000 caratteri) e un file più lungo viene rifiutato
