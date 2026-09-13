@@ -2125,9 +2125,9 @@
       openSidebarSender(clientId);
     });
 
-    // Riga giudici (4 pallini, riassunto a colpo d'occhio). Il click su un
-    // pallino apre QUEL giudice (nome + classe + reasoning) nel pannello destro.
-    renderJudgesRow(fb);
+    // La fila dei cinque livelli: triangolo, cerchi, rombo, pentagono,
+    // quadrato. Ogni forma cliccata si apre nel pannello di destra.
+    renderLivelliRow(fb);
 
     // Striscia "a che punto è la lavorazione" (solo per i feedback nell'iter
     // working/revision_*): stessi contenuti della card pinnata in lista.
