@@ -627,6 +627,33 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
+  // «Salta il controllo»: l'owner ha letto la bocciatura dell'audit di
+  // sicurezza e decide di andare avanti. Stesso cancello delle approvazioni di
+  // fusione — solo pagine filo://, solo il proprietario — perché è lo stesso
+  // tipo di gesto: un'eccezione a un controllo automatico, fatta davanti allo
+  // schermo e non da un terminale che potrebbe non essere nelle sue mani.
+  //
+  // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
+  // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
+  // torna è l'esito VERO di quel cancello, non un "fatto" generico.
+  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente'];
+  on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };
+    const r = await callSecurityFunction('ownerSkipSecaudit', { feedbackId });
+    if (!r || r.ok === false) {
+      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha saltato il controllo.' };
+    }
+    // Un esito che questo client non conosce non si traduce in «fatto»: passa
+    // com'è, e la pagina lo scrive invece di inventarsi un successo.
+    const esito = String(r.esito || r.result || '').trim();
+    const out = { ok: true, esito: ESITI_SALTA.includes(esito) ? esito : esito };
+    if (r.requestId) out.requestId = String(r.requestId);
+    if (r.sha) out.sha = String(r.sha);
+    if (r.error) out.error = String(r.error);
+    return out;
+  }));
+
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Non riuscita.' };
