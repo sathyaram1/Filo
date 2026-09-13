@@ -49,7 +49,8 @@ l'archivio.
   feedback col saldo dei crediti, e gli avvisi sul sito che si sta guardando.
   Rileggere o togliere quello che l'utente ha messo da parte, no: quello si fa
   dalle pagine interne.
-- **Due bandiere rosse** che rendono il gate non negoziabile: la risposta
+- **Due bandiere rosse** che tengono un messaggio FUORI dall'elenco qualunque
+  comodità sembri portarci dentro: la risposta
   contiene **percorsi assoluti su disco** (rivelano lo username e la struttura
   del computer), oppure il comando fa **aprire/eseguire qualcosa** al sistema
   (`shell.openPath`, `showItemInFolder`, spawn). Un sito che può far aprire un
