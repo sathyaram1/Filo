@@ -331,5 +331,5 @@ test('porta G: il numero sulla linguetta dei Ricevuti conta anche la pratica por
   });
   console.log('[verifica] Ricevuti: lista =', nellaLista, ', linguetta =', sullaLinguetta);
   expect(nellaLista).toBe(1);
-  expect(String(sullaLinguetta)).toMatch(/^1\b/);
+  expect(String(sullaLinguetta).replace(/\D/g, '')).toBe('1');
 });
