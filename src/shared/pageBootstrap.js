@@ -358,6 +358,16 @@
     for (const el of campiDiTesto()) el.dataset.snReso = el.value;
   }
 
+  // Per i campi in cui quello che si salva NON è quello che c'è scritto. La
+  // lista dei siti da bloccare è così: l'utente scrive tre righe, una è scritta
+  // male, in memoria ne finiscono due e nel riquadro restano tre, apposta,
+  // perché la corregga. La fotografia deve essere quella che è andata in
+  // memoria, se no alla rilettura sembra che sia cambiato tutto e il testo
+  // dell'utente viene sostituito (#592, giro 4).
+  function segnaCampo(el, valoreInMemoria) {
+    if (el) el.dataset.snReso = String(valoreInMemoria == null ? '' : valoreInMemoria);
+  }
+
   async function ricaricaSenzaDisturbare(load, dopo) {
     const attivo = document.activeElement;
     const fuoco = (attivo && attivo.id && campiDiTesto().includes(attivo))
