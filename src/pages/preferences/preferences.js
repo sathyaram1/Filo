@@ -169,6 +169,26 @@
     for (const name of Tokens.names()) if (name !== exceptName) renderTokenRow(name);
   }
 
+  // Fine della modifica di una riga: o il valore è valido e la riga si
+  // canonicalizza, oppure resta com'è scritto con l'errore puntuale sotto,
+  // perché sia l'utente a correggerlo. Serve anche alla rilettura: un valore
+  // scritto male che torna sullo schermo deve tornarci col suo errore, se no
+  // l'errore sparito fa credere che sia stato sistemato (#592, giro 4).
+  function chiudiRigaToken(name) {
+    const input = $(`tok-${name}`);
+    if (!input || !Tokens) return;
+    const row = input.closest('.sn-token-row');
+    const v = input.value.trim();
+    if (v !== '' && !Tokens.validate(name, v)) {
+      const errEl = row.querySelector('.sn-token-error');
+      errEl.hidden = false;
+      errEl.textContent = tokenErrorMsg(name);
+      row.classList.add('sn-token-invalid');
+      return;
+    }
+    renderTokenRow(name); // canonicalizza al valore effettivo
+  }
+
   function onTokenInput(name) {
     const input = $(`tok-${name}`);
     const row = input.closest('.sn-token-row');
