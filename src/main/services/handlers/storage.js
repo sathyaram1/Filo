@@ -88,20 +88,43 @@ module.exports = function register(on, ctx) {
     // toccare le chiavi API: le strippiamo prima del merge, così una pagina
     // ostile non può iniettare/sovrascrivere una apiKey (es. dirottare i
     // prompt su una chiave attaccante). Dalle pagine interne filo:// passa tutto.
-    // Stessa cosa per `agentStyle` (#592): è testo libero che entra nel
-    // messaggio di sistema di ogni agente conversazionale e ci resta dopo il
-    // riavvio. Cambiarlo passa dalla pagina Preferenze (dove l'utente lo vede)
-    // o dall'azione della chat (che chiede conferma mostrando il testo): da una
-    // pagina web non ha nessuna ragione legittima di arrivare.
-    const VIETATE_DA_WEB = ['apiKeys', 'agentStyle'];
+    // Da un'origine web passa SOLO quello che un content script fa davvero, e
+    // oggi è una cosa sola: scegliere il modello di dettatura dal menu del
+    // tasto destro (src/content/tts.js). Tutto il resto si ferma qui.
+    //
+    // #592, giro 4 — prima questa guardia era un elenco di DUE nomi vietati
+    // (chiavi API e stile dell'agente) e tutto il resto passava: accendere la
+    // modalità terminale, cioè il permesso che dà a Filo la shell della
+    // macchina; spegnere il rilevamento dei siti pericolosi, l'ad-block, il
+    // blocco dei siti, il blocco dei popup, la protezione dell'IP locale;
+    // mettere i cookie su «manuale» e l'anti-fingerprint su «spento»; alzare il
+    // limite di spesa; dirottare il modello che risponde in chat. L'elenco di
+    // ciò che è LECITO è più corto di quello dei divieti e non lascia fuori
+    // niente: un permesso nuovo nasce vietato, non permesso per dimenticanza.
+    //
+    // L'altro canale con cui Filo cambia le impostazioni (le azioni della chat)
+    // si difende già così, chiedendo che l'azione sia passata davvero dal
+    // riquadro di conferma (#250): qui ci si allinea.
+    const AMMESSE_DA_WEB = {
+      // models: solo la voce della dettatura, e solo come stringa.
+      models: (v) => {
+        if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+        const chiave = SN_CONST.ACTIONS.TRANSCRIBE_AUDIO;
+        if (typeof v[chiave] !== 'string') return undefined;
+        return { [chiave]: v[chiave] };
+      },
+    };
     let incoming = msg.settings;
-    if (!isFilo(origin) && incoming && typeof incoming === 'object') {
-      for (const campo of VIETATE_DA_WEB) {
-        if (campo in incoming) {
-          if (incoming === msg.settings) incoming = { ...incoming };
-          delete incoming[campo];
+    if (!isFilo(origin)) {
+      const filtrato = {};
+      if (incoming && typeof incoming === 'object') {
+        for (const [campo, tieni] of Object.entries(AMMESSE_DA_WEB)) {
+          if (!(campo in incoming)) continue;
+          const valore = tieni(incoming[campo]);
+          if (valore !== undefined) filtrato[campo] = valore;
         }
       }
+      incoming = filtrato;
     }
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
