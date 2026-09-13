@@ -2919,12 +2919,27 @@ function daPaginaWeb(sender, origin) {
   return !String(origin || '').startsWith('filo://');
 }
 
+// Un mittente che non è una pagina: nessun indirizzo, nessuna scheda, nessun
+// contenuto web dietro. Chi arriva dall'IPC ha sempre tutte e tre le cose —
+// gliele mette il main leggendo l'evento, non le sceglie chi chiama — quindi un
+// oggetto spoglio è una chiamata nata DENTRO Filo, come `sender` assente.
+//
+// La distinzione serve perché senza di lei le due cose si separavano: nessun
+// mittente contava come interno, un mittente spoglio come sito visitato. Ogni
+// pezzo di Filo che chiama un'azione passando solo la finestra si vedeva
+// rifiutare l'azione in silenzio, con una riga nei log e niente all'utente
+// (#592, giro 11: le azioni sul proxy comandate a parole).
+function senzaIdentitaDiPagina(sender) {
+  if (!sender || typeof sender !== 'object') return true;
+  return !sender.url && !sender.tab && !sender.wc && !sender.frame;
+}
+
 // Il rovescio, per chi ha in mano solo il mittente (#592, giro 10: il gate delle
 // azioni). Una regola sola, non due copie che divergono. `sender` assente vuol
 // dire che a chiamare è il main per conto suo, senza che nessuna pagina abbia
 // chiesto niente: quelle chiamate nascono dentro Filo.
 function daOrigineInterna(sender) {
-  if (!sender) return true;
+  if (senzaIdentitaDiPagina(sender)) return true;
   return !daPaginaWeb(sender, sender.tab?.url || sender.url || '');
 }
 
