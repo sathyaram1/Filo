@@ -427,7 +427,12 @@ if (isMain) {
       // Un campo di TESTO senza il suo testo non è un sì: è un report che
       // parte vuoto mentre la risposta dice OK (feedback #565).
       if (CAMPI_TESTO.has(key)) {
-        console.error(`--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
+        // `--segnala` vuole un FILE, non un testo: dirgli «un testo» lo mandava
+        // a passare la segnalazione sulla riga di comando, e a sbagliare due
+        // volte. Stessa frase di dispatch --record-*.
+        console.error(key === 'segnala'
+          ? '--segnala vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.'
+          : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
         process.exit(1);
       }
       data[key] = true;
