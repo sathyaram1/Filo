@@ -585,7 +585,24 @@ module.exports = function register(on, ctx) {
   on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') });
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Fusione non riuscita.' };
-    return { ok: true, result: (r && r.result) || '', sha: (r && r.sha) || '', headSha: (r && r.headSha) || '' };
+    // Alla pagina arriva TUTTO quello che il server dice dell'esito, non solo
+    // esito e sha: il riallineamento fatto dal server (`realigned`), la
+    // richiesta nuova aperta per la sola differenza (`newRequest`, `newBlocks`)
+    // e il motivo di un tentativo fallito (`realignReason`). Senza, la pagina
+    // diceva «la richiesta decade, rilancia» a un riallineamento riuscito.
+    const out = { ok: true, result: (r && r.result) || '', sha: (r && r.sha) || '', headSha: (r && r.headSha) || '' };
+    if (r && r.realigned && typeof r.realigned === 'object') {
+      out.realigned = {
+        from: String(r.realigned.from || ''),
+        to: String(r.realigned.to || ''),
+        mainSha: String(r.realigned.mainSha || ''),
+      };
+    }
+    if (r && r.newRequest) out.newRequest = String(r.newRequest);
+    if (r && Array.isArray(r.newBlocks)) out.newBlocks = r.newBlocks;
+    if (r && r.realignReason) out.realignReason = String(r.realignReason);
+    if (r && r.reason) out.reason = String(r.reason);
+    return out;
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
