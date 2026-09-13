@@ -517,6 +517,37 @@ restano per due motivi, entrambi indipendenti dal muro: un tentativo respinto in
 silenzio è un guasto invisibile, e una difesa che dipende da un solo muro cade
 con quel muro.
 
+### I livelli sul feedback (2026-09-13)
+
+Tre consegne portano un testo in più, che il server cifra come le `notes` e
+scrive in `livelli` sul documento del feedback (lo legge la dashboard, nella
+fila delle forme della scheda):
+
+- `fixed` e `verdict` accettano `segnalazione` (markdown, al più 12.000
+  caratteri: oltre, `malformed` col numero) → `livelli.l3 = { esito: segnalato,
+  ruolo, at, testo }`. Il ruolo lo dice il biglietto, mai il messaggio. È un
+  trade-off vero che decide l'owner; il server la appende anche alle note,
+  per la storia della chat. Sulla riga di comando: `--segnala <file.md>`.
+- `secaudit` accetta `testo` (accettato anche il nome storico `notes`) →
+  `livelli.l4 = { esito: pass|fail, at, testo }`, **sempre**, anche su pass. Un
+  `pass` senza testo è respinto (`malformed`): un controllo passato senza dire
+  cosa è stato guardato non si distingue da un controllo mai fatto. Un `fail`
+  senza testo riceve una frase standard. Sulla riga di comando: `--nota
+  <file.md>`, obbligatoria; dispatch si ferma prima di consegnare.
+- `status` con `reason: l5`: il controllo di sicurezza chiude così il blocco del
+  cancello (exit 10 del gate), distinto dal proprio `fail` (`reason:
+  secaudit`).
+
+Il salto di L4 è un'azione dell'owner (callable `ownerSkipSecaudit
+{ feedbackId }`, dal tasto «Salta il controllo» della dashboard): il server
+verifica l'identità, scrive `livelli.l4 = { esito: saltato, by: owner, at }`
+conservando il testo del fail, segna nello stato del giro `secauditVerdict:
+saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
+per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
+richiesta aperta, `conflitto`, `ramo assente`). Le regole Firestore ammettono
+`livelli` nei due rami di triage con vincolo di forma (mappa con al più
+`l3`/`l4`, testo cifrato ≤ 20.000).
+
 ## 12. Anche il numero di versione lo scrive il server: `releaseBump` (2026-08-21)
 
 Con la ruleset su `main` attiva, l'ultimo che ci scriveva senza passare dal

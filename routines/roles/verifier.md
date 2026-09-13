@@ -277,8 +277,19 @@ nella chat del feedback in dashboard — senza, il tuo lavoro è invisibile):
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> "Provato: … 
 [2] …
-[0] …"
+[0] …" [--segnala <file.md>]
 ```
+
+**`--segnala` è per un trade-off vero o una domanda di design**, non per un
+difetto: un difetto è un rilievo col suo livello, e resta nella critica. Se un
+rilievo chiede una decisione (`[1?]`, `[2?]`), la riga nella critica resta una
+riga; le scelte e i loro costi vanno nel file della segnalazione, che l'owner
+legge cliccando il rombo nella scheda, in dashboard. Tre parti, con questi
+titoli: `## Problema` (due o tre righe), `## Scelte` (una voce per strada, col
+suo trade-off), `## Cosa ho fatto nel frattempo`. Breve, senza nomi di file o
+funzioni: lo legge chi non sa niente di codice. Il file va in `--segnala`
+anche quando correggi tu (`--record-fixed`), se il trade-off lo trovi
+correggendo.
 
 La critica è per l'owner: comportamento dell'app, senza nomi di file/funzioni.
 Scrivi ogni rilievo **per esteso e autonomo** (cosa manca, dove, perché

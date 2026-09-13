@@ -19,6 +19,12 @@ REGISTRATO con gli script, mentre lavori:
 - l'esito del tuo ruolo → i comandi di registrazione/consegna del tuo
   file-ruolo;
 - i testi per l'owner e per chi ha segnalato → nelle `notes` via canale;
+- un trade-off vero o una domanda di design (CLAUDE.md § Iniziativa: non lo
+  decidi tu) → `--segnala <file.md>` sulla consegna (`--record-fixed`,
+  `--record-verifier`): è il rombo che l'owner vede nella scheda, in
+  dashboard. Nel report da solo si perde;
+- l'esito del controllo di sicurezza → sempre con la sua nota
+  (`--record-secaudit … --nota <file.md>`), anche quando passa;
 - il claim → il rilascio, quando hai finito;
 - un guasto che ti impedisce di lavorare → dichiaralo AL CANALE nel rilascio,
   col motivo (`node scripts/routine-channel.mjs release <biglietto>
