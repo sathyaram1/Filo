@@ -2224,8 +2224,21 @@
     reflectManage(fb);
     setManageMsg('', '');
 
-    // Chiudi pannello laterale
-    closeSidebar();
+    // Pannello laterale: su un ridisegno (aggiornamento continuo della stessa
+    // pratica) la forma che l'owner stava leggendo resta aperta e si riempie
+    // di nuovo, come già fa quando cambia l'elenco delle fusioni; a chiuderlo
+    // era ogni ridisegno, e con una segnalazione lunga si perdeva il punto.
+    // Cambiando pratica si chiude, come sempre.
+    if (ridisegno && livelloAperto) riapriPannelloLivello(fb);
+    else closeSidebar();
+  }
+
+  // Riapre il pannello sulla forma già scelta, tenendo il punto di scorrimento.
+  function riapriPannelloLivello(fb) {
+    const scrolls = [mgSideBody, mgSide].map((el) => (el ? el.scrollTop : 0));
+    if (livelloAperto === 'l2' && giudiceAperto != null) openSidebarJudge(fb, giudiceAperto);
+    else openSidebarLivello(fb, livelloAperto);
+    [mgSideBody, mgSide].forEach((el, i) => { if (el) el.scrollTop = scrolls[i]; });
   }
 
   // Riflette lo stato corrente del feedback sul bottone ⭐. Il preferito è un
