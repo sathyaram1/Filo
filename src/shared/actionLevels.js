@@ -433,6 +433,39 @@
     },
   };
 
+  // ── Cosa può azionare una pagina VISITATA (#592, giro 10) ────────────────
+  //
+  // Il canale delle azioni arriva anche dagli script che Filo fa girare dentro
+  // le pagine web: è da lì che l'assistente «Aiuto» della barra laterale aziona
+  // le cose. Finché il registro intero era raggiungibile da quel canale, un
+  // indirizzo web poteva far girare tutto quello che Filo sa fare: le azioni di
+  // livello 1 partono senza chiedere niente e RESTITUISCONO quello che leggono,
+  // quindi da fuori si leggeva un documento dal disco dell'utente (provato con
+  // un estratto conto) e si otteneva l'uscita di un comando del terminale
+  // (`cat` su un file, con la modalità terminale accesa); si fissava una
+  // lezione che poi vale in ogni conversazione, si creava una sveglia il cui
+  // NOME entra nel prompt di ogni messaggio, si instradava un dominio
+  // dell'utente da un altro paese. E le azioni di livello 2 e 3 si
+  // confermavano da sé: prima la si chiede (il main registra che quel mittente
+  // potrà confermarla), subito dopo si manda la conferma, e il riquadro non
+  // compare mai — così da un indirizzo web si impostava lo stile dell'agente e
+  // si cancellava tutta la memoria.
+  //
+  // Quindi qui l'elenco è di ciò che è LECITO, come per i messaggi
+  // (SN_MSG.WEB_ALLOWED), per le chiavi dello storage e per i campi delle
+  // impostazioni (#592, giri 4, 8 e 9): un'azione nuova nasce VIETATA alle
+  // pagine visitate. L'elenco è corto perché corto è il bisogno vero: la barra
+  // laterale emette INVIA_FEEDBACK (l'unica azione tipizzata che il suo prompt
+  // le insegna) e NAVIGA (il suo «apri il link in una nuova scheda»). Leggere
+  // il disco, lanciare comandi, scrivere o cancellare la memoria, cambiare le
+  // impostazioni: non le sono mai servite.
+  //
+  // Aggiungere una voce qui vuol dire rispondere sì alla domanda «ha senso che
+  // un sito qualsiasi lo chieda, anche quando a convincerlo è il testo della
+  // pagina invece dell'utente?». Vedi
+  // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md.
+  const WEB_ALLOWED_ACTIONS = new Set(['INVIA_FEEDBACK', 'NAVIGA']);
+
   // Livello dell'azione: 1|2|3, oppure null se l'azione NON è registrata
   // (→ il dispatch deve rifiutarla).
   function levelFor(action) {
