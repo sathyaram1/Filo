@@ -899,6 +899,16 @@
       if (presenti && !presenti.has(chiave) && partial[chiave] === undefined) partial[chiave] = valore;
     }
 
+    // Nel riquadro dello stile quello che si salva NON è sempre quello che c'è
+    // scritto: «normale» salva "nessuno stile" e resta scritto finché l'utente
+    // non esce dal campo, e un testo oltre il tetto non si salva affatto. La
+    // fotografia per la rilettura deve quindi essere quella che è andata in
+    // memoria, se no la rilettura crede che la memoria sia cambiata e svuota il
+    // riquadro mentre l'utente ci sta ancora scrivendo (#592, giro 5).
+    if (typeof Bootstrap.segnaCampo === 'function') {
+      Bootstrap.segnaCampo($('agentStyleText'), valori.agentStyle);
+    }
+
     // La resa a schermo è locale e non dipende dal salvataggio.
     savedAgentStyle = valori.agentStyle;
     window.SN_PAGE_THEME = valori.theme;
