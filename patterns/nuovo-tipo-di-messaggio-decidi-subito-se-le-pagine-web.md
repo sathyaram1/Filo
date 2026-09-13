@@ -8,9 +8,9 @@ Il canale `filo:message` è **uno solo** e ci arrivano sia le pagine interne
 **Il default è stato invertito** (#592, giro 9): il gate non sta più dentro i
 singoli handler, sta nel dispatch centrale, e legge l'elenco di ciò che è LECITO
 (`SN_MSG.WEB_ALLOWED` in `src/shared/messages.js`). Un messaggio nuovo nasce
-**vietato** alle pagine visitate. Per tre anni il default era l'opposto — chi
-registrava un handler lo apriva a qualunque sito senza accorgersene — e il conto
-si è visto tutto insieme: da un indirizzo web si leggeva lo stato che il modello
+**vietato** alle pagine visitate. Prima il default era l'opposto — chi registrava
+un handler lo apriva a qualunque sito senza accorgersene — e il conto si è visto
+tutto insieme: da un indirizzo web si leggeva lo stato che il modello
 legge a ogni messaggio (schede aperte con indirizzo e titolo, sveglie,
 notifiche, registro delle azioni delle ultime 24 ore, messaggio della home), si
 **scriveva** una sveglia il cui nome finisce dentro ogni prompt senza recinto, si
