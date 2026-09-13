@@ -149,5 +149,5 @@ tutto», dove svuotare la mappa è proprio quello che l'utente ha chiesto.
 - `src/pages/security/security.js` — stesse tre funzioni, più `saveCookies`
 - `tests/impostazioni-pagina-aperta.spec.mjs` — le porte, più la controprova che
   quello che tocchi tu si salva ancora
-- `tests/unit/settingsPartial.test.mjs` — il confronto fino alla foglia, senza
-  Electron
+- `tests/unit/settingsPartial.test.mjs` — il confronto fino alla foglia e la
+  mappa ribasata, senza Electron
