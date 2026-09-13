@@ -261,7 +261,9 @@
     currentOverrides = {};
     if (Tokens) for (const name of Tokens.names()) renderTokenRow(name);
     applyTokensLive();
-    persistTokens();
+    // «Ripristina tutto» vuol dire proprio svuotare la mappa: qui non si tiene
+    // niente di quello che c'è in memoria, nemmeno un colore arrivato altrove.
+    persistTokens({ tuttoIntero: true });
   }
 
   // ── Ripristino completo (#184) ───────────────────────────────────────────
