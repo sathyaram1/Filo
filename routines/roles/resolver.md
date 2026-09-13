@@ -112,7 +112,9 @@ dati dell'utente, una scelta di gusto) o una domanda di design la decide
 l'owner. Fin qui la segnalazione finiva in fondo al report, e l'owner la
 trovava solo rileggendo la chat. Adesso ha un posto suo: il rombo nella fila
 delle forme della scheda, in dashboard. Ci arriva così: scrivi un file
-markdown e passalo alla consegna con `--segnala <file.md>`.
+markdown e passalo alla consegna con `--segnala <file.md>`: vale sul primo
+passaggio (`deliver status`), sulla correzione (`--record-fixed`) e sulla
+critica di chi verifica (`--record-verifier`).
 
 Il testo lo legge chi non sa niente di codice, cliccando il rombo: breve,
 niente nomi di file o funzioni. Tre parti, con questi titoli:
@@ -149,10 +151,8 @@ Sei tu a scriverli.
   node scripts/routine-channel.mjs deliver status --status revision_capability \
     --notes "[il tuo report]" --frase "[la frase]" --branch <il-tuo-branch>
   ```
-  Questa consegna oggi non porta `--segnala`: se nel primo passaggio hai un
-  trade-off da segnalare, mettilo in fondo al report con gli stessi tre titoli
-  (Problema / Scelte / Cosa ho fatto nel frattempo). Il rombo si accende dalla
-  consegna dopo.
+  Con un trade-off da segnalare aggiungi `--segnala <file.md>`: vale su
+  tutte e tre le consegne (questa, la correzione, la critica di chi verifica).
 - **Correzione** → rimetti il branch in coda di verifica col report della
   correzione (senza, la correzione è invisibile all'owner):
   ```bash

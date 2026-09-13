@@ -81,6 +81,7 @@ import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, cle
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -358,9 +359,10 @@ export function secauditPassato(verdict) {
 // markdown di più righe, e sulla riga di comando un testo così finisce
 // spezzato o con le virgolette sbagliate.
 
-// Tetto sul testo di un livello, lo stesso del server. Oltre: rifiuto con il
-// numero, qui, prima di chiamare il server. Mai un taglio.
-export const MAX_LIVELLO_CHARS = 12000;
+// La lettura del file (intera, mai tosata, col tetto del server) sta in
+// lib/livelli.mjs, perché la usa anche il canale (`deliver status --segnala`).
+// Ri-esportata da qui per chi la importava da dispatch.
+export { MAX_LIVELLO_CHARS, leggiTestoLivello };
 export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 
 /**
@@ -378,30 +380,6 @@ export function stripFileArg(list, nome) {
   if (!v || SEMBRA_OPZIONE(v)) return { args, file: '', error: `${flag} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.` };
   if (args.includes(flag)) return { args, file: '', error: `${flag} va passato una volta sola: non ho consegnato niente.` };
   return { args, file: v, error: '' };
-}
-
-/**
- * Legge il testo di un livello da file: intero, mai tosato. Un file assente o
- * vuoto è un errore chiaro, non un livello vuoto consegnato in silenzio.
- * @returns {{ ok:true, testo:string }|{ ok:false, message:string }}
- */
-export function leggiTestoLivello(file, nome) {
-  const p = resolve(String(file || ''));
-  if (!existsSync(p)) {
-    return { ok: false, message: `--${nome}: il file ${file} non esiste (cercato in ${p}). Scrivilo prima, poi rilancia lo stesso comando: non ho consegnato niente.` };
-  }
-  let testo = '';
-  try {
-    testo = readFileSync(p, 'utf8');
-  } catch (e) {
-    return { ok: false, message: `--${nome}: non riesco a leggere ${file} (${e?.message || e}): non ho consegnato niente.` };
-  }
-  testo = testo.replace(/\r\n/g, '\n').trim();
-  if (!testo) return { ok: false, message: `--${nome}: il file ${file} è vuoto. Ci va il testo per l'owner: non ho consegnato niente.` };
-  if (testo.length > MAX_LIVELLO_CHARS) {
-    return { ok: false, message: `--${nome}: ${testo.length} caratteri, il massimo è ${MAX_LIVELLO_CHARS} (lo stesso del server, che lo respingerebbe). Accorcia il testo, non i fatti: non ho consegnato niente.` };
-  }
-  return { ok: true, testo };
 }
 
 /** Il payload della consegna «corretto», con la segnalazione se c'è. PURA. */

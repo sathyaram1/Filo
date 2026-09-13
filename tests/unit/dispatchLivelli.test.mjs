@@ -222,6 +222,74 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
   }
 });
 
+// ─── Il canale: deliver status --segnala ──────────────────────────────────────
+// Il primo passaggio di chi risolve passa da `routine-channel.mjs deliver
+// status`, non da dispatch: senza questa strada il rombo non si accendeva mai
+// al primo passaggio. Server finto come in dueTesti.test.mjs: si guarda cosa
+// arriva davvero nel corpo della richiesta.
+
+function fintoServer() {
+  const ricevuti = [];
+  const srv = createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      let j = {};
+      try { j = body ? JSON.parse(body) : {}; } catch (_) {}
+      ricevuti.push({ url: req.url, body: j });
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, ricevuti, port: srv.address().port })));
+}
+
+test('canale: deliver status --segnala manda `segnalazione` intera; file assente = niente parte', async () => {
+  const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
+  const { srv, ricevuti, port } = await fintoServer();
+  const casa = cartellaTemporanea('filo-livelli-canale-');
+  try {
+    const seg = resolve(casa, 'segnala.md');
+    writeFileSync(seg, '## Problema\r\nDue strade.\r\n\r\n## Scelte\r\n- A: costa.\r\n- B: lenta.\r\n', 'utf8');
+    const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+    const lancia = (args) => spawnSync(process.execPath, [CANALE, ...args], { env, encoding: 'utf8', cwd: casa });
+
+    // `working` e non `revision_capability`: qui si prova il campo, non il
+    // controllo sui file fuori dai commit (che vale sulla directory vera).
+    const ok = lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
+      '--notes', 'Preso in carico: ho trovato un trade-off vero e lo segnalo.', '--segnala', seg]);
+    assert.equal(ok.status, 0, `la consegna doveva partire (stderr: ${ok.stderr})`);
+    const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
+    assert.ok(consegna, 'la consegna deve arrivare al server');
+    const d = consegna.body.data || {};
+    assert.equal(d.segnalazione, '## Problema\nDue strade.\n\n## Scelte\n- A: costa.\n- B: lenta.',
+      'il testo arriva intero, col nome che il server legge');
+    assert.equal(d.segnala, undefined, 'il nome dell\'opzione non viaggia: il server non lo conosce');
+
+    // File assente: si ferma prima del server, con la frase giusta.
+    const prima = ricevuti.length;
+    const assente = lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
+      '--notes', 'Preso in carico.', '--segnala', 'manca.md']);
+    assert.equal(assente.status, 1);
+    assert.match(String(assente.stderr), /manca\.md non esiste/);
+    assert.equal(ricevuti.length, prima, 'niente deve partire');
+
+    // --segnala senza file dopo: errore d'uso.
+    const monco = lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working', '--segnala']);
+    assert.equal(monco.status, 1);
+    assert.match(String(monco.stderr), /--segnala vuole un testo/);
+
+    // Su un intento che il server non legge (note) non si consegna a vuoto.
+    const altrove = lancia(['deliver', 'biglietto-di-prova', 'note', '--notes', 'Una riga.', '--segnala', seg]);
+    assert.equal(altrove.status, 1);
+    assert.match(String(altrove.stderr), /vale solo su deliver status, fixed e verdict/);
+    assert.equal(ricevuti.length, prima, 'niente deve partire');
+  } finally {
+    srv.close();
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
 test('cleanup', () => {
   rmSync(TMP, { recursive: true, force: true });
   assert.ok(!existsSync(TMP));
