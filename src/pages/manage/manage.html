@@ -895,6 +895,18 @@
       white-space: nowrap;
     }
 
+    /* Una fusione ferma sulla scheda: stessa forma del segno qui sopra, tinta
+       del blocco di sicurezza. È una decisione che aspetta l'owner, e senza
+       questo segno non si distinguerebbe scorrendo la lista. */
+    .mg-fusione-badge {
+      flex: none;
+      font-size: 10.5px; line-height: 1;
+      padding: 3px 6px; border-radius: 999px;
+      border: 1px solid color-mix(in srgb, #c0392b 55%, transparent);
+      color: #c0392b;
+      white-space: nowrap;
+    }
+
     /* Mittente */
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
     .mg-sender-stat { font-size: 13px; color: var(--sn-muted); }
