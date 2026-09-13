@@ -919,31 +919,11 @@
     }
     .mg-auto-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css. Qui la
-       spaziatura nella pagina e, soprattutto, il TETTO.
-
-       Il riquadro sta sopra le tre aree, dentro la stessa colonna, e cresce
-       quanto sono le richieste: una richiesta ne prende già 266 pixel, e le
-       richieste valgono una settimana, quindi si accumulano. Senza tetto, con
-       due le aree scendevano al loro minimo e la pagina ricominciava a
-       scorrere; con tre le aree uscivano quasi tutte dallo schermo e dei
-       Ricevuti restava la sola intestazione (#498). Oltre il tetto il riquadro
-       scorre dentro di sé: niente sparisce, e quante siano lo dice comunque il
-       titolo ("3 fusioni aspettano il tuo via libera"). `min-height: 0` serve
-       perché è un elemento di una colonna flex, e senza si rifiuterebbe di
-       scendere sotto la propria altezza naturale. */
-    .mg-merge-approvals {
-      margin: 0 0 20px;
-      max-height: var(--mg-attesa-max);
-      /* Il tetto dice quanto può chiedere; `flex: 0 1 auto` più un minimo basso
-         dicono a quanto deve rinunciare quando lo spazio non basta. È lui a
-         cedere, non le aree: le aree sono la cosa che il feedback chiedeva di
-         espandere. Sotto il minimo non scende, così l'intestazione col numero
-         resta leggibile e il resto si raggiunge scorrendo. */
-      min-height: var(--mg-attesa-min);
-      flex: 0 1 auto;
-      overflow-y: auto;
-    }
+    /* Fusioni ferme senza una segnalazione alle spalle: l'aspetto sta tutto in
+       mergeApprovals.css, qui solo la spaziatura. Non serve più un tetto: le
+       fusioni non stanno più sopra le tre aree dei Ricevuti (dove rubavano
+       altezza, #498) ma in Automazioni, che scorre da sé. */
+    .mg-merge-approvals { margin: 0 0 20px; }
     .mg-merge-approvals-recent { margin: 0 0 20px; }
 
     /* ── Sezione "Modelli di supporto" (DD1) ────────────────────────────── */
