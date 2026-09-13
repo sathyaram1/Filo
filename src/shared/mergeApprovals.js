@@ -564,6 +564,84 @@
     return list.length;
   }
 
+  /** Chi aveva messo il segno sulla pratica, in una frase. PURA. */
+  function preapprovedBy(r) {
+    var by = String((r && r.preapprovedBy) || '').trim().slice(0, 120);
+    return by ? 'pre-approvata da ' + by : 'pre-approvata sulla pratica';
+  }
+
+  /**
+   * Le fusioni avvenute SENZA chiedere: l'owner aveva messo il segno sulla
+   * pratica, e il server ha fuso da solo quando i controlli hanno bloccato.
+   *
+   * È il controllo a posteriori, quindi qui l'elenco di ciò che era stato
+   * segnalato si mostra PER INTERO — ogni gate, ogni file, ogni riga — non
+   * nelle righe minute delle decisioni: la decisione l'owner l'ha presa prima,
+   * senza leggere; questa è l'unica occasione in cui legge.
+   * Vive in Gestione → Automazioni.
+   */
+  function renderPreapproved(host, opts) {
+    if (!host) return 0;
+    var o = opts || {};
+    var now = Number(o.nowMs) || Date.now();
+    var list = Array.isArray(o.preapproved) ? o.preapproved : [];
+    host.replaceChildren();
+    host.hidden = list.length === 0;
+    if (!list.length) return 0;
+    host.appendChild(el('p', 'sn-mac-recent-title', 'Fuse senza chiedere'));
+    var intro = el('p', 'sn-mac-preapproved-intro',
+      'Lavori delle automazioni fermati dai controlli e fusi lo stesso, perché sulla pratica avevi detto «fondi senza chiedermelo». '
+      + 'Qui c’è tutto quello che era stato segnalato.');
+    host.appendChild(intro);
+    var ul = el('ul', 'sn-mac-preapproved');
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      var li = el('li', 'sn-mac-preapproved-row');
+      var head = el('div', 'sn-mac-preapproved-head');
+      if (typeof o.onFeedback === 'function' && feedbackNum(r)) {
+        var origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(r));
+        origin.type = 'button';
+        origin.title = 'Apri la segnalazione';
+        origin.addEventListener('click', (function (req) { return function () { o.onFeedback(req); }; })(r));
+        head.appendChild(origin);
+      } else {
+        head.appendChild(el('span', 'sn-mac-recent-origin', originLabel(r)));
+      }
+      head.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
+      var sha = el('span', 'sn-mac-sha', shortSha(r.mergeSha || r.sha));
+      sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
+      head.appendChild(sha);
+      var who = el('span', 'sn-mac-recent-who', preapprovedBy(r));
+      if (r.preapprovedAt) who.title = 'Segno messo il ' + String(r.preapprovedAt);
+      head.appendChild(who);
+      head.appendChild(el('span', 'sn-mac-recent-when', 'fusa ' + timeAgo(r.decidedAtMs || r.createdAtMs, now)));
+      li.appendChild(head);
+      var blocks = Array.isArray(r.blocks) ? r.blocks : [];
+      if (blocks.length) {
+        var bl = el('ul', 'sn-mac-blocks');
+        for (var j = 0; j < blocks.length; j++) {
+          var b = el('li', 'sn-mac-block');
+          b.appendChild(el('span', 'sn-mac-block-label', blockLabel(blocks[j])));
+          var items = blockItems(blocks[j]);
+          if (items.length) {
+            // Ogni voce sulla sua riga: qui l'elenco è la cosa da leggere, e
+            // cinquanta percorsi in una riga sola non si leggono.
+            var il = el('ul', 'sn-mac-block-list');
+            for (var k = 0; k < items.length; k++) il.appendChild(el('li', 'sn-mac-block-items', items[k]));
+            b.appendChild(il);
+          }
+          bl.appendChild(b);
+        }
+        li.appendChild(bl);
+      } else {
+        li.appendChild(el('p', 'sn-mac-status', 'Nessun dettaglio registrato su cosa era stato segnalato.'));
+      }
+      ul.appendChild(li);
+    }
+    host.appendChild(ul);
+    return list.length;
+  }
+
   global.SN_MERGE_APPROVALS = {
     shortSha: shortSha,
     timeAgo: timeAgo,
