@@ -46,9 +46,9 @@
 // USO (la stessa lista, per chi la chiede dal terminale: `--help`)
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
-//   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--ticket <b>]
-//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--ticket <b>]
-//   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> [--ticket <b>]
+//   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--segnala <file.md>] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
 //   Nei --record-* il biglietto si rilegge dal promemoria (.claude/routine-ticket.json);
@@ -328,12 +328,110 @@ export function applyFixed(state) {
   return s;
 }
 
-/** Il secaudit ha prodotto un verdetto L4. */
+/**
+ * Il secaudit ha prodotto un verdetto L4. `saltato` è il terzo esito, e non
+ * lo dà il ruolo: lo scrive il server quando l'owner, letto il fail, decide
+ * di andare avanti (contratto dei livelli, 2026-09-13). Vale come un pass
+ * ovunque si guardi il verdetto, ma resta scritto com'è: è una decisione
+ * dell'owner, e la copia locale non deve travestirla da controllo superato.
+ */
 export function applySecaudit(state, verdict) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
   s.secauditDone = true;
-  s.secauditVerdict = verdict === 'pass' ? 'pass' : 'fail';
+  s.secauditVerdict = secauditPassato(verdict) ? verdict : 'fail';
   return s;
+}
+
+/** Il verdetto L4 lascia passare? `pass` e `saltato` (dall'owner) sì. PURA. */
+export function secauditPassato(verdict) {
+  return verdict === 'pass' || verdict === 'saltato';
+}
+
+// ─── I livelli L3 e L4 (contratto del 2026-09-13) ─────────────────────────────
+//
+// Con la consegna viaggiano due testi in più, che il server cifra e scrive nel
+// documento del feedback (`livelli.l3`, `livelli.l4`) perché la dashboard li
+// mostri nella fila delle forme: la SEGNALAZIONE di chi risolve o verifica (un
+// trade-off vero o una domanda di design, che decide l'owner: il rombo) e la
+// NOTA del controllo di sicurezza (cosa ha controllato e cosa ha trovato: il
+// pentagono). Tutti e due arrivano da un file (`--segnala`, `--nota`): sono
+// markdown di più righe, e sulla riga di comando un testo così finisce
+// spezzato o con le virgolette sbagliate.
+
+// Tetto sul testo di un livello, lo stesso del server. Oltre: rifiuto con il
+// numero, qui, prima di chiamare il server. Mai un taglio.
+export const MAX_LIVELLO_CHARS = 12000;
+export const SECAUDIT_VERDICTS = ['pass', 'fail'];
+
+/**
+ * Toglie `--<nome> <file>` dagli argomenti, come stripTicketArg col biglietto.
+ * PURA. `error` è la frase da stampare (opzione senza file dopo, o un flag al
+ * posto del file, o l'opzione ripetuta).
+ */
+export function stripFileArg(list, nome) {
+  const args = Array.isArray(list) ? [...list] : [];
+  const flag = `--${nome}`;
+  const i = args.indexOf(flag);
+  if (i === -1) return { args, file: '', error: '' };
+  const v = String(args[i + 1] ?? '').trim();
+  args.splice(i, 2);
+  if (!v || SEMBRA_OPZIONE(v)) return { args, file: '', error: `${flag} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.` };
+  if (args.includes(flag)) return { args, file: '', error: `${flag} va passato una volta sola: non ho consegnato niente.` };
+  return { args, file: v, error: '' };
+}
+
+/**
+ * Legge il testo di un livello da file: intero, mai tosato. Un file assente o
+ * vuoto è un errore chiaro, non un livello vuoto consegnato in silenzio.
+ * @returns {{ ok:true, testo:string }|{ ok:false, message:string }}
+ */
+export function leggiTestoLivello(file, nome) {
+  const p = resolve(String(file || ''));
+  if (!existsSync(p)) {
+    return { ok: false, message: `--${nome}: il file ${file} non esiste (cercato in ${p}). Scrivilo prima, poi rilancia lo stesso comando: non ho consegnato niente.` };
+  }
+  let testo = '';
+  try {
+    testo = readFileSync(p, 'utf8');
+  } catch (e) {
+    return { ok: false, message: `--${nome}: non riesco a leggere ${file} (${e?.message || e}): non ho consegnato niente.` };
+  }
+  testo = testo.replace(/\r\n/g, '\n').trim();
+  if (!testo) return { ok: false, message: `--${nome}: il file ${file} è vuoto. Ci va il testo per l'owner: non ho consegnato niente.` };
+  if (testo.length > MAX_LIVELLO_CHARS) {
+    return { ok: false, message: `--${nome}: ${testo.length} caratteri, il massimo è ${MAX_LIVELLO_CHARS} (lo stesso del server, che lo respingerebbe). Accorcia il testo, non i fatti: non ho consegnato niente.` };
+  }
+  return { ok: true, testo };
+}
+
+/** Il payload della consegna «corretto», con la segnalazione se c'è. PURA. */
+export function fixedPayload({ report, frase, branch, segnalazione } = {}) {
+  const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
+  if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
+  return p;
+}
+
+/** Il payload del verdetto L4, con la nota se c'è. PURA. */
+export function secauditPayload({ verdict, branch, testo } = {}) {
+  const p = { verdict: String(verdict || ''), branch: String(branch || '') };
+  if (String(testo || '').trim()) p.testo = String(testo).trim();
+  return p;
+}
+
+/**
+ * Un `pass` senza nota non si consegna: il server lo respingerebbe, e prima
+ * ancora un «passato» senza cosa è stato guardato non si distingue da un
+ * controllo mai fatto. Ritorna la frase che ferma, '' se si può consegnare.
+ * Su `fail` la nota resta dovuta (è quello che l'owner legge per decidere),
+ * ma senza il server mette una frase standard: non si ferma qui. PURA.
+ */
+export function secauditSenzaNota(verdict, testo) {
+  if (verdict !== 'pass' || String(testo || '').trim()) return '';
+  return [
+    'Un «pass» senza nota non si registra: il server lo respinge, e un controllo passato senza dire cosa è stato guardato non si distingue da un controllo mai fatto.',
+    'Scrivi un file .md con cosa hai controllato (i pattern cercati, le parti del diff lette) e cosa hai trovato, in breve e senza nomi di file o funzioni: è quello che l\'owner legge cliccando il pentagono in dashboard.',
+    'Poi rilancia: node scripts/dispatch.mjs --record-secaudit <id> pass --nota <file.md>',
+  ].join('\n');
 }
 
 // ─── Stato su disco ───────────────────────────────────────────────────────────
@@ -821,7 +919,7 @@ function sealTransition(state, by) {
  * per quel commit. L'ESITO lo calcola il server e torna nella risposta, che
  * si stampa intera: non sta da nessun'altra parte.
  */
-async function recordVerifier(id, critiqueText) {
+async function recordVerifier(id, critiqueText, segnalazione = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
@@ -873,6 +971,9 @@ async function recordVerifier(id, critiqueText) {
     critique: critiqueNorm.trim(),
     branch: base.branch || '',
     sha: headSha(ROOT) || '',
+    // L3: la segnalazione per l'owner, se c'è (un trade-off vero trovato
+    // verificando). Il server la cifra in `livelli.l3`.
+    ...(String(segnalazione || '').trim() ? { segnalazione: String(segnalazione).trim() } : {}),
   });
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `critica non accettata (${motivoRifiuto(sent)})` };
@@ -957,7 +1058,7 @@ export function verifierReplyText(reply) {
     'L\'esito vero sta in dashboard, nella chat del feedback: leggilo lì prima di rilasciare il biglietto.',
   ].join('\n');
 }
-async function recordFixed(id, report = '', frase = '') {
+async function recordFixed(id, report = '', frase = '', segnalazione = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
@@ -979,7 +1080,9 @@ async function recordFixed(id, report = '', frase = '') {
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
   // Due testi, due destinatari: il report lo cifra il server per l'owner, la
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
-  const sent = await deliverToChannel('fixed', { report: String(report || ''), userNote: String(frase || ''), branch: next.branch || '' });
+  // La segnalazione (L3) viaggia nello stesso payload: il server la cifra e la
+  // scrive in `livelli.l3`, e la appende alle note come storia della chat.
+  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
@@ -995,14 +1098,21 @@ async function recordFixed(id, report = '', frase = '') {
   sealTransition(next, `${readRole(ROOT) || 'fixer'}:consegna`);
   return next;
 }
-async function recordSecaudit(id, verdict) {
+async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
+  // Un pass senza nota si ferma QUI, prima del server (che comunque lo
+  // respingerebbe): la riga di comando lo controlla già, questa è la guardia
+  // per chi chiama la funzione da un altro strumento.
+  const ferma = secauditSenzaNota(verdict, testo);
+  if (ferma) return { rejected: true, formatRejected: true, message: ferma };
   const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict);
   next.id = id;
 
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
-  const sent = await deliverToChannel('secaudit', { verdict, branch: next.branch || '' });
+  // La nota (L4) va nel payload: il server la cifra in `livelli.l4`, anche su
+  // pass, così il pentagono in dashboard ha qualcosa da mostrare.
+  const sent = await deliverToChannel('secaudit', secauditPayload({ verdict, branch: next.branch || '', testo }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${motivoRifiuto(sent)})` };
   }
@@ -1220,14 +1330,21 @@ export function usageText() {
     '                         promemoria del biglietto e avvia il battito',
     '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
-    '  --record-verifier <id> "<critica>" [--ticket <b>]   una riga per rilievo,',
+    '  --record-verifier <id> "<critica>" [--segnala <file.md>] [--ticket <b>]   una riga per rilievo,',
     '                         col livello davanti ([2] …; [1?] = chiede una decisione);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
-    '  --record-fixed    <id> "<report>" [--frase "…"] [--ticket <b>]   il report',
-    '                         non è facoltativo: da qui esce un esito, e l’owner legge questo',
-    '  --record-secaudit <id> <pass|fail> [--ticket <b>]',
+    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
+    '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
+    '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
+    '                         la nota dice cosa hai controllato e cosa hai trovato;',
+    '                         su pass è obbligatoria (senza, il verdetto non parte)',
+    '',
+    '  --segnala <file.md>    un trade-off vero o una domanda di design trovati',
+    '                         lavorando: NON deciderlo, segnalalo (Problema / Scelte',
+    '                         col loro trade-off / Cosa ho fatto nel frattempo); è quello',
+    '                         che l\'owner legge cliccando il rombo in dashboard',
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
     '',
@@ -1640,7 +1757,11 @@ if (isMainModule) {
 
   try {
     if (flag === '--record-verifier') {
-      const [, id, ...rest] = conBiglietto(argv);
+      // `--segnala <file>` si toglie PRIMA di leggere i posizionali, come il
+      // biglietto: il resto è la critica, un testo solo.
+      const seg = stripFileArg(conBiglietto(argv), 'segnala');
+      if (seg.error) { console.error(seg.error); process.exit(1); }
+      const [, id, ...rest] = seg.args;
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, col livello davanti: [2] …>"'); process.exit(1); }
       // La parola del vecchio verdetto (pass|migliorabile|fail) NON si tollera
       // più: veniva buttata via in silenzio, e senza rilievi la verifica
@@ -1678,14 +1799,20 @@ if (isMainModule) {
         console.error('Vale anche quando promuovi: senza rilievi la verifica risulta superata, e una promozione senza motivo non dice a nessuno cosa hai provato.');
         process.exit(1);
       }
-      const s = await recordVerifier(id, critica);
+      // Il file della segnalazione si legge qui, a critica già buona: un file
+      // assente ferma con la frase giusta, e niente parte a metà.
+      const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
+      if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
+      const s = await recordVerifier(id, critica, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
       console.log(verifierReplyText(s.reply));
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const [, id, ...rest] = conBiglietto(argv);
-      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"]'); process.exit(1); }
+      const seg = stripFileArg(conBiglietto(argv), 'segnala');
+      if (seg.error) { console.error(seg.error); process.exit(1); }
+      const [, id, ...rest] = seg.args;
+      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
       // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
       // resto è il report per l'owner, che il server cifra.
       const fi = rest.indexOf('--frase');
@@ -1713,21 +1840,30 @@ if (isMainModule) {
         console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: è quello che l\'owner legge, e non si riscrive più.');
         process.exit(1);
       }
-      const s = await recordFixed(id, report, frase);
+      const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
+      if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
+      const s = await recordFixed(id, report, frase, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
-      const [, id, verdict] = conBiglietto(argv);
-      if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
+      // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.
+      const nota = stripFileArg(conBiglietto(argv), 'nota');
+      if (nota.error) { console.error(nota.error); process.exit(1); }
+      const [, id, verdict, ...avanzo] = nota.args;
+      if (!id || !SECAUDIT_VERDICTS.includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail> --nota <file.md>'); process.exit(1); }
       // Qui non c'è altro da dire: un argomento in più veniva ignorato in
       // silenzio e il verdetto partiva lo stesso (feedback #565).
-      const avanzo = conBiglietto(argv).slice(3);
       if (avanzo.length) {
-        console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci vanno solo l'identificativo e pass|fail.`);
+        console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci vanno solo l'identificativo, pass|fail e --nota <file.md>.`);
         process.exit(1);
       }
-      const s = await recordSecaudit(id, verdict);
+      const testo = nota.file ? leggiTestoLivello(nota.file, 'nota') : { ok: true, testo: '' };
+      if (!testo.ok) { console.error(testo.message); process.exit(1); }
+      // Un pass senza nota si ferma PRIMA di consegnare, con cosa scrivere.
+      const ferma = secauditSenzaNota(verdict, testo.testo);
+      if (ferma) { console.error(ferma); process.exit(1); }
+      const s = await recordSecaudit(id, verdict, testo.testo);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
       process.exit(0);
