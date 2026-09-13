@@ -42,9 +42,15 @@ test("mentre si scrive lo stile, un colore chiesto a Filo non deve essere cancel
 
   // 1. l'utente sta scrivendo il suo stile nel riquadro: il salvataggio
   //    automatico parte da sé mentre scrive.
+  const STILE = 'Rispondimi breve e senza giri di parole';
   await pagina.click('#agentStyleText');
-  await pagina.type('#agentStyleText', 'Rispondimi breve e senza giri di parole', { delay: 30 });
+  await pagina.type('#agentStyleText', STILE, { delay: 30 });
   await pagina.waitForTimeout(500);
+
+  // Scrivere fa salvare da sé, e ogni salvataggio fa rileggere la pagina: la
+  // rilettura non deve mangiare le lettere che l'utente sta ancora battendo.
+  expect(await pagina.inputValue('#agentStyleText')).toBe(STILE);
+  expect((await impostazioni(pagina)).agentStyle).toBe(STILE);
 
   // 2. nello stesso momento chiede a Filo un colore d'accento, e Filo lo
   //    applica: in memoria c'è.
