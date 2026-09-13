@@ -1089,11 +1089,8 @@ test('fix bocciato dalla sicurezza (design/secaudit) → card ROSSA + frase acca
   await expect(page.locator('#mgLivelliRow .mg-dot--aligned')).toHaveCount(4);
   // …e in fondo alla fila l'etichetta di stato dice PERCHÉ, rossa come la card.
   const stato = page.locator('#mgDetailState');
-  await expect(stato).toContainText(/sicurezza/i);
-  const statoColor = await stato.locator('.mg-detail-state-dot').evaluate((el) => getComputedStyle(el).color);
-  expect(statoColor).toBe(border);
-  // La frase per esteso resta a portata: sotto il puntatore e nel pannello
-  // dei giudici.
+  await expect(stato).toContainText(/bloccato dalla sicurezza/i);
+  // La frase per esteso resta a portata, sotto il puntatore.
   expect(await stato.getAttribute('title')).toMatch(/decidi tu/i);
 });
 

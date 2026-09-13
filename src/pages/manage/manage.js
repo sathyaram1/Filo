@@ -1558,6 +1558,11 @@
     updateTabCounts();
     setListHead(TAB_LABELS[currentTab] || '', dataLoaded ? currentList.length : null);
     renderListBody();
+    // Chi è "senza feedback" dipende da quali feedback ci sono: quando la lista
+    // cambia, l'elenco in Automazioni si rifà — altrimenti una richiesta
+    // resterebbe lì anche dopo che la sua scheda è arrivata, e si leggerebbe
+    // due volte.
+    renderFusioniOrfane();
   }
 
   // Questa segnalazione ha una fusione ferma che aspetta l'owner?

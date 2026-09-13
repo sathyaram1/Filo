@@ -156,28 +156,11 @@ test('le sezioni partono in alto e le aree arrivano in fondo alla finestra', asy
 
 // #498, secondo giro. Le aree si prendono "quello che avanza": quindi tutto ciò
 // che sta SOPRA di loro nella stessa colonna glielo toglie. Il riquadro delle
-// fusioni che aspettano il via libera dell'owner cresce quanto sono le
-// richieste, e le richieste valgono una settimana: con due le aree scendevano
-// al minimo e la pagina ricominciava a scorrere, con tre uscivano quasi tutte
-// dallo schermo. Ora il riquadro ha un tetto e oltre quello scorre dentro di sé.
-function richiestaFinta(i) {
-  return {
-    id: `req-${i}`,
-    branch: `claude/lavoro-numero-${i}`,
-    sha: `abcdef012345678901234567890abcdef012345${i}`,
-    who: `routine-${i}`,
-    origin: 'routine',
-    feedbackNum: `#${400 + i}`,
-    createdAtMs: Date.now() - 3600_000,
-    expiresAtMs: Date.now() + 6 * 86400_000,
-    blocks: [
-      { kind: 'protected-paths', items: ['src/main/main.js', 'package.json'] },
-      { kind: 'workflow', items: ['.github/workflows/release.yml'] },
-    ],
-  };
-}
+// fusioni in attesa cresceva quanto erano le richieste e le schiacciava. La
+// cura definitiva è stata toglierlo di lì: una fusione ferma ora è una
+// segnalazione col quadrato rosso, dentro la lista.
 
-test('le fusioni in attesa non spingono le aree fuori dallo schermo', async ({ openTab }) => {
+test('le fusioni ferme non stanno più sopra le aree: dai Ricevuti sono sparite', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -186,87 +169,35 @@ test('le fusioni in attesa non spingono le aree fuori dallo schermo', async ({ o
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.setData([]));
 
-  const senza = await page.evaluate(() =>
-    Math.round(document.getElementById('mgReviewGrid').getBoundingClientRect().height));
-
-  for (const quante of [1, 2, 3, 6]) {
-    await page.evaluate((reqs) => {
-      window.SN_MERGE_APPROVALS.render(
-        document.getElementById('mgMergeApprovals'), { requests: reqs, failed: [] });
-    }, Array.from({ length: quante }, (_, i) => richiestaFinta(i)));
-    await page.waitForTimeout(250);
-
-    const g = await page.evaluate(() => {
-      const doc = document.documentElement;
-      const blocco = document.getElementById('mgMergeApprovals');
-      const grid = document.getElementById('mgReviewGrid');
-      return {
-        bloccoH: Math.round(blocco.getBoundingClientRect().height),
-        bloccoScrollH: blocco.scrollHeight,
-        gridH: Math.round(grid.getBoundingClientRect().height),
-        gridBottom: Math.round(grid.getBoundingClientRect().bottom),
-        viewport: doc.clientHeight,
-        scrollH: doc.scrollHeight,
-      };
-    });
-
-    // La pagina non torna a scorrere, e le aree restano in finestra.
-    expect(g.scrollH, `${quante} fusioni: la pagina scrolla`).toBeLessThanOrEqual(g.viewport + 1);
-    expect(g.gridBottom, `${quante} fusioni: le aree escono dalla finestra`).toBeLessThanOrEqual(g.viewport + 1);
-    // Alle aree resta più della metà di quello che avevano senza fusioni: non
-    // sono più schiacciate al minimo da un riquadro senza tetto.
-    expect(g.gridH, `${quante} fusioni: aree schiacciate`).toBeGreaterThan(senza / 2);
-    // E niente sparisce: quello che non entra si raggiunge scorrendo dentro il
-    // riquadro, non è tagliato via.
-    if (g.bloccoScrollH > g.bloccoH + 1) {
-      const scrollabile = await page.evaluate(() => {
-        const b = document.getElementById('mgMergeApprovals');
-        b.scrollTop = b.scrollHeight;
-        return b.scrollTop > 0;
-      });
-      expect(scrollabile, `${quante} fusioni: il riquadro non scorre`).toBe(true);
-    }
-  }
+  // Il riquadro che rubava altezza alle tre aree non esiste più nel pannello
+  // delle liste: una fusione ferma È una segnalazione col quadrato rosso, e si
+  // approva dal suo pannello. Quelle senza segnalazione vivono in Automazioni.
+  await expect(page.locator('#panel-list #mgMergeApprovals')).toHaveCount(0);
+  await expect(page.locator('#panel-automation #mgMergeApprovalsOrphans')).toHaveCount(1);
 });
 
-// #498, terzo giro. Il tetto da solo non bastava: dice quanto il riquadro può
-// CHIEDERE, ma finché la colonna della pagina poteva crescere oltre la finestra
-// nessuno lo obbligava a rinunciare a niente, e la somma (testata + tetto +
-// minimo delle aree) usciva dal fondo lo stesso. Si vedeva con lo zoom di Filo
-// alzato o su una finestra bassa: a zoom +2 con due fusioni in attesa delle
-// aree restava la sola intestazione dei Ricevuti, e la pagina scorreva di quasi
-// cento pixel. Adesso sulle schede-lista la colonna è alta ESATTAMENTE la
-// finestra, e sotto pressione cede il riquadro (che scorre dentro di sé), non
-// le aree.
-async function misuraColonna(page) {
-  return page.evaluate(() => {
+// #498, terzo giro: sulle schede-lista la colonna è alta ESATTAMENTE la
+// finestra, e le tre aree restano dentro anche con lo zoom alzato o una
+// finestra bassa.
+test('con lo zoom alzato o la finestra bassa le aree restano dentro la finestra', async ({ app, openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.setData([]));
+
+  const misura = () => page.evaluate(() => {
     const doc = document.documentElement;
     const grid = document.getElementById('mgReviewGrid').getBoundingClientRect();
-    const blocco = document.getElementById('mgMergeApprovals');
     return {
       gridH: Math.round(grid.height),
       gridBottom: Math.round(grid.bottom),
-      bloccoH: Math.round(blocco.getBoundingClientRect().height),
-      bloccoScrollH: blocco.scrollHeight,
       viewport: doc.clientHeight,
       scrollH: doc.scrollHeight,
     };
   });
-}
-
-test('con lo zoom alzato o la finestra bassa le fusioni in attesa non buttano fuori le aree', async ({ app, openTab }) => {
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
-  await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
-  await page.evaluate(() => window.__mgTest.setAdmin(true));
-  await page.evaluate(() => window.__mgTest.setData([]));
-  await page.evaluate((reqs) => {
-    window.SN_MERGE_APPROVALS.render(
-      document.getElementById('mgMergeApprovals'), { requests: reqs, failed: [] });
-  }, [0, 1].map((i) => richiestaFinta(i)));
-  await page.waitForTimeout(250);
 
   // a) lo zoom di Filo, che è un tasto solo (Ctrl e il più).
   for (const lvl of [0, 1, 2, 3]) {
@@ -276,13 +207,10 @@ test('con lo zoom alzato o la finestra bassa le fusioni in attesa non buttano fu
       }
     }, lvl);
     await page.waitForTimeout(400);
-    const g = await misuraColonna(page);
+    const g = await misura();
     expect(g.scrollH, `zoom ${lvl}: la pagina scrolla`).toBeLessThanOrEqual(g.viewport + 2);
     expect(g.gridBottom, `zoom ${lvl}: le aree escono dal fondo`).toBeLessThanOrEqual(g.viewport + 2);
-    // Delle aree resta molto più dell'intestazione: la lista si vede.
     expect(g.gridH, `zoom ${lvl}: delle aree resta solo l'intestazione`).toBeGreaterThan(220);
-    // E il riquadro non sparisce: l'intestazione col numero resta leggibile.
-    expect(g.bloccoH, `zoom ${lvl}: il riquadro in attesa sparisce`).toBeGreaterThan(40);
   }
   await app.evaluate(async ({ webContents }) => {
     for (const wc of webContents.getAllWebContents()) {
@@ -300,21 +228,11 @@ test('con lo zoom alzato o la finestra bassa le fusioni in attesa non buttano fu
       if (win) win.setContentSize(w, h);
     }, [w, h]);
     await page.waitForTimeout(400);
-    const g = await misuraColonna(page);
+    const g = await misura();
     expect(g.scrollH, `${w}x${h}: la pagina scrolla`).toBeLessThanOrEqual(g.viewport + 2);
     expect(g.gridBottom, `${w}x${h}: le aree escono dal fondo`).toBeLessThanOrEqual(g.viewport + 2);
-    expect(g.bloccoH, `${w}x${h}: il riquadro in attesa sparisce`).toBeGreaterThan(40);
-    // Quello che il riquadro non mostra si raggiunge scorrendo dentro di lui.
-    if (g.bloccoScrollH > g.bloccoH + 1) {
-      const inFondo = await page.evaluate(() => {
-        const b = document.getElementById('mgMergeApprovals');
-        b.scrollTop = b.scrollHeight;
-        return b.scrollTop + b.clientHeight >= b.scrollHeight - 2;
-      });
-      expect(inFondo, `${w}x${h}: il riquadro non scorre fino in fondo`).toBe(true);
-    }
   }
-  await page.screenshot({ path: 'tests/.shots/manage-fusioni-finestra-bassa.png' });
+  await page.screenshot({ path: 'tests/.shots/manage-aree-finestra-bassa.png' });
 });
 
 // L'altra metà della stessa regola: l'altezza fissa vale SOLO dove ci sono le
