@@ -161,6 +161,89 @@
     return next;
   }
 
+  // ===== Quello che Filo si è appuntato, dal lato dell'utente =====
+  //
+  // Una lezione e una riga di memoria valgono in ogni conversazione e
+  // sopravvivono al riavvio, come lo stile dell'agente: quindi devono restare
+  // leggibili e cancellabili UNA PER VOLTA (#592). Fino a qui l'unica strada
+  // era cancellare tutta la memoria insieme, profilo di mesi compreso, e non
+  // c'era nessun posto dove leggerla: una regola entrata di traverso (il
+  // titolo di una scheda, un risultato web, il riassunto di un file che
+  // convincono Filo a «ricordarsi» qualcosa) restava lì senza che si potesse
+  // vedere.
+
+  // Le righe vere di un modulo, con l'indice che hanno nel testo salvato: la
+  // pagina mostra il testo, e per cancellare rimanda quell'indice. Tenere
+  // l'indice del testo GREZZO, e non quello delle sole righe piene, è ciò che
+  // permette di togliere una riga senza riscrivere il resto del modulo (le
+  // righe vuote che il compattatore usa per separare i paragrafi restano dove
+  // sono).
+  function memoryLines(testo) {
+    const raw = String(testo == null ? '' : testo).split(/\r?\n/);
+    const out = [];
+    raw.forEach((r, i) => { if (r.trim()) out.push({ i, text: r.trim() }); });
+    return out;
+  }
+
+  // Toglie la riga di indice `i`. Ritorna `tolta: null` se l'indice non c'è o
+  // è una riga vuota: la pagina può essere rimasta indietro rispetto a quello
+  // che Filo ha scritto nel frattempo, e in quel caso non si tocca niente.
+  function removeMemoryLine(testo, i) {
+    const originale = String(testo == null ? '' : testo);
+    const raw = originale.split(/\r?\n/);
+    if (!Number.isInteger(i) || i < 0 || i >= raw.length || !raw[i].trim()) {
+      return { testo: originale, tolta: null };
+    }
+    const tolta = raw[i].trim();
+    raw.splice(i, 1);
+    // Tolta una riga, due righe vuote di fila non separano più niente.
+    return { testo: raw.join('\n').replace(/\n{3,}/g, '\n\n').trim(), tolta };
+  }
+
+  // Cancella UNA lezione dal buffer. Si cerca per testo (e per data, se c'è):
+  // per indice, una lezione scritta da Filo nel frattempo ne farebbe sparire
+  // un'altra.
+  async function forgetLesson({ ts, text } = {}) {
+    const buf = await getLessonsBuffer();
+    const cercato = String(text == null ? '' : text);
+    const i = buf.findIndex((l) => String(l?.text || '') === cercato && (!ts || l?.ts === ts));
+    if (i < 0) return { lessons: buf, tolta: false };
+    buf.splice(i, 1);
+    await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+    return { lessons: buf, tolta: true };
+  }
+
+  // Cancella UNA riga di un modulo. `atteso` è il testo che la pagina stava
+  // mostrando: se non combacia, la pagina è vecchia e non si cancella niente.
+  async function forgetMemoryLine({ module, index, atteso } = {}) {
+    const mem = await getMemory();
+    if (!module || !Object.prototype.hasOwnProperty.call(mem, module)) {
+      return { memory: mem, tolta: false };
+    }
+    const { testo, tolta } = removeMemoryLine(mem[module], index);
+    if (tolta === null) return { memory: mem, tolta: false };
+    if (atteso != null && tolta !== String(atteso).trim()) return { memory: mem, tolta: false };
+    const next = { ...mem, [module]: testo };
+    await setMemory(next);
+    return { memory: next, tolta: true };
+  }
+
+  // Svuota un modulo intero. PROFILO e PREFERENZE ci sono sempre, quindi
+  // restano come etichette vuote; un'espansione nata da una conversazione
+  // sparisce del tutto, se no resterebbe un titolo vuoto che non si può
+  // togliere.
+  async function forgetMemoryModule(module) {
+    const mem = await getMemory();
+    if (!module || !Object.prototype.hasOwnProperty.call(mem, module)) {
+      return { memory: mem, tolta: false };
+    }
+    const next = { ...mem };
+    if (module === 'PROFILO' || module === 'PREFERENZE') next[module] = '';
+    else delete next[module];
+    await setMemory(next);
+    return { memory: next, tolta: true };
+  }
+
   // Parsing dell'output del Compattatore: blocchi "NOME:\ncontenuto multilinea"
   // separati da una riga vuota. Tollerante: il primo elemento prima del primo
   // header viene scartato.
