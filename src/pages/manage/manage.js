@@ -2303,7 +2303,12 @@
       return;
     }
     mgDetailState.hidden = false;
-    mgDetailState.title = b.hint;
+    // Sotto il puntatore, la frase per esteso: l'etichetta dice COSA, la frase
+    // dice perché e cosa tocca all'owner. Sulla riga ci starebbe male — le
+    // forme hanno già preso la larghezza — ma perderla del tutto era un passo
+    // indietro (#462).
+    const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
+    mgDetailState.title = b.hint + (nota && nota.text ? ` — ${nota.text}` : '');
     mgDetailState.innerHTML =
       (b.color ? `<span class="mg-detail-state-dot" style="color:${esc(b.color)}"></span>` : '')
       + `<span>${esc(b.label)}</span>`

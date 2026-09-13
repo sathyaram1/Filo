@@ -163,8 +163,8 @@ test('#509 — stato illeggibile: niente sezioni su ENTRAMBE le pagine', async (
   // 6. Aprendo una segnalazione già chiusa, il dettaglio lo dice — invece di
   //    "In attesa del giudizio".
   await mg.locator('.mg-item', { hasText: 'chiusa pure' }).click();
-  await expect(mg.locator('#mgJudgesRow')).toContainText('Chiusa');
-  await expect(mg.locator('#mgJudgesRow')).not.toContainText('In attesa del giudizio');
+  await expect(mg.locator('#mgLivelliRow')).toContainText('Chiusa');
+  await expect(mg.locator('#mgLivelliRow')).not.toContainText('In attesa del giudizio');
 });
 
 test('#509 — stato illeggibile: nessuna decisione offerta su ciò che non si legge', async ({ openTab }) => {

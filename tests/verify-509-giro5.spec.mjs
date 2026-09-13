@@ -221,7 +221,7 @@ test('#509/g5 — il dettaglio di una cifrata non dichiara giudizi che non ha', 
     await mg.evaluate((fid) => window.__mgTest.openDetail(fid), id);
     const d = await mg.evaluate(() => ({
       thread: document.getElementById('mgThread').innerText,
-      giudici: (() => { const r = document.getElementById('mgJudgesRow'); return r && !r.hidden ? r.innerText.trim() : ''; })(),
+      giudici: (() => { const r = document.getElementById('mgLivelliRow'); return r && !r.hidden ? r.innerText.trim() : ''; })(),
       statoRiga: (() => { const r = document.getElementById('mgDetailState'); return r && !r.hidden ? r.innerText.trim() : ''; })(),
     }));
     expect(d.thread, `${id}: la bolla non deve promettere un giudizio in arrivo`)
