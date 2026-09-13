@@ -1036,7 +1036,7 @@
     if (!cat) {
       return forma('l1', 'triangolo', titolo, null, 'assente', {
         titolo,
-        righe: [],
+        righe: righeStato(fb),
         testo: 'Il filtro d’ingresso non ha lasciato traccia su questa segnalazione.',
         azioni: [],
       });
