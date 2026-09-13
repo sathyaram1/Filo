@@ -323,6 +323,8 @@ test('tema scuro e chiaro: catture del dettaglio e di Automazioni', async ({ ope
   await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
   for (const scheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: scheme });
+    await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+    await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
     await page.screenshot({ path: `tests/.shots/preapprovazione-dettaglio-${scheme}.png` });
     await page.locator('.mg-tab[data-tab="automation"]').click();
     await expect(page.locator('#mgMergeApprovalsPreapproved')).toBeVisible();
