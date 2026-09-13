@@ -331,7 +331,8 @@ test('#509 — su «Gestione» un attacco confermato non si può riscrivere ad "
 
   // Il pannello DICE che è un attacco confermato: prima non lo diceva da
   // nessuna parte, e la conversazione scriveva "Filo non ha ancora un parere".
-  await expect(mg.locator('#mgDetailState')).toContainText('Attacco confermato');
+  await mg.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(mg.locator('#mgSideBody')).toContainText('Attacco confermato');
 
   // L'unico bottone è il ripristino, e rimette in coda: la conferma non si
   // cancella premendo l'unica cosa disponibile.

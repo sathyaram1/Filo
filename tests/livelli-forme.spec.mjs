@@ -199,8 +199,25 @@ test('cinque livelli, cinque forme: quattro sagome più i cerchi dei giudici', a
   expect(xTri).toBeLessThan(xGiu);
   expect(xGiu).toBeLessThan(xRom);
 
-  // La vecchia riga «Giudici:» non c'è più.
+  // La vecchia riga «Giudici:» non c'è più, e nemmeno l'etichetta di stato:
+  // nella fila ci sono le forme e basta.
   await expect(page.locator('.mg-judge-label')).toHaveCount(0);
+  await expect(page.locator('#mgDetailState')).toHaveCount(0);
+  expect((await fila.innerText()).trim()).toBe('');
+});
+
+test('la decisione già presa si legge nel pannello del triangolo', async ({ openTab }) => {
+  // Lo stato non è uno dei cinque controlli — viene dall'owner o dalla
+  // macchina a stati — quindi non ha una forma sua. Ma non deve sparire: un
+  // attacco confermato la pagina lo deve dire da qualche parte.
+  const page = await openTab(MANAGE);
+  const confermato = { ...FB_ATTACCO, _id: 'fb-confermato', status: 'attack_confirmed' };
+  await apri(page, [confermato]);
+  await page.evaluate(() => window.__mgTest.setTab('archived'));
+  await page.evaluate(() => window.__mgTest.openDetail('fb-confermato'));
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(page.locator('#mgSideBody')).toContainText('Attacco confermato');
 });
 
 test('un livello senza parere resta al suo posto, grigio, e cliccato dice perché', async ({ openTab }) => {

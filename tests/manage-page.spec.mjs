@@ -1087,11 +1087,13 @@ test('fix bocciato dalla sicurezza (design/secaudit) → card ROSSA + frase acca
   // Dettaglio: i 4 pallini blu restano (è la storia del giudizio)…
   await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_SECAUDIT._id);
   await expect(page.locator('#mgLivelliRow .mg-dot--aligned')).toHaveCount(4);
-  // …e in fondo alla fila l'etichetta di stato dice PERCHÉ, rossa come la card.
-  const stato = page.locator('#mgDetailState');
-  await expect(stato).toContainText(/bloccato dalla sicurezza/i);
-  // La frase per esteso resta a portata, sotto il puntatore.
-  expect(await stato.getAttribute('title')).toMatch(/decidi tu/i);
+  // …e la fila non scrive nient'altro: lo stato lo dicono il colore della
+  // scheda e le forme.
+  await expect(page.locator('#mgLivelliRow')).not.toContainText(/bloccato dalla sicurezza/i);
+  // La decisione da prendere si legge aprendo il triangolo.
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(page.locator('#mgSideBody')).toContainText(/bloccato dalla sicurezza/i);
+  await expect(page.locator('#mgSideBody')).toContainText(/decidi tu/i);
 });
 
 // #238: mittente fidato (routine) con panel COMPLETO che ha segnalato un
@@ -1135,7 +1137,8 @@ test('fidato con panel completo che segnala attacco → rosso (non bianco), fras
   // Dettaglio: verdetti visibili + frase che spiega la decisione da prendere.
   await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_TRUSTED_FLAGGED._id);
   await expect(page.locator('#mgLivelliRow .mg-dot--attack')).toHaveCount(1);
-  expect(await page.locator('#mgDetailState').getAttribute('title')).toMatch(/decidi tu/i);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(page.locator('#mgSideBody')).toContainText(/decidi tu/i);
 });
 
 test('il pannello centrale si apre al click e mostra bolle + forme dei livelli', async ({ openTab }) => {

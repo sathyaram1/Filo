@@ -91,7 +91,6 @@
   const mgDetailEmpty = document.getElementById('mgDetailEmpty');
   const mgDetail      = document.getElementById('mgDetail');
   const mgDetailHead  = document.getElementById('mgDetailHead');
-  const mgDetailState = document.getElementById('mgDetailState');
   const mgLivelliRow  = document.getElementById('mgLivelliRow');
   const mgForme       = document.getElementById('mgForme');
   const mgWorkState   = document.getElementById('mgWorkState');
@@ -2293,33 +2292,10 @@
   }
   if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', togglePreapproved);
 
-  // ── L'etichetta di stato del dettaglio ────────────────────────────────────
-  // Le parole (etichetta, motivo, hover) vengono dal modulo condiviso: la
-  // gemella scrive esattamente la stessa riga sulla scheda.
-  function renderDetailState(fb) {
-    if (!mgDetailState) return;
-    const b = MR.stateBadge(fb);
-    // Stato illeggibile: l'unica cosa vera (aperta/chiusa) questa pagina la
-    // scrive già accanto ai pallini dei giudici, con le stesse parole della
-    // gemella. Ripeterla qui sarebbe la stessa riga due volte.
-    if (!b || b.encrypted) {
-      mgDetailState.hidden = true;
-      mgDetailState.textContent = '';
-      mgDetailState.removeAttribute('title');
-      return;
-    }
-    mgDetailState.hidden = false;
-    // Sotto il puntatore, la frase per esteso: l'etichetta dice COSA, la frase
-    // dice perché e cosa tocca all'owner. Sulla riga ci starebbe male — le
-    // forme hanno già preso la larghezza — ma perderla del tutto era un passo
-    // indietro (#462).
-    const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
-    mgDetailState.title = b.hint + (nota && nota.text ? ` — ${nota.text}` : '');
-    mgDetailState.innerHTML =
-      (b.color ? `<span class="mg-detail-state-dot" style="color:${esc(b.color)}"></span>` : '')
-      + `<span>${esc(b.label)}</span>`
-      + (b.showReason ? `<span class="mg-detail-state-reason">— ${esc(b.reasonText)}</span>` : '');
-  }
+  // L'etichetta di stato NON si scrive più nel dettaglio (scelta owner
+  // 2026-09-13): lo stato lo dicono il colore della scheda in lista e le
+  // forme, e la decisione già presa — attacco confermato, bocciatura della
+  // sicurezza — si legge nel pannello del triangolo (MR.righeStato).
 
   // ── Le azioni di stato: una riga GENERATA dalla tabella condivisa ─────────
   // Ogni azione ha un id stabile, così resta indirizzabile da fuori. Archivia e
@@ -2474,7 +2450,6 @@
       collassaFrase();
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
-      if (mgDetailState) mgDetailState.hidden = true;
       chiudiRiapertura();
       closeSidebar();
       renderList();
@@ -2966,7 +2941,6 @@
   function renderLivelliRow(fb) {
     if (!mgLivelliRow || !mgForme) return;
     mgForme.replaceChildren();
-    renderDetailState(fb);
 
     // Stato illeggibile: le forme nascerebbero da uno stato che la macchina si
     // inventa (`unlabeled`), e direbbero "in attesa del giudizio" su una
