@@ -1010,7 +1010,15 @@
     // Le misure e i colori dell'aspetto: il valore scritto male torna sullo
     // schermo col suo messaggio e il bordo rosso, come quando l'utente esce dal
     // campo. Se invece è valido, la riga si riallinea.
-    if (el.id.startsWith('tok-')) { chiudiRigaToken(el.id.slice(4)); return; }
+    if (el.id.startsWith('tok-')) {
+      const nome = el.id.slice(4);
+      const v = el.value.trim();
+      // Scritto male: torna l'errore sotto la riga. Scritto bene ma non ancora
+      // salvato (il salvataggio parte dopo una pausa): si applica adesso.
+      if (v !== '' && Tokens && !Tokens.validate(nome, v)) chiudiRigaToken(nome);
+      else onTokenInput(nome);
+      return;
+    }
     if (el.id.startsWith('tabcol-')) onTabColorInput(el.id.slice(7));
   }
 
