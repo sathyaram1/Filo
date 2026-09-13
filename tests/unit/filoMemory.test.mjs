@@ -204,3 +204,69 @@ test('una lezione vuota o di soli spazi non occupa posto nel buffer', async () =
   await M.appendLesson('');
   assert.equal((await M.getLessonsBuffer()).length, 0);
 });
+
+// ── Le righe della memoria, viste dall'utente (#592) ────────────────────────
+//
+// La pagina Preferenze mostra quello che Filo si è appuntato e toglie una riga
+// per volta. L'indice che manda indietro è quello del testo GREZZO: è ciò che
+// permette di togliere una riga lasciando il resto del modulo esattamente
+// com'era, righe vuote comprese.
+
+test('memoryLines salta le righe vuote e tiene l\'indice del testo salvato', () => {
+  const testo = 'Beve solo tè\n\nLavora di notte\n   \nVive a Lisbona';
+  assert.deepEqual(M.memoryLines(testo), [
+    { i: 0, text: 'Beve solo tè' },
+    { i: 2, text: 'Lavora di notte' },
+    { i: 4, text: 'Vive a Lisbona' },
+  ]);
+});
+
+test('memoryLines su vuoto, null e soli spazi non trova niente', () => {
+  assert.deepEqual(M.memoryLines(''), []);
+  assert.deepEqual(M.memoryLines(null), []);
+  assert.deepEqual(M.memoryLines(undefined), []);
+  assert.deepEqual(M.memoryLines('   \n\n \t '), []);
+});
+
+test('removeMemoryLine toglie la riga chiesta e lascia stare le altre', () => {
+  const testo = 'Beve solo tè\nLavora di notte\nVive a Lisbona';
+  const r = M.removeMemoryLine(testo, 1);
+  assert.equal(r.tolta, 'Lavora di notte');
+  assert.equal(r.testo, 'Beve solo tè\nVive a Lisbona');
+});
+
+test('removeMemoryLine su un indice che non c\'è non tocca niente', () => {
+  const testo = 'Beve solo tè\nLavora di notte';
+  for (const i of [-1, 2, 99, null, undefined, 1.5, '1']) {
+    const r = M.removeMemoryLine(testo, i);
+    assert.equal(r.tolta, null, `indice ${String(i)}`);
+    assert.equal(r.testo, testo, `indice ${String(i)}`);
+  }
+});
+
+test('removeMemoryLine su una riga vuota non tocca niente', () => {
+  const testo = 'Beve solo tè\n\nLavora di notte';
+  const r = M.removeMemoryLine(testo, 1);
+  assert.equal(r.tolta, null);
+  assert.equal(r.testo, testo);
+});
+
+test('tolta la riga, non restano buchi di righe vuote in fila', () => {
+  const testo = 'Beve solo tè\n\nLavora di notte\n\nVive a Lisbona';
+  const r = M.removeMemoryLine(testo, 2);
+  assert.equal(r.tolta, 'Lavora di notte');
+  assert.equal(r.testo, 'Beve solo tè\n\nVive a Lisbona');
+});
+
+test('togliere l\'ultima riga rimasta lascia il modulo vuoto', () => {
+  const r = M.removeMemoryLine('Beve solo tè', 0);
+  assert.equal(r.tolta, 'Beve solo tè');
+  assert.equal(r.testo, '');
+});
+
+test('una riga con caratteri speciali si toglie per quello che è', () => {
+  const testo = 'Usa <script>alert(1)</script>\nDice sempre «grazie» 🙂';
+  const r = M.removeMemoryLine(testo, 0);
+  assert.equal(r.tolta, 'Usa <script>alert(1)</script>');
+  assert.equal(r.testo, 'Dice sempre «grazie» 🙂');
+});
