@@ -3362,10 +3362,24 @@
     const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
     const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
     const v = expected ? verdictByName(fb, expected[i]) : (verdicts[i] || null);
-    if (!v) return;
 
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const anonLabel = `Giudice ${letters[i] || String(i + 1)}`;
+    segnaForma('l2');
+
+    // Giudice che non ha votato in quella run: il cerchio è tratteggiato e
+    // cliccarlo dice PERCHÉ, invece di non fare niente. È la stessa regola dei
+    // livelli grigi: un buco si spiega, non si tace.
+    if (!v) {
+      const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
+      openSidebar(anonLabel, `
+        <div class="mg-judge-detail">
+          <div class="mg-liv-testo">Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.</div>
+          ${nota && nota.text ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
+        </div>
+      `);
+      return;
+    }
     const cls     = v.class || '';
     const badgeClass = cls ? `mg-class-badge--${cls}` : '';
 
