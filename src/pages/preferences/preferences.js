@@ -989,24 +989,34 @@
     // Punto di partenza del confronto: quello che i campi mostrano adesso è
     // quello che c'è in memoria, quindi non c'è ancora niente da salvare.
     ribasa();
+    // E fotografia dei campi di testo, per la rilettura: da qui in poi un
+    // campo che mostra altro l'ha scritto l'utente.
+    if (typeof Bootstrap.segnaCampi === 'function') Bootstrap.segnaCampi();
+  }
+
+  // Rifà quello che è appeso al testo di un campo rimesso al suo posto dalla
+  // rilettura: senza, il testo tornerebbe senza il suo avviso, e un errore
+  // sparito fa credere che sia stato risolto.
+  function riappendiAlTesto(el) {
+    if (el.id === 'agentStyleText') { syncPresetSelect(); refreshStyleLimit(); return; }
+    // Le misure e i colori dell'aspetto: il valore scritto male si riconvalida
+    // sul posto, con il suo messaggio e il bordo rosso.
+    if (el.id.startsWith('tok-')) { onTokenInput(el.id.slice(4)); return; }
+    if (el.id.startsWith('tabcol-')) onTabColorInput(el.id.slice(7));
   }
 
   // Un'impostazione può cambiare mentre questa pagina è aperta: da Filo in
   // chat (dopo una conferma), da un'altra scheda, dal menu del tasto destro.
-  // La pagina si rilegge sempre, così non mostra un valore che non è più vero;
-  // l'unica cosa che si rimette al suo posto è il testo che l'utente stava
-  // scrivendo in quel momento.
+  // La pagina si rilegge sempre, così non mostra un valore che non è più vero,
+  // e rimette al loro posto i campi che l'utente ha scritto e che la pagina non
+  // ha salvato.
   function ascoltaCambiamentiAltrove() {
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
       if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       if (typeof Bootstrap.ricaricaSenzaDisturbare !== 'function') { load().catch(() => {}); return; }
-      Bootstrap.ricaricaSenzaDisturbare(load, (el) => {
-        // Il riquadro dello stile ha due cose appese al testo: il conteggio
-        // col tetto e la tendina dei preset. Rimesso il testo, vanno rifatti.
-        if (el.id === 'agentStyleText') { syncPresetSelect(); refreshStyleLimit(); }
-      }).catch(() => {});
+      Bootstrap.ricaricaSenzaDisturbare(load, riappendiAlTesto).catch(() => {});
     });
   }
 
