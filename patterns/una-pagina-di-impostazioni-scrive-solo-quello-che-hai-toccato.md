@@ -117,11 +117,11 @@ secondo dopo l'ultimo tasto, quindi mentre si scrive nel riquadro dello stile la
 pagina era sorda quasi sempre, e in quella finestra tornava a mostrare il
 permesso della shell, la chiave API e le protezioni nello stato di prima.
 
-La regola: **il silenzio non è mai una finestra di tempo.** Rileggere non
-cancella più niente — ci pensa la sezione qui sopra — quindi non c'è nulla da
-proteggere e si rilegge sempre. Se un giorno servisse davvero saltare un
-annuncio, va saltato QUELLO (riconosciuto), non tutto quello che arriva in quel
-momento.
+La regola: **il silenzio non è mai una finestra di tempo.** Da quando rileggere
+non butta più via quello che la pagina non ha salvato, non c'è più niente da
+proteggere, e si rilegge sempre. Se un giorno servisse davvero saltare un
+annuncio, va saltato QUELLO, riconosciuto per quello che è, non tutto quello che
+arriva in quel momento.
 
 ## Una mappa che si salva intera riparte da quello che c'è in memoria
 
