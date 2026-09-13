@@ -2095,6 +2095,9 @@
     // ADESSO, finché `selectedId` è ancora quello di prima: un istante dopo
     // andrebbe a finire sul feedback sbagliato, o in nessun posto.
     if (!ridisegno) salvaFraseAutomatico();
+    // Cambiando segnalazione il pannello di destra riparte da zero: la forma
+    // scelta era di un'altra pratica. Su un ridisegno resta dov'era.
+    if (!ridisegno) livelloAperto = null;
     selectedId = id;
 
     // Aggiorna selezione visiva nella lista
