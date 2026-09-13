@@ -922,11 +922,15 @@ async function maybeRunCompactor() {
     const text = (r?.text || '').trim();
     if (!text || /^NESSUNA MODIFICA/i.test(text)) {
       await FiloMem.clearLessonsBuffer();
+      broadcastLiveUpdate();
       return true;
     }
     const patch = FiloMem.parseCompactorOutput(text);
     if (Object.keys(patch).length) await FiloMem.patchMemory(patch);
     await FiloMem.clearLessonsBuffer();
+    // Il riordino sposta le lezioni dentro i moduli: chi ha la pagina aperta
+    // deve vederle nel posto nuovo, non sparire da quello vecchio.
+    broadcastLiveUpdate();
     return true;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
