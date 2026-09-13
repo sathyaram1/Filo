@@ -88,7 +88,7 @@ test('il pannello di un giudice resta sullo stesso giudice dopo l’aggiornament
   await apri(page, [fb, altra]);
   await page.locator('#mgForme .mg-forme-gruppo .mg-dot').nth(2).click();
   await expect(page.locator('#mgSideTitle')).toHaveText('modello/g3');
-  await aggiorna(page, pratica({ _updateTime: 't2', notes: 'Nota.' }));
+  await aggiorna(page, pratica({ _updateTime: 't2', notes: 'Nota.' }), [altra]);
   await expect(page.locator('#mgSideTitle')).toHaveText('modello/g3');
   await expect(page.locator('#mgSideBody')).toContainText('Ragionamento di g3.');
   await page.evaluate((id) => window.__mgTest.openDetail(id), altra._id);
