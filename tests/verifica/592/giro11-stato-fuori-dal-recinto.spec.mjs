@@ -148,7 +148,7 @@ test('controprova: lo stile dell\'utente continua ad arrivare recintato e prima 
     await globalThis.SN_STORAGE.updateSettings({ agentStyle: testo });
     const stile = (await globalThis.SN_STORAGE.getSettings()).agentStyle;
     const messaggi = C.injectAgentStyle(
-      [{ role: 'system', content: C.PROMPTS.filoChatStatic || '' }],
+      [{ role: 'system', content: C.PROMPTS.filoChatStatic({ capacita: '', sistema: 'win32' }) }],
       C.ACTIONS.FILO_CHAT,
       stile,
     );
