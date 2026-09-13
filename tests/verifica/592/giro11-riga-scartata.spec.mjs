@@ -85,6 +85,8 @@ test('una riga con un soprannome già usato resta sullo schermo', async ({ openT
   await expect(page.locator('#savedHint')).toHaveClass(/sn-hint-warn/, { timeout: 4000 });
   await page.waitForTimeout(800);
 
+  const tutte = await page.evaluate(() => [...document.querySelectorAll('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')].map((r) => `${r.querySelector('.sn-model-nick').value}|${r.querySelector('.sn-model-id').value}`));
+  console.log('RIGHE:', JSON.stringify(tutte));
   const seconda = await page.evaluate(() => {
     const righe = [...document.querySelectorAll('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')];
     const r = righe.find((x) => x.querySelector('.sn-model-id')?.value === 'gemini-2.0-flash');

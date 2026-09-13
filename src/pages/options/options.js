@@ -454,7 +454,15 @@
     const host = $('modelRegistryList');
     if (!host || !righe.length) return;
     for (const r of righe) {
-      const row = makeModelRow(r.nick, { provider: r.provider, model: r.model });
+      const row = makeModelRow(r.nick, { provider: r.provider || 'openrouter', model: r.model });
+      // I campi si riscrivono a mano: quello che l'utente aveva davanti torna
+      // esattamente com'era. Passarlo solo come voce non basta — una voce senza
+      // fornitore scelto viene letta come voce vuota e la stringa del modello si
+      // perde per strada (#592, giro 11).
+      const provEl = row.querySelector('.sn-model-provider');
+      if (provEl && r.provider) provEl.value = r.provider;
+      const idEl2 = row.querySelector('.sn-model-id');
+      if (idEl2) idEl2.value = r.model;
       host.appendChild(row);
       if (!r.fuoco) continue;
       const campo = row.querySelector(r.fuoco.campo);
