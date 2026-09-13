@@ -674,6 +674,8 @@
       ul.appendChild(li);
     }
     host.appendChild(ul);
+    var more = preapprovedMoreText(list.length, o.preapprovedTotal);
+    if (more) host.appendChild(el('p', 'sn-mac-status sn-mac-preapproved-more', more));
     return list.length;
   }
 
