@@ -62,7 +62,9 @@
       transition: background 0.12s ease;
     }
     .mem-line:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
-    .mem-text { white-space: pre-wrap; line-height: 1.45; }
+    /* Una riga di memoria può essere lunga quanto vuole e senza spazi (un
+       indirizzo, un id): va mandata a capo, non fatta sbordare. */
+    .mem-text { white-space: pre-wrap; line-height: 1.45; min-width: 0; overflow-wrap: anywhere; }
     .mem-when { flex: 0 0 auto; opacity: 0.55; font-size: 0.85em; line-height: 1.7; }
     .mem-forget {
       margin-left: auto;
