@@ -29,7 +29,7 @@ test('da una pagina web non si deve poter leggere lo stato che il modello legge'
   // il messaggio della home.
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.addTimer({ label: 'colloquio in banca a Lisbona', seconds: 3600, kind: 'alarm' });
-    await globalThis.SN_FILO_MEMORY.pushNotification({ kind: 'test', text: 'la carta scade il 12/27' });
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'test', text: 'la carta scade il 12/27' });
   });
 
   const stato = await comeSeFosse(app, { type: 'filo_get_state' }, DA_WEB);
@@ -45,7 +45,7 @@ test('da una pagina web non si deve poter leggere lo stato che il modello legge'
 test('da una pagina web non si devono poter leggere sveglie e notifiche', async ({ app }) => {
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.addTimer({ label: 'pillola alle 8', seconds: 3600, kind: 'alarm' });
-    await globalThis.SN_FILO_MEMORY.pushNotification({ kind: 'test', text: 'messaggio privato' });
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'test', text: 'messaggio privato' });
   });
 
   const sveglie = await comeSeFosse(app, { type: 'filo_get_timers' }, DA_WEB);
@@ -77,18 +77,56 @@ test('da una pagina web non si deve poter scrivere una sveglia', async ({ app })
 test('da una pagina web non si deve poter cancellare una sveglia dell\'utente', async ({ app }) => {
   const id = await app.evaluate(async () => {
     const r = await globalThis.SN_FILO_MEMORY.addTimer({ label: 'volo 7:40', seconds: 3600, kind: 'alarm' });
-    return r?.timer?.id || r?.id || (await globalThis.SN_FILO_MEMORY.listTimers())[0]?.id;
+    return r?.id || (await globalThis.SN_FILO_MEMORY.listTimers())[0]?.id;
   });
   await comeSeFosse(app, { type: 'filo_delete_timer', id }, DA_WEB);
   const dentro = await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.listTimers()));
   expect(dentro, 'una pagina web ha cancellato la sveglia dell\'utente').toContain('volo 7:40');
 });
 
+test('da una pagina web non si devono poter leggere le schede archiviate', async ({ app }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_ARCHIVED_TABS.archive({ url: 'https://clinica-esempio.test/referto', title: 'referto della visita' });
+  });
+
+  const archivio = await comeSeFosse(app, { type: 'get_archived_tabs' }, DA_WEB);
+  expect(JSON.stringify(archivio || {}), 'da una pagina web si legge dove è stato l\'utente')
+    .not.toContain('clinica-esempio');
+
+  const ricerca = await comeSeFosse(app, { type: 'search_archived_tabs', query: 'referto' }, DA_WEB);
+  expect(JSON.stringify(ricerca || {}), 'da una pagina web si cerca dentro le schede archiviate')
+    .not.toContain('clinica-esempio');
+
+  const interna = await comeSeFosse(app, { type: 'get_archived_tabs' }, DA_FILO);
+  expect(JSON.stringify(interna || {})).toContain('clinica-esempio');
+});
+
+test('da una pagina web non si deve poter svuotare l\'archivio delle schede', async ({ app }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_ARCHIVED_TABS.archive({ url: 'https://da-tenere.test/pagina', title: 'da tenere' });
+  });
+  await comeSeFosse(app, { type: 'clear_archived_tabs' }, DA_WEB);
+  const dentro = await app.evaluate(async () => JSON.stringify(await globalThis.SN_ARCHIVED_TABS.listMeta()));
+  expect(dentro, 'una pagina web ha svuotato l\'archivio delle schede').toContain('da tenere');
+});
+
+test('da una pagina web non si devono poter leggere le pagine salvate per dopo', async ({ app }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_SAVED_PAGES.save({ url: 'https://banca-esempio.test/estratto', title: 'estratto conto' });
+  });
+  const salvate = await comeSeFosse(app, { type: 'get_saved_pages' }, DA_WEB);
+  expect(JSON.stringify(salvate || {}), 'da una pagina web si leggono le pagine salvate')
+    .not.toContain('banca-esempio');
+
+  const interna = await comeSeFosse(app, { type: 'get_saved_pages' }, DA_FILO);
+  expect(JSON.stringify(interna || {})).toContain('banca-esempio');
+});
+
 test('da una pagina web non si deve poter far sparire una notifica', async ({ app }) => {
   const id = await app.evaluate(async () => {
-    await globalThis.SN_FILO_MEMORY.pushNotification({ kind: 'test', text: 'da leggere' });
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'test', text: 'da leggere' });
     const l = await globalThis.SN_FILO_MEMORY.listNotifications();
-    return l[l.length - 1]?.id;
+    return l[0]?.id;
   });
   await comeSeFosse(app, { type: 'filo_dismiss_notification', id }, DA_WEB);
   const dentro = await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.listNotifications()));
