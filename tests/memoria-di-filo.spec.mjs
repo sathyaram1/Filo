@@ -15,6 +15,7 @@
 // memoria che Filo si porta nella conversazione dopo.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
 
 const PREFERENZE = 'filo://preferences/preferences.html';
 
