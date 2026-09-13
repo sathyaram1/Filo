@@ -75,9 +75,37 @@ Il secondo pezzo del giro 3 è la rilettura. Saltarla quando il cursore sta in u
 campo sembrava prudente, ma il cursore resta appiccicato all'ultimo controllo
 toccato, anche mentre l'utente è in un'altra scheda a parlare con Filo: da lì in
 poi la pagina mostrava per sempre valori che non erano più veri. Adesso si
-rilegge sempre, e si rimette al suo posto solo il **testo che l'utente stava
-scrivendo** (`SN_PAGE_BOOTSTRAP.ricaricaSenzaDisturbare`): spunte, tendine e
+rilegge sempre (`SN_PAGE_BOOTSTRAP.ricaricaSenzaDisturbare`): spunte, tendine e
 pulsanti non hanno niente in corso da salvare.
+
+## E rileggere non butta via quello che la pagina non ha salvato
+
+Il giro 4 ha trovato il conto della rilettura. Rileggere riscrive tutti i campi
+con quello che c'è in memoria, e sullo schermo c'è anche roba che in memoria non
+c'è **apposta**: è quella che la pagina si tiene perché l'utente la sistemi.
+Uno stile più lungo del tetto, che il tetto promette di non accorciare da sé;
+una misura scritta senza unità, tenuta lì col suo errore perché tu ci aggiunga
+il «px»; una riga della lista dei siti bloccati scritta male, segnalata e
+conservata; una riga di modello senza soprannome, che il salvataggio scarta
+finché non è completa. Cinque porte, tutte con lo stesso finale: il testo
+spariva insieme all'avviso che diceva perché, e non restava niente da correggere.
+
+Tenere solo il campo col cursore dentro non basta: quei campi il cursore non ce
+l'hanno più, perché per accorgersi dell'errore l'utente ne è uscito.
+
+La regola: **rileggere non è un'autorizzazione a riscrivere.** Dopo ogni
+rilettura la pagina fotografa nei campi di testo quello che ci ha messo
+(`segnaCampi`); alla rilettura dopo, un campo che mostra qualcos'altro l'ha
+scritto l'utente, e se per quel campo in memoria non è cambiato niente, il suo
+testo si rimette al suo posto con tutto quello che gli è appeso: l'avviso, il
+conteggio, la tendina. Quando invece il valore in memoria è cambiato davvero,
+vince la memoria: è il motivo per cui la rilettura esiste.
+
+Dove quello che si salva NON è quello che c'è scritto (la lista dei siti: tre
+righe scritte, due in memoria), la fotografia è quella che è andata in memoria,
+e la mette la pagina quando salva (`segnaCampo`). Quello che la rilettura non
+può rifare da sé, come una riga intera aggiunta e non ancora salvata, se lo
+ricostruisce la pagina attorno al `load()`.
 
 ## Dove sta
 

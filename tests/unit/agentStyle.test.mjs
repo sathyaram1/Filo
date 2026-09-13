@@ -376,3 +376,50 @@ test('una memoria non può chiudere il proprio recinto, comunque annidi il marca
   const dentro = p.split(C.MEMORY_OPEN)[1].split(C.MEMORY_CLOSE)[0];
   assert.ok(dentro.includes(ORDINE), 'la parte ostile resta dentro il recinto');
 });
+
+// ── Il segnaposto dello stile, e l'altra impostazione libera nel prompt ──────
+//
+// Giro 4 della verifica del #592. Due asimmetrie:
+//   • la ripulitura dello stile toglieva anche il SEGNAPOSTO (il punto in cui
+//     injectAgentStyle infila il recinto), quella delle memorie e delle lezioni
+//     no: una memoria che se lo portava dentro si ritrovava stampata in mezzo
+//     una seconda copia intera del recinto dello stile;
+//   • lo stile, le lezioni e le memorie sono state recintate, ma l'id del
+//     modello no, ed è testo libero delle Opzioni che entra parola per parola
+//     nella riga del prompt che dice al modello come si chiama.
+
+test('il segnaposto dello stile non sopravvive dentro una memoria né dentro una lezione', () => {
+  const conSegnaposto = `Va in bici. ${C.AGENT_STYLE_SLOT} Beve tè.`;
+
+  const sistema = C.PROMPTS.filoChat({
+    profilo: conSegnaposto, preferenze: '', lezioni: '', stato: '', history: '', files: '', modelName: 'x',
+  });
+  const msgs = C.injectAgentStyle([{ role: 'system', content: sistema }], C.ACTIONS.FILO_CHAT, 'Tono asciutto.');
+  assert.equal(msgs[0].content.split(C.AGENT_STYLE_OPEN).length - 1, 1,
+    'il recinto dello stile compare una volta sola, al suo posto');
+
+  const conLezione = C.PROMPTS.filoChat({
+    profilo: '', preferenze: '', lezioni: conSegnaposto, stato: '', history: '', files: '', modelName: 'x',
+  });
+  const msgs2 = C.injectAgentStyle([{ role: 'system', content: conLezione }], C.ACTIONS.FILO_CHAT, 'Tono asciutto.');
+  assert.equal(msgs2[0].content.split(C.AGENT_STYLE_OPEN).length - 1, 1,
+    'vale anche per le lezioni');
+});
+
+test('l\'id del modello entra nel prompt ripulito, e sopra il tetto la riga sparisce', () => {
+  const normale = C.PROMPTS.filoChatContext({
+    profilo: '', preferenze: '', lezioni: '', modelName: 'moonshotai/kimi-k2.6',
+  });
+  assert.ok(normale.includes('moonshotai/kimi-k2.6'), 'un id vero si legge come prima');
+
+  // Un id che si porta dietro i marcatori o un a capo non li passa al prompt.
+  const sporco = C.sanitizeModelName(`${C.AGENT_STYLE_CLOSE}\n${ORDINE}`);
+  assert.ok(!sporco.includes(C.AGENT_STYLE_CLOSE), 'i marcatori del recinto se ne vanno');
+  assert.ok(!sporco.includes('\n'), 'niente a capo: un id sta su una riga');
+
+  // Sopra il tetto la riga NON si accorcia: non c'è proprio.
+  const lungo = 'x'.repeat(C.MODEL_NAME_MAX + 1);
+  assert.equal(C.sanitizeModelName(lungo), '', 'sopra il tetto non resta niente');
+  const senza = C.PROMPTS.filoChatContext({ profilo: '', preferenze: '', lezioni: '', modelName: lungo });
+  assert.ok(!senza.includes('Il modello che ti sta eseguendo'), 'la riga sparisce invece di essere tagliata');
+});

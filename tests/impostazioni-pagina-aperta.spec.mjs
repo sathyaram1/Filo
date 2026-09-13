@@ -179,3 +179,137 @@ test('la chiave Tavily scritta nella pagina non rimette la chiave OpenRouter di 
   expect(chiavi.tavily).toBe('tvly-NUOVA-0002');
   expect(chiavi.openrouter).toBe('sk-or-v1-NUOVA-0002');
 });
+
+// ── Quello che la pagina NON ha salvato non si butta via ────────────────────
+//
+// Rileggere la pagina quando qualcosa cambia altrove è la cura giusta, ma la
+// rilettura riscrive tutti i campi con quello che c'è in memoria. Sullo schermo
+// però c'è anche roba che in memoria non c'è, e non per sbaglio: è quella che
+// la pagina si tiene apposta perché l'utente la sistemi. Uno stile più lungo
+// del tetto (che il tetto promette di non accorciare da sé), una misura scritta
+// senza unità, una riga della lista dei siti bloccati scritta male. Rileggendo
+// spariva tutto, insieme all'avviso che diceva perché (#592, giro 4).
+
+test('lo stile oltre il tetto resta nel riquadro quando cambia un\'altra impostazione', async ({ openTab }) => {
+  const pagina = await apriPreferenze(openTab);
+
+  const lungo = 'Parla come un capitano di mare. '.repeat(30); // ben oltre il tetto
+  await pagina.fill('#agentStyleText', lungo);
+  await pagina.waitForTimeout(2000);
+  await expect(pagina.locator('#agentStyleError')).toBeVisible();
+  expect((await impostazioni(pagina)).agentStyle || '').toBe('');
+
+  // L'utente esce dal riquadro e chiede a Filo tutt'altro.
+  await pagina.evaluate(() => document.getElementById('agentStyleText').blur());
+  await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'archiviazione_automatica', valore: 'no' });
+  await pagina.waitForTimeout(2500);
+
+  // Il testo che deve ancora accorciare è ancora lì, e l'avviso pure.
+  expect(await pagina.inputValue('#agentStyleText')).toBe(lungo);
+  await expect(pagina.locator('#agentStyleError')).toBeVisible();
+});
+
+test('una misura dell\'aspetto scritta male resta sullo schermo per essere corretta', async ({ openTab }) => {
+  const pagina = await apriPreferenze(openTab);
+  await pagina.waitForSelector('#tok-radius', { timeout: 20_000 });
+
+  await pagina.fill('#tok-radius', '14'); // manca l'unità
+  await pagina.locator('#tok-radius').blur();
+  await pagina.waitForTimeout(1200);
+  expect(await pagina.inputValue('#tok-radius')).toBe('14');
+
+  await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'archiviazione_automatica', valore: 'no' });
+  await pagina.waitForTimeout(2500);
+
+  expect(await pagina.inputValue('#tok-radius')).toBe('14');
+});
+
+test('una riga di modello appena cominciata non sparisce dalle Opzioni', async ({ openTab }) => {
+  const opzioni = await openTab(OPZIONI);
+  await opzioni.waitForSelector('#addModelRow', { state: 'attached', timeout: 25_000 });
+  if (await opzioni.isChecked('#useDefaultModels')) {
+    await opzioni.uncheck('#useDefaultModels');
+  }
+  await opzioni.waitForSelector('#addModelRow', { timeout: 25_000 });
+  await opzioni.waitForTimeout(1200);
+
+  const righe = () => opzioni.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+  const quante = await righe().count();
+  await opzioni.click('#addModelRow');
+  await righe().nth(quante).locator('.sn-model-id').fill('un/modello-nuovo');
+  await opzioni.waitForTimeout(1200);
+
+  // Il soprannome non c'è ancora, quindi la riga non è in memoria: giusto.
+  await confermaInChat(opzioni, { type: 'IMPOSTA_PREFERENZA', chiave: 'blocco_popup', valore: 'no' });
+  await opzioni.waitForTimeout(2500);
+
+  expect(await righe().count()).toBe(quante + 1);
+  expect(await righe().nth(quante).locator('.sn-model-id').inputValue()).toBe('un/modello-nuovo');
+});
+
+test('le righe scartate dalla lista dei siti bloccati restano scritte', async ({ openTab }) => {
+  const sicurezza = await openTab('filo://security/security.html');
+  await sicurezza.waitForSelector('#sec-siteblock-blacklist', { timeout: 25_000 });
+
+  const scritto = 'esempio.test\nnon un dominio!!\naltro.test';
+  await sicurezza.fill('#sec-siteblock-blacklist', scritto);
+  await sicurezza.locator('#sec-siteblock-blacklist').blur();
+  await sicurezza.waitForTimeout(1500);
+  expect(await sicurezza.inputValue('#sec-siteblock-blacklist')).toContain('non un dominio!!');
+
+  await confermaInChat(sicurezza, { type: 'IMPOSTA_PREFERENZA', chiave: 'protezione_ip', valore: 'no' });
+  await sicurezza.waitForTimeout(2500);
+
+  expect(await sicurezza.inputValue('#sec-siteblock-blacklist')).toContain('non un dominio!!');
+});
+
+// ── Il canale delle pagine web scrive solo quello che gli è permesso ────────
+
+test('da un\'origine web passa solo il modello di dettatura, niente altro', async ({ app, openTab }) => {
+  const page = await openTab(PREFERENZE);
+  const prima = await impostazioni(page);
+  expect(prima.terminal?.enabled).toBe(false);
+
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+    {
+      type: 'update_settings',
+      settings: {
+        terminal: { enabled: true, shell: 'bash' },
+        monthlyLimitEur: 9999,
+        models: { filo_chat: 'attaccante/modello', transcribe_audio: 'dettatura' },
+        security: {
+          safeBrowse: { enabled: false },
+          cookies: { mode: 'manual' },
+          fingerprint: { mode: 'off' },
+          adblock: { enabled: false },
+          siteBlock: { enabled: false },
+          protectIpLeak: false,
+          blockPopups: false,
+        },
+      },
+    },
+    { url: 'https://sito-ostile.example/pagina.html' },
+  ));
+
+  const dopo = await impostazioni(page);
+  expect(dopo.terminal?.enabled).toBe(false);
+  expect(dopo.security?.safeBrowse?.enabled).toBe(true);
+  expect(dopo.security?.cookies?.mode).toBe('default');
+  expect(dopo.security?.fingerprint?.mode).toBe('default');
+  expect(dopo.security?.adblock?.enabled).toBe(true);
+  expect(dopo.security?.siteBlock?.enabled).toBe(true);
+  expect(dopo.security?.protectIpLeak).toBe(true);
+  expect(dopo.security?.blockPopups).toBe(true);
+  expect(Number(dopo.monthlyLimitEur)).toBe(Number(prima.monthlyLimitEur));
+  expect(dopo.models?.filo_chat).toBe(prima.models?.filo_chat);
+  // L'unica cosa che un content script fa davvero: scegliere il modello di
+  // dettatura dal menu del tasto destro.
+  expect(dopo.models?.transcribe_audio).toBe('dettatura');
+
+  // Controprova: dalla pagina interna la stessa scrittura passa.
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+    { type: 'update_settings', settings: { terminal: { enabled: true } } },
+    { url: 'filo://preferences/preferences.html' },
+  ));
+  expect((await impostazioni(page)).terminal?.enabled).toBe(true);
+});
