@@ -800,6 +800,30 @@
       border-color: #e0a30b; color: #b9770a;
       background: color-mix(in srgb, #e0a30b 12%, var(--sn-bg, transparent));
     }
+    /* Acceso = il server fonde senza chiedere: tinta dell'accento, non della
+       stella — è una delega, non un preferito. Vale in tutti e due i temi
+       perché parte dai token. */
+    .mg-preapprove-btn[aria-pressed="true"] {
+      border-color: var(--sn-accent); color: var(--sn-accent);
+      background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
+    }
+    .mg-preapproved-info {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: var(--sn-muted);
+    }
+    /* Il segno in lista: piccolo, prima dei pallini di priorità (che si
+       spingono a destra da soli). */
+    .mg-preapproved {
+      flex: none;
+      font-size: 10.5px;
+      line-height: 1;
+      padding: 3px 6px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--sn-accent) 45%, transparent);
+      color: var(--sn-accent);
+      white-space: nowrap;
+    }
 
     /* Mittente */
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
