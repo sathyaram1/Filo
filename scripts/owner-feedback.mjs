@@ -23,9 +23,19 @@
 //   node scripts/owner-feedback.mjs <id> <status> "nota"  [--branch <nome>]
 //                                                         [--reason <slug>]
 //                                                         [--starred|--unstar]
+//                                                         [--preapprova|--chiedi-prima]
 //                                                         [--frase "per l'utente"]
 //                                                         [--come-routine]
 //                                                         [--dry-run]
+//   node scripts/owner-feedback.mjs <id> --preapprova     (solo il segno, stato invariato)
+//   node scripts/owner-feedback.mjs <id> --chiedi-prima
+//
+//   `--preapprova`: «fondi senza chiedermelo» su QUESTA pratica. Se i controlli
+//   del server fermano il lavoro di una routine, il server fonde lo stesso e
+//   registra cosa era stato fermato (Gestione → Automazioni, «Fuse senza
+//   chiedere»). `--chiedi-prima` toglie il segno. Vale finché la pratica è
+//   aperta; il lavoro locale (npm run finish) non lo guarda. È la stessa cosa
+//   del tasto nel dettaglio della pratica in Gestione.
 //
 //   `--come-routine`: la macchina a stati distingue chi scrive. L'owner decide
 //   sui feedback che aspettano lui (approvare, riaprire, archiviare); i passaggi
@@ -76,7 +86,55 @@ function toFsValue(v) {
   if (Number.isInteger(v)) return { integerValue: String(v) };
   if (typeof v === 'number') return { doubleValue: v };
   if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
+  if (typeof v === 'object') {
+    const fields = {};
+    for (const [k, vv] of Object.entries(v)) fields[k] = toFsValue(vv);
+    return { mapValue: { fields } };
+  }
   throw new Error('tipo non supportato per Firestore value');
+}
+
+/**
+ * Chi sta scrivendo, per il segno «fondi senza chiedermelo»: l'email dentro
+ * il token dell'owner, o l'account di servizio. Un bearer che non è un JWT
+ * (token di accesso OAuth) non dice chi è: si scrive che è lo script.
+ */
+export function chiScrive(bearer) {
+  try {
+    const parti = String(bearer || '').split('.');
+    if (parti.length === 3) {
+      const payload = JSON.parse(Buffer.from(parti[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+      const email = String(payload.email || payload.client_email || payload.iss || '').trim();
+      if (email) return email.slice(0, 120);
+    }
+  } catch (_) { /* non è un JWT leggibile */ }
+  return 'owner (script)';
+}
+
+/**
+ * Il segno «fondi senza chiedermelo» su una pratica, senza toccare lo stato.
+ * `valore` true lo mette ({ by, at }), false lo toglie (cancella il campo:
+ * la maschera lo nomina e i campi non lo portano). È la stessa scrittura che
+ * fa la dashboard dal dettaglio della pratica.
+ */
+export async function segnaPreapprovazione(id, valore, opts = {}) {
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const pub = doc.fields?.statusPublic?.stringValue || 'open';
+  if (valore && pub === 'closed') return { ok: false, motivo: 'pratica chiusa: il segno non conterebbe' };
+  const fields = {};
+  const mask = ['mergePreapproved'];
+  const segno = valore ? { by: chiScrive(bearer), at: new Date().toISOString() } : null;
+  if (segno) fields.mergePreapproved = toFsValue(segno);
+  if (opts.dryRun) return { ok: true, dryRun: true, campi: mask, segno };
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=mergePreapproved`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
+  return { ok: true, segno };
 }
 
 /** La versione in costruzione: è quella in cui un fix confluisce. */
@@ -207,6 +265,12 @@ export async function scrivi(id, to, nota, opts = {}) {
     set('blockReason', opts.reason.slice(0, 60));
   }
   if (typeof opts.starred === 'boolean') set('starred', opts.starred);
+  // Il segno «fondi senza chiedermelo» insieme al cambio di stato: stessa
+  // forma di segnaPreapprovazione. Toglierlo = cancellare il campo.
+  if (typeof opts.preapprova === 'boolean') {
+    if (opts.preapprova) set('mergePreapproved', { by: chiScrive(bearer), at: new Date().toISOString() });
+    else mask.push('mergePreapproved');
+  }
   if (to === 'done') set('resolvedInVersion', packageVersion());
   // Una consegna reale azzera il contatore delle interruzioni.
   if (to !== 'working' && to !== 'todo') set('workingResets', 0);
@@ -236,13 +300,14 @@ if (isMain) {
   // scritta male non deve scalare sui posizionali e far partire lo stesso il
   // cambio di stato. `--help` è legittima: chiedere aiuto non è un errore.
   const uso = () => {
-    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--come-routine] [--dry-run]');
+    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--preapprova|--chiedi-prima] [--come-routine] [--dry-run]');
+    console.error('     node scripts/owner-feedback.mjs <id> --preapprova | --chiedi-prima   (solo il segno, stato invariato)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'],
+    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima'],
     conValore: ['--branch', '--reason', '--frase'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -272,6 +337,9 @@ if (isMain) {
   let starred;
   if (argv.includes('--starred')) starred = true;
   else if (argv.includes('--unstar')) starred = false;
+  let preapprova;
+  if (argv.includes('--preapprova')) preapprova = true;
+  else if (argv.includes('--chiedi-prima')) preapprova = false;
 
   // Per POSTO, non per valore: come nello strumento gemello (#565). Prima si
   // toglievano le parole «uguali al valore di un'opzione», e una nota scritta
@@ -285,13 +353,23 @@ if (isMain) {
   }
   const [id, status, ...nota] = posizionali;
 
+  // Solo il segno, stato invariato: `<id> --preapprova` / `<id> --chiedi-prima`.
+  if (id && !status && typeof preapprova === 'boolean') {
+    const r = await segnaPreapprovazione(id, preapprova, { dryRun });
+    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); process.exit(3); }
+    console.log(r.dryRun
+      ? `[dry-run] ${id}: ${preapprova ? 'metterei' : 'toglierei'} il segno «fondi senza chiedermelo» (${r.campi.join(', ')})`
+      : `${id}: ${preapprova ? `da ora si fonde senza chiedere (segno di ${r.segno.by})` : 'da ora ti chiede prima di fondere'}`);
+    process.exit(0);
+  }
+
   if (!id || !status) {
     console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--come-routine] [--dry-run]');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
     process.exit(1);
   }
 
-  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, dryRun, attore });
+  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, preapprova, dryRun, attore });
   if (!r.ok) {
     console.error(`RIFIUTATO: ${r.motivo}`);
     if (attore === 'owner' && /non è un passaggio permesso/.test(r.motivo || '')) {
