@@ -23,8 +23,10 @@ const RULES = readFileSync(join(__dirname, '..', '..', 'firestore.rules'), 'utf8
 function bloccoUpdate(guardia) {
   const i = RULES.indexOf(`allow update: if\n        ${guardia}()`);
   assert.notEqual(i, -1, `manca il ramo di update con ${guardia}()`);
-  const fine = RULES.indexOf(';', i);
-  return RULES.slice(i, fine);
+  // Fino alla regola dopo: un «;» dentro un commento chiuderebbe il blocco
+  // troppo presto.
+  const fine = RULES.indexOf('\n      allow ', i + 1);
+  return RULES.slice(i, fine === -1 ? undefined : fine);
 }
 
 test('livelli: ammesso negli hasOnly del triage admin e della routine, con il vincolo di forma', () => {
