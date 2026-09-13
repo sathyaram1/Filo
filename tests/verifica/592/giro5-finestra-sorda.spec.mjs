@@ -68,11 +68,11 @@ test("mentre si scrive lo stile, il colore delle schede chiesto a Filo non deve 
   await pagina.type('#agentStyleText', 'Tono pacato', { delay: 30 });
   await pagina.waitForTimeout(500);
 
-  // Filo alza la luminosità del colore delle schede, e l'utente conferma.
-  await eseguiInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'colore_tab', valore: 'luminosita_tab 0.8' });
+  // Filo spegne il colore delle schede, e l'utente conferma.
+  await eseguiInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'colore_tab', valore: 'togli il colore' });
   await pagina.waitForTimeout(200);
   const chiesto = (await impostazioni(pagina)).tabColor || {};
-  expect(chiesto.luminosita_tab).toBe(0.8);
+  expect(chiesto.opacita_tab).toBe(0);
 
   // Poi ritocca un ALTRO parametro dello stesso gruppo.
   await pagina.fill('#tabcol-saturazione_tab', '0.55');
@@ -80,7 +80,7 @@ test("mentre si scrive lo stile, il colore delle schede chiesto a Filo non deve 
   await pagina.waitForTimeout(2500);
 
   const dopo = (await impostazioni(pagina)).tabColor || {};
-  expect(dopo.luminosita_tab, 'la luminosità chiesta a voce è tornata indietro').toBe(0.8);
+  expect(dopo.opacita_tab, 'il colore delle schede spento a voce è tornato indietro').toBe(0);
 });
 
 test('le Opzioni non devono mostrare una chiave API che non è più quella in uso', async ({ openTab }) => {
