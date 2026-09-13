@@ -235,6 +235,10 @@
     // Punto di partenza del confronto: quello che le spunte mostrano adesso è
     // quello che c'è in memoria.
     ribasa();
+    // E fotografia dei campi di testo, per la rilettura: da qui in poi un
+    // campo che mostra altro l'ha scritto l'utente e la pagina non l'ha
+    // salvato, quindi la rilettura non ci scrive sopra (#592, giro 4).
+    if (Bootstrap && typeof Bootstrap.segnaCampi === 'function') Bootstrap.segnaCampi();
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
