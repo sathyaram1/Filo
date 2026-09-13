@@ -342,6 +342,35 @@ Da oggi la fusione è una consegna del canale come le altre:
   e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
   1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
   sono spariti da questa macchina: qui non c'è più niente da convincere.
+- **Cosa copre un'approvazione** (dal 2026-09-13). Un'approvazione copre il
+  contenuto approvato più uno spostamento su main senza conflitti,
+  ricontrollato. Vale per il click dell'owner in Gestione come per il segno di
+  pre-approvazione messo sulla pratica. Se la fusione fallisce perché main è andato avanti, il server
+  fonde main dentro il ramo del worker (stesso nome, un commit di merge in
+  coda, identità del server), verifica che il commit di merge parta
+  esattamente dallo sha approvato, e rifà i controlli deterministici sul diff
+  nuovo. Fonde con l'approvazione già data solo se i controlli trovano gli
+  stessi blocchi di prima, o meno (esito `merged` con `realigned {from, to,
+  mainSha}`). Un controllo nuovo, o un file nuovo sotto un controllo già
+  scattato, non è coperto: la richiesta si chiude senza fondere (`stale`, con
+  `realigned` e `newRequestId`) e se ne apre una per la punta riallineata,
+  con la sola differenza (`supersedes` = la richiesta chiusa). Se git non
+  fonde da solo, o un passo qualunque fallisce, compresa la registrazione
+  della richiesta nuova, vale l'esito di prima: richiesta consumata
+  (`conflict`), giro di riallineamento della routine, motivo registrato in
+  `realignReason`. Mai una fusione senza ricontrollo. Il lavoro locale non si
+  riallinea: il suo ramo vive anche nella cartella dell'owner, e un commit
+  messo sul remoto dal server farebbe respingere in silenzio il salvataggio
+  automatico di quella cartella.
+- **Il segno di pre-approvazione**, in breve: l'owner può marcare una pratica
+  con «Fondi senza chiedermelo» (dal dettaglio in Gestione, o dallo script
+  locale dei feedback; si toglie con «Chiedimi prima di fondere»). Con il
+  segno, un blocco L5 sul lavoro di quella pratica non apre la richiesta: il
+  server fonde come dopo un'approvazione e registra la fusione fra le
+  approvazioni con `preapproved: true`, chi aveva messo il segno e l'elenco
+  intero dei blocchi (`ownerMergeApprovals {op:'list'}` → `preapproved`).
+  Vale solo per il lavoro delle routine, mai per il finish locale; non esiste
+  una pre-approvazione globale o per mittente.
 
 ### L'identità del server: una GitHub App (2026-08-20)
 

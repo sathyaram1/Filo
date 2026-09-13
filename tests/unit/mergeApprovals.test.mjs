@@ -257,3 +257,98 @@ test('di un’automazione si dice il ruolo che lavorava, non "un accesso senza e
   assert.match(UI.requestedBy('K3nD9xQw1aZ7mB2pL0rT', { origin: 'locale' }), /senza email/);
   assert.equal(UI.requestedBy('sathya@esempio.it', { origin: 'routine' }), 'chiesta da sathya@esempio.it');
 });
+
+// ── Il riallineamento fatto dal server ──────────────────────────────────────
+//
+// Quando l'owner approva e main è andato avanti, il server fonde main dentro il
+// ramo, rifà i controlli e: fonde (`merged` + `realigned`), oppure chiude la
+// richiesta `stale` e ne apre una NUOVA per la punta riallineata coi soli
+// blocchi nuovi (`supersedes`), oppure fallisce (`conflict` + `realignReason`).
+// L'avviso deve raccontare QUESTO, non la storia di prima ("la richiesta
+// decade, rifai i controlli"), che con `realigned` è falsa.
+
+describe('il riallineamento fatto dal server', () => {
+  const RIA = { from: 'a'.repeat(40), to: 'e'.repeat(40), mainSha: 'd'.repeat(40) };
+
+  test('fusa dopo il riallineamento: si dice che il ramo è stato spostato, con lo sha', () => {
+    const m = UI.outcomeMessage({ ok: true, result: 'merged', sha: 'c'.repeat(40), realigned: RIA }, { origin: 'routine' });
+    assert.equal(m.kind, 'ok');
+    assert.match(m.text, /riallineato/);
+    assert.match(m.text, /rifatto i controlli/);
+    assert.match(m.text, /cccccccc/);
+    // Senza riallineamento la frase resta quella di sempre.
+    assert.doesNotMatch(UI.outcomeMessage({ ok: true, result: 'merged', sha: 'c'.repeat(40) }).text, /riallineat/);
+  });
+
+  test('stale + realigned: NON dice che la richiesta decade né di rifare i controlli, dice della richiesta nuova', () => {
+    const m = UI.outcomeMessage({ ok: true, result: 'stale', headSha: RIA.to, realigned: RIA, newRequest: 'x'.repeat(24) }, { origin: 'routine' });
+    assert.equal(m.kind, 'warn');
+    assert.doesNotMatch(m.text, /decade/);
+    assert.doesNotMatch(m.text, /rifà i controlli|rifai/);
+    assert.match(m.text, /riallineato/);
+    assert.match(m.text, /richiesta nuova/);
+    assert.match(m.text, /solo quella differenza/);
+    // L'elenco va ricaricato: la richiesta nuova è già lì.
+    assert.equal(m.reload, true);
+    // Vale anche per il lavoro locale, se mai il server lo riallineasse.
+    assert.doesNotMatch(UI.outcomeMessage({ ok: true, result: 'stale', realigned: RIA }, { origin: 'locale' }).text, /npm run finish/);
+    // Stale SENZA riallineamento: la storia di prima, invariata.
+    const vecchia = UI.outcomeMessage({ ok: true, result: 'stale' }, { origin: 'routine' });
+    assert.match(vecchia.text, /decade/);
+    assert.notEqual(vecchia.reload, true);
+  });
+
+  test('conflict + realignReason: aggiunge che il server ci ha provato, col motivo in italiano', () => {
+    const m = UI.outcomeMessage({ ok: true, result: 'conflict', realignReason: 'riallineamento automatico non riuscito: realign_branch_moved (genitori: abc)' }, { origin: 'routine' });
+    assert.equal(m.kind, 'warn');
+    assert.match(m.text, /giro nuovo dell’automazione/);
+    assert.match(m.text, /Il server ha provato a riallineare da sé, senza riuscirci: /);
+    assert.match(m.text, /si era mosso/);
+    assert.doesNotMatch(m.text, /realign_branch_moved/);
+    assert.match(m.text, /\(genitori: abc\)/, 'il dettaglio del server resta');
+    // Senza motivo la frase è quella di sempre.
+    assert.doesNotMatch(UI.outcomeMessage({ ok: true, result: 'conflict' }, { origin: 'routine' }).text, /ha provato/);
+  });
+
+  test('i motivi del server hanno una frase ciascuno; uno sconosciuto si mostra com’è, non si nasconde', () => {
+    for (const slug of ['realign_branch_moved', 'realign_unavailable', 'realign_threw', 'realign_nothing_to_do', 'realign_malformed', 'realign_request_failed', 'gates_unavailable']) {
+      const t = UI.realignReasonText(slug);
+      assert.ok(t && t !== slug, `${slug} senza frase`);
+      assert.doesNotMatch(t, /_/, `${slug} stampato grezzo`);
+    }
+    assert.equal(UI.realignReasonText('motivo_mai_visto_prima'), 'motivo_mai_visto_prima');
+    assert.equal(UI.realignReasonText('main è andato avanti di nuovo durante il riallineamento'), 'main è andato avanti di nuovo durante il riallineamento');
+    assert.equal(UI.realignReasonText(''), '');
+    assert.equal(UI.realignReasonText(undefined), '');
+    assert.equal(UI.realignFailureText(''), '');
+    assert.match(UI.realignFailureText('x_y'), /^Il server ha provato a riallineare da sé, senza riuscirci: x_y\.$/);
+  });
+
+  test('«Decise di recente»: una stale consumata NON è «approvata»', () => {
+    // Il caso che ha fatto nascere il test: used:true + outcome:stale cadeva
+    // nel ramo "approvata" e mostrava come approvata una richiesta che non ha
+    // fuso niente.
+    assert.equal(UI.recentOutcome({ used: true, outcome: 'stale', realigned: RIA, newRequestId: 'y'.repeat(24) }), 'riallineata, chiede di nuovo');
+    assert.equal(UI.recentOutcome({ used: true, outcome: 'stale' }), 'decaduta');
+    assert.equal(UI.recentOutcome({ used: true, outcome: 'merged', realigned: RIA }), 'approvata, riallineata e fusa');
+    assert.equal(UI.recentOutcome({ used: true, outcome: 'merged' }), 'approvata e fusa');
+    assert.equal(UI.recentOutcome({ used: true, outcome: 'conflict', realigned: RIA }), 'approvata, ma in conflitto');
+    assert.equal(UI.recentOutcome({ discarded: true }), 'scartata');
+    assert.equal(UI.recentOutcome({ used: true }), 'approvata');
+    assert.equal(UI.recentOutcome({ expired: true }), 'scaduta senza risposta');
+    for (const r of [{ used: true, outcome: 'stale' }, { used: true, outcome: 'stale', realigned: RIA }]) {
+      assert.doesNotMatch(UI.recentOutcome(r), /^approvata/, JSON.stringify(r));
+    }
+  });
+
+  test('la scheda nuova dice che è la punta riallineata, da quale sha, e che sotto c’è solo il nuovo', () => {
+    const nota = UI.realignedNote({ supersedes: 'z'.repeat(24), realigned: RIA });
+    assert.match(nota, /^Punta riallineata su main dal server \(era aaaaaaaa\): qui solo ciò che non avevi ancora visto\.$/);
+    // Senza lo sha di partenza la riga c'è lo stesso: è il `supersedes` che la fa nascere.
+    assert.match(UI.realignedNote({ supersedes: 'z'.repeat(24) }), /^Punta riallineata su main dal server: qui solo/);
+    // Una richiesta normale non ha la riga.
+    assert.equal(UI.realignedNote({ realigned: RIA }), '');
+    assert.equal(UI.realignedNote({}), '');
+    assert.equal(UI.realignedNote(null), '');
+  });
+});
