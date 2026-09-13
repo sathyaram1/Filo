@@ -2916,7 +2916,7 @@ async function handleMessage(msg, sender = {}) {
   // modello legge a ogni messaggio, l'archivio delle schede chiuse e le pagine
   // messe da parte, si scriveva una sveglia il cui nome finisce in ogni prompt e
   // si svuotava l'archivio. Adesso un messaggio nuovo nasce vietato.
-  if (daPaginaWeb(sender, origin) && !globalThis.SN_MSG.WEB_ALLOWED.has(msg.type)) {
+  if (daPaginaWeb(sender, origin) && !WEB_ALLOWED.has(msg.type)) {
     return { ok: false, error: 'forbidden' };
   }
   const fn = registry.get(msg.type);
