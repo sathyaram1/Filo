@@ -972,6 +972,15 @@
     mergeApprovalsCount = n;
     applyMergeApprovalsVisibility();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
+    // Le fuse senza chiedere: il controllo a posteriori del segno messo sulla
+    // pratica. Quando il main avvisa di un cambiamento manda solo l'elenco in
+    // attesa: quello che c'era resta finché non si rilegge.
+    if (mgMergeApprovalsPreapproved && (Array.isArray(r.preapproved) || !already)) {
+      UI.renderPreapproved(mgMergeApprovalsPreapproved, {
+        preapproved: r.preapproved || [],
+        onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
+      });
+    }
     return n;
   }
 
