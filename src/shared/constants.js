@@ -2314,6 +2314,8 @@
     isAgentStyleRemoval,
     sanitizeAgentStyle,
     validateAgentStyle,
+    MODEL_NAME_MAX,
+    sanitizeModelName,
     LESSON_MAX,
     LESSONS_OPEN,
     LESSONS_CLOSE,
