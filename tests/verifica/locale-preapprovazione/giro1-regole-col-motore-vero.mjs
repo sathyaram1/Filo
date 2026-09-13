@@ -29,6 +29,10 @@ const REGOLE_RAMO = process.env.RULES_FILE || resolve(__dirname, '..', '..', '..
 const REGOLE_MAIN = process.env.RULES_MAIN || '';
 
 const SEGNO = { by: 'capo@esempio.it', at: '2026-09-13T08:00:00.000Z' };
+// Un segno DIVERSO da quello già sul documento: scrivere lo stesso identico
+// valore non cambia niente, e una scrittura che non cambia niente passa da
+// qualunque ramo (affectedKeys vuoto) — non direbbe nulla sulle regole.
+const SEGNO_ALTRUI = { by: 'intruso@esempio.it', at: '2026-09-13T09:00:00.000Z' };
 const PRATICA = {
   text: 'Le regole vanno strette.', url: '', title: '', name: 'Regole strette',
   userAgent: 'Filo/33', clientId: 'anon-1', images: [], files: [],
@@ -54,6 +58,8 @@ async function apri(regole, projectId) {
     await setDoc(doc(db, 'routines/routine@esempio.it'), { ok: true });
     await setDoc(doc(db, 'feedback/pratica-1'), PRATICA);
     await setDoc(doc(db, 'feedback/pratica-segnata'), Object.assign({}, PRATICA, { mergePreapproved: SEGNO }));
+    await setDoc(doc(db, 'feedback/pratica-segnata-2'), Object.assign({}, PRATICA, { mergePreapproved: SEGNO }));
+    await setDoc(doc(db, 'feedback/pratica-2'), PRATICA);
   });
   return env;
 }
@@ -96,29 +102,37 @@ function attori(env) {
     assertFails(updateDoc(doc(admin, 'feedback/pratica-1'), { mergePreapproved: true })));
 
   await prova('ramo: una ROUTINE non mette il segno', () =>
-    assertFails(updateDoc(doc(routine, 'feedback/pratica-1'), { mergePreapproved: SEGNO })));
+    assertFails(updateDoc(doc(routine, 'feedback/pratica-2'), { mergePreapproved: SEGNO_ALTRUI })));
+  await prova('ramo: una routine non lo cambia su una pratica già segnata', () =>
+    assertFails(updateDoc(doc(routine, 'feedback/pratica-segnata-2'), { mergePreapproved: SEGNO_ALTRUI })));
   await prova('ramo: una routine non lo infila nemmeno insieme a un passaggio suo', () =>
-    assertFails(updateDoc(doc(routine, 'feedback/pratica-1'), { status: 'working', mergePreapproved: SEGNO })));
+    assertFails(updateDoc(doc(routine, 'feedback/pratica-2'), { status: 'working', mergePreapproved: SEGNO_ALTRUI })));
   await prova('ramo: una routine non lo TOGLIE', () =>
-    assertFails(updateDoc(doc(routine, 'feedback/pratica-segnata'), { mergePreapproved: deleteField() })));
+    assertFails(updateDoc(doc(routine, 'feedback/pratica-segnata-2'), { mergePreapproved: deleteField() })));
 
   await prova('ramo: un utente loggato non mette il segno', () =>
-    assertFails(updateDoc(doc(loggato, 'feedback/pratica-1'), { mergePreapproved: SEGNO })));
+    assertFails(updateDoc(doc(loggato, 'feedback/pratica-2'), { mergePreapproved: SEGNO_ALTRUI })));
+  await prova('ramo: un utente loggato non lo TOGLIE', () =>
+    assertFails(updateDoc(doc(loggato, 'feedback/pratica-segnata-2'), { mergePreapproved: deleteField() })));
   await prova('ramo: un utente loggato non lo infila accanto al proprio voto', () =>
-    assertFails(updateDoc(doc(loggato, 'feedback/pratica-1'), {
+    assertFails(updateDoc(doc(loggato, 'feedback/pratica-2'), {
       votes: { 'utente-1': { vote: 'works', at: new Date().toISOString(), credibilitySnapshot: 0 } },
-      mergePreapproved: SEGNO,
+      mergePreapproved: SEGNO_ALTRUI,
     })));
   await prova('ramo: un utente loggato non lo infila accanto a una richiesta di riapertura', () =>
-    assertFails(updateDoc(doc(loggato, 'feedback/pratica-1'), {
+    assertFails(updateDoc(doc(loggato, 'feedback/pratica-2'), {
       reopenRequests: { 'utente-1': { at: new Date().toISOString() } },
-      mergePreapproved: SEGNO,
+      mergePreapproved: SEGNO_ALTRUI,
     })));
 
   await prova('ramo: chi non ha fatto login non mette il segno', () =>
-    assertFails(updateDoc(doc(anonimo, 'feedback/pratica-1'), { mergePreapproved: SEGNO })));
-  await prova('ramo: una segnalazione NUOVA non nasce già pre-approvata', () =>
-    assertFails(setDoc(doc(anonimo, 'feedback/nuova-1'), Object.assign({}, PRATICA, { status: undefined, mergePreapproved: SEGNO }))));
+    assertFails(updateDoc(doc(anonimo, 'feedback/pratica-2'), { mergePreapproved: SEGNO_ALTRUI })));
+  await prova('ramo: chi non ha fatto login non lo toglie', () =>
+    assertFails(updateDoc(doc(anonimo, 'feedback/pratica-segnata-2'), { mergePreapproved: deleteField() })));
+  await prova('ramo: una segnalazione NUOVA non nasce già pre-approvata', () => {
+    const d = Object.assign({}, PRATICA, { mergePreapproved: SEGNO_ALTRUI }); delete d.status;
+    return assertFails(setDoc(doc(anonimo, 'feedback/nuova-1'), d));
+  });
   await prova('ramo: (controllo) la stessa segnalazione senza il segno nasce', () => {
     const d = Object.assign({}, PRATICA); delete d.status;
     return assertSucceeds(setDoc(doc(anonimo, 'feedback/nuova-2'), d));
