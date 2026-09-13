@@ -766,6 +766,22 @@
     .mg-liv-esito[data-kind="err"]  { color: #c0392b; }
     .mg-liv-esito[data-kind="wait"] { color: var(--sn-muted); }
 
+    /* Toast discreto in basso a destra: stesso pattern dell'editor e dei
+       mazzi. Serve quando l'esito di un'azione conta anche se l'owner ha già
+       spostato lo sguardo dal pannello. */
+    .mg-toast {
+      position: fixed; right: 18px; bottom: 18px; max-width: 360px;
+      background: var(--sn-bg); border: 1px solid var(--sn-border);
+      border-left: 3px solid var(--sn-accent); border-radius: 10px;
+      box-shadow: var(--sn-shadow); padding: 12px 14px; font-size: 13px;
+      line-height: 1.45; color: var(--sn-fg); opacity: 0; transform: translateY(8px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      pointer-events: none; z-index: 2147483001;
+    }
+    .mg-toast.show { opacity: 1; transform: translateY(0); }
+    .mg-toast[data-kind="err"] { border-left-color: #c0392b; }
+    .mg-toast[data-kind="ok"]  { border-left-color: #2e9e5b; }
+
     /* ── Azioni di revisione (accetta + commento), owner-only ─────────────── */
     .mg-actions {
       flex: 0 0 auto; border-top: 1px solid var(--sn-border);
