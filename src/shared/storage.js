@@ -135,6 +135,7 @@
     setRaw,
     deepMerge,
     partialCambiato,
+    mappaRibasata,
     REPLACE_KEYS,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
