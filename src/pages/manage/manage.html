@@ -803,6 +803,9 @@
     /* Acceso = il server fonde senza chiedere: tinta dell'accento, non della
        stella — è una delega, non un preferito. Vale in tutti e due i temi
        perché parte dai token. */
+    /* `all: unset` del tasto azzera anche il display di [hidden]: senza questa
+       riga un tasto nascosto resta visibile. */
+    .mg-preapprove-btn[hidden] { display: none; }
     .mg-preapprove-btn[aria-pressed="true"] {
       border-color: var(--sn-accent); color: var(--sn-accent);
       background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
