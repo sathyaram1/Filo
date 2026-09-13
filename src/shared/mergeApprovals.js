@@ -606,6 +606,19 @@
   }
 
   /**
+   * Quando era stato messo il segno, per esteso e in ora locale. PURA.
+   * Il momento viaggia come testo ISO (in ora universale): mostrarlo grezzo
+   * era un calcolo per chi legge — la stessa cura della data di fusione.
+   * '' se manca; se non è una data, il testo così com'è (meglio di niente).
+   */
+  function preapprovedWhenText(at) {
+    var s = String(at || '').trim();
+    if (!s) return '';
+    var data = dateTimeText(Date.parse(s));
+    return 'Segno messo il ' + (data || s);
+  }
+
+  /**
    * Le fusioni avvenute SENZA chiedere: l'owner aveva messo il segno sulla
    * pratica, e il server ha fuso da solo quando i controlli hanno bloccato.
    *
