@@ -28,6 +28,12 @@
     // verde di `design` faceva sembrare "questione di gusto" un allarme di
     // sicurezza — scelta dell'owner, 2026-08-29.
     secaudit:   { label: 'Bloccato dalla sicurezza', color: '#c0392b', severity: 3 },
+    // Fermata al CANCELLO DI FUSIONE (statusReason `l5`): il fix è scritto e
+    // l'audit l'ha passato, ma i controlli deterministici del server non
+    // lasciano entrare il ramo in main senza il via libera dell'owner. Rosso
+    // come la bocciatura di sicurezza, e per lo stesso motivo: è un allarme di
+    // sicurezza che aspetta una persona, non una questione di gusto.
+    l5:         { label: 'Fusione ferma', color: '#c0392b', severity: 3 },
     attack:     { label: 'Attacco',      color: '#c0392b', severity: 3 },
     spam:       { label: 'Spam',         color: '#e08e0b', severity: 2 },
     design:     { label: 'Design',       color: '#2e9e5b', severity: 1 },
