@@ -282,7 +282,9 @@ test('canale: deliver status --segnala manda `segnalazione` intera; file assente
     // --segnala senza file dopo: errore d'uso.
     const monco = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working', '--segnala']);
     assert.equal(monco.status, 1);
-    assert.match(String(monco.stderr), /--segnala vuole un testo/);
+    // Vuole un FILE, e lo dice: «un testo» mandava a passare la segnalazione
+    // sulla riga di comando (verifica del giro 1).
+    assert.match(String(monco.stderr), /--segnala vuole il percorso di un file/);
 
     // Su un intento che il server non legge (note) non si consegna a vuoto.
     const altrove = await lancia(['deliver', 'biglietto-di-prova', 'note', '--notes', 'Una riga.', '--segnala', seg]);
