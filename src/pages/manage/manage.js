@@ -3394,6 +3394,7 @@
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const anonLabel = `Giudice ${letters[i] || String(i + 1)}`;
     segnaForma('l2');
+    giudiceAperto = i;
 
     // Giudice che non ha votato in quella run: il cerchio è tratteggiato e
     // cliccarlo dice PERCHÉ, invece di non fare niente. È la stessa regola dei
