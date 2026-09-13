@@ -10,8 +10,9 @@
 // una stringa qualunque, un oggetto, novecentomila caratteri. Il server la
 // ricopia nel fascicolo fuori da ogni cornice.
 //
-// La porta è stata trovata aperta nel giro 4: la prova è segnata come rosso
-// atteso finché non viene chiusa.
+// La porta è stata trovata aperta nel giro 4 e chiusa nella sua fase di
+// correzione (regole del database + fascicolo): queste prove restano come
+// guardia del giro.
 //
 // Come nei giri prima: fascicolo costruito dal codice vero del server (repo
 // filo-security accanto a questo), stampato dal dispatch vero di questo ramo.
