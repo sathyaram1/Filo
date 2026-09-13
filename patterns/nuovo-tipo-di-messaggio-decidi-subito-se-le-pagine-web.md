@@ -162,3 +162,57 @@ La sentinella in `tests/unit/webStorageAllow.test.mjs` legge le chiavi dal
 CODICE degli script che girano nelle pagine visitate e verifica che stiano tutte
 nell'elenco: una lista scritta a mano nel test invecchia in silenzio, ed è
 esattamente il difetto che l'elenco corregge.
+
+## E la terza porta: quello che una pagina visitata può far FARE a Filo
+
+I messaggi e le chiavi dicono cosa una pagina può leggere e scrivere. Restava il
+canale con cui può far AGIRE Filo: le azioni (`FILO_RUN_ACTION` e
+`FILO_CONFIRM_ACTION`), che stanno nell'elenco dei messaggi leciti perché da lì
+lavora l'assistente «Aiuto» della barra laterale. Accanto alle due voci era
+scritto che andavano bene perché passano dal registro dei livelli e dalla
+conferma. Il registro c'era davvero. La frase era falsa lo stesso (#592, giro
+10):
+
+- le azioni di livello 1 partono senza chiedere niente e **restituiscono a chi
+  le chiede quello che leggono**. Da un indirizzo web si leggeva un documento
+  dal disco dell'utente (provato con un estratto conto: IBAN e saldo sono
+  tornati indietro interi) e si otteneva l'uscita di un comando del terminale
+  (`cat` su un file, con la modalità terminale accesa). Il livello 1 di quelle
+  azioni è motivato per iscritto con «non manda niente fuori dal computer,
+  il testo entra solo nel contesto del modello»: vero finché a chiedere è Filo,
+  falso appena a chiedere è il sito;
+- si fissava una lezione, che poi vale in ogni conversazione e sopravvive al
+  riavvio, e si creava una sveglia il cui NOME entra nello stato che il modello
+  legge a ogni messaggio: la stessa porta che il giro 9 aveva chiuso sul
+  messaggio dedicato, aperta dal canale accanto;
+- le azioni di livello 2 e 3 **si confermavano da sé**. La difesa in profondità
+  del #250 chiede che un mittente non interno abbia ricevuto PRIMA la richiesta
+  di conferma per quella stessa azione. Ma a registrare quel pending è la
+  richiesta stessa: prima si chiede l'azione, subito dopo si manda la conferma,
+  e il riquadro non compare mai. Da un indirizzo web si impostava lo stile
+  dell'agente e si cancellava tutta la memoria dell'utente, che a lui Filo fa
+  cancellare digitando «conferma».
+
+Quindi il terzo elenco, dove le azioni sono dichiarate:
+`SN_ACTION_LEVELS.WEB_ALLOWED_ACTIONS`. Un'azione nuova nasce vietata alle
+pagine visitate, e il controllo sta nel dispatch delle azioni, che è il punto
+unico da cui passano sia la richiesta sia la conferma. L'elenco è corto perché
+corto è il bisogno vero: la barra laterale emette `INVIA_FEEDBACK` (l'unica
+azione tipizzata che il suo prompt le insegna) e `NAVIGA` (il suo «apri il link
+in una scheda nuova»).
+
+La regola generale, dopo tre giri sulla stessa stanza: **ogni canale che arriva
+dalle pagine visitate vuole il suo elenco di ciò che è lecito, scritto dove la
+cosa è dichiarata**, e la sentinella che lo confronta col codice che quel canale
+usa davvero (`tests/unit/webActionsAllow.test.mjs` legge le azioni dal codice
+della barra laterale e dal prompt dell'agente di pagina). Chiuderne uno e non
+gli altri lascia la stessa stanza aperta dalla porta accanto, ed è successo a
+ogni giro.
+
+Resta una cosa che l'elenco non risolve e che va tenuta presente: per un
+mittente che non è una pagina interna, il riquadro di conferma lo disegna la
+pagina stessa (`SN_CONFIRM_UI` gira nel mondo isolato del content script).
+Quel riquadro non è una prova che l'utente abbia visto qualcosa: è per questo
+che l'elenco delle azioni lecite deve restare corto, e contenere solo cose il
+cui danno, se confermate da sole, è quello che quella pagina poteva già fare per
+conto suo (mandare un feedback, aprire un link).
