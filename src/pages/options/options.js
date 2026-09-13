@@ -961,7 +961,10 @@
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
-    markRegistryRowIssues(missingNickRows, dupRows);
+    // Si rilegge l'elenco invece di segnare le righe raccolte prima dell'invio:
+    // nel frattempo la pagina può essersi ridisegnata e quelle righe non sono
+    // più sullo schermo (#592, giro 11).
+    rimarcaRigheScartate();
 
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
     const hint = $('savedHint');
