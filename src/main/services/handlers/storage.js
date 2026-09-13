@@ -29,20 +29,40 @@ module.exports = function register(on, ctx) {
     if (!s || typeof s !== 'object' || !s.apiKeys) return value;
     return { ...value, [SETTINGS_KEY]: { ...s, apiKeys: undefined } };
   }
-  // Una richiesta tocca la chiave `settings`? (set: oggetto; remove: lista chiavi)
-  const touchesSettings = (keys) =>
-    (Array.isArray(keys) ? keys : [keys]).some((k) => k === SETTINGS_KEY);
+
+  // #592, giro 8 — da un'origine web passano SOLO le chiavi dell'elenco
+  // (SN_CONST.WEB_STORAGE_KEYS, dove c'è anche il perché). Prima la guardia era
+  // un nome vietato solo, `settings`, e tutto il resto passava: da un indirizzo
+  // web si leggevano, si riscrivevano e si cancellavano la memoria di Filo, le
+  // lezioni, il registro delle azioni che finisce nel contesto di ogni
+  // messaggio, la cronologia delle conversazioni e quella degli appunti
+  // copiati. Adesso una chiave nuova nasce vietata.
+  const leggibiliDaWeb = SN_CONST.WEB_STORAGE_READABLE;
+  const scrivibiliDaWeb = SN_CONST.WEB_STORAGE_WRITABLE;
+  const elenco = (keys) => (Array.isArray(keys) ? keys : [keys]);
+  // Tutte le chiavi chieste sono ammesse in scrittura? Basta una fuori elenco
+  // per rifiutare l'intera richiesta: una scrittura mezza fatta è peggio di una
+  // rifiutata, e chi chiama non ha modo di sapere quale metà è passata.
+  const tutteScrivibili = (keys) => elenco(keys).every((k) => scrivibiliDaWeb.has(k));
+  // In lettura invece si FILTRA: `get(null)` («dammi tutto») è la forma normale
+  // dello shim, e rifiutarla spegnerebbe il correttore in ogni pagina.
+  function filtraLetturaWeb(value) {
+    const out = {};
+    for (const [k, v] of Object.entries(value || {})) {
+      if (leggibiliDaWeb.has(k)) out[k] = v;
+    }
+    return redactForWeb(out);
+  }
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {
     const value = await globalThis.chrome.storage.local.get(msg.keys ?? null);
-    return { ok: true, value: isFilo(origin) ? value : redactForWeb(value) };
+    return { ok: true, value: isFilo(origin) ? value : filtraLetturaWeb(value) };
   });
 
   on('_storage:set', async (msg, sender, origin) => {
     const obj = msg.obj || {};
-    // Una pagina web non può scrivere/avvelenare i settings (né iniettare apiKeys).
-    if (!isFilo(origin) && touchesSettings(Object.keys(obj))) {
+    if (!isFilo(origin) && !tutteScrivibili(Object.keys(obj))) {
       return { ok: false, error: 'forbidden' };
     }
     await globalThis.chrome.storage.local.set(obj);
@@ -50,7 +70,7 @@ module.exports = function register(on, ctx) {
   });
 
   on('_storage:remove', async (msg, sender, origin) => {
-    if (!isFilo(origin) && touchesSettings(msg.keys)) {
+    if (!isFilo(origin) && !tutteScrivibili(msg.keys)) {
       return { ok: false, error: 'forbidden' };
     }
     await globalThis.chrome.storage.local.remove(msg.keys);
