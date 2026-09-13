@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -73,9 +74,11 @@ function bloccoFeedback() {
 /** Gli `allow update` del blocco, ognuno col suo testo di condizione. */
 function ramiUpdate(testo) {
   const out = [];
+  // I commenti via PRIMA: un `;` dentro un commento chiuderebbe il ramo a metà.
+  const pulito = testo.replace(/\/\/[^\n]*/g, ' ');
   const re = /allow\s+update\s*:\s*if\s+([\s\S]*?);/g;
   let m;
-  while ((m = re.exec(testo)) !== null) out.push(m[1].replace(/\/\/[^\n]*/g, ' ').replace(/\s+/g, ' ').trim());
+  while ((m = re.exec(pulito)) !== null) out.push(m[1].replace(/\s+/g, ' ').trim());
   return out;
 }
 
@@ -96,7 +99,7 @@ test('le regole: il campo è ammesso SOLO nel ramo admin, e con la forma { by, a
 // ── c. lo script dell'owner ─────────────────────────────────────────────────
 
 test('lo script scrive il CHI leggendolo dal token, e non finge un’identità se il token non la porta', async () => {
-  const { chiScrive } = await import(join(ROOT, 'scripts', 'owner-feedback.mjs'));
+  const { chiScrive } = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   assert.equal(chiScrive(`${b64({ alg: 'RS256' })}.${b64({ email: 'owner@esempio', sub: '1' })}.firma`), 'owner@esempio');
   assert.equal(chiScrive('ya29.token-di-accesso-opaco'), 'owner (script)');
