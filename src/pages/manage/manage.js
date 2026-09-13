@@ -2934,6 +2934,9 @@
   // quando arriva un aggiornamento (una fusione approvata altrove) e a
   // segnare la forma scelta.
   let livelloAperto = null;
+  // Quale cerchio dei giudici sta aperto (posizione), quando livelloAperto è
+  // 'l2': serve a riaprire lo stesso giudice su un ridisegno.
+  let giudiceAperto = null;
 
   function formaEl(liv, fb) {
     const b = document.createElement('button');
