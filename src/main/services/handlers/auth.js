@@ -233,9 +233,23 @@ module.exports = function register(on, ctx) {
       // metà dei due testi (il report, cifrato, è `notes`). Va inoltrata, o la
       // dashboard resta l'unica strada da cui quella metà si perde.
       const { id, status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
+      // «Fondi senza chiedermelo» su questa pratica: la pagina manda solo
+      // sì/no, il CHI lo mette il main dalla sessione (l'email del token, la
+      // stessa che le regole vedono) — non è un dato che la pagina possa
+      // raccontare. `true` → { by, at }; `false` → il campo si toglie.
+      let mergePreapproved;
+      if (typeof msg.mergePreapproved === 'boolean') {
+        if (msg.mergePreapproved) {
+          let email = '';
+          try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
+          mergePreapproved = { by: email || 'owner', at: new Date().toISOString() };
+        } else {
+          mergePreapproved = null;
+        }
+      }
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved },
         { idToken },
       );
       return { ok: true };
