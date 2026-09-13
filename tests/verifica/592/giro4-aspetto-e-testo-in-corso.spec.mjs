@@ -190,9 +190,10 @@ test('una misura scritta male resta sullo schermo per essere corretta', async ({
 
 test('una riga di modello appena cominciata non deve sparire dalle Opzioni', async ({ openTab }) => {
   const opzioni = await openTab(OPZIONI);
-  await opzioni.waitForSelector('#addModelRow', { timeout: 20_000 });
+  await opzioni.waitForSelector('#addModelRow', { state: 'attached', timeout: 20_000 });
   // Il registro si vede solo con i modelli predefiniti spenti.
   await opzioni.uncheck('#useDefaultModels');
+  await opzioni.waitForSelector('#addModelRow', { timeout: 20_000 });
   await opzioni.waitForTimeout(1500);
 
   const quante = await opzioni.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').count();
