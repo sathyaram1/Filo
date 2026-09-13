@@ -397,6 +397,10 @@
     if (status === 'design' && statusReason === 'secaudit') {
       return { reason: 'secaudit', ...REASONS.secaudit };
     }
+    // Ferma al cancello di fusione: c'è una richiesta che aspetta l'owner.
+    if (status === 'design' && statusReason === 'l5') {
+      return { reason: 'l5', ...REASONS.l5 };
+    }
     // Panel COMPLETO su un feedback rimasto `unlabeled`: succede ai mittenti
     // fidati che i giudici hanno segnalato (la pipeline non li marchia mai
     // attack/spam, li lascia "da ri-giudicare"). Ma un panel completo non ha
