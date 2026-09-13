@@ -40,6 +40,42 @@
     .onb-line { display: flex; gap: 8px; line-height: 1.45; }
     .onb-who { flex: 0 0 auto; font-weight: 600; opacity: 0.75; }
     .onb-what { white-space: pre-wrap; }
+
+    /* #592 — quello che Filo si è appuntato sull'utente. Vale in ogni
+       conversazione e sopravvive al riavvio, come lo stile dell'agente: qui si
+       rilegge e si toglie una riga per volta. */
+    .mem-box { display: flex; flex-direction: column; gap: 16px; margin-top: 12px; }
+    .mem-group-head { display: flex; align-items: baseline; gap: 10px; }
+    .mem-group-title { font-weight: 600; }
+    .mem-group-count { opacity: 0.6; font-size: 0.9em; }
+    .mem-clear { margin-left: auto; }
+    .mem-lines { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+    .mem-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 4px 6px;
+      border-radius: 8px;
+      transition: background 0.12s ease;
+    }
+    .mem-line:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
+    .mem-text { white-space: pre-wrap; line-height: 1.45; }
+    .mem-when { flex: 0 0 auto; opacity: 0.55; font-size: 0.85em; line-height: 1.7; }
+    .mem-forget {
+      margin-left: auto;
+      flex: 0 0 auto;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 0 7px;
+      line-height: 1.5;
+      opacity: 0.45;
+      transition: opacity 0.12s ease, background 0.12s ease;
+    }
+    .mem-line:hover .mem-forget { opacity: 0.8; }
+    .mem-forget:hover, .mem-forget:focus-visible { opacity: 1; background: var(--sn-hover, rgba(127, 127, 127, 0.2)); }
   </style>
 </head>
 <body>
