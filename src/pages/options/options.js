@@ -494,9 +494,10 @@
         Boot.ricaricaSenzaDisturbare(async () => {
           await load();
           rimettiRigheNonSalvate(righe);
+          rimarcaRigheScartate();
         }).catch(() => {});
       } else {
-        load().catch(() => {});
+        load().then(rimarcaRigheScartate).catch(() => {});
       }
     });
   }
