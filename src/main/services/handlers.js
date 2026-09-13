@@ -1182,6 +1182,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
 
+  // #592, giro 10 — chi chiede è una pagina VISITATA? Allora può azionare solo
+  // l'elenco corto di SN_ACTION_LEVELS.WEB_ALLOWED_ACTIONS (il perché è scritto
+  // lì). Il controllo sta QUI perché questo è il punto unico da cui passano sia
+  // la richiesta sia la conferma: metterlo sui due messaggi lascerebbe scoperta
+  // la strada che verrà dopo.
+  if (!daOrigineInterna(sender)) {
+    const Ammesse = globalThis.SN_ACTION_LEVELS && globalThis.SN_ACTION_LEVELS.WEB_ALLOWED_ACTIONS;
+    if (!Ammesse || !Ammesse.has(type)) {
+      console.warn('[Filo] azione chiesta da una pagina visitata e non ammessa:', type);
+      return { executed: false, kept: false, rejected: true };
+    }
+  }
+
   // IMPOSTA_ESTETICA: il livello (1 normale, 2 se rende il testo illeggibile)
   // dipende dallo stato risultante, che solo il main conosce (ha i token
   // correnti). Iniettiamo `_illegible` PRIMA del gate, mai dall'LLM (#146.4).
