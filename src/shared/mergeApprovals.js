@@ -200,6 +200,79 @@
   }
 
   /**
+   * Perché il riallineamento automatico non ha aiutato, in italiano. PURA.
+   *
+   * Il server registra il motivo con dentro un'etichetta tecnica
+   * (`realign_branch_moved`, `realign_unavailable`…): qui l'etichetta
+   * diventa una frase, e il resto della riga (il dettaglio fra parentesi)
+   * resta com'è. Un'etichetta che questa tabella non conosce si stampa così
+   * com'è: un motivo grezzo dice più di un motivo nascosto.
+   */
+  var REALIGN_REASONS = {
+    realign_unavailable: 'il riallineamento automatico non è disponibile su questo server',
+    realign_threw: 'il server si è fermato a metà del riallineamento',
+    realign_nothing_to_do: 'il ramo conteneva già main, eppure la fusione era in conflitto',
+    realign_malformed: 'il commit di riallineamento è tornato senza sha',
+    realign_branch_moved: 'il ramo si era mosso dopo l’approvazione: il commit di riallineamento non parte dal commit approvato',
+    realign_request_failed: 'la richiesta nuova per la punta riallineata non si è registrata',
+    gates_unavailable: 'i controlli deterministici non erano disponibili',
+    bad_branch: 'il nome del ramo non si può riallineare',
+    bad_sha: 'il commit approvato non ha la forma di uno sha',
+    github_unreachable: 'GitHub non rispondeva',
+    github_no_token: 'il server non aveva la credenziale con cui scrive',
+    github_404: 'GitHub non ha trovato il commit',
+  };
+  function realignReasonText(reason) {
+    var s = String(reason == null ? '' : reason).trim();
+    if (!s) return '';
+    return s.replace(/[a-z][a-z0-9_]*/g, function (tok) {
+      return Object.prototype.hasOwnProperty.call(REALIGN_REASONS, tok) ? REALIGN_REASONS[tok] : tok;
+    });
+  }
+
+  /** La frase sul tentativo fallito del server, o '' se non ci ha provato. PURA. */
+  function realignFailureText(reason) {
+    var t = realignReasonText(reason);
+    return t ? 'Il server ha provato a riallineare da sé, senza riuscirci: ' + t + '.' : '';
+  }
+
+  /**
+   * La riga in testa a una richiesta nata da un riallineamento del server.
+   * PURA: '' per una richiesta normale.
+   *
+   * Una richiesta con `supersedes` rimpiazza una che l'owner aveva GIÀ
+   * approvato: il server ha spostato il ramo su main, ha rifatto i controlli
+   * e ha trovato qualcosa di nuovo. I blocchi elencati sotto sono SOLO quelli:
+   * senza questa riga l'owner li leggerebbe come una richiesta da capo.
+   */
+  function realignedNote(req) {
+    var r = req || {};
+    if (!String(r.supersedes || '').trim()) return '';
+    var from = r.realigned && r.realigned.from ? shortSha(r.realigned.from) : '';
+    return 'Punta riallineata su main dal server' + (from ? ' (era ' + from + ')' : '')
+      + ': qui solo ciò che non avevi ancora visto.';
+  }
+
+  /**
+   * L'esito di una decisione passata, in due parole. PURA.
+   *
+   * `stale` con `used: true` è una richiesta CONSUMATA senza fusione: dirla
+   * «approvata» racconta una fusione mai avvenuta. Con `realigned` il server
+   * l'ha spostata su main e ha chiesto di nuovo per la sola differenza; senza,
+   * è semplicemente decaduta.
+   */
+  function recentOutcome(r) {
+    var v = r || {};
+    var ria = !!(v.realigned && typeof v.realigned === 'object');
+    if (v.outcome === 'merged') return ria ? 'approvata, riallineata e fusa' : 'approvata e fusa';
+    if (v.outcome === 'conflict') return 'approvata, ma in conflitto';
+    if (v.outcome === 'stale') return ria ? 'riallineata, chiede di nuovo' : 'decaduta';
+    if (v.discarded) return 'scartata';
+    if (v.used) return 'approvata';
+    return 'scaduta senza risposta';
+  }
+
+  /**
    * L'esito di un'approvazione, detto all'owner. PURA.
    *
    * Vale la stessa regola delle bolle di chat: mai il motivo tecnico lasciato
@@ -218,16 +291,33 @@
       if (/unreachable|github_5/i.test(err)) return { kind: 'err', text: 'Server non raggiungibile: nessuna fusione è avvenuta, riprova.' };
       return { kind: 'err', text: err ? 'Non è riuscita: ' + err : 'Non è riuscita. Nessuna fusione è avvenuta.' };
     }
-    if (r.result === 'merged') return { kind: 'ok', text: 'Fatto: il lavoro è su main' + (r.sha ? ' (' + shortSha(r.sha) + ')' : '') + '.' };
-    if (r.result === 'conflict') {
-      return {
-        kind: 'warn',
-        text: originOf(req) === 'routine'
-          ? 'Main è andato avanti e le modifiche non si incastrano da sole: serve un giro nuovo dell’automazione.'
-          : 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.',
-      };
+    var shaTxt = r.sha ? ' (' + shortSha(r.sha) + ')' : '';
+    var ria = !!(r.realigned && typeof r.realigned === 'object');
+    if (r.result === 'merged') {
+      return ria
+        ? { kind: 'ok', text: 'Fatto: main era andato avanti, il server ha riallineato il ramo, rifatto i controlli e fuso' + shaTxt + '.' }
+        : { kind: 'ok', text: 'Fatto: il lavoro è su main' + shaTxt + '.' };
     }
-    if (r.result === 'stale') return { kind: 'warn', text: 'Il ramo è andato avanti dopo i controlli: la richiesta decade. ' + retry };
+    if (r.result === 'conflict') {
+      var base = originOf(req) === 'routine'
+        ? 'Main è andato avanti e le modifiche non si incastrano da sole: serve un giro nuovo dell’automazione.'
+        : 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.';
+      var tentativo = realignFailureText(r.realignReason);
+      return { kind: 'warn', text: tentativo ? base + ' ' + tentativo : base };
+    }
+    if (r.result === 'stale') {
+      // Riallineata dal server: la richiesta vecchia è consumata, ma il lavoro
+      // non è perso e non c'è niente da rilanciare. La scheda nuova, con la
+      // sola differenza, arriva nell'elenco: `reload` lo fa ricaricare.
+      if (ria) {
+        return {
+          kind: 'warn',
+          reload: true,
+          text: 'Main era andato avanti: il server ha riallineato il ramo, ma i controlli hanno trovato qualcosa che non avevi visto. C’è una richiesta nuova con solo quella differenza.',
+        };
+      }
+      return { kind: 'warn', text: 'Il ramo è andato avanti dopo i controlli: la richiesta decade. ' + retry };
+    }
     if (r.result === 'discarded') return { kind: 'ok', text: 'Scartata.' };
     return { kind: 'warn', text: 'Esito inatteso: nessuna fusione è avvenuta.' };
   }
@@ -302,9 +392,17 @@
     head.appendChild(exp);
     card.appendChild(head);
 
+    var nota = realignedNote(req);
+    if (nota) {
+      var ria = el('p', 'sn-mac-realigned', nota);
+      ria.title = 'L’avevi già approvata, ma main era andato avanti: il server ha fuso main nel ramo e ha rifatto i controlli. '
+        + 'Sotto ci sono solo i blocchi che quella approvazione non copriva.';
+      card.appendChild(ria);
+    }
+
     var blocks = Array.isArray(req.blocks) ? req.blocks : [];
     if (blocks.length) {
-      card.appendChild(el('p', 'sn-mac-why', 'Bloccata perché:'));
+      card.appendChild(el('p', 'sn-mac-why', nota ? 'Bloccata perché (solo il nuovo):' : 'Bloccata perché:'));
       var ul = el('ul', 'sn-mac-blocks');
       for (var i = 0; i < blocks.length; i++) {
         var li = el('li', 'sn-mac-block');
@@ -364,7 +462,7 @@
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
           say(msg);
-          if (msg.kind === 'ok' && o.onDone) o.onDone();
+          if ((msg.kind === 'ok' || msg.reload) && o.onDone) o.onDone();
           else setBusy(false);
         })
         .catch(function (e) {
@@ -441,10 +539,11 @@
     head.appendChild(el('span', 'sn-mac-when', 'approvata ' + timeAgo(req.decidedAtMs || req.usedAtMs, now)));
     card.appendChild(head);
 
+    var tentativo = realignFailureText(req.realignReason);
     card.appendChild(el('p', 'sn-mac-why',
       'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
-      + 'non si incastrano da sole. ' + howToRetry(req) + ' Quando il lavoro rifatto verrà fuso, '
-      + 'questa scheda si toglie da sola.'));
+      + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + howToRetry(req)
+      + ' Quando il lavoro rifatto verrà fuso, questa scheda si toglie da sola.'));
 
     var status = el('p', 'sn-mac-status');
     status.setAttribute('role', 'status');
@@ -544,11 +643,7 @@
     var ul = el('ul', 'sn-mac-recent');
     for (var i = 0; i < list.length; i++) {
       var r = list[i];
-      var esito = r.outcome === 'merged' ? 'approvata e fusa'
-        : r.outcome === 'conflict' ? 'approvata, ma in conflitto'
-          : r.discarded ? 'scartata'
-            : r.used ? 'approvata'
-              : 'scaduta senza risposta';
+      var esito = recentOutcome(r);
       var li = el('li', 'sn-mac-recent-row');
       li.appendChild(el('span', 'sn-mac-recent-origin', originLabel(r)));
       li.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
@@ -566,6 +661,10 @@
 
   global.SN_MERGE_APPROVALS = {
     shortSha: shortSha,
+    realignReasonText: realignReasonText,
+    realignFailureText: realignFailureText,
+    realignedNote: realignedNote,
+    recentOutcome: recentOutcome,
     timeAgo: timeAgo,
     expiresIn: expiresIn,
     headline: headline,
