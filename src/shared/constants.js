@@ -123,6 +123,50 @@
     AUTOMATION_CAP0: 'filo_automation_cap0', // giri per i soli rilievi di livello 0
   };
 
+  // ── Cosa una PAGINA WEB può toccare nello storage ─────────────────────────
+  //
+  // Il canale generico dello storage è raggiungibile sia dalle pagine interne
+  // filo:// sia dagli script che Filo fa girare dentro le pagine visitate.
+  // Difendeva UNA chiave, quella delle impostazioni, e tutto il resto passava:
+  // da un indirizzo web si leggevano, si riscrivevano e si cancellavano i
+  // moduli di memoria, il buffer delle lezioni, il registro delle azioni, le
+  // notifiche, le sveglie, il messaggio della home, la cronologia delle
+  // conversazioni con Filo e la cronologia degli appunti copiati (#592,
+  // giro 8). Scrivere la memoria è l'attacco del feedback preso dalla porta di
+  // servizio: una riga scritta da fuori sta in ogni prompt, vale in ogni
+  // conversazione e sopravvive al riavvio, senza dover convincere il modello a
+  // salvare niente.
+  //
+  // Quindi qui l'elenco è di ciò che è LECITO, come per il canale delle
+  // impostazioni (#592, giro 4): una chiave nuova nasce vietata alle pagine
+  // web, non ammessa per dimenticanza. È corto perché gli script che girano
+  // nelle pagine visitate fanno poche cose: correggere il testo (dizionario
+  // personale e autocorrezione), ricordare la disposizione delle icone del
+  // menu, tenere la bozza di un feedback finché non viene spedito.
+  //
+  // I nomi scritti a mano sono chiavi locali di quegli script, che non stanno
+  // in STORAGE_KEYS: se lì cambiano, vanno cambiati anche qui, e la sentinella
+  // in tests/unit/webStorageAllow.test.mjs lo dice.
+  const WEB_STORAGE_KEYS = {
+    // Scrivibili E leggibili da una pagina web.
+    WRITE: [
+      STORAGE_KEYS.PERSONAL_DICT,
+      STORAGE_KEYS.AUTOCORRECT,
+      STORAGE_KEYS.ICON_LAYOUT,
+      'sn_qr_in_primary_migrated', // src/content/menuIcons.js
+      'sn_feedback_client_id', // src/content/feedback.js
+      'sn_feedback_draft_text', // src/content/feedback.js
+      'sn_redteam_attack_draft', // src/content/redteamAttack.js
+      'sn_redteam_desc_draft', // src/content/redteamAttack.js
+    ],
+    // Solo leggibili. Le impostazioni servono a ogni script che gira nella
+    // pagina (tema, correttore, colore della scheda); le chiavi API restano
+    // tolte dalla risposta, come prima.
+    READ_ONLY: [STORAGE_KEYS.SETTINGS],
+  };
+  const WEB_STORAGE_WRITABLE = new Set(WEB_STORAGE_KEYS.WRITE);
+  const WEB_STORAGE_READABLE = new Set([...WEB_STORAGE_KEYS.WRITE, ...WEB_STORAGE_KEYS.READ_ONLY]);
+
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
   // dashboard Gestione). Il RANGE dei tre bilanci del verificatore vive qui;
   // i DEFAULT (cap2 5, cap1 2, cap0 0) vivono con le transizioni promosse
