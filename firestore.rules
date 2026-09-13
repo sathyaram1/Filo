@@ -350,6 +350,19 @@ service cloud.firestore {
         // riapertura sullo stesso doc. Nessun vincolo di forma extra qui: il
         // ramo non-admin sotto resta l'unico modo per gli utenti di scriverlo.
         && request.resource.data.get('reopenRequests', {}) is map
+        // `mergePreapproved` { by, at }: «fondi senza chiedermelo» su QUESTA
+        // pratica. Assente = si chiede, come sempre. Toglierlo è cancellare il
+        // campo (updateMask senza valore), per questo la forma vale solo
+        // quando c'è. Solo questo ramo (admin) può scriverlo: i rami sotto
+        // (voti, richieste di riapertura) non lo ammettono.
+        && (!('mergePreapproved' in request.resource.data)
+            || (request.resource.data.mergePreapproved is map
+                && request.resource.data.mergePreapproved.keys().hasOnly(['by', 'at'])
+                && request.resource.data.mergePreapproved.get('by', '') is string
+                && request.resource.data.mergePreapproved.get('by', '').size() > 0
+                && request.resource.data.mergePreapproved.get('by', '').size() <= 120
+                && request.resource.data.mergePreapproved.get('at', '') is string
+                && request.resource.data.mergePreapproved.get('at', '').size() <= 40))
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
         // per il dedup auto-feedback. Stringa breve.
         && request.resource.data.get('capabilityGapId', '') is string
