@@ -2895,103 +2895,82 @@
     mgOwnerMsgs.hidden = vuoto;
   }
 
-  function renderJudgesRow(fb) {
-    // Pulisce tutto tranne la label
-    const label = mgJudgesRow.querySelector('.mg-judge-label');
-    mgJudgesRow.innerHTML = '';
-    if (label) mgJudgesRow.appendChild(label);
-    else {
-      const lbl = document.createElement('span');
-      lbl.className = 'mg-judge-label';
-      lbl.textContent = 'Giudici:';
-      mgJudgesRow.appendChild(lbl);
-    }
+  // ── La fila dei cinque livelli ────────────────────────────────────────────
+  //
+  // I disegni delle quattro forme, dentro una griglia di 16. I cerchi dei
+  // giudici restano `.mg-dot` come sempre: sono lo stesso oggetto di prima, e
+  // cambiarne il disegno avrebbe cambiato una cosa che non c'era da cambiare.
+  const FORME_SVG = {
+    triangolo: 'M8 2 L14.5 13.6 L1.5 13.6 Z',
+    rombo:     'M8 1.4 L14.6 8 L8 14.6 L1.4 8 Z',
+    pentagono: 'M8 1.4 L14.6 6.3 L12.1 14.2 L3.9 14.2 L1.4 6.3 Z',
+    quadrato:  'M2.6 2.6 H13.4 V13.4 H2.6 Z',
+  };
 
-    // Stato illeggibile: i pallini tratteggiati nascono da "non filtrato", che
-    // qui la macchina si inventa — e la frase accanto diceva "In attesa del
-    // giudizio." anche su una segnalazione già chiusa. Al loro posto va l'unica
-    // cosa che si sa: aperta o chiusa, con le stesse parole della gemella.
+  // Quale forma sta guardando il pannello di destra: serve a ridisegnarlo
+  // quando arriva un aggiornamento (una fusione approvata altrove) e a
+  // segnare la forma scelta.
+  let livelloAperto = null;
+
+  function formaEl(liv, fb) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mg-forma'
+      + (liv.vuoto ? ' mg-forma--vuota' : ` mg-forma--${liv.classe}`)
+      + (livelloAperto === liv.key ? ' mg-forma--scelta' : '');
+    b.dataset.livello = liv.key;
+    b.dataset.esito = liv.esito;
+    // Una o due parole sotto il puntatore, come su ogni icona della pagina.
+    b.title = liv.titolo;
+    b.setAttribute('aria-label', liv.titolo);
+    b.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG[liv.forma]}"/></svg>`;
+    b.addEventListener('click', () => openSidebarLivello(fb, liv.key));
+    return b;
+  }
+
+  function renderLivelliRow(fb) {
+    if (!mgLivelliRow || !mgForme) return;
+    mgForme.replaceChildren();
+    renderDetailState(fb);
+
+    // Stato illeggibile: le forme nascerebbero da uno stato che la macchina si
+    // inventa (`unlabeled`), e direbbero "in attesa del giudizio" su una
+    // segnalazione già chiusa. Al loro posto l'unica cosa che si sa: aperta o
+    // chiusa, con le stesse parole della gemella.
     if (!statoLeggibile(fb)) {
       const pubblico = MR.publicStateLabel(fb);
-      if (!pubblico) { mgJudgesRow.hidden = true; return; }
-      mgJudgesRow.hidden = false;
-      mgJudgesRow.innerHTML = '';
+      if (!pubblico) { mgLivelliRow.hidden = true; return; }
+      mgLivelliRow.hidden = false;
       const span = document.createElement('span');
       span.className = 'mg-state';
       span.textContent = pubblico;
       span.title = `Stato: ${pubblico} — ${MR.PUBLIC_STATE_HINT}`;
-      mgJudgesRow.appendChild(span);
+      mgForme.appendChild(span);
       return;
     }
 
-    // Un pallino per ogni giudice ATTESO del panel (non per verdetto): un panel
-    // parziale mostra i mancanti come pallini tratteggiati, non un panel
-    // "accorciato". Pipeline NUOVA → posizioni esatte da `expectedJudges`.
-    // STORICO (senza quel campo) → mostriamo i verdetti presenti e poi pad-iamo
-    // con pallini tratteggiati fino alla dimensione attesa del panel (così 2
-    // giudici su 4 = 2 colorati + 2 tratteggiati).
-    const p = (fb && fb.pipeline) || {};
-    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
-    const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
-    const judgeLetters = ['A', 'B', 'C', 'D', 'E'];
-
-    // Nessun verdetto registrato. Se il feedback è "non filtrato" (da giudicare —
-    // es. mai giudicato o identità dell'owner sbloccata), mostra COMUNQUE il panel
-    // atteso tutto tratteggiato, così l'owner vede i giudici che non hanno (ancora)
-    // votato. Altrimenti (clarify, chiusi…) nascondi la riga.
-    if (!expected && verdicts.length === 0) {
-      const cl = MR.classifyBlock(fb);
-      if (!cl || cl.reason !== 'unfiltered') { mgJudgesRow.hidden = true; return; }
-      mgJudgesRow.hidden = false;
-      const n = MR.EXPECTED_PANEL_SIZE || 4;
-      for (let i = 0; i < n; i++) {
-        const dot = document.createElement('span');
-        dot.className = 'mg-dot mg-dot--empty';
-        dot.title = `Giudice ${judgeLetters[i] || i + 1}: nessun verdetto`;
-        mgJudgesRow.appendChild(dot);
+    mgLivelliRow.hidden = false;
+    for (const liv of MR.livelli(fb, { fusioni })) {
+      if (liv.key !== 'l2') { mgForme.appendChild(formaEl(liv, fb)); continue; }
+      // I giudici: un cerchio per giudice ATTESO, non per verdetto. Un panel
+      // parziale mostra i mancanti tratteggiati, non un panel accorciato — e
+      // anche un tratteggiato si clicca: dice PERCHÉ è vuoto.
+      const gruppo = document.createElement('span');
+      gruppo.className = 'mg-forme-gruppo';
+      gruppo.title = liv.titolo;
+      for (const g of liv.giudici) {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'mg-dot mg-dot--clickable'
+          + (g.classe ? ` mg-dot--${g.classe}` : ' mg-dot--empty');
+        dot.dataset.livello = 'l2';
+        dot.title = `${g.etichetta}: ${g.classe || 'nessun verdetto'}`;
+        dot.setAttribute('aria-label', dot.title);
+        dot.addEventListener('click', () => openSidebarJudge(fb, g.indice));
+        gruppo.appendChild(dot);
       }
-      appendJudgesNote(fb);
-      return;
+      mgForme.appendChild(gruppo);
     }
-    mgJudgesRow.hidden = false;
-
-    const fallbackSize = Math.max(verdicts.length, (MR.EXPECTED_PANEL_SIZE || 4));
-    const size = expected ? expected.length : fallbackSize;
-    for (let i = 0; i < size; i++) {
-      const v = expected ? verdictByName(fb, expected[i]) : (verdicts[i] || null);
-      const dot = document.createElement('span');
-      dot.className = 'mg-dot';
-      if (v) {
-        const cls = v.class || '';
-        if (cls) dot.classList.add(`mg-dot--${cls}`);
-        dot.classList.add('mg-dot--clickable');
-        dot.title = `Giudice ${judgeLetters[i] || i + 1}: ${cls}`;
-        // Click sul pallino → apre QUEL giudice nel pannello destro.
-        dot.addEventListener('click', () => openSidebarJudge(fb, i));
-      } else {
-        // Quel giudice NON ha emesso un verdetto in quella run (timeout/errore/
-        // giudice non configurato): pallino tratteggiato. È la causa del
-        // "non filtrato" (panel parziale).
-        dot.classList.add('mg-dot--empty');
-        dot.title = `Giudice ${judgeLetters[i] || i + 1}: nessun verdetto`;
-      }
-      mgJudgesRow.appendChild(dot);
-    }
-    appendJudgesNote(fb);
-  }
-
-  // La frase accanto ai pallini: perché il feedback è in questo stato. I
-  // pallini da soli raccontavano solo il voto dei giudici, e uno stato deciso
-  // DOPO (sicurezza che boccia il fix, domande della routine) sembrava in
-  // contraddizione con quattro pallini blu (#462).
-  function appendJudgesNote(fb) {
-    const note = MR.judgesNote ? MR.judgesNote(fb) : null;
-    if (!note || !note.text) return;
-    const span = document.createElement('span');
-    span.className = 'mg-judge-note';
-    span.textContent = note.text;
-    if (note.color) span.style.color = note.color;
-    mgJudgesRow.appendChild(span);
   }
 
   // Verdetto di un dato giudice (per nome) su un feedback, o null se mancante.
