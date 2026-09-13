@@ -3188,6 +3188,7 @@
     mgSideTitle.textContent = '';
     mgSideBody.innerHTML = '';
     livelloAperto = null;
+    giudiceAperto = null;
     if (mgForme) mgForme.querySelectorAll('.mg-forma--scelta')
       .forEach((el) => el.classList.remove('mg-forma--scelta'));
   }
