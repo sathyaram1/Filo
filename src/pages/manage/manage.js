@@ -1560,6 +1560,17 @@
     renderListBody();
   }
 
+  // Questa segnalazione ha una fusione ferma che aspetta l'owner?
+  function fusioneFerma(fb) {
+    return MR.fusioneInAttesa(fb, { fusioni });
+  }
+
+  // Le segnalazioni con una fusione ferma davanti a tutte, conservando fra loro
+  // l'ordine che avevano (`sort` è stabile).
+  function pinFusioniFerme(lista) {
+    return lista.slice().sort((a, b) => (fusioneFerma(b) ? 1 : 0) - (fusioneFerma(a) ? 1 : 0));
+  }
+
   // Disegna la colonna a partire da `currentList`: è la parte che NON dipende
   // da quale sezione si sta guardando, e la condivide anche l'elenco unico di
   // quando le sezioni non ci sono.
