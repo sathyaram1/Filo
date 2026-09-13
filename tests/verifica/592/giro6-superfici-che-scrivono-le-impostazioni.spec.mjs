@@ -152,8 +152,8 @@ test('la velocità di lettura appena spostata non deve tornare indietro perché 
   await eseguiInChat(page, { type: 'IMPOSTA_ESTETICA', token: 'accent', valore: '#0055ff' });
   await page.waitForTimeout(1500);
 
-  // Quello che ha spostato è ancora quello che vede…
-  expect(await page.inputValue('#ttsRate')).toBe('1.8');
-  // …e quello che è scritto in memoria.
-  expect((await impostazioni(page)).tts?.rate).toBe(1.8);
+  // Quello che ha spostato è ancora quello che vede, e quello che è in memoria.
+  const visto = await page.inputValue('#ttsRate');
+  const inMemoria = (await impostazioni(page)).tts?.rate;
+  expect({ visto, inMemoria }).toEqual({ visto: '1.8', inMemoria: 1.8 });
 });
