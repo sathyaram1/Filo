@@ -3176,6 +3176,27 @@
     });
   }
 
+  // Toast discreto in basso a destra: l'esito di un'azione deve arrivare anche
+  // se nel frattempo l'owner ha chiuso il pannello o cambiato scheda.
+  let mgToastTimer = null;
+  function toast(text, kind) {
+    let el = document.getElementById('mgToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mgToast';
+      el.className = 'mg-toast';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = String(text || '');
+    el.dataset.kind = kind || '';
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(mgToastTimer);
+    // Le frasi degli esiti sono lunghe: quattro secondi e mezzo per leggerle.
+    mgToastTimer = setTimeout(() => el.classList.remove('show'), 4500);
+  }
+
   // ── Il pannello di un livello ─────────────────────────────────────────────
   //
   // Il contenuto (titolo, righe, testo, azioni) arriva già pronto dal modulo
