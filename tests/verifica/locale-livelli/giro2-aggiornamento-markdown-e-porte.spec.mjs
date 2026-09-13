@@ -292,7 +292,11 @@ test('porta E: una categoria del filtro che il client non conosce non rompe la f
   await forma(page, 'l1').click();
   await expect(side(page)).toBeVisible();
   const t = await sideBody(page).innerText();
-  expect(t).toMatch(/nuova.categoria.x/i);
+  // Traccia per la critica: una categoria ignota si legge grezza o viene
+  // presentata come un'altra? (Nel giro 2: «Pulito», triangolo blu.)
+  const classe = await forma(page, 'l1').getAttribute('class');
+  console.log('[verifica] categoria ignota → pannello:', t.split('\n').slice(0, 2).join(' '), '| classe:', classe);
+  expect(t).toMatch(/motivo ignoto/i);
 });
 
 // ── F. Chi non è l'owner e il quadrato di una fusione ferma ─────────────────
