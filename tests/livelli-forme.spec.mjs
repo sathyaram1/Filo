@@ -459,11 +459,13 @@ test('le forme si vedono in tutti e due i temi', async ({ openTab }) => {
   await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
 
   for (const tema of ['dark', 'light']) {
-    await page.evaluate((t) => {
-      document.documentElement.setAttribute('data-theme', t);
-      document.documentElement.classList.toggle('sn-light', t === 'light');
-    }, tema);
+    // Il tema di Filo si dichiara su <html> (src/styles/theme.css).
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
     await page.waitForTimeout(150);
+    // Il fondo cambia davvero: senza questo il confronto fra i due temi non
+    // proverebbe niente (i due scatti sarebbero identici).
+    const fondo = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    fondi.push(fondo);
 
     // Ogni forma ha un colore proprio e non è trasparente, e il grigio si
     // distingue dal fondo.
