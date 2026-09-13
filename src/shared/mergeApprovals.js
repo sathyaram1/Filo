@@ -660,7 +660,7 @@
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
       head.appendChild(sha);
       var who = el('span', 'sn-mac-recent-who', preapprovedBy(r));
-      if (r.preapprovedAt) who.title = 'Segno messo il ' + String(r.preapprovedAt);
+      if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
       head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));
       li.appendChild(head);
