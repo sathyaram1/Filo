@@ -200,8 +200,17 @@ test('un sito aggiunto ai fidati non deve rimettere la gestione cookie di prima'
   await pagina.waitForTimeout(1200);
   expect((await impostazioni(pagina)).security?.cookies?.mode).toBe('manual');
 
-  // Finisce di aggiungere il sito fidato.
-  await pagina.click('#cookie-wl-add-btn');
+  // Dal giro 5 la pagina si rilegge sempre: adesso mostra «manuale», e i siti
+  // fidati si scrivono solo in «privacy massima», quindi il bottone è spento.
+  // La strada del giro 3 non esiste più perché la pagina non mente.
+  await expect.poll(
+    async () => pagina.$eval('#cookie-wl-add-btn', (el) => el.disabled),
+    { timeout: 5000 },
+  ).toBe(true);
+
+  // L'invariante resta la stessa e si prova dal vicino raggiungibile: un'altra
+  // protezione della pagina non deve rimettere la gestione cookie di prima.
+  await pagina.click('#sec-protect-ip');
   await pagina.waitForTimeout(1800);
 
   expect((await impostazioni(pagina)).security?.cookies?.mode).toBe('manual');
