@@ -213,6 +213,13 @@ async function notePrecedentiInChiaro(doc) {
 
 export async function scrivi(id, to, nota, opts = {}) {
   if (!ALLOWED.includes(to)) return { ok: false, motivo: `stato non valido: "${to}"` };
+  // Il segno «fondi senza chiedermelo» vale solo a pratica aperta: metterlo
+  // nello stesso comando che la chiude lo scriverebbe senza che conti (e
+  // tornerebbe a valere a una riapertura). Stesso rifiuto della forma senza
+  // stato (segnaPreapprovazione), prima di toccare la rete.
+  if (opts.preapprova === true && statusToPublic && statusToPublic(to) === 'closed') {
+    return { ok: false, motivo: `lo stato «${to}» chiude la pratica: il segno «fondi senza chiedermelo» non conterebbe. Ometti --preapprova (o usa --chiedi-prima).` };
+  }
   const bearer = await acquireBearer();
   const doc = await getDoc(id, bearer);
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
