@@ -1543,6 +1543,12 @@
       currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
     }
 
+    // Una fusione ferma È una decisione dell'owner: la sua segnalazione sale
+    // in cima, sopra le altre della stessa scheda. Prima la richiesta viveva in
+    // un riquadro a parte e la scheda non diceva niente — chi scorreva la lista
+    // non aveva modo di sapere che un ramo era fermo lì.
+    currentList = pinFusioniFerme(currentList);
+
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
     // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
     currentList = applySortMode(currentList);
