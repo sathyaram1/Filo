@@ -110,6 +110,35 @@ async function decryptPipelineField(out, C, priv) {
   }
 }
 
+// I testi dei livelli 3 e 4 (`livelli.l3.testo`, `livelli.l4.testo`): quello
+// che Claude ha segnalato lavorando e il resoconto dell'audit di sicurezza.
+// Viaggiano nella stessa busta delle note, con la stessa chiave dell'owner,
+// quindi si decifrano con lo stesso helper — e la mappa si copia prima di
+// scriverci dentro, per non mutare il documento che il chiamante ha passato.
+// Senza chiave: il placeholder, come per gli altri testi (la dashboard lo
+// riconosce e lo dichiara invece di mostrare un blob).
+const LIVELLI_CON_TESTO = ['l3', 'l4'];
+async function decryptLivelliFields(out, C, priv) {
+  const l = out.livelli;
+  if (!l || typeof l !== 'object') return;
+  const copia = { ...l };
+  let toccato = false;
+  for (const k of LIVELLI_CON_TESTO) {
+    const voce = copia[k];
+    if (!voce || typeof voce !== 'object') continue;
+    if (!C.isEncrypted(voce.testo)) continue;
+    if (!priv) { copia[k] = { ...voce, testo: PLACEHOLDER_NO_KEY }; toccato = true; continue; }
+    try {
+      copia[k] = { ...voce, testo: await C.decrypt(voce.testo, priv) };
+    } catch (e) {
+      console.warn(`[auth] decifratura di livelli.${k}.testo fallita:`, e?.message || e);
+      copia[k] = { ...voce, testo: PLACEHOLDER_NO_KEY };
+    }
+    toccato = true;
+  }
+  if (toccato) out.livelli = copia;
+}
+
 // `privKey` (opzionale): la chiave già letta dal chiamante. Il batch della
 // dashboard la passa una volta per tutti i documenti — rileggerla dal disco a
 // ogni feedback (500 volte per una lista) era solo tempo perso.
