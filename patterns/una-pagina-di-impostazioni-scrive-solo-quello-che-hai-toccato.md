@@ -110,7 +110,7 @@ ricostruisce la pagina attorno al `load()`.
 ## Dove sta
 
 - `src/shared/storage.js` — `partialCambiato`, il confronto fino alla foglia
-- `src/shared/pageBootstrap.js` — `ricaricaSenzaDisturbare`
+- `src/shared/pageBootstrap.js` — `ricaricaSenzaDisturbare`, `segnaCampi`, `segnaCampo`
 - `src/pages/preferences/preferences.js` — `raccogli`, `ribasa`, `persist`
 - `src/pages/options/options.js` — stesse tre funzioni
 - `src/pages/security/security.js` — stesse tre funzioni, più `saveCookies`
