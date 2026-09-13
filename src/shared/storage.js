@@ -67,7 +67,7 @@
   // `partialCambiato` non serve a niente, perché mandarne un pezzo cancella il
   // resto. Allora si parte da quello che c'è in memoria ADESSO e ci si applica
   // SOLO le voci che l'utente ha toccato da quando la pagina le ha lette,
-  // comprese quelle che ha togliere.
+  // comprese quelle che ha tolto.
   //
   // Senza questo, una pagina di impostazioni rimandava la mappa com'era
   // all'apertura e cancellava quello che era cambiato altrove nel frattempo: un
