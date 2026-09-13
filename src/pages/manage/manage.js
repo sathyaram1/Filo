@@ -1019,6 +1019,20 @@
     return n;
   }
 
+  // Un cambiamento nelle fusioni si vede in due posti: il quadrato della scheda
+  // aperta e le card della lista (una fusione ferma le colora come un blocco e
+  // le porta fra le cose da decidere). Tutti e due, sempre insieme.
+  function riflettiFusioni() {
+    if (selectedId && allFeedbacks.some((f) => f._id === selectedId)) {
+      const fb = allFeedbacks.find((f) => f._id === selectedId);
+      renderLivelliRow(fb);
+      // Il pannello aperto su un livello si riempie di nuovo: se era il
+      // quadrato, dentro c'è una richiesta che potrebbe non esistere più.
+      if (livelloAperto) openSidebarLivello(fb, livelloAperto);
+    }
+    if (dataLoaded) renderList();
+  }
+
   async function loadChannelLog() {
     if (!mgChannelSection || !isAdmin) return;
     try {
