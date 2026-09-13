@@ -480,6 +480,12 @@
   async function save() {
     const { valori, invalid } = raccogli();
     setBlacklistError(invalid);
+    // Nel riquadro restano anche le righe scartate; in memoria vanno solo le
+    // buone. La fotografia per la rilettura è quella che va in memoria.
+    if (Bootstrap && typeof Bootstrap.segnaCampo === 'function') {
+      const lista = (valori.siteBlock && valori.siteBlock.blacklist) || [];
+      Bootstrap.segnaCampo($('sec-siteblock-blacklist'), lista.join('\n'));
+    }
 
     // Solo le protezioni che l'utente ha davvero toccato. Le altre possono
     // essere state cambiate altrove mentre la pagina era aperta: rimandarle
