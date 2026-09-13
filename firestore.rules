@@ -46,6 +46,37 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/routines/$(request.auth.token.email));
     }
 
+    // I livelli di sicurezza sul feedback (contratto del 2026-09-13): `livelli`
+    // è una mappa con al più `l3` (la segnalazione di chi ha lavorato: un
+    // trade-off vero che decide l'owner) e `l4` (l'esito del controllo di
+    // sicurezza, anche quando passa, e il salto dell'owner). Li scrive SOLO il
+    // server con la sua identità; qui la forma, così una voce storpiata non
+    // passa da nessuno dei due rami di triage. `testo` è cifrato come `notes`,
+    // e il tetto è abbondante (CLAUDE.md § Limiti): 12.000 caratteri in
+    // chiaro, cifrati, stanno in 20.000.
+    function livelloValido(l) {
+      return l is map
+        && l.keys().hasOnly(['esito', 'at', 'ruolo', 'by', 'testo'])
+        && l.get('esito', '') is string
+        && l.get('esito', '').size() > 0
+        && l.get('esito', '').size() <= 40
+        && l.get('at', '') is string
+        && l.get('at', '').size() <= 40
+        && l.get('ruolo', '') is string
+        && l.get('ruolo', '').size() <= 40
+        && l.get('by', '') is string
+        && l.get('by', '').size() <= 120
+        && l.get('testo', '') is string
+        && l.get('testo', '').size() <= 20000;
+    }
+    function livelliValidi(d) {
+      return !('livelli' in d)
+        || (d.livelli is map
+            && d.livelli.keys().hasOnly(['l3', 'l4'])
+            && (!('l3' in d.livelli) || livelloValido(d.livelli.l3))
+            && (!('l4' in d.livelli) || livelloValido(d.livelli.l4)));
+    }
+
     // Allowlist amministratori. Gestita SOLO da console Firebase.
     match /admins/{email} {
       allow read: if isAdmin();
@@ -249,6 +280,8 @@ service cloud.firestore {
                     // 'userNote' la frase in chiaro per chi ha mandato il feedback.
                     'userNote',
                     'archiveOverride', 'reopenRequests',
+                    // I livelli L3/L4 (vincolo di forma: livelliValidi, in cima).
+                    'livelli',
                     // La pre-approvazione della fusione, per singola pratica:
                     // solo l'owner la mette e la toglie (vedi il vincolo di
                     // forma più sotto). Il server la legge prima di aprire una
@@ -371,6 +404,7 @@ service cloud.firestore {
                 && request.resource.data.mergePreapproved.get('by', '').size() <= 120
                 && request.resource.data.mergePreapproved.get('at', '') is string
                 && request.resource.data.mergePreapproved.get('at', '').size() <= 40))
+        && livelliValidi(request.resource.data)
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
         // per il dedup auto-feedback. Stringa breve.
         && request.resource.data.get('capabilityGapId', '') is string
@@ -436,7 +470,7 @@ service cloud.firestore {
       allow update: if
         isRoutine()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch'])
+          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch', 'livelli'])
         && request.resource.data.get('status', 'new') in
              ['todo', 'working', 'revision_capability', 'revision_security', 'done', 'design', 'clarify']
         && request.resource.data.get('statusReason', '') is string
@@ -449,7 +483,8 @@ service cloud.firestore {
         // rami devono restare allineati, o una routine potrebbe scrivere note
         // che poi bloccano l'owner.
         && request.resource.data.get('notes', '') is string
-        && request.resource.data.get('notes', '').size() <= 60000;
+        && request.resource.data.get('notes', '').size() <= 60000
+        && livelliValidi(request.resource.data);
 
       // Cancellazione: solo admin.
       allow delete: if isAdmin();
