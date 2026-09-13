@@ -2919,6 +2919,15 @@ function daPaginaWeb(sender, origin) {
   return !String(origin || '').startsWith('filo://');
 }
 
+// Il rovescio, per chi ha in mano solo il mittente (#592, giro 10: il gate delle
+// azioni). Una regola sola, non due copie che divergono. `sender` assente vuol
+// dire che a chiamare è il main per conto suo, senza che nessuna pagina abbia
+// chiesto niente: quelle chiamate nascono dentro Filo.
+function daOrigineInterna(sender) {
+  if (!sender) return true;
+  return !daPaginaWeb(sender, sender.tab?.url || sender.url || '');
+}
+
 async function handleMessage(msg, sender = {}) {
   const origin = sender?.tab?.url || sender?.url || '';
   // #592, giro 9 — il gate delle pagine web sta QUI, prima degli handler, e
