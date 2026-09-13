@@ -252,7 +252,9 @@ module.exports = function register(on, ctx) {
         { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved },
         { idToken },
       );
-      return { ok: true };
+      // La pagina mostra subito chi ha messo il segno: glielo dice il main,
+      // che è l'unico a saperlo.
+      return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
       let claims = null;

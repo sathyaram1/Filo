@@ -2183,7 +2183,7 @@
     if (mgPreapprovedInfo) {
       mgPreapprovedInfo.hidden = !(m && aperta);
       mgPreapprovedInfo.textContent = m && aperta
-        ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${fmtDate(m.at)}` : ''}.`
+        ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
         : '';
     }
   }
