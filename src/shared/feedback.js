@@ -605,7 +605,7 @@
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -697,6 +697,20 @@
     // Override owner per l'auto-archiviazione a punteggio (DC3, vedi
     // boardArchive.js): 'archived' | 'keep_open' | '' (nessun override).
     if (archiveOverride !== undefined) { fields.archiveOverride = toFsValue(archiveOverride); mask.push('archiveOverride'); }
+    // La pre-approvazione della fusione, per QUESTA pratica: `{ by, at }` per
+    // metterla, `null` per toglierla. Togliere è CANCELLARE il campo: la maschera
+    // lo nomina e i campi non lo portano, che per Firestore vuol dire "via".
+    // Un `null` scritto come valore resterebbe sul documento e le regole lo
+    // respingerebbero (vogliono una mappa, quando c'è).
+    if (mergePreapproved !== undefined) {
+      if (mergePreapproved && typeof mergePreapproved === 'object') {
+        fields.mergePreapproved = toFsValue({
+          by: String(mergePreapproved.by || '').slice(0, 120),
+          at: String(mergePreapproved.at || new Date().toISOString()).slice(0, 40),
+        });
+      }
+      mask.push('mergePreapproved');
+    }
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));

@@ -800,6 +800,34 @@
       border-color: #e0a30b; color: #b9770a;
       background: color-mix(in srgb, #e0a30b 12%, var(--sn-bg, transparent));
     }
+    /* Acceso = il server fonde senza chiedere: tinta dell'accento, non della
+       stella — è una delega, non un preferito. Vale in tutti e due i temi
+       perché parte dai token. */
+    /* `all: unset` del tasto azzera anche il display di [hidden]: senza questa
+       riga un tasto nascosto resta visibile. */
+    .mg-preapprove-btn[hidden] { display: none; }
+    .mg-preapprove-btn[aria-pressed="true"] {
+      border-color: var(--sn-accent); color: var(--sn-accent);
+      background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
+    }
+    .mg-preapprove-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .mg-preapprove-line[hidden] { display: none; }
+    .mg-preapproved-info {
+      font-size: 12px;
+      color: var(--sn-muted);
+    }
+    /* Il segno in lista: piccolo, prima dei pallini di priorità (che si
+       spingono a destra da soli). */
+    .mg-preapproved {
+      flex: none;
+      font-size: 10.5px;
+      line-height: 1;
+      padding: 3px 6px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--sn-accent) 45%, transparent);
+      color: var(--sn-accent);
+      white-space: nowrap;
+    }
 
     /* Mittente */
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
@@ -1162,6 +1190,20 @@
                 <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
               </div>
 
+              <!-- «Fondi senza chiedermelo»: il segno che dice al server di
+                   fondere il lavoro delle automazioni su questa pratica anche
+                   quando i controlli lo fermerebbero, senza aspettare il click.
+                   Sta su una riga SUA, sotto i tasti: nella riga dei tasti un
+                   nome per esteso mandava a capo tutto sulle segnalazioni con
+                   quattro azioni (è il caso della «Frase»), e qui il nome
+                   intero serve. Il testo e l'hover li compone il JS; la riga
+                   sparisce sulle pratiche chiuse, dove il segno non conta. -->
+              <div class="mg-preapprove-line" id="mgPreapproveLine" hidden>
+                <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
+                  aria-pressed="false" hidden>Fondi senza chiedermelo</button>
+                <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
+              </div>
+
               <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo
                    appende alla conversazione, come la gemella. -->
               <div class="mg-reopen" id="mgReopen" hidden>
@@ -1374,6 +1416,11 @@
              pagina, sopra le schede, perché sono la cosa che aspetta una tua
              decisione. Qui resta la traccia di quelle già decise. -->
         <div class="mg-merge-approvals-recent" id="mgMergeApprovalsRecent" hidden></div>
+
+        <!-- Le fusioni avvenute SENZA chiedere: l'owner aveva messo il segno
+             sulla pratica, il server ha fuso da solo quando i controlli hanno
+             bloccato. È il controllo a posteriori, con l'elenco intero. -->
+        <div class="mg-merge-approvals-recent" id="mgMergeApprovalsPreapproved" hidden></div>
 
         <!-- Interruttore master delle routine autonome. -->
         <section class="mg-auto-block">

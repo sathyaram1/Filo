@@ -136,6 +136,9 @@
 
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
+  const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
+  const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
+  const mgPreapproveLine = document.getElementById('mgPreapproveLine');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
@@ -900,6 +903,7 @@
   // controlli di sicurezza deve lasciare una traccia che si può guardare.
   const mgMergeApprovals = document.getElementById('mgMergeApprovals');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
+  const mgMergeApprovalsPreapproved = document.getElementById('mgMergeApprovalsPreapproved');
 
   // Il pannello-lista è condiviso dalle quattro schede (Ricevuti / In coda /
   // Risolti / Archiviati): l'avviso appartiene SOLO ai Ricevuti, quindi la
@@ -944,6 +948,10 @@
         mgMergeApprovalsRecent.replaceChildren();
         mgMergeApprovalsRecent.hidden = true;
       }
+      if (mgMergeApprovalsPreapproved) {
+        mgMergeApprovalsPreapproved.replaceChildren();
+        mgMergeApprovalsPreapproved.hidden = true;
+      }
       return 0;
     };
     if (!isAdmin) return spegni();
@@ -966,6 +974,16 @@
     mergeApprovalsCount = n;
     applyMergeApprovalsVisibility();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
+    // Le fuse senza chiedere: il controllo a posteriori del segno messo sulla
+    // pratica. Quando il main avvisa di un cambiamento manda solo l'elenco in
+    // attesa: quello che c'era resta finché non si rilegge.
+    if (mgMergeApprovalsPreapproved && (Array.isArray(r.preapproved) || !already)) {
+      UI.renderPreapproved(mgMergeApprovalsPreapproved, {
+        preapproved: r.preapproved || [],
+        preapprovedTotal: r.preapprovedTotal,
+        onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
+      });
+    }
     return n;
   }
 
@@ -1585,6 +1603,7 @@
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
         ${leggibile ? '' : statePublicHtml(fb)}
+        ${preapprovedHtml(fb)}
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
@@ -1609,6 +1628,24 @@
     const label = MR.publicStateLabel(fb);
     if (!label) return '';
     return `<span class="mg-state" title="${esc(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">${esc(label)}</span>`;
+  }
+
+  // ── «Fondi senza chiedermelo» ─────────────────────────────────────────────
+  // Il segno sulla pratica: `mergePreapproved { by, at }`, in chiaro. Conta
+  // solo finché la pratica è aperta (a pratica chiusa il server non lo guarda,
+  // e qui non si mostra: sarebbe un'informazione su niente).
+  function preapprovedOf(fb) {
+    const m = fb && fb.mergePreapproved;
+    if (!m || typeof m !== 'object' || !String(m.by || '').trim()) return null;
+    return { by: String(m.by || ''), at: String(m.at || '') };
+  }
+  function isOpenPublic(fb) {
+    return String((fb && fb.statusPublic) || 'open') !== 'closed';
+  }
+  function preapprovedHtml(fb) {
+    const m = preapprovedOf(fb);
+    if (!m || !isOpenPublic(fb)) return '';
+    return `<span class="mg-preapproved" title="${esc(`Si fonde senza chiedere: segno messo da ${m.by}`)}">senza chiedere</span>`;
   }
 
   // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
@@ -2129,7 +2166,59 @@
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
+    reflectPreapproved(fb);
   }
+
+  // Il tasto «Fondi senza chiedermelo» e la riga che dice chi ha messo il
+  // segno. Sulle pratiche chiuse il tasto sparisce: il segno lì non conta.
+  function reflectPreapproved(fb) {
+    if (!mgPreapproveBtn) return;
+    const m = preapprovedOf(fb);
+    const aperta = isOpenPublic(fb);
+    mgPreapproveBtn.disabled = false;
+    mgPreapproveBtn.hidden = !aperta;
+    if (mgPreapproveLine) mgPreapproveLine.hidden = !aperta;
+    mgPreapproveBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
+    mgPreapproveBtn.textContent = m ? 'Chiedimi prima di fondere' : 'Fondi senza chiedermelo';
+    mgPreapproveBtn.title = m
+      ? 'Oggi il lavoro delle automazioni su questa pratica si fonde da solo anche se i controlli lo fermano. Toglilo per tornare a ricevere la richiesta da approvare.'
+      : 'Se i controlli di sicurezza fermano il lavoro delle automazioni su questa pratica, il server fonde lo stesso, senza aspettare il tuo click. Quello che era stato fermato lo trovi poi in Automazioni.';
+    if (mgPreapprovedInfo) {
+      mgPreapprovedInfo.hidden = !(m && aperta);
+      mgPreapprovedInfo.textContent = m && aperta
+        ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
+        : '';
+    }
+  }
+
+  // Mette o toglie il segno. Il CHI lo scrive il main dalla sessione: da qui
+  // parte solo sì/no.
+  async function togglePreapproved() {
+    if (!selectedId || !mgPreapproveBtn) return;
+    const id = selectedId;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    const next = !preapprovedOf(fb);
+    mgPreapproveBtn.disabled = true;
+    setManageMsg(next ? 'Segno la pratica…' : 'Tolgo il segno…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, mergePreapproved: next });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      // Il documento vero porta l'email della sessione; qui basta che il segno
+      // ci sia, e l'aggiornamento continuo porterà il resto.
+      fb.mergePreapproved = next ? { by: (r && r.by) || 'te', at: new Date().toISOString() } : undefined;
+      if (selectedId !== id) { renderList(); return; }
+      reflectPreapproved(fb);
+      renderList();
+      setManageMsg(next ? 'Da ora si fonde senza chiedere.' : 'Da ora ti chiede prima di fondere.', 'ok');
+    } catch (e) {
+      if (selectedId !== id) return;
+      setManageMsg(e.message || 'Errore', 'err');
+    } finally {
+      mgPreapproveBtn.disabled = false;
+    }
+  }
+  if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', togglePreapproved);
 
   // ── L'etichetta di stato del dettaglio ────────────────────────────────────
   // Le parole (etichetta, motivo, hover) vengono dal modulo condiviso: la

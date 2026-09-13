@@ -338,6 +338,25 @@ Da oggi la fusione è una consegna del canale come le altre:
      non una richiesta che verrebbe approvata e fallirebbe;
   5. fusione di **quello sha**, via API GitHub con l'identità del server.
      Conflitto → `conflict`, niente fusione.
+- **La pre-approvazione per singola pratica** (dal 2026-09-13). L'owner può
+  mettere sulla pratica un segno — «Fondi senza chiedermelo», dal dettaglio in
+  Gestione o con `scripts/owner-feedback.mjs <id> --preapprova`; si toglie con
+  «Chiedimi prima di fondere» / `--chiedi-prima`. È il campo
+  `mergePreapproved { by, at }` sul documento del feedback, scrivibile solo
+  dall'owner (regole Firestore) e valido finché la pratica è aperta. Al passo
+  4, se L5 blocca **e** la pratica porta il segno, il server **non apre la
+  richiesta**: fa gli stessi passi di una fusione approvata (la prova di
+  fusione è già passata; un conflitto esce come `conflict` prima), fonde lo
+  sha esaminato con la sua identità e registra la fusione nella collezione
+  delle approvazioni con `preapproved: true`, chi aveva messo il segno e
+  **l'elenco intero** di ciò che L5 aveva segnalato (gate, file, righe: senza
+  tetto). Il blocco resta comunque nel registro dei rifiuti. Il lavoratore
+  riceve `merged` e chiude la pratica come dopo ogni fusione. L'owner rilegge
+  a posteriori in Gestione → Automazioni, «Fuse senza chiedere»
+  (`ownerMergeApprovals {op:'list'}` → `preapproved`, stessa finestra di
+  `recent`). Vale **solo** per il lavoro delle routine: `npm run finish`
+  locale non guarda il segno e apre la richiesta come sempre. Non esiste una
+  pre-approvazione globale o per mittente.
 - **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
   e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
   1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
