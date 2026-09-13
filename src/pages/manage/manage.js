@@ -1641,7 +1641,13 @@
         + (progress ? ' mg-item--staged' : '')
         + (progress && progress.active ? ' mg-item--active-work' : '');
       item.dataset.id = fb._id;
-      item.style.borderLeftColor = cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent');
+      // Una fusione ferma aspetta l'owner quanto un blocco: stessa tinta rossa
+      // e stesso peso, così si riconosce scorrendo la lista.
+      const ferma = fusioneFerma(fb);
+      if (ferma) item.classList.add('mg-item--fusione');
+      item.style.borderLeftColor = ferma
+        ? MR.REASONS.secaudit.color
+        : (cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent'));
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
       // implicito nel colore del border-left; il titolo completo nel tooltip,
       // col sottotesto dello stato (statusReason: loop, clarify, …) se presente.
