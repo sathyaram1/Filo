@@ -1274,6 +1274,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
     ascoltaCambiamentiAltrove();
+    loadMemoria();
+    ascoltaMemoriaCambiata();
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
