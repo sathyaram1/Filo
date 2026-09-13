@@ -59,7 +59,9 @@ server un verdetto raccontato non lo legge).
    mai fatto, e in dashboard il pentagono della scheda restava grigio. È
    quello che l'owner legge cliccando il pentagono: cosa hai controllato (i
    pattern cercati, le parti del diff lette per intero) e cosa hai trovato, in
-   breve, senza nomi di file o funzioni.
+   breve, senza nomi di file o funzioni. Il file va FUORI dal repo, nella
+   cartella temporanea del sistema (per esempio `../nota-<numero>.md`): non
+   deve entrare nel ramo che stai giudicando.
 2. Su **pass**, chiedi la fusione (su **fail** non fondere: accoda `design`
    con la tua spiegazione nella nota — decide l'owner):
    ```bash
