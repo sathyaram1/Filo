@@ -313,3 +313,70 @@ test('da un\'origine web passa solo il modello di dettatura, niente altro', asyn
   ));
   expect((await impostazioni(page)).terminal?.enabled).toBe(true);
 });
+
+// ── Il salvataggio dell'aspetto, e la pagina che non deve restare sorda ─────
+//
+// I colori e le misure si salvano come una mappa intera, perché chi manca è
+// tornato al predefinito. Per un po' la pagina è rimasta sorda per un secondo e
+// mezzo dopo ogni suo salvataggio, per non cancellare i propri avvisi: in quella
+// finestra rimandava la mappa com'era all'apertura, e un colore chiesto a Filo
+// spariva del tutto (#592, giro 5). Adesso la mappa riparte da quello che c'è in
+// memoria e la pagina si rilegge sempre.
+
+test('un colore chiesto a Filo sopravvive al ritocco di una misura appena dopo un salvataggio', async ({ openTab }) => {
+  const pagina = await apriPreferenze(openTab);
+  await pagina.waitForSelector('#tok-radius', { timeout: 20_000 });
+
+  await pagina.fill('#tok-radius', '11px');
+  await pagina.waitForTimeout(1500);
+  expect((await impostazioni(pagina)).themeTokens?.radius).toBe('11px');
+
+  // La pagina salva (una spunta qualunque) e nello stesso istante Filo applica
+  // un colore d'accento.
+  await pagina.uncheck('#showHomeMessage');
+  await confermaInChat(pagina, { type: 'IMPOSTA_ESTETICA', token: 'accent', valore: '#0055ff' });
+  await pagina.waitForTimeout(300);
+  expect((await impostazioni(pagina)).themeTokens?.accent).toBe('#0055ff');
+
+  // Poi l'utente ritocca la misura: il colore che ha chiesto a voce resta.
+  await pagina.fill('#tok-radius', '12px');
+  await pagina.waitForTimeout(2500);
+  const dopo = (await impostazioni(pagina)).themeTokens || {};
+  expect(dopo.radius).toBe('12px');
+  expect(dopo.accent).toBe('#0055ff');
+});
+
+test('il colore delle schede spento a voce non torna accesso ritoccando la saturazione', async ({ openTab }) => {
+  const pagina = await apriPreferenze(openTab);
+  await pagina.waitForSelector('#tabcol-saturazione_tab', { state: 'attached', timeout: 20_000 });
+
+  await pagina.uncheck('#showHomeMessage');
+  await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'colore_tab', valore: 'togli il colore' });
+  await pagina.waitForTimeout(300);
+  expect((await impostazioni(pagina)).tabColor?.opacita_tab).toBe(0);
+
+  await pagina.fill('#tabcol-saturazione_tab', '0.55');
+  await pagina.dispatchEvent('#tabcol-saturazione_tab', 'input');
+  await pagina.waitForTimeout(2500);
+  expect((await impostazioni(pagina)).tabColor?.opacita_tab).toBe(0);
+});
+
+test('il permesso della shell si rilegge anche subito dopo un salvataggio della pagina', async ({ openTab }) => {
+  const pagina = await apriPreferenze(openTab);
+
+  await pagina.check('#terminalEnabled');
+  await pagina.waitForTimeout(1500);
+  expect((await impostazioni(pagina)).terminal?.enabled).toBe(true);
+
+  // La pagina salva e nello stesso istante il permesso viene spento a voce.
+  await pagina.uncheck('#showHomeMessage');
+  await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'modalita_terminale', valore: 'no' });
+  await pagina.waitForTimeout(300);
+  expect((await impostazioni(pagina)).terminal?.enabled).toBe(false);
+
+  // Chi ha quel permesso sotto gli occhi deve vederlo spento.
+  await expect.poll(
+    async () => pagina.$eval('#terminalEnabled', (el) => el.checked),
+    { timeout: 5000 },
+  ).toBe(false);
+});

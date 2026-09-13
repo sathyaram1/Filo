@@ -107,9 +107,41 @@ e la mette la pagina quando salva (`segnaCampo`). Quello che la rilettura non
 può rifare da sé, come una riga intera aggiunta e non ancora salvata, se lo
 ricostruisce la pagina attorno al `load()`.
 
+## E non si diventa sordi per proteggere i propri avvisi
+
+Il giro 5 ha trovato il conto della cura del giro 4. Per non cancellare gli
+avvisi appena mostrati, le tre pagine avevano preso a IGNORARE ogni annuncio di
+cambiamento per un secondo e mezzo dopo ogni salvataggio — anche gli annunci che
+non avevano scritto loro. Il salvataggio automatico parte quattro decimi di
+secondo dopo l'ultimo tasto, quindi mentre si scrive nel riquadro dello stile la
+pagina era sorda quasi sempre, e in quella finestra tornava a mostrare il
+permesso della shell, la chiave API e le protezioni nello stato di prima.
+
+La regola: **il silenzio non è mai una finestra di tempo.** Rileggere non
+cancella più niente — ci pensa la sezione qui sopra — quindi non c'è nulla da
+proteggere e si rilegge sempre. Se un giorno servisse davvero saltare un
+annuncio, va saltato QUELLO (riconosciuto), non tutto quello che arriva in quel
+momento.
+
+## Una mappa che si salva intera riparte da quello che c'è in memoria
+
+Il confronto fino alla foglia non copre le chiavi di `REPLACE_KEYS`, e non è una
+dimenticanza: il loro contratto è «questa è la lista completa, chi manca è stato
+rimosso», quindi mandarne un pezzo cancellerebbe il resto. Ma mandare la mappa
+com'era quando la pagina l'ha letta cancella quello che è cambiato altrove nel
+frattempo. Nel giro 5 un colore d'accento chiesto a Filo non tornava al valore
+di prima: **sparir** del tutto al primo ritocco di una misura, perché la mappa
+dei colori partiva dalla fotografia dell'apertura.
+
+La regola: si legge la mappa in memoria al momento del salvataggio e ci si
+applicano SOLO le voci che l'utente ha toccato, comprese quelle che ha rimesso
+al predefinito (`SN_STORAGE.mappaRibasata`). L'unica eccezione è un «ripristina
+tutto», dove svuotare la mappa è proprio quello che l'utente ha chiesto.
+
 ## Dove sta
 
-- `src/shared/storage.js` — `partialCambiato`, il confronto fino alla foglia
+- `src/shared/storage.js` — `partialCambiato`, il confronto fino alla foglia;
+  `mappaRibasata`, per le mappe che viaggiano intere
 - `src/shared/pageBootstrap.js` — `ricaricaSenzaDisturbare`, `segnaCampi`, `segnaCampo`
 - `src/pages/preferences/preferences.js` — `raccogli`, `ribasa`, `persist`
 - `src/pages/options/options.js` — stesse tre funzioni

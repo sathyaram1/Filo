@@ -94,3 +94,43 @@ test('quello che il confronto produce, rimesso dentro, dà lo stato mostrato', (
   const pezzo = S.partialCambiato(inMemoria, mostrato);
   assert.deepEqual(S.deepMerge(inMemoria, pezzo), mostrato);
 });
+
+// ── #592 (giro 5) — le mappe che si salvano INTERE ─────────────────────────
+//
+// Per una chiave di REPLACE_KEYS il confronto non basta: mandarne un pezzo
+// cancella il resto, quindi va mandata intera. Ma intera com'era quando la
+// pagina l'ha letta significa cancellare quello che è cambiato altrove nel
+// frattempo: un colore chiesto a Filo spariva del tutto al primo ritocco di una
+// misura. Quindi si riparte da quello che c'è in memoria e ci si applica solo
+// quello che l'utente ha toccato.
+//
+// Senza mappaRibasata questi test sono rossi: la mappa mostrata sostituirebbe
+// quella in memoria e la voce arrivata da fuori non ci sarebbe più.
+
+test('una voce arrivata da fuori sopravvive al ritocco di un’altra voce', () => {
+  const letta = { radius: '11px' };
+  const inMemoria = { radius: '11px', accent: '#0055ff' }; // l’accento è arrivato da Filo
+  const mostrata = { radius: '12px' };                      // la pagina non l’ha mai visto
+  assert.deepEqual(S.mappaRibasata(inMemoria, letta, mostrata),
+    { radius: '12px', accent: '#0055ff' });
+});
+
+test('una voce che l’utente ha tolto viene tolta davvero', () => {
+  const letta = { radius: '11px', accent: '#111111' };
+  const inMemoria = { radius: '11px', accent: '#111111' };
+  const mostrata = { radius: '11px' }; // l’utente ha rimesso l’accento al predefinito
+  assert.deepEqual(S.mappaRibasata(inMemoria, letta, mostrata), { radius: '11px' });
+});
+
+test('quello che l’utente non ha toccato non torna al valore di prima', () => {
+  const letta = { radius: '11px', accent: '#111111' };
+  const inMemoria = { radius: '11px', accent: '#999999' }; // cambiato altrove
+  const mostrata = { radius: '12px', accent: '#111111' };  // la pagina è rimasta indietro
+  assert.deepEqual(S.mappaRibasata(inMemoria, letta, mostrata),
+    { radius: '12px', accent: '#999999' });
+});
+
+test('senza niente in memoria resta quello che la pagina mostra', () => {
+  assert.deepEqual(S.mappaRibasata(null, {}, { radius: '12px' }), { radius: '12px' });
+  assert.deepEqual(S.mappaRibasata({}, {}, {}), {});
+});
