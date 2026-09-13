@@ -749,6 +749,14 @@
       word-break: break-word; color: var(--sn-text);
     }
     .mg-liv-testo em { color: var(--sn-muted); font-style: italic; }
+    /* La segnalazione e la nota dell'audit arrivano in markdown: i titoli
+       («## Problema») e le voci a trattino si vedono come tali, il resto è
+       testo. Niente HTML dal testo. */
+    .mg-liv-titolo { font-weight: 600; margin: 10px 0 4px; }
+    .mg-liv-titolo:first-child { margin-top: 0; }
+    .mg-liv-par { margin: 0 0 6px; }
+    .mg-liv-elenco { margin: 0 0 6px 18px; padding: 0; }
+    .mg-liv-elenco li { margin: 2px 0; }
     /* Il tasto che scavalca l'audit: è un'eccezione, non un'azione di tutti i
        giorni, e si arma con un secondo clic (come l'approvazione di una
        fusione) perché il primo non basti. */
