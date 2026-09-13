@@ -78,6 +78,30 @@ modello) e il loro recinto nel prompt (`lessonsBlock`, in `filoChatContext` e
 confermerebbe chiunque sia alla tastiera in quel momento, che è proprio chi la
 lezione di protezione vuole tenere fuori.
 
+**Ma allora la quarta cosa deve esserci davvero.** Se una lezione entra senza
+chiedere niente, l'unica cosa che la tiene a bada è che l'utente possa
+rileggerla e toglierla: la visibilità non è il contorno, è ciò che paga il
+livello 1. Il giro 6 della verifica ha trovato che non c'era. In nessuna pagina
+di Filo si vedeva quello che si era appuntato, e l'unica strada per togliere una
+riga era `CANCELLA_MEMORIA`, cioè cancellare TUTTA la memoria digitando
+«conferma», profilo di mesi compreso. La frase «l'utente la vede e può
+cancellarla fra le memorie» stava scritta in due punti del codice, e in uno di
+quei due è la descrizione dello strumento che il modello legge: Filo la
+ripeteva all'utente. Adesso il posto c'è, accanto allo stile: Preferenze →
+Memoria di Filo mostra le lezioni ancora da riordinare e i moduli
+(PROFILO, PREFERENZE, i capitoli che Filo apre da sé), ogni riga col suo ×, e
+ogni gruppo con un «Dimentica tutto». La pagina si rilegge da sé quando Filo
+scrive (`FILO_LIVE_UPDATED`), se no mostrerebbe una memoria che non è più
+quella. Cancellare una riga manda indietro l'indice della riga **e il testo che
+la pagina stava mostrando**: se non combacia più non si cancella niente, perché
+una pagina rimasta indietro non deve portarsi via la riga sbagliata.
+
+Una nota su cosa NON si è fatto: togliere una singola lezione **a voce** non si
+può, e non è una dimenticanza. Un'azione «dimentica questa regola» sarebbe la
+strada gemella di `SALVA_LEZIONE`, ma la darebbe in mano al modello, e la prima
+cosa che un inganno le farebbe fare è cancellare la lezione di protezione che
+lo tiene fuori. È un compromesso vero: decide l'owner, non l'automatismo.
+
 **Il testo libero non è solo nelle «preferenze».** Il giro 4 della verifica ne
 ha trovato uno fuori dall'elenco dei setter: l'id del modello, il campo delle
 Opzioni in cui scrivi con quale modello Filo deve rispondere, libero per scelta
