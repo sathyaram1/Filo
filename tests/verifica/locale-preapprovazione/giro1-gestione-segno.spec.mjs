@@ -287,6 +287,30 @@ test('Automazioni: senza fusioni «senza chiedere» la sezione non c’è; nei R
   await expect(page.locator('#mgMergeApprovalsPreapproved')).toBeHidden();
 });
 
+// ── 5bis. Il segno messo da fuori (script) arriva alla pagina aperta ────────
+
+test('il segno messo dallo script mentre Gestione è aperta compare da solo, in lista e nel dettaglio', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: undefined, _updateTime: 't1' });
+  await apri(page, { fbs: [fb] });
+  await vaiAllaScheda(page, fb);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Fondi senza chiedermelo');
+
+  const conSegno = pratica({ _updateTime: 't2', mergePreapproved: { by: 'owner (script)', at: '2026-09-13T09:30:00.000Z' } });
+  await page.evaluate((doc) => {
+    window.__mgTest.setLiveSources({
+      listVersions: async () => [{ _id: doc._id, _updateTime: 't2' }],
+      getMany: async () => [doc],
+    });
+  }, conSegno);
+  const r = await page.evaluate(() => window.__mgTest.pollNow());
+  expect(r.changed).toBe(1);
+  await expect(page.locator('.mg-item .mg-preapproved')).toHaveCount(1);
+  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Chiedimi prima di fondere');
+  await expect(page.locator('#mgPreapprovedInfo')).toContainText('owner (script)');
+});
+
 // ── 6. Tema scuro: la traccia visiva (si guarda a mano) ─────────────────────
 
 test('tema scuro e chiaro: catture del dettaglio e di Automazioni', async ({ openTab }) => {
