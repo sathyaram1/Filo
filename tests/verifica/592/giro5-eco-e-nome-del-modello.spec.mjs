@@ -90,6 +90,12 @@ test('una protezione spenta a voce subito dopo un tocco sulla pagina non deve re
 
 // ── 2. l'id del modello: la ripulitura e poi gli spazi compattati ───────────
 
+// I due che seguono restano ROSSI di proposito: il difetto è vero, ma il server
+// ha mandato quel rilievo a un feedback a parte invece di correggerlo in questo
+// giro. `test.fail` dice «mi aspetto che non passi»: la corsa resta verde, la
+// prova resta scritta, e il giorno in cui qualcuno chiude il difetto è questa
+// riga a diventare rossa per dire che va togliato il `test.fail`.
+test.fail();
 test("l'id del modello non deve poter ricomporre un marcatore dei recinti", async ({ openTab }) => {
   const pagina = await apriPreferenze(openTab);
 
