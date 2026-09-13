@@ -1006,6 +1006,24 @@
     return { etichetta: String(etichetta || ''), valore: String(valore == null ? '' : valore) };
   }
 
+  /**
+   * Dove è arrivata la pratica e perché, in righe. PURA.
+   *
+   * La fila delle forme racconta i cinque controlli; questo racconta la
+   * DECISIONE — «attacco confermato», «bloccato dalla sicurezza», «aspetta la
+   * tua approvazione» — che nessuna delle cinque forme esprime, perché non
+   * viene da un controllo ma dall'owner o dalla macchina a stati. Vive nel
+   * pannello del triangolo, il primo della fila e l'unico che c'è sempre.
+   */
+  function righeStato(fb) {
+    const righe = [];
+    const b = stateBadge(fb);
+    if (b) righe.push(riga('Stato', b.label + (b.showReason ? ` — ${b.reasonText}` : '')));
+    const nota = judgesNote(fb);
+    if (nota && nota.text) righe.push(riga('In breve', nota.text));
+    return righe;
+  }
+
   /** Livello 1: il filtro d'ingresso (identità, forma, indizi). PURA. */
   function livelloL1(fb) {
     const titolo = 'Filtro d’ingresso';
