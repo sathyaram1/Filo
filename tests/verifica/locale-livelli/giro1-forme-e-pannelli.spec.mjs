@@ -361,6 +361,32 @@ test('pentagono bocciato: rosso, il resoconto si legge, «Salta il controllo» c
   await expect(page.locator('#mgToast')).toContainText(/quadrato/i);
 });
 
+test('«Salta il controllo»: un rifiuto del server si legge e il tasto torna utilizzabile; un esito ignoto non diventa un «fatto»', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ _id: 'fb-l4b', seq: 32, status: 'design', statusReason: 'secaudit', livelli: { l4: { esito: 'fail', by: 'secaudit', testo: 'Bocciato.' } } });
+  await apri(page, { fbs: [fb], salta: { ok: false, error: 'GitHub non risponde adesso.' } });
+  await vaiAllaScheda(page, fb);
+  await apriDettaglio(page, fb);
+  await forma(page, 'l4').click();
+  const btn = page.locator('#mgSaltaL4Btn');
+  await btn.click();
+  await btn.click();
+  const esito = page.locator('#mgSideBody .mg-liv-esito');
+  await expect(esito).toContainText('GitHub non risponde adesso.');
+  await expect(btn).toBeEnabled();
+  await expect(btn).toHaveText('Salta il controllo');
+
+  // Esito sconosciuto: si scrive com'è, non «fatto».
+  await page.evaluate(() => {
+    const orig = window.filo.message;
+    window.filo.message = async (msg) => (msg && msg.type === 'livello4_salta') ? { ok: true, esito: 'boh_nuovo' } : orig(msg);
+  });
+  await btn.click();
+  await btn.click();
+  await expect(esito).toContainText('boh_nuovo');
+  await expect(esito).not.toContainText(/entrato in main/i);
+});
+
 test('pentagono: passato verde senza tasto; saltato giallo; chi non è l’owner non vede «Salta»', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const passato = pratica({ _id: 'ok', seq: 41, status: 'working', livelli: { l4: { esito: 'pass', by: 'secaudit', at: '2026-09-13T11:00:00.000Z', testo: 'Controllato: niente segreti, niente regole toccate.' } } });
