@@ -571,6 +571,9 @@ module.exports = function register(on, ctx) {
       // finché non vengono sistemate, non sono decisioni passate.
       failed: (r && r.failed) || [],
       recent: (r && r.recent) || [],
+      // Le fusioni avvenute SENZA chiedere, perché l'owner aveva pre-approvato
+      // la pratica: la traccia con cui controlla a posteriori.
+      preapproved: (r && r.preapproved) || [],
       ttlMs: Number(r && r.ttlMs) || 0,
     };
   }
