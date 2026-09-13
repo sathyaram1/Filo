@@ -1236,7 +1236,9 @@
       parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
         + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
     }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memory);
+    // Il recinto porta già la sua intestazione e le frasi di guardia: una
+    // seconda etichetta qui sopra direbbe la stessa cosa senza recinto.
+    if (memory) parts.push(memory);
     const messages = [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
       { role: 'user', content: parts.join('\n\n') },
