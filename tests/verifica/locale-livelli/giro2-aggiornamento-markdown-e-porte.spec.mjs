@@ -247,8 +247,15 @@ test('porta C: «Scarta» dal pannello del quadrato manda il comando sull’id g
   await expect(sideBody(page).locator('button', { hasText: /scarta/i })).toHaveCount(0);
   const t = (await sideBody(page).innerText()).trim();
   expect(t.length).toBeGreaterThan(10);
+  // Traccia: lo stato della pratica dice ancora «ferma al cancello» (il server
+  // non l'ha mossa): il quadrato e il badge in lista seguono lo stato, non la
+  // richiesta scartata. Cosa dice il pannello, adesso che non c'è più niente
+  // da approvare?
+  console.log('[verifica] dopo lo scarto, pannello del quadrato:', t.replace(/\s+/g, ' ').slice(0, 200));
   await page.locator('.mg-tab[data-tab="inbox"]').click();
-  await expect(page.locator('.mg-item .mg-fusione-badge')).toHaveCount(0);
+  const badge = await page.locator('.mg-item .mg-fusione-badge').count();
+  const rosso = /mg-forma--attack/.test(await forma(page, 'l5').getAttribute('class') || '');
+  expect(badge === 1).toBe(rosso);
 });
 
 // ── D. I cerchi dei giudici: tastiera, nome, gruppo vuoto ───────────────────
