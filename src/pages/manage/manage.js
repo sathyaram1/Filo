@@ -979,6 +979,7 @@
     if (mgMergeApprovalsPreapproved && (Array.isArray(r.preapproved) || !already)) {
       UI.renderPreapproved(mgMergeApprovalsPreapproved, {
         preapproved: r.preapproved || [],
+        preapprovedTotal: r.preapprovedTotal,
         onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
       });
     }
