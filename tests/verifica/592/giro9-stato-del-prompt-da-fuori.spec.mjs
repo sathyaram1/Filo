@@ -13,6 +13,11 @@
 // insieme: i messaggi del dato, e la sua chiave. Qui si prova la metà rimasta:
 // i messaggi dedicati con cui quegli stessi dati si leggono, si scrivono e si
 // cancellano. Controprova dalla pagina interna su ognuna.
+//
+// Due delle porte contate in questo giro non erano porte: il menu «Incolla» e il
+// saldo mostrato dal riquadro del feedback servono davvero da dentro una pagina
+// qualsiasi. Le ultime due prove del file stanno lì per tenerle APERTE: se un
+// giro futuro le chiude per zelo, quelle due cose si spengono su ogni sito.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
