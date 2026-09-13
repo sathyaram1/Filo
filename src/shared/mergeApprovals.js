@@ -564,6 +564,41 @@
     return list.length;
   }
 
+  /**
+   * La data e l'ora per esteso, «13/09/2026 alle 10:00». PURA.
+   *
+   * Il controllo a posteriori si fa a distanza di giorni: «7 giorni fa» non
+   * dice quando è successo, la data sì. Ora locale di chi legge.
+   */
+  function dateTimeText(atMs) {
+    var at = Number(atMs);
+    if (!isFinite(at) || at <= 0) return '';
+    var d = new Date(at);
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear()
+      + ' alle ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  /** Quando è stata fusa: la data, e fra parentesi quanto tempo fa. PURA. */
+  function mergedWhenText(atMs, nowMs) {
+    var data = dateTimeText(atMs);
+    if (!data) return 'fusa in un momento non registrato';
+    return 'fusa il ' + data + ' (' + timeAgo(atMs, nowMs) + ')';
+  }
+
+  /**
+   * Quante fusioni «senza chiedere» il server ha lasciato fuori dall'elenco.
+   * PURA: '' quando ci sono tutte. Un elenco tagliato in silenzio è proprio
+   * ciò che il controllo a posteriori non può permettersi.
+   */
+  function preapprovedMoreText(shown, total) {
+    var n = Math.max(0, Math.floor(Number(total) || 0) - Math.max(0, Math.floor(Number(shown) || 0)));
+    if (!n) return '';
+    return n === 1
+      ? 'Ce n’è un’altra, più vecchia, che qui non entra.'
+      : 'Ce ne sono altre ' + n + ', più vecchie, che qui non entrano.';
+  }
+
   /** Chi aveva messo il segno sulla pratica, in una frase. PURA. */
   function preapprovedBy(r) {
     var by = String((r && r.preapprovedBy) || '').trim().slice(0, 120);
