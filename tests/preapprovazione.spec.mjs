@@ -167,7 +167,7 @@ test('Automazioni elenca le fuse senza chiedere, con tutto quello che era stato 
   // Il feedback è a un click.
   await page.locator('#mgMergeApprovalsPreapproved .sn-mac-origin-link').click();
   await expect(page.locator('#mgDetail')).toBeVisible();
-  await expect(page.locator('#mgDetail')).toContainText('#581');
+  await expect(page.locator('#mgDetail')).toContainText('tester@e');
   await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
 });
 
