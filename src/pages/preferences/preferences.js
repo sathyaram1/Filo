@@ -121,19 +121,7 @@
       input.autocomplete = 'off';
       input.setAttribute('aria-label', t.label || name);
       input.addEventListener('input', () => onTokenInput(name));
-      input.addEventListener('blur', () => {
-        const v = input.value.trim();
-        if (v !== '' && !Tokens.validate(name, v)) {
-          // Lasciato un valore non valido: errore puntuale, gli altri token
-          // restano intatti. Teniamo il testo così l'utente può correggerlo.
-          const errEl = row.querySelector('.sn-token-error');
-          errEl.hidden = false;
-          errEl.textContent = tokenErrorMsg(name);
-          row.classList.add('sn-token-invalid');
-          return;
-        }
-        renderTokenRow(name); // canonicalizza al valore effettivo
-      });
+      input.addEventListener('blur', () => chiudiRigaToken(name));
       row.appendChild(input);
 
       const reset = document.createElement('button');
