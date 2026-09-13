@@ -429,8 +429,11 @@ test('una fusione senza segnalazione non sparisce: resta in Automazioni', async 
 
 test('una richiesta che arriva a pagina aperta cambia il quadrato e la card', async ({ app, openTab }) => {
   const page = await openTab(MANAGE);
-  await apri(page, [FB_COMPLETO], { pending: [] });
-  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+  // Una pratica che sta nella scheda di partenza (i Ricevuti), così la card si
+  // vede senza cambiare scheda.
+  const fb = { ...FB_COMPLETO, _id: 'fb-vive', status: 'unlabeled', statusReason: null };
+  await apri(page, [fb], { pending: [] });
+  await page.evaluate(() => window.__mgTest.openDetail('fb-vive'));
 
   // All'inizio niente: il quadrato non è rosso e la card non ha il segno.
   await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]')).not.toHaveClass(/mg-forma--attack/);
