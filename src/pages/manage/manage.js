@@ -946,6 +946,10 @@
         mgMergeApprovalsRecent.replaceChildren();
         mgMergeApprovalsRecent.hidden = true;
       }
+      if (mgMergeApprovalsPreapproved) {
+        mgMergeApprovalsPreapproved.replaceChildren();
+        mgMergeApprovalsPreapproved.hidden = true;
+      }
       return 0;
     };
     if (!isAdmin) return spegni();
