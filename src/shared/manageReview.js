@@ -447,6 +447,9 @@
       if (statusReason === 'secaudit') {
         return { text: 'Il controllo di sicurezza ha bocciato il fix: decidi tu.', color: REASONS.secaudit.color };
       }
+      if (statusReason === 'l5') {
+        return { text: 'Il ramo è fermo al cancello di fusione: aspetta il tuo via libera.', color: REASONS.l5.color };
+      }
       if (statusReason === 'clarify') {
         return { text: 'La routine ha domande: rispondi qui sotto.', color: S.design.color };
       }
