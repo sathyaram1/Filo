@@ -458,6 +458,7 @@ test('le forme si vedono in tutti e due i temi', async ({ openTab }) => {
   await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
   await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
 
+  const fondi = [];
   for (const tema of ['dark', 'light']) {
     // Il tema di Filo si dichiara su <html> (src/styles/theme.css).
     await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
