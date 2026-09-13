@@ -83,7 +83,6 @@ test.describe('la data di creazione, scritta dal mittente', () => {
   });
 
   test('una data di creazione che è un oggetto o un testo lunghissimo non viaggia com\'è', () => {
-    test.fail(true, 'porta trovata aperta nel giro 4: createdAt passa grezzo, di qualunque tipo e lunghezza');
     for (const role of RUOLI) {
       const oggetto = fascicolo(role, { ...BASE(), createdAt: { ordine: ORDINE, lista: ['a', 'b'] } }).feedback.createdAt;
       expect(typeof oggetto, `${role}: un oggetto al posto della data`).not.toBe('object');
