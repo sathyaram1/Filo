@@ -61,6 +61,8 @@ async function apri(page, fbs, opts) {
   await page.evaluate(() => window.__mgTest.whenReady());
   await stubMain(page, opts);
   await page.evaluate((list) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(list); }, fbs);
+  // La pratica di prova sta «In coda» (todo): la lista si guarda lì.
+  await page.evaluate((tab) => window.__mgTest.setTab(tab), (opts && opts.tab) || 'queue');
 }
 
 test('dal dettaglio: il segno si mette, la pagina dice chi, la lista lo mostra; e si toglie', async ({ openTab }) => {
@@ -116,8 +118,7 @@ test('una pratica che arriva già col segno lo mostra, in lista e nel dettaglio'
 test('su una pratica chiusa il tasto non c’è, e un segno rimasto non si mostra', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fb = pratica({ _id: 'fb-chiusa', status: 'done', statusPublic: 'closed', mergePreapproved: { by: 'owner@esempio', at: '2026-09-01T00:00:00Z' } });
-  await apri(page, [fb]);
-  await page.evaluate((tab) => window.__mgTest.setTab(tab), 'resolved');
+  await apri(page, [fb], { tab: 'resolved' });
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
   await expect(page.locator('#mgStarBtn')).toBeVisible();
   await expect(page.locator('#mgPreapproveBtn')).toBeHidden();
@@ -166,7 +167,8 @@ test('Automazioni elenca le fuse senza chiedere, con tutto quello che era stato 
   // Il feedback è a un click.
   await page.locator('#mgMergeApprovalsPreapproved .sn-mac-origin-link').click();
   await expect(page.locator('#mgDetail')).toBeVisible();
-  await expect(page.locator('#mgDetail')).toContainText('Le regole del database');
+  await expect(page.locator('#mgDetail')).toContainText('#581');
+  await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
 });
 
 test('senza fusioni pre-approvate l’elenco non compare', async ({ openTab }) => {
