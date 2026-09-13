@@ -17,6 +17,7 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 const PREFERENZE = 'filo://preferences/preferences.html';
 const OPZIONI = 'filo://options/options.html';
+const SICUREZZA = 'filo://security/security.html';
 
 const impostazioni = (page) =>
   page.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'get_settings' })).settings);
