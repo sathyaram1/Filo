@@ -890,35 +890,29 @@
 
   // ── Fusioni in attesa del via libera (SPEC-RIDISEGNO-MAX.md §10) ─────────
   //
-  // L'UNICA superficie dove si approvano (scelta owner 2026-08-26: prima
-  // l'avviso stava anche sulla prima schermata del browser). Vive in cima ai
-  // Ricevuti perché i Ricevuti sono le cose che aspettano una decisione
-  // dell'owner, e questa è la più urgente: un ramo fermo finché lui non dice
-  // sì o no. Il disegno e i bottoni li costruisce il modulo condiviso
-  // (src/shared/mergeApprovals.js); qui c'è il posto dove appenderlo, la
-  // lettura via IPC e il legame con la lista dei feedback.
+  // UNA FUSIONE FERMA È UNA SEGNALAZIONE COL QUADRATO ROSSO (contratto
+  // 2026-09-13). Prima viveva in un riquadro suo, in cima ai Ricevuti: due
+  // posti per la stessa pratica — la scheda del feedback da una parte, il ramo
+  // che ne è uscito dall'altra — e nessuno dei due diceva dell'altro. Adesso
+  // la richiesta si apre dal quadrato della scheda, coi tasti Approva/Scarta
+  // di sempre (il disegno resta del modulo condiviso, src/shared/mergeApprovals.js).
   //
-  // Quando non c'è niente in attesa il blocco resta invisibile: una sezione
-  // vuota in una pagina di gestione è rumore, non informazione. Le decisioni
-  // già prese restano invece elencate in Automazioni: un'eccezione ai
+  // Restano fuori le richieste che non nascono da una segnalazione — un ramo
+  // locale chiuso con `npm run finish`, che un numero non ce l'ha: non hanno
+  // una scheda dove vivere, e finiscono in Automazioni con gli stessi tasti.
+  // Nasconderle sarebbe un ramo fermo per sempre senza dirlo.
+  //
+  // Le decisioni già prese restano elencate in Automazioni: un'eccezione ai
   // controlli di sicurezza deve lasciare una traccia che si può guardare.
-  const mgMergeApprovals = document.getElementById('mgMergeApprovals');
+  const mgMergeApprovalsOrphans = document.getElementById('mgMergeApprovalsOrphans');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
   const mgMergeApprovalsPreapproved = document.getElementById('mgMergeApprovalsPreapproved');
 
-  // Il pannello-lista è condiviso dalle quattro schede (Ricevuti / In coda /
-  // Risolti / Archiviati): l'avviso appartiene SOLO ai Ricevuti, quindi la
-  // visibilità dipende da due cose — c'è qualcosa da approvare, e si sta
-  // guardando la scheda giusta. Il conteggio resta qui e il cambio scheda
-  // riapplica la regola senza rileggere niente dal server.
-  let mergeApprovalsCount = 0;
-  function applyMergeApprovalsVisibility() {
-    if (!mgMergeApprovals) return;
-    // Le fusioni ferme non vengono dallo status dei feedback: senza sezioni non
-    // c'è una scheda "Ricevuti" in cui metterle, ma restano vere e si mostrano.
-    const sezione = sezioniAttendibili() ? currentTab === 'inbox' : true;
-    mgMergeApprovals.hidden = mergeApprovalsCount === 0 || !sezione;
-  }
+  // Gli elenchi del server, così come sono arrivati: il quadrato di ogni scheda
+  // e il bordo delle card in lista li leggono da qui. Restano in memoria fra un
+  // avviso e l'altro — una scheda aperta deve poter ridisegnare il suo quadrato
+  // senza rileggere niente.
+  let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
   // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
