@@ -493,5 +493,5 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone };
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, WEB_ALLOWED_ACTIONS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
