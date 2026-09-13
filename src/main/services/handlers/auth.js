@@ -576,6 +576,9 @@ module.exports = function register(on, ctx) {
       // Le fusioni avvenute SENZA chiedere, perché l'owner aveva pre-approvato
       // la pratica: la traccia con cui controlla a posteriori.
       preapproved: (r && r.preapproved) || [],
+      // Quante sono in tutto: se il server ne ha lasciate fuori, la pagina lo
+      // dice invece di tacere. Un server vecchio non lo manda: vale l'elenco.
+      preapprovedTotal: Number(r && r.preapprovedTotal) || ((r && r.preapproved) || []).length,
       ttlMs: Number(r && r.ttlMs) || 0,
     };
   }
