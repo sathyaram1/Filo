@@ -78,7 +78,8 @@ test.describe("un ordine nell'estensione di un indirizzo di immagine accettato",
     test(`estensione «${ordine}»: l'indirizzo viene rifiutato e l'ordine non arriva al lavoratore`, () => {
       // Rilievo del giro 6, aperto: l'estensione è libera fino a trentadue
       // lettere e cifre, e un ordine ci sta.
-      test.fail(true, "rilievo del giro 6: l'estensione del file ammette un ordine di trentadue lettere, e l'indirizzo arriva accettato fuori cornice");
+      // Rilievo del giro 6, chiuso dopo il pass: l'estensione è una di quelle
+      // che i caricatori producono davvero.
       const indirizzo = `${RADICE}${ordine}?alt=media`;
       const v = storageUrl.validateStorageUrl(indirizzo);
       expect(v.ok, 'il controllo dello storage deve rifiutarlo').toBe(false);
