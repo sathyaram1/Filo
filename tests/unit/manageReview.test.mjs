@@ -1112,3 +1112,189 @@ test('valueUnreadable: riconosce i campi arrivati cifrati (revisione dell\'owner
   assert.equal(MR.valueUnreadable(''), false);
   assert.equal(MR.valueUnreadable(undefined), false);
 });
+
+// ── I cinque livelli, come forme ──────────────────────────────────────────
+//
+// La fila è sempre di cinque voci, nello stesso ordine, anche quando un
+// livello non ha (ancora) dato un parere: un buco deve vedersi, non sparire.
+
+const VERDETTI_4 = ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'];
+function panelPieno(cls) {
+  return {
+    expectedJudges: VERDETTI_4,
+    verdicts: VERDETTI_4.map((j) => ({ judge: j, class: cls, reasoning: 'ok' })),
+  };
+}
+
+test('livelli: cinque forme, sempre, sempre nello stesso ordine', () => {
+  const f = MR.livelli({ status: 'new' });
+  assert.deepEqual(f.map((l) => l.key), ['l1', 'l2', 'l3', 'l4', 'l5']);
+  assert.deepEqual(f.map((l) => l.forma), ['triangolo', 'cerchi', 'rombo', 'pentagono', 'quadrato']);
+  // Niente dati: tutte grigie, ma tutte al loro posto.
+  assert.deepEqual(f.map((l) => l.vuoto), [true, true, true, true, true]);
+  for (const l of f) assert.equal(l.colore, null);
+});
+
+test('livelli L1: categoria, motivi in italiano, chi ha deciso e cosa ha fatto', () => {
+  const l1 = MR.livelloL1({
+    pipeline: { l1Category: 'dangerous', l1Reasons: ['linked_prior_attack', 'obfuscation'], action: 'block_attack' },
+  });
+  assert.equal(l1.esito, 'pericoloso');
+  assert.equal(l1.classe, 'attack');
+  assert.equal(l1.colore, MR.REASONS.attack.color);
+  const testo = l1.pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`).join(' | ');
+  assert.match(testo, /Categoria: Pericoloso/);
+  assert.match(testo, /collegato a un attacco precedente/);
+  assert.match(testo, /offuscamento/);
+  assert.match(testo, /filtro automatico/);
+  assert.match(testo, /ha fermato la segnalazione come attacco/);
+  // Un codice che la tabella non conosce si scrive lo stesso: meglio grezzo
+  // che muto.
+  assert.equal(MR.l1MotivoText('qualcosa_di_nuovo'), 'qualcosa di nuovo');
+});
+
+test('livelli L1: spam giallo, pulito blu, e "pulito" dedotto se i giudici hanno votato', () => {
+  assert.equal(MR.livelloL1({ pipeline: { l1Category: 'spam', action: 'block_spam' } }).classe, 'spam');
+  assert.equal(MR.livelloL1({ pipeline: { l1Category: 'clean' } }).classe, 'aligned');
+  // Senza categoria ma coi verdetti: L2 gira solo se L1 ha fatto passare.
+  assert.equal(MR.livelloL1({ pipeline: panelPieno('aligned') }).esito, 'pulito');
+  // Senza niente: grigio, e il pannello dice perché.
+  const vuoto = MR.livelloL1({});
+  assert.equal(vuoto.vuoto, true);
+  assert.match(vuoto.pannello.testo, /non ha lasciato traccia/);
+});
+
+test('livelli L2: un cerchio per giudice atteso, i mancanti restano al loro posto', () => {
+  const l2 = MR.livelloL2({
+    pipeline: {
+      expectedJudges: VERDETTI_4,
+      verdicts: [{ judge: 'fixed_1', class: 'aligned' }, { judge: 'dynamic', class: 'attack' }],
+    },
+  });
+  assert.equal(l2.giudici.length, 4);
+  assert.deepEqual(l2.giudici.map((g) => g.classe), ['aligned', null, null, 'attack']);
+  assert.deepEqual(l2.giudici.map((g) => g.etichetta), ['Giudice A', 'Giudice B', 'Giudice C', 'Giudice D']);
+  // Nessun verdetto: quattro cerchi vuoti e il pannello lo dice.
+  const senza = MR.livelloL2({});
+  assert.equal(senza.giudici.length, MR.EXPECTED_PANEL_SIZE);
+  assert.equal(senza.vuoto, true);
+  assert.match(senza.pannello.testo, /Nessun giudice/);
+});
+
+test('livelli L3: grigio senza segnalazione, verde con il testo di chi ha lavorato', () => {
+  const senza = MR.livelloL3({});
+  assert.equal(senza.vuoto, true);
+  assert.equal(senza.esito, 'nessuna');
+  assert.match(senza.pannello.testo, /Nessuna segnalazione/);
+
+  const con = MR.livelloL3({
+    livelli: { l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-12T10:00:00Z', testo: 'Problema: due strade.' } },
+  });
+  assert.equal(con.esito, 'segnalato');
+  assert.equal(con.colore, MR.REASONS.design.color);
+  assert.match(con.pannello.testo, /due strade/);
+  const righe = con.pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`).join(' | ');
+  assert.match(righe, /chi ha verificato il fix/);
+  assert.match(righe, /2026-09-12/);
+});
+
+test('livelli L3: testo cifrato → dichiarato, mai mostrato come blob', () => {
+  const l3 = MR.livelloL3({ livelli: { l3: { esito: 'segnalato', testo: CIFRATO } } });
+  assert.equal(l3.pannello.illeggibile, true);
+});
+
+test('livelli L4: verde passa, rosso boccia (col tasto), ambra saltato, grigio non fatto', () => {
+  const pass = MR.livelloL4({ livelli: { l4: { esito: 'pass', testo: 'Controllato il diff.' } } });
+  assert.equal(pass.colore, MR.REASONS.design.color);
+  assert.deepEqual(pass.pannello.azioni, []);
+
+  const fail = MR.livelloL4({ livelli: { l4: { esito: 'fail', testo: 'Scrive su una chiave.' } } });
+  assert.equal(fail.colore, MR.REASONS.attack.color);
+  assert.deepEqual(fail.pannello.azioni, ['salta_l4']);
+  assert.match(fail.pannello.testo, /Scrive su una chiave/);
+
+  const saltato = MR.livelloL4({ livelli: { l4: { esito: 'saltato', by: 'owner', at: '2026-09-13T09:00:00Z' } } });
+  assert.equal(saltato.colore, MR.REASONS.spam.color);
+  assert.match(saltato.pannello.righe.map((r) => r.valore).join(' '), /Saltato dall/);
+  assert.deepEqual(saltato.pannello.azioni, []);
+
+  const niente = MR.livelloL4({});
+  assert.equal(niente.vuoto, true);
+  assert.match(niente.pannello.testo, /non ancora fatto/);
+});
+
+// ── L5: il cancello di fusione ────────────────────────────────────────────
+
+const RICHIESTA = {
+  id: 'ab12cd34ef56ab12cd34ef56',
+  branch: 'claude/lavoro',
+  sha: 'a'.repeat(40),
+  num: '#412',
+  blocks: [{ gate: 'guard_the_guards', label: 'Tocca aree protette', items: ['firestore.rules'] }],
+};
+const FB_412 = { _id: 'fb-412', seq: 412, subSeq: 0, status: 'revision_security' };
+
+test('livelli L5: la richiesta si lega alla segnalazione per numero o per id', () => {
+  const l5 = MR.livelloL5(FB_412, { fusioni: { pending: [RICHIESTA] } });
+  assert.equal(l5.esito, 'bloccato');
+  assert.equal(l5.colore, MR.REASONS.attack.color);
+  assert.equal(l5.richiesta.id, RICHIESTA.id);
+  // Per id del documento, quando il numero non c'è.
+  const perId = MR.livelloL5(FB_412, { fusioni: { pending: [{ id: 'x', feedbackId: 'fb-412' }] } });
+  assert.equal(perId.esito, 'bloccato');
+  // Una richiesta di un'altra pratica non tocca questo quadrato.
+  const altrui = MR.livelloL5(FB_412, { fusioni: { pending: [{ id: 'y', num: '#999' }] } });
+  assert.equal(altrui.esito, 'attesa');
+});
+
+test('livelli L5: giallo in lavorazione, verde fuso con la versione, grigio se non ci è arrivato', () => {
+  assert.equal(MR.livelloL5({ status: 'working' }, {}).esito, 'attesa');
+  assert.equal(MR.livelloL5({ status: 'working' }, {}).colore, MR.REASONS.spam.color);
+
+  const fuso = MR.livelloL5({ status: 'done', resolvedInVersion: '0.3.1' }, {});
+  assert.equal(fuso.esito, 'fuso');
+  assert.equal(fuso.colore, MR.REASONS.design.color);
+  assert.match(fuso.pannello.righe.map((r) => r.valore).join(' '), /0\.3\.1/);
+
+  const mai = MR.livelloL5({ status: 'new' }, {});
+  assert.equal(mai.esito, 'nonarrivato');
+  assert.equal(mai.vuoto, true);
+});
+
+test('livelli L5: un sì già dato che non ha prodotto niente resta rosso, e lo dice', () => {
+  const l5 = MR.livelloL5(FB_412, { fusioni: { failed: [{ ...RICHIESTA, used: true, outcome: 'conflict' }] } });
+  assert.equal(l5.esito, 'conflitto');
+  assert.equal(l5.colore, MR.REASONS.attack.color);
+  assert.match(l5.pannello.testo, /non è avvenuta/);
+});
+
+test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenchi', () => {
+  // Gli elenchi delle richieste possono non essere ancora arrivati: un quadrato
+  // grigio direbbe il falso su una pratica che il server dichiara ferma.
+  const l5 = MR.livelloL5({ status: 'design', statusReason: 'l5' }, {});
+  assert.equal(l5.esito, 'bloccato');
+  assert.equal(l5.colore, MR.REASONS.attack.color);
+});
+
+test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {
+  const fb = { status: 'design', statusReason: 'l5' };
+  assert.equal(MR.classifyBlock(fb).reason, 'l5');
+  assert.equal(MR.classifyBlock(fb).color, '#c0392b');
+  assert.match(MR.judgesNote(fb).text, /cancello di fusione/);
+  assert.equal(MR.reasonText('l5'), 'fermo al cancello di fusione');
+});
+
+test('fusioneInAttesa: vera solo quando una fusione aspetta davvero l’owner', () => {
+  assert.equal(MR.fusioneInAttesa(FB_412, { fusioni: { pending: [RICHIESTA] } }), true);
+  assert.equal(MR.fusioneInAttesa(FB_412, { fusioni: {} }), false);
+  assert.equal(MR.fusioneInAttesa({ status: 'done' }, {}), false);
+});
+
+test('fusioniSenzaFeedback: restano solo quelle che non hanno una scheda dove vivere', () => {
+  const locale = { id: 'z', branch: 'claude/locale' }; // nessun numero: finish locale
+  const orfane = MR.fusioniSenzaFeedback([RICHIESTA, locale], [FB_412]);
+  assert.deepEqual(orfane.map((r) => r.id), ['z']);
+  // Senza la lista dei feedback non si può dire di nessuna che ha una scheda:
+  // si mostrano tutte, invece di perderne una.
+  assert.equal(MR.fusioniSenzaFeedback([RICHIESTA, locale], []).length, 2);
+});
