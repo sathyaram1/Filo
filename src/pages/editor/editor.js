@@ -1162,15 +1162,34 @@
   }
 
   // Estratto della memoria di Filo (profilo + preferenze) come contesto.
+  //
+  // #592 — il profilo e le preferenze apprese sono testo che Filo si è scritto
+  // da sé ascoltando le conversazioni, e ci si arriva anche di traverso (il
+  // titolo di una scheda, un risultato web, il riassunto di un file che lo
+  // convincono a «ricordarsi» una regola). Quindi nel prompt sono CONTENUTO, e
+  // vanno nel recinto condiviso: i marcatori intorno, tolti dal testo
+  // dell'utente, più le due frasi che dicono al modello che è materiale da
+  // tenere presente e non istruzioni sue. Lo stesso recinto della chat, della
+  // home e del compattatore: qui l'Editor se la costruiva da sé e la memoria
+  // arrivava nuda, in mezzo alle istruzioni.
+  //
+  // Il tetto si applica al TESTO, prima del recinto: tagliare dopo porterebbe
+  // via il marcatore di chiusura, cioè proprio la cosa che tiene il testo
+  // separato. Se il modulo condiviso non c'è, la memoria non entra affatto:
+  // meglio un titolo senza contesto che un contesto senza recinto.
+  const MEM_BUDGET = 1500;
   async function filoMemoryText() {
     try {
+      const C = window.SN_CONST;
+      if (!C || typeof C.memoryBlock !== 'function') return '';
       const r = await sendMessage({ type: MSG.FILO_GET_MEMORY });
       const mem = r && r.ok ? r.memory : null;
       if (!mem || typeof mem !== 'object') return '';
-      const parts = [];
-      if (mem.PROFILO && String(mem.PROFILO).trim()) parts.push('Profilo: ' + String(mem.PROFILO).trim());
-      if (mem.PREFERENZE && String(mem.PREFERENZE).trim()) parts.push('Preferenze: ' + String(mem.PREFERENZE).trim());
-      return parts.join('\n').slice(0, 1500);
+      const profilo = String(mem.PROFILO == null ? '' : mem.PROFILO).trim().slice(0, MEM_BUDGET);
+      const preferenze = String(mem.PREFERENZE == null ? '' : mem.PREFERENZE).trim()
+        .slice(0, Math.max(0, MEM_BUDGET - profilo.length));
+      if (!profilo && !preferenze) return '';
+      return C.memoryBlock({ profilo, preferenze }).trim();
     } catch (_) { return ''; }
   }
 
