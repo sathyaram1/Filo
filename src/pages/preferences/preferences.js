@@ -754,6 +754,7 @@
         titolo,
         aiuto: MEM_TITOLI[m.nome] ? undefined : 'Un capitolo che Filo ha aperto da sé.',
         quante: m.righe.length,
+        cosaSvuota: `Filo dimentica tutto quello che si è appuntato sotto «${titolo}».`,
         svuota: () => chrome.runtime.sendMessage({ type: MSG.FILO_FORGET_MEMORY_MODULE, module: m.nome }),
       });
       for (const r of m.righe) {
