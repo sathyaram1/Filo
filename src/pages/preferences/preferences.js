@@ -148,10 +148,37 @@
     Bootstrap.applyThemeTokens(currentOverrides);
   }
 
-  function persistTokens() {
+  // I colori e le misure si salvano come una mappa INTERA: il loro contratto è
+  // «questi sono tutti gli scostamenti, chi manca è tornato al predefinito»,
+  // quindi mandarne un pezzo cancellerebbe il resto. Mandarla com'era
+  // all'apertura però cancella quello che è cambiato altrove nel frattempo: un
+  // colore chiesto a Filo spariva del tutto al primo ritocco di una misura
+  // (#592, giro 5). Quindi si parte da quello che c'è in memoria adesso e ci si
+  // applicano solo le voci che l'utente ha toccato, comprese quelle che ha
+  // rimesso al predefinito.
+  //
+  // `tuttoIntero` è per il «ripristina tutto»: lì svuotare la mappa è proprio
+  // quello che l'utente ha chiesto, e non c'è niente da tenere.
+  async function tokenInMemoria() {
+    try {
+      const r = await chrome.storage.local.get('settings');
+      return ((r && r.settings) || {}).themeTokens || {};
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function persistTokens({ tuttoIntero = false } = {}) {
+    const mostrati = { ...currentOverrides };
+    let daMandare = mostrati;
+    if (!tuttoIntero) {
+      const memoria = await tokenInMemoria();
+      if (memoria) daMandare = Storage.mappaRibasata(memoria, ultimiToken || {}, mostrati);
+    }
+    ultimiToken = mostrati;
     chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { themeTokens: currentOverrides },
+      settings: { themeTokens: daMandare },
     });
     flashSaved('tokenSavedHint');
   }
