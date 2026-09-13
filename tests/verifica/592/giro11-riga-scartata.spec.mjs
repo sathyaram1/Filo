@@ -47,13 +47,16 @@ test('una riga senza soprannome resta segnata e spiegata', async ({ openTab }) =
   await page.waitForTimeout(800);
 
   const stato = await page.evaluate(() => {
-    const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+    const righe = [...document.querySelectorAll('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')];
+    const row = righe.find((r) => r.querySelector('.sn-model-id')?.value === 'openai/gpt-4o-mini');
     return {
-      testo: row?.querySelector('.sn-model-id')?.value || '',
+      testo: row ? row.querySelector('.sn-model-id').value : '',
       segnata: !!row?.classList.contains('sn-row-invalid'),
       spiegazione: row?.querySelector('.sn-model-row-msg')?.textContent || '',
+      quante: righe.length,
     };
   });
+  await page.screenshot({ path: 'tests/.shots/592-giro11-riga-scartata.png' });
   expect(stato.testo, 'quello che hai scritto è sparito').toBe('openai/gpt-4o-mini');
   expect(stato.segnata, 'la riga scartata non è più evidenziata: l\'avviso in fondo dice che qualcosa non è stato salvato, ma non quale riga').toBe(true);
   expect(stato.spiegazione.length, 'la spiegazione accanto alla riga è sparita').toBeGreaterThan(0);
