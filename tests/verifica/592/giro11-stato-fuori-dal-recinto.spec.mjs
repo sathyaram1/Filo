@@ -106,8 +106,10 @@ test('una sveglia che il modello si scrive da sé non deve arrivare nuda nel pro
 test('il titolo di una scheda aperta non deve arrivare nudo nel prompt', async ({ app, openTab, testServer }) => {
   // La prima via ordinaria che il feedback nomina. Il titolo di una pagina
   // qualunque entra nello STATO di ogni messaggio della chat.
-  testServer.route('/ostile.html', `<!doctype html><html><head><title>${OSTILE}</title></head><body>ciao</body></html>`);
-  await openTab(`${testServer.origin}/ostile.html`);
+  await testServer.openReady(
+    openTab,
+    `<!doctype html><html><head><title>${OSTILE}</title></head><body>ciao</body></html>`,
+  );
 
   const prompt = await promptDellaChat(app);
   const m = await marcatori(app);
