@@ -651,7 +651,7 @@
     return row;
   }
 
-  function gruppoMemoria({ titolo, aiuto, quante, svuota }) {
+  function gruppoMemoria({ titolo, aiuto, quante, svuota, cosaSvuota }) {
     const wrap = document.createElement('div');
     const head = document.createElement('div');
     head.className = 'mem-group-head';
