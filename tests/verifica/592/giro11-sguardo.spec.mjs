@@ -9,6 +9,20 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 const PREFS = 'filo://preferences/preferences.html';
 
+// Il tema si cambia dal canale vero, non scrivendo la chiave: solo così parte
+// l'annuncio che fa ridipingere le pagine aperte.
+const scuro = (app) => app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
+  { type: 'update_settings', settings: { theme: 'dark' } },
+  { url: 'filo://preferences/preferences.html' },
+));
+
+// Il pannello della memoria, ritagliato: con cento righe la pagina intera è
+// alta ottomila pixel e non si guarda.
+async function scatta(page, path) {
+  const box = await page.locator('#memoryBox').boundingBox();
+  await page.screenshot({ path, clip: { x: 0, y: Math.max(0, box.y - 120), width: 1270, height: 760 } });
+}
+
 const LUNGA = `Nota lunghissima ${'x'.repeat(10_000)} fine`;
 const HTML = '<script>window.__pwned=1</script><img src=x onerror="window.__pwned=2">';
 const JS = 'javascript:alert(1) — e un «link» finto';
@@ -24,7 +38,7 @@ test('il pannello della memoria regge righe enormi, cento righe, HTML e simboli'
   }, { lunga: LUNGA, html: HTML, js: JS });
 
   const page = await openTab(PREFS);
-  await page.waitForSelector('#memoryGroups .mem-line');
+  await page.waitForSelector('#memoryBox .mem-line');
 
   // Niente HTML eseguito: il testo è testo.
   expect(await page.evaluate(() => window.__pwned || 0), 'l\'HTML di una riga di memoria viene eseguito').toBe(0);
@@ -34,18 +48,18 @@ test('il pannello della memoria regge righe enormi, cento righe, HTML e simboli'
   expect(sborda, 'la pagina scorre in orizzontale per colpa di una riga di memoria lunga').toBe(false);
 
   // Il × della prima riga è cliccabile e la riga se ne va.
-  const prima = await page.locator('#memoryGroups .mem-line').first();
+  const prima = await page.locator('#memoryBox .mem-line').first();
   const testoPrima = (await prima.locator('.mem-text').innerText()).slice(0, 20);
   await prima.locator('.mem-forget').click();
-  await expect.poll(async () => (await page.locator('#memoryGroups').innerText()).includes(testoPrima),
+  await expect.poll(async () => (await page.locator('#memoryBox').innerText()).includes(testoPrima),
     { timeout: 5000 }).toBe(false);
 
-  await page.screenshot({ path: 'tests/.shots/592-giro11-memoria-chiaro.png', fullPage: true });
+  await scatta(page, 'tests/.shots/592-giro11-memoria-chiaro.png');
 
   // Tema scuro: stesso pannello, contrasto leggibile.
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: 'tests/.shots/592-giro11-memoria-scuro.png', fullPage: true });
+  await scuro(app);
+  await page.waitForTimeout(600);
+  await scatta(page, 'tests/.shots/592-giro11-memoria-scuro.png');
 });
 
 test('il riquadro dello stile mostra conteggio e rifiuto, e in scuro si legge', async ({ app, openTab }) => {
@@ -58,7 +72,8 @@ test('il riquadro dello stile mostra conteggio e rifiuto, e in scuro si legge', 
   expect(messaggio, 'il rifiuto non dice il numero').toMatch(/600/);
   expect(await page.locator('#agentStyleCount').innerText()).toBe('700/600');
 
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
-  await page.waitForTimeout(400);
+  await scuro(app);
+  await page.waitForTimeout(600);
+  await page.locator('#agentStyleText').scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/.shots/592-giro11-stile-scuro.png' });
 });
