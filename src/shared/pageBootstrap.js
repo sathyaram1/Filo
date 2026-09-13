@@ -410,6 +410,6 @@
 
   window.SN_PAGE_BOOTSTRAP = {
     applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects,
-    ricaricaSenzaDisturbare, segnaCampi,
+    ricaricaSenzaDisturbare, segnaCampi, segnaCampo,
   };
 })();
