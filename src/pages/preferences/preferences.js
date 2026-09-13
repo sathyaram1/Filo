@@ -731,7 +731,10 @@
     }
 
     for (const m of moduli) {
-      const titolo = MEM_TITOLI[m.nome] || m.nome;
+      // I capitoli che Filo apre da sé hanno nomi in stampatello (VIAGGI,
+      // LAVORO): qui sono titoli letti da una persona, non etichette di codice.
+      const titolo = MEM_TITOLI[m.nome]
+        || m.nome.charAt(0) + m.nome.slice(1).toLowerCase().replace(/_/g, ' ');
       const g = gruppoMemoria({
         titolo,
         aiuto: MEM_TITOLI[m.nome] ? undefined : 'Un capitolo che Filo ha aperto da sé.',
