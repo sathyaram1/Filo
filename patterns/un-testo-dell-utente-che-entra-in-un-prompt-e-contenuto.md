@@ -78,6 +78,16 @@ modello) e il loro recinto nel prompt (`lessonsBlock`, in `filoChatContext` e
 confermerebbe chiunque sia alla tastiera in quel momento, che è proprio chi la
 lezione di protezione vuole tenere fuori.
 
+**Il testo libero non è solo nelle «preferenze».** Il giro 4 della verifica ne
+ha trovato uno fuori dall'elenco dei setter: l'id del modello, il campo delle
+Opzioni in cui scrivi con quale modello Filo deve rispondere, libero per scelta
+perché deve accettare anche un modello che non è in elenco. Quel testo entra
+parola per parola nella riga del prompt che dice al modello come si chiama, e ci
+resta dopo il riavvio, come lo stile. Un id vero è corto e sta su una riga,
+quindi lì bastano la ripulitura dai marcatori e un tetto; sopra il tetto la riga
+non si accorcia, sparisce (`sanitizeModelName`). La domanda da farsi non è «è
+una preferenza?» ma «questo testo lo scrive qualcuno e finisce in un prompt?».
+
 **Regola operativa.** Prima di aggiungere una preferenza a testo libero,
 chiediti se quel testo finisce in un prompt. Se sì, le quattro cose qui sopra
 valgono tutte. La sentinella `tests/unit/preferences.test.mjs`
