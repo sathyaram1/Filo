@@ -69,7 +69,7 @@ test('quello che gli script delle pagine visitate usano davvero sta nell\'elenco
     // comincia per sn_ nel file (una classe CSS, un id) non è una chiave, e
     // farla passare per tale renderebbe questa sentinella rumorosa.
     for (const m of src.matchAll(/chrome\.storage\.local\.(?:get|set|remove)\s*\(/g)) {
-      const dentro = src.slice(m.index + m[0].length, m.index + m[0].length + 300);
+      const dentro = primoArgomento(src, m.index + m[0].length);
       for (const s of dentro.matchAll(/['"]([a-z0-9_]+)['"]/g)) usate.add(s[1]);
       for (const s of dentro.matchAll(/STORAGE_KEYS\.([A-Z0-9_]+)/g)) {
         if (K[s[1]]) usate.add(K[s[1]]);
