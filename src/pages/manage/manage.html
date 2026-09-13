@@ -463,10 +463,11 @@
       white-space: nowrap;
     }
     /* Etichetta di stato nel dettaglio: stesse parole e stesso peso visivo di
-       .fb-state nella gemella (pallino del colore di rischio + motivo). */
+       .fb-state nella gemella (pallino del colore di rischio + motivo). Vive
+       in fondo alla fila delle forme, non più su una riga sua. */
     .mg-detail-state {
-      display: flex; align-items: center; gap: 5px;
-      padding: 8px 12px 0; font-size: 11px; color: var(--sn-muted);
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-left: 4px; font-size: 11px; color: var(--sn-muted);
     }
     .mg-detail-state[hidden] { display: none; }
     .mg-detail-state-dot {
