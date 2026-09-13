@@ -250,7 +250,6 @@
 
   async function saveFingerprint() {
     const partial = { security: { fingerprint: { mode: currentFpMode() } } };
-    ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
     const hint = $('savedHint');
     hint.classList.add('sn-show');
@@ -370,7 +369,6 @@
     ultimiCookie = adesso;
     if (!Object.keys(cookies).length) return;
     const partial = { security: { cookies } };
-    ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
     const hint = $('savedHint');
     hint.classList.add('sn-show');
@@ -442,8 +440,6 @@
   let ultimiCookie = null;
   // Quando abbiamo salvato noi: l'annuncio che rimbalza indietro subito dopo è
   // il nostro, non una modifica arrivata da fuori.
-  let ecoDaIgnorare = 0;
-  const ECO_MS = 1500;
 
   function raccogli() {
     const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
@@ -503,7 +499,6 @@
 
     if (!Object.keys(security).length) return;
 
-    ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security } });
     const hint = $('savedHint');
     hint.classList.add('sn-show');
@@ -523,7 +518,6 @@
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
-      if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       if (Bootstrap && typeof Bootstrap.ricaricaSenzaDisturbare === 'function') {
         // Le righe scritte male nella lista dei siti bloccati tornano sullo
         // schermo insieme all'avviso che dice quali sono state scartate: senza

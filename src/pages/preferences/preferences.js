@@ -912,7 +912,6 @@
 
     if (!Object.keys(partial).length) return;
 
-    ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
 
     // Il "Salvato" mentirebbe su uno stile che non è stato salvato: lì parla
@@ -1069,7 +1068,6 @@
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
-      if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       if (typeof Bootstrap.ricaricaSenzaDisturbare !== 'function') { load().catch(() => {}); return; }
       Bootstrap.ricaricaSenzaDisturbare(load, riappendiAlTesto).catch(() => {});
     });

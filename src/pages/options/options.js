@@ -465,7 +465,6 @@
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
-      if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       const Boot = window.SN_PAGE_BOOTSTRAP;
       if (Boot && typeof Boot.ricaricaSenzaDisturbare === 'function') {
         const righe = righeNonSalvate();
@@ -883,8 +882,6 @@
   // Quando abbiamo salvato noi: l'annuncio che rimbalza indietro subito dopo è
   // il nostro, non una modifica arrivata da fuori, e rileggere la pagina in
   // quel momento cancellerebbe gli avvisi appena mostrati.
-  let ecoDaIgnorare = 0;
-  const ECO_MS = 1500;
 
   function raccogli() {
     const apiKey = $('apiKey').value.trim();
@@ -935,7 +932,6 @@
     ultimoInviato = valori;
 
     if (Object.keys(partial).length) {
-      ecoDaIgnorare = Date.now();
       await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
     }
 
