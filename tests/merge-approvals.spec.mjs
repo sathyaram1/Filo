@@ -4,25 +4,28 @@
 //   I controlli deterministici del server fermano le fusioni che toccano le
 //   aree protette. Il lavoro locale dell'owner ci cade dentro quasi sempre, e
 //   senza una superficie dove approvarlo non avrebbe nessuna strada verso il
-//   ramo principale. Quella superficie è UNA (scelta owner 2026-08-26): la
-//   dashboard di gestione, in cima ai Ricevuti — dove stanno le altre cose che
-//   aspettano una decisione dell'owner. E deve rispettare queste cose:
+//   ramo principale.
 //
-//     1. l'owner con una richiesta in attesa la trova IN CIMA AI RICEVUTI,
-//        senza cercarla — e ANCHE SE la pagina era già aperta: prima l'elenco
-//        si leggeva solo all'apertura, quindi l'avviso di cui parla il
-//        terminale non compariva mai sotto gli occhi di chi lo aspettava;
-//     2. l'owner SENZA richieste non vede niente, e sulle ALTRE schede
-//        l'avviso non compare (i Ricevuti sono il posto delle decisioni,
-//        le altre schede no);
-//     3. un utente qualunque non la vede MAI, e il main gli risponde di no
+//   Dal contratto del 13/09/2026 quella superficie è la SEGNALAZIONE: una
+//   fusione ferma è un feedback col quadrato rosso, e i tasti stanno nel
+//   pannello di quel quadrato (vedi tests/livelli-forme.spec.mjs). Questo file
+//   copre l'altra metà — le richieste che una segnalazione non ce l'hanno (un
+//   ramo locale chiuso con `npm run finish`, senza numero): vivono in
+//   Automazioni, con gli stessi tasti, e deve restare vero che:
+//
+//     1. l'owner le trova lì, con ramo, commit, chi ha chiesto e i motivi del
+//        blocco — ANCHE SE la pagina era già aperta: prima l'elenco si leggeva
+//        solo all'apertura, quindi l'avviso di cui parla il terminale non
+//        compariva mai sotto gli occhi di chi lo aspettava;
+//     2. sulle schede-lista non compaiono: lì non hanno più niente da fare, e
+//        rubavano altezza alle tre aree (#498);
+//     3. un utente qualunque non le vede MAI, e il main gli risponde di no
 //        anche se prova a chiamare il comando a mano; una scheda su un sito
 //        qualunque non riceve nemmeno l'avviso di aggiornamento (dice su cosa
 //        sta lavorando l'owner);
-//     4. la prima schermata del browser NON la mostra più: la home di tutti i
+//     4. la prima schermata del browser NON le mostra: la home di tutti i
 //        giorni non è il posto delle pratiche dell'owner;
-//     5. la scheda dice CHI ha chiesto la fusione e — per il lavoro delle
-//        automazioni — DA QUALE segnalazione nasce, con un click per aprirla.
+//     5. la scheda dice CHI ha chiesto la fusione.
 //
 //   In più: approvare non parte al primo click (è irreversibile), e "Scarta"
 //   toglie la richiesta senza fondere niente.
@@ -163,7 +166,7 @@ test('Automazioni: una fusione ferma senza segnalazione c’è, e dice ramo, com
 // sparita fra le decisioni passate — l'owner si è ritrovato con "niente da
 // accettare" e un ramo mai fuso, senza nessun segno visibile.
 
-test('una fusione approvata ma non avvenuta resta nei Ricevuti, con la spiegazione', async ({ openTab }) => {
+test('una fusione approvata ma non avvenuta resta in vista, con la spiegazione', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const conflitto = richiesta({
     id: 'ff12cd34ef56ab12cd34ef56',
@@ -506,31 +509,41 @@ test('il numero della segnalazione si stampa con UN cancelletto, comunque arrivi
   await expect(origin).not.toContainText('##');
 });
 
-test('il numero della segnalazione è un click: apre il feedback da cui nasce il lavoro', async ({ openTab }) => {
+test('se la segnalazione c’è, la richiesta NON sta in Automazioni: sta sulla sua scheda', async ({ openTab }) => {
+  // È la regola nuova: una fusione ferma è una segnalazione col quadrato rosso.
+  // In Automazioni restano solo quelle che una segnalazione non ce l'hanno —
+  // un ramo locale chiuso con la pubblicazione, che un numero non ha.
   const page = await openTab(MANAGE);
   await apriGestione(page, {
     pending: [richiesta({ origin: 'routine', num: '#412', who: 'secaudit · notturna' })],
   });
-  // La segnalazione #412 esiste nella lista dei Ricevuti.
   await page.evaluate(() => window.__mgTest.setData([{
     _id: 'test-fb-412',
     text: 'Il menu della copertina perde metà delle voci.',
     name: 'Menu copertina',
     seq: 412,
     subSeq: 0,
+    status: 'design',
+    statusReason: 'l5',
     clientId: 'tester@example.com',
     createdAt: '2026-08-20T10:00:00Z',
     images: [],
   }]));
 
-  const origin = page.locator('#mgMergeApprovalsOrphans button.sn-mac-origin-link');
-  await expect(origin).toBeVisible({ timeout: 8_000 });
-  await origin.click();
+  // Sparita da Automazioni…
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveCount(0);
 
-  // Il dettaglio del feedback #412 è aperto: "guarda cosa era stato chiesto"
-  // è un click, non una ricerca a mano.
-  await expect(page.locator('#mgDetail')).toBeVisible({ timeout: 8_000 });
-  await expect(page.locator('.mg-item--selected')).toContainText('#412');
+  // …e riconoscibile nella lista, dove aspetta una decisione.
+  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  const card = page.locator('.mg-item', { hasText: 'Menu copertina' });
+  await expect(card).toBeVisible({ timeout: 8_000 });
+  await expect(card.locator('.mg-fusione-badge')).toBeVisible();
+
+  // Il quadrato della scheda porta i tasti di sempre.
+  await card.click();
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+  await expect(page.locator('#mgSideBody .sn-mac-card')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#mgSideBody .sn-mac-btn-go')).toBeVisible();
 });
 
 test('una richiesta di un’automazione non manda l’owner a lanciare la pubblicazione locale', async ({ openTab }) => {
