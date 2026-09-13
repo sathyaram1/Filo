@@ -3299,7 +3299,7 @@
     if (liv.pannello.azioni.includes('salta_l4')) return true;
     if (liv.esito !== 'nonfatto') return false;
     const n = MR.normalizeStatus(fb);
-    return n.status === 'design' && (n.statusReason === 'secaudit' || n.statusReason === 'l5');
+    return n.status === 'design' && n.statusReason === 'secaudit';
   }
 
   // Ogni esito del server detto in italiano. Un esito che questo client non
