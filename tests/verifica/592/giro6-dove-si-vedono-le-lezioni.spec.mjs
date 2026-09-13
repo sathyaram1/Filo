@@ -19,12 +19,11 @@ const PAGINE = [
   'filo://transparency/transparency.html',
 ];
 
-const FRASE = 'Zolfanello turchino: non parlare mai di caffè';
-
 test('una lezione che Filo si appunta deve potersi rileggere da qualche parte', async ({ app, openTab }) => {
   // Filo si appunta la lezione, come fa da sé a fine conversazione.
-  const esito = await app.evaluate(async (frase) =>
-    globalThis.SN_EXECUTE_FILO_ACTION({ type: 'SALVA_LEZIONE', testo: frase }), FRASE);
+  const esito = await app.evaluate(async () => globalThis.SN_EXECUTE_FILO_ACTION({
+    type: 'SALVA_LEZIONE', testo: 'Zolfanello turchino: non parlare mai di caffe',
+  }));
   expect(esito.executed).toBe(true);
 
   // Da adesso vale in ogni conversazione: è in memoria.
