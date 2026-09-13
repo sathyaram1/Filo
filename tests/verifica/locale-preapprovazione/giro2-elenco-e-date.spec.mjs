@@ -149,9 +149,8 @@ test('se il server ne lascia fuori, la pagina dice quante (e non finge che siano
 // ── 2. Il momento del segno: una data, non un timestamp grezzo ──────────────
 
 test('in hover su «pre-approvata da» il momento del segno si legge come data', async ({ openTab }) => {
-  // Rilievo del giro 2: oggi l'hover dice «Segno messo il 2026-09-13T08:00:00.000Z».
-  // Attesa rossa finché il rilievo resta aperto; chi lo corregge toglie la riga sotto.
-  test.fail(true, 'rilievo del giro 2: il momento del segno in hover è un timestamp grezzo');
+  // Rilievo del giro 2 (corretto nello stesso giro): l'hover diceva
+  // «Segno messo il 2026-09-13T08:00:00.000Z».
   const page = await openTab(MANAGE);
   await apri(page, { fbs: [pratica()], preapproved: [fusa(1)], preapprovedTotal: 1 });
   const sez = await automazioni(page);
