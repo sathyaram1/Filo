@@ -139,23 +139,26 @@ test('da una pagina web non si devono poter leggere le pagine salvate per dopo',
   expect(JSON.stringify(interna || {})).toContain('banca-esempio');
 });
 
-// La cronologia degli appunti copiati resta LEGGIBILE da una pagina web per
-// scelta dichiarata: il menu «Incolla» funziona su qualsiasi pagina. Quello che
-// non è una scelta è svuotarla: accanto alla lettura, il commento nel codice
-// promette che le operazioni «tutto o niente» sono guardate, e questa non lo è.
-test('da una pagina web non si deve poter svuotare la cronologia degli appunti', async ({ app }) => {
+// Le due porte che DEVONO restare aperte, e per cui l'elenco di ciò che è
+// lecito esiste invece di un divieto secco. Chiuderle sarebbe una regressione,
+// non una difesa: qui si asserisce che continuano a funzionare.
+test('il menu «Incolla» continua a funzionare su una pagina qualsiasi', async ({ app }) => {
   await app.evaluate(async () => {
     const K = globalThis.SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY;
-    await globalThis.SN_STORAGE.setRaw(K, [{ type: 'text', text: 'IBAN IT60X0542811101000000123456', ts: Date.now() }]);
+    await globalThis.SN_STORAGE.setRaw(K, [{ type: 'text', text: 'riga copiata', ts: Date.now() }]);
   });
-  await comeSeFosse(app, { type: 'clear_clipboard_history' }, DA_WEB);
-  const dentro = await app.evaluate(async () => JSON.stringify(
-    await globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []),
-  ));
-  expect(dentro, 'una pagina web ha svuotato la cronologia degli appunti').toContain('IBAN');
+  const lettura = await comeSeFosse(app, { type: 'get_clipboard_history' }, DA_WEB);
+  expect(JSON.stringify(lettura || {}), 'il menu «Incolla» non vede più la cronologia')
+    .toContain('riga copiata');
+
+  // Anche svuotarla: è un gesto dell'utente in quel menu, che si apre su ogni sito.
+  const vuotata = await comeSeFosse(app, { type: 'clear_clipboard_history' }, DA_WEB);
+  expect(vuotata?.ok, 'dal menu «Incolla» non si può più svuotare la cronologia').toBe(true);
 });
 
-test('da una pagina web non si deve poter leggere il saldo dei crediti', async ({ app }) => {
+test('il riquadro del feedback e il banco di prova continuano a funzionare', async ({ app }) => {
+  // Il saldo dei crediti si mostra dentro quei riquadri, che si aprono da ogni
+  // pagina: senza, il riquadro nascerebbe con un saldo vuoto.
   const crediti = await comeSeFosse(app, { type: 'get_credits' }, DA_WEB);
-  expect(crediti?.ok, 'get_credits risponde a una pagina web').not.toBe(true);
+  expect(crediti?.ok, 'il banco di prova non vede più il saldo').toBe(true);
 });
