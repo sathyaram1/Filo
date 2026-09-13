@@ -241,6 +241,11 @@ service cloud.firestore {
                     // 'userNote' la frase in chiaro per chi ha mandato il feedback.
                     'userNote',
                     'archiveOverride', 'reopenRequests',
+                    // La pre-approvazione della fusione, per singola pratica:
+                    // solo l'owner la mette e la toglie (vedi il vincolo di
+                    // forma più sotto). Il server la legge prima di aprire una
+                    // richiesta di approvazione per il lavoro delle routine.
+                    'mergePreapproved',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
         // Enum: stati CANONICI della macchina a stati (FEEDBACK-STATES.md) +
