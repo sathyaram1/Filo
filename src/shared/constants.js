@@ -2090,8 +2090,14 @@
   const LESSONS_OPEN = '<<<INIZIO LEZIONI APPUNTATE DA FILO';
   const LESSONS_CLOSE = 'FINE LEZIONI APPUNTATE DA FILO>>>';
 
+  // Il segnaposto dello stile si toglie anche da qui. Non è un marcatore di
+  // QUESTO recinto, ma è il punto in cui `injectAgentStyle` infila il recinto
+  // dello stile: una lezione che se lo porta dentro si ritrova stampato in
+  // mezzo una seconda copia intera di quel recinto, dentro un recinto che dice
+  // l'opposto (#592, giro 4). Le tre ripuliture ora tolgono tutte lo stesso
+  // insieme: i marcatori del proprio recinto più il segnaposto.
   function sanitizeLesson(raw) {
-    return togliMarcatori(raw, [LESSONS_OPEN, LESSONS_CLOSE]);
+    return togliMarcatori(raw, [LESSONS_OPEN, LESSONS_CLOSE, AGENT_STYLE_SLOT]);
   }
 
   function validateLesson(raw) {
