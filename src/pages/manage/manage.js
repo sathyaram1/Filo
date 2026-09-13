@@ -932,13 +932,47 @@
   // `already` è l'elenco già pronto, quando ad avvisare è stato il main
   // (MERGE_APPROVALS_CHANGED): una pagina già aperta deve accorgersi di una
   // richiesta nuova, altrimenti l'avviso lo vede solo chi riapre la pagina.
+  // Le opzioni che il modulo condiviso vuole per disegnare le card: gli stessi
+  // tasti, lo stesso "chiedi conferma", lo stesso esito, ovunque le card
+  // compaiano — nel pannello del quadrato e in Automazioni.
+  function opzioniFusioni(extra) {
+    const UI = window.SN_MERGE_APPROVALS;
+    return Object.assign({
+      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
+      onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
+      onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
+    }, extra || {});
+  }
+
+  // Le richieste ferme che NON hanno una scheda in questa lista. Finché i
+  // feedback non sono arrivati la lista è vuota e ci finiscono tutte: meglio
+  // mostrarle due volte per un istante che perderne una.
+  function fusioniOrfane() {
+    const ferme = (fusioni.pending || []).concat(fusioni.failed || []);
+    return MR.fusioniSenzaFeedback(ferme, allFeedbacks);
+  }
+
+  function renderFusioniOrfane() {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (!mgMergeApprovalsOrphans || !UI) return 0;
+    const orfane = fusioniOrfane();
+    const inAttesa = orfane.filter((r) => !r.used);
+    const fallite = orfane.filter((r) => r.used);
+    return UI.render(mgMergeApprovalsOrphans, opzioniFusioni({
+      requests: inAttesa, failed: fallite,
+    }));
+  }
+
   async function loadMergeApprovals(already) {
     const UI = window.SN_MERGE_APPROVALS;
-    if (!mgMergeApprovals || !UI) return 0;
+    if (!UI) return 0;
     const spegni = () => {
-      mergeApprovalsCount = 0;
-      mgMergeApprovals.replaceChildren();
-      mgMergeApprovals.hidden = true;
+      fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+      if (mgMergeApprovalsOrphans) {
+        mgMergeApprovalsOrphans.replaceChildren();
+        mgMergeApprovalsOrphans.hidden = true;
+      }
       if (mgMergeApprovalsRecent) {
         mgMergeApprovalsRecent.replaceChildren();
         mgMergeApprovalsRecent.hidden = true;
@@ -947,6 +981,7 @@
         mgMergeApprovalsPreapproved.replaceChildren();
         mgMergeApprovalsPreapproved.hidden = true;
       }
+      riflettiFusioni();
       return 0;
     };
     if (!isAdmin) return spegni();
@@ -958,16 +993,18 @@
       return spegni();
     }
     if (!r || r.ok === false) return spegni();
-    const n = UI.render(mgMergeApprovals, {
-      requests: r.pending || [],
+    fusioni = {
+      pending: r.pending || [],
       failed: r.failed || [],
-      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
-      onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
-      onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
-      onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
-    });
-    mergeApprovalsCount = n;
-    applyMergeApprovalsVisibility();
+      recent: r.recent || [],
+      // Il campanello del main manda solo ciò che è cambiato: quello che c'era
+      // resta finché non si rilegge.
+      preapproved: Array.isArray(r.preapproved) ? r.preapproved : (fusioni.preapproved || []),
+    };
+    const n = renderFusioniOrfane();
+    // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
+    // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
+    riflettiFusioni();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
     // Le fuse senza chiedere: il controllo a posteriori del segno messo sulla
     // pratica. Quando il main avvisa di un cambiamento manda solo l'elenco in
