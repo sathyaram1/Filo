@@ -495,6 +495,7 @@
   // lista; un motivo sconosciuto passa invariato (meglio grezzo che muto).
   const REASON_TEXTS = {
     secaudit: 'bloccato dalla sicurezza',
+    l5: 'fermo al cancello di fusione',
     clarify: 'domande per te',
     loop: 'difetto non più correggibile da soli',
     decisione: 'la verifica chiede una tua decisione',
