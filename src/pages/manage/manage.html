@@ -582,9 +582,11 @@
        filo d'aria in più ai lati perché si legga come "un livello solo". */
     .mg-forme { display: flex; align-items: center; gap: 6px; }
     .mg-forme-gruppo { display: flex; align-items: center; gap: 6px; margin: 0 2px; }
+    /* Stessa misura dei pallini dei giudici qui sotto (14px): la fila si legge
+       come una cosa sola, non come forme di pesi diversi. */
     .mg-forma {
       all: unset;
-      width: 16px; height: 16px; flex: 0 0 auto;
+      width: 14px; height: 14px; flex: 0 0 auto;
       display: inline-flex; align-items: center; justify-content: center;
       cursor: pointer; color: var(--sn-muted);
       transition: transform 0.1s;
