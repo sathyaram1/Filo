@@ -414,23 +414,35 @@
     if (Boot0 && typeof Boot0.segnaCampi === 'function') Boot0.segnaCampi();
   }
 
-  // Le righe del registro che l'utente ha cominciato e non sono ancora in
-  // memoria: quelle senza soprannome, che il salvataggio scarta apposta finché
-  // non sono complete. `load()` ridisegna l'elenco da quello che c'è in
-  // memoria, quindi senza questo una riga appena cominciata spariva con dentro
-  // quello che l'utente aveva scritto, e bastava un'impostazione cambiata
-  // altrove (#592, giro 4).
+  // Le righe del registro che l'utente ha scritto e che il salvataggio NON ha
+  // preso: quelle senza soprannome e quelle con un soprannome già usato più
+  // su. `load()` ridisegna l'elenco da quello che c'è in memoria, quindi senza
+  // questo una riga scartata spariva con dentro quello che l'utente aveva
+  // scritto, e bastava un'impostazione cambiata altrove (#592, giro 4).
+  //
+  // Il soprannome doppio è arrivato dopo (#592, giro 11): la pagina adesso si
+  // rilegge anche quando a salvare è stata lei, e la riga doppia — che prima
+  // restava lì segnata in rosso, in attesa che l'utente le cambiasse nome —
+  // spariva un istante dopo essere stata scritta.
   function righeNonSalvate() {
     const host = $('modelRegistryList');
     if (!host) return [];
     const attivo = document.activeElement;
     const fuori = [];
+    const visti = new Set();
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const nickEl = row.querySelector('.sn-model-nick');
       const idEl = row.querySelector('.sn-model-id');
       const nick = nickEl.value.trim();
       const model = idEl.value.trim();
-      if (nick || !model) continue;
+      // Riga vuota: la ridisegna `load()`, non c'è niente da salvare.
+      if (!nick && !model) continue;
+      // Presa in memoria: la ritroverà da sé. Il primo che usa un soprannome se
+      // lo tiene, come nel salvataggio.
+      if (nick && !visti.has(nick)) { visti.add(nick); continue; }
+      if (nick) visti.add(nick);
+      // Senza modello e senza soprannome doppio non c'è niente da rimettere.
+      if (!nick && !model) continue;
       // Se il cursore era dentro questa riga, ci torna: la riga viene rifatta,
       // e una riga che riappare senza cursore interrompe la digitazione.
       let fuoco = null;
