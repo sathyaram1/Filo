@@ -1485,8 +1485,8 @@
     filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
       `═══ CONTESTO (cambia a ogni messaggio) ═══\n` +
       PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
-      (modelName
-        ? `Il modello che ti sta eseguendo è ${modelName}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
+      (sanitizeModelName(modelName)
+        ? `Il modello che ti sta eseguendo è ${sanitizeModelName(modelName)}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
         : '') +
       memoryBlock({ profilo, preferenze, espansioni }) +
       lessonsBlock(lezioni) +
