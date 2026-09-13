@@ -210,7 +210,7 @@ test('porta B: nel rombo «## Problema» è un titolo e «- A» una voce, anche 
   await expect(voci.nth(2)).toHaveText('C: entrambe');
   await expect(body.locator('b')).toHaveCount(0);
   const txt = await body.innerText();
-  expect(txt).not.toMatch(/^\s*#/m);
+  expect(txt).not.toMatch(/^\s*#{1,6}\s/m);
   expect(txt).not.toMatch(/^\s*[-*]\s/m);
   expect(txt).toContain('#nonTitolo resta testo');
   expect(txt).not.toContain('\r');
