@@ -289,7 +289,9 @@ titoli: `## Problema` (due o tre righe), `## Scelte` (una voce per strada, col
 suo trade-off), `## Cosa ho fatto nel frattempo`. Breve, senza nomi di file o
 funzioni: lo legge chi non sa niente di codice. Il file va in `--segnala`
 anche quando correggi tu (`--record-fixed`), se il trade-off lo trovi
-correggendo.
+correggendo. Scrivilo FUORI dal repo, nella cartella temporanea del sistema
+(per esempio `../segnala-<numero>.md`): la registrazione rifiuta una directory
+con file non committati, e quel file non deve entrare nel ramo.
 
 La critica è per l'owner: comportamento dell'app, senza nomi di file/funzioni.
 Scrivi ogni rilievo **per esteso e autonomo** (cosa manca, dove, perché
