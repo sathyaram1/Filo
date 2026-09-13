@@ -143,7 +143,8 @@ tutto», dove svuotare la mappa è proprio quello che l'utente ha chiesto.
 - `src/shared/storage.js` — `partialCambiato`, il confronto fino alla foglia;
   `mappaRibasata`, per le mappe che viaggiano intere
 - `src/shared/pageBootstrap.js` — `ricaricaSenzaDisturbare`, `segnaCampi`, `segnaCampo`
-- `src/pages/preferences/preferences.js` — `raccogli`, `ribasa`, `persist`
+- `src/pages/preferences/preferences.js` — `raccogli`, `ribasa`, `persist`, più
+  `persistTokens` e `persistTabColor` per l'aspetto
 - `src/pages/options/options.js` — stesse tre funzioni
 - `src/pages/security/security.js` — stesse tre funzioni, più `saveCookies`
 - `tests/impostazioni-pagina-aperta.spec.mjs` — le porte, più la controprova che
