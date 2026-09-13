@@ -135,6 +135,7 @@ async function decryptFeedbackObject(fields, privKey) {
     }
   }
   await decryptPipelineField(out, C, priv);
+  await decryptLivelliFields(out, C, priv);
 
   // S1.priority: `priority` è un intero, non testo → logica dedicata (come in
   // decrypt-feedback-fields.mjs). Retrocompat: se è già un numero → invariato.
