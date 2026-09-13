@@ -53,15 +53,18 @@ async function apriRiquadroTonalita(openTab) {
     };
   });
 
+  // Filo applica subito il colore che ha scelto (è quello che fa davvero
+  // rispondendo: l'azione è di livello 1, reversibile, e non chiede conferma).
+  await eseguiInChat(page, { type: 'IMPOSTA_ESTETICA', token: 'button.bg', valore: '#3a7d44' });
+  await expect(async () => {
+    expect((await impostazioni(page)).themeTokens?.['button.bg']).toBe('#3a7d44');
+  }).toPass({ timeout: 8_000 });
+
   await page.fill('#input', 'rendi i bottoni verdi');
   await page.click('#sendBtn');
 
   const trigger = page.locator('.sn-refine-trigger');
   await expect(trigger).toBeVisible({ timeout: 20_000 });
-  // Il colore proposto da Filo è davvero in memoria.
-  await expect(async () => {
-    expect((await impostazioni(page)).themeTokens?.['button.bg']).toBe('#3a7d44');
-  }).toPass({ timeout: 8_000 });
 
   await trigger.click();
   await expect(page.locator('.sn-refine-overlay')).toBeVisible({ timeout: 8_000 });
