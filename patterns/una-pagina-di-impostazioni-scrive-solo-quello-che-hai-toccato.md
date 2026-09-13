@@ -130,7 +130,7 @@ dimenticanza: il loro contratto è «questa è la lista completa, chi manca è s
 rimosso», quindi mandarne un pezzo cancellerebbe il resto. Ma mandare la mappa
 com'era quando la pagina l'ha letta cancella quello che è cambiato altrove nel
 frattempo. Nel giro 5 un colore d'accento chiesto a Filo non tornava al valore
-di prima: **sparir** del tutto al primo ritocco di una misura, perché la mappa
+di prima: spariva del tutto al primo ritocco di una misura, perché la mappa
 dei colori partiva dalla fotografia dell'apertura.
 
 La regola: si legge la mappa in memoria al momento del salvataggio e ci si
