@@ -249,10 +249,12 @@ test('il segnaposto dello stile non deve sopravvivere dentro una memoria', async
   const r = await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     const profilo = `Va in bici. ${C.AGENT_STYLE_SLOT} Beve tè.`;
-    const ctx = C.PROMPTS.filoChatContext({
+    // Il messaggio di sistema della chat è tutto uno: parte immutabile (dove
+    // sta il segnaposto) più contesto (dove stanno le memorie).
+    const sistema = C.PROMPTS.filoChat({
       profilo, preferenze: '', lezioni: '', stato: '', history: '', files: '', modelName: 'x',
     });
-    const msgs = C.injectAgentStyle([{ role: 'system', content: ctx }], C.ACTIONS.FILO_CHAT, 'Tono asciutto.');
+    const msgs = C.injectAgentStyle([{ role: 'system', content: sistema }], C.ACTIONS.FILO_CHAT, 'Tono asciutto.');
     const testo = msgs[0].content;
     return { recinti: testo.split(C.AGENT_STYLE_OPEN).length - 1 };
   });
