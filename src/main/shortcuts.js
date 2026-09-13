@@ -123,7 +123,10 @@ async function saveForLater(win, tab) {
       description: extra.description,
       excerpt: extra.excerpt,
     },
-  });
+    // Questa chiamata nasce nel main (la scorciatoia da tastiera), non da una
+    // pagina: dichiararlo la distingue da un messaggio arrivato da un sito, che
+    // il gate centrale confronta con l'elenco di ciò che è lecito (#592).
+  }, { internal: true });
   try { win._filoTabs.closeTab(tab.id); } catch (_) {}
 }
 
