@@ -30,6 +30,30 @@ test('si registra su globalThis con la sua API', () => {
   }
 });
 
+describe('le fuse senza chiedere: quando, e quante mancano', () => {
+  test('la data della fusione si legge per esteso, non solo «N giorni fa»', () => {
+    const at = ORA - 7 * 24 * ORE;
+    const d = new Date(at);
+    const p = (n) => String(n).padStart(2, '0');
+    const attesa = `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} alle ${p(d.getHours())}:${p(d.getMinutes())}`;
+    assert.equal(UI.dateTimeText(at), attesa);
+    assert.equal(UI.mergedWhenText(at, ORA), `fusa il ${attesa} (7 giorni fa)`);
+    assert.equal(UI.dateTimeText(0), '');
+    assert.equal(UI.dateTimeText('boh'), '');
+    assert.equal(UI.mergedWhenText(0, ORA), 'fusa in un momento non registrato');
+  });
+
+  test('se il server ne ha lasciate fuori, si dice quante; se ci sono tutte, niente', () => {
+    assert.equal(UI.preapprovedMoreText(8, 8), '');
+    assert.equal(UI.preapprovedMoreText(8, undefined), '');
+    assert.equal(UI.preapprovedMoreText(0, 0), '');
+    assert.equal(UI.preapprovedMoreText(8, 9), 'Ce n’è un’altra, più vecchia, che qui non entra.');
+    assert.equal(UI.preapprovedMoreText(200, 212), 'Ce ne sono altre 12, più vecchie, che qui non entrano.');
+    // Un totale più piccolo dell'elenco è un dato incoerente: non si inventa.
+    assert.equal(UI.preapprovedMoreText(8, 3), '');
+  });
+});
+
 describe('il titolo', () => {
   test('zero richieste = nessun titolo: chi non ne ha non deve vedere niente', () => {
     assert.equal(UI.headline(0), '');
