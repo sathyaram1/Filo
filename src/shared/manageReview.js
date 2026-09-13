@@ -901,6 +901,342 @@
   // resto della lista. Basso di proposito (il segnale arriva subito).
   const REEVAL_WASTE_LIMIT = 3;
 
+  // ══ I cinque livelli di sicurezza, come una fila di forme ═════════════════
+  //
+  // Una segnalazione attraversa cinque controlli, e finora la dashboard ne
+  // mostrava due: il filtro d'ingresso spariva dentro una parola ("Attacco"),
+  // quello che Claude aveva segnalato lavorando finiva in mezzo alla
+  // conversazione, l'audit di sicurezza lasciava traccia solo quando bocciava e
+  // il cancello di fusione viveva in un riquadro a parte, sopra la lista.
+  //
+  // Qui i cinque livelli diventano cinque forme in fila, sempre le stesse e
+  // sempre nello stesso posto: triangolo (filtro d'ingresso), cerchi (giudici),
+  // rombo (segnalazione di Claude), pentagono (audit di sicurezza), quadrato
+  // (fusione). Un livello che non ha dato un parere è GRIGIO e resta al suo
+  // posto: la fila ha sempre la stessa lunghezza, e un buco si vede.
+  //
+  // Questa funzione è PURA e non disegna niente: dice, per ciascun livello,
+  // l'esito, il colore, il titolo sotto il puntatore e cosa scrivere nel
+  // pannello di destra. Chi disegna (src/pages/manage/manage.js) ci mette solo
+  // il markup — così l'intera tabella si prova senza aprire Filo.
+
+  // I quattro colori sono quelli che i pallini dei giudici usano già
+  // (src/pages/manage/manage.html, .mg-dot--*): stessa scala di severità in
+  // tutta la pagina, così il rosso vuol dire la stessa cosa ovunque.
+  const LIVELLO_COLORI = {
+    attack:  REASONS.attack.color,   // rosso  — bloccato / bocciato
+    spam:    REASONS.spam.color,     // giallo — in sospeso, o scavalcato dall'owner
+    design:  REASONS.design.color,   // verde  — passato, o una domanda per l'owner
+    aligned: ALIGNED.color,          // blu    — pulito
+  };
+
+  // Perché il filtro d'ingresso ha deciso così. I codici arrivano dal server;
+  // uno che questa tabella non conosce si scrive lo stesso, con i trattini
+  // bassi sciolti in spazi: un motivo grezzo dice più di un motivo nascosto.
+  const L1_MOTIVI = {
+    linked_prior_attack: 'collegato a un attacco precedente',
+    prior_attack: 'chi l’ha scritta aveva già tentato un attacco',
+    flagged_identity: 'identità già segnalata',
+    blocked_identity: 'identità bloccata',
+    new_account: 'account nuovo',
+    new_account_vpn: 'account nuovo da VPN',
+    vpn: 'connessione da VPN',
+    obfuscation: 'offuscamento',
+    encoding: 'testo codificato per nascondere il contenuto',
+    instruction_override: 'prova a scavalcare le istruzioni',
+    prompt_injection: 'tentativo di iniezione di istruzioni',
+    secrets: 'chiede chiavi o segreti',
+    rate_limit: 'troppe segnalazioni in poco tempo',
+    flood: 'troppe segnalazioni in poco tempo',
+    duplicate: 'già inviata',
+    too_long: 'testo fuori misura',
+    empty: 'testo vuoto',
+    link_spam: 'pieno di link',
+    gibberish: 'testo senza senso',
+    suspicious_file: 'allegato sospetto',
+  };
+  function l1MotivoText(code) {
+    const k = String(code == null ? '' : code).trim();
+    if (!k) return '';
+    return L1_MOTIVI[k] || k.replace(/_/g, ' ');
+  }
+
+  // Cosa ha FATTO il filtro d'ingresso, non come si chiama il campo.
+  const L1_AZIONI = {
+    block_attack: 'ha fermato la segnalazione come attacco',
+    block_spam: 'ha fermato la segnalazione come spam',
+    human_review: 'l’ha mandata alla tua revisione',
+    candidate_change: 'l’ha fatta passare in coda di lavorazione',
+  };
+
+  const L1_CATEGORIE = {
+    clean:     { esito: 'pulito',     etichetta: 'Pulito',     classe: 'aligned' },
+    spam:      { esito: 'spam',       etichetta: 'Spam',       classe: 'spam' },
+    dangerous: { esito: 'pericoloso', etichetta: 'Pericoloso', classe: 'attack' },
+  };
+
+  function forma(key, tipo, titolo, classe, esito, pannello, extra) {
+    const out = {
+      key, forma: tipo, titolo,
+      classe: classe || null,
+      colore: classe ? LIVELLO_COLORI[classe] : null,
+      esito,
+      vuoto: !classe,
+      pannello: pannello || { titolo: titolo, righe: [], testo: '', azioni: [] },
+    };
+    if (extra) Object.assign(out, extra);
+    return out;
+  }
+
+  function riga(etichetta, valore) {
+    return { etichetta: String(etichetta || ''), valore: String(valore == null ? '' : valore) };
+  }
+
+  /** Livello 1: il filtro d'ingresso (identità, forma, indizi). PURA. */
+  function livelloL1(fb) {
+    const titolo = 'Filtro d’ingresso';
+    const p = (fb && fb.pipeline && typeof fb.pipeline === 'object') ? fb.pipeline : null;
+    const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
+    // Senza categoria ma coi verdetti dei giudici: L2 gira solo se L1 ha fatto
+    // passare, quindi "pulito" è un fatto dedotto, non un'ipotesi.
+    const raw = String((p && p.l1Category) || '').trim();
+    const cat = L1_CATEGORIE[raw] || (p && verdicts.length ? L1_CATEGORIE.clean : null);
+    if (!cat) {
+      return forma('l1', 'triangolo', titolo, null, 'assente', {
+        titolo,
+        righe: [],
+        testo: 'Il filtro d’ingresso non ha lasciato traccia su questa segnalazione.',
+        azioni: [],
+      });
+    }
+    const motivi = (p && Array.isArray(p.l1Reasons) ? p.l1Reasons : [])
+      .map(l1MotivoText).filter(Boolean);
+    const azione = String((p && p.action) || '').trim();
+    const righe = [riga('Categoria', cat.etichetta)];
+    if (motivi.length) righe.push(riga('Perché', motivi.join(' · ')));
+    righe.push(riga('Chi ha deciso', 'il filtro automatico, prima dei giudici'));
+    if (azione) righe.push(riga('Cosa ha fatto', L1_AZIONI[azione] || azione.replace(/_/g, ' ')));
+    return forma('l1', 'triangolo', titolo, cat.classe, cat.esito, {
+      titolo, righe, testo: '', azioni: [],
+    });
+  }
+
+  /** Livello 2: i giudici. Un cerchio per giudice atteso, come da sempre. PURA. */
+  function livelloL2(fb) {
+    const titolo = 'Giudici';
+    const p = (fb && fb.pipeline && typeof fb.pipeline === 'object') ? fb.pipeline : {};
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
+    const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
+    const size = expected ? expected.length : Math.max(verdicts.length, panelSize(p));
+    const lettere = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const giudici = [];
+    for (let i = 0; i < size; i++) {
+      const v = expected
+        ? verdicts.find((x) => x && x.judge === expected[i]) || null
+        : (verdicts[i] || null);
+      giudici.push({
+        indice: i,
+        etichetta: `Giudice ${lettere[i] || (i + 1)}`,
+        classe: (v && v.class) || null,
+        verdetto: v,
+      });
+    }
+    const worst = worstVerdictBlock(fb);
+    const nota = judgesNote(fb);
+    const dati = verdicts.filter((v) => v && v.class).length;
+    return forma('l2', 'cerchi', titolo, worst ? worst.reason : (dati ? 'aligned' : null),
+      dati ? 'giudicato' : 'assente', {
+        titolo,
+        righe: [],
+        testo: dati ? '' : 'Nessun giudice ha ancora votato su questa segnalazione.',
+        azioni: [],
+      }, { giudici, nota: (nota && nota.text) || '', notaColore: (nota && nota.color) || null });
+  }
+
+  const L3_RUOLI = {
+    resolver: 'chi ha scritto il fix',
+    verifier: 'chi ha verificato il fix',
+    fixer: 'chi ha scritto il fix',
+    secaudit: 'chi ha fatto l’audit di sicurezza',
+  };
+
+  /** Livello 3: quello che Claude ha segnalato lavorando. PURA. */
+  function livelloL3(fb) {
+    const titolo = 'Segnalazione di Claude';
+    const l = livelliOf(fb).l3;
+    if (!l || !String(l.esito || '').trim()) {
+      return forma('l3', 'rombo', titolo, null, 'nessuna', {
+        titolo,
+        righe: [],
+        testo: 'Nessuna segnalazione: lavorando non è emersa nessuna scelta da farti fare.',
+        azioni: [],
+      });
+    }
+    const ruolo = String(l.ruolo || '').trim();
+    const righe = [];
+    if (ruolo) righe.push(riga('Chi ha segnalato', L3_RUOLI[ruolo] || ruolo));
+    if (l.at) righe.push(riga('Quando', String(l.at)));
+    const testo = String(l.testo || '').trim();
+    return forma('l3', 'rombo', titolo, 'design', 'segnalato', {
+      titolo,
+      righe,
+      testo: testo || 'La segnalazione è arrivata senza testo.',
+      illeggibile: valueUnreadable(l.testo),
+      azioni: [],
+    });
+  }
+
+  const L4_ESITI = {
+    pass:    { classe: 'design', etichetta: 'Passato' },
+    fail:    { classe: 'attack', etichetta: 'Bocciato' },
+    saltato: { classe: 'spam',   etichetta: 'Saltato da te' },
+  };
+
+  /** Livello 4: l'audit di sicurezza sul lavoro fatto. PURA. */
+  function livelloL4(fb) {
+    const titolo = 'Audit di sicurezza';
+    const l = livelliOf(fb).l4;
+    const esito = String((l && l.esito) || '').trim();
+    const info = L4_ESITI[esito];
+    if (!info) {
+      return forma('l4', 'pentagono', titolo, null, 'nonfatto', {
+        titolo,
+        righe: [],
+        testo: 'Audit non ancora fatto: si controlla il lavoro, non la segnalazione, quindi arriva quando c’è un fix da guardare.',
+        azioni: [],
+      });
+    }
+    const righe = [riga('Esito', info.etichetta)];
+    if (l.by) righe.push(riga('Deciso da', l.by === 'owner' ? 'te' : String(l.by)));
+    if (l.at) righe.push(riga('Quando', String(l.at)));
+    const testo = String(l.testo || '').trim();
+    return forma('l4', 'pentagono', titolo, info.classe, esito, {
+      titolo,
+      righe,
+      testo: testo || 'L’audit non ha lasciato un resoconto.',
+      illeggibile: valueUnreadable(l.testo),
+      // Bocciato: l'owner legge e può decidere di andare avanti lo stesso.
+      // Il cancello di fusione (L5) resta, quindi non è un via libera cieco.
+      azioni: esito === 'fail' ? ['salta_l4'] : [],
+    });
+  }
+
+  /** La mappa `livelli` del documento, sempre un oggetto. PURA. */
+  function livelliOf(fb) {
+    const l = fb && fb.livelli;
+    return (l && typeof l === 'object') ? l : {};
+  }
+
+  /** Il numero della segnalazione, senza cancelletto. PURA. */
+  function numeroOf(fb) {
+    const s = Number(fb && fb.seq);
+    if (!Number.isInteger(s) || s <= 0) return '';
+    const sub = Number(fb && fb.subSeq);
+    return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
+  }
+
+  /** Questa richiesta di fusione nasce da QUESTA segnalazione? PURA. */
+  function richiestaDiQuesto(req, fb) {
+    if (!req || !fb) return false;
+    const id = String(req.feedbackId || '').trim();
+    if (id && id === String(fb._id || '')) return true;
+    const num = String(req.num || '').trim().replace(/^#+/, '');
+    return !!num && num === numeroOf(fb);
+  }
+
+  /**
+   * Livello 5: il cancello di fusione. Le richieste arrivano dal server
+   * (`MERGE_APPROVALS_GET`) e si legano alla segnalazione per id o per numero.
+   * `opts.fusioni` = { pending, failed, preapproved, recent }. PURA.
+   */
+  function livelloL5(fb, opts) {
+    const titolo = 'Fusione';
+    const f = (opts && opts.fusioni && typeof opts.fusioni === 'object') ? opts.fusioni : {};
+    const lista = (k) => (Array.isArray(f[k]) ? f[k] : []).filter((r) => richiestaDiQuesto(r, fb));
+    const pending = lista('pending');
+    const failed = lista('failed');
+    const preapproved = lista('preapproved');
+    const { status } = normalizeStatus(fb);
+
+    // Una fusione approvata che non è avvenuta (conflitto) pesa quanto una
+    // richiesta ferma: è un sì già dato che non ha prodotto niente.
+    const ferme = failed.concat(pending);
+    if (ferme.length) {
+      const req = ferme[0];
+      const inConflitto = failed.length > 0;
+      return forma('l5', 'quadrato', titolo, 'attack', inConflitto ? 'conflitto' : 'bloccato', {
+        titolo,
+        righe: [],
+        testo: inConflitto
+          ? 'Avevi detto sì, ma la fusione non è avvenuta: il ramo non entra in main finché non si sistema.'
+          : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
+        azioni: [],
+      }, { richiesta: req, richieste: ferme, conflitto: inConflitto });
+    }
+
+    const versione = String((fb && fb.resolvedInVersion) || '').trim();
+    if (status === 'done' || preapproved.length) {
+      return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
+        titolo,
+        righe: versione ? [riga('Uscito nella versione', versione)] : [],
+        testo: preapproved.length
+          ? 'Fusa senza chiedere: avevi messo il segno su questa pratica.'
+          : 'Il lavoro è entrato in main.',
+        azioni: [],
+      }, { richiesta: preapproved[0] || null, richieste: preapproved, conflitto: false });
+    }
+
+    if (WORK_STAGES.indexOf(status) >= 0) {
+      return forma('l5', 'quadrato', titolo, 'spam', 'attesa', {
+        titolo,
+        righe: [],
+        testo: 'Il lavoro è in corso: al cancello ci arriva quando c’è un ramo da fondere.',
+        azioni: [],
+      }, { richiesta: null, richieste: [], conflitto: false });
+    }
+
+    return forma('l5', 'quadrato', titolo, null, 'nonarrivato', {
+      titolo,
+      righe: [],
+      testo: 'Niente da fondere: nessun ramo è ancora arrivato al cancello.',
+      azioni: [],
+    }, { richiesta: null, richieste: [], conflitto: false });
+  }
+
+  /**
+   * La fila intera, sempre cinque voci nello stesso ordine. PURA.
+   * `opts.fusioni` = gli elenchi del server (vedi livelloL5).
+   */
+  function livelli(fb, opts) {
+    return [livelloL1(fb), livelloL2(fb), livelloL3(fb), livelloL4(fb), livelloL5(fb, opts)];
+  }
+
+  /** La voce di un livello per chiave ('l1'…'l5'), o null. PURA. */
+  function livelloPer(fb, key, opts) {
+    return livelli(fb, opts).find((l) => l.key === String(key)) || null;
+  }
+
+  /**
+   * Questa segnalazione ha una fusione ferma che aspetta l'owner? PURA.
+   * È quello che fa diventare rossa la scheda in lista e la porta in cima
+   * alle cose da decidere: una fusione ferma È una decisione dell'owner.
+   */
+  function fusioneInAttesa(fb, opts) {
+    const l5 = livelloL5(fb, opts);
+    return l5.esito === 'bloccato' || l5.esito === 'conflitto';
+  }
+
+  /**
+   * Le richieste di fusione che NON hanno una segnalazione in questa lista:
+   * non hanno una scheda dove vivere, e restano visibili in Automazioni.
+   * Senza questo, una fusione locale (un ramo senza numero) sparirebbe. PURA.
+   */
+  function fusioniSenzaFeedback(richieste, feedbacks) {
+    const list = Array.isArray(feedbacks) ? feedbacks : [];
+    return (Array.isArray(richieste) ? richieste : [])
+      .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
+  }
+
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
