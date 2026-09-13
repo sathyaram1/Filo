@@ -2127,8 +2127,9 @@
   const MEMORY_OPEN = '<<<INIZIO MEMORIE DI FILO SU QUESTO UTENTE';
   const MEMORY_CLOSE = 'FINE MEMORIE DI FILO SU QUESTO UTENTE>>>';
 
+  // Anche qui il segnaposto dello stile se ne va: stessa ragione delle lezioni.
   function sanitizeMemory(raw) {
-    return togliMarcatori(raw, [MEMORY_OPEN, MEMORY_CLOSE]);
+    return togliMarcatori(raw, [MEMORY_OPEN, MEMORY_CLOSE, AGENT_STYLE_SLOT]);
   }
 
   // Il recinto dei moduli di memoria. `profilo`, `preferenze` ed `espansioni`
