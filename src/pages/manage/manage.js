@@ -2148,7 +2148,58 @@
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
+    reflectPreapproved(fb);
   }
+
+  // Il tasto «Fondi senza chiedermelo» e la riga che dice chi ha messo il
+  // segno. Sulle pratiche chiuse il tasto sparisce: il segno lì non conta.
+  function reflectPreapproved(fb) {
+    if (!mgPreapproveBtn) return;
+    const m = preapprovedOf(fb);
+    const aperta = isOpenPublic(fb);
+    mgPreapproveBtn.disabled = false;
+    mgPreapproveBtn.hidden = !aperta;
+    mgPreapproveBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
+    mgPreapproveBtn.textContent = m ? 'Chiedimi prima di fondere' : 'Fondi senza chiedermelo';
+    mgPreapproveBtn.title = m
+      ? 'Oggi il lavoro delle automazioni su questa pratica si fonde da solo anche se i controlli lo fermano. Toglilo per tornare a ricevere la richiesta da approvare.'
+      : 'Se i controlli di sicurezza fermano il lavoro delle automazioni su questa pratica, il server fonde lo stesso, senza aspettare il tuo click. Quello che era stato fermato lo trovi poi in Automazioni.';
+    if (mgPreapprovedInfo) {
+      mgPreapprovedInfo.hidden = !(m && aperta);
+      mgPreapprovedInfo.textContent = m && aperta
+        ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${fmtDate(m.at)}` : ''}.`
+        : '';
+    }
+  }
+
+  // Mette o toglie il segno. Il CHI lo scrive il main dalla sessione: da qui
+  // parte solo sì/no.
+  async function togglePreapproved() {
+    if (!selectedId || !mgPreapproveBtn) return;
+    const id = selectedId;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    const next = !preapprovedOf(fb);
+    mgPreapproveBtn.disabled = true;
+    setManageMsg(next ? 'Segno la pratica…' : 'Tolgo il segno…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, mergePreapproved: next });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      // Il documento vero porta l'email della sessione; qui basta che il segno
+      // ci sia, e l'aggiornamento continuo porterà il resto.
+      fb.mergePreapproved = next ? { by: (r && r.by) || 'te', at: new Date().toISOString() } : undefined;
+      if (selectedId !== id) { renderList(); return; }
+      reflectPreapproved(fb);
+      renderList();
+      setManageMsg(next ? 'Da ora si fonde senza chiedere.' : 'Da ora ti chiede prima di fondere.', 'ok');
+    } catch (e) {
+      if (selectedId !== id) return;
+      setManageMsg(e.message || 'Errore', 'err');
+    } finally {
+      mgPreapproveBtn.disabled = false;
+    }
+  }
+  if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', togglePreapproved);
 
   // ── L'etichetta di stato del dettaglio ────────────────────────────────────
   // Le parole (etichetta, motivo, hover) vengono dal modulo condiviso: la
