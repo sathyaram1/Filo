@@ -883,10 +883,14 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
     const text = (r?.text || '').trim();
     if (!text || /^NULLA DA IMPARARE/i.test(text)) return;
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    let scritte = 0;
     for (const line of lines) {
       const m = line.match(/^LEZIONE:\s*(.+)$/i);
-      if (m) await FiloMem.appendLesson(m[1]);
+      if (m) { await FiloMem.appendLesson(m[1]); scritte++; }
     }
+    // Le lezioni che Filo si scrive da solo a fine scambio sono quelle che
+    // l'utente non ha chiesto: devono comparire subito dove le può rileggere.
+    if (scritte) broadcastLiveUpdate();
     if (await FiloMem.lessonsBufferShouldCompact()) {
       maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
     }
