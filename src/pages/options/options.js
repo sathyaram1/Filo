@@ -423,11 +423,20 @@
   function righeNonSalvate() {
     const host = $('modelRegistryList');
     if (!host) return [];
+    const attivo = document.activeElement;
     const fuori = [];
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
-      const nick = row.querySelector('.sn-model-nick').value.trim();
-      const model = row.querySelector('.sn-model-id').value.trim();
-      if (!nick && model) fuori.push({ nick, model, provider: row.querySelector('.sn-model-provider').value });
+      const nickEl = row.querySelector('.sn-model-nick');
+      const idEl = row.querySelector('.sn-model-id');
+      const nick = nickEl.value.trim();
+      const model = idEl.value.trim();
+      if (nick || !model) continue;
+      // Se il cursore era dentro questa riga, ci torna: la riga viene rifatta,
+      // e una riga che riappare senza cursore interrompe la digitazione.
+      let fuoco = null;
+      if (attivo === nickEl) fuoco = { campo: '.sn-model-nick', start: attivo.selectionStart, end: attivo.selectionEnd };
+      if (attivo === idEl) fuoco = { campo: '.sn-model-id', start: attivo.selectionStart, end: attivo.selectionEnd };
+      fuori.push({ nick, model, provider: row.querySelector('.sn-model-provider').value, fuoco });
     }
     return fuori;
   }
@@ -438,6 +447,11 @@
     for (const r of righe) {
       const row = makeModelRow(r.nick, { provider: r.provider, model: r.model });
       host.appendChild(row);
+      if (!r.fuoco) continue;
+      const campo = row.querySelector(r.fuoco.campo);
+      if (!campo) continue;
+      try { campo.focus(); } catch (_) {}
+      try { if (r.fuoco.start != null) campo.setSelectionRange(r.fuoco.start, r.fuoco.end); } catch (_) {}
     }
     applyOpenWeightsTestGates();
   }
