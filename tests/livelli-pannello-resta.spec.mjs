@@ -43,13 +43,14 @@ async function apri(page, fbs) {
   await expect(page.locator('#mgDetail')).toBeVisible();
 }
 
-async function aggiorna(page, doc) {
-  await page.evaluate((d) => {
+async function aggiorna(page, doc, altre = []) {
+  await page.evaluate(({ d, altre }) => {
     window.__mgTest.setLiveSources({
-      listVersions: async () => [{ _id: d._id, _updateTime: d._updateTime }],
+      listVersions: async () => [{ _id: d._id, _updateTime: d._updateTime }]
+        .concat(altre.map((a) => ({ _id: a._id, _updateTime: a._updateTime }))),
       getMany: async () => [d],
     });
-  }, doc);
+  }, { d: doc, altre });
   const r = await page.evaluate(() => window.__mgTest.pollNow());
   expect(r.changed).toBe(1);
 }
