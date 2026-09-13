@@ -86,3 +86,41 @@ const nomi = Object.entries(MESSAGES)
 ```
 
 Esempio in `tests/memoria-di-filo.spec.mjs`.
+
+## Il dato non sta solo dietro i suoi messaggi: sta anche in una chiave
+
+Chiudere tutti i messaggi che servono un dato non lo chiude. Sotto i messaggi
+c'è lo storage, e il canale generico dello storage (`_storage:get`,
+`_storage:set`, `_storage:remove`) risponde anche alle pagine visitate: è la
+porta di servizio della stessa stanza, e ci si entra con il nome della chiave
+invece che con il nome del messaggio.
+
+È successo con la memoria di Filo (#592, giro 8). Il giro 6 aveva chiuso i tre
+messaggi nuovi, il giro 7 quello vecchio che dava gli stessi moduli. Il canale
+dello storage difendeva **una chiave sola**, `settings`, quindi da un indirizzo
+web la memoria si leggeva, si riscriveva e si cancellava lo stesso. E scriverla
+è peggio che leggerla: una riga entrata da fuori sta in ogni prompt, vale in
+ogni conversazione e sopravvive al riavvio, senza dover convincere il modello a
+salvare niente. Dalla stessa porta uscivano anche il registro delle azioni
+recenti, le notifiche, le sveglie e il messaggio della home, che finiscono nel
+contesto che il modello legge a ogni messaggio, e la cronologia delle
+conversazioni con Filo.
+
+Quindi, per un dato che le pagine web non devono toccare, le porte sono due e si
+chiudono insieme: i suoi messaggi, e la sua chiave. Sul canale dello storage
+vale la regola del paragrafo qui sopra, l'elenco di ciò che è lecito
+(`SN_CONST.WEB_STORAGE_KEYS`): le pagine visitate ci tengono il dizionario
+personale, l'autocorrezione, la disposizione delle icone del menu e la bozza di
+un feedback, e leggono le impostazioni. Tutto il resto è vietato, e una chiave
+nuova nasce vietata.
+
+In lettura si FILTRA invece di rifiutare: `get(null)`, «dammi tutto», è la forma
+normale dello shim, e rifiutarla spegnerebbe il correttore in ogni pagina. In
+scrittura si rifiuta l'intera richiesta se anche una sola chiave è fuori
+elenco: una scrittura mezza fatta è peggio di una rifiutata, perché chi chiama
+non ha modo di sapere quale metà è passata.
+
+La sentinella in `tests/unit/webStorageAllow.test.mjs` legge le chiavi dal
+CODICE degli script che girano nelle pagine visitate e verifica che stiano tutte
+nell'elenco: una lista scritta a mano nel test invecchia in silenzio, ed è
+esattamente il difetto che l'elenco corregge.
