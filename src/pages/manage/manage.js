@@ -902,6 +902,7 @@
   // controlli di sicurezza deve lasciare una traccia che si può guardare.
   const mgMergeApprovals = document.getElementById('mgMergeApprovals');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
+  const mgMergeApprovalsPreapproved = document.getElementById('mgMergeApprovalsPreapproved');
 
   // Il pannello-lista è condiviso dalle quattro schede (Ricevuti / In coda /
   // Risolti / Archiviati): l'avviso appartiene SOLO ai Ricevuti, quindi la
