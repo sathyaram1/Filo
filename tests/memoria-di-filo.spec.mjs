@@ -82,11 +82,39 @@ test('«Dimentica tutto» svuota un modulo solo e lascia stare gli altri', async
 
   const page = await apri(openTab);
   await page.locator('.mem-group-head', { hasText: 'Chi sei' }).locator('.mem-clear').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await clickConfirm(page, 'ok');
 
   await expect(righe(page)).toHaveCount(1);
   const dopo = await memoria(app);
   expect(dopo.memory.PROFILO).toBe('');
   expect(dopo.memory.PREFERENZE).toBe('Risposte corte');
+});
+
+test('«Dimentica tutto» chiede prima, e se dici di no non tocca niente', async ({ app, openTab }) => {
+  // Butta via il gruppo intero e non si torna indietro: la stessa cancellazione
+  // chiesta a Filo a voce gli fa digitare «conferma», quindi da qui non può
+  // costare un clic solo (#592, giro 10). Contava anche perché il bottone
+  // stava nella stessa colonna del × che toglie una riga sola.
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.setMemory({
+      PROFILO: 'Si chiama Marta\nVive a Lisbona\nLavora in banca',
+      PREFERENZE: '',
+    });
+  });
+
+  const page = await apri(openTab);
+  await page.locator('.mem-group-head', { hasText: 'Chi sei' }).locator('.mem-clear').click();
+
+  const riquadro = page.locator(CONFIRM_HOST);
+  await expect(riquadro).toBeVisible();
+  // Dice quanto si perde, invece di un «sei sicuro?» che non informa.
+  await expect.poll(() => confirmText(page)).toContain('3 righe');
+  await clickConfirm(page, 'cancel');
+
+  await expect(riquadro).toHaveCount(0);
+  await expect(righe(page)).toHaveCount(3);
+  expect((await memoria(app)).memory.PROFILO).toContain('Marta');
 });
 
 test('senza niente in memoria la pagina lo dice, invece di lasciare un buco', async ({ app, openTab }) => {
