@@ -2897,8 +2897,28 @@ require('./handlers/misc')(on, handlerCtx);
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
+// Chi sta chiedendo è uno script che gira in una PAGINA VISITATA? Tutto ciò che
+// non è una pagina interna filo://, la shell, o una chiamata del main che si
+// dichiara tale. Un'origine vuota conta come pagina web: è il verso prudente, lo
+// stesso dei gate dentro i singoli handler.
+function daPaginaWeb(sender, origin) {
+  if (sender?.isShell || sender?.internal) return false;
+  return !String(origin || '').startsWith('filo://');
+}
+
 async function handleMessage(msg, sender = {}) {
   const origin = sender?.tab?.url || sender?.url || '';
+  // #592, giro 9 — il gate delle pagine web sta QUI, prima degli handler, e
+  // legge l'elenco di ciò che è lecito (SN_MSG.WEB_ALLOWED, dove c'è anche il
+  // perché). Prima era scritto a mano dentro i singoli handler: un messaggio
+  // nuovo nasceva APERTO a qualunque sito visitato, e nessuno se ne accorgeva
+  // finché non lo cercava. Da un indirizzo web si leggevano lo stato che il
+  // modello legge a ogni messaggio, l'archivio delle schede chiuse e le pagine
+  // messe da parte, si scriveva una sveglia il cui nome finisce in ogni prompt e
+  // si svuotava l'archivio. Adesso un messaggio nuovo nasce vietato.
+  if (daPaginaWeb(sender, origin) && !globalThis.SN_MSG.WEB_ALLOWED.has(msg.type)) {
+    return { ok: false, error: 'forbidden' };
+  }
   const fn = registry.get(msg.type);
   if (fn) return fn(msg, sender, origin);
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };
