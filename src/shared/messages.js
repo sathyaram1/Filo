@@ -722,5 +722,84 @@
     AI_STREAM: 'ai_stream',
   };
 
-  global.SN_MSG = { MSG, PORTS };
+  // ── Cosa può chiedere uno script che gira in una pagina VISITATA ──────────
+  //
+  // Il canale dei messaggi è UNO SOLO e ci arrivano sia le pagine interne
+  // (shell, filo://) sia gli script che Filo fa girare dentro le pagine web.
+  // Per anni la difesa era un gate scritto a mano dentro i singoli handler, uno
+  // per volta: chi registrava un messaggio nuovo lo apriva a qualunque sito
+  // visitato senza accorgersene, perché quello era il default. Da un indirizzo
+  // web si leggevano lo stato che il modello legge a ogni messaggio (schede
+  // aperte, sveglie, notifiche, registro delle azioni, messaggio della home),
+  // l'archivio delle schede chiuse e le pagine messe da parte; si scriveva una
+  // sveglia il cui NOME finisce dentro ogni prompt; si svuotava l'archivio
+  // delle schede (#592, giro 9).
+  //
+  // Quindi qui l'elenco è di ciò che è LECITO, come per le chiavi dello storage
+  // e per i campi delle impostazioni (#592, giri 4 e 8): un messaggio nuovo
+  // nasce VIETATO alle pagine visitate, non permesso per dimenticanza. Il gate
+  // è uno solo e sta nel dispatch centrale, prima degli handler; i gate dentro
+  // i singoli handler restano dove ci sono, come seconda barriera.
+  //
+  // L'elenco non si indovina: contiene esattamente i messaggi che gli script
+  // sotto `src/content/` (più `src/preload/page-preload.js`) mandano davvero, e
+  // una sentinella negli unit test li rilegge da quel codice e diventa rossa se
+  // divergono. Aggiungere una voce qui vuol dire rispondere sì alla domanda
+  // «ha senso che un sito qualsiasi lo chiami?»: vedi
+  // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md.
+  const WEB_ALLOWED = new Set([
+    // Chiedere qualcosa all'AI, leggere ad alta voce, cercare sul web: sono le
+    // funzioni di Filo sulla pagina (spiega, traduci, riassumi, leggi).
+    MSG.AI_REQUEST, MSG.WEB_SEARCH,
+    MSG.TTS_SYNTH, MSG.TTS_READING_STATE, MSG.TTS_READING_STATUS, MSG.TTS_STOP_READING,
+    // L'agente «Aiuto» nella barra laterale: aziona un'azione di Filo passando
+    // dal registro dei livelli e dalla conferma, e i comandi rapidi della barra.
+    MSG.FILO_RUN_ACTION, MSG.FILO_CONFIRM_ACTION, MSG.SHELL_ACTION,
+    // Navigazione e schede: sono i bottoni del menu del tasto destro.
+    MSG.NAV_BACK, MSG.NAV_FORWARD, MSG.NAV_RELOAD, MSG.NAV_STATE,
+    MSG.CLOSE_TAB, MSG.OPEN_NEW_TAB, MSG.OPEN_URL, MSG.OPEN_INCOGNITO,
+    MSG.OPEN_HOME, MSG.GO_HOME, MSG.OPEN_OPTIONS, MSG.OPEN_SPELLCHECK_PAGE,
+    MSG.TOGGLE_FULLSCREEN, MSG.EXIT_FULLSCREEN, MSG.FULLSCREEN_STATE,
+    MSG.ESC_CHIEDI_TASTO, MSG.ESC_CONSUMATO,
+    MSG.RUN_IN_TOP_FRAME, MSG.CLOSE_OTHER_MENUS,
+    MSG.TRANSLATE_FRAMES, MSG.FRAME_TRANSLATE_DONE,
+    // Segnali che la pagina manda sul proprio conto (colore, attività).
+    MSG.TAB_ACTIVITY, MSG.TAB_DOMINANT_COLOR, MSG.TAB_IDENTITY_COLOR,
+    // Correttore e appunti copiati: il menu «Incolla» e la correzione del testo
+    // funzionano su QUALSIASI pagina, quindi la cronologia degli appunti si
+    // legge, si aggiunge, si descrive, si toglie una voce e si svuota anche da
+    // qui — è il menu dell'utente, non una lettura di nascosto. La cronologia
+    // delle CONVERSAZIONI e quella di navigazione non sono in questo elenco.
+    MSG.REPLACE_MISSPELLING,
+    MSG.GET_CLIPBOARD_HISTORY, MSG.PUSH_CLIPBOARD_ENTRY,
+    MSG.REMOVE_CLIPBOARD_ENTRY, MSG.CLEAR_CLIPBOARD_HISTORY,
+    MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+    // Salvataggi partiti dal menu della pagina: mettere da parte la pagina o un
+    // link. RILEGGERE o togliere quello che è stato messo da parte no: quello si
+    // fa dalle pagine interne.
+    MSG.SAVE_PAGE, MSG.SAVE_LINK, MSG.SET_SAVED_PAGE_THUMB, MSG.SAVE_PATH,
+    // Scaricare un'immagine, un media, un link dal menu del tasto destro.
+    MSG.DOWNLOAD_IMAGE, MSG.DOWNLOAD_MEDIA, MSG.DOWNLOAD_LINK,
+    // Impostazioni: lettura piena (il tema e il correttore servono a ogni
+    // script della pagina) e scrittura filtrata al solo modello di dettatura.
+    MSG.GET_SETTINGS, MSG.UPDATE_SETTINGS,
+    // Cattura dello schermo e riquadro del feedback, che si apre da ogni pagina.
+    MSG.CAPTURE_VISIBLE_TAB, MSG.CAPTURE_FEEDBACK_TOPBAR,
+    MSG.FEEDBACK_ANNOTATE, MSG.FEEDBACK_CLEAR_DRAW, MSG.SUBMIT_FEEDBACK,
+    MSG.CREDITS_AWARD_FEEDBACK,
+    // Il banco di prova di sicurezza si apre da ogni pagina e mostra il saldo.
+    MSG.REDTEAM_SUBMIT, MSG.GET_CREDITS, MSG.AUTH_SIGNIN, MSG.AUTH_STATUS,
+    // Avvisi sul sito che si sta guardando: siti pericolosi, cookie, posizione.
+    MSG.SAFEBROWSE_GET, MSG.SAFEBROWSE_PROCEED, MSG.SAFEBROWSE_DISMISS,
+    MSG.COOKIES_CONFIG, MSG.GEO_PROPOSE_ACCEPT, MSG.GEO_PROPOSE_DISMISS,
+    MSG.SHORTCUT_TRIGGERED,
+    // Canali interni dello shim chrome.*: lo storage filtra per chiave
+    // (SN_CONST.WEB_STORAGE_KEYS) e i tab aprono/chiudono soltanto.
+    '_storage:get', '_storage:set', '_storage:remove', '_storage:clear',
+    '_tabs:create', '_tabs:remove',
+    // Anteprima di un link al passaggio del mouse.
+    'fetch_link_meta',
+  ]);
+
+  global.SN_MSG = { MSG, PORTS, WEB_ALLOWED };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
