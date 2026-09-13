@@ -1007,9 +1007,10 @@
   // sparito fa credere che sia stato risolto.
   function riappendiAlTesto(el) {
     if (el.id === 'agentStyleText') { syncPresetSelect(); refreshStyleLimit(); return; }
-    // Le misure e i colori dell'aspetto: il valore scritto male si riconvalida
-    // sul posto, con il suo messaggio e il bordo rosso.
-    if (el.id.startsWith('tok-')) { onTokenInput(el.id.slice(4)); return; }
+    // Le misure e i colori dell'aspetto: il valore scritto male torna sullo
+    // schermo col suo messaggio e il bordo rosso, come quando l'utente esce dal
+    // campo. Se invece è valido, la riga si riallinea.
+    if (el.id.startsWith('tok-')) { chiudiRigaToken(el.id.slice(4)); return; }
     if (el.id.startsWith('tabcol-')) onTabColorInput(el.id.slice(7));
   }
 
