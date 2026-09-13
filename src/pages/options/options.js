@@ -409,12 +409,44 @@
     // Punto di partenza del confronto: quello che i campi mostrano adesso è
     // quello che c'è in memoria, quindi non c'è niente da salvare.
     ribasa();
+    // E fotografia dei campi di testo, per la rilettura.
+    const Boot0 = window.SN_PAGE_BOOTSTRAP;
+    if (Boot0 && typeof Boot0.segnaCampi === 'function') Boot0.segnaCampi();
+  }
+
+  // Le righe del registro che l'utente ha cominciato e non sono ancora in
+  // memoria: quelle senza soprannome, che il salvataggio scarta apposta finché
+  // non sono complete. `load()` ridisegna l'elenco da quello che c'è in
+  // memoria, quindi senza questo una riga appena cominciata spariva con dentro
+  // quello che l'utente aveva scritto, e bastava un'impostazione cambiata
+  // altrove (#592, giro 4).
+  function righeNonSalvate() {
+    const host = $('modelRegistryList');
+    if (!host) return [];
+    const fuori = [];
+    for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      const nick = row.querySelector('.sn-model-nick').value.trim();
+      const model = row.querySelector('.sn-model-id').value.trim();
+      if (!nick && model) fuori.push({ nick, model, provider: row.querySelector('.sn-model-provider').value });
+    }
+    return fuori;
+  }
+
+  function rimettiRigheNonSalvate(righe) {
+    const host = $('modelRegistryList');
+    if (!host || !righe.length) return;
+    for (const r of righe) {
+      const row = makeModelRow(r.nick, { provider: r.provider, model: r.model });
+      host.appendChild(row);
+    }
+    applyOpenWeightsTestGates();
   }
 
   // Un'impostazione può cambiare mentre questa pagina è aperta (Filo in chat,
   // un'altra scheda). La pagina si rilegge sempre, così non mostra un valore
-  // che non è più vero; l'unica cosa che si rimette al suo posto è il testo che
-  // l'utente stava scrivendo, per esempio una chiave API a metà.
+  // che non è più vero, e rimette al loro posto le cose che l'utente ha scritto
+  // e che la pagina non ha salvato: una chiave API a metà, una riga di modello
+  // appena cominciata.
   function ascoltaCambiamentiAltrove() {
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
@@ -422,7 +454,11 @@
       if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       const Boot = window.SN_PAGE_BOOTSTRAP;
       if (Boot && typeof Boot.ricaricaSenzaDisturbare === 'function') {
-        Boot.ricaricaSenzaDisturbare(load).catch(() => {});
+        const righe = righeNonSalvate();
+        Boot.ricaricaSenzaDisturbare(async () => {
+          await load();
+          rimettiRigheNonSalvate(righe);
+        }).catch(() => {});
       } else {
         load().catch(() => {});
       }
