@@ -15,7 +15,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFile } from 'node:child_process';
 import { createServer } from 'node:http';
 import { rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -253,11 +253,15 @@ test('canale: deliver status --segnala manda `segnalazione` intera; file assente
     const seg = resolve(casa, 'segnala.md');
     writeFileSync(seg, '## Problema\r\nDue strade.\r\n\r\n## Scelte\r\n- A: costa.\r\n- B: lenta.\r\n', 'utf8');
     const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
-    const lancia = (args) => spawnSync(process.execPath, [CANALE, ...args], { env, encoding: 'utf8', cwd: casa });
+    // Asincrono, non spawnSync: il server finto vive in QUESTO processo, e
+    // una spawn bloccante gli toglie il ciclo degli eventi (il figlio aspetta
+    // una risposta che non arriva mai).
+    const lancia = (args) => new Promise((r) => execFile(process.execPath, [CANALE, ...args], { env, cwd: casa },
+      (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
 
     // `working` e non `revision_capability`: qui si prova il campo, non il
     // controllo sui file fuori dai commit (che vale sulla directory vera).
-    const ok = lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
+    const ok = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
       '--notes', 'Preso in carico: ho trovato un trade-off vero e lo segnalo.', '--segnala', seg]);
     assert.equal(ok.status, 0, `la consegna doveva partire (stderr: ${ok.stderr})`);
     const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
@@ -269,19 +273,19 @@ test('canale: deliver status --segnala manda `segnalazione` intera; file assente
 
     // File assente: si ferma prima del server, con la frase giusta.
     const prima = ricevuti.length;
-    const assente = lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
+    const assente = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
       '--notes', 'Preso in carico.', '--segnala', 'manca.md']);
     assert.equal(assente.status, 1);
     assert.match(String(assente.stderr), /manca\.md non esiste/);
     assert.equal(ricevuti.length, prima, 'niente deve partire');
 
     // --segnala senza file dopo: errore d'uso.
-    const monco = lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working', '--segnala']);
+    const monco = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working', '--segnala']);
     assert.equal(monco.status, 1);
     assert.match(String(monco.stderr), /--segnala vuole un testo/);
 
     // Su un intento che il server non legge (note) non si consegna a vuoto.
-    const altrove = lancia(['deliver', 'biglietto-di-prova', 'note', '--notes', 'Una riga.', '--segnala', seg]);
+    const altrove = await lancia(['deliver', 'biglietto-di-prova', 'note', '--notes', 'Una riga.', '--segnala', seg]);
     assert.equal(altrove.status, 1);
     assert.match(String(altrove.stderr), /vale solo su deliver status, fixed e verdict/);
     assert.equal(ricevuti.length, prima, 'niente deve partire');
