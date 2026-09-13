@@ -492,10 +492,38 @@
   // che non è più vero, e rimette al loro posto le cose che l'utente ha scritto
   // e che la pagina non ha salvato: una chiave API a metà, una riga di modello
   // appena cominciata.
+  // Quello che questa pagina mostra, letto da un'impostazione arrivata
+  // dall'annuncio. Serve per capire se l'annuncio porta davvero qualcosa di
+  // nuovo per lei.
+  function valoriDaImpostazioni(s) {
+    const st = s && typeof s === 'object' ? s : {};
+    const k = st.apiKeys && typeof st.apiKeys === 'object' ? st.apiKeys : {};
+    return {
+      useDefaultModels: !!st.useDefaultModels,
+      openWeightsOnly: !!st.openWeightsOnly,
+      apiKeys: { openrouter: k.openrouter || '', tavily: k.tavily || '' },
+      modelRegistry: st.modelRegistry || {},
+      models: st.models || {},
+      monthlyLimitEur: Number(st.monthlyLimitEur) || 0,
+    };
+  }
+
   function ascoltaCambiamentiAltrove() {
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
+      // L'annuncio arriva anche a chi ha appena salvato. Se non porta niente
+      // che questa pagina mostri diversamente da com'è adesso, rileggere è
+      // lavoro a vuoto che però si vede: ridisegnando l'elenco dei modelli
+      // cancella per un istante il bordo rosso e la spiegazione che il
+      // salvataggio ha appena messo sulle righe scartate (#592, giro 11).
+      // Non è il momento di sordità di prima (#592, giro 5): qui non si guarda
+      // l'orologio, si guarda se c'è qualcosa di diverso da mostrare.
+      try {
+        if (ultimoInviato && !Object.keys(
+          Storage.partialCambiato(ultimoInviato, valoriDaImpostazioni(msg.settings)),
+        ).length) return;
+      } catch (_) { /* nel dubbio si rilegge */ }
       const Boot = window.SN_PAGE_BOOTSTRAP;
       if (Boot && typeof Boot.ricaricaSenzaDisturbare === 'function') {
         const righe = righeNonSalvate();
