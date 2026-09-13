@@ -3449,6 +3449,7 @@
         <div class="mg-sender-list" id="senderFbList">${listHtml || '<em>Nessun feedback.</em>'}</div>
       </div>
     `;
+    segnaForma(null);
     openSidebar('Mittente', html);
 
     // Click su un feedback del mittente → carica nel pannello centrale
