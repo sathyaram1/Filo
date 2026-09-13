@@ -574,6 +574,194 @@
     $('agentStylePreset').value = match ? match.key : CUSTOM_KEY;
   }
 
+  // ── Memoria di Filo: quello che si è appuntato su di te (#592) ───────────
+  //
+  // Le lezioni che Filo si scrive e i moduli in cui finiscono hanno la stessa
+  // portata dello stile dell'agente: entrano nel prompt di ogni conversazione e
+  // sopravvivono al riavvio. Una lezione però entra SENZA chiedere niente, e
+  // ci si arriva anche di traverso (il titolo di una scheda, un risultato web o
+  // il riassunto di un file che convincono Filo a «ricordarsi» una regola).
+  // L'unica cosa che la tiene a bada è che l'utente possa rileggerla e
+  // toglierla: prima non c'era nessun posto dove farlo, e l'unica strada era
+  // cancellare tutta la memoria insieme, profilo di mesi compreso.
+  //
+  // Sta accanto allo stile perché è la stessa promessa, sulla stessa pagina.
+  const MEM_TITOLI = {
+    PROFILO: 'Chi sei',
+    PREFERENZE: 'Come preferisci le cose',
+  };
+
+  let memoria = { memory: {}, lessons: [] };
+
+  function memLines(testo) {
+    const M = window.SN_FILO_MEMORY;
+    return M && typeof M.memoryLines === 'function' ? M.memoryLines(testo) : [];
+  }
+
+  async function loadMemoria() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.FILO_LIST_MEMORY });
+      if (!r || !r.ok) return;
+      memoria = {
+        memory: r.memory && typeof r.memory === 'object' ? r.memory : {},
+        lessons: Array.isArray(r.lessons) ? r.lessons : [],
+      };
+    } catch (_) {
+      return;
+    }
+    renderMemoria();
+  }
+
+  function quandoBreve(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getDate()}/${d.getMonth() + 1}`;
+  }
+
+  // Una riga con il suo ×. `dimentica` fa la cancellazione e ricarica.
+  function rigaMemoria({ testo, quando, titoloBottone, dimentica }) {
+    const row = document.createElement('div');
+    row.className = 'mem-line';
+
+    if (quando) {
+      const when = document.createElement('span');
+      when.className = 'mem-when';
+      when.textContent = quando;
+      row.appendChild(when);
+    }
+
+    const t = document.createElement('span');
+    t.className = 'mem-text';
+    t.textContent = testo;
+    row.appendChild(t);
+
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'mem-forget';
+    x.textContent = '×';
+    x.title = titoloBottone;
+    x.setAttribute('aria-label', titoloBottone);
+    x.addEventListener('click', async () => {
+      x.disabled = true;
+      try { await dimentica(); } catch (_) {}
+      await loadMemoria();
+      flashSaved('memorySavedHint');
+    });
+    row.appendChild(x);
+    return row;
+  }
+
+  function gruppoMemoria({ titolo, aiuto, quante, svuota }) {
+    const wrap = document.createElement('div');
+    const head = document.createElement('div');
+    head.className = 'mem-group-head';
+
+    const h = document.createElement('span');
+    h.className = 'mem-group-title';
+    h.textContent = titolo;
+    if (aiuto) h.title = aiuto;
+    head.appendChild(h);
+
+    const c = document.createElement('span');
+    c.className = 'mem-group-count';
+    c.textContent = quante === 1 ? '1 riga' : `${quante} righe`;
+    head.appendChild(c);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary mem-clear';
+    btn.textContent = 'Dimentica tutto';
+    btn.title = `Toglie tutte le righe di «${titolo}»`;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try { await svuota(); } catch (_) {}
+      await loadMemoria();
+      flashSaved('memorySavedHint');
+    });
+    head.appendChild(btn);
+
+    wrap.appendChild(head);
+    const lines = document.createElement('div');
+    lines.className = 'mem-lines';
+    wrap.appendChild(lines);
+    return { wrap, lines };
+  }
+
+  function renderMemoria() {
+    const box = $('memoryBox');
+    if (!box) return;
+    box.textContent = '';
+
+    const lezioni = memoria.lessons || [];
+    const moduli = Object.entries(memoria.memory || {})
+      .map(([nome, testo]) => ({ nome, righe: memLines(testo) }))
+      .filter((m) => m.righe.length);
+
+    if (!lezioni.length && !moduli.length) {
+      const vuoto = document.createElement('p');
+      vuoto.className = 'sn-muted';
+      vuoto.style.margin = '0';
+      vuoto.textContent = 'Filo non si è ancora appuntato niente su di te. Quello che impara parlandoci comparirà qui.';
+      box.appendChild(vuoto);
+      return;
+    }
+
+    if (lezioni.length) {
+      const g = gruppoMemoria({
+        titolo: 'Appunti recenti',
+        aiuto: 'Regole che Filo si è appuntato e non ha ancora riordinato nel profilo.',
+        quante: lezioni.length,
+        svuota: async () => {
+          for (const l of lezioni.slice()) {
+            await chrome.runtime.sendMessage({ type: MSG.FILO_FORGET_LESSON, ts: l.ts, text: l.text });
+          }
+        },
+      });
+      for (const l of lezioni) {
+        g.lines.appendChild(rigaMemoria({
+          testo: String(l.text || ''),
+          quando: quandoBreve(l.ts),
+          titoloBottone: 'Fai dimenticare questo appunto',
+          dimentica: () => chrome.runtime.sendMessage({
+            type: MSG.FILO_FORGET_LESSON, ts: l.ts, text: l.text,
+          }),
+        }));
+      }
+      box.appendChild(g.wrap);
+    }
+
+    for (const m of moduli) {
+      const titolo = MEM_TITOLI[m.nome] || m.nome;
+      const g = gruppoMemoria({
+        titolo,
+        aiuto: MEM_TITOLI[m.nome] ? undefined : 'Un capitolo che Filo ha aperto da sé.',
+        quante: m.righe.length,
+        svuota: () => chrome.runtime.sendMessage({ type: MSG.FILO_FORGET_MEMORY_MODULE, module: m.nome }),
+      });
+      for (const r of m.righe) {
+        g.lines.appendChild(rigaMemoria({
+          testo: r.text,
+          titoloBottone: 'Fai dimenticare questa riga',
+          dimentica: () => chrome.runtime.sendMessage({
+            type: MSG.FILO_FORGET_MEMORY_LINE, module: m.nome, index: r.i, atteso: r.text,
+          }),
+        }));
+      }
+      box.appendChild(g.wrap);
+    }
+  }
+
+  // Filo scrive in memoria mentre la pagina è aperta: si appunta una lezione a
+  // fine scambio, o riordina il buffer dentro il profilo. La pagina si rilegge,
+  // se no mostrerebbe qualcosa che non è più vero (è la stessa regola delle
+  // impostazioni, vedi ascoltaCambiamentiAltrove).
+  function ascoltaMemoriaCambiata() {
+    if (!chrome.runtime?.onMessage?.addListener) return;
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.FILO_LIVE_UPDATED) loadMemoria();
+    });
+  }
+
   // ── Lettura ad alta voce (text-to-speech) ────────────────────────────────
   function ttsSupported() {
     return typeof window.speechSynthesis !== 'undefined'
