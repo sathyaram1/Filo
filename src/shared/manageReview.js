@@ -1283,6 +1283,36 @@
       .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
   }
 
+  /**
+   * Il testo di un livello (la segnalazione del rombo, la nota del pentagono)
+   * spezzato in righe tipizzate, per disegnarlo senza HTML. I file di `--segnala`
+   * e `--nota` sono markdown con tre titoli obbligatori («## Problema»,
+   * «## Scelte», «## Cosa ho fatto nel frattempo») e voci a trattino: mostrati
+   * grezzi, cancelletti e trattini compaiono come caratteri e l'owner legge un
+   * blocco con simboli al posto di tre sezioni. Qui si riconoscono SOLO titoli
+   * e voci d'elenco: niente HTML dal testo, che resta testo. PURA.
+   *   { tipo:'titolo', livello:1..6, testo } | { tipo:'voce', testo } |
+   *   { tipo:'testo', testo }  (le righe di seguito si uniscono in un paragrafo)
+   */
+  function righeTesto(testo) {
+    const out = [];
+    const righe = String(testo == null ? '' : testo).replace(/\r\n?/g, '\n').split('\n');
+    let paragrafo = null;
+    const chiudi = () => { paragrafo = null; };
+    for (const raw of righe) {
+      const line = raw.replace(/\s+$/, '');
+      if (!line.trim()) { chiudi(); continue; }
+      const h = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*$/.exec(line);
+      if (h && h[2].trim()) { chiudi(); out.push({ tipo: 'titolo', livello: h[1].length, testo: h[2].trim() }); continue; }
+      const li = /^\s*(?:[-*+•]|\d{1,3}[.)])\s+(.*)$/.exec(line);
+      if (li && li[1].trim()) { chiudi(); out.push({ tipo: 'voce', testo: li[1].trim() }); continue; }
+      if (paragrafo) { paragrafo.testo += '\n' + line.trim(); continue; }
+      paragrafo = { tipo: 'testo', testo: line.trim() };
+      out.push(paragrafo);
+    }
+    return out;
+  }
+
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
