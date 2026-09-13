@@ -213,7 +213,7 @@
     realign_threw: 'il server si è fermato a metà del riallineamento',
     realign_nothing_to_do: 'il ramo conteneva già main, eppure la fusione era in conflitto',
     realign_malformed: 'il commit di riallineamento è tornato senza sha',
-    realign_branch_moved: 'il ramo si era mosso dopo l’approvazione: il commit di riallineamento non parte dal commit approvato',
+    realign_branch_moved: 'il ramo si era mosso dopo l’approvazione, e il commit di riallineamento non parte da quello approvato',
     realign_request_failed: 'la richiesta nuova per la punta riallineata non si è registrata',
     gates_unavailable: 'i controlli deterministici non erano disponibili',
     bad_branch: 'il nome del ramo non si può riallineare',
@@ -230,9 +230,13 @@
     });
   }
 
-  /** La frase sul tentativo fallito del server, o '' se non ci ha provato. PURA. */
+  /**
+   * La frase sul tentativo fallito del server, o '' se non ci ha provato. PURA.
+   * Il server premette «riallineamento automatico non riuscito: » al motivo:
+   * qui la frase lo dice già, e ripeterlo faceva tre due-punti di fila.
+   */
   function realignFailureText(reason) {
-    var t = realignReasonText(reason);
+    var t = realignReasonText(reason).replace(/^riallineamento automatico non riuscito:\s*/i, '');
     return t ? 'Il server ha provato a riallineare da sé, senza riuscirci: ' + t + '.' : '';
   }
 
