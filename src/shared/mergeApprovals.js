@@ -709,6 +709,7 @@
     render: render,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
+    preapprovedWhenText: preapprovedWhenText,
     dateTimeText: dateTimeText,
     mergedWhenText: mergedWhenText,
     preapprovedMoreText: preapprovedMoreText,
