@@ -81,8 +81,9 @@ test.describe('un ordine nei parametri di un indirizzo di immagine accettato', (
   test.skip(!serverPresente, 'repo filo-security non presente accanto a questo: la metà server non si può provare qui');
 
   for (const [porta, indirizzo, ordine] of PORTE) {
-    test(`${porta}: l'indirizzo passa il controllo e arriva al lavoratore fuori cornice`, () => {
-      test.fail(true, 'rilievo aperto del giro 5: il token e i parametri ripetuti restano liberi, e l\'indirizzo accettato viaggia fuori cornice');
+    test(`${porta}: l'indirizzo viene rifiutato e l'ordine non arriva al lavoratore`, () => {
+      // Rilievo del giro 5, chiuso dopo il pass: il token dev'essere un UUID
+      // e nessun parametro può ripetersi.
       const v = storageUrl.validateStorageUrl(indirizzo);
       // La porta è aperta se il controllo lo accetta: allora l'ordine arriva.
       expect(v.ok, `${porta}: il controllo dello storage deve rifiutarlo o normalizzarlo senza l'ordine`).toBe(false);
