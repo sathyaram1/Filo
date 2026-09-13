@@ -170,7 +170,8 @@ test('stale riallineata, dal server alla frase: la scheda nuova con la sola diff
   await expect(nuova.locator('.sn-mac-realigned')).toHaveText('Punta riallineata su main dal server (era a1b2c3d4): qui solo ciò che non avevi ancora visto.');
   await expect(nuova.locator('.sn-mac-why')).toHaveText('Bloccata perché (solo il nuovo):');
   await expect(nuova.locator('.sn-mac-block-items')).toHaveText('functions/src/routine/policy.js');
-  await expect(page.locator('.sn-mac-card', { hasText: 'a1b2c3d4' })).toHaveCount(0);
+  // La vecchia non c'è più: il suo sha non è più in testa a nessuna scheda.
+  await expect(page.locator('.sn-mac-card .sn-mac-sha', { hasText: 'a1b2c3d4' })).toHaveCount(0);
   await expect(page.locator('.sn-mac-recent-row').first().locator('.sn-mac-recent-what')).toHaveText('riallineata, chiede di nuovo');
 });
 
