@@ -1298,3 +1298,16 @@ test('fusioniSenzaFeedback: restano solo quelle che non hanno una scheda dove vi
   // si mostrano tutte, invece di perderne una.
   assert.equal(MR.fusioniSenzaFeedback([RICHIESTA, locale], []).length, 2);
 });
+
+test('livelli L1: il pannello del triangolo porta anche la decisione già presa', () => {
+  // Lo stato non è uno dei cinque controlli: non ha una forma sua, ma la
+  // dashboard lo deve dire da qualche parte.
+  const righe = MR.livelloL1({ status: 'attack_confirmed' })
+    .pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`).join(' | ');
+  assert.match(righe, /Stato: Attacco confermato/);
+
+  const sec = MR.livelloL1({ status: 'design', statusReason: 'secaudit', pipeline: { l1Category: 'clean' } })
+    .pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`).join(' | ');
+  assert.match(sec, /bloccato dalla sicurezza/);
+  assert.match(sec, /decidi tu/);
+});
