@@ -1461,6 +1461,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           try {
             await FiloMem.appendLesson(lezione);
             fissata = true;
+            // La pagina Preferenze mostra le lezioni appuntate: senza questo
+            // resterebbe indietro, e una regola appena fissata non si vedrebbe
+            // finché non la si riapre (#592).
+            broadcastLiveUpdate();
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
             }
