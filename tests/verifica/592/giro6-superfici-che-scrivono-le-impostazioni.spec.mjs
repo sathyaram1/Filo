@@ -71,7 +71,13 @@ async function apriRiquadroTonalita(openTab) {
   return page;
 }
 
+// I quattro che seguono documentano due difetti VERI che questo giro non
+// corregge: il server ha mandato entrambi i rilievi a un feedback a parte.
+// `test.fail()` dice «mi aspetto che non passi»: la corsa resta verde, la prova
+// resta scritta, e il giorno in cui il difetto viene chiuso è questa riga a
+// diventare rossa, per dire che il `test.fail()` va tolto.
 test('il riquadro della tonalità non deve cancellare un colore chiesto mentre era aperto', async ({ openTab }) => {
+  test.fail();
   const page = await apriRiquadroTonalita(openTab);
 
   // Mentre il riquadro è aperto (l'utente sta scegliendo la tonalità) chiede a
