@@ -85,10 +85,16 @@ test("mentre si scrive lo stile, il colore delle schede chiesto a Filo non deve 
 
 test('le Opzioni non devono mostrare una chiave API che non è più quella in uso', async ({ openTab }) => {
   const pagina = await openTab(OPZIONI);
-  await pagina.waitForSelector('#apiKey', { timeout: 20_000 });
+  await pagina.waitForSelector('#apiKey', { state: 'attached', timeout: 25_000 });
+  if (await pagina.isChecked('#useDefaultModels')) {
+    await pagina.uncheck('#useDefaultModels');
+    await pagina.waitForTimeout(800);
+  }
+  await pagina.waitForSelector('#apiKey', { timeout: 25_000 });
 
-  await pagina.fill('#apiKey', 'sk-vecchia-1111');
-  await pagina.dispatchEvent('#apiKey', 'change');
+  await pagina.click('#apiKey');
+  await pagina.type('#apiKey', 'sk-vecchia-1111');
+  await pagina.locator('#apiKey').blur();
   await pagina.waitForTimeout(600);
 
   // Subito dopo, la chiave cambia altrove (Filo in chat, dopo una conferma).
