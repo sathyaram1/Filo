@@ -51,7 +51,11 @@
     .mem-group-head { display: flex; align-items: baseline; gap: 10px; }
     .mem-group-title { font-weight: 600; }
     .mem-group-count { opacity: 0.6; font-size: 0.9em; }
-    .mem-clear { margin-left: auto; }
+    /* Il bottone che svuota il gruppo INTERO sta accanto al titolo, non in
+       fondo a destra: là finiva nella stessa colonna del × che toglie UNA riga,
+       dieci pixel più su, e chi sbagliava mira di poco cancellava il profilo
+       (#592, giro 10). Il × resta l'unica cosa in quella colonna. */
+    .mem-clear { margin-right: auto; }
     .mem-lines { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
     .mem-line {
       display: flex;
