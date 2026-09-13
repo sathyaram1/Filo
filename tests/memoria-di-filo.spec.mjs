@@ -247,6 +247,9 @@ test('una pagina web fa ancora il suo lavoro sullo storage: dizionario, autocorr
   expect(riletto.value[K.ICON_LAYOUT]).toEqual(['qr']);
 
   // Le impostazioni si leggono (servono al tema e al correttore), senza chiavi API.
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ theme: 'dark', apiKeys: { openrouter: 'sk-segreta' } });
+  });
   const s = await dispatch({ type: '_storage:get', keys: ['settings'] });
   expect(s.value.settings, 'le impostazioni non arrivano più alla pagina').toBeTruthy();
   expect(s.value.settings.apiKeys, 'le chiavi API escono da un indirizzo web').toBeUndefined();
