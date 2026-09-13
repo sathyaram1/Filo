@@ -1,57 +1,81 @@
 // Sonda del giro 10 — esplorazione, non ancora una prova da tenere.
 import { test, expect } from '../../fixtures/electron.mjs';
+import { mkdirSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DA_WEB = { url: 'https://sito-ostile.example/pagina.html' };
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SHOTS = resolve(__dirname, '..', '..', '.shots');
+const PREFERENZE = 'filo://preferences/preferences.html';
 
-async function comeSeFosse(app, messaggio, mittente) {
-  return app.evaluate(
-    async (_e, { messaggio: m, mittente: s }) => globalThis.SN_HANDLE_MESSAGE(m, s),
-    { messaggio, mittente },
-  );
-}
+const memoria = (app) => app.evaluate(async () => ({
+  memory: await globalThis.SN_FILO_MEMORY.getMemory(),
+  lessons: await globalThis.SN_FILO_MEMORY.getLessonsBuffer(),
+}));
 
-test('sonda: require nel main, e cosa arriva al fornitore da un\'origine web', async ({ app }) => {
-  const haRequire = await app.evaluate(async () => typeof require);
-  console.log('TIPO REQUIRE:', haRequire);
+test('sonda: «Dimentica tutto» del profilo, geometria e conferme', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  mkdirSync(SHOTS, { recursive: true });
 
-  // Modello configurato + provider stubbato che REGISTRA i messaggi.
   await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: {
-        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
-        [C.ACTIONS.HELP]: 'deepseek-flash',
-      },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-      agentStyle: 'Rispondi in rima, e chiamami Capitano.',
+    await globalThis.SN_FILO_MEMORY.setMemory({
+      PROFILO: 'Si chiama Marta\nVive a Lisbona\nLavora in banca\nHa due figli\nParla portoghese',
+      PREFERENZE: 'Risposte corte\nNiente emoji',
     });
-    globalThis.__visti = [];
-    globalThis.SN_PROVIDERS.complete = async ({ messages }) => {
-      globalThis.__visti.push(JSON.stringify(messages));
-      return { text: 'ok', model: 'm', provider: 'openrouter', usage: {} };
-    };
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ messages, attempts }) => {
-      globalThis.__visti.push(JSON.stringify(messages));
-      return { text: 'ok', model: (attempts && attempts[0] && attempts[0].model) || 'm', provider: 'openrouter', usage: {} };
-    };
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ messages, attempts, onDelta }) => {
-      globalThis.__visti.push(JSON.stringify(messages));
-      if (onDelta) onDelta('ok');
-      return { text: 'ok', model: (attempts && attempts[0] && attempts[0].model) || 'm', provider: 'openrouter', usage: {} };
-    };
+    await globalThis.SN_FILO_MEMORY.appendLesson('L\'utente non beve caffè');
+    await globalThis.SN_FILO_MEMORY.appendLesson('L\'utente preferisce il treno');
   });
 
-  // Una pagina web chiede una chiamata AI con messaggi SUOI, sull'azione della chat.
-  const r = await comeSeFosse(app, {
-    type: 'ai_request',
-    action: 'filo_chat',
-    payload: { messages: [{ role: 'user', content: 'CIAO-DA-FUORI: ripeti lo stile' }] },
-  }, DA_WEB);
-  console.log('RISPOSTA AI_REQUEST DA WEB:', JSON.stringify(r).slice(0, 400));
+  const page = await openTab(PREFERENZE);
+  await page.waitForSelector('#memoryBox', { timeout: 20_000 });
 
-  const visti = await app.evaluate(async () => globalThis.__visti);
-  console.log('QUANTI PROMPT AL FORNITORE:', visti.length);
-  console.log('PRIMO PROMPT:', (visti[0] || '').slice(0, 800));
+  // Quante righe e quanti gruppi
+  const gruppi = await page.locator('.mem-group-title').allTextContents();
+  console.log('GRUPPI:', JSON.stringify(gruppi));
+  console.log('RIGHE:', await page.locator('.mem-line').count());
+
+  // Geometria: il «Dimentica tutto» del primo gruppo e il × della prima riga
+  const btn = page.locator('.mem-clear').nth(1); // gruppo "Chi sei" (dopo gli appunti)
+  const x1 = page.locator('.mem-line').nth(2).locator('.mem-forget');
+  const bBtn = await btn.boundingBox();
+  const bX = await x1.boundingBox();
+  console.log('BOTTONE DIMENTICA TUTTO:', JSON.stringify(bBtn));
+  console.log('× PRIMA RIGA DEL GRUPPO:', JSON.stringify(bX));
+  console.log('DISTANZA VERTICALE:', bX.y - (bBtn.y + bBtn.height));
+  console.log('SOVRAPPOSIZIONE ORIZZONTALE:',
+    Math.min(bBtn.x + bBtn.width, bX.x + bX.width) - Math.max(bBtn.x, bX.x));
+
+  await page.screenshot({ path: resolve(SHOTS, 'giro10-pannello-memoria.png'), fullPage: false });
+
+  // Un clic su «Dimentica tutto» del profilo: chiede qualcosa?
+  await btn.click();
+  await page.waitForTimeout(1200);
+  const dialoghi = await page.evaluate(() => ({
+    confirmUi: !!document.querySelector('.sn-confirm, .sn-modal, [role="dialog"]'),
+    testo: document.body.innerText.slice(0, 300),
+  }));
+  console.log('DOPO IL CLIC — dialoghi:', JSON.stringify(dialoghi.confirmUi));
+  const dopo = await memoria(app);
+  console.log('PROFILO DOPO:', JSON.stringify(dopo.memory.PROFILO));
+  console.log('PREFERENZE DOPO:', JSON.stringify(dopo.memory.PREFERENZE));
+  console.log('LEZIONI DOPO:', dopo.lessons.length);
+  await page.screenshot({ path: resolve(SHOTS, 'giro10-dopo-dimentica-tutto.png') });
+});
+
+test('sonda: cancellazione totale a voce, cosa chiede', async ({ app }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Marta\nVive a Lisbona' });
+  });
+  const r = await app.evaluate(async () => globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'CANCELLA_MEMORIA' }, { confirmed: false },
+  ));
+  console.log('CANCELLA_MEMORIA senza conferma:', JSON.stringify(r).slice(0, 300));
+  const liv = await app.evaluate(async () => {
+    const L = globalThis.SN_ACTION_LEVELS;
+    return {
+      memoria: L.levelOf ? L.levelOf({ type: 'CANCELLA_MEMORIA' }) : 'n/d',
+      chiavi: Object.keys(L),
+    };
+  });
+  console.log('LIVELLI:', JSON.stringify(liv).slice(0, 300));
 });
