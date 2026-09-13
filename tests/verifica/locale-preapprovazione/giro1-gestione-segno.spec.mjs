@@ -245,7 +245,8 @@ test('Automazioni: la fusione avvenuta senza chiedere si legge per intero, e por
   await expect(sez).toContainText(MERGE_SHA.slice(0, 8));
   await expect(sez).toContainText('owner@esempio');
   await expect(sez).toContainText('#501');
-  await expect(sez).toContainText(/fusa \d+ ore fa/);
+  // Dopo la correzione del giro: la data per esteso, e fra parentesi quanto fa.
+  await expect(sez).toContainText(/fusa il \d\d\/\d\d\/\d{4} alle \d\d:\d\d \(\d+ ore fa\)/);
   await expect(sez).toContainText('Tocca aree protette');
   await expect(sez).toContainText('Assomiglia a un segreto');
   // TUTTI i file, nessun «… e altri».
