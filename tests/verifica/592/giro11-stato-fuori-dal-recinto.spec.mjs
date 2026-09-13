@@ -110,6 +110,12 @@ test('il titolo di una scheda aperta non deve arrivare nudo nel prompt', async (
     openTab,
     `<!doctype html><html><head><title>${OSTILE}</title></head><body>ciao</body></html>`,
   );
+  // Il titolo arriva allo stato quando la scheda lo comunica: si aspetta lui,
+  // non un tempo fisso.
+  await expect.poll(
+    async () => (await app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble()).stateText)).includes('PWNED'),
+    { timeout: 10_000, message: 'il titolo della scheda non è mai arrivato nello stato' },
+  ).toBe(true);
 
   const prompt = await promptDellaChat(app);
   const m = await marcatori(app);
