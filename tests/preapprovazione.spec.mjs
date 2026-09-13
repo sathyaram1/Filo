@@ -171,6 +171,42 @@ test('Automazioni elenca le fuse senza chiedere, con tutto quello che era stato 
   await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
 });
 
+// Il controllo a posteriori si legge a distanza di giorni, e può essere lungo:
+// la riga dice la DATA della fusione (non solo «N giorni fa»), e se il server
+// ha lasciato fuori le più vecchie lo dice, invece di tacere.
+test('Automazioni: la data della fusione per esteso, e quante ne restano fuori', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fusaAt = Date.now() - 9 * 24 * 60 * 60 * 1000;
+  const d = new Date(fusaAt);
+  const p = (n) => String(n).padStart(2, '0');
+  const data = `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} alle ${p(d.getHours())}:${p(d.getMinutes())}`;
+  const righe = Array.from({ length: 8 }, (_, i) => ({
+    id: String(i).padStart(24, 'a'), branch: `worker/lavoro-${i}`, sha: SHA, mergeSha: SHA,
+    who: 'secaudit · notturna', origin: 'routine', num: `#${600 + i}`, feedbackId: `f${i}`,
+    blocks: [{ gate: 'guard_the_guards', label: 'Tocca aree protette', items: ['firestore.rules'], more: 0 }],
+    createdAtMs: fusaAt - i * 1000, expiresAtMs: fusaAt + 7 * 24 * 60 * 60 * 1000, expired: true,
+    used: true, discarded: false, outcome: 'merged', decidedAtMs: fusaAt - i * 1000,
+    preapproved: true, preapprovedBy: 'owner@esempio', preapprovedAt: '2026-09-13T08:00:00.000Z',
+  }));
+  await apri(page, [pratica()], { preapproved: righe });
+  // Il server ne ha tre in più, più vecchie, oltre il suo tetto.
+  await page.evaluate(() => {
+    const orig = window.filo.message;
+    window.filo.message = async (msg) => {
+      const r = await orig(msg);
+      if (msg && msg.type === 'merge_approvals_get' && r && r.ok) r.preapprovedTotal = 11;
+      return r;
+    };
+  });
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  const box = page.locator('#mgMergeApprovalsPreapproved');
+  await expect(box).toBeVisible();
+  await expect(box.locator('.sn-mac-preapproved-row')).toHaveCount(8);
+  await expect(box.locator('.sn-mac-recent-when').first()).toHaveText(`fusa il ${data} (9 giorni fa)`);
+  await expect(box.locator('.sn-mac-preapproved-more')).toHaveText('Ce ne sono altre 3, più vecchie, che qui non entrano.');
+});
+
 test('senza fusioni pre-approvate l’elenco non compare', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [pratica()], { preapproved: [] });
