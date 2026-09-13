@@ -62,24 +62,25 @@ test("mentre si scrive lo stile, un colore chiesto a Filo non deve essere cancel
 
 test("mentre si scrive lo stile, il colore delle schede chiesto a Filo non deve essere cancellato", async ({ openTab }) => {
   const pagina = await apriPreferenze(openTab);
-  await pagina.waitForSelector('#tabcol-saturation', { timeout: 20_000 });
+  await pagina.waitForSelector('#tabcol-saturazione_tab', { state: 'attached', timeout: 20_000 });
 
   await pagina.click('#agentStyleText');
   await pagina.type('#agentStyleText', 'Tono pacato', { delay: 30 });
   await pagina.waitForTimeout(500);
 
-  await eseguiInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'colore_tab', valore: 'luminosità 70' });
+  // Filo alza la luminosità del colore delle schede, e l'utente conferma.
+  await eseguiInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'colore_tab', valore: 'luminosita_tab 0.8' });
   await pagina.waitForTimeout(200);
   const chiesto = (await impostazioni(pagina)).tabColor || {};
+  expect(chiesto.luminosita_tab).toBe(0.8);
 
-  await pagina.fill('#tabcol-saturation', '55');
+  // Poi ritocca un ALTRO parametro dello stesso gruppo.
+  await pagina.fill('#tabcol-saturazione_tab', '0.55');
+  await pagina.dispatchEvent('#tabcol-saturazione_tab', 'input');
   await pagina.waitForTimeout(2500);
 
   const dopo = (await impostazioni(pagina)).tabColor || {};
-  for (const k of Object.keys(chiesto)) {
-    if (k === 'saturation') continue;
-    expect(dopo[k], `il parametro ${k} chiesto a voce è tornato indietro`).toBe(chiesto[k]);
-  }
+  expect(dopo.luminosita_tab, 'la luminosità chiesta a voce è tornata indietro').toBe(0.8);
 });
 
 test('le Opzioni non devono mostrare una chiave API che non è più quella in uso', async ({ openTab }) => {
