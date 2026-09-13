@@ -696,6 +696,9 @@
     render: render,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
+    dateTimeText: dateTimeText,
+    mergedWhenText: mergedWhenText,
+    preapprovedMoreText: preapprovedMoreText,
     renderPreapproved: renderPreapproved,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
