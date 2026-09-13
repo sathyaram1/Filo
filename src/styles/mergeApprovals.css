@@ -263,3 +263,49 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 }
 .sn-mac.sn-mac-failed .sn-mac-title-text { color: var(--sn-error); }
 .sn-mac-card-failed .sn-mac-why { color: var(--sn-fg); }
+
+/* ── Fuse senza chiedere (solo in Gestione → Automazioni) ──────────────── */
+
+/* Il controllo a posteriori: qui l'elenco di ciò che era stato segnalato si
+   legge per intero, una voce per riga. Stessa grammatica della scheda, ma
+   senza tasti: non c'è più niente da decidere. */
+.sn-mac-preapproved-intro {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sn-muted);
+}
+.sn-mac-preapproved {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sn-mac-preapproved-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--sn-border);
+  border-left: 3px solid var(--sn-accent);
+  border-radius: var(--sn-radius, 10px);
+  background: color-mix(in srgb, var(--sn-accent) 5%, var(--sn-bg));
+}
+.sn-mac-preapproved-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 12px;
+  color: var(--sn-muted);
+}
+.sn-mac-block-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
