@@ -3265,9 +3265,27 @@
       t.className = 'mg-liv-testo';
       // Testo cifrato che questo computer non sa leggere: si dice, non si
       // mostra il blob.
-      t.textContent = p.illeggibile
-        ? 'Il testo è cifrato e questo computer non ha la chiave privata per leggerlo.'
-        : p.testo;
+      if (p.illeggibile) {
+        t.textContent = 'Il testo è cifrato e questo computer non ha la chiave privata per leggerlo.';
+      } else {
+        // Titoli e voci d'elenco del markdown resi come tali, il resto come
+        // testo: niente HTML dal testo (il modulo condiviso li riconosce).
+        let lista = null;
+        for (const r of MR.righeTesto(p.testo)) {
+          if (r.tipo === 'voce') {
+            if (!lista) { lista = document.createElement('ul'); lista.className = 'mg-liv-elenco'; t.appendChild(lista); }
+            const li = document.createElement('li');
+            li.textContent = r.testo;
+            lista.appendChild(li);
+            continue;
+          }
+          lista = null;
+          const el = document.createElement('div');
+          el.className = r.tipo === 'titolo' ? 'mg-liv-titolo' : 'mg-liv-par';
+          el.textContent = r.testo;
+          t.appendChild(el);
+        }
+      }
       body.appendChild(t);
     }
 
