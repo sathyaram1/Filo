@@ -1612,6 +1612,24 @@
     return `<span class="mg-state" title="${esc(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">${esc(label)}</span>`;
   }
 
+  // ── «Fondi senza chiedermelo» ─────────────────────────────────────────────
+  // Il segno sulla pratica: `mergePreapproved { by, at }`, in chiaro. Conta
+  // solo finché la pratica è aperta (a pratica chiusa il server non lo guarda,
+  // e qui non si mostra: sarebbe un'informazione su niente).
+  function preapprovedOf(fb) {
+    const m = fb && fb.mergePreapproved;
+    if (!m || typeof m !== 'object' || !String(m.by || '').trim()) return null;
+    return { by: String(m.by || ''), at: String(m.at || '') };
+  }
+  function isOpenPublic(fb) {
+    return String((fb && fb.statusPublic) || 'open') !== 'closed';
+  }
+  function preapprovedHtml(fb) {
+    const m = preapprovedOf(fb);
+    if (!m || !isOpenPublic(fb)) return '';
+    return `<span class="mg-preapproved" title="${esc(`Si fonde senza chiedere: segno messo da ${m.by}`)}">senza chiedere</span>`;
+  }
+
   // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
   // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
