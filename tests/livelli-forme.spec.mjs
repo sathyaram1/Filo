@@ -483,4 +483,5 @@ test('le forme si vedono in tutti e due i temi', async ({ openTab }) => {
     }
     await page.screenshot({ path: `tests/.shots/livelli-forme-${tema}.png` });
   }
+  expect(fondi[0], 'i due temi devono dare fondi diversi').not.toBe(fondi[1]);
 });
