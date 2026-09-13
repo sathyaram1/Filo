@@ -744,6 +744,28 @@
     /* Dettaglio giudice nel pannello destro: badge classe sopra, reasoning sotto. */
     .mg-judge-detail { display: flex; flex-direction: column; align-items: flex-start; }
 
+    /* ── Pannello di un livello (la forma cliccata) ───────────────────────── */
+    .mg-liv-righe { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; }
+    .mg-liv-riga { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.5; }
+    .mg-liv-riga strong { color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
+    .mg-liv-riga span { color: var(--sn-text); word-break: break-word; }
+    /* Il testo lungo (la segnalazione di Claude, il resoconto dell'audit):
+       arriva come markdown breve, si legge a capo come l'ha scritto chi ha
+       lavorato. */
+    .mg-liv-testo {
+      font-size: 13px; line-height: 1.6; white-space: pre-wrap;
+      word-break: break-word; color: var(--sn-text);
+    }
+    .mg-liv-testo em { color: var(--sn-muted); font-style: italic; }
+    /* Il tasto che scavalca l'audit: è un'eccezione, non un'azione di tutti i
+       giorni, e si arma con un secondo clic (come l'approvazione di una
+       fusione) perché il primo non basti. */
+    .mg-liv-azioni { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+    .mg-liv-esito { font-size: 12px; }
+    .mg-liv-esito[data-kind="ok"]   { color: #2e9e5b; }
+    .mg-liv-esito[data-kind="err"]  { color: #c0392b; }
+    .mg-liv-esito[data-kind="wait"] { color: var(--sn-muted); }
+
     /* ── Azioni di revisione (accetta + commento), owner-only ─────────────── */
     .mg-actions {
       flex: 0 0 auto; border-top: 1px solid var(--sn-border);
