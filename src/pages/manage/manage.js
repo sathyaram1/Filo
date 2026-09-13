@@ -3161,6 +3161,169 @@
     mgSideEmpty.hidden = false;
     mgSideTitle.textContent = '';
     mgSideBody.innerHTML = '';
+    livelloAperto = null;
+    if (mgForme) mgForme.querySelectorAll('.mg-forma--scelta')
+      .forEach((el) => el.classList.remove('mg-forma--scelta'));
+  }
+
+  // Segna quale forma sta guardando il pannello: senza, con cinque forme in
+  // fila e un pannello che cambia, non si sa più quale si era premuta.
+  function segnaForma(key) {
+    livelloAperto = key || null;
+    if (!mgForme) return;
+    mgForme.querySelectorAll('.mg-forma').forEach((el) => {
+      el.classList.toggle('mg-forma--scelta', el.dataset.livello === livelloAperto);
+    });
+  }
+
+  // ── Il pannello di un livello ─────────────────────────────────────────────
+  //
+  // Il contenuto (titolo, righe, testo, azioni) arriva già pronto dal modulo
+  // condiviso: qui c'è solo il markup, e i due pezzi che il markup non può
+  // avere — i tasti Approva/Scarta della fusione (li costruisce il modulo delle
+  // fusioni) e «Salta il controllo» dell'audit.
+  function openSidebarLivello(fb, key) {
+    if (!fb) return;
+    const liv = MR.livelloPer(fb, key, { fusioni });
+    if (!liv) return;
+    segnaForma(key);
+
+    // I giudici non hanno un pannello loro: la fila di cerchi apre il singolo
+    // giudice. Cliccare il gruppo quando nessuno ha votato dice perché.
+    const p = liv.pannello;
+    const body = document.createElement('div');
+
+    if (p.righe && p.righe.length) {
+      const righe = document.createElement('div');
+      righe.className = 'mg-liv-righe';
+      for (const r of p.righe) {
+        const el = document.createElement('div');
+        el.className = 'mg-liv-riga';
+        const et = document.createElement('strong');
+        et.textContent = `${r.etichetta}:`;
+        const va = document.createElement('span');
+        // Le date arrivano in ISO dal server: qui si scrivono come le scrive
+        // il resto della pagina.
+        va.textContent = /^Quando$/i.test(r.etichetta) ? formatDateTime(r.valore) : r.valore;
+        el.appendChild(et); el.appendChild(va);
+        righe.appendChild(el);
+      }
+      body.appendChild(righe);
+    }
+
+    if (p.testo) {
+      const t = document.createElement('div');
+      t.className = 'mg-liv-testo';
+      // Testo cifrato che questo computer non sa leggere: si dice, non si
+      // mostra il blob.
+      t.textContent = p.illeggibile
+        ? 'Il testo è cifrato e questo computer non ha la chiave privata per leggerlo.'
+        : p.testo;
+      body.appendChild(t);
+    }
+
+    if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
+    if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
+
+    openSidebar(p.titolo, '');
+    mgSideBody.replaceChildren(body);
+  }
+
+  // Le card della fusione dentro il pannello del quadrato: stesso disegno e
+  // stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.
+  function pannelloFusione(fb, liv) {
+    const UI = window.SN_MERGE_APPROVALS;
+    const host = document.createElement('div');
+    const ferme = Array.isArray(liv.richieste) ? liv.richieste : [];
+    if (!UI || !ferme.length || !isAdmin) return host;
+    UI.render(host, opzioniFusioni({
+      requests: ferme.filter((r) => !r.used),
+      failed: ferme.filter((r) => r.used),
+    }));
+    host.hidden = false;
+    return host;
+  }
+
+  // «Salta il controllo» si offre su una bocciatura dell'audit — e anche sulle
+  // pratiche vecchie, ferme prima che l'audit lasciasse traccia: lì il segno è
+  // lo stato (`design` con motivo `secaudit`). Senza questo secondo caso quelle
+  // pratiche non avrebbero nessuna via d'uscita.
+  function mostraSaltaAudit(fb, liv) {
+    if (!isAdmin || !liv || liv.key !== 'l4') return false;
+    if (liv.pannello.azioni.includes('salta_l4')) return true;
+    if (liv.esito !== 'nonfatto') return false;
+    const n = MR.normalizeStatus(fb);
+    return n.status === 'design' && (n.statusReason === 'secaudit' || n.statusReason === 'l5');
+  }
+
+  // Ogni esito del server detto in italiano. Un esito che questo client non
+  // conosce si scrive lo stesso: meglio grezzo che muto, e mai un «fatto» al
+  // posto di un guasto.
+  const SALTA_ESITI = {
+    fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
+    bloccato: { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera sul quadrato.' },
+    conflitto: { kind: 'err', text: 'Saltato, ma il ramo è in conflitto con main: torna in lavorazione per riallinearlo.' },
+    ramo_assente: { kind: 'err', text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere.' },
+    feedback_assente: { kind: 'err', text: 'Il server non trova questa segnalazione.' },
+    non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
+    non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
+    guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
+  };
+
+  function pannelloSaltaAudit(fb) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary';
+    btn.id = 'mgSaltaL4Btn';
+    btn.textContent = 'Salta il controllo';
+    btn.title = 'Hai letto cosa ha trovato l’audit e vai avanti lo stesso. Il cancello di fusione resta: può fermare il ramo comunque.';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+
+    // Un secondo clic per confermare, come l'approvazione di una fusione:
+    // scavalcare un controllo di sicurezza non è un gesto da un click solo.
+    let armato = false;
+    let timer = null;
+    const disarma = () => {
+      armato = false;
+      btn.textContent = 'Salta il controllo';
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    btn.addEventListener('click', async () => {
+      if (!armato) {
+        armato = true;
+        btn.textContent = 'Confermi?';
+        timer = setTimeout(disarma, 5000);
+        return;
+      }
+      disarma();
+      btn.disabled = true;
+      esito.dataset.kind = 'wait';
+      esito.textContent = 'Chiedo al server…';
+      try {
+        const r = await sendToMain({ type: LIVELLO4_SALTA, feedbackId: fb._id });
+        if (!r || r.ok === false) throw new Error((r && r.error) || 'Non riuscito.');
+        const m = SALTA_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
+        esito.dataset.kind = m.kind;
+        esito.textContent = m.text;
+        toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+        // L'esito cambia il pentagono e (se si è aperta una richiesta) il
+        // quadrato: si rilegge tutto invece di indovinare.
+        setTimeout(() => { loadMergeApprovals(); refreshFromRemote(); }, 800);
+      } catch (e) {
+        esito.dataset.kind = 'err';
+        esito.textContent = e.message || 'Non riuscito.';
+        toast(e.message || 'Non riuscito.', 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    box.appendChild(btn);
+    box.appendChild(esito);
+    return box;
   }
 
   mgSideClose.addEventListener('click', closeSidebar);
