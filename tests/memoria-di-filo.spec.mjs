@@ -128,12 +128,28 @@ test('una pagina web non legge e non cancella la memoria', async ({ app }) => {
   const dispatch = (msg) => app.evaluate((_e, { msg, sender }) =>
     globalThis.SN_HANDLE_MESSAGE(msg, sender), { msg, sender: web });
 
-  for (const msg of [
-    { type: 'filo_list_memory' },
-    { type: 'filo_forget_lesson', text: "L'utente non beve caffe" },
-    { type: 'filo_forget_memory_line', module: 'PROFILO', index: 0, atteso: 'Vive a Lisbona' },
-    { type: 'filo_forget_memory_module', module: 'PROFILO' },
-  ]) {
+  // L'elenco NON è scritto a mano: si ricava dai nomi dei messaggi. Scritto a
+  // mano lasciava fuori il messaggio più vecchio, quello che l'Editor usa per
+  // avere il contesto: rispondeva a chiunque e restituiva gli stessi identici
+  // moduli che gli altri rifiutavano, quindi la chiusura era aggirabile
+  // chiedendo la stessa cosa col nome vecchio (#592, giro 7). Ricavato dai
+  // nomi, un messaggio nuovo sulla memoria nasce dentro questa prova.
+  const nomi = await app.evaluate(() => {
+    const M = globalThis.SN_CONST.MESSAGES || globalThis.SN_MSG?.MSG || {};
+    return Object.entries(M)
+      .filter(([k]) => /^FILO_/.test(k) && /MEMORY|LESSON/.test(k))
+      .map(([, v]) => v);
+  });
+  expect(nomi.length, 'nessun messaggio della memoria trovato: la prova non sta provando niente')
+    .toBeGreaterThan(3);
+
+  const parametri = {
+    filo_forget_lesson: { text: "L'utente non beve caffe" },
+    filo_forget_memory_line: { module: 'PROFILO', index: 0, atteso: 'Vive a Lisbona' },
+    filo_forget_memory_module: { module: 'PROFILO' },
+  };
+
+  for (const msg of nomi.map((type) => ({ type, ...(parametri[type] || {}) }))) {
     const r = await dispatch(msg);
     expect(r.ok, msg.type).toBe(false);
     expect(r.error, msg.type).toBe('forbidden');
