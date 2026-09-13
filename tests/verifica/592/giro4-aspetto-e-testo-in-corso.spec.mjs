@@ -188,6 +188,47 @@ test('una misura scritta male resta sullo schermo per essere corretta', async ({
   expect(await pagina.inputValue('#tok-radius')).toBe('14');
 });
 
+test('una riga di modello appena cominciata non deve sparire dalle Opzioni', async ({ openTab }) => {
+  const opzioni = await openTab(OPZIONI);
+  await opzioni.waitForSelector('#addModelRow', { timeout: 20_000 });
+  // Il registro si vede solo con i modelli predefiniti spenti.
+  await opzioni.uncheck('#useDefaultModels');
+  await opzioni.waitForTimeout(1500);
+
+  const quante = await opzioni.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').count();
+  await opzioni.click('#addModelRow');
+  const riga = opzioni.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').nth(quante);
+  await riga.locator('.sn-model-id').fill('un/modello-nuovo');
+  await opzioni.waitForTimeout(1200);
+
+  // Mentre pensa al soprannome da dargli, chiede a Filo di spegnere il blocco
+  // dei popup. La riga che sta compilando non c'entra niente.
+  await eseguiInChat(opzioni, { type: 'IMPOSTA_PREFERENZA', chiave: 'blocco_popup', valore: 'no' });
+  await opzioni.waitForTimeout(2500);
+
+  expect(await opzioni.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').count())
+    .toBe(quante + 1);
+  expect(await riga.locator('.sn-model-id').inputValue()).toBe('un/modello-nuovo');
+});
+
+test('i siti scritti male nella blacklist restano sullo schermo per essere corretti', async ({ openTab }) => {
+  const sicurezza = await openTab('filo://security/security.html');
+  await sicurezza.waitForSelector('#sec-siteblock-blacklist', { timeout: 20_000 });
+
+  const scritto = 'esempio.test\nnon un dominio!!\naltro.test';
+  await sicurezza.fill('#sec-siteblock-blacklist', scritto);
+  await sicurezza.locator('#sec-siteblock-blacklist').blur();
+  await sicurezza.waitForTimeout(1500);
+  // La riga sbagliata viene scartata dal salvataggio ma resta scritta, con
+  // l'avviso che dice quale: è così che l'utente la corregge.
+  expect(await sicurezza.inputValue('#sec-siteblock-blacklist')).toContain('non un dominio!!');
+
+  await eseguiInChat(sicurezza, { type: 'IMPOSTA_PREFERENZA', chiave: 'protezione_ip', valore: 'no' });
+  await sicurezza.waitForTimeout(2500);
+
+  expect(await sicurezza.inputValue('#sec-siteblock-blacklist')).toContain('non un dominio!!');
+});
+
 // ── il canale delle pagine web ─────────────────────────────────────────────
 //
 // Lo stile dell'agente adesso non passa più da una pagina web. Ma la guardia
