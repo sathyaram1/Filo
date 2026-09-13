@@ -440,9 +440,6 @@
       // Presa in memoria: la ritroverà da sé. Il primo che usa un soprannome se
       // lo tiene, come nel salvataggio.
       if (nick && !visti.has(nick)) { visti.add(nick); continue; }
-      if (nick) visti.add(nick);
-      // Senza modello e senza soprannome doppio non c'è niente da rimettere.
-      if (!nick && !model) continue;
       // Se il cursore era dentro questa riga, ci torna: la riga viene rifatta,
       // e una riga che riappare senza cursore interrompe la digitazione.
       let fuoco = null;
