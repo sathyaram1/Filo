@@ -519,7 +519,14 @@
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
       if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       if (Bootstrap && typeof Bootstrap.ricaricaSenzaDisturbare === 'function') {
-        Bootstrap.ricaricaSenzaDisturbare(load).catch(() => {});
+        // Le righe scritte male nella lista dei siti bloccati tornano sullo
+        // schermo insieme all'avviso che dice quali sono state scartate: senza
+        // l'avviso, un testo che riappare senza spiegazione sembra salvato.
+        Bootstrap.ricaricaSenzaDisturbare(load, (el) => {
+          if (el.id === 'sec-siteblock-blacklist') {
+            setBlacklistError(parseBlacklist(el.value).invalid);
+          }
+        }).catch(() => {});
       } else {
         load().catch(() => {});
       }
