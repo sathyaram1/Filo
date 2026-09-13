@@ -13,7 +13,7 @@ const Defaults = require('./defaultsStore');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
-const { MSG } = SN_MSG;
+const { MSG, WEB_ALLOWED } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
 const Providers = globalThis.SN_PROVIDERS;
 const Costs = globalThis.SN_COSTS;
