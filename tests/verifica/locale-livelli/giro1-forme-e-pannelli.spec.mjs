@@ -561,6 +561,8 @@ test('un livello che arriva dopo (segnalazione, richiesta di fusione) si vede da
   });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
   await expect(forma(page, 'l5')).toHaveClass(/mg-forma--attack/);
+  // La pratica, con l'aggiornamento, è passata nei Ricevuti: la si guarda lì.
+  await page.locator('.mg-tab[data-tab="inbox"]').click();
   await expect(page.locator('.mg-item .mg-fusione-badge')).toHaveCount(1);
 });
 
