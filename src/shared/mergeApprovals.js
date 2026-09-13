@@ -649,7 +649,7 @@
       var who = el('span', 'sn-mac-recent-who', preapprovedBy(r));
       if (r.preapprovedAt) who.title = 'Segno messo il ' + String(r.preapprovedAt);
       head.appendChild(who);
-      head.appendChild(el('span', 'sn-mac-recent-when', 'fusa ' + timeAgo(r.decidedAtMs || r.createdAtMs, now)));
+      head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));
       li.appendChild(head);
       var blocks = Array.isArray(r.blocks) ? r.blocks : [];
       if (blocks.length) {
