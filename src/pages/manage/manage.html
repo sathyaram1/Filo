@@ -572,16 +572,52 @@
       font-weight: 600;
     }
     .mg-sender-link:hover { text-decoration: underline; }
-    .mg-judges-row {
-      display: flex; align-items: center; gap: 6px;
+    /* ── La fila dei cinque livelli ──────────────────────────────────────
+       Una segnalazione attraversa cinque controlli e la pagina ne mostrava
+       due. Adesso sono cinque forme in fila, sempre le stesse e sempre nello
+       stesso ordine: triangolo (filtro d'ingresso), cerchi (giudici), rombo
+       (segnalazione di Claude), pentagono (audit di sicurezza), quadrato
+       (fusione). Un livello che non ha dato un parere resta al suo posto,
+       grigio: la fila ha sempre la stessa lunghezza, e un buco si vede. */
+    .mg-livelli-row {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
       padding: 8px 12px; border-bottom: 1px solid var(--sn-border);
       flex: 0 0 auto; font-size: 12px; color: var(--sn-muted);
     }
-    /* L'attributo `hidden` di default è display:none, ma `.mg-judges-row` sopra
-       impone display:flex e lo sovrascrive: serve una regola più specifica per
-       nascondere davvero la riga giudici quando non ci sono verdetti. */
-    .mg-judges-row[hidden] { display: none; }
-    .mg-judge-label { margin-right: 4px; }
+    /* L'attributo `hidden` di default è display:none, ma la regola sopra impone
+       display:flex e lo sovrascrive: serve una regola più specifica. */
+    .mg-livelli-row[hidden] { display: none; }
+    /* Le forme stanno insieme; i giudici sono un gruppo dentro la fila, con un
+       filo d'aria in più ai lati perché si legga come "un livello solo". */
+    .mg-forme { display: flex; align-items: center; gap: 6px; }
+    .mg-forme-gruppo { display: flex; align-items: center; gap: 6px; margin: 0 2px; }
+    .mg-forma {
+      all: unset;
+      width: 16px; height: 16px; flex: 0 0 auto;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--sn-muted);
+      transition: transform 0.1s;
+    }
+    .mg-forma:hover, .mg-forma:focus-visible { transform: scale(1.2); }
+    .mg-forma svg { width: 16px; height: 16px; display: block; overflow: visible; }
+    .mg-forma svg path { fill: currentColor; stroke: currentColor; stroke-width: 1.5;
+      stroke-linejoin: round; }
+    /* Livello che non ha (ancora) dato un parere: contorno tratteggiato, come
+       il pallino di un giudice che non ha votato. Resta cliccabile — cliccarlo
+       dice PERCHÉ è grigio. */
+    .mg-forma--vuota svg path {
+      fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 3 2;
+    }
+    .mg-forma--vuota { opacity: 0.65; }
+    /* Stessa scala di severità dei pallini dei giudici qui sotto: il rosso
+       vuol dire la stessa cosa in tutta la pagina. */
+    .mg-forma--attack  { color: #c0392b; }
+    .mg-forma--spam    { color: #e08e0b; }
+    .mg-forma--design  { color: #2e9e5b; }
+    .mg-forma--aligned { color: #5b6ee0; }
+    /* La forma scelta: un anello attorno, così si sa cosa sta guardando il
+       pannello di destra. */
+    .mg-forma--scelta { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 3px; }
     .mg-dot {
       width: 14px; height: 14px; border-radius: 50%;
       border: 2px solid var(--sn-border);
