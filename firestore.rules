@@ -210,6 +210,14 @@ service cloud.firestore {
         && request.resource.data.get('subSeq', 0) <= 100000
         && request.resource.data.get('parentId', '') is string
         && request.resource.data.get('parentId', '').size() <= 128
+        // La data di creazione: un timestamp (il client) o una stringa ISO corta
+        // (lo script locale, il server). Senza vincolo era un campo libero che
+        // le routine ricevevano così com'era, fuori dalla cornice «dato, non
+        // istruzione» (verifica locale del ramo cornice-routine, giro 4).
+        && (!('createdAt' in request.resource.data)
+            || request.resource.data.createdAt is timestamp
+            || (request.resource.data.createdAt is string
+                && request.resource.data.createdAt.size() <= 40))
         // F4: capabilityGapId — opzionale, solo per auto-feedback (clientId 'auto:*').
         && request.resource.data.get('capabilityGapId', '') is string
         && request.resource.data.get('capabilityGapId', '').size() <= 100;
