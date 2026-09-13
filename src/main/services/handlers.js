@@ -2929,6 +2929,12 @@ function daPaginaWeb(sender, origin) {
 // pezzo di Filo che chiama un'azione passando solo la finestra si vedeva
 // rifiutare l'azione in silenzio, con una riga nei log e niente all'utente
 // (#592, giro 11: le azioni sul proxy comandate a parole).
+//
+// Vale per le AZIONI, non per il gate dei messaggi qui sotto: là il mittente ha
+// un valore di ripiego (`sender = {}`), cioè «il chiamante non ha detto
+// niente», e quella porta resta chiusa perché chiuderla non costa niente —
+// dentro Filo chi manda un messaggio o si dichiara interno o arriva dall'IPC
+// con l'indirizzo.
 function senzaIdentitaDiPagina(sender) {
   if (!sender || typeof sender !== 'object') return true;
   return !sender.url && !sender.tab && !sender.wc && !sender.frame;
