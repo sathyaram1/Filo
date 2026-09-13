@@ -131,5 +131,11 @@ segnaposto dentro `PROMPTS.helpStatic` / `PROMPTS.filoChatStatic`),
 `IMPOSTA_PREFERENZA`, `toolResultText`),
 `src/main/services/handlers/storage.js` (`AMMESSE_DA_WEB`: da un'origine web
 passa solo l'elenco di ciò che è lecito),
-`src/pages/preferences/preferences.js` (conteggio e rifiuto).
-Prove: `tests/unit/agentStyle.test.mjs`, `tests/agent-style.spec.mjs`.
+`src/pages/preferences/preferences.js` (conteggio e rifiuto, e la sezione
+«Memoria di Filo»),
+`src/shared/filoMemory.js` (`memoryLines`, `removeMemoryLine`, `forgetLesson`,
+`forgetMemoryLine`, `forgetMemoryModule`),
+`src/main/services/handlers/filo.js` (i messaggi che leggono e cancellano la
+memoria, tutti chiusi alle pagine web).
+Prove: `tests/unit/agentStyle.test.mjs`, `tests/unit/filoMemory.test.mjs`,
+`tests/agent-style.spec.mjs`, `tests/memoria-di-filo.spec.mjs`.
