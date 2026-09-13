@@ -375,6 +375,8 @@
   // singolo parametro al predefinito; il bottone in fondo li azzera tutti.
   let currentTabColor = {};
   let tabColorSaveTimer = null;
+  // Il colore delle schede come la pagina l'ha letto: stessa ragione dei token.
+  let ultimiTabColor = {};
 
   function buildTabColorSection() {
     const box = $('tabColorCode');
