@@ -672,7 +672,21 @@
     btn.className = 'sn-btn sn-btn-secondary mem-clear';
     btn.textContent = 'Dimentica tutto';
     btn.title = `Toglie tutte le righe di «${titolo}»`;
+    // Butta via il gruppo INTERO, e non si torna indietro: si chiede prima, e
+    // si dice quante righe se ne vanno (#592, giro 10). La stessa cancellazione
+    // chiesta a Filo a voce è la più protetta che ha, gli fa digitare
+    // «conferma»: da qui non poteva costare un clic solo. E il clic solo era
+    // anche facile da prendere per sbaglio, perché questo bottone stava nella
+    // stessa colonna del × che toglie UNA riga, dieci pixel più su.
     btn.addEventListener('click', async () => {
+      const Ui = window.SN_CONFIRM_UI;
+      const testo = `${cosaSvuota || `Toglie tutte le righe di «${titolo}»`} `
+        + `Sono ${quante === 1 ? '1 riga' : `${quante} righe`}, e non si possono recuperare. `
+        + 'Per toglierne una sola c’è il × accanto alla riga.';
+      const ok = Ui
+        ? await Ui.confirm({ title: `Dimentica «${titolo}»`, text: testo, okLabel: 'Dimentica tutto' })
+        : window.confirm(`${testo} Procedo?`);
+      if (!ok) return;
       btn.disabled = true;
       try { await svuota(); } catch (_) {}
       await loadMemoria();
