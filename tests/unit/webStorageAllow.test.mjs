@@ -50,6 +50,24 @@ test('le impostazioni si leggono ma non si scrivono da una pagina web', () => {
   assert.equal(C.WEB_STORAGE_WRITABLE.has(K.SETTINGS), false);
 });
 
+// Il PRIMO argomento di una chiamata, cioè le chiavi: si conta l'annidamento
+// delle parentesi e ci si ferma alla virgola di primo livello o alla parentesi
+// che chiude. Prendere una finestra di tot caratteri raccoglieva anche le
+// stringhe della riga dopo ('input', '2d'): una sentinella che si allarma per
+// quelle è una sentinella che si spegne.
+function primoArgomento(src, da) {
+  let liv = 0;
+  for (let i = da; i < src.length; i += 1) {
+    const c = src[i];
+    if (c === '(' || c === '[' || c === '{') liv += 1;
+    else if (c === ')' || c === ']' || c === '}') {
+      if (liv === 0) return src.slice(da, i);
+      liv -= 1;
+    } else if (c === ',' && liv === 0) return src.slice(da, i);
+  }
+  return src.slice(da, da + 300);
+}
+
 test('quello che gli script delle pagine visitate usano davvero sta nell\'elenco', () => {
   // Le chiavi si leggono dal CODICE degli script, non da una lista scritta a
   // mano qui: una lista a mano invecchia in silenzio, ed è esattamente il
