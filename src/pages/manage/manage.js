@@ -136,6 +136,8 @@
 
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
+  const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
+  const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
