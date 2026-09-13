@@ -1032,6 +1032,7 @@
     currentTabColor = TabColor
       ? TabColor.clampParams(settings.tabColor || {})
       : { ...(settings.tabColor || {}) };
+    ultimiTabColor = { ...currentTabColor };
     buildTabColorSection();
 
     // Punto di partenza del confronto: quello che i campi mostrano adesso è
