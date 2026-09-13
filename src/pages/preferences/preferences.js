@@ -47,6 +47,9 @@
 
   let currentOverrides = {};
   let tokensSaveTimer = null;
+  // I colori e le misure come la pagina li ha letti (o come li ha scritti per
+  // ultimo): da qui si capisce quali ha toccato l'utente.
+  let ultimiToken = {};
 
   // Tema risolto (light/dark) com'è applicato ora su <html>: i default di alcuni
   // token differiscono fra chiaro e scuro.
