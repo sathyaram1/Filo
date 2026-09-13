@@ -112,6 +112,24 @@ quindi lì bastano la ripulitura dai marcatori e un tetto; sopra il tetto la rig
 non si accorcia, sparisce (`sanitizeModelName`). La domanda da farsi non è «è
 una preferenza?» ma «questo testo lo scrive qualcuno e finisce in un prompt?».
 
+**Il recinto si perde dove il prompt lo monta una PAGINA.** I recinti stanno in
+`src/shared/constants.js`, e chi costruisce un prompt nel main li prende da lì
+senza pensarci. Una pagina che si monta il prompt per conto suo, invece, il
+recinto se lo deve ricordare: l'Editor chiedeva la memoria di Filo e la infilava
+nei prompt del titolo e del riassunto di un file scrivendosi l'etichetta da sé,
+quindi profilo e preferenze apprese arrivavano al modello nudi, in mezzo alle
+istruzioni (#592, giro 7). Nello stesso prompt lo stile il recinto ce l'aveva,
+perché quello lo mette il main: due sorelle, due trattamenti.
+
+Due conseguenze pratiche. La prima: il tetto si applica al TESTO, prima del
+recinto. Tagliare dopo porta via il marcatore di chiusura, cioè proprio la cosa
+che tiene il testo separato. La seconda: se il modulo condiviso non c'è, quel
+contesto non entra affatto. Meglio un titolo senza contesto che un contesto
+senza recinto.
+
+La sentinella è in `tests/unit/filoMemory.test.mjs`: una pagina che si fa dare la
+memoria e non chiama `memoryBlock` fa diventare rossa la prova.
+
 **Regola operativa.** Prima di aggiungere una preferenza a testo libero,
 chiediti se quel testo finisce in un prompt. Se sì, le quattro cose qui sopra
 valgono tutte. La sentinella `tests/unit/preferences.test.mjs`
@@ -136,6 +154,8 @@ passa solo l'elenco di ciò che è lecito),
 `src/shared/filoMemory.js` (`memoryLines`, `removeMemoryLine`, `forgetLesson`,
 `forgetMemoryLine`, `forgetMemoryModule`),
 `src/main/services/handlers/filo.js` (i messaggi che leggono e cancellano la
-memoria, tutti chiusi alle pagine web).
+memoria, tutti chiusi alle pagine web),
+`src/pages/editor/editor.js` (`filoMemoryText`: la memoria nei prompt del titolo
+e del riassunto passa dal recinto condiviso).
 Prove: `tests/unit/agentStyle.test.mjs`, `tests/unit/filoMemory.test.mjs`,
 `tests/agent-style.spec.mjs`, `tests/memoria-di-filo.spec.mjs`.

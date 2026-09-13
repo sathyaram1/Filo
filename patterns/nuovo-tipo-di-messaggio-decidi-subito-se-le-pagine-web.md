@@ -56,3 +56,33 @@ annuncio a vuoto farebbe rileggere tutte le pagine di impostazioni aperte.
 
 Sta in `src/main/services/handlers/storage.js` (`AMMESSE_DA_WEB`), provato in
 `tests/impostazioni-pagina-aperta.spec.mjs`.
+
+## Chiudendo un messaggio, guarda quelli che c'erano già
+
+Il gate si mette quasi sempre mentre si scrive un messaggio nuovo, e lì lo
+sguardo è sul nuovo. Ma un messaggio nuovo che legge i dati dell'utente quasi
+mai è il primo: di solito ce n'è uno vecchio, scritto quando la domanda non se
+la faceva nessuno, che restituisce **le stesse identiche righe** con un altro
+nome. Gattare solo il nuovo lascia in piedi una chiusura aggirabile chiedendo la
+stessa cosa col nome di prima.
+
+Successo così con la memoria di Filo (#592, giro 7): tre messaggi nuovi per
+leggerla e cancellarla dall'utente, tutti e tre chiusi alle pagine web, con la
+ragione scritta accanto. Nove righe più su, `filo_get_memory` rispondeva a
+chiunque e restituiva profilo e preferenze apprese per intero.
+
+Quindi, quando gatti un messaggio: cerca gli altri che toccano lo stesso dato
+(`grep` sul nome del modulo che li serve, non sul nome del messaggio) e gattali
+insieme.
+
+E **l'elenco del test non si scrive a mano**: ricavalo dai nomi nel catalogo dei
+messaggi, così un messaggio nuovo sulla stessa cosa nasce dentro la prova invece
+che fuori.
+
+```js
+const nomi = Object.entries(MESSAGES)
+  .filter(([k]) => /^FILO_/.test(k) && /MEMORY|LESSON/.test(k))
+  .map(([, v]) => v);
+```
+
+Esempio in `tests/memoria-di-filo.spec.mjs`.
