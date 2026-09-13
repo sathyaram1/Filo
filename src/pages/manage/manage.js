@@ -4076,6 +4076,11 @@
   // Fusioni in attesa: rilettura via IPC dopo lo stub (in test non c'è né una
   // sessione da proprietario né il server di sicurezza).
   window.__mgTest.loadMergeApprovals = loadMergeApprovals;
+  // Le forme dei cinque livelli: quale forma sta aperta nel pannello e le
+  // richieste di fusione che la pagina ha in mano (per gli spec).
+  window.__mgTest.openSidebarLivello = openSidebarLivello;
+  window.__mgTest.livelloAperto = () => livelloAperto;
+  window.__mgTest.getFusioni = () => fusioni;
 
   // Icone della ricerca (lente): iniettate da JS così restano nel tema di Filo
   // (SVG outline, currentColor) invece di un glifo emoji.
