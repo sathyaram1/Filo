@@ -927,6 +927,8 @@
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
+    // quello che Filo si è appuntato, dal lato dell'utente (#592)
+    memoryLines, removeMemoryLine, forgetLesson, forgetMemoryLine, forgetMemoryModule,
     // onboarding (#524)
     getOnboarding, setOnboarding,
     // timer + sveglie (#322)
