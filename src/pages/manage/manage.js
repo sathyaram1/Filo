@@ -138,6 +138,7 @@
   const mgManage     = document.getElementById('mgManage');
   const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
+  const mgPreapproveLine = document.getElementById('mgPreapproveLine');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
@@ -2176,6 +2177,7 @@
     const aperta = isOpenPublic(fb);
     mgPreapproveBtn.disabled = false;
     mgPreapproveBtn.hidden = !aperta;
+    if (mgPreapproveLine) mgPreapproveLine.hidden = !aperta;
     mgPreapproveBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
     mgPreapproveBtn.textContent = m ? 'Chiedimi prima di fondere' : 'Fondi senza chiedermelo';
     mgPreapproveBtn.title = m

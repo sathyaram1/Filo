@@ -810,8 +810,9 @@
       border-color: var(--sn-accent); color: var(--sn-accent);
       background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
     }
+    .mg-preapprove-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .mg-preapprove-line[hidden] { display: none; }
     .mg-preapproved-info {
-      margin: 6px 0 0;
       font-size: 12px;
       color: var(--sn-muted);
     }
@@ -1176,14 +1177,6 @@
                     <button type="button" class="mg-star-btn mg-usernote-toggle" id="mgUserNoteToggle"
                       aria-expanded="false" aria-controls="mgUserNote"
                       title="Scrivi la riga che leggerà chi ha segnalato">Frase</button>
-                    <!-- «Fondi senza chiedermelo»: il segno che dice al server
-                         di fondere il lavoro delle automazioni su questa
-                         pratica anche quando i controlli lo fermerebbero, senza
-                         aspettare il click. Il testo e l'hover li compone il JS
-                         (dicono anche chi l'ha messo); nascosto sulle pratiche
-                         chiuse, dove il segno non conta più. -->
-                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
-                      aria-pressed="false" hidden>Fondi senza chiedermelo</button>
                   </div>
                 </div>
               </div>
@@ -1197,9 +1190,19 @@
                 <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
               </div>
 
-              <!-- Chi ha messo il segno «fondi senza chiedermelo», e quando:
-                   la riga compare solo quando il segno c'è. -->
-              <p class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></p>
+              <!-- «Fondi senza chiedermelo»: il segno che dice al server di
+                   fondere il lavoro delle automazioni su questa pratica anche
+                   quando i controlli lo fermerebbero, senza aspettare il click.
+                   Sta su una riga SUA, sotto i tasti: nella riga dei tasti un
+                   nome per esteso mandava a capo tutto sulle segnalazioni con
+                   quattro azioni (è il caso della «Frase»), e qui il nome
+                   intero serve. Il testo e l'hover li compone il JS; la riga
+                   sparisce sulle pratiche chiuse, dove il segno non conta. -->
+              <div class="mg-preapprove-line" id="mgPreapproveLine" hidden>
+                <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
+                  aria-pressed="false" hidden>Fondi senza chiedermelo</button>
+                <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
+              </div>
 
               <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo
                    appende alla conversazione, come la gemella. -->
