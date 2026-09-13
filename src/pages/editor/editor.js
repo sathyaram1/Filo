@@ -1335,7 +1335,8 @@
       parts.push('CONVERSAZIONE COL DOCUMENTO (contesto):\n'
         + chat.map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${m.content}`).join('\n'));
     }
-    if (memory) parts.push('MEMORIA DI FILO (contesto su chi scrive):\n' + memory);
+    // Come sopra: il recinto si porta dietro intestazione e frasi di guardia.
+    if (memory) parts.push(memory);
     const messages = [
       { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
       { role: 'user', content: parts.join('\n\n') },
