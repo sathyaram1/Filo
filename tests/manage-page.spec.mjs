@@ -1160,8 +1160,10 @@ test('il pannello centrale si apre al click e mostra bolle + forme dei livelli',
   await expect(page.locator('#mgDetail')).toBeVisible();
   await expect(page.locator('#mgDetailEmpty')).toBeHidden();
 
-  // Intestazione con il mittente
-  await expect(page.locator('#mgDetailHead')).toContainText('tester@example.com');
+  // Intestazione con il mittente: la riga lo accorcia, l'indirizzo intero
+  // resta sotto il puntatore.
+  await expect(page.locator('#mgDetailHead')).toContainText('tester@e');
+  expect(await page.locator('#senderLink').getAttribute('title')).toBe('tester@example.com');
 
   // La fila dei livelli: quattro forme (triangolo, rombo, pentagono,
   // quadrato) piu' i cerchi dei giudici, di cui 2 col verdetto "attacco".
