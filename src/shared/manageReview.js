@@ -1248,6 +1248,9 @@
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
+    livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5,
+    fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
+    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
