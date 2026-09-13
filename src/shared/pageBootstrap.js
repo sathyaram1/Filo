@@ -317,35 +317,89 @@
     }
   }
 
-  // Ricarica una pagina di impostazioni quando qualcosa è cambiato altrove,
-  // senza buttare via quello che l'utente sta scrivendo in quel momento.
+  // ── Rilettura di una pagina di impostazioni ────────────────────────────────
   //
-  // Prima la rilettura si saltava del tutto se il cursore era dentro un campo,
-  // e il cursore ci resta appiccicato: basta aver cliccato una spunta, anche
-  // mentre sei in un'altra scheda a parlare con Filo. Da lì in poi la pagina
-  // mostrava valori che non erano più veri (#592, giro 3). Le spunte, le
-  // tendine e i pulsanti non hanno niente "in corso" da salvare: quello che
-  // l'utente ci ha fatto è già scritto. Il testo che sta digitando sì, quindi
-  // è l'unica cosa che si rimette al suo posto, col cursore dov'era.
+  // Una pagina di impostazioni si rilegge quando qualcosa cambia altrove, così
+  // non mostra un valore che non è più vero (#592, giro 3: prima la rilettura
+  // si saltava se il cursore era dentro un campo, e il cursore ci resta
+  // appiccicato anche mentre sei in un'altra scheda).
+  //
+  // Rileggere però riscrive tutti i campi con quello che c'è in memoria, e
+  // sullo schermo c'è anche roba che in memoria NON c'è: è quella che la pagina
+  // si tiene apposta perché l'utente la sistemi. Uno stile più lungo del tetto,
+  // che il tetto promette di non accorciare da sé; una misura scritta senza
+  // unità, tenuta lì perché tu ci aggiunga il «px»; una riga della lista dei
+  // siti bloccati scritta male, segnalata e conservata. Rileggendo spariva
+  // tutto, insieme all'avviso che diceva perché (#592, giro 4: cinque porte).
+  //
+  // Quindi la rilettura rimette al loro posto i campi che l'utente ha toccato e
+  // che la pagina non ha salvato. Come li riconosce: dopo ogni rilettura
+  // `segnaCampi` scrive in ogni campo di testo il valore che la pagina gli ha
+  // appena messo. Se al giro dopo il campo mostra qualcosa di diverso da quel
+  // valore, l'ha scritto l'utente; e se dopo la rilettura in memoria c'è ancora
+  // lo stesso valore di prima, per quel campo non è cambiato niente altrove e
+  // non c'è nessuna ragione di riscriverci sopra. Quando invece il valore in
+  // memoria è cambiato davvero, vince la memoria: è il motivo per cui la
+  // rilettura esiste.
+  const TIPI_TESTO = ['text', 'password', 'search', 'url', 'email', 'tel', 'number'];
+
+  function campiDiTesto() {
+    const out = [];
+    for (const el of document.querySelectorAll('input[id], textarea[id]')) {
+      if (el.tagName === 'TEXTAREA'
+        || TIPI_TESTO.includes(String(el.type || 'text').toLowerCase())) out.push(el);
+    }
+    return out;
+  }
+
+  // Da chiamare in fondo al `load()` di ogni pagina di impostazioni: fotografa
+  // quello che la pagina ha appena scritto nei campi di testo.
+  function segnaCampi() {
+    for (const el of campiDiTesto()) el.dataset.snReso = el.value;
+  }
+
   async function ricaricaSenzaDisturbare(load, dopo) {
-    const TIPI_TESTO = ['text', 'password', 'search', 'url', 'email', 'tel', 'number'];
-    const el = document.activeElement;
-    const staScrivendo = !!(el && el.id && (el.tagName === 'TEXTAREA'
-      || (el.tagName === 'INPUT' && TIPI_TESTO.includes(String(el.type || 'text').toLowerCase()))));
-    const memo = staScrivendo
-      ? { id: el.id, value: el.value, start: el.selectionStart, end: el.selectionEnd }
+    const attivo = document.activeElement;
+    const fuoco = (attivo && attivo.id && campiDiTesto().includes(attivo))
+      ? { id: attivo.id, start: attivo.selectionStart, end: attivo.selectionEnd }
       : null;
+
+    const prima = new Map();
+    for (const el of campiDiTesto()) prima.set(el.id, { valore: el.value, reso: el.dataset.snReso });
+
     await load();
-    if (!memo) return;
-    const ora = document.getElementById(memo.id);
-    if (!ora) return;
-    ora.value = memo.value;
-    try { ora.focus(); } catch (_) {}
-    try { if (memo.start != null) ora.setSelectionRange(memo.start, memo.end); } catch (_) {}
-    if (typeof dopo === 'function') dopo(ora);
+
+    const rimessi = [];
+    for (const [id, p] of prima) {
+      // Un campo mai fotografato (la pagina non chiama segnaCampi) non si
+      // giudica: si lascia alla rilettura, come prima.
+      if (p.reso === undefined) continue;
+      const toccatoDallUtente = p.valore !== p.reso;
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const memoriaFerma = el.value === p.reso;
+      if (!toccatoDallUtente || !memoriaFerma) continue;
+      el.value = p.valore;
+      // Resta "toccato": se arriva un'altra rilettura, il testo va rimesso
+      // di nuovo finché l'utente non lo sistema.
+      el.dataset.snReso = p.reso;
+      rimessi.push(el);
+    }
+
+    if (fuoco) {
+      const ora = document.getElementById(fuoco.id);
+      if (ora) {
+        try { ora.focus(); } catch (_) {}
+        try { if (fuoco.start != null) ora.setSelectionRange(fuoco.start, fuoco.end); } catch (_) {}
+      }
+    }
+    // La pagina rifà quello che è appeso al testo di quei campi: il conteggio,
+    // l'avviso, la tendina che lo segue.
+    if (typeof dopo === 'function') for (const el of rimessi) dopo(el);
   }
 
   window.SN_PAGE_BOOTSTRAP = {
-    applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects, ricaricaSenzaDisturbare,
+    applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects,
+    ricaricaSenzaDisturbare, segnaCampi,
   };
 })();
