@@ -136,7 +136,7 @@ test('da una pagina web non si deve poter creare una sveglia il cui nome entra n
 test('da una pagina web non si deve poter instradare un dominio dell\'utente da un altro paese', async ({ app, openTab, testServer }) => {
   // Qui il mittente è una scheda web VERA: l'azione del proxy lavora sulla
   // scheda di chi la chiede, quindi con un mittente inventato non direbbe niente.
-  await openTab(testServer.url('/pagina.html'));
+  await testServer.openReady(openTab, '<!doctype html><title>Sito</title><p>ciao</p>');
   const scheda = await app.evaluate(({ BrowserWindow }) => {
     for (const w of BrowserWindow.getAllWindows()) {
       const t = (w._filoTabs?.tabs || []).find((x) => /^https?:/i.test(x.url || ''));
