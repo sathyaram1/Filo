@@ -482,12 +482,19 @@
     persistTabColor();
   }
 
+  // Solo i parametri che l'utente ha toccato. Mandandoli tutti, un colore delle
+  // schede spento a voce tornava accesso appena si ritoccava la saturazione
+  // (#592, giro 5): sono sei manopole dello stesso gruppo, e il gruppo intero
+  // partiva coi valori letti all'apertura.
   function persistTabColor() {
     const clamped = TabColor ? TabColor.clampParams(currentTabColor) : currentTabColor;
     currentTabColor = clamped;
+    const cambiati = Storage.partialCambiato(ultimiTabColor || {}, clamped);
+    ultimiTabColor = { ...clamped };
+    if (!Object.keys(cambiati).length) return;
     chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { tabColor: clamped },
+      settings: { tabColor: cambiati },
     });
     flashSaved('tabColorSavedHint');
   }
