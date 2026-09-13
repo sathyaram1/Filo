@@ -114,6 +114,23 @@ test('chiudere il riquadro della tonalità non deve cancellare un colore chiesto
   expect(dopo.themeTokens?.accent).toBe('#0055ff');
 });
 
+test('aprire e confermare il riquadro senza toccare niente non deve cancellare un colore chiesto nel frattempo', async ({ openTab }) => {
+  const page = await apriRiquadroTonalita(openTab);
+
+  await eseguiInChat(page, { type: 'IMPOSTA_ESTETICA', token: 'accent', valore: '#0055ff' });
+  await expect(async () => {
+    expect((await impostazioni(page)).themeTokens?.accent).toBe('#0055ff');
+  }).toPass({ timeout: 8_000 });
+
+  // «Fatto» senza aver spostato niente: non c'è nessuna scelta da scrivere.
+  await page.click('.sn-refine-done');
+  await page.waitForTimeout(1000);
+
+  const dopo = await impostazioni(page);
+  expect(dopo.themeTokens?.['button.bg']).toBe('#3a7d44');
+  expect(dopo.themeTokens?.accent).toBe('#0055ff');
+});
+
 test('la velocità di lettura appena spostata non deve tornare indietro perché è cambiato altro', async ({ openTab }) => {
   const page = await openTab(PREFERENZE);
   await page.waitForSelector('#ttsRate', { timeout: 20_000 });
