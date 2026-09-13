@@ -1103,7 +1103,7 @@
   const L4_ESITI = {
     pass:    { classe: 'design', etichetta: 'Passato' },
     fail:    { classe: 'attack', etichetta: 'Bocciato' },
-    saltato: { classe: 'spam',   etichetta: 'Saltato da te' },
+    saltato: { classe: 'spam',   etichetta: 'Saltato dall’owner' },
   };
 
   /** Livello 4: l'audit di sicurezza sul lavoro fatto. PURA. */
