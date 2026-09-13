@@ -98,7 +98,8 @@ testo libero nuova e non censita fa diventare rossa la sentinella.
 
 Codice: `src/shared/constants.js` (`AGENT_STYLE_MAX`, `togliMarcatori`,
 `sanitizeAgentStyle`, `validateAgentStyle`, `agentStyleBlock`,
-`injectAgentStyle`, `LESSON_MAX`, `validateLesson`, `lessonsBlock`, e i
+`injectAgentStyle`, `LESSON_MAX`, `validateLesson`, `lessonsBlock`,
+`MODEL_NAME_MAX`, `sanitizeModelName`, e i
 segnaposto dentro `PROMPTS.helpStatic` / `PROMPTS.filoChatStatic`),
 `src/shared/preferences.js` (setter `stile_agente`),
 `src/shared/actionLevels.js` (il rifiuto non apre popup),
