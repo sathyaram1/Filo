@@ -658,5 +658,7 @@
     outcomeMessage: outcomeMessage,
     render: render,
     renderRecent: renderRecent,
+    preapprovedBy: preapprovedBy,
+    renderPreapproved: renderPreapproved,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
