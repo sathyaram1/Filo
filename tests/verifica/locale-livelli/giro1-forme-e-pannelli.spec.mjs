@@ -444,13 +444,15 @@ test('quadrato: la richiesta ferma si vede sulla scheda (rosso, badge, in cima) 
   await expect(sideTitle(page)).toHaveText(/fusione/i);
   await expect(sideBody(page)).toContainText('worker/salva-immagine');
   await expect(sideBody(page)).toContainText(/Tocca aree protette/);
-  const approva = sideBody(page).locator('button', { hasText: /approva/i }).first();
+  const approva = sideBody(page).locator('button.sn-mac-btn-go').first();
   await expect(approva).toBeVisible();
+  await expect(approva).toHaveText(/approva/i);
   await expect(sideBody(page).locator('button', { hasText: /scarta/i }).first()).toBeVisible();
+  // Due click: il primo arma («Confermi?»), il secondo manda.
   await approva.click();
-  // Seconda pressione se chiede conferma.
-  const testoDopo = await approva.textContent().catch(() => '');
-  if (/conferm/i.test(testoDopo || '')) await approva.click();
+  await expect(approva).toHaveText(/confermi/i);
+  expect(await page.evaluate(() => window.__calls.length)).toBe(0);
+  await approva.click();
   await expect.poll(async () => page.evaluate(() => window.__calls.map((c) => c.type))).toContain('merge_approval_approve');
   const call = await page.evaluate(() => window.__calls.find((c) => c.type === 'merge_approval_approve'));
   expect(call.id).toBe('req-0001-abcdef');
