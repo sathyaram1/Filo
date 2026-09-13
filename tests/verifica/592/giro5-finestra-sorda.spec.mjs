@@ -109,3 +109,28 @@ test('le Opzioni non devono mostrare una chiave API che non è più quella in us
     { timeout: 4000 },
   ).toBe('sk-nuova-2222');
 });
+
+test('la pagina Sicurezza non deve mostrare accesa una protezione spenta altrove', async ({ openTab }) => {
+  const pagina = await openTab(SICUREZZA);
+  await pagina.waitForSelector('#sec-siteblock-blacklist', { state: 'attached', timeout: 25_000 });
+
+  // Il rilevamento dei siti pericolosi acceso da questa pagina.
+  await pagina.check('#sec-safebrowse');
+  await pagina.waitForTimeout(1200);
+  expect((await impostazioni(pagina)).security?.safeBrowse?.enabled).toBe(true);
+
+  // L'utente scrive un sito nel riquadro della lista (il salvataggio parte da
+  // sé) e nello stesso momento fa spegnere il rilevamento a Filo, confermando.
+  await pagina.click('#sec-siteblock-blacklist');
+  await pagina.type('#sec-siteblock-blacklist', 'esempio.it', { delay: 30 });
+  await pagina.locator('#sec-siteblock-blacklist').blur();
+  await eseguiInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'navigazione_sicura', valore: 'no' });
+  await pagina.waitForTimeout(300);
+  expect((await impostazioni(pagina)).security?.safeBrowse?.enabled).toBe(false);
+
+  // La pagina che ha quella protezione sotto gli occhi deve dirla spenta.
+  await expect.poll(
+    async () => pagina.$eval('#sec-safebrowse', (el) => el.checked),
+    { timeout: 4000 },
+  ).toBe(false);
+});
