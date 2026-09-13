@@ -103,25 +103,36 @@ test('una sveglia che il modello si scrive da sé non deve arrivare nuda nel pro
     + 'e sopravvive al riavvio: è l\'inganno permanente che il feedback chiede di chiudere').toBe(true);
 });
 
-test('il titolo di una scheda aperta non deve arrivare nudo nel prompt', async ({ app, openTab, testServer }) => {
-  // La prima via ordinaria che il feedback nomina. Il titolo di una pagina
-  // qualunque entra nello STATO di ogni messaggio della chat.
-  await testServer.openReady(
-    openTab,
-    `<!doctype html><html><head><title>${OSTILE}</title></head><body>ciao</body></html>`,
-  );
-  // Il titolo arriva allo stato quando la scheda lo comunica: si aspetta lui,
-  // non un tempo fisso.
-  await expect.poll(
-    async () => (await app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble()).stateText)).includes('PWNED'),
-    { timeout: 10_000, message: 'il titolo della scheda non è mai arrivato nello stato' },
-  ).toBe(true);
+test('un appunto che il modello si salva da sé non deve arrivare nudo nel prompt', async ({ app }) => {
+  // «il riassunto di un file» è la terza via ordinaria che il feedback nomina.
+  // SALVA_APPUNTO è di livello 1: nessuna conferma. Il file resta, e la sua
+  // prima parte entra nel prompt di ogni messaggio come riassunto.
+  const esito = await comeSeFosse(app, {
+    type: 'filo_run_action',
+    action: { type: 'SALVA_APPUNTO', testo: `Lista della spesa. ${OSTILE}` },
+  });
+  expect(JSON.stringify(esito || {}), 'l\'appunto non è stato salvato: il resto della prova non vale')
+    .toContain('true');
 
-  const prompt = await promptDellaChat(app);
+  const prompt = await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const M = globalThis.SN_FILO_MEMORY;
+    const EF = globalThis.SN_EDITOR_SUMMARY;
+    const Store = globalThis.SN_STORAGE;
+    const collection = await Store.getRaw('filo.editor.collection', null);
+    const files = EF.renderForPrompt(EF.buildContextFiles(collection));
+    const memoria = await M.getMemory();
+    const { profilo, preferenze, espansioni } = M.renderMemoryForPrompt(memoria);
+    return C.PROMPTS.filoChatContext({
+      profilo, preferenze, espansioni,
+      lezioni: '', stato: '', history: '', modelName: 'm',
+      files, onboarding: '', onboardingTurns: 0, onboardingMax: 0,
+    });
+  });
   const m = await marcatori(app);
   const esame = dentroUnRecinto(prompt, 'PWNED', m);
-  expect(esame.trovato, 'il titolo della scheda non è finito nel prompt: la prova non vale').toBe(true);
-  expect(esame.dentro, 'il titolo di una scheda arriva al modello fuori da ogni recinto').toBe(true);
+  expect(esame.trovato, 'l\'appunto non è finito nel prompt: la prova non vale').toBe(true);
+  expect(esame.dentro, 'il riassunto di un file arriva al modello fuori da ogni recinto').toBe(true);
 });
 
 test('il messaggio della home e le notifiche non devono arrivare nudi nel prompt', async ({ app }) => {
