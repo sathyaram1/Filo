@@ -43,6 +43,17 @@ describe('le fuse senza chiedere: quando, e quante mancano', () => {
     assert.equal(UI.mergedWhenText(0, ORA), 'fusa in un momento non registrato');
   });
 
+  test('il momento del segno (in hover) si legge come data locale, non come timestamp grezzo', () => {
+    const at = ORA - 3 * ORE;
+    const iso = new Date(at).toISOString();
+    assert.equal(UI.preapprovedWhenText(iso), `Segno messo il ${UI.dateTimeText(at)}`);
+    assert.doesNotMatch(UI.preapprovedWhenText(iso), /T\d\d:\d\d:\d\d/);
+    assert.equal(UI.preapprovedWhenText(''), '');
+    assert.equal(UI.preapprovedWhenText(undefined), '');
+    // Un testo che non è una data non sparisce: si mostra com'è.
+    assert.equal(UI.preapprovedWhenText('boh'), 'Segno messo il boh');
+  });
+
   test('se il server ne ha lasciate fuori, si dice quante; se ci sono tutte, niente', () => {
     assert.equal(UI.preapprovedMoreText(8, 8), '');
     assert.equal(UI.preapprovedMoreText(8, undefined), '');
