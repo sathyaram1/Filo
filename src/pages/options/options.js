@@ -465,6 +465,20 @@
     applyOpenWeightsTestGates();
   }
 
+  // Rimette il bordo rosso e la spiegazione sulle righe che il salvataggio non
+  // ha preso, leggendo l'elenco COM'È ADESSO (#592, giro 11).
+  //
+  // Serve perché fra il momento in cui si salva e il momento in cui si segna la
+  // pagina può essersi ridisegnata: l'annuncio del salvataggio rimbalza indietro
+  // anche a chi l'ha fatto, e la rilettura rifà le righe da capo. Segnare le
+  // righe di prima voleva dire segnare elementi che non sono più sullo schermo,
+  // e all'utente restava l'avviso in fondo («qualcosa non è stato salvato»)
+  // senza nessun modo di sapere quale riga.
+  function rimarcaRigheScartate() {
+    const { missingNickRows, dupRows } = collectModelRegistry();
+    markRegistryRowIssues(missingNickRows, dupRows);
+  }
+
   // Un'impostazione può cambiare mentre questa pagina è aperta (Filo in chat,
   // un'altra scheda). La pagina si rilegge sempre, così non mostra un valore
   // che non è più vero, e rimette al loro posto le cose che l'utente ha scritto
