@@ -540,6 +540,23 @@
     FILO_GENERATE_DASHBOARD: 'filo_generate_dashboard',
     // CRUD memoria/contenuti dashboard
     FILO_GET_MEMORY: 'filo_get_memory',
+    // Quello che Filo si è appuntato sull'utente, così com'è: i moduli di
+    // memoria e le lezioni non ancora compattate. Serve alla pagina Preferenze,
+    // dove l'utente lo rilegge e lo cancella una riga per volta (#592). Solo
+    // pagine filo://: è memoria dell'utente, non roba da pagine web.
+    // Risposta: { ok, memory: { PROFILO, PREFERENZE, … }, lessons: [{ ts, text }] }
+    FILO_LIST_MEMORY: 'filo_list_memory',
+    // Cancella UNA lezione appuntata. { ts?, text }. Solo pagine filo://.
+    // Risposta: { ok, tolta, lessons }
+    FILO_FORGET_LESSON: 'filo_forget_lesson',
+    // Cancella UNA riga di un modulo di memoria. { module, index, atteso }:
+    // `atteso` è il testo che la pagina mostrava, e se non combacia non si
+    // cancella niente. Solo pagine filo://.
+    // Risposta: { ok, tolta, memory }
+    FILO_FORGET_MEMORY_LINE: 'filo_forget_memory_line',
+    // Svuota un modulo di memoria intero. { module }. Solo pagine filo://.
+    // Risposta: { ok, tolta, memory }
+    FILO_FORGET_MEMORY_MODULE: 'filo_forget_memory_module',
     // Compattazione FORZATA della memoria: svuota subito il buffer delle
     // lezioni dentro PROFILO/PREFERENZE senza aspettare la soglia dei 3000
     // caratteri. Serve alla fine della micro-intervista di benvenuto (#524),
