@@ -3235,6 +3235,7 @@
     const liv = MR.livelloPer(fb, key, { fusioni });
     if (!liv) return;
     segnaForma(key);
+    giudiceAperto = null;
 
     // I giudici non hanno un pannello loro: la fila di cerchi apre il singolo
     // giudice. Cliccare il gruppo quando nessuno ha votato dice perché.
