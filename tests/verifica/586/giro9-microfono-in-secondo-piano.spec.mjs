@@ -54,6 +54,7 @@ test('il microfono aperto in una scheda lascia un segno anche da un\'altra sched
   // il sito che lo tiene aperto.
   const cornice = await shell.evaluate(() => (document.body.innerText || '').replace(/\s+/g, ' '));
   const segnoAltrove = new RegExp(`microfono|${host.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}`, 'i').test(cornice);
+  await shell.screenshot({ path: 'tests/.shots/586-giro9-microfono-in-secondo-piano.png' }).catch(() => {});
   console.log('[586 g9] dopo il cambio scheda — traccia:', JSON.stringify(traccia),
     'cartelli visibili:', visibili, 'testi:', JSON.stringify(testi),
     'qualcosa nella cornice nomina il microfono o il sito:', segnoAltrove);
