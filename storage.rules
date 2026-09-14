@@ -90,41 +90,13 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-<<<<<<< HEAD
-    match /feedback/{file=**} {
-      allow get: if false;
-      allow list: if false;
-      allow write: if
-        request.resource.size < 4 * 1024 * 1024
-        && (
-          request.resource.contentType.matches('image/(png|jpeg|jpg|gif|webp|bmp)')
-          || request.resource.contentType == 'text/plain'
-          || request.resource.contentType == 'text/markdown'
-          || request.resource.contentType == 'text/csv'
-          || request.resource.contentType == 'application/pdf'
-          || request.resource.contentType == 'application/json'
-          // blob cifrati S1.2 (maybeEncryptBlob) viaggiano come octet-stream
-          || request.resource.contentType == 'application/octet-stream'
-        );
-=======
-    // Owner/amministratore: loggato, email verificata, e presente
-    // nell'allowlist `admins` di Firestore — la stessa che comanda in
-    // firestore.rules. Cross-service: se la lettura non riesce la regola nega
-    // (e l'owner vede comunque gli allegati dai link col token: si degrada
-    // verso il chiuso, non verso l'aperto).
-    // `email_verified` si chiede con `get(…, false)` e non col punto: il motore
-    // di Storage (a differenza di quello di Firestore) non espone quel claim
-    // come proprietà, e `request.auth.token.email_verified` lì non è «falso», è
-    // un ERRORE di valutazione — cioè una regola che smette di funzionare. Con
-    // `get` il claim assente vale false e la lettura resta negata: il default
-    // sbaglia dalla parte chiusa. Verificato sul motore vero
-    // (tests/rules/storage-allegati-motore-vero.mjs).
-    function eAmministratore() {
-      return request.auth != null
-        && request.auth.token.get('email_verified', false) == true
-        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.token.email));
->>>>>>> a59b09cdd (feedback #582: regole degli allegati dei feedback (lavoro squashato per il riallineamento))
-    }
+    // Nessuna funzione «sei l'amministratore?»: da queste regole non legge
+    // nessuno, nemmeno lui (vedi `get: if false` più sotto). Il ramo che
+    // chiedeva l'allowlist `admins` di Firestore con le regole cross-service è
+    // stato tolto quando la lettura si è chiusa del tutto: un permesso che
+    // nessuno usa è solo una porta in più, e per di più era l'unica riga che
+    // in laboratorio non si riusciva a misurare (il motore degli emulatori al
+    // database quella domanda non la gira).
 
     // Tipi PASSIVI, allowlist esplicita, allineata a
     // src/shared/feedbackAttachTypes.js.
