@@ -30,6 +30,12 @@
   // storage.rules. NIENTE text/html / application/xhtml+xml / text/xml.
   const DOC_MIME = new Set([
     'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
+    // `.tsv` e `.yaml` col loro tipo esplicito. Le storage.rules li ammettono
+    // già e `npm run feedback:apri` li manda; senza questi due, un .yaml che il
+    // sistema operativo tipizza `application/x-yaml` veniva rifiutato qui
+    // mentre il deposito lo avrebbe accettato, e lo strumento a riga di comando
+    // poteva mandare quello che una persona non poteva allegare (#582, giro 7).
+    'text/tab-separated-values', 'application/x-yaml',
   ]);
 
   // Estensioni ammesse SOLO quando il MIME è vuoto o generico
