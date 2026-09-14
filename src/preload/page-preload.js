@@ -240,18 +240,41 @@ try {
       // `viste`: quante tracce questo riquadro ha visto passare da sempre. Zero
       // vuol dire che la pagina non è passata dal nostro giro, e chi chiede non
       // deve concludere che sia tutto a posto (#586, giro 6).
-      const rispondi = (vive, viste) => {
+      const rispondi = (vive, viste, incoerenza) => {
         if (risposto) return;
         risposto = true;
-        try { ipcRenderer.send('filo:permessi-fermato', { id, vive, viste: Number(viste) || 0 }); } catch (_) {}
+        try {
+          ipcRenderer.send('filo:permessi-fermato', {
+            id, vive, viste: Number(viste) || 0, incoerenza: Number(incoerenza) || 0,
+          });
+        } catch (_) {}
       };
       try {
         const chiavi = (msg && Array.isArray(msg.chiavi) && msg.chiavi.length) ? msg.chiavi : null;
+        // Quante tracce dice di aver consegnato il giro che sta nella pagina. Il
+        // suo conto sta in una variabile chiusa che il sito non raggiunge, e la
+        // funzione con cui si chiede il microfono la teniamo noi: quel numero è
+        // onesto. Serve a un confronto, non a decidere: se il giro nella pagina
+        // ne ha consegnate più di quante ne vede qui il preload, qualcuno ha
+        // rotto il ponte fra i due mondi, e allora non si conclude «è tutto a
+        // posto» (#586, giro 10). Il massimo, e non l'ultimo: una pagina che
+        // spara risposte finte può solo far scattare la strada dura.
+        let vistePagina = 0;
+        const senti = (ev) => {
+          try {
+            const d = ev && ev.detail;
+            if (!d || d.id !== id) return;
+            const n = Number(d.viste) || 0;
+            if (n > vistePagina) vistePagina = n;
+          } catch (_) {}
+        };
         // Prima si avvisa il giro nella pagina, che chiude quello che sa e
         // toglie di mezzo i suoi elementi: per un sito qualunque finisce lì.
         try {
+          document.addEventListener(CANALE_FERMATO, senti, true);
           document.dispatchEvent(new CustomEvent(CANALE_FERMA, { detail: { id, chiavi } }));
         } catch (_) {}
+        try { document.removeEventListener(CANALE_FERMATO, senti, true); } catch (_) {}
         // Poi il conto vero, con gli stampi di questo mondo.
         raccogli(document);
         let vive = 0;
@@ -262,8 +285,8 @@ try {
           try { v.t.stop(); } catch (_) {}
           try { if (v.t.readyState === 'live') vive++; } catch (_) { vive++; }
         }
-        rispondi(vive, viste);
-      } catch (_) { rispondi(1, 0); }
+        rispondi(vive, viste, Math.max(0, vistePagina - viste));
+      } catch (_) { rispondi(1, 0, 0); }
     });
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
