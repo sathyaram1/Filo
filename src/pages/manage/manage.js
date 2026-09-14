@@ -1173,14 +1173,19 @@
         const full = img.dataset.full;
         if (full) openLightbox(full);
       });
-      resolveImageSrc(url).then(({ dataUrl, error }) => {
+      resolveImageSrc(url).then(({ dataUrl, error, soloDestinatario }) => {
         img.classList.remove('mg-img-loading');
         if (dataUrl) {
           img.src = dataUrl;
           img.dataset.full = dataUrl;
         } else {
           img.classList.add('mg-img-failed');
-          img.alt = 'immagine non disponibile';
+          // «Non disponibile» fa sembrare un guasto quello che è solo roba di
+          // qualcun altro: la stessa frase che il riquadro ha smesso di dire.
+          // E non «consegnato»: se quell'allegato sia mai arrivato, da qui Filo
+          // non l'ha guardato. Resta l'unica cosa vera in ogni caso, cioè chi
+          // lo apre.
+          img.alt = soloDestinatario ? '(allegato riservato)' : 'immagine non disponibile';
           if (error) img.title = error;
         }
       });
