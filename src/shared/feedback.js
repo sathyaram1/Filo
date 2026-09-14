@@ -101,12 +101,19 @@
   }
 
   // Intestazioni con cui l'owner scarica un allegato. PURA.
-  // Dal #582 la lettura del bucket è riservata agli amministratori: senza
-  // identità si passa solo col download token dentro l'URL. Chi ce l'ha,
-  // l'identità, la manda — così la dashboard vede gli allegati anche quando il
-  // token non c'è (allegati storici) o viene revocato. Il token dell'owner esce
-  // SOLO verso il bucket di Filo (isAttachmentUrl lo confronta per intero): su
-  // qualunque altro URL queste intestazioni sono vuote.
+  //
+  // Dal #583 la lettura del deposito è negata dalle regole a CHIUNQUE, owner
+  // compreso: quello che apre un allegato è il download token dentro l'URL,
+  // che Firebase valuta prima delle regole. Quindi questo Bearer non apre più
+  // niente da solo, e resta per una ragione sola: se un domani le regole
+  // tornassero a riconoscere un'identità, la richiesta è già firmata nel modo
+  // giusto invece di esserlo nel modo comodo.
+  //
+  // La regola che conta è DOVE va: il token dell'owner esce SOLO verso il
+  // deposito di Filo, e `isAttachmentUrl` lo confronta per intero, parsando
+  // l'URL. L'indirizzo di un allegato non lo sceglie l'owner — sta dentro il
+  // documento del feedback, e un feedback lo manda chiunque: su qualunque altro
+  // URL queste intestazioni sono vuote.
   function attachmentFetchHeaders(url, idToken) {
     const t = String(idToken || '');
     if (!t || !isAttachmentUrl(url)) return {};
