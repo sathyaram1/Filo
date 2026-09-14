@@ -179,16 +179,56 @@ if (!IS_SUBFRAME) try {
 // e qui non si chiede niente al main, quindi non costa nulla ripeterlo.
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https?:/i.test(loc)) {
+  // Anche nei riquadri senza indirizzo proprio (about:blank, srcdoc): per il
+  // browser sono lo stesso sito di chi li ospita, e una traccia presa lì dentro
+  // è una traccia di quel sito. Senza il giro qui, la revoca non aveva nessuno a
+  // cui chiedere e finiva sempre nella ricarica.
+  if (/^https?:/i.test(loc) || (IS_SUBFRAME && /^(about:blank|about:srcdoc|)$/i.test(loc))) {
     const {
-      buildCatturaSicuraSource, CANALE_FERMA, CANALE_FERMATO,
+      buildCatturaSicuraSource, CANALE_FERMA, ATTR_TRACCIA,
     } = require('./permessi-guard.js');
     webFrame.executeJavaScript(buildCatturaSicuraSource(), true).catch(() => {});
+
     // #586 — «togli il permesso» deve chiudere anche la traccia già consegnata,
     // e chiuderla senza ricaricare la pagina: ricaricare butta via quello che
-    // chi naviga stava scrivendo lì. Il main chiede, la pagina ferma le sue
-    // tracce e risponde quante ne restano vive; con quella risposta il main
-    // decide se serve ancora la strada dura (vedi services/permessiSito.js).
+    // chi naviga stava scrivendo lì. Il main chiede, qui si ferma e si risponde
+    // quante ne restano vive; con quella risposta il main decide se serve ancora
+    // la strada dura (vedi services/permessiSito.js).
+    //
+    // Il conto lo teniamo QUI, nel mondo del preload, e non nel mondo della
+    // pagina: gli stampi di questo mondo la pagina non li può riscrivere. Prima
+    // il conto arrivava dal suo, e un sito che dichiarava finite le proprie
+    // tracce mentre erano vive si teneva il microfono aperto a permesso tolto
+    // (#586, giro 9). Le tracce ci arrivano dal DOM, che i due mondi
+    // condividono: il giro nella pagina appende ognuna a un elemento nascosto
+    // marcato con la chiave di Filo che la copre.
+    const tracce = new Set(); // { t, k }
+    const raccogli = (radice) => {
+      try {
+        if (!radice || !radice.querySelectorAll) return;
+        const nodi = [...radice.querySelectorAll(`[${ATTR_TRACCIA}]`)];
+        if (radice.nodeType === 1 && radice.hasAttribute && radice.hasAttribute(ATTR_TRACCIA)) nodi.push(radice);
+        for (const el of nodi) {
+          const s = el.srcObject;
+          if (!s || typeof s.getTracks !== 'function') continue;
+          const k = el.getAttribute(ATTR_TRACCIA) || '';
+          for (const t of s.getTracks()) {
+            let gia = false;
+            for (const v of tracce) if (v.t === t) { gia = true; break; }
+            if (!gia) tracce.add({ t, k });
+          }
+        }
+      } catch (_) {}
+    };
+    try {
+      const osserva = new MutationObserver((mutazioni) => {
+        for (const m of mutazioni) {
+          for (const n of (m.addedNodes || [])) raccogli(n);
+        }
+      });
+      osserva.observe(document, { childList: true, subtree: true });
+    } catch (_) {}
+
     ipcRenderer.on('filo:permessi-ferma', (_e, msg) => {
       const id = (msg && msg.id) || null;
       let risposto = false;
@@ -201,20 +241,23 @@ try {
         try { ipcRenderer.send('filo:permessi-fermato', { id, vive, viste: Number(viste) || 0 }); } catch (_) {}
       };
       try {
-        const suRisposta = (e) => {
-          try {
-            if (!e || !e.detail || e.detail.id !== id) return;
-            document.removeEventListener(CANALE_FERMATO, suRisposta, true);
-            rispondi(Number(e.detail.vive) || 0, e.detail.viste);
-          } catch (_) {}
-        };
-        document.addEventListener(CANALE_FERMATO, suRisposta, true);
-        document.dispatchEvent(new CustomEvent(CANALE_FERMA, {
-          detail: { id, chiavi: (msg && msg.chiavi) || null },
-        }));
-        // La pagina risponde sull'istante. Se non risponde (il suo codice ha
-        // tolto di mezzo il nostro giro), vale come "è rimasto tutto vivo".
-        setTimeout(() => rispondi(1, 0), 400);
+        const chiavi = (msg && Array.isArray(msg.chiavi) && msg.chiavi.length) ? msg.chiavi : null;
+        // Prima si avvisa il giro nella pagina, che chiude quello che sa e
+        // toglie di mezzo i suoi elementi: per un sito qualunque finisce lì.
+        try {
+          document.dispatchEvent(new CustomEvent(CANALE_FERMA, { detail: { id, chiavi } }));
+        } catch (_) {}
+        // Poi il conto vero, con gli stampi di questo mondo.
+        raccogli(document);
+        let vive = 0;
+        let viste = 0;
+        for (const v of [...tracce]) {
+          viste++;
+          if (chiavi && !chiavi.includes(v.k)) continue;
+          try { v.t.stop(); } catch (_) {}
+          try { if (v.t.readyState === 'live') vive++; } catch (_) { vive++; }
+        }
+        rispondi(vive, viste);
       } catch (_) { rispondi(1, 0); }
     });
   }
