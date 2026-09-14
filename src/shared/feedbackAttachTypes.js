@@ -44,7 +44,7 @@
   // l'estensione per "salvare" un MIME esplicito e pericoloso (es. un .txt che
   // il SO tipizza text/html resta rifiutato).
   const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
-  const DOC_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'log', 'yml', 'yaml', 'pdf']);
+  const DOC_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'log', 'yml', 'yaml', 'pdf']);
 
   function extOf(name) {
     const m = /\.([a-z0-9]+)$/i.exec(String(name || ''));
