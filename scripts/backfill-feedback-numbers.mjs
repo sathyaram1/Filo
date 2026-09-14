@@ -37,6 +37,45 @@ function strField(doc, name) {
   return doc?.fields?.[name]?.stringValue || '';
 }
 
+// La data d'invio, qualunque forma abbia sul documento.
+//
+// Firestore non ha UN modo di dire "data": `createdAt` lo scrive l'app come
+// `timestampValue`, ma i feedback più vecchi della migrazione ce l'hanno come
+// `stringValue` ISO, e qualche riga importata come `integerValue` di
+// millisecondi. Un lettore che ne guarda una sola torna vuoto sugli altri, e
+// una stringa vuota non si lamenta: si mette in fila con le altre stringhe
+// vuote e l'ordinamento diventa un nastro fermo. È quello che è successo
+// quando l'ordine per data è passato dal database a qui (verifica #583, giro
+// 7): tutti i confronti davano zero e i numeri uscivano nell'ordine interno
+// del database, cioè a caso. Chi legge una data da un documento grezzo passa
+// da qui.
+export function dataDiArrivo(doc) {
+  const v = doc?.fields?.createdAt;
+  if (!v) return NaN;
+  if (typeof v.timestampValue === 'string') return Date.parse(v.timestampValue);
+  if (typeof v.stringValue === 'string') return Date.parse(v.stringValue);
+  if (v.integerValue != null) return Number(v.integerValue);
+  if (v.doubleValue != null) return Number(v.doubleValue);
+  return NaN;
+}
+
+// I più vecchi davanti: è la promessa del comando, «i numeri più bassi alle
+// segnalazioni arrivate prima». Una data che non si legge non deve scavalcare
+// nessuno, quindi va in fondo invece di valere zero (che vorrebbe dire 1970);
+// a parità di data decide il nome del documento, così due giri di fila danno
+// lo stesso risultato.
+export function ordinaPerArrivo(docs) {
+  return (Array.isArray(docs) ? docs.slice() : []).sort((a, b) => {
+    const ta = dataDiArrivo(a);
+    const tb = dataDiArrivo(b);
+    const va = Number.isFinite(ta);
+    const vb = Number.isFinite(tb);
+    if (va && vb && ta !== tb) return ta - tb;
+    if (va !== vb) return va ? -1 : 1;
+    return String(a?.name || '').localeCompare(String(b?.name || ''));
+  });
+}
+
 async function listAll(bearer) {
   // TUTTI i feedback, paginati con un cursore sul nome del documento, poi
   // ordinati per data d'invio crescente (i più vecchi prendono i numeri più
