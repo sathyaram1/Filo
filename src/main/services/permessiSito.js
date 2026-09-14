@@ -844,29 +844,39 @@ function chiediAUnFrame(frame, chiavi) {
   });
 }
 
+// Torna { vive, registrate, incoerenti }. La regola su cosa farne è di chi
+// chiama, perché non è la stessa per tutti: vedi `restaVivo` e `schermoSenzaScelta`.
 async function chiediAllaPaginaDiFermare(wc, chiavi) {
-  if (!wc || wc.isDestroyed()) return 0;
+  const duro = { vive: 1, registrate: 0, incoerenti: 1 };
+  if (!wc || wc.isDestroyed()) return { vive: 0, registrate: 1, incoerenti: 0 };
   let frames = [];
   try {
     const main = wc.mainFrame;
     frames = (main && main.framesInSubtree) ? main.framesInSubtree.filter((f) => f && !f.detached) : [];
     if (!frames.length && main && !main.detached) frames = [main];
   } catch (_) { frames = []; }
-  if (!frames.length) return 1; // non si sa a chi chiedere: strada dura
+  if (!frames.length) return duro; // non si sa a chi chiedere: strada dura
   const esiti = await Promise.all(frames.map((f) => chiediAUnFrame(f, chiavi)));
-  const vive = esiti.reduce((n, e) => n + e.vive, 0);
-  const registrate = esiti.reduce((n, e) => n + e.registrate, 0);
-  // Un riquadro che dice di aver consegnato più tracce di quante il preload ne
-  // veda: il ponte fra i due mondi è rotto, e quelle che non si vedono non si
-  // possono nemmeno fermare. Vale per riquadro, non sulla somma: prima bastava
-  // che un riquadro qualunque ne avesse vista passare una perché la rete non
-  // scattasse per nessuno degli altri, e un riquadro che si accecava da solo
-  // teneva il microfono aperto a permesso tolto (#586, giro 10).
-  if (esiti.some((e) => e.incoerenza > 0)) return 1;
-  // Nessuno ha mai visto passare una traccia: la pagina non è passata dal nostro
-  // giro (o se l'è tolto di mezzo). Non si conclude «è tutto a posto».
-  if (!registrate) return 1;
-  return vive;
+  return {
+    vive: esiti.reduce((n, e) => n + e.vive, 0),
+    registrate: esiti.reduce((n, e) => n + e.registrate, 0),
+    // Un riquadro che dice di aver consegnato più tracce di quante il preload ne
+    // veda: il ponte fra i due mondi è rotto, e quelle che non si vedono non si
+    // possono nemmeno fermare. Si conta per riquadro e non sulla somma: prima
+    // bastava che un riquadro qualunque ne avesse vista passare una perché la
+    // rete non scattasse per nessuno degli altri, e un riquadro che si accecava
+    // da solo teneva il microfono aperto a permesso tolto (#586, giro 10).
+    incoerenti: esiti.filter((e) => e.incoerenza > 0).length,
+  };
+}
+
+// La regola della revoca e dell'«Interrompi»: si ricarica se qualcosa è rimasto
+// vivo, se un riquadro ha rotto il conto, o se NESSUNO ha mai visto passare una
+// traccia mentre Filo sa di aver concesso quella cosa (la pagina non è passata
+// dal nostro giro, o se l'è tolto di mezzo).
+function restaVivo(esito) {
+  const e = esito || {};
+  return !!(e.vive || e.incoerenti || !e.registrate);
 }
 
 // La risposta di un riquadro, inoltrata da src/main/ipc.js.
