@@ -114,18 +114,28 @@ test('il parser vede davvero le regole (niente test che passa sul vuoto)', () =>
   }
 });
 
-test('la lettura degli allegati NON è pubblica: la concede solo l’amministratore', () => {
+test('da queste regole non scarica NESSUNO, owner compreso', () => {
+  // La lettura si è chiusa in due tempi, e il secondo è quello che conta.
+  // Prima (#582) era riservata a chi è nell'allowlist `admins`: bastava a
+  // togliere gli screenshot dei tester dalle mani del mondo. Poi (#583) è stata
+  // negata del tutto, ed è quello che rende di nuovo utile RUOTARE il token di
+  // un file finito in giro: finché un `get` esisteva, un indirizzo raccolto
+  // quando i documenti erano pubblici restava buono per sempre, e cambiare il
+  // token non serviva a niente perché il file si prendeva lo stesso.
+  //
+  // L'unica chiave è ora il download token dentro il link, che Firebase valuta
+  // PRIMA delle regole: la dashboard (che scarica il link intero dal main e
+  // decifra) e il server dei giudici (Admin SDK) continuano a vedere gli
+  // allegati, un indirizzo senza token no.
   const letture = PERMESSI.filter((p) => p.verbi.some((v) => ['read', 'get', 'list'].includes(v)));
-  assert.ok(letture.length >= 1, 'nessuna regola di lettura: gli allegati sarebbero illeggibili anche all’owner');
+  assert.ok(letture.length >= 1, 'nessuna regola di lettura dichiarata: un confine si scrive, non si lascia al default');
   for (const l of letture) {
     const cond = espandi(l.cond);
-    assert.doesNotMatch(cond, /^true$/, `lettura aperta a chiunque: allow ${l.verbi.join(',')}: if ${cond}`);
-    // L'identità non si prova "essendo loggati" (la chiave web è pubblica e per
-    // entrare basta un account Google qualunque): serve l'allowlist `admins`,
-    // la stessa di firestore.rules.
-    assert.match(cond, /firestore\.exists\(/, `lettura senza allowlist admins: if ${cond}`);
-    assert.match(cond, /documents\/admins\//, `lettura non legata alla raccolta admins: if ${cond}`);
-    assert.match(cond, /email_verified/, `lettura senza email verificata: if ${cond}`);
+    assert.match(
+      cond,
+      /^false$/,
+      `allow ${l.verbi.join(',')}: if ${cond} — una lettura concessa qui rimette in circolazione gli indirizzi raccolti quando i documenti erano pubblici`,
+    );
   }
 });
 
