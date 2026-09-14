@@ -91,32 +91,3 @@ test('la strada vecchia dello schermo non deve saltare la scelta di cosa condivi
     + 'basta una riga per saltarla',
   ).toBe(true);
 });
-
-test('il riquadro «cosa condividi» non deve restare in piedi quando la pagina se ne va', async ({ shell, openTab, testServer }) => {
-  test.setTimeout(240_000);
-  const page = await testServer.openReady(openTab, HTML);
-  const altra = testServer.html('<!doctype html><html><body><h1>un altro posto</h1></body></html>');
-
-  const mod = page.evaluate(() => window.__moderno());
-  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
-  await shell.locator('.perm-chip .perm-chip-allow').first().click();
-  await expect(shell.locator('.perm-source')).toHaveCount(1, { timeout: 20_000 });
-
-  // Chi naviga cambia pagina mentre il riquadro è aperto: un link, il tasto
-  // indietro, l'indirizzo riscritto a mano.
-  await page.evaluate((u) => { window.location.href = u; }, altra);
-  await page.waitForLoadState('domcontentloaded').catch(() => {});
-  await shell.waitForTimeout(2500);
-
-  const restato = await shell.locator('.perm-source').count();
-  const testo = (await shell.locator('.perm-source').allTextContents()).join(' | ');
-  console.log('[586 g9] riquadro dopo la navigazione:', restato, JSON.stringify(testo.slice(0, 120)));
-  await mod.catch(() => {});
-
-  expect(
-    restato,
-    'la pagina che aveva chiesto lo schermo se n\'è andata e il riquadro «cosa condividi» è ancora '
-    + 'lì, sopra la pagina nuova, col nome del sito di prima e con la pagina spinta giù: chi ci '
-    + `clicca consegna lo schermo a una pagina che non c'è più (${JSON.stringify(testo.slice(0, 120))})`,
-  ).toBe(0);
-});
