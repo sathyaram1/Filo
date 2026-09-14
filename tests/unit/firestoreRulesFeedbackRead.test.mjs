@@ -142,11 +142,22 @@ test('la vista pubblica ammette solo stati CHIUSI', () => {
   }
 });
 
-test('gli allegati dei feedback non si possono ELENCARE', () => {
-  // L'altra porta sulla stessa stanza: chiudere i documenti e lasciare il
-  // bucket elencabile vuol dire che chiunque si porta via i nomi di tutti gli
-  // allegati, e poi i file. Il singolo `get` resta aperto: i link della
-  // dashboard portano già il loro token di download.
+test('gli allegati dei feedback non si elencano e non si scaricano col solo indirizzo', () => {
+  // Due porte sulla stessa stanza, e chiuderne una sola vale la metà.
+  //
+  // L'ELENCO: chiedendolo, chiunque si portava via i nomi di tutti gli allegati
+  // mai caricati, e poi i file, senza sapere niente di nessun feedback.
+  //
+  // IL SINGOLO FILE: con `get: if true` il token del link non lo guardava
+  // nessuno, quindi bastava l'indirizzo — e gli indirizzi stavano dentro i
+  // documenti dei feedback, che fino a questo audit chiunque leggeva con la
+  // sola chiave web del repo. Chi li ha raccolti in quei mesi se li tiene, e
+  // cambiare il token del file (la cura di serie per un link scappato) non
+  // serviva a niente. Negando il `get` resta valido solo il link COL token, che
+  // Firebase valuta prima delle regole: la dashboard continua a vedere gli
+  // allegati e il token torna a essere revocabile. Verificato #583 giro 8 con
+  // l'emulatore ufficiale di Storage (link col token 200, solo indirizzo 403,
+  // token sbagliato 403).
   const STORAGE = readFileSync(join(ROOT, 'storage.rules'), 'utf8');
   const corpo = blocco(STORAGE, '/feedback/{file=**}');
   assert.ok(corpo, 'blocco /feedback delle storage.rules non letto');
@@ -154,6 +165,10 @@ test('gli allegati dei feedback non si possono ELENCARE', () => {
     'gli allegati dei feedback non devono essere elencabili');
   assert.ok(!/allow\s+read\s*:\s*if\s+true/.test(corpo),
     '`read` comprende anche `list`: serve il solo `get`');
+  assert.ok(!/allow\s+(get|read)\s*:\s*if\s+true/.test(corpo),
+    'un allegato non si scarica col solo indirizzo: gli indirizzi sono stati pubblici per mesi');
+  assert.ok(/allow\s+get\s*:\s*if\s+false/.test(corpo),
+    'serve un `get` negato: è ciò che rende di nuovo revocabile il token di un link scappato');
 });
 
 test('il contatore dei numeri: pubblico in lettura, e si può solo far avanzare di uno', () => {
