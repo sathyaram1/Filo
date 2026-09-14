@@ -702,7 +702,7 @@ module.exports = function register(on, ctx) {
     // come risolto, votabile e riapribile a pagamento — cioè il doppione che il
     // blocco delle riaperture doveva impedire.
     const rows = FB.listAllPublic
-      ? await FB.listAllPublic({ timeoutMs: 20000 })
+      ? await FB.listAllPublic({ timeoutMs: 20000, fresh })
       : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
     cardsCache = { at: Date.now(), rows };
     return rows;
