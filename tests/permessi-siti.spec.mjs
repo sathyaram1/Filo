@@ -1873,3 +1873,233 @@ test('la domanda chiesta da una finestra di accesso arriva alla cornice di Filo'
   await shell.locator('.perm-chip .perm-chip-allow').first().click();
   expect(await esito, 'la domanda è comparsa ma il «Consenti» non ha dato niente').toBe('ok');
 });
+
+// ─── giro 10: le porte che restavano su «scegli tu cosa condividi» ──────────
+//
+// La strada vecchia della cattura schermo viene riportata su quella moderna,
+// che è il punto in cui Filo fa scegliere cosa si condivide. Il riconoscimento
+// cercava la sola parola «desktop» dentro `mandatory`: scritta con un altro dei
+// nomi che Chromium tiene buoni, la richiesta passava accanto e al sito
+// arrivava lo schermo intero con un «Consenti» solo (#586, giro 10).
+const HTML_SCHERMO_ALTRI_NOMI = `<!doctype html><html><body style="margin:0"><p>prova</p>
+<script>
+  const piatto = (s) => s.getTracks().map((t) => t.kind + ':' + (t.label || '?'));
+  window.__altroNome = () => navigator.mediaDevices.getUserMedia({
+    video: { mandatory: { chromeMediaSource: 'screen' } },
+  }).then((s) => { window.__s = s; return piatto(s); }, (e) => ['no:' + ((e && e.name) || '?')]);
+</script></body></html>`;
+
+test('anche scritta con un altro nome, la richiesta dello schermo passa dalla scelta', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, HTML_SCHERMO_ALTRI_NOMI);
+
+  const esito = page.evaluate(() => window.__altroNome());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  expect(await pastiglia(shell).first().textContent()).toMatch(/vedere il tuo schermo/i);
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+
+  await expect(
+    shell.locator('.perm-source'),
+    'con questo nome della fonte la scelta di cosa si condivide non è comparsa: al sito arriva lo '
+    + 'schermo intero con un «Consenti» solo',
+  ).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-source-item').first().click();
+  expect(String(await esito), 'scelta la fonte, la condivisione deve funzionare').toMatch(/Screen|Entire screen|Schermo/i);
+});
+
+// Il ponte con cui le tracce arrivano al conto di Filo passa dal DOM, e prima
+// passava anche dalle funzioni del DOM che il sito può ridefinire: bastava
+// spegnere il setter di `srcObject` perché le tracce successive non risultassero
+// a nessuno, e la revoca le lasciava aperte (#586, giro 10).
+const HTML_PONTE_ROTTO = `<!doctype html><html><body style="margin:0">
+<script>
+  window.__a = null; window.__b = null;
+  const vero = Object.getOwnPropertyDescriptor(MediaStreamTrack.prototype, 'readyState').get;
+  window.__stato = () => [window.__a, window.__b].map((t) => (t ? vero.call(t) : 'assente'));
+  window.__uno = () => navigator.mediaDevices.getUserMedia({ audio: true })
+    .then((s) => { window.__a = s.getTracks()[0]; return 'ok'; }, (e) => 'no:' + ((e && e.name) || '?'));
+  window.__cieco = () => {
+    Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
+      configurable: true, get() { return null; }, set(_v) {},
+    });
+    MediaStreamTrack.prototype.stop = function () {};
+    return 'fatto';
+  };
+  window.__due = () => navigator.mediaDevices.getUserMedia({ audio: true })
+    .then((s) => { window.__b = s.getTracks()[0]; return 'ok'; }, (e) => 'no:' + ((e && e.name) || '?'));
+</script></body></html>`;
+
+test('la revoca chiude anche la traccia che la pagina ha tolto dal conto', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, HTML_PONTE_ROTTO);
+
+  const primo = page.evaluate(() => window.__uno());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  expect(await primo).toBe('ok');
+  await page.evaluate(() => window.__cieco());
+  expect(await page.evaluate(() => window.__due())).toBe('ok');
+
+  await shell.locator('.perm-live .perm-chip-btn').first().click();
+  await shell.waitForTimeout(3500);
+  const stato = await page.evaluate(() => window.__stato()).catch(() => ['pagina ricaricata']);
+  expect(
+    stato.includes('live'),
+    'la seconda traccia è ancora aperta: la pagina ha tolto di mezzo il ponte con cui le tracce '
+    + 'arrivano al conto di Filo, e a Filo è bastato che il conto non fosse a zero per non prendere '
+    + 'la strada dura',
+  ).toBe(false);
+});
+
+// Un `<iframe>` creato senza indirizzo resta sul suo documento vuoto iniziale,
+// dove il preload non gira: era la scorciatoia per saltare la scelta di cosa si
+// condivide, per far morire la scheda con una riga e per leggere «negato» su
+// cose che nessuno aveva negato (#586, giro 10).
+const HTML_RIQUADRO_NUDO = `<!doctype html><html><body style="margin:0;padding:12px">
+<input id="campo" style="width:70%">
+<script>
+  window.__vivo = String(Date.now());
+  const dentro = () => {
+    const f = document.createElement('iframe');
+    f.style.width = '20px'; f.style.height = '20px';
+    document.body.appendChild(f);
+    try { f.contentDocument.open(); f.contentDocument.write('<p>r</p>'); f.contentDocument.close(); } catch (_) {}
+    return f.contentWindow;
+  };
+  window.__schermo = () => dentro().navigator.mediaDevices.getUserMedia({
+    video: { mandatory: { chromeMediaSource: 'desktop' } },
+  }).then((s) => { window.__s = s; return s.getTracks().map((t) => t.kind + ':' + (t.label || '?')); },
+    (e) => ['no:' + ((e && e.name) || '?')]);
+  window.__ammazza = () => dentro().navigator.mediaDevices.getUserMedia({
+    audio: { mandatory: { chromeMediaSource: 'desktop' } },
+  }).then(() => 'ottenuto', (e) => 'no:' + ((e && e.name) || '?'));
+  window.__legge = async () => {
+    const w = dentro();
+    const out = {};
+    for (const n of ['camera', 'microphone', 'geolocation', 'notifications']) {
+      try { out[n] = (await w.navigator.permissions.query({ name: n })).state; }
+      catch (e) { out[n] = 'errore'; }
+    }
+    return out;
+  };
+</script></body></html>`;
+
+test('anche dentro un riquadro creato senza indirizzo lo schermo passa dalla scelta', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, HTML_RIQUADRO_NUDO);
+
+  const esito = page.evaluate(() => window.__schermo());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  await expect(
+    shell.locator('.perm-source'),
+    'dal riquadro creato senza indirizzo la scelta di cosa si condivide non compare: lo schermo '
+    + 'intero parte con un «Consenti» solo',
+  ).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-source-item').first().click();
+  expect(String(await esito)).toMatch(/Screen|Entire screen|Schermo/i);
+});
+
+test('dentro un riquadro creato senza indirizzo non muore la scheda e i permessi si leggono «da chiedere»', async ({ openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, HTML_RIQUADRO_NUDO);
+  await page.fill('#campo', 'quello che stavo leggendo');
+  const prima = await page.evaluate(() => window.__vivo);
+
+  const esito = await page.evaluate(() => window.__ammazza()).catch((e) => 'scheda morta: ' + e.message);
+  expect(String(esito), 'la richiesta impossibile deve tornare un errore che il sito sa gestire').toMatch(/^no:/);
+  expect(
+    await page.evaluate(() => window.__vivo).catch(() => 'morta'),
+    'la scheda è morta per una riga scritta dentro un riquadro: chi stava leggendo ha perso tutto',
+  ).toBe(prima);
+  expect(await page.inputValue('#campo')).toBe('quello che stavo leggendo');
+
+  const letto = await page.evaluate(() => window.__legge());
+  expect(
+    Object.values(letto),
+    `dentro il riquadro i permessi mai scelti si leggono «negato» (${JSON.stringify(letto)}): un `
+    + 'widget che guarda prima di chiedere non chiederà mai, e in Impostazioni non c\'è niente da '
+    + 'sbloccare',
+  ).toEqual(['prompt', 'prompt', 'prompt', 'prompt']);
+});
+
+// La garanzia che non dipende dal mondo della pagina: se dopo il «Consenti» la
+// cattura non passa dal punto in cui si sceglie cosa condividere, Filo la
+// chiude e dice perché. Ci si arriva raggiungendo un riquadro appena creato per
+// una strada che non passa da nessuna proprietà (`window.frames[0]`), prima che
+// Filo faccia in tempo a coprirlo.
+const HTML_SCORCIATOIA = `<!doctype html><html><body style="margin:0;padding:12px">
+<script>
+  window.__scorciatoia = () => {
+    const f = document.createElement('iframe');
+    f.style.width = '20px'; f.style.height = '20px';
+    document.body.appendChild(f);
+    const w = window.frames[window.frames.length - 1];
+    return w.navigator.mediaDevices.getUserMedia({
+      video: { mandatory: { chromeMediaSource: 'desktop' } },
+    }).then((s) => {
+      window.__tracce = s.getTracks();
+      return 'ottenuto';
+    }, (e) => 'no:' + ((e && e.name) || '?'));
+  };
+  window.__vive = () => (window.__tracce || []).map((t) => t.readyState);
+</script></body></html>`;
+
+test('una cattura schermo che salta la scelta viene chiusa, e Filo dice perché', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, HTML_SCORCIATOIA);
+
+  const esito = page.evaluate(() => window.__scorciatoia());
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  const arrivato = await esito;
+  await shell.waitForTimeout(4000);
+
+  const vive = await page.evaluate(() => window.__vive()).catch(() => []);
+  expect(
+    vive.includes('live'),
+    `la cattura è arrivata al sito (${JSON.stringify(arrivato)}) senza passare dalla scelta di cosa `
+    + 'condividere, ed è ancora viva: chi ha risposto «Consenti» sta condividendo lo schermo intero '
+    + 'e non ha scelto niente',
+  ).toBe(false);
+
+  expect(
+    (await shell.locator('.perm-live[data-notizia]').allTextContents()).join(' '),
+    'la condivisione è stata chiusa senza dire perché: chi ha appena premuto «Consenti» la vede '
+    + 'morire da sola e dà la colpa al sito',
+  ).toMatch(/scegliere cosa condividere/i);
+});
+
+// La × su «ho smesso di chiedere» deve togliere la riga per davvero: con un
+// sito che richiede in continuazione, la richiesta successiva la riaccendeva
+// subito e non c'era modo di togliersela di mezzo (#586, giro 10).
+test('la × sulla riga «ho smesso di chiedere» la toglie di mezzo', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<script>
+  let acceso = false;
+  const giro = () => {
+    if (!acceso) return;
+    navigator.mediaDevices.getUserMedia({ video: true }).then(() => {}, () => {});
+    setTimeout(giro, 300);
+  };
+  window.__insisti = () => { acceso = true; giro(); };
+</script></body></html>`);
+  await page.evaluate(() => window.__insisti());
+
+  for (let i = 0; i < 3; i++) {
+    await expect(pastiglia(shell)).toHaveCount(1, { timeout: 20_000 });
+    await shell.locator('.perm-chip .perm-chip-x').first().click();
+    await shell.waitForTimeout(400);
+  }
+  const avviso = shell.locator('.perm-live[data-notizia]');
+  await expect(avviso).toHaveCount(1, { timeout: 20_000 });
+  await avviso.first().locator('.perm-chip-x').click();
+  await shell.waitForTimeout(2500);
+
+  await expect(
+    shell.locator('.perm-live[data-notizia]'),
+    'la riga è tornata da sola: il sito continua a chiedere e ogni richiesta la riaccende, quindi '
+    + 'finché si resta su quel sito non c\'è modo di togliersela di mezzo',
+  ).toHaveCount(0);
+});

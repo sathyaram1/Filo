@@ -60,13 +60,47 @@ qualunque strada prenda, e viene consumato dal gestore della cattura schermo
 (che va dritto alla scelta della fonte invece di richiedere la stessa cosa due
 volte di fila). Un no le chiude tutte e due.
 
-La strada vecchia consegna lo schermo intero senza passare dalla scelta della
-fonte: non c'è modo di intercettarla. Per quella resta il segno «può vedere il
-tuo schermo» sotto le schede, acceso quando il gestore della cattura non si fa
-vivo entro un attimo dal sì.
+La SCELTA di cosa si condivide, però, sta solo sulla strada moderna, perché
+quella vecchia non passa da nessun gestore. Due pezzi, e fanno due lavori
+diversi:
 
-Codice: `preamboloSchermo` in `src/shared/permessiSiti.js`, `decidi` e
-`segnaPreambolo`/`consumaPreambolo` in `src/main/services/permessiSito.js`.
-Prove: `tests/permessi-siti.spec.mjs` («anche la strada vecchia per lo schermo
-passa dalla domanda») e `tests/unit/permessiSiti.test.mjs` («il preambolo della
-cattura schermo non concede niente da solo»).
+- **la cortesia**, nel mondo della pagina: la richiesta vecchia viene riscritta
+  in quella moderna prima di partire, così la scelta la incontra chiunque
+  chieda lo schermo e la condivisione continua a funzionare
+  (`buildCatturaSicuraSource` in `src/preload/permessi-guard.js`). La
+  riconosce `sorgenteSchermo`, e riconoscerla vuol dire accettare OGNI forma:
+  `chromeMediaSource` ha quattro valori buoni (`desktop`, `screen`, `system`,
+  `tab`) e può stare nell'oggetto, in `mandatory` o in `optional`, che è anche
+  una lista. Cercare la sola parola «desktop» dentro `mandatory` lasciava
+  passare le altre forme, e da lì lo schermo intero ripartiva con un «Consenti»
+  solo (#586, giro 10);
+- **la serratura**, nel processo principale: se dopo il sì il gestore della
+  cattura non si fa vivo entro un attimo, la cattura è uscita senza passare da
+  nessuna scelta. Filo la chiude — chiede alla pagina di fermare le tracce dello
+  schermo, e ricarica la scheda se qualcosa resta vivo — e scrive perché. Non
+  dipende dal mondo della pagina, quindi vale anche per i riquadri dove la
+  cortesia non arriva e per una forma della richiesta vecchia che non conosciamo
+  ancora (`schermoSenzaScelta` in `src/main/services/permessiSito.js`).
+
+Prima al posto della serratura c'era un segno, «può vedere il tuo schermo»,
+acceso quando il gestore non si faceva vivo. Un segno non è una scelta: chi lo
+leggeva poteva solo prenderne atto, mentre lo schermo intero era già uscito.
+
+E la cortesia va portata dove il preload non arriva da sé: un `<iframe>` creato
+senza indirizzo resta sul documento vuoto iniziale, non c'è nessuna navigazione,
+quindi lì il preload non gira. Ci arriva il riquadro che lo contiene, che è
+dello stesso sito e ne può mettere a posto gli stampi
+(`sorgenteRiquadriFigli`): al primo accesso a `contentWindow` o
+`contentDocument`, e su ogni riquadro che compare nel documento.
+
+Codice: `preamboloSchermo` in `src/shared/permessiSiti.js`, `decidi`,
+`segnaPreambolo`/`consumaPreambolo` e `schermoSenzaScelta` in
+`src/main/services/permessiSito.js`, `sorgenteSchermo` e
+`sorgenteRiquadriFigli` in `src/preload/permessi-guard.js`.
+Prove: in `tests/permessi-siti.spec.mjs` «anche la strada vecchia per lo schermo
+passa dalla domanda», «anche scritta con un altro nome, la richiesta dello
+schermo passa dalla scelta», «anche dentro un riquadro creato senza indirizzo lo
+schermo passa dalla scelta» e «una cattura schermo che salta la scelta viene
+chiusa, e Filo dice perché»; in `tests/unit/permessiSiti.test.mjs` «il preambolo
+della cattura schermo non concede niente da solo» e «la richiesta vecchia della
+cattura schermo si riconosce in ogni sua forma».
