@@ -202,6 +202,7 @@ function buildPermessiGuardSource(noti) {
 function buildCatturaSicuraSource() {
   const ferma = JSON.stringify(CANALE_FERMA);
   const fermato = JSON.stringify(CANALE_FERMATO);
+  const attr = JSON.stringify(ATTR_TRACCIA);
   return `(() => {
   try {
     const md = navigator.mediaDevices;
