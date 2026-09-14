@@ -506,7 +506,18 @@
 
     async function addFile(file) {
       if (!file) return;
-      const isImg = (file.type || '').startsWith('image/');
+      // Il TIPO si guarda PRIMA di caricare, come fa il riquadro di
+      // segnalazione dentro i siti (#582, giro 7). Il selettore offre anche
+      // `image/*` e `text/*`, che comprendono una pagina web e un disegno
+      // vettoriale: tipi che il deposito rifiuta. Senza questo controllo il file
+      // partiva lo stesso e quello che si leggeva era il numero dell'errore del
+      // deposito, invece della frase che dice cosa si può allegare. Il confine
+      // reggeva comunque: a non andare era ciò che si leggeva.
+      const kind = AttachTypes && typeof AttachTypes.classify === 'function'
+        ? AttachTypes.classify(file)
+        : 'file';
+      if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
+      const isImg = kind === 'image';
       const c = counts();
       if (isImg && c.imgs >= ATTACH_MAX_IMAGES) { setStatus(`Massimo ${ATTACH_MAX_IMAGES} immagini.`); return; }
       if (!isImg && c.files >= ATTACH_MAX_FILES) { setStatus(`Massimo ${ATTACH_MAX_FILES} file.`); return; }
