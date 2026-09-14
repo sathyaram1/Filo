@@ -79,7 +79,7 @@ const MIME_PER_ESTENSIONE = Object.freeze(Object.assign(Object.create(null), {
   json: 'application/json', csv: 'text/csv', tsv: 'text/tab-separated-values',
   yaml: 'application/x-yaml', yml: 'application/x-yaml', pdf: 'application/pdf',
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
-});
+}));
 export const MAX_ALLEGATI = 5;
 export const MAX_ALLEGATO_BYTES = 4 * 1024 * 1024; // lo storage rifiuta oltre
 
