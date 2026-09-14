@@ -856,7 +856,13 @@
     let complete = false;
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       // eslint-disable-next-line no-await-in-loop
-      const batch = await listPublic({ pageSize: limit, timeoutMs, afterName: cursor });
+      // Si passa dalla porta ESPOSTA, non dal riferimento interno: chi
+      // sostituisce `SN_FEEDBACK.listPublic` (una prova, la bacheca in modalità
+      // test) deve sostituire anche questa lettura, o si ritroverebbe la rete
+      // vera sotto una pagina che crede finta.
+      const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listPublic) || listPublic;
+      // eslint-disable-next-line no-await-in-loop
+      const batch = await porta({ pageSize: limit, timeoutMs, afterName: cursor });
       const arr = Array.isArray(batch) ? batch : [];
       let nuove = 0;
       for (const r of arr) {
