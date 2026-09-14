@@ -122,3 +122,106 @@ test('togliere il microfono deve chiuderlo anche alla traccia presa con una funz
     + 'posto da cui rimediare',
   ).toEqual([]);
 });
+
+// Seconda porta, stessa causa: l'«Interrompi» del cartello, che è il bottone che
+// chi naviga si trova addosso mentre il sito sta ascoltando.
+test('l\'«Interrompi» del cartello deve chiudere anche la traccia presa in prestito', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+
+  const primo = page.evaluate(() => window.__uno());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 25_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  expect(await primo).toBe('ottenuto');
+  await shell.waitForTimeout(800);
+
+  console.log('[586 g11] il prestito:', await page.evaluate(() => window.__presta()));
+  console.log('[586 g11] la seconda traccia:', await page.evaluate(() => window.__due()));
+  const vivoPrima = await page.evaluate(() => window.__vivo);
+
+  const stop = shell.locator('button', { hasText: /Interrompi/i }).first();
+  await expect(stop).toBeVisible({ timeout: 20_000 });
+  await stop.click();
+  await shell.waitForTimeout(5000);
+
+  const statoDopo = await page.evaluate(() => window.__stato()).catch(() => ['pagina ricaricata', 'pagina ricaricata']);
+  const vivoDopo = await page.evaluate(() => window.__vivo).catch(() => null);
+  const restano = await shell.locator('button', { hasText: /Interrompi/i }).count();
+  console.log('[586 g11] dopo l\'Interrompi — stato VERO:', JSON.stringify(statoDopo),
+    'pagina ricaricata:', vivoDopo !== vivoPrima, 'Interrompi rimasti:', restano);
+
+  expect(
+    (statoDopo || []).filter((s) => s === 'live'),
+    'premuto l\'«Interrompi» il cartello se ne va col suo bottone e il sito continua ad ascoltare: '
+    + 'da lì in poi non resta nessun posto in cui riprovare, e per chiudere davvero il microfono '
+    + 'bisogna chiudere la scheda — che senza cartello non si sa quale sia',
+  ).toEqual([]);
+});
+
+// Terza porta, stessa causa, sulla cosa più delicata: con la copia intonsa la
+// richiesta vecchia della cattura schermo non viene più riportata su quella
+// moderna, quindi nessuno fa scegliere cosa si condivide. E la rete del processo
+// principale, che quella cattura la chiudeva, chiede il conto alla pagina — che
+// con la traccia fuori dal conto risponde «non è rimasto niente di vivo».
+const PAGINA_SCHERMO = `<!doctype html><html><body style="margin:0;padding:16px">
+<h1>Presentazione</h1>
+<script>
+  window.__vivo = String(Date.now());
+  window.__preso = null;
+  const veroStato = Object.getOwnPropertyDescriptor(MediaStreamTrack.prototype, 'readyState').get;
+  window.__stato = () => (window.__preso
+    ? window.__preso.getTracks().map((t) => t.kind + ':' + (t.label || '?') + ':' + veroStato.call(t))
+    : ['niente']);
+
+  window.__presta = () => {
+    try {
+      const f = document.createElement('iframe');
+      f.style.display = 'none';
+      document.body.appendChild(f);
+      const w = window[0];
+      if (!w || !w.MediaDevices) return 'niente riquadro';
+      window.__intonsa = w.MediaDevices.prototype.getUserMedia;
+      f.remove();
+      return typeof window.__intonsa === 'function' ? 'preso' : 'non è una funzione';
+    } catch (e) { return 'errore: ' + e.message; }
+  };
+
+  window.__schermo = () => {
+    if (typeof window.__intonsa !== 'function') return Promise.resolve(['niente prestito']);
+    return window.__intonsa.call(navigator.mediaDevices, {
+      audio: { mandatory: { chromeMediaSource: 'desktop' } },
+      video: { mandatory: { chromeMediaSource: 'desktop' } },
+    }).then((s) => { window.__preso = s; return s.getTracks().map((t) => t.kind + ':' + (t.label || '?')); },
+      (e) => ['rifiutato:' + ((e && e.name) || '?')]);
+  };
+</script></body></html>`;
+
+test('la scelta di cosa si condivide non si salta con la funzione presa in prestito', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await testServer.openReady(openTab, PAGINA_SCHERMO);
+  console.log('[586 g11] il prestito:', await page.evaluate(() => window.__presta()));
+  const vivoPrima = await page.evaluate(() => window.__vivo);
+
+  const corsa = page.evaluate(() => window.__schermo()).catch((e) => ['la scheda è morta: ' + e.message]);
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 25_000 });
+  console.log('[586 g11] la domanda dice:', (await shell.locator('.perm-chip').first().innerText()).replace(/\s+/g, ' '));
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  await shell.waitForTimeout(1500);
+  console.log('[586 g11] è comparso il riquadro della scelta:',
+    (await shell.locator('.perm-source-picker, .perm-fonti, [class*="source"]').count()) > 0);
+  console.log('[586 g11] quello che è arrivato al sito:', JSON.stringify(await corsa));
+
+  await page.waitForTimeout(9000);
+  const statoDopo = await page.evaluate(() => window.__stato()).catch(() => ['pagina ricaricata']);
+  const vivoDopo = await page.evaluate(() => window.__vivo).catch(() => null);
+  console.log('[586 g11] nove secondi dopo — stato VERO:', JSON.stringify(statoDopo),
+    'pagina ricaricata:', vivoDopo !== vivoPrima);
+
+  expect(
+    (statoDopo || []).filter((s) => String(s).endsWith(':live')),
+    'con la copia intonsa della funzione la richiesta vecchia della cattura schermo non passa più '
+    + 'dalla scelta di cosa si condivide: un «Consenti» solo e al sito restano lo schermo intero e '
+    + 'l\'audio del computer, vivi. La rete che chiudeva quella cattura chiede il conto alla '
+    + 'pagina, e la pagina risponde che non è rimasto niente',
+  ).toEqual([]);
+});
