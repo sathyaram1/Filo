@@ -54,14 +54,14 @@ async function alzaServer() {
     }
 
     // giornale.test — la pagina qualunque da cui partono tutte le prove.
-    if (path === '/login-rimbalza') {
+    if (path === '/login') {
       // Un indirizzo che SOMIGLIA a un accesso (basta il percorso /login) e che
       // il server rimbalza sul sito della lista.
       res.writeHead(302, { Location: `http://${LISTA}:${porta}/pagina` });
       res.end();
       return;
     }
-    if (path === '/login-diritto') {
+    if (path === '/signin') {
       html('<h1 id="acc">la pagina di accesso vera</h1>');
       return;
     }
@@ -69,13 +69,13 @@ async function alzaServer() {
       // Il clic ce lo mette l'utente: senza un gesto vero Chromium non apre
       // nessuna finestrella, e la prova resterebbe verde a vuoto.
       html('<h1 id="n">pagina qualunque</h1>'
-        + `<button id="b" onclick="window.open('http://${NORMALE}:${porta}/login-rimbalza',`
+        + `<button id="b" onclick="window.open('http://${NORMALE}:${porta}/login',`
         + " '_blank', 'width=500,height=400')\">accedi</button>");
       return;
     }
     if (path === '/apre-accesso-diritto') {
       html('<h1 id="n">pagina qualunque</h1>'
-        + `<button id="b" onclick="window.open('http://${NORMALE}:${porta}/login-diritto',`
+        + `<button id="b" onclick="window.open('http://${NORMALE}:${porta}/signin',`
         + " '_blank', 'width=500,height=400')\">accedi</button>");
       return;
     }
@@ -239,7 +239,7 @@ test.beforeEach(async () => {
 
 test('BB0 — controllo: senza la lista, quella finestrella arriva davvero sul sito', async () => {
   await metti([]);
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${NORMALE}:${srv.porta}/apre-accesso`);
+  await cliccaAccedi('/apre-accesso');
   await shell.waitForTimeout(3000);
   expect(
     await visibile(),
@@ -249,14 +249,14 @@ test('BB0 — controllo: senza la lista, quella finestrella arriva davvero sul s
 
 test('BB1 — la finestrella di accesso non deve arrivare sul sito della lista per rimbalzo', async () => {
   await metti([LISTA]);
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${NORMALE}:${srv.porta}/apre-accesso`);
+  await cliccaAccedi('/apre-accesso');
   await shell.waitForTimeout(3000);
   expect(await visibile(), 'il rimbalzo dentro la finestrella deve essere fermato').toBe(false);
 });
 
 test('BB2 — fermato il rimbalzo, non deve restare a schermo una finestrella vuota', async () => {
   await metti([LISTA]);
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${NORMALE}:${srv.porta}/apre-accesso`);
+  await cliccaAccedi('/apre-accesso');
   await shell.waitForTimeout(3500);
   const finestre = await finestreDiFilo();
   // La finestrella fermata non ha mai caricato niente: né indirizzo né titolo.
@@ -272,11 +272,11 @@ test('BB2 — fermato il rimbalzo, non deve restare a schermo una finestrella vu
 
 test('BB3 — controllo: una finestrella di accesso che NON rimbalza resta aperta e carica', async () => {
   await metti([LISTA]);
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${NORMALE}:${srv.porta}/apre-accesso-diritto`);
+  await cliccaAccedi('/apre-accesso-diritto');
   await shell.waitForTimeout(3000);
   const finestre = await finestreDiFilo();
   expect(
-    finestre.some((w) => w.url.includes('/login-diritto')),
+    finestre.some((w) => w.url.includes('/signin')),
     'una finestrella di accesso legittima deve continuare ad aprirsi: se la chiusura della '
     + `finestra vuota la portasse via, sarebbe peggio del difetto. Finestre: ${JSON.stringify(finestre)}`,
   ).toBe(true);
