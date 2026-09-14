@@ -1,5 +1,7 @@
 # Se basta l'indirizzo, l'indirizzo È la chiave — e un indirizzo non si revoca
 
+[← Tutti i pattern](../PATTERNS.md)
+
 **Regola.** Quando chiudi una raccolta di dati, chiudi anche il modo di prendere
 UN elemento alla volta. Se il singolo resta aperto a chi ne conosce l'indirizzo,
 l'indirizzo diventa la chiave; e a differenza di una chiave vera, un indirizzo
