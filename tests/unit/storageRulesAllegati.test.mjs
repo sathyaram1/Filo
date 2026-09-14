@@ -65,8 +65,8 @@ function bloccoFeedback(testo) {
 
 /**
  * Le funzioni dichiarate nelle regole, nome → corpo. Servono a leggere una
- * condizione per quello che FA: `allow get: if eAmministratore()` non dice
- * niente finché non si guarda dentro la funzione.
+ * condizione per quello che FA: `allow create: if … nomeConEntropia(file)` non
+ * dice niente finché non si guarda dentro la funzione.
  */
 function funzioni(testo) {
   const out = new Map();
