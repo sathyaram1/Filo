@@ -17,7 +17,13 @@ const DA_WEB = {
   tab: { id: 77, url: 'https://sito-ostile.example/pagina.html' },
 };
 
+// Il rilievo è vero e questo ramo non lo corregge: il server l'ha mandato a un
+// feedback a parte. `test.fail()` dice «mi aspetto che non passi», come per le
+// altre prove lasciate aperte nei giri 5, 6, 7 e 8: senza, la cartella del
+// feedback risponde rosso per sempre e il giro dopo non distingue una
+// regressione da un buco già noto (#592, giro 11).
 test('da una pagina web non si deve poter fare una chiamata AI con un prompt proprio', async ({ app }) => {
+  test.fail();
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({

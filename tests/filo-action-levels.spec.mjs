@@ -267,3 +267,30 @@ test('una lezione oltre il tetto viene rifiutata con la spiegazione, e non si sa
   const buffer = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
   expect(buffer.map((l) => l.text)).toEqual(['L\'utente non beve caffè.']);
 });
+
+// #592, giro 11 — un'azione chiesta da DENTRO Filo, con un mittente che non è
+// una pagina (nessun indirizzo, nessuna scheda), non va trattata come se
+// arrivasse da un sito visitato.
+//
+// Il gate che tiene le pagine web fuori dal registro delle azioni leggeva solo
+// l'indirizzo: mittente assente valeva «interno», mittente spoglio valeva
+// «sito». Ogni pezzo di Filo che chiama un'azione passando solo la finestra si
+// vedeva rifiutare l'azione in silenzio. La controprova sta sotto: un mittente
+// che È una pagina web resta fuori.
+test('un\'azione chiesta da dentro Filo senza indirizzo non viene scambiata per un sito', async ({ app, openTab }) => {
+  await openTab(NEWTAB);
+  const dentro = await app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    return globalThis.SN_EXECUTE_FILO_ACTION(
+      { type: 'TIMER', seconds: 60, label: 'Focaccia' },
+      { sender: { win } },
+    );
+  });
+  expect(dentro.executed, 'un\'azione nata dentro Filo è stata rifiutata come se la chiedesse un sito').toBe(true);
+
+  const daWeb = await app.evaluate(async () => globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'TIMER', seconds: 60, label: 'Da fuori' },
+    { sender: { url: 'https://sito-ostile.example/pagina.html' } },
+  ));
+  expect(daWeb.executed, 'una pagina web ha azionato un timer').toBe(false);
+});
