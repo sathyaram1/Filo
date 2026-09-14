@@ -394,13 +394,6 @@ module.exports = function register(on, ctx) {
   on(MSG.FEEDBACK_DECRYPT_IMAGE, ownerOnly(async (msg) => {
     try {
       const url = String((msg && msg.url) || '');
-<<<<<<< HEAD
-      // Solo gli allegati DI FILO: il deposito è uno solo, e il suo nome lo
-      // tiene il modulo condiviso che carica le immagini. Accettare qualunque
-      // indirizzo dei depositi di Google faceva di questo canale un modo per
-      // farsi scaricare altro, che non è quello che dice di fare.
-      if (!allegatoDiFilo(url)) {
-=======
       const FB = globalThis.SN_FEEDBACK;
       if (!FB?.isAttachmentUrl) throw new Error('SN_FEEDBACK non caricato nel main process');
       // DOVE PUNTA, PRIMA DI CHI GUARDA (#582, giro 4). Solo URL https del
