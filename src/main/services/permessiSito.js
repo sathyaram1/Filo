@@ -407,6 +407,13 @@ const senzaRisposta = new Map(); // `${wcId}|${origine}|${chiave}` → numero
 const SENZA_RISPOSTA_MAX = 3;
 // Le righe «ho smesso di chiedere» aperte adesso: id → { wc, origine, chiavi }.
 const anelliDetti = new Map();
+// Le righe che chi naviga ha chiuso con la ×: quella × deve togliere di mezzo la
+// riga per davvero. Prima la toglieva e basta, e la richiesta seguente del sito
+// la riaccendeva: su un sito che chiede in continuazione tornava subito, teneva
+// giù la pagina, e l'unica uscita era andarsene dal sito (#586, giro 10). Qui
+// resta zitta finché la pagina non riparte o finché non si preme «Chiedimelo di
+// nuovo», che è la scelta opposta.
+const anelliZittiti = new Set(); // `${wcId}|${origine}`
 
 function chiaveAnello(wc, origine, chiave) { return `${wc.id}|${origine}|${chiave}`; }
 
@@ -414,6 +421,9 @@ function dimenticaAnello(wc, chiave) {
   const prefisso = chiave === undefined ? `${wc.id}|` : null;
   for (const key of [...senzaRisposta.keys()]) {
     if (prefisso ? key.startsWith(prefisso) : key === chiave) senzaRisposta.delete(key);
+  }
+  for (const key of [...anelliZittiti]) {
+    if (key.startsWith(`${wc.id}|`)) anelliZittiti.delete(key);
   }
 }
 
@@ -444,6 +454,7 @@ function scordaRisposte(wc, origine, chiavi) {
 // indietro. Una per scheda e sito: un sito che insiste non deve impilarne dieci.
 function diciCheHoSmesso(wc, origine, chiavi) {
   try {
+    if (anelliZittiti.has(`${wc.id}|${origine}`)) return;
     for (const v of anelliDetti.values()) {
       if (v.wc === wc && v.origine === origine) return;
     }
@@ -479,6 +490,7 @@ function riprendiAChiedere(id) {
   try { dimenticaAnello(v.wc); } catch (_) {}
   return { ok: true };
 }
+
 
 // ─── il gestore ─────────────────────────────────────────────────────────────
 
@@ -601,7 +613,7 @@ function segnaSensori(wc, origine, chiavi) {
 // Chi ha appena detto sì alla domanda dello schermo, per pochi secondi: il
 // gestore della cattura schermo lo consuma e va dritto alla scelta della fonte
 // invece di richiedere la stessa cosa due volte di fila.
-const preamboli = new Map(); // wcId → { fino, timer, ripresaId }
+const preamboli = new Map(); // wcId → { fino, timer }
 const PREAMBOLO_MS = 20_000;
 
 // Passato questo tempo dal sì, se il gestore della cattura schermo non si è
@@ -615,7 +627,7 @@ function segnaPreambolo(wc, origine) {
   for (const [k, v] of preamboli) {
     if (v.fino <= ora) { clearTimeout(v.timer); preamboli.delete(k); }
   }
-  const voce = { fino: ora + PREAMBOLO_MS, timer: null, ripresaId: null };
+  const voce = { fino: ora + PREAMBOLO_MS, timer: null };
   voce.timer = setTimeout(() => {
     const attuale = preamboli.get(wc.id);
     if (attuale !== voce) return;
@@ -700,9 +712,7 @@ function consumaPreambolo(wc) {
   if (!v) return null;
   preamboli.delete(wc.id);
   clearTimeout(v.timer);
-  if (v.fino > Date.now()) return v;
-  if (v.ripresaId) fineUso(v.ripresaId);
-  return null;
+  return v.fino > Date.now() ? v : null;
 }
 
 // Quello che un sito PUÒ fare adesso, mentre lo può fare: la ripresa dello
@@ -962,11 +972,20 @@ function posizioneNonDisponibile(wc) {
 }
 
 function chiudiNotizia(id) {
-  // La × toglie l'avviso e basta. Su «ho smesso di chiedere» non rimette il
-  // conto a zero: quello lo fa il «Chiedimelo di nuovo», che è una scelta.
-  if (anelliDetti.delete(String(id))) return { ok: true };
+  // La × toglie l'avviso. Su «ho smesso di chiedere» non rimette il conto a
+  // zero — quello lo fa il «Chiedimelo di nuovo», che è una scelta — ma la riga
+  // resta via: altrimenti la richiesta successiva del sito la riaccende subito.
+  const anello = anelliDetti.get(String(id));
+  if (anello) {
+    anelliDetti.delete(String(id));
+    try { anelliZittiti.add(`${anello.wc.id}|${anello.origine}`); } catch (_) {}
+    return { ok: true };
+  }
   for (const [wcId, v] of [...avvisiPosizione]) {
     if (v === String(id)) { avvisiPosizione.delete(wcId); return { ok: true }; }
+  }
+  for (const [wcId, v] of [...avvisiSchermo]) {
+    if (v === String(id)) { avvisiSchermo.delete(wcId); return { ok: true }; }
   }
   return { ok: false };
 }
@@ -1096,18 +1115,12 @@ function installaSuSessione(ses) {
         // una scelta a parte dentro il riquadro, e parte da spenta.
         const scelta = await scegliFonte(bersaglio, frame, !!(richiesta && richiesta.audioRequested));
         if (!scelta) {
-          // Annullato qui: il sì di un attimo fa non vale più niente, e un
-          // eventuale segno della ripresa va tolto o resterebbe a mentire.
-          if (pre && pre.ripresaId) fineUso(pre.ripresaId);
+          // Annullato qui: il sì di un attimo fa non vale più niente.
           nega();
           return;
         }
         // Il segno parte ADESSO, che è quando il sito comincia davvero a
-        // vedere: prima della scelta della fonte non vede ancora niente. Se il
-        // segno prudente della strada vecchia era già partito (il sito ci ha
-        // messo più di un attimo ad arrivare qui), lo rifacciamo: adesso
-        // sappiamo per certo se l'audio c'è o no, e il segno lo deve dire.
-        if (pre && pre.ripresaId) fineUso(pre.ripresaId);
+        // vedere: prima della scelta della fonte non vede ancora niente.
         iniziaUso(bersaglio, P().origineDi(url) || url, [P().CHIAVI.SCHERMO], {
           audioSistema: !!scelta.audio,
         });
@@ -1338,6 +1351,8 @@ function _reset() {
   preamboli.clear();
   senzaRisposta.clear();
   anelliDetti.clear();
+  anelliZittiti.clear();
+  avvisiSchermo.clear();
   fermate.clear();
   avvisiPosizione.clear();
   for (const id of [...usi.keys()]) fineUso(id);

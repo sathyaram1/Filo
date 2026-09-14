@@ -322,32 +322,35 @@ function buildCatturaSicuraSource() {
     // ridefinisce quando vuole: bastavano due righe perché le tracce
     // arrivassero a un elemento che non le teneva, il conto di Filo non le
     // vedesse, e un microfono restasse aperto a permesso tolto (#586, giro 10).
-    const creaEl = document.createElement.bind(document);
-    const setAttr = Element.prototype.setAttribute;
-    const appendiNodo = Node.prototype.appendChild;
-    const togliNodo = Element.prototype.remove;
-    const ascolta = EventTarget.prototype.addEventListener;
-    const spara = EventTarget.prototype.dispatchEvent;
-    const Evento = window.CustomEvent;
-    const Flusso = window.MediaStream;
-    const tracceDi = Flusso && Flusso.prototype.getTracks;
-    const setSrc = (() => {
-      try { return Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject').set; }
-      catch (_) { return null; }
-    })();
-    const radiceDoc = (() => {
-      try {
-        const d = Object.getOwnPropertyDescriptor(Document.prototype, 'documentElement');
-        return () => d.get.call(document);
-      } catch (_) { return () => document.documentElement; }
-    })();
-    const statoTraccia = (() => {
-      try {
-        const d = Object.getOwnPropertyDescriptor(window.MediaStreamTrack.prototype, 'readyState');
-        return (t) => d.get.call(t);
-      } catch (_) { return (t) => t.readyState; }
-    })();
-    const fermaTraccia = (window.MediaStreamTrack && window.MediaStreamTrack.prototype.stop) || null;
+    // Uno per uno, e nessuno può far cadere il resto: quello che conta davvero è
+    // che la funzione con cui si chiede il microfono sia la nostra, e quella non
+    // dipende da nessuno di questi.
+    const prendi = (fn) => { try { return fn() || null; } catch (_) { return null; } };
+    const creaEl = prendi(() => document.createElement.bind(document));
+    const setAttr = prendi(() => Element.prototype.setAttribute);
+    const appendiNodo = prendi(() => Node.prototype.appendChild);
+    const togliNodo = prendi(() => Element.prototype.remove);
+    const ascolta = prendi(() => EventTarget.prototype.addEventListener);
+    const spara = prendi(() => EventTarget.prototype.dispatchEvent);
+    const Evento = prendi(() => window.CustomEvent);
+    const Flusso = prendi(() => window.MediaStream);
+    const tracceDi = prendi(() => Flusso.prototype.getTracks);
+    const setSrc = prendi(() => Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject').set);
+    const getRadice = prendi(() => Object.getOwnPropertyDescriptor(Document.prototype, 'documentElement').get);
+    const getStato = prendi(() => Object.getOwnPropertyDescriptor(window.MediaStreamTrack.prototype, 'readyState').get);
+    const fermaTraccia = prendi(() => window.MediaStreamTrack.prototype.stop);
+    const su = (bersaglio, nome, fn) => {
+      try { (ascolta || bersaglio.addEventListener).call(bersaglio, nome, fn, true); } catch (_) {}
+    };
+    const radiceDoc = () => {
+      try { return getRadice ? getRadice.call(document) : document.documentElement; } catch (_) { return null; }
+    };
+    const statoTraccia = (t) => {
+      try { return getStato ? getStato.call(t) : t.readyState; } catch (_) { return 'live'; }
+    };
+    const tracce = (s) => {
+      try { return tracceDi ? tracceDi.call(s) : s.getTracks(); } catch (_) { return []; }
+    };
 
     // Le tracce consegnate, con la chiave di Filo che le copre. Un insieme
     // debole non va bene: qui ci serve scorrerle. Il registro è UNO per
