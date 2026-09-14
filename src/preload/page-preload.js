@@ -179,11 +179,16 @@ if (!IS_SUBFRAME) try {
 // e qui non si chiede niente al main, quindi non costa nulla ripeterlo.
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  // Anche nei riquadri senza indirizzo proprio (about:blank, srcdoc): per il
-  // browser sono lo stesso sito di chi li ospita, e una traccia presa lì dentro
-  // è una traccia di quel sito. Senza il giro qui, la revoca non aveva nessuno a
-  // cui chiedere e finiva sempre nella ricarica.
-  if (/^https?:/i.test(loc) || (IS_SUBFRAME && /^(about:blank|about:srcdoc|)$/i.test(loc))) {
+  // In OGNI riquadro, non solo in quelli con un indirizzo web. Un riquadro senza
+  // indirizzo proprio (about:blank, srcdoc) o con un indirizzo fabbricato dalla
+  // pagina (blob:) per il browser è lo stesso sito di chi lo ospita: lì dentro
+  // il permesso vale, e una traccia presa lì è una traccia di quel sito. Finché
+  // il giro non ci arrivava, quel riquadro era la scorciatoia buona per tutto
+  // ciò che il giro tiene chiuso: la strada vecchia dello schermo che salta la
+  // scelta di cosa si condivide, e la revoca che non aveva nessuno a cui
+  // chiedere. Qui non si parla col main, quindi installarlo dappertutto non
+  // costa niente. Le pagine di Filo non passano di qui: hanno un altro preload.
+  if (/^https?:/i.test(loc) || (IS_SUBFRAME && !/^(filo|devtools|chrome|chrome-extension):/i.test(loc))) {
     const {
       buildCatturaSicuraSource, CANALE_FERMA, ATTR_TRACCIA,
     } = require('./permessi-guard.js');
