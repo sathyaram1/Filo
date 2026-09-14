@@ -881,10 +881,42 @@
     return { rows, complete };
   }
 
+  // ── La memoria breve della lettura completa ──────────────────────────────
+  //
+  // L'annuncio della ricompensa gira a ogni caricamento della home, e la home
+  // è la pagina di OGNI SCHEDA NUOVA. Senza memoria, chi ha mandato almeno una
+  // segnalazione si riscarica tutte le schede della bacheca ogni volta che apre
+  // una scheda: misurato, quattro aperture costavano 2208 schede in otto
+  // richieste, e il numero cresce da solo a ogni fix che esce. La risposta che
+  // serve («c'è un mio fix appena uscito?») cambia una volta ogni mai.
+  //
+  // Trenta secondi sono gli stessi che si dà chi gestisce i feedback dal lato
+  // suo: era l'asimmetria da chiudere, due cammini uguali di cui uno solo
+  // ricordava.
+  //
+  // La memoria tiene anche il riferimento della PORTA da cui è stata riempita.
+  // Chi la sostituisce (una prova, la bacheca in modalità test) mette una
+  // funzione nuova, quindi la memoria non combacia più e si rilegge: una prova
+  // non si ritrova mai davanti le schede della scena precedente. E si ricorda
+  // solo una lettura COMPLETA: memorizzare un troncamento vorrebbe dire
+  // ripeterlo per mezzo minuto.
+  const ALL_CACHE_TTL_MS = 30_000;
+  let allCache = { at: 0, rows: null, porta: null };
+
   async function listAllPublic(opts = {}) {
-    const { rows } = await listAllPublicPaged(opts);
+    const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listPublic) || listPublic;
+    const fresca = !!(opts && opts.fresh);
+    if (!fresca && allCache.rows && allCache.porta === porta
+        && (Date.now() - allCache.at) < ALL_CACHE_TTL_MS) {
+      return allCache.rows;
+    }
+    const { rows, complete } = await listAllPublicPaged(opts);
+    allCache = complete ? { at: Date.now(), rows, porta } : { at: 0, rows: null, porta: null };
     return rows;
   }
+
+  /** Butta via la memoria breve: dopo aver scritto o tolto una scheda. */
+  function forgetAllPublic() { allCache = { at: 0, rows: null, porta: null }; }
 
   // Il nome intero del documento, quello che Firestore vuole come cursore.
   function nomeDocumento(collectionId, row) {

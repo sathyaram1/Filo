@@ -37,9 +37,9 @@ test('senza l\'altezza fissa della colonna le aree uscivano dallo schermo', asyn
         const grid = document.getElementById('mgReviewGrid');
         grid.parentNode.insertBefore(blocco, grid);
       }
-      // Alto quasi quanto la finestra: con la colonna ferma a 100vh le aree si
-      // accorciano e restano dentro; senza, la somma sborda di sicuro.
-      blocco.style.cssText = 'height:calc(100vh - 200px);flex:0 0 auto;border:1px solid #999;border-radius:8px';
+      // Alto in proporzione alla finestra: con la colonna ferma a 100vh le aree
+      // si accorciano e restano dentro; senza, la somma sborda di sicuro.
+      blocco.style.cssText = 'height:calc(100vh - 420px);flex:0 0 auto;border:1px solid #999;border-radius:8px';
       blocco.textContent = 'Fusione ferma: ramo claude/prova, in attesa del tuo via libera';
     });
     await page.waitForTimeout(250);
@@ -63,7 +63,7 @@ test('senza l\'altezza fissa della colonna le aree uscivano dallo schermo', asyn
   // stare dentro la finestra, e la stessa scena rompe gli stessi assert.
   await page.addStyleTag({ content: `
     .sn-page { height: auto !important; min-height: 100vh !important; }
-    #mgReviewGrid { min-height: 300px !important; }
+    #mgReviewGrid { min-height: calc(100vh - 280px) !important; }
   ` });
   await page.waitForTimeout(250);
   const prima = await conUnBloccoAlto();
