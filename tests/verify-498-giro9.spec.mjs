@@ -8,24 +8,17 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
 
-function richiestaFinta(i) {
-  return {
-    id: `req-${i}`,
-    branch: `claude/lavoro-numero-${i}`,
-    sha: `abcdef012345678901234567890abcdef012345${i}`,
-    who: `routine-${i}`,
-    origin: 'routine',
-    feedbackNum: `#${400 + i}`,
-    createdAtMs: Date.now() - 3600_000,
-    expiresAtMs: Date.now() + 6 * 86400_000,
-    blocks: [
-      { kind: 'protected-paths', items: ['src/main/main.js', 'package.json'] },
-      { kind: 'workflow', items: ['.github/workflows/release.yml'] },
-    ],
-  };
-}
-
-test('senza il tetto sul riquadro delle fusioni le aree uscivano dallo schermo', async ({ openTab }) => {
+// Il riquadro delle fusioni in attesa non sta più sopra le aree: la
+// pre-approvazione l'ha spostato nella scheda Automazioni, dove la pagina è
+// libera di allungarsi, e l'ha diviso in tre riquadri con nomi nuovi. Questa
+// controprova frugava il riquadro unico di allora, quindi dal giorno dello
+// spostamento non provava più niente e cascava.
+//
+// Delle due misure di #498 ne resta una, ed è quella che tiene: la colonna
+// della pagina è ALTA QUANTO LA FINESTRA finché la scheda lista è quella
+// aperta, quindi qualunque cosa stia sopra le aree le accorcia invece di
+// spingerle fuori. È questa che la controprova rimette a com'era.
+test('senza l\'altezza fissa della colonna le aree uscivano dallo schermo', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -34,11 +27,19 @@ test('senza il tetto sul riquadro delle fusioni le aree uscivano dallo schermo',
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.setData([]));
 
-  async function conFusioni(quante) {
-    await page.evaluate((reqs) => {
-      window.SN_MERGE_APPROVALS.render(
-        document.getElementById('mgMergeApprovals'), { requests: reqs, failed: [] });
-    }, Array.from({ length: quante }, (_, i) => richiestaFinta(i)));
+  // Qualcosa di alto sopra le aree, come lo era il blocco delle fusioni.
+  async function conUnBloccoAlto(altezza) {
+    await page.evaluate((h) => {
+      let blocco = document.getElementById('bloccoDiProva498');
+      if (!blocco) {
+        blocco = document.createElement('div');
+        blocco.id = 'bloccoDiProva498';
+        const grid = document.getElementById('mgReviewGrid');
+        grid.parentNode.insertBefore(blocco, grid);
+      }
+      blocco.style.cssText = `height:${h}px;flex:0 0 auto;border:1px solid #999;border-radius:8px`;
+      blocco.textContent = 'Fusione ferma: ramo claude/prova, in attesa del tuo via libera';
+    }, altezza);
     await page.waitForTimeout(250);
     return page.evaluate(() => {
       const doc = document.documentElement;
@@ -50,28 +51,23 @@ test('senza il tetto sul riquadro delle fusioni le aree uscivano dallo schermo',
     });
   }
 
-  // Com'è adesso: tre fusioni in attesa e le aree restano dentro la finestra.
-  const adesso = await conFusioni(3);
-  console.log('ADESSO 3 fusioni', JSON.stringify(adesso));
+  // Com'è adesso: un blocco alto sopra le aree e le aree restano dentro.
+  const adesso = await conUnBloccoAlto(320);
+  console.log('ADESSO blocco alto', JSON.stringify(adesso));
   expect(adesso.scrollH).toBeLessThanOrEqual(adesso.viewport + 1);
   expect(adesso.gridBottom).toBeLessThanOrEqual(adesso.viewport + 1);
 
-  // Com'era prima: rimetto a mano le due misure di allora e la stessa scena
-  // rompe gli stessi assert. Sono DUE, non una. Il tetto dice quanto il
-  // riquadro può chiedere; l'altezza della colonna è ciò che lo obbliga a
-  // rinunciare. Con la colonna a `min-height: 100vh` poteva crescere oltre la
-  // finestra, e allora nessuno gli chiedeva niente: era la metà che mancava, e
-  // si vedeva con lo zoom alzato o su una finestra bassa (#498, terzo giro).
+  // Com'era prima: la colonna torna a crescere con il contenuto invece di
+  // stare dentro la finestra, e la stessa scena rompe gli stessi assert.
   await page.addStyleTag({ content: `
     .sn-page { height: auto !important; min-height: 100vh !important; }
-    #mgMergeApprovals { max-height: none !important; min-height: 0 !important; overflow-y: visible !important; }
     #mgReviewGrid { min-height: 300px !important; }
   ` });
   await page.waitForTimeout(250);
-  const prima = await conFusioni(3);
-  console.log('PRIMA 3 fusioni', JSON.stringify(prima));
-  expect(prima.scrollH, 'senza tetto la pagina DEVE tornare a scorrere').toBeGreaterThan(prima.viewport + 1);
-  expect(prima.gridBottom, 'senza tetto le aree DEVONO uscire dalla finestra').toBeGreaterThan(prima.viewport + 1);
+  const prima = await conUnBloccoAlto(320);
+  console.log('PRIMA blocco alto', JSON.stringify(prima));
+  expect(prima.scrollH, 'senza altezza fissa la pagina DEVE tornare a scorrere').toBeGreaterThan(prima.viewport + 1);
+  expect(prima.gridBottom, 'senza altezza fissa le aree DEVONO uscire dalla finestra').toBeGreaterThan(prima.viewport + 1);
 });
 
 test('col vecchio margine fisso la barra di ricerca tornava appiccicata', async ({ openTab }) => {
