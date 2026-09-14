@@ -190,7 +190,7 @@ try {
   // costa niente. Le pagine di Filo non passano di qui: hanno un altro preload.
   if (/^https?:/i.test(loc) || (IS_SUBFRAME && !/^(filo|devtools|chrome|chrome-extension):/i.test(loc))) {
     const {
-      buildCatturaSicuraSource, CANALE_FERMA, ATTR_TRACCIA,
+      buildCatturaSicuraSource, CANALE_FERMA, CANALE_FERMATO, ATTR_TRACCIA,
     } = require('./permessi-guard.js');
     webFrame.executeJavaScript(buildCatturaSicuraSource(), true).catch(() => {});
 
