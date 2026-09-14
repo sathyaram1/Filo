@@ -223,6 +223,36 @@ test('i content-type ammessi sono solo quelli passivi, allineati al gate del cli
   }
 });
 
+test('il tipo di un allegato è sempre una stringa, anche coi nomi di serie', () => {
+  // Verifica #582, giro 7, stessa causa della tabella degli indirizzi: la
+  // chiave è l'estensione di un nome di file, e in una tabella normale
+  // `__proto__` e `constructor` ci sono già. Un file chiamato `note.__proto__`
+  // si faceva dare un «tipo» che non è una stringa, passava il controllo
+  // «tipo ammesso?» e partiva verso il deposito con `data:[object Object]`.
+  for (const nome of ['a.__proto__', 'a.constructor', 'a.tostring', 'a.valueof', 'a.exe', 'a']) {
+    const tipo = mimeDiAllegato(nome);
+    assert.equal(typeof tipo, 'string', `${nome}: il tipo non è una stringa`);
+    assert.equal(tipo, '', `${nome}: tipo non ammesso accettato come «${String(tipo)}»`);
+  }
+  // Controprova: i nomi veri continuano ad avere il loro tipo.
+  assert.equal(mimeDiAllegato('a.png'), 'image/png');
+  assert.equal(mimeDiAllegato('a.yaml'), 'application/x-yaml');
+});
+
+test('quello che il gate del client ammette, il deposito lo accetta — e viceversa per i tipi dei due mittenti', () => {
+  // Verifica #582, giro 7. Le liste sono tre (gate del client, storage.rules,
+  // strumento a riga di comando) e devono dire la stessa cosa: se lo strumento
+  // può mandare un .yaml e una persona non può allegarlo, è la stessa
+  // asimmetria che questo audit continua a trovare.
+  for (const nomeFile of ['a.tsv', 'a.yaml', 'a.yml']) {
+    const tipo = mimeDiAllegato(nomeFile);
+    assert.ok(
+      ATTACH.DOC_MIME.has(tipo),
+      `feedback:apri manda ${nomeFile} come ${tipo}, ma il gate del client lo rifiuta`,
+    );
+  }
+});
+
 // ── Il nome dell'allegato: le regole e l'app devono dire la stessa cosa ──────
 
 /** L'espressione del nome, così com'è scritta nelle regole, come RegExp JS. */
