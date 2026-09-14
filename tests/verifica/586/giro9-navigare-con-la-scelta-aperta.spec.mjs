@@ -47,6 +47,7 @@ test('il riquadro «cosa condividi» se ne va con la pagina che l\'aveva chiesto
 
   const restato = await shell.locator('.perm-source').count().catch(() => -1);
   const testo = (await shell.locator('.perm-source').allTextContents().catch(() => [])).join(' | ');
+  await shell.screenshot({ path: 'tests/.shots/586-giro9-riquadro-rimasto.png' }).catch(() => {});
   console.log('[586 g9] riquadri della scelta dopo la navigazione:', restato,
     JSON.stringify(testo.replace(/\s+/g, ' ').slice(0, 160)));
 

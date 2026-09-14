@@ -95,3 +95,63 @@ test('togliere il microfono deve chiuderlo anche se la pagina dice che è già c
     + 'quarta porta dopo i giri 4, 6 e 7',
   ).toBe(false);
 });
+
+// La stessa causa da un'altra porta, provata e NON aperta: prendere il microfono
+// da un riquadro incorporato senza indirizzo proprio (about:blank, blob:), dove
+// il giro di Filo non viene installato. Lì la pagina non risponde affatto alla
+// domanda «hai qualcosa di vivo?», e Filo prende la strada dura: ricarica. La
+// traccia muore, e quello che c'era scritto nella pagina si perde — che è il
+// prezzo già noto della strada dura, non una porta aperta.
+const HTML_RIQUADRO = `<!doctype html><html><body style="margin:0;padding:16px">
+<input id="campo" style="width:80%">
+<script>
+  window.__vivo = String(Date.now());
+  window.__prendi = () => new Promise((ok) => {
+    const f = document.createElement('iframe');
+    f.style.width = '10px'; f.style.height = '10px';
+    f.onload = () => {
+      f.contentWindow.navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => {
+        window.__dalRiquadro = s.getTracks();
+        ok('ottenuto');
+      }, (e) => ok('rifiutato:' + ((e && e.name) || '?')));
+    };
+    f.src = 'about:blank';
+    document.body.appendChild(f);
+  });
+  window.__statoRiquadro = () => (window.__dalRiquadro || []).map((t) => t.readyState);
+</script></body></html>`;
+
+test('il microfono preso da un riquadro senza indirizzo proprio si chiude comunque', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await testServer.openReady(openTab, HTML_RIQUADRO);
+  const host = new URL(page.url()).host;
+
+  const esito = page.evaluate(() => window.__prendi());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  console.log('[586 g9] il riquadro senza indirizzo ha ottenuto:', await esito);
+  await page.fill('#campo', 'quello che stavo scrivendo').catch(() => {});
+  const vivoPrima = await page.evaluate(() => window.__vivo);
+
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  const sicurezza = await aspetta(async () => app.windows().find((w) => {
+    try { return w.url().includes('security.html'); } catch (_) { return false; }
+  }) || null);
+  expect(sicurezza, 'pagina Sicurezza non trovata').toBeTruthy();
+  await sicurezza.waitForLoadState('domcontentloaded').catch(() => {});
+  await sicurezza.waitForTimeout(1200);
+  await sicurezza.locator('#perms-list li').filter({ hasText: host }).first()
+    .locator('button[aria-label]').first().click();
+  await sicurezza.waitForTimeout(3500);
+
+  const stato = await page.evaluate(() => window.__statoRiquadro()).catch(() => ['pagina ricaricata']);
+  const vivoDopo = await page.evaluate(() => window.__vivo).catch(() => 'ricaricata');
+  const campo = await page.inputValue('#campo').catch(() => '');
+  console.log('[586 g9] dopo la revoca — tracce del riquadro:', JSON.stringify(stato),
+    'pagina ricaricata:', vivoDopo !== vivoPrima, 'campo:', JSON.stringify(campo));
+
+  expect(
+    stato.includes('live'),
+    'tolta la risposta, il microfono preso da un riquadro senza indirizzo proprio è ancora aperto',
+  ).toBe(false);
+});
