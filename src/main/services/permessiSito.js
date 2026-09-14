@@ -649,8 +649,13 @@ function schermoSenzaScelta(wc, origine) {
     if (!wc || wc.isDestroyed()) return;
     avvisoSchermoChiuso(wc, origine);
     const dura = () => { try { if (wc && !wc.isDestroyed()) wc.reload(); } catch (_) {} };
-    chiediAllaPaginaDiFermare(wc, [P().CHIAVI.SCHERMO]).then((vive) => {
-      if (vive) dura();
+    // Qui NON si guarda «nessuno ha mai visto passare niente»: la strada vecchia
+    // consegna senza passare dal nostro giro, quindi quel conto è zero per
+    // costruzione. Quello che conta è che nessun riquadro resti con una traccia
+    // dello schermo viva, e un riquadro che non risponde affatto — quello creato
+    // senza indirizzo, dove il preload non gira — conta come vivo.
+    chiediAllaPaginaDiFermare(wc, [P().CHIAVI.SCHERMO]).then((esito) => {
+      if (esito && (esito.vive || esito.incoerenti)) dura();
     }).catch(dura);
   } catch (_) {}
 }
