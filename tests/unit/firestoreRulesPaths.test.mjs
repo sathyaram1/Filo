@@ -37,6 +37,13 @@ const SCRITTURE_ANONIME_DICHIARATE = {
   feedback:
     'una segnalazione si manda senza account, di proposito: la legge l’owner (e le routine), ' +
     'non viene mai rimessa nel prompt di un altro utente come istruzione fidata.',
+  counters:
+    'il numero progressivo di un feedback (#583). Chi invia lo alza DI UNO e basta: ' +
+    'la regola ammette il solo campo `value`, intero, esattamente +1 rispetto a quello ' +
+    'letto. Dentro non entra testo, quindi non c’è niente che possa finire nel prompt ' +
+    'di un altro; il caso peggiore è un numero saltato, che è un’etichetta e non una ' +
+    'chiave. Anonimo perché l’invio di un feedback lo è per scelta: chiedere un account ' +
+    'per il numero varrebbe chiederlo per la segnalazione.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];
