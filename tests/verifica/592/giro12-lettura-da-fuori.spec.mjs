@@ -48,7 +48,7 @@ async function preparaImpostazioni(app) {
 test('da una pagina web le impostazioni non devono portarsi via le credenziali del proxy e la chiave anti-phishing', async ({ app }) => {
   await preparaImpostazioni(app);
 
-  const r = await comeSeFosse(app, { type: globalThis.__MSG_GET_SETTINGS || 'get_settings' }, DA_WEB);
+  const r = await comeSeFosse(app, { type: 'get_settings' }, DA_WEB);
   const testo = JSON.stringify(r || {});
 
   expect(testo, 'la chiave API esce').not.toContain('CHIAVE-OPENROUTER');
