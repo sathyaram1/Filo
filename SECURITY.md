@@ -184,6 +184,11 @@ I server applicano regole precise (Firebase Security Rules):
 - **Nessuno può LEGGERE i feedback**, a parte chi li gestisce: gli
   amministratori e il server che li lavora. Quello che invii non è consultabile
   da un altro utente, e nemmeno da chi conoscesse l'indirizzo del documento.
+- Lo stesso vale per gli **screenshot e i file** che alleghi: non si possono
+  elencare e non si aprono conoscendone l'indirizzo. L'unica chiave è il codice
+  di scarico che sta nel link, e quel link non esce dalle mani di chi gestisce i
+  feedback. Se un codice dovesse scappare si può cambiare, e da quel momento il
+  vecchio link non apre più niente.
 - Quello che tutti possono vedere è la **bacheca dei miglioramenti**, e sono
   solo i campi pensati per stare lì: il titolo breve di un problema già
   risolto, il suo numero, la versione in cui è uscito, la frase scritta per chi
