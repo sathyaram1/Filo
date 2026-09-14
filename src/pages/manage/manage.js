@@ -1130,22 +1130,32 @@
   // segnaposto può spiegare all'owner perché non la vede (chiave non
   // configurata, decifratura fallita, download non riuscito…) invece di un muto
   // "non disponibile". null = fallita, non si ritenta.
+  //
+  // `soloDestinatario` viene dal main e NON si butta via: è la differenza fra
+  // «qualcosa si è rotto» e «questo allegato è di qualcun altro». Gestione sta
+  // nell'elenco delle app accanto a Editor e Feedback, senza nessun filtro,
+  // quindi ci arriva qualunque tester e vede le segnalazioni di tutti. Il
+  // riquadro dei feedback questa risposta la usa già; qui la si buttava, e la
+  // stessa segnalazione, con lo stesso allegato e lo stesso utente, diceva due
+  // cose diverse a seconda della pagina da cui la si guardava (#582, giro 6).
+  // Il canale è uno solo apposta: la frase la decide lui.
   const imgCache = new Map();
   async function resolveImageSrc(url) {
-    if (!url) return { dataUrl: null, error: '' };
+    if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
     if (imgCache.has(url)) return imgCache.get(url);
     let dataUrl = null;
     let error = '';
+    let soloDestinatario = false;
     try {
       const r = await sendToMain({ type: 'feedback_decrypt_image', url });
       if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
-      else if (r && r.error) error = String(r.error);
+      else if (r && r.error) { error = String(r.error); soloDestinatario = !!r.soloDestinatario; }
       else error = 'immagine non disponibile';
     } catch (_) {
       // rete/canale: trattala come non disponibile
       error = 'immagine non raggiungibile';
     }
-    const res = { dataUrl, error };
+    const res = { dataUrl, error, soloDestinatario };
     imgCache.set(url, res);
     return res;
   }
