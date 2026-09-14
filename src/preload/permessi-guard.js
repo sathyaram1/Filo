@@ -68,6 +68,97 @@ const ATTR_TRACCIA = 'data-filo-traccia';
 // Evento privato con cui la pagina dice a Filo che la posizione non è arrivata.
 const CANALE_POSIZIONE_KO = '__filo_posizione_ko';
 
+// ── La richiesta vecchia della cattura schermo, in ogni sua forma (#586) ─────
+//
+// Chromium tiene ancora aperta una seconda strada per la cattura dello schermo:
+// `getUserMedia` con `chromeMediaSource` fra i vincoli. Quella strada non passa
+// dal punto in cui Filo fa scegliere COSA si condivide, quindi va riportata su
+// quella moderna prima di partire — e per riportarla va riconosciuta.
+//
+// Il nome della fonte non è uno solo: Chromium tiene buoni «desktop»,
+// «screen», «system» e «tab», e il vincolo può stare direttamente nell'oggetto,
+// dentro `mandatory` o dentro `optional`, che è anche una lista. Cercare la sola
+// parola «desktop» dentro `mandatory` lasciava passare le altre forme, e da lì
+// lo schermo intero partiva con un «Consenti» solo, senza far scegliere niente
+// (#586, giro 10). Qui basta che `chromeMediaSource` ci sia, qualunque valore
+// abbia: è un vincolo che nessuna richiesta normale usa, quindi la sua presenza
+// è già la risposta.
+//
+// PURA, e inserita tale e quale nel giro che gira dentro la pagina: gli unit
+// test la provano da qui.
+function sorgenteSchermo(vincolo) {
+  try {
+    if (!vincolo || typeof vincolo !== 'object') return false;
+    const dentro = (o) => {
+      if (!o || typeof o !== 'object') return false;
+      if (Array.isArray(o)) return o.some(dentro);
+      return typeof o.chromeMediaSource === 'string' && !!o.chromeMediaSource;
+    };
+    return dentro(vincolo) || dentro(vincolo.mandatory) || dentro(vincolo.optional);
+  } catch (_) { return false; }
+}
+
+// ── I riquadri a cui il preload non arriva (#586, giro 10) ───────────────────
+//
+// Un `<iframe>` creato senza indirizzo resta sul suo documento vuoto iniziale:
+// non c'è nessuna navigazione, quindi il preload lì non gira e niente di questo
+// giro ci arriva. Una pagina si scrive un riquadro così in una riga, e da lì
+// tornavano aperte le porte che il giro tiene chiuse.
+//
+// Ci arriviamo dal riquadro che lo contiene: la finestra del figlio è dello
+// stesso sito, quindi i suoi stampi si possono mettere a posto direttamente da
+// qui. Si fa al primo accesso — `contentWindow` e `contentDocument` sono la
+// strada che la pagina deve prendere per usarlo — e su ogni riquadro che
+// compare nel documento. Resta fuori chi arriva al figlio per una strada che
+// non passa da una proprietà (`window.frames[0]`) prima che l'osservatore se ne
+// accorga: per quello la garanzia sta nel processo principale, che chiude una
+// cattura schermo consegnata senza scelta (services/permessiSito.js).
+function sorgenteRiquadriFigli(installa) {
+  return `
+    const figliFatti = new WeakSet();
+    const copri = (w) => {
+      try {
+        if (!w || figliFatti.has(w) || !w.MediaDevices) return;
+        figliFatti.add(w);
+        ${installa}(w);
+      } catch (_) {}
+    };
+    const guarda = (nome) => {
+      try {
+        const proto = window.HTMLIFrameElement && window.HTMLIFrameElement.prototype;
+        const d = proto && Object.getOwnPropertyDescriptor(proto, nome);
+        if (!d || typeof d.get !== 'function') return;
+        Object.defineProperty(proto, nome, {
+          configurable: true,
+          enumerable: !!d.enumerable,
+          get() {
+            const v = d.get.call(this);
+            try { copri(nome === 'contentWindow' ? v : (v && v.defaultView)); } catch (_) {}
+            return v;
+          },
+        });
+      } catch (_) {}
+    };
+    guarda('contentWindow');
+    guarda('contentDocument');
+    try {
+      const occhio = new MutationObserver((ms) => {
+        for (const m of ms) {
+          for (const n of (m.addedNodes || [])) {
+            try {
+              if (n && n.tagName === 'IFRAME') copri(n.contentWindow);
+              else if (n && n.querySelectorAll) {
+                for (const f of n.querySelectorAll('iframe')) copri(f.contentWindow);
+              }
+            } catch (_) {}
+          }
+        }
+      });
+      occhio.observe(document, { childList: true, subtree: true });
+    } catch (_) {}
+`;
+}
+
 function buildPermessiGuardSource(noti) {
   const iniziali = JSON.stringify(noti && typeof noti === 'object' ? noti : {});
   const nomi = JSON.stringify(NOMI);
@@ -123,48 +214,60 @@ function buildPermessiGuardSource(noti) {
       for (const t of nostre) { try { t.__aggiorna(); } catch (_) {} }
     }, true);
 
-    const P = window.Permissions && window.Permissions.prototype;
-    if (P && typeof P.query === 'function') {
-      const vera = P.query;
-      P.query = function query(desc) {
-        try {
-          const k = DA_LETTURA[String((desc && desc.name) || '')];
-          if (k) return Promise.resolve(rispostaNostra(String(desc.name), k));
-        } catch (_) {}
-        return vera.call(this, desc).then((stato) => {
-          try {
-            const nome = desc && desc.name;
-            if (!stato || stato.state !== 'denied' || !mai(nome)) return stato;
-            // Un oggetto che ridice solo lo stato: i metodi (addEventListener,
-            // onchange) restano quelli veri, legati all'originale, altrimenti
-            // un sito che si iscrive ai cambi si prende un errore.
-            return new Proxy(stato, {
-              get(t, p, r) {
-                if (p === 'state') return 'prompt';
-                const v = Reflect.get(t, p, t);
-                return typeof v === 'function' ? v.bind(t) : v;
+    // La stessa messa a posto, per una finestra qualunque dello stesso sito: la
+    // propria, e quella di un riquadro creato senza indirizzo, dove il preload
+    // non gira (#586, giro 10). Lì dentro un widget leggeva «negato» su cose che
+    // nessuno aveva negato, quindi non chiedeva mai e mostrava «sbloccalo dalle
+    // impostazioni del browser», dove non c'era niente da sbloccare.
+    const installaLetture = (w) => {
+      try {
+        const P = w.Permissions && w.Permissions.prototype;
+        if (P && typeof P.query === 'function') {
+          const vera = P.query;
+          P.query = function query(desc) {
+            try {
+              const k = DA_LETTURA[String((desc && desc.name) || '')];
+              if (k) return w.Promise.resolve(rispostaNostra(String(desc.name), k));
+            } catch (_) {}
+            return vera.call(this, desc).then((stato) => {
+              try {
+                const nome = desc && desc.name;
+                if (!stato || stato.state !== 'denied' || !mai(nome)) return stato;
+                // Un oggetto che ridice solo lo stato: i metodi (addEventListener,
+                // onchange) restano quelli veri, legati all'originale, altrimenti
+                // un sito che si iscrive ai cambi si prende un errore.
+                return new Proxy(stato, {
+                  get(t, p, r) {
+                    if (p === 'state') return 'prompt';
+                    const v = Reflect.get(t, p, t);
+                    return typeof v === 'function' ? v.bind(t) : v;
+                  },
+                });
+              } catch (_) { return stato; }
+            });
+          };
+        }
+
+        if (typeof w.Notification === 'function') {
+          const d = Object.getOwnPropertyDescriptor(w.Notification, 'permission');
+          if (d && typeof d.get === 'function') {
+            Object.defineProperty(w.Notification, 'permission', {
+              configurable: true,
+              enumerable: !!d.enumerable,
+              get() {
+                try {
+                  const v = d.get.call(w.Notification);
+                  return (v === 'denied' && mai('notifications')) ? 'default' : v;
+                } catch (_) { return 'default'; }
               },
             });
-          } catch (_) { return stato; }
-        });
-      };
-    }
+          }
+        }
+      } catch (_) {}
+    };
 
-    if (typeof window.Notification === 'function') {
-      const d = Object.getOwnPropertyDescriptor(window.Notification, 'permission');
-      if (d && typeof d.get === 'function') {
-        Object.defineProperty(window.Notification, 'permission', {
-          configurable: true,
-          enumerable: !!d.enumerable,
-          get() {
-            try {
-              const v = d.get.call(window.Notification);
-              return (v === 'denied' && mai('notifications')) ? 'default' : v;
-            } catch (_) { return 'default'; }
-          },
-        });
-      }
-    }
+    installaLetture(window);
+${sorgenteRiquadriFigli('installaLetture')}
   } catch (_) {}
 })();`;
 }
@@ -176,12 +279,12 @@ function buildPermessiGuardSource(noti) {
 // mano.
 //
 // 1. LA RICHIESTA CHE AMMAZZA LA SCHEDA. La strada vecchia della cattura
-//    schermo (`chromeMediaSource: 'desktop'` fra i vincoli) non si mescola: o
-//    viene dal desktop tutto quello che si chiede, o non è una richiesta
-//    valida. Chromium non la rifiuta, chiude il processo della pagina. Per chi
-//    naviga la scheda muore all'istante e al suo posto compare la pagina di
-//    errore di Filo, senza che abbia toccato niente. Le forme che ammazzano
-//    sono due e sono speculari:
+//    schermo (`chromeMediaSource` fra i vincoli) non si mescola: o viene dal
+//    desktop tutto quello che si chiede, o non è una richiesta valida. Chromium
+//    non la rifiuta, chiude il processo della pagina. Per chi naviga la scheda
+//    muore all'istante e al suo posto compare la pagina di errore di Filo,
+//    senza che abbia toccato niente. Le forme che ammazzano sono due e sono
+//    speculari:
 //      · l'audio del computer senza l'immagine dello schermo (#586, giro 4);
 //      · l'immagine dello schermo insieme a un microfono o a una webcam veri
 //        (#586, giro 5), che è quello che fanno i siti di videochiamata
@@ -206,52 +309,66 @@ function buildCatturaSicuraSource() {
   return `(() => {
   try {
     const md = navigator.mediaDevices;
-    // Il posto dove si avvolge è lo STAMPO, non l'oggetto. Avvolgendo l'oggetto,
-    // la funzione originale restava lì accanto sullo stampo, raggiungibile con
-    // una riga, e un sito che ne prendeva una seconda per quella via si teneva
-    // il microfono aperto a permesso tolto: il conto non era a zero (la prima
-    // era passata di qui), quindi la strada dura non partiva (#586, giro 7).
-    // Sostituendo la funzione sullo stampo, l'originale non è più raggiungibile
-    // da nessuna parte in questa pagina: la teniamo solo noi, in questa
-    // chiusura. Resta scrivibile e riconfigurabile di proposito: le librerie
-    // che avvolgono a loro volta il microfono (quelle delle videochiamate lo
-    // fanno quasi tutte) si prendono la NOSTRA e la richiamano, e vietare la
-    // scrittura le farebbe morire con un errore.
     const stampo = window.MediaDevices && window.MediaDevices.prototype;
     if (!md || !stampo || typeof stampo.getUserMedia !== 'function') return;
-    const desktop = (v) => {
-      try {
-        if (!v || typeof v !== 'object') return false;
-        const m = v.mandatory || v.optional;
-        if (v.chromeMediaSource === 'desktop') return true;
-        if (m && m.chromeMediaSource === 'desktop') return true;
-        if (Array.isArray(m)) return m.some((o) => o && o.chromeMediaSource === 'desktop');
-        return false;
-      } catch (_) { return false; }
-    };
+
+    const schermoChiesto = ${sorgenteSchermo.toString()};
     const chiesto = (v) => v !== undefined && v !== null && v !== false;
 
+    // GLI STAMPI DI QUESTO MONDO, PRESI ADESSO. Questo giro parte prima del
+    // codice del sito, e quello che si prende qui non gli si può più riscrivere
+    // sotto. Passare dalle proprietà («el.srcObject = …», «el.setAttribute(…)»,
+    // «dove.appendChild(el)») voleva dire passare da funzioni che il sito
+    // ridefinisce quando vuole: bastavano due righe perché le tracce
+    // arrivassero a un elemento che non le teneva, il conto di Filo non le
+    // vedesse, e un microfono restasse aperto a permesso tolto (#586, giro 10).
+    const creaEl = document.createElement.bind(document);
+    const setAttr = Element.prototype.setAttribute;
+    const appendiNodo = Node.prototype.appendChild;
+    const togliNodo = Element.prototype.remove;
+    const ascolta = EventTarget.prototype.addEventListener;
+    const spara = EventTarget.prototype.dispatchEvent;
+    const Evento = window.CustomEvent;
+    const Flusso = window.MediaStream;
+    const tracceDi = Flusso && Flusso.prototype.getTracks;
+    const setSrc = (() => {
+      try { return Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'srcObject').set; }
+      catch (_) { return null; }
+    })();
+    const radiceDoc = (() => {
+      try {
+        const d = Object.getOwnPropertyDescriptor(Document.prototype, 'documentElement');
+        return () => d.get.call(document);
+      } catch (_) { return () => document.documentElement; }
+    })();
+    const statoTraccia = (() => {
+      try {
+        const d = Object.getOwnPropertyDescriptor(window.MediaStreamTrack.prototype, 'readyState');
+        return (t) => d.get.call(t);
+      } catch (_) { return (t) => t.readyState; }
+    })();
+    const fermaTraccia = (window.MediaStreamTrack && window.MediaStreamTrack.prototype.stop) || null;
+
     // Le tracce consegnate, con la chiave di Filo che le copre. Un insieme
-    // debole non va bene: qui ci serve scorrerle.
-    const consegnate = new Set(); // { traccia, chiave }
-    // Quante ne abbiamo viste passare, da sempre. Se è zero mentre Filo sa di
-    // aver concesso qualcosa, vuol dire che la pagina non è passata di qui: chi
-    // chiede non deve crederci e deve prendere la strada dura (#586, giro 6).
+    // debole non va bene: qui ci serve scorrerle. Il registro è UNO per
+    // documento e vale anche per le tracce prese dentro un riquadro creato
+    // senza indirizzo, perché l'elemento che le porta lo appendiamo qui.
+    const consegnate = new Set(); // { t, k }
+    // Quante ne abbiamo viste passare, da sempre. Questo numero lo tiene una
+    // variabile chiusa qui dentro, che il sito non raggiunge: è il confronto con
+    // quello che il preload vede nel DOM a dire se qualcuno ha rotto il ponte.
     let viste = 0;
-    // Ogni traccia consegnata viene anche APPESA al DOM, dentro un elemento
-    // nascosto marcato con la chiave di Filo che la copre. Il DOM lo vede anche
-    // il preload, che lì legge e ferma con i propri stampi: è da lì che esce il
-    // conto vero, perché questo mondo qui la pagina lo può riscrivere.
     const appendi = (t, k) => {
       try {
-        const el = document.createElement('audio');
+        if (!setSrc || !Flusso) return;
+        const el = creaEl('audio');
         el.muted = true;
-        el.setAttribute(${attr}, String(k || ''));
+        setAttr.call(el, ${attr}, String(k || ''));
         el.style.display = 'none';
-        el.srcObject = new MediaStream([t]);
-        const dove = document.documentElement || document.body;
-        if (dove) dove.appendChild(el);
-        t.addEventListener('ended', () => { try { el.remove(); } catch (_) {} });
+        setSrc.call(el, new Flusso([t]));
+        const dove = radiceDoc() || document.body;
+        if (dove) appendiNodo.call(dove, el);
+        ascolta.call(t, 'ended', () => { try { togliNodo.call(el); } catch (_) {} });
       } catch (_) {}
     };
     const segna = (t, k) => {
@@ -261,16 +378,37 @@ function buildCatturaSicuraSource() {
       const voce = { t, k };
       consegnate.add(voce);
       appendi(t, k);
-      try { t.addEventListener('ended', () => { consegnate.delete(voce); }); } catch (_) {}
+      try { ascolta.call(t, 'ended', () => { consegnate.delete(voce); }); } catch (_) {}
       return t;
     };
     const chiaveDi = (t, chiave) => chiave || (t.kind === 'audio' ? 'microfono' : 'fotocamera');
     const registra = (stream, chiave) => {
       try {
-        for (const t of stream.getTracks()) segna(t, chiaveDi(t, chiave));
+        for (const t of tracceDi.call(stream)) segna(t, chiaveDi(t, chiave));
       } catch (_) {}
       return stream;
     };
+
+    ascolta.call(document, ${ferma}, (e) => {
+      let vive = 0;
+      try {
+        const chiavi = (e && e.detail && Array.isArray(e.detail.chiavi)) ? e.detail.chiavi : null;
+        for (const v of [...consegnate]) {
+          if (statoTraccia(v.t) !== 'live') { consegnate.delete(v); continue; }
+          // Quello che non è stato chiesto non si tocca e non si conta: chi
+          // toglie il microfono non deve ritrovarsi la pagina ricaricata
+          // perché la fotocamera, che non aveva tolto, è ancora accesa.
+          if (chiavi && !chiavi.includes(v.k)) continue;
+          try { fermaTraccia ? fermaTraccia.call(v.t) : v.t.stop(); } catch (_) {}
+          if (statoTraccia(v.t) === 'live') vive++; else consegnate.delete(v);
+        }
+      } catch (_) {}
+      try {
+        spara.call(document, new Evento(${fermato}, {
+          detail: { id: (e && e.detail && e.detail.id) || null, vive, viste },
+        }));
+      } catch (_) {}
+    }, true);
 
     // Una traccia CLONATA è una traccia in più, viva per conto suo: fermare
     // l'originale non la ferma. Chi si metteva da parte una copia continuava ad
@@ -288,7 +426,7 @@ function buildCatturaSicuraSource() {
             try {
               const mia = [...consegnate].find((v) => v.t === this);
               if (quali === 'stream') {
-                for (const t of out.getTracks()) segna(t, chiaveDi(t, null));
+                for (const t of tracceDi.call(out)) segna(t, chiaveDi(t, null));
               } else if (mia) segna(out, mia.k);
             } catch (_) {}
             return out;
@@ -296,117 +434,99 @@ function buildCatturaSicuraSource() {
         });
       } catch (_) {}
     };
-    avvolgiClone(window.MediaStreamTrack && window.MediaStreamTrack.prototype, 'traccia');
-    // Una copia dello stream copia le sue tracce: vanno registrate anche quelle,
-    // con la chiave che avevano le originali quando si riesce a risalirci.
-    try {
-      const protoS = window.MediaStream && window.MediaStream.prototype;
-      if (protoS && typeof protoS.clone === 'function') {
-        const veroS = protoS.clone;
-        Object.defineProperty(protoS, 'clone', {
+
+    // Tutto quello che va messo a posto in UNA finestra dello stesso sito: la
+    // propria, e quella di un riquadro creato senza indirizzo, dove il preload
+    // non gira. Senza, quel riquadro era la scorciatoia per saltare la scelta di
+    // cosa si condivide e per far morire la scheda con una riga (#586, giro 10).
+    const installaCattura = (w) => {
+      const suo = w.MediaDevices && w.MediaDevices.prototype;
+      if (!suo || typeof suo.getUserMedia !== 'function') return;
+      const suaMd = w.navigator && w.navigator.mediaDevices;
+      const Attesa = w.Promise;
+      const Errore = w.DOMException;
+      // Il posto dove si avvolge è lo STAMPO, non l'oggetto. Avvolgendo
+      // l'oggetto, la funzione originale restava lì accanto sullo stampo,
+      // raggiungibile con una riga, e un sito che ne prendeva una seconda per
+      // quella via si teneva il microfono aperto a permesso tolto: il conto non
+      // era a zero (la prima era passata di qui), quindi la strada dura non
+      // partiva (#586, giro 7). Sostituendo la funzione sullo stampo,
+      // l'originale non è più raggiungibile da nessuna parte in questa
+      // finestra: la teniamo solo noi, in questa chiusura. Resta scrivibile e
+      // riconfigurabile di proposito: le librerie che avvolgono a loro volta il
+      // microfono (quelle delle videochiamate lo fanno quasi tutte) si prendono
+      // la NOSTRA e la richiamano, e vietare la scrittura le farebbe morire con
+      // un errore.
+      const vera = suo.getUserMedia;
+      const veraDisplay = typeof suo.getDisplayMedia === 'function' ? suo.getDisplayMedia : null;
+      Object.defineProperty(suo, 'getUserMedia', {
+        configurable: true,
+        writable: true,
+        value: function getUserMedia(vincoli) {
+          const c = vincoli || {};
+          let schermo = false;
+          try {
+            const aD = schermoChiesto(c.audio);
+            const vD = schermoChiesto(c.video);
+            schermo = aD || vD;
+            if (aD && !vD) {
+              return Attesa.reject(new Errore(
+                "L'audio del computer si può chiedere solo insieme all'immagine dello schermo.",
+                'NotSupportedError',
+              ));
+            }
+            if (vD && chiesto(c.audio) && !aD) {
+              return Attesa.reject(new Errore(
+                "L'immagine dello schermo si può chiedere da sola o insieme all'audio del computer, non insieme al microfono.",
+                'NotSupportedError',
+              ));
+            }
+            // LA STRADA VECCHIA DELLO SCHERMO, riportata su quella nuova.
+            //
+            // Le due strade arrivano a Filo con una richiesta indistinguibile,
+            // ma solo la nuova passa dal punto in cui Filo fa scegliere COSA si
+            // condivide (tutto lo schermo o una finestra sola) e se dare anche
+            // l'audio del computer. Dalla vecchia partivano lo schermo intero e
+            // il suono insieme, con un «Consenti» solo: la scelta valeva per i
+            // siti che chiedevano con le buone, e bastava una riga per saltarla
+            // (#586, giro 9). Qui la richiesta vecchia diventa quella nuova
+            // prima di partire, così la scelta la incontra chiunque chieda lo
+            // schermo. L'audio del computer resta una richiesta a parte, che il
+            // riquadro mostra spenta: chiederlo non è averlo.
+            if (vD && veraDisplay) {
+              let v = (c.video && typeof c.video === 'object') ? { ...c.video } : true;
+              if (v && typeof v === 'object') {
+                delete v.mandatory; delete v.optional;
+                delete v.chromeMediaSource; delete v.chromeMediaSourceId;
+                if (!Object.keys(v).length) v = true;
+              }
+              return veraDisplay.call(this || suaMd || md, {
+                video: v,
+                ...(aD ? { audio: true } : {}),
+              }).then((s) => registra(s, 'schermo'));
+            }
+          } catch (_) {}
+          return vera.call(this || suaMd || md, vincoli).then((s) => registra(s, schermo ? 'schermo' : null));
+        },
+      });
+
+      if (typeof suo.getDisplayMedia === 'function') {
+        const veraD = suo.getDisplayMedia;
+        Object.defineProperty(suo, 'getDisplayMedia', {
           configurable: true,
           writable: true,
-          value: function clone() {
-            const out = veroS.call(this);
-            try {
-              const mie = this.getTracks();
-              const nuove = out.getTracks();
-              nuove.forEach((t, i) => {
-                const vecchia = mie[i];
-                const voce = vecchia ? [...consegnate].find((v) => v.t === vecchia) : null;
-                segna(t, voce ? voce.k : chiaveDi(t, null));
-              });
-            } catch (_) {}
-            return out;
+          value: function getDisplayMedia(vincoli) {
+            return veraD.call(this || suaMd || md, vincoli).then((s) => registra(s, 'schermo'));
           },
         });
       }
-    } catch (_) {}
 
-    document.addEventListener(${ferma}, (e) => {
-      let vive = 0;
-      try {
-        const chiavi = (e && e.detail && Array.isArray(e.detail.chiavi)) ? e.detail.chiavi : null;
-        for (const v of [...consegnate]) {
-          if (v.t.readyState !== 'live') { consegnate.delete(v); continue; }
-          // Quello che non è stato chiesto non si tocca e non si conta: chi
-          // toglie il microfono non deve ritrovarsi la pagina ricaricata
-          // perché la fotocamera, che non aveva tolto, è ancora accesa.
-          if (chiavi && !chiavi.includes(v.k)) continue;
-          try { v.t.stop(); } catch (_) {}
-          if (v.t.readyState === 'live') vive++; else consegnate.delete(v);
-        }
-      } catch (_) {}
-      try {
-        document.dispatchEvent(new CustomEvent(${fermato}, {
-          detail: { id: (e && e.detail && e.detail.id) || null, vive, viste },
-        }));
-      } catch (_) {}
-    }, true);
+      avvolgiClone(w.MediaStreamTrack && w.MediaStreamTrack.prototype, 'traccia');
+      avvolgiClone(w.MediaStream && w.MediaStream.prototype, 'stream');
+    };
 
-    const vera = stampo.getUserMedia;
-    const veraDisplay = typeof stampo.getDisplayMedia === 'function' ? stampo.getDisplayMedia : null;
-    Object.defineProperty(stampo, 'getUserMedia', {
-      configurable: true,
-      writable: true,
-      value: function getUserMedia(vincoli) {
-        const c = vincoli || {};
-        let schermo = false;
-        try {
-          const aD = desktop(c.audio);
-          const vD = desktop(c.video);
-          schermo = aD || vD;
-          if (aD && !vD) {
-            return Promise.reject(new DOMException(
-              "L'audio del computer si può chiedere solo insieme all'immagine dello schermo.",
-              'NotSupportedError',
-            ));
-          }
-          if (vD && chiesto(c.audio) && !aD) {
-            return Promise.reject(new DOMException(
-              "L'immagine dello schermo si può chiedere da sola o insieme all'audio del computer, non insieme al microfono.",
-              'NotSupportedError',
-            ));
-          }
-          // LA STRADA VECCHIA DELLO SCHERMO, riportata su quella nuova.
-          //
-          // Le due strade arrivano a Filo con una richiesta indistinguibile, ma
-          // solo la nuova passa dal punto in cui Filo fa scegliere COSA si
-          // condivide (tutto lo schermo o una finestra sola) e se dare anche
-          // l'audio del computer. Dalla vecchia partivano lo schermo intero e il
-          // suono insieme, con un «Consenti» solo: la scelta valeva per i siti
-          // che chiedevano con le buone, e bastava una riga per saltarla (#586,
-          // giro 9). Qui la richiesta vecchia diventa quella nuova prima di
-          // partire, così la scelta la incontra chiunque chieda lo schermo.
-          // L'audio del computer resta una richiesta a parte, che il riquadro
-          // mostra spenta: chiederlo non è averlo.
-          if (vD && veraDisplay) {
-            let v = (c.video && typeof c.video === 'object') ? { ...c.video } : true;
-            if (v && typeof v === 'object') {
-              delete v.mandatory; delete v.optional;
-              delete v.chromeMediaSource; delete v.chromeMediaSourceId;
-              if (!Object.keys(v).length) v = true;
-            }
-            return veraDisplay.call(this || md, {
-              video: v,
-              ...(aD ? { audio: true } : {}),
-            }).then((s) => registra(s, 'schermo'));
-          }
-        } catch (_) {}
-        return vera.call(this || md, vincoli).then((s) => registra(s, schermo ? 'schermo' : null));
-      },
-    });
-
-    if (typeof stampo.getDisplayMedia === 'function') {
-      const veraD = stampo.getDisplayMedia;
-      Object.defineProperty(stampo, 'getDisplayMedia', {
-        configurable: true,
-        writable: true,
-        value: function getDisplayMedia(vincoli) {
-          return veraD.call(this || md, vincoli).then((s) => registra(s, 'schermo'));
-        },
-      });
-    }
+    installaCattura(window);
+${sorgenteRiquadriFigli('installaCattura')}
   } catch (_) {}
 })();`;
 }
@@ -460,6 +580,7 @@ module.exports = {
   buildPermessiGuardSource,
   buildCatturaSicuraSource,
   buildPosizioneSinceraSource,
+  sorgenteSchermo,
   CANALE,
   CANALE_FERMA,
   CANALE_FERMATO,
