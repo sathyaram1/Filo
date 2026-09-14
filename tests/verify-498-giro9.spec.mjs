@@ -28,8 +28,8 @@ test('senza l\'altezza fissa della colonna le aree uscivano dallo schermo', asyn
   await page.evaluate(() => window.__mgTest.setData([]));
 
   // Qualcosa di alto sopra le aree, come lo era il blocco delle fusioni.
-  async function conUnBloccoAlto(altezza) {
-    await page.evaluate((h) => {
+  async function conUnBloccoAlto() {
+    await page.evaluate(() => {
       let blocco = document.getElementById('bloccoDiProva498');
       if (!blocco) {
         blocco = document.createElement('div');
@@ -37,9 +37,11 @@ test('senza l\'altezza fissa della colonna le aree uscivano dallo schermo', asyn
         const grid = document.getElementById('mgReviewGrid');
         grid.parentNode.insertBefore(blocco, grid);
       }
-      blocco.style.cssText = `height:${h}px;flex:0 0 auto;border:1px solid #999;border-radius:8px`;
+      // Alto quasi quanto la finestra: con la colonna ferma a 100vh le aree si
+      // accorciano e restano dentro; senza, la somma sborda di sicuro.
+      blocco.style.cssText = 'height:calc(100vh - 200px);flex:0 0 auto;border:1px solid #999;border-radius:8px';
       blocco.textContent = 'Fusione ferma: ramo claude/prova, in attesa del tuo via libera';
-    }, altezza);
+    });
     await page.waitForTimeout(250);
     return page.evaluate(() => {
       const doc = document.documentElement;
