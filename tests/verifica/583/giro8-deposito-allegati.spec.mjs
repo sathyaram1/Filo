@@ -36,8 +36,18 @@
 //   tests/unit/firestoreRulesFeedbackRead.test.mjs, che però oggi mette per
 //   iscritto il contrario («Il singolo `get` resta aperto»).
 //
-//   OGGI QUESTA PROVA È ROSSA, ed è il senso del giro: diventa verde quando il
-//   singolo file smette di aprirsi a chiunque abbia l'indirizzo.
+// COM'È FINITA (stesso giro, dopo la correzione)
+//   La prima prova era rossa ed è diventata verde: il `get` è negato, quindi
+//   l'unica chiave di un allegato torna a essere il codice di scarico nel link.
+//   Provato con l'emulatore ufficiale di Storage prima di chiudere, perché
+//   chiudere alla cieca avrebbe spento le immagini in dashboard: con
+//   `get: if false` il link col codice risponde 200, il solo indirizzo 403, un
+//   codice sbagliato 403.
+//
+//   La seconda (riscrivere l'allegato di un altro) è rimasta aperta: il server
+//   l'ha tenuta fuori da questo giro e la apre come feedback a sé. È segnata
+//   `fixme` apposta — la memoria del giro resta, senza far credere a chi
+//   verifica dopo di aver trovato una regressione.
 
 import { test, expect } from './../../fixtures/electron.mjs';
 import { readFileSync } from 'node:fs';
