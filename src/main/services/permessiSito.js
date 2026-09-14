@@ -1078,7 +1078,18 @@ async function scegliFonte(wc, frame, audioChiesto) {
       resolve(fonte ? { fonte, audio: !!(audioChiesto && audio) } : null);
     };
     const suMorte = () => finisci(null);
+    // La scelta appartiene alla PAGINA che l'ha chiesta, non solo alla scheda:
+    // se quella pagina se ne va (un link, il tasto indietro, l'indirizzo
+    // riscritto), la richiesta è morta con lei. Senza questo il riquadro restava
+    // sopra la pagina nuova, col nome del sito di prima e con la pagina spinta
+    // giù, e premerci accendeva il cartello «può vedere il tuo schermo» per un
+    // sito a cui non arrivava niente (#586, giro 9). È la stessa regola che la
+    // pastiglia della domanda ha già.
+    const suNavigazione = (_e, _url, inPlace, isMainFrame) => {
+      if (isMainFrame && !inPlace) finisci(null);
+    };
     try { wc.once('destroyed', suMorte); } catch (_) {}
+    try { wc.on('did-start-navigation', suNavigazione); } catch (_) {}
     const timer = setTimeout(() => finisci(null), ATTESA_MS);
     scelteFonte.set(id, { finisci });
     try {
