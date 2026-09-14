@@ -96,8 +96,8 @@
     let u;
     try { u = new URL(String(url || '')); } catch (_) { return false; }
     if (u.protocol !== 'https:') return false;
-    const prefisso = PREFISSI_ALLEGATO[u.hostname];
-    return !!prefisso && u.pathname.startsWith(prefisso);
+    const prefissi = PREFISSI_ALLEGATO[u.hostname];
+    return !!prefissi && prefissi.some((p) => u.pathname.startsWith(p));
   }
 
   // Intestazioni con cui l'owner scarica un allegato. PURA.
