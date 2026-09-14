@@ -463,6 +463,7 @@ module.exports = {
   CANALE,
   CANALE_FERMA,
   CANALE_FERMATO,
+  ATTR_TRACCIA,
   CANALE_POSIZIONE_KO,
   NOMI,
 };
