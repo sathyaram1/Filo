@@ -86,7 +86,11 @@ export const MAX_ALLEGATO_BYTES = 4 * 1024 * 1024; // lo storage rifiuta oltre
 /** Il tipo di un allegato dal nome, o '' se non è ammesso. PURA. */
 export function mimeDiAllegato(nome) {
   const ext = extname(String(nome || '')).slice(1).toLowerCase();
-  return MIME_PER_ESTENSIONE[ext] || '';
+  const tipo = MIME_PER_ESTENSIONE[ext];
+  // `typeof === 'string'` e non `|| ''`: da qui esce il tipo che finisce nel
+  // `data:` dell'allegato e poi nella richiesta al deposito. Quello che non è
+  // una stringa non è un tipo, ed è un allegato da rifiutare.
+  return typeof tipo === 'string' ? tipo : '';
 }
 
 /**
