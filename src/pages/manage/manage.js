@@ -1196,9 +1196,6 @@
     });
   }
 
-  // I documenti allegati: al click si scaricano decifrati (stesso canale delle
-  // immagini, col tipo dichiarato) e si salvano col nome originale. Se la
-  // decifratura fallisce, il motivo finisce nel `title` del link.
   // Perché una pillola non si apre, DETTO PRIMA del clic e non dopo.
   // Lo stesso canale che serve le immagini risponde anche qui, e a chi non
   // riceve le segnalazioni risponde subito, senza toccare la rete: chiederglielo
