@@ -79,6 +79,13 @@ test('e nemmeno passando dalla strada vecchia dello schermo', async ({ shell, op
   const domanda = (await chip.allTextContents())[0];
   await chip.locator('.perm-chip-allow').click();
 
+  // Dal giro 9 anche questa strada passa dal riquadro «cosa condividi», dove
+  // l'audio del computer è una spunta a parte e parte spenta: qui non la si
+  // tocca, quindi al sito l'audio non deve arrivare affatto.
+  const box = shell.locator('.perm-source');
+  await expect(box).toHaveCount(1, { timeout: 20_000 });
+  await box.locator('.perm-source-item').first().click();
+
   const esito = await promessa;
   const live = shell.locator('.perm-live');
   await expect(live).toHaveCount(1, { timeout: 20_000 });
