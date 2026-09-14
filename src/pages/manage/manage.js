@@ -1195,8 +1195,46 @@
   // I documenti allegati: al click si scaricano decifrati (stesso canale delle
   // immagini, col tipo dichiarato) e si salvano col nome originale. Se la
   // decifratura fallisce, il motivo finisce nel `title` del link.
+  // Perché una pillola non si apre, DETTO PRIMA del clic e non dopo.
+  // Lo stesso canale che serve le immagini risponde anche qui, e a chi non
+  // riceve le segnalazioni risponde subito, senza toccare la rete: chiederglielo
+  // costa una domanda già scritta. Senza, la pillola di un allegato che non è
+  // suo arriva identica a una che si apre, e il tester lo scopre cliccando.
+  // Cache url → { error, soloDestinatario } | null (null = si apre).
+  const fileWhyCache = new Map();
+  async function fileClosedReason(url) {
+    if (!url) return null;
+    if (fileWhyCache.has(url)) return fileWhyCache.get(url);
+    let res = null;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_image', url });
+      if (!r || !r.ok) {
+        res = { error: String((r && r.error) || 'allegato non disponibile'), soloDestinatario: !!(r && r.soloDestinatario) };
+      }
+    } catch (_) {
+      res = { error: 'allegato non raggiungibile', soloDestinatario: false };
+    }
+    fileWhyCache.set(url, res);
+    return res;
+  }
+
+  function markFileClosed(a, motivo, soloDestinatario) {
+    a.title = motivo || '';
+    a.classList.add('mg-img-failed');
+    let nota = a.querySelector('.mg-file-note');
+    if (!nota) {
+      nota = document.createElement('span');
+      nota.className = 'mg-file-note';
+      a.appendChild(nota);
+    }
+    nota.textContent = soloDestinatario ? ' (riservato)' : ' (non disponibile)';
+  }
+
   function resolveBubbleFiles(bubble) {
     bubble.querySelectorAll('.mg-file-link').forEach((a) => {
+      if (!isAdmin) {
+        fileClosedReason(a.dataset.url || '').then((r) => { if (r) markFileClosed(a, r.error, r.soloDestinatario); });
+      }
       a.addEventListener('click', async (ev) => {
         ev.preventDefault();
         const url = a.dataset.url || '';
