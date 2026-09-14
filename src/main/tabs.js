@@ -2279,7 +2279,7 @@ class TabManager {
       this.openTab(url, { activate: true });
       return { action: 'deny' };
     });
-    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child));
+    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child, tabOpener));
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
