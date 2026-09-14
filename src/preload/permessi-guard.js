@@ -424,10 +424,23 @@ function buildCatturaSicuraSource() {
           value: function clone() {
             const out = vero.call(this);
             try {
-              const mia = [...consegnate].find((v) => v.t === this);
               if (quali === 'stream') {
-                for (const t of tracceDi.call(out)) segna(t, chiaveDi(t, null));
-              } else if (mia) segna(out, mia.k);
+                // Una copia dello stream copia le sue tracce: vanno registrate
+                // anche quelle, con la chiave che avevano le originali. Senza il
+                // riscontro per posizione, la copia di uno schermo finiva
+                // registrata come fotocamera, e togliere lo schermo non la
+                // chiudeva.
+                const mie = tracceDi.call(this);
+                const nuove = tracceDi.call(out);
+                nuove.forEach((t, i) => {
+                  const vecchia = mie[i];
+                  const voce = vecchia ? [...consegnate].find((v) => v.t === vecchia) : null;
+                  segna(t, voce ? voce.k : chiaveDi(t, null));
+                });
+              } else {
+                const mia = [...consegnate].find((v) => v.t === this);
+                if (mia) segna(out, mia.k);
+              }
             } catch (_) {}
             return out;
           },
