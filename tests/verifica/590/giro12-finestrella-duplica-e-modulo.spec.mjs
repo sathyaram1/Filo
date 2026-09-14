@@ -194,6 +194,34 @@ function schedeSu(tabs, host) {
   return tabs.filter((t) => { try { return new URL(t.url).hostname === host; } catch (_) { return false; } });
 }
 
+function finestreSu(host) {
+  return app.windows().filter((w) => {
+    if (w.isClosed()) return false;
+    try { return new URL(w.url()).hostname === host; } catch (_) { return false; }
+  });
+}
+
+async function aspettaPaginaSu(host, ms = 8000) {
+  const fine = Date.now() + ms;
+  while (Date.now() < fine) {
+    for (const w of finestreSu(host).reverse()) {
+      const viva = await w.evaluate(() => true).catch(() => false);
+      if (viva) return w;
+    }
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return null;
+}
+
+// Apre la pagina che ospita il bottone e lo clicca: la finestrella di accesso
+// nasce da un gesto vero dell'utente, come nella vita.
+async function cliccaAccedi(percorso) {
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${NORMALE}:${srv.porta}${percorso}`);
+  const p = await aspettaPaginaSu(NORMALE);
+  expect(p, 'la pagina che ospita il bottone deve aprirsi').toBeTruthy();
+  await p.locator('#b').click();
+}
+
 async function pulisciNotifiche() {
   await shell.evaluate(() => document.querySelectorAll('.shell-notif').forEach((n) => n.remove()));
 }
