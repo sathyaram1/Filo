@@ -28,6 +28,7 @@
         'Gli allegati che mandi con una segnalazione, quando la riapri, dicono che li apre solo chi riceve le segnalazioni, invece di sembrare rotti. Vale sia per gli screenshot sia per i file.',
         'Nell\'elenco dei feedback si aprono solo gli allegati veri, e Filo non dichiara arrivato niente che non abbia visto. Prima una segnalazione poteva dichiarare un finto allegato, mandarti sul sito scelto da chi l\'aveva scritta e farselo pure presentare da Filo come consegnato.',
         'Nell\'elenco dei feedback l\'indirizzo della pagina segnalata dice su che sito porta, anche quando è lungo. Prima si leggevano i primi caratteri e basta, e un indirizzo scritto apposta poteva sembrare di Filo e portare altrove.',
+        'Allegare un .tsv o un .yaml a una segnalazione funziona sempre: prima, a seconda di come il computer riconosceva quel file, poteva venire rifiutato senza motivo.',
       ],
     },
     {
