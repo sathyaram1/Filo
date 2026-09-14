@@ -696,7 +696,14 @@ module.exports = function register(on, ctx) {
     const FB = FEEDBACK();
     if (!FB) return [];
     if (!fresh && Date.now() - cardsCache.at < CARDS_TTL_MS) return cardsCache.rows;
-    const rows = await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+    // TUTTE le schede, paginate. Una finestra sui 500 più recenti per data
+    // d'invio qui vuol dire che le schede più vecchie non le può togliere più
+    // nessuno: un fix vecchio che torna in lavorazione resterebbe in bacheca
+    // come risolto, votabile e riapribile a pagamento — cioè il doppione che il
+    // blocco delle riaperture doveva impedire.
+    const rows = FB.listAllPublic
+      ? await FB.listAllPublic({ timeoutMs: 20000 })
+      : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
     cardsCache = { at: Date.now(), rows };
     return rows;
   }
