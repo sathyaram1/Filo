@@ -66,15 +66,17 @@ async function alzaServer() {
       return;
     }
     if (path === '/apre-accesso') {
-      html('<h1 id="n">pagina qualunque</h1><script>'
-        + `setTimeout(() => window.open("http://${NORMALE}:${porta}/login-rimbalza",`
-        + ' "acc", "width=500,height=400"), 200);</script>');
+      // Il clic ce lo mette l'utente: senza un gesto vero Chromium non apre
+      // nessuna finestrella, e la prova resterebbe verde a vuoto.
+      html('<h1 id="n">pagina qualunque</h1>'
+        + `<button id="b" onclick="window.open('http://${NORMALE}:${porta}/login-rimbalza',`
+        + " '_blank', 'width=500,height=400')\">accedi</button>");
       return;
     }
     if (path === '/apre-accesso-diritto') {
-      html('<h1 id="n">pagina qualunque</h1><script>'
-        + `setTimeout(() => window.open("http://${NORMALE}:${porta}/login-diritto",`
-        + ' "acc2", "width=500,height=400"), 200);</script>');
+      html('<h1 id="n">pagina qualunque</h1>'
+        + `<button id="b" onclick="window.open('http://${NORMALE}:${porta}/login-diritto',`
+        + " '_blank', 'width=500,height=400')\">accedi</button>");
       return;
     }
     if (path === '/modulo-scheda-nuova') {
