@@ -381,7 +381,6 @@
     //   { op: 'getMany', ids: [...], timeoutMs? }       → { ok, rows }
     //   → { ok:false, error } se non sei admin o la lettura fallisce.
     FEEDBACK_FETCH: 'feedback_fetch',
->>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
     // S1.3: decifratura campi feedback lato main (la chiave privata NON lascia
     // mai il main process). Il renderer manda i campi con valori potenzialmente
     // cifrati; il main li decifra e torna il plaintext. Owner-only.
