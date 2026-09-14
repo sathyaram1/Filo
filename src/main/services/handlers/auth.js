@@ -811,6 +811,7 @@ module.exports = function register(on, ctx) {
         await FB.publishPublicCard(key, Object.keys(carry).length ? { ...card, ...carry } : card, { idToken });
       }
       cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
+      if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
     } catch (e) {
       console.warn('[feedback] scheda singola non aggiornata:', e?.message || e);
     }
