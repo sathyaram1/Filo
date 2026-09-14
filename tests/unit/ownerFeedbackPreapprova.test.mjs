@@ -37,9 +37,9 @@ test('--preapprova con uno stato che chiude la pratica: rifiuto, con la spiegazi
   }
 });
 
-test('--chiedi-prima insieme a uno stato che chiude passa il controllo (si ferma dopo, sulla rete)', async () => {
-  // Senza credenziali la scrittura non può andare avanti: qui basta che il
-  // rifiuto NON sia quello della pratica chiusa.
+test('--chiedi-prima insieme a uno stato che chiude passa il controllo (si ferma dopo, sulla rete)', { skip: CREDENZIALI ? false : 'servono le credenziali dell\'owner (FILO_SA_KEY / FILO_ADMIN_REFRESH_TOKEN)' }, async () => {
+  // Con le credenziali la scrittura arriva alla rete e si ferma lì: qui basta
+  // che il rifiuto NON sia quello della pratica chiusa.
   let r;
   try { r = await mod.scrivi('id-qualunque', 'done', 'nota', { preapprova: false }); }
   catch (e) { r = { ok: false, motivo: String(e && e.message) }; }
