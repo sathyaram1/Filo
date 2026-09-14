@@ -535,7 +535,16 @@ async function decidi(wc, permesso, dettagli) {
   } : null;
   const esito = await chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile: !!salvaScelta });
   const ok = !!(esito && esito.ok);
-  if (esito && !esito.deciso) segnaSenzaRisposta(wc, origine, chiavi);
+  // Il conto dell'anello: quante volte di fila questa domanda è tornata senza
+  // approdare a niente. Ci finisce la × (ho chiuso, non ho deciso) e ci finisce
+  // anche un «Nega» che non resta scritto da nessuna parte, cioè lo schermo, che
+  // per scelta non si ricorda mai. Su tutto il resto un no chiude il discorso da
+  // sé, perché la volta dopo la memoria risponde prima della domanda; sullo
+  // schermo non chiudeva niente, e un sito che richiedeva in continuazione
+  // teneva la domanda incollata sotto le schede all'infinito, perché chi
+  // rispondeva «Nega» azzerava il conto (#586, giro 9).
+  const senzaEsito = (esito && !esito.deciso) || (!ok && !salvaScelta);
+  if (senzaEsito) segnaSenzaRisposta(wc, origine, chiavi);
   else scordaRisposte(wc, origine, chiavi);
 
   // Il sì al preambolo vale per la cattura schermo che segue, qualunque delle
