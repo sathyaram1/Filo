@@ -402,13 +402,17 @@
    *
    * Regole:
    *   - un rilievo di livello 3 o 2 che chiede una decisione ferma il lavoro;
-   *   - un rilievo di livello 3/2 (o 1) si corregge se il SUO bilancio ha
-   *     ancora giri; a bilancio finito un 3/2 ferma il lavoro, un 1 va nel
-   *     feedback derivato;
-   *   - un 1 che chiede una decisione va nel feedback derivato;
-   *   - gli 0 si correggono solo se nello stesso giro si corregge anche altro
-   *     (un altro verificatore arriva comunque) oppure se l'owner ha dato
-   *     giri al loro bilancio; altrimenti vanno nel feedback derivato;
+   *   - un rilievo di livello 3/2 si corregge se il bilancio cap2 ha ancora
+   *     giri; a bilancio finito ferma il lavoro;
+   *   - un giro che parte comunque corregge TUTTO: un 1 e uno 0 in elenco con
+   *     un 3/2 si correggono sempre, il loro bilancio non c'entra (decisione
+   *     owner 2026-09-14: fino ad allora un 1 a bilancio finito finiva nel
+   *     derivato anche dentro un giro aperto per un 2, e il #590 ne ha
+   *     accantonati dieci in dieci giri). I bilanci cap1 e cap0 decidono solo
+   *     se far PARTIRE un giro per rilievi di quel livello da soli: a
+   *     bilancio finito, da soli, vanno nel feedback derivato;
+   *   - un rilievo che chiede una decisione non si corregge mai: un 3/2 ferma
+   *     il lavoro, un 1 o uno 0 va nel feedback derivato;
    *   - un giro consuma UN giro dal bilancio del livello più alto corretto;
    *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto.
    *
@@ -428,20 +432,28 @@
     const blocking = [];
     const fixable = [];
     const derived = [];
+    const ones = [];
     const zeros = [];
     for (const f of findings) {
       if (f.level >= 2) {
         if (f.decision || left('cap2') <= 0) blocking.push(f);
         else fixable.push(f);
       } else if (f.level === 1) {
-        if (f.decision || left('cap1') <= 0) derived.push(f);
-        else fixable.push(f);
+        ones.push(f);
       } else {
         zeros.push(f);
       }
     }
-    // Gli 0: con qualcos'altro da correggere si correggono pure loro; da soli
-    // solo se il loro bilancio lo permette (z = 0 per default).
+    // Gli 1: se un giro parte comunque (c'è un 3/2 da correggere) entrano
+    // tutti; da soli, solo se il loro bilancio lo permette.
+    for (const f of ones) {
+      if (f.decision) derived.push(f);
+      else if (fixable.length || left('cap1') > 0) fixable.push(f);
+      else derived.push(f);
+    }
+    // Gli 0, stessa regola: con qualcos'altro da correggere si correggono
+    // pure loro; da soli solo se il loro bilancio lo permette (z = 0 per
+    // default).
     for (const f of zeros) {
       if (f.decision) derived.push(f);
       else if (fixable.length || left('cap0') > 0) fixable.push(f);

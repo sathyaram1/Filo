@@ -165,12 +165,15 @@
   //   cap2 (x): giri di correzione per i rilievi di livello 3 e 2 (la cosa
   //             chiesta non si ottiene, cammino principale). A bilancio finito
   //             un 3/2 ferma la pratica e chiama l'owner (statusReason `loop`).
-  //   cap1 (y): giri di correzione per i rilievi di livello 1 (cosmetica,
-  //             attrito fuori cammino). A bilancio finito un 1 va nel feedback
-  //             derivato invece di essere corretto.
+  //   cap1 (y): giri di correzione aperti dai SOLI rilievi di livello 1
+  //             (cosmetica, attrito fuori cammino). A bilancio finito, degli 1
+  //             da soli vanno nel feedback derivato invece di essere corretti.
   //   cap0 (z): giri per i soli rilievi di livello 0 (casi rari). Con z = 0 gli
-  //             0 da soli non si correggono mai: si correggono solo insieme ad
-  //             altro (un altro verificatore arriva comunque).
+  //             0 da soli non si correggono mai.
+  // Un giro che parte corregge TUTTO quello che c'è in elenco: gli 1 e gli 0
+  // in compagnia di un 3/2 si correggono sempre, qualunque sia il loro
+  // bilancio (un altro verificatore arriva comunque). I bilanci cap1 e cap0
+  // decidono solo se far partire un giro per quel livello da solo.
   // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
   // I vecchi nomi (`failCap`/`improvableCap`, i tre esiti pass/migliorabile/
   // fail) sono aboliti: l'esito lo calcola il server dai livelli e dai bilanci.

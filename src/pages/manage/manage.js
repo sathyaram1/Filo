@@ -44,7 +44,7 @@
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
   // I tre bilanci dei giri di correzione (feedback #561): cap2 = giri
-  // per i rilievi di livello 3/2, cap1 = per gli 1, cap0 = per i soli 0; più il
+  // per i rilievi di livello 3/2, cap1 = per i soli 1, cap0 = per i soli 0; più il
   // testo in coda alla risposta (fixInstructions).
   const mgCap2     = document.getElementById('mgCap2');
   const mgCap2Save = document.getElementById('mgCap2Save');
@@ -531,8 +531,9 @@
   // Quattro campi sul doc Firestore config/routines (feedback #561, §4):
   //   cap2  giri di correzione per i rilievi di livello 3 e 2 (a bilancio
   //         finito un 3/2 ferma la pratica e chiama l'owner);
-  //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
-  //         feedback derivato);
+  //   cap1  giri aperti dai soli rilievi di livello 1 (a bilancio finito,
+  //         da soli, vanno nel feedback derivato; dentro un giro aperto da
+  //         un 3/2 si correggono sempre);
   //   cap0  giri per i soli rilievi di livello 0 (0 = mai da soli);
   //   fixInstructions  il testo che il server aggiunge in coda alla risposta
   //         a una critica (vuoto = il testo del server).

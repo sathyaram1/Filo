@@ -113,11 +113,28 @@ test('cap0 alzato dall\'owner: soli 0 → fix, il giro si conta su cap0', () => 
   assert.deepEqual(dopo.fix, [], 'al secondo giro il bilancio è finito');
 });
 
-test('bilancio esaurito su quel livello: un 1 con cap1 a zero → derivato', () => {
+test('bilancio esaurito su quel livello: un 1 da solo con cap1 a zero → derivato', () => {
   const d = decide([f(1, 'bordo')], { count1: 2 });
   assert.deepEqual(d.fix, []);
   assert.equal(d.derived.length, 1);
   assert.equal(d.stop, false, 'un 1 non ferma mai il lavoro');
+});
+
+test('un giro che parte corregge tutto: con cap1 e cap0 a zero, un 2 porta con sé gli 1 e gli 0', () => {
+  // Decisione owner 2026-09-14: il #590 ha accantonato dieci rilievi di
+  // livello 1 in dieci giri aperti comunque da un 2. I bilanci cap1 e cap0
+  // decidono solo se far partire un giro per quel livello da solo.
+  const d = decide([f(1, 'bordo'), f(2, 'rotto'), f(0, 'raro'), f(1, 'altro bordo')], { count1: 2 }, { cap2: 5, cap1: 2, cap0: 0 });
+  assert.deepEqual(d.fix.map((x) => x.level), [1, 2, 0, 1], 'tutti, nell\'ordine della critica');
+  assert.deepEqual(d.derived, []);
+  assert.equal(d.consume, 'cap2', 'si paga solo dal livello più alto');
+  assert.equal(d.counts.count1, 2, 'il bilancio degli 1 non si tocca');
+  const solo = decide([f(1, 'bordo'), f(0, 'raro')], { count1: 2 });
+  assert.deepEqual(solo.fix, [], 'senza un 3/2 in elenco, gli 1 a bilancio finito non aprono un giro');
+  assert.equal(solo.derived.length, 2);
+  const conDecisione = decide([f(2, 'rotto'), f(1, 'gusto?', true)]);
+  assert.deepEqual(conDecisione.fix.map((x) => x.level), [2], 'un 1 che chiede una decisione resta fuori anche nel giro aperto');
+  assert.equal(conDecisione.derived.length, 1);
 });
 
 test('livello 2 o 3 con cap2 esaurito → stop, decide l\'owner', () => {
