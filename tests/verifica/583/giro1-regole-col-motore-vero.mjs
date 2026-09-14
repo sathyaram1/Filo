@@ -240,25 +240,37 @@ await prova('owner: scrive i voti sulla scheda (il travaso dal documento)', () =
     reopenRequests: { 'uid-b': { at: 'y' } },
   })));
 
-console.log('\n— i percorsi: conoscenza condivisa, senza chi era —');
-await prova('anonimo: scrive un percorso senza identificativo', () =>
-  assertSucceeds(setDoc(doc(anon, 'paths', 'P1'), {
+// Riscritto il 2026-09-14, riallineando questo ramo su main.
+//
+// Quando il primo giro ha scritto queste righe, il ramo lasciava scrivere un
+// percorso a chiunque e toglieva dal documento i due campi che dicevano CHI era
+// (`clientId`, `userAgent`). Nel frattempo il #585 è arrivato su main e ha
+// chiuso la porta più a monte: in `paths` il client non scrive più niente, il
+// documento lo scrive il server (la callable `pathSubmit`), che riapplica la
+// pulizia e tiene i limiti di frequenza. L'identità viaggia accanto alla
+// richiesta e nel documento non entra, quindi la conoscenza resta senza chi
+// era. Le regole di main vincono: qui si prova quello che dicono oggi.
+console.log('\n— i percorsi: li scrive solo il server —');
+await prova('anonimo: NON scrive un percorso, nemmeno uno ben formato', () =>
+  assertFails(setDoc(doc(anon, 'paths', 'P1'), {
     domain: 'esempio.test', initialUrl: '/carrello', intent: 'svuotare il carrello',
     steps: [{ selector: '#a', action: 'click' }], success: true,
     createdAt: new Date().toISOString(),
   })));
-await prova('anonimo: NON ci può più attaccare il clientId', () =>
+await prova('anonimo: NON ci può attaccare il clientId', () =>
   assertFails(setDoc(doc(anon, 'paths', 'P2'), {
     domain: 'esempio.test', initialUrl: '/carrello', intent: 'svuotare il carrello',
     steps: [], success: true, createdAt: new Date().toISOString(),
     clientId: 'installazione-di-mario',
   })));
-await prova('anonimo: NON ci può più attaccare lo user agent', () =>
+await prova('anonimo: NON ci può attaccare lo user agent', () =>
   assertFails(setDoc(doc(anon, 'paths', 'P3'), {
     domain: 'esempio.test', initialUrl: '/carrello', intent: 'svuotare il carrello',
     steps: [], success: true, createdAt: new Date().toISOString(),
     userAgent: 'Mozilla/5.0 (Windows NT 10.0)',
   })));
+await prova('anonimo: i percorsi restano LEGGIBILI (l\'Aiuto di chi non ha account)', () =>
+  assertSucceeds(getDoc(doc(anon, 'paths', 'P1'))));
 
 console.log('\n— gli allegati: un file sì, l\'elenco no —');
 await prova('(storage) la regola di list è chiusa nel file', async () => {
