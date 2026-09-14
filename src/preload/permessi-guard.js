@@ -238,12 +238,29 @@ function buildCatturaSicuraSource() {
     // aver concesso qualcosa, vuol dire che la pagina non è passata di qui: chi
     // chiede non deve crederci e deve prendere la strada dura (#586, giro 6).
     let viste = 0;
+    // Ogni traccia consegnata viene anche APPESA al DOM, dentro un elemento
+    // nascosto marcato con la chiave di Filo che la copre. Il DOM lo vede anche
+    // il preload, che lì legge e ferma con i propri stampi: è da lì che esce il
+    // conto vero, perché questo mondo qui la pagina lo può riscrivere.
+    const appendi = (t, k) => {
+      try {
+        const el = document.createElement('audio');
+        el.muted = true;
+        el.setAttribute(${attr}, String(k || ''));
+        el.style.display = 'none';
+        el.srcObject = new MediaStream([t]);
+        const dove = document.documentElement || document.body;
+        if (dove) dove.appendChild(el);
+        t.addEventListener('ended', () => { try { el.remove(); } catch (_) {} });
+      } catch (_) {}
+    };
     const segna = (t, k) => {
       if (!t) return t;
       for (const v of consegnate) if (v.t === t) return t;
       viste++;
       const voce = { t, k };
       consegnate.add(voce);
+      appendi(t, k);
       try { t.addEventListener('ended', () => { consegnate.delete(voce); }); } catch (_) {}
       return t;
     };
