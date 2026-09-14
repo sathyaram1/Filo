@@ -69,21 +69,23 @@ function permissionDeniedHelp(rawError, claims, opts) {
 // questo testo finisce nell'hover del segnaposto dell'immagine in dashboard,
 // dove un messaggio su più righe non si legge.
 //
-// Da quando il deposito degli allegati non è più pubblico, un allegato si apre
-// in due modi: col download token che sta nel link salvato nel feedback, o con
-// le credenziali di un amministratore. Un 403 vuol dire che sono mancati
-// entrambi, e le due mancanze hanno cure opposte — rifare l'accesso, oppure
-// farsi mettere fra gli amministratori del progetto. Dire quale delle due è
-// ciò che distingue un segnaposto muto da un problema che si risolve.
+// La causa è UNA SOLA, e va detta com'è. Per un po' ne sono state due: il
+// download token nel link, oppure le credenziali di un amministratore. Poi
+// (#583) le regole hanno chiuso la lettura del deposito a chiunque, owner
+// compreso — ed è quella chiusura che rende di nuovo utile ritirare il token di
+// un link finito in giro. Da allora l'unica chiave è il token, e il messaggio
+// che mandava a «farsi mettere fra gli amministratori» mandava a fare una cosa
+// che non apre più niente: la cura sbagliata è peggio di nessuna cura, perché
+// ci si perde tempo prima di scoprirlo.
 //
-// @param {{ conIdentita?: boolean }} opts - `conIdentita` true = la richiesta
-//   era firmata con un token valido (quindi il problema non è la sessione).
-// @returns {string} una riga, senza a capo.
-function attachmentForbiddenHelp(opts) {
-  const conIdentita = !!(opts && opts.conIdentita);
-  return conIdentita
-    ? 'allegato non leggibile: il link non porta il token di download e questo account non è fra gli amministratori del progetto'
-    : 'allegato non leggibile: accedi con l’account amministratore (la sessione è scaduta)';
+// Quello che resta vero: quel link non ha un token valido — non l'ha mai avuto
+// (allegato caricato quando il deposito non ne rilasciava) o è stato ritirato.
+// In quel caso il file c'è ancora, ma si raggiunge solo dalla console del
+// progetto.
+//
+// @returns {string} una riga, senza a capo (finisce in un hover).
+function attachmentForbiddenHelp() {
+  return 'allegato non leggibile: il link non porta un token di download valido (mancante o ritirato), e il deposito non lo apre a nessuno — resta raggiungibile solo dalla console del progetto';
 }
 
 // #582 — e poi c'è chi NON è l'owner: un utente qualunque che riapre le proprie
