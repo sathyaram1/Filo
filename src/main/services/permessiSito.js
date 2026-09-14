@@ -807,6 +807,13 @@ async function chiediAllaPaginaDiFermare(wc, chiavi) {
   const esiti = await Promise.all(frames.map((f) => chiediAUnFrame(f, chiavi)));
   const vive = esiti.reduce((n, e) => n + e.vive, 0);
   const registrate = esiti.reduce((n, e) => n + e.registrate, 0);
+  // Un riquadro che dice di aver consegnato più tracce di quante il preload ne
+  // veda: il ponte fra i due mondi è rotto, e quelle che non si vedono non si
+  // possono nemmeno fermare. Vale per riquadro, non sulla somma: prima bastava
+  // che un riquadro qualunque ne avesse vista passare una perché la rete non
+  // scattasse per nessuno degli altri, e un riquadro che si accecava da solo
+  // teneva il microfono aperto a permesso tolto (#586, giro 10).
+  if (esiti.some((e) => e.incoerenza > 0)) return 1;
   // Nessuno ha mai visto passare una traccia: la pagina non è passata dal nostro
   // giro (o se l'è tolto di mezzo). Non si conclude «è tutto a posto».
   if (!registrate) return 1;
@@ -814,10 +821,10 @@ async function chiediAllaPaginaDiFermare(wc, chiavi) {
 }
 
 // La risposta di un riquadro, inoltrata da src/main/ipc.js.
-function rispostaFermata(id, vive, registrate) {
+function rispostaFermata(id, vive, registrate, incoerenza) {
   const f = fermate.get(String(id || ''));
   if (!f) return { ok: false };
-  f(vive, registrate);
+  f(vive, registrate, incoerenza);
   return { ok: true };
 }
 
