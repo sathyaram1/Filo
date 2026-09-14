@@ -134,8 +134,19 @@ devono costare una bacheca sola, `fresh` e `forgetAllPublic` devono
 scavalcarla, una sorgente diversa non deve ritrovarsi i dati di quella prima, e
 un troncamento non si ricorda.
 
+L'ordine ha le sue due. `tests/unit/backfillOrdineArrivo.test.mjs` mette davanti
+al comando dei numeri tre segnalazioni in cui l'ordine per identificativo è
+l'opposto di quello per data, e le date scritte in tutte e tre le forme; una
+data illeggibile deve finire in fondo, non in testa. In
+`tests/feedback-resolved-reward.spec.mjs` la stessa scena vista da chi usa Filo:
+due fix suoi che escono insieme, e l'annuncio che deve partire dal più recente.
+
 ## Il segnale, quando lo incontri
 
 Cerca il punto in cui il codice scrive `pageSize` e poi tratta il risultato come
 se fosse l'insieme: un `find` su quella lista, un «quali mancano», un
 «quali vanno tolte». Sono tutte domande sull'insieme, fatte a una finestra.
+
+L'altro segnale è una lettura che cambia ordinamento. Se una query smette di
+ordinare per data, ogni consumatore che quell'ordine lo dava per scontato è
+adesso sbagliato, e nessuno di loro se ne lamenta.
