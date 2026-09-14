@@ -68,7 +68,13 @@ export const CLIENT_ID = (THREAD && THREAD.LOCAL_CLIENT_ID) || 'local:claude';
 // Tipo dichiarato per estensione: la stessa allowlist del gate deterministico
 // sugli allegati (filo-security, L0 fileGate) e delle storage.rules. Fuori da
 // qui il feedback diventerebbe `suspicious_file`: meglio fermarsi prima.
-const MIME_PER_ESTENSIONE = Object.freeze({
+// ⚠️ Tabella SENZA eredità, per lo stesso motivo di `PREFISSI_ALLEGATO` in
+// src/shared/feedback.js (#582, giro 7): la chiave è l'estensione di un nome di
+// file, e una tabella normale contiene già `__proto__` e `constructor` senza che
+// nessuno ce li abbia messi. Un file chiamato `note.__proto__` si faceva
+// dichiarare un tipo che non è una stringa, e partiva verso il deposito con
+// `data:[object Object]` al posto del tipo, invece di essere respinto qui.
+const MIME_PER_ESTENSIONE = Object.freeze(Object.assign(Object.create(null), {
   md: 'text/markdown', markdown: 'text/markdown', txt: 'text/plain', log: 'text/plain',
   json: 'application/json', csv: 'text/csv', tsv: 'text/tab-separated-values',
   yaml: 'application/x-yaml', yml: 'application/x-yaml', pdf: 'application/pdf',
