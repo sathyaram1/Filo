@@ -838,9 +838,11 @@
         const s = document.createElement('span');
         s.className = 'sensor-ind';
         s.setAttribute('role', 'button');
-        const detto = `Questo sito ${frasePotere}`;
+        // `frasePotere` è la stessa del cartello sotto le schede, ed è scritta
+        // per stare dopo «può»: «usare il microfono», «vedere il tuo schermo».
+        const detto = `Questo sito può ${frasePotere}`;
         s.title = detto;
-        s.dataset.tip = `${detto} — clicca per aprire la scheda e interrompere`;
+        s.dataset.tip = `${detto}. Clicca per aprire la scheda e interrompere.`;
         s.setAttribute('aria-label', detto);
         s.innerHTML = SENSORE_IND_SVG;
         s.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.activate(t.id); });
