@@ -323,6 +323,10 @@
     if (nuovo === isAdmin) return;
     isAdmin = nuovo;
     imgCache.clear();
+    // Anche le risposte sulle pillole dei documenti: dipendono da chi guarda
+    // esattamente come quelle delle immagini, e tenerne una sola delle due
+    // avrebbe lasciato metà del difetto in piedi.
+    fileWhyCache.clear();
   }
 
   async function refreshAuth() {
