@@ -1357,6 +1357,9 @@
     // che sull'asse della data d'invio non si possono chiedere.
     listAllPublic,
     listAllPublicPaged,
+    // La memoria breve di `listAllPublic` si butta via da qui, dopo aver
+    // scritto o tolto una scheda.
+    forgetAllPublic,
     getPublic,
     publishPublicCard,
     unpublishPublicCard,
