@@ -63,11 +63,18 @@
   }
 
   // I due modi in cui si può nominare un oggetto del bucket di Filo: il
-  // percorso REST di Firebase e quello diretto di Google Storage. Host → inizio
-  // obbligatorio del percorso, BUCKET compreso.
+  // percorso REST di Firebase e quello diretto di Google Storage. Host → inizi
+  // ammessi del percorso, NOME DEL DEPOSITO compreso.
+  //
+  // I nomi del deposito sono due e sono lo stesso deposito: quello attuale
+  // (`…firebasestorage.app`) e quello storico che finisce in `appspot.com`, che
+  // gli allegati più vecchi hanno ancora dentro il proprio indirizzo. Con il
+  // solo nome attuale un allegato del 2025 non sarebbe più riconosciuto come
+  // roba di Filo, e la dashboard smetterebbe di aprirlo.
+  const DEPOSITI = [BUCKET, `${PROJECT_ID}.appspot.com`];
   const PREFISSI_ALLEGATO = {
-    'firebasestorage.googleapis.com': `/v0/b/${BUCKET}/o/`,
-    'storage.googleapis.com': `/${BUCKET}/`,
+    'firebasestorage.googleapis.com': DEPOSITI.map((b) => `/v0/b/${b}/o/`),
+    'storage.googleapis.com': DEPOSITI.map((b) => `/${b}/`),
   };
 
   // Un URL è un allegato del bucket dei feedback? PURA. Serve a due cose che
