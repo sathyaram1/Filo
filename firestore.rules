@@ -778,35 +778,7 @@ service cloud.firestore {
     // Aiuto in src/shared/constants.js).
     match /paths/{doc} {
       allow read: if true;
-<<<<<<< HEAD
       allow create, update, delete: if false;
-=======
-
-      // #583 — `userAgent` e `clientId` NON sono più ammessi. Questa raccolta si
-      // legge senza credenziali (ogni installazione la interroga per il dominio
-      // che ha sotto gli occhi: è una conoscenza condivisa, ed è il motivo per
-      // cui è aperta), quindi tutto quello che c'è dentro è pubblico. Il
-      // dominio, il percorso e la riga d'intento sono la conoscenza; l'impronta
-      // di chi era e il suo user agent no: erano solo un modo per legare quelle
-      // righe a un'installazione. Chi scrive non li manda più.
-      allow create: if
-        request.resource.data.keys().hasOnly(
-          ['domain', 'initialUrl', 'intent', 'steps', 'success', 'createdAt']
-        )
-        && request.resource.data.domain is string
-        && request.resource.data.domain.size() > 0
-        && request.resource.data.domain.size() <= 253
-        && request.resource.data.initialUrl is string
-        && request.resource.data.initialUrl.size() <= 2000
-        && request.resource.data.intent is string
-        && request.resource.data.intent.size() <= 500
-        && request.resource.data.steps is list
-        && request.resource.data.steps.size() <= 30
-        && request.resource.data.success is bool;
-
-      allow update: if false;
-      allow delete: if false;
->>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
     }
 
     // ── Collezioni del backend di sicurezza (filo-security, DESIGN §13) ──────

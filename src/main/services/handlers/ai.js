@@ -613,7 +613,6 @@ module.exports = function register(on, ctx) {
       try {
         const settings = await getEffectiveSettings();
         if (!settings.apiKeys?.[settings.provider]) return;
-<<<<<<< HEAD
         const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
         const cid = msg.payload?.clientId || '';
         // #585: il percorso non si scrive più dal client, lo scrive il server,
@@ -640,17 +639,9 @@ module.exports = function register(on, ctx) {
         if (!idToken) {
           try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
         }
-=======
->>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
         const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
-        // #583: user agent e clientId non partono più. Finivano in una raccolta
-        // che legge chiunque senza credenziali, e a chi la legge non servono.
         const r = await PathsCollector.collectAndSave({
-<<<<<<< HEAD
           session: msg.payload?.session, invokeAI, userAgent: ua, clientId: cid, idToken,
-=======
-          session: msg.payload?.session, invokeAI,
->>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
         });
         if (r?.saved) console.info('[Filo] path salvato:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }

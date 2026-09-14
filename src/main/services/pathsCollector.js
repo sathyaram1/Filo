@@ -75,11 +75,7 @@
   // Ritorna { saved: bool, reason: string }. Non lancia: i fallimenti sono
   // reportati come reason testuale così il chiamante può loggare senza che
   // l'utente veda errori (è una pipeline best-effort di telemetria).
-<<<<<<< HEAD
   async function collectAndSave({ session, invokeAI, userAgent, clientId, idToken }) {
-=======
-  async function collectAndSave({ session, invokeAI }) {
->>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
     if (!session || typeof session !== 'object') {
       return { saved: false, reason: 'session vuota' };
     }
@@ -120,20 +116,15 @@
 
     // 3. invio al server, che ripulisce di nuovo e scrive.
     try {
-      // #583: niente userAgent e niente clientId. Vanno in una raccolta che
-      // legge chiunque, e a chi la legge non servono.
       const { id } = await Paths.submit({
         domain,
         initialUrl,
         intent: guessedIntent,
         steps: sanitizedSteps,
         success: !!session.success,
-<<<<<<< HEAD
         userAgent: userAgent || '',
         clientId: clientId || '',
         idToken: idToken || '',
-=======
->>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
       });
       return { saved: true, id, intent: guessedIntent };
     } catch (e) {
