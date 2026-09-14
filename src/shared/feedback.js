@@ -809,6 +809,98 @@
     return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs });
   }
 
+  // ── TUTTE le schede, non una pagina ───────────────────────────────────────
+  //
+  // Il tetto qui sopra è una FINESTRA sui più recenti PER DATA D'INVIO, e le
+  // domande che si fanno alle schede non sono su quell'asse:
+  //   · «mi spetta una ricompensa?» — una segnalazione vecchia chiusa oggi ha
+  //     una data d'invio vecchia, quindi la sua scheda sta in fondo: fuori
+  //     dalla finestra, e chi l'ha mandata non riceve né annuncio né crediti
+  //     (verifica #583, giri 3, 4 e 5: lo stesso danno rientrato da tre porte);
+  //   · «quali schede vanno tolte?» — una scheda fuori dalla finestra non la
+  //     può togliere più nessuno, e un fix vecchio che torna in lavorazione
+  //     resta in bacheca come risolto, votabile e riapribile a pagamento;
+  //   · «cosa mostra la bacheca?» — i fix più vecchi sparirebbero dalla vetrina
+  //     pur essendo pubblicati.
+  // Sono tre modi di chiedere «tutte le schede». Con 552 schede e un tetto di
+  // 500 la risposta ne dimenticava 52, in silenzio.
+  //
+  // Quindi qui non si finestra: si PAGINA fino in fondo, ordinando per nome del
+  // documento (unico e stabile: un cursore sul nome non salta e non ripete
+  // righe, mentre una data può essere uguale su due schede). Il costo è una
+  // lettura per scheda — oggi ~550, qualche centesimo al mese su tutte le
+  // installazioni — ed è lo stesso che pagava la finestra da 500, ma completo.
+  //
+  // `maxPages` è un freno contro un ciclo infinito, non un tetto di prodotto:
+  // se scatta la risposta lo DICE (`complete: false`) invece di far finta di
+  // essere tutto. Chi vuole solo le righe usa `listAllPublic`.
+  const ALL_PAGES_MAX = 40;
+
+  async function listAllPublicPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, maxPages = ALL_PAGES_MAX } = {}) {
+    const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
+    const rows = [];
+    let cursor = '';
+    let complete = false;
+    for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const batch = await listByNameDirect(VIEW_COLLECTION, { pageSize: limit, timeoutMs, afterName: cursor });
+      rows.push(...batch.rows);
+      cursor = batch.lastName;
+      if (batch.rows.length < limit || !cursor) { complete = true; break; }
+    }
+    return { rows, complete };
+  }
+
+  async function listAllPublic(opts = {}) {
+    const { rows } = await listAllPublicPaged(opts);
+    return rows;
+  }
+
+  // Una pagina ordinata per nome del documento, con cursore. Solo per la
+  // paginazione completa qui sopra: l'ordine è quello degli id, che a chi
+  // mostra le schede non serve — ordina lui come gli pare.
+  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '' } = {}) {
+    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
+    const structuredQuery = {
+      from: [{ collectionId }],
+      orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+      limit: pageSize,
+    };
+    if (afterName) {
+      structuredQuery.startAt = { before: false, values: [{ referenceValue: afterName }] };
+    }
+    const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ structuredQuery }) };
+    let timer = null;
+    let timedOut = false;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { timedOut = true; try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try {
+      res = await fetch(endpoint, opts);
+    } catch (e) {
+      if (timedOut) throw new Error('firestore list: timeout di rete');
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`firestore list fallito (${res.status}): ${errText.slice(0, 300)}`);
+    }
+    const arr = await res.json();
+    const rows = [];
+    let lastName = '';
+    for (const row of arr) {
+      if (!row.document) continue;
+      lastName = row.document.name || lastName;
+      rows.push(fsDocToObject(row.document));
+    }
+    return { rows, lastName };
+  }
+
   // UNA scheda pubblica (per id). Torna null se non c'è: un feedback che non è
   // in bacheca semplicemente non ha scheda.
   async function getPublic(id, { idToken = '' } = {}) {
