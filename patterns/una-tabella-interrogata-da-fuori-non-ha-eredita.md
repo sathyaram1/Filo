@@ -1,5 +1,7 @@
 # Una tabella interrogata con una chiave scelta da fuori non ha eredità
 
+[← Tutti i pattern](../PATTERNS.md)
+
 **Regola.** Se la chiave con cui si interroga una tabella la sceglie qualcuno
 che non sei tu, la tabella si costruisce con `Object.create(null)`. E chi legge
 il risultato controlla che sia della forma che si aspetta, invece di fidarsi del
