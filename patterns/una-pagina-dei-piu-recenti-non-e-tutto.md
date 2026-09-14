@@ -28,13 +28,19 @@ lo diceva:
   rimesso in lavorazione restava in bacheca come risolto, votabile e riapribile
   a pagamento: il doppione che il blocco delle riaperture doveva impedire.
 - **La bacheca.** I fix più vecchi erano pubblicati e non comparivano.
-- **L'auto-archiviazione.** I voti stanno sulla scheda: senza scheda il
-  punteggio era quello dei soli voti storici, e le segnalazioni più vecchie,
-  cioè proprio quelle da archiviare, non si archiviavano.
+- **L'auto-archiviazione.** Due volte. I voti stanno sulla scheda: senza scheda
+  il punteggio era quello dei soli voti storici. E le segnalazioni su cui il
+  giro decide si chiedevano anch'esse a finestra, le 500 più recenti per data
+  d'invio: con 711 segnalazioni ne restavano fuori 211, cioè proprio quelle da
+  archiviare per prime. I loro fix non uscivano mai dalla bacheca, restavano
+  votabili e riapribili a pagamento, e per loro non si accendeva nemmeno il
+  segnale «gli utenti dicono che non va».
 
-La verifica ha trovato lo stesso danno in tre giri di fila, da tre porte
-diverse. Ogni giro chiudeva la porta segnalata e lasciava le altre aperte,
-perché nessuno aveva fatto l'inventario.
+La verifica ha trovato lo stesso danno in quattro giri di fila, da quattro
+porte diverse. Ogni giro chiudeva la porta segnalata e lasciava le altre
+aperte, perché nessuno aveva fatto l'inventario. Il quarto giro l'inventario
+l'ha scritto qui sopra e ha chiuso tre porte su quattro: la quarta,
+l'auto-archiviazione, l'aveva chiusa solo dal lato delle schede.
 
 ## La regola
 
