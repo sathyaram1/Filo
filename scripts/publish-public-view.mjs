@@ -45,9 +45,59 @@ require(resolve(ROOT, 'src', 'shared', 'feedbackPublicView.js'));
 const FB = globalThis.SN_FEEDBACK;
 const PV = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
 
+// Le segnalazioni che la pagina PER DATA D'INVIO non vede, e che qui servono
+// lo stesso. È la stessa domanda che l'app dell'owner fa dentro Filo
+// (`conLeSegnalazioniFuoriPagina` in src/main/services/handlers/auth.js), e va
+// fatta anche da qui: senza, una segnalazione vecchia chiusa dal server o da
+// riga di comando non avrebbe mai una scheda — niente bacheca, niente annuncio
+// e niente crediti per chi l'aveva mandata.
+//
+//   · i feedback CHIUSI più di recente (ordinati per data di chiusura): è lì
+//     che sta una segnalazione vecchia chiusa oggi;
+//   · i feedback delle schede già in bacheca che non sono nella pagina: così un
+//     fix vecchio che torna in lavorazione perde la scheda, invece di restare
+//     «risolto», votabile e riapribile a pagamento.
+//
+// Best-effort: se una delle due domande non riesce si prosegue con quello che
+// si ha, invece di non pubblicare niente.
+async function conLeSegnalazioniFuoriPagina(base, bearer, schede) {
+  const rows = Array.isArray(base) ? base.slice() : [];
+  const visti = new Set(rows.map((r) => String((r && r._id) || '')).filter(Boolean));
+  const aggiungi = (arr) => {
+    for (const r of Array.isArray(arr) ? arr : []) {
+      const id = String((r && r._id) || '');
+      if (!id || visti.has(id)) continue;
+      visti.add(id);
+      rows.push(r);
+    }
+  };
+
+  if (typeof FB.listResolved === 'function') {
+    try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, idToken: bearer })); }
+    catch (e) { console.warn(`AVVISO: chiusi di recente non letti (${e?.message || e})`); }
+  }
+
+  const mancanti = (Array.isArray(schede) ? schede : [])
+    .map((c) => String((c && c._id) || ''))
+    .filter((id) => id && !visti.has(id))
+    .slice(0, FB.LIST_PAGE_SIZE);
+  if (mancanti.length && typeof FB.getMany === 'function') {
+    try { aggiungi(await FB.getMany(mancanti, { idToken: bearer })); }
+    catch (e) { console.warn(`AVVISO: feedback delle schede fuori pagina non letti (${e?.message || e})`); }
+  }
+  return rows;
+}
+
 export async function publishPublicView({ dryRun = false } = {}) {
   const bearer = await acquireBearer();
-  const grezzi = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, idToken: bearer });
+  const base = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, idToken: bearer });
+  // TUTTE le schede già pubblicate, paginate: con una finestra sui 500 più
+  // recenti per data d'invio, le schede oltre quel tetto non le poteva togliere
+  // più nessuno, e non servivano nemmeno a ripescare i feedback fuori pagina.
+  const published = typeof FB.listAllPublic === 'function'
+    ? await FB.listAllPublic()
+    : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE });
+  const grezzi = await conLeSegnalazioniFuoriPagina(base, bearer, published);
   const feedbacks = await decryptFeedbackList(grezzi);
 
   // Senza chiave privata ogni status è illeggibile: non si pubblicherebbe
