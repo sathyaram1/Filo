@@ -589,6 +589,9 @@ test('anche la strada vecchia per lo schermo passa dalla domanda ─────
   const terza = page.evaluate(() => window.__schermoVecchiaManiera());
   await expect(pastiglia(shell)).toHaveCount(1, { timeout: 15_000 });
   await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  // Dal giro 9 anche questa strada passa dal riquadro «cosa condividi»: prima
+  // consegnava lo schermo intero con un «Consenti» solo.
+  await shell.locator('.perm-source-item').first().click({ timeout: 20_000 });
   expect(traccia(await terza, 'video'), 'chi dice sì deve ottenere lo schermo').not.toBeNull();
 
   // E anche qui non resta scritto niente: lo schermo si richiede ogni volta.
@@ -1828,7 +1831,9 @@ test('il microfono aperto in una scheda si vede anche da un\'altra scheda', asyn
     'aperta un\'altra scheda, il microfono è ancora acceso e in tutta la cornice di Filo non c\'è '
     + 'più niente che lo dica: chi vuole chiuderlo deve indovinare da quale scheda arriva',
   ).toHaveCount(1);
-  expect(await segno.getAttribute('aria-label')).toMatch(/microfono/i);
+  // La frase arriva dal main già scritta per stare dopo «può»: qui si controlla
+  // che sia una frase intera, non un pezzo di frase.
+  expect(await segno.getAttribute('aria-label')).toMatch(/può usare il microfono/i);
 });
 
 // La finestra di accesso («Continua con Google») non è una scheda e non ha la
