@@ -2015,8 +2015,9 @@
         }
 
         permHost.appendChild(chip);
-        riprese.set(id, { tabId: info.tabId, nodo: chip });
+        riprese.set(id, { tabId: info.tabId, nodo: chip, frase: info.frase || '' });
         allineaRiprese();
+        allineaSegniScheda();
       });
 
       api.tabs.onUpdate(() => { try { allineaRiprese(); } catch (_) {} });
