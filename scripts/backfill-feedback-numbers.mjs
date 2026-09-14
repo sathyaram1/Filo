@@ -124,7 +124,7 @@ async function listAll(bearer) {
     throw new Error(`non sono riuscito a leggere TUTTI i feedback (fermato a ${docs.length}): `
       + 'con un elenco parziale i numeri assegnati sarebbero già presi.');
   }
-  return docs.sort((a, b) => String(strField(a, 'createdAt')).localeCompare(String(strField(b, 'createdAt'))));
+  return ordinaPerArrivo(docs);
 }
 
 async function patchSeq(id, seq, bearer) {
