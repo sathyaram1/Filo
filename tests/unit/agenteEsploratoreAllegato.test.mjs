@@ -17,14 +17,14 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const { pushIssue } = await import('../agent/feedback.mjs');
 
 function screenshotFinto() {
-  const dir = mkdtempSync(join(tmpdir(), 'agente-allegato-'));
+  const dir = cartellaTemporanea('agente-allegato-');
   const p = join(dir, 'schermata.png');
   writeFileSync(p, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   return p;
