@@ -204,3 +204,72 @@ test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async
   await expect(page.locator('#thanksOverlay')).toHaveCount(0);
   expect(await balanceOf(app)).toBe(1050);
 });
+
+test('una segnalazione VECCHIA risolta oggi paga chi l\'ha mandata come una recente', async ({ app, openTab }) => {
+  // #583, giri 3, 4 e 5 di verifica: lo stesso danno rientrato da tre porte.
+  // Il popup non chiedeva la propria scheda per nome: ne chiedeva una PAGINA,
+  // le più recenti per DATA D'INVIO. Una segnalazione vecchia ha una data
+  // d'invio vecchia, quindi la sua scheda — scritta il giorno in cui viene
+  // chiusa — nasceva già fuori da quella pagina e l'annuncio non la vedeva mai:
+  // il fix compariva in bacheca sotto gli occhi di chi l'aveva segnalato, e a
+  // lui non arrivava né l'annuncio né i crediti. Coi numeri veri (552 schede,
+  // pagina da 500) succedeva a tutto ciò che restava in coda più di due mesi.
+  //
+  // Qui la sorgente si comporta come Firestore: senza cursore torna la pagina
+  // per data d'invio, col cursore riparte dal nome del documento. La scheda di
+  // questa installazione è messa apposta OLTRE la prima pagina.
+  const page = await openTab('filo://newtab/');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+
+  await app.evaluate(async (_electron, { clientId }) => {
+    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
+    const fresh = globalThis.SN_CREDITS.freshState();
+    fresh.lastAutoFeedbackBonusDate = globalThis.SN_CREDITS.dateKey();
+    await globalThis.SN_CREDITS.writeState(fresh);
+
+    const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
+    const mioHash = await H.hashClientId(clientId);
+    const base = (id, giorno) => ({
+      _id: id, status: 'done', statusPublic: 'closed',
+      name: `Scheda ${id}`, seq: 100, subSeq: 0, userNote: 'Sistemato.',
+      createdAt: `${giorno}T10:00:00Z`, resolvedAt: '2026-09-11T10:00:00Z',
+    });
+
+    const schede = [];
+    // Una pagina intera di segnalazioni altrui, tutte mandate di recente.
+    for (let i = 0; i < 500; i += 1) {
+      const g = new Date(Date.UTC(2026, 7, 1) + i * 3600_000).toISOString().slice(0, 10);
+      schede.push({ ...base(`altrui-${String(i).padStart(3, '0')}`, g), clientIdTag: 'b'.repeat(32) });
+    }
+    // La mia, mandata a maggio: più vecchia di tutte quelle sopra.
+    const mia = base('la-mia-vecchia', '2026-05-20');
+    mia.clientIdTag = await H.cardTag(mia._id, mioHash);
+    schede.push(mia);
+
+    // Come Firestore: per data d'invio decrescente senza cursore, per nome del
+    // documento (con `startAt`) quando il cursore c'è.
+    const perData = schede.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    const perNome = schede.slice().sort((a, b) => a._id.localeCompare(b._id));
+    globalThis.SN_FEEDBACK.listPublic = async ({ pageSize = 500, afterName = null } = {}) => {
+      if (typeof afterName !== 'string') return perData.slice(0, pageSize);
+      const dopo = afterName ? perNome.findIndex((r) => afterName.endsWith(`/${r._id}`)) + 1 : 0;
+      return perNome.slice(dopo, dopo + pageSize);
+    };
+
+    // La scheda esiste ed è FUORI dalla prima pagina: se un domani la pagina
+    // diventasse più larga, questa riga resta vera e la prova continua a dire
+    // qualcosa.
+    globalThis.__fuoriPagina = perData.findIndex((c) => c._id === 'la-mia-vecchia') >= 500;
+  }, { clientId: CLIENT_ID });
+
+  expect(await app.evaluate(() => globalThis.__fuoriPagina)).toBe(true);
+
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('#thanksOverlay')).toBeVisible();
+  await expect(page.locator('.dash-thanks-item')).toHaveCount(1);
+  await expect(page.locator('.dash-thanks-item-title')).toHaveText('#100 Scheda la-mia-vecchia');
+  await expect.poll(() => balanceOf(app)).toBe(1050);
+});
