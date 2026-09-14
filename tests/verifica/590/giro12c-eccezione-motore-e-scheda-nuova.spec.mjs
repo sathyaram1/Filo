@@ -205,11 +205,33 @@ test('BW3 — lo stesso risultato che rimbalza, aperto in una scheda nuova, deve
   await metti([LISTA]);
   await daiRisultati('nuova');
   const dette = await notifiche();
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
   expect(
     await visibile(),
     'stesso risultato, stessa pagina di partenza, stesso rimbalzo: cambia solo che la scheda è '
     + 'nuova. La scheda appena nata non si porta dietro la pagina dei risultati, quindi il '
-    + 'rimbalzo non trova più l\'eccezione e viene fermato a metà strada: resta una scheda vuota '
-    + `e una notifica. Notifiche a schermo: ${JSON.stringify(dette)}`,
+    + 'rimbalzo non trova più l\'eccezione e viene fermato a metà strada. '
+    + `Notifiche a schermo: ${JSON.stringify(dette)}. `
+    + `Schede: ${JSON.stringify(snap.tabs.map((t) => t.url))}`,
+  ).toBe(true);
+});
+
+test('BW4 — e nemmeno col Ctrl+clic, che è l\'altro modo di aprire un risultato dietro', async () => {
+  await metti([LISTA]);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u),
+    `http://${MOTORE}:${srv.porta}/search?q=qualcosa`);
+  const ris = await aspettaPagina('/search');
+  expect(ris, 'la pagina dei risultati deve aprirsi').toBeTruthy();
+  // «aprilo dietro, io continuo a leggere qui»: lo stesso link di BW2, che
+  // cliccato normalmente arriva.
+  await ris.locator('#stessa').click({ modifiers: ['Control'] });
+  await shell.waitForTimeout(3500);
+  const dette = await notifiche();
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  expect(
+    await visibile(),
+    'stesso link, stessa pagina dei risultati: cambia solo che la scheda nasce dietro invece di '
+    + `prendere il posto della pagina. Notifiche: ${JSON.stringify(dette)}. `
+    + `Schede: ${JSON.stringify(snap.tabs.map((t) => t.url))}`,
   ).toBe(true);
 });
