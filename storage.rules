@@ -45,7 +45,7 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     match /feedback/{file=**} {
-      allow get: if true;
+      allow get: if false;
       allow list: if false;
       allow write: if
         request.resource.size < 4 * 1024 * 1024
