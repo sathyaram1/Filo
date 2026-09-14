@@ -606,9 +606,7 @@ const PREAMBOLO_MS = 20_000;
 
 // Passato questo tempo dal sì, se il gestore della cattura schermo non si è
 // fatto vivo la strada era quella vecchia: lo schermo è già stato consegnato
-// senza passare da nessuna scelta della fonte, e il segno «può vedere il tuo
-// schermo» va acceso lo stesso — altrimenti proprio la strada silenziosa
-// resterebbe l'unica senza nemmeno un segno.
+// senza passare da nessuna scelta della fonte.
 const SENZA_GESTORE_MS = 1500;
 
 function segnaPreambolo(wc, origine) {
@@ -620,24 +618,75 @@ function segnaPreambolo(wc, origine) {
   const voce = { fino: ora + PREAMBOLO_MS, timer: null, ripresaId: null };
   voce.timer = setTimeout(() => {
     const attuale = preamboli.get(wc.id);
-    if (attuale !== voce || voce.ripresaId) return;
-    // Strada vecchia: non passa dalla scelta della fonte, quindi Filo non può
-    // sapere se il sito si è preso anche l'audio del computer né toglierglielo
-    // (la richiesta arriva identica a quella senza audio, e il permesso è uno
-    // solo: sì o no). Qui il segno dice la cosa più grande delle due, perché
-    // «può» al posto di «sta» è già il modo in cui questo segno parla: dire
-    // solo «vede» quando potrebbe anche sentire sarebbe la bugia peggiore.
-    //
-    // E non sa nemmeno se la cattura sia partita: se fallisce (su Mac basta che
-    // manchi il permesso di sistema) al sito non arriva niente e questo
-    // cartello resta acceso a dire il contrario. Per questo, e solo per questo,
-    // porta una × che lo chiude senza ricaricare la pagina (#586, giro 4).
-    voce.ripresaId = iniziaUso(wc, origine, [P().CHIAVI.SCHERMO], {
-      audioSistema: true, chiudibile: true,
-    });
+    if (attuale !== voce) return;
+    preamboli.delete(wc.id);
+    schermoSenzaScelta(wc, origine);
   }, SENZA_GESTORE_MS);
   if (voce.timer.unref) voce.timer.unref();
   preamboli.set(wc.id, voce);
+}
+
+// ─── la cattura schermo che ha saltato la scelta ────────────────────────────
+//
+// Il gestore della cattura non si è fatto vivo dopo il sì: lo schermo è già
+// uscito per la strada vecchia, intero, e con l'audio del computer se il sito
+// l'ha chiesto. Nessuna scelta di cosa si condivide, e Filo non sa nemmeno cosa
+// sia uscito, perché quella strada non passa da nessun gestore.
+//
+// Prima qui si accendeva un cartello che lo diceva, e chi navigava poteva solo
+// leggerlo. Ma la promessa di questo lavoro è che si scelga cosa si condivide, e
+// un cartello non è una scelta: quindi la cattura si chiude, e si dice perché.
+//
+// Chi chiede lo schermo alla maniera vecchia con il giro di Filo addosso non
+// arriva mai qui: quel giro riporta la richiesta su quella moderna, che passa
+// dalla scelta (src/preload/permessi-guard.js). Qui ci arriva solo chi quel giro
+// non ce l'ha — un riquadro creato senza indirizzo, dove il preload non gira — o
+// chi se l'è tolto di mezzo, e ci arriverebbe anche una forma della richiesta
+// vecchia che non conosciamo ancora. È la metà della garanzia che non dipende
+// dal mondo della pagina (#586, giro 10).
+function schermoSenzaScelta(wc, origine) {
+  try {
+    if (!wc || wc.isDestroyed()) return;
+    avvisoSchermoChiuso(wc, origine);
+    const dura = () => { try { if (wc && !wc.isDestroyed()) wc.reload(); } catch (_) {} };
+    chiediAllaPaginaDiFermare(wc, [P().CHIAVI.SCHERMO]).then((vive) => {
+      if (vive) dura();
+    }).catch(dura);
+  } catch (_) {}
+}
+
+// La riga che spiega perché quella condivisione si è chiusa: un rifiuto non
+// rifiuta mai in silenzio. Senza, chi ha appena premuto «Consenti» vedrebbe la
+// condivisione morire da sola e darebbe la colpa al sito.
+//
+// Non se ne va con la navigazione, a differenza degli altri avvisi: la strada
+// dura QUI è una ricarica, e un avviso che sparisce con la ricarica che ha
+// provocato lui non lo legge nessuno. Se ne va da sé dopo un po', o con la sua ×.
+const avvisiSchermo = new Map(); // wcId → id dell'avviso
+const AVVISO_SCHERMO_MS = 25_000;
+
+function avvisoSchermoChiuso(wc, origine) {
+  try {
+    if (!wc || wc.isDestroyed() || avvisiSchermo.has(wc.id)) return;
+    const { win, tab } = posizione(wc);
+    const shell = win && !win.isDestroyed() ? win.webContents : null;
+    if (!shell || shell.isDestroyed()) return;
+    const id = `sch${prossimoAvviso++}`;
+    avvisiSchermo.set(wc.id, id);
+    const togli = () => {
+      if (avvisiSchermo.get(wc.id) !== id) return;
+      avvisiSchermo.delete(wc.id);
+      try { if (shell && !shell.isDestroyed()) shell.send('permissions:notice-end', { id }); } catch (_) {}
+    };
+    const t = setTimeout(togli, AVVISO_SCHERMO_MS);
+    if (t.unref) t.unref();
+    try { wc.once('destroyed', togli); } catch (_) {}
+    shell.send('permissions:notice', {
+      id,
+      tabId: tab ? tab.id : null,
+      testo: `Ho chiuso la condivisione: ${P().host(origine)} ha chiesto il tuo schermo in un modo che non mi lascia farti scegliere cosa condividere.`,
+    });
+  } catch (_) {}
 }
 
 function consumaPreambolo(wc) {
