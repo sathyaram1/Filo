@@ -88,6 +88,10 @@ lavoro finisce quando ogni chiamante lo legge — non quando il primo lo legge.
 - Il canale degli allegati in `src/main/services/handlers/auth.js`
   (`FEEDBACK_DECRYPT_IMAGE`): `SN_FEEDBACK.isAttachmentUrl` prima di
   `auth.isAdmin()`.
+- Le due pagine che devono dire la stessa cosa:
+  `src/pages/feedback/feedback.js` e `src/pages/manage/manage.js`, che leggono
+  entrambe `soloDestinatario` dalla risposta del canale.
 - Guardie: in `tests/feedback-allegato-del-mittente.spec.mjs` le due prove
-  «non si dichiara consegnato» (una per lo screenshot, una per il documento),
+  «non si dichiara consegnato» (una per lo screenshot, una per il documento) e
+  «Gestione dice dell'allegato la stessa cosa del riquadro dei feedback»,
   accanto a quelle che tengono chiuse le porte dei giri prima.
