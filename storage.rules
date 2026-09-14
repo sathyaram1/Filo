@@ -137,8 +137,15 @@ service firebase.storage {
     }
 
     match /feedback/{file} {
-      allow get: if eAmministratore();
-      // `list` non compare: elencare il bucket non si può, per nessuno.
+      // Da qui non scarica nessuno (#583): l'unica chiave è il download token
+      // dentro il link, che Firebase valuta PRIMA delle regole. Chiuderlo anche
+      // all'owner è ciò che rende utile ruotare il token di un file finito in
+      // giro: finché il `get` era aperto, quella cura non serviva a niente.
+      allow get: if false;
+      // `list` non è concesso da nessuna riga: elencare il bucket non si può,
+      // per nessuno. La dashboard non elenca — apre gli allegati che il
+      // documento del feedback nomina.
+      allow list: if false;
 
       allow create: if resource == null
         && dimensioneAmmessa()
