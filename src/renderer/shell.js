@@ -484,6 +484,18 @@
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
     '<path d="M18.5 6a9 9 0 0 1 0 12"/></svg>';
 
+  // Indicatore "questo sito può usare la fotocamera, il microfono o vedere lo
+  // schermo" (#586). Il cartello che lo dice per esteso vive sotto le schede e
+  // appartiene alla scheda che l'ha chiesto: appena se ne guarda un'altra
+  // sparisce, e allora del microfono aperto non restava nessun segno da nessuna
+  // parte, né un modo di raggiungere «Interrompi» senza indovinare la scheda
+  // (#586, giro 9). Qui il segno sta sulla SCHEDA, come quello dell'audio, e si
+  // vede anche mentre si guarda altrove.
+  const SENSORE_IND_SVG =
+    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8.5"/></svg>';
+
   // Indicatore "aperta da un altro paese": globo + codice paese, discreto e
   // caldo (accento Filo, niente lucchetti da security tool).
   const PROXY_IND_SVG =
