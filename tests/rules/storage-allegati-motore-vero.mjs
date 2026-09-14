@@ -8,12 +8,11 @@
 // deploya in millisecondi; questo file è l'altra metà: la prova che quel file,
 // dato in pasto al motore vero, si comporta come dice.
 //
-// Servono DUE emulatori, non uno: le regole riconoscono l'owner leggendo
-// l'allowlist `admins` di Firestore (regole cross-service), quindi il motore di
-// Storage deve poter interrogare quello di Firestore. Quel pezzo l'emulatore
-// non lo sa fare (vedi `crossServiceDisponibile` qui sotto): la prova lo
-// misura e lo DICHIARA come riga «NOTA», invece di lasciare un rosso che non
-// vuol dire niente.
+// Si lanciano DUE emulatori, non uno. Non più perché le regole interroghino
+// Firestore — quel ramo non c'è più, la lettura è negata a tutti — ma perché i
+// contesti autenticati della prova (l'owner, un account Google qualunque)
+// vogliono un progetto completo, e perché caricare anche `firestore.rules`
+// tiene le due metà dello stesso confine sotto lo stesso comando.
 //
 // COME SI LANCIA (fuori dal repo, in una cartella usa-e-getta: stando nel repo
 // Node cerca i pacchetti nel node_modules del repo, dove l'emulatore non c'è —
