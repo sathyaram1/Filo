@@ -30,6 +30,16 @@ Un permesso che nessuno usa non è gratis: è una porta aperta che nessuno sta
 guardando. Il «solo in creazione» si scrive `resource == null`, che è anche ciò
 che rende impossibile la cancellazione (in una `delete` `resource` c'è).
 
+Su questo stesso deposito il verbo più stretto si è poi rivelato essere
+**nessuno**: `allow get: if false`, owner compreso. Chi legge per davvero non
+passava comunque dalle regole — passa dal token nel link — quindi la riga che
+riconosceva l'amministratore non apriva niente a nessuno che non avesse già il
+link, e in cambio teneva in piedi un ramo che in laboratorio non si riusciva
+nemmeno a misurare. Toglierla ha fatto due cose: ha reso il confine
+verificabile col motore vero, e ha ridato senso al ritirare il token di un link
+scappato, che con un `get` aperto era una cura per finta. **La domanda non è
+«chi deve poter leggere», è «da dove legge davvero chi legge».**
+
 **Il secondo mezzo passo: se il percorso è un segreto, pretendilo.** Chiudere
 la lettura non serve a niente se il nome si indovina. Il nome di un allegato
 porta un uuid e le regole lo ESIGONO con una `matches()` — la stessa forma che
