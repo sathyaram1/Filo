@@ -1,9 +1,26 @@
 rules_version = '2';
 
-<<<<<<< HEAD
-// Storage rules per l'alpha test.
-// Gli allegati dei feedback vivono in /feedback/*.
-// - Upload: chiunque, fino a 4 MB, SOLO tipi passivi in allowlist esplicita.
+// Regole Storage degli ALLEGATI dei feedback.
+// Due audit pre-alpha si incontrano qui: #582 (queste regole) e #583 (la
+// lettura dei documenti dei feedback). Confine unico, scritto una volta.
+//
+// Cosa c'era prima, e perché non reggeva. Su `feedback/{file=**}` la lettura
+// era `if true` e la scrittura chiedeva solo dimensione e content-type:
+// nessun controllo di identità, in nessuna direzione.
+// - In Storage `read` comprende `list`: col nome del bucket (che sta nel repo,
+//   accanto alla chiave web di Firebase) si ELENCAVA il bucket e si scaricava
+//   tutto — cioè gli screenshot dello schermo dei tester, uno dopo l'altro,
+//   senza sapere niente di nessun feedback.
+// - `write` comprende `update` e `delete`: chi conosceva il nome di un allegato
+//   ci scriveva sopra (uno screenshot sostituito dopo che il giudice l'ha
+//   visto) o lo cancellava.
+// - E un bucket aperto in lettura è hosting gratuito sul dominio dell'owner.
+//
+// Il confine ora:
+// - Upload: chiunque manda un feedback, anche senza login — l'invio anonimo è
+//   voluto, e resta — fino a 4 MB, SOLO tipi passivi in allowlist esplicita,
+//   SOLO in creazione e SOLO su un nome che non si indovina (sotto, in
+//   dettaglio).
 //   ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
 //   attivi (`text/html` con script, `image/svg+xml`). Il gate deterministico
 //   lato pipeline (filo-security, L0 fileGate) marca comunque `suspicious_file`
