@@ -803,9 +803,20 @@
   // feedback). È ciò che leggono la bacheca e il popup delle ricompense: niente
   // token, niente ponte col main: qui dentro non c'è nulla da proteggere.
 
-  // Le schede pubbliche, dalla più recente. Stesso tetto e stesso ordinamento
-  // della lista vera, così chi la mostra non cambia ragionamento.
-  async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
+  // UNA pagina di schede pubbliche.
+  //
+  // Senza `afterName`: le più recenti per data d'invio, come la lista vera, così
+  // chi la mostra non cambia ragionamento.
+  //
+  // Con `afterName` (anche la stringa vuota, che vuol dire «dall'inizio»): la
+  // pagina è ordinata per NOME del documento e comincia dopo quello passato. È
+  // il cursore con cui `listAllPublic` arriva in fondo alla raccolta. Il nome è
+  // unico e stabile, quindi non salta né ripete righe; una data no (due schede
+  // possono averla identica).
+  async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = null } = {}) {
+    if (typeof afterName === 'string') {
+      return listByNameDirect(VIEW_COLLECTION, { pageSize, timeoutMs, afterName });
+    }
     return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs });
   }
 
