@@ -363,6 +363,13 @@
 
   let state = { activeId: null, tabs: [] };
 
+  // #586 — quello che un sito PUÒ fare adesso, scheda per scheda: tabId → frase
+  // («può usare il microfono», «può vedere il tuo schermo e sentire l'audio del
+  // computer»). La riempie il pezzo delle pastiglie qui sotto; la legge il
+  // disegno delle schede, che ne fa un segno visibile anche mentre si sta
+  // guardando un'altra scheda.
+  const sensoriPerScheda = new Map();
+
   function activeTab() {
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
