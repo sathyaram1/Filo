@@ -276,6 +276,13 @@
   // sono ANCORATI al singolo turno: vivono come righe-marcatore dentro `notes`
   // (vedi SN_FEEDBACK_THREAD), così non serve cambiare lo schema Firestore né le
   // regole. L'upload va diretto a Storage (path feedback/* è pubblico).
+  // L'allowlist dei tipi allegabili è UNA, condivisa col riquadro di
+  // segnalazione dentro i siti: le due strade devono rifiutare le stesse cose,
+  // e con le stesse parole (#582, giro 7).
+  const AttachTypes = window.SN_FEEDBACK_ATTACH;
+  const ATTACH_REJECT_MSG =
+    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+
   const ATTACH_MAX_IMAGES = 5;
   const ATTACH_MAX_FILES = 5;
   const ATTACH_MAX_BYTES = 4 * 1024 * 1024;
