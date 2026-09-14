@@ -1283,6 +1283,11 @@
     // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
     // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.
     listPublic,
+    // TUTTE le schede, paginate fino in fondo: è la risposta a «mi spetta una
+    // ricompensa?», «quali schede vanno tolte?» e «cosa mostra la bacheca?»,
+    // che sull'asse della data d'invio non si possono chiedere.
+    listAllPublic,
+    listAllPublicPaged,
     getPublic,
     publishPublicCard,
     unpublishPublicCard,
