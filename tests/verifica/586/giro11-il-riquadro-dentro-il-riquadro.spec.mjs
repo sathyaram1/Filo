@@ -161,9 +161,21 @@ test('la scelta di cosa si condivide non si salta nemmeno due piani sotto', asyn
   const arrivato = await corsa;
   console.log('[586 g11] quello che è arrivato al sito:', JSON.stringify(arrivato));
 
+  // La rete del processo principale, se scatta, chiude la cattura consegnata
+  // senza scelta entro pochi secondi (e ricarica la pagina se resta viva). Le
+  // si lascia tutto il tempo che le serve prima di misurare.
+  const vivoPrima = await page.evaluate(() => window.__vivo).catch(() => null);
+  await page.waitForTimeout(9000);
+  const statoDopo = await page.evaluate(() => window.__statoPreso()).catch(() => ['pagina ricaricata']);
+  const vivoDopo = await page.evaluate(() => window.__vivo).catch(() => null);
+  const ancoraVive = (statoDopo || []).filter((s) => String(s).endsWith(':live'));
+  console.log('[586 g11] nove secondi dopo — stato vero:', JSON.stringify(statoDopo),
+    'pagina ricaricata:', vivoDopo !== vivoPrima);
+
   expect(
-    (arrivato || []).some((t) => /^video|^audio/.test(String(t))),
+    ancoraVive,
     'da due piani sotto un «Consenti» solo ha consegnato la cattura senza far scegliere cosa si '
-    + 'condivide: al sito è arrivato ' + JSON.stringify(arrivato),
-  ).toBe(false);
+    + 'condivide (al sito è arrivato ' + JSON.stringify(arrivato) + '), e nove secondi dopo quelle '
+    + 'tracce sono ancora vive: lo schermo intero e l\'audio del computer restano al sito',
+  ).toEqual([]);
 });
