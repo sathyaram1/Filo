@@ -337,6 +337,22 @@ test('il token dell’owner non esce verso un bucket che non è quello di Filo',
   }
 });
 
+test('la domanda sul deposito RISPONDE anche ai nomi di dominio di serie', () => {
+  // Verifica #582, giro 7. La tabella degli inizi ammessi è indicizzata per
+  // nome di dominio, e il nome di dominio lo sceglie chi manda la segnalazione.
+  // In una tabella normale alcuni nomi ci sono già senza che nessuno ce li
+  // metta (`__proto__` torna il prototipo, `constructor` torna una funzione):
+  // il codice li trattava come un elenco di inizi e ESPLODEVA, invece di
+  // rispondere «no». Cadeva dal lato chiuso, quindi non era una porta aperta;
+  // ma questa domanda decide se firmare col gettone di chi riceve le
+  // segnalazioni, e una domanda di sicurezza deve rispondere.
+  for (const nome of ['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+    const url = `https://${nome}/v0/b/filo-8b9cb.firebasestorage.app/o/x.png?alt=media`;
+    assert.equal(FB.isAttachmentUrl(url), false, `riconosciuto come allegato di Filo: ${url}`);
+    assert.deepEqual(FB.attachmentFetchHeaders(url, 'ID-TOKEN'), {}, `token spedito a ${url}`);
+  }
+});
+
 test('tutto ciò che non è feedback/<file> resta chiuso', () => {
   const i = VIVO.indexOf('match /{path=**}');
   assert.notEqual(i, -1, 'manca il blocco che chiude tutto il resto');
