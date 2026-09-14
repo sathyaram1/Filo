@@ -71,7 +71,20 @@
     }
     const json = await res.json();
     const token = json.downloadTokens || (json.metadata?.downloadTokens) || '';
-    const publicUrl = `${STORAGE_BASE}/${encodeURIComponent(name)}?alt=media${token ? `&token=${token}` : ''}`;
+    // Il token di scarico è la CHIAVE dell'allegato, non un ornamento del link
+    // (#583, giro 8): da quando le regole del deposito negano il `get`, un
+    // indirizzo senza token non apre più niente — nemmeno al main dell'owner,
+    // che è l'unico che quegli allegati li deve vedere. Prima il link si
+    // costruiva lo stesso e funzionava, perché il file era aperto a chiunque:
+    // adesso sarebbe un allegato perso in silenzio, scoperto settimane dopo da
+    // chi apre il feedback e trova un buco. Meglio dirlo subito: chi invia
+    // ritrova il nome del file fra quelli non caricati (i due chiamanti
+    // raccolgono l'errore in `failed`) e può riprovare.
+    if (!token) {
+      throw new Error('il deposito non ha rilasciato il codice di scarico: '
+        + "senza, l'allegato non sarebbe più leggibile da nessuno.");
+    }
+    const publicUrl = `${STORAGE_BASE}/${encodeURIComponent(name)}?alt=media&token=${token}`;
     return { url: publicUrl, name };
   }
 
