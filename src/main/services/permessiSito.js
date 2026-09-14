@@ -1096,7 +1096,15 @@ function installaSuSessione(ses) {
         const frame = richiesta && richiesta.frame;
         const bersaglio = trovaWcDelFrame(frame);
         if (!bersaglio) { nega(); return; }
-        const url = (frame && frame.url) || richiesta.securityOrigin || '';
+        // Un riquadro creato senza indirizzo non ha un'origine sua: per il
+        // browser è lo stesso sito della pagina che lo ospita, ed è quel nome
+        // che va scritto nel riquadro della scelta e nel cartello. Senza, al
+        // posto del sito compariva «Questo sito».
+        const url = buonaPerChiedere(frame && frame.url)
+          ? frame.url
+          : (buonaPerChiedere(richiesta.securityOrigin)
+            ? richiesta.securityOrigin
+            : ((bersaglio && !bersaglio.isDestroyed() ? bersaglio.getURL() : '') || ''));
         // La domanda l'ha già fatta il preambolo, un attimo fa: richiedere la
         // stessa cosa due volte di fila è attrito, e la seconda domanda
         // sembrerebbe una cosa diversa dalla prima.
@@ -1159,8 +1167,9 @@ async function scegliFonte(wc, frame, audioChiesto) {
   if (!fonti || !fonti.length) return null;
 
   const Pp = P();
-  const url = (frame && frame.url) || (wc && !wc.isDestroyed() ? wc.getURL() : '');
-  const host = Pp.host(Pp.origineDi(url) || '');
+  const suo = (wc && !wc.isDestroyed() ? wc.getURL() : '');
+  const url = buonaPerChiedere(frame && frame.url) ? frame.url : suo;
+  const host = Pp.host(Pp.origineDi(url) || Pp.origineDi(suo) || '');
 
   const id = String(prossimaScelta++);
   // I nomi degli SCHERMI arrivano dal sistema in inglese («Entire screen»,

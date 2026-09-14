@@ -545,3 +545,73 @@ test('la guardia della cattura si mette sullo stampo, e l\'originale non resta r
     assert.deepEqual(chiamate, [['gum', { audio: true }]]);
   });
 });
+
+// ─── la richiesta vecchia della cattura schermo, in ogni sua forma ───────────
+//
+// Il difetto che questo controllo impedisce di riaprire (#586, giro 10): la
+// guardia cercava la sola parola «desktop» dentro `mandatory`, e guardava
+// `optional` solo quando `mandatory` mancava. Scritta in un'altra forma, la
+// richiesta le passava accanto: la domanda diceva «vuole vedere il tuo
+// schermo», dopo il «Consenti» non compariva niente da scegliere, e al sito
+// arrivava lo schermo intero.
+
+test('la richiesta vecchia della cattura schermo si riconosce in ogni sua forma', () => {
+  const { sorgenteSchermo } = require_(join(RADICE, 'src', 'preload', 'permessi-guard.js'));
+
+  const chiedono = [
+    { mandatory: { chromeMediaSource: 'desktop' } },
+    { mandatory: { chromeMediaSource: 'screen' } },
+    { mandatory: { chromeMediaSource: 'system' } },
+    { mandatory: { chromeMediaSource: 'tab' } },
+    { chromeMediaSource: 'desktop' },
+    { optional: { chromeMediaSource: 'desktop' } },
+    { optional: [{ minWidth: 1 }, { chromeMediaSource: 'desktop' }] },
+    // mandatory presente E optional con dentro la fonte: la forma che passava
+    // accanto, perché si guardava uno dei due posti e non tutti e due.
+    { mandatory: { maxWidth: 1920 }, optional: [{ chromeMediaSource: 'desktop' }] },
+    { mandatory: { chromeMediaSourceId: 'screen:0:0', chromeMediaSource: 'desktop' } },
+  ];
+  for (const v of chiedono) {
+    assert.equal(
+      sorgenteSchermo(v), true,
+      `${JSON.stringify(v)} è una richiesta di cattura schermo: senza riconoscerla, lo schermo `
+      + 'intero parte con un «Consenti» solo e nessuno sceglie cosa condividere',
+    );
+  }
+
+  const normali = [
+    true, false, undefined, null, 'audio', 42,
+    { deviceId: 'abc' },
+    { width: 1280, height: 720 },
+    { mandatory: { maxWidth: 1920 } },
+    { optional: [{ minFrameRate: 30 }] },
+    { chromeMediaSource: '' },
+  ];
+  for (const v of normali) {
+    assert.equal(
+      sorgenteSchermo(v), false,
+      `${JSON.stringify(v)} è una richiesta normale di fotocamera o microfono: dirottarla sulla `
+      + 'condivisione dello schermo la romperebbe',
+    );
+  }
+});
+
+// La guardia va installata anche nei riquadri a cui il preload non arriva: un
+// `<iframe>` creato senza indirizzo resta sul suo documento vuoto iniziale, e lì
+// il preload non gira. Era la scorciatoia per saltare la scelta di cosa si
+// condivide, per far morire la scheda con una riga e per leggere «negato» su
+// cose che nessuno aveva negato (#586, giro 10).
+test('i riquadri creati senza indirizzo vengono coperti dal riquadro che li contiene', () => {
+  const sorgenti = require_(join(RADICE, 'src', 'preload', 'permessi-guard.js'));
+  for (const [nome, src] of [
+    ['cattura', sorgenti.buildCatturaSicuraSource()],
+    ['letture', sorgenti.buildPermessiGuardSource({})],
+  ]) {
+    for (const via of ['contentWindow', 'contentDocument', 'MutationObserver']) {
+      assert.ok(
+        src.includes(via),
+        `il giro «${nome}» deve arrivare ai riquadri figli anche per la via «${via}»`,
+      );
+    }
+  }
+});
