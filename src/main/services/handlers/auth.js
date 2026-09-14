@@ -438,22 +438,22 @@ module.exports = function register(on, ctx) {
       if (!auth.isAdmin()) {
         return { ok: false, soloDestinatario: true, error: attachmentNotForYouHelp() };
       }
-      // #582: la lettura del bucket è riservata agli amministratori. L'URL
-      // salvato nel feedback porta il download token e da solo basterebbe, ma
-      // quel token può mancare (allegati storici) o essere revocato: qui siamo
-      // già dentro il ramo owner, quindi la richiesta va firmata con la sua
-      // identità. Se la sessione è scaduta si prosegue senza: con il token
-      // nell'URL l'allegato si vede lo stesso, e un allegato in meno è meglio
-      // di un errore al posto della dashboard.
+      // Quello che apre l'allegato è il download token dentro l'URL salvato nel
+      // feedback: dal #583 le regole del deposito non concedono la lettura a
+      // nessuno, owner compreso. L'identità si manda lo stesso, e solo verso il
+      // deposito di Filo (`attachmentFetchHeaders` lo confronta per intero):
+      // oggi non apre niente da sola, ma se un domani le regole tornassero a
+      // riconoscerla la richiesta è già firmata nel modo giusto. Se la sessione
+      // è scaduta si prosegue senza: non cambia nulla per l'allegato.
       let idToken = '';
       try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
       const res = await fetch(url, { headers: FB.attachmentFetchHeaders(url, idToken) });
       if (!res.ok) {
-        // Un 403 su un allegato ora ha una causa precisa e una cura precisa:
-        // dirla qui è la differenza fra un segnaposto muto e un problema che si
+        // Un 403 su un allegato ora ha una causa sola e una cura sola: dirla
+        // qui è la differenza fra un segnaposto muto e un problema che si
         // risolve. (Il motivo finisce nell'hover del segnaposto, in dashboard.)
         if (res.status === 403) {
-          return { ok: false, error: attachmentForbiddenHelp({ conIdentita: !!idToken }) };
+          return { ok: false, error: attachmentForbiddenHelp() };
         }
         return { ok: false, error: `download allegato fallito (${res.status})` };
       }
