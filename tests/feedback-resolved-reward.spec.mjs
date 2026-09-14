@@ -144,6 +144,40 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
   await expect.poll(() => balanceOf(app)).toBe(1100);
 });
 
+// Quando escono insieme due fix di chi sta guardando, l'annuncio li mette in
+// fila dal più recente. Non è un vezzo: le schede arrivano da una lettura
+// completa, che le porta nell'ordine interno del database (quello degli
+// identificativi, cioè casuale), e finché l'annuncio chiedeva una pagina
+// ordinata per data quell'ordine glielo dava il database. La scena qui sotto
+// mette i due ordini uno contro l'altro: l'identificativo dice «prima la
+// vecchia», la data dice «prima la recente» (#583, giro 7).
+test('con due fix insieme l\'annuncio parte dal più recente, non dal primo identificativo', async ({ app, openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+
+  await seed(app, [
+    {
+      _id: 'aaa-vecchia', mia: true, status: 'done', statusPublic: 'closed',
+      name: 'Vecchia', seq: 10, subSeq: 0, userNote: 'Sistemata la vecchia.',
+      createdAt: '2026-01-01T10:00:00.000Z',
+    },
+    {
+      _id: 'zzz-recente', mia: true, status: 'done', statusPublic: 'closed',
+      name: 'Recente', seq: 20, subSeq: 0, userNote: 'Sistemata la recente.',
+      createdAt: '2026-05-01T10:00:00.000Z',
+    },
+  ]);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('#thanksOverlay')).toBeVisible();
+  const titoli = page.locator('.dash-thanks-item-title');
+  await expect(titoli).toHaveCount(2);
+  await expect(titoli.nth(0)).toContainText('Recente');
+  await expect(titoli.nth(1)).toContainText('Vecchia');
+});
+
 test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'ha mandato', async ({ app, openTab }) => {
   // Il feedback dell'attaccante, visto DALLA SUA macchina: lo status fine è
   // cifrato (non ha la chiave), quindi l'unica cosa leggibile è l'enum
