@@ -89,6 +89,13 @@ const PAGINA = `<!doctype html><html><body style="margin:0;padding:16px">
     }).then((s) => { window.__preso = s; return piatto(s); },
       (e) => ['rifiutato:' + ((e && e.name) || '?')]);
   };
+
+  // Lo stato VERO delle tracce prese, letto dallo stampo originale: è quello che
+  // conta, non quello che la pagina dice.
+  const veroStato = Object.getOwnPropertyDescriptor(MediaStreamTrack.prototype, 'readyState').get;
+  window.__statoPreso = () => (window.__preso
+    ? window.__preso.getTracks().map((t) => t.kind + ':' + veroStato.call(t))
+    : ['niente']);
 </script></body></html>`;
 
 test('la richiesta che ammazza la scheda non deve ammazzarla nemmeno da un riquadro dentro un riquadro', async ({ openTab, testServer }) => {
