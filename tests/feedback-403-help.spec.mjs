@@ -61,3 +61,57 @@ test('errori non-403 passano invariati (nessun falso positivo)', () => {
   const msg = permissionDeniedHelp(raw, { email: 'x@example.com', email_verified: true });
   expect(msg).toBe(raw); // invariato
 });
+
+// #582 — il 403 su un ALLEGATO. Da quando il deposito non è più pubblico, un
+// allegato si apre col download token che sta nel link o con le credenziali di
+// un amministratore: un 403 vuol dire che sono mancati entrambi. Le due cause
+// hanno cure opposte (rifare l'accesso / farsi mettere fra gli amministratori),
+// e il testo deve stare in UNA riga: finisce nell'hover del segnaposto
+// dell'immagine, dove un messaggio a più righe non si legge.
+test('403 su un allegato: dice quale delle due cause è, in una riga', () => {
+  const { attachmentForbiddenHelp } = require('../src/main/services/feedbackError.js');
+
+  const senzaSessione = attachmentForbiddenHelp({ conIdentita: false });
+  expect(senzaSessione).toMatch(/accedi/i);
+  expect(senzaSessione).not.toMatch(/\n/);
+
+  const conSessione = attachmentForbiddenHelp({ conIdentita: true });
+  expect(conSessione).toMatch(/amministratori/i);
+  expect(conSessione).not.toMatch(/\n/);
+
+  // Le due cause non si confondono: il messaggio di chi ha una sessione valida
+  // non manda a rifare l'accesso, ed è il caso in cui si perdeva tempo.
+  expect(conSessione).not.toMatch(/sessione è scaduta/i);
+  expect(conSessione).not.toEqual(senzaSessione);
+
+  // Nessun argomento = nessuna sessione: il default sbaglia dalla parte che non
+  // accusa l'account di non essere amministratore.
+  expect(attachmentForbiddenHelp()).toEqual(senzaSessione);
+});
+
+test('a chi NON riceve le segnalazioni il messaggio non parla di amministratori', () => {
+  // Verifica #582, giro 1. Un utente qualunque riapre le proprie segnalazioni e
+  // ritrova lo screenshot che ha mandato: non lo rivedrà (è cifrato con la
+  // chiave di chi riceve le segnalazioni) e va bene così. Quello che non andava
+  // era il messaggio, che gli parlava di permessi di amministratore e lo
+  // mandava a cercare un problema suo dove non c'era niente da risolvere.
+  const { attachmentNotForYouHelp } = require('../src/main/services/feedbackError.js');
+
+  const msg = attachmentNotForYouHelp();
+  expect(msg).not.toMatch(/amministrat/i);
+  expect(msg).not.toMatch(/riservata/i);
+  // Dice la cosa che serve sapere, ed è chi apre quell'allegato. Non «inviato»
+  // (#582, giro 3): l'elenco dei feedback mostra a ogni tester le segnalazioni
+  // di tutti, quindi questa frase si legge anche davanti all'allegato di un
+  // altro, e lì «inviato» suonava come «l'hai mandato tu».
+  expect(msg).toMatch(/lo apre solo chi riceve le segnalazioni/i);
+  // E NON dice che è arrivato, né come viaggia (#582, giro 5): questa frase la
+  // riceve anche un indirizzo scritto nella forma del deposito di Filo, che
+  // Filo non ha aperto e che può non esistere affatto. Da questo lato
+  // l'esistenza non si può controllare: senza il download token il deposito
+  // risponde 403 sia per un oggetto che c'è sia per uno che non c'è.
+  expect(msg).not.toMatch(/consegnat|arrivat|ricevut/i);
+  expect(msg).not.toMatch(/cifrat/i);
+  // Sta in un hover: una riga sola.
+  expect(msg).not.toMatch(/\n/);
+});

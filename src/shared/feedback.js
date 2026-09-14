@@ -22,13 +22,129 @@
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
 
   // ---- helpers ----
+  // L'uuid non serve solo a non far collidere due nomi: da #582 è ANCHE il
+  // segreto del percorso di un allegato (storage.rules concede la creazione
+  // solo su un nome che lo contiene, e mai la sovrascrittura). Quindi i bit
+  // vengono dal generatore crittografico quando c'è; `Math.random()` resta
+  // l'ultima spiaggia per non rompere ambienti senza `crypto`, mai la prima.
   function uuid() {
-    if (global.crypto?.randomUUID) return global.crypto.randomUUID();
-    return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const c = global.crypto;
+    if (c?.randomUUID) return c.randomUUID();
+    if (c?.getRandomValues) {
+      const b = c.getRandomValues(new Uint8Array(16));
+      b[6] = (b[6] & 0x0f) | 0x40;
+      b[8] = (b[8] & 0x3f) | 0x80;
+      const hex = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+    return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
       const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      const v = ch === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
+  }
+
+  // Percorso di un allegato dentro il bucket. FONTE UNICA della forma del nome:
+  // `storage.rules` concede la creazione SOLO su un nome fatto così, e una
+  // sentinella (tests/unit/storageRulesAllegati.test.mjs) confronta quello che
+  // esce di qui con l'espressione scritta nelle regole. Cambiare la forma qui
+  // senza cambiarla là vuol dire che dal giorno del deploy nessun allegato si
+  // carica più: il test lo dice prima.
+  //
+  // Forma: feedback/<etichetta_>?<millisecondi>_<uuid>.<estensione>
+  // L'etichetta facoltativa dice la provenienza (`agent` per i ritrovamenti
+  // dell'agente esploratore); i millisecondi servono a leggere a occhio quando
+  // è arrivato; l'uuid è la parte che non si indovina.
+  function attachmentPath(mimeOrExt, label) {
+    const raw = String(mimeOrExt || '');
+    const ext = (raw.includes('/') ? raw.split('/')[1] : raw).replace(/[^a-z0-9]/gi, '').slice(0, 12) || 'bin';
+    const et = String(label || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 16);
+    return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ext}`;
+  }
+
+  // I due modi in cui si può nominare un oggetto del bucket di Filo: il
+  // percorso REST di Firebase e quello diretto di Google Storage. Host → inizio
+  // obbligatorio del percorso, BUCKET compreso.
+  const PREFISSI_ALLEGATO = {
+    'firebasestorage.googleapis.com': `/v0/b/${BUCKET}/o/`,
+    'storage.googleapis.com': `/${BUCKET}/`,
+  };
+
+  // Un URL è un allegato del bucket dei feedback? PURA. Serve a due cose che
+  // devono dare la stessa risposta: il guard anti-SSRF del main (che non deve
+  // trasformare la decifratura allegati in una fetch arbitraria) e la decisione
+  // di allegare o no il token dell'owner alla richiesta.
+  //
+  // ⚠️ Il confronto è sul BUCKET, non sull'host. Fermarsi all'host sembrava
+  // bastare finché questa risposta serviva solo a non fare fetch arbitrarie:
+  // da quando decide anche se firmare la richiesta con l'identità dell'owner,
+  // l'host da solo è una porta aperta. L'indirizzo dell'allegato non lo sceglie
+  // l'owner — sta dentro il documento del feedback, e un feedback lo crea
+  // chiunque, anche senza account: bastava indicare un bucket qualsiasi ospitato
+  // da Google e la dashboard ci portava il token dell'owner.
+  // L'URL si PARSA, non si confronta a colpi di regex: `new URL` normalizza i
+  // casi in cui una regex si fa fregare (host in maiuscolo, `@`, `..`), e un
+  // indirizzo che non si parsa vale "no".
+  function isAttachmentUrl(url) {
+    let u;
+    try { u = new URL(String(url || '')); } catch (_) { return false; }
+    if (u.protocol !== 'https:') return false;
+    const prefisso = PREFISSI_ALLEGATO[u.hostname];
+    return !!prefisso && u.pathname.startsWith(prefisso);
+  }
+
+  // Intestazioni con cui l'owner scarica un allegato. PURA.
+  // Dal #582 la lettura del bucket è riservata agli amministratori: senza
+  // identità si passa solo col download token dentro l'URL. Chi ce l'ha,
+  // l'identità, la manda — così la dashboard vede gli allegati anche quando il
+  // token non c'è (allegati storici) o viene revocato. Il token dell'owner esce
+  // SOLO verso il bucket di Filo (isAttachmentUrl lo confronta per intero): su
+  // qualunque altro URL queste intestazioni sono vuote.
+  function attachmentFetchHeaders(url, idToken) {
+    const t = String(idToken || '');
+    if (!t || !isAttachmentUrl(url)) return {};
+    return { Authorization: `Bearer ${t}` };
+  }
+
+  // Etichetta con cui si MOSTRA un indirizzo che arriva da fuori. PURA.
+  //
+  // Un indirizzo dentro una segnalazione non lo sceglie Filo: lo scrive chi
+  // manda, e una segnalazione la manda chiunque, anche senza account. Quando
+  // quell'indirizzo diventa qualcosa su cui si clicca, la scritta che si legge
+  // deve dire dove si va — altrimenti è un'esca dentro una pagina di Filo.
+  //
+  // Cosa mangiava la vecchia scritta (i primi 80 caratteri dell'indirizzo,
+  // tagliati senza nemmeno un puntino): chi lo costruisce apposta sceglie cosa
+  // cade dentro quegli 80 caratteri, e `https://filo.app/guida/…@sito-di-un-
+  // estraneo.invalid/accedi` si leggeva come un indirizzo di Filo.
+  //
+  // Le tre regole, in ordine di importanza:
+  // 1. la parte prima della chiocciola NON si mostra mai: è lì solo per mentire
+  //    (`u.host` non la contiene);
+  // 2. l'host non si taglia MAI dalla coda, perché la coda è il posto vero
+  //    (`aggiornamento.filo.app.qualcosa.sito-di-un-estraneo.invalid` sarebbe la
+  //    stessa bugia un piano più sotto). Se è l'host a non entrare, si taglia da
+  //    DAVANTI e il puntino va all'inizio;
+  // 3. un indirizzo tagliato lo dice, con un carattere di troncamento.
+  // Fuori si passa l'indirizzo già normalizzato da `new URL` (in pagina:
+  // l'uscita di safeHref), così l'etichetta e la destinazione parlano dello
+  // stesso indirizzo. Se non si parsa, torna stringa vuota: chi chiama mostrerà
+  // l'indirizzo crudo, che però non è un collegamento.
+  const LINK_LABEL_MAX = 80;
+  function linkLabel(rawUrl, max) {
+    const limite = Number.isFinite(max) && max >= 8 ? Math.floor(max) : LINK_LABEL_MAX;
+    let u;
+    try { u = new URL(String(rawUrl || '')); } catch (_) { return ''; }
+    // Solo indirizzi che portano su un sito. `javascript:alert(1)` si parsa
+    // benissimo, ha host vuoto, e l'etichetta diventerebbe `alert(1)`: una
+    // scritta che non dice dove si va, che è esattamente ciò che questa
+    // funzione esiste per evitare.
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+    const host = u.host; // host = dominio + porta, senza credenziali davanti
+    const resto = `${u.pathname}${u.search}${u.hash}`;
+    if (host.length >= limite) return `…${host.slice(host.length - (limite - 1))}`;
+    if (host.length + resto.length <= limite) return `${host}${resto}`;
+    return `${host}${resto.slice(0, limite - host.length - 1)}…`;
   }
 
   // Anti-duplicati (#370): id documento STABILE per una singola composizione di
@@ -56,9 +172,15 @@
   }
 
   // Upload diretto a Firebase Storage. Ritorna { url, name }.
+  //
+  // L'upload è una CREAZIONE e basta: dal #582 le regole non concedono la
+  // sovrascrittura, quindi un nome già esistente (che l'uuid rende comunque
+  // improbabile) torna 403 invece di calpestare l'allegato di qualcun altro.
+  // L'URL che torna porta il download token: da quando la lettura del bucket è
+  // riservata all'owner, quel token È il permesso di leggere l'allegato — va
+  // trattato come il contenuto, non come un indirizzo qualunque.
   async function uploadImage(blob) {
-    const ext = (blob.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
-    const name = `${COLLECTION}/${Date.now()}_${uuid()}.${ext}`;
+    const name = attachmentPath(blob.type || 'png');
     const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
     const res = await fetch(url, {
       method: 'POST',
@@ -179,8 +301,9 @@
 
   // Carica un allegato (immagine O file) su Storage e lo classifica per la UI.
   // Usata dalla dashboard per allegare immagini/file ai COMMENTI dei feedback
-  // (#190.3). Lo storage path feedback/* è scrivibile da chiunque (storage.rules),
-  // quindi non serve token. Ritorna { kind:'img'|'file', url, name, type }.
+  // (#190.3). Su feedback/* chiunque può CREARE un allegato nuovo senza login
+  // (storage.rules), ma nessuno può sovrascriverne uno: niente token da passare
+  // di qui. Ritorna { kind:'img'|'file', url, name, type }.
   async function uploadAttachment(blob, name) {
     const u = await uploadImage(blob); // upload generico (usa blob.type)
     const type = (blob && blob.type) || '';
@@ -1474,6 +1597,16 @@
     castReopenRequest,
     uploadImage,
     uploadAttachment,
+    // #582 — il confine degli allegati: la forma del nome (che storage.rules
+    // pretende), il riconoscimento di un URL del bucket e le intestazioni con
+    // cui l'owner lo scarica. Pure, e usate anche dal main.
+    attachmentPath,
+    isAttachmentUrl,
+    attachmentFetchHeaders,
+    // #582 giro 3 — la scritta di un collegamento verso un indirizzo che arriva
+    // da fuori: dice dove si va, e lo dice anche quando è tagliata.
+    linkLabel,
+    LINK_LABEL_MAX,
     formatNum,
     fallbackName,
     // Plumbing REST riutilizzabile (es. dal motore crediti): encoder Value

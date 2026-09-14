@@ -5,8 +5,12 @@ const path = require('node:path');
 const auth = require('../../auth/google-auth');
 const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
+<<<<<<< HEAD
 const { permissionDeniedHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
+=======
+const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
+>>>>>>> a59b09cdd (feedback #582: regole degli allegati dei feedback (lavoro squashato per il riallineamento))
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
 // stessa region/progetto del deploy. Override per i test via env.
@@ -409,15 +413,67 @@ module.exports = function register(on, ctx) {
   on(MSG.FEEDBACK_DECRYPT_IMAGE, ownerOnly(async (msg) => {
     try {
       const url = String((msg && msg.url) || '');
+<<<<<<< HEAD
       // Solo gli allegati DI FILO: il deposito è uno solo, e il suo nome lo
       // tiene il modulo condiviso che carica le immagini. Accettare qualunque
       // indirizzo dei depositi di Google faceva di questo canale un modo per
       // farsi scaricare altro, che non è quello che dice di fare.
       if (!allegatoDiFilo(url)) {
+=======
+      const FB = globalThis.SN_FEEDBACK;
+      if (!FB?.isAttachmentUrl) throw new Error('SN_FEEDBACK non caricato nel main process');
+      // DOVE PUNTA, PRIMA DI CHI GUARDA (#582, giro 4). Solo URL https del
+      // bucket feedback: evita che questo canale diventi un fetch arbitrario
+      // (SSRF) pilotato dal renderer.
+      //
+      // Questo controllo sta PRIMA di quello sull'identità, e l'ordine è il
+      // punto. L'indirizzo di un allegato non lo sceglie Filo: sta scritto
+      // dentro la segnalazione, e una segnalazione la manda chiunque, anche
+      // senza account e senza avere Filo installato. Con l'identità davanti, a
+      // chi non riceve le segnalazioni si rispondeva «consegnato» senza aver
+      // mai guardato l'indirizzo: Filo dichiarava partito — e cifrato con la
+      // chiave di chi le riceve — un «allegato» che nel suo deposito non era
+      // mai entrato, e la pillola finta di chi aveva messo l'esca diventava
+      // indistinguibile da una vera, avvalorata da Filo. A chi le riceve
+      // l'indirizzo veniva invece controllato: due strade per la stessa cosa e
+      // una non guardava niente (la stessa forma del rilievo del giro 2).
+      //
+      // Fuori dal deposito di Filo la risposta è UNA SOLA, uguale per tutti:
+      // quello non è un allegato di Filo. Niente `soloDestinatario`, così il
+      // segnaposto torna a dire che non è disponibile invece di prometterlo
+      // consegnato.
+      if (!FB.isAttachmentUrl(url)) {
+>>>>>>> a59b09cdd (feedback #582: regole degli allegati dei feedback (lavoro squashato per il riallineamento))
         return { ok: false, error: 'url allegato non valido' };
       }
-      const res = await fetch(url);
-      if (!res.ok) return { ok: false, error: `download allegato fallito (${res.status})` };
+      // Questo canale lo chiamano DUE pagine: la dashboard dell'owner e il
+      // riquadro dei feedback, dove un utente qualunque riapre le proprie
+      // segnalazioni. Chi non è amministratore l'immagine non la vedrà (è
+      // cifrata con la chiave di chi riceve le segnalazioni), ma `soloDestinatario`
+      // dice alla pagina che non è un guasto: l'allegato è partito, e il
+      // segnaposto lo scrive così invece di dire "non disponibile".
+      if (!auth.isAdmin()) {
+        return { ok: false, soloDestinatario: true, error: attachmentNotForYouHelp() };
+      }
+      // #582: la lettura del bucket è riservata agli amministratori. L'URL
+      // salvato nel feedback porta il download token e da solo basterebbe, ma
+      // quel token può mancare (allegati storici) o essere revocato: qui siamo
+      // già dentro il ramo owner, quindi la richiesta va firmata con la sua
+      // identità. Se la sessione è scaduta si prosegue senza: con il token
+      // nell'URL l'allegato si vede lo stesso, e un allegato in meno è meglio
+      // di un errore al posto della dashboard.
+      let idToken = '';
+      try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
+      const res = await fetch(url, { headers: FB.attachmentFetchHeaders(url, idToken) });
+      if (!res.ok) {
+        // Un 403 su un allegato ora ha una causa precisa e una cura precisa:
+        // dirla qui è la differenza fra un segnaposto muto e un problema che si
+        // risolve. (Il motivo finisce nell'hover del segnaposto, in dashboard.)
+        if (res.status === 403) {
+          return { ok: false, error: attachmentForbiddenHelp({ conIdentita: !!idToken }) };
+        }
+        return { ok: false, error: `download allegato fallito (${res.status})` };
+      }
       const raw = new Uint8Array(await res.arrayBuffer());
 
       const C = globalThis.SN_FEEDBACK_CRYPTO;

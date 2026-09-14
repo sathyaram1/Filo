@@ -39,6 +39,12 @@ function toFsValue(v) {
   return { stringValue: String(v) };
 }
 
+// Il nome NON è libero: storage.rules concede la creazione solo su
+// `<etichetta_>?<millisecondi>_<uuid>.<estensione>` (l'uuid è ciò che rende il
+// percorso non indovinabile, #582). La forma canonica è
+// `SN_FEEDBACK.attachmentPath`; qui è ricopiata perché questo file è un
+// utensile a sé, e la sentinella tests/unit/storageRulesAllegati.test.mjs prova
+// anche la variante con etichetta.
 async function uploadImage(buffer, mime = 'image/png') {
   const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
   const name = `${COLLECTION}/agent_${Date.now()}_${randomUUID()}.${ext}`;
