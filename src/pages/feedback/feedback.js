@@ -283,6 +283,18 @@
   const ATTACH_REJECT_MSG =
     'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
+  // Stesso ripiego del riquadro di segnalazione dentro i siti, e per lo stesso
+  // motivo: se l'allowlist condivisa non si carica, il ripiego deve CHIUDERE
+  // (solo immagini raster), non aprire. Un gate che sparisce in silenzio quando
+  // manca un pezzo è un gate che non c'è.
+  function classificaAllegato(file) {
+    if (AttachTypes && typeof AttachTypes.classify === 'function') {
+      return AttachTypes.classify(file);
+    }
+    const t = String(file?.type || '').toLowerCase();
+    return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
+  }
+
   const ATTACH_MAX_IMAGES = 5;
   const ATTACH_MAX_FILES = 5;
   const ATTACH_MAX_BYTES = 4 * 1024 * 1024;
