@@ -62,31 +62,32 @@ test('errori non-403 passano invariati (nessun falso positivo)', () => {
   expect(msg).toBe(raw); // invariato
 });
 
-// #582 — il 403 su un ALLEGATO. Da quando il deposito non è più pubblico, un
-// allegato si apre col download token che sta nel link o con le credenziali di
-// un amministratore: un 403 vuol dire che sono mancati entrambi. Le due cause
-// hanno cure opposte (rifare l'accesso / farsi mettere fra gli amministratori),
-// e il testo deve stare in UNA riga: finisce nell'hover del segnaposto
+// #582 — il 403 su un ALLEGATO. Per un po' le cause erano due (il download
+// token nel link, oppure le credenziali di un amministratore) e il messaggio
+// diceva quale delle due fosse. Poi #583 ha chiuso la lettura del deposito a
+// chiunque, owner compreso: da allora l'unica chiave è il token, e mandare a
+// «farsi mettere fra gli amministratori» manda a fare una cosa che non apre
+// più niente. Una cura sbagliata costa più di nessuna cura, perché ci si perde
+// tempo prima di scoprirlo.
+//
+// Il testo deve stare in UNA riga: finisce nell'hover del segnaposto
 // dell'immagine, dove un messaggio a più righe non si legge.
-test('403 su un allegato: dice quale delle due cause è, in una riga', () => {
+test('403 su un allegato: dice l’unica causa vera, in una riga', () => {
   const { attachmentForbiddenHelp } = require('../src/main/services/feedbackError.js');
 
-  const senzaSessione = attachmentForbiddenHelp({ conIdentita: false });
-  expect(senzaSessione).toMatch(/accedi/i);
-  expect(senzaSessione).not.toMatch(/\n/);
+  const msg = attachmentForbiddenHelp();
+  expect(msg).not.toMatch(/\n/);
 
-  const conSessione = attachmentForbiddenHelp({ conIdentita: true });
-  expect(conSessione).toMatch(/amministratori/i);
-  expect(conSessione).not.toMatch(/\n/);
+  // La causa: il link non porta un token valido.
+  expect(msg).toMatch(/token/i);
 
-  // Le due cause non si confondono: il messaggio di chi ha una sessione valida
-  // non manda a rifare l'accesso, ed è il caso in cui si perdeva tempo.
-  expect(conSessione).not.toMatch(/sessione è scaduta/i);
-  expect(conSessione).not.toEqual(senzaSessione);
+  // Le cure che non funzionano più non si propongono: né rifare l'accesso, né
+  // farsi aggiungere fra gli amministratori. Dalle regole non legge nessuno.
+  expect(msg, 'manda a rifare l’accesso, che non apre l’allegato').not.toMatch(/accedi|sessione/i);
+  expect(msg, 'manda a farsi mettere fra gli amministratori, che non apre l’allegato').not.toMatch(/amministrator/i);
 
-  // Nessun argomento = nessuna sessione: il default sbaglia dalla parte che non
-  // accusa l'account di non essere amministratore.
-  expect(attachmentForbiddenHelp()).toEqual(senzaSessione);
+  // E dice dove il file si raggiunge ancora, altrimenti è solo un no.
+  expect(msg).toMatch(/console/i);
 });
 
 test('a chi NON riceve le segnalazioni il messaggio non parla di amministratori', () => {
