@@ -3,7 +3,7 @@
 // Filo apre come VERA finestra, e non come scheda, i popup che somigliano a un
 // accesso: è la sola strada che tiene in piedi il legame fra la pagina e la
 // finestra che l'OAuth usa per restituire l'esito. Quella finestra non è una
-// scheda, e la domanda dei permessi arriva alla scheda.
+// scheda, e la domanda dei permessi va alla scheda.
 //
 // Per chi usa Filo: dentro una finestra di accesso un sito chiede la fotocamera
 // (la verifica dell'identità con un documento, il codice QR da inquadrare) o il
@@ -17,14 +17,9 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
-const PAGINA = `<!doctype html><html><body style="margin:0;padding:16px">
-<button id="apri">Continua con l'accesso</button>
-<script>
-  document.getElementById('apri').addEventListener('click', () => {
-    window.open(location.origin + '/login?client_id=filo&redirect_uri=' + encodeURIComponent(location.origin),
-      'accesso', 'width=520,height=640');
-  });
-</script></body></html>`;
+const ACCESSO = `<!doctype html><html><body style="margin:0;padding:16px">
+<h1 id="titolo">Accedi</h1>
+<script>window.__pronta = 1;</script></body></html>`;
 
 async function aspetta(fn, ms = 20_000) {
   const fine = Date.now() + ms;
@@ -38,25 +33,32 @@ async function aspetta(fn, ms = 20_000) {
 
 test('dentro una finestra di accesso la domanda del permesso deve arrivare a qualcuno', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(240_000);
-  const page = await testServer.openReady(openTab, PAGINA);
+
+  // La pagina dell'accesso: l'indirizzo porta i parametri dell'OAuth, che è la
+  // firma con cui Filo riconosce un popup di accesso e lo apre come finestra
+  // vera invece che come scheda.
+  const urlAccesso = `${testServer.html(ACCESSO)}?client_id=filo&redirect_uri=${encodeURIComponent(testServer.origin)}`;
+  const pagina = `<!doctype html><html><body style="margin:0;padding:16px">
+<button id="apri">Continua con l'accesso</button>
+<script>
+  document.getElementById('apri').addEventListener('click', () => {
+    window.open(${JSON.stringify(urlAccesso)}, 'accesso', 'width=520,height=640');
+  });
+</script></body></html>`;
+
+  const page = await testServer.openReady(openTab, pagina);
+  const pathAccesso = new URL(urlAccesso).pathname;
+  const prima = app.windows().length;
 
   await page.click('#apri');
 
-  // La finestra di accesso: una pagina in più, che non è né la shell né la scheda.
-  const accesso = await aspetta(async () => {
-    const pagine = app.windows();
-    const trovata = [];
-    for (const w of pagine) {
-      let u = '';
-      try { u = w.url(); } catch (_) { u = ''; }
-      if (u.includes('/login')) trovata.push(w);
-    }
-    return trovata[0] || null;
-  });
+  const accesso = await aspetta(async () => app.windows().find((w) => {
+    try { return new URL(w.url()).pathname === pathAccesso; } catch (_) { return false; }
+  }) || null);
   console.log('[586 g9] finestre aperte:', JSON.stringify(app.windows().map((w) => {
-    try { return w.url().slice(0, 70); } catch (_) { return '?'; }
-  })));
-  expect(accesso, 'la finestra di accesso non si è aperta: la prova non riguarda questo caso').toBeTruthy();
+    try { return w.url().slice(0, 80); } catch (_) { return '?'; }
+  })), 'prima erano', prima);
+  expect(accesso, 'la finestra di accesso non si è aperta: questa prova non riguarda quel caso').toBeTruthy();
   await accesso.waitForLoadState('domcontentloaded').catch(() => {});
 
   const partito = Date.now();
@@ -65,10 +67,9 @@ test('dentro una finestra di accesso la domanda del permesso deve arrivare a qua
     (e) => 'rifiutato:' + ((e && e.name) || '?'),
   ));
 
-  // Dodici secondi: molto più di quanto serve a una domanda per comparire.
   const comparsa = await aspetta(async () => {
     const n = await shell.locator('.perm-chip').count().catch(() => 0);
-    if (n > 0) return 'shell';
+    if (n > 0) return 'cornice di Filo';
     const m = await accesso.locator('.perm-chip').count().catch(() => 0);
     if (m > 0) return 'finestra di accesso';
     return null;
@@ -76,7 +77,7 @@ test('dentro una finestra di accesso la domanda del permesso deve arrivare a qua
   console.log('[586 g9] dove è comparsa la domanda:', comparsa || 'da nessuna parte');
 
   if (comparsa) {
-    const dove = comparsa === 'shell' ? shell : accesso;
+    const dove = comparsa === 'cornice di Filo' ? shell : accesso;
     await dove.locator('.perm-chip .perm-chip-allow').first().click();
     const r = await esito;
     console.log('[586 g9] dopo il Consenti:', r);
@@ -84,8 +85,6 @@ test('dentro una finestra di accesso la domanda del permesso deve arrivare a qua
     return;
   }
 
-  // Nessuna domanda: allora almeno il rifiuto deve arrivare subito, non dopo
-  // due minuti di attesa muta dentro una finestra che non spiega niente.
   const r = await Promise.race([
     esito,
     new Promise((res) => setTimeout(() => res('ancora in attesa'), 20_000)),
