@@ -520,9 +520,7 @@
       // partiva lo stesso e quello che si leggeva era il numero dell'errore del
       // deposito, invece della frase che dice cosa si può allegare. Il confine
       // reggeva comunque: a non andare era ciò che si leggeva.
-      const kind = AttachTypes && typeof AttachTypes.classify === 'function'
-        ? AttachTypes.classify(file)
-        : 'file';
+      const kind = classificaAllegato(file);
       if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
       const isImg = kind === 'image';
       const c = counts();
