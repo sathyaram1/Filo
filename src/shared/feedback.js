@@ -925,10 +925,12 @@
     return `${FIRESTORE_BASE.replace(/^https:\/\/firestore\.googleapis\.com\/v1\//, '')}/${collectionId}/${id}`;
   }
 
-  // Una pagina ordinata per nome del documento, con cursore. Solo per la
-  // paginazione completa qui sopra: l'ordine è quello degli id, che a chi
-  // mostra le schede non serve — ordina lui come gli pare.
-  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '' } = {}) {
+  // Una pagina ordinata per nome del documento, con cursore. È il mattone
+  // delle letture complete: l'ordine è quello degli id, che a chi mostra le
+  // righe non serve — ordina lui come gli pare. `idToken` serve per la
+  // collezione vera, che senza credenziali non si legge (#583); la vista
+  // pubblica lo lascia vuoto.
+  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '' } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const structuredQuery = {
       from: [{ collectionId }],
@@ -938,7 +940,9 @@
     if (afterName) {
       structuredQuery.startAt = { before: false, values: [{ referenceValue: afterName }] };
     }
-    const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ structuredQuery }) };
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const opts = { method: 'POST', headers, body: JSON.stringify({ structuredQuery }) };
     let timer = null;
     let timedOut = false;
     if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
