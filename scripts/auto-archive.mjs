@@ -69,7 +69,12 @@ export async function runAutoArchive({ dryRun = false, now = Date.now(), release
   // I voti (DB4) si scrivono sulla scheda pubblica: senza riunirli, il
   // punteggio sarebbe quello dei soli voti storici e non archivierebbe più
   // niente.
-  const cards = await FB.listPublic({ pageSize: 500 });
+  // TUTTE le schede, paginate: i voti stanno lì, e una finestra sulle 500 più
+  // recenti per data d'invio lascerebbe senza voti proprio le segnalazioni più
+  // vecchie — quelle che questo giro dovrebbe archiviare per prime.
+  const cards = typeof FB.listAllPublic === 'function'
+    ? await FB.listAllPublic()
+    : await FB.listPublic({ pageSize: 500 });
   const feedbacks = PV.mergeUserFields(grezzi, cards);
   const { toArchive, toFlag } = BA.applyAutoArchive(feedbacks, { now, releasedVersion: ver });
 
