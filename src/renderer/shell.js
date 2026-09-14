@@ -1935,12 +1935,26 @@
         sincronizzaRiserva();
       }
 
+      // Il segno sulla SCHEDA, che si vede anche da un'altra scheda. Il cartello
+      // sotto le schede resta quello che è: una riga per la scheda che si sta
+      // guardando, con «Interrompi» dentro.
+      function allineaSegniScheda() {
+        sensoriPerScheda.clear();
+        for (const r of riprese.values()) {
+          if (r.tabId === null || r.tabId === undefined || !r.frase) continue;
+          const gia = sensoriPerScheda.get(r.tabId);
+          sensoriPerScheda.set(r.tabId, gia && gia !== r.frase ? `${gia}, e ${r.frase}` : r.frase);
+        }
+        try { render(); } catch (_) {}
+      }
+
       api.permissions.onCaptureEnd((info) => {
         const r = info && riprese.get(String(info.id));
         if (!r) return;
         riprese.delete(String(info.id));
         rimuoviNodo(r.nodo);
         sincronizzaRiserva();
+        allineaSegniScheda();
       });
 
       api.permissions.onCaptureStart((info) => {
