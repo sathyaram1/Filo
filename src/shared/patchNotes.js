@@ -23,6 +23,8 @@
         'Quello che scrivi in un feedback lo leggono solo Filo e chi lo lavora: testo, indirizzo della pagina e screenshot non sono raggiungibili da nessun altro. Pubblici restano i miglioramenti già usciti, che vedi in bacheca: il titolo, la versione e la frase scritta per chi li aveva segnalati.',
         'Quando l\'assistente ti aiuta a fare qualcosa su un sito, quello che Filo impara e condivide con le altre installazioni non porta più nessun segno di chi eri: né un identificativo, né il browser.',
         'I siti che apri non possono più agire al posto tuo dentro Filo: votare in bacheca, spendere i tuoi crediti per riaprire un fix, farti uscire dall\'account o leggere con che indirizzo sei entrato.',
+        'Se una tua segnalazione viene risolta dopo mesi, l\'annuncio e i crediti arrivano lo stesso. Prima Filo guardava solo le segnalazioni più recenti, e chi aveva aspettato di più non riceveva niente.',
+        'In bacheca ci sono tutti i fix usciti, anche i più vecchi: prima l\'elenco si fermava ai cinquecento più recenti.',
       ],
     },
     {
