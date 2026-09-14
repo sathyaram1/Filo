@@ -1,6 +1,6 @@
-// Verifica avversariale #498 — controprova: le due correzioni sono davvero
-// quello che tiene? Qui si rimettono a mano i valori di PRIMA (riquadro delle
-// fusioni senza tetto, barra di ricerca che si tira su di 12px fissi) e si
+// Verifica avversariale #498 — controprova: le correzioni sono davvero quello
+// che tiene? Qui si rimettono a mano le misure di PRIMA (colonna della pagina
+// che cresce col contenuto, barra di ricerca che si tira su di 12px fissi) e si
 // controlla che gli stessi assert diventino rossi. Se non diventano rossi, i
 // test nuovi non stanno guardando niente.
 
@@ -54,7 +54,7 @@ test('senza l\'altezza fissa della colonna le aree uscivano dallo schermo', asyn
   }
 
   // Com'è adesso: un blocco alto sopra le aree e le aree restano dentro.
-  const adesso = await conUnBloccoAlto(320);
+  const adesso = await conUnBloccoAlto();
   console.log('ADESSO blocco alto', JSON.stringify(adesso));
   expect(adesso.scrollH).toBeLessThanOrEqual(adesso.viewport + 1);
   expect(adesso.gridBottom).toBeLessThanOrEqual(adesso.viewport + 1);
@@ -66,7 +66,7 @@ test('senza l\'altezza fissa della colonna le aree uscivano dallo schermo', asyn
     #mgReviewGrid { min-height: 300px !important; }
   ` });
   await page.waitForTimeout(250);
-  const prima = await conUnBloccoAlto(320);
+  const prima = await conUnBloccoAlto();
   console.log('PRIMA blocco alto', JSON.stringify(prima));
   expect(prima.scrollH, 'senza altezza fissa la pagina DEVE tornare a scorrere').toBeGreaterThan(prima.viewport + 1);
   expect(prima.gridBottom, 'senza altezza fissa le aree DEVONO uscire dalla finestra').toBeGreaterThan(prima.viewport + 1);
