@@ -515,7 +515,14 @@
       // può leggere davvero). I filtri qui sotto restano: sono la seconda
       // rete, e il gate "uscito in produzione" (DB3) dipende dalla versione
       // che gira su QUESTA macchina, quindi va applicato qui.
-      allFeedbacks = await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
+      //
+      // TUTTE le schede, paginate: un fix vecchio pubblicato in bacheca deve
+      // comparire in bacheca. Il tetto per data d'invio faceva sparire dalla
+      // vetrina le schede oltre la cinquecentesima, che esistevano e che nessun
+      // filtro qui sotto aveva scartato.
+      allFeedbacks = FB.listAllPublic
+        ? await FB.listAllPublic({ timeoutMs: LOAD_TIMEOUT_MS })
+        : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
       dataLoaded = true;
       lastLoadError = null;
     } catch (err) {
