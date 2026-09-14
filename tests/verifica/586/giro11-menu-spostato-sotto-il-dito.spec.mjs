@@ -50,9 +50,8 @@ function pagina(voce) {
       for (const n of menu.children) n.style.setProperty('pointer-events', 'none', 'important');
       menu.style.setProperty('position', 'fixed', 'important');
       const r = menu.getBoundingClientRect();
-      const sopra = document.createElement('div');
-      // Niente di finto: il clic vero della persona cade su questo pezzo, che
-      // inoltra il gesto alla voce sotto. Ma basta anche stendere la voce stessa.
+      // Niente di finto: il clic vero della persona cade sulla voce stessa,
+      // stesa su tutto il riquadro del menu.
       clicca.style.setProperty('position', 'fixed', 'important');
       clicca.style.setProperty('left', r.left + 'px', 'important');
       clicca.style.setProperty('top', r.top + 'px', 'important');
@@ -61,7 +60,6 @@ function pagina(voce) {
       clicca.style.setProperty('pointer-events', 'auto', 'important');
       clicca.style.setProperty('z-index', '2147483647', 'important');
       clicca.style.setProperty('opacity', '0.01', 'important');
-      sopra.remove();
       window.__vestito = 'fatto';
     } catch (e) { window.__vestito = 'errore: ' + e.message; }
   };
@@ -88,7 +86,7 @@ test('un clic vero dentro il menu di Filo non deve poter diventare un «Incolla�
 
   // Il clic destro lo fa una persona, sul testo dell'articolo: gesto vero, con
   // `isTrusted` a posto, esattamente come quando si vuole tradurre una parola.
-  await page.click('#testo', { button: 'right', position: { x: 40, y: 8 } });
+  await page.click('#foglio', { button: 'right', position: { x: 220, y: 120 } });
   await page.waitForSelector('.sn-menu', { timeout: 10_000 });
   await page.waitForTimeout(500);
   console.log('[586 g11] il sito ha rivestito il menu:', await page.evaluate(() => window.__vestito));
@@ -121,7 +119,7 @@ test('lo stesso clic non deve poter diventare una «Detta» scelta dal sito', as
   test.setTimeout(180_000);
   const page = await testServer.openReady(openTab, pagina('detta'));
 
-  await page.click('#testo', { button: 'right', position: { x: 40, y: 8 } });
+  await page.click('#foglio', { button: 'right', position: { x: 220, y: 120 } });
   await page.waitForSelector('.sn-menu', { timeout: 10_000 });
   await page.waitForTimeout(500);
   console.log('[586 g11] rivestito per la dettatura:', await page.evaluate(() => window.__vestito));
@@ -152,4 +150,29 @@ test('lo stesso clic non deve poter diventare una «Detta» scelta dal sito', as
     + 'microfono, senza che comparisse nessuna domanda: il sito si porta via anche la trascrizione '
     + 'di quello che si dice davanti al computer',
   ).toBe(false);
+});
+
+// Il controllo delle due prove qui sopra: l'«Incolla» del menu di Filo, premuto
+// per davvero dove sta, incolla. Senza questo controllo le due prove qui sopra
+// potrebbero essere verdi solo perché il clic non ha mai raggiunto niente.
+test('controllo: l\'«Incolla» del menu di Filo, premuto dov\'è, incolla', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<div id="foglio" contenteditable="true" style="position:fixed;inset:0;font:16px system-ui"></div>
+<script>window.__bottino = () => document.getElementById('foglio').innerText || '';</script>
+</body></html>`);
+
+  await page.click('#foglio', { button: 'right', position: { x: 220, y: 120 } });
+  await page.waitForSelector('.sn-menu', { timeout: 10_000 });
+  const voce = page.locator('.sn-menu-paste-main, .sn-menu-item').filter({ hasText: /incolla|paste/i }).first();
+  console.log('[586 g11] voci del menu:', JSON.stringify(await page.locator('.sn-menu .sn-menu-label').allTextContents()));
+  await voce.click();
+  await page.waitForTimeout(2000);
+  const bottino = await page.evaluate(() => window.__bottino()).catch(() => '');
+  console.log('[586 g11] controllo, incollato:', JSON.stringify(bottino));
+  expect(
+    String(bottino || ''),
+    'l\'«Incolla» del menu di Filo non incolla: le due prove qui sopra non provano niente',
+  ).toContain(SEGRETO);
 });
