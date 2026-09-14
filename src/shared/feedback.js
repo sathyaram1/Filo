@@ -836,11 +836,11 @@
   // Sono tre modi di chiedere «tutte le schede». Con 552 schede e un tetto di
   // 500 la risposta ne dimenticava 52, in silenzio.
   //
-  // Quindi qui non si finestra: si PAGINA fino in fondo, ordinando per nome del
-  // documento (unico e stabile: un cursore sul nome non salta e non ripete
-  // righe, mentre una data può essere uguale su due schede). Il costo è una
-  // lettura per scheda — oggi ~550, qualche centesimo al mese su tutte le
-  // installazioni — ed è lo stesso che pagava la finestra da 500, ma completo.
+  // Quindi qui non si finestra: si PAGINA fino in fondo, passando sempre da
+  // `listPublic` — una porta sola, così chi la sostituisce in una prova
+  // sostituisce anche questa. Il costo è una lettura per scheda — oggi ~550,
+  // qualche centesimo al mese su tutte le installazioni — ed è lo stesso che
+  // pagava la finestra da 500, ma completo.
   //
   // `maxPages` è un freno contro un ciclo infinito, non un tetto di prodotto:
   // se scatta la risposta lo DICE (`complete: false`) invece di far finta di
@@ -850,14 +850,28 @@
   async function listAllPublicPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, maxPages = ALL_PAGES_MAX } = {}) {
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
     const rows = [];
+    const visti = new Set();
     let cursor = '';
     let complete = false;
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       // eslint-disable-next-line no-await-in-loop
-      const batch = await listByNameDirect(VIEW_COLLECTION, { pageSize: limit, timeoutMs, afterName: cursor });
-      rows.push(...batch.rows);
-      cursor = batch.lastName;
-      if (batch.rows.length < limit || !cursor) { complete = true; break; }
+      const batch = await listPublic({ pageSize: limit, timeoutMs, afterName: cursor });
+      const arr = Array.isArray(batch) ? batch : (batch && batch.rows) || [];
+      let nuove = 0;
+      for (const r of arr) {
+        const id = String((r && r._id) || '');
+        if (id && visti.has(id)) continue;
+        if (id) visti.add(id);
+        rows.push(r);
+        nuove += 1;
+      }
+      // Una sorgente che ignora il cursore (una prova che la sostituisce con
+      // un array fisso) torna sempre la stessa pagina: se non arriva niente di
+      // nuovo si è già in fondo, e continuare sarebbe un ciclo.
+      const ultimo = (!Array.isArray(batch) && batch && batch.lastName)
+        || nomeDocumento(VIEW_COLLECTION, arr[arr.length - 1]);
+      if (arr.length < limit || nuove === 0 || !ultimo || ultimo === cursor) { complete = true; break; }
+      cursor = ultimo;
     }
     return { rows, complete };
   }
@@ -865,6 +879,13 @@
   async function listAllPublic(opts = {}) {
     const { rows } = await listAllPublicPaged(opts);
     return rows;
+  }
+
+  // Il nome intero del documento, quello che Firestore vuole come cursore.
+  function nomeDocumento(collectionId, row) {
+    const id = String((row && row._id) || '');
+    if (!id) return '';
+    return `${FIRESTORE_BASE.replace(/^https:\/\/firestore\.googleapis\.com\/v1\//, '')}/${collectionId}/${id}`;
   }
 
   // Una pagina ordinata per nome del documento, con cursore. Solo per la
