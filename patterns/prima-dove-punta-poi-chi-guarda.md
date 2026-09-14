@@ -53,6 +53,23 @@ che non c'è (misurato col motore vero delle regole). Quindi la frase è scesa a
 ciò che regge in ogni caso, «questo allegato lo apre solo chi riceve le
 segnalazioni», e il segnaposto dice «riservato» invece di «consegnato».
 
+**Giro 6: il canale rispondeva giusto, una pagina buttava via la risposta.**
+Il controllo sta nel canale perché il canale è uno solo — ma le pagine che
+mostrano una segnalazione sono due, e la cura era stata scritta in una sola. Il
+riquadro dei feedback leggeva `soloDestinatario` e diceva «riservato»; la
+Gestione lo ignorava e teneva la sua frase di prima, «immagine non
+disponibile», che fa sembrare un guasto quello che è soltanto roba di qualcun
+altro — e la pillola di un documento arrivava identica a una che si apre,
+rispondendo solo dopo il clic. Stessa segnalazione, stesso allegato, stesso
+utente, due risposte diverse a seconda di dove la guardavi. Gestione non è una
+pagina nascosta: sta nell'elenco delle app accanto a Editor e Feedback, senza
+filtri.
+
+**Avere una fonte unica non basta: va USATA da tutte le superfici.** Una
+risposta calcolata bene e scartata da chi la riceve è indistinguibile dal non
+averla calcolata. Quando si aggiunge un campo a una risposta condivisa, il
+lavoro finisce quando ogni chiamante lo legge — non quando il primo lo legge.
+
 ## I tentativi sbagliati
 
 - **Cambiare la frase.** Ammorbidirla («l'allegato potrebbe essere stato
