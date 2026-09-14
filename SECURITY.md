@@ -204,9 +204,12 @@ ti aiuta a fare qualcosa su un sito, Filo può tenere da parte come ci è
 riuscito: il dominio, il percorso della pagina (senza la parte dopo il punto
 interrogativo) e una riga che riassume l'obiettivo, riscritta da un modello e
 scartata se non è generica. Serve a tutte le installazioni, che la rileggono per
-il sito che hanno davanti, e per questo si legge senza credenziali. Da settembre
-2026 lì dentro non c'è più niente che dica da quale installazione arriva: né un
-identificativo, né il browser.
+il sito che hanno davanti, e per questo si legge senza credenziali. Lì dentro
+non c'è niente che dica da quale installazione arriva: nessun identificativo,
+nessun account. L'unica cosa che resta accanto al percorso è la versione di Filo
+che l'ha raccolto, che è la stessa per tutti quelli che hanno quella versione.
+Da settembre 2026 quei documenti non li scrive più il client: li scrive il
+server, che rifà la pulizia e tiene i limiti di frequenza.
 
 La sicurezza qui non sta nel nascondere la chiave API di Firebase (che, come in
 tutti i progetti Firebase, è pubblica per design e visibile nel client): sta
