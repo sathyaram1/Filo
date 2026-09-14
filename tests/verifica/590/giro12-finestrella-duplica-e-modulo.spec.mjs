@@ -259,6 +259,7 @@ test('BB2 — fermato il rimbalzo, non deve restare a schermo una finestrella vu
   await cliccaAccedi('/apre-accesso');
   await shell.waitForTimeout(3500);
   const finestre = await finestreDiFilo();
+  const dette = await notifiche();
   // La finestrella fermata non ha mai caricato niente: né indirizzo né titolo.
   const vuote = finestre.filter((w) => !w.url || w.url === 'about:blank');
   expect(
@@ -266,7 +267,7 @@ test('BB2 — fermato il rimbalzo, non deve restare a schermo una finestrella vu
     'la finestrella di accesso era già nata quando il rimbalzo è stato fermato: resta a schermo '
     + 'senza indirizzo, senza titolo e senza contenuto, e va chiusa a mano. Per la SCHEDA lo '
     + 'stesso caso è già stato chiuso (la scheda rimasta vuota viene chiusa da sola). '
-    + `Finestre viste: ${JSON.stringify(finestre)}`,
+    + `Finestre viste: ${JSON.stringify(finestre)}. Notifiche: ${JSON.stringify(dette)}`,
   ).toBe(0);
 });
 
