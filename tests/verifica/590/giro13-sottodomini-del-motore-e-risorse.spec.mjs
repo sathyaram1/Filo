@@ -238,7 +238,7 @@ test('CA0 — controllo: dai risultati veri del motore il sito della lista si ap
   await apri(`http://${MOTORE}:${srv.porta}/search?q=qualcosa`);
   const ris = await aspettaPagina('/search');
   expect(ris, 'la pagina dei risultati deve aprirsi').toBeTruthy();
-  await ris.locator('#vai').click();
+  await ris.evaluate(() => document.getElementById('vai').click());
   await shell.waitForTimeout(3000);
   expect(
     await visibile(),
@@ -251,7 +251,7 @@ test('CA0b — controllo: da una pagina senza privilegi lo stesso link viene fer
   await apri(`http://${QUALUNQUE}:${srv.porta}/pagina`);
   const p = await aspettaPagina('qualunque.test');
   expect(p, 'la pagina qualunque deve aprirsi').toBeTruthy();
-  await p.locator('#vai').click();
+  await p.evaluate(() => document.getElementById('vai').click());
   await shell.waitForTimeout(3000);
   expect(
     await visibile(),
@@ -265,7 +265,7 @@ test('CA1 — la pagina di un estraneo ospitata su un sottodominio del motore no
   await apri(`http://${AUTORE}:${srv.porta}/s?id=1234567890`);
   const art = await aspettaPagina('/s?id=');
   expect(art, 'l\'articolo deve aprirsi').toBeTruthy();
-  await art.locator('#vai').click();
+  await art.evaluate(() => document.getElementById('vai').click());
   await shell.waitForTimeout(3000);
   const dette = await notifiche();
   expect(
@@ -307,7 +307,7 @@ test('CA4 — nemmeno in una scheda nuova aperta da quella pagina', async () => 
   await apri(`http://${AUTORE}:${srv.porta}/s?id=1234567890`);
   const art = await aspettaPagina('/s?id=');
   expect(art, 'l\'articolo deve aprirsi').toBeTruthy();
-  await art.locator('#nuova').click();
+  await art.evaluate(() => document.getElementById('nuova').click());
   await shell.waitForTimeout(3500);
   const dette = await notifiche();
   expect(
