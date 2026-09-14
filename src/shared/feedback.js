@@ -617,12 +617,25 @@
   // rimandare i campi pesanti che servono solo nel dettaglio, e — con il solo
   // `__name__` — per chiedere a Firestore "cosa è cambiato?" pagando pochi
   // byte: ogni riga porta comunque `updateTime`.
-  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '' } = {}) {
+  // `afterName` (anche la stringa vuota, che vuol dire «dall'inizio»): la
+  // pagina è ordinata per NOME del documento e comincia dopo quello passato. È
+  // il cursore di `listAll`, e non passa dal ponte con il main: da una pagina
+  // filo:// una lettura completa della collezione vera non si fa.
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null } = {}) {
     // Da una pagina filo:// la lettura passa dal main, che ha il token admin
     // (#583): qui non c'è nessuna credenziale, e la collezione non è più
     // pubblica. Il main torna le righe già decodificate.
     const bridge = pageBridge();
-    if (bridge) return readViaMain(bridge, { op: 'list', pageSize, timeoutMs, fields });
+    if (bridge) {
+      if (typeof afterName === 'string') {
+        throw new Error('lettura completa dei feedback non disponibile da una pagina: passa dal main');
+      }
+      return readViaMain(bridge, { op: 'list', pageSize, timeoutMs, fields });
+    }
+    if (typeof afterName === 'string') {
+      const { rows } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken });
+      return rows;
+    }
     return listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken });
   }
 
