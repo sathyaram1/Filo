@@ -1,5 +1,10 @@
 // Bacheca utente di Filo (filo://board/, DC1 + DC2).
 //
+// DA DOVE VENGONO I DATI (#583): dalla vista pubblica `feedback-public`, una
+// scheda per fix chiuso con i soli campi pubblici (titolo, numero, versione,
+// voti). La collezione dei feedback non si legge senza credenziali: qui non ne
+// arriva più niente, nemmeno per essere scartato.
+//
 // Superficie a PERMESSI RIDOTTI, NON owner-gated: gli anonimi leggono, per
 // votare serve il login. Mostra SOLO i miglioramenti già IN PRODUZIONE (fix
 // chiusi e usciti in una versione rilasciata, DB3) in chiave POSITIVA. Il
@@ -500,7 +505,17 @@
     }
 
     try {
-      allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
+      // #583: la bacheca legge la VISTA pubblica (`feedback-public`), non i
+      // feedback. Prima scaricava i documenti interi — testo, URL, user agent,
+      // link agli screenshot — e decideva qui cosa disegnare: ma "filtrato in
+      // pagina" vuol dire solo "non disegnato", il resto era già arrivato.
+      // Adesso ogni scheda contiene SOLO i campi pubblici, e le schede
+      // esistono solo per i fix chiusi e mai segnalati dalla sicurezza (la
+      // decisione sta in src/shared/feedbackPublicView.js, dove lo status si
+      // può leggere davvero). I filtri qui sotto restano: sono la seconda
+      // rete, e il gate "uscito in produzione" (DB3) dipende dalla versione
+      // che gira su QUESTA macchina, quindi va applicato qui.
+      allFeedbacks = await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
       dataLoaded = true;
       lastLoadError = null;
     } catch (err) {
@@ -548,7 +563,7 @@
     // loadData usa: su pagine filo:// `window.SN_FEEDBACK` può essere una vista
     // diversa da quella catturata qui, quindi i test non possono affidarsi a
     // rimpiazzare `window.SN_FEEDBACK.list`.
-    setList(fn) { if (typeof fn === 'function') FB.list = fn; },
+    setList(fn) { if (typeof fn === 'function') { FB.listPublic = fn; FB.list = fn; } },
   };
 
   if (document.readyState === 'loading') {

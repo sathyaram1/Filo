@@ -55,6 +55,7 @@
     return out;
   }
 
+<<<<<<< HEAD
   // Invia un percorso al server, che lo ripulisce di nuovo e lo scrive.
   //
   // `idToken` è l'identità su cui il server tiene i limiti di frequenza, e la
@@ -81,6 +82,29 @@
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const res = await fetch(`${FUNCTIONS_BASE}/${SUBMIT_FUNCTION}`, {
+=======
+  // Crea un documento `paths`. I campi corrispondono allo schema di
+  // firestore.rules. `steps` è un array di {selector, action, retracted}.
+  //
+  // #583 — NIENTE `userAgent` e NIENTE `clientId`. Questa raccolta la legge
+  // chiunque, senza credenziali: è una conoscenza condivisa fra tutte le
+  // installazioni, ed è aperta apposta. Quello che ci finiva accanto — chi era
+  // e con che browser — non serviva a nessuno che la legge, e legava righe
+  // pubbliche a un'installazione. Le regole ora rifiutano quei due campi.
+  async function submit({ domain, initialUrl, intent, steps, success }) {
+    const doc = {
+      fields: {
+        domain: toFsValue(domain || ''),
+        initialUrl: toFsValue(initialUrl || ''),
+        intent: toFsValue(intent || ''),
+        steps: toFsValue(Array.isArray(steps) ? steps : []),
+        success: toFsValue(!!success),
+        createdAt: { timestampValue: new Date().toISOString() },
+      },
+    };
+    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
+    const res = await fetch(endpoint, {
+>>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
       method: 'POST',
       headers,
       body: JSON.stringify({ data: { ...pulito.doc, clientId: clientId || '' } }),

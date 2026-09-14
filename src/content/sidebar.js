@@ -443,12 +443,18 @@
       await chrome.runtime.sendMessage({
         type: MSG.SAVE_PATH,
         payload: {
+<<<<<<< HEAD
           // Vuoto di proposito: da #585 il mittente si presenta al server con
           // il token dell'identità dell'installazione, che il server verifica,
           // e che il main allega alla richiesta. Un identificativo generato
           // qui sarebbe autodichiarato, e chi attacca ne scriverebbe un altro
           // a ogni invio.
           clientId: '',
+=======
+          // Niente identificativo di chi sta mandando: questa conoscenza finisce
+          // in una raccolta che legge chiunque, e chi la legge non ha bisogno di
+          // sapere da quale installazione arriva (#583).
+>>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
           session: {
             rawUrl: session.initialUrl,
             rawSteps: session.executedSteps,

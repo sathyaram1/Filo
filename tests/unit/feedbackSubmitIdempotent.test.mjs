@@ -24,7 +24,8 @@ require(join(__dirname, '..', '..', 'src', 'shared', 'feedback.js'));
 const FB = globalThis.SN_FEEDBACK;
 
 // Stub di fetch che registra ogni URL create e risponde in modo controllato.
-// - runQuery (nextSeq) → un solo doc con seq=5 → nextSeq=6
+// - counters/feedbackSeq (nextSeq, #583) → valore 5, l'avanzamento va a buon
+//   fine → il numero assegnato è 6
 // - create sul collection → status pilotato da `createStatuses` (coda), body
 //   con `name` così submit ricava l'id dal path.
 function installFetch({ createStatuses }) {
@@ -33,8 +34,13 @@ function installFetch({ createStatuses }) {
   const prev = globalThis.fetch;
   globalThis.fetch = async (url, opts) => {
     const u = String(url);
-    if (u.includes(':runQuery')) {
-      return { ok: true, status: 200, json: async () => ([{ document: { fields: { seq: { integerValue: '5' } } } }]) };
+    if (u.includes('/counters/')) {
+      if (opts && opts.method === 'PATCH') return { ok: true, status: 200, json: async () => ({}) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ fields: { value: { integerValue: '5' } }, updateTime: '2026-09-01T00:00:00Z' }),
+      };
     }
     // create endpoint (POST sul collection, non runQuery)
     createUrls.push(u);

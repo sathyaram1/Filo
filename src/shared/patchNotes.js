@@ -19,7 +19,13 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
+<<<<<<< HEAD
         'L\'Aiuto tratta le tracce di navigazione lasciate da altri come indizi da verificare sulla pagina, non come istruzioni da eseguire. E nessuno può più aggiungerne una senza passare da Filo. Quelle che mandi tu partono senza i tuoi dati: indirizzi email, IBAN, codici fiscali e numeri di telefono vengono cancellati prima.',
+=======
+        'Quello che scrivi in un feedback lo leggono solo Filo e chi lo lavora: testo, indirizzo della pagina e screenshot non sono raggiungibili da nessun altro. Pubblici restano i miglioramenti già usciti, che vedi in bacheca: il titolo, la versione e la frase scritta per chi li aveva segnalati.',
+        'Quando l\'assistente ti aiuta a fare qualcosa su un sito, quello che Filo impara e condivide con le altre installazioni non porta più nessun segno di chi eri: né un identificativo, né il browser.',
+        'I siti che apri non possono più agire al posto tuo dentro Filo: votare in bacheca, spendere i tuoi crediti per riaprire un fix, farti uscire dall\'account o leggere con che indirizzo sei entrato.',
+>>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
       ],
     },
     {

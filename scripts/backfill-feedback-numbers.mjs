@@ -15,9 +15,17 @@
 // Serve il token admin dell'owner (vedi scripts/admin-login.mjs), ed è l'unica
 // strada rimasta: non c'è più modo di farlo eseguire da un'automazione.
 
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
+
+// #583: i numeri nuovi escono da `counters/feedbackSeq`. Chi ne assegna a mano
+// deve rimettere il contatore in pari, o i prossimi invii ripartirebbero da un
+// numero già usato.
+const require = createRequire(import.meta.url);
+require(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'shared', 'feedback.js'));
+const FB = globalThis.SN_FEEDBACK;
 
 function intField(doc, name) {
   const v = doc?.fields?.[name];
@@ -32,8 +40,8 @@ function strField(doc, name) {
 async function listAll(bearer) {
   // runQuery ordinato per createdAt ASC: i feedback più vecchi prendono i
   // numeri più bassi. 1000 è ben oltre il volume attuale dell'alpha.
-  // La lettura della collezione è pubblica: il bearer serve solo se presente
-  // (in dry-run non si autentica affatto).
+  // La lettura della collezione vuole le credenziali dell'owner (#583)
+  // (anche il giro a vuoto: leggere è già un'operazione con credenziali).
   const headers = { 'Content-Type': 'application/json' };
   if (bearer) headers.Authorization = `Bearer ${bearer}`;
   const res = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
@@ -62,9 +70,10 @@ async function patchSeq(id, seq, bearer) {
   return { ok: res.ok, status: res.status, body: res.ok ? '' : (await res.text()).slice(0, 200) };
 }
 
-// Esegue il backfill. `bearer` null = dry-run (solo lettura, che è pubblica).
-async function backfillNumbers(bearer) {
-  const dry = !bearer;
+// Esegue il backfill. `dry` = solo lettura, nessuna scrittura. Le credenziali
+// servono in entrambi i casi: dal 2026-09 (#583) la collezione dei feedback non
+// si legge senza (il vecchio dry-run senza bearer si prendeva un 403).
+async function backfillNumbers(bearer, { dry = false } = {}) {
   const docs = await listAll(bearer || '');
   const withSeq = docs.filter((d) => intField(d, 'seq') > 0);
   const missing = docs.filter((d) => intField(d, 'seq') === 0);
@@ -82,6 +91,17 @@ async function backfillNumbers(bearer) {
     const r = await patchSeq(id, next, bearer);
     if (r.ok) console.log(`  ✓ #${next++} → ${id}  «${label}»`);
     else { console.error(`  ✗ ${id}: HTTP ${r.status} ${r.body}`); failures++; }
+  }
+  // Il contatore da cui i feedback nuovi prendono il numero: se questo giro ha
+  // assegnato numeri più alti, va allineato (#583).
+  const maxSeq = Math.max(next - 1, withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0));
+  if (!dry && maxSeq > 0) {
+    try {
+      const v = await FB.ensureSeqCounter(maxSeq, { idToken: bearer });
+      console.log(`Contatore dei numeri allineato a ${v}.`);
+    } catch (e) {
+      console.error(`  ! contatore dei numeri non allineato: ${e?.message || e}`);
+    }
   }
   return { total: docs.length, numbered: missing.length - failures, failures, dry };
 }
@@ -112,8 +132,8 @@ const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
   }
   const DRY = process.argv.includes('--dry-run');
   try {
-    const bearer = DRY ? null : await acquireBearer();
-    const r = await backfillNumbers(bearer);
+    const bearer = await acquireBearer();
+    const r = await backfillNumbers(bearer, { dry: DRY });
     console.log(DRY ? '\nDry-run: nessuna scrittura.' : `\nFatto${r.failures ? ` (${r.failures} falliti)` : ''}.`);
     if (r.failures) process.exit(1);
   } catch (e) {

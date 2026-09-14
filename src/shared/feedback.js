@@ -11,6 +11,12 @@
   const BUCKET = 'filo-8b9cb.firebasestorage.app';
   const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY';
   const COLLECTION = 'feedback';
+  // #583: la vista pubblica (un documento per feedback, stesso id, solo i campi
+  // sicuri) e il contatore dei numeri. La collezione vera non si legge più
+  // senza credenziali: vedi firestore.rules e src/shared/feedbackPublicView.js.
+  const VIEW_COLLECTION = 'feedback-public';
+  const COUNTERS_COLLECTION = 'counters';
+  const SEQ_COUNTER = 'feedbackSeq';
 
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
@@ -210,6 +216,41 @@
     return null;
   }
 
+  // ── Chi legge la collezione vera, e come ci arriva (#583) ──────────────────
+  // Le regole ammettono solo l'owner (admin) e il server. L'ID token dell'owner
+  // vive nel main process e non deve mai arrivare in una pagina, quindi da una
+  // pagina filo:// la lettura si CHIEDE al main, che la esegue con il token e
+  // torna le righe già decodificate. Nel main (e negli script) la fetch è
+  // diretta, col token passato dal chiamante.
+  //
+  // Solo `window.filo` (il ponte delle pagine interne): un content script su una
+  // pagina web ha `chrome.runtime.sendMessage`, ma di feedback non ne legge — e
+  // il canale del main rifiuta comunque le origini che non sono filo://.
+  function pageBridge() {
+    const w = (typeof window !== 'undefined') ? window : null;
+    if (w && w.filo && typeof w.filo.message === 'function') return (m) => w.filo.message(m);
+    return null;
+  }
+
+  async function readViaMain(bridge, payload) {
+    // 'feedback_fetch' = MSG.FEEDBACK_FETCH (src/shared/messages.js). Qui il
+    // vocabolario non è caricato: questo modulo gira anche fuori dalle pagine.
+    const r = await bridge({ type: 'feedback_fetch', ...payload });
+    if (!r || r.ok !== true) {
+      const code = r && r.code;
+      if (code === 'not_admin' || code === 'forbidden') {
+        // Non è un guasto: è un permesso che manca. Va detto con parole sue —
+        // tradotto in "controlla la connessione" manderebbe a guardare la cosa
+        // sbagliata, e riprovare non servirebbe a niente.
+        const e = new Error('i feedback li legge solo chi li gestisce: accedi con l\'account amministratore per vederli.');
+        e.code = 'FEEDBACK_READ_DENIED';
+        throw e;
+      }
+      throw new Error((r && r.error) || 'lettura dei feedback non riuscita');
+    }
+    return Array.isArray(r.rows) ? r.rows : [];
+  }
+
   function fsDocToObject(doc) {
     const out = {};
     for (const [k, v] of Object.entries(doc.fields || {})) out[k] = fromFsValue(v);
@@ -267,29 +308,104 @@
     return words.length > maxWords ? out + '…' : out;
   }
 
-  // Prossimo numero progressivo libero: max(seq) + 1. I documenti senza `seq`
-  // (storici, mai backfillati) non compaiono nella query: partono da 1.
-  // Best-effort: una race fra due invii simultanei può duplicare un numero,
-  // accettabile per il volume dell'alpha (il numero è un'etichetta, non una key).
+  // ── Il numero progressivo (#583) ──────────────────────────────────────────
+  // Prima si ricavava con una query sulla collezione feedback ordinata per
+  // `seq`: una LETTURA, e dal 2026-09 la collezione non si legge senza
+  // credenziali — mentre l'invio resta anonimo per scelta. Il numero adesso
+  // viene da un contatore suo, `counters/feedbackSeq`: dentro c'è un intero e
+  // niente altro, chiunque può farlo avanzare di uno, nessuno può farlo tornare
+  // indietro (firestore.rules).
+  //
+  // Avanzamento con controllo di versione (`currentDocument.updateTime`): se
+  // due invii partono insieme, il secondo si accorge che il contatore è
+  // cambiato sotto e rilegge invece di sovrascrivere. Prima la race
+  // DUPLICAVA un numero; adesso non può.
+  //
+  // Torna `null` (invece di lanciare) quando il contatore non c'è ancora o la
+  // concorrenza non si risolve: il feedback parte SENZA numero, come già
+  // faceva quando la query falliva. Il contatore lo crea e lo rimette in pari
+  // l'app dell'owner (che è l'unica a poterlo scrivere a piacere).
+  const SEQ_RETRIES = 5;
+
   async function nextSeq() {
-    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
-    const body = {
-      structuredQuery: {
-        from: [{ collectionId: COLLECTION }],
-        orderBy: [{ field: { fieldPath: 'seq' }, direction: 'DESCENDING' }],
-        limit: 1,
-      },
-    };
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
+    for (let attempt = 0; attempt < SEQ_RETRIES; attempt++) {
+      const res = await fetch(`${docUrl}?key=${API_KEY}`);
+      if (res.status === 404) return null;      // contatore non ancora creato
+      if (!res.ok) throw new Error(`firestore nextSeq fallito (${res.status})`);
+      const doc = await res.json();
+      const current = Number(fromFsValue(doc.fields?.value));
+      const base = Number.isInteger(current) && current > 0 ? current : 0;
+      const next = base + 1;
+      const qs = [
+        'updateMask.fieldPaths=value',
+        `currentDocument.updateTime=${encodeURIComponent(doc.updateTime || '')}`,
+        `key=${API_KEY}`,
+      ].join('&');
+      const w = await fetch(`${docUrl}?${qs}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { value: { integerValue: String(next) } } }),
+      });
+      if (w.ok) return next;
+      // 400/409/412: qualcun altro ha scritto nel frattempo (precondizione
+      // fallita). Si rilegge e si riprova.
+      if (w.status === 400 || w.status === 409 || w.status === 412) continue;
+      throw new Error(`firestore nextSeq fallito (${w.status})`);
+    }
+    return null;
+  }
+
+  // Rimette il contatore in pari: lo crea se manca, lo alza se un `seq` più
+  // alto è già in giro (backfill, migrazioni, numeri assegnati a mano). Solo
+  // owner: serve il token admin. Torna il valore in vigore alla fine.
+  //
+  // `allowLower` lo RIPORTA GIÙ quando è più alto di qualunque `seq` esistente.
+  // Serve perché farlo avanzare di uno lo può fare chiunque (è ciò che fa chi
+  // invia, e non c'è modo di distinguerlo da chi lo alza a vuoto): senza questo,
+  // un estraneo che lo spinge a diecimila lascerebbe i feedback nuovi con numeri
+  // assurdi per sempre, e l'unica cura sarebbe la console. Si passa `true` SOLO
+  // con il numero più alto VERO in mano (SN_FEEDBACK.maxSeq, che lo chiede al
+  // server): con il massimo dei soli feedback caricati si riassegnerebbero
+  // numeri già usati.
+  //
+  // Anche col massimo vero resta una corsa: un invio fra la nostra lettura e la
+  // nostra scrittura assegna un numero che noi non abbiamo visto, e abbassare
+  // lo farebbe riusare. Per questo si scende solo quando lo scarto è più largo
+  // di qualunque corsa realistica (SEQ_LOWER_MARGIN): uno scarto di uno o due è
+  // gente che sta inviando adesso, uno scarto di cento è un contatore gonfiato.
+  // Uno scarto piccolo resta com'è: sono numeri saltati, cioè un'etichetta con
+  // un buco, e vale meno del rischio di stamparne due uguali.
+  const SEQ_LOWER_MARGIN = 10;
+
+  async function ensureSeqCounter(maxSeq, opts = {}) {
+    const value = Math.max(0, Math.trunc(Number(maxSeq) || 0));
+    const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    // La lettura del contatore è pubblica: qui il token non serve.
+    const res = await fetch(`${docUrl}?key=${API_KEY}`);
+    let current = -1;
+    if (res.ok) {
+      const doc = await res.json();
+      const v = Number(fromFsValue(doc.fields?.value));
+      current = Number.isInteger(v) ? v : -1;
+    } else if (res.status !== 404) {
+      throw new Error(`firestore contatore non leggibile (${res.status})`);
+    }
+    if (current === value) return current;
+    if (current > value && !opts.allowLower) return current;
+    if (current > value && current - value < SEQ_LOWER_MARGIN) return current;
+    const w = await fetch(`${docUrl}?updateMask.fieldPaths=value&key=${API_KEY}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ fields: { value: { integerValue: String(value) } } }),
     });
-    if (!res.ok) throw new Error(`firestore nextSeq fallito (${res.status})`);
-    const arr = await res.json();
-    const top = arr.find((r) => r.document);
-    const max = top ? Number(fromFsValue(top.document.fields?.seq)) : 0;
-    return (Number.isInteger(max) && max > 0 ? max : 0) + 1;
+    if (!w.ok) {
+      const t = await w.text().catch(() => '');
+      throw new Error(`firestore contatore non scritto (${w.status}): ${t.slice(0, 200)}`);
+    }
+    return value;
   }
 
   // Invia un feedback. images: array di { dataUrl } (max ~5).
@@ -501,14 +617,39 @@
   // rimandare i campi pesanti che servono solo nel dettaglio, e — con il solo
   // `__name__` — per chiedere a Firestore "cosa è cambiato?" pagando pochi
   // byte: ogni riga porta comunque `updateTime`.
-  async function list({ pageSize = 200, timeoutMs = 0, fields = null } = {}) {
-    // structuredQuery via runQuery, ordinamento per createdAt DESC.
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '' } = {}) {
+    // Da una pagina filo:// la lettura passa dal main, che ha il token admin
+    // (#583): qui non c'è nessuna credenziale, e la collezione non è più
+    // pubblica. Il main torna le righe già decodificate.
+    const bridge = pageBridge();
+    if (bridge) return readViaMain(bridge, { op: 'list', pageSize, timeoutMs, fields });
+    return listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken });
+  }
+
+  // I feedback CHIUSI più di recente (data di chiusura decrescente), non i più
+  // recenti per data d'invio. Serve a chi tiene aggiornata la bacheca: una
+  // segnalazione vecchia chiusa oggi sta in fondo alla lista per data d'invio,
+  // cioè fuori dalla pagina che si carica, e senza questa domanda la sua scheda
+  // non verrebbe scritta mai (niente bacheca, niente annuncio e niente crediti
+  // per chi l'aveva mandata). Qui invece è in cima. La data di chiusura è in
+  // chiaro sul documento, quindi si può ordinare; i feedback che non sono mai
+  // stati chiusi non ce l'hanno e Firestore li lascia fuori da sé.
+  // Serve il token dell'owner: la collezione non si legge senza.
+  async function listResolved({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '' } = {}) {
+    return listDirect(COLLECTION, { pageSize, timeoutMs, idToken, orderField: 'resolvedAt' });
+  }
+
+  // La query vera e propria, senza ponti: la usano il main (col token
+  // dell'owner), gli script e la vista pubblica (che non ha bisogno di token).
+  async function listDirect(collectionId, { pageSize = 200, timeoutMs = 0, fields = null, idToken = '', orderField = 'createdAt' } = {}) {
+    // structuredQuery via runQuery, ordinamento decrescente sul campo chiesto
+    // (per data d'invio salvo che il chiamante ne chieda un altro).
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const body = {
       structuredQuery: {
-        from: [{ collectionId: COLLECTION }],
+        from: [{ collectionId }],
         orderBy: [
-          { field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' },
+          { field: { fieldPath: String(orderField || 'createdAt') }, direction: 'DESCENDING' },
         ],
         limit: pageSize,
       },
@@ -516,9 +657,11 @@
     if (Array.isArray(fields) && fields.length > 0) {
       body.structuredQuery.select = { fields: fields.map((f) => ({ fieldPath: String(f) })) };
     }
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const opts = {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     };
     // Timeout opzionale via AbortController. Se scatta, rilanciamo un errore con
@@ -553,6 +696,55 @@
     return out;
   }
 
+  // Il numero più alto MAI assegnato, chiesto al server con una query sua
+  // (ordinata per `seq`, un documento solo). Serve il token dell'owner: la
+  // collezione non si legge senza.
+  //
+  // Perché non basta il massimo dei feedback caricati: il caricamento si ferma
+  // ai 500 più recenti PER DATA, e Filo quel numero l'ha passato. Chi guardava
+  // solo quella pagina non poteva sapere se il contatore era più alto del
+  // dovuto o solo più alto di quello che aveva visto, e per prudenza non lo
+  // toccava: la cura scritta per un contatore gonfiato non è mai partita.
+  // Questa domanda costa UNA lettura e la risposta è esatta.
+  async function maxSeq({ idToken = '', timeoutMs = 0 } = {}) {
+    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const opts = {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: COLLECTION }],
+          orderBy: [{ field: { fieldPath: 'seq' }, direction: 'DESCENDING' }],
+          limit: 1,
+        },
+      }),
+    };
+    let timer = null;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try { res = await fetch(endpoint, opts); } finally { if (timer) clearTimeout(timer); }
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore maxSeq fallito (${res.status}): ${t.slice(0, 200)}`);
+    }
+    const arr = await res.json();
+    for (const row of Array.isArray(arr) ? arr : []) {
+      if (!row || !row.document) continue;
+      const n = Number(fromFsValue(row.document.fields?.seq));
+      if (Number.isInteger(n) && n >= 0) return n;
+    }
+    // Nessun feedback con un numero: il contatore non ha un massimo da
+    // rispettare. `null`, non 0: chi chiama deve poter distinguere «non lo so»
+    // da «zero», o riporterebbe il contatore a zero su un database vuoto.
+    return null;
+  }
+
   // Le sole "versioni" dei feedback: per ciascuno id + `_updateTime`, niente
   // campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata
   // senza riscaricare tutto (≈130 KB invece di 5 MB per 500 feedback).
@@ -563,14 +755,18 @@
 
   // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
   // solo quelli trovati: un id cancellato nel frattempo non compare. Vuoto → [].
-  async function getMany(ids, { timeoutMs = 0 } = {}) {
+  async function getMany(ids, { timeoutMs = 0, idToken = '' } = {}) {
     const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
     if (wanted.length === 0) return [];
+    const bridge = pageBridge();
+    if (bridge) return readViaMain(bridge, { op: 'getMany', ids: wanted, timeoutMs });
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
     const prefix = `${FIRESTORE_BASE}/${COLLECTION}/`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const opts = {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ documents: wanted.map((id) => prefix + id) }),
     };
     let timer = null;
@@ -599,6 +795,91 @@
       if (row && row.found) out.push(fsDocToObject(row.found));
     }
     return out;
+  }
+
+  // ── La vista pubblica (#583) ──────────────────────────────────────────────
+  // `feedback-public/{id}`: una scheda per feedback chiuso, con i soli campi
+  // pubblici (src/shared/feedbackPublicView.js decide quali e per quali
+  // feedback). È ciò che leggono la bacheca e il popup delle ricompense: niente
+  // token, niente ponte col main: qui dentro non c'è nulla da proteggere.
+
+  // Le schede pubbliche, dalla più recente. Stesso tetto e stesso ordinamento
+  // della lista vera, così chi la mostra non cambia ragionamento.
+  async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
+    return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs });
+  }
+
+  // UNA scheda pubblica (per id). Torna null se non c'è: un feedback che non è
+  // in bacheca semplicemente non ha scheda.
+  async function getPublic(id, { idToken = '' } = {}) {
+    const key = String(id || '');
+    if (!key) return null;
+    const url = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(key)}?key=${API_KEY}`;
+    const headers = idToken ? { Authorization: `Bearer ${idToken}` } : undefined;
+    const res = await fetch(url, headers ? { headers } : undefined);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`firestore vista pubblica fallita (${res.status})`);
+    return fsDocToObject(await res.json());
+  }
+
+  // Scrive (o aggiorna) la scheda pubblica di un feedback. La maschera elenca
+  // SOLO i campi della scheda: `votes` e `reopenRequests` li scrivono gli
+  // utenti e non devono essere cancellati da una ripubblicazione.
+  // Serve il token dell'owner (o del server): le regole non ammettono altri.
+  async function publishPublicCard(id, card, opts = {}) {
+    const key = String(id || '');
+    if (!key) throw new Error('id mancante');
+    const V = global.SN_FEEDBACK_PUBLIC_VIEW;
+    const names = (V && V.CARD_FIELDS) ? V.CARD_FIELDS : Object.keys(card || {});
+    const fields = {};
+    const mask = [];
+    for (const f of names) {
+      if (f === 'publishedAt') continue;
+      const v = (card || {})[f];
+      fields[f] = toFsValue(v === undefined ? '' : v);
+      mask.push(f);
+    }
+    fields.publishedAt = toFsValue(new Date().toISOString());
+    mask.push('publishedAt');
+    // I voti e le riaperture li scrivono gli UTENTI, quindi di norma non
+    // entrano nella maschera: una ripubblicazione li cancellerebbe. L'unica
+    // volta che ci entrano è il travaso dal documento alla scheda (#583,
+    // SN_FEEDBACK_PUBLIC_VIEW.carryUserFields), e in quel caso il valore che
+    // arriva qui ha già dentro anche quello che c'era sulla scheda.
+    const userFields = (V && V.USER_FIELDS) ? V.USER_FIELDS : ['votes', 'reopenRequests'];
+    for (const f of userFields) {
+      const v = (card || {})[f];
+      if (!v || typeof v !== 'object') continue;
+      fields[f] = toFsValue(v);
+      mask.push(f);
+    }
+    const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
+    const url = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(key)}?${qs}&key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    const res = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify({ fields }) });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore pubblicazione scheda fallita (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return true;
+  }
+
+  // Toglie la scheda pubblica: un fix riaperto o riclassificato esce dalla
+  // bacheca perché la sua scheda non c'è più, non perché la pagina la nasconde.
+  async function unpublishPublicCard(id, opts = {}) {
+    const key = String(id || '');
+    if (!key) throw new Error('id mancante');
+    const url = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(key)}?key=${API_KEY}`;
+    const headers = {};
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    const res = await fetch(url, { method: 'DELETE', headers });
+    // 404 = già tolta: l'esito voluto è lo stesso.
+    if (!res.ok && res.status !== 404) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore rimozione scheda fallita (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return true;
   }
 
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
@@ -764,9 +1045,17 @@
   // ---- voti di verifica (DB4) ----
   // Substrato dei voti "funziona / non funziona" che la board utente (DC*) e
   // l'archiviazione automatica a punteggio (DC3) leggono. I voti vivono in un
-  // campo `votes` (map) SUL documento feedback: chiave = uid del votante, valore
-  // = { vote, at, credibilitySnapshot }. Un voto per utente, cambiabile.
+  // campo `votes` (map): chiave = uid del votante, valore = { vote, at,
+  // credibilitySnapshot }. Un voto per utente, cambiabile.
   // Le Firestore rules vincolano ogni utente a scrivere SOLO la propria chiave.
+  //
+  // #583: stanno sulla SCHEDA PUBBLICA (`feedback-public/{id}`), non più sul
+  // documento feedback. È lì che la bacheca li legge — il documento vero, da
+  // quando non è più pubblico, chi vota non lo può nemmeno aprire — e tenerli in
+  // due posti avrebbe voluto dire due copie che divergono. Chi fa i conti dal
+  // lato dell'owner (archiviazione a punteggio) li riceve dal main, che unisce
+  // la scheda al documento quando lo legge. I voti storici già scritti sul
+  // documento restano leggibili da lì.
   const VOTE_WORKS = 'works';
   const VOTE_BROKEN = 'broken';
   const VOTE_VALUES = [VOTE_WORKS, VOTE_BROKEN];
@@ -834,7 +1123,7 @@
     };
     const fieldPath = `votes.\`${uid}\``;
     const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const endpoint = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
     const body = { fields: { votes: { mapValue: { fields: { [uid]: toFsValue(entry) } } } } };
@@ -854,7 +1143,7 @@
     if (!uid) throw new Error('uid mancante');
     const fieldPath = `votes.\`${uid}\``;
     const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const endpoint = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
     const res = await fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields: {} }) });
@@ -879,7 +1168,7 @@
     const entry = { at: new Date().toISOString() };
     const fieldPath = `reopenRequests.\`${uid}\``;
     const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const endpoint = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
     const body = { fields: { reopenRequests: { mapValue: { fields: { [uid]: toFsValue(entry) } } } } };
@@ -894,8 +1183,21 @@
   global.SN_FEEDBACK = {
     submit,
     list,
+    // I chiusi più di recente: è così che una segnalazione vecchia chiusa oggi
+    // arriva in bacheca, senza allargare il caricamento per data d'invio.
+    listResolved,
     listVersions,
     getMany,
+    // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
+    // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.
+    listPublic,
+    getPublic,
+    publishPublicCard,
+    unpublishPublicCard,
+    // Il contatore dei numeri (l'owner lo crea e lo rimette in pari).
+    ensureSeqCounter,
+    nextSeq,
+    maxSeq,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
     listHitCap,
@@ -924,7 +1226,7 @@
     toFsValue,
     fromFsValue,
     fsDocToObject,
-    rest: { FIRESTORE_BASE, API_KEY, PROJECT_ID },
+    rest: { FIRESTORE_BASE, API_KEY, PROJECT_ID, VIEW_COLLECTION },
     configPublic: { projectId: PROJECT_ID, bucket: BUCKET, collection: COLLECTION },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

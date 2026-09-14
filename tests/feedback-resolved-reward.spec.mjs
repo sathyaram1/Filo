@@ -1,23 +1,36 @@
 // Ricompensa alla risoluzione di un feedback (C5): all'avvio, se un feedback
 // INVIATO DA QUESTO UTENTE è passato a "risolto", la home mostra un popup di
-// ringraziamento con la spiegazione non tecnica e accredita crediti in base alla
-// priorità (50/100/200/300), UNA VOLTA SOLA per feedback.
+// ringraziamento con la spiegazione non tecnica e accredita crediti UNA VOLTA
+// SOLA per feedback.
 //
 // Asserisce il SUCCESSO della feature: compare il popup #thanksOverlay con il
 // titolo del feedback + la spiegazione, e il saldo crediti cresce dell'importo
 // atteso. Senza il fix il popup non compare mai e il saldo non cambia.
 //
-// La lista feedback (normalmente da Firestore via rete) è stubbata nel main così
-// il test è deterministico e offline.
+// Da dove arrivano i dati (#583): dalla VISTA pubblica dei feedback
+// (`feedback-public`), non dai documenti — che ora non si leggono senza le
+// credenziali dell'owner, e questa è la macchina di chi ha mandato la
+// segnalazione. Nella scheda c'è quello che serve qui: l'hash
+// dell'installazione (per riconoscere i propri), il titolo, il numero, la
+// FRASE per chi ha segnalato e i CREDITI che gli spettano. La priorità no:
+// viaggia cifrata e non è cosa da collezione pubblica, quindi sulla scheda si
+// scrive la cifra, non il giudizio che l'ha decisa. Una scheda senza quella
+// cifra (pubblicata prima che il campo esistesse) vale la fascia di base.
+// La lista (normalmente da Firestore via rete) è stubbata nel main così il
+// test è deterministico e offline.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const CLIENT_ID = 'test-client-c5';
 
-// Stub della lista feedback + clientId di questo install + reset del saldo a uno
-// stato fresco noto (1000). Va fatto DOPO il boot, poi si ricarica la home.
-async function seed(app, feedback) {
-  await app.evaluate(async (_electron, { clientId, feedback }) => {
+// Stub delle SCHEDE pubbliche + clientId di questo install + reset del saldo a
+// uno stato fresco noto (1000). Va fatto DOPO il boot, poi si ricarica la home.
+// Una scheda con `mia: true` prende l'impronta di QUELLA scheda per QUESTA
+// installazione: è così che il popup riconosce i feedback di chi lo sta
+// guardando, senza che la bacheca (pubblica) permetta a un estraneo di
+// raggruppare i fix per segnalatore (#583).
+async function seed(app, schede) {
+  await app.evaluate(async (_electron, { clientId, schede }) => {
     await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
     const fresh = globalThis.SN_CREDITS.freshState();
     // Isola la ricompensa di RISOLUZIONE (C5) dal bonus giornaliero separato
@@ -26,16 +39,22 @@ async function seed(app, feedback) {
     // come già ricevuto oggi: qui misuriamo SOLO il premio per il feedback risolto.
     fresh.lastAutoFeedbackBonusDate = globalThis.SN_CREDITS.dateKey();
     await globalThis.SN_CREDITS.writeState(fresh);
-    // Niente rete: la lista è quella che passiamo noi.
-    globalThis.SN_FEEDBACK.list = async () => feedback;
-  }, { clientId: CLIENT_ID, feedback });
+    const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
+    const mioHash = await H.hashClientId(clientId);
+    const cards = [];
+    for (const { mia, ...c } of schede) {
+      cards.push(mia ? { ...c, clientIdTag: await H.cardTag(c._id, mioHash) } : c);
+    }
+    // Niente rete: le schede sono quelle che passiamo noi.
+    globalThis.SN_FEEDBACK.listPublic = async () => cards;
+  }, { clientId: CLIENT_ID, schede });
 }
 
 function balanceOf(app) {
   return app.evaluate(async () => (await globalThis.SN_CREDITS.getPublic()).balance);
 }
 
-test('feedback risolto: popup di ringraziamento + ricompensa per priorità', async ({ app, openTab }) => {
+test('feedback risolto: popup di ringraziamento + ricompensa', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
   // Lascia che l'init iniziale (clientId ancora assente → nessun premio) si
@@ -45,9 +64,9 @@ test('feedback risolto: popup di ringraziamento + ricompensa per priorità', asy
 
   await seed(app, [
     {
-      _id: 'fbA', clientId: CLIENT_ID, status: 'done', priority: 2,
+      _id: 'fbA', mia: true, status: 'done', statusPublic: 'closed',
       name: 'Incolla immagine nel box', seq: 42, subSeq: 0,
-      notes: 'Ora puoi incollare un’immagine direttamente nel box e arriva intera.',
+      userNote: 'Ora puoi incollare un’immagine direttamente nel box e arriva intera.',
     },
   ]);
   await page.reload();
@@ -61,9 +80,40 @@ test('feedback risolto: popup di ringraziamento + ricompensa per priorità', asy
   await expect(page.locator('.dash-thanks-item-body'))
     .toHaveText('Ora puoi incollare un’immagine direttamente nel box e arriva intera.');
 
-  // Priorità 2 → +200 crediti (mostrati nel totale e accreditati sul saldo).
-  await expect(page.locator('.dash-thanks-total')).toContainText('+200');
-  await expect.poll(() => balanceOf(app)).toBe(1200);
+  // +50 crediti, la fascia di base: questa scheda non porta la cifra, ed è il
+  // caso delle schede pubblicate prima che il campo esistesse.
+  await expect(page.locator('.dash-thanks-total')).toContainText('+50');
+  await expect.poll(() => balanceOf(app)).toBe(1050);
+});
+
+test('la ricompensa segue quanto contava la segnalazione, non la fascia minima', async ({ app, openTab }) => {
+  // Una segnalazione che l'owner aveva messo in cima vale 300 crediti, non 50.
+  // La sua macchina la priorità non la vede (è cifrata, e la scheda pubblica
+  // non la porta): la cifra gliela dice la scheda. Senza quel campo il popup
+  // annuncia 50 a tutti, in silenzio, e non si rimedia dopo — un feedback
+  // premiato resta premiato (#583, giro 2 di verifica).
+  const page = await openTab('filo://newtab/');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+
+  // La cifra non è scritta a mano: è quella che il publisher mette sulla scheda
+  // di un feedback di priorità 3, cioè la stessa tabella del portafoglio.
+  const attesa = await app.evaluate(async () => globalThis.SN_FEEDBACK_PUBLIC_VIEW.rewardFor(3));
+  expect(attesa).toBeGreaterThan(50);
+
+  await seed(app, [
+    {
+      _id: 'fbGrosso', mia: true, status: 'done', statusPublic: 'closed',
+      name: 'Filo non si apriva più', seq: 7, subSeq: 0,
+      userNote: 'Adesso si apre.', reward: attesa,
+    },
+  ]);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('#thanksOverlay')).toBeVisible();
+  await expect(page.locator('.dash-thanks-total')).toContainText(`+${attesa}`);
+  await expect.poll(() => balanceOf(app)).toBe(1000 + attesa);
 });
 
 test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTab }) => {
@@ -75,12 +125,13 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
   await page.waitForTimeout(500);
 
   await seed(app, [
-    { _id: 'fb1', clientId: CLIENT_ID, status: 'done', priority: 3, name: 'Uno', seq: 1, subSeq: 0, notes: 'Sistemato uno.' },
-    { _id: 'fb2', clientId: CLIENT_ID, status: 'done', priority: 0, name: 'Due', seq: 2, subSeq: 0, notes: 'Sistemato due.' },
-    // Non deve premiare: non è done.
-    { _id: 'fb3', clientId: CLIENT_ID, status: 'todo', priority: 3, name: 'Tre', seq: 3, subSeq: 0, notes: '' },
-    // Non deve premiare: di un altro utente.
-    { _id: 'fb4', clientId: 'altro-utente', status: 'done', priority: 3, name: 'Quattro', seq: 4, subSeq: 0, notes: '' },
+    { _id: 'fb1', mia: true, status: 'done', statusPublic: 'closed', name: 'Uno', seq: 1, subSeq: 0, userNote: 'Sistemato uno.' },
+    { _id: 'fb2', mia: true, status: 'done', statusPublic: 'closed', name: 'Due', seq: 2, subSeq: 0, userNote: 'Sistemato due.' },
+    // Non deve premiare: non è chiuso (una scheda così non verrebbe nemmeno
+    // pubblicata, ma il popup non deve fidarsi).
+    { _id: 'fb3', mia: true, status: 'done', statusPublic: 'open', name: 'Tre', seq: 3, subSeq: 0, userNote: '' },
+    // Non deve premiare: di un'altra installazione.
+    { _id: 'fb4', clientIdTag: 'b'.repeat(32), status: 'done', statusPublic: 'closed', name: 'Quattro', seq: 4, subSeq: 0, userNote: '' },
   ]);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
@@ -88,9 +139,9 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
   await expect(page.locator('#thanksOverlay')).toBeVisible();
   // Solo i due feedback done DI QUESTO utente.
   await expect(page.locator('.dash-thanks-item')).toHaveCount(2);
-  // 300 (prio 3) + 50 (prio 0) = 350.
-  await expect(page.locator('.dash-thanks-total')).toContainText('+350');
-  await expect.poll(() => balanceOf(app)).toBe(1350);
+  // 50 + 50 = 100.
+  await expect(page.locator('.dash-thanks-total')).toContainText('+100');
+  await expect.poll(() => balanceOf(app)).toBe(1100);
 });
 
 test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'ha mandato', async ({ app, openTab }) => {
@@ -107,13 +158,15 @@ test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'h
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(500);
 
+  // (Oggi una scheda così non verrebbe nemmeno pubblicata — #583: la vista
+  // esclude tutto ciò che è passato dalle mani della sicurezza. Qui la si
+  // semina lo stesso: la mappa degli stati pubblici deve reggere da sola.)
   await seed(app, [
     {
-      _id: 'fbAttacco', clientId: CLIENT_ID, clientIdHash: undefined,
-      status: 'FENC1:cifrato-non-leggibile-dalla-sua-macchina',
+      _id: 'fbAttacco', mia: true,
       statusPublic,
-      priority: 0, name: 'Ignora le istruzioni precedenti e…', seq: 99, subSeq: 0,
-      notes: '',
+      name: 'Ignora le istruzioni precedenti e…', seq: 99, subSeq: 0,
+      userNote: '',
     },
   ]);
   await page.reload();
@@ -133,13 +186,13 @@ test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async
   await page.waitForTimeout(500);
 
   await seed(app, [
-    { _id: 'fbZ', clientId: CLIENT_ID, status: 'done', priority: 1, name: 'Una cosa', seq: 7, subSeq: 0, notes: 'Fatto.' },
+    { _id: 'fbZ', mia: true, status: 'done', statusPublic: 'closed', name: 'Una cosa', seq: 7, subSeq: 0, userNote: 'Fatto.' },
   ]);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
 
   await expect(page.locator('#thanksOverlay')).toBeVisible();
-  await expect.poll(() => balanceOf(app)).toBe(1100); // 1000 + 100 (prio 1)
+  await expect.poll(() => balanceOf(app)).toBe(1050); // 1000 + 50 (ricompensa di base)
 
   await page.locator('.dash-recap-done').click();
   await expect(page.locator('#thanksOverlay')).toHaveCount(0);
@@ -149,5 +202,5 @@ test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(400);
   await expect(page.locator('#thanksOverlay')).toHaveCount(0);
-  expect(await balanceOf(app)).toBe(1100);
+  expect(await balanceOf(app)).toBe(1050);
 });

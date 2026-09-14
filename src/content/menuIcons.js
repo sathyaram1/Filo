@@ -43,6 +43,28 @@
     return out;
   }
 
+  // #583 — «Feedback» fra le icone apre la POSTA delle segnalazioni, che da
+  // quando i feedback li legge solo chi li gestisce non ha niente da mostrare a
+  // un utente comune: una pagina vuota con un invito ad accedere come
+  // amministratore, cosa che accedendo non si diventa. L'icona compare quindi
+  // solo all'owner. Parte nascosta e si accende dopo la risposta del main:
+  // sbagliare per difetto fa perdere un'icona a una persona sola, sbagliare per
+  // eccesso manda tutti gli altri in un vicolo cieco.
+  let isOwner = false;
+  function refreshOwner() {
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS }))
+        .then((r) => {
+          const now = !!(r && r.ok && r.signedIn && r.isAdmin);
+          if (now === isOwner) return;
+          isOwner = now;
+          // Il menu può essere già aperto: le icone si ridisegnano da sole.
+          try { redrawIconRows(); } catch (_) {}
+        })
+        .catch(() => {});
+    } catch (_) {}
+  }
+
   function runInTopFrame(iconId) {
     try {
       Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RUN_IN_TOP_FRAME, iconId })).catch(() => {});
@@ -92,7 +114,7 @@
     // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
     const canBack = navState ? !!navState.canBack : true;
     const canFwd = navState ? !!navState.canFwd : true;
-    return {
+    const registry = {
       translate:     { id: 'translate',     icon: translateIcon,    label: translateLabel,                   onClick: () => (restore ? Translate.restoreOriginal() : Translate.translatePage()) },
       screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => Actions.takeScreenshot() },
       screenshotCrop:{ id: 'screenshotCrop',icon: I('screenshotCrop'),label: I18n.t('menu_screenshot_crop'), onClick: () => Actions.takePartialScreenshot() },
@@ -114,8 +136,15 @@
       openOptions:   { id: 'openOptions',   icon: I('options'),     label: I18n.t('menu_open_options'),      onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS }) },
       home:          { id: 'home',          icon: I('home'),        label: I18n.t('menu_open_home'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.GO_HOME }) },
       editorApp:     { id: 'editorApp',     icon: I('editor'),      label: I18n.t('menu_open_editor'),       onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }) },
-      feedbackApp:   { id: 'feedbackApp',   icon: I('feedback'),    label: I18n.t('menu_open_feedback'),      onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) },
     };
+    // Solo all'owner (vedi refreshOwner sopra): a chiunque altro quella pagina
+    // non ha niente da mostrare. Un id assente dal registro sparisce da solo
+    // anche dai layout che l'utente si era salvato: i builder filtrano su
+    // `registry[id]`.
+    if (isOwner) {
+      registry.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
+    }
+    return registry;
   }
 
   // Layout di default: icone primarie nella riga, le altre nella griglia
@@ -211,6 +240,7 @@
     } catch (_) { iconLayoutCache = DEFAULT_ICON_LAYOUT; }
   }
   loadIconLayout();
+  refreshOwner();
 
   function getIconLayout() {
     return iconLayoutCache || DEFAULT_ICON_LAYOUT;
@@ -286,6 +316,9 @@
   // a redrawIconRows() per i rebuild post-drag.
   function buildGlobalIconRow(navState) {
     lastNavState = navState || null;
+    // Chi apre il menu può essere entrato (o uscito) da quando la pagina è
+    // stata caricata: si richiede, e se cambia le icone si ridisegnano.
+    refreshOwner();
     return {
       type: 'row',
       dropTarget: 'primary',
