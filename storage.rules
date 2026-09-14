@@ -58,52 +58,34 @@ rules_version = '2';
 //   un allegato caricato senza che il deposito ne rilasci uno non si deve
 //   registrare come riuscito (src/shared/feedback.js → uploadImage rifiuta, e
 //   chi invia se lo vede scritto fra gli allegati non caricati).
-=======
-// Regole Storage degli ALLEGATI dei feedback (audit pre-alpha, #582).
 //
-// Cosa c'era prima, e perché non reggeva. Su `feedback/{file=**}` la lettura
-// era `if true` e la scrittura chiedeva solo dimensione e content-type:
-// nessun controllo di identità, in nessuna direzione.
-// - In Storage `read` comprende `list`: col nome del bucket (che sta nel repo,
-//   accanto alla chiave web di Firebase) si ELENCAVA il bucket e si scaricava
-//   tutto — cioè gli screenshot dello schermo dei tester, uno dopo l'altro,
-//   senza sapere niente di nessun feedback.
-// - `write` comprende `update` e `delete`: chi conosceva il nome di un allegato
-//   ci scriveva sopra (uno screenshot sostituito dopo che il giudice l'ha
-//   visto) o lo cancellava.
-// - E un bucket aperto in lettura è hosting gratuito sul dominio dell'owner.
-//
-// Il confine ora:
-// - LEGGE l'owner, provando di esserlo (allowlist `admins` di Firestore, la
-//   stessa di firestore.rules, letta con le regole cross-service: una fonte
-//   sola, aggiungere un collaboratore resta una cosa da fare in un posto).
-//   Il server dei giudici legge con l'Admin SDK, che le regole non le guarda.
-// - ELENCARE non si può, per NESSUNO: `list` non è concesso da nessuna riga,
-//   nemmeno all'owner (la dashboard non elenca il bucket: apre gli allegati che
-//   il documento del feedback nomina). Un permesso che nessuno usa è solo una
-//   porta in più.
-// - SCRIVE chiunque mandi un feedback, anche senza login — l'invio anonimo è
-//   voluto, e resta — ma SOLO in CREAZIONE, su un nome che ancora non esiste.
+// - Scrittura: SOLO in CREAZIONE, su un nome che ancora non esiste (#582).
 //   Niente `update`, niente `delete`: un allegato, una volta scritto, è
 //   immutabile. Il `resource == null` è ciò che lo dice, ed è anche ciò che
 //   rende la cancellazione impossibile (in una delete `resource` c'è).
+//   Conseguenza da tenere presente: cancellare un allegato non è permesso a
+//   nessuno, owner compreso, quindi un file caricato per dispetto si toglie
+//   solo dalla console del progetto.
 // - Il nome deve portare ENTROPIA (un uuid), così non lo si indovina e non lo
 //   si riusa: il pattern è quello che genera `SN_FEEDBACK.attachmentPath`
 //   (src/shared/feedback.js), e una sentinella negli unit test
 //   (tests/unit/storageRulesAllegati.test.mjs) confronta i due e diventa rossa
-//   se divergono.
+//   se divergono. Senza, `screenshot.png` era un nome come un altro.
 //
-// LA CAPACITÀ CHE RESTA, dichiarata. Una strada per leggere un allegato senza
-// essere l'owner esiste ed è una sola: il download token che Storage assegna
-// all'oggetto quando viene creato e che finisce nell'URL salvato nel feedback
+// LA CAPACITÀ CHE RESTA, dichiarata. Una strada per leggere un allegato esiste
+// ed è una sola: il download token che Storage assegna all'oggetto quando
+// viene creato e che finisce nell'URL salvato nel feedback
 // (`?alt=media&token=…`). Quei link scavalcano queste regole per costruzione —
-// è il loro mestiere — e servono al server dei giudici, che le immagini le
-// passa a un modello con ingresso visivo. Quindi l'URL col token vale quanto
-// l'allegato: vive dentro il documento del feedback, e chiudere la lettura di
-// quei documenti è l'ALTRA METÀ di questo confine (il feedback gemello sulla
-// lettura dei documenti feedback). Senza token, `?alt=media` passa di qui e a
-// un anonimo risponde 403.
->>>>>>> a59b09cdd (feedback #582: regole degli allegati dei feedback (lavoro squashato per il riallineamento))
+// è il loro mestiere, ed è la strada da cui leggono sia la dashboard (via main,
+// che decifra) sia il server dei giudici, che le immagini le passa a un modello
+// con ingresso visivo. Quindi l'URL col token vale quanto l'allegato: vive
+// dentro il documento del feedback, e chiudere la lettura di quei documenti è
+// l'ALTRA METÀ di questo confine (#583). Senza token, `?alt=media` passa di qui
+// e risponde 403 a chiunque, owner compreso.
+//
+// ⚠️ Queste regole diventano vere il giorno in cui le si pubblica sul progetto
+// Firebase. Finché quel comando non gira, nel repo c'è un confine stretto e in
+// produzione la porta è ancora quella di prima: è un passo da fare a mano.
 
 service firebase.storage {
   match /b/{bucket}/o {
