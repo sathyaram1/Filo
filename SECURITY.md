@@ -243,6 +243,19 @@ le regole, poi si ruotano le chiavi dai pannelli dei servizi. Al contrario, le
 chiavi nuove finiscono in un documento che chiunque legge ancora, e la
 rotazione è da rifare da capo.
 
+**Poi vanno ruotati i codici di scarico degli allegati vecchi.** Le regole nuove
+negano il `get` sul deposito, quindi un allegato si apre solo col codice che sta
+nel suo link. Quel codice è quello che serviva: gli indirizzi degli allegati
+stavano dentro i documenti dei feedback, leggibili da chiunque fino a questo
+audit, e chi li ha raccolti in quei mesi se li tiene. Ruotare il codice di un
+file (Firebase Console → Storage → il file → «Crea nuovo token di download», e
+cancella il vecchio) manda in errore i link scappati. Prima serviva a zero,
+perché col `get` aperto il file si prendeva lo stesso dall'indirizzo. Vale
+soprattutto per gli allegati anteriori al 25 giugno 2026, che non sono cifrati.
+Dopo la rotazione i link dentro i documenti dei feedback puntano al codice
+vecchio, quindi quei documenti vanno riscritti col link nuovo: è lo stesso
+lavoro di migrazione dei documenti storici, e si fa insieme.
+
 ---
 
 ## 8. I percorsi condivisi dell'Aiuto
