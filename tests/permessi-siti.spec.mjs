@@ -1639,3 +1639,232 @@ test('in incognito le Impostazioni elencano anche le risposte delle finestre nor
     return Object.keys(s || {}).length;
   }, { timeout: 10_000 }).toBe(0);
 });
+
+// ─── #586, giro 9 ────────────────────────────────────────────────────────────
+
+// Le due strade per lo schermo devono passare TUTTE E DUE dalla scelta di cosa
+// si condivide. La vecchia (getUserMedia con chromeMediaSource «desktop»)
+// saltava il riquadro: dopo un «Consenti» solo partivano lo schermo intero e
+// l'audio del computer insieme, e chi rispondeva non aveva modo di scegliere
+// una finestra sola né di rifiutare il suono.
+const HTML_SCHERMO_VECCHIO = `<!doctype html><html><body style="margin:0">
+<script>
+  const piatto = (s) => s.getTracks().map((t) => t.kind);
+  window.__vecchiaConAudio = () => navigator.mediaDevices.getUserMedia({
+    audio: { mandatory: { chromeMediaSource: 'desktop' } },
+    video: { mandatory: { chromeMediaSource: 'desktop' } },
+  }).then((s) => { window.__s = s; return piatto(s); }, (e) => ['no:' + ((e && e.name) || '?')]);
+</script></body></html>`;
+
+test('la strada vecchia dello schermo passa dalla scelta di cosa condividere', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, HTML_SCHERMO_VECCHIO);
+
+  const esito = page.evaluate(() => window.__vecchiaConAudio());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+
+  // Senza il fix qui non compare niente e alla pagina arrivano già immagine e
+  // audio del computer.
+  await expect(
+    shell.locator('.perm-source'),
+    'dalla strada vecchia il riquadro «cosa condividi» non è comparso: lo schermo intero parte '
+    + 'con un «Consenti» solo, e la scelta che Filo promette vale solo per i siti che chiedono '
+    + 'con le buone',
+  ).toHaveCount(1, { timeout: 20_000 });
+  // La spunta dell'audio del computer c'è, perché il sito l'ha chiesto, e parte spenta.
+  await expect(shell.locator('.perm-source-audio')).toHaveCount(1);
+
+  await shell.locator('.perm-source-item').first().click();
+  const tracce = await esito;
+  expect(tracce, `chi sceglie deve ottenere lo schermo: è arrivato ${JSON.stringify(tracce)}`)
+    .toContain('video');
+  expect(
+    tracce,
+    'l\'audio del computer è arrivato senza che nessuno abbia acceso la spunta',
+  ).not.toContain('audio');
+});
+
+// Togliere il permesso deve chiudere quello che il sito ha già in mano ANCHE se
+// la pagina risponde il falso. Il conto delle tracce vive non lo tiene più il
+// mondo della pagina, che la pagina può riscrivere, ma il preload, i cui stampi
+// la pagina non tocca (#586, giro 9).
+const HTML_PAGINA_CHE_MENTE = `<!doctype html><html><body style="margin:0">
+<script>
+  window.__tracce = [];
+  const d = Object.getOwnPropertyDescriptor(MediaStreamTrack.prototype, 'readyState');
+  window.__veroStato = (t) => d.get.call(t);
+  Object.defineProperty(MediaStreamTrack.prototype, 'readyState', {
+    configurable: true, get() { return 'ended'; },
+  });
+  MediaStreamTrack.prototype.stop = function () {};
+  window.__chiedi = () => navigator.mediaDevices.getUserMedia({ audio: true }).then(
+    (s) => { window.__tracce.push(...s.getTracks()); return 'ok'; },
+    (e) => 'no:' + ((e && e.name) || '?'));
+  window.__vero = () => window.__tracce.map((t) => window.__veroStato(t));
+</script></body></html>`;
+
+test('la revoca chiude il microfono anche se la pagina giura che è già chiuso', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, HTML_PAGINA_CHE_MENTE);
+  const origine = new URL(page.url()).origin;
+
+  const esito = page.evaluate(() => window.__chiedi());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  expect(await esito).toBe('ok');
+  expect(await page.evaluate(() => window.__vero())).toEqual(['live']);
+
+  // La revoca come la fa la pagina Sicurezza: stesso canale, stesso choke point.
+  await app.evaluate(async (_e, o) => {
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: globalThis.SN_MSG.MSG.PERMESSI_SITI_REVOCA, origine: o, chiave: 'microfono' },
+      { url: 'filo://security/security.html' },
+    );
+  }, origine);
+
+  await page.waitForTimeout(2500);
+  const vero = await page.evaluate(() => window.__vero()).catch(() => ['ricaricata']);
+  expect(
+    vero,
+    'tolto il permesso, il microfono del sito è ancora aperto: alla domanda «hai ancora qualcosa '
+    + 'di vivo?» la pagina ha risposto di no e le è stato creduto',
+  ).not.toContain('live');
+});
+
+// Il riquadro «cosa condividi» appartiene alla PAGINA che l'ha chiesto: se
+// quella se ne va, se ne va anche lui. Restava sopra la pagina nuova col nome
+// del sito di prima, e premerci accendeva il cartello «può vedere il tuo
+// schermo» per un sito a cui non arrivava niente (#586, giro 9).
+test('il riquadro «cosa condividi» se ne va con la pagina che l\'aveva chiesto', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<script>window.__schermo = () => navigator.mediaDevices.getDisplayMedia({ video: true })
+  .then(() => 'ok', (e) => 'no:' + ((e && e.name) || '?'));</script></body></html>`);
+  const altra = testServer.html('<!doctype html><html><body><h1>un altro posto</h1></body></html>');
+
+  page.evaluate(() => window.__schermo()).catch(() => {});
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  await expect(shell.locator('.perm-source')).toHaveCount(1, { timeout: 20_000 });
+
+  await page.evaluate((u) => { window.location.href = u; }, altra).catch(() => {});
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await shell.waitForTimeout(2000);
+
+  await expect(
+    shell.locator('.perm-source'),
+    'la pagina che aveva chiesto lo schermo se n\'è andata e il riquadro è rimasto sopra quella '
+    + 'nuova, col nome del sito di prima',
+  ).toHaveCount(0);
+  await expect(
+    shell.locator('.perm-live'),
+    'dopo la navigazione è rimasto acceso un cartello per una ripresa che non è mai partita',
+  ).toHaveCount(0);
+});
+
+// Un «Nega» che non resta scritto da nessuna parte (lo schermo, che per scelta
+// non si ricorda mai) deve comunque portare alla via d'uscita: dopo tre, Filo
+// smette di chiedere su quella pagina e lo dice. Prima il conto si azzerava a
+// ogni risposta, e un sito poteva rimettere la domanda all'infinito.
+test('tre «Nega» allo schermo portano alla via d\'uscita, come tre chiusure', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<script>window.__schermo = () => navigator.mediaDevices.getDisplayMedia({ video: true })
+  .then(() => 'ok', (e) => 'no:' + ((e && e.name) || '?'));</script></body></html>`);
+
+  for (let i = 0; i < 3; i++) {
+    const p = page.evaluate(() => window.__schermo());
+    await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+    await shell.locator('.perm-chip .perm-chip-btn', { hasText: 'Nega' }).first().click();
+    await p.catch(() => {});
+    await shell.waitForTimeout(200);
+  }
+
+  const quarta = page.evaluate(() => window.__schermo());
+  await shell.waitForTimeout(2500);
+  const domande = await shell.locator('.perm-chip').count();
+  const righe = (await shell.locator('.perm-live').allTextContents()).join(' | ');
+  await quarta.catch(() => {});
+  expect(domande, 'dopo tre «Nega» la domanda dello schermo torna ancora').toBe(0);
+  expect(
+    righe,
+    'Filo ha smesso di chiedere senza dirlo: chi ha detto no tre volte non sa perché il pulsante '
+    + 'non fa più niente, né come tornare indietro',
+  ).toMatch(/smesso di chiedere/i);
+});
+
+// Finché un sito può usare il microfono, la fotocamera o vedere lo schermo,
+// dev'esserci un segno anche quando si sta guardando un'altra scheda. Il
+// cartello sotto le schede appartiene alla scheda che l'ha chiesto e sparisce
+// appena se ne apre un'altra: di un microfono aperto non restava nessun segno
+// da nessuna parte, e «Interrompi» non si raggiungeva senza indovinare la
+// scheda (#586, giro 9).
+test('il microfono aperto in una scheda si vede anche da un\'altra scheda', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<script>
+  window.__tracce = [];
+  window.__chiedi = () => navigator.mediaDevices.getUserMedia({ audio: true }).then(
+    (s) => { window.__tracce.push(...s.getTracks()); return 'ok'; }, (e) => 'no:' + ((e && e.name) || '?'));
+  window.__stato = () => window.__tracce.map((t) => t.readyState);
+</script></body></html>`);
+
+  const esito = page.evaluate(() => window.__chiedi());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  expect(await esito).toBe('ok');
+  await expect(shell.locator('.perm-live')).toHaveCount(1, { timeout: 20_000 });
+  await expect(shell.locator('.tab .sensor-ind')).toHaveCount(1, { timeout: 10_000 });
+
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  await shell.waitForTimeout(1500);
+
+  expect(await page.evaluate(() => window.__stato()), 'il microfono deve essere ancora aperto')
+    .toEqual(['live']);
+  const segno = shell.locator('.tab .sensor-ind');
+  await expect(
+    segno,
+    'aperta un\'altra scheda, il microfono è ancora acceso e in tutta la cornice di Filo non c\'è '
+    + 'più niente che lo dica: chi vuole chiuderlo deve indovinare da quale scheda arriva',
+  ).toHaveCount(1);
+  expect(await segno.getAttribute('aria-label')).toMatch(/microfono/i);
+});
+
+// La finestra di accesso («Continua con Google») non è una scheda e non ha la
+// cornice di Filo: la domanda di un permesso chiesto lì dentro non aveva nessuno
+// a cui comparire, restava appesa due minuti e finiva negata da sola, quindi la
+// fotocamera lì si poteva solo negare e mai consentire (#586, giro 9).
+test('la domanda chiesta da una finestra di accesso arriva alla cornice di Filo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const urlAccesso = `${testServer.html('<!doctype html><html><body><h1>Accedi</h1></body></html>')}?client_id=filo&redirect_uri=${encodeURIComponent(testServer.origin)}`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
+<button id="apri">Accedi</button>
+<script>document.getElementById('apri').addEventListener('click', () => {
+  window.open(${JSON.stringify(urlAccesso)}, 'accesso', 'width=520,height=640');
+});</script></body></html>`);
+  const pathAccesso = new URL(urlAccesso).pathname;
+
+  await page.click('#apri');
+  let accesso = null;
+  for (let i = 0; i < 60 && !accesso; i++) {
+    accesso = app.windows().find((w) => {
+      try { return new URL(w.url()).pathname === pathAccesso; } catch (_) { return false; }
+    }) || null;
+    if (!accesso) await new Promise((r) => setTimeout(r, 250));
+  }
+  expect(accesso, 'la finestra di accesso non si è aperta').toBeTruthy();
+  await accesso.waitForLoadState('domcontentloaded').catch(() => {});
+
+  const esito = accesso.evaluate(() => navigator.mediaDevices.getUserMedia({ video: true }).then(
+    (s) => { s.getTracks().forEach((t) => t.stop()); return 'ok'; },
+    (e) => 'no:' + ((e && e.name) || '?')));
+
+  await expect(
+    shell.locator('.perm-chip'),
+    'dentro la finestra di accesso la domanda non è comparsa da nessuna parte: lì la fotocamera '
+    + 'si può solo negare, e chi ci finisce resta davanti a una finestra che sembra rotta',
+  ).toHaveCount(1, { timeout: 25_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').first().click();
+  expect(await esito, 'la domanda è comparsa ma il «Consenti» non ha dato niente').toBe('ok');
+});
