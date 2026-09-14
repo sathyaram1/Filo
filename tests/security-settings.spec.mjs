@@ -150,6 +150,93 @@ test('blacklist siti: una voce senza estensione avvisa e NON viene salvata (#225
   await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
 });
 
+test('blacklist siti: un sito con estensione non latina si salva davvero (#590)', async ({ openTab }) => {
+  // .рф, .テスト e le altre esistono e si usano. Il campo le buttava via come
+  // righe non valide, quindi quei siti non si potevano bloccare affatto: la
+  // regola qui e quella del controllo vero erano due copie che divergevano.
+  const page = await openTab('filo://security/');
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+
+  await page.locator('#sec-siteblock-blacklist').fill('сайт.рф');
+  await page.locator('#sec-siteblock-blacklist').blur();
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+
+  await page.reload();
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+  // E torna scritta come l'utente l'ha scritta (#590, terzo giro). Sulla rete
+  // quel nome viaggia come "xn--80aswg.xn--p1ai", ed è così che Filo lo salva e
+  // lo confronta; rimandarglielo in quella forma gli faceva trovare al posto
+  // della sua riga una stringa che non somiglia a niente.
+  const saved = await page.locator('#sec-siteblock-blacklist').inputValue();
+  expect(saved.trim()).toBe('сайт.рф');
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+
+  // E il salvataggio regge un secondo giro: quello che si vede si risalva uguale.
+  await page.locator('#sec-siteblock-blacklist').fill('сайт.рф\nesempio.com');
+  await page.locator('#sec-siteblock-blacklist').blur();
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+  await page.reload();
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+  expect((await page.locator('#sec-siteblock-blacklist').inputValue()).trim().split('\n'))
+    .toEqual(['сайт.рф', 'esempio.com']);
+});
+
+test('blacklist siti: il sito scritto si salva senza dover lasciare il campo (#590)', async ({ openTab }) => {
+  // Questa pagina non ha un bottone che salva. Finché il campo si salvava solo
+  // quando lo si LASCIAVA, chi scriveva un sito nella lista e faceva subito la
+  // cosa più naturale — passare a un'altra scheda per andare a provarlo, o
+  // chiudere le Preferenze — perdeva la riga in silenzio: la vedeva scritta nel
+  // campo e si credeva protetto, mentre il sito si apriva da ogni strada.
+  const page = await openTab('filo://security/');
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+
+  // Si scrive come si scrive a mano, e NON si lascia il campo: niente blur,
+  // niente clic altrove. È questo che rendeva rossa la prova.
+  await page.locator('#sec-siteblock-blacklist').pressSequentially('esempio.com');
+  await new Promise((r) => setTimeout(r, 1_200));
+
+  // SUCCESSO = il sito è in lista per davvero, cioè lo trova chi chiede la
+  // lista salvata, non solo chi guarda il campo.
+  const salvata = await page.evaluate(async () => {
+    const res = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.GET_SETTINGS });
+    const s = (res && (res.settings || res)) || {};
+    return (((s.security || {}).siteBlock || {}).blacklist) || [];
+  });
+  expect(salvata).toContain('esempio.com');
+});
+
+test('pagina Sicurezza: non riscrive una lista cambiata altrove (#590)', async ({ openTab }) => {
+  // La pagina era una fotografia scattata all'apertura e ogni suo salvataggio
+  // riscriveva TUTTO il riquadro Sicurezza da quella copia: bastava che la
+  // lista dei siti bloccati fosse cambiata altrove e il primo tocco a una
+  // qualunque altra manopola la riportava indietro, cancellando un blocco che
+  // nessuno aveva chiesto di togliere.
+  const page = await openTab('filo://security/');
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+
+  // Qualcun altro aggiunge un sito alla lista mentre la pagina è aperta.
+  await page.evaluate(async () => {
+    await chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.UPDATE_SETTINGS,
+      settings: { security: { siteBlock: { enabled: true, blacklist: ['daltrove.test'] } } },
+    });
+  });
+  await new Promise((r) => setTimeout(r, 1_000));
+
+  // L'utente torna qui e tocca un'altra manopola, che salva tutto insieme.
+  await page.locator('#sec-block-popups').click();
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+
+  // SUCCESSO = il sito aggiunto altrove è ancora in lista.
+  const salvata = await page.evaluate(async () => {
+    const res = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.GET_SETTINGS });
+    const s = (res && (res.settings || res)) || {};
+    return (((s.security || {}).siteBlock || {}).blacklist) || [];
+  });
+  expect(salvata).toContain('daltrove.test');
+});
+
 test('popup blocker: window.open() automatico viene bloccato', async ({ openTab, testServer, shell }) => {
   // Pagina che chiama window.open() AL CARICAMENTO (no gesto utente) — è il
   // pattern degli ad popup. Disposition 'new-window' (per via di features=popup)

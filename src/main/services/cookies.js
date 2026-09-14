@@ -203,6 +203,20 @@ function applyTrackerBlocking(ses, enabled) {
     // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
     // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
     ses.webRequest.onBeforeRequest((details, callback) => {
+      // #590 (ottavo giro) — LA PAGINA CHE LA SCHEDA STA APRENDO NON SI POTA.
+      // Queste due liste servono a togliere quello che una pagina si tira
+      // dentro: riquadri pubblicitari, pixel, script di misura. Applicarle
+      // anche al documento della scheda annullava i link che passano per un
+      // contatore di clic, che è come sono fatti i link sponsorizzati, quelli
+      // delle newsletter, quelli dei giornali e quelli che arrivano da una
+      // ricerca: la scheda restava dov'era e l'articolo non arrivava mai, su
+      // ogni strada e senza una parola. A fermare una SCHEDA è la lista dei
+      // siti bloccati (services/siteBlock.js), che lo dice e lascia una via
+      // d'uscita; qui si pota e basta.
+      if (details.resourceType === 'mainFrame') {
+        callback({ cancel: false });
+        return;
+      }
       const s = blockState.get(ses);
       if (s && s.enabled && isTrackerUrl(details.url)) {
         callback({ cancel: true });

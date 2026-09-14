@@ -8,6 +8,7 @@
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
+  const UrlNav = window.SN_URL_NAV;
 
   function $(id) { return document.getElementById(id); }
 
@@ -36,6 +37,7 @@
     $('sec-siteblock-desc').textContent = I18n.t('options_security_siteblock_desc');
     $('sec-siteblock-lists-label').textContent = I18n.t('options_security_siteblock_lists');
     $('sec-siteblock-blacklist-label').textContent = I18n.t('options_security_siteblock_blacklist_label');
+    $('sec-siteblock-allowed-label').textContent = I18n.t('options_security_siteblock_allowed_label');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
@@ -203,11 +205,19 @@
     const sblk = sec.siteBlock || {};
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
-    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+    // #590 — le voci si mostrano come l'utente le scrive. Un sito in cirillico
+    // o in giapponese viene salvato nella forma con cui viaggia sulla rete
+    // ("xn--…"), che è quella giusta per il confronto: rimandargliela indietro
+    // così gli faceva trovare al posto della sua riga una stringa che non
+    // somiglia a niente, con il rischio che la cancellasse.
+    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : [])
+      .map((d) => UrlNav.hostLeggibile(d))
+      .join('\n');
     // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
     // subito che non bloccheranno nulla invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     syncSiteBlockEnabled();
+    renderAllowed();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
@@ -284,7 +294,12 @@
       s = s.split('/')[0].split('?')[0];
     }
     s = s.replace(/^www\./, '');
-    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) ? s : '';
+    // #590 — la stessa regola che usa il controllo vero, chiesta all'unico
+    // posto in cui è scritta. Quando qui c'era una copia, le due divergevano:
+    // un sito con l'estensione in caratteri non latini (.рф, .テスト, e le
+    // altre, che esistono e si usano) veniva accettato da una e buttato
+    // dall'altra, quindi restava in elenco senza bloccare niente.
+    return UrlNav.isListableDomain(s) ? s : '';
   }
 
   function renderWhitelist() {
@@ -301,7 +316,9 @@
     for (const domain of cookieWhitelist) {
       const li = document.createElement('li');
       const span = document.createElement('span');
-      span.textContent = domain;
+      // Come per la lista dei siti bloccati: si mostra il nome leggibile, si
+      // conserva e si confronta quello salvato (#590).
+      span.textContent = UrlNav.hostLeggibile(domain);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn-secondary';
@@ -384,6 +401,52 @@
     $('sec-siteblock-blacklist').disabled = !on;
   }
 
+  // #590 — I SITI SBLOCCATI A MANO, quelli su cui l'utente ha detto "Apri
+  // comunque". Il permesso dura fino alla chiusura di Filo e vale su ogni
+  // strada, ma si vedeva solo nella notifica che lo annunciava: passata quella
+  // (se ne va da sola dopo pochi secondi) non restava modo di sapere che
+  // c'era, né di toglierlo se non riscrivendo l'elenco qui sopra, che li
+  // azzera tutti insieme. Se una cosa si può concedere, si deve poter vedere e
+  // revocare. L'elenco vive in memoria, non nelle impostazioni: si chiede a
+  // parte e sparisce quando Filo si chiude.
+  async function renderAllowed() {
+    const box = $('sec-siteblock-allowed-box');
+    const list = $('sec-siteblock-allowed-list');
+    if (!box || !list) return;
+    let hosts = [];
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.SITE_BLOCK_ALLOWED });
+      hosts = (res && Array.isArray(res.hosts)) ? res.hosts : [];
+    } catch (_) { hosts = []; }
+    list.innerHTML = '';
+    if (!hosts.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    for (const host of hosts) {
+      const li = document.createElement('li');
+      li.style.display = 'flex';
+      li.style.alignItems = 'center';
+      li.style.justifyContent = 'space-between';
+      li.style.gap = '8px';
+      li.style.padding = '4px 0';
+      const span = document.createElement('span');
+      // Il nome come l'utente lo scriverebbe: un indirizzo in cirillico o in
+      // giapponese viaggia come "xn--…", che qui non nomina niente.
+      span.textContent = UrlNav.hostLeggibile(host);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_security_siteblock_allowed_restore');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try { await chrome.runtime.sendMessage({ type: MSG.SITE_BLOCK_REVOKE, host }); } catch (_) {}
+        await renderAllowed();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
   // Mostra (o nasconde, con lista vuota) un avviso inline sotto la blacklist
   // che nomina le righe scartate perché non sono domini validi. Senza questo,
   // una voce tipo "facebook" veniva salvata muta ma non bloccava mai il sito.
@@ -419,9 +482,52 @@
     return { valid, invalid };
   }
 
-  async function save() {
+  // #590 (quinto giro) — QUELLO CHE L'UTENTE SCRIVE NELLA LISTA DEVE ARRIVARCI.
+  // Questa pagina non ha un bottone che salva: ogni manopola si applica da sé.
+  // Per una manopola va bene, perché il suo evento scatta al clic. Per un CAMPO
+  // DI TESTO no: scatta solo quando lo si LASCIA, e chi scrive un sito nella
+  // lista dei siti bloccati fa subito dopo la cosa più naturale del mondo, cioè
+  // passa a un'altra scheda per andare a provarlo, oppure chiude le Preferenze.
+  // In tutti e due i casi la riga non era ancora stata salvata e spariva senza
+  // dire niente, mentre l'utente la vedeva scritta nel campo e si credeva
+  // protetto. Le quattro strade della lista erano chiuse bene, ma solo per i
+  // siti che riuscivano a entrarci.
+  //
+  // Il campo si salva quindi MENTRE si scrive, come ogni altra manopola di
+  // questa pagina. Salvare uscendo non è un'alternativa e l'ho provato: quando
+  // Filo mette da parte una scheda, la pagina non riceve né il cambio di
+  // visibilità né la perdita del fuoco, e quando la scheda si chiude non fa in
+  // tempo a dire niente. L'attesa qui sotto serve solo a non scrivere una volta
+  // per tasto premuto: è corta apposta, perché chiudere una pagina richiede
+  // molto più tempo di così.
+  //
+  // Finché si scrive, però, l'avviso sulle righe scartate resta zitto: a metà
+  // di "esempio.com" la riga non è ancora un sito valido, e dirglielo mentre
+  // sta ancora battendo è solo rumore. L'avviso torna quando lascia il campo.
+  const ATTESA_SCRITTURA = 150;
+  let salvataggioInCoda = null;
+  function salvaTraPoco() {
+    clearTimeout(salvataggioInCoda);
+    salvataggioInCoda = setTimeout(() => {
+      salvataggioInCoda = null;
+      save({ avvisa: false });
+    }, ATTESA_SCRITTURA);
+  }
+
+  function listaSalvata(settings) {
+    const sb = (settings && settings.security && settings.security.siteBlock) || {};
+    return Array.isArray(sb.blacklist) ? sb.blacklist : [];
+  }
+
+  function stessaLista(a, b) {
+    return a.slice().sort().join('\n') === b.slice().sort().join('\n');
+  }
+
+  async function save({ avvisa = true } = {}) {
+    clearTimeout(salvataggioInCoda);
+    salvataggioInCoda = null;
     const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
-    setBlacklistError(invalid);
+    if (avvisa) setBlacklistError(invalid);
     const partial = {
       security: {
         protectIpLeak: !!$('sec-protect-ip').checked,
@@ -443,6 +549,9 @@
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    // Cambiare le voci della lista azzera i sì dati a mano: l'elenco qui sotto
+    // deve raccontarlo subito, non alla prossima apertura della pagina (#590).
+    renderAllowed();
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);
@@ -459,8 +568,11 @@
     $('sec-siteblock-lists').addEventListener('change', save);
     $('sec-siteblock-blacklist').addEventListener('change', save);
     // Mentre l'utente corregge le righe, togli l'avviso precedente (rivalutato
-    // al prossimo salvataggio su blur).
-    $('sec-siteblock-blacklist').addEventListener('input', () => setBlacklistError([]));
+    // al prossimo salvataggio). E metti in coda il salvataggio: vedi salvaTraPoco.
+    $('sec-siteblock-blacklist').addEventListener('input', () => {
+      setBlacklistError([]);
+      salvaTraPoco();
+    });
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
@@ -480,5 +592,33 @@
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
+
+    // #590 (quinto giro) — E LA PAGINA NON DEVE RESTARE INDIETRO. Finché era
+    // una fotografia scattata all'apertura, ogni suo salvataggio riscriveva
+    // TUTTO il riquadro Sicurezza dalla copia vecchia che aveva in mano:
+    // bastava che la lista dei siti bloccati fosse cambiata altrove e il primo
+    // tocco a una qualunque altra manopola la riportava indietro, cancellando
+    // un blocco che nessuno aveva chiesto di togliere, in silenzio.
+    // Il campo NON si tocca mentre lo si sta scrivendo, né mentre un
+    // salvataggio è in coda: lì la copia buona è quella davanti all'utente.
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
+      if (salvataggioInCoda) return;
+      const el = $('sec-siteblock-blacklist');
+      if (el && document.activeElement === el) return;
+      // Il testo che l'utente ha davanti si tiene com'è quando dice già le
+      // stesse voci di quello salvato: dentro ci possono essere righe scartate
+      // che l'avviso qui sotto sta nominando, e riscrivere il campo gliele
+      // cancellerebbe proprio mentre le sta correggendo.
+      const testo = el ? el.value : null;
+      const analisi = el ? parseBlacklist(testo) : null;
+      const daTenere = !!analisi && stessaLista(analisi.valid, listaSalvata(msg.settings));
+      load().then(() => {
+        if (daTenere && el) {
+          el.value = testo;
+          setBlacklistError(analisi.invalid);
+        }
+      }).catch(() => {});
+    });
   });
 })();

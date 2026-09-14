@@ -259,9 +259,37 @@ module.exports = function register(on, ctx) {
   // file veniva accumulato in memoria e consegnato tutto in fondo: salvare un
   // filmato voleva dire fissare uno schermo immobile per minuti, e oltre mezzo
   // giga il salvataggio si rifiutava proprio.
+  // #590 (settimo giro) — LA LISTA DEI SITI BLOCCATI VALE ANCHE SUI FILE.
+  // Un sito che l'utente ha messo in lista non deve arrivargli addosso da
+  // nessuna strada, e scaricare è una strada: il tasto destro su un'immagine,
+  // su un video o su un link offre di prendere quello che c'è dall'altra parte,
+  // e la pagina che quel link ce l'ha messo la sceglie il sito, non l'utente.
+  // I byte di un'immagine o di un filmato li prende il main per conto suo, fuori
+  // dalla sessione della scheda, quindi non incontrano nemmeno il filtro delle
+  // richieste: senza questo controllo il file di un sito bloccato arriva.
+  // Vale SOLO la lista scritta dall'utente, come sul rimbalzo del server e sui
+  // riquadri: le liste pubbliche di pubblicità e tracciatori sono una potatura,
+  // e la fa già il filtro delle richieste dove passa.
+  // Torna true quando il file NON si scarica (e l'ha già detto all'utente).
+  const fileDaSitoBloccato = (url, sender) => {
+    let decisione = null;
+    try {
+      decisione = require('../siteBlock')
+        .shouldBlockNavigation(url, { soloListaUtente: true });
+    } catch (_) { return false; }
+    if (!decisione || !decisione.block) return false;
+    // Detto con le stesse parole del blocco di una scheda: è lo stesso divieto.
+    try {
+      const win = winOf(sender);
+      if (win && win._filoTabs) win._filoTabs._notifyBlocked(decisione.host, url);
+    } catch (_) {}
+    return true;
+  };
+
   const handleDownload = async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    if (fileDaSitoBloccato(url, sender)) return { ok: false, error: 'sito bloccato' };
     const kind = ['image', 'video', 'audio'].includes(msg.kind) ? msg.kind : 'image';
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
@@ -398,6 +426,8 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOAD_LINK, async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    // #590 (settimo giro) — vale la lista dei siti bloccati, come sopra.
+    if (fileDaSitoBloccato(url, sender)) return { ok: false, error: 'sito bloccato' };
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
     try {

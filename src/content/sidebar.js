@@ -590,13 +590,25 @@
     return `azione Filo: ${type.toLowerCase().replace(/_/g, ' ')}`;
   }
 
+  // "non riuscita", più il motivo quando il main lo conosce (#590). Le parole
+  // sono le stesse della chat della home: stanno in SN_CHAT_ERRORS, una volta
+  // sola. Prima qui il motivo non arrivava mai — un'apertura fermata dalla
+  // lista dei siti bloccati diceva solo "non riuscita", e il nome del sito lo
+  // dava soltanto la notifica in basso a destra.
+  function esitoFallito(label, res) {
+    const CE = global.SN_CHAT_ERRORS;
+    const motivo = (CE && res && CE.actionFailure(res.output)) || '';
+    appendActionLog(motivo ? `${label}: non riuscita · ${motivo}` : `${label}: non riuscita`);
+    return false;
+  }
+
   async function runFiloAction(action) {
     const label = filoActionLabel(action);
     let res = null;
     try {
       res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
     } catch (_) {}
-    if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
+    if (!res || !res.ok) return esitoFallito(label, res);
 
     // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
     // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
@@ -616,13 +628,15 @@
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action });
       } catch (_) {}
       const done = !!(c && c.executed);
-      appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
-      return done;
+      if (!done) return esitoFallito(label, c);
+      appendActionLog(`${label}: fatto`);
+      return true;
     }
 
     const done = !!res.executed;
-    appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
-    return done;
+    if (!done) return esitoFallito(label, res);
+    appendActionLog(`${label}: fatto`);
+    return true;
   }
 
   // ---------- Azioni SULLA PAGINA (parità col menu tasto destro) ----------

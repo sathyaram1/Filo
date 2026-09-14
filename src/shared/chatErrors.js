@@ -23,6 +23,10 @@
 //   (senza marcatore di provider AI). Se la chat non interroga nient'altro,
 //   ometti l'opzione: l'errore diventa una frase generica.
 //
+//   SN_CHAT_ERRORS.actionFailure(output) → motivo breve del fallimento di
+//     un'azione di Filo ('sito bloccato: x', 'indirizzo non valido', …), '' se
+//     il motivo non si sa. Una sola volta per TUTTE le chat (#590).
+//
 //   SN_CHAT_ERRORS.isTransientNetwork(err) → bool
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
@@ -139,6 +143,40 @@
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
 
-  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork };
+  // Perché un'azione di Filo NON è riuscita, in due o tre parole (#590).
+  //
+  // Il main sa già il motivo e lo manda insieme all'esito; a raccontarlo però
+  // erano due chat diverse, e una sola ce la faceva: la chat della home diceva
+  // "sito bloccato: <nome>", quella che si apre sopra una pagina qualsiasi
+  // diceva solo "non riuscita". Due strade equivalenti che raccontano la stessa
+  // cosa in modo diverso: il motivo si chiede qui, una volta sola.
+  //
+  // Torna '' quando il motivo non si sa: chi chiama mostra la sua frase
+  // generica ("non riuscita") senza aggiungere niente.
+  function actionFailure(output) {
+    const o = output;
+    if (!o || typeof o !== 'object') return '';
+    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    // La lista dei siti bloccati ha fermato un'apertura. Dirlo, col sito: un
+    // blocco muto sembra un guasto (#482).
+    // Il nome del sito come l'utente lo scriverebbe (#590): un indirizzo in
+    // cirillico o in giapponese viaggia come "xn--80aswg.xn--p1ai", e la
+    // notifica in basso a destra lo chiama già col suo nome. Due posti che
+    // nominano lo stesso sito nello stesso istante devono chiamarlo uguale.
+    if (o.blocked === 'site') {
+      if (!o.host) return 'sito bloccato';
+      const NAV = global.SN_URL_NAV;
+      const nome = (NAV && NAV.hostLeggibile && NAV.hostLeggibile(o.host)) || o.host;
+      return `sito bloccato: ${nome}`;
+    }
+    if (o.blocked === 'address') return 'indirizzo non valido';
+    if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
+    if (o.found === false) return 'non trovato';
+    if (o.ok === false && o.detail) return String(o.detail);
+    if (o.error) return String(o.error);
+    return '';
+  }
+
+  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork, actionFailure };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

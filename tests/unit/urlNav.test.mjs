@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'urlNav.js'));
 const {
   looksLikeAddress, normalizeUrl, isLocalHost, isLocalNetworkName,
-  canonicalizeFiloUrl, isShareableAddress,
+  canonicalizeFiloUrl, isShareableAddress, hostLeggibile,
 } = globalThis.SN_URL_NAV;
 
 // ─── il cuore del fix #398: gli indirizzi locali sono INDIRIZZI ──────────────
@@ -203,4 +203,38 @@ test('#437 gli indirizzi veri restano copiabili', () => {
   assert.equal(isShareableAddress('tel:+390123'), true);
   assert.equal(isShareableAddress('magnet:?xt=urn:btih:abc'), true);
   assert.equal(isShareableAddress('filo://home/home.html'), true); // riapribile dentro Filo
+});
+
+// ─── #590: il nome di un sito come lo scrive chi lo legge ────────────────────
+
+test('#590 hostLeggibile riporta in chiaro un nome scritto in punycode', () => {
+  // Un indirizzo non latino viaggia sulla rete come "xn--…": è la forma giusta
+  // per confrontarlo con una lista, ed è quella sbagliata da far leggere. Chi
+  // scriveva la sua voce in cirillico se la ritrovava in Preferenze cambiata in
+  // una stringa che non somiglia a niente.
+  assert.equal(hostLeggibile('xn--80aswg.xn--p1ai'), 'сайт.рф');
+  assert.equal(hostLeggibile('www.xn--80aswg.xn--p1ai'), 'www.сайт.рф');
+  assert.equal(hostLeggibile('xn--mnchen-3ya.de'), 'münchen.de');
+  assert.equal(hostLeggibile('xn--fiqs8s'), '中国');
+  assert.equal(hostLeggibile('xn--zckzah'), 'テスト');
+});
+
+test('#590 hostLeggibile non tocca ciò che è già leggibile, né ciò che non è punycode', () => {
+  assert.equal(hostLeggibile('esempio.com'), 'esempio.com');
+  assert.equal(hostLeggibile('сайт.рф'), 'сайт.рф');
+  assert.equal(hostLeggibile(''), '');
+  assert.equal(hostLeggibile(null), '');
+  // Roba che comincia per xn-- ma non è punycode valido: resta com'era, non
+  // sparisce e non diventa un'altra cosa.
+  assert.equal(hostLeggibile('xn--'), 'xn--');
+  assert.equal(hostLeggibile('xn--...'), 'xn--...');
+  assert.equal(hostLeggibile('xn--!!!.com'), 'xn--!!!.com');
+});
+
+test('#590 andata e ritorno: quello che si mostra si risalva identico', () => {
+  for (const puny of ['xn--80aswg.xn--p1ai', 'xn--mnchen-3ya.de', 'xn--j1ay.xn--p1ai']) {
+    const leggibile = hostLeggibile(puny);
+    assert.notEqual(leggibile, puny, `${puny} deve diventare leggibile`);
+    assert.equal(new URL('http://' + leggibile).hostname, puny, 'e tornare alla stessa forma di rete');
+  }
 });

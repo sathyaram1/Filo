@@ -1,8 +1,10 @@
 // Unit test per il blocco apertura siti in blacklist (#170.3,
-// src/main/services/siteBlock.js). Assertano i TRE CASI richiesti dalla spec:
+// src/main/services/siteBlock.js). Assertano i DUE CASI della spec:
 //   1) apertura diretta di un sito in blacklist  → BLOCCATO
 //   2) stessa apertura ma con referrer di un motore di ricerca → CONSENTITA
-//   3) stessa apertura ma originata da Filo (viaFilo) → CONSENTITA
+// #590 ha tolto il terzo caso ("originata da Filo → consentita"): la decisione
+// non guarda più CHI apre, perché l'azione NAVIGA la propone il modello e una
+// pagina ostile poteva usarla per scavalcare la lista.
 // più i bordi: schemi non-web, host non in lista, blocco disattivato, match per
 // suffisso/sottodominio. electron è richiesto in modo pigro (solo da adblock),
 // e qui usiamo useAdblockLists:false, quindi il modulo gira senza Electron.
@@ -37,10 +39,69 @@ test('caso 2: apertura da un motore di ricerca (referrer Google) → consentita'
   assert.equal(d.block, false);
 });
 
-test('caso 3: apertura originata da Filo (viaFilo) → consentita', () => {
+test('#590: CHI apre non cambia la decisione — nessun parametro apre un varco', () => {
   reset();
+  // Il vecchio viaFilo:true consentiva l'apertura. Ora è un campo ignoto e
+  // ignorato: il sito resta bloccato anche quando ad aprirlo è Filo (azione
+  // NAVIGA proposta dal modello, indirizzo scritto dall'utente, link).
   const d = SB.shouldBlockNavigation('https://evil.example/page', { viaFilo: true });
-  assert.equal(d.block, false);
+  assert.equal(d.block, true);
+  assert.equal(d.host, 'evil.example');
+});
+
+test('#590: searx solo come dominio registrabile, non come label iniziale', () => {
+  reset();
+  // Il caso della spec: prima /(^|\.)searx\b/ non aveva ancora finale, quindi
+  // searx.esempio.com si spacciava per motore di ricerca e apriva l'eccezione.
+  for (const ref of [
+    'https://searx.esempio.com/',
+    'https://searx.evil.com/search?q=x',
+    'https://www.searx.phishing.io/',
+    'https://searx.com.evil.net/',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è un motore`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      true,
+      `dovrebbe BLOCCARE con referrer-civetta ${ref}`,
+    );
+  }
+  // Le istanze pubbliche del progetto restano riconosciute, sulla loro pagina
+  // di risultati.
+  for (const ref of ['https://searx.be/search', 'https://searx.info/search?q=x']) {
+    assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è un motore`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      false,
+      `dovrebbe consentire da ${ref}`,
+    );
+  }
+});
+
+test('#590 (decimo giro): un nome COMPRATO non concede l\'eccezione, per nessun motore', () => {
+  reset();
+  // La regola stava sulla FORMA del nome ("<motore> davanti al suffisso
+  // pubblico"), e la forma lascia libere tutte le estensioni: searx.xyz,
+  // searx.top, google.cheap sono nomi che chiunque registra per pochi euro.
+  // Chi li aveva si prendeva l'eccezione e la lista dei siti bloccati non
+  // valeva più, su ogni strada insieme (la scheda, una scheda nuova, un
+  // riquadro incorporato), senza nemmeno una notifica.
+  for (const ref of [
+    'https://searx.xyz/search?q=x',
+    'https://searx.top/search?q=x',
+    'https://searx.cheap/search?q=x',
+    'https://searx.online/?q=x',
+    'https://google.cheap/search?q=x',
+    'https://yahoo.top/search?p=x',
+    'https://yandex.xyz/search/?text=x',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è un motore`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      true,
+      `dovrebbe BLOCCARE con referrer comprato ${ref}`,
+    );
+  }
 });
 
 test('referrer di ricerca robusto su TLD e sottodomini diversi', () => {
@@ -85,7 +146,7 @@ test('#230: i motori multi-TLD legittimi restano riconosciuti', () => {
     'https://www.google.com.au/search?q=x',
     'https://search.yahoo.com/search?p=x',
     'https://es.search.yahoo.com/search?p=x',
-    'https://yahoo.co.jp/',
+    'https://yahoo.co.jp/search?p=x',
     'https://yandex.ru/search/?text=x',
     'https://yandex.com.tr/search/?text=x',
   ]) {
@@ -168,4 +229,290 @@ test('configureFromSettings scarta le voci non valide dalla blacklist salvata', 
   assert.equal(SB.status().blacklistSize, 2);
   assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
   assert.equal(SB.shouldBlockNavigation('https://ads.test/').block, true);
+});
+
+// ─── #590 giro 2: lo STESSO sito scritto in un'altra forma ───────────────────
+//
+// La rete risolve identici nomi che il confronto con la lista trattava come
+// diversi: bastava scriverne uno e la lista non valeva più, su tutte le strade
+// insieme (tutte chiedono a questa funzione).
+
+test('#590: il PUNTO FINALE dell\'host non scavalca la lista', () => {
+  reset();
+  // "evil.example." è la forma assoluta di "evil.example": stessa pagina, in
+  // qualunque browser. Prima passava: il confronto falliva su quel carattere.
+  for (const u of [
+    'https://evil.example./',
+    'https://evil.example./pagina?x=1',
+    'https://deep.sub.evil.example./',
+    'https://evil.example../', // più punti: comunque lo stesso nome
+    'https://EVIL.EXAMPLE./',
+    'https://evil.example.:8443/',
+  ]) {
+    const d = SB.shouldBlockNavigation(u);
+    assert.equal(d.block, true, `dovrebbe BLOCCARE ${u}`);
+    // L'host che finisce nella notifica è quello pulito: senza punto finale e
+    // in minuscolo, altrimenti l'utente legge un nome che non ha mai scritto.
+    assert.ok(!d.host.endsWith('.'), `host senza punto finale per ${u}, letto "${d.host}"`);
+    assert.equal(d.host, d.host.toLowerCase(), `host in minuscolo per ${u}`);
+  }
+  // E l'host riportato è quello vero anche per i sottodomini.
+  assert.equal(SB.shouldBlockNavigation('https://sub.evil.example./').host, 'sub.evil.example');
+  // Un sito fuori lista resta fuori: la pulizia non allarga il blocco.
+  assert.equal(SB.shouldBlockNavigation('https://wikipedia.org./').block, false);
+});
+
+test('#590: il punto finale vale anche nella voce scritta dall\'utente e nel referrer', () => {
+  // Voce della lista scritta con il punto finale: deve bloccare l'una e l'altra forma.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['evil.example.'] });
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://evil.example./').block, true);
+
+  // Un motore di ricerca col punto finale resta un motore di ricerca: la
+  // pulizia non deve trasformare l'eccezione in un blocco a sorpresa.
+  reset();
+  assert.equal(SB.isSearchEngineUrl('https://www.google.com./search?q=x'), true);
+  assert.equal(
+    SB.shouldBlockNavigation('https://evil.example/', { fromUrl: 'https://www.google.com./search?q=x' }).block,
+    false,
+  );
+});
+
+test('#590: una voce scritta in alfabeto non latino entra nella lista e blocca davvero', () => {
+  // L'indirizzo viaggia sulla rete in punycode: se la voce resta in unicode non
+  // combacia mai — e prima veniva anche scartata in silenzio come "non valida",
+  // lasciando l'utente convinto di aver bloccato qualcosa.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['münchen.example'] });
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('https://münchen.example/pagina').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://xn--mnchen-3ya.example/pagina').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://altro.example/').block, false);
+});
+
+test('#590: canonicalHost è la forma unica di un nome di host', () => {
+  assert.equal(SB.canonicalHost('EVIL.Example.'), 'evil.example');
+  assert.equal(SB.canonicalHost('evil.example...'), 'evil.example');
+  assert.equal(SB.canonicalHost('  evil.example  '), 'evil.example');
+  assert.equal(SB.canonicalHost('münchen.example'), 'xn--mnchen-3ya.example');
+  assert.equal(SB.canonicalHost(''), '');
+  assert.equal(SB.canonicalHost('.'), '');
+  assert.equal(SB.canonicalHost(null), '');
+});
+
+// ─── #590 giro 2 — il sì dell'utente ("Apri comunque") si ricorda ────────────
+
+test('#590: dopo "Apri comunque" il sito si apre, e ci si può navigare dentro', () => {
+  reset();
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
+  SB.allowHost('evil.example');
+  // La prima pagina.
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, false);
+  // Dove il server rimbalza subito dopo (http→https, / → /home): è lo stesso
+  // sito, ed era la porta che lasciava una scheda vuota e nessun modo di aprirlo.
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/home').block, false);
+  // Un link cliccato dentro il sito, con la pagina del sito come partenza.
+  assert.equal(
+    SB.shouldBlockNavigation('https://evil.example/altra', { fromUrl: 'https://evil.example/' }).block,
+    false,
+  );
+  // E i sottodomini dello stesso sito (www → nome nudo e ritorno).
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example/').block, false);
+});
+
+test('#590: il sì vale per il sito che l\'utente ha messo in lista, non per gli altri', () => {
+  reset();
+  // Il blocco può scattare su un sottodominio: il sì si lega comunque alla voce
+  // di lista, altrimenti il primo salto fra www e nome nudo ricadrebbe nel blocco.
+  assert.equal(SB.allowHost('www.evil.example'), 'evil.example');
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, false);
+  // Gli altri siti della lista restano bloccati: il sì non è un interruttore.
+  assert.equal(SB.shouldBlockNavigation('https://ads.test/').block, true);
+  assert.equal(SB.isAllowedHost('ads.test'), false);
+  assert.equal(SB.isAllowedHost('evil.example'), true);
+});
+
+test('#590: cambiare la lista è il modo di tornare indietro su un "Apri comunque"', () => {
+  const impostazioni = (blacklist) => ({ security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist } } });
+  SB.configureFromSettings(impostazioni(['evil.example']));
+  SB.allowHost('evil.example');
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, false);
+
+  // Le Preferenze si risalvano a ogni modifica di QUALSIASI impostazione: se la
+  // lista non cambia, il sì deve reggere (altrimenti durerebbe pochi secondi).
+  SB.configureFromSettings(impostazioni(['evil.example']));
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, false);
+
+  // La lista cambia davvero → i sì di questa sessione cadono.
+  SB.configureFromSettings(impostazioni(['evil.example', 'ads.test']));
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
+  assert.equal(SB.status().allowedSize, 0);
+});
+
+test('#590: un sito con l\'estensione non latina si può mettere in lista', () => {
+  // .рф, .テスト, .中国, .укр esistono e si usano. Sulla rete viaggiano in
+  // punycode (xn--…), e la vecchia regola pretendeva solo lettere latine: la
+  // voce veniva scartata e quei siti non si potevano bloccare affatto.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['сайт.рф', '例え.テスト'] });
+  assert.equal(SB.status().blacklistSize, 2);
+  assert.equal(SB.shouldBlockNavigation('https://сайт.рф/pagina').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://xn--80aswg.xn--p1ai/pagina').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://例え.テスト/').block, true);
+  // E quello che non è un nome di sito resta fuori, come prima.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['facebook', '1.2.3.4', 'x..y.com'] });
+  assert.equal(SB.status().blacklistSize, 0);
+});
+
+test('#590: l\'eccezione vale per una pagina di RISULTATI, non per tutto ciò che sta sul motore', () => {
+  reset();
+  // Sui nomi dei motori si pubblicano anche pagine di chiunque: i siti fatti
+  // con lo strumento per siti di Google, le pagine servite dai suoi script, i
+  // documenti condivisi. Una di quelle apriva qualunque sito della lista senza
+  // un clic dell'utente e senza passare dal modello: le bastava cambiare da
+  // sola l'indirizzo della scheda.
+  for (const ref of [
+    'https://sites.google.com/view/qualcuno',
+    'https://sites.google.com/view/qualcuno/search?q=x',
+    'https://script.google.com/macros/s/ABC/exec',
+    'https://docs.google.com/document/d/ABC/edit',
+    'https://www.google.com/pagina',
+    'https://groups.google.com/g/tale/c/quale',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è una pagina di risultati`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      true,
+      `dovrebbe BLOCCARE partendo da ${ref}`,
+    );
+  }
+  // Le pagine di risultati vere restano l'eccezione, su ogni motore.
+  for (const ref of [
+    'https://www.google.com/search?q=x',
+    'https://www.bing.com/search?q=x',
+    'https://duckduckgo.com/?q=x',
+    'https://html.duckduckgo.com/html/?q=x',
+    'https://www.ecosia.org/search?q=x',
+    'https://www.startpage.com/sp/search',
+    'https://www.qwant.com/?q=x',
+    'https://search.yahoo.com/search?p=x',
+    'https://yandex.ru/search/?text=x',
+    'https://www.baidu.com/s?wd=x',
+    'https://search.brave.com/search?q=x',
+    'https://kagi.com/search?q=x',
+    'https://www.mojeek.com/search?q=x',
+    'https://www.ask.com/web?q=x',
+    'https://searx.be/search?q=x',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è una pagina di risultati`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      false,
+      `dovrebbe consentire da ${ref}`,
+    );
+  }
+});
+
+test('#590: la PAGINA INIZIALE di un motore non è un risultato di ricerca', () => {
+  reset();
+  // È anche la forma in cui arriva un referrer ridotto alla sola origine, che
+  // è come quasi tutti i siti lo mandano fuori dal proprio dominio: se bastasse
+  // quello, l'eccezione varrebbe per ogni pagina del motore, comprese quelle
+  // che ci pubblica chiunque.
+  for (const ref of [
+    'https://www.google.com/',
+    'https://duckduckgo.com/',
+    'https://searx.be/',
+    'https://yahoo.co.jp/',
+    'https://www.google.com/?hl=it',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è una pagina di risultati`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      true,
+      `dovrebbe BLOCCARE partendo da ${ref}`,
+    );
+  }
+  // La domanda scritta nell'indirizzo invece sì, anche sulla radice.
+  for (const ref of ['https://duckduckgo.com/?q=x', 'https://www.qwant.com/?q=x&t=web']) {
+    assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è una pagina di risultati`);
+  }
+});
+
+test('#590: «Apri comunque» si può togliere senza rimettere mano alla lista', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['evil.example'] });
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example/x').block, true);
+  const sito = SB.allowHost('www.evil.example');
+  assert.equal(sito, 'evil.example', 'il sì vale per la voce di lista, non per il solo sottodominio');
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example/x').block, false);
+  assert.equal(SB.revokeHost(sito), true);
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example/x').block, true, 'tolto il sì, torna bloccato');
+  assert.equal(SB.status().allowedSize, 0);
+  // Togliere un sì che non c'è non rompe niente e non concede niente.
+  assert.equal(SB.revokeHost('mai.dato.example'), false);
+  assert.equal(SB.revokeHost(''), false);
+});
+
+// #590 (quarto giro) — i sì dati a mano si devono poter ELENCARE, non solo
+// dare. Il permesso vale tutta la sessione e su ogni strada: se l'unico posto
+// dove si vede è la notifica che lo annuncia, dopo pochi secondi non esiste più
+// nessun modo di sapere che c'è né di toglierlo.
+test('#590: i siti sbloccati a mano si possono elencare e togliere uno per uno', () => {
+  reset();
+  assert.deepEqual(SB.allowedHosts(), [], 'si parte senza permessi');
+
+  SB.allowHost('www.evil.example');
+  SB.allowHost('ads.test');
+  assert.deepEqual(SB.allowedHosts(), ['ads.test', 'evil.example'],
+    'si elenca la VOCE DI LISTA a cui il sì è stato dato, non l\'host preciso di quel momento');
+
+  assert.equal(SB.revokeHost('evil.example'), true);
+  assert.deepEqual(SB.allowedHosts(), ['ads.test'], 'si toglie quello, non tutti');
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/page').block, true,
+    'tolto il sì, il sito torna bloccato');
+  assert.equal(SB.shouldBlockNavigation('https://ads.test/page').block, false,
+    'l\'altro sì resta');
+});
+
+test('#590: cambiare le voci della lista azzera i sì, e l\'elenco lo racconta', () => {
+  reset();
+  SB.allowHost('evil.example');
+  assert.equal(SB.allowedHosts().length, 1);
+  SB.configureFromSettings({ security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: ['altro.example'] } } });
+  assert.deepEqual(SB.allowedHosts(), [], 'rimettere mano alla lista li azzera tutti');
+});
+
+// #590 (sesto giro) — LE DUE SORGENTI DELLA LISTA NON SONO LA STESSA COSA.
+// Sotto lo stesso interruttore ci sono i siti che l'utente scrive e le liste
+// pubbliche di pubblicità e tracciatori che Filo scarica da solo. Le prime
+// sono un divieto; le seconde una potatura che il filtro delle richieste fa in
+// silenzio su ogni pagina. Dove si PASSA (il rimbalzo del server) e dove ci si
+// INCORPORA (un riquadro dentro una pagina) vale solo il divieto: applicare
+// anche le liste pubbliche faceva morire a metà strada i link che rimbalzano
+// su un contatore di clic, e annunciava con una notifica ogni tracciatore di
+// ogni pagina.
+test('#590: soloListaUtente esclude le liste pubbliche, non i siti scritti dall\'utente', () => {
+  const AD = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'adblock.js'));
+  AD.setDomainsForTest(['tracker.example']);
+  SB.setForTest({ enabled: true, useAdblockLists: true, blacklist: ['evil.example'] });
+  try {
+    assert.equal(SB.shouldBlockNavigation('https://tracker.example/clic').block, true,
+      'senza l\'opzione le liste pubbliche valgono come prima');
+    assert.equal(
+      SB.shouldBlockNavigation('https://tracker.example/clic', { soloListaUtente: true }).block,
+      false,
+      'un contatore di clic delle liste pubbliche non ferma un rimbalzo né un riquadro',
+    );
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/page', { soloListaUtente: true }).block,
+      true,
+      'il sito scritto dall\'utente resta bloccato anche lì: il rimbalzo era il modo più comodo di aggirarlo',
+    );
+    assert.equal(
+      SB.shouldBlockNavigation('https://sub.evil.example/page', { soloListaUtente: true }).block,
+      true,
+      'e vale per i sottodomini come sempre',
+    );
+  } finally {
+    AD.setDomainsForTest([]);
+  }
 });

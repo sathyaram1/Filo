@@ -103,6 +103,30 @@ module.exports = function register(on, ctx) {
     return { ok: true, settings: merged };
   });
 
+  // #590 (quarto giro) — i sì dati su "Apri comunque", per le Preferenze.
+  // Il permesso vale per tutta la sessione e su ogni strada, e finora si vedeva
+  // solo nella notifica che lo annunciava: passata quella, non c'era più modo
+  // né di sapere che esisteva né di toglierlo, se non riscrivendo l'elenco dei
+  // siti bloccati (che li azzera tutti insieme). Solo da origine filo://: è
+  // una superficie di sicurezza, e una pagina web non deve poter leggere quali
+  // siti l'utente ha sbloccato né rimettere il blocco per conto suo.
+  function sitiConsentiti() {
+    try { return require('../siteBlock').allowedHosts(); } catch (_) { return []; }
+  }
+
+  on(MSG.SITE_BLOCK_ALLOWED, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    return { ok: true, hosts: sitiConsentiti() };
+  });
+
+  on(MSG.SITE_BLOCK_REVOKE, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const host = String((msg && msg.host) || '').trim();
+    if (!host) return { ok: false, error: 'no_host', hosts: sitiConsentiti() };
+    try { require('../siteBlock').revokeHost(host); } catch (_) {}
+    return { ok: true, hosts: sitiConsentiti() };
+  });
+
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     // Ripristino completo (#184): riscrive TUTTE le impostazioni ai valori

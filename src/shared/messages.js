@@ -29,6 +29,12 @@
     GET_SETTINGS: 'get_settings',
     UPDATE_SETTINGS: 'update_settings',           // { settings }
     RESET_SETTINGS: 'reset_settings',             // → riporta TUTTE le impostazioni ai predefiniti
+    // #590 — i sì dati a mano su "Apri comunque": quali siti della lista
+    // restano aperti fino alla chiusura di Filo, e come togliere il permesso.
+    // Vivono in memoria e non nelle impostazioni (muoiono con la sessione),
+    // quindi non arrivano con GET_SETTINGS e hanno bisogno di un canale loro.
+    SITE_BLOCK_ALLOWED: 'site_block_allowed',     // → { ok, hosts: [string] }
+    SITE_BLOCK_REVOKE: 'site_block_revoke',       // { host } → { ok, hosts }
     EXPORT_DATA: 'export_data',                   // → salva tutti i dati come .zip
     // Reimportazione del .zip di EXPORT_DATA, in due passi: prima si sceglie e
     // si LEGGE il file (anteprima con quante sezioni/immagini contiene), poi si

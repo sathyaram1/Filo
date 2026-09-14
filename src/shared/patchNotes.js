@@ -18,6 +18,7 @@
     {
       version: '0.2.228', date: '2026-09-11',
       fixes: [
+        'Quasi tutti i link sponsorizzati, quelli delle newsletter e quelli dei giornali passano per un indirizzo di conteggio prima di arrivare all\'articolo. Adesso ci arrivano: prima il clic non faceva niente, oppure compariva «Sito bloccato» con il nome di un sito che non avevi mai visto.',
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
         'L\'Aiuto tratta le tracce di navigazione lasciate da altri come indizi da verificare sulla pagina, non come istruzioni da eseguire. E nessuno può più aggiungerne una senza passare da Filo. Quelle che mandi tu partono senza i tuoi dati: indirizzi email, IBAN, codici fiscali e numeri di telefono vengono cancellati prima.',
         'Quello che scrivi in un feedback lo leggono solo Filo e chi lo lavora: testo, indirizzo della pagina e screenshot non sono raggiungibili da nessun altro. Pubblici restano i miglioramenti già usciti, che vedi in bacheca: il titolo, la versione e la frase scritta per chi li aveva segnalati.',
@@ -25,6 +26,17 @@
         'I siti che apri non possono più agire al posto tuo dentro Filo: votare in bacheca, spendere i tuoi crediti per riaprire un fix, farti uscire dall\'account o leggere con che indirizzo sei entrato.',
         'Se una tua segnalazione viene risolta dopo mesi, l\'annuncio e i crediti arrivano lo stesso. Prima Filo guardava solo le segnalazioni più recenti, e chi aveva aspettato di più non riceveva niente.',
         'In bacheca ci sono tutti i fix usciti, anche i più vecchi: prima l\'elenco si fermava ai cinquecento più recenti.',
+        'I siti che metti fra quelli da bloccare ora restano chiusi da ogni strada: se scrivi tu l\'indirizzo, se chiedi a Filo di aprirli, se ci arrivi da un link accorciato che rimbalza lì, se premi indietro dopo averli messi in lista. Prima bastava una di queste e ti ritrovavi davanti un sito che avevi detto di bloccare.',
+        'Il sito che scrivi fra quelli da bloccare vale da subito. Prima si salvava solo quando lasciavi il campo: se chiudevi Sicurezza o passavi a un\'altra scheda appena finito di scriverlo, la riga andava persa in silenzio e il sito si apriva come se non l\'avessi mai messa.',
+        'Il bottone «Apri» su una finestrella bloccata ora apre solo quella finestrella. Prima toglieva il sito dalla lista di quelli bloccati fino alla chiusura di Filo, senza dirtelo.',
+        'Quando chiedi a Filo di aprire una pagina, a volte nasceva una scheda bianca e la chat diceva comunque di averla aperta. Ora la pagina si apre davvero, e se l\'indirizzo non sta in piedi Filo te lo dice.',
+        '«Apri comunque», sulla notifica di un sito bloccato, ora apre il sito per davvero e ti lascia girarci dentro: link, ricarica, schede nuove. Prima quasi ogni sito ti lasciava una scheda vuota e non c\'era nessun altro modo di arrivarci.',
+        'Anche i siti con l\'estensione in caratteri non latini (.рф, .テスト e le altre) si possono mettere fra quelli da bloccare, e nell\'elenco restano scritti come li hai scritti tu: prima la riga spariva e il sito si apriva lo stesso.',
+        'Un sito della lista non si vede più nemmeno dentro un riquadro che un\'altra pagina si incorpora: prima bastava che a mostrartelo fosse qualcun altro.',
+        'Ricaricare non riporta più su un sito che hai appena messo in lista, e non ce la fa nemmeno una pagina che si aggiorna da sola.',
+        'I siti che apri lo stesso con «Apri comunque» adesso si vedono in Sicurezza, con il bottone per rimettere il blocco. Prima quel permesso valeva fino alla chiusura di Filo e spariva dalla vista insieme alla notifica che lo annunciava.',
+        'Una finestrella di accesso («Continua con…») verso un sito della lista non si apre più. Prima si apriva vuota e restava lì da chiudere a mano.',
+        'Un file non si scarica più da un sito che hai messo fra quelli da bloccare, nemmeno col tasto destro su un\'immagine, un video o un link.',
       ],
     },
     {

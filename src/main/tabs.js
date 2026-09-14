@@ -136,6 +136,14 @@ const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload
 // legittime navigano solo verso http(s); le interne verso filo://. La barra
 // indirizzi (navigazione esplicita dell'utente) NON passa da questo gate.
 const WEB_NAV_SCHEMES = new Set(['http:', 'https:', 'filo:', 'about:', 'blob:']);
+// L'indirizzo è già scritto per intero (schema compreso)? È la domanda che
+// separa "https://sito.esempio/x" da "sito.esempio/x": il secondo non è un URL
+// finché non gli si mette lo schema davanti, e prima di allora nessun controllo
+// che ragiona per host riesce a leggerlo (#590).
+function parsesAsUrl(rawUrl) {
+  try { new URL(String(rawUrl || '')); return true; } catch (_) { return false; }
+}
+
 function isWebUnsafeNav(rawUrl) {
   let proto = '';
   try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
@@ -164,6 +172,55 @@ function openExternalScheme(rawUrl) {
   if (!isOsDelegatedScheme(rawUrl)) return false;
   try { shell.openExternal(String(rawUrl)); } catch (_) {}
   return true;
+}
+
+// #590 (nono giro) — L'INDIRIZZO CHE IL SERVER HA SERVITO, NON QUELLO CHE LA
+// PAGINA SI È SCRITTA ADDOSSO.
+//
+// L'unica eccezione alla lista dei siti bloccati che non passi dall'utente è
+// "vengo da una pagina di risultati di un motore di ricerca", e chi decide se
+// una pagina è di risultati è il suo indirizzo. Ma l'indirizzo di una pagina,
+// dentro la propria origine, lo riscrive la pagina: una riga
+// (history.pushState/replaceState) porta una pagina qualunque ospitata sul nome
+// di un motore nel percorso dei risultati, senza ricaricare niente e senza
+// chiedere niente a nessuno. Da quel momento l'indirizzo corrente è quello di
+// una ricerca e la lista non vale più: né sulla scheda, né su una scheda nuova
+// aperta da lì, né su un riquadro incorporato, perché tutte e tre chiedono alla
+// stessa decisione.
+//
+// Il giro 3 aveva già chiuso "il sito di chiunque che si spaccia per motore"
+// (ancorando il nome al dominio registrabile) e il giro 7 "la pagina di chiunque
+// ospitata sul motore vero" (pretendendo il percorso dei risultati). Quella
+// seconda correzione si regge su un'idea che non sta in piedi finché a
+// rispondere è l'indirizzo CORRENTE: che sul percorso dei risultati nessuno
+// possa pubblicare una pagina propria. Ci si può arrivare senza pubblicare
+// niente, riscrivendoselo.
+//
+// La cura è chiedere l'indirizzo da cui il documento è stato davvero CARICATO.
+// Quello lo decide il server, non la pagina: `did-navigate` scatta solo sui
+// caricamenti veri, mentre pushState/replaceState e i salti all'ancora passano
+// per `did-navigate-in-page`, che qui non guardiamo. Un motore vero non ci
+// rimette niente: i risultati li serve a un indirizzo di risultati, e le
+// riscritture che fa mentre l'utente affina la ricerca restano dentro lo stesso
+// percorso.
+const URL_SERVITO = new WeakMap(); // webContents → ultimo indirizzo davvero caricato
+
+function segnaUrlServito(wc) {
+  if (!wc || typeof wc.on !== 'function') return;
+  wc.on('did-navigate', (_e, url) => {
+    try { URL_SERVITO.set(wc, String(url || '')); } catch (_) {}
+  });
+}
+
+// La pagina di partenza da cui si giudica l'eccezione del motore di ricerca.
+// Finché il primo caricamento non è arrivato non c'è niente di riscrivibile e
+// l'indirizzo corrente va bene lo stesso.
+function urlDiPartenza(wc) {
+  try {
+    return URL_SERVITO.get(wc) || wc.getURL() || '';
+  } catch (_) {
+    return '';
+  }
 }
 
 // Altezza della sola fila di tab (tab + nuova scheda + controlli finestra),
@@ -697,12 +754,43 @@ class TabManager {
     return view;
   }
 
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false } = {}) {
+  // Apre una scheda e ritorna il solo id (null se l'apertura è stata negata).
+  // È la forma usata ovunque; chi deve SPIEGARE un rifiuto usa openTabResult.
+  openTab(url = 'filo://newtab/', opts = {}) {
+    return this.openTabResult(url, opts).id;
+  }
+
+  // Come openTab, ma ritorna l'esito per esteso: { id, blocked, host }.
+  //   blocked: '' consentita | 'scheme' schema non-web | 'site' lista dei siti
+  //            bloccati (#590) — la chat lo dice invece di tacere (#482) |
+  //            'address' non è un indirizzo apribile (#590).
+  // Opzioni oltre a quelle di openTab:
+  //   fromUrl:  pagina di partenza / referrer, per l'eccezione "arrivo da un
+  //             motore di ricerca" (la passa chi quel referrer ce l'ha, cioè
+  //             setWindowOpenHandler).
+  //   overrideSiteBlock: scavalco VOLUTO DALL'UTENTE ("Apri comunque").
+  openTabResult(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, fromUrl = '', overrideSiteBlock = false } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
     // ingresso convergono su un solo URL, qualunque chiamante li apra.
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
+
+    // #590 — INDIRIZZO "NUDO" (senza schema davanti). navigate() lo riduceva già
+    // alla sua forma navigabile prima di ogni controllo; qui no, e la differenza
+    // costava due cose: la scheda nasceva BIANCA (loadURL non sa che farsene di
+    // "sito.esempio/pagina") mentre la chat raccontava di averla aperta, e i
+    // controlli qui sotto — schemi non-web e lista dei siti bloccati — lo
+    // vedevano come un indirizzo che non parsa e lo lasciavano passare senza
+    // guardarlo. Un modello che propone l'indirizzo senza "https://" davanti
+    // (capita, soprattutto coi modelli piccoli) bastava a scavalcare la lista.
+    // Se non parsa e NON somiglia a un indirizzo, non c'è niente da aprire:
+    // meglio dirlo che aprire una scheda bianca e chiamarla successo.
+    if (typeof url === 'string' && !parsesAsUrl(url)) {
+      const NAV = globalThis.SN_URL_NAV;
+      if (NAV && NAV.looksLikeAddress(url)) url = normalizeUrl(url);
+      else return { id: null, blocked: 'address', host: '' };
+    }
 
     // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
     // in una scheda, riportaci l'utente invece di duplicarla. Solo per aperture
@@ -719,7 +807,7 @@ class TabManager {
           // così l'intento (evidenziare l'elemento appena salvato) si applica.
           if (existing.url !== url) this.navigate(existing.id, url);
           this.activate(existing.id);
-          return existing.id;
+          return { id: existing.id, blocked: '', host: '' };
         }
       }
     }
@@ -739,7 +827,32 @@ class TabManager {
     // assicurati che il percorso IPC → openTab(file://) resti bloccato.
     if (isWebUnsafeNav(url)) {
       openExternalScheme(url); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
-      return null;
+      return { id: null, blocked: 'scheme', host: '' };
+    }
+    // SICUREZZA (#590) — la LISTA DEI SITI BLOCCATI, sullo stesso cammino e per
+    // lo stesso motivo del gate qui sopra: will-navigate non scatta su un
+    // loadURL programmatico, quindi senza questo controllo la lista non valeva
+    // per l'indirizzo scritto dall'utente nella home, né per l'azione NAVIGA
+    // che propone il modello. Un controllo unico qui copre ogni chiamante
+    // presente e futuro. L'unico scavalco è quello che l'utente sceglie a mano
+    // sulla notifica ("Apri comunque" → openBlockedPopup).
+    // `indirizzoDellUtente` (#590, settimo giro): questo è l'indirizzo che
+    // l'utente ha scritto nella barra o che ha chiesto a Filo di aprire. Se
+    // viene fermato glielo si dice anche quando a fermarlo sono le liste
+    // pubbliche, che altrove restano mute: una richiesta esplicita che finisce
+    // nel nulla senza una parola sembra un guasto.
+    // `indirizzoDellUtente` (#590, settimo giro): questo è l'indirizzo che
+    // l'utente ha scritto nella barra o che ha chiesto a Filo di aprire.
+    // #590 (ottavo giro) — ma qui arrivano anche le schede aperte da un LINK
+    // (target="_blank", Ctrl+clic, clic centrale, "Apri in una nuova scheda"
+    // del menu del tasto destro, una finestrella): quelle l'indirizzo non se
+    // lo sceglie l'utente, e trattarle come suo faceva nominare all'utente un
+    // contatore di clic che non aveva mai visto, al posto dell'articolo.
+    if (!overrideSiteBlock) {
+      const blocco = this._maybeBlockNavigation(url, {
+        fromUrl, indirizzoDellUtente: !openedByLink,
+      });
+      if (blocco) return { id: null, blocked: 'site', host: blocco.host };
     }
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
@@ -820,7 +933,7 @@ class TabManager {
     // nasce instradata da quel paese (ricrea la view nella partition proxata).
     this._maybeApplyDomainRule(tab, url);
     this._broadcast();
-    return id;
+    return { id, blocked: '', host: '' };
   }
 
   closeTab(id) {
@@ -1496,6 +1609,14 @@ class TabManager {
       openExternalScheme(target);
       return;
     }
+    // SICUREZZA (#590) — e la lista dei siti bloccati, per lo stesso motivo:
+    // questa è la strada dell'indirizzo scritto a mano nella barra della shell
+    // (tabs:navigate), che prima non incontrava nessun controllo. Nessun
+    // fromUrl: la pagina su cui si trova la scheda non è il referrer di un
+    // indirizzo digitato, e non deve poter aprire l'eccezione "arrivo da un
+    // motore di ricerca" solo perché la scheda stava su Google.
+    // `indirizzoDellUtente`: come in openTab, l'indirizzo l'ha fornito lui.
+    if (this._maybeBlockNavigation(target, { indirizzoDellUtente: true })) return;
     // La WebContentsView va RICREATA (non basta un loadURL) quando cambia la
     // partizione (privacy, fra siti diversi) oppure quando si attraversa il
     // confine di fiducia interno↔esterno: il preload e contextIsolation sono
@@ -1577,23 +1698,47 @@ class TabManager {
     this._broadcast();
   }
 
+  // SICUREZZA (#590, terzo giro) — avanti e indietro sono un cambio di
+  // indirizzo della scheda come gli altri, e non passavano dal punto unico:
+  // né will-navigate né will-redirect scattano su una navigazione di
+  // cronologia. Un sito visitato prima e messo in lista dopo tornava a schermo
+  // al primo clic su "indietro", senza nemmeno la notifica. È il caso normale:
+  // un sito lo si mette in lista proprio mentre ce l'hai davanti.
+  // L'indirizzo della voce di cronologia si chiede PRIMA di muoversi.
+  _urlVoceCronologia(wc, delta) {
+    try {
+      const h = wc.navigationHistory;
+      if (!h || typeof h.getActiveIndex !== 'function') return '';
+      const voce = h.getEntryAtIndex(h.getActiveIndex() + delta);
+      return (voce && voce.url) || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
-    if (tab.view.webContents.navigationHistory?.canGoBack()) {
-      tab.view.webContents.navigationHistory.goBack();
-    } else if (tab.view.webContents.canGoBack?.()) {
-      tab.view.webContents.goBack();
+    const wc = tab.view.webContents;
+    if (wc.navigationHistory?.canGoBack()) {
+      if (this._maybeBlockNavigation(this._urlVoceCronologia(wc, -1))) return;
+      wc.navigationHistory.goBack();
+    } else if (wc.canGoBack?.()) {
+      if (this._maybeBlockNavigation(this._urlVoceCronologia(wc, -1))) return;
+      wc.goBack();
     }
   }
 
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
-    if (tab.view.webContents.navigationHistory?.canGoForward()) {
-      tab.view.webContents.navigationHistory.goForward();
-    } else if (tab.view.webContents.canGoForward?.()) {
-      tab.view.webContents.goForward();
+    const wc = tab.view.webContents;
+    if (wc.navigationHistory?.canGoForward()) {
+      if (this._maybeBlockNavigation(this._urlVoceCronologia(wc, 1))) return;
+      wc.navigationHistory.goForward();
+    } else if (wc.canGoForward?.()) {
+      if (this._maybeBlockNavigation(this._urlVoceCronologia(wc, 1))) return;
+      wc.goForward();
     }
   }
 
@@ -1607,6 +1752,15 @@ class TabManager {
     let current = '';
     try { current = tab.view.webContents.getURL() || ''; } catch (_) {}
     const target = NE && NE.targetOf(current);
+    // SICUREZZA (#590, quarto giro) — ricaricare è ricaricare un INDIRIZZO, e
+    // quell'indirizzo può essere finito in lista dopo che la pagina era già a
+    // schermo. È il caso normale: un sito lo si mette in lista proprio mentre
+    // ce l'hai davanti. Il tasto indietro, che è la strada gemella, lo ferma
+    // dal giro prima; qui non lo fermava nessuno, quindi le due strade
+    // raccontavano due cose diverse e la lista sembrava non funzionare.
+    // Vale sia per la pagina mostrata sia per il sito che la pagina d'errore
+    // sta per ritentare.
+    if (this._maybeBlockNavigation(target || current)) return;
     if (target) {
       try { tab.view.webContents.loadURL(target); } catch (_) {}
       return;
@@ -1679,6 +1833,10 @@ class TabManager {
 
   _wireEvents(tab) {
     const wc = tab.view.webContents;
+    // #590 (nono giro) — da qui in poi si sa da quale indirizzo il documento è
+    // stato davvero caricato, che è l'unico che la pagina non può riscriversi.
+    // Serve all'eccezione del motore di ricerca (vedi segnaUrlServito).
+    segnaUrlServito(wc);
     const update = (patch) => {
       Object.assign(tab, patch);
       this._broadcast();
@@ -1788,7 +1946,7 @@ class TabManager {
       // #170.3 — Blocco apertura siti in blacklist. Click su un link generico
       // (o window.location) verso un sito in blacklist: blocca, TRANNE se la
       // pagina di partenza è un motore di ricerca (l'utente l'ha cercato).
-      if (this._maybeBlockNavigation(tab, url, { fromUrl: wc.getURL() })) {
+      if (this._maybeBlockNavigation(url, { fromUrl: urlDiPartenza(wc) })) {
         event.preventDefault();
         return;
       }
@@ -1813,8 +1971,119 @@ class TabManager {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
         openExternalScheme(url);
+        return;
+      }
+      // #590 — e la LISTA DEI SITI BLOCCATI, per lo stesso identico motivo. Il
+      // gate di will-navigate guarda l'indirizzo CHIESTO; dove si finisce
+      // davvero lo decide il server, e un rimbalzo 301/302 (gli accorciatori di
+      // link, i contatori di clic, mezzo web) portava la scheda sul sito della
+      // lista senza incontrare nessun controllo. Non serviva nemmeno far
+      // scrivere al modello l'indirizzo della lista: bastava un accorciatore.
+      // Il referrer per l'eccezione "arrivo da un motore di ricerca" è la
+      // pagina da cui siamo partiti, come in will-navigate.
+      //
+      // Qui vale SOLO la lista scritta dall'utente (#590, sesto giro). Un
+      // rimbalzo è un posto da cui si PASSA, non uno dove si va, e mezzo web
+      // passa per un contatore di clic prima di arrivare all'articolo: quei
+      // contatori stanno nelle liste pubbliche, e fermarli qui faceva morire
+      // il link a metà strada, con una notifica che nominava all'utente un
+      // sito che non aveva mai visto. Le liste pubbliche continuano a fare
+      // quello che hanno sempre fatto, cioè annullare le richieste in
+      // silenzio; il divieto scritto dall'utente resta valido anche qui,
+      // perché un rimbalzo era il modo più comodo di aggirarlo.
+      if (this._maybeBlockNavigation(url, { fromUrl: urlDiPartenza(wc), soloListaUtente: true })) {
+        event.preventDefault();
+        // La scheda era già nata per questo indirizzo e non ha mai caricato
+        // niente: fermare il rimbalzo la lascia vuota, senza indirizzo, senza
+        // titolo e senza contenuto, e l'utente deve chiuderla a mano quando la
+        // notifica se n'è già andata. Se invece la scheda aveva una pagina
+        // (l'utente ha cliccato un link da lì), quella pagina resta dov'era e
+        // non c'è niente da chiudere.
+        if (!tab._everNavigated) this._chiudiSchedaRimastaVuota(tab);
       }
     });
+    // SICUREZZA (#590, quarto giro) — LA RICARICA CHIESTA DALLA PAGINA.
+    // `location.reload()` e il meta refresh non emettono will-navigate: per
+    // Chromium la scheda resta dov'era. Una pagina che si aggiorna da sola
+    // (caselle di posta, cruscotti, risultati in diretta) continuava quindi a
+    // ricaricare un sito finito in lista nel frattempo, senza che servisse
+    // nemmeno un clic. Qui guardiamo solo le ricariche, cioè le navigazioni
+    // verso l'indirizzo su cui la scheda si trova già: le prime aperture non
+    // entrano (le ha già filtrate openTab, ed è così che il ripristino della
+    // sessione e "Apri comunque" restano quello che sono).
+    wc.on('did-start-navigation', (_e, url, isInPlace, isMainFrame) => {
+      if (!isMainFrame || isInPlace) return;
+      // La scheda cambia pagina: il conto di quali riquadri sono già stati
+      // annunciati riparte (#590, sesto giro). Era per scheda, e una scheda
+      // vive quanto l'utente vuole: dalla seconda pagina in poi lo stesso sito
+      // veniva tolto in silenzio, e la pagina sembrava rotta invece che potata.
+      tab._sitiIncorporatiDetti = null;
+      let corrente = '';
+      try { corrente = wc.getURL() || ''; } catch (_) { return; }
+      if (!corrente || url !== corrente) return;
+      // La ricarica la chiede la PAGINA, non l'utente: vale solo la lista che
+      // l'utente ha scritto (#590, ottavo giro). Una pagina che si aggiorna da
+      // sola passa spesso per un indirizzo di misurazione, e fermarla con le
+      // liste pubbliche spegneva la pagina in silenzio.
+      let decisione = null;
+      try {
+        decisione = require('./services/siteBlock')
+          .shouldBlockNavigation(url, { soloListaUtente: true });
+      } catch (_) { return; }
+      if (!decisione || !decisione.block) return;
+      // Fermare un caricamento mentre si sta ancora annunciando fa cadere tutto
+      // (la scheda muore, e con lei la finestra): la fermata va rimandata di un
+      // giro, come la chiusura della scheda rimasta vuota qui sotto.
+      setImmediate(() => { try { wc.stop(); } catch (_) {} });
+      // Una pagina può chiedere di ricaricarsi in continuazione, e Chromium
+      // riprova da sé dopo una fermata: la notifica si dice UNA volta, non una
+      // per tentativo, altrimenti al posto di una spiegazione arriva una
+      // raffica che copre lo schermo.
+      // La ricarica la chiede la PAGINA, non l'utente: qui vale la stessa
+      // regola del resto (#590, settimo giro). Il nome lo dice solo il divieto
+      // che l'utente ha scritto lui; le liste pubbliche fermano e tacciono.
+      if (decisione.reason !== 'blacklist') return;
+      const ora = Date.now();
+      const ultima = tab._ultimaRicaricaFermata;
+      if (ultima && ultima.url === url && ora - ultima.t < 5000) { ultima.t = ora; return; }
+      tab._ultimaRicaricaFermata = { url, t: ora };
+      this._notifyBlocked(decisione.host, url);
+    });
+    // SICUREZZA (#590, quarto giro) — I RIQUADRI INCORPORATI. La lista guardava
+    // solo l'indirizzo della scheda, quindi un sito della lista messo dentro un
+    // riquadro da un'altra pagina si vedeva per intero, e il riquadro lo sceglie
+    // la pagina, non l'utente: bastava farlo grande quanto lo schermo. I siti
+    // che uno si mette in lista sono anche quelli che mezzo web incorpora a
+    // pezzi. Il riferimento per l'eccezione "arrivo da un motore di ricerca"
+    // resta la pagina che OSPITA il riquadro, come per i popup.
+    if (typeof wc.on === 'function') {
+      wc.on('will-frame-navigate', (event) => {
+        if (!event || event.isMainFrame) return; // il frame principale ha già i suoi gate
+        const url = event.url;
+        if (isWebUnsafeNav(url)) { event.preventDefault(); return; }
+        // Anche qui vale SOLO la lista scritta dall'utente (#590, sesto giro).
+        // I riquadri incorporati sono il posto dove vive la pubblicità, e le
+        // liste pubbliche la tolgono già da sole con il filtro delle
+        // richieste, in silenzio, da sempre. Farle passare di qui voleva dire
+        // una notifica per ogni tracciatore di ogni pagina: aprire un giornale
+        // riempiva l'angolo dello schermo di avvisi che l'utente non aveva
+        // chiesto e su cui non poteva fare niente.
+        let decisione = null;
+        try {
+          decisione = require('./services/siteBlock')
+            .shouldBlockNavigation(url, { fromUrl: urlDiPartenza(wc), soloListaUtente: true });
+        } catch (_) { return; }
+        if (!decisione || !decisione.block) return;
+        event.preventDefault();
+        // Una pagina può incorporare venti riquadri dello stesso sito: la
+        // notifica si dice UNA volta per sito e per scheda, altrimenti al
+        // posto di una spiegazione arriva una raffica che copre tutto.
+        if (!tab._sitiIncorporatiDetti) tab._sitiIncorporatiDetti = new Set();
+        if (tab._sitiIncorporatiDetti.has(decisione.host)) return;
+        tab._sitiIncorporatiDetti.add(decisione.host);
+        this._notifyBlockedFrame(decisione.host);
+      });
+    }
     // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
       wc.on('console-message', (_e, level, message, line, source) => {
@@ -2167,7 +2436,16 @@ class TabManager {
       // avrebbe una scheda aperta su quella URL (Cookies.MODES.PRIVACY →
       // partizione per-sito; altrimenti null = sessione condivisa), per non
       // spezzare un eventuale login Google già presente in Filo.
+      // #590 (quarto giro) — prima di riconoscere un login si chiede alla
+      // lista. "Somiglia a un accesso" lo decide l'indirizzo che la pagina
+      // scrive (basta un percorso /login, /signin, /oauth), quindi qualunque
+      // pagina poteva far comparire un sito della lista dentro una finestrella.
+      // Il giro prima aveva chiuso gli spostamenti DENTRO quella finestrella,
+      // non il suo primo indirizzo: la finestra nasceva, il primo caricamento
+      // veniva fermato, e all'utente restava a schermo un rettangolo vuoto da
+      // chiudere a mano. Chiedendo qui la finestra non nasce affatto.
       if (tab.isInternal === false && isAuthPopup(url)) {
+        if (this._maybeBlockNavigation(url, { fromUrl: urlDiPartenza(wc) })) return { action: 'deny' };
         return this._allowAuthPopup(url);
       }
       const isAdLikePopup = disposition === 'new-window';
@@ -2177,18 +2455,26 @@ class TabManager {
       }
       // #170.3 — link verso un sito in blacklist aperto in una nuova scheda
       // (target=_blank / window.open): stesso blocco di will-navigate. Il
-      // referrer è la pagina che ha originato l'apertura.
-      const fromUrl = (details.referrer && details.referrer.url) || wc.getURL();
-      if (this._maybeBlockNavigation(tab, url, { fromUrl })) {
-        return { action: 'deny' };
-      }
+      // referrer è la pagina che ha originato l'apertura, e va PASSATO a
+      // openTab (#590), che è il punto in cui la lista viene applicata: senza,
+      // l'eccezione "arrivo da un motore di ricerca" non varrebbe per i
+      // risultati aperti in una scheda nuova.
+      // #590 (terzo giro) — la pagina di partenza è quella su cui sta la
+      // scheda, non il referrer che la richiesta si porta dietro. Il referrer
+      // fuori dal proprio dominio arriva quasi sempre ridotto alla sola origine
+      // ("https://motore.esempio/"), cioè senza la domanda che rende quella
+      // pagina un risultato di ricerca, e l'eccezione andava concessa a
+      // qualunque pagina di quel sito. Ed è anche il valore più solido: dentro
+      // un riquadro incorporato il referrer è del riquadro, mentre a comandare
+      // la scheda è la pagina che lo ospita.
+      const fromUrl = urlDiPartenza(wc) || (details.referrer && details.referrer.url) || '';
       // #376 — parità con qualsiasi browser: Ctrl+click / click centrale su un
       // link ("aprilo dietro, io continuo a leggere qui") arriva con
       // disposition 'background-tab' e NON deve rubare il primo piano. Prima
       // ogni apertura veniva attivata, quindi l'utente veniva strappato dalla
       // pagina che stava leggendo — lo stesso attrito della musica che passava
       // davanti da sola.
-      this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true });
+      this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true, fromUrl });
       return { action: 'deny' };
     });
 
@@ -2252,30 +2538,50 @@ class TabManager {
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
       );
     } catch (_) { /* policy non supportata in qualche build */ }
-    pwc.on('will-navigate', (event, url) => {
+    // #590 (nono giro) — anche la finestrella tiene il conto dell'indirizzo da
+    // cui è stata davvero caricata: l'eccezione del motore di ricerca vale qui
+    // come nelle schede, e qui come là la pagina non deve poterselo riscrivere.
+    segnaUrlServito(pwc);
+    // #590 — la finestrella di accesso era l'ultima superficie rimasta fuori dal
+    // passaggio unico: applicava le difese sugli schemi ma non la lista dei
+    // siti bloccati, quindi dentro quella finestra un sito della lista si
+    // apriva. Qui le due difese vanno insieme, come in una scheda normale.
+    const gatePopup = ({ soloListaUtente } = {}) => (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
         openExternalScheme(url);
+        return;
       }
-    });
+      if (this._maybeBlockNavigation(url, { fromUrl: urlDiPartenza(pwc), soloListaUtente })) {
+        event.preventDefault();
+      }
+    };
+    pwc.on('will-navigate', gatePopup());
     // SICUREZZA (#309) — come per le tab: will-navigate non copre i redirect
     // lato server, e un IdP compromesso/ostile potrebbe rimbalzare il popup
     // verso file:// (leak hash NTLM) o data:/javascript:. Stesso gate esplicito.
-    pwc.on('will-redirect', (event, url) => {
-      if (isWebUnsafeNav(url)) {
-        event.preventDefault();
-        openExternalScheme(url);
-      }
-    });
+    // Sul RIMBALZO vale solo la lista scritta dall'utente, come nelle schede
+    // (#590, sesto giro): un accesso con Google o Facebook passa quasi sempre
+    // per un indirizzo di misurazione prima di tornare al sito, e quegli
+    // indirizzi stanno nelle liste pubbliche. Fermarli qui avrebbe spento
+    // l'accesso a metà, in una finestrella che l'utente non può nemmeno
+    // riaprire da solo.
+    pwc.on('will-redirect', gatePopup({ soloListaUtente: true }));
     pwc.setWindowOpenHandler(({ url }) => {
       if (isWebUnsafeNav(url)) {
         openExternalScheme(url);
         return { action: 'deny' };
       }
+      // #590 (quarto giro) — anche qui la lista viene prima del riconoscimento
+      // del login, come nel gate delle schede: una finestrella che ne apre
+      // un'altra non deve essere la strada che scavalca la lista.
       if (isAuthPopup(url)) {
+        if (this._maybeBlockNavigation(url, { fromUrl: urlDiPartenza(pwc) })) return { action: 'deny' };
         return this._allowAuthPopup(url);
       }
-      this.openTab(url, { activate: true });
+      // La scheda la apre la finestrella, non l'utente: vale la stessa regola
+      // del gate delle schede (#590, ottavo giro).
+      this.openTab(url, { activate: true, openedByLink: true, fromUrl: urlDiPartenza(pwc) });
       return { action: 'deny' };
     });
     pwc.on('did-create-window', (child) => this._hardenAuthPopup(child));
@@ -2291,10 +2597,62 @@ class TabManager {
     } catch (_) {}
   }
 
-  // Chiamato da IPC quando l'utente clicca "Apri" sulla chip — il popup era
-  // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco.
+  // Chiamato da IPC quando l'utente clicca "Apri" sulla chip del BLOCCO POPUP
+  // — il popup era legittimo (es. share dialog, OAuth) e va aperto come scheda.
+  //
+  // Qui NON si scavalca la lista dei siti bloccati (#590, terzo giro). Per un
+  // giro questo metodo è stato l'unico ingresso di tutti i bottoni "apri lo
+  // stesso", e il permesso che concede è cresciuto: da "questa apertura" a
+  // "questo sito, per tutta la sessione, su ogni strada". La chip dei popup
+  // però chiede un'altra cosa ("fai passare questa finestrella") e il sito che
+  // la fa comparire lo sceglie la pagina, non l'utente: un clic lì smontava la
+  // lista che l'utente aveva scritto, e da quel momento nemmeno l'apertura
+  // chiesta dal modello incontrava più un controllo. Il permesso grande lo dà
+  // solo il bottone che lo nomina: apriSitoComunque, qui sotto.
   openBlockedPopup(url) {
     this.openTab(url, { activate: true });
+  }
+
+  // Chiamato da IPC quando l'utente clicca "Apri comunque" sulla notifica
+  // "Sito bloccato". È l'UNICO scavalco della lista dei siti bloccati, e lo
+  // sceglie una persona che sta guardando il nome del sito che ha fermato.
+  //
+  // Il sì si REGISTRA (#590, secondo giro), non vale solo per la richiesta che
+  // parte adesso. Un sito che risponde "vai qui" invece di dare la pagina (il
+  // salto da http a https, la barra iniziale che porta alla home: quasi ogni
+  // sito vero) finiva contro il controllo del rimbalzo, che del sì non sapeva
+  // niente: la scheda restava vuota e il sito non si apriva più in nessun modo.
+  // Lo stesso al primo link cliccato dentro il sito, alla ricarica, e a una
+  // scheda nuova aperta da lì.
+  // E si torna indietro (#590, terzo giro): il sì dura tutta la sessione, e un
+  // permesso che dura va detto a chi lo dà e tolto quando ci ripensa. Chi
+  // clicca "Apri comunque" per guardare una pagina non sta dicendo "tieni quel
+  // sito aperto fino a stasera", e l'unica marcia indietro era rimettere mano
+  // all'elenco dei siti bloccati, che li azzera tutti e che nessuno indovina.
+  apriSitoComunque(url) {
+    let sito = '';
+    try {
+      sito = require('./services/siteBlock').allowHost(new URL(url).hostname);
+    } catch (_) { /* indirizzo non analizzabile: resta il solo scavalco qui sotto */ }
+    this.openTab(url, { activate: true, overrideSiteBlock: true });
+    if (sito) this._notifyAllowed(sito);
+  }
+
+  // Il permesso appena dato, a parole, con la strada per toglierlo.
+  _notifyAllowed(sito) {
+    try {
+      const NAV = globalThis.SN_URL_NAV;
+      const label = (NAV && NAV.hostLeggibile(sito)) || sito;
+      this.win.webContents.send('shell:toast', {
+        text: `${label} resta aperto fino alla chiusura di Filo`,
+        opts: { actions: [{ label: 'Rimetti il blocco', restoreBlockHost: sito }] },
+      });
+    } catch (_) {}
+  }
+
+  // L'utente ci ha ripensato: quel sito torna a valere come gli altri in lista.
+  rimettiIlBlocco(sito) {
+    try { require('./services/siteBlock').revokeHost(sito); } catch (_) {}
   }
 
   // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova
@@ -2368,32 +2726,132 @@ class TabManager {
     } catch (_) {}
   }
 
-  // #170.3 — decide se bloccare una navigazione top-level verso un sito in
-  // blacklist e, in caso, mostra la notifica. Ritorna true se ha bloccato.
-  // Le aperture originate da Filo (openTab dell'azione NAVIGA, navigazione
-  // interna filo://) non passano da qui (loadURL programmatico non emette
-  // will-navigate), quindi sono naturalmente consentite.
-  _maybeBlockNavigation(tab, url, { fromUrl = '' } = {}) {
+  // #170.3/#590 — IL PUNTO DI PASSAGGIO UNICO della lista dei siti bloccati.
+  // Ogni cambio di indirizzo di una scheda passa di qui, da qualunque strada
+  // arrivi: link cliccato (will-navigate), popup/target=_blank
+  // (setWindowOpenHandler), apertura programmatica (openTab: barra della home,
+  // azione NAVIGA del modello, IPC, shim chrome.tabs), rinavigazione
+  // programmatica (navigate: barra degli indirizzi della shell), RIMBALZO del
+  // server (will-redirect: 301/302, dove si finisce lo decide il server e non
+  // l'indirizzo cliccato) e la finestrella di accesso (_hardenAuthPopup).
+  //
+  // Prima erano solo le prime due: chi scriveva l'indirizzo a mano e il
+  // modello che emetteva NAVIGA non incontravano nessun controllo, quindi una
+  // pagina ostile che convinceva il modello (NAVIGA è livello 1, senza
+  // conferma) apriva qualunque sito della lista.
+  //
+  // Quando blocca mostra la notifica con "Apri comunque" e ritorna la
+  // decisione ({ block, host, reason }) — truthy, così i chiamanti possono
+  // usarla come booleano e chi deve SPIEGARE il rifiuto (la chat) ha l'host.
+  // Ritorna null quando la navigazione è consentita.
+  //
+  // CHI PARLA (#590, settimo giro). Il blocco ferma sempre; la NOTIFICA no.
+  // Le due sorgenti della lista non hanno la stessa voce:
+  //   - il sito che l'utente ha SCRITTO lui è un divieto suo, e quando scatta
+  //     glielo si dice sempre, col nome e col bottone per insistere: quel nome
+  //     lo riconosce;
+  //   - le liste pubbliche di pubblicità e tracciatori sono una potatura muta,
+  //     e mute restano. Nominare un contatore di clic a chi ha cliccato "leggi
+  //     l'articolo" gli presenta un sito che non ha mai visto, offrendogli di
+  //     aprirlo al posto dell'articolo.
+  // L'eccezione è l'indirizzo che l'utente ha fornito LUI (`indirizzoDellUtente`:
+  // la barra della shell, l'apertura che ha chiesto a Filo): lì quel nome l'ha
+  // scritto o dettato, e una richiesta esplicita che finisce nel nulla senza
+  // una parola è peggio del nome di uno sconosciuto.
+  // Il giro scorso questa distinzione era arrivata solo sul rimbalzo del server
+  // e sui riquadri incorporati: il link cliccato, che è la strada più comune,
+  // continuava a parlare con la voce sbagliata.
+  // #590 (ottavo giro) — LE DUE LISTE HANNO DUE RAGGI, E IL RAGGIO LO DECIDE
+  // CHI HA SCELTO L'INDIRIZZO. Il divieto che l'utente ha scritto ferma una
+  // scheda comunque ci si arrivi, e lo dice. Le liste pubbliche di pubblicità
+  // e tracciatori sono un'altra cosa: sono nate per potare quello che una
+  // pagina si tira dentro, e fermare con quelle un indirizzo che l'utente non
+  // ha chiesto annullava i link che passano per un contatore di clic, cioè i
+  // link sponsorizzati, quelli delle newsletter, quelli dei giornali e quelli
+  // che arrivano da una ricerca. Restavano fuori dal raggio il rimbalzo del
+  // server e i riquadri incorporati (sesto giro), mentre il link cliccato, la
+  // scheda nuova, il Ctrl+clic, la finestrella e i tasti avanti/indietro ci
+  // restavano dentro: lo stesso gesto finiva in due modi diversi.
+  // Quindi: `soloListaUtente` segue `indirizzoDellUtente` quando chi chiama non
+  // dice altro. L'indirizzo è dell'utente quando l'ha scritto lui nella barra o
+  // l'ha chiesto a Filo; un link, un popup, un rimbalzo o un tasto di
+  // navigazione non lo sono.
+  _maybeBlockNavigation(url, {
+    fromUrl = '', soloListaUtente, indirizzoDellUtente = false,
+  } = {}) {
+    const soloUtente = soloListaUtente === undefined ? !indirizzoDellUtente : soloListaUtente;
     let decision;
     try {
-      decision = require('./services/siteBlock').shouldBlockNavigation(url, { fromUrl });
+      decision = require('./services/siteBlock')
+        .shouldBlockNavigation(url, { fromUrl, soloListaUtente: soloUtente });
     } catch (_) {
-      return false;
+      return null;
     }
-    if (!decision || !decision.block) return false;
-    this._notifyBlocked(decision.host, url);
-    return true;
+    if (!decision || !decision.block) return null;
+    if (decision.reason === 'blacklist' || indirizzoDellUtente) {
+      this._notifyBlocked(decision.host, url);
+    }
+    return decision;
+  }
+
+  // #590 — la scheda nata per un indirizzo che è rimbalzato su un sito della
+  // lista. Niente da archiviare (non è un sito che l'utente ha visitato: non ha
+  // mai caricato nulla), quindi non passa da closeTab. La chiusura è rimandata
+  // di un giro perché qui siamo dentro il gestore dell'evento di navigazione di
+  // questa stessa scheda: distruggerla mentre sta parlando fa cadere tutto.
+  _chiudiSchedaRimastaVuota(tab) {
+    if (!tab || tab._chiusuraVuotaInCorso) return;
+    tab._chiusuraVuotaInCorso = true;
+    setImmediate(() => {
+      const idx = this.tabs.findIndex((t) => t.id === tab.id);
+      if (idx < 0) return;
+      if (tab._everNavigated) return; // nel frattempo ha caricato qualcosa: non è più vuota
+      try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
+      try { tab.view.webContents.close(); } catch (_) {}
+      ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+      this.tabs.splice(idx, 1);
+      if (this.activeId === tab.id) {
+        const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
+        if (next) this.activate(next.id);
+        else this.openTab('filo://newtab/');
+      } else {
+        this._broadcast();
+      }
+    });
   }
 
   // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque".
-  // L'azione riusa il percorso openBlockedPopup (apertura programmatica, che
-  // bypassa il blocco).
+  // L'azione è DICHIARATA a parte (`openAnywayUrl`, non il generico `openUrl`)
+  // perché è l'unica che scavalca la lista: gli altri bottoni "apri" che
+  // passano da un toast — la scheda-ponte richiusa, la chip dei popup —
+  // aprono e basta (#590, terzo giro).
+  //
+  // Il nome del sito si mostra come l'utente lo scriverebbe: un indirizzo in
+  // cirillico o in giapponese viaggia sulla rete come "xn--…", e una notifica
+  // che dice "Sito bloccato: xn--80aswg.xn--p1ai" non nomina niente.
   _notifyBlocked(host, url) {
     try {
-      const label = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+      const grezzo = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+      const NAV = globalThis.SN_URL_NAV;
+      const label = (NAV && NAV.hostLeggibile(grezzo)) || grezzo;
       this.win.webContents.send('shell:toast', {
         text: `Sito bloccato: ${label}`,
-        opts: { actions: [{ label: 'Apri comunque', openUrl: url }] },
+        opts: { actions: [{ label: 'Apri comunque', openAnywayUrl: url }] },
+      });
+    } catch (_) {}
+  }
+
+  // #590 (quarto giro) — un RIQUADRO dentro la pagina, non la pagina. Qui non
+  // c'è "Apri comunque": l'utente non stava aprendo quel sito, e aprire in una
+  // scheda il pezzo che una pagina si incorpora (uno script, un widget) non è
+  // una cosa che qualcuno voglia. Il nome del sito però va detto, altrimenti la
+  // pagina sembra rotta invece che potata.
+  _notifyBlockedFrame(host) {
+    try {
+      const NAV = globalThis.SN_URL_NAV;
+      const label = (NAV && NAV.hostLeggibile(host)) || host;
+      this.win.webContents.send('shell:toast', {
+        text: `${label} è in lista: un riquadro di questa pagina non è stato caricato`,
       });
     } catch (_) {}
   }
@@ -2517,7 +2975,14 @@ class TabManager {
       // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
       // al boot (niente più video YouTube che ripartono tutti insieme).
       urls.forEach((url, i) => {
-        const id = this.openTab(url, { activate: false, suppressAutoplay: true });
+        // overrideSiteBlock (#590): il ripristino non è una NAVIGAZIONE nuova,
+        // è la sessione di prima che torna com'era. Bloccarlo qui toglierebbe
+        // all'utente schede che aveva già aperte, e lo farebbe MUTO: al boot
+        // la shell non è ancora in ascolto, quindi la notifica "Apri comunque"
+        // non arriverebbe a nessuno — esattamente il blocco silenzioso che
+        // sembra un guasto (#482). La lista torna a valere al primo
+        // spostamento di quelle schede.
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true, overrideSiteBlock: true });
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
         // riparte già tinta e il riordino cromatico alla riapertura ha i dati
         // pronti senza attendere il ricalcolo dei content script. Seeda anche la

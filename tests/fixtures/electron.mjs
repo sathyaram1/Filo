@@ -50,9 +50,14 @@ export const test = base.extend({
       //    rete di chi li lancia. Nessun test deve parlare con un apparecchio
       //    vero della LAN di qualcuno: la connessione viene rifiutata e la
       //    scheda resta sull'indirizzo chiesto, uguale ovunque.
+      //  • "sites.google.com" al loopback (#590): è il nome di un motore di
+      //    ricerca, ma le pagine che ci stanno sopra le pubblica chiunque. Serve
+      //    a provare che una pagina così non si prende l'eccezione "arrivo da
+      //    una ricerca" riscrivendosi da sola l'indirizzo. Nessuno spec parla
+      //    con il sito vero.
       args: [
         ...argomentiScala,
-        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9',
+        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sites.google.com 127.0.0.1',
         '.',
       ],
       cwd: APP_ROOT,
