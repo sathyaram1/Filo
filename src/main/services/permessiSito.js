@@ -744,12 +744,15 @@ function usoEsistente(wc, origine, tipo) {
   return null;
 }
 
-// `chiudibile`: il cartello si può togliere con una ×. Vale solo dove Filo sta
-// TIRANDO A INDOVINARE, cioè sulla strada vecchia dello schermo, che non passa
-// da nessun gestore e non dice mai se la cattura sia partita davvero. Lì il
-// cartello si accendeva anche quando al sito non era arrivato niente, e non se
-// ne andava più (#586, giro 4). Dove Filo sa (la fotocamera, il microfono, la
-// cattura moderna) la × non c'è: un avviso vero non si toglie di mezzo.
+// `chiudibile`: il cartello si può togliere con una ×. Oggi nessuno lo chiede, e
+// va bene così: la × serviva dove Filo TIRAVA A INDOVINARE, cioè sulla strada
+// vecchia dello schermo, che non passa da nessun gestore e non dice mai se la
+// cattura sia partita davvero — lì il cartello si accendeva anche quando al sito
+// non era arrivato niente (#586, giro 4). Quella strada adesso non arriva più a
+// consegnare niente: se la cattura salta la scelta di cosa si condivide, Filo la
+// chiude invece di appenderci un cartello (`schermoSenzaScelta`). Dove Filo sa
+// (fotocamera, microfono, cattura moderna) la × non c'è e non ci va: un avviso
+// vero non si toglie di mezzo.
 function iniziaUso(wc, origine, chiavi, opzioni) {
   try {
     const o = opzioni || {};
