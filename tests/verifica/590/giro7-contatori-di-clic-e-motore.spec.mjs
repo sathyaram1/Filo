@@ -210,7 +210,7 @@ test('AD1 — un link il cui indirizzo È il contatore di clic non deve far comp
   await shell.waitForTimeout(3000);
 
   expect(
-    (await notifiche()).filter((t) => t.includes('Sito bloccato')),
+    (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t)),
     'la lista dei siti bloccati non c\'entra niente con un contatore di clic, '
     + 'né quando ci si arriva per rimbalzo né quando il suo indirizzo sta già nel link',
   ).toEqual([]);
@@ -238,7 +238,9 @@ test('AE1 — se la notifica offre «Apri comunque», cliccarlo deve aprire qual
   // notifica gli offre «Apri comunque». Un bottone che non apre mai niente è
   // peggio di nessun bottone.
   await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${CONTATORE}:${srv.porta}/clic`);
-  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  // Dal dodicesimo giro il testo nomina la sorgente della regola: la notifica
+  // si riconosce dal bottone, che è quello che questa prova verifica.
+  const card = shell.locator('.shell-notif', { hasText: 'Apri comunque' });
   await expect(card).toBeVisible({ timeout: 6000 });
   await card.getByText('Apri comunque').click();
   await shell.waitForTimeout(3000);

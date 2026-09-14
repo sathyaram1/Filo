@@ -891,3 +891,117 @@ test('#590 controllo: da una pagina di risultati VERA l\'eccezione vale ancora',
     await new Promise((r) => server.close(r));
   }
 });
+
+// #590 (dodicesimo giro) — IL RISULTATO DI RICERCA APERTO IN UNA SCHEDA NUOVA.
+//
+// Un risultato di ricerca non punta quasi mai diritto al sito: passa per un
+// indirizzo che rimbalza. E un risultato si apre in due modi, tutti e due
+// normalissimi: cliccandolo, oppure con Ctrl+clic, col tasto centrale o con un
+// link fatto per aprirsi di là. Il primo porta con sé la pagina dei risultati;
+// il secondo faceva nascere una scheda vergine, e il controllo sul rimbalzo
+// (nuovo di questo lavoro) non trovava più l'eccezione: stesso gesto, due
+// esiti. Senza la correzione i due test qui sotto sono rossi.
+async function serverRisultatiCheRimbalzano() {
+  let porta = 0;
+  const server = createServer((req, res) => {
+    const host = String(req.headers.host || '').split(':')[0];
+    const percorso = String(req.url || '').split('?')[0];
+    if (host === BLOCKED_HOST) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<!doctype html><meta charset="utf-8"><h1 id="t">IL SITO CERCATO</h1>');
+      return;
+    }
+    if (percorso === '/vai') {
+      // Il contatore di clic che sta in mezzo a quasi ogni risultato vero.
+      res.writeHead(302, { Location: `http://${BLOCKED_HOST}:${porta}/pagina` });
+      res.end();
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><meta charset="utf-8"><h1>risultati</h1>'
+      + `<a id="stessa" href="http://${OSPITE_MOTORE}:${porta}/vai">il risultato</a> `
+      + `<a id="nuova" target="_blank" href="http://${OSPITE_MOTORE}:${porta}/vai">lo stesso</a>`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  porta = server.address().port;
+  return {
+    risultati: () => `http://${OSPITE_MOTORE}:${porta}/search?q=qualcosa`,
+    chiudi: async () => {
+      try { server.closeAllConnections?.(); } catch (_) {}
+      await new Promise((r) => server.close(r));
+    },
+  };
+}
+
+test('#590 un risultato che rimbalza arriva anche aperto in una scheda nuova', async ({ shell, openTab }) => {
+  await enableBlock(shell);
+  const srv = await serverRisultatiCheRimbalzano();
+  try {
+    const page = await openTab(srv.risultati());
+    await page.waitForSelector('#nuova', { timeout: 8000 });
+    await page.evaluate(() => document.getElementById('nuova').click());
+    await page.waitForTimeout(2500);
+    expect(
+      await sitoInListaAperto(shell),
+      'cliccare il risultato e aprirlo in una scheda nuova sono lo stesso gesto: la scheda '
+      + 'appena nata deve portarsi dietro la pagina dei risultati da cui è partita',
+    ).toBe(true);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('#590 lo stesso risultato col Ctrl+clic, cioè aperto dietro', async ({ shell, openTab }) => {
+  await enableBlock(shell);
+  const srv = await serverRisultatiCheRimbalzano();
+  try {
+    const page = await openTab(srv.risultati());
+    await page.waitForSelector('#stessa', { timeout: 8000 });
+    await page.evaluate(() => {
+      document.getElementById('stessa').dispatchEvent(new MouseEvent('click', {
+        bubbles: true, cancelable: true, ctrlKey: true, metaKey: true, button: 0,
+      }));
+    });
+    await page.waitForTimeout(2500);
+    expect(await sitoInListaAperto(shell), '«aprilo dietro» deve portare dove porta il clic').toBe(true);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('#590 controllo: da una pagina qualunque lo stesso rimbalzo resta fermato, anche in una scheda nuova', async ({ shell, openTab }) => {
+  await enableBlock(shell);
+  // La correzione propaga la pagina di partenza, non la spegne: fuori dai
+  // risultati di una ricerca il rimbalzo verso un sito della lista si ferma
+  // come prima, altrimenti si sarebbe aperta una porta invece di chiuderne una.
+  let porta = 0;
+  const server = createServer((req, res) => {
+    const host = String(req.headers.host || '').split(':')[0];
+    const percorso = String(req.url || '').split('?')[0];
+    if (host === BLOCKED_HOST) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<!doctype html><meta charset="utf-8"><h1 id="t">NON DEVE ARRIVARE</h1>');
+      return;
+    }
+    if (percorso === '/vai') {
+      res.writeHead(302, { Location: `http://${BLOCKED_HOST}:${porta}/pagina` });
+      res.end();
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><meta charset="utf-8"><h1>pagina qualunque</h1>'
+      + `<a id="nuova" target="_blank" href="http://127.0.0.1:${porta}/vai">di là</a>`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  porta = server.address().port;
+  try {
+    const page = await openTab(`http://127.0.0.1:${porta}/pagina-qualunque`);
+    await page.waitForSelector('#nuova', { timeout: 8000 });
+    await page.evaluate(() => document.getElementById('nuova').click());
+    await page.waitForTimeout(2500);
+    expect(await sitoInListaAperto(shell)).toBe(false);
+  } finally {
+    try { server.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => server.close(r));
+  }
+});

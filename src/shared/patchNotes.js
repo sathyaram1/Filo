@@ -37,6 +37,8 @@
         'I siti che apri lo stesso con «Apri comunque» adesso si vedono in Sicurezza, con il bottone per rimettere il blocco. Prima quel permesso valeva fino alla chiusura di Filo e spariva dalla vista insieme alla notifica che lo annunciava.',
         'Una finestrella di accesso («Continua con…») verso un sito della lista non si apre più. Prima si apriva vuota e restava lì da chiudere a mano.',
         'Un file non si scarica più da un sito che hai messo fra quelli da bloccare, nemmeno col tasto destro su un\'immagine, un video o un link.',
+        'Se cerchi apposta un sito che avevi messo fra quelli da bloccare, il risultato si apre anche col Ctrl+clic, col tasto centrale o se si apre da solo in una scheda nuova. Prima ci arrivavi solo col clic normale.',
+        'Quando a fermare una pagina sono le liste di pubblicità e tracciatori, adesso la notifica lo dice. Prima usava le stesse parole di un sito bloccato da te, e di quel nome in Sicurezza non c\'era traccia.',
       ],
     },
     {

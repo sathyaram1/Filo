@@ -263,7 +263,7 @@ test('un link il cui indirizzo È il contatore di clic porta all\'articolo, senz
   await p.evaluate(() => document.getElementById('go').click());
   expect(await articoloArrivato(), 'l\'utente ha cliccato «leggi l\'articolo»').toBe(true);
   expect(
-    (await notifiche()).filter((t) => t.includes('Sito bloccato')),
+    (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t)),
     'un contatore di clic non è un sito che l\'utente abbia messo in lista, '
     + 'e nominarglielo offrendogli di aprirlo è la voce sbagliata',
   ).toEqual([]);
@@ -279,7 +279,7 @@ test('lo stesso link in una scheda nuova porta all\'articolo, senza dire niente'
   await p.waitForSelector('#go', { timeout: 8000 });
   await p.evaluate(() => document.getElementById('go').click());
   expect(await articoloArrivato(), 'l\'articolo si deve aprire nella scheda nuova').toBe(true);
-  expect((await notifiche()).filter((t) => t.includes('Sito bloccato'))).toEqual([]);
+  expect((await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t))).toEqual([]);
 });
 
 // E con Ctrl+clic o il clic centrale, cioè "aprilo dietro, io continuo a
@@ -294,7 +294,7 @@ test('Ctrl+clic sullo stesso link porta all\'articolo, senza dire niente', async
     }));
   });
   expect(await articoloArrivato(), 'l\'articolo si deve aprire nella scheda dietro').toBe(true);
-  expect((await notifiche()).filter((t) => t.includes('Sito bloccato'))).toEqual([]);
+  expect((await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t))).toEqual([]);
 });
 
 // L'eccezione alla regola: l'indirizzo l'ha fornito l'utente. Lì una richiesta
@@ -302,7 +302,9 @@ test('Ctrl+clic sullo stesso link porta all\'articolo, senza dire niente', async
 test('l\'indirizzo scritto dall\'utente lo dice anche quando a fermarlo sono le liste pubbliche', async () => {
   await metti([]);
   await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${CONTATORE}:${srv.porta}/clic`);
-  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' }).first();
+  // Il testo nomina la sorgente della regola (#590, dodicesimo giro): qui la
+  // notifica si riconosce dal bottone, che è quello che questa prova verifica.
+  const card = shell.locator('.shell-notif', { hasText: 'Apri comunque' }).first();
   await expect(card).toBeVisible({ timeout: 6000 });
   // E il bottone deve aprire davvero (#590, ottavo giro): finché il filtro
   // delle richieste annullava anche il documento della scheda, quel sì non
@@ -348,4 +350,39 @@ test('del riquadro fermato si dice di nuovo quando la scheda cambia pagina', asy
     (await notifiche()).filter((t) => t.includes('non è stato caricato')).length,
     'il conto di cosa è già stato detto riparte a ogni pagina, non a ogni scheda',
   ).toBe(1);
+});
+
+// #590 (dodicesimo giro) — CHI HA MESSO QUEL DIVIETO.
+//
+// Quando l'indirizzo lo fornisce l'utente, le liste pubbliche parlano: è
+// l'unico caso, ed è giusto, perché una richiesta esplicita che finisce nel
+// nulla senza una parola sembra un guasto. Ma parlavano con le parole del
+// divieto dell'utente ("Sito bloccato: <nome>"), parola per parola, e di quel
+// nome in Preferenze non c'è traccia: chi lo cercava nella propria lista non
+// lo trovava, e niente gli diceva quale regola l'avesse fermato né dove si
+// spegne. Senza la correzione il primo test qui sotto è rosso.
+test('un sito fermato dalle liste pubbliche nomina la sorgente della regola', async () => {
+  await metti([]);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${CONTATORE}:${srv.porta}/clic`);
+  const card = shell.locator('.shell-notif', { hasText: 'Apri comunque' }).first();
+  await expect(card).toBeVisible({ timeout: 6000 });
+  const testo = await card.innerText();
+  expect(testo, 'il nome del sito va detto comunque').toContain(CONTATORE);
+  expect(
+    testo,
+    'deve dire da dove viene la regola, con le stesse parole dell\'interruttore che la spegne '
+    + 'in Preferenze, altrimenti è indistinguibile da un divieto scritto dall\'utente',
+  ).toMatch(/liste di pubblicità e tracciatori/);
+});
+
+test('il divieto scritto dall\'utente resta "Sito bloccato", con il suo nome', async () => {
+  await metti([LISTA]);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${LISTA}:${srv.porta}/pagina`);
+  const card = shell.locator('.shell-notif', { hasText: 'Apri comunque' }).first();
+  await expect(card).toBeVisible({ timeout: 6000 });
+  const testo = await card.innerText();
+  expect(testo).toContain('Sito bloccato');
+  expect(testo).toContain(LISTA);
+  expect(testo, 'quel divieto l\'ha scritto lui: non c\'entrano le liste pubbliche')
+    .not.toMatch(/liste di pubblicità/);
 });

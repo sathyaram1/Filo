@@ -2515,7 +2515,10 @@ class TabManager {
     // hook resterebbe senza le difese che ogni scheda ha. Qui arrivano SOLO i
     // popup di login (ogni altro percorso del handler qui sopra ritorna 'deny').
     wc.on('did-create-window', (child) => {
-      this._hardenAuthPopup(child);
+      // #590 (dodicesimo giro) — la finestrella si porta dietro la pagina che
+      // l'ha aperta, come una scheda nuova: anche lei nasce senza pagina
+      // propria, e il rimbalzo che la porta altrove arriva subito dopo.
+      this._hardenAuthPopup(child, urlDiPartenza(wc));
     });
   }
 
@@ -2562,9 +2565,10 @@ class TabManager {
   //     di login concatenato (es. scelta account → verifica) resta una vera
   //     finestra (ricorsivamente hardened), tutto il resto torna dentro Filo
   //     come scheda normale — mai finestre libere non gestite.
-  _hardenAuthPopup(win) {
+  _hardenAuthPopup(win, paginaDiPartenza = '') {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    ricordaChiHaAperto(pwc, paginaDiPartenza);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
@@ -2616,7 +2620,7 @@ class TabManager {
       this.openTab(url, { activate: true, openedByLink: true, fromUrl: urlDiPartenza(pwc) });
       return { action: 'deny' };
     });
-    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child));
+    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child, urlDiPartenza(pwc)));
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
@@ -2821,7 +2825,7 @@ class TabManager {
     }
     if (!decision || !decision.block) return null;
     if (decision.reason === 'blacklist' || indirizzoDellUtente) {
-      this._notifyBlocked(decision.host, url);
+      this._notifyBlocked(decision.host, url, decision.reason);
     }
     return decision;
   }
@@ -2861,13 +2865,26 @@ class TabManager {
   // Il nome del sito si mostra come l'utente lo scriverebbe: un indirizzo in
   // cirillico o in giapponese viaggia sulla rete come "xn--…", e una notifica
   // che dice "Sito bloccato: xn--80aswg.xn--p1ai" non nomina niente.
-  _notifyBlocked(host, url) {
+  //
+  // CHI HA MESSO QUEL DIVIETO (#590, dodicesimo giro). Le due sorgenti della
+  // lista parlavano con la stessa voce: "Sito bloccato: <nome>", parola per
+  // parola, sia per il sito che l'utente ha scritto lui sia per un tracciatore
+  // che sta nelle liste pubbliche. Il secondo l'utente non l'ha mai messo in
+  // lista, in Preferenze non lo trova, e niente gli dice dove si spegne quella
+  // regola. Capita solo quando è lui a fornire l'indirizzo (le liste pubbliche
+  // altrove tacciono), ma quando capita il nome della sorgente è l'unica cosa
+  // che gli permette di ritrovarla: è scritto come l'interruttore che la
+  // spegne, in Preferenze, sezione Sicurezza.
+  _notifyBlocked(host, url, reason = 'blacklist') {
     try {
       const grezzo = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
       const NAV = globalThis.SN_URL_NAV;
       const label = (NAV && NAV.hostLeggibile(grezzo)) || grezzo;
+      const text = reason === 'lists'
+        ? `${label} è nelle liste di pubblicità e tracciatori: pagina non aperta`
+        : `Sito bloccato: ${label}`;
       this.win.webContents.send('shell:toast', {
-        text: `Sito bloccato: ${label}`,
+        text,
         opts: { actions: [{ label: 'Apri comunque', openAnywayUrl: url }] },
       });
     } catch (_) {}
