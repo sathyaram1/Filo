@@ -1071,6 +1071,7 @@ async function scegliFonte(wc, frame, audioChiesto) {
       scelteFonte.delete(id);
       clearTimeout(timer);
       try { wc.off('destroyed', suMorte); } catch (_) {}
+      try { wc.off('did-start-navigation', suNavigazione); } catch (_) {}
       try { if (shell && !shell.isDestroyed()) shell.send('permissions:source-closed', { id }); } catch (_) {}
       const fonte = fonteId ? (fonti.find((f) => f.id === fonteId) || null) : null;
       // L'audio si dà solo se il sito l'ha chiesto E l'utente l'ha acceso: una
