@@ -1231,6 +1231,9 @@
     nota.textContent = soloDestinatario ? ' (riservato)' : ' (non disponibile)';
   }
 
+  // I documenti allegati: al click si scaricano decifrati (stesso canale delle
+  // immagini, col tipo dichiarato) e si salvano col nome originale. Se la
+  // decifratura fallisce, il motivo finisce nel `title` del link.
   function resolveBubbleFiles(bubble) {
     bubble.querySelectorAll('.mg-file-link').forEach((a) => {
       if (!isAdmin) {
