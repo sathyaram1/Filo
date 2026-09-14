@@ -106,7 +106,12 @@
     try { u = new URL(String(url || '')); } catch (_) { return false; }
     if (u.protocol !== 'https:') return false;
     const prefissi = PREFISSI_ALLEGATO[u.hostname];
-    return !!prefissi && prefissi.some((p) => u.pathname.startsWith(p));
+    // `Array.isArray` e non `!!`: la tabella non ha eredità, ma il confine lo
+    // attraversa roba scelta da chi manda la segnalazione e questa domanda
+    // decide se firmare col gettone di chi riceve le segnalazioni. Se un
+    // giorno la tabella torna a essere un oggetto normale, qui si continua a
+    // rispondere «no» invece di esplodere.
+    return Array.isArray(prefissi) && prefissi.some((p) => u.pathname.startsWith(p));
   }
 
   // Intestazioni con cui l'owner scarica un allegato. PURA.
