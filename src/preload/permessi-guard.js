@@ -51,6 +51,20 @@ const CANALE = '__filo_permessi_noti';
 const CANALE_FERMA = '__filo_permessi_ferma';
 const CANALE_FERMATO = '__filo_permessi_fermato';
 
+// L'attributo con cui ogni traccia consegnata viene appesa al DOM, dentro un
+// elemento nascosto, con scritta accanto la chiave di Filo che la copre
+// ('microfono', 'fotocamera', 'schermo').
+//
+// Perché esiste: il conto delle tracce vive lo teneva il codice che gira nel
+// mondo della PAGINA, e il conto arrivava a Filo come una risposta della pagina
+// stessa. Una pagina che dichiarava finite le proprie tracce mentre erano vive
+// si teneva il microfono aperto a permesso tolto, perché Filo, sentendosi dire
+// «non è rimasto niente», non ricaricava (#586, giro 9). Il DOM invece è
+// condiviso fra il mondo della pagina e quello del preload, mentre gli STAMPI
+// no: il preload legge `srcObject` e chiama `stop()` con i suoi, che la pagina
+// non può toccare. Da lì esce il conto vero.
+const ATTR_TRACCIA = 'data-filo-traccia';
+
 // Evento privato con cui la pagina dice a Filo che la posizione non è arrivata.
 const CANALE_POSIZIONE_KO = '__filo_posizione_ko';
 
