@@ -857,7 +857,7 @@
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       // eslint-disable-next-line no-await-in-loop
       const batch = await listPublic({ pageSize: limit, timeoutMs, afterName: cursor });
-      const arr = Array.isArray(batch) ? batch : (batch && batch.rows) || [];
+      const arr = Array.isArray(batch) ? batch : [];
       let nuove = 0;
       for (const r of arr) {
         const id = String((r && r._id) || '');
