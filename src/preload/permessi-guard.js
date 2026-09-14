@@ -363,15 +363,14 @@ function buildCatturaSicuraSource() {
     let viste = 0;
     const appendi = (t, k) => {
       try {
-        if (!setSrc || !Flusso) return;
+        if (!setSrc || !Flusso || !creaEl || !setAttr || !appendiNodo) return;
         const el = creaEl('audio');
-        el.muted = true;
+        try { el.muted = true; el.style.display = 'none'; } catch (_) {}
         setAttr.call(el, ${attr}, String(k || ''));
-        el.style.display = 'none';
         setSrc.call(el, new Flusso([t]));
         const dove = radiceDoc() || document.body;
         if (dove) appendiNodo.call(dove, el);
-        ascolta.call(t, 'ended', () => { try { togliNodo.call(el); } catch (_) {} });
+        su(t, 'ended', () => { try { if (togliNodo) togliNodo.call(el); } catch (_) {} });
       } catch (_) {}
     };
     const segna = (t, k) => {
@@ -381,18 +380,18 @@ function buildCatturaSicuraSource() {
       const voce = { t, k };
       consegnate.add(voce);
       appendi(t, k);
-      try { ascolta.call(t, 'ended', () => { consegnate.delete(voce); }); } catch (_) {}
+      su(t, 'ended', () => { consegnate.delete(voce); });
       return t;
     };
     const chiaveDi = (t, chiave) => chiave || (t.kind === 'audio' ? 'microfono' : 'fotocamera');
     const registra = (stream, chiave) => {
       try {
-        for (const t of tracceDi.call(stream)) segna(t, chiaveDi(t, chiave));
+        for (const t of tracce(stream)) segna(t, chiaveDi(t, chiave));
       } catch (_) {}
       return stream;
     };
 
-    ascolta.call(document, ${ferma}, (e) => {
+    su(document, ${ferma}, (e) => {
       let vive = 0;
       try {
         const chiavi = (e && e.detail && Array.isArray(e.detail.chiavi)) ? e.detail.chiavi : null;
@@ -407,11 +406,12 @@ function buildCatturaSicuraSource() {
         }
       } catch (_) {}
       try {
-        spara.call(document, new Evento(${fermato}, {
+        const ev = new Evento(${fermato}, {
           detail: { id: (e && e.detail && e.detail.id) || null, vive, viste },
-        }));
+        });
+        (spara || document.dispatchEvent).call(document, ev);
       } catch (_) {}
-    }, true);
+    });
 
     // Una traccia CLONATA è una traccia in più, viva per conto suo: fermare
     // l'originale non la ferma. Chi si metteva da parte una copia continuava ad
@@ -433,8 +433,8 @@ function buildCatturaSicuraSource() {
                 // riscontro per posizione, la copia di uno schermo finiva
                 // registrata come fotocamera, e togliere lo schermo non la
                 // chiudeva.
-                const mie = tracceDi.call(this);
-                const nuove = tracceDi.call(out);
+                const mie = tracce(this);
+                const nuove = tracce(out);
                 nuove.forEach((t, i) => {
                   const vecchia = mie[i];
                   const voce = vecchia ? [...consegnate].find((v) => v.t === vecchia) : null;
@@ -459,8 +459,8 @@ function buildCatturaSicuraSource() {
       const suo = w.MediaDevices && w.MediaDevices.prototype;
       if (!suo || typeof suo.getUserMedia !== 'function') return;
       const suaMd = w.navigator && w.navigator.mediaDevices;
-      const Attesa = w.Promise;
-      const Errore = w.DOMException;
+      const Attesa = w.Promise || Promise;
+      const Errore = w.DOMException || DOMException;
       // Il posto dove si avvolge è lo STAMPO, non l'oggetto. Avvolgendo
       // l'oggetto, la funzione originale restava lì accanto sullo stampo,
       // raggiungibile con una riga, e un sito che ne prendeva una seconda per

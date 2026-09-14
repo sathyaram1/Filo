@@ -76,6 +76,9 @@ test('la scelta di cosa si condivide non si salta nemmeno da un riquadro appena 
   await shell.locator('.perm-chip .perm-chip-allow').first().click();
   const picker = await shell.locator('.perm-source').first()
     .waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false);
+  // Scelta la fonte, la condivisione deve funzionare: la porta si chiude
+  // aggiungendo la scelta, non spegnendo la condivisione.
+  if (picker) await shell.locator('.perm-source-item').first().click();
   const arrivato = await preso;
   await shell.waitForTimeout(2500);
   const segno = (await shell.locator('.perm-live').allTextContents()).join(' | ').replace(/\s+/g, ' ');
