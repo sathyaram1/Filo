@@ -100,6 +100,12 @@ visto da chi usa Filo sta in `tests/feedback-resolved-reward.spec.mjs`: una
 segnalazione vecchia, una pagina intera di segnalazioni altrui più recenti
 davanti, e l'annuncio che deve pagare lo stesso.
 
+`tests/unit/feedbackLettureComplete.test.mjs` copre le altre due metà: le 711
+segnalazioni della collezione vera, e la memoria breve — quattro letture di fila
+devono costare una bacheca sola, `fresh` e `forgetAllPublic` devono
+scavalcarla, una sorgente diversa non deve ritrovarsi i dati di quella prima, e
+un troncamento non si ricorda.
+
 ## Il segnale, quando lo incontri
 
 Cerca il punto in cui il codice scrive `pageSize` e poi tratta il risultato come
