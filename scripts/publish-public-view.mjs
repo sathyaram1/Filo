@@ -110,8 +110,12 @@ export async function publishPublicView({ dryRun = false } = {}) {
     );
   }
 
-  const published = await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE });
-  const complete = grezzi.length < FB.LIST_PAGE_SIZE;
+  // `complete`: il caricamento PER DATA D'INVIO non ha toccato il tetto, quindi
+  // questi sono TUTTI i feedback che esistono, e solo allora una scheda senza
+  // feedback è un orfano da togliere. Si guarda la pagina di partenza, non il
+  // totale: le segnalazioni ripescate sono un'aggiunta, e contarle direbbe
+  // «pagina piena» anche quando non lo era.
+  const complete = base.length < FB.LIST_PAGE_SIZE;
   const plan = PV.planSync(published, feedbacks, { complete });
 
   if (!dryRun) {
