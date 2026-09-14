@@ -8,13 +8,45 @@ rules_version = '2';
 //   lato pipeline (filo-security, L0 fileGate) marca comunque `suspicious_file`
 //   i feedback con allegati fuori allowlist: questa regola è la cintura,
 //   quello le bretelle.
-// - Read: aperto (la dashboard mostra immagini e file via link diretto).
+// - List: NEGATO (#583). Un elenco è una cosa diversa da un file: chiedendolo,
+//   chiunque si portava via il nome di ogni allegato mai caricato e poi il
+//   contenuto, senza sapere niente di nessun feedback. Il resto dell'audit ha
+//   chiuso la lettura dei documenti, che era l'altra strada per arrivarci: se
+//   il bucket resta elencabile, quella chiusura vale la metà. Gli allegati dal
+//   25 giugno 2026 sono cifrati, ma i più vecchi no.
+// - Get: NEGATO (#583, giro 8). Chi passa da queste regole non scarica niente.
+//   L'unica chiave è il download token nel link, che Firebase valuta PRIMA
+//   delle regole: `.../o/<path>?alt=media&token=<t>` continua a funzionare,
+//   `.../o/<path>?alt=media` senza token no. Provato con l'emulatore ufficiale
+//   di Storage: con `get: if false` il link col token risponde 200, il solo
+//   indirizzo e un token sbagliato rispondono 403.
+//
+//   Perché non basta aver chiuso l'elenco. Finché il get era `if true` il token
+//   non lo guardava nessuno: bastava l'indirizzo del file, e gli indirizzi degli
+//   allegati stavano DENTRO i documenti dei feedback, che fino a questo audit
+//   chiunque leggeva con la sola chiave web del repo. Chi li ha raccolti in
+//   quei mesi se li tiene. La cura di serie per un link scappato è cambiare il
+//   token di quel file dalla console (o ricaricarlo): con il get aperto quella
+//   cura non serviva a niente, perché il file si prendeva lo stesso
+//   dall'indirizzo. Adesso serve — ed è l'unico modo di togliere davvero dalla
+//   circolazione gli screenshot in chiaro anteriori al 25 giugno 2026.
+//
+//   Chi legge per davvero non passa da qui: la dashboard non mette mai
+//   l'indirizzo dentro un <img>, lo manda al main, che scarica col link intero
+//   (token compreso) e decifra con la chiave privata. Il server dei giudici e
+//   delle routine usa l'Admin SDK, che queste regole le bypassa.
+//
+//   Conseguenza sull'upload: il link SENZA token adesso è un link morto, quindi
+//   un allegato caricato senza che il deposito ne rilasci uno non si deve
+//   registrare come riuscito (src/shared/feedback.js → uploadImage rifiuta, e
+//   chi invia se lo vede scritto fra gli allegati non caricati).
 
 service firebase.storage {
   match /b/{bucket}/o {
 
     match /feedback/{file=**} {
-      allow read: if true;
+      allow get: if false;
+      allow list: if false;
       allow write: if
         request.resource.size < 4 * 1024 * 1024
         && (

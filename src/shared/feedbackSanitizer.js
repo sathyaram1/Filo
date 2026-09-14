@@ -14,6 +14,16 @@
 //   testing. In produzione il chiamante (main process o backend) passa il
 //   modello corrispondente allo slot "sanitizer" di DD1.
 //
+// DOV'È FINITA QUESTA IDEA (#583)
+//   La parte deterministica — «quali campi di un feedback possono stare sotto
+//   gli occhi di chiunque, e per quali feedback» — è diventata la VISTA
+//   PUBBLICA: `src/shared/feedbackPublicView.js` decide e
+//   `feedback-public/{id}` la contiene, scritta dal main dell'owner. La board
+//   legge di lì e il documento vero non lo apre più nessuno. Questo modulo
+//   resta per il passo che quella vista NON fa: redigere con un LLM il TESTO
+//   libero di un feedback, se un giorno si vorrà mostrarne una riga in
+//   bacheca. Finché quel giorno non arriva, la bacheca mostra solo il titolo.
+//
 // DOVE GIRA (raccomandazione — vedi report)
 //   La sanitizzazione DEVE girare lato backend (Admin SDK / filo-security) o
 //   lato owner-app (che ha la chiave privata per decifrare text/url prima di

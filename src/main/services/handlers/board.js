@@ -12,6 +12,14 @@
 // quanto il renderer vede di sé via AUTH_STATUS.
 
 const auth = require('../../auth/google-auth');
+// #583 — queste tre porte non sono del proprietario: valgono per chiunque
+// abbia fatto l'accesso, e su una macchina con una sessione aperta «hai una
+// sessione?» è sempre sì. Senza guardare da dove arriva la richiesta, una
+// pagina di un sito visitato votava al posto dell'utente, gli cancellava il
+// voto e gli spendeva i crediti per riaprire un fix, aprendo a suo nome una
+// segnalazione col testo che voleva. Il voto e la riapertura sono gesti che si
+// fanno in bacheca, che è una pagina di Filo.
+const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
@@ -19,7 +27,7 @@ module.exports = function register(on, ctx) {
   const FB = globalThis.SN_FEEDBACK;
   const { SN_CONST } = globalThis;
 
-  on(MSG.BOARD_CAST_VOTE, async (msg) => {
+  on(MSG.BOARD_CAST_VOTE, soloFilo(async (msg) => {
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, error: 'Accedi per votare i miglioramenti.' };
@@ -61,7 +69,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Riapertura a pagamento (DC4): l'utente loggato segnala che un fix
   // "Risolti" è ancora rotto. Passi atomici-quanto-possibile:
@@ -86,7 +94,7 @@ module.exports = function register(on, ctx) {
   // blocca comunque ogni tentativo successivo → al più UN feedback figlio per
   // utente, mai duplicati. In entrambi i rami di fallimento dopo aver scalato,
   // restituiamo i crediti (compensazione best-effort).
-  on(MSG.BOARD_REOPEN, async (msg) => {
+  on(MSG.BOARD_REOPEN, soloFilo(async (msg) => {
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, error: 'Accedi per segnalare che un fix è ancora rotto.' };
@@ -135,8 +143,12 @@ module.exports = function register(on, ctx) {
         await FB.castReopenRequest(id, uid, { idToken });
         created = await FB.submit({
           text: `[Riapertura #${original.seq || id}] ${text}`,
-          url: original.url || '',
-          title: original.title || '',
+          // #583: l'URL e il titolo della pagina del feedback originale non
+          // arrivano più fin qui — sono di chi l'aveva mandato, e la scheda
+          // pubblica non li porta. Il collegamento all'originale resta
+          // `parentId` (più il numero nel testo), che è ciò che serve al triage.
+          url: '',
+          title: '',
           userAgent: '',
           clientId: `uid:${uid}`,
           parentId: id,
@@ -154,9 +166,9 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
-  on(MSG.BOARD_CLEAR_VOTE, async (msg) => {
+  on(MSG.BOARD_CLEAR_VOTE, soloFilo(async (msg) => {
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, error: 'Accedi per votare i miglioramenti.' };
@@ -177,33 +189,32 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
-  // Legge il documento feedback intero via REST (GET singolo, no proiezione):
-  // serve a BOARD_REOPEN per verificare idoneità con i dati FRESCHI dal server
+  // Legge la SCHEDA PUBBLICA del fix (`feedback-public/{id}`, #583): serve a
+  // BOARD_REOPEN per verificare l'idoneità con i dati FRESCHI dal server
   // (status/resolvedInVersion/reopenRequests), non con quanto il renderer ha in
-  // cache. Ritorna null se non trovato o in caso d'errore di rete.
+  // cache. È la scheda e non il documento perché il documento, da quando la
+  // collezione non è più pubblica, questa macchina non lo può aprire — e non
+  // deve: il testo e l'URL di quel feedback sono di chi l'ha mandato.
+  // Ritorna null se non trovato o in caso d'errore di rete.
   async function fetchFeedback(id) {
-    if (!FB?.rest) return null;
+    if (!FB?.getPublic) return null;
     try {
-      const url = `${FB.rest.FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?key=${FB.rest.API_KEY}`;
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      const doc = await res.json();
-      return FB.fsDocToObject(doc);
+      return await FB.getPublic(id);
     } catch (_) {
       return null;
     }
   }
 
-  // Legge SOLO il campo `votes` del documento feedback via REST (GET singolo,
-  // proiezione mask) — più leggero di un FB.list({pageSize:500}) per un solo
-  // documento. Ritorna {} se il documento non ha ancora voti o in caso d'errore
-  // (best-effort: il chiamante ha comunque appena scritto il proprio voto).
+  // Legge SOLO il campo `votes` della scheda pubblica (GET singolo, proiezione
+  // mask) — più leggero di una lista intera per un solo documento. Ritorna {}
+  // se la scheda non ha ancora voti o in caso d'errore (best-effort: il
+  // chiamante ha comunque appena scritto il proprio voto).
   async function fetchVotes(id) {
     if (!FB?.rest) return {};
     try {
-      const url = `${FB.rest.FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}` +
+      const url = `${FB.rest.FIRESTORE_BASE}/${FB.rest.VIEW_COLLECTION}/${encodeURIComponent(id)}` +
         `?mask.fieldPaths=votes&key=${FB.rest.API_KEY}`;
       const res = await fetch(url);
       if (!res.ok) return {};

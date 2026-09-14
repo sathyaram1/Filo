@@ -11,13 +11,12 @@ default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
   qualsiasi lo chiami?"*. Se la risposta è no — e lo è per tutto ciò che legge
   dati dell'utente, tocca il disco, o aziona il sistema operativo — gattalo:
   ```js
-  const isFilo = (origin) => String(origin || '').startsWith('filo://');
-  on(MSG.X, async (msg, sender, origin) => {
-    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
-    …
-  });
+  const { soloFilo } = require('./origine');
+  on(MSG.X, soloFilo(async (msg) => { … }));
   ```
-  (`origin` è il terzo argomento dell'handler; la shell è `filo://shell/shell.html`.)
+  (`origine.js` è la porta unica del confine: risponde `code: 'forbidden'`, così
+  chi deve dirlo all'utente sa che è la provenienza e non la rete. `origin` è il
+  terzo argomento dell'handler; la shell è `filo://shell/shell.html`.)
 - **Due bandiere rosse** che rendono il gate non negoziabile: la risposta
   contiene **percorsi assoluti su disco** (rivelano lo username e la struttura
   del computer), oppure il comando fa **aprire/eseguire qualcosa** al sistema
@@ -30,3 +29,52 @@ default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
   stessa chiamata da `filo://` deve passare. Esempi:
   `tests/downloads-nav.spec.mjs`, `tests/clipboard-origin-gate.spec.mjs`,
   `tests/audit-quit-app-origin.spec.mjs`.
+
+## Il potere di proprietario passa da UNA porta, non da nove
+
+`isAdmin()` da solo non è un gate. Sul computer di chiunque altro la risposta è
+no e non succede niente; su quello dell'owner è sempre sì, ed è l'unico dove c'è
+qualcosa da prendere. Il controllo che conta è l'ORIGINE, e va chiesto **prima**
+dell'identità.
+
+Il caso (#583, tre giri di verifica). L'audit ha dato il controllo di
+provenienza alla porta che legge i feedback. Il secondo giro ha trovato che le
+porte che li SCRIVONO non ce l'avevano, e le ha chiuse. Il terzo giro ha trovato
+che nello stesso file restavano cinque porte con lo stesso potere e senza
+controllo: cambiare i modelli predefiniti (che valgono per tutte le
+installazioni di Filo), accendere e spegnere l'automazione, i bilanci dei giri
+di correzione, i modelli dei giudici, i registri del lavoro e delle routine. Tre
+giri, una porta alla volta.
+
+La cura non è ricordarsi il gate a ogni handler:
+
+- **Una funzione sola** che avvolge l'handler e fa i due controlli in ordine
+  (origine, poi amministratore), e **ogni** handler con potere di proprietario
+  ci passa. In Filo è `ownerOnly` in
+  `src/main/services/handlers/auth.js`. Un handler che non ci passa si vede a
+  occhio nell'elenco dei `on(MSG.…)`: `async (` invece di `ownerOnly(async (`.
+- **Il rifiuto per provenienza porta il motivo in una parola** (`code:
+  'forbidden'`), diverso da quello per identità (`code: 'not_admin'`). Senza,
+  una pagina di Filo traduce il rifiuto in «controlla la connessione» e manda a
+  guardare la cosa sbagliata.
+- **Una prova che bussa a TUTTE le porte della famiglia** da un sito visitato,
+  in un elenco solo: è lì che si aggiunge la porta nuova, e diventa rossa se una
+  risponde qualcosa di diverso.
+  (`tests/feedback-canali-origine.spec.mjs`.)
+
+## La famiglia non è solo il proprietario
+
+Quarto giro dello stesso feedback: chiuse le nove porte del proprietario,
+restavano accanto quelle che chiedono soltanto **«hai una sessione aperta?»**.
+Sul computer di chiunque sia entrato la risposta è sempre sì, quindi valgono
+quanto le altre: votare in bacheca, ritirare il voto, riaprire un fix a
+pagamento (che spende i crediti e apre una segnalazione a nome suo), uscire
+dall'account. Quando cerchi le porte analoghe, non fermarti a `isAdmin()`:
+guarda anche `isSignedIn()`.
+
+**«Chi sei» si risponde a metà.** L'unica porta che DEVE rispondere anche a un
+content script è quella dello stato dell'accesso, perché pezzi di Filo girano
+dentro le pagine dei siti e da lì decidono cosa mostrare (la griglia del tasto
+destro nasconde l'icona Feedback a chi non gestisce i feedback). Rispondere non
+vuol dire dire tutto: di là dal confine passano i booleani che servono a
+disegnare, non l'identità (indirizzo email, nome, identificativo dell'account).

@@ -196,7 +196,14 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // era a un click dalla home ma non compariva affatto nel manifesto, così
   // l'agente diceva di non saperlo fare.
   const dash = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard.js'), 'utf8');
-  const urls = [...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)].map((m) => m[1]);
+  // Le pagine dell'OWNER non stanno nel manifesto, e non devono starci: il
+  // manifesto dice a un utente qualunque cosa sa fare Filo, e la posta delle
+  // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
+  // admin, per questo l'indirizzo compare ancora nel file.
+  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html']);
+  const urls = [...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)]
+    .map((m) => m[1])
+    .filter((u) => !SOLO_OWNER.has(u));
   assert.ok(urls.length >= 2, `mi aspetto ≥2 icone della home con url filo://, trovate ${urls.length}`);
   const manifestText = CAP.CAPABILITIES.map((c) => `${c.invoke} ${c.desc}`).join('\n');
   for (const url of urls) {
@@ -271,10 +278,20 @@ test('ogni voce del menu «App» citata dal manifesto esiste davvero nel launche
   // Simmetrico al test precedente sul lato "positivo": il manifesto indica il
   // menu App come strada per alcune pagine (Scaricamenti, Aperti per dopo…).
   // Se quella voce non è nel launcher, l'indicazione è falsa.
+  //
+  // Dal 2026-09 (#583) il registro è una FUNZIONE, perché "Feedback" e
+  // "Gestione" compaiono solo all'owner: quelle due le teniamo fuori dalle
+  // etichette che il manifesto può citare, perché per un utente qualunque non
+  // sono una strada.
   const shell = readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
-  const appsBlock = shell.match(/const APPS\s*=\s*\[([\s\S]*?)\n  \];/)?.[1];
-  assert.ok(appsBlock, 'non trovo il registro APPS del launcher in shell.js');
-  const appLabels = new Set([...appsBlock.matchAll(/label:\s*'([^']+)'/g)].map((m) => m[1]));
+  const appsBlock = shell.match(/function buildApps\(\)\s*\{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(appsBlock, 'non trovo il registro delle App del launcher in shell.js');
+  const soloAdmin = appsBlock.slice(appsBlock.indexOf('if (isAdmin)'));
+  const perTutti = appsBlock.slice(0, appsBlock.indexOf('if (isAdmin)'));
+  const appLabels = new Set([...perTutti.matchAll(/label:\s*'([^']+)'/g)].map((m) => m[1]));
+  for (const m of soloAdmin.matchAll(/label:\s*'([^']+)'/g)) {
+    assert.ok(!appLabels.has(m[1]), `"${m[1]}" non può stare in entrambi i rami`);
+  }
   assert.ok(appLabels.size >= 5, `mi aspetto ≥5 voci nel menu App, trovate ${appLabels.size}`);
 
   let cited = 0;

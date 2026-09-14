@@ -80,24 +80,25 @@ globalThis.SN_FEEDBACK = {
     server.feedbacks.push({ id, ...fb });
     return { id };
   },
-  // Plumbing letto da fetchFeedback dentro board.js.
-  rest: { FIRESTORE_BASE: 'https://example.invalid/v1', API_KEY: 'k' },
+  // #583: l'idoneità si legge dalla SCHEDA PUBBLICA del fix — il documento
+  // feedback, da quando la collezione non è più pubblica, questa macchina non
+  // lo può nemmeno aprire. Copia viva del guard: se una scrittura precedente
+  // l'ha marcato, il gate d'idoneità (canReopen) deve vederlo.
+  getPublic: async () => ({
+    _id: ORIGINAL_ID,
+    seq: 42,
+    status: 'done',
+    reopenRequests: { ...server.reopenRequests },
+  }),
+  // Plumbing letto da fetchVotes dentro board.js.
+  rest: { FIRESTORE_BASE: 'https://example.invalid/v1', API_KEY: 'k', VIEW_COLLECTION: 'feedback-public' },
   fsDocToObject: (doc) => doc,
 };
 
-// fetchFeedback fa `fetch(...)` e mappa via fsDocToObject: torniamo un doc che
-// riflette lo stato corrente del "server" (guard incluso), come farebbe la GET.
+// fetchVotes fa `fetch(...)` e mappa via fsDocToObject.
 globalThis.fetch = async () => ({
   ok: true,
-  json: async () => ({
-    seq: 42,
-    url: '',
-    title: '',
-    // Copia viva del guard: se una scrittura precedente l'ha marcato, il gate
-    // d'idoneità (canReopen) deve vederlo.
-    reopenRequests: { ...server.reopenRequests },
-    status: 'done',
-  }),
+  json: async () => ({ votes: {} }),
 });
 
 // SN_MANAGE_REVIEW: qui interessa SOLO il guard anti-doppia-riapertura, non le
@@ -118,7 +119,10 @@ globalThis.SN_MANAGE_REVIEW = {
 const registerBoard = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers', 'board.js'));
 const handlers = new Map();
 registerBoard((type, fn) => handlers.set(type, fn), { MSG });
-const reopen = (msg) => handlers.get(MSG.BOARD_REOPEN)(msg);
+// #583: l'handler guarda anche DA DOVE arriva la richiesta. La bacheca è una
+// pagina di Filo, e questi test sono la bacheca.
+const BACHECA = 'filo://board/board.html';
+const reopen = (msg, origin = BACHECA) => handlers.get(MSG.BOARD_REOPEN)(msg, null, origin);
 
 const msgFor = () => ({ type: MSG.BOARD_REOPEN, id: ORIGINAL_ID, text: 'Ancora rotto, ho riprovato e si spacca uguale.' });
 
@@ -176,4 +180,18 @@ test('guard riuscito ma creazione feedback fallita: il ritentativo è bloccato (
   assert.match(r2.error, /gi[àa].*segnalato|segnalato.*rotto/i, 'messaggio "già segnalato"');
   assert.equal(server.feedbacks.length, 0, 'ancora nessun feedback figlio');
   assert.equal(spends.length, spendsBefore, 'nessun credito scalato al ritentativo bloccato');
+});
+
+// #583 — la stessa riapertura chiesta da una pagina di un SITO VISITATO.
+// Senza il confine d'origine bastava una sessione aperta: il sito spendeva i
+// crediti di chi sta usando Filo e gli apriva a suo nome una segnalazione col
+// testo che voleva. Il rifiuto arriva prima di toccare qualunque cosa, e porta
+// il motivo in una parola.
+test('da un sito visitato la riapertura non scala crediti e non scrive niente', async () => {
+  const r = await reopen(msgFor(), 'https://evil.example/pagina');
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'forbidden', 'rifiutato per provenienza, non per la sessione');
+  assert.equal(spends.length, 0, 'nessun credito scalato');
+  assert.equal(server.feedbacks.length, 0, 'nessuna segnalazione aperta a nome dell\'utente');
+  assert.deepEqual(server.reopenRequests, {}, 'nessun segnale scritto sul fix');
 });

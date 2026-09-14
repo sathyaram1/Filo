@@ -1,6 +1,11 @@
-// Le icone Impostazioni, Home e le app interne (Editor, Feedback) devono essere
+// Le icone Impostazioni, Home e l'app interna Editor devono essere
 // raggiungibili fra le icone del menu del tasto destro (feedback alpha). Di
 // default vivono nella griglia "Altro…" (secondary).
+//
+// «Feedback» NON è in quell'elenco dal 2026-09 (#583): apre la posta delle
+// segnalazioni, che legge solo chi le gestisce, quindi l'icona esiste solo per
+// l'owner. Per chiunque altro era un vicolo cieco. Mandare un feedback resta
+// una strada di tutti, ed è la voce «Invia feedback» dello stesso menu.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -21,16 +26,33 @@ async function openOverflowGrid(page) {
   return grid;
 }
 
-test('Impostazioni, Home, Editor e Feedback sono presenti fra le icone del menu', async ({ openTab, testServer }) => {
+test('Impostazioni, Home ed Editor sono presenti fra le icone del menu', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   const grid = await openOverflowGrid(page);
 
-  for (const id of ['openOptions', 'home', 'editorApp', 'feedbackApp']) {
+  for (const id of ['openOptions', 'home', 'editorApp']) {
     await expect(
       grid.locator(`.sn-menu-icon-btn[data-sn-icon-id="${id}"]`),
       `icona "${id}" mancante nel menu`,
     ).toBeVisible();
   }
+});
+
+test('#583 chi non gestisce i feedback non trova l\'icona che porta alla loro posta', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, HTML);
+  const grid = await openOverflowGrid(page);
+  await expect(
+    grid.locator('.sn-menu-icon-btn[data-sn-icon-id="feedbackApp"]'),
+    'l\'icona apre una pagina che a chi non è amministratore non mostra niente',
+  ).toHaveCount(0);
+});
+
+test('#583 mandare un feedback resta nel menu, per chiunque', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, HTML);
+  await page.locator('p').click({ button: 'right' });
+  const menu = page.locator('.sn-menu').first();
+  await expect(menu).toBeVisible();
+  await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
 });
 
 test('click su Impostazioni apre la pagina Opzioni', async ({ openTab, testServer, app }) => {

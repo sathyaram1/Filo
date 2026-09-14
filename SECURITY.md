@@ -181,6 +181,21 @@ I server applicano regole precise (Firebase Security Rules):
 
 - **Chiunque** può **inviare** un nuovo feedback (in forma anonima). Non serve
   loggarsi: vogliamo abbassare al massimo l'attrito per ricevere segnalazioni.
+- **Nessuno può LEGGERE i feedback**, a parte chi li gestisce: gli
+  amministratori e il server che li lavora. Quello che invii non è consultabile
+  da un altro utente, e nemmeno da chi conoscesse l'indirizzo del documento.
+- Lo stesso vale per gli **screenshot e i file** che alleghi: non si possono
+  elencare e non si aprono conoscendone l'indirizzo. L'unica chiave è il codice
+  di scarico che sta nel link, e quel link non esce dalle mani di chi gestisce i
+  feedback. Se un codice dovesse scappare si può cambiare, e da quel momento il
+  vecchio link non apre più niente.
+- Quello che tutti possono vedere è la **bacheca dei miglioramenti**, e sono
+  solo i campi pensati per stare lì: il titolo breve di un problema già
+  risolto, il suo numero, la versione in cui è uscito, la frase scritta per chi
+  l'aveva segnalato, i voti. Non il testo, non l'indirizzo della pagina, non
+  gli screenshot, non le note di lavorazione. Quei campi vivono in una raccolta
+  separata — una vetrina — riempita da chi gestisce i feedback: la raccolta
+  vera resta chiusa.
 - **Solo gli amministratori** (un elenco ristretto di email autorizzate)
   possono **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
   cancellarli. Un utente normale non può toccare i feedback altrui né mettere
@@ -188,6 +203,18 @@ I server applicano regole precise (Firebase Security Rules):
 - La lista degli amministratori è una raccolta dedicata sul server: per
   aggiungere un collaboratore basta aggiungere la sua email, senza modificare
   il codice dell'app.
+
+C'è una seconda raccolta aperta a tutti, e va detto perché. Quando l'assistente
+ti aiuta a fare qualcosa su un sito, Filo può tenere da parte come ci è
+riuscito: il dominio, il percorso della pagina (senza la parte dopo il punto
+interrogativo) e una riga che riassume l'obiettivo, riscritta da un modello e
+scartata se non è generica. Serve a tutte le installazioni, che la rileggono per
+il sito che hanno davanti, e per questo si legge senza credenziali. Lì dentro
+non c'è niente che dica da quale installazione arriva: nessun identificativo,
+nessun account. L'unica cosa che resta accanto al percorso è la versione di Filo
+che l'ha raccolto, che è la stessa per tutti quelli che hanno quella versione.
+Da settembre 2026 quei documenti non li scrive più il client: li scrive il
+server, che rifà la pulizia e tiene i limiti di frequenza.
 
 La sicurezza qui non sta nel nascondere la chiave API di Firebase (che, come in
 tutti i progetti Firebase, è pubblica per design e visibile nel client): sta
@@ -220,6 +247,19 @@ aperta in produzione, e il lavoro sembra finito mentre non lo è.
 le regole, poi si ruotano le chiavi dai pannelli dei servizi. Al contrario, le
 chiavi nuove finiscono in un documento che chiunque legge ancora, e la
 rotazione è da rifare da capo.
+
+**Poi vanno ruotati i codici di scarico degli allegati vecchi.** Le regole nuove
+negano il `get` sul deposito, quindi un allegato si apre solo col codice che sta
+nel suo link. Quel codice è quello che serviva: gli indirizzi degli allegati
+stavano dentro i documenti dei feedback, leggibili da chiunque fino a questo
+audit, e chi li ha raccolti in quei mesi se li tiene. Ruotare il codice di un
+file (Firebase Console → Storage → il file → «Crea nuovo token di download», e
+cancella il vecchio) manda in errore i link scappati. Prima serviva a zero,
+perché col `get` aperto il file si prendeva lo stesso dall'indirizzo. Vale
+soprattutto per gli allegati anteriori al 25 giugno 2026, che non sono cifrati.
+Dopo la rotazione i link dentro i documenti dei feedback puntano al codice
+vecchio, quindi quei documenti vanno riscritti col link nuovo: è lo stesso
+lavoro di migrazione dei documenti storici, e si fa insieme.
 
 ---
 

@@ -6,6 +6,7 @@ const auth = require('../../auth/google-auth');
 const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp } = require('../feedbackError');
+const { daFilo, soloFilo } = require('./origine');
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
 // stessa region/progetto del deploy. Override per i test via env.
@@ -75,6 +76,29 @@ async function getPrivateKey() {
   } catch (_) {}
 
   return null;
+}
+
+// Questo indirizzo è un allegato di Filo? Il deposito è uno solo, e il nome lo
+// tiene il modulo condiviso dei feedback: qui si controlla che l'indirizzo
+// appartenga a QUELLO, non a un deposito qualunque di Google. Senza, il canale
+// che decifra un allegato diventa un modo per farsi scaricare altro.
+function allegatoDiFilo(url) {
+  const u = String(url || '');
+  const cfg = (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.configPublic) || null;
+  const bucket = cfg && cfg.bucket ? String(cfg.bucket) : '';
+  const progetto = cfg && cfg.projectId ? String(cfg.projectId) : '';
+  if (!bucket && !progetto) return false;
+  // Lo stesso deposito ha più nomi ufficiali (quello attuale e quello storico
+  // che finisce in appspot.com: gli allegati vecchi hanno ancora quello) e due
+  // indirizzi (Firebase Storage e il deposito diretto). Valgono quelli, e
+  // nessun altro.
+  const depositi = new Set([bucket, progetto ? `${progetto}.firebasestorage.app` : '', progetto ? `${progetto}.appspot.com` : '']);
+  depositi.delete('');
+  for (const b of depositi) {
+    if (u.startsWith(`https://firebasestorage.googleapis.com/v0/b/${b}/o/`)) return true;
+    if (u.startsWith(`https://storage.googleapis.com/${b}/`)) return true;
+  }
+  return false;
 }
 
 // Decifra i campi FENC1: di un oggetto con la chiave privata del main.
@@ -209,51 +233,79 @@ async function probeServerAdmin(claims) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, broadcastToTabs } = ctx;
+  const { MSG } = ctx;
+  // L'avviso «l'accesso è cambiato» porta con sé il profilo, cioè l'indirizzo
+  // email di chi sta usando Filo: va SOLO alle superfici di Filo. Mandarlo a
+  // tutte le schede vorrebbe dire consegnarlo anche ai content script dei siti
+  // visitati, ed è la stessa porta chiusa un attimo fa vista dal verso opposto:
+  // se un sito non lo può chiedere, non glielo si manda da soli.
+  const avvisaLeSuperficiDiFilo = (m) => {
+    if (typeof ctx.broadcastToFiloPages === 'function') ctx.broadcastToFiloPages(m);
+    else ctx.broadcastToTabs(m);
+  };
 
   // I token restano nel main process: qui torniamo solo il profilo pubblico
   // + se l'utente è admin (può triagiare i feedback). `uid` è il claim
   // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
   // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
   // propri voti nella mappa `votes` autorevole letta da Firestore.
-  on(MSG.AUTH_STATUS, async () => {
+  // Da un sito visitato questa porta risponde, ma senza IDENTITÀ: niente
+  // indirizzo email, niente nome, niente identificativo dell'account. Un
+  // content script gira anche dentro le pagine dei siti, e di sé deve sapere
+  // solo due cose: se c'è una sessione (il pannello del red-team invita ad
+  // accedere) e se questa è l'installazione di chi gestisce i feedback (la
+  // griglia del tasto destro mostra l'icona Feedback solo a lui, #583 giro 2).
+  // Chi è, e con che indirizzo, lo chiede una superficie di Filo.
+  on(MSG.AUTH_STATUS, async (msg, sender, origin) => {
     const signedIn = auth.isSignedIn();
+    const isAdmin = auth.isAdmin();
+    if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
     const uid = signedIn ? await auth.getUid() : null;
-    return { ok: true, signedIn, isAdmin: auth.isAdmin(), profile: auth.getProfile(), uid };
+    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid };
   });
 
   on(MSG.AUTH_SIGNIN, async () => {
     try {
       const profile = await auth.signIn();
-      broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
+      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.
       Defaults.refresh().catch(() => {});
+      // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
+      // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
+      if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
       return { ok: true, profile, isAdmin: auth.isAdmin() };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
   });
 
-  on(MSG.AUTH_SIGNOUT, async () => {
+  // Uscire dall'account lo chiede solo la finestra di Filo. Da un sito
+  // visitato era un modo per buttare fuori chi sta usando Filo: da lì in poi
+  // la posta delle segnalazioni non si apre e la bacheca di tutti smette di
+  // aggiornarsi, finché non rientra.
+  on(MSG.AUTH_SIGNOUT, soloFilo(async () => {
     try {
       auth.signOut();
-      broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
+      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Triage admin di un feedback: solo admin loggati, con Firebase ID token
   // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
   // Firestore rules; questo è il gate applicativo + il trasporto autenticato.
-  on(MSG.FEEDBACK_UPDATE, async (msg) => {
+  // `ownerOnly`: prima di chiedersi CHI è, si chiede DA DOVE arriva. Il triage
+  // scrive sul feedback e sulla frase che finisce in bacheca sotto gli occhi di
+  // tutti: è un gesto che si fa sulle superfici di Filo, non una cosa che una
+  // pagina di un sito visitato possa chiedere. Sul computer di chiunque altro
+  // «sei l'amministratore?» basta, perché la risposta è no; su quello di chi i
+  // feedback li gestisce è sempre sì, ed è l'unico dove c'è qualcosa da fare.
+  on(MSG.FEEDBACK_UPDATE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       if (!globalThis.SN_FEEDBACK?.updateStatus) {
         throw new Error('SN_FEEDBACK non caricato nel main process');
       }
@@ -282,8 +334,22 @@ module.exports = function register(on, ctx) {
         { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved },
         { idToken },
       );
-      // La pagina mostra subito chi ha messo il segno: glielo dice il main,
-      // che è l'unico a saperlo.
+      // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
+      // entra, uno riaperto esce, la frase per chi ha segnalato cambia): la
+      // vista pubblica si rifà subito, non al prossimo caricamento.
+      //
+      // Prima la scheda di QUESTO feedback, poi il giro generale. Non è un
+      // doppione: il giro generale guarda solo i 500 feedback più recenti per
+      // data d'invio, e Filo quel numero l'ha passato. Chiudere oggi una
+      // segnalazione vecchia non le scriveva nessuna scheda (niente bacheca,
+      // niente annuncio e niente crediti per chi l'aveva mandata) e riaprirne
+      // una vecchia non le toglieva la sua (restava in bacheca come risolta,
+      // votabile e riapribile a pagamento). Qui l'id ce l'abbiamo: si va
+      // dritti su quello, e l'età non conta più.
+      await syncOneCard(id, idToken);
+      scheduleViewSync({ delayMs: 1500, force: true });
+      // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
+      // glielo dice il main, che è l'unico a saperlo.
       return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
@@ -296,7 +362,7 @@ module.exports = function register(on, ctx) {
       const serverAdmin = await probeServerAdmin(claims);
       return { ok: false, error: permissionDeniedHelp(raw, claims, { serverAdmin }) };
     }
-  });
+  }));
 
   // S1.3: decifratura dei campi feedback nel main (la privkey non esce mai da qui).
   // Il renderer manda i campi con valori potenzialmente cifrati; il main li
@@ -306,11 +372,8 @@ module.exports = function register(on, ctx) {
   // Modalità batch:    { list: [{…}, …] }         → { ok, list: [{…decifrati}, …] }
   // (Il path singolo esiste per retrocompat; il batch serve alle dashboard che
   //  caricano centinaia di feedback — una sola IPC invece di N.)
-  on(MSG.FEEDBACK_DECRYPT_FIELDS, async (msg) => {
+  on(MSG.FEEDBACK_DECRYPT_FIELDS, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori.' };
-      }
       // Batch: array di oggetti feedback. La chiave si legge UNA volta e i
       // documenti si decifrano a gruppi in parallelo: la crittografia gira nel
       // pool di thread di Node, quindi in sequenza si usava un solo core e
@@ -335,7 +398,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // S1.2: decifratura di UN allegato immagine. Le immagini dei feedback sono
   // cifrate come byte opachi su Storage (octet-stream): un <img src=URL> diretto
@@ -343,15 +406,14 @@ module.exports = function register(on, ctx) {
   // privata (che NON esce mai dal main), ne indovina il MIME e torna un data URL
   // mostrabile. Owner-only. Retrocompat: immagini NON cifrate (storiche) passano
   // invariate (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
-  on(MSG.FEEDBACK_DECRYPT_IMAGE, async (msg) => {
+  on(MSG.FEEDBACK_DECRYPT_IMAGE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori.' };
-      }
       const url = String((msg && msg.url) || '');
-      // Solo URL https del bucket feedback: evita che questo canale diventi un
-      // fetch arbitrario (SSRF) pilotato dal renderer.
-      if (!/^https:\/\/(firebasestorage\.googleapis\.com|storage\.googleapis\.com)\//.test(url)) {
+      // Solo gli allegati DI FILO: il deposito è uno solo, e il suo nome lo
+      // tiene il modulo condiviso che carica le immagini. Accettare qualunque
+      // indirizzo dei depositi di Google faceva di questo canale un modo per
+      // farsi scaricare altro, che non è quello che dice di fare.
+      if (!allegatoDiFilo(url)) {
         return { ok: false, error: 'url allegato non valido' };
       }
       const res = await fetch(url);
@@ -388,23 +450,20 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
   // NON espone le chiavi vere, solo se sono configurate. La scrittura è
   // riservata agli admin (Firebase ID token come Bearer): le regole Firestore
   // rifiutano i non-admin. La modifica si propaga a tutti gli utenti.
-  on(MSG.DEFAULTS_GET, async () => {
+  on(MSG.DEFAULTS_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       await Defaults.refresh().catch(() => {});
       return { ok: true, config: Defaults.getPublicForAdmin() };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Versione LEGGIBILE DA TUTTI della config modelli: solo i nomi (registry e
   // modello per funzione), mai una chiave. La pagina Opzioni la usa per elencare
@@ -420,11 +479,8 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  on(MSG.DEFAULTS_UPDATE, async (msg) => {
+  on(MSG.DEFAULTS_UPDATE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const config = await Defaults.update(msg.config || {}, idToken);
@@ -432,17 +488,14 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Interruttore master dell'auto-miglioramento (config/automation). Owner-only.
   // Default OFF (autonomia spenta): mentre è OFF anche i feedback "sicuri"
   // richiedono verifica umana. Vedi filo-security DESIGN §2. La scrittura passa
   // dal main con l'ID token admin; le regole Firestore sono la garanzia forte.
-  on(MSG.AUTOMATION_GET, async () => {
+  on(MSG.AUTOMATION_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const enabled = await Defaults.getAutomationGate(idToken);
@@ -453,16 +506,13 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa dei mittenti
   // ammessi all'auto-approvazione, #446), e tocca SOLO ciò che riceve: la vecchia
   // pagina feedback manda ancora il solo `enabled` e non deve azzerare la mappa.
-  on(MSG.AUTOMATION_SET, async (msg) => {
+  on(MSG.AUTOMATION_SET, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       let enabled;
@@ -487,33 +537,27 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // I tre bilanci dei giri di correzione e il testo della fase 2
   // (config/routines, campi `cap2`, `cap1`, `cap0`, `fixInstructions` —
   // feedback #561). Owner-only. È la fonte di verità che il server applica
   // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.
   const capsReply = (caps) => ({ ok: true, cap2: caps.cap2, cap1: caps.cap1, cap0: caps.cap0, fixInstructions: caps.fixInstructions });
-  on(MSG.AUTOMATION_CAPS_GET, async () => {
+  on(MSG.AUTOMATION_CAPS_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       return capsReply(await Defaults.getRoutineCaps(idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Tocca SOLO i campi che riceve (come AUTOMATION_SET): salvare un bilancio
   // non deve riscrivere gli altri.
-  on(MSG.AUTOMATION_CAPS_SET, async (msg) => {
+  on(MSG.AUTOMATION_CAPS_SET, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       return capsReply(await Defaults.setRoutineCaps({
@@ -522,17 +566,14 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
   // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
   // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab
   // "Log" della dashboard.
-  on(MSG.WORKER_LOG_GET, async () => {
+  on(MSG.WORKER_LOG_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const entries = await Defaults.getWorkerLog(idToken);
@@ -540,7 +581,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Registri del canale autenticato delle routine. Owner-only, sola lettura.
   //
@@ -548,18 +589,15 @@ module.exports = function register(on, ctx) {
   // nessun client le può leggere: un registro dei rifiuti leggibile da chiunque
   // direbbe a chi sta provando ad abusare del canale quanto è stato notato.
   // Perciò si passa dalla callable, che chiede le credenziali dell'owner.
-  on(MSG.ROUTINE_LOG_GET, async (msg) => {
+  on(MSG.ROUTINE_LOG_GET, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const limit = Number(msg && msg.limit);
       const r = await callSecurityFunction('routineLog', Number.isFinite(limit) ? { limit } : {});
       return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [] };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // ── Fusioni bloccate, in attesa dell'owner (SPEC-RIDISEGNO-MAX.md §10) ─────
   //
@@ -578,13 +616,31 @@ module.exports = function register(on, ctx) {
   //     scoprire su cosa sta lavorando l'owner) o provare a farla approvare
   //     mentre lui guarda altrove. Il gesto che vale è quello fatto sulla
   //     superficie di Filo: è tutto il senso di questa superficie.
-  const isFiloOrigin = (origin, sender) => String(origin || '').startsWith('filo://') || !!(sender && sender.isShell);
-
+  //
+  // `ownerOnly` NON è delle sole fusioni: è la porta unica di OGNI canale con
+  // potere di proprietario di questo file. Ogni `on(MSG.…)` qui dentro che
+  // richieda l'amministratore ci passa — i feedback, i modelli predefiniti (che
+  // valgono per tutte le installazioni di Filo), l'automazione, i bilanci dei
+  // giri, i modelli dei giudici, i registri del lavoro e delle routine, le
+  // fusioni. Non è una regola di stile: il #583 ha chiuso quattro porte su
+  // nove, e le cinque rimaste erano quelle che cambiano la configurazione di
+  // tutti. `tests/feedback-canali-origine.spec.mjs` bussa a tutte da un sito
+  // visitato e diventa rossa se una risponde qualcosa di diverso da
+  // «rifiutato per provenienza»: è il posto dove aggiungere una porta nuova.
   function ownerOnly(handler) {
     return async (msg, sender, origin) => {
-      if (!isFiloOrigin(origin, sender)) return { ok: false, error: 'forbidden' };
+      // La provenienza la decide la porta unica del confine (handlers/origine.js),
+      // che è la stessa di ogni altra porta con potere e porta con sé il motivo
+      // in una parola: senza, il rifiuto arriva a una pagina come un errore
+      // qualunque e finisce tradotto in "controlla la connessione", che non è
+      // vero e manda a controllare la cosa sbagliata.
+      if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
       if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+        return {
+          ok: false,
+          code: 'not_admin',
+          error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.',
+        };
       }
       try {
         return await handler(msg);
@@ -614,6 +670,321 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.MERGE_APPROVALS_GET, ownerOnly(listMergeApprovals));
+
+  // ── #583: leggere i feedback, e tenere aggiornata la vista pubblica ───────
+  //
+  // La collezione `feedback` non si legge più senza credenziali. Le due
+  // superfici dell'owner (Gestione e la pagina dei feedback) girano in una
+  // pagina filo://, dove l'ID token non deve arrivare: chiedono la lettura
+  // qui, e qui la si fa col token. Stessi due cancelli delle approvazioni di
+  // fusione (`ownerOnly`): sei l'admin, e lo stai chiedendo da una superficie
+  // di Filo — un sito visitato non deve poter domandare al main cosa c'è nella
+  // posta dell'owner.
+  const PUBLIC_VIEW = () => globalThis.SN_FEEDBACK_PUBLIC_VIEW;
+  const FEEDBACK = () => globalThis.SN_FEEDBACK;
+
+  // I voti e le riaperture si scrivono sulla SCHEDA pubblica (è l'unico
+  // documento che chi vota può aprire), quindi chi legge il feedback dal main
+  // se li ritrova riuniti: la dashboard e l'archiviazione a punteggio
+  // continuano a leggere `fb.votes` come hanno sempre fatto. I voti storici,
+  // rimasti sul documento, non si perdono: la scheda vince solo dove ha
+  // qualcosa da dire.
+  let cardsCache = { at: 0, rows: [] };
+  const CARDS_TTL_MS = 30_000;
+
+  async function publicCards({ fresh = false } = {}) {
+    const FB = FEEDBACK();
+    if (!FB) return [];
+    if (!fresh && Date.now() - cardsCache.at < CARDS_TTL_MS) return cardsCache.rows;
+    // TUTTE le schede, paginate. Una finestra sui 500 più recenti per data
+    // d'invio qui vuol dire che le schede più vecchie non le può togliere più
+    // nessuno: un fix vecchio che torna in lavorazione resterebbe in bacheca
+    // come risolto, votabile e riapribile a pagamento — cioè il doppione che il
+    // blocco delle riaperture doveva impedire.
+    const rows = FB.listAllPublic
+      ? await FB.listAllPublic({ timeoutMs: 20000, fresh })
+      : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+    cardsCache = { at: Date.now(), rows };
+    return rows;
+  }
+
+  async function mergeCardFields(rows) {
+    const V = PUBLIC_VIEW();
+    if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
+    let cards;
+    try { cards = await publicCards(); }
+    catch (e) {
+      console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
+      return rows; // meglio i voti storici che nessun feedback
+    }
+    return V.mergeUserFields(rows, cards);
+  }
+
+  on(MSG.FEEDBACK_FETCH, ownerOnly(async (msg) => {
+    const FB = FEEDBACK();
+    if (!FB) throw new Error('SN_FEEDBACK non caricato nel main process');
+    const idToken = await auth.getIdToken();
+    if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+    const op = String((msg && msg.op) || 'list');
+    const timeoutMs = Number(msg && msg.timeoutMs) || 0;
+
+    if (op === 'getMany') {
+      const ids = Array.isArray(msg.ids) ? msg.ids : [];
+      const rows = await FB.getMany(ids, { timeoutMs, idToken });
+      return { ok: true, rows: await mergeCardFields(rows) };
+    }
+    if (op !== 'list') return { ok: false, error: `lettura non prevista: ${op}` };
+
+    const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+    const pageSize = Math.max(1, Math.min(FB.LIST_PAGE_SIZE, Number(msg.pageSize) || FB.LIST_PAGE_SIZE));
+    const rows = await FB.list({ pageSize, timeoutMs, fields, idToken });
+    // Una PROIEZIONE (il giro leggero che chiede solo "cosa è cambiato") non
+    // porta campi da riunire, e non deve pagare la lettura delle schede a ogni
+    // battito. La lista intera invece sì — ed è anche il momento buono per
+    // rimettere in pari la vista pubblica.
+    if (fields) return { ok: true, rows };
+    // Le righe appena lette sono le stesse che servirebbero alla
+    // sincronizzazione: gliele passiamo invece di far rileggere mezzo database
+    // un attimo dopo.
+    scheduleViewSync({ rows });
+    return { ok: true, rows: await mergeCardFields(rows) };
+  }));
+
+  // ── Chi pubblica la vista, e quando ──────────────────────────────────────
+  //
+  // La scheda pubblica di un feedback la può scrivere solo chi ha due cose che
+  // un utente non ha: l'autorità (le regole ammettono owner e server) e la
+  // CHIAVE per leggere lo status vero, che viaggia cifrato — senza la quale
+  // "questo fix è chiuso e pulito" non è una frase che si possa dire. Le ha il
+  // main dell'owner, ed è per questo che il lavoro sta qui.
+  //
+  // Gira dopo un caricamento della dashboard e dopo ogni triage, mai più di
+  // una volta al minuto (a meno che non sia appena cambiato qualcosa), e non
+  // fa niente se la chiave privata non è configurata: senza, ogni status
+  // sarebbe illeggibile e la sincronizzazione svuoterebbe la bacheca.
+  let syncTimer = null;
+  let syncing = false;
+  let lastSyncAt = 0;
+  const SYNC_MIN_GAP_MS = 60_000;
+
+  /**
+   * La scheda pubblica di UN feedback, per id: la scrive, l'aggiorna o la
+   * toglie secondo quello che dice il feedback adesso.
+   *
+   * Esiste perché il giro generale lavora su una pagina di caricamento (i 500
+   * più recenti per data d'invio) e i feedback più vecchi ne restano fuori: per
+   * loro la bacheca si congelava all'ultimo giro in cui erano dentro. Qui
+   * l'id lo sappiamo, quindi non serve cercarli.
+   *
+   * Best-effort: se fallisce non fa fallire il triage (la segnalazione è già
+   * cambiata sul server), ma lo scrive nei log. Il giro generale resta la rete
+   * di sicurezza per i feedback recenti.
+   */
+  async function syncOneCard(id, idToken) {
+    const FB = FEEDBACK();
+    const V = PUBLIC_VIEW();
+    const key = String(id || '');
+    if (!FB || !V || !key || !idToken) return;
+    try {
+      const priv = await getPrivateKey();
+      // Senza chiave lo status è un blob: pubblicare sarebbe alla cieca e
+      // togliere cancellerebbe una scheda buona. Stessa scelta del giro
+      // generale: fermarsi e dirlo.
+      if (!priv) {
+        console.warn('[feedback] scheda singola saltata: chiave privata non configurata');
+        return;
+      }
+      const rows = await FB.getMany([key], { idToken });
+      const row = rows && rows[0];
+      if (!row) return; // cancellato nel frattempo: se ne occupa il giro generale
+      const fb = await decryptFeedbackObject(row, priv);
+      const card = V.cardFor(fb);
+      if (!card) {
+        await FB.unpublishPublicCard(key, { idToken });
+      } else {
+        // I voti e le riaperture stanno sulla scheda: la maschera di
+        // publishPublicCard non li tocca, ma quelli rimasti sul documento vanno
+        // portati dentro come fa il giro generale.
+        let before = null;
+        try { before = await FB.getPublic(key, { idToken }); } catch (_) {}
+        const carry = V.carryUserFields(fb, before);
+        await FB.publishPublicCard(key, Object.keys(carry).length ? { ...card, ...carry } : card, { idToken });
+      }
+      cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
+      if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
+    } catch (e) {
+      console.warn('[feedback] scheda singola non aggiornata:', e?.message || e);
+    }
+  }
+
+  /**
+   * Il caricamento generale guarda i feedback più recenti PER DATA D'INVIO, e
+   * Filo quel tetto l'ha passato: le segnalazioni più vecchie restano fuori, e
+   * quello che succede a loro non arriva in bacheca. Il triage fatto dentro
+   * l'app ha l'id in mano e scrive la scheda da sé, ma non è l'unico modo in
+   * cui una segnalazione si chiude: nel giro delle routine la chiude il server
+   * quando il lavoro viene fuso, e dal terminale la chiude un comando. In quei
+   * casi l'unico a poter scrivere la scheda è questo giro, che però non le
+   * vedeva.
+   *
+   * Due aggiunte, tutte e due limitate e a costo fisso:
+   *   · le segnalazioni CHIUSE più di recente (una query ordinata per data di
+   *     chiusura): è lì che sta una segnalazione vecchia chiusa oggi;
+   *   · i feedback delle schede già in bacheca che non sono nella pagina: così
+   *     un fix vecchio che torna in lavorazione perde la scheda, invece di
+   *     restare «risolto», votabile e riapribile a pagamento.
+   *
+   * Best-effort: se una delle due domande non riesce, il giro prosegue con
+   * quello che ha invece di fermarsi. Torna anche gli id aggiunti, perché su
+   * quelli chi pubblica è più prudente (vedi `statusLeggibile`).
+   */
+  async function conLeSegnalazioniFuoriPagina(base, idToken, schede) {
+    const FB = FEEDBACK();
+    const rows = Array.isArray(base) ? base.slice() : [];
+    const aggiunti = new Set();
+    if (!FB || !idToken) return { rows, aggiunti };
+    const visti = new Set(rows.map((r) => String((r && r._id) || '')).filter(Boolean));
+    const aggiungi = (arr) => {
+      for (const r of Array.isArray(arr) ? arr : []) {
+        const id = String((r && r._id) || '');
+        if (!id || visti.has(id)) continue;
+        visti.add(id);
+        aggiunti.add(id);
+        rows.push(r);
+      }
+    };
+
+    if (typeof FB.listResolved === 'function') {
+      try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken })); }
+      catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
+    }
+
+    const mancanti = (Array.isArray(schede) ? schede : [])
+      .map((c) => String((c && c._id) || ''))
+      .filter((id) => id && !visti.has(id))
+      .slice(0, FB.LIST_PAGE_SIZE);
+    if (mancanti.length) {
+      try { aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000 })); }
+      catch (e) { console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e); }
+    }
+    return { rows, aggiunti };
+  }
+
+  /**
+   * Lo stato di questo feedback si è potuto leggere davvero? Un campo cifrato
+   * che non si apre torna come segnaposto, e uno stato illeggibile non è
+   * «questo feedback non merita una scheda»: pubblicare o togliere basandosi
+   * su quello vorrebbe dire far sparire dalla bacheca un fix buono. Sulle
+   * segnalazioni pescate fuori pagina, che prima questo giro non guardava
+   * nemmeno, in quel caso si sta fermi.
+   */
+  function statusLeggibile(fb) {
+    const MR = globalThis.SN_MANAGE_REVIEW;
+    const v = fb && fb.status;
+    if (!v) return true; // uno stato assente è il vecchio «da lavorare»: non è illeggibile
+    if (MR && typeof MR.valueUnreadable === 'function') return !MR.valueUnreadable(v);
+    return !String(v).startsWith('FENC');
+  }
+
+  function scheduleViewSync({ delayMs = 2000, force = false, rows = null } = {}) {
+    if (syncTimer) return;
+    syncTimer = setTimeout(() => {
+      syncTimer = null;
+      syncPublicView({ force, rows }).catch(() => {});
+    }, delayMs);
+    if (typeof syncTimer.unref === 'function') syncTimer.unref();
+  }
+
+  async function syncPublicView({ force = false, rows = null } = {}) {
+    const FB = FEEDBACK();
+    const V = PUBLIC_VIEW();
+    if (!FB || !V || syncing || !auth.isAdmin()) return { ok: false, skipped: true };
+    if (!force && Date.now() - lastSyncAt < SYNC_MIN_GAP_MS) return { ok: false, skipped: true };
+    syncing = true;
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, skipped: true };
+      const priv = await getPrivateKey();
+      if (!priv) {
+        // Senza chiave ogni status è un blob: pubblicare sarebbe alla cieca e
+        // TOGLIERE cancellerebbe la bacheca. Si sta fermi e lo si dice.
+        console.warn('[feedback] vista pubblica: chiave privata non configurata, sincronizzazione saltata');
+        return { ok: false, skipped: true };
+      }
+      const base = (Array.isArray(rows) && rows.length)
+        ? rows
+        : await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken });
+      // Le schede già in bacheca si leggono una volta sola e servono due volte:
+      // per pescare i feedback fuori pagina che ne hanno una, e per il piano.
+      const published = await publicCards({ fresh: true });
+      const { rows: raw, aggiunti } = await conLeSegnalazioniFuoriPagina(base, idToken, published);
+      const decifrati = new Array(raw.length);
+      let next = 0;
+      const worker = async () => {
+        while (next < raw.length) {
+          const i = next++;
+          decifrati[i] = await decryptFeedbackObject(raw[i] || {}, priv);
+        }
+      };
+      await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
+      const feedbacks = decifrati.filter(
+        (f) => !aggiunti.has(String((f && f._id) || '')) || statusLeggibile(f),
+      );
+
+      // `complete`: il caricamento PER DATA D'INVIO non ha toccato il tetto,
+      // quindi questi sono TUTTI i feedback che esistono, e solo allora una
+      // scheda senza feedback è un orfano (feedback cancellato) da togliere.
+      // Si guarda la pagina di partenza, non il totale: le segnalazioni pescate
+      // per data di chiusura sono un'aggiunta, e contarle direbbe «pagina
+      // piena» anche quando non lo era.
+      const complete = base.length < FB.LIST_PAGE_SIZE;
+      const plan = V.planSync(published, feedbacks, { complete });
+      for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
+      for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
+
+      // Il contatore dei numeri: lo crea e lo rimette in pari l'app
+      // dell'owner, che è l'unica a poterlo scrivere a piacere. Senza, un
+      // feedback nuovo arriverebbe senza numero.
+      //
+      // Il massimo si CHIEDE al server con una query sua (una lettura), non si
+      // ricava dai feedback caricati: quelli sono i 500 più recenti per data, e
+      // il numero più alto potrebbe stare fuori. Con il massimo vero,
+      // `allowLower` è sempre lecito, ed è l'unico modo perché la cura funzioni:
+      // chiunque può far avanzare il contatore di uno, e prima si abbassava solo
+      // quando il caricamento non toccava il tetto, cioè mai più.
+      let piuAlto = null;
+      try { piuAlto = await FB.maxSeq({ idToken, timeoutMs: 15000 }); }
+      catch (e) { console.warn('[feedback] numero più alto non letto:', e?.message || e); }
+      if (piuAlto === null) {
+        // Non lo sappiamo: al massimo alziamo il contatore fino a quello che
+        // abbiamo visto, mai abbassarlo alla cieca.
+        const visto = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
+        if (visto > 0) {
+          try { await FB.ensureSeqCounter(visto, { idToken }); }
+          catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
+        }
+      } else if (piuAlto > 0) {
+        try { await FB.ensureSeqCounter(piuAlto, { idToken, allowLower: true }); }
+        catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
+      }
+
+      lastSyncAt = Date.now();
+      if (plan.upsert.length || plan.remove.length) {
+        cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
+        // E anche la memoria breve della lettura completa: le schede sono
+        // appena cambiate, quindi quella di mezzo minuto fa non vale più.
+        if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
+        console.log('[feedback] vista pubblica aggiornata:',
+          `${plan.upsert.length} schede scritte, ${plan.remove.length} tolte`);
+      }
+      return { ok: true, published: plan.upsert.length, removed: plan.remove.length };
+    } catch (e) {
+      console.warn('[feedback] sincronizzazione della vista pubblica non riuscita:', e?.message || e);
+      return { ok: false, error: e?.message || String(e) };
+    } finally {
+      syncing = false;
+    }
+  }
 
   // Una pagina di gestione GIÀ APERTA deve accorgersi di una richiesta nuova.
   // Prima l'elenco si leggeva solo all'apertura di una pagina: il terminale
@@ -692,26 +1063,20 @@ module.exports = function register(on, ctx) {
 
   // Config "modelli di supporto" (doc config/supportModels). Owner-only.
   // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
-  on(MSG.SUPPORT_MODELS_GET, async () => {
+  on(MSG.SUPPORT_MODELS_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const models = await SupportModels.get();
       return { ok: true, models };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Ri-valutazione dei feedback "non filtrati": la dashboard (che decifra i
   // pipeline e quindi sa quali sono bianchi) passa la lista degli id; il backend
   // ri-esegue SOLO i giudici mancanti di ciascuno. Owner-only.
-  on(MSG.FEEDBACK_REEVALUATE, async (msg) => {
+  on(MSG.FEEDBACK_REEVALUATE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const feedbackIds = Array.isArray(msg.feedbackIds)
         ? msg.feedbackIds.map(String).filter(Boolean)
         : [];
@@ -721,13 +1086,10 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
-  on(MSG.SUPPORT_MODELS_UPDATE, async (msg) => {
+  on(MSG.SUPPORT_MODELS_UPDATE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       // Slot + registro giudici + (eventuale) chiave OpenRouter dei giudici.
@@ -741,5 +1103,5 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 };

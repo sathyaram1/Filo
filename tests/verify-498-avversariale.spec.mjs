@@ -89,15 +89,65 @@ test('#498 col banner di sola lettura le aree arrivano lo stesso in fondo', asyn
   expect(g.viewportH - g.grid.bottom).toBeLessThanOrEqual(28);
 });
 
+// Il blocco delle fusioni in attesa non sta più sopra le aree: la
+// pre-approvazione l'ha spostato nella scheda Automazioni e diviso in tre
+// riquadri (le fusioni senza segnalazione, quelle già decise, quelle fuse
+// senza chiedere). La prova di prima frugava il riquadro unico di allora e
+// dal giorno dello spostamento cascava senza guardare più niente.
+//
+// Quello che #498 chiedeva resta vero e si prova qui, nel posto dove le due
+// cose vivono adesso: con le fusioni in attesa piene, le aree della scheda
+// lista restano dentro la finestra e la pagina non scorre; e nella scheda
+// Automazioni, dove la pagina è libera di allungarsi, l'ultima fusione
+// dell'elenco resta raggiungibile invece di finire tagliata.
 test('#498 col blocco delle fusioni in attesa le aree non escono dalla finestra', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
+
+  // La scheda Automazioni, dove le fusioni ferme vivono adesso. Si passa di
+  // qui per prima: aprendo la scheda la pagina rilegge le fusioni vere (in
+  // prova non ce n'è nessuna) e cancellerebbe quelle che mettiamo noi.
+  await page.locator('#mgTabs .mg-tab[data-tab="automation"]').click();
+  await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
+  await page.waitForTimeout(500);
+
+  // Sei fusioni ferme, ognuna con i suoi tasti: l'elenco è alto.
   await page.evaluate(() => {
-    const el = document.getElementById('mgMergeApprovals');
-    el.hidden = false;
-    el.innerHTML = '<div style="padding:14px;border:1px solid #999;border-radius:8px">'
-      + 'Fusione ferma: ramo claude/prova — in attesa del tuo via libera</div>';
+    const el = document.getElementById('mgMergeApprovalsOrphans');
+    window.SN_MERGE_APPROVALS.render(el, {
+      requests: Array.from({ length: 6 }, (_, i) => ({
+        id: `req-${i}`,
+        branch: `claude/lavoro-numero-${i}`,
+        sha: `abcdef012345678901234567890abcdef01234${i}0`,
+        who: `routine-${i}`,
+        origin: 'routine',
+        createdAtMs: Date.now() - 3600_000,
+        expiresAtMs: Date.now() + 6 * 86400_000,
+        blocks: [{ kind: 'protected-paths', items: ['src/main/main.js', 'package.json'] }],
+      })),
+      failed: [],
+    });
   });
+
+  // L'ultima fusione dell'elenco si raggiunge: non finisce tagliata fuori.
+  const ultima = page.locator('#mgMergeApprovalsOrphans .sn-mac-card').last();
+  await expect(ultima).toBeVisible();
+  await ultima.scrollIntoViewIfNeeded();
+  const dentro = await ultima.evaluate((el) => {
+    const b = el.getBoundingClientRect();
+    return b.bottom <= document.documentElement.clientHeight + 1 && b.top >= -1;
+  });
+  expect(dentro, 'l\'ultima fusione in attesa deve potersi raggiungere').toBe(true);
+
+  // E tornando alla scheda lista, con le fusioni ferme ancora lì, le aree
+  // restano dentro la finestra e la pagina non scorre: è quello che chiedeva
+  // #498.
+  await page.locator('#mgTabs .mg-tab[data-tab="inbox"]').click();
+  await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#mgReviewGrid')).toBeVisible();
   const g = await geom(page);
   console.log('MERGE', JSON.stringify(g));
   expect(g.scrollH).toBeLessThanOrEqual(g.viewportH + 1);

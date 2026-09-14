@@ -2170,7 +2170,17 @@
     '/sicurezza': () => { send({ type: MSG.OPEN_URL, url: 'filo://security/security.html' }); },
     '/preferenze': () => { send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html' }); },
     '/editor': () => { send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }); },
-    '/feedback': () => { send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }); },
+    // #583 — apre la POSTA delle segnalazioni, che legge solo chi le gestisce:
+    // a chiunque altro darebbe una pagina vuota. Chi vuole MANDARE un feedback
+    // lo fa dal menu del tasto destro → "Invia feedback", oppure chiedendolo a
+    // Filo in chat, e quella strada non cambia.
+    '/feedback': () => {
+      if (!isOwner) {
+        showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.');
+        return;
+      }
+      send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });
+    },
     '/incognito': () => { send({ type: MSG.OPEN_INCOGNITO }); },
     '/pulisci': () => { runTabCleanup(); },
     '/pulizia': () => { runTabCleanup(); },
@@ -2189,7 +2199,6 @@
         '/sicurezza — impostazioni sicurezza',
         '/preferenze — preferenze',
         '/editor — apri l\'editor',
-        '/feedback — apri i feedback',
         '/incognito — apri una finestra in incognito',
         '/pulisci, /pulizia — riordina e archivia le schede non più utili',
         '/riordina — riordina le schede per colore (nessuna viene chiusa)',
@@ -2199,6 +2208,7 @@
       ];
       if (isOwner) {
         lines.push(
+          '/feedback — apri la posta delle segnalazioni (proprietario)',
           '/users — elenca gli utenti registrati (proprietario)',
           '/gift NUMERO EMAIL — regala crediti a un utente (proprietario)',
         );

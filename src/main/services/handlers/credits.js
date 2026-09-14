@@ -7,6 +7,7 @@
 // trasporto: IPC verso la UI + REST Firestore autenticato con l'ID token utente.
 
 const auth = require('../../auth/google-auth');
+const { soloFilo } = require('./origine');
 // SN_FEEDBACK_THREAD: ci serve splitNotes() per estrarre la spiegazione non
 // tecnica dalle note del feedback risolto (C5). Idempotente se già caricato.
 require('../../../shared/feedbackThread.js');
@@ -242,13 +243,19 @@ module.exports = function register(on, ctx) {
   });
 
   // ── Comandi proprietario (#210): /users e /gift ─────────────────────────────
-  on(MSG.OWNER_LIST_USERS, async () => {
+  //
+  // #583 — «sei il proprietario?» da solo non basta: sul suo computer la
+  // risposta è sempre sì, ed è l'unico dove c'è qualcosa da prendere. Questi
+  // due comandi si scrivono nella chat della dashboard, che è una pagina di
+  // Filo; un sito visitato non deve poter chiedere l'elenco di chi usa Filo né
+  // regalare crediti a un indirizzo che sceglie lui.
+  on(MSG.OWNER_LIST_USERS, soloFilo(async () => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     try { return { ok: true, users: await adminListUsers() }; }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  });
+  }));
 
-  on(MSG.OWNER_GIFT_CREDITS, async (msg) => {
+  on(MSG.OWNER_GIFT_CREDITS, soloFilo(async (msg) => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     const amount = Math.round(Number(msg?.amount));
     const email = String(msg?.email || '').trim().toLowerCase();
@@ -262,7 +269,7 @@ module.exports = function register(on, ctx) {
       const r = await adminGift(email, amount);
       return { ok: true, email, amount, balance: r.balance };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  });
+  }));
 
   // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
@@ -274,13 +281,6 @@ module.exports = function register(on, ctx) {
   });
 
   // ── Ricompensa alla risoluzione di un feedback (C5) ─────────────────────────
-  // base(clientId): toglie il prefisso "owner:" applicato agli invii dell'admin,
-  // così l'install riconosce come "suoi" sia i feedback inviati da sloggato sia
-  // quelli marcati owner quando era loggato (stesso clientId di base).
-  function baseClientId(c) {
-    const s = String(c || '');
-    return s.startsWith('owner:') ? s.slice(6) : s;
-  }
 
   // Cosa legge chi ha mandato il feedback, quando gli viene detto che è risolto.
   // La scelta (la frase in chiaro sì, il report cifrato mai) sta nella logica
@@ -303,11 +303,46 @@ module.exports = function register(on, ctx) {
       // quello vero anche dopo un cambio dispositivo) prima di premiare.
       await ensureAccountSync().catch(() => {});
       const id = await globalThis.SN_STORAGE?.getRaw?.('sn_feedback_client_id', null);
-      if (!id || !FB?.list) return empty;
+      if (!id || !(FB?.listAllPublic || FB?.listPublic)) return empty;
 
-      let all;
-      try { all = await FB.list({ pageSize: 200 }); }
-      catch (e) { console.warn('[credits] lista feedback non disponibile:', e?.message || e); return empty; }
+      // #583: si leggono le SCHEDE pubbliche, non i feedback. La collezione
+      // vera non si apre senza credenziali (e questa macchina non ne ha: il
+      // popup gira da chiunque abbia Filo). Nella scheda c'è tutto quello che
+      // serve qui — l'impronta per riconoscere i propri, il titolo, il numero,
+      // la frase per chi ha segnalato e la cifra che gli spetta — e niente dei
+      // feedback altrui.
+      //
+      // TUTTE le schede, non una pagina. La pagina era dei 200 più recenti PER
+      // DATA D'INVIO: una segnalazione vecchia chiusa oggi ha una data d'invio
+      // vecchia, quindi la sua scheda nasceva già fuori e chi l'aveva mandata
+      // non riceveva né l'annuncio né i crediti — mentre il suo fix compariva
+      // in bacheca sotto i suoi occhi. Chiedere una finestra sull'asse
+      // sbagliato è la stessa causa che la verifica del #583 ha visto rientrare
+      // da tre porte.
+      let lette;
+      try {
+        lette = FB.listAllPublic
+          ? await FB.listAllPublic({ timeoutMs: 15000 })
+          : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 15000 });
+      }
+      catch (e) { console.warn('[credits] schede dei feedback non disponibili:', e?.message || e); return empty; }
+
+      // Dal più recente, come le vedeva chi chiedeva una pagina ordinata per
+      // data d'invio. La lettura completa arriva nell'ordine interno del
+      // database, che è l'ordine degli identificativi, cioè casuale: senza
+      // questa riga chi si vede risolvere due segnalazioni insieme le trova
+      // annunciate a caso. Si ordina una COPIA: quelle righe arrivano dalla
+      // memoria breve delle schede ed è la stessa lista che legge anche chi
+      // gestisce i feedback.
+      const all = (Array.isArray(lette) ? lette.slice() : []).sort((a, b) => {
+        const ta = Date.parse(a?.createdAt || '');
+        const tb = Date.parse(b?.createdAt || '');
+        const va = Number.isFinite(ta);
+        const vb = Number.isFinite(tb);
+        if (va && vb && ta !== tb) return tb - ta;
+        if (va !== vb) return va ? -1 : 1;
+        return String(b?._id || '').localeCompare(String(a?._id || ''));
+      });
 
       // S1.F2.2: pre-calcola l'hash del clientId locale UNA VOLTA per tutti i confronti.
       // Stesso algoritmo di feedbackClientIdHash.js (SHA-256 troncato 32 hex).
@@ -331,20 +366,32 @@ module.exports = function register(on, ctx) {
           ? FBS.isResolvedForUser(f)
           : f.statusPublic === 'closed';
         if (!f || !isResolved) continue;
-        // S1.F2.2: match via clientIdHash (in chiaro, disponibile anche se clientId è cifrato).
-        // RETROCOMPAT: se il feedback non ha clientIdHash (storico), ricadi sul confronto raw.
-        const matched = (() => {
-          if (f.clientIdHash && localIdHash) {
-            return f.clientIdHash === localIdHash;
-          }
-          // Fallback per feedback storici senza clientIdHash: confronto raw clientId.
-          return baseClientId(f.clientId) === id;
+        // #583: l'impronta sulla scheda è di QUELLA scheda, non
+        // dell'installazione, così chi legge la bacheca non può raggruppare i
+        // fix per segnalatore. Qui la si ricalcola scheda per scheda: sappiamo
+        // l'id e sappiamo l'impronta del nostro clientId, che è tutto quello
+        // che serve. I feedback anteriori a giugno 2026 non hanno nemmeno
+        // quella, e non producono più una ricompensa.
+        const matched = await (async () => {
+          if (!f.clientIdTag || !localIdHash) return false;
+          try {
+            const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
+            if (!H || !H.cardTag) return false;
+            return f.clientIdTag === await H.cardTag(f._id, localIdHash);
+          } catch (_) { return false; }
         })();
         if (!matched) continue; // solo i feedback DI questo install
         const fid = f._id;
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
-        const priority = Math.max(0, Math.min(3, Math.round(Number(f.priority) || 0)));
-        const credits = Credits.rewardForPriority(priority);
+        // #583 — quanto vale la segnalazione lo dice la SCHEDA (`reward`), non
+        // il feedback: la priorità è un giudizio interno e sulla scheda non
+        // c'è. Letta dal feedback, qui sarebbe sempre assente e ogni
+        // ricompensa scenderebbe in silenzio alla fascia più bassa. Le schede
+        // pubblicate prima che il campo esistesse non ce l'hanno: per quelle
+        // resta la fascia minima, che è quello che davano comunque.
+        const credits = Number.isFinite(Number(f.reward)) && Number(f.reward) > 0
+          ? Math.round(Number(f.reward))
+          : Credits.rewardForPriority(0);
         // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
         // così alla prossima apertura non ricompare.
         await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
@@ -354,7 +401,6 @@ module.exports = function register(on, ctx) {
           name: String(f.name || '').slice(0, 200),
           explanation: resolutionExplanation(f),
           credits,
-          priority,
         });
       }
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
