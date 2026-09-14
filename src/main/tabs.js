@@ -2235,9 +2235,19 @@ class TabManager {
   //     di login concatenato (es. scelta account → verifica) resta una vera
   //     finestra (ricorsivamente hardened), tutto il resto torna dentro Filo
   //     come scheda normale — mai finestre libere non gestite.
-  _hardenAuthPopup(win) {
+  _hardenAuthPopup(win, tabOpener) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    // #586 — questa finestra non è una scheda e non ha la cornice di Filo: la
+    // domanda di un permesso chiesto qui dentro non aveva nessuno a cui
+    // comparire, restava appesa due minuti e finiva negata da sola, quindi lì
+    // la fotocamera si poteva solo negare e mai consentire (#586, giro 9).
+    // Segniamo da dove viene: la domanda va alla cornice che l'ha aperta, sulla
+    // scheda che l'ha aperta.
+    try {
+      win._filoShellWin = this.win || null;
+      win._filoShellTabId = tabOpener ? tabOpener.id : null;
+    } catch (_) {}
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
