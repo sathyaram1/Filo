@@ -202,11 +202,29 @@ function configureFromSettings(settings) {
 // Dove vive una WebContents: la finestra che la possiede e la scheda, se è una
 // scheda. Serve a sapere a chi mandare la pastiglia, se siamo in incognito, e
 // se l'ultimo tasto era Esc (#514).
+// Una finestra è una CORNICE di Filo se ha la fila delle schede: è lì che
+// vivono la pastiglia della domanda, il riquadro della condivisione e i
+// cartelli. Le finestre di servizio e quelle di accesso («Continua con
+// Google», che Filo apre come finestra vera perché l'OAuth ha bisogno del
+// legame con la pagina che l'ha aperta) non ce l'hanno: lì `webContents` è la
+// pagina del sito, e mandarle una domanda voleva dire mandarla nel vuoto e
+// aspettare due minuti prima di negare (#586, giro 9). Quelle finestre portano
+// scritto da quale cornice vengono, e la domanda va lì.
+function cornice(win) {
+  if (!win || win.isDestroyed()) return { win: null, tab: null };
+  if (win._filoTabs) return { win, tab: null };
+  const madre = win._filoShellWin;
+  if (!madre || madre.isDestroyed() || !madre._filoTabs) return { win: null, tab: null };
+  const tm = madre._filoTabs;
+  const t = Array.isArray(tm.tabs) ? tm.tabs.find((x) => x && x.id === win._filoShellTabId) : null;
+  return { win: madre, tab: t || null };
+}
+
 function posizione(wc) {
   try {
     for (const w of BrowserWindow.getAllWindows()) {
       if (w.isDestroyed()) continue;
-      if (w.webContents === wc) return { win: w, tab: null };
+      if (w.webContents === wc) return cornice(w);
       const tm = w._filoTabs;
       if (!tm || !Array.isArray(tm.tabs)) continue;
       const t = tm.tabs.find((x) => {
