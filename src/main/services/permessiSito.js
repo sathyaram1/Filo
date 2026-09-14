@@ -906,12 +906,10 @@ function interrompiUso(id, solo) {
   // fotocamera): il cartello deve restare, con la frase di quello che gli
   // rimane.
   if (restano.length) iniziaUso(wc, r.origine, restano, { tipo: r.tipo });
-  chiediAllaPaginaDiFermare(wc, chiavi).then((vive) => {
-    if (!vive) return;
-    try { if (wc && !wc.isDestroyed()) wc.reload(); } catch (_) {}
-  }).catch(() => {
-    try { if (wc && !wc.isDestroyed()) wc.reload(); } catch (_) {}
-  });
+  const dura = () => { try { if (wc && !wc.isDestroyed()) wc.reload(); } catch (_) {} };
+  chiediAllaPaginaDiFermare(wc, chiavi).then((esito) => {
+    if (restaVivo(esito)) dura();
+  }).catch(dura);
   return { ok: true };
 }
 
