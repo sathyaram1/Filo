@@ -815,7 +815,8 @@
   // possono averla identica).
   async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = null } = {}) {
     if (typeof afterName === 'string') {
-      return listByNameDirect(VIEW_COLLECTION, { pageSize, timeoutMs, afterName });
+      const { rows } = await listByNameDirect(VIEW_COLLECTION, { pageSize, timeoutMs, afterName });
+      return rows;
     }
     return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs });
   }
