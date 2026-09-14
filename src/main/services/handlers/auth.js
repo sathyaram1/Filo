@@ -5,12 +5,8 @@ const path = require('node:path');
 const auth = require('../../auth/google-auth');
 const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
-<<<<<<< HEAD
-const { permissionDeniedHelp } = require('../feedbackError');
-const { daFilo, soloFilo } = require('./origine');
-=======
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
->>>>>>> a59b09cdd (feedback #582: regole degli allegati dei feedback (lavoro squashato per il riallineamento))
+const { daFilo, soloFilo } = require('./origine');
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
 // stessa region/progetto del deploy. Override per i test via env.
