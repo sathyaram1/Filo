@@ -389,8 +389,8 @@ module.exports = function register(on, ctx) {
   // cifrate come byte opachi su Storage (octet-stream): un <img src=URL> diretto
   // mostra un allegato rotto. Qui il main le scarica, le decifra con la chiave
   // privata (che NON esce mai dal main), ne indovina il MIME e torna un data URL
-  // mostrabile. Owner-only. Retrocompat: immagini NON cifrate (storiche) passano
-  // invariate (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
+  // mostrabile. Retrocompat: immagini NON cifrate (storiche) passano invariate
+  // (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
   // PROVENIENZA sì, `ownerOnly` no, e la differenza è voluta. Il confine
   // d'origine (#583) vale anche qui: da un sito visitato questa porta risponde
   // «rifiutato per provenienza», come ogni altra del corridoio. Quello che NON
