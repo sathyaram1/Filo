@@ -2188,7 +2188,7 @@ class TabManager {
     // hook resterebbe senza le difese che ogni scheda ha. Qui arrivano SOLO i
     // popup di login (ogni altro percorso del handler qui sopra ritorna 'deny').
     wc.on('did-create-window', (child) => {
-      this._hardenAuthPopup(child);
+      this._hardenAuthPopup(child, tab);
     });
   }
 
