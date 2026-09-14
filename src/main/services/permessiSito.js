@@ -446,7 +446,7 @@ function diciCheHoSmesso(wc, origine, chiavi) {
     shell.send('permissions:notice', {
       id,
       tabId: tab ? tab.id : null,
-      testo: `Ho smesso di chiedere per ${Pp.host(origine)}: le ultime domande le hai chiuse senza rispondere.`,
+      testo: `Ho smesso di chiedere per ${Pp.host(origine)}: alle ultime domande hai detto di no o le hai chiuse.`,
       azione: { testo: 'Chiedimelo di nuovo', tip: 'Le prossime richieste di questo sito tornano a comparire' },
     });
   } catch (_) {}
