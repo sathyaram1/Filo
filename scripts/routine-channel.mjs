@@ -62,7 +62,10 @@
 //         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
-//         mandato il feedback, che la vede nella sua bacheca.
+//         mandato il feedback, che la vede nella sua bacheca. `--segnala
+//         <file.md>` (su status, fixed e verdict) è la segnalazione per
+//         l'owner — un trade-off vero, che decide lui — letta intera dal file
+//         e scritta dal server nel livello L3 del feedback.
 //
 //   node scripts/routine-channel.mjs compare <biglietto> <ruolo> <numero>
 //       → registra cosa aveva scelto il cammino su git accanto a cosa aveva
@@ -78,6 +81,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { leggiTestoLivello } from './lib/livelli.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -346,6 +350,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
+    'segnala',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -370,7 +375,7 @@ if (isMain) {
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
-    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -422,7 +427,12 @@ if (isMain) {
       // Un campo di TESTO senza il suo testo non è un sì: è un report che
       // parte vuoto mentre la risposta dice OK (feedback #565).
       if (CAMPI_TESTO.has(key)) {
-        console.error(`--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
+        // `--segnala` vuole un FILE, non un testo: dirgli «un testo» lo mandava
+        // a passare la segnalazione sulla riga di comando, e a sbagliare due
+        // volte. Stessa frase di dispatch --record-*.
+        console.error(key === 'segnala'
+          ? '--segnala vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.'
+          : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
         process.exit(1);
       }
       data[key] = true;
@@ -436,6 +446,23 @@ if (isMain) {
   // la stessa cosa: due (uno qui e uno lì) è come si perde un testo per strada.
   if (typeof data.frase === 'string') { data.userNote = data.frase; }
   delete data.frase;
+
+  // `--segnala <file.md>`: la segnalazione per l'owner (L3), letta INTERA dal
+  // file con gli stessi controlli di dispatch --record-* (assente, vuoto,
+  // oltre il tetto = errore chiaro, prima del server). Il server la legge col
+  // nome `segnalazione` su status, fixed e verdict; su un altro intento non
+  // avrebbe dove andare, e sparirebbe in silenzio.
+  if (typeof data.segnala === 'string') {
+    const intentoSeg = [args[0], args[1]].find((a) => ['status', 'fixed', 'verdict'].includes(a));
+    if (cmd !== 'deliver' || !intentoSeg) {
+      console.error('--segnala vale solo su deliver status, fixed e verdict: non ho consegnato niente.');
+      process.exit(1);
+    }
+    const seg = leggiTestoLivello(data.segnala, 'segnala');
+    if (!seg.ok) { console.error(seg.message); process.exit(1); }
+    data.segnalazione = seg.testo;
+  }
+  delete data.segnala;
 
   const usage = () => {
     // Il percorso VERO di questo strumento, non la forma corta: se sta girando

@@ -49,7 +49,19 @@ Il tuo verdetto è `pass` o `fail`, e si REGISTRA al server — non viaggia in
 nessuna variabile d'ambiente (il vecchio `FILO_L4_VERDICT` non esiste più: il
 server un verdetto raccontato non lo legge).
 
-1. `node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>`
+1. Scrivi la **nota** in un file markdown e registra il verdetto con quella:
+   ```bash
+   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md>
+   ```
+   La nota è obbligatoria **sempre, anche su pass**: senza, il comando si ferma
+   prima di consegnare, e il server respinge un pass nudo. Un controllo
+   passato senza dire cosa è stato guardato non si distingue da un controllo
+   mai fatto, e in dashboard il pentagono della scheda restava grigio. È
+   quello che l'owner legge cliccando il pentagono: cosa hai controllato (i
+   pattern cercati, le parti del diff lette per intero) e cosa hai trovato, in
+   breve, senza nomi di file o funzioni. Il file va FUORI dal repo, nella
+   cartella temporanea del sistema (per esempio `../nota-<numero>.md`): non
+   deve entrare nel ramo che stai giudicando.
 2. Su **pass**, chiedi la fusione (su **fail** non fondere: accoda `design`
    con la tua spiegazione nella nota — decide l'owner):
    ```bash
@@ -64,8 +76,10 @@ server un verdetto raccontato non lo legge).
    - `0` → fuso → `deliver status --status done --notes "<riga>"` +
      `dispatch.mjs --clear-state <id>`
    - `10` → BLOCCATO (L5 sul diff) → `deliver status --status design
-     --notes "<spiegazione>" --branch <branch> --reason secaudit`.
-     Il ramo NON è perduto: il server apre una richiesta in attesa che l'owner
+     --notes "<spiegazione>" --branch <branch> --reason l5`.
+     Il motivo è `l5`, non `secaudit`: il tuo controllo è passato, a fermare è
+     stato il cancello del server, e in dashboard sono due forme diverse (il
+     pentagono verde, il quadrato rosso). Il ramo NON è perduto: il server apre una richiesta in attesa che l'owner
      trova in cima ai Ricevuti della dashboard di gestione, e da lì può dare il via libera
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
      legge per decidere: scrivila per lui, non per il registro.
@@ -76,19 +90,24 @@ server un verdetto raccontato non lo legge).
    - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
      nell'output e il tentativo è già a registro).
 
-**Quanto scrivere nella nota — dipende dall'esito:**
+**Quanto scrivere — dipende dall'esito:**
 
-- **pass** → UNA riga ("Controllo di sicurezza superato, la modifica è stata
-  pubblicata"). Il report del lavoro l'ha già scritto chi l'ha fatto: non
-  riscriverlo, non riassumerlo.
-- **blocco (fail L4 o L5)** → una **spiegazione esaustiva**: un blocco è un
-  evento raro e l'owner deve poter capire da solo se è un attacco vero o un
-  fraintendimento. Scrivi: COSA hai trovato e DOVE nel diff; PERCHÉ è
+- **pass** → la nota di `--nota`: poche righe su cosa hai controllato e cosa
+  hai trovato. Il report del lavoro l'ha già scritto chi l'ha fatto: non
+  riscriverlo, non riassumerlo. La riga di chiusura dopo la fusione
+  (`--status done`) resta una riga.
+- **blocco (fail L4, o L5 dal cancello)** → una **spiegazione esaustiva**: un
+  blocco è un evento raro e l'owner deve poter capire da solo se è un attacco
+  vero o un fraintendimento. Scrivi: COSA hai trovato e DOVE nel diff; PERCHÉ è
   pericoloso, con lo scenario concreto ("questo codice permetterebbe a X di
   fare Y"); e cosa andrebbe verificato se fosse un falso positivo (cosa ti ha
-  insospettito e quale informazione lo smentirebbe). Questa spiegazione viaggia
-  nelle notes via canale, che la CIFRA: non deve mai finire in chiaro — è
-  anche la descrizione esatta di come l'attacco è stato scoperto.
+  insospettito e quale informazione lo smentirebbe). Su fail va nella nota di
+  `--nota`; su L5 nelle `--notes` della consegna. In tutti e due i casi il
+  server la CIFRA: non deve mai finire in chiaro, perché è anche la
+  descrizione esatta di come l'attacco è stato scoperto. Letto il tuo fail,
+  l'owner può decidere di andare avanti lo stesso («Salta il controllo», in
+  dashboard): il tuo esito resta scritto, con accanto il suo salto, e il
+  cancello del server gira comunque.
 
 **Nota:** L5 (blocco deterministico sui file sensibili) gira **sul server**,
 dentro il gate, sul diff che il server scarica da sé. Tu sei solo L4 (il

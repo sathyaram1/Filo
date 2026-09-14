@@ -104,6 +104,42 @@ relativo alla radice del repo, con le barre normali, viene riconosciuto).
 
 Quello che trovi lo correggi adesso, non lo lasci al verificatore.
 
+## Un trade-off vero non lo decidi tu: lo segnali
+
+CLAUDE.md § Iniziativa: le invarianti ovvie e i miglioramenti senza costo si
+fanno; un trade-off vero (velocità contro costo, semplicità contro potenza,
+dati dell'utente, una scelta di gusto) o una domanda di design la decide
+l'owner. Fin qui la segnalazione finiva in fondo al report, e l'owner la
+trovava solo rileggendo la chat. Adesso ha un posto suo: il rombo nella fila
+delle forme della scheda, in dashboard. Ci arriva così: scrivi un file
+markdown e passalo alla consegna con `--segnala <file.md>`: vale sul primo
+passaggio (`deliver status`), sulla correzione (`--record-fixed`) e sulla
+critica di chi verifica (`--record-verifier`).
+
+Il testo lo legge chi non sa niente di codice, cliccando il rombo: breve,
+niente nomi di file o funzioni. Tre parti, con questi titoli:
+
+```markdown
+## Problema
+Due o tre righe: cosa hai incontrato e perché non spetta a te deciderlo.
+
+## Scelte
+- **A.** Cosa succede, e cosa costa (il trade-off di questa scelta).
+- **B.** Idem.
+
+## Cosa ho fatto nel frattempo
+La strada che hai preso per consegnare, e cosa cambia se l'owner sceglie l'altra.
+```
+
+Il file va scritto FUORI dal repo, nella cartella temporanea del sistema (per
+esempio `../segnala-<numero>.md`, sopra la radice del repo): la consegna rifiuta
+una directory con file non committati, e quel file non deve entrare nel ramo.
+
+Una segnalazione per consegna: se ne hai due, stanno nello stesso file. Se
+segnali di nuovo in un giro dopo, il rombo mostra l'ultima; la storia resta in
+chat. Il tetto è largo (12.000 caratteri) e un file più lungo viene rifiutato
+col numero, non tagliato.
+
 ## Consegna
 
 I TRE testi (report, frase, changelog) sono definiti in CLAUDE.md § Consegna.
@@ -115,10 +151,12 @@ Sei tu a scriverli.
   node scripts/routine-channel.mjs deliver status --status revision_capability \
     --notes "[il tuo report]" --frase "[la frase]" --branch <il-tuo-branch>
   ```
+  Con un trade-off da segnalare aggiungi `--segnala <file.md>`: vale su
+  tutte e tre le consegne (questa, la correzione, la critica di chi verifica).
 - **Correzione** → rimetti il branch in coda di verifica col report della
   correzione (senza, la correzione è invisibile all'owner):
   ```bash
-  node scripts/dispatch.mjs --record-fixed <id> "[report della correzione]"
+  node scripts/dispatch.mjs --record-fixed <id> "[report della correzione]" [--segnala <file.md>]
   ```
   La frase e la riga di changelog del primo passaggio restano valide: cambiale
   SOLO se hai cambiato qualcosa di visibile (la riga di changelog la vedi nel

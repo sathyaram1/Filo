@@ -148,7 +148,8 @@ test('#509/3b — negli Archiviati non esiste un\'azione che cancelli la conferm
   await mg.evaluate(() => window.__mgTest.openDetail('z2'));
   await mg.waitForTimeout(150);
   // Il pannello dice CHE COS'È, e offre una cosa sola: togliere dall'archivio.
-  await expect(mg.locator('#mgDetailState')).toContainText('Attacco confermato');
+  await mg.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(mg.locator('#mgSideBody')).toContainText('Attacco confermato');
   const azioni = await mg.locator('#mgActionsRow button')
     .evaluateAll((n) => n.map((b) => b.textContent.trim()));
   expect(azioni).toEqual(['↩ Ripristina']);

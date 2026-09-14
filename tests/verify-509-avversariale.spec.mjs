@@ -354,8 +354,8 @@ test('#509 — stato illeggibile: le due pagine devono dire la stessa cosa', asy
   const testa = (await mg.locator('#mgListHead').innerText()).trim();
   expect(testa, 'intestazione della colonna').not.toMatch(/Ricevuti|In coda|Risolti|Archiviati/);
   await mg.locator('.mg-item', { hasText: 'due' }).first().click();
-  await expect(mg.locator('#mgJudgesRow')).toContainText('Chiusa');
-  await expect(mg.locator('#mgJudgesRow')).not.toContainText('In attesa del giudizio');
+  await expect(mg.locator('#mgLivelliRow')).toContainText('Chiusa');
+  await expect(mg.locator('#mgLivelliRow')).not.toContainText('In attesa del giudizio');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

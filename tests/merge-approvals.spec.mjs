@@ -4,25 +4,28 @@
 //   I controlli deterministici del server fermano le fusioni che toccano le
 //   aree protette. Il lavoro locale dell'owner ci cade dentro quasi sempre, e
 //   senza una superficie dove approvarlo non avrebbe nessuna strada verso il
-//   ramo principale. Quella superficie è UNA (scelta owner 2026-08-26): la
-//   dashboard di gestione, in cima ai Ricevuti — dove stanno le altre cose che
-//   aspettano una decisione dell'owner. E deve rispettare queste cose:
+//   ramo principale.
 //
-//     1. l'owner con una richiesta in attesa la trova IN CIMA AI RICEVUTI,
-//        senza cercarla — e ANCHE SE la pagina era già aperta: prima l'elenco
-//        si leggeva solo all'apertura, quindi l'avviso di cui parla il
-//        terminale non compariva mai sotto gli occhi di chi lo aspettava;
-//     2. l'owner SENZA richieste non vede niente, e sulle ALTRE schede
-//        l'avviso non compare (i Ricevuti sono il posto delle decisioni,
-//        le altre schede no);
-//     3. un utente qualunque non la vede MAI, e il main gli risponde di no
+//   Dal contratto del 13/09/2026 quella superficie è la SEGNALAZIONE: una
+//   fusione ferma è un feedback col quadrato rosso, e i tasti stanno nel
+//   pannello di quel quadrato (vedi tests/livelli-forme.spec.mjs). Questo file
+//   copre l'altra metà — le richieste che una segnalazione non ce l'hanno (un
+//   ramo locale chiuso con `npm run finish`, senza numero): vivono in
+//   Automazioni, con gli stessi tasti, e deve restare vero che:
+//
+//     1. l'owner le trova lì, con ramo, commit, chi ha chiesto e i motivi del
+//        blocco — ANCHE SE la pagina era già aperta: prima l'elenco si leggeva
+//        solo all'apertura, quindi l'avviso di cui parla il terminale non
+//        compariva mai sotto gli occhi di chi lo aspettava;
+//     2. sulle schede-lista non compaiono: lì non hanno più niente da fare, e
+//        rubavano altezza alle tre aree (#498);
+//     3. un utente qualunque non le vede MAI, e il main gli risponde di no
 //        anche se prova a chiamare il comando a mano; una scheda su un sito
 //        qualunque non riceve nemmeno l'avviso di aggiornamento (dice su cosa
 //        sta lavorando l'owner);
-//     4. la prima schermata del browser NON la mostra più: la home di tutti i
+//     4. la prima schermata del browser NON le mostra: la home di tutti i
 //        giorni non è il posto delle pratiche dell'owner;
-//     5. la scheda dice CHI ha chiesto la fusione e — per il lavoro delle
-//        automazioni — DA QUALE segnalazione nasce, con un click per aprirla.
+//     5. la scheda dice CHI ha chiesto la fusione.
 //
 //   In più: approvare non parte al primo click (è irreversibile), e "Scarta"
 //   toglie la richiesta senza fondere niente.
@@ -110,14 +113,21 @@ async function stubApprovals(page, { admin = true, pending = [], failed = [], re
   }, { admin, pending, failed, recent, approveReply });
 }
 
-/** Gestione, sulla scheda di partenza: i Ricevuti. */
+/**
+ * Gestione → Automazioni, dove vivono le fusioni ferme che NON nascono da una
+ * segnalazione (un ramo locale, senza numero: sono queste le richieste finte
+ * di questo file). Quelle che nascono da una segnalazione si approvano dal
+ * quadrato della sua scheda — `tests/livelli-forme.spec.mjs`.
+ */
 async function apriGestione(page, opts) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
   await stubApprovals(page, opts);
   await page.evaluate((admin) => window.__mgTest.setAdmin(admin), opts?.admin !== false);
+  await page.evaluate(() => window.__mgTest.setData([]));
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.locator('.mg-tab[data-tab="automation"]').click();
 }
 
 /** Gestione → Automazioni: dove vive la traccia delle decisioni passate. */
@@ -126,15 +136,13 @@ async function apriAutomazioni(page, opts) {
   await page.locator('.mg-tab[data-tab="automation"]').click();
 }
 
-// ── 1. L'owner la trova in cima ai Ricevuti ─────────────────────────────────
+// ── 1. Una fusione senza segnalazione l'owner la trova in Automazioni ───────
 
-test('Ricevuti: con una fusione in attesa l’avviso c’è, e dice ramo, commit e perché', async ({ openTab }) => {
+test('Automazioni: una fusione ferma senza segnalazione c’è, e dice ramo, commit e perché', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apriGestione(page, { pending: [richiesta()] });
 
-  // Si vede restando sulla scheda di partenza, senza andare a cercarlo.
-  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveClass(/mg-tab--active/);
-  const avviso = page.locator('#mgMergeApprovals .sn-mac');
+  const avviso = page.locator('#mgMergeApprovalsOrphans .sn-mac');
   await expect(avviso).toBeVisible({ timeout: 8_000 });
   await expect(avviso).toContainText('Una fusione aspetta il tuo via libera');
   await expect(avviso).toContainText('claude/approvazione-fusioni');
@@ -147,12 +155,9 @@ test('Ricevuti: con una fusione in attesa l’avviso c’è, e dice ramo, commit
   // giorno, quindi si legge in ore.
   await expect(avviso.locator('.sn-mac-expiry')).toContainText(/scade fra \d+ ore/);
 
-  // IN CIMA: sotto la barra delle schede, sopra la lista dei feedback.
-  const suo = await avviso.boundingBox();
-  const schede = await page.locator('#mgTabs').boundingBox();
-  const lista = await page.locator('#mgReviewGrid').boundingBox();
-  expect(suo.y).toBeGreaterThanOrEqual(schede.y + schede.height - 1);
-  expect(suo.y + suo.height).toBeLessThanOrEqual(lista.y + 1);
+  // Nei Ricevuti non c'è più niente del genere: le tre aree non hanno più
+  // niente sopra che le schiacci.
+  await expect(page.locator('#panel-list .sn-mac')).toHaveCount(0);
 });
 
 // ── 1bis. Un sì già dato che non ha prodotto niente resta in vista ──────────
@@ -161,7 +166,7 @@ test('Ricevuti: con una fusione in attesa l’avviso c’è, e dice ramo, commit
 // sparita fra le decisioni passate — l'owner si è ritrovato con "niente da
 // accettare" e un ramo mai fuso, senza nessun segno visibile.
 
-test('una fusione approvata ma non avvenuta resta nei Ricevuti, con la spiegazione', async ({ openTab }) => {
+test('una fusione approvata ma non avvenuta resta in vista, con la spiegazione', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const conflitto = richiesta({
     id: 'ff12cd34ef56ab12cd34ef56',
@@ -173,7 +178,7 @@ test('una fusione approvata ma non avvenuta resta nei Ricevuti, con la spiegazio
   // Anche SENZA nessuna richiesta in attesa: il conflitto basta da solo.
   await apriGestione(page, { pending: [], failed: [conflitto] });
 
-  const avviso = page.locator('#mgMergeApprovals .sn-mac-failed');
+  const avviso = page.locator('#mgMergeApprovalsOrphans .sn-mac-failed');
   await expect(avviso).toBeVisible({ timeout: 8_000 });
   await expect(avviso).toContainText('Una fusione approvata non è avvenuta');
   await expect(avviso).toContainText('worker/lavoro-in-conflitto');
@@ -187,8 +192,8 @@ test('"Segna come sistemata" arriva al main e la scheda sparisce', async ({ open
   const conflitto = richiesta({ id: 'ff12cd34ef56ab12cd34ef56', used: true, outcome: 'conflict' });
   await apriGestione(page, { pending: [], failed: [conflitto] });
 
-  await page.locator('#mgMergeApprovals .sn-mac-card-failed button', { hasText: 'Segna come sistemata' }).click();
-  await expect(page.locator('#mgMergeApprovals .sn-mac-failed')).toHaveCount(0, { timeout: 8_000 });
+  await page.locator('#mgMergeApprovalsOrphans .sn-mac-card-failed button', { hasText: 'Segna come sistemata' }).click();
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-failed')).toHaveCount(0, { timeout: 8_000 });
   const calls = await page.evaluate(() => window.__macCalls);
   expect(calls).toEqual([{ op: 'discard', id: 'ff12cd34ef56ab12cd34ef56' }]);
 });
@@ -198,8 +203,8 @@ test('due richieste = due schede, e il titolo lo dice', async ({ openTab }) => {
   await apriGestione(page, {
     pending: [richiesta(), richiesta({ id: 'ff'.repeat(12), branch: 'claude/altro' })],
   });
-  await expect(page.locator('#mgMergeApprovals .sn-mac-card')).toHaveCount(2);
-  await expect(page.locator('#mgMergeApprovals .sn-mac')).toContainText('2 fusioni aspettano');
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveCount(2);
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toContainText('2 fusioni aspettano');
 });
 
 test('la scheda dice CHI ha chiesto la fusione', async ({ openTab }) => {
@@ -208,7 +213,7 @@ test('la scheda dice CHI ha chiesto la fusione', async ({ openTab }) => {
   // senso.
   const page = await openTab(MANAGE);
   await apriGestione(page, { pending: [richiesta({ who: 'sathya@esempio.it' })] });
-  const chi = page.locator('#mgMergeApprovals .sn-mac-who');
+  const chi = page.locator('#mgMergeApprovalsOrphans .sn-mac-who');
   await expect(chi).toBeVisible({ timeout: 8_000 });
   await expect(chi).toHaveText('chiesta da sathya@esempio.it');
 });
@@ -218,10 +223,10 @@ test('una richiesta senza email non stampa un identificativo tecnico', async ({ 
   // significa, non la si mostra.
   const page = await openTab(MANAGE);
   await apriGestione(page, { pending: [richiesta({ who: 'K3nD9xQw1aZ7mB2pL0rT' })] });
-  const chi = page.locator('#mgMergeApprovals .sn-mac-who');
+  const chi = page.locator('#mgMergeApprovalsOrphans .sn-mac-who');
   await expect(chi).toBeVisible({ timeout: 8_000 });
   await expect(chi).toContainText(/senza email/i);
-  await expect(page.locator('#mgMergeApprovals .sn-mac')).not.toContainText('K3nD9xQw1aZ7mB2pL0rT');
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).not.toContainText('K3nD9xQw1aZ7mB2pL0rT');
 });
 
 // ── 1 bis. Una pagina GIÀ APERTA se ne accorge ──────────────────────────────
@@ -234,13 +239,13 @@ test('la Gestione già aperta vede arrivare una richiesta nuova, senza riaprire 
   const page = await openTab(MANAGE);
   // La situazione vera: pagina aperta da un pezzo, niente in sospeso.
   await apriGestione(page, { pending: [] });
-  await expect(page.locator('#mgMergeApprovals')).toBeHidden();
+  await expect(page.locator('#mgMergeApprovalsOrphans')).toBeHidden();
 
   // …e adesso una fusione viene bloccata dai controlli. Nessuno tocca questa
   // pagina: è il main ad avvisarla.
   await avvisaDalMain(app, { pending: [richiesta()] });
 
-  const avviso = page.locator('#mgMergeApprovals .sn-mac');
+  const avviso = page.locator('#mgMergeApprovalsOrphans .sn-mac');
   await expect(avviso).toBeVisible({ timeout: 8_000 });
   await expect(avviso).toContainText('claude/approvazione-fusioni');
   await expect(avviso).toContainText('Tocca aree protette');
@@ -251,39 +256,34 @@ test('e sparisce da sola quando la richiesta non c’è più', async ({ app, ope
   // dopo che non c'è più niente da approvare fa cliccare a vuoto.
   const page = await openTab(MANAGE);
   await apriGestione(page, { pending: [richiesta()] });
-  await expect(page.locator('#mgMergeApprovals .sn-mac')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible({ timeout: 8_000 });
 
   await avvisaDalMain(app, { pending: [] });
-  await expect(page.locator('#mgMergeApprovals')).toBeHidden({ timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovalsOrphans')).toBeHidden({ timeout: 8_000 });
 });
 
-// ── 2. Solo i Ricevuti: le altre schede non lo mostrano ─────────────────────
+// ── 2. Vive in Automazioni, e nelle schede-lista non compare ────────────────
 
-test('l’avviso vive nei Ricevuti: cambiando scheda sparisce, tornando ricompare', async ({ openTab }) => {
+test('l’elenco vive in Automazioni: sulle schede-lista non c’è', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apriGestione(page, { pending: [richiesta()] });
-  await expect(page.locator('#mgMergeApprovals .sn-mac')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible({ timeout: 8_000 });
 
-  // "In coda" condivide lo stesso pannello dei Ricevuti: è il caso che il
-  // solo display del pannello non copre — senza la regola sulla scheda,
-  // l'avviso resterebbe lì.
-  await page.locator('.mg-tab[data-tab="queue"]').click();
-  await expect(page.locator('#mgMergeApprovals')).toBeHidden();
+  for (const scheda of ['inbox', 'queue', 'resolved', 'archived']) {
+    await page.locator(`.mg-tab[data-tab="${scheda}"]`).click();
+    await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).not.toBeVisible();
+    await expect(page.locator('#panel-list .sn-mac')).toHaveCount(0);
+  }
 
-  // Automazioni ha un pannello suo: l'avviso da decidere non c'è nemmeno lì
-  // (resta la traccia delle decisioni passate, che è un'altra cosa).
+  // Tornando in Automazioni è ancora lì, senza ricaricare niente.
   await page.locator('.mg-tab[data-tab="automation"]').click();
-  await expect(page.locator('#mgMergeApprovals .sn-mac')).not.toBeVisible();
-
-  // Tornando sui Ricevuti ricompare, senza dover ricaricare niente.
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
-  await expect(page.locator('#mgMergeApprovals .sn-mac')).toBeVisible();
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible();
 });
 
 test('senza richieste non compare niente', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apriGestione(page, { pending: [] });
-  await expect(page.locator('#mgMergeApprovals')).toBeHidden();
+  await expect(page.locator('#mgMergeApprovalsOrphans')).toBeHidden();
   await expect(page.locator('.sn-mac')).toHaveCount(0);
 });
 
@@ -307,7 +307,7 @@ test('un utente normale non vede l’avviso, nemmeno se il server avesse qualcos
   const page = await openTab(MANAGE);
   // `admin:false` → la lettura risponde "riservato", come fa il main vero.
   await apriGestione(page, { admin: false, pending: [richiesta()] });
-  await expect(page.locator('#mgMergeApprovals')).toBeHidden();
+  await expect(page.locator('#mgMergeApprovalsOrphans')).toBeHidden();
   await expect(page.locator('.sn-mac')).toHaveCount(0);
 });
 
@@ -384,7 +384,7 @@ test('approvare chiede conferma sul posto, e il gesto arriva al main', async ({ 
   const page = await openTab(MANAGE);
   await apriGestione(page, { pending: [richiesta()] });
 
-  const btn = page.locator('#mgMergeApprovals .sn-mac-btn-go');
+  const btn = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
   await expect(btn).toBeVisible({ timeout: 8_000 });
 
   // Irreversibile → il primo click NON manda niente: chiede conferma sul posto.
@@ -394,7 +394,7 @@ test('approvare chiede conferma sul posto, e il gesto arriva al main', async ({ 
 
   await btn.click();
   // L'esito che conta per l'owner: il codice è su main.
-  await expect(page.locator('#mgMergeApprovals .sn-mac-status')).toContainText(/su main/i, { timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-status')).toContainText(/su main/i, { timeout: 8_000 });
   const calls = await page.evaluate(() => window.__macCalls);
   expect(calls).toEqual([{ op: 'approve', id: 'ab12cd34ef56ab12cd34ef56' }]);
 });
@@ -403,7 +403,7 @@ test('scartare va dritto, e non fonde niente', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apriGestione(page, { pending: [richiesta()] });
 
-  await page.locator('#mgMergeApprovals .sn-mac-btn-quiet').click();
+  await page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-quiet').click();
   await expect.poll(() => page.evaluate(() => window.__macCalls), { timeout: 8_000 })
     .toEqual([{ op: 'discard', id: 'ab12cd34ef56ab12cd34ef56' }]);
   expect((await page.evaluate(() => window.__macCalls)).some((c) => c.op === 'approve')).toBe(false);
@@ -417,10 +417,10 @@ test('se il ramo è andato avanti l’avviso lo dice, e non finge di aver pubbli
     pending: [richiesta()],
     approveReply: { ok: true, result: 'stale', headSha: 'ff'.repeat(20) },
   });
-  const btn = page.locator('#mgMergeApprovals .sn-mac-btn-go');
+  const btn = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
   await btn.click();
   await btn.click();
-  const status = page.locator('#mgMergeApprovals .sn-mac-status');
+  const status = page.locator('#mgMergeApprovalsOrphans .sn-mac-status');
   await expect(status).toContainText(/andato avanti/i, { timeout: 8_000 });
   await expect(status).toContainText(/npm run finish/);
   await expect(status).not.toContainText(/su main/);
@@ -432,12 +432,12 @@ test('un guasto del server non diventa un “fatto”: si dice, e la richiesta r
     pending: [richiesta()],
     approveReply: { ok: false, error: 'callable ownerMergeApprovals 500: github_unreachable' },
   });
-  const btn = page.locator('#mgMergeApprovals .sn-mac-btn-go');
+  const btn = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
   await btn.click();
   await btn.click();
-  await expect(page.locator('#mgMergeApprovals .sn-mac-status')).toContainText(/non raggiungibile/i, { timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-status')).toContainText(/non raggiungibile/i, { timeout: 8_000 });
   // La richiesta è ancora lì: si può riprovare senza rifare i controlli.
-  await expect(page.locator('#mgMergeApprovals .sn-mac-card')).toHaveCount(1);
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveCount(1);
   await expect(btn).toBeEnabled();
 });
 
@@ -478,8 +478,8 @@ test('una fusione fermata a un’automazione si riconosce da quella locale', asy
     ],
   });
 
-  const automazione = page.locator('#mgMergeApprovals .sn-mac-card[data-origin="routine"]');
-  const locale = page.locator('#mgMergeApprovals .sn-mac-card[data-origin="locale"]');
+  const automazione = page.locator('#mgMergeApprovalsOrphans .sn-mac-card[data-origin="routine"]');
+  const locale = page.locator('#mgMergeApprovalsOrphans .sn-mac-card[data-origin="locale"]');
   await expect(automazione).toBeVisible({ timeout: 8_000 });
   await expect(locale).toBeVisible();
 
@@ -503,37 +503,47 @@ test('il numero della segnalazione si stampa con UN cancelletto, comunque arrivi
   await apriGestione(page, {
     pending: [richiesta({ origin: 'routine', num: '#444', who: 'secaudit · notturna' })],
   });
-  const origin = page.locator('#mgMergeApprovals .sn-mac-origin');
+  const origin = page.locator('#mgMergeApprovalsOrphans .sn-mac-origin');
   await expect(origin).toBeVisible({ timeout: 8_000 });
   await expect(origin).toContainText('feedback #444');
   await expect(origin).not.toContainText('##');
 });
 
-test('il numero della segnalazione è un click: apre il feedback da cui nasce il lavoro', async ({ openTab }) => {
+test('se la segnalazione c’è, la richiesta NON sta in Automazioni: sta sulla sua scheda', async ({ openTab }) => {
+  // È la regola nuova: una fusione ferma è una segnalazione col quadrato rosso.
+  // In Automazioni restano solo quelle che una segnalazione non ce l'hanno —
+  // un ramo locale chiuso con la pubblicazione, che un numero non ha.
   const page = await openTab(MANAGE);
   await apriGestione(page, {
     pending: [richiesta({ origin: 'routine', num: '#412', who: 'secaudit · notturna' })],
   });
-  // La segnalazione #412 esiste nella lista dei Ricevuti.
   await page.evaluate(() => window.__mgTest.setData([{
     _id: 'test-fb-412',
     text: 'Il menu della copertina perde metà delle voci.',
     name: 'Menu copertina',
     seq: 412,
     subSeq: 0,
+    status: 'design',
+    statusReason: 'l5',
     clientId: 'tester@example.com',
     createdAt: '2026-08-20T10:00:00Z',
     images: [],
   }]));
 
-  const origin = page.locator('#mgMergeApprovals button.sn-mac-origin-link');
-  await expect(origin).toBeVisible({ timeout: 8_000 });
-  await origin.click();
+  // Sparita da Automazioni…
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveCount(0);
 
-  // Il dettaglio del feedback #412 è aperto: "guarda cosa era stato chiesto"
-  // è un click, non una ricerca a mano.
-  await expect(page.locator('#mgDetail')).toBeVisible({ timeout: 8_000 });
-  await expect(page.locator('.mg-item--selected')).toContainText('#412');
+  // …e riconoscibile nella lista, dove aspetta una decisione.
+  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  const card = page.locator('.mg-item', { hasText: 'Menu copertina' });
+  await expect(card).toBeVisible({ timeout: 8_000 });
+  await expect(card.locator('.mg-fusione-badge')).toBeVisible();
+
+  // Il quadrato della scheda porta i tasti di sempre.
+  await card.click();
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+  await expect(page.locator('#mgSideBody .sn-mac-card')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#mgSideBody .sn-mac-btn-go')).toBeVisible();
 });
 
 test('una richiesta di un’automazione non manda l’owner a lanciare la pubblicazione locale', async ({ openTab }) => {
@@ -546,7 +556,7 @@ test('una richiesta di un’automazione non manda l’owner a lanciare la pubbli
     approveReply: { ok: true, result: 'stale', headSha: 'f'.repeat(40) },
   });
 
-  const card = page.locator('#mgMergeApprovals .sn-mac-card');
+  const card = page.locator('#mgMergeApprovalsOrphans .sn-mac-card');
   await expect(card).toBeVisible({ timeout: 8_000 });
   await card.locator('.sn-mac-btn-go').click();
   await card.locator('.sn-mac-btn-go').click();
@@ -590,7 +600,7 @@ test('Ricevuti: la richiesta nata dal riallineamento dice che è la punta rialli
     blocks: [{ gate: 'guard_the_guards', label: 'Tocca aree protette (guardie, regole del database, chiavi, automatismi)', items: ['scripts/lib/owner-merge.mjs'], more: 0 }],
   });
   await apriGestione(page, { pending: [nuova] });
-  const card = page.locator('#mgMergeApprovals .sn-mac-card');
+  const card = page.locator('#mgMergeApprovalsOrphans .sn-mac-card');
   await expect(card).toHaveCount(1, { timeout: 8_000 });
   await expect(card.locator('.sn-mac-realigned')).toContainText('Punta riallineata su main dal server (era ' + SHA.slice(0, 8) + ')');
   await expect(card.locator('.sn-mac-realigned')).toContainText('solo ciò che non avevi ancora visto');
@@ -599,7 +609,7 @@ test('Ricevuti: la richiesta nata dal riallineamento dice che è la punta rialli
   await expect(card.locator('.sn-mac-block')).toContainText('scripts/lib/owner-merge.mjs');
   // Una richiesta normale non ha la riga.
   await apriGestione(page, { pending: [richiesta()] });
-  await expect(page.locator('#mgMergeApprovals .sn-mac-realigned')).toHaveCount(0);
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-realigned')).toHaveCount(0);
 });
 
 test('approvare una richiesta che il server riallinea con blocchi nuovi: l’esito lo dice, e l’elenco si ricarica con la nuova', async ({ openTab }) => {
@@ -620,17 +630,17 @@ test('approvare una richiesta che il server riallinea con blocchi nuovi: l’esi
       return orig(msg);
     };
   }, nuova);
-  const btn = page.locator('#mgMergeApprovals .sn-mac-btn-go');
+  const btn = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
   await btn.click();
   await btn.click();
-  const status = page.locator('#mgMergeApprovals .sn-mac-status');
+  const status = page.locator('#mgMergeApprovalsOrphans .sn-mac-status');
   await expect(status).toContainText(/riallineato il ramo/, { timeout: 8_000 });
   await expect(status).toContainText(/richiesta nuova/);
   await expect(status).not.toContainText(/decade/);
   await expect(status).not.toContainText(/npm run finish/);
   // …e la scheda nuova prende il posto della vecchia, con la riga del riallineamento.
-  await expect(page.locator('#mgMergeApprovals .sn-mac-realigned')).toHaveCount(1, { timeout: 8_000 });
-  await expect(page.locator('#mgMergeApprovals .sn-mac-card')).toHaveAttribute('data-request-id', nuova.id);
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-realigned')).toHaveCount(1, { timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveAttribute('data-request-id', nuova.id);
 });
 
 test('approvata ma non avvenuta: se il server ha provato a riallineare, la scheda dice perché non ci è riuscito', async ({ openTab }) => {
@@ -641,7 +651,7 @@ test('approvata ma non avvenuta: se il server ha provato a riallineare, la sched
     decidedAtMs: Date.now() - 60 * 1000,
   });
   await apriGestione(page, { pending: [], failed: [conflitto] });
-  const why = page.locator('#mgMergeApprovals .sn-mac-card-failed .sn-mac-why');
+  const why = page.locator('#mgMergeApprovalsOrphans .sn-mac-card-failed .sn-mac-why');
   await expect(why).toContainText('Il server ha provato a riallineare da sé, senza riuscirci: ', { timeout: 8_000 });
   await expect(why).toContainText('si era mosso');
   await expect(why).not.toContainText('realign_branch_moved');

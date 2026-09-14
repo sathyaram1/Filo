@@ -221,8 +221,15 @@ test('#509/g5 — il dettaglio di una cifrata non dichiara giudizi che non ha', 
     await mg.evaluate((fid) => window.__mgTest.openDetail(fid), id);
     const d = await mg.evaluate(() => ({
       thread: document.getElementById('mgThread').innerText,
-      giudici: (() => { const r = document.getElementById('mgJudgesRow'); return r && !r.hidden ? r.innerText.trim() : ''; })(),
-      statoRiga: (() => { const r = document.getElementById('mgDetailState'); return r && !r.hidden ? r.innerText.trim() : ''; })(),
+      giudici: (() => { const r = document.getElementById('mgLivelliRow'); return r && !r.hidden ? r.innerText.trim() : ''; })(),
+      // L'etichetta di stato non sta più nel dettaglio: la decisione si legge
+      // nel pannello del triangolo. Su una segnalazione cifrata un triangolo
+      // non c'è nemmeno — la fila mostra solo aperta/chiusa — quindi qui si
+      // guarda che di forme non ce ne sia una.
+      statoRiga: (() => {
+        const forme = document.querySelectorAll('#mgLivelliRow .mg-forma');
+        return forme.length ? 'forme disegnate su uno stato che non si legge' : '';
+      })(),
     }));
     expect(d.thread, `${id}: la bolla non deve promettere un giudizio in arrivo`)
       .not.toContain('non ha ancora un parere');

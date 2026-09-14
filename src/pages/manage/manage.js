@@ -91,8 +91,8 @@
   const mgDetailEmpty = document.getElementById('mgDetailEmpty');
   const mgDetail      = document.getElementById('mgDetail');
   const mgDetailHead  = document.getElementById('mgDetailHead');
-  const mgDetailState = document.getElementById('mgDetailState');
-  const mgJudgesRow   = document.getElementById('mgJudgesRow');
+  const mgLivelliRow  = document.getElementById('mgLivelliRow');
+  const mgForme       = document.getElementById('mgForme');
   const mgWorkState   = document.getElementById('mgWorkState');
   const mgThread      = document.getElementById('mgThread');
 
@@ -825,6 +825,7 @@
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
+  const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
 
   // Perché una richiesta è stata respinta, detto all'owner e non al codice.
   const DENY_LABELS = {
@@ -889,35 +890,29 @@
 
   // ── Fusioni in attesa del via libera (SPEC-RIDISEGNO-MAX.md §10) ─────────
   //
-  // L'UNICA superficie dove si approvano (scelta owner 2026-08-26: prima
-  // l'avviso stava anche sulla prima schermata del browser). Vive in cima ai
-  // Ricevuti perché i Ricevuti sono le cose che aspettano una decisione
-  // dell'owner, e questa è la più urgente: un ramo fermo finché lui non dice
-  // sì o no. Il disegno e i bottoni li costruisce il modulo condiviso
-  // (src/shared/mergeApprovals.js); qui c'è il posto dove appenderlo, la
-  // lettura via IPC e il legame con la lista dei feedback.
+  // UNA FUSIONE FERMA È UNA SEGNALAZIONE COL QUADRATO ROSSO (contratto
+  // 2026-09-13). Prima viveva in un riquadro suo, in cima ai Ricevuti: due
+  // posti per la stessa pratica — la scheda del feedback da una parte, il ramo
+  // che ne è uscito dall'altra — e nessuno dei due diceva dell'altro. Adesso
+  // la richiesta si apre dal quadrato della scheda, coi tasti Approva/Scarta
+  // di sempre (il disegno resta del modulo condiviso, src/shared/mergeApprovals.js).
   //
-  // Quando non c'è niente in attesa il blocco resta invisibile: una sezione
-  // vuota in una pagina di gestione è rumore, non informazione. Le decisioni
-  // già prese restano invece elencate in Automazioni: un'eccezione ai
+  // Restano fuori le richieste che non nascono da una segnalazione — un ramo
+  // locale chiuso con `npm run finish`, che un numero non ce l'ha: non hanno
+  // una scheda dove vivere, e finiscono in Automazioni con gli stessi tasti.
+  // Nasconderle sarebbe un ramo fermo per sempre senza dirlo.
+  //
+  // Le decisioni già prese restano elencate in Automazioni: un'eccezione ai
   // controlli di sicurezza deve lasciare una traccia che si può guardare.
-  const mgMergeApprovals = document.getElementById('mgMergeApprovals');
+  const mgMergeApprovalsOrphans = document.getElementById('mgMergeApprovalsOrphans');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
   const mgMergeApprovalsPreapproved = document.getElementById('mgMergeApprovalsPreapproved');
 
-  // Il pannello-lista è condiviso dalle quattro schede (Ricevuti / In coda /
-  // Risolti / Archiviati): l'avviso appartiene SOLO ai Ricevuti, quindi la
-  // visibilità dipende da due cose — c'è qualcosa da approvare, e si sta
-  // guardando la scheda giusta. Il conteggio resta qui e il cambio scheda
-  // riapplica la regola senza rileggere niente dal server.
-  let mergeApprovalsCount = 0;
-  function applyMergeApprovalsVisibility() {
-    if (!mgMergeApprovals) return;
-    // Le fusioni ferme non vengono dallo status dei feedback: senza sezioni non
-    // c'è una scheda "Ricevuti" in cui metterle, ma restano vere e si mostrano.
-    const sezione = sezioniAttendibili() ? currentTab === 'inbox' : true;
-    mgMergeApprovals.hidden = mergeApprovalsCount === 0 || !sezione;
-  }
+  // Gli elenchi del server, così come sono arrivati: il quadrato di ogni scheda
+  // e il bordo delle card in lista li leggono da qui. Restano in memoria fra un
+  // avviso e l'altro — una scheda aperta deve poter ridisegnare il suo quadrato
+  // senza rileggere niente.
+  let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
   // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
@@ -937,13 +932,47 @@
   // `already` è l'elenco già pronto, quando ad avvisare è stato il main
   // (MERGE_APPROVALS_CHANGED): una pagina già aperta deve accorgersi di una
   // richiesta nuova, altrimenti l'avviso lo vede solo chi riapre la pagina.
+  // Le opzioni che il modulo condiviso vuole per disegnare le card: gli stessi
+  // tasti, lo stesso "chiedi conferma", lo stesso esito, ovunque le card
+  // compaiano — nel pannello del quadrato e in Automazioni.
+  function opzioniFusioni(extra) {
+    const UI = window.SN_MERGE_APPROVALS;
+    return Object.assign({
+      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
+      onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
+      onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
+    }, extra || {});
+  }
+
+  // Le richieste ferme che NON hanno una scheda in questa lista. Finché i
+  // feedback non sono arrivati la lista è vuota e ci finiscono tutte: meglio
+  // mostrarle due volte per un istante che perderne una.
+  function fusioniOrfane() {
+    const ferme = (fusioni.pending || []).concat(fusioni.failed || []);
+    return MR.fusioniSenzaFeedback(ferme, allFeedbacks);
+  }
+
+  function renderFusioniOrfane() {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (!mgMergeApprovalsOrphans || !UI) return 0;
+    const orfane = fusioniOrfane();
+    const inAttesa = orfane.filter((r) => !r.used);
+    const fallite = orfane.filter((r) => r.used);
+    return UI.render(mgMergeApprovalsOrphans, opzioniFusioni({
+      requests: inAttesa, failed: fallite,
+    }));
+  }
+
   async function loadMergeApprovals(already) {
     const UI = window.SN_MERGE_APPROVALS;
-    if (!mgMergeApprovals || !UI) return 0;
+    if (!UI) return 0;
     const spegni = () => {
-      mergeApprovalsCount = 0;
-      mgMergeApprovals.replaceChildren();
-      mgMergeApprovals.hidden = true;
+      fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+      if (mgMergeApprovalsOrphans) {
+        mgMergeApprovalsOrphans.replaceChildren();
+        mgMergeApprovalsOrphans.hidden = true;
+      }
       if (mgMergeApprovalsRecent) {
         mgMergeApprovalsRecent.replaceChildren();
         mgMergeApprovalsRecent.hidden = true;
@@ -952,6 +981,7 @@
         mgMergeApprovalsPreapproved.replaceChildren();
         mgMergeApprovalsPreapproved.hidden = true;
       }
+      riflettiFusioni();
       return 0;
     };
     if (!isAdmin) return spegni();
@@ -963,16 +993,18 @@
       return spegni();
     }
     if (!r || r.ok === false) return spegni();
-    const n = UI.render(mgMergeApprovals, {
-      requests: r.pending || [],
+    fusioni = {
+      pending: r.pending || [],
       failed: r.failed || [],
-      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
-      onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
-      onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
-      onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
-    });
-    mergeApprovalsCount = n;
-    applyMergeApprovalsVisibility();
+      recent: r.recent || [],
+      // Il campanello del main manda solo ciò che è cambiato: quello che c'era
+      // resta finché non si rilegge.
+      preapproved: Array.isArray(r.preapproved) ? r.preapproved : (fusioni.preapproved || []),
+    };
+    const n = renderFusioniOrfane();
+    // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
+    // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
+    riflettiFusioni();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
     // Le fuse senza chiedere: il controllo a posteriori del segno messo sulla
     // pratica. Quando il main avvisa di un cambiamento manda solo l'elenco in
@@ -985,6 +1017,20 @@
       });
     }
     return n;
+  }
+
+  // Un cambiamento nelle fusioni si vede in due posti: il quadrato della scheda
+  // aperta e le card della lista (una fusione ferma le colora come un blocco e
+  // le porta fra le cose da decidere). Tutti e due, sempre insieme.
+  function riflettiFusioni() {
+    if (selectedId && allFeedbacks.some((f) => f._id === selectedId)) {
+      const fb = allFeedbacks.find((f) => f._id === selectedId);
+      renderLivelliRow(fb);
+      // Il pannello aperto su un livello si riempie di nuovo: se era il
+      // quadrato, dentro c'è una richiesta che potrebbe non esistere più.
+      if (livelloAperto) openSidebarLivello(fb, livelloAperto);
+    }
+    if (dataLoaded) renderList();
   }
 
   async function loadChannelLog() {
@@ -1031,9 +1077,6 @@
       if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
       renderList();
-      // L'avviso delle fusioni appartiene ai soli Ricevuti: il pannello è lo
-      // stesso per le quattro schede-lista, quindi si ricontrolla qui.
-      applyMergeApprovalsVisibility();
     }
   }
 
@@ -1472,6 +1515,7 @@
       mgListEmpty.textContent = TAB_EMPTY.inbox;
       setListHead(SENZA_SEZIONI_LABEL, dataLoaded ? currentList.length : null);
       renderListBody();
+      renderFusioniOrfane();
       return;
     }
 
@@ -1499,6 +1543,12 @@
       currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion });
     }
 
+    // Una fusione ferma È una decisione dell'owner: la sua segnalazione sale
+    // in cima, sopra le altre della stessa scheda. Prima la richiesta viveva in
+    // un riquadro a parte e la scheda non diceva niente — chi scorreva la lista
+    // non aveva modo di sapere che un ramo era fermo lì.
+    currentList = pinFusioniFerme(currentList);
+
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
     // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
     currentList = applySortMode(currentList);
@@ -1508,6 +1558,22 @@
     updateTabCounts();
     setListHead(TAB_LABELS[currentTab] || '', dataLoaded ? currentList.length : null);
     renderListBody();
+    // Chi è "senza feedback" dipende da quali feedback ci sono: quando la lista
+    // cambia, l'elenco in Automazioni si rifà — altrimenti una richiesta
+    // resterebbe lì anche dopo che la sua scheda è arrivata, e si leggerebbe
+    // due volte.
+    renderFusioniOrfane();
+  }
+
+  // Questa segnalazione ha una fusione ferma che aspetta l'owner?
+  function fusioneFerma(fb) {
+    return MR.fusioneInAttesa(fb, { fusioni });
+  }
+
+  // Le segnalazioni con una fusione ferma davanti a tutte, conservando fra loro
+  // l'ordine che avevano (`sort` è stabile).
+  function pinFusioniFerme(lista) {
+    return lista.slice().sort((a, b) => (fusioneFerma(b) ? 1 : 0) - (fusioneFerma(a) ? 1 : 0));
   }
 
   // Disegna la colonna a partire da `currentList`: è la parte che NON dipende
@@ -1580,7 +1646,13 @@
         + (progress ? ' mg-item--staged' : '')
         + (progress && progress.active ? ' mg-item--active-work' : '');
       item.dataset.id = fb._id;
-      item.style.borderLeftColor = cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent');
+      // Una fusione ferma aspetta l'owner quanto un blocco: stessa tinta rossa
+      // e stesso peso, così si riconosce scorrendo la lista.
+      const ferma = fusioneFerma(fb);
+      if (ferma) item.classList.add('mg-item--fusione');
+      item.style.borderLeftColor = ferma
+        ? MR.REASONS.secaudit.color
+        : (cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent'));
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
       // implicito nel colore del border-left; il titolo completo nel tooltip,
       // col sottotesto dello stato (statusReason: loop, clarify, …) se presente.
@@ -1597,11 +1669,13 @@
       ));
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${MR.reasonText(norm.statusReason)}` : '')
+        + (ferma ? ' — una fusione aspetta il tuo via libera' : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
+        ${ferma ? '<span class="mg-fusione-badge" title="Una fusione aspetta il tuo via libera">fusione ferma</span>' : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
         ${preapprovedHtml(fb)}
         ${priorityDotsHtml(fb)}
@@ -2051,6 +2125,9 @@
     // ADESSO, finché `selectedId` è ancora quello di prima: un istante dopo
     // andrebbe a finire sul feedback sbagliato, o in nessun posto.
     if (!ridisegno) salvaFraseAutomatico();
+    // Cambiando segnalazione il pannello di destra riparte da zero: la forma
+    // scelta era di un'altra pratica. Su un ridisegno resta dov'era.
+    if (!ridisegno) livelloAperto = null;
     selectedId = id;
 
     // Aggiorna selezione visiva nella lista
@@ -2081,9 +2158,9 @@
       openSidebarSender(clientId);
     });
 
-    // Riga giudici (4 pallini, riassunto a colpo d'occhio). Il click su un
-    // pallino apre QUEL giudice (nome + classe + reasoning) nel pannello destro.
-    renderJudgesRow(fb);
+    // La fila dei cinque livelli: triangolo, cerchi, rombo, pentagono,
+    // quadrato. Ogni forma cliccata si apre nel pannello di destra.
+    renderLivelliRow(fb);
 
     // Striscia "a che punto è la lavorazione" (solo per i feedback nell'iter
     // working/revision_*): stessi contenuti della card pinnata in lista.
@@ -2095,11 +2172,6 @@
 
     // Bolle chat
     renderThread(fb);
-
-    // L'etichetta di stato: le stesse parole della gemella, lette dal modulo
-    // condiviso. Senza, questa pagina non diceva da nessuna parte che una
-    // segnalazione era, per esempio, un attacco confermato.
-    renderDetailState(fb);
 
     // Azioni di stato (owner-only). QUALI sono NON lo decide più questa pagina:
     // le legge da MR.ownerActions, la stessa tabella che disegna i pulsanti
@@ -2152,8 +2224,21 @@
     reflectManage(fb);
     setManageMsg('', '');
 
-    // Chiudi pannello laterale
-    closeSidebar();
+    // Pannello laterale: su un ridisegno (aggiornamento continuo della stessa
+    // pratica) la forma che l'owner stava leggendo resta aperta e si riempie
+    // di nuovo, come già fa quando cambia l'elenco delle fusioni; a chiuderlo
+    // era ogni ridisegno, e con una segnalazione lunga si perdeva il punto.
+    // Cambiando pratica si chiude, come sempre.
+    if (ridisegno && livelloAperto) riapriPannelloLivello(fb);
+    else closeSidebar();
+  }
+
+  // Riapre il pannello sulla forma già scelta, tenendo il punto di scorrimento.
+  function riapriPannelloLivello(fb) {
+    const scrolls = [mgSideBody, mgSide].map((el) => (el ? el.scrollTop : 0));
+    if (livelloAperto === 'l2' && giudiceAperto != null) openSidebarJudge(fb, giudiceAperto);
+    else openSidebarLivello(fb, livelloAperto);
+    [mgSideBody, mgSide].forEach((el, i) => { if (el) el.scrollTop = scrolls[i]; });
   }
 
   // Riflette lo stato corrente del feedback sul bottone ⭐. Il preferito è un
@@ -2220,28 +2305,10 @@
   }
   if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', togglePreapproved);
 
-  // ── L'etichetta di stato del dettaglio ────────────────────────────────────
-  // Le parole (etichetta, motivo, hover) vengono dal modulo condiviso: la
-  // gemella scrive esattamente la stessa riga sulla scheda.
-  function renderDetailState(fb) {
-    if (!mgDetailState) return;
-    const b = MR.stateBadge(fb);
-    // Stato illeggibile: l'unica cosa vera (aperta/chiusa) questa pagina la
-    // scrive già accanto ai pallini dei giudici, con le stesse parole della
-    // gemella. Ripeterla qui sarebbe la stessa riga due volte.
-    if (!b || b.encrypted) {
-      mgDetailState.hidden = true;
-      mgDetailState.textContent = '';
-      mgDetailState.removeAttribute('title');
-      return;
-    }
-    mgDetailState.hidden = false;
-    mgDetailState.title = b.hint;
-    mgDetailState.innerHTML =
-      (b.color ? `<span class="mg-detail-state-dot" style="color:${esc(b.color)}"></span>` : '')
-      + `<span>${esc(b.label)}</span>`
-      + (b.showReason ? `<span class="mg-detail-state-reason">— ${esc(b.reasonText)}</span>` : '');
-  }
+  // L'etichetta di stato NON si scrive più nel dettaglio (scelta owner
+  // 2026-09-13): lo stato lo dicono il colore della scheda in lista e le
+  // forme, e la decisione già presa — attacco confermato, bocciatura della
+  // sicurezza — si legge nel pannello del triangolo (MR.righeStato).
 
   // ── Le azioni di stato: una riga GENERATA dalla tabella condivisa ─────────
   // Ogni azione ha un id stabile, così resta indirizzabile da fuori. Archivia e
@@ -2396,7 +2463,6 @@
       collassaFrase();
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
-      if (mgDetailState) mgDetailState.hidden = true;
       chiudiRiapertura();
       closeSidebar();
       renderList();
@@ -2852,103 +2918,84 @@
     mgOwnerMsgs.hidden = vuoto;
   }
 
-  function renderJudgesRow(fb) {
-    // Pulisce tutto tranne la label
-    const label = mgJudgesRow.querySelector('.mg-judge-label');
-    mgJudgesRow.innerHTML = '';
-    if (label) mgJudgesRow.appendChild(label);
-    else {
-      const lbl = document.createElement('span');
-      lbl.className = 'mg-judge-label';
-      lbl.textContent = 'Giudici:';
-      mgJudgesRow.appendChild(lbl);
-    }
+  // ── La fila dei cinque livelli ────────────────────────────────────────────
+  //
+  // I disegni delle quattro forme, dentro una griglia di 16. I cerchi dei
+  // giudici restano `.mg-dot` come sempre: sono lo stesso oggetto di prima, e
+  // cambiarne il disegno avrebbe cambiato una cosa che non c'era da cambiare.
+  const FORME_SVG = {
+    triangolo: 'M8 2 L14.5 13.6 L1.5 13.6 Z',
+    rombo:     'M8 1.4 L14.6 8 L8 14.6 L1.4 8 Z',
+    pentagono: 'M8 1.4 L14.6 6.3 L12.1 14.2 L3.9 14.2 L1.4 6.3 Z',
+    quadrato:  'M2.6 2.6 H13.4 V13.4 H2.6 Z',
+  };
 
-    // Stato illeggibile: i pallini tratteggiati nascono da "non filtrato", che
-    // qui la macchina si inventa — e la frase accanto diceva "In attesa del
-    // giudizio." anche su una segnalazione già chiusa. Al loro posto va l'unica
-    // cosa che si sa: aperta o chiusa, con le stesse parole della gemella.
+  // Quale forma sta guardando il pannello di destra: serve a ridisegnarlo
+  // quando arriva un aggiornamento (una fusione approvata altrove) e a
+  // segnare la forma scelta.
+  let livelloAperto = null;
+  // Quale cerchio dei giudici sta aperto (posizione), quando livelloAperto è
+  // 'l2': serve a riaprire lo stesso giudice su un ridisegno.
+  let giudiceAperto = null;
+
+  function formaEl(liv, fb) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mg-forma'
+      + (liv.vuoto ? ' mg-forma--vuota' : ` mg-forma--${liv.classe}`)
+      + (livelloAperto === liv.key ? ' mg-forma--scelta' : '');
+    b.dataset.livello = liv.key;
+    b.dataset.esito = liv.esito;
+    // Una o due parole sotto il puntatore, come su ogni icona della pagina.
+    b.title = liv.titolo;
+    b.setAttribute('aria-label', liv.titolo);
+    b.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG[liv.forma]}"/></svg>`;
+    b.addEventListener('click', () => openSidebarLivello(fb, liv.key));
+    return b;
+  }
+
+  function renderLivelliRow(fb) {
+    if (!mgLivelliRow || !mgForme) return;
+    mgForme.replaceChildren();
+
+    // Stato illeggibile: le forme nascerebbero da uno stato che la macchina si
+    // inventa (`unlabeled`), e direbbero "in attesa del giudizio" su una
+    // segnalazione già chiusa. Al loro posto l'unica cosa che si sa: aperta o
+    // chiusa, con le stesse parole della gemella.
     if (!statoLeggibile(fb)) {
       const pubblico = MR.publicStateLabel(fb);
-      if (!pubblico) { mgJudgesRow.hidden = true; return; }
-      mgJudgesRow.hidden = false;
-      mgJudgesRow.innerHTML = '';
+      if (!pubblico) { mgLivelliRow.hidden = true; return; }
+      mgLivelliRow.hidden = false;
       const span = document.createElement('span');
       span.className = 'mg-state';
       span.textContent = pubblico;
       span.title = `Stato: ${pubblico} — ${MR.PUBLIC_STATE_HINT}`;
-      mgJudgesRow.appendChild(span);
+      mgForme.appendChild(span);
       return;
     }
 
-    // Un pallino per ogni giudice ATTESO del panel (non per verdetto): un panel
-    // parziale mostra i mancanti come pallini tratteggiati, non un panel
-    // "accorciato". Pipeline NUOVA → posizioni esatte da `expectedJudges`.
-    // STORICO (senza quel campo) → mostriamo i verdetti presenti e poi pad-iamo
-    // con pallini tratteggiati fino alla dimensione attesa del panel (così 2
-    // giudici su 4 = 2 colorati + 2 tratteggiati).
-    const p = (fb && fb.pipeline) || {};
-    const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
-    const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
-    const judgeLetters = ['A', 'B', 'C', 'D', 'E'];
-
-    // Nessun verdetto registrato. Se il feedback è "non filtrato" (da giudicare —
-    // es. mai giudicato o identità dell'owner sbloccata), mostra COMUNQUE il panel
-    // atteso tutto tratteggiato, così l'owner vede i giudici che non hanno (ancora)
-    // votato. Altrimenti (clarify, chiusi…) nascondi la riga.
-    if (!expected && verdicts.length === 0) {
-      const cl = MR.classifyBlock(fb);
-      if (!cl || cl.reason !== 'unfiltered') { mgJudgesRow.hidden = true; return; }
-      mgJudgesRow.hidden = false;
-      const n = MR.EXPECTED_PANEL_SIZE || 4;
-      for (let i = 0; i < n; i++) {
-        const dot = document.createElement('span');
-        dot.className = 'mg-dot mg-dot--empty';
-        dot.title = `Giudice ${judgeLetters[i] || i + 1}: nessun verdetto`;
-        mgJudgesRow.appendChild(dot);
+    mgLivelliRow.hidden = false;
+    for (const liv of MR.livelli(fb, { fusioni })) {
+      if (liv.key !== 'l2') { mgForme.appendChild(formaEl(liv, fb)); continue; }
+      // I giudici: un cerchio per giudice ATTESO, non per verdetto. Un panel
+      // parziale mostra i mancanti tratteggiati, non un panel accorciato — e
+      // anche un tratteggiato si clicca: dice PERCHÉ è vuoto.
+      const gruppo = document.createElement('span');
+      gruppo.className = 'mg-forme-gruppo';
+      gruppo.title = liv.titolo;
+      for (const g of liv.giudici) {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'mg-dot mg-dot--clickable'
+          + (g.classe ? ` mg-dot--${g.classe}` : ' mg-dot--empty');
+        dot.dataset.livello = 'l2';
+        dot.title = `${g.etichetta}: ${g.classe || 'nessun verdetto'}`;
+        dot.setAttribute('aria-label', dot.title);
+        dot.addEventListener('click', () => openSidebarJudge(fb, g.indice));
+        gruppo.appendChild(dot);
       }
-      appendJudgesNote(fb);
-      return;
+      mgForme.appendChild(gruppo);
     }
-    mgJudgesRow.hidden = false;
-
-    const fallbackSize = Math.max(verdicts.length, (MR.EXPECTED_PANEL_SIZE || 4));
-    const size = expected ? expected.length : fallbackSize;
-    for (let i = 0; i < size; i++) {
-      const v = expected ? verdictByName(fb, expected[i]) : (verdicts[i] || null);
-      const dot = document.createElement('span');
-      dot.className = 'mg-dot';
-      if (v) {
-        const cls = v.class || '';
-        if (cls) dot.classList.add(`mg-dot--${cls}`);
-        dot.classList.add('mg-dot--clickable');
-        dot.title = `Giudice ${judgeLetters[i] || i + 1}: ${cls}`;
-        // Click sul pallino → apre QUEL giudice nel pannello destro.
-        dot.addEventListener('click', () => openSidebarJudge(fb, i));
-      } else {
-        // Quel giudice NON ha emesso un verdetto in quella run (timeout/errore/
-        // giudice non configurato): pallino tratteggiato. È la causa del
-        // "non filtrato" (panel parziale).
-        dot.classList.add('mg-dot--empty');
-        dot.title = `Giudice ${judgeLetters[i] || i + 1}: nessun verdetto`;
-      }
-      mgJudgesRow.appendChild(dot);
-    }
-    appendJudgesNote(fb);
-  }
-
-  // La frase accanto ai pallini: perché il feedback è in questo stato. I
-  // pallini da soli raccontavano solo il voto dei giudici, e uno stato deciso
-  // DOPO (sicurezza che boccia il fix, domande della routine) sembrava in
-  // contraddizione con quattro pallini blu (#462).
-  function appendJudgesNote(fb) {
-    const note = MR.judgesNote ? MR.judgesNote(fb) : null;
-    if (!note || !note.text) return;
-    const span = document.createElement('span');
-    span.className = 'mg-judge-note';
-    span.textContent = note.text;
-    if (note.color) span.style.color = note.color;
-    mgJudgesRow.appendChild(span);
   }
 
   // Verdetto di un dato giudice (per nome) su un feedback, o null se mancante.
@@ -3140,6 +3187,210 @@
     mgSideEmpty.hidden = false;
     mgSideTitle.textContent = '';
     mgSideBody.innerHTML = '';
+    livelloAperto = null;
+    giudiceAperto = null;
+    if (mgForme) mgForme.querySelectorAll('.mg-forma--scelta')
+      .forEach((el) => el.classList.remove('mg-forma--scelta'));
+  }
+
+  // Segna quale forma sta guardando il pannello: senza, con cinque forme in
+  // fila e un pannello che cambia, non si sa più quale si era premuta.
+  function segnaForma(key) {
+    livelloAperto = key || null;
+    if (!mgForme) return;
+    mgForme.querySelectorAll('.mg-forma').forEach((el) => {
+      el.classList.toggle('mg-forma--scelta', el.dataset.livello === livelloAperto);
+    });
+  }
+
+  // Toast discreto in basso a destra: l'esito di un'azione deve arrivare anche
+  // se nel frattempo l'owner ha chiuso il pannello o cambiato scheda.
+  let mgToastTimer = null;
+  function toast(text, kind) {
+    let el = document.getElementById('mgToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mgToast';
+      el.className = 'mg-toast';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = String(text || '');
+    el.dataset.kind = kind || '';
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(mgToastTimer);
+    // Le frasi degli esiti sono lunghe: quattro secondi e mezzo per leggerle.
+    mgToastTimer = setTimeout(() => el.classList.remove('show'), 4500);
+  }
+
+  // ── Il pannello di un livello ─────────────────────────────────────────────
+  //
+  // Il contenuto (titolo, righe, testo, azioni) arriva già pronto dal modulo
+  // condiviso: qui c'è solo il markup, e i due pezzi che il markup non può
+  // avere — i tasti Approva/Scarta della fusione (li costruisce il modulo delle
+  // fusioni) e «Salta il controllo» dell'audit.
+  function openSidebarLivello(fb, key) {
+    if (!fb) return;
+    const liv = MR.livelloPer(fb, key, { fusioni });
+    if (!liv) return;
+    segnaForma(key);
+    giudiceAperto = null;
+
+    // I giudici non hanno un pannello loro: la fila di cerchi apre il singolo
+    // giudice. Cliccare il gruppo quando nessuno ha votato dice perché.
+    const p = liv.pannello;
+    const body = document.createElement('div');
+
+    if (p.righe && p.righe.length) {
+      const righe = document.createElement('div');
+      righe.className = 'mg-liv-righe';
+      for (const r of p.righe) {
+        const el = document.createElement('div');
+        el.className = 'mg-liv-riga';
+        const et = document.createElement('strong');
+        et.textContent = `${r.etichetta}:`;
+        const va = document.createElement('span');
+        // Le date arrivano in ISO dal server: qui si scrivono come le scrive
+        // il resto della pagina.
+        va.textContent = /^Quando$/i.test(r.etichetta) ? formatDateTime(r.valore) : r.valore;
+        el.appendChild(et); el.appendChild(va);
+        righe.appendChild(el);
+      }
+      body.appendChild(righe);
+    }
+
+    if (p.testo) {
+      const t = document.createElement('div');
+      t.className = 'mg-liv-testo';
+      // Testo cifrato che questo computer non sa leggere: si dice, non si
+      // mostra il blob.
+      if (p.illeggibile) {
+        t.textContent = 'Il testo è cifrato e questo computer non ha la chiave privata per leggerlo.';
+      } else {
+        // Titoli e voci d'elenco del markdown resi come tali, il resto come
+        // testo: niente HTML dal testo (il modulo condiviso li riconosce).
+        let lista = null;
+        for (const r of MR.righeTesto(p.testo)) {
+          if (r.tipo === 'voce') {
+            if (!lista) { lista = document.createElement('ul'); lista.className = 'mg-liv-elenco'; t.appendChild(lista); }
+            const li = document.createElement('li');
+            li.textContent = r.testo;
+            lista.appendChild(li);
+            continue;
+          }
+          lista = null;
+          const el = document.createElement('div');
+          el.className = r.tipo === 'titolo' ? 'mg-liv-titolo' : 'mg-liv-par';
+          el.textContent = r.testo;
+          t.appendChild(el);
+        }
+      }
+      body.appendChild(t);
+    }
+
+    if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
+    if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
+
+    openSidebar(p.titolo, '');
+    mgSideBody.replaceChildren(body);
+  }
+
+  // Le card della fusione dentro il pannello del quadrato: stesso disegno e
+  // stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.
+  function pannelloFusione(fb, liv) {
+    const UI = window.SN_MERGE_APPROVALS;
+    const host = document.createElement('div');
+    const ferme = Array.isArray(liv.richieste) ? liv.richieste : [];
+    if (!UI || !ferme.length || !isAdmin) return host;
+    UI.render(host, opzioniFusioni({
+      requests: ferme.filter((r) => !r.used),
+      failed: ferme.filter((r) => r.used),
+    }));
+    host.hidden = false;
+    return host;
+  }
+
+  // «Salta il controllo» si offre su una bocciatura dell'audit — e anche sulle
+  // pratiche vecchie, ferme prima che l'audit lasciasse traccia: lì il segno è
+  // lo stato (`design` con motivo `secaudit`). Senza questo secondo caso quelle
+  // pratiche non avrebbero nessuna via d'uscita.
+  function mostraSaltaAudit(fb, liv) {
+    if (!isAdmin || !liv || liv.key !== 'l4') return false;
+    if (liv.pannello.azioni.includes('salta_l4')) return true;
+    if (liv.esito !== 'nonfatto') return false;
+    const n = MR.normalizeStatus(fb);
+    return n.status === 'design' && n.statusReason === 'secaudit';
+  }
+
+  // Ogni esito del server detto in italiano. Un esito che questo client non
+  // conosce si scrive lo stesso: meglio grezzo che muto, e mai un «fatto» al
+  // posto di un guasto.
+  const SALTA_ESITI = {
+    fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
+    bloccato: { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera sul quadrato.' },
+    conflitto: { kind: 'err', text: 'Saltato, ma il ramo è in conflitto con main: torna in lavorazione per riallinearlo.' },
+    ramo_assente: { kind: 'err', text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere.' },
+    feedback_assente: { kind: 'err', text: 'Il server non trova questa segnalazione.' },
+    non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
+    non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
+    guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
+  };
+
+  function pannelloSaltaAudit(fb) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary';
+    btn.id = 'mgSaltaL4Btn';
+    btn.textContent = 'Salta il controllo';
+    btn.title = 'Hai letto cosa ha trovato l’audit e vai avanti lo stesso. Il cancello di fusione resta: può fermare il ramo comunque.';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+
+    // Un secondo clic per confermare, come l'approvazione di una fusione:
+    // scavalcare un controllo di sicurezza non è un gesto da un click solo.
+    let armato = false;
+    let timer = null;
+    const disarma = () => {
+      armato = false;
+      btn.textContent = 'Salta il controllo';
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    btn.addEventListener('click', async () => {
+      if (!armato) {
+        armato = true;
+        btn.textContent = 'Confermi?';
+        timer = setTimeout(disarma, 5000);
+        return;
+      }
+      disarma();
+      btn.disabled = true;
+      esito.dataset.kind = 'wait';
+      esito.textContent = 'Chiedo al server…';
+      try {
+        const r = await sendToMain({ type: LIVELLO4_SALTA, feedbackId: fb._id });
+        if (!r || r.ok === false) throw new Error((r && r.error) || 'Non riuscito.');
+        const m = SALTA_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
+        esito.dataset.kind = m.kind;
+        esito.textContent = m.text;
+        toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+        // L'esito cambia il pentagono e (se si è aperta una richiesta) il
+        // quadrato: si rilegge tutto invece di indovinare.
+        setTimeout(() => { loadMergeApprovals(); refreshFromRemote(); }, 800);
+      } catch (e) {
+        esito.dataset.kind = 'err';
+        esito.textContent = e.message || 'Non riuscito.';
+        toast(e.message || 'Non riuscito.', 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    box.appendChild(btn);
+    box.appendChild(esito);
+    return box;
   }
 
   mgSideClose.addEventListener('click', closeSidebar);
@@ -3157,10 +3408,25 @@
     const expected = (Array.isArray(p.expectedJudges) && p.expectedJudges.length) ? p.expectedJudges : null;
     const verdicts = Array.isArray(p.verdicts) ? p.verdicts : [];
     const v = expected ? verdictByName(fb, expected[i]) : (verdicts[i] || null);
-    if (!v) return;
 
     const letters = ['A', 'B', 'C', 'D', 'E'];
     const anonLabel = `Giudice ${letters[i] || String(i + 1)}`;
+    segnaForma('l2');
+    giudiceAperto = i;
+
+    // Giudice che non ha votato in quella run: il cerchio è tratteggiato e
+    // cliccarlo dice PERCHÉ, invece di non fare niente. È la stessa regola dei
+    // livelli grigi: un buco si spiega, non si tace.
+    if (!v) {
+      const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
+      openSidebar(anonLabel, `
+        <div class="mg-judge-detail">
+          <div class="mg-liv-testo">Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.</div>
+          ${nota && nota.text ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
+        </div>
+      `);
+      return;
+    }
     const cls     = v.class || '';
     const badgeClass = cls ? `mg-class-badge--${cls}` : '';
 
@@ -3230,6 +3496,7 @@
         <div class="mg-sender-list" id="senderFbList">${listHtml || '<em>Nessun feedback.</em>'}</div>
       </div>
     `;
+    segnaForma(null);
     openSidebar('Mittente', html);
 
     // Click su un feedback del mittente → carica nel pannello centrale
@@ -3831,6 +4098,11 @@
   // Fusioni in attesa: rilettura via IPC dopo lo stub (in test non c'è né una
   // sessione da proprietario né il server di sicurezza).
   window.__mgTest.loadMergeApprovals = loadMergeApprovals;
+  // Le forme dei cinque livelli: quale forma sta aperta nel pannello e le
+  // richieste di fusione che la pagina ha in mano (per gli spec).
+  window.__mgTest.openSidebarLivello = openSidebarLivello;
+  window.__mgTest.livelloAperto = () => livelloAperto;
+  window.__mgTest.getFusioni = () => fusioni;
 
   // Icone della ricerca (lente): iniettate da JS così restano nel tema di Filo
   // (SVG outline, currentColor) invece di un glifo emoji.

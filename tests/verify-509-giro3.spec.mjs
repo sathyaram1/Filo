@@ -299,7 +299,7 @@ test('#509/3 — stati illeggibili: la gemella non offre decisioni né frasi inv
   await mg.waitForTimeout(250);
 
   // La riga dei giudici non deve dire "In attesa del giudizio" su una chiusa.
-  const giudici = (await mg.locator('#mgJudgesRow').innerText().catch(() => '')).trim();
+  const giudici = (await mg.locator('#mgLivelliRow').innerText().catch(() => '')).trim();
   expect(giudici).not.toContain('In attesa del giudizio');
   expect(giudici).toContain('Chiusa');
 

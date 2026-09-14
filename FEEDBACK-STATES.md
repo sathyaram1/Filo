@@ -49,7 +49,15 @@ DB3 esistente), poi "Risolti".
 (ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
 l'ultimo battito arrivato al server per quel lavoro, che lo specchia qui perché
 la dashboard i semafori non li vede — è l'unica cosa che le permette di dire il
-vero su "qualcuno ci sta lavorando ORA").
+vero su "qualcuno ci sta lavorando ORA"), `livelli` (dal 2026-09-13: mappa con al
+più `l3` e `l4`, ognuna `{ esito, at, ruolo?, by?, testo }`; la scrive SOLO il
+server; `l3` è la segnalazione di chi ha risolto o verificato (`esito:
+segnalato`, `ruolo`), un trade-off vero che decide l'owner, arrivata con
+`--segnala`; `l4` è l'esito del controllo di sicurezza, `pass|fail|saltato`,
+scritto sempre, anche su pass, col testo di cosa è stato controllato; `saltato`
+lo mette l'owner (`by: owner`) quando, letto il fail, decide di andare avanti,
+e conserva il testo del fail; `testo` è cifrato come `notes`; in dashboard sono
+il rombo e il pentagono della fila delle forme).
 
 **Stati legacy da RITIRARE:** `new`, `review`, `blocked`, `clarify`, `verified`,
 `ignored` (mappatura in §8).
@@ -191,12 +199,20 @@ decisione dell'owner (`statusReason: decisione`); in entrambi i casi bilanci e
 verdetti del giro si azzerano — la storia delle critiche resta, per il
 verificatore del lavoro rifatto — così dopo la decisione dell'owner il lavoro
 rifatto riparte da un verificatore invece di rimbalzare a `design`; (4) fix bocciato
-dal **controllo di sicurezza** o dal cancello di fusione (`statusReason: secaudit`);
-(5) lavorazione arenata ripetutamente (`statusReason: arenato`). La risposta
-dell'owner appende alla chat e (se decide) muove a `todo`.
+dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
+fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
+server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
+stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
+arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
+alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
+«Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
+owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
+ramo; l'esito è quello di un'approvazione (fuso → `done`; bloccato → richiesta
+di fusione in attesa; conflitto → riallineamento). Non serve una transizione
+nuova: è `design` → `todo` con attore owner, e da lì il cancello.
 
-Presentazione (scelta owner 2026-08-29): il caso `secaudit` è **ROSSO** in dashboard
-(è un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel
+Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
+dashboard (un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel
 dettaglio, accanto ai pallini dei giudici, una frase spiega il PERCHÉ dello stato
 (`judgesNote` in `manageReview.js`): i pallini raccontano il voto dei giudici, che
 può essere tutto allineato anche su un feedback tornato indietro dopo.

@@ -806,10 +806,10 @@ test('un feedback "non filtrato" è bianco, sta nei Ricevuti, mostra i giudici m
   // Aprendo il dettaglio: 4 pallini (panel atteso), 3 aligned + 1 mancante
   // (tratteggiato) nella posizione corretta.
   await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_UNFILTERED._id);
-  await expect(page.locator('#mgJudgesRow')).toBeVisible();
-  await expect(page.locator('#mgJudgesRow .mg-dot')).toHaveCount(4);
-  await expect(page.locator('#mgJudgesRow .mg-dot--aligned')).toHaveCount(3);
-  await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(1);
+  await expect(page.locator('#mgLivelliRow')).toBeVisible();
+  await expect(page.locator('#mgLivelliRow .mg-dot')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow .mg-dot--aligned')).toHaveCount(3);
+  await expect(page.locator('#mgLivelliRow .mg-dot--empty')).toHaveCount(1);
 
   // La barra "Ri-valuta i non filtrati" compare col conteggio e invia il solo id bianco.
   await expect(page.locator('#mgReevalBar')).toBeVisible();
@@ -964,9 +964,9 @@ test('storico parziale (2 verdetti su 4, senza expectedJudges) → bianco e 4 pa
 
   // Apri il dettaglio: 4 pallini (2 aligned + 2 mancanti tratteggiati).
   await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_LEGACY_PARTIAL._id);
-  await expect(page.locator('#mgJudgesRow .mg-dot')).toHaveCount(4);
-  await expect(page.locator('#mgJudgesRow .mg-dot--aligned')).toHaveCount(2);
-  await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(2);
+  await expect(page.locator('#mgLivelliRow .mg-dot')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow .mg-dot--aligned')).toHaveCount(2);
+  await expect(page.locator('#mgLivelliRow .mg-dot--empty')).toHaveCount(2);
 });
 
 // Coerenza dei colori: il pallino di un giudice DEVE avere lo stesso colore del
@@ -1000,8 +1000,8 @@ test('colori giudici: scala rosso→giallo→verde→blu; "design" è verde e co
 
   // Bordo della card per un aggregato "design" = il verde di REASONS.design.
   const itemBorder = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
-  const designDot = await page.locator('#mgJudgesRow .mg-dot--design').first().evaluate((el) => getComputedStyle(el).backgroundColor);
-  const alignedDot = await page.locator('#mgJudgesRow .mg-dot--aligned').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  const designDot = await page.locator('#mgLivelliRow .mg-dot--design').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  const alignedDot = await page.locator('#mgLivelliRow .mg-dot--aligned').first().evaluate((el) => getComputedStyle(el).backgroundColor);
 
   // Il pallino "design" ha lo STESSO colore del bordo "design" della card.
   expect(designDot).toBe(itemBorder);
@@ -1039,8 +1039,8 @@ test('feedback di routine bloccato a L1 → bianco (non rosso) e panel atteso tr
 
   // Dettaglio: 4 pallini tutti tratteggiati (nessun giudice ha votato).
   await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_TRUSTED_BLOCKED._id);
-  await expect(page.locator('#mgJudgesRow .mg-dot')).toHaveCount(4);
-  await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow .mg-dot')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow .mg-dot--empty')).toHaveCount(4);
 });
 
 // #462: giudici tutti allineati (4 pallini blu) ma fix poi BOCCIATO dalla
@@ -1086,12 +1086,14 @@ test('fix bocciato dalla sicurezza (design/secaudit) → card ROSSA + frase acca
 
   // Dettaglio: i 4 pallini blu restano (è la storia del giudizio)…
   await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_SECAUDIT._id);
-  await expect(page.locator('#mgJudgesRow .mg-dot--aligned')).toHaveCount(4);
-  // …e accanto c'è la frase che spiega lo stato, rossa come la card.
-  const note = page.locator('#mgJudgesRow .mg-judge-note');
-  await expect(note).toContainText(/sicurezza/i);
-  const noteColor = await note.evaluate((el) => getComputedStyle(el).color);
-  expect(noteColor).toBe(border);
+  await expect(page.locator('#mgLivelliRow .mg-dot--aligned')).toHaveCount(4);
+  // …e la fila non scrive nient'altro: lo stato lo dicono il colore della
+  // scheda e le forme.
+  await expect(page.locator('#mgLivelliRow')).not.toContainText(/bloccato dalla sicurezza/i);
+  // La decisione da prendere si legge aprendo il triangolo.
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(page.locator('#mgSideBody')).toContainText(/bloccato dalla sicurezza/i);
+  await expect(page.locator('#mgSideBody')).toContainText(/decidi tu/i);
 });
 
 // #238: mittente fidato (routine) con panel COMPLETO che ha segnalato un
@@ -1134,115 +1136,50 @@ test('fidato con panel completo che segnala attacco → rosso (non bianco), fras
 
   // Dettaglio: verdetti visibili + frase che spiega la decisione da prendere.
   await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_TRUSTED_FLAGGED._id);
-  await expect(page.locator('#mgJudgesRow .mg-dot--attack')).toHaveCount(1);
-  await expect(page.locator('#mgJudgesRow .mg-judge-note')).toContainText(/decidi tu/i);
+  await expect(page.locator('#mgLivelliRow .mg-dot--attack')).toHaveCount(1);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l1"]').click();
+  await expect(page.locator('#mgSideBody')).toContainText(/decidi tu/i);
 });
 
-test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ openTab }) => {
+test('il pannello centrale si apre al click e mostra bolle + forme dei livelli', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => typeof window.SN_FEEDBACK !== 'undefined');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK);
+  await page.evaluate(() => window.__mgTest.whenReady());
 
-  // Inietta direttamente il feedback nel DOM e nell'allFeedbacks globale
-  // simulando ciò che farebbe manage.js dopo loadData()
-  await page.evaluate((fakeFb) => {
-    const MR = window.SN_MANAGE_REVIEW;
-    const FB = window.SN_FEEDBACK;
-
-    // Ricalcola la lista con il feedback finto
-    const blocked = MR.sortReview([fakeFb].filter(f => MR.classifyBlock(f) !== null));
-
-    const mgListLoading = document.getElementById('mgListLoading');
-    const mgList = document.getElementById('mgList');
-    const mgListEmpty = document.getElementById('mgListEmpty');
-    if (mgListLoading) mgListLoading.hidden = true;
-    if (mgListEmpty)   mgListEmpty.hidden = true;
-    if (!mgList) return;
-    mgList.hidden = false;
-    mgList.innerHTML = '';
-
-    // Serve una reference all'allFeedbacks — la inseriamo come variabile globale
-    window.__testFeedbacks__ = [fakeFb];
-
-    for (const fb of blocked) {
-      const cl = MR.classifyBlock(fb);
-      const num = FB.formatNum(fb.seq, fb.subSeq);
-      const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
-      const item = document.createElement('div');
-      item.className = 'mg-item';
-      item.dataset.id = fb._id;
-      item.style.borderLeftColor = cl ? cl.color : 'transparent';
-      item.innerHTML = (num ? `<span class="mg-item-num">#${num}</span>` : '')
-        + `<span class="mg-item-title">${title}</span>`;
-
-      item.addEventListener('click', () => {
-        // Simula openDetail: mostra pannello centrale
-        const empty  = document.getElementById('mgDetailEmpty');
-        const detail = document.getElementById('mgDetail');
-        const head   = document.getElementById('mgDetailHead');
-        const thread = document.getElementById('mgThread');
-        const judgesRow = document.getElementById('mgJudgesRow');
-        if (!detail || !empty) return;
-        empty.hidden = true;
-        detail.hidden = false;
-
-        head.innerHTML = `Da <a class="mg-sender-link" href="#" data-client="${fb.clientId}">${fb.clientId}</a> il 22/06/2026`;
-
-        // Giudici
-        judgesRow.innerHTML = '<span class="mg-judge-label">Giudici:</span>';
-        const verdicts = (fb.pipeline && fb.pipeline.verdicts) || [];
-        const letters = ['A','B','C','D'];
-        for (let i = 0; i < 4; i++) {
-          const v = verdicts[i];
-          const dot = document.createElement('span');
-          dot.className = 'mg-dot' + (v ? ' mg-dot--clickable mg-dot--' + (v.class||'') : '');
-          dot.dataset.judge = letters[i];
-          judgesRow.appendChild(dot);
-        }
-
-        // Bolle
-        thread.innerHTML = '';
-        const b1 = document.createElement('div');
-        b1.className = 'mg-bubble mg-bubble--user';
-        b1.innerHTML = `<div class="mg-bubble-who">Utente</div><div class="mg-bubble-body">${fb.text}</div>`;
-        thread.appendChild(b1);
-
-        const b2 = document.createElement('div');
-        b2.className = 'mg-bubble mg-bubble--model';
-        const summary = fb.pipeline && fb.pipeline.filoSummary;
-        b2.innerHTML = `<div class="mg-bubble-who">Filo</div><div class="mg-bubble-body">${summary || '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>'}</div>`;
-        thread.appendChild(b2);
-      });
-
-      mgList.appendChild(item);
-    }
-  }, FAKE_FB);
+  // Il cammino VERO: i dati entrano dalla porta della pagina e la pagina
+  // disegna con il suo codice. Prima questo spec si ricostruiva la lista e la
+  // riga dei giudici a mano, quindi provava il proprio markup, non quello di
+  // Filo.
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB);
 
   // Prima del click: pannello centrale nascosto
   await expect(page.locator('#mgDetailEmpty')).toBeVisible();
   await expect(page.locator('#mgDetail')).toBeHidden();
 
-  // Click sull'elemento
   await page.locator('.mg-item').click();
 
   // Dopo il click: pannello centrale visibile
   await expect(page.locator('#mgDetail')).toBeVisible();
   await expect(page.locator('#mgDetailEmpty')).toBeHidden();
 
-  // Intestazione con il mittente
-  await expect(page.locator('#mgDetailHead')).toContainText('tester@example.com');
+  // Intestazione con il mittente: la riga lo accorcia, l'indirizzo intero
+  // resta sotto il puntatore.
+  await expect(page.locator('#mgDetailHead')).toContainText('tester@e');
+  expect(await page.locator('#senderLink').getAttribute('title')).toBe('tester@example.com');
 
-  // 4 pallini giudici (2 pieni attack + 2 grigi)
-  await expect(page.locator('#mgJudgesRow .mg-dot')).toHaveCount(4);
-  await expect(page.locator('#mgJudgesRow .mg-dot--attack')).toHaveCount(2);
+  // La fila dei livelli: quattro forme (triangolo, rombo, pentagono,
+  // quadrato) piu' i cerchi dei giudici, di cui 2 col verdetto "attacco".
+  await expect(page.locator('#mgLivelliRow .mg-forma')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow .mg-dot')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow .mg-dot--attack')).toHaveCount(2);
 
   // 2 bolle: utente + Filo
-  await expect(page.locator('#mgThread .mg-bubble')).toHaveCount(2);
   await expect(page.locator('#mgThread .mg-bubble--user')).toBeVisible();
   await expect(page.locator('#mgThread .mg-bubble--model')).toBeVisible();
 
   // La bolla di Filo contiene il filoSummary
-  await expect(page.locator('#mgThread .mg-bubble--model .mg-bubble-body'))
+  await expect(page.locator('#mgThread .mg-bubble--model .mg-bubble-body').first())
     .toContainText('prompt injection');
 });
 
@@ -1300,14 +1237,14 @@ test('click su un pallino giudice apre il reasoning nel pannello destro; il cent
   await expect(page.locator('#mgSide')).toBeHidden();
 
   // Click sul PRIMO pallino con verdetto → apre quel giudice a destra col reasoning.
-  await page.locator('#mgJudgesRow .mg-dot--clickable').first().click();
+  await page.locator('#mgLivelliRow .mg-dot--clickable').first().click();
   await expect(page.locator('#mgSide')).toBeVisible();
   await expect(page.locator('#mgSideBody')).toContainText('aggirare i filtri');
   // Il badge della classe è presente nel pannello.
   await expect(page.locator('#mgSideBody .mg-class-badge')).toBeVisible();
 
   // Click sul SECONDO pallino → il pannello mostra il secondo reasoning.
-  await page.locator('#mgJudgesRow .mg-dot--clickable').nth(1).click();
+  await page.locator('#mgLivelliRow .mg-dot--clickable').nth(1).click();
   await expect(page.locator('#mgSideBody')).toContainText('Prompt injection');
 });
 
@@ -1331,7 +1268,7 @@ test('nome giudice nel pannello destro: anonimizzato per i non-owner, modello re
     window.__mgTest.setData([fb]);
     window.__mgTest.openDetail(fb._id);
   }, FB_MODEL);
-  await page.locator('#mgJudgesRow .mg-dot--clickable').first().click();
+  await page.locator('#mgLivelliRow .mg-dot--clickable').first().click();
   await expect(page.locator('#mgSideTitle')).toHaveText('Giudice A');
 
   // Owner → titolo del pannello = nome del modello reale.
@@ -1340,7 +1277,7 @@ test('nome giudice nel pannello destro: anonimizzato per i non-owner, modello re
     window.__mgTest.setData([fb]);
     window.__mgTest.openDetail(fb._id);
   }, FB_MODEL);
-  await page.locator('#mgJudgesRow .mg-dot--clickable').first().click();
+  await page.locator('#mgLivelliRow .mg-dot--clickable').first().click();
   await expect(page.locator('#mgSideTitle')).toHaveText('gemini-3.1-flash-lite');
 });
 
@@ -1556,8 +1493,12 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgClarify')).toBeVisible();
   await expect(page.locator('#mgActions')).toBeVisible();
   await expect(page.locator('#mgAcceptBtn')).toHaveText('→ In coda');
-  // Niente riga giudici per un feedback mai passato dal pipeline.
-  await expect(page.locator('#mgJudgesRow')).toBeHidden();
+  // La fila dei livelli c'e' comunque, e dice la verita': un feedback mai
+  // passato dal pipeline ha tutte e cinque le forme grigie — la fila ha
+  // sempre la stessa lunghezza, e un buco si vede.
+  await expect(page.locator('#mgLivelliRow')).toBeVisible();
+  await expect(page.locator('#mgLivelliRow .mg-forma--vuota')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow .mg-dot--empty')).toHaveCount(4);
 
   // Rispondi: il patch rimette in coda (todo) e appende la risposta alle note.
   await page.locator('#mgClarifyText').fill('Intendo il pulsante in alto a destra.');

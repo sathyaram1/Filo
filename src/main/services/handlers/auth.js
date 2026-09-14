@@ -110,6 +110,35 @@ async function decryptPipelineField(out, C, priv) {
   }
 }
 
+// I testi dei livelli 3 e 4 (`livelli.l3.testo`, `livelli.l4.testo`): quello
+// che Claude ha segnalato lavorando e il resoconto dell'audit di sicurezza.
+// Viaggiano nella stessa busta delle note, con la stessa chiave dell'owner,
+// quindi si decifrano con lo stesso helper — e la mappa si copia prima di
+// scriverci dentro, per non mutare il documento che il chiamante ha passato.
+// Senza chiave: il placeholder, come per gli altri testi (la dashboard lo
+// riconosce e lo dichiara invece di mostrare un blob).
+const LIVELLI_CON_TESTO = ['l3', 'l4'];
+async function decryptLivelliFields(out, C, priv) {
+  const l = out.livelli;
+  if (!l || typeof l !== 'object') return;
+  const copia = { ...l };
+  let toccato = false;
+  for (const k of LIVELLI_CON_TESTO) {
+    const voce = copia[k];
+    if (!voce || typeof voce !== 'object') continue;
+    if (!C.isEncrypted(voce.testo)) continue;
+    if (!priv) { copia[k] = { ...voce, testo: PLACEHOLDER_NO_KEY }; toccato = true; continue; }
+    try {
+      copia[k] = { ...voce, testo: await C.decrypt(voce.testo, priv) };
+    } catch (e) {
+      console.warn(`[auth] decifratura di livelli.${k}.testo fallita:`, e?.message || e);
+      copia[k] = { ...voce, testo: PLACEHOLDER_NO_KEY };
+    }
+    toccato = true;
+  }
+  if (toccato) out.livelli = copia;
+}
+
 // `privKey` (opzionale): la chiave già letta dal chiamante. Il batch della
 // dashboard la passa una volta per tutti i documenti — rileggerla dal disco a
 // ogni feedback (500 volte per una lista) era solo tempo perso.
@@ -135,6 +164,7 @@ async function decryptFeedbackObject(fields, privKey) {
     }
   }
   await decryptPipelineField(out, C, priv);
+  await decryptLivelliFields(out, C, priv);
 
   // S1.priority: `priority` è un intero, non testo → logica dedicata (come in
   // decrypt-feedback-fields.mjs). Retrocompat: se è già un numero → invariato.
@@ -624,6 +654,33 @@ module.exports = function register(on, ctx) {
     if (r && Array.isArray(r.newBlocks)) out.newBlocks = r.newBlocks;
     if (r && r.realignReason) out.realignReason = String(r.realignReason);
     if (r && r.reason) out.reason = String(r.reason);
+    return out;
+  }));
+
+  // «Salta il controllo»: l'owner ha letto la bocciatura dell'audit di
+  // sicurezza e decide di andare avanti. Stesso cancello delle approvazioni di
+  // fusione — solo pagine filo://, solo il proprietario — perché è lo stesso
+  // tipo di gesto: un'eccezione a un controllo automatico, fatta davanti allo
+  // schermo e non da un terminale che potrebbe non essere nelle sue mani.
+  //
+  // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
+  // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
+  // torna è l'esito VERO di quel cancello, non un "fatto" generico.
+  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente'];
+  on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };
+    const r = await callSecurityFunction('ownerSkipSecaudit', { feedbackId });
+    if (!r || r.ok === false) {
+      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha saltato il controllo.' };
+    }
+    // Un esito che questo client non conosce non si traduce in «fatto»: passa
+    // com'è, e la pagina lo scrive invece di inventarsi un successo.
+    const esito = String(r.esito || r.result || '').trim();
+    const out = { ok: true, esito: ESITI_SALTA.includes(esito) ? esito : esito };
+    if (r.requestId) out.requestId = String(r.requestId);
+    if (r.sha) out.sha = String(r.sha);
+    if (r.error) out.error = String(r.error);
     return out;
   }));
 

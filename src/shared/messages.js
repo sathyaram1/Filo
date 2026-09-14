@@ -456,6 +456,13 @@
     MERGE_APPROVALS_GET: 'merge_approvals_get',        // → { ok, pending:[…], failed:[…], recent:[…], ttlMs } | { ok:false, error }
     MERGE_APPROVAL_APPROVE: 'merge_approval_approve',  // { id } → { ok, result:'merged'|'conflict'|'stale', sha?, headSha?, realigned?:{from,to,mainSha}, newRequest?, newBlocks?, realignReason?, reason? } | { ok:false, error }
     MERGE_APPROVAL_DISCARD: 'merge_approval_discard',  // { id } → { ok, result:'discarded' } | { ok:false, error }
+    // L'owner ha letto la bocciatura dell'audit di sicurezza (L4) e decide di
+    // andare avanti lo stesso. Non è un via libera cieco: il cancello di
+    // fusione (L5) resta, e parte subito dopo — l'esito dice se il ramo è
+    // entrato in main o se si è aperta una richiesta da approvare.
+    // Stessa origine e stesso cancello delle approvazioni di fusione: solo
+    // pagine `filo://`, solo il proprietario.
+    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente', requestId? } | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
