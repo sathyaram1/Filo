@@ -827,6 +827,26 @@
         el.appendChild(m);
       }
 
+      // Indicatore "questo sito può usare la fotocamera, il microfono o vedere
+      // lo schermo" (#586). Sta sulla scheda, non solo nel cartello sotto le
+      // schede, perché il cartello si vede solo mentre si guarda quella scheda:
+      // appena se ne apriva un'altra, di un microfono aperto non restava nessun
+      // segno. Un clic porta sulla scheda che lo tiene aperto, dov'è
+      // «Interrompi».
+      const frasePotere = sensoriPerScheda.get(t.id);
+      if (frasePotere) {
+        const s = document.createElement('span');
+        s.className = 'sensor-ind';
+        s.setAttribute('role', 'button');
+        const detto = `Questo sito ${frasePotere}`;
+        s.title = detto;
+        s.dataset.tip = `${detto} — clicca per aprire la scheda e interrompere`;
+        s.setAttribute('aria-label', detto);
+        s.innerHTML = SENSORE_IND_SVG;
+        s.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.activate(t.id); });
+        el.appendChild(s);
+      }
+
       // Indicatore "aperta da un altro paese": globo + codice paese accanto al
       // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
       if (t.proxy && t.proxy.country) {
