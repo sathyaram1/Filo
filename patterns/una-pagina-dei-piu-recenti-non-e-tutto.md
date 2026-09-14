@@ -48,11 +48,13 @@ l'auto-archiviazione, l'aveva chiusa solo dal lato delle schede.
 «alzo il tetto»: un tetto più alto è lo stesso difetto con una data di scadenza
 più lontana, e quando scade non lo dice nessuno.
 
-In `src/shared/feedback.js` la porta è `listAllPublic()`. Pagina passando da
-`listPublic` (una porta sola: chi la sostituisce in una prova sostituisce anche
-la lettura completa), usa come cursore il **nome del documento** — unico e
-stabile, mentre una data può essere identica su due righe — e si ferma quando la
-pagina torna più corta del limite.
+In `src/shared/feedback.js` le porte sono due, una per raccolta:
+`listAllPublic()` per le schede della bacheca, `listAll()` per le segnalazioni
+vere. Paginano passando dalla porta ESPOSTA — `listPublic` e `list`: una porta
+sola, così chi la sostituisce in una prova sostituisce anche la lettura
+completa — usano come cursore il **nome del documento**, unico e stabile mentre
+una data può essere identica su due righe, e si fermano quando la pagina torna
+più corta del limite.
 
 Il freno sul numero di pagine c'è, ma **non mente**: se scatta, la risposta
 porta `complete: false`. Un troncamento silenzioso qui vuol dire schede che
