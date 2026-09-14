@@ -61,6 +61,27 @@ porta `complete: false`. Un troncamento silenzioso qui vuol dire schede che
 nessuno può più togliere e ricompense che non arrivano, e lo si scopre
 settimane dopo (vedi CLAUDE.md § Limiti).
 
+## Una lettura completa su un cammino caldo vuole una memoria breve
+
+Leggere tutto costa una lettura per riga. Va bene una volta; non va bene a ogni
+gesto. L'annuncio della ricompensa gira a ogni caricamento della home, e la home
+è la pagina di **ogni scheda nuova**: appena è passato a leggere tutte le schede,
+chi aveva mandato una segnalazione si riscaricava la bacheca intera ogni volta
+che apriva una scheda. Misurate: quattro aperture, 2208 schede in otto
+richieste, per una risposta che cambia una volta ogni mai.
+
+Quindi: prima di mettere una lettura completa dietro qualcosa, chiediti **quante
+volte parte**. Se parte spesso, dalle una memoria breve — `listAllPublic` ne ha
+una di trenta secondi — e due modi di scavalcarla: `fresh: true` per chi deve
+vedere lo stato appena scritto, e `forgetAllPublic()` per chi ha appena scritto
+o tolto una riga.
+
+Due dettagli che rendono la memoria innocua nelle prove. Si ricorda **la porta
+da cui è stata riempita**: chi sostituisce la sorgente mette una funzione nuova,
+la memoria non combacia più e si rilegge, quindi una prova non si ritrova mai
+davanti i dati della scena precedente. E si ricorda **solo una lettura
+completa**: memorizzare un troncamento vuol dire ripeterlo per mezzo minuto.
+
 ## Quando invece la finestra va bene
 
 Quando la domanda È «gli ultimi N»: la posta dei feedback, un elenco che si
