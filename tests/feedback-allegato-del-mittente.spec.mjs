@@ -217,3 +217,63 @@ test('di un allegato che non ha aperto, Filo dice chi lo apre e nient’altro', 
   expect(motivo, 'Filo dichiara arrivato un allegato che non ha aperto').not.toMatch(/consegnat|arrivat|ricevut/i);
   expect(motivo, 'Filo descrive la cifratura di un allegato che non ha aperto').not.toMatch(/cifrat/i);
 });
+
+// #582, giro 6 — la stessa segnalazione, lo stesso allegato, lo stesso utente,
+// e DUE pagine che la mostrano: il riquadro dei feedback e la Gestione.
+//
+// La cura dei giri 1, 3 e 5 era stata scritta solo nella prima. In Gestione —
+// che non è una pagina nascosta: sta nell'elenco delle app accanto a Editor e
+// Feedback, senza filtri, e mostra le segnalazioni di tutti — restava la frase
+// di prima, «immagine non disponibile», che fa sembrare un guasto quello che è
+// solo roba di qualcun altro; e la pillola di un documento arrivava identica a
+// una che si apre, rispondendo solo dopo il clic.
+//
+// La causa è sempre la stessa di questo feedback: il canale che serve le due
+// pagine la risposta giusta la dà già, e una delle due la buttava via. Questa
+// prova sta qui, e non fra quelle di un giro di verifica, perché è la guardia
+// contro il ritorno del difetto: lì dentro sarebbe verde il giorno in cui la
+// scrivo e non girerebbe mai più.
+//
+// Senza il fix è rossa due volte: sull'alt dell'immagine e sull'hover della
+// pillola, che prima del clic non esisteva.
+const GESTIONE_URL = 'filo://manage/manage.html';
+
+test('Gestione dice dell’allegato la stessa cosa del riquadro dei feedback', async ({ openTab }) => {
+  const page = await openTab(GESTIONE_URL);
+  await page.waitForFunction(() => !!window.__mgTest);
+  await page.evaluate(({ img, doc }) => {
+    window.__mgTest.setAdmin(false);
+    window.__mgTest.setData([{
+      _id: 'due-superfici-582',
+      seq: 9582, subSeq: 0, number: 9582,
+      status: 'open',
+      name: 'Lo schermo diventa bianco',
+      text: 'succede quando apro la seconda scheda',
+      clientId: 'tester@example.com',
+      createdAt: '2026-09-11T10:00:00Z',
+      images: [img],
+      files: [{ name: 'registro.txt', url: doc, type: 'text/plain' }],
+    }]);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.openDetail('due-superfici-582');
+  }, { img: ALLEGATO, doc: DOCUMENTO });
+  await expect(page.locator('#mgDetail')).toBeVisible();
+
+  const img = page.locator('.mg-bubble-imgs img').first();
+  await expect(img).toBeVisible();
+  await expect(img).toHaveAttribute('alt', '(allegato riservato)', { timeout: 10_000 });
+  const hoverImg = (await img.getAttribute('title')) || '';
+  expect(hoverImg, 'Gestione dice chi apre l’allegato').toMatch(/lo apre solo chi riceve le segnalazioni/i);
+  expect(hoverImg, 'Gestione manda un tester a cercare permessi che non avrà mai').not.toMatch(/amministrator/i);
+
+  const pillola = page.locator('a.mg-file-link').first();
+  await expect(pillola).toBeVisible();
+  // Lo dice PRIMA del clic, come nel riquadro.
+  await expect(pillola.locator('.mg-file-note')).toHaveText(/riservato/, { timeout: 10_000 });
+  const hoverDoc = (await pillola.getAttribute('title')) || '';
+  expect(hoverDoc, 'la pillola di Gestione non dice niente prima del clic').toMatch(/lo apre solo chi riceve le segnalazioni/i);
+  expect(hoverDoc, 'la pillola di Gestione parla di amministratori').not.toMatch(/amministrator/i);
+  // E di un allegato che non ha aperto, Filo non dichiara né che è arrivato né
+  // come viaggia — la regola del giro 5, anche di qua.
+  expect(hoverDoc).not.toMatch(/consegnat|arrivat|ricevut|cifrat/i);
+});

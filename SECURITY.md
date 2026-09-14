@@ -206,10 +206,11 @@ I server applicano regole precise (Firebase Security Rules):
 - Gli **allegati** (gli screenshot, cioè il tuo schermo) non sono pubblici.
   Chiunque può caricarne di nuovi insieme a un feedback, anche senza login, ma
   nessuno può sovrascriverli, cancellarli o farsi dare l'elenco di quelli che
-  ci sono: si leggono solo dal collegamento che nasce con l'allegato e che vive
-  dentro il tuo feedback, o con le credenziali di chi riceve la segnalazione.
-  Prima bastava il nome del deposito, che è scritto nel codice, per scaricarli
-  tutti.
+  ci sono. Si aprono da una strada sola: il collegamento che nasce insieme
+  all'allegato e che vive dentro il tuo feedback. Nemmeno chi riceve le
+  segnalazioni ne ha un'altra, ed è voluto — è quello che rende utile ritirare
+  quel collegamento se finisce in giro. Prima bastava il nome del deposito, che
+  è scritto nel codice, per scaricarli tutti.
 
 C'è una seconda raccolta aperta a tutti, e va detto perché. Quando l'assistente
 ti aiuta a fare qualcosa su un sito, Filo può tenere da parte come ci è
