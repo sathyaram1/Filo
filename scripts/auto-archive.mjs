@@ -65,7 +65,19 @@ function packageVersion() {
 export async function runAutoArchive({ dryRun = false, now = Date.now(), releasedVersion } = {}) {
   const ver = releasedVersion || packageVersion();
   const bearer = await acquireBearer();
-  const grezzi = await FB.list({ pageSize: 500, idToken: bearer });
+  // TUTTE le segnalazioni, paginate. Una finestra sulle 500 più recenti per
+  // data d'invio lasciava fuori le più vecchie, che sono esattamente quelle che
+  // questo giro dovrebbe archiviare per prime: i loro fix non uscivano mai
+  // dalla bacheca, restavano votabili e riapribili a pagamento, e per loro non
+  // si accendeva nemmeno «gli utenti dicono che non va». Con 711 segnalazioni
+  // ne restavano fuori 211, e il numero cresceva da solo.
+  const { rows: grezzi, complete } = typeof FB.listAllPaged === 'function'
+    ? await FB.listAllPaged({ idToken: bearer })
+    : { rows: await FB.list({ pageSize: 500, idToken: bearer }), complete: false };
+  if (!complete) {
+    console.warn('AVVISO: non sono riuscito a leggere TUTTE le segnalazioni: '
+      + `questo giro decide su ${grezzi.length}, le più vecchie restano fuori.`);
+  }
   // I voti (DB4) si scrivono sulla scheda pubblica: senza riunirli, il
   // punteggio sarebbe quello dei soli voti storici e non archivierebbe più
   // niente.
