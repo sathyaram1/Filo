@@ -391,7 +391,17 @@ module.exports = function register(on, ctx) {
   // privata (che NON esce mai dal main), ne indovina il MIME e torna un data URL
   // mostrabile. Owner-only. Retrocompat: immagini NON cifrate (storiche) passano
   // invariate (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
-  on(MSG.FEEDBACK_DECRYPT_IMAGE, ownerOnly(async (msg) => {
+  // PROVENIENZA sì, `ownerOnly` no, e la differenza è voluta. Il confine
+  // d'origine (#583) vale anche qui: da un sito visitato questa porta risponde
+  // «rifiutato per provenienza», come ogni altra del corridoio. Quello che NON
+  // può fare è fermarsi a «sei l'amministratore?», perché questo canale lo
+  // chiamano DUE pagine di Filo: la dashboard di chi riceve le segnalazioni e
+  // il riquadro dei feedback, dove un tester qualunque riapre le proprie. Con
+  // `ownerOnly` un tester si sentiva rispondere «operazione riservata agli
+  // amministratori» davanti al proprio screenshot — mandato a cercare un
+  // permesso che non avrà mai (#582). La risposta giusta gliela dà il corpo,
+  // dopo aver guardato PRIMA dove punta l'indirizzo.
+  on(MSG.FEEDBACK_DECRYPT_IMAGE, soloFilo(async (msg) => {
     try {
       const url = String((msg && msg.url) || '');
       const FB = globalThis.SN_FEEDBACK;
