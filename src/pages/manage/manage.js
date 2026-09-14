@@ -1251,8 +1251,7 @@
             dl.click();
             dl.remove();
           } else {
-            a.title = (r && r.error) ? String(r.error) : 'allegato non disponibile';
-            a.classList.add('mg-img-failed');
+            markFileClosed(a, (r && r.error) ? String(r.error) : 'allegato non disponibile', !!(r && r.soloDestinatario));
           }
         } catch (_) {
           a.title = 'allegato non raggiungibile';
