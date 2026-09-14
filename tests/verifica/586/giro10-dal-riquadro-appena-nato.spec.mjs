@@ -86,15 +86,26 @@ test('la scelta di cosa si condivide non si salta nemmeno da un riquadro appena 
   console.log('[586 g10] quello che è arrivato al sito:', JSON.stringify(arrivato));
   console.log('[586 g10] il segno che resta:', JSON.stringify(segno));
 
-  const ottenuto = Array.isArray(arrivato) && arrivato.some((s) => !String(s).startsWith('rifiutato'));
   expect(
-    ottenuto && !picker,
+    picker,
     'dal riquadro appena nato la strada vecchia della cattura schermo consegna lo schermo intero (e '
     + 'l\'audio del computer, se il sito lo chiede) con un «Consenti» solo: il riquadro con le cose '
     + `fra cui scegliere non compare. È arrivato ${JSON.stringify(arrivato)}. La domanda è la stessa `
     + 'parola per parola di quella della strada moderna, quindi chi risponde non può sapere se dopo '
     + 'gli verrà chiesto cosa condividere o se lo schermo intero parte subito',
-  ).toBe(false);
+  ).toBe(true);
+
+  expect(
+    String(arrivato),
+    'scelta la fonte, al sito deve arrivare quello che ha chiesto: chiudere la porta aggiungendo la '
+    + 'scelta, non spegnendo la condivisione',
+  ).toMatch(/Screen|Entire screen|Schermo/i);
+
+  expect(
+    String(arrivato),
+    'l\'audio del computer non si dà per scontato: il sito l\'ha chiesto, ma nel riquadro della '
+    + 'scelta la spunta parte spenta e nessuno l\'ha accesa',
+  ).not.toMatch(/System Audio/i);
 });
 
 test('la richiesta che ammazza la scheda non deve ammazzarla nemmeno da un riquadro appena nato', async ({ shell, openTab, testServer }) => {
