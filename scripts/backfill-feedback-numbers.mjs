@@ -38,26 +38,54 @@ function strField(doc, name) {
 }
 
 async function listAll(bearer) {
-  // runQuery ordinato per createdAt ASC: i feedback più vecchi prendono i
-  // numeri più bassi. 1000 è ben oltre il volume attuale dell'alpha.
+  // TUTTI i feedback, paginati con un cursore sul nome del documento, poi
+  // ordinati per data d'invio crescente (i più vecchi prendono i numeri più
+  // bassi). Prima si chiedevano i primi mille e si trattavano come tutti: il
+  // giorno che il tetto si tocca, i feedback oltre il millesimo non prendono un
+  // numero e nessuno lo dice — e i numeri qui si assegnano contando quelli che
+  // ci sono, quindi da un elenco parziale escono numeri già presi.
   // La lettura della collezione vuole le credenziali dell'owner (#583)
   // (anche il giro a vuoto: leggere è già un'operazione con credenziali).
   const headers = { 'Content-Type': 'application/json' };
   if (bearer) headers.Authorization = `Bearer ${bearer}`;
-  const res = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: 'feedback' }],
-        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
-        limit: 1000,
-      },
-    }),
-  });
-  if (!res.ok) throw new Error(`firestore query fallita (${res.status}): ${(await res.text()).slice(0, 200)}`);
-  const arr = await res.json();
-  return arr.filter((r) => r.document).map((r) => r.document);
+  const PAGINA = 500;
+  const MAX_PAGINE = 40;
+  const docs = [];
+  const visti = new Set();
+  let cursore = '';
+  let completo = false;
+  for (let i = 0; i < MAX_PAGINE; i += 1) {
+    const structuredQuery = {
+      from: [{ collectionId: 'feedback' }],
+      orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+      limit: PAGINA,
+    };
+    if (cursore) structuredQuery.startAt = { before: false, values: [{ referenceValue: cursore }] };
+    // eslint-disable-next-line no-await-in-loop
+    const res = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
+      method: 'POST', headers, body: JSON.stringify({ structuredQuery }),
+    });
+    // eslint-disable-next-line no-await-in-loop
+    if (!res.ok) throw new Error(`firestore query fallita (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    // eslint-disable-next-line no-await-in-loop
+    const arr = (await res.json()).filter((r) => r.document).map((r) => r.document);
+    let nuovi = 0;
+    for (const d of arr) {
+      if (!d.name || visti.has(d.name)) continue;
+      visti.add(d.name);
+      docs.push(d);
+      nuovi += 1;
+    }
+    const ultimo = arr.length ? arr[arr.length - 1].name : '';
+    if (arr.length < PAGINA || nuovi === 0 || !ultimo || ultimo === cursore) { completo = true; break; }
+    cursore = ultimo;
+  }
+  // Un elenco parziale qui produce numeri sbagliati: meglio fermarsi.
+  if (!completo) {
+    throw new Error(`non sono riuscito a leggere TUTTI i feedback (fermato a ${docs.length}): `
+      + 'con un elenco parziale i numeri assegnati sarebbero già presi.');
+  }
+  return docs.sort((a, b) => String(strField(a, 'createdAt')).localeCompare(String(strField(b, 'createdAt'))));
 }
 
 async function patchSeq(id, seq, bearer) {
