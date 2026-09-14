@@ -855,7 +855,6 @@
     let cursor = '';
     let complete = false;
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
-      // eslint-disable-next-line no-await-in-loop
       // Si passa dalla porta ESPOSTA, non dal riferimento interno: chi
       // sostituisce `SN_FEEDBACK.listPublic` (una prova, la bacheca in modalità
       // test) deve sostituire anche questa lettura, o si ritroverebbe la rete
