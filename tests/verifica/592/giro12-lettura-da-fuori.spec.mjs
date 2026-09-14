@@ -82,8 +82,7 @@ test("da una pagina web lo stato dell'account non deve dire chi è l'utente", as
   // Un accesso finto: si sostituiscono le funzioni del modulo già caricato, che
   // è lo stesso oggetto che l'handler ha in mano.
   await app.evaluate(async () => {
-    const via = Object.keys(require.cache).find((k) => k.endsWith('google-auth.js'));
-    const auth = require.cache[via].exports;
+    const auth = process.mainModule.require('./auth/google-auth');
     auth.isSignedIn = () => true;
     auth.isAdmin = () => true;
     auth.getUid = async () => 'uid-di-marta-123';
