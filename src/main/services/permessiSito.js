@@ -775,15 +775,19 @@ function chiediAUnFrame(frame, chiavi) {
   return new Promise((resolve) => {
     const id = `f${prossimaFermata++}`;
     let finito = false;
-    const finisci = (vive, registrate) => {
+    const finisci = (vive, registrate, incoerenza) => {
       if (finito) return;
       finito = true;
       fermate.delete(id);
       clearTimeout(timer);
-      resolve({ vive: Number(vive) || 0, registrate: Number(registrate) || 0 });
+      resolve({
+        vive: Number(vive) || 0,
+        registrate: Number(registrate) || 0,
+        incoerenza: Number(incoerenza) || 0,
+      });
     };
     // Nessuna risposta entro la finestra = "è rimasto tutto vivo": si ricarica.
-    const timer = setTimeout(() => finisci(1, 0), FERMATA_MS);
+    const timer = setTimeout(() => finisci(1, 0, 0), FERMATA_MS);
     if (timer.unref) timer.unref();
     fermate.set(id, finisci);
     try { frame.send('filo:permessi-ferma', { id, chiavi: chiavi && chiavi.length ? chiavi : null }); }
