@@ -13,7 +13,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
+const auth = await import(pathToFileURL(join(ROOT, 'scripts', 'lib', 'firestore-auth.mjs')).href);
 const publicOf = globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.statusToPublic;
+
+// Il primo caso si ferma PRIMA delle credenziali, quindi gira ovunque. Il
+// secondo le attraversa: `acquireBearer()` è pensato per una riga di comando e
+// senza credenziali chiude il processo (`process.exit(1)`), che in un unit test
+// non è un'eccezione da catturare — è il file intero che muore. Sulla macchina
+// dell'owner le credenziali ci sono e il caso gira davvero; dove non ci sono
+// (il contenitore delle routine, una macchina qualunque) si salta, invece di
+// far cadere `npm run test:unit` per un motivo che col codice non c'entra.
+const CREDENZIALI = !!(auth.loadServiceAccount() || auth.findAdminRefreshToken());
 
 test('--preapprova con uno stato che chiude la pratica: rifiuto, con la spiegazione', async () => {
   assert.equal(typeof publicOf, 'function');
