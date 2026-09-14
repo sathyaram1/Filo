@@ -334,11 +334,6 @@ module.exports = function register(on, ctx) {
         { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved },
         { idToken },
       );
-<<<<<<< HEAD
-      // La pagina mostra subito chi ha messo il segno: glielo dice il main,
-      // che è l'unico a saperlo.
-      return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
-=======
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
       // entra, uno riaperto esce, la frase per chi ha segnalato cambia): la
       // vista pubblica si rifà subito, non al prossimo caricamento.
