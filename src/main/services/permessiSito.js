@@ -791,7 +791,7 @@ function chiediAUnFrame(frame, chiavi) {
     if (timer.unref) timer.unref();
     fermate.set(id, finisci);
     try { frame.send('filo:permessi-ferma', { id, chiavi: chiavi && chiavi.length ? chiavi : null }); }
-    catch (_) { finisci(1, 0); }
+    catch (_) { finisci(1, 0, 0); }
   });
 }
 
