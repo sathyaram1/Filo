@@ -61,6 +61,34 @@ porta `complete: false`. Un troncamento silenzioso qui vuol dire schede che
 nessuno può più togliere e ricompense che non arrivano, e lo si scopre
 settimane dopo (vedi CLAUDE.md § Limiti).
 
+## Chi pagina col nome si prende anche l'ordine
+
+Il cursore è il nome del documento, quindi una lettura completa arriva
+nell'ordine degli identificativi: casuale. Finché la domanda era «i primi N per
+data», l'ordine lo faceva il database e nessuno ci pensava. Dopo, l'ordine è
+lavoro di chi legge, e chi si dimentica non vede niente di rotto: una lista
+disordinata non lancia eccezioni.
+
+È già costato due volte (#583, giro 7). Il comando che numera le segnalazioni
+rimaste senza numero ha ricominciato a darli a caso, e l'annuncio della
+ricompensa elencava i fix appena usciti in ordine di identificativo. Nessuna
+prova diventava rossa.
+
+Quindi, quando passi una lettura a paginare col nome: cerca chi consuma quella
+lista e chiediti su quale asse la voleva. La bacheca se lo era già preso
+(riordina lei per data d'invio) e infatti non si è rotta. Se l'ordine conta,
+riordina **una copia** — quelle righe possono arrivare dalla memoria breve, ed è
+la stessa lista che stanno leggendo altri.
+
+Attenzione a come leggi la data per riordinare. Su un documento grezzo di
+Firestore `createdAt` è un `timestampValue`; i documenti più vecchi ce l'hanno
+come `stringValue`, qualcuno importato come `integerValue`. Un lettore che ne
+guarda una sola torna vuoto sugli altri, e vuoto contro vuoto dà zero: il
+confronto dice «pari» per tutte le righe e l'ordinamento non sposta niente.
+Il comando dei numeri è caduto esattamente lì. Una data che non si riesce a
+leggere deve valere «non lo so» e finire in fondo, non zero, che è il 1970 e
+scavalca tutti.
+
 ## Una lettura completa su un cammino caldo vuole una memoria breve
 
 Leggere tutto costa una lettura per riga. Va bene una volta; non va bene a ogni
