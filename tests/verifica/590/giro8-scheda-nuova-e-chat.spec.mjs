@@ -224,7 +224,7 @@ test('AH1 — un link sponsorizzato che si apre in una scheda NUOVA non deve far
   await shell.waitForTimeout(3000);
 
   // Le notifiche si leggono SUBITO: spariscono da sole dopo pochi secondi.
-  const nominaSubito = (await notifiche()).filter((t) => t.includes('Sito bloccato'));
+  const nominaSubito = (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t));
   const articoloAperto = await aspettaArticolo();
   const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
   expect(
@@ -255,7 +255,7 @@ test('AH4 — col blocco dei popup spento, una finestrella verso un contatore no
   await p.evaluate((u) => window.open(u, '_blank', 'width=500,height=400'),
     `http://${CONTATORE}:${srv.porta}/clic?u=articolo`);
   await shell.waitForTimeout(3000);
-  const dette = (await notifiche()).filter((t) => t.includes('Sito bloccato'));
+  const dette = (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t));
   await shell.evaluate(() => window.filoShell.message({
     type: 'update_settings', settings: { security: { blockPopups: true } },
   }));
@@ -273,7 +273,7 @@ test('AH0 — controllo: lo stesso link SENZA target, nella stessa scheda, tace 
   await p.waitForSelector('#go', { timeout: 8000 });
   await p.evaluate(() => document.getElementById('go').click());
   await shell.waitForTimeout(3000);
-  const nomina = (await notifiche()).filter((t) => t.includes('Sito bloccato'));
+  const nomina = (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t));
   const articoloAperto = await aspettaArticolo();
   const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
   expect(
@@ -337,7 +337,7 @@ test('AH5 — «Apri in una nuova scheda» dal tasto destro sullo stesso link: s
   await p.evaluate(() => window.open(document.getElementById('go').href, '_blank', 'noopener'));
   await shell.waitForTimeout(3000);
   expect(
-    (await notifiche()).filter((t) => t.includes('Sito bloccato')),
+    (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t)),
     'stesso link, stesso contatore, terza strada: non può nominarlo',
   ).toEqual([]);
 });
@@ -358,7 +358,7 @@ test('AH2 — Ctrl+clic su un link sponsorizzato («aprilo dietro») non deve fa
   await shell.waitForTimeout(3000);
 
   expect(
-    (await notifiche()).filter((t) => t.includes('Sito bloccato')),
+    (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t)),
     'aprire un link dietro è un gesto ordinario di ogni browser: non può '
     + 'nominare all\'utente un sito che non ha mai visto',
   ).toEqual([]);
@@ -436,7 +436,7 @@ test('AJ — il sì dato in una finestra in incognito non deve valere nella fine
   await pulisciNotifiche();
   await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${LISTA}:${srv.porta}/pagina?normale`);
   await shell.waitForTimeout(2500);
-  const dette = (await notifiche()).filter((t) => t.includes('Sito bloccato'));
+  const dette = (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t));
   const aperto = await sitoDellaListaVisibile();
   // E la seconda porta sulla stessa causa: quel sì è anche SCRITTO nell'elenco
   // dei siti sbloccati a mano, che l'utente legge nella pagina Sicurezza delle
@@ -553,7 +553,7 @@ test('AL — dopo un riavvio la lista blocca ancora e il sì di prima non vale p
     + 'deve tornare a valere',
   ).toBe(false);
   expect(
-    (await notifiche()).filter((t) => t.includes('Sito bloccato')).length,
+    (await notifiche()).filter((t) => /Sito bloccato|liste di pubblicità/.test(t)).length,
     'e il blocco si deve dire',
   ).toBeGreaterThan(0);
 });

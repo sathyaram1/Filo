@@ -341,10 +341,13 @@ test('AQ1 — «Apri» sulla chip di una finestrella verso un contatore non deve
   });
   await shell.waitForTimeout(1500);
   const dette = await notifiche();
+  // Dal dodicesimo giro le due sorgenti della lista hanno due testi diversi:
+  // qui si guarda il NOME del contatore, non le parole della notifica, così la
+  // prova resta rossa finché il difetto c'è, comunque lo si scriva.
   expect(
-    dette.some((t) => /Sito bloccato/i.test(t)),
+    dette.some((t) => t.includes(CONTATORE)),
     'la chip promette di far passare QUELLA finestrella, e l\'indirizzo l\'ha scelto la pagina, non l\'utente: '
-    + `«Sito bloccato» col nome del contatore non ci va. Notifiche a schermo ${JSON.stringify(dette)}. `
+    + `nominare il contatore all'utente non ci va. Notifiche a schermo ${JSON.stringify(dette)}. `
     + 'Con il blocco dei popup SPENTO lo stesso identico indirizzo passa in silenzio (giro 8, AH4)',
   ).toBe(false);
   await pulisciChip();
@@ -363,8 +366,8 @@ test('AQ2 — controllo: sulla stessa chip, il sito che l\'UTENTE ha messo in li
   await shell.waitForTimeout(1500);
   const dette = await notifiche();
   expect(
-    dette.some((t) => /Sito bloccato/i.test(t)),
-    'il divieto scritto dall\'utente vale anche qui, e va detto',
+    dette.some((t) => /Sito bloccato/i.test(t) && t.includes(LISTA)),
+    'il divieto scritto dall\'utente vale anche qui, e va detto col suo nome',
   ).toBe(true);
   expect(await visibile('t'), 'e il sito della lista non si deve aprire').toBe(false);
   await pulisciChip();
