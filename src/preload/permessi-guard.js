@@ -356,25 +356,6 @@ function buildCatturaSicuraSource() {
           const aD = desktop(c.audio);
           const vD = desktop(c.video);
           schermo = aD || vD;
-          // LA STRADA VECCHIA DELLO SCHERMO, riportata su quella nuova.
-          //
-          // Le due strade arrivano a Filo con una richiesta indistinguibile, ma
-          // solo la nuova passa dal punto in cui Filo fa scegliere COSA si
-          // condivide (tutto lo schermo o una finestra sola) e se dare anche
-          // l'audio del computer. Dalla vecchia partiva lo schermo intero, e il
-          // suono con lui, con un «Consenti» solo: la scelta valeva per i siti
-          // che chiedevano con le buone, e bastava una riga per saltarla (#586,
-          // giro 9). Qui la richiesta vecchia diventa quella nuova prima ancora
-          // di partire, così la scelta la vede chiunque chieda lo schermo.
-          if (vD && veraDisplay) {
-            const v = (c.video && typeof c.video === 'object') ? { ...c.video } : true;
-            if (v && typeof v === 'object') { delete v.mandatory; delete v.optional; delete v.chromeMediaSource; delete v.chromeMediaSourceId; }
-            const chiediAudio = aD;
-            return veraDisplay.call(this || md, {
-              video: (v && typeof v === 'object' && Object.keys(v).length) ? v : true,
-              ...(chiediAudio ? { audio: true } : {}),
-            }).then((s) => registra(s, 'schermo'));
-          }
           if (aD && !vD) {
             return Promise.reject(new DOMException(
               "L'audio del computer si può chiedere solo insieme all'immagine dello schermo.",
@@ -386,6 +367,30 @@ function buildCatturaSicuraSource() {
               "L'immagine dello schermo si può chiedere da sola o insieme all'audio del computer, non insieme al microfono.",
               'NotSupportedError',
             ));
+          }
+          // LA STRADA VECCHIA DELLO SCHERMO, riportata su quella nuova.
+          //
+          // Le due strade arrivano a Filo con una richiesta indistinguibile, ma
+          // solo la nuova passa dal punto in cui Filo fa scegliere COSA si
+          // condivide (tutto lo schermo o una finestra sola) e se dare anche
+          // l'audio del computer. Dalla vecchia partivano lo schermo intero e il
+          // suono insieme, con un «Consenti» solo: la scelta valeva per i siti
+          // che chiedevano con le buone, e bastava una riga per saltarla (#586,
+          // giro 9). Qui la richiesta vecchia diventa quella nuova prima di
+          // partire, così la scelta la incontra chiunque chieda lo schermo.
+          // L'audio del computer resta una richiesta a parte, che il riquadro
+          // mostra spenta: chiederlo non è averlo.
+          if (vD && veraDisplay) {
+            let v = (c.video && typeof c.video === 'object') ? { ...c.video } : true;
+            if (v && typeof v === 'object') {
+              delete v.mandatory; delete v.optional;
+              delete v.chromeMediaSource; delete v.chromeMediaSourceId;
+              if (!Object.keys(v).length) v = true;
+            }
+            return veraDisplay.call(this || md, {
+              video: v,
+              ...(aD ? { audio: true } : {}),
+            }).then((s) => registra(s, 'schermo'));
           }
         } catch (_) {}
         return vera.call(this || md, vincoli).then((s) => registra(s, schermo ? 'schermo' : null));
