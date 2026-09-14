@@ -34,11 +34,12 @@ async function consentiSchermo(shell, quale) {
     'la domanda della condivisione dello schermo deve parlare dello schermo',
   ).toContain('schermo');
   await chip.locator('.perm-chip-allow').click();
-  if (quale === 'moderno') {
-    const box = shell.locator('.perm-source');
-    await expect(box).toHaveCount(1, { timeout: 20_000 });
-    await box.locator('.perm-source-item').first().click();
-  }
+  // Dal giro 9 il riquadro «cosa condividi» compare su tutte e due le strade:
+  // prima la vecchia lo saltava e consegnava lo schermo intero con un
+  // «Consenti» solo.
+  const box = shell.locator('.perm-source');
+  await expect(box).toHaveCount(1, { timeout: 20_000 });
+  await box.locator('.perm-source-item').first().click();
   await expect(chip).toHaveCount(0, { timeout: 20_000 });
 }
 
