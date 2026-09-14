@@ -970,6 +970,9 @@ module.exports = function register(on, ctx) {
       lastSyncAt = Date.now();
       if (plan.upsert.length || plan.remove.length) {
         cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
+        // E anche la memoria breve della lettura completa: le schede sono
+        // appena cambiate, quindi quella di mezzo minuto fa non vale più.
+        if (typeof FB.forgetAllPublic === 'function') FB.forgetAllPublic();
         console.log('[feedback] vista pubblica aggiornata:',
           `${plan.upsert.length} schede scritte, ${plan.remove.length} tolte`);
       }
