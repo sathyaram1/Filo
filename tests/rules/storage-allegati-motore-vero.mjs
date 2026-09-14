@@ -32,8 +32,11 @@
 //   npx firebase emulators:exec --only firestore,storage --project filo-prova-582 \
 //     "node storage-allegati-motore-vero.mjs"
 //
-// Esito atteso: tutte le righe verdi, uscita 0, più la riga NOTA sulla lettura
-// dell'owner. Al primo passaggio (2026-09-11) è stato così: 25/25.
+// Esito atteso: tutte le righe verdi, uscita 0. Al primo passaggio
+// (2026-09-11) è stato così: 25/25, con una riga NOTA perché la lettura
+// dell'owner allora passava da `firestore.exists(...)` e l'emulatore quella
+// chiamata non la inoltrava. Adesso quella nota non serve più: la lettura è
+// negata a tutti, owner compreso, e il motore la sa misurare.
 //
 // CONTROPROVA, che è la metà che conta: le stesse chiamate con le regole di
 // PRIMA (`git show main:storage.rules > vecchie.rules`, poi
