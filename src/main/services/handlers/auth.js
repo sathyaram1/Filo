@@ -417,7 +417,6 @@ module.exports = function register(on, ctx) {
       // segnaposto torna a dire che non è disponibile invece di prometterlo
       // consegnato.
       if (!FB.isAttachmentUrl(url)) {
->>>>>>> a59b09cdd (feedback #582: regole degli allegati dei feedback (lavoro squashato per il riallineamento))
         return { ok: false, error: 'url allegato non valido' };
       }
       // Questo canale lo chiamano DUE pagine: la dashboard dell'owner e il
