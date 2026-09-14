@@ -33,13 +33,21 @@ globalThis.fetch = async (url, opts = {}) => {
     return risposta({ id_token: 'token-finto', access_token: 'token-finto' });
   }
 
-  // La lettura della collezione.
+  // La lettura della collezione. Come Firestore vero, la risposta rispetta
+  // l'ordinamento CHIESTO: è il solo modo perché la stessa prova sappia
+  // distinguere chi ordina per data d'invio da chi ordina per nome.
   if (u.includes(':runQuery')) {
     const body = JSON.parse(String(opts.body || '{}'));
     const sq = body.structuredQuery || {};
     // Se qualcuno avesse ancora un cursore, la seconda pagina è vuota.
     if (sq.startAt) return risposta([]);
-    return risposta(DOCS.map(([id, createdAt]) => ({
+    const campo = String(sq.orderBy?.[0]?.field?.fieldPath || '__name__');
+    const giu = String(sq.orderBy?.[0]?.direction || 'ASCENDING') === 'DESCENDING';
+    const ordinati = DOCS.slice().sort((a, b) => (campo === 'createdAt'
+      ? String(a[1]).localeCompare(String(b[1]))
+      : String(a[0]).localeCompare(String(b[0]))));
+    if (giu) ordinati.reverse();
+    return risposta(ordinati.map(([id, createdAt]) => ({
       document: {
         name: `projects/filo/databases/(default)/documents/feedback/${id}`,
         fields: {
