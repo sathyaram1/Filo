@@ -72,10 +72,19 @@
   // solo nome attuale un allegato del 2025 non sarebbe più riconosciuto come
   // roba di Filo, e la dashboard smetterebbe di aprirlo.
   const DEPOSITI = [BUCKET, `${PROJECT_ID}.appspot.com`];
-  const PREFISSI_ALLEGATO = {
+  // ⚠️ Tabella SENZA eredità (`Object.create(null)`), e non è un vezzo: la
+  // chiave con cui la si interroga è il nome di dominio scritto da chi manda la
+  // segnalazione. Una tabella normale di nomi ne contiene già alcuni che
+  // nessuno ci ha messo — `__proto__`, `constructor`, `toString` — e chiedendo
+  // quelli tornava roba che non è un elenco di inizi: il `.some()` sotto
+  // esplodeva invece di rispondere «no», e chi guardava un allegato si trovava
+  // un guasto generico al posto della frase che dice che quello non è un
+  // allegato di Filo (#582, giro 7). Cadeva dal lato chiuso, quindi non era una
+  // porta aperta; ma una domanda di sicurezza deve RISPONDERE.
+  const PREFISSI_ALLEGATO = Object.assign(Object.create(null), {
     'firebasestorage.googleapis.com': DEPOSITI.map((b) => `/v0/b/${b}/o/`),
     'storage.googleapis.com': DEPOSITI.map((b) => `/${b}/`),
-  };
+  });
 
   // Un URL è un allegato del bucket dei feedback? PURA. Serve a due cose che
   // devono dare la stessa risposta: il guard anti-SSRF del main (che non deve
