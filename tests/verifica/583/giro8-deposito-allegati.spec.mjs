@@ -75,6 +75,11 @@ function blocco(testo, percorso) {
   return null;
 }
 
+function bloccoFeedback() {
+  const regole = readFileSync(join(ROOT, 'storage.rules'), 'utf8');
+  return blocco(regole, '/feedback/{file}') || blocco(regole, '/feedback/{file=**}');
+}
+
 test('un allegato di un feedback non si scarica col solo indirizzo', async ({ app, shell }) => {
   void app; void shell;
   // Il blocco si chiama `/feedback/{file}` da quando #582 ha ristretto la
