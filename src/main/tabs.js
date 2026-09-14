@@ -205,11 +205,38 @@ function openExternalScheme(rawUrl) {
 // percorso.
 const URL_SERVITO = new WeakMap(); // webContents → ultimo indirizzo davvero caricato
 
+// CHI HA CHIESTO QUESTA APERTURA (#590, dodicesimo giro). Una scheda appena
+// nata non ha ancora caricato niente, quindi non ha una pagina di partenza da
+// dare: il rimbalzo del server, che arriva un istante dopo, incontrava un
+// controllo che dell'eccezione del motore di ricerca non sapeva niente. Un
+// risultato di ricerca però non punta quasi mai diritto al sito, passa per un
+// indirizzo che rimbalza; e un risultato si apre in due modi, tutti e due
+// normali: cliccandolo (la scheda cambia pagina, e lì la pagina di partenza
+// c'è) oppure con Ctrl+clic, col tasto centrale o con un link fatto per
+// aprirsi di là (nasce una scheda nuova, e lì non c'era). Lo stesso gesto
+// finiva in due modi diversi.
+// La cura è che la superficie appena nata si porti dietro la pagina che l'ha
+// chiesta, e la tenga finché non ha una pagina sua. Vale per le schede aperte
+// da un link e per le finestrelle di accesso: sono le due cose che nascono da
+// una pagina. Non allarga niente, perché quello che si propaga è l'indirizzo
+// già irrigidito dell'opener (vedi qui sopra), non quello che la pagina si
+// scrive da sé.
+const PAGINA_APERTURA = new WeakMap(); // webContents → pagina che ha chiesto l'apertura
+
 function segnaUrlServito(wc) {
   if (!wc || typeof wc.on !== 'function') return;
   wc.on('did-navigate', (_e, url) => {
-    try { URL_SERVITO.set(wc, String(url || '')); } catch (_) {}
+    try {
+      URL_SERVITO.set(wc, String(url || ''));
+      // Da qui in poi una pagina sua ce l'ha: chi l'ha aperta non conta più.
+      PAGINA_APERTURA.delete(wc);
+    } catch (_) {}
   });
+}
+
+function ricordaChiHaAperto(wc, fromUrl) {
+  if (!wc || !fromUrl) return;
+  try { PAGINA_APERTURA.set(wc, String(fromUrl)); } catch (_) {}
 }
 
 // La pagina di partenza da cui si giudica l'eccezione del motore di ricerca.
@@ -217,7 +244,7 @@ function segnaUrlServito(wc) {
 // l'indirizzo corrente va bene lo stesso.
 function urlDiPartenza(wc) {
   try {
-    return URL_SERVITO.get(wc) || wc.getURL() || '';
+    return URL_SERVITO.get(wc) || PAGINA_APERTURA.get(wc) || wc.getURL() || '';
   } catch (_) {
     return '';
   }
