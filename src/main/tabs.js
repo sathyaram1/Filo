@@ -885,6 +885,11 @@ class TabManager {
     const isInternal = url.startsWith('filo://');
     const partition = this._partitionFor(url);
     const view = this._makeView(url, partition, { suppressAutoplay });
+    // #590 (dodicesimo giro) — la scheda nasce adesso e non ha ancora una
+    // pagina sua: chi l'ha chiesta glielo diciamo, così il rimbalzo del server
+    // che arriva un istante dopo trova la stessa pagina di partenza che
+    // avrebbe trovato se il link avesse cambiato pagina a questa scheda.
+    ricordaChiHaAperto(view.webContents, fromUrl);
 
     const tab = {
       id,
