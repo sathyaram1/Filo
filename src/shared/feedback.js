@@ -639,6 +639,58 @@
     return listDirect(COLLECTION, { pageSize, timeoutMs, idToken, orderField: 'resolvedAt' });
   }
 
+  // ── TUTTE le segnalazioni, non una pagina ────────────────────────────────
+  //
+  // `list` è una FINESTRA sui più recenti per data d'invio, e va benissimo per
+  // chi guarda gli ultimi arrivati: la posta dell'owner, una diagnostica. Non
+  // va bene per chi fa una domanda sull'INSIEME.
+  //
+  // Il caso che l'ha fatta nascere è l'archiviazione automatica: decide quali
+  // fix chiusi possono uscire dalla bacheca, e chiedendo una finestra sui
+  // cinquecento più recenti non guardava nemmeno le segnalazioni più vecchie —
+  // cioè quelle che dovrebbe prendere per prime. Con 711 segnalazioni le 211
+  // più vecchie restavano fuori: i loro fix non uscivano mai dalla bacheca,
+  // restavano votabili e riapribili a pagamento, e per loro non si accendeva
+  // nemmeno il segnale «gli utenti dicono che non va». Il numero peggiorava da
+  // solo, perché la finestra sta ferma e le segnalazioni crescono. È lo stesso
+  // difetto della vista pubblica, da un'altra porta: vedi
+  // patterns/una-pagina-dei-piu-recenti-non-e-tutto.md.
+  //
+  // Come `listAllPublic`: si pagina col nome del documento, che è unico e
+  // stabile, si passa sempre dalla porta ESPOSTA (`SN_FEEDBACK.list`) così chi
+  // la sostituisce in una prova sostituisce anche questa, e il freno sulle
+  // pagine non mente — se scatta, la risposta lo dice.
+  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX } = {}) {
+    const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
+    const rows = [];
+    const visti = new Set();
+    let cursor = '';
+    let complete = false;
+    for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
+      const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.list) || list;
+      // eslint-disable-next-line no-await-in-loop
+      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor });
+      const arr = Array.isArray(batch) ? batch : [];
+      let nuove = 0;
+      for (const r of arr) {
+        const id = String((r && r._id) || '');
+        if (id && visti.has(id)) continue;
+        if (id) visti.add(id);
+        rows.push(r);
+        nuove += 1;
+      }
+      const ultimo = nomeDocumento(COLLECTION, arr[arr.length - 1]);
+      if (arr.length < limit || nuove === 0 || !ultimo || ultimo === cursor) { complete = true; break; }
+      cursor = ultimo;
+    }
+    return { rows, complete };
+  }
+
+  async function listAll(opts = {}) {
+    const { rows } = await listAllPaged(opts);
+    return rows;
+  }
+
   // La query vera e propria, senza ponti: la usano il main (col token
   // dell'owner), gli script e la vista pubblica (che non ha bisogno di token).
   async function listDirect(collectionId, { pageSize = 200, timeoutMs = 0, fields = null, idToken = '', orderField = 'createdAt' } = {}) {
