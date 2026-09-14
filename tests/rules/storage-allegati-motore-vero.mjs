@@ -160,17 +160,16 @@ await prova('allegato esistente — lettura da account Google qualunque: NEGATA'
   () => getBytes(ref(googleQualunque.storage(), ESISTENTE)));
 await prova('allegato esistente — lettura da login anonimo: NEGATA', 'ko',
   () => getBytes(ref(anonimo.storage(), ESISTENTE)));
-if (CROSS_SERVICE) {
-  await prova('allegato esistente — lettura dell’owner (allowlist admins): OK', 'ok',
-    () => getBytes(ref(owner.storage(), ESISTENTE)));
-} else {
-  // Fail-closed: senza cross-service la regola dell'owner nega, non apre. La
-  // dashboard continua a vedere gli allegati perché li apre con il download
-  // token che sta nell'URL salvato nel feedback.
-  await prova('allegato esistente — senza cross-service la regola dell’owner NEGA (mai apre)', 'ko',
-    () => getBytes(ref(owner.storage(), ESISTENTE)));
-  nota('lettura dell’owner: NON PROVATA — questo emulatore non inoltra le regole cross-service a Firestore (firestore.exists torna sempre falso). In produzione è la strada autenticata dell’owner; qui si prova solo che, se non funzionasse, nega.');
-}
+// L'owner NON fa eccezione, e questa è l'unica misura che prima non si poteva
+// prendere. Finché la lettura era riservata all'allowlist `admins`, quella riga
+// dipendeva da `firestore.exists(...)` e l'emulatore non la sapeva valutare:
+// restava dichiarata come non provata, giro dopo giro. Ora la lettura è negata a
+// tutti e il motore lo dice. La dashboard vede comunque gli allegati, perché li
+// apre col download token dentro l'URL salvato nel feedback (valutato da
+// Firebase PRIMA delle regole), e il server dei giudici con l'Admin SDK, che le
+// regole non le guarda affatto.
+await prova('allegato esistente — lettura dell’owner: NEGATA anche a lui', 'ko',
+  () => getBytes(ref(owner.storage(), ESISTENTE)));
 
 // ── Elencare il bucket: per nessuno, owner compreso ─────────────────────────
 await prova('elenco di feedback/ senza login: NEGATO', 'ko',
