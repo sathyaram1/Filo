@@ -107,10 +107,16 @@ test('#498 col blocco delle fusioni in attesa le aree non escono dalla finestra'
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
 
-  // Sei fusioni ferme, ognuna con i suoi due tasti: l'elenco è alto.
+  // La scheda Automazioni, dove le fusioni ferme vivono adesso. Si passa di
+  // qui per prima: aprendo la scheda la pagina rilegge le fusioni vere (in
+  // prova non ce n'è nessuna) e cancellerebbe quelle che mettiamo noi.
+  await page.locator('#mgTabs .mg-tab[data-tab="automation"]').click();
+  await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
+  await page.waitForTimeout(500);
+
+  // Sei fusioni ferme, ognuna con i suoi tasti: l'elenco è alto.
   await page.evaluate(() => {
     const el = document.getElementById('mgMergeApprovalsOrphans');
-    el.hidden = false;
     window.SN_MERGE_APPROVALS.render(el, {
       requests: Array.from({ length: 6 }, (_, i) => ({
         id: `req-${i}`,
@@ -126,16 +132,7 @@ test('#498 col blocco delle fusioni in attesa le aree non escono dalla finestra'
     });
   });
 
-  // La scheda lista: le aree restano dentro la finestra, come chiedeva #498.
-  const g = await geom(page);
-  console.log('MERGE', JSON.stringify(g));
-  expect(g.scrollH).toBeLessThanOrEqual(g.viewportH + 1);
-  expect(g.viewportH - g.grid.bottom).toBeLessThanOrEqual(28);
-  expect(g.grid.height).toBeGreaterThan(200);
-
-  // La scheda Automazioni: l'ultima fusione dell'elenco si raggiunge.
-  await page.locator('#mgTabs .mg-tab[data-tab="automation"]').click();
-  await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
+  // L'ultima fusione dell'elenco si raggiunge: non finisce tagliata fuori.
   const ultima = page.locator('#mgMergeApprovalsOrphans .sn-mac-card').last();
   await expect(ultima).toBeVisible();
   await ultima.scrollIntoViewIfNeeded();
@@ -144,6 +141,18 @@ test('#498 col blocco delle fusioni in attesa le aree non escono dalla finestra'
     return b.bottom <= document.documentElement.clientHeight + 1 && b.top >= -1;
   });
   expect(dentro, 'l\'ultima fusione in attesa deve potersi raggiungere').toBe(true);
+
+  // E tornando alla scheda lista, con le fusioni ferme ancora lì, le aree
+  // restano dentro la finestra e la pagina non scorre: è quello che chiedeva
+  // #498.
+  await page.locator('#mgTabs .mg-tab[data-tab="inbox"]').click();
+  await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#mgReviewGrid')).toBeVisible();
+  const g = await geom(page);
+  console.log('MERGE', JSON.stringify(g));
+  expect(g.scrollH).toBeLessThanOrEqual(g.viewportH + 1);
+  expect(g.viewportH - g.grid.bottom).toBeLessThanOrEqual(28);
+  expect(g.grid.height).toBeGreaterThan(200);
 });
 
 test('#498 finestra stretta: schede a capo, aree ancora a fondo pagina', async ({ app, openTab }) => {
