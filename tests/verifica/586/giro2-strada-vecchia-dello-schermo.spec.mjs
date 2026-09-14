@@ -110,6 +110,10 @@ test('dopo un sì la strada vecchia consegna, e non lascia scritto niente', asyn
   const promessa = page.evaluate(() => window.__schermoVecchiaManiera());
   await expect(chip).toHaveCount(1, { timeout: 15_000 });
   await chip.locator('.perm-chip-allow').click();
+  // Dal giro 9 anche questa strada passa dal riquadro «cosa condividi»: prima
+  // consegnava lo schermo intero con un «Consenti» solo, saltando la scelta che
+  // Filo promette. Il passo in più è quello, e l'esito atteso non cambia.
+  await shell.locator('.perm-source-item').first().click({ timeout: 20_000 });
   const esito = await promessa;
   expect(
     traccia(esito, 'video'),
