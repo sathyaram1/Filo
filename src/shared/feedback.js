@@ -869,8 +869,7 @@
       // Una sorgente che ignora il cursore (una prova che la sostituisce con
       // un array fisso) torna sempre la stessa pagina: se non arriva niente di
       // nuovo si è già in fondo, e continuare sarebbe un ciclo.
-      const ultimo = (!Array.isArray(batch) && batch && batch.lastName)
-        || nomeDocumento(VIEW_COLLECTION, arr[arr.length - 1]);
+      const ultimo = nomeDocumento(VIEW_COLLECTION, arr[arr.length - 1]);
       if (arr.length < limit || nuove === 0 || !ultimo || ultimo === cursor) { complete = true; break; }
       cursor = ultimo;
     }
