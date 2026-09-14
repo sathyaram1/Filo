@@ -78,28 +78,13 @@ async function getPrivateKey() {
   return null;
 }
 
-// Questo indirizzo è un allegato di Filo? Il deposito è uno solo, e il nome lo
-// tiene il modulo condiviso dei feedback: qui si controlla che l'indirizzo
-// appartenga a QUELLO, non a un deposito qualunque di Google. Senza, il canale
-// che decifra un allegato diventa un modo per farsi scaricare altro.
-function allegatoDiFilo(url) {
-  const u = String(url || '');
-  const cfg = (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.configPublic) || null;
-  const bucket = cfg && cfg.bucket ? String(cfg.bucket) : '';
-  const progetto = cfg && cfg.projectId ? String(cfg.projectId) : '';
-  if (!bucket && !progetto) return false;
-  // Lo stesso deposito ha più nomi ufficiali (quello attuale e quello storico
-  // che finisce in appspot.com: gli allegati vecchi hanno ancora quello) e due
-  // indirizzi (Firebase Storage e il deposito diretto). Valgono quelli, e
-  // nessun altro.
-  const depositi = new Set([bucket, progetto ? `${progetto}.firebasestorage.app` : '', progetto ? `${progetto}.appspot.com` : '']);
-  depositi.delete('');
-  for (const b of depositi) {
-    if (u.startsWith(`https://firebasestorage.googleapis.com/v0/b/${b}/o/`)) return true;
-    if (u.startsWith(`https://storage.googleapis.com/${b}/`)) return true;
-  }
-  return false;
-}
+// «Questo indirizzo è un allegato di Filo?» si chiede a UNA funzione sola,
+// `SN_FEEDBACK.isAttachmentUrl`, che è anche quella usata dalle pagine. Qui
+// c'era una seconda copia, scritta a colpi di `startsWith`: due strade per la
+// stessa domanda sono esattamente la forma di difetto che questo confine ha
+// già pagato più volte (una delle due prima o poi non guarda quello che guarda
+// l'altra). I nomi storici del deposito che quella copia conosceva sono
+// passati nel modulo condiviso, insieme al resto.
 
 // Decifra i campi FENC1: di un oggetto con la chiave privata del main.
 // Retrocompatibile: i valori non cifrati passano invariati.
