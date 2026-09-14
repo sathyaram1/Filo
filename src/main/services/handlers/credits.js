@@ -319,13 +319,30 @@ module.exports = function register(on, ctx) {
       // in bacheca sotto i suoi occhi. Chiedere una finestra sull'asse
       // sbagliato è la stessa causa che la verifica del #583 ha visto rientrare
       // da tre porte.
-      let all;
+      let lette;
       try {
-        all = FB.listAllPublic
+        lette = FB.listAllPublic
           ? await FB.listAllPublic({ timeoutMs: 15000 })
           : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 15000 });
       }
       catch (e) { console.warn('[credits] schede dei feedback non disponibili:', e?.message || e); return empty; }
+
+      // Dal più recente, come le vedeva chi chiedeva una pagina ordinata per
+      // data d'invio. La lettura completa arriva nell'ordine interno del
+      // database, che è l'ordine degli identificativi, cioè casuale: senza
+      // questa riga chi si vede risolvere due segnalazioni insieme le trova
+      // annunciate a caso. Si ordina una COPIA: quelle righe arrivano dalla
+      // memoria breve delle schede ed è la stessa lista che legge anche chi
+      // gestisce i feedback.
+      const all = (Array.isArray(lette) ? lette.slice() : []).sort((a, b) => {
+        const ta = Date.parse(a?.createdAt || '');
+        const tb = Date.parse(b?.createdAt || '');
+        const va = Number.isFinite(ta);
+        const vb = Number.isFinite(tb);
+        if (va && vb && ta !== tb) return tb - ta;
+        if (va !== vb) return va ? -1 : 1;
+        return String(b?._id || '').localeCompare(String(a?._id || ''));
+      });
 
       // S1.F2.2: pre-calcola l'hash del clientId locale UNA VOLTA per tutti i confronti.
       // Stesso algoritmo di feedbackClientIdHash.js (SHA-256 troncato 32 hex).
