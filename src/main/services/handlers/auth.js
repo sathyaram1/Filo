@@ -348,8 +348,9 @@ module.exports = function register(on, ctx) {
       // dritti su quello, e l'età non conta più.
       await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
-      return { ok: true };
->>>>>>> 7aed162 (feedback #583: chiusura della lettura pubblica dei feedback (lavoro del ramo, squash per riallineamento))
+      // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
+      // glielo dice il main, che è l'unico a saperlo.
+      return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
       let claims = null;
