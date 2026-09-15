@@ -941,7 +941,6 @@
     }
     NOTIFS.show(info.text, opts);
   });
-  // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
