@@ -376,10 +376,8 @@ class TabManager {
     return nostro;
   }
 
-  // Consegna alla pagina l'Esc che il browser le avrebbe mangiato. Va al frame
-  // che ha il fuoco, dove sarebbe arrivato il tasto vero: il menu del tasto
-  // destro aperto dentro un riquadro incorporato vive lì. Torna true se il
-  // messaggio è partito, cioè se il tasto ce lo siamo presi noi.
+  // Consegna alla pagina l'Esc che il browser le avrebbe mangiato. Torna true
+  // se il messaggio è partito, cioè se il tasto ce lo siamo presi noi.
   _inoltraEscAllaPagina(tabId) {
     const tab = this.tabs.find((t) => t.id === tabId);
     const wc = tab?.view?.webContents;
