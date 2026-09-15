@@ -39,11 +39,8 @@ function contenutoAFuoco() {
   return wc && !wc.isDestroyed() ? wc : null;
 }
 
-// L'utente sta scrivendo in un campo di testo? La regola è una sola e sta in
-// src/shared/campoTesto.js: qui la mandiamo a valutare dentro la pagina.
-// #405: la domanda va fatta al RIQUADRO con cui l'utente ha interagito per
-// ultimo (un commento dentro un iframe è un campo di testo tanto quanto uno
-// nella pagina che lo ospita).
+// La regola sta in src/shared/campoTesto.js: qui si manda a valutare dentro la
+// pagina. #405 — si chiede all'ultimo riquadro toccato, non alla pagina madre.
 async function staScrivendo(wc) {
   if (!wc) return false;
   let dove = wc;
