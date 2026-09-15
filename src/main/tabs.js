@@ -565,9 +565,8 @@ class TabManager {
       if (key) {
         const existing = this.tabs.find((t) => filoSingletonKey(t.url) === key);
         if (existing) {
-          // URL identico → basta riportare a fuoco. Differisce solo per query/
-          // hash (es. ?highlight=…) → rinaviga la scheda esistente al nuovo URL
-          // così l'intento (evidenziare l'elemento appena salvato) si applica.
+          // Se differisce per query o hash si rinaviga la scheda esistente:
+          // quel ?highlight è l'intento di chi ha cliccato.
           if (existing.url !== url) this.navigate(existing.id, url);
           this.activate(existing.id);
           return existing.id;
