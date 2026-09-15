@@ -836,10 +836,8 @@ class TabManager {
     if (!tab) return { ok: false, error: 'no_tab' };
     let settings = null;
     try { settings = await this._readSettings(); } catch (_) {}
-    // Senza paese esplicito (click diretto su "Apri da un altro paese") si usa
-    // l'ultima location usata, altrimenti il default delle impostazioni (USA).
-    // Un paese esplicito ma non valido resta un errore: mai proxare in silenzio
-    // verso un paese diverso da quello chiesto.
+    // Senza paese vale l'ultima location usata. Un paese esplicito ma non
+    // valido è un ERRORE: mai instradare in silenzio verso un altro.
     const p = (settings && settings.proxy) || {};
     const code = country
       ? ProxyTab.normalizeCountry(country)
