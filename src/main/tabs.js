@@ -196,10 +196,8 @@ class TabManager {
     this.win = window;
     this.shellView = shellView; // WebContentsView della shell — per il broadcast tabs:updated
     this.shellHeight = shellHeight;
-    // Incognito: i tab nascono in una sessione effimera (partition senza
-    // 'persist:') e la sessione del browser NON viene salvata/ripristinata su
-    // disco. La privacy dello storage filo:// è invece garantita a monte
-    // dall'overlay in RAM nello shim (vedi src/main/shim/storage.js).
+    // Incognito: sessione effimera e nessun ripristino su disco. Lo storage
+    // filo:// è già coperto a monte dall'overlay in RAM dello shim.
     this.incognito = !!incognito;
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
