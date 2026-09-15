@@ -771,10 +771,8 @@
     e.preventDefault();
   }, { passive: false });
 
-  // Notifiche/toast in basso a destra (spec #170.1). Sistema riutilizzabile:
-  // ogni notifica è una card impilata nell'angolo, con durata configurabile
-  // (0 = infinita → resta finché l'utente non preme la X) e suono opzionale.
-  // È la base che i blocchi (#170.2/#170.3) usano per segnalare gli eventi.
+  // #170.1 — notifiche impilate in basso a destra; durata 0 = resta finché non
+  // la si chiude. È la base su cui passano tutti gli avvisi della shell.
   const NOTIFS = (() => {
     let host = null;
     // Tetto al numero di card impilate insieme. Senza limite una raffica di
