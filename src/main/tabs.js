@@ -599,7 +599,6 @@ class TabManager {
       canFwd: false,
       muted: false,
       isInternal,
-      // Quando la tab è stata aperta — metadato dell'archivio (§3.1).
       openedAt: new Date().toISOString(),
       // §2.1 segnali per la decisione di auto-archiviazione (popolati a runtime).
       lastActiveAt: activate ? Date.now() : null,
