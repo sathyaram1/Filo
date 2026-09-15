@@ -88,10 +88,7 @@
     });
   }
 
-  // ── Modalità incognito ────────────────────────────────────────────────────
-  // La finestra incognito carica shell.html?incognito=1. Applichiamo un tema
-  // scuro dedicato (via data-incognito sul <html>, vedi shell.css) e mostriamo
-  // un badge "Incognito" nella barra così la finestra è inconfondibile.
+  // Tema dedicato e badge: una finestra incognito dev'essere inconfondibile.
   const isIncognito = new URLSearchParams(location.search).get('incognito') === '1';
   if (isIncognito) {
     document.documentElement.dataset.incognito = '1';
