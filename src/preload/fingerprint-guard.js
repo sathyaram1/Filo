@@ -1,19 +1,7 @@
-// Costruisce il sorgente JS (stringa) della "guardia anti-fingerprint" da
-// iniettare nel MAIN WORLD di una pagina web esterna.
-//
-// Gira PRIMA degli script della pagina (lo inietta page-preload.js via
-// webFrame.executeJavaScript, che valuta nel main world e ignora la CSP),
-// quindi gli override dei prototipi sono in piedi prima di qualsiasi lettura di
-// canvas/audio/webgl da parte di uno script di fingerprinting.
-//
-// `seed` (uint32) è derivato in main da HMAC(masterSecret, eTLD+1 + finestra
-// temporale): stesso sito → stesso rumore (nessun flicker tra letture diverse),
-// siti diversi → rumore scorrelato. Il rumore è legato alla posizione assoluta
-// del pixel, così una lettura parziale (getImageData su un ritaglio) ottiene lo
-// stesso rumore della lettura intera.
-//
-// `level` 1/2 serve solo a sapere se siamo accesi: la rotazione (settimanale vs
-// per-sessione) è già codificata nel seed a monte.
+// Sorgente della guardia anti-fingerprint, iniettato da page-preload nel main
+// world PRIMA degli script della pagina (altrimenti un lettore di canvas arriva
+// prima degli override). `seed` uint32 = HMAC(segreto, eTLD+1 + finestra): stesso
+// sito stesso rumore, siti diversi scorrelati; `level` dice solo se siamo accesi.
 
 function buildGuardSource(seed, level) {
   const s = (seed >>> 0);
