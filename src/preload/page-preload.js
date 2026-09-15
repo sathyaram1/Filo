@@ -63,10 +63,9 @@ try {
   }, { capture: true });
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
-// Copia inerte del clic destro da rigiocare quando l'handler vero è pronto.
-// Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
-// fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
-// i dati che l'handler legge, così il menu si apre sull'elemento giusto.
+// L'evento vero, una volta consegnato, perde composedPath(): l'elemento reale
+// (shadow DOM compreso) va fotografato SUBITO, o il menu si apre sul posto
+// sbagliato quando lo rigiochiamo.
 function replayContextMenu(e) {
   let node = null;
   try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
