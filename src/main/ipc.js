@@ -176,11 +176,8 @@ function registerIpcHandlers() {
     }
   });
 
-  // Questo "/dominio.tld" esiste davvero? Usato dalla barra comando della
-  // dashboard per (a) colorare di rosso un sito inesistente mentre si scrive e
-  // (b) non navigare a vuoto verso una pagina bianca quando lo si invia. Solo
-  // pagine interne filo:// (come shell:which). In caso di dubbio torna
-  // resolves:true così non blocca mai una navigazione legittima.
+  // Un "/dominio.tld" esiste? Nel dubbio risponde SÌ: questa risposta può
+  // impedire una navigazione, e non deve mai fermarne una legittima.
   ipcMain.handle('net:resolves', async (event, { host } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
