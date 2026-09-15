@@ -75,9 +75,7 @@ app.whenReady().then(async () => {
   await registerFiloProtocol();
   registerIpcHandlers();
   configureSpellchecker();
-  // La barra dei menu di Filo, al posto di quella di serie di Electron. Su Mac
-  // è in cima allo schermo e vince sui tasti che le pagine ascoltano, quindi va
-  // messa PRIMA che si apra qualsiasi finestra (vedi src/main/menu.js).
+  // PRIMA di qualsiasi finestra: su Mac la barra vince sui tasti delle pagine.
   installaMenuApplicazione();
 
   const Storage = globalThis.SN_STORAGE;
