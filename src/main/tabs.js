@@ -123,8 +123,7 @@ function isOsDelegatedScheme(rawUrl) {
   return OS_DELEGATED_SCHEMES.has(proto);
 }
 
-// Consegna all'OS un link mailto:/tel:/sms: (best-effort). Da chiamare SOLO dopo
-// aver bloccato la navigazione in-app, e SOLO per gli schemi dell'allowlist.
+// SOLO dopo aver bloccato la navigazione in-app, e SOLO per gli schemi ammessi.
 function openExternalScheme(rawUrl) {
   if (!isOsDelegatedScheme(rawUrl)) return false;
   try { shell.openExternal(String(rawUrl)); } catch (_) {}
