@@ -360,8 +360,9 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~390 spec, ~1.600 casi): solo nel cancello del server e nelle routine.
-                           # Sulla macchina dell'owner dura ~7 ore: in locale NON si lancia (vedi § Verifica).
+npm test                   # SUITE COMPLETA (~390 spec, ~1.600 casi): NON si lancia a mano, da nessuna parte.
+                           # Gira solo in GitHub, nel lavoro di release, ogni sei ore prima di pubblicare (vedi § Verifica).
+                           # Sulla macchina dell'owner durerebbe ~7 ore con un solo worker.
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 
