@@ -1,6 +1,5 @@
-// Popup menu custom: BrowserWindow frameless + trasparente che mostra un menu
-// stilizzato come il menu tasto destro. Risolve il problema per cui i dropdown
-// HTML nella shell non possono apparire sopra una WebContentsView nativa.
+// Menu a tendina della shell su una BrowserWindow trasparente: un dropdown HTML
+// non può comparire sopra la WebContentsView nativa di una scheda.
 
 const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
