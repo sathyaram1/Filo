@@ -267,8 +267,7 @@ function registerIpcHandlers() {
     if (win?._filoTabs) win._filoTabs.reload(id);
     return { ok: true };
   });
-  // Menu tasto destro su tab: silenzia/riattiva l'audio. Se `muted` non è
-  // passato (undefined) facciamo un toggle.
+  // `muted` assente = toggle.
   ipcMain.handle('tabs:set-muted', (event, { id, muted } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) {
