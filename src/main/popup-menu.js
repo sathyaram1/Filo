@@ -226,8 +226,7 @@ function buildHTML(entries, isDark, margin = 26) {
       const label = (e.label || '').replace(/[<>&"]/g, (ch) =>
         ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch]);
       if (e.disabled) {
-        // Voce informativa non cliccabile (es. l'email dell'account loggato).
-        // Senza icona la centriamo nel suo campo per evitare l'indent fantasma.
+        // Senza icona si centra, o resta l'incavo della colonna che non c'è.
         const cls = ico ? 'item disabled' : 'item disabled centered';
         items += `<div class="${cls}">` +
           `${icoSpan}` +
