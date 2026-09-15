@@ -59,6 +59,27 @@ anche un rientro cambiato.
 const inizio = new RegExp(`allow update: if\\s+${guardia}\\(\\)`).exec(testo);
 ```
 
+## La sentinella guarda tutto, o ripete lo stesso errore
+
+Questo difetto è già tornato una volta perché la cura era stata messa nel solo
+file che l'aveva mostrato. La prima sentinella scritta per fermarlo guardava una
+cartella sola, `tests/unit`, e nemmeno le sue sottocartelle: la stessa forma
+malata messa fra le prove dell'app, in `tests/rules/` o in una cartella di
+verifica passava indisturbata. Cioè la difesa contro «chiuso in un file solo»
+era chiusa in una cartella sola.
+
+Quindi la sentinella scende in **tutto** `tests/`, e riconosce anche il percorso
+tenuto in una variabile (`const RULES = join(ROOT, 'firestore.rules')`, e la
+lettura una riga più giù): con il solo confronto sulla riga della lettura
+bastava spostare il percorso per sparire.
+
+Le eccezioni esistono, e si scrivono sulla riga che le usa, non si tolgono in
+silenzio da un elenco di cartelle. Dove il testo del file viene solo passato a
+qualcun altro invece che analizzato — le regole date in pasto agli emulatori
+veri, dove i fini riga non cambiano niente — la riga porta il marcatore
+`fini riga: non analizzato`. Un'esenzione scritta si vede in revisione; una
+cartella esclusa in silenzio no.
+
 ## Dove vive
 
 - `.gitattributes` — la regola per tutti i checkout.
