@@ -1,57 +1,16 @@
-// La barra dei menu dell'applicazione.
-//
-// PERCHÉ ESISTE (#527)
-//   Su Windows e Linux la finestra di Filo è senza cornice: nessuna barra dei
-//   menu viene disegnata e i suoi tasti non arrivano a nessuno. Su macOS la
-//   barra è dell'APPLICAZIONE: sta in cima allo schermo, c'è sempre — anche con
-//   la finestra senza cornice — ed è la PRIMA a vedere i tasti, prima di
-//   qualunque cosa la pagina ascolti.
-//
-//   Filo non ne dichiarava nessuna, quindi restava appesa quella di serie di
-//   Electron: in inglese, con le voci di un altro prodotto e i link al suo
-//   sito, e con otto voci che si prendevano Cmd+W, Cmd+R, Cmd+Z e Cmd +/-/0 —
-//   cioè proprio le scorciatoie che il manifesto delle capacità promette
-//   all'utente Mac. Chiudere una scheda gli chiudeva la finestra intera.
-//
-// LA REGOLA, UNA SOLA
-//   Ogni tasto che compare in questa barra fa ESATTAMENTE quello che Filo fa
-//   già per quel tasto. Non basta togliere la barra: su macOS Chromium NON ha
-//   scorciatoie di modifica proprie (taglia, copia, incolla, seleziona tutto,
-//   annulla le lascia apposta al menu dell'applicazione), quindi una barra
-//   assente spegne copia e incolla in ogni campo di testo. Va sostituita, non
-//   rimossa.
-//
-//   Da qui le due metà del file:
-//   · i `role` di Electron si usano SOLO dove il tasto non è di Filo (taglia,
-//     copia, incolla, seleziona tutto, nascondi, riduci a icona, esci);
-//   · dove il tasto è di Filo (T, W, R, Z, +, -, 0) la voce NON ha `role`: ha
-//     un `click` che chiama la stessa funzione della scorciatoia. Un `role` lì
-//     significherebbe il comportamento di Electron al posto di quello di Filo,
-//     ed è esattamente il difetto che questo file chiude.
-//
-//   `registerAccelerator: false` non è una via d'uscita su Mac: Electron lo
-//   onora solo su Windows e Linux. Lì lo usiamo, ed è giusto — i tasti li
-//   gestiscono già le pagine (src/main/tabs.js, src/renderer/shell.js), la
-//   barra non si vede e non deve toglierglieli. Su Mac l'unico modo di non
-//   prendersi un tasto è non scriverlo.
-//
-// NIENTE STRUMENTI DA SVILUPPATORE
-//   La barra di serie apriva le DevTools con Opzione+Cmd+I a chiunque. Non è
-//   una voce per l'utente di Filo: qui non c'è.
+// La barra dei menu dell'applicazione (#527). Su Mac esiste sempre ed è la
+// PRIMA a vedere i tasti: ogni voce deve fare ESATTAMENTE quello che Filo fa già
+// per quel tasto, e togliere la barra non è un'uscita (spegnerebbe copia e
+// incolla). Perché e storia: patterns/quello-che-il-sistema-aggancia-da-se-va-dichiarato.md.
 
-// Electron si chiede DENTRO le funzioni, non qui in cima: così `template()` —
-// la forma della barra, cioè la parte che va tenuta d'occhio — si legge anche
-// dalla sentinella negli unit test, che gira in Node puro e in millisecondi
-// sulla macchina di chi scrive la modifica.
+// Electron si chiede DENTRO le funzioni: così `template()` lo legge anche la
+// sentinella degli unit test, che gira in Node puro.
 const MAC = process.platform === 'darwin';
 
-// Tasti che le pagine di Filo gestiscono già da sé: su Windows e Linux la voce
-// mostra la scritta ma NON registra il tasto (là arriva alla pagina, e la
-// pagina sa cosa farne). Su Mac la barra lo registra comunque — ed è per questo
-// che la voce deve fare la cosa giusta.
+// Voce che mostra la scritta senza registrare il tasto. Su Mac non si può:
+// Electron onora `registerAccelerator: false` solo su Windows e Linux, quindi
+// lì la barra il tasto se lo prende e la voce deve fare la cosa giusta.
 const SOLO_SCRITTA = MAC ? {} : { registerAccelerator: false };
-
-// ─── a chi si parla ─────────────────────────────────────────────────────────
 
 function finestra() {
   const { BrowserWindow } = require('electron');
