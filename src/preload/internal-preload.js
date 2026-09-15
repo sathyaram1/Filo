@@ -236,9 +236,8 @@ function injectContentScriptStyles() {
 function loadContentScripts() {
   const SHARED = path.join(__dirname, '..', 'shared');
   const CONTENT = path.join(__dirname, '..', 'content');
-  // i moduli SN_CONST/I18N/MSG/ICONS sono già caricati via <script> nelle
-  // pagine interne; require() li reseguirà ma è idempotente (riassegna gli
-  // stessi oggetti su globalThis).
+  // Alcuni moduli sono già caricati via <script> nelle pagine interne: il
+  // require li riesegue, ma è idempotente (riassegna gli stessi oggetti).
   const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
   safe(path.join(SHARED, 'constants.js'));
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
