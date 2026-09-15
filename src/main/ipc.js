@@ -144,9 +144,8 @@ function registerIpcHandlers() {
     const key = event.sender.id;
     const wantShell = shell || 'powershell';
     let session = shellSessions.get(key);
-    // (Ri)crea la sessione se manca, è morta o l'utente ha cambiato shell nelle
-    // Preferenze. La cwd passata serve solo allo spawn iniziale: per una
-    // sessione viva è la sessione stessa a tenere la directory (cd persiste).
+    // La `cwd` passata serve solo al primo avvio: in una sessione viva la
+    // directory la tiene la sessione, e un `cd` deve restare.
     if (!session || session.dead || session.shell !== wantShell) {
       if (session) { try { session.kill(); } catch (_) {} }
       session = createSession({ shell: wantShell, cwd });
