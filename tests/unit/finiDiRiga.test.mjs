@@ -80,12 +80,19 @@ test('nessuna ricerca su un file del repo contiene un «a capo» in mezzo', () =
   // `indexOf('…if\n        isAdmin()')` è la forma che si è rotta: con CRLF non
   // trova niente e il test accusa il file. Un «a capo» in TESTA alla stringa
   // cercata regge (il \r sta prima), quindi si guarda solo quello in mezzo.
+  //
+  // Si guardano SOLO i test che leggono uno di quei file. Altrove una stringa
+  // con un «a capo» dentro è di solito un testo che il test si è costruito da
+  // sé (una critica, un prompt), dove i fini riga li decide il codice e non il
+  // checkout: segnalarla sarebbe rumore, e il rumore fa spegnere le sentinelle.
   const conACapoInMezzo = /\.(indexOf|lastIndexOf|includes|startsWith|endsWith|split)\(\s*(['"`])(?:(?!\2)[^\\])+\\n/;
   const colpevoli = [];
   for (const nome of readdirSync(CARTELLA_UNIT)) {
     if (!nome.endsWith('.mjs')) continue;
     if (nome === 'finiDiRiga.test.mjs') continue; // la regex qui sopra si nomina da sé
-    leggiTestoRepo(join(CARTELLA_UNIT, nome)).split('\n').forEach((riga, i) => {
+    const sorgente = leggiTestoRepo(join(CARTELLA_UNIT, nome));
+    if (!FILE_ANALIZZATI.test(sorgente)) continue;
+    sorgente.split('\n').forEach((riga, i) => {
       if (conACapoInMezzo.test(riga)) colpevoli.push(`${nome}:${i + 1}: ${riga.trim().slice(0, 100)}`);
     });
   }
