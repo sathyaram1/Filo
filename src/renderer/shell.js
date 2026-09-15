@@ -50,10 +50,8 @@
   function applyShellTokens(tokens) {
     if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
   }
-  // Opacità del colore identità sulle tab inattive (param `opacita_tab` della
-  // spec "Colore identità delle tab"): governa quanto la tinta del sito copre lo
-  // sfondo del tab bar nel color-mix più sotto. 0 = nessun colore, 1 = tinta
-  // piena. Letta dalle impostazioni e aggiornata live al cambio prefs.
+  // `opacita_tab`: quanto la tinta del sito copre lo sfondo delle schede
+  // inattive nel color-mix più sotto. 0 = niente colore, 1 = tinta piena.
   let tabOpacity = 0.6;
   function applyTabColorParams(tabColor) {
     const v = tabColor && Number(tabColor.opacita_tab);
