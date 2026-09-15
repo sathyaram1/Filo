@@ -398,9 +398,8 @@ class TabManager {
     return true;
   }
 
-  // Un riquadro incorporato ha aperto qualcosa di Filo sopra lo schermo pieno,
-  // ma il tasto lo può chiedere al browser solo il frame principale: la
-  // richiesta gliela giriamo noi.
+  // Solo il frame principale può chiedere l'uscita al browser: la richiesta di
+  // un riquadro incorporato gliela giriamo noi.
   chiediEscAlFramePrincipale(tabId) {
     const tab = tabId != null ? this.tabs.find((t) => t.id === tabId) : null;
     const wc = tab?.view?.webContents;
