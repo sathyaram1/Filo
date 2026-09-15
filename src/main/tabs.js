@@ -1126,9 +1126,8 @@ class TabManager {
     } catch (_) {}
   }
 
-  // "Vetro smerigliato" (§1.1): registra il colore dominante della cima della
-  // pagina, campionato dal content script. Solo se cambia davvero (i sample
-  // arrivano spesso durante lo scroll) per non inondare la shell di redraw.
+  // §1.1 — solo se cambia davvero: i campioni arrivano di continuo durante lo
+  // scroll e ridisegnerebbero la barra ogni volta.
   setTabColor(id, color) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
