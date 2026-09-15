@@ -278,10 +278,8 @@
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
 
-  // Comandi shell pilotati dall'agente "Aiuto": l'AI aziona i comandi rapidi
-  // della barra cliccando il bottone REALE (così riusa menu, navigazione e
-  // toggle finestra senza duplicare logica). "close" è escluso di proposito:
-  // non è mappato qui, quindi l'AI non può chiudere la finestra.
+  // L'agente "Aiuto" clicca il bottone VERO, così non si duplica niente.
+  // "close" non è mappato apposta: l'agente non deve chiudere la finestra.
   if (api.onTriggerButton) {
     const triggerMap = {
       home: homeBtn,
