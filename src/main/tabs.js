@@ -1991,7 +1991,6 @@ class TabManager {
         muted: !!t.muted,
         color: t.color || null,
         identityColor: t.identityColor || null,
-        // §2.1 — segnali per l'auto-archiviazione.
         openedAt: t.openedAt || null,
         lastActiveAt: t.lastActiveAt || null,
         lastInteractionAt: t.lastInteractionAt || null,
