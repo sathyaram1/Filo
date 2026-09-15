@@ -130,10 +130,8 @@ function openExternalScheme(rawUrl) {
   return true;
 }
 
-// Altezza della sola fila di tab (tab + nuova scheda + controlli finestra),
-// senza la barra indirizzi. In sync con `.tab-row { flex: 0 0 40px }` in
-// src/renderer/shell.css. Quando la shell è in "chrome compatto" (fuori dalla
-// home) la WebContentsView attiva parte da qui invece che da SHELL_HEIGHT.
+// Da tenere in sync con `.tab-row { flex: 0 0 40px }` in shell.css: è l'altezza
+// da cui parte la vista quando la shell è in chrome compatto.
 const TAB_ROW_HEIGHT = 40;
 
 // Pagine interne su cui i content script (e quindi il menu Filo del tasto
