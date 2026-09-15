@@ -485,16 +485,10 @@ class TabManager {
     }
   }
 
-  // ─── lifecycle ──────────────────────────────────────────────────────────
-
-  // Partizione (sessione Electron) che una view per `url` deve usare:
-  //   - incognito → la partizione effimera della finestra (già isolata);
-  //   - privacy + pagina esterna → partizione per-sito (eTLD+1): effimera per i
-  //     siti normali (non sopravvive alla sessione), persistente per i siti
-  //     fidati (resti connesso), sempre isolata dagli altri siti;
-  //   - altrimenti → null (sessione persistente di default della finestra).
-  // Le pagine filo:// usano sempre la sessione della finestra (serve a storage
-  // e protocollo), mai una partizione per-sito.
+  // La sessione che una vista deve usare. In privacy ogni sito ha la sua
+  // (effimera, o persistente se fidato), sempre isolata dagli altri. Le pagine
+  // filo:// restano SEMPRE sulla sessione della finestra: lì vivono storage e
+  // protocollo, e una partizione per-sito gliene toglierebbe l'accesso.
   _partitionFor(url) {
     if (this.incognito) return this.partition || null;
     if (!url || url.startsWith('filo://')) return null;
