@@ -812,8 +812,8 @@ class TabManager {
     } catch (_) { /* l'archiviazione non deve mai bloccare la chiusura */ }
   }
 
-  // Silenzia/riattiva l'audio della tab. Lo stato vive sul tab (non sul
-  // WebContents) così sopravvive a una _recreateView. Idempotente.
+  // Lo stato vive sulla SCHEDA, non sul WebContents: deve sopravvivere a una
+  // ricreazione della vista.
   setMuted(id, muted) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
