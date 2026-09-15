@@ -1216,8 +1216,7 @@ class TabManager {
   setTabActivity(id, activity) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !activity || typeof activity !== 'object') return;
-    // Qualsiasi attività in una tab conta come "Filo è in uso": resetta il
-    // contatore di inattività dell'app (§2.1).
+    // §2.1 — attività in una scheda qualsiasi vuol dire "Filo è in uso".
     this._lastAppInteractionAt = Date.now();
     let changed = false;
     if (typeof activity.lastInteractionAt === 'number') {
