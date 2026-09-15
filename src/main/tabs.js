@@ -364,14 +364,11 @@ class TabManager {
       this.setContentFullscreen(false);
       return true;
     }
-    // Lo schermo pieno se l'è preso la PAGINA (il pulsante del lettore video) e
-    // il tasto arriva da lei. Qui il tasto NON si può lasciar passare: il
-    // browser lo consuma per uscire dal suo fullscreen e il documento non lo
-    // vede mai — la traccia dei tasti della pagina resta vuota — quindi ogni
-    // riquadro che Filo ha aperto sopra la pagina veniva scavalcato, restava
-    // aperto e la modalità se ne andava lo stesso (#514, giro 10). Ce lo
-    // prendiamo noi (l'unico modo di fermare l'uscita del browser) e lo
-    // consegniamo alla pagina, che poi decide con la regola di sempre.
+    // #514 — schermo pieno chiesto dalla PAGINA, tasto che arriva da lei. Non
+    // si può lasciar passare: il browser lo consuma per uscire dal suo
+    // fullscreen e il documento non lo vede mai, quindi ogni riquadro aperto
+    // sopra la pagina veniva scavalcato. Ce lo prendiamo — è l'unico modo di
+    // fermare l'uscita del browser — e lo consegniamo noi alla pagina.
     const nostro = this.pageFullscreen && tabId === this.pageFullscreenTabId
       ? this._inoltraEscAllaPagina(tabId)
       : false;
