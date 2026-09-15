@@ -116,10 +116,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     return !!(badge && target && (target === badge || (badge.contains && badge.contains(target))));
   }
 
-  // Click: il centrale attiva/disattiva la modalità (e blocca l'autoscroll
-  // nativo). In modalità zoom, QUALSIASI click (sinistro o destro) fuori dal
-  // badge la chiude. Sui link, fuori dalla modalità, il click centrale resta
-  // nativo (apre in nuova scheda).
+  // In modalità zoom QUALSIASI click fuori dal badge chiude. Sui link il
+  // centrale resta nativo: aprire in una scheda nuova viene prima.
   document.addEventListener('mousedown', (e) => {
     if (e.button === 1) {
       if (!zoomMode && isOnLink(e.target)) return;
