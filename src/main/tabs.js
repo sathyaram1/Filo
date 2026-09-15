@@ -1739,9 +1739,8 @@ class TabManager {
       if (m.timer) { clearTimeout(m.timer); m.timer = null; }
     });
 
-    // Errore certificato: registra lo stato (scaduto, autofirmato, mismatch…)
-    // per arricchire il verdetto safebrowse. Manteniamo il comportamento sicuro
-    // di default (callback(false) = rifiuta la connessione non attendibile).
+    // Si registra lo stato per il verdetto, ma il comportamento resta quello
+    // sicuro: callback(false) rifiuta la connessione.
     wc.on('certificate-error', (event, url, error, _cert, callback) => {
       try {
         const SB = globalThis.SN_SAFEBROWSE;
