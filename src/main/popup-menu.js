@@ -86,8 +86,6 @@ const ICON_PATHS = {
     '<rect x="8" y="5" width="10" height="14" rx="1.5"/>' +
     '<path d="M6.5 7.2l-2.9.8 3.1 11 3.4-.9"/>',
 
-  // Bacheca: una lavagna a colonne (kanban) — i miglioramenti affissi che si
-  // votano. Distinta dall'aeroplanino di "condividi", che qui era fuori tema.
   board:
     '<rect x="3.5" y="5" width="17" height="14" rx="1.5"/>' +
     '<path d="M9 5v14"/>' +
