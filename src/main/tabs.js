@@ -1632,11 +1632,9 @@ class TabManager {
     wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
-      // #412 — questa scheda ha committato una vera navigazione main-frame:
-      // NON è più il "contenitore vuoto" di un download (una scheda aperta da un
-      // link Scarica target=_blank che diventa subito scaricamento non committa
-      // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
-      // sbaglio se poi parte un download da una pagina che ha già contenuto.
+      // #412 — da qui la scheda ha contenuto suo e non è più il contenitore
+      // vuoto di un download: il flag la protegge dall'essere chiusa se più
+      // tardi parte uno scaricamento da una pagina già piena.
       tab._everNavigated = true;
       // Documento nuovo: chi rispondeva era quello vecchio. Il nuovo si
       // ripresenterà da solo appena montato (MSG.FULLSCREEN_STATE); fino ad
