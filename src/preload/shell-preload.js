@@ -63,8 +63,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:menu-action', wrapped);
     return () => ipcRenderer.removeListener('shell:menu-action', wrapped);
   },
-  // L'agente "Aiuto" può azionare i comandi rapidi della barra (le icone in
-  // alto) chiedendo al main, che inoltra qui: la shell clicca il bottone reale.
+  // L'agente "Aiuto" aziona le icone della barra: il main inoltra qui e la
+  // shell clicca il bottone vero, così il cammino è lo stesso dell'utente.
   onTriggerButton: (fn) => {
     const wrapped = (_event, info) => { try { fn(info && info.command); } catch (_) {} };
     ipcRenderer.on('shell:trigger-button', wrapped);
