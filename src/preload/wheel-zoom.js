@@ -111,7 +111,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     return !!(target && target.closest && target.closest('a[href], area[href]'));
   }
 
-  // L'interazione col badge (editare la percentuale) non deve chiudere la modalità.
+  // L'unica interazione che NON chiude la modalità: si sta editando la %.
   function isInBadge(target) {
     return !!(badge && target && (target === badge || (badge.contains && badge.contains(target))));
   }
