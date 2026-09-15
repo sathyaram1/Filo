@@ -96,9 +96,6 @@ const ICON_PATHS = {
     '<path d="M8 10.5l4 4 4-4"/>' +
     '<path d="M4 19h16"/>',
 
-  // Salva/Aperti per dopo: segnalibro. Stesso disegno di src/shared/icons.js
-  // (`saveForLater`), così la lista "Aperti per dopo" nel menu App porta la
-  // stessa icona con cui la si riempie dal menu del tasto destro.
   saveForLater:
     '<path d="M7 4h10a1 1 0 0 1 1 1v15.2l-6-3.8-6 3.8V5a1 1 0 0 1 1-1z"/>',
 };
