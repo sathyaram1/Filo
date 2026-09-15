@@ -7,14 +7,11 @@ const { hideForTests } = require('./test-window-mode');
 
 let activePopup = null;
 
-// ── SVG icon paths (viewBox 0 0 24 24, stroke-based) ──────────────────────
+// Icone del menu: viewBox 0 0 24 24, solo tratto. Il popup è una finestra a sé
+// e non carica src/shared/icons.js, quindi queste ne sono una COPIA: una voce
+// che esiste in tutte e due deve disegnare la stessa cosa in tutte e due.
 const ICON_PATHS = {
-  // Editor = foglio con l'angolo piegato e due righe di testo: è la stessa
-  // icona degli appunti (`note` in src/shared/icons.js). Da quando gli appunti
-  // vivono dentro l'editor e non hanno più un pannello a parte, l'editor È il
-  // posto degli appunti: le due icone devono coincidere ovunque. Questo
-  // registro è una COPIA (il popup è una BrowserWindow a parte e non carica
-  // shared/icons.js): se cambi l'una, cambia anche l'altra.
+  // `note` in src/shared/icons.js: gli appunti vivono nell'editor, stessa icona.
   editor:
     '<path d="M6 3.5h8l4 4v13H6z"/>' +
     '<path d="M14 3.5v4h4"/>' +
