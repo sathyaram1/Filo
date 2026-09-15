@@ -1,0 +1,26 @@
+# I file tracciati arrivano con i fini riga LF, su qualunque macchina.
+#
+# PERCHE'
+#   Senza questa riga i fini riga li decide la macchina che scarica il repo:
+#   Git for Windows converte tutto in CRLF al checkout. Il codice non se ne
+#   accorge, ma le SENTINELLE sì — quelle che leggono un file del repo e lo
+#   analizzano riga per riga (le regole Firestore, l'indice dei pattern, i
+#   sorgenti). Una ricerca che contiene un «a capo» non trova più niente, e il
+#   test diventa rosso su Windows mentre è verde ovunque altro.
+#
+#   E' successo due volte, e tutte e due hanno fermato la pubblicazione:
+#   il #565 (l'indice dei pattern «vuoto»: nessuna versione per un giorno) e il
+#   #569 (la sentinella delle regole dei livelli: nessuna versione dall'11 al 15
+#   settembre 2026). Chi scriveva quei test non poteva vederlo: la macchina che
+#   fa la differenza è il runner della pubblicazione.
+#
+#   Qui la differenza sparisce alla radice: il repo non contiene file che
+#   abbiano bisogno di CRLF (nessun .bat, .cmd, .ps1), quindi LF per tutti.
+#
+# NOTA per chi lavora su Windows
+#   Una copia scaricata PRIMA di questa riga tiene i suoi CRLF finché il file
+#   non viene riscritto da un checkout. Per questo le sentinelle normalizzano
+#   comunque quello che leggono (tests/helpers/testo.mjs): la regola qui sotto
+#   toglie il problema alle macchine nuove, il lettore lo toglie anche a quelle
+#   vecchie.
+* text=auto eol=lf
