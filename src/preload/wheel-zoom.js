@@ -134,8 +134,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     }
   }, true);
 
-  // Sopprimi il menu contestuale solo quando il click destro è servito a chiudere
-  // la modalità zoom (così il destro "chiude e basta", senza aprire il menu).
+  // Il destro che chiude la modalità non deve anche aprire il menu.
   document.addEventListener('contextmenu', (e) => {
     if (suppressContextMenu) {
       suppressContextMenu = false;
