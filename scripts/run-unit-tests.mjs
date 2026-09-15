@@ -30,7 +30,7 @@
 //   node scripts/run-unit-tests.mjs <flag di node>   i flag passano a node --test
 //     (es. --test-name-pattern=…, --test-reporter=…)
 
-import { readdirSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
