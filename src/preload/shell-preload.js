@@ -78,8 +78,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     ipcRenderer.on('shell:toast', wrapped);
     return () => ipcRenderer.removeListener('shell:toast', wrapped);
   },
-  // Modalità annotazione del box feedback: la shell mette/toglie un velo
-  // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.
+  // Il velo del box feedback non copre la barra in alto: se la oscura la shell.
   onFeedbackDim: (fn) => {
     const wrapped = (_event, info) => { try { fn(!!info?.on); } catch (_) {} };
     ipcRenderer.on('shell:feedback-dim', wrapped);
