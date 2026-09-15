@@ -85,9 +85,8 @@ function vaiAScrivereUnIndirizzo() {
   nuovaScheda();
 }
 
-// Lo zoom è della PAGINA, non della fila delle schede: passa dallo stesso punto
-// da cui passa Ctrl+rotella (src/preload/wheel-zoom.js), così le pagine che
-// zoomano da sé — l'editor — restano escluse anche da questa strada.
+// Stessa porta di Ctrl+rotella (src/preload/wheel-zoom.js): lo zoom è della
+// PAGINA, e le pagine che zoomano da sé restano escluse anche da qui.
 function zoom(verso) {
   const c = schedaAttiva();
   if (!c) return;
