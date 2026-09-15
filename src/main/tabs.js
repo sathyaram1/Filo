@@ -1085,12 +1085,8 @@ class TabManager {
     if (!this.tabs.length) this.openTab('filo://newtab/');
     else if (!this.tabs.some((t) => t.id === this.activeId)) this.activate(this.tabs[0].id);
 
-    // §1.3 — riordino cromatico della striscia. Avviene a OGNI giro di triage
-    // (riapertura di Filo, inattività, richiesta manuale), NON solo quando
-    // qualcosa è stato archiviato: all'apertura l'utente si aspetta comunque la
-    // barra riordinata per colore anche se non c'era nulla da chiudere. Se
-    // l'ordine non cambia (tab senza identità, una sola tab) è un no-op e non
-    // ribroadcastiamo inutilmente.
+    // §1.3 — a OGNI giro, non solo quando si è archiviato qualcosa: all'apertura
+    // la barra dev'essere riordinata comunque.
     const reordered = this.reorderTabsByColor();
     if (toArchive.length || reordered) this._broadcast();
     if (toArchive.length) this._showTriageToast(toArchive.length);
