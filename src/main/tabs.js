@@ -229,10 +229,8 @@ class TabManager {
     // un'altra, o dalla barra, alla pagina non arriverebbe mai, e lasciarlo
     // passare chiuderebbe l'utente dentro senza uscite.
     this.pageFullscreenTabId = null;
-    // Uscita dallo schermo intero messa in attesa: l'Esc premuto sulla pagina
-    // è prima suo (un riquadro di Filo aperto sopra la pagina lo usa per
-    // chiudersi), e usciamo solo se nessuno se l'è preso. Vedi
-    // handleFullscreenEscape (#514).
+    // #514 — l'uscita in attesa: l'Esc sulla pagina è prima suo, si esce solo
+    // se nessuno se l'è preso (vedi handleFullscreenEscape).
     this._escUscitaTimer = null;
     // Quanti Esc di fila la pagina si è presa senza che l'utente facesse altro.
     // Il conto sta nel main perché nella pagina il sito ci arriva (#514).
