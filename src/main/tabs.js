@@ -1156,7 +1156,6 @@ class TabManager {
   async duplicateTab(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return null;
-    // Zoom: leggibile in modo sincrono dal webContents (0 = 100%).
     let zoomLevel = null;
     try { zoomLevel = tab.view.webContents.getZoomLevel(); } catch (_) {}
     // Scroll: prova a leggere la posizione ESATTA dalla pagina sorgente (più
