@@ -1306,8 +1306,6 @@ class TabManager {
     // i bounds di default e si disegna sopra quella attiva.
     this.layout();
     view.webContents.loadURL(opts.loadUrl || url);
-    // Visibilità coerente con lo stato attivo: solo la scheda attiva è visibile,
-    // le altre (inclusa la view appena ricreata se non attiva) restano nascoste.
     for (const t of this.tabs) t.view.setVisible?.(t.id === this.activeId);
     this._broadcast();
   }
