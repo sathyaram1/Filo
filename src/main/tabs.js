@@ -1429,8 +1429,6 @@ class TabManager {
       // veda il tasto, ed è dentro quel giro che la pagina chiede lo schermo.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
       if (input.type === 'keyDown' && input.key === 'Escape') {
-        // Regola unica in tabs.js: handleFullscreenEscape decide (e sa quando
-        // l'Esc va invece lasciato alla pagina che ha chiesto il fullscreen).
         if (this.handleFullscreenEscape(tab.id)) {
           event.preventDefault();
           return;
