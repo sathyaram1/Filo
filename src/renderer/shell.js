@@ -269,7 +269,6 @@
         else if (action === 'auth-signin') doSignIn();
       });
     }
-    // Aggiorna l'icona quando il main segnala un cambio sessione.
     if (api.auth && api.auth.onChanged) {
       api.auth.onChanged((m) => { authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin); renderAccount(); });
     }
