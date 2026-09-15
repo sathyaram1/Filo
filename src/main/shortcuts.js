@@ -75,7 +75,6 @@ async function saveForLater(win, tab) {
   const url = tab.url;
   const title = tab.title;
   const favicon = tab.favicon || '';
-  // Chiediamo metadata al content script (best-effort), poi catturiamo thumbnail.
   let extra = {};
   try {
     extra = await tab.view.webContents.executeJavaScript(
