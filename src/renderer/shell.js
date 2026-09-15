@@ -633,8 +633,7 @@
       }
       el.appendChild(ico);
 
-      // Indicatore "audio mutato": un altoparlante barrato accanto al titolo,
-      // così l'utente sa quali tab ha silenziato senza doverci passare sopra.
+      // Serve a sapere quali schede sono state silenziate senza passarci sopra.
       if (t.muted) {
         const m = document.createElement('span');
         m.className = 'mute-ind';
