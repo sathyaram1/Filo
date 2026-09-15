@@ -1519,8 +1519,8 @@ class TabManager {
       if (!NE) return;
       const failed = failedUrl || tab.url || '';
       if (!NE.shouldShowErrorPage({ code, failedUrl: failed, isMainFrame })) return;
-      // Per l'utente la scheda resta "sul" sito fallito (titolo/sessione/riprova):
-      // la pagina d'errore è solo la faccia del fallimento, come negli altri browser.
+      // Per l'utente la scheda resta SUL sito fallito: la pagina d'errore è la
+      // faccia del fallimento, non una destinazione.
       tab.url = failed;
       try {
         if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc));
