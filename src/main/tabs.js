@@ -1581,9 +1581,8 @@ class TabManager {
       }
     });
 
-    // §3.1 — ripristino scroll alla riapertura da archivio: a caricamento finito
-    // riportiamo la pagina alla percentuale registrata, una sola volta. Best-effort
-    // (la pagina potrebbe avere altezza diversa o caricare contenuti lazy).
+    // §3.1 — una volta sola, a caricamento finito. Approssimato: la pagina può
+    // avere un'altezza diversa o caricare pezzi dopo.
     wc.on('did-finish-load', () => {
       // Duplicazione tab: replica il livello di zoom della scheda sorgente,
       // una sola volta a caricamento finito.
