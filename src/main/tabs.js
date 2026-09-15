@@ -1605,9 +1605,8 @@ class TabManager {
       setTimeout(() => this._geoTextCheck(tab), 2000);
     });
 
-    // #327 — URL "per l'utente" della scheda: se il webContents mostra la
-    // pagina d'errore interna, la scheda per l'utente è ancora sull'URL fallito
-    // (titolo, sessione salvata, ricarica = riprova) — come negli altri browser.
+    // #327 — l'URL che l'utente vede: con la pagina d'errore davanti, la scheda
+    // è ancora "sul" sito fallito per titolo, sessione salvata e ricarica.
     const userUrl = (raw) => {
       const NE = globalThis.SN_NET_ERROR;
       const target = NE && NE.targetOf(raw);
