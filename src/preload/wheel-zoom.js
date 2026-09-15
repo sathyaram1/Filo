@@ -214,20 +214,14 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       }
     }, true);
 
-    // Stesse scorciatoie, ma premute mentre il focus è sulla barra di Filo
-    // (fila delle schede): lì i tasti non arrivano alla pagina, quindi il main
-    // li inoltra qui. Passano dallo STESSO punto degli altri, così l'opt-out
-    // delle pagine che zoomano da sé vale anche per questa strada.
+    // Gli stessi tasti premuti col fuoco sulla barra: alla pagina non arrivano,
+    // il main li inoltra qui.
     if (ipc && typeof ipc.on === 'function') {
       ipc.on('filo:zoom-key', (_e, dir) => {
-        // La pagina che zooma da sé (l'editor scala il foglio) non deve essere
-        // zoomata da qui — ma il tasto va comunque CONSEGNATO, altrimenti su
-        // Mac il suo zoom muore in silenzio: là questa è l'unica strada, perché
-        // il tasto se lo prende la barra dei menu prima che arrivi alla pagina.
-        // Su Windows e Linux il keydown della pagina arriva e basta a sé.
-        //
-        // Il verso sta nel NOME dell'evento, non in `detail`: fra il mondo
-        // isolato del preload e quello della pagina un `detail` non passa.
+        // Alla pagina che zooma da sé il tasto va comunque CONSEGNATO: su Mac
+        // questa è l'unica strada (la barra dei menu lo prende prima), e senza
+        // consegna il suo zoom morirebbe in silenzio. Il verso sta nel NOME
+        // dell'evento: un `detail` non passa dal mondo isolato del preload.
         if (pageHandlesZoom()) {
           try {
             const nomi = { in: 'filo:zoom-in', out: 'filo:zoom-out', reset: 'filo:zoom-reset' };
