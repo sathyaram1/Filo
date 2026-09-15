@@ -943,11 +943,9 @@
   });
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
-  // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
-  // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
-  // nativa della pagina) + pannello espandibile con i singoli download. Il
-  // pannello sfrutta reserveTop per rivelarsi SOPRA l'area pagina (che è una
-  // WebContentsView nativa e altrimenti lo occulterebbe).
+  // #410.1 — l'indicatore sta nella fila di schede, dove la vista nativa della
+  // pagina non lo copre; il pannello si apre riservando spazio in alto, o
+  // finirebbe sotto la pagina.
   if (api.downloads) {
     const dlBtn = document.getElementById('dl-indicator');
     const dlIcon = document.getElementById('dl-ind-icon');
