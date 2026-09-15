@@ -1704,8 +1704,7 @@ class TabManager {
       if (hit) tab._geoRedirectHit = { url: target, detail: hit };
     });
 
-    // §2.1 segnale: la tab sta producendo audio? Una tab che riproduce
-    // audio/video NON va mai archiviata (decisione utente). L'evento arriva come
+    // §2.1 — una scheda che suona NON si archivia mai.
     // In Electron 32+ l'audible sta SULL'oggetto evento (un solo argomento); in
     // quelli più vecchi arriva come (event, {audible}) o (event, audible). Su
     // Electron 33 leggere solo il secondo argomento dava sempre false →
