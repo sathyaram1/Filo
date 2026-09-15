@@ -269,8 +269,7 @@ class TabManager {
     }
   }
 
-  // Applica la policy WebRTC sulla webContents di un singolo tab. È sicuro
-  // chiamarla più volte: setWebRTCIPHandlingPolicy è idempotente.
+  // Idempotente: si può richiamare quante volte serve.
   _applySecurity(tab) {
     if (tab.isInternal) return; // le pagine filo:// sono fidate, niente da limitare
     try {
