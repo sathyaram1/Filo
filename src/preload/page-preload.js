@@ -52,10 +52,8 @@ try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
     if (typeof contextMenuHandler === 'function') { contextMenuHandler(e); return; }
-    // #405 — primo tasto destro dentro un riquadro: i content script non sono
-    // ancora montati (li montiamo solo all'uso). Montali ORA e rigioca questo
-    // stesso clic appena l'handler è pronto, così il primo tentativo apre il
-    // menu invece di andare perso — l'utente non deve cliccare due volte.
+    // #405 — primo tasto destro in un riquadro: monta Filo e RIGIOCA questo
+    // stesso clic, o il primo tentativo va perso e si deve cliccare due volte.
     if (!IS_SUBFRAME) return;
     // Shift resta la via di fuga anche qui: con Shift premuto non tocchiamo
     // l'evento e lasciamo che il riquadro faccia quello che farebbe da solo.
