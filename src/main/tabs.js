@@ -290,7 +290,6 @@ class TabManager {
     return this.chromeCompact ? this.tabRowHeight : this.shellHeight;
   }
 
-  // Riserva (o libera, con px=0) spazio sopra la view attiva e rifà il layout.
   setTopInset(px) {
     this.topInset = Math.max(0, Math.round(Number(px) || 0));
     this.layout();
