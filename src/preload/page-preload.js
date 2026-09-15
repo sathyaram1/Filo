@@ -15,16 +15,10 @@ const IS_SUBFRAME = (() => {
   try { return window.top !== window.self; } catch (_) { return true; }
 })();
 
-// ─── #145 — blocco autoplay sulle schede RIPRISTINATE al boot ───────────────
-//
-// Le schede riaperte all'avvio di Filo nascono con il flag
-// '--filo-suppress-autoplay' (passato via additionalArguments dal main): i loro
-// media non devono partire da soli (i video YouTube ripartivano tutti insieme).
-// Installiamo SUBITO — prima ancora del caricamento della pagina — un listener
-// 'play' in fase di cattura che rimette in pausa qualunque media tenti di
-// autopartire. Si disattiva alla PRIMA interazione dell'utente con la scheda:
-// da lì in poi i media partono normalmente (è l'utente a comandarli). Il
-// listener vive nel mondo isolato del preload ma ascolta il DOM condiviso.
+// #145 — le schede riaperte all'avvio nascono col flag '--filo-suppress-autoplay'
+// e i loro media non devono partire da soli (ripartivano tutti insieme). Il
+// listener si installa SUBITO, prima della pagina, e cade alla prima
+// interazione dell'utente: da lì in poi comanda lui.
 if (process.argv.includes('--filo-suppress-autoplay')) {
   try {
     let active = true;
