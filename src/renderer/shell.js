@@ -295,12 +295,8 @@
     });
   }
 
-  // Tooltip custom: legge `data-tip` su qualunque elemento della shell e chiede
-  // al main di mostrare un mini-BrowserWindow stile Filo (vedi popup-tooltip.js),
-  // invece del title nativo bianco squadrato. Serve una BrowserWindow secondaria
-  // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
-  // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
-  // tab ricreati ad ogni render().
+  // `data-tip` su un elemento qualsiasi della shell. Delega globale, o i nodi
+  // ricreati a ogni render resterebbero senza tooltip.
   (() => {
     let showTimer = null;
     let currentTarget = null;
