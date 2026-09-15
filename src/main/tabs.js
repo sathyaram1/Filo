@@ -642,7 +642,6 @@ class TabManager {
     }
     view.webContents.loadURL(url);
     if (activate) {
-      // Riaffermo la visibilità su tutti i tab dopo loadURL.
       for (const t of this.tabs) t.view.setVisible?.(t.id === id);
     }
     // #152 — born proxied: se il dominio ha una regola persistente, la scheda
