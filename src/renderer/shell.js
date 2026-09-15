@@ -1136,8 +1136,8 @@
       return row;
     }
 
-    // reserveTop = altezza del pannello (capped) così la view della pagina
-    // scende e il pannello non finisce sotto di essa. Vedi setTopInset in tabs.js.
+    // Lo spazio riservato è l'altezza del pannello: senza, la vista della
+    // pagina gli sale sopra (setTopInset in tabs.js).
     function reserveForPanel() {
       if (!panelOpen || !panel) return;
       requestAnimationFrame(() => {
