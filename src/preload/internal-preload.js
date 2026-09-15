@@ -74,9 +74,8 @@ const filoApi = {
       abort: () => { ipcRenderer.send('ai-stream:abort', { requestId }); cleanup(); },
     };
   },
-  // Esecuzione shell (modalità terminale della dashboard), gemella di aiStream.
-  // onData({chunk, stream}), onExit({code, cwd}), onError({message}).
-  // Ritorna { sendInput(text), abort() }.
+  // onData({chunk, stream}), onExit({code, cwd}), onError({message});
+  // ritorna { sendInput(text), abort() }.
   shellExec: ({ command, cwd, shell, onData, onExit, onError }) => {
     const execId = `sh${Date.now()}_${++streamCounter}`;
     const offData = (_e, data) => onData && onData(data);
