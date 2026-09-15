@@ -1921,8 +1921,6 @@ class TabManager {
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     this.tabs.splice(idx, 1);
     if (this.activeId === tab.id) {
-      // Torna alla scheda di partenza (la più recente fra le rimaste), come fa
-      // closeTab; se non ne resta nessuna, apri una newtab fresca.
       const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
       if (next) this.activate(next.id);
       else this.openTab('filo://newtab/');
