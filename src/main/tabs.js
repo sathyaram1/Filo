@@ -1009,11 +1009,9 @@ class TabManager {
     return out;
   }
 
-  // Esegue un giro di triage: raccoglie i candidati, collassa i DUPLICATI esatti
-  // in modo deterministico (home duplicate / doppioni — mai lasciato al giudizio
-  // dell'LLM), poi chiede all'LLM (batch su tutte le tab) per i casi di giudizio
-  // (feed consumati, dead-end, impostazioni ormai chiuse) e applica le decisioni.
-  // Se l'LLM manca o fallisce, i duplicati vengono comunque collassati.
+  // I DUPLICATI esatti si chiudono per regola, mai chiedendolo all'LLM: è una
+  // decisione che non ha bisogno di giudizio, e deve funzionare anche senza
+  // modello. All'LLM restano i casi di giudizio (un feed già letto).
   async runAutoTriage({ trigger = 'idle' } = {}) {
     if (this.incognito || this._triageRunning) return { archived: 0 };
     const cands = this._triageCandidates();
