@@ -98,8 +98,8 @@ function registerIpcHandlers() {
         t.send(`ai-stream:${requestId}:${suffix}`, data);
       } catch (_) {}
     };
-    // ai-stream è un canale IPC SEPARATO da filo:message: va avvolto anch'esso
-    // in runIncognito così cache AI e tracciamento costi restano effimeri.
+    // Canale SEPARATO da filo:message, quindi l'incognito va rimesso anche qui:
+    // cache AI e conteggio dei costi devono restare effimeri.
     const work = async () => {
       try {
         const meta = {};
