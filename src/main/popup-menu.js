@@ -123,7 +123,6 @@ function computeMenuWidth(entries) {
     const fontPx = e.disabled ? 12 : 13;
     const charW = fontPx * 0.6;
     const hasIcon = !!e.icon && ICON_PATHS[e.icon];
-    // La freccia del submenu (subAction) occupa una colonna extra a destra.
     const SUB_COL = e.subAction ? 30 : 0;
     const w = H_PADDING + (hasIcon ? ICON_COL : 0) + SUB_COL + Math.ceil(label.length * charW);
     if (w > needed) needed = w;
