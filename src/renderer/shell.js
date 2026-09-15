@@ -989,8 +989,7 @@
       if (active.length) {
         dlCount.hidden = false;
         dlCount.textContent = String(active.length);
-        // Avanzamento aggregato: byte ricevuti / totali sui download con totale
-        // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
+        // Solo i download con totale noto: se nessuno ce l'ha, barra indeterminata.
         let recv = 0; let total = 0; let known = 0;
         for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
         if (known && total > 0) {
