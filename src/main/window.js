@@ -68,8 +68,7 @@ function createMainWindow() {
     height: 840,
     minWidth: 720,
     minHeight: 500,
-    // Background diverso dal cream della shell così se la WebContentsView
-    // non rende vediamo subito un'area di colore diverso (debugging visivo).
+    // Diverso dal cream della shell: se la WebContentsView non rende si vede.
     backgroundColor: '#222222',
     title: 'Filo',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
