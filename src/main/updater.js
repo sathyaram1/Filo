@@ -5,9 +5,8 @@
 const { app } = require('electron');
 
 function initAutoUpdater() {
-  // Solo build installate: in dev/test non esiste un feed remoto.
   if (!app.isPackaged) return;
-  // Non interferire con gli scenari di test/smoke headless.
+  // Test e smoke headless: niente traffico di rete né riavvii a sorpresa.
   if (process.env.FILO_SMOKE || process.env.FILO_USER_DATA) return;
 
   let autoUpdater;
