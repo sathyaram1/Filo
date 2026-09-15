@@ -1275,8 +1275,6 @@ class TabManager {
     return nextInternal !== !!tab.isInternal;
   }
 
-  // La view va ricreata (non basta un loadURL) se cambia partizione (privacy) o
-  // se si attraversa il confine di fiducia interno↔esterno (preload sbagliato).
   _needsRecreate(tab, url) {
     return this._crossesTrustBoundary(tab, url) || this._needsRepartition(tab, url);
   }
