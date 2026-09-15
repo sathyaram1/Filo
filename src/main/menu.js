@@ -59,8 +59,6 @@ async function staScrivendo(wc) {
   }
 }
 
-// ─── le azioni, le stesse delle scorciatoie ─────────────────────────────────
-
 function nuovaScheda() {
   const win = finestra();
   try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
