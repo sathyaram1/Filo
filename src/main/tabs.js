@@ -941,9 +941,7 @@ class TabManager {
     return { ok: true, domain: dom, country: code };
   }
 
-  // Toglie la regola persistente per il dominio. Non tocca le tab già proxate
-  // (l'utente può "tornare in Italia" a parte): rimuove solo l'automatismo
-  // futuro alla navigazione.
+  // Non tocca le schede già instradate: toglie solo l'automatismo futuro.
   async removeDomainProxyRule({ domain } = {}) {
     const src = String(domain || '');
     const dom = src ? Cookies.registrableOf(/:\/\//.test(src) ? src : `https://${src}`) : null;
