@@ -658,7 +658,6 @@
       title.textContent = tabLabel(t);
       el.appendChild(title);
 
-      // Tasto destro su una tab → menu contestuale (Duplica / Muta / Chiudi).
       el.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         openTabContextMenu(t, e.clientX, e.clientY);
