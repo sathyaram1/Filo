@@ -1354,7 +1354,6 @@ class TabManager {
     if (tab) tab.view.setVisible?.(visible);
   }
 
-  // ─── layout ─────────────────────────────────────────────────────────────
 
   layout() {
     const [w, h] = this.win.getContentSize();
