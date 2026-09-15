@@ -904,12 +904,9 @@ class TabManager {
     return (dom && this._proxyRules && this._proxyRules[dom]) || null;
   }
 
-  // Se `url` ha una regola persistente e la tab non è già instradata su quel
-  // paese, avvia il proxy (born proxied). NON blocca né previene la navigazione:
-  // setTabProxy ricrea la view nella partition proxata SOLO se il provider è
-  // configurato — altrimenti è un no-op silenzioso e la pagina resta diretta
-  // (mai una tab "appesa" perché il proxy non è configurato). Ritorna true se
-  // ha avviato l'instradamento. Incognito escluso (nessuna persistenza, §6).
+  // NON blocca la navigazione: senza un fornitore configurato non fa niente e
+  // la pagina resta diretta — mai una scheda appesa per un proxy che non c'è.
+  // Incognito escluso (§6: niente persistenza).
   _maybeApplyDomainRule(tab, url) {
     if (!tab || this.incognito) return false;
     const rule = this._ruleForUrl(url);
