@@ -108,8 +108,8 @@ function registerIpcHandlers() {
           signal: ac.signal,
           onMeta: (m) => { Object.assign(meta, m); send('meta', m); },
           onDelta: (delta) => send('delta', { delta }),
-          // Fallback dopo delta già streamati: il renderer deve azzerare il
-          // testo parziale del tentativo fallito (#273).
+          // #273 — se il ripiego parte dopo dei delta, il renderer deve buttare
+          // il testo parziale del tentativo fallito.
           onReset: () => send('reset', {}),
         });
         send('done', { ...result });
