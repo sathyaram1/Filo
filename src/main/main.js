@@ -22,9 +22,8 @@ try {
   if (cleaned) app.userAgentFallback = cleaned;
 } catch (_) { /* best-effort: in peggio resta la UA di default */ }
 
-// Carica i moduli "shared/background" portati dall'estensione. Si registrano
-// tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
-// gli altri moduli del main process li trovano via global.
+// I moduli condivisi si auto-registrano su `globalThis` (convenzione IIFE):
+// chi li usa non li richiede, li trova già lì.
 require('./shim/chrome-api');
 require('./services/loader');
 
