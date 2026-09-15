@@ -4,10 +4,7 @@
 
 const { ipcRenderer, webFrame } = require('electron');
 
-// Modalità zoom con la rotella attivata dal click centrale (sostituisce
-// l'autoscroll nativo) + zoom con Ctrl/Cmd (rotella, pinch del trackpad,
-// Ctrl +/-/0): sulle pagine interne funziona come su quelle web. Le pagine che
-// zoomano da sé si tirano fuori con `dataset.filoOwnZoom`. Vedi wheel-zoom.js.
+// Stesso zoom delle pagine web, comprese le regole (wheel-zoom.js).
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 
 // ─── SICUREZZA: gate d'origine ─────────────────────────────────────────────
