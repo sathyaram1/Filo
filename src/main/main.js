@@ -231,7 +231,6 @@ app.whenReady().then(async () => {
           ), 10_000, 'diagnostica content-script');
           console.log('[smoke] content-script diag:', JSON.stringify(csDiag, null, 2));
 
-          // Simula selezione + right-click per verificare che il menu compaia.
           await entro(csWin.webContents.executeJavaScript(`(() => {
             const span = document.querySelector('.selectable');
             if (!span) return false;
