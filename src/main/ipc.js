@@ -12,9 +12,8 @@ const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 
 const inFlightStreams = new Map(); // requestId → AbortController
-// Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
-// possiede: i comandi successivi della stessa scheda riusano lo stesso
-// processo (variabili, $env, cwd persistono). Muore alla chiusura della scheda.
+// Una shell PERSISTENTE per scheda: i comandi successivi riusano lo stesso
+// processo, quindi variabili e cwd restano. Muore con la scheda.
 const shellSessions = new Map(); // webContents.id → sessione shell persistente
 
 function senderInfo(event) {
