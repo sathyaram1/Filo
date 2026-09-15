@@ -33,7 +33,6 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     }
   }
 
-  // Applica la percentuale digitata nel campo come fattore di zoom esatto.
   function applyPercentFromInput() {
     if (!percentInput) return;
     const v = parseInt(String(percentInput.value).replace(/[^\d]/g, ''), 10);
