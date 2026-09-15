@@ -91,9 +91,6 @@ const ICON_PATHS = {
     '<path d="M9 5v14"/>' +
     '<path d="M15 5v14"/>',
 
-  // Scaricamenti: freccia verso il basso che entra in un vassoio. Stesso
-  // disegno di src/shared/icons.js (`download`): la voce "Scaricamenti" del
-  // menu App restava senza icona perché qui mancava il glifo.
   download:
     '<path d="M12 3v11"/>' +
     '<path d="M8 10.5l4 4 4-4"/>' +
