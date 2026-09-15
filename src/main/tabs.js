@@ -1658,9 +1658,8 @@ class TabManager {
         canBack: canGoBack(wc),
         canFwd: canGoFwd(wc),
       });
-      // Rilevamento siti pericolosi: ricontrolla l'URL FINALE (dopo i redirect)
-      // appena il main-frame si è committato, prima che la pagina sia
-      // interattiva. Best-effort, non blocca mai (vedi _sbOnNavigate).
+      // Si ricontrolla l'URL FINALE, dopo i redirect: quello di partenza può
+      // essere innocuo. Non blocca mai la navigazione.
       this._sbOnNavigate(tab, url);
       // Geo-block livello 1 (deterministico): nuova navigazione → il segnale
       // precedente decade; HTTP 451 è conclusivo, altrimenti vale l'eventuale
