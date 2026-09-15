@@ -730,8 +730,7 @@
   function tabLabel(t) {
     const url = t.url || '';
     if (url.startsWith('filo://')) {
-      // Chiave = host + path, senza lo slash iniziale del path. La newtab è
-      // "filo://newtab/" → chiave "newtab".
+      // Chiave = host + path senza slash iniziale: "filo://newtab/" → "newtab".
       const rest = url.slice('filo://'.length);
       const noQuery = rest.split(/[?#]/)[0];
       const key = noQuery.replace(/\/+$/, '');
