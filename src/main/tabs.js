@@ -930,7 +930,8 @@ class TabManager {
     const FM = globalThis.SN_FILO_MEMORY;
     if (FM) await FM.setProxyRule(dom, { country: code });
     await this.loadProxyRules();
-    // Applica subito alle tab già aperte su quel dominio (born proxied immediato).
+    // Subito anche alle schede già aperte: una regola che vale solo la prossima
+    // volta sembra non aver funzionato.
     for (const t of this.tabs) {
       if (t.isInternal || !/^https?:\/\//i.test(t.url || '')) continue;
       if (Cookies.registrableOf(t.url) !== dom) continue;
