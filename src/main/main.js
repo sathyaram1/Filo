@@ -149,10 +149,8 @@ app.whenReady().then(async () => {
         }));
         console.log('[smoke] sentinel scritto:', process.env.FILO_SMOKE);
       } catch (e) { console.log('[smoke] sentinel non scritto:', e?.message || String(e)); }
-      // Forza la finestra in primo piano. Quando spawn-ata da Node non
-      // sempre Windows la mostra automaticamente; senza una composizione
-      // visibile, capturePage delle child WebContentsView fallisce con
-      // "display surface not available" e desktopCapturer non la vede.
+      // Senza una composizione visibile capturePage fallisce con "display
+      // surface not available", e da Node Windows non la mostra da sé.
       try {
         mainWindow.show();
         mainWindow.moveTop();
