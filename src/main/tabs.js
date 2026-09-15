@@ -1508,12 +1508,9 @@ class TabManager {
         console.log(`[tab:${tab.id.slice(0, 6)}:${tag}] ${message}${src}`);
       });
     }
-    // #327 — navigazione fallita (dominio inesistente, server giù, offline):
-    // senza gestione il frame resta su chrome-error://chromewebdata/ con body
-    // vuoto → scheda completamente bianca e muta. Simmetria con gli errori di
-    // certificato (che hanno già il loro percorso, mapCertError → safebrowse):
-    // qui carichiamo la pagina d'errore interna con motivo tradotto e "Riprova".
-    // -3 (ERR_ABORTED: stop utente, redirect, nostre _recreateView) si ignora.
+    // #327 — senza questo una navigazione fallita lascia la scheda bianca e
+    // muta su chrome-error://. Si carica la pagina d'errore interna, col motivo
+    // tradotto e "Riprova". -3 (ERR_ABORTED) si ignora: è uno stop voluto.
     wc.on('did-fail-load', (_e, code, desc, failedUrl, isMainFrame) => {
       if (process.env.NODE_ENV !== 'production') {
         console.error(`[tab:${tab.id.slice(0, 6)}] did-fail-load`, code, desc, failedUrl);
