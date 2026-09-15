@@ -271,9 +271,8 @@ ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
       try { fn({ type: t, command, context }, { id: 'filo-desktop' }, () => {}); } catch (_) {}
     }
   };
-  // #405 — una scorciatoia indirizzata a un riquadro (Alt+E su testo
-  // selezionato dentro un video incorporato) può arrivare prima che il
-  // riquadro abbia montato Filo: montalo e consegna appena è pronto.
+  // #405 — la scorciatoia può arrivare prima che il riquadro abbia montato
+  // Filo: si monta e si consegna appena è pronto.
   if (IS_SUBFRAME && !contentScriptsStarted) {
     ensureContentScripts();
     waitForContentScripts(deliver);
