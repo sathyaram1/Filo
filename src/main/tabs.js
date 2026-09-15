@@ -1151,10 +1151,8 @@ class TabManager {
     this._broadcast();
   }
 
-  // Apre una copia della tab (stesso URL), attivandola — come "Duplica" di Chrome.
-  // A differenza di Chrome, replica anche lo zoom e la posizione di scroll della
-  // scheda sorgente: la copia è davvero "uguale a com'era", non solo stesso URL.
-  // Ritorna l'id della nuova tab, o null se l'originale non esiste.
+  // Copia anche zoom e scroll, non solo l'URL: "duplica" deve dare una scheda
+  // uguale a com'era. Ritorna l'id della nuova, o null.
   async duplicateTab(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return null;
