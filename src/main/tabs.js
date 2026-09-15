@@ -1584,8 +1584,6 @@ class TabManager {
     // §3.1 — una volta sola, a caricamento finito. Approssimato: la pagina può
     // avere un'altezza diversa o caricare pezzi dopo.
     wc.on('did-finish-load', () => {
-      // Duplicazione tab: replica il livello di zoom della scheda sorgente,
-      // una sola volta a caricamento finito.
       if (typeof tab.restoreZoomLevel === 'number') {
         const z = tab.restoreZoomLevel;
         tab.restoreZoomLevel = null;
