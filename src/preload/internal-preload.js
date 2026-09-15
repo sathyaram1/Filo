@@ -53,8 +53,7 @@ const filoApi = {
     const requestId = `s${Date.now()}_${++streamCounter}`;
     const offMeta = (_e, data) => onMeta && onMeta(data);
     const offDelta = (_e, data) => onDelta && onDelta(data.delta);
-    // reset = il provider è caduto a metà stream e il main riparte col fallback:
-    // il chiamante deve buttare i delta accumulati finora (#273).
+    // #273 — reset: il provider è caduto a metà, i delta accumulati si buttano.
     const offReset = (_e, data) => onReset && onReset(data);
     const offDone = (_e, data) => { cleanup(); onDone && onDone(data); };
     const offError = (_e, data) => { cleanup(); onError && onError(data); };
