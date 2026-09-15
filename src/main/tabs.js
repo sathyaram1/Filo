@@ -662,9 +662,7 @@ class TabManager {
       this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     }
-    // Un'uscita dallo schermo intero in attesa della risposta di questa scheda
-    // non ha più nessuno che risponda: se la scheda se ne va, l'attesa se ne va
-    // con lei (a spegnere la modalità, se serve, ci pensa il giro qui sopra).
+    // Un'attesa rivolta a questa scheda non ha più nessuno che risponda.
     this.annullaUscitaSchermoIntero();
     // §3.1/§4 — "Chiudi = archivia": prima di distruggere la view salviamo i
     // metadati della tab nell'archivio (consultabile da filo://archive).
