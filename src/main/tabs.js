@@ -503,12 +503,9 @@ class TabManager {
     return null;
   }
 
-  // Partizione effettiva per `tab` su `url`: una tab proxata ("Apri da un
-  // altro paese") vive nella sua partition dedicata proxy:<tabId> finché vive,
-  // su qualsiasi pagina esterna. Partition diversa = cookie jar separato: la
-  // tab proxata NON condivide i login con le altre (isolamento voluto, da non
-  // rompere). Le pagine filo:// restano nella sessione normale anche su tab
-  // proxate (sono interne, niente traffico da instradare).
+  // Una scheda proxata vive in proxy:<tabId> finché vive. Partizione diversa
+  // vuol dire cookie separati: NON condivide i login con le altre, ed è voluto.
+  // Le pagine filo:// restano nella sessione normale anche lì: sono interne.
   _partitionForTab(tab, url) {
     if (tab && tab.proxy && url && !url.startsWith('filo://')) {
       return `proxy:${tab.id}`;
