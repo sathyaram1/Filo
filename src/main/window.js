@@ -53,14 +53,9 @@ function wireWindowCommon(win, tabs) {
     else tabs.layout();
   });
 
-  // Esc esce dallo schermo intero anche quando il fuoco è sulla barra di Filo
-  // (#514). A tutto schermo la barra è nascosta sotto la pagina, ma tiene il
-  // fuoco se l'ultimo clic era lì — barra indirizzi, un pulsante, il menu su
-  // Mac: da lì il tasto non passa da nessun before-input-event delle schede, e
-  // prima moriva nel nulla. La regola sta in un posto solo (tabs.js); qui non si
-  // decide niente, si porta il tasto dove si decide. Quando la barra è visibile
-  // handleFullscreenEscape risponde false e l'Esc resta a chi lo usa nella barra
-  // (il pannello degli scaricamenti si chiude ancora con Esc).
+  // #514 — a tutto schermo la barra è nascosta ma può tenere il fuoco, e da lì
+  // l'Esc non passa dal before-input-event di nessuna scheda. Qui non si decide
+  // niente: la regola sta in tabs.js, che risponde false se la barra è visibile.
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
