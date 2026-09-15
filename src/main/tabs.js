@@ -1158,10 +1158,8 @@ class TabManager {
     if (!tab) return null;
     let zoomLevel = null;
     try { zoomLevel = tab.view.webContents.getZoomLevel(); } catch (_) {}
-    // Scroll: prova a leggere la posizione ESATTA dalla pagina sorgente (più
-    // precisa del segnale `scrollPct` arrotondato dal content script); se la
-    // pagina non risponde (es. interna senza diritto di esecuzione) ricadi sul
-    // valore già tracciato.
+    // Si chiede la posizione ESATTA alla pagina: il valore già tracciato è
+    // arrotondato, e serve solo come ripiego se non risponde.
     let scrollPct = typeof tab.scrollPct === 'number' ? tab.scrollPct : null;
     try {
       const exact = await tab.view.webContents.executeJavaScript(
