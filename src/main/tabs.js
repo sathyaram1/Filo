@@ -1768,12 +1768,9 @@ class TabManager {
       }
     });
 
-    // Apertura nuove tab: tutto resta dentro Filo come nuovo tab — a meno che
-    // il popup blocker sia attivo e l'apertura sembri un popup pubblicitario
-    // (cioè non un click su <a target="_blank">). Heuristic: il disposition
-    // 'new-window' corrisponde a window.open() esplicito con features (size,
-    // toolbar, ecc.), che è la firma classica degli ad popup. Disposition
-    // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
+    // Tutto resta dentro Filo come scheda, salvo i popup pubblicitari. Il
+    // segno: 'new-window' è una window.open() con misure e barre, la firma
+    // classica di un popup; 'foreground-tab'/'background-tab' sono link cliccati.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition } = details;
       // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
