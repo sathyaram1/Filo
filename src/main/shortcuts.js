@@ -30,10 +30,8 @@ function registerShortcuts(window) {
   }
 }
 
-// Una tab è "interna" (pagina filo://) se il flag isInternal è settato oppure
-// se l'URL usa lo schema filo://. Controlliamo entrambi perché isInternal è il
-// campo canonico ma l'URL è la difesa definitiva contro tab in stati di
-// transizione.
+// Due controlli: isInternal è il campo canonico, l'URL regge anche le tab in
+// stati di transizione, quando il flag non è ancora aggiornato.
 function isInternalTab(tab) {
   if (!tab) return false;
   return !!tab.isInternal || String(tab.url || '').startsWith('filo://');
