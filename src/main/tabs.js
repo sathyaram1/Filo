@@ -2004,7 +2004,6 @@ class TabManager {
   }
 
   _broadcast() {
-    // La shell è il primary webContents della BrowserWindow.
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());
     } catch (_) { /* shell non ancora caricata */ }
