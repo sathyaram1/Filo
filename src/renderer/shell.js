@@ -489,8 +489,7 @@
 
   let ctxTabId = null;
   let ctxMenuPos = { x: 0, y: 0 };
-  // Stato proxy per il menu (lazy, richiesto a ogni apertura: la config può
-  // cambiare dalle impostazioni mentre l'app è aperta).
+  // Richiesto a ogni apertura: la configurazione può cambiare a Filo acceso.
   let ctxProxyStatus = null;
   async function openTabContextMenu(t, x, y) {
     ctxTabId = t.id;
