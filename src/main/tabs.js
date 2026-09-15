@@ -1248,11 +1248,9 @@ class TabManager {
       openExternalScheme(target);
       return;
     }
-    // La WebContentsView va RICREATA (non basta un loadURL) quando cambia la
-    // partizione (privacy, fra siti diversi) oppure quando si attraversa il
-    // confine di fiducia interno↔esterno: il preload e contextIsolation sono
-    // fissati alla creazione della view e un loadURL non li rivaluta, quindi
-    // riusare la view caricherebbe il contenuto col preload sbagliato.
+    // Preload e contextIsolation sono fissati alla CREAZIONE della vista: un
+    // loadURL non li rivaluta, quindi cambiare partizione o attraversare il
+    // confine interno/esterno impone di ricrearla.
     if (this._needsRecreate(tab, target)) {
       this._recreateView(tab, target);
     } else {
