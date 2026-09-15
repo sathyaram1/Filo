@@ -579,13 +579,10 @@
       el.dataset.id = t.id;
       el.dataset.tip = t.title || t.url;
 
-      // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
-      // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
-      // assumono lo stesso colore. Il testo passa a chiaro/scuro per contrasto.
-      // Se il colore campionato dalla cima pagina è neutro (header bianco/grigio:
-      // es. YouTube) non porta identità → ripieghiamo sul colore identità del
-      // sito (theme-color/favicon), così la tab attiva mostra il brand e non il
-      // bianco. Se manca anche quello, si resta sul colore campionato.
+      // §1.1 — si scrive --tab-active così anche i piedini a goccia seguono.
+      // Se il colore campionato in cima alla pagina è neutro (un header bianco)
+      // non dice niente del sito: si ripiega sul colore identità, e la scheda
+      // attiva mostra il brand invece del bianco.
       if (t.id === state.activeId) {
         const activeColor = hasColorIdentity(t.color) ? t.color : (t.identityColor || t.color);
         if (activeColor) {
