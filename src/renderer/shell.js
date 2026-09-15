@@ -866,7 +866,6 @@
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
       card.classList.add('show');
-      // Finestra molto bassa: rendi scrollabile e mostra la più recente.
       syncOverflow();
 
       // Suono opzionale alla comparsa.
