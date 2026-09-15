@@ -690,8 +690,7 @@
       try { activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (_) {}
     }
 
-    // Barra di navigazione (icone). Il campo URL è stato rimosso: l'indirizzo
-    // si digita dalla home di Filo. Qui aggiorniamo solo lo stato dei tasti.
+    // Non c'è un campo URL: l'indirizzo si scrive dalla home.
     const a = activeTab();
     backBtn.disabled = !(a && a.canBack);
     fwdBtn.disabled = !(a && a.canFwd);
