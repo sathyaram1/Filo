@@ -910,9 +910,8 @@
 
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
-    // Le azioni che arrivano dal main non possono trasportare funzioni: le
-    // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
-    // - openUrl → apri quel sito bypassando il blocco (#170.3 "Apri comunque").
+    // Attraverso l'IPC una funzione non passa: le azioni arrivano dichiarative
+    // e diventano onClick qui.
     let opts = info.opts;
     if (opts && Array.isArray(opts.actions)) {
       opts = {
