@@ -53,8 +53,7 @@ async function avvisaSeAggiornamentoBloccato(versione) {
   try {
     const FiloMem = globalThis.SN_FILO_MEMORY;
     if (!FiloMem?.addNotification) return;
-    // Il riconoscimento passa da `action`, che la scheda NON mostra: un
-    // marcatore dentro al testo lo leggerebbe l'utente.
+    // Il marcatore sta in `action`, non nel testo: la scheda il testo lo mostra.
     const gia = await FiloMem.listNotifications({ includeDismissed: true });
     if (gia.some((n) => n.action?.tipo === 'aggiornamento-mac' && n.action?.versione === versione)) return;
     await FiloMem.addNotification({
