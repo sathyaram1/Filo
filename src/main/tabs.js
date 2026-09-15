@@ -1487,10 +1487,8 @@ class TabManager {
         event.preventDefault();
         this._recreateView(tab, url);
       }
-      // #152 — born proxied su click-link/redirect verso un dominio con regola
-      // persistente: NON preventDefault (la navigazione in-place prosegue), poi
-      // _maybeApplyDomainRule instrada ricreando la view proxata se serve. Così
-      // se il proxy non è configurato la pagina resta semplicemente diretta.
+      // #152 — niente preventDefault: la navigazione prosegue e l'instradamento
+      // arriva dopo, così senza proxy configurato la pagina resta diretta.
       this._maybeApplyDomainRule(tab, url);
     });
     // SICUREZZA (#309) — will-navigate NON scatta sui redirect lato server
