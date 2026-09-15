@@ -184,8 +184,8 @@ function template() {
     label: 'Vista',
     submenu: [
       { label: 'Ingrandisci', accelerator: 'CommandOrControl+Plus', click: () => zoom('in'), ...SOLO_SCRITTA },
-      // Sulle tastiere il "+" si fa con Shift: senza questo alias Cmd+= — il
-      // modo in cui lo zoom si preme davvero — resterebbe scoperto.
+      // Il "+" si fa con Shift: senza questo alias Cmd+=, che è come lo zoom si
+      // preme davvero, resterebbe scoperto.
       { label: 'Ingrandisci', accelerator: 'CommandOrControl+=', click: () => zoom('in'), visible: false, ...SOLO_SCRITTA },
       { label: 'Rimpicciolisci', accelerator: 'CommandOrControl+-', click: () => zoom('out'), ...SOLO_SCRITTA },
       { label: 'Dimensione reale', accelerator: 'CommandOrControl+0', click: () => zoom('reset'), ...SOLO_SCRITTA },
