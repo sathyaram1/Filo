@@ -1693,11 +1693,9 @@ class TabManager {
       tab._ultimoInputEsc = esc;
       if (!esc) this.azzeraRivendicazioniEsc();
     });
-    // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
-    // /region-block, … — lista curata in geoBlock.js): il match viene
-    // memorizzato e diventa segnale al did-navigate dell'URL finale.
-    // Firma difensiva: Electron recenti passano i dettagli nell'event object,
-    // i vecchi come argomenti posizionali.
+    // Redirect verso un URL "di blocco" (lista in geoBlock.js): si memorizza e
+    // diventa segnale al did-navigate. Firma difensiva: Electron passa i
+    // dettagli nell'evento nelle versioni recenti, posizionali in quelle vecchie.
     wc.on('did-redirect-navigation', (e, url, _inPlace, isMainFrame) => {
       const target = typeof url === 'string' ? url : (e && e.url) || '';
       const main = typeof isMainFrame === 'boolean' ? isMainFrame : !(e && e.isMainFrame === false);
