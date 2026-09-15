@@ -110,8 +110,7 @@ function registerFiloProtocolForSession(sess) {
   try {
     sess.protocol.handle('filo', filoHandler);
   } catch (err) {
-    // handle() lancia se 'filo' è già registrato su quella sessione: ok,
-    // significa che è già servito (es. doppia init).
+    // Lancia se 'filo' è già registrato su quella sessione: allora è già servito.
     console.warn('[Filo protocol] per-session register:', err.message || err);
   }
 }
