@@ -160,8 +160,7 @@ function template() {
       { label: 'Ricarica', accelerator: 'CommandOrControl+R', click: ricarica, ...SOLO_SCRITTA },
       { label: 'Cronologia', click: () => apriPagina('filo://history/history.html') },
       { type: 'separator' },
-      // Cmd+W chiude la SCHEDA, non la finestra: è quello che Filo promette e
-      // quello che fa dovunque non ci sia una barra dei menu di mezzo.
+      // Cmd+W chiude la SCHEDA, non la finestra: è quello che Filo promette.
       { label: 'Chiudi scheda', accelerator: 'CommandOrControl+W', click: chiudiScheda, ...SOLO_SCRITTA },
       { label: 'Chiudi finestra', click: chiudiFinestra },
     ],
