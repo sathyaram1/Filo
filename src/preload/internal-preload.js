@@ -218,9 +218,8 @@ if (IS_FILO_ORIGIN) {
   });
 }
 
-// Inietta i content script (menu, popup, sidebar, highlight, spellcheck,
-// feedback) su tutte le pagine filo:// — il tasto destro Filo deve funzionare
-// ovunque, come richiesto dall'utente.
+// I content script si iniettano su TUTTE le pagine filo://: il tasto destro di
+// Filo deve funzionare ovunque, pagine interne comprese.
 const path = require('node:path');
 const shouldInjectContentScripts = () => true;
 function injectContentScriptStyles() {
