@@ -119,7 +119,6 @@ function createIncognitoWindow() {
     height: 800,
     minWidth: 720,
     minHeight: 500,
-    // Sfondo viola scuro: distinzione visiva immediata dalla finestra normale.
     backgroundColor: '#1f1b2e',
     title: 'Filo — Incognito',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
