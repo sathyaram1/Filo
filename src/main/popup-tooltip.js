@@ -94,8 +94,7 @@ function ensureWin(parentWin) {
 function doShow(parentWin, text, x, y) {
   if (!tipWin || tipWin.isDestroyed()) return;
   const cb = parentWin.getContentBounds();
-  // Posizione provvisoria: la window verrà ridimensionata dopo che il renderer
-  // riporta la dimensione del testo (handler 'size' più sopra).
+  // Dimensione provvisoria: la corregge l'handler 'size' quando il renderer misura il testo.
   const px = cb.x + Math.round(x);
   const py = cb.y + Math.round(y);
   tipWin.setBounds({ x: px, y: py, width: 200, height: 30 });
