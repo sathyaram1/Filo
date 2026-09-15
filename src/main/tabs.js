@@ -252,7 +252,6 @@ class TabManager {
     // verità sta in SN_FILO_MEMORY.listProxyRules.
     this._proxyRules = {};
     this.loadProxyRules().catch(() => {});
-    // Ctrl +/-/0 premuti mentre il focus è sulla barra (vedi _wireShellZoomKeys).
     this._wireShellZoomKeys();
   }
 
