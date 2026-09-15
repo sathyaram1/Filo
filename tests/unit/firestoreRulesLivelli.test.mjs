@@ -64,3 +64,18 @@ test('livelli: la forma è una mappa con al più l3/l4, ognuna con esito/at e un
   assert.match(voce, /get\('at', ''\) is string/);
   assert.match(voce, /get\('testo', ''\)\.size\(\) <= 20000/, 'il tetto del testo cifrato è 20.000 (CLAUDE.md § Limiti: ampio)');
 });
+
+test('la sentinella legge le stesse regole anche da un checkout con i fini riga di Windows (#569)', () => {
+  // Il file è lo stesso: cambia solo come lo consegna la macchina. Su Windows
+  // il checkout scrive CRLF, e fino al #569 questa sentinella rispondeva «manca
+  // il ramo di update con isAdmin()» — su regole in cui quel ramo c'era. Rosso
+  // solo sul runner della pubblicazione, cioè dove un rosso vuol dire che agli
+  // utenti non arriva nessuna versione: dall'11 al 15 settembre 2026 non ne è
+  // uscita nessuna. Senza il fix questa prova è rossa.
+  const comeSuWindows = RULES.replace(/\n/g, '\r\n');
+  for (const guardia of ['isAdmin', 'isRoutine']) {
+    const blocco = bloccoUpdate(comeSuWindows, guardia);
+    assert.match(blocco, /'livelli'/, `${guardia}: 'livelli' deve stare nell'hasOnly anche con CRLF`);
+    assert.match(blocco, /livelliValidi\(request\.resource\.data\)/, `${guardia}: il vincolo di forma va visto anche con CRLF`);
+  }
+});
