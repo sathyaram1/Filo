@@ -45,8 +45,7 @@ function hideForTests(win, { main = false } = {}) {
       try { const p = posizioneFuoriSchermo(); win.setPosition(p.x, p.y); win.setOpacity(0); } catch (_) {}
       riposizionando = false;
     });
-    // Alcune superfici rimettono l'opacità (animazioni, ripristini): il giro a
-    // tutto schermo è il caso noto, quindi la riaffermiamo anche lì.
+    // Il giro a tutto schermo rimette l'opacità: la riaffermiamo anche lì.
     win.on('enter-full-screen', () => {
       try { win.setOpacity(0); } catch (_) {}
     });
