@@ -1175,7 +1175,6 @@
       if (panelOpen) renderPanel();
     }
 
-    // Aggiornamenti live dal main (start/progress/done/error).
     api.downloads.onEvent((info) => {
       if (!info || !info.item) return;
       dls.set(info.item.id, info.item);
