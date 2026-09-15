@@ -44,9 +44,8 @@
   setIcon(accountBtn, 'user', 16);
   setIcon(newBtn, 'plus', 16);
 
-  // Token estetici (#146.1): applica gli override dell'utente alle variabili
-  // della shell (--accent, --fg, …) al boot e live a ogni cambio impostazioni
-  // (stesso canale SETTINGS_UPDATED usato dalle pagine).
+  // #146.1 — i token estetici dell'utente valgono anche qui, e si riapplicano
+  // dal vivo a ogni cambio: la barra non può restare indietro sulle pagine.
   const ThemeTokens = window.SN_THEME_TOKENS;
   function applyShellTokens(tokens) {
     if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
