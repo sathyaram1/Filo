@@ -313,8 +313,6 @@ class TabManager {
     // schermo pieno: lei resterebbe convinta di averlo, col lettore disegnato a
     // schermo pieno dentro una vista tornata sotto la barra.
     if (!on && this.pageFullscreen) this._exitPageFullscreen();
-    // Avvisa i content script così la voce di menu mostra "Esci da schermo
-    // intero" (icona shrink) mentre la modalità è attiva.
     try {
       const type = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
       this._broadcastToViews({ type, fullscreen: on });
