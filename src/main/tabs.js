@@ -295,10 +295,8 @@ class TabManager {
     this.layout();
   }
 
-  // Entra/esce dalla modalità "contenuto a tutto schermo": la view attiva copre
-  // tutta la finestra (top=0), così la barra di tab+indirizzo della shell resta
-  // sotto e non è visibile. Porta anche la finestra in fullscreen OS per
-  // coerenza. Idempotente. Ritorna lo stato risultante.
+  // Idempotente; porta anche la finestra a tutto schermo di sistema, o i due
+  // stati divergono. Ritorna lo stato risultante.
   setContentFullscreen(on) {
     on = !!on;
     // La modalità cambia per una strada qualunque (voce di menu, gesto di
