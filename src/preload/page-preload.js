@@ -365,8 +365,7 @@ function start() {
   } catch (_) {}
 }
 
-// #405 — montaggio dei content script in un riquadro incorporato: una volta
-// sola, alla prima interazione dell'utente con quel riquadro.
+// #405 — una volta sola, alla prima interazione con quel riquadro.
 let contentScriptsStarted = false;
 function ensureContentScripts() {
   if (contentScriptsStarted) return;
