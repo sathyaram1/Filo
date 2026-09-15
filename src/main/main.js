@@ -87,26 +87,15 @@ app.whenReady().then(async () => {
   try {
     const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
-    // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);
-    // Anti-fingerprinting: carica/genera il master secret persistente e fissa
-    // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
+    // Fingerprint e pulizia dei cookie di tracker vanno PRIMA che si apra una
+    // scheda: dopo, la prima pagina è già stata letta con le difese spente.
     try { await require('./services/fingerprint').init(s); } catch (_) {}
-    // Backstop del wipe: se dei cookie di tracker noti sono rimasti su disco
-    // (es. da prima di attivare l'Automatico, o da un'uscita interrotta),
-    // ripuliscili PRIMA di aprire qualsiasi tab. I cookie funzionali/di login
-    // restano. In privacy le sessioni sono effimere; in manual non tocchiamo nulla.
     try { await Cookies.wipeTrackerCookies(s); } catch (_) {}
-    // Ad-blocking per-dominio basato su liste (StevenBlack/EasyList): applica il
-    // blocco alla sessione di default, carica la cache e — se attivo e stantia —
-    // avvia un refresh in background. Non blocca l'avvio.
     try { await require('./services/adblock').init(s); } catch (_) {}
-    // Blocco apertura siti in blacklist (#170.3): legge la config dalle
-    // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
-    // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
-    // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
+    // Una-tantum, idempotente: i vecchi appunti diventano un file dell'editor.
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
   } catch (_) {}
 
