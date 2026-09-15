@@ -517,10 +517,9 @@ class TabManager {
     const isInternal = url.startsWith('filo://');
     const webPreferences = {
       preload: isInternal ? INTERNAL_PRELOAD : PAGE_PRELOAD,
-      // Per le pagine interne (filo://) usiamo contextIsolation:false così
-      // possiamo overwritare window.chrome direttamente — i file portati
-      // dall'estensione si aspettano chrome.* in scope globale. Le pagine
-      // web esterne mantengono l'isolation (codice non fidato).
+      // contextIsolation spento SOLO sulle pagine interne, dove i moduli
+      // portati si aspettano chrome.* globale. Le pagine web sono codice non
+      // fidato e restano isolate.
       contextIsolation: !isInternal,
       sandbox: false,
       nodeIntegration: false,
