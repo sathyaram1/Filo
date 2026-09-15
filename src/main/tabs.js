@@ -1645,9 +1645,8 @@ class TabManager {
         this.annullaUscitaSchermoIntero();
         if (this.contentFullscreen) this.setContentFullscreen(false);
       }
-      // #441 — quando la pagina corrente si è committata: una pagina-ponte
-      // ("il download partirà a breve…") avvia il file entro pochi secondi da
-      // qui. Oltre quella finestra la scheda non è più un semplice ponte.
+      // #441 — una pagina-ponte avvia il file entro pochi secondi da qui: oltre
+      // quella finestra la scheda non è più un ponte.
       tab._navigatedAt = Date.now();
       // Nuova pagina → il colore live (§1.1) del sito precedente non vale più: lo
       // azzeriamo (la tab torna al neutro finché il content script non ricampiona).
