@@ -1,6 +1,5 @@
-// Finestra principale: BrowserWindow che ospita la "shell" del browser
-// (tab bar + barra indirizzi + pulsanti) e una serie di WebContentsView,
-// una per ogni tab aperto.
+// Finestra principale e finestra incognito: la BrowserWindow che ospita la
+// shell (barra in alto) e una WebContentsView per ogni scheda.
 
 const { BrowserWindow, session } = require('electron');
 const path = require('node:path');
