@@ -34,6 +34,10 @@
 # In questo repo NESSUN file ha bisogno di CRLF: non ci sono .bat ne' .cmd (gli
 # unici formati che lo pretendono davvero). Se un giorno ce ne fosse uno, va
 # aggiunto qui con `eol=crlf`, non tolta la regola generale.
+#
+# La regola qui sotto toglie il problema alle copie nuove; a quelle scaricate
+# PRIMA lo toglie il lettore delle sentinelle (`tests/helpers/testo.mjs`), che
+# normalizza comunque i byte che legge.
 * text=auto eol=lf
 
 # Gli hook vengono ESEGUITI da bash: qui un CRLF non e' una sfumatura, e' uno
