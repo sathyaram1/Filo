@@ -627,10 +627,8 @@ class TabManager {
     this.win.contentView.addChildView(view);
     this.tabs.push(tab);
 
-    // IMPORTANTE: setBounds PRIMA di loadURL così la WebContentsView ha una
-    // dimensione valida quando il compositor alloca il display surface.
-    // Caricare con bounds 0x0 può far andare in fallimento le capturePage
-    // successive con "Current display surface not available".
+    // setBounds PRIMA di loadURL: con dimensione 0x0 il compositor non alloca
+    // un display surface valido e le capturePage successive falliscono.
     if (activate) {
       this.activeId = id;
       tab.activateSeq = this._nextActivationSeq();
