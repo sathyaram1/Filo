@@ -1333,9 +1333,8 @@ class TabManager {
   reload(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
-    // #327 — parità di cammini: ricaricare una scheda che mostra la pagina
-    // d'errore deve RITENTARE il sito fallito (come il bottone "Riprova"),
-    // non ricaricare la pagina d'errore stessa.
+    // #327 — ricaricare una pagina d'errore deve RITENTARE il sito, come il
+    // bottone "Riprova": due strade per la stessa cosa fanno la stessa cosa.
     const NE = globalThis.SN_NET_ERROR;
     let current = '';
     try { current = tab.view.webContents.getURL() || ''; } catch (_) {}
