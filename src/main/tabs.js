@@ -2111,8 +2111,7 @@ function hostOf(url) {
   } catch (_) { return null; }
 }
 
-// Hue (0..360) del colore identità per l'ordine cromatico (§1.3). Le tab senza
-// colore tornano Infinity → finiscono in coda.
+// §1.3 — le schede senza colore tornano Infinity e finiscono in coda.
 function hueOf(rgbStr) {
   const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
   if (!m) return Infinity;
