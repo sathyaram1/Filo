@@ -749,11 +749,9 @@
     return !url || url.startsWith('filo://newtab/');
   }
 
-  // La barra indirizzi è sempre nascosta: le icone di navigazione (indietro,
-  // avanti, ricarica) vivono nel menu tasto destro, mentre home/impostazioni/
-  // app/profilo sono state spostate DENTRO la pagina home (in alto a destra).
-  // Resta solo la fila di tab, e la WebContentsView risale a coprire lo spazio
-  // liberato. Manteniamo applyChrome (chiamata dal render) per idempotenza.
+  // La barra indirizzi è sempre nascosta: indietro/avanti/ricarica stanno nel
+  // menu del tasto destro, le altre icone dentro la home. Resta la fila di
+  // schede e la vista della pagina risale a coprire lo spazio.
   let chromeCompact = null;
   function applyChrome(_isHome) {
     const compact = true;
