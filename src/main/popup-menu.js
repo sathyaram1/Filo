@@ -119,8 +119,7 @@ function computeMenuWidth(entries) {
   for (const e of entries || []) {
     if (e.type === 'separator') continue;
     const label = String(e.label || '');
-    // L'email (voce disabled senza icona) usa font 12px, le altre 13px. Stima
-    // generosa (~0.6 * font-size per carattere) per non troncare mai.
+    // Stima generosa (~0.6 * font-size per carattere): meglio larghi che troncati.
     const fontPx = e.disabled ? 12 : 13;
     const charW = fontPx * 0.6;
     const hasIcon = !!e.icon && ICON_PATHS[e.icon];
