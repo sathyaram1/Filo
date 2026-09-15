@@ -1557,11 +1557,9 @@ class TabManager {
     // `tab.isInternal`, che è fissato alla creazione: una nuova scheda che
     // naviga verso un sito esterno deve riceverli lo stesso.
     wc.on('dom-ready', () => {
-      // Qui NON si annuncia lo schermo intero. Ci si era provato, e l'annuncio
-      // arrivava prima che il content script avesse un orecchio: si perdeva, e
-      // il menu del tasto destro continuava a offrire "Schermo intero" mentre
-      // ci si era già dentro (#514). Adesso è la pagina a CHIEDERE lo stato
-      // appena è pronta (MSG.FULLSCREEN_STATE), che è l'unico momento in cui la
+      // #514 — qui NON si annuncia lo schermo intero: l'annuncio arriverebbe
+      // prima che il content script abbia un orecchio e si perderebbe. È la
+      // pagina a CHIEDERE lo stato appena è pronta, l'unico momento in cui la
       // risposta non può cadere nel vuoto.
       let current = '';
       try { current = wc.getURL() || ''; } catch (_) {}
