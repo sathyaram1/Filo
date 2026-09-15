@@ -957,7 +957,6 @@ class TabManager {
     try { return await globalThis.SN_STORAGE?.getSettings?.(); } catch (_) { return null; }
   }
 
-  // Tick periodico: se Filo è inattivo da ≥ soglia (preferenze), avvia il triage.
   async _autoArchiveTick() {
     if (this.incognito || this._triageRunning) return;
     const s = await this._readSettings();
