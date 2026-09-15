@@ -1206,7 +1206,7 @@
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.close(a.id);
     } else if (meta && e.key.toLowerCase() === 'l') {
-      // L'indirizzo si digita dalla home: Ctrl+L apre la home di Filo.
+      // L'indirizzo si scrive dalla home, quindi Ctrl+L apre la home.
       e.preventDefault();
       const a = activeTab();
       if (a) api.tabs.navigate(a.id, 'filo://newtab/');
