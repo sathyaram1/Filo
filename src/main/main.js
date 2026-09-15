@@ -27,11 +27,8 @@ try {
 require('./shim/chrome-api');
 require('./services/loader');
 
-// Solo in test: esponi i singleton di handlers/defaults su globalThis così i
-// test Playwright (che girano nel main via app.evaluate, dove `require` non è
-// iniettato) possono esercitare la catena reale chiave-condivisa → motore. Va
-// fatto in modo SINCRONO qui (non dentro whenReady) perché i test che dipendono
-// solo dal fixture `app` possono valutare prima che il callback async finisca.
+// Dentro app.evaluate `require` non esiste: i test arrivano ai servizi veri da
+// qui. SINCRONO, non dentro whenReady: un test può valutare prima che finisca.
 if (process.env.NODE_ENV === 'test') {
   try {
     globalThis.__filoHandlers = require('./services/handlers');
