@@ -159,7 +159,12 @@ test('gli allegati dei feedback non si elencano e non si scaricano col solo indi
   // l'emulatore ufficiale di Storage (link col token 200, solo indirizzo 403,
   // token sbagliato 403).
   const STORAGE = readFileSync(join(ROOT, 'storage.rules'), 'utf8');
-  const corpo = blocco(STORAGE, '/feedback/{file=**}');
+  // Il blocco si chiama `/feedback/{file}` da quando #582 ha ristretto la
+  // scrittura a un solo segmento (le sottocartelle cadono nel diniego finale).
+  // La forma larga `{file=**}` resta cercata perché se qualcuno la rimettesse
+  // queste asserzioni devono girare su QUELLA, non sparire: il blocco non
+  // trovato è un errore, non un test che passa a vuoto.
+  const corpo = blocco(STORAGE, '/feedback/{file}') || blocco(STORAGE, '/feedback/{file=**}');
   assert.ok(corpo, 'blocco /feedback delle storage.rules non letto');
   assert.ok(/allow\s+list\s*:\s*if\s+false/.test(corpo),
     'gli allegati dei feedback non devono essere elencabili');

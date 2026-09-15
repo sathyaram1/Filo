@@ -98,6 +98,19 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
   // «controlla la connessione».
   for (const [porta, r] of Object.entries(out.filo)) {
     expect(r.ok, `filo/${porta}`).toBe(false);
+    // `decifraAllegato` è l'eccezione, ed è voluta (#582). Le altre porte
+    // servono solo la dashboard di chi riceve le segnalazioni, quindi «non sei
+    // l'amministratore» è la risposta giusta. Quella lì la chiama ANCHE il
+    // riquadro dei feedback, dove un tester qualunque riapre le proprie
+    // segnalazioni: mandarlo a cercare un permesso di amministratore che non
+    // avrà mai era il difetto. E prima ancora dell'identità guarda DOVE punta
+    // l'indirizzo — che non lo sceglie Filo, lo scrive chi manda la
+    // segnalazione — e qui l'indirizzo è di un deposito che non è il nostro.
+    if (porta === 'decifraAllegato') {
+      expect(String(r.code || ''), `filo/${porta}: non è una questione di permessi`).not.toBe('not_admin');
+      expect(String(r.error || ''), `filo/${porta}: l'indirizzo va guardato per primo`).toContain('url allegato non valido');
+      continue;
+    }
     expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
   }
 });

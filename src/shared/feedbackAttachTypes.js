@@ -30,6 +30,12 @@
   // storage.rules. NIENTE text/html / application/xhtml+xml / text/xml.
   const DOC_MIME = new Set([
     'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
+    // `.tsv` e `.yaml` col loro tipo esplicito. Le storage.rules li ammettono
+    // già e `npm run feedback:apri` li manda; senza questi due, un .yaml che il
+    // sistema operativo tipizza `application/x-yaml` veniva rifiutato qui
+    // mentre il deposito lo avrebbe accettato, e lo strumento a riga di comando
+    // poteva mandare quello che una persona non poteva allegare (#582, giro 7).
+    'text/tab-separated-values', 'application/x-yaml',
   ]);
 
   // Estensioni ammesse SOLO quando il MIME è vuoto o generico
@@ -38,7 +44,7 @@
   // l'estensione per "salvare" un MIME esplicito e pericoloso (es. un .txt che
   // il SO tipizza text/html resta rifiutato).
   const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
-  const DOC_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'log', 'yml', 'yaml', 'pdf']);
+  const DOC_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'log', 'yml', 'yaml', 'pdf']);
 
   function extOf(name) {
     const m = /\.([a-z0-9]+)$/i.exec(String(name || ''));

@@ -52,6 +52,23 @@
   // e ogni scrittura passa comunque dal main process che rifiuta i non-admin.
   let isAdmin = false;
 
+  // Chi guarda cambia: l'unica porta per dirlo, e l'unico posto dove si buttano
+  // via le risposte tenute da parte.
+  //
+  // Gli allegati si chiedono una volta per indirizzo e la risposta resta in
+  // memoria, anche quando è un no. Quel no però dipende da CHI sta guardando, e
+  // il pulsante per farsi riconoscere sta in questa stessa pagina: senza
+  // svuotare, chi lo premeva continuava a vedere segnaposti al posto degli
+  // allegati finché non riapriva la pagina (#582, giro 3). Vale nei due sensi:
+  // anche uscendo, gli allegati già decifrati non devono restare a schermo.
+  function setIsAdmin(v) {
+    const nuovo = Boolean(v);
+    if (nuovo === isAdmin) return;
+    isAdmin = nuovo;
+    fbImgCache.clear();
+    fbFileWhyCache.clear();
+  }
+
   // Invia un messaggio al main process. Su pagine filo:// è sempre presente.
   function sendToMain(msg) {
     if (window.filo?.message) return window.filo.message(msg);
@@ -259,6 +276,25 @@
   // sono ANCORATI al singolo turno: vivono come righe-marcatore dentro `notes`
   // (vedi SN_FEEDBACK_THREAD), così non serve cambiare lo schema Firestore né le
   // regole. L'upload va diretto a Storage (path feedback/* è pubblico).
+  // L'allowlist dei tipi allegabili è UNA, condivisa col riquadro di
+  // segnalazione dentro i siti: le due strade devono rifiutare le stesse cose,
+  // e con le stesse parole (#582, giro 7).
+  const AttachTypes = window.SN_FEEDBACK_ATTACH;
+  const ATTACH_REJECT_MSG =
+    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+
+  // Stesso ripiego del riquadro di segnalazione dentro i siti, e per lo stesso
+  // motivo: se l'allowlist condivisa non si carica, il ripiego deve CHIUDERE
+  // (solo immagini raster), non aprire. Un gate che sparisce in silenzio quando
+  // manca un pezzo è un gate che non c'è.
+  function classificaAllegato(file) {
+    if (AttachTypes && typeof AttachTypes.classify === 'function') {
+      return AttachTypes.classify(file);
+    }
+    const t = String(file?.type || '').toLowerCase();
+    return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
+  }
+
   const ATTACH_MAX_IMAGES = 5;
   const ATTACH_MAX_FILES = 5;
   const ATTACH_MAX_BYTES = 4 * 1024 * 1024;
@@ -283,28 +319,125 @@
   // Decifratura lazy degli allegati immagine (S1.2), con cache
   // url → { dataUrl, error }. Su fallimento `error` porta il MOTIVO preciso
   // (dal main) così il segnaposto lo spiega in hover invece di restare muto.
+  // `soloDestinatario`: non è un guasto, è che l'allegato lo apre solo chi
+  // riceve le segnalazioni. Il segnaposto allora lo dice, invece di far
+  // sembrare che manchi qualcosa. Quello che NON dice è che l'allegato sia
+  // arrivato: da qui Filo non l'ha aperto (#582, giro 5).
   const fbImgCache = new Map();
   async function resolveImageSrc(url) {
-    if (!url) return { dataUrl: null, error: '' };
+    if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
     if (fbImgCache.has(url)) return fbImgCache.get(url);
     let dataUrl = null;
     let error = '';
+    let soloDestinatario = false;
     try {
       const r = await sendToMain({ type: 'feedback_decrypt_image', url });
       if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
-      else if (r && r.error) error = String(r.error);
+      else if (r && r.error) { error = String(r.error); soloDestinatario = !!r.soloDestinatario; }
       else error = 'immagine non disponibile';
     } catch (_) { error = 'immagine non raggiungibile'; }
-    const res = { dataUrl, error };
+    const res = { dataUrl, error, soloDestinatario };
     fbImgCache.set(url, res);
     return res;
   }
 
-  // Lista di allegati non-immagine come link scaricabili (nome originale).
+  // Lista di allegati non-immagine.
+  //
+  // L'indirizzo di un allegato NON diventa mai un href, e il motivo è che non lo
+  // sceglie Filo (#582): sta scritto dentro la segnalazione, e una segnalazione
+  // la manda chiunque, anche senza account e senza avere Filo installato. Le
+  // regole del database contano gli allegati, non guardano dove puntano. Con un
+  // href diretto bastava mandare una segnalazione con un finto allegato
+  // «schermata.png» che punta al proprio sito per mettere un'esca dentro una
+  // pagina di Filo, davanti a tutti quelli che aprono l'elenco: la pillola è
+  // identica a quella di un allegato vero, il nome lo sceglie chi manda, e il
+  // clic portava fuori.
+  //
+  // Il clic passa dal canale del main, che l'indirizzo lo confronta col deposito
+  // di Filo e i byte li decifra. È la stessa strada della dashboard, che questo
+  // controllo ce l'aveva già: erano due strade per la stessa cosa e una non
+  // guardava niente.
   function filesListHtml(files) {
     const fs = (files || []).filter((x) => x && typeof x.url === 'string' && x.url);
     if (!fs.length) return '';
-    return `<div class="fb-files">${fs.map((x) => `<a class="fb-file" href="${escapeHtml(safeHref(x.url) || '#')}" target="_blank" rel="noopener" download="${escapeHtml(x.name || '')}">${FILE_SVG}<span class="fb-file-name">${escapeHtml(x.name || 'allegato')}</span></a>`).join('')}</div>`;
+    return `<div class="fb-files">${fs.map((x) => `<a class="fb-file" href="#" data-url="${escapeHtml(x.url)}" data-name="${escapeHtml(x.name || 'allegato')}" data-type="${escapeHtml(x.type || '')}">${FILE_SVG}<span class="fb-file-name">${escapeHtml(x.name || 'allegato')}</span></a>`).join('')}</div>`;
+  }
+
+  // Perché un allegato non si apre, con le parole del main (una sola fonte per
+  // quella frase). Lo si chiede solo quando chi guarda NON riceve le
+  // segnalazioni: in quel caso il main risponde subito, senza toccare la rete.
+  // Cache url → { error, soloDestinatario } | null (null = si apre).
+  const fbFileWhyCache = new Map();
+  async function fileClosedReason(url) {
+    if (!url) return null;
+    if (fbFileWhyCache.has(url)) return fbFileWhyCache.get(url);
+    let res = null;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_image', url });
+      if (!r || !r.ok) {
+        res = { error: String((r && r.error) || 'allegato non disponibile'), soloDestinatario: !!(r && r.soloDestinatario) };
+      }
+    } catch (_) {
+      res = { error: 'allegato non raggiungibile', soloDestinatario: false };
+    }
+    fbFileWhyCache.set(url, res);
+    return res;
+  }
+
+  // Lo dice sulla pillola, non solo nell'hover: chi ha mandato la segnalazione
+  // deve poter capire a colpo d'occhio che quell'allegato lui non lo apre, come
+  // già succede per lo screenshot lì accanto.
+  function markFileClosed(a, motivo, soloDestinatario) {
+    a.title = motivo || '';
+    a.classList.add('fb-file--closed');
+    let nota = a.querySelector('.fb-file-note');
+    if (!nota) {
+      nota = document.createElement('span');
+      nota.className = 'fb-file-note';
+      a.appendChild(nota);
+    }
+    // Non «inviato»: l'elenco mostra a ogni tester le segnalazioni di tutti,
+    // quindi questa pillola compare anche davanti all'allegato di un altro
+    // (#582, giro 3). E non «consegnato» (#582, giro 5): se sia arrivato Filo
+    // non l'ha guardato. Dice chi lo apre, che è vero in ogni caso.
+    nota.textContent = soloDestinatario ? '(riservato)' : '(non disponibile)';
+  }
+
+  // Il clic su un allegato: scarica e decifra dal main, poi salva col nome vero.
+  // Se non si può aprire, lo dice invece di consegnare un file rotto in silenzio
+  // (prima il collegamento portava ai byte cifrati: arrivava un .pdf col nome
+  // giusto che non si apriva, e nessuno spiegava perché).
+  function resolveFileLinks(root) {
+    root.querySelectorAll('a.fb-file').forEach((a) => {
+      const url = a.dataset.url || '';
+      const name = a.dataset.name || 'allegato';
+      const mime = a.dataset.type || 'application/octet-stream';
+      if (!isAdmin) {
+        fileClosedReason(url).then((r) => { if (r) markFileClosed(a, r.error, r.soloDestinatario); });
+      }
+      a.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        if (a.classList.contains('fb-file--loading')) return;
+        a.classList.add('fb-file--loading');
+        try {
+          const r = await sendToMain({ type: 'feedback_decrypt_image', url, mime });
+          if (r && r.ok && r.dataUrl) {
+            const dl = document.createElement('a');
+            dl.href = r.dataUrl;
+            dl.download = name;
+            document.body.appendChild(dl);
+            dl.click();
+            dl.remove();
+          } else {
+            markFileClosed(a, (r && r.error) || 'allegato non disponibile', !!(r && r.soloDestinatario));
+          }
+        } catch (_) {
+          markFileClosed(a, 'allegato non raggiungibile', false);
+        } finally {
+          a.classList.remove('fb-file--loading');
+        }
+      });
+    });
   }
 
   function humanSize(n) {
@@ -392,7 +525,16 @@
 
     async function addFile(file) {
       if (!file) return;
-      const isImg = (file.type || '').startsWith('image/');
+      // Il TIPO si guarda PRIMA di caricare, come fa il riquadro di
+      // segnalazione dentro i siti (#582, giro 7). Il selettore offre anche
+      // `image/*` e `text/*`, che comprendono una pagina web e un disegno
+      // vettoriale: tipi che il deposito rifiuta. Senza questo controllo il file
+      // partiva lo stesso e quello che si leggeva era il numero dell'errore del
+      // deposito, invece della frase che dice cosa si può allegare. Il confine
+      // reggeva comunque: a non andare era ciò che si leggeva.
+      const kind = classificaAllegato(file);
+      if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
+      const isImg = kind === 'image';
       const c = counts();
       if (isImg && c.imgs >= ATTACH_MAX_IMAGES) { setStatus(`Massimo ${ATTACH_MAX_IMAGES} immagini.`); return; }
       if (!isImg && c.files >= ATTACH_MAX_FILES) { setStatus(`Massimo ${ATTACH_MAX_FILES} file.`); return; }
@@ -780,6 +922,12 @@
     listEl.innerHTML = items.map((f) => {
       const when = fmtTs(f.createdAt || f._createTime);
       const url = f.url || '';
+      // L'indirizzo della pagina segnalata: si apre (serve a chi guarda la
+      // segnalazione: è il posto dove il problema è successo), ma la scritta la
+      // compone SN_FEEDBACK.linkLabel, che mostra il sito vero e dichiara il
+      // taglio. Prima erano i primi 80 caratteri dell'indirizzo, tagliati senza
+      // nemmeno un puntino: e l'indirizzo lo scrive chi manda la segnalazione,
+      // che sceglieva così cosa si leggeva e dove si finiva (#582, giro 3).
       const safeUrl = safeHref(url);
       const ua = (f.userAgent || '').slice(0, 80);
       const cid = (f.clientId || '').slice(0, 12);
@@ -922,7 +1070,7 @@
           <div class="fb-meta">
             <span>${escapeHtml(when)}</span>
             ${stateBadgeHtml(f)}
-            ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">${escapeHtml(url).slice(0, 80)}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url).slice(0, 80)}</span>` : '')}
+            ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
             ${claimBadgeHtml(f)}
@@ -947,7 +1095,7 @@
         }
       });
       // Decifra e riempi il src (o mostra il segnaposto testuale se non arriva).
-      resolveImageSrc(img.dataset.url || '').then(({ dataUrl, error }) => {
+      resolveImageSrc(img.dataset.url || '').then(({ dataUrl, error, soloDestinatario }) => {
         img.classList.remove('fb-img-loading');
         if (dataUrl) {
           img.src = dataUrl;
@@ -955,13 +1103,25 @@
         } else {
           const ph = document.createElement('div');
           ph.className = 'fb-img-broken';
-          ph.textContent = '(immagine non disponibile)';
+          // Chi ha mandato la segnalazione non rivedrà il proprio screenshot:
+          // quell'allegato lo apre solo chi riceve le segnalazioni. Non è un
+          // guasto e il segnaposto non deve farlo sembrare tale. Non è nemmeno
+          // «inviato»: l'elenco mostra a ogni tester le segnalazioni di tutti,
+          // quindi lo stesso segnaposto compare davanti all'allegato di un
+          // altro, che chi guarda non ha mandato.
+          // «Riservato», non «consegnato» (#582, giro 5): che sia arrivato Filo
+          // non l'ha guardato, e bastava un indirizzo scritto nella forma del
+          // deposito perché lo dichiarasse di un file mai caricato. Il motivo
+          // per esteso lo dà il main, una fonte sola per quella frase.
+          ph.textContent = soloDestinatario ? '(allegato riservato)' : '(immagine non disponibile)';
           // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
           ph.title = error || img.dataset.url || '';
           img.replaceWith(ph);
         }
       });
     });
+
+    resolveFileLinks(listEl);
 
     bindCardActions(listEl);
 
@@ -1486,10 +1646,10 @@
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
-      isAdmin = Boolean(r?.isAdmin);
+      setIsAdmin(r?.isAdmin);
       renderAuthState(r?.profile);
     } catch (_) {
-      isAdmin = false;
+      setIsAdmin(false);
       renderAuthState(null);
     }
   }
@@ -1499,7 +1659,7 @@
       adminSignInBtn.disabled = true;
       try {
         const r = await sendToMain({ type: 'auth_signin' });
-        isAdmin = Boolean(r?.isAdmin);
+        setIsAdmin(r?.isAdmin);
         renderAuthState(r?.profile);
         applyFilter(); // ridisegna con/senza controlli admin
         if (r?.ok === false) alert('Accesso non riuscito: ' + (r.error || 'errore sconosciuto'));
@@ -1553,7 +1713,7 @@
   if (window.filo?.onBroadcast) {
     window.filo.onBroadcast((m) => {
       if (m?.type === 'auth_changed') {
-        isAdmin = Boolean(m.isAdmin);
+        setIsAdmin(m.isAdmin);
         renderAuthState(m.profile);
         applyFilter();
       }
@@ -1567,7 +1727,7 @@
   // sovrascrivere i dati finti. È lo stesso rimedio che tiene stabile manage.
   window.__fbTest = {
     setAdmin(v, profile) {
-      isAdmin = !!v;
+      setIsAdmin(v);
       renderAuthState(profile || null);
       applyFilter();
     },

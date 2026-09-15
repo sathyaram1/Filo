@@ -39,6 +39,12 @@ function toFsValue(v) {
   return { stringValue: String(v) };
 }
 
+// Il nome NON è libero: storage.rules concede la creazione solo su
+// `<etichetta_>?<millisecondi>_<uuid>.<estensione>` (l'uuid è ciò che rende il
+// percorso non indovinabile, #582). La forma canonica è
+// `SN_FEEDBACK.attachmentPath`; qui è ricopiata perché questo file è un
+// utensile a sé, e la sentinella tests/unit/storageRulesAllegati.test.mjs prova
+// anche la variante con etichetta.
 async function uploadImage(buffer, mime = 'image/png') {
   const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
   const name = `${COLLECTION}/agent_${Date.now()}_${randomUUID()}.${ext}`;
@@ -47,7 +53,20 @@ async function uploadImage(buffer, mime = 'image/png') {
   if (!res.ok) throw new Error(`upload storage ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
   const json = await res.json();
   const token = json.downloadTokens || json.metadata?.downloadTokens || '';
-  return `${STORAGE_BASE}/${encodeURIComponent(name)}?alt=media${token ? `&token=${token}` : ''}`;
+  // Il codice di scarico è la CHIAVE dell'allegato, non un ornamento del link
+  // (#582, giro 7): da quando le regole del deposito negano la lettura a
+  // chiunque, un indirizzo senza codice non apre più niente, nemmeno a chi
+  // riceve le segnalazioni. Costruirlo lo stesso voleva dire scrivere dentro la
+  // segnalazione un allegato che nessuno potrà aprire, e scoprirlo settimane
+  // dopo davanti a un buco. Meglio fermarsi: chi chiama (`pushIssue`) tratta
+  // l'errore come «niente immagine», e la segnalazione parte lo stesso senza
+  // promettere un allegato che non c'è. È lo stesso controllo che fa
+  // `SN_FEEDBACK.uploadImage` per gli invii dall'app.
+  if (!token) {
+    throw new Error('il deposito non ha rilasciato il codice di scarico: '
+      + "senza, l'allegato non sarebbe più leggibile da nessuno.");
+  }
+  return `${STORAGE_BASE}/${encodeURIComponent(name)}?alt=media&token=${token}`;
 }
 
 // Crea un documento feedback per una issue d'agente.

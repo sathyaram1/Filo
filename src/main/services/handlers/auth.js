@@ -5,7 +5,7 @@ const path = require('node:path');
 const auth = require('../../auth/google-auth');
 const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
-const { permissionDeniedHelp } = require('../feedbackError');
+const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
 
 // Base delle Cloud Function callable del backend di sicurezza (filo-security):
@@ -78,28 +78,13 @@ async function getPrivateKey() {
   return null;
 }
 
-// Questo indirizzo è un allegato di Filo? Il deposito è uno solo, e il nome lo
-// tiene il modulo condiviso dei feedback: qui si controlla che l'indirizzo
-// appartenga a QUELLO, non a un deposito qualunque di Google. Senza, il canale
-// che decifra un allegato diventa un modo per farsi scaricare altro.
-function allegatoDiFilo(url) {
-  const u = String(url || '');
-  const cfg = (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.configPublic) || null;
-  const bucket = cfg && cfg.bucket ? String(cfg.bucket) : '';
-  const progetto = cfg && cfg.projectId ? String(cfg.projectId) : '';
-  if (!bucket && !progetto) return false;
-  // Lo stesso deposito ha più nomi ufficiali (quello attuale e quello storico
-  // che finisce in appspot.com: gli allegati vecchi hanno ancora quello) e due
-  // indirizzi (Firebase Storage e il deposito diretto). Valgono quelli, e
-  // nessun altro.
-  const depositi = new Set([bucket, progetto ? `${progetto}.firebasestorage.app` : '', progetto ? `${progetto}.appspot.com` : '']);
-  depositi.delete('');
-  for (const b of depositi) {
-    if (u.startsWith(`https://firebasestorage.googleapis.com/v0/b/${b}/o/`)) return true;
-    if (u.startsWith(`https://storage.googleapis.com/${b}/`)) return true;
-  }
-  return false;
-}
+// «Questo indirizzo è un allegato di Filo?» si chiede a UNA funzione sola,
+// `SN_FEEDBACK.isAttachmentUrl`, che è anche quella usata dalle pagine. Qui
+// c'era una seconda copia, scritta a colpi di `startsWith`: due strade per la
+// stessa domanda sono esattamente la forma di difetto che questo confine ha
+// già pagato più volte (una delle due prima o poi non guarda quello che guarda
+// l'altra). I nomi storici del deposito che quella copia conosceva sono
+// passati nel modulo condiviso, insieme al resto.
 
 // Decifra i campi FENC1: di un oggetto con la chiave privata del main.
 // Retrocompatibile: i valori non cifrati passano invariati.
@@ -404,20 +389,74 @@ module.exports = function register(on, ctx) {
   // cifrate come byte opachi su Storage (octet-stream): un <img src=URL> diretto
   // mostra un allegato rotto. Qui il main le scarica, le decifra con la chiave
   // privata (che NON esce mai dal main), ne indovina il MIME e torna un data URL
-  // mostrabile. Owner-only. Retrocompat: immagini NON cifrate (storiche) passano
-  // invariate (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
-  on(MSG.FEEDBACK_DECRYPT_IMAGE, ownerOnly(async (msg) => {
+  // mostrabile. Retrocompat: immagini NON cifrate (storiche) passano invariate
+  // (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
+  // PROVENIENZA sì, `ownerOnly` no, e la differenza è voluta. Il confine
+  // d'origine (#583) vale anche qui: da un sito visitato questa porta risponde
+  // «rifiutato per provenienza», come ogni altra del corridoio. Quello che NON
+  // può fare è fermarsi a «sei l'amministratore?», perché questo canale lo
+  // chiamano DUE pagine di Filo: la dashboard di chi riceve le segnalazioni e
+  // il riquadro dei feedback, dove un tester qualunque riapre le proprie. Con
+  // `ownerOnly` un tester si sentiva rispondere «operazione riservata agli
+  // amministratori» davanti al proprio screenshot — mandato a cercare un
+  // permesso che non avrà mai (#582). La risposta giusta gliela dà il corpo,
+  // dopo aver guardato PRIMA dove punta l'indirizzo.
+  on(MSG.FEEDBACK_DECRYPT_IMAGE, soloFilo(async (msg) => {
     try {
       const url = String((msg && msg.url) || '');
-      // Solo gli allegati DI FILO: il deposito è uno solo, e il suo nome lo
-      // tiene il modulo condiviso che carica le immagini. Accettare qualunque
-      // indirizzo dei depositi di Google faceva di questo canale un modo per
-      // farsi scaricare altro, che non è quello che dice di fare.
-      if (!allegatoDiFilo(url)) {
+      const FB = globalThis.SN_FEEDBACK;
+      if (!FB?.isAttachmentUrl) throw new Error('SN_FEEDBACK non caricato nel main process');
+      // DOVE PUNTA, PRIMA DI CHI GUARDA (#582, giro 4). Solo URL https del
+      // bucket feedback: evita che questo canale diventi un fetch arbitrario
+      // (SSRF) pilotato dal renderer.
+      //
+      // Questo controllo sta PRIMA di quello sull'identità, e l'ordine è il
+      // punto. L'indirizzo di un allegato non lo sceglie Filo: sta scritto
+      // dentro la segnalazione, e una segnalazione la manda chiunque, anche
+      // senza account e senza avere Filo installato. Con l'identità davanti, a
+      // chi non riceve le segnalazioni si rispondeva «consegnato» senza aver
+      // mai guardato l'indirizzo: Filo dichiarava partito — e cifrato con la
+      // chiave di chi le riceve — un «allegato» che nel suo deposito non era
+      // mai entrato, e la pillola finta di chi aveva messo l'esca diventava
+      // indistinguibile da una vera, avvalorata da Filo. A chi le riceve
+      // l'indirizzo veniva invece controllato: due strade per la stessa cosa e
+      // una non guardava niente (la stessa forma del rilievo del giro 2).
+      //
+      // Fuori dal deposito di Filo la risposta è UNA SOLA, uguale per tutti:
+      // quello non è un allegato di Filo. Niente `soloDestinatario`, così il
+      // segnaposto torna a dire che non è disponibile invece di prometterlo
+      // consegnato.
+      if (!FB.isAttachmentUrl(url)) {
         return { ok: false, error: 'url allegato non valido' };
       }
-      const res = await fetch(url);
-      if (!res.ok) return { ok: false, error: `download allegato fallito (${res.status})` };
+      // Questo canale lo chiamano DUE pagine: la dashboard dell'owner e il
+      // riquadro dei feedback, dove un utente qualunque riapre le proprie
+      // segnalazioni. Chi non è amministratore l'immagine non la vedrà (è
+      // cifrata con la chiave di chi riceve le segnalazioni), ma `soloDestinatario`
+      // dice alla pagina che non è un guasto: l'allegato è partito, e il
+      // segnaposto lo scrive così invece di dire "non disponibile".
+      if (!auth.isAdmin()) {
+        return { ok: false, soloDestinatario: true, error: attachmentNotForYouHelp() };
+      }
+      // Quello che apre l'allegato è il download token dentro l'URL salvato nel
+      // feedback: dal #583 le regole del deposito non concedono la lettura a
+      // nessuno, owner compreso. L'identità si manda lo stesso, e solo verso il
+      // deposito di Filo (`attachmentFetchHeaders` lo confronta per intero):
+      // oggi non apre niente da sola, ma se un domani le regole tornassero a
+      // riconoscerla la richiesta è già firmata nel modo giusto. Se la sessione
+      // è scaduta si prosegue senza: non cambia nulla per l'allegato.
+      let idToken = '';
+      try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
+      const res = await fetch(url, { headers: FB.attachmentFetchHeaders(url, idToken) });
+      if (!res.ok) {
+        // Un 403 su un allegato ora ha una causa sola e una cura sola: dirla
+        // qui è la differenza fra un segnaposto muto e un problema che si
+        // risolve. (Il motivo finisce nell'hover del segnaposto, in dashboard.)
+        if (res.status === 403) {
+          return { ok: false, error: attachmentForbiddenHelp() };
+        }
+        return { ok: false, error: `download allegato fallito (${res.status})` };
+      }
       const raw = new Uint8Array(await res.arrayBuffer());
 
       const C = globalThis.SN_FEEDBACK_CRYPTO;

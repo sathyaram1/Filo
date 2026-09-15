@@ -75,9 +75,18 @@ function blocco(testo, percorso) {
   return null;
 }
 
+function bloccoFeedback() {
+  const regole = readFileSync(join(ROOT, 'storage.rules'), 'utf8');
+  return blocco(regole, '/feedback/{file}') || blocco(regole, '/feedback/{file=**}');
+}
+
 test('un allegato di un feedback non si scarica col solo indirizzo', async ({ app, shell }) => {
   void app; void shell;
-  const corpo = blocco(readFileSync(join(ROOT, 'storage.rules'), 'utf8'), '/feedback/{file=**}');
+  // Il blocco si chiama `/feedback/{file}` da quando #582 ha ristretto la
+  // scrittura a un solo segmento (le sottocartelle cadono nel diniego finale).
+  // La forma larga si cerca lo stesso: se tornasse, queste asserzioni devono
+  // girare su QUELLA invece di non trovare niente.
+  const corpo = bloccoFeedback();
   expect(corpo, 'blocco /feedback delle storage.rules non letto').toBeTruthy();
 
   // L'elenco: questa metà il lavoro l'ha chiusa, e deve restare chiusa.
@@ -99,7 +108,11 @@ test('un allegato di un feedback non si scarica col solo indirizzo', async ({ ap
 // sopra (l'indirizzo come unica chiave), e chi la chiuderà trova già il caso.
 test.fixme('un allegato già caricato non si può riscrivere da fuori', async ({ app, shell }) => {
   void app; void shell;
-  const corpo = blocco(readFileSync(join(ROOT, 'storage.rules'), 'utf8'), '/feedback/{file=**}');
+  // Il blocco si chiama `/feedback/{file}` da quando #582 ha ristretto la
+  // scrittura a un solo segmento (le sottocartelle cadono nel diniego finale).
+  // La forma larga si cerca lo stesso: se tornasse, queste asserzioni devono
+  // girare su QUELLA invece di non trovare niente.
+  const corpo = bloccoFeedback();
   expect(corpo, 'blocco /feedback delle storage.rules non letto').toBeTruthy();
 
   // Caricare un allegato nuovo è anonimo per scelta: un feedback si manda

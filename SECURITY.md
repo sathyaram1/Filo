@@ -203,6 +203,14 @@ I server applicano regole precise (Firebase Security Rules):
 - La lista degli amministratori è una raccolta dedicata sul server: per
   aggiungere un collaboratore basta aggiungere la sua email, senza modificare
   il codice dell'app.
+- Gli **allegati** (gli screenshot, cioè il tuo schermo) non sono pubblici.
+  Chiunque può caricarne di nuovi insieme a un feedback, anche senza login, ma
+  nessuno può sovrascriverli, cancellarli o farsi dare l'elenco di quelli che
+  ci sono. Si aprono da una strada sola: il collegamento che nasce insieme
+  all'allegato e che vive dentro il tuo feedback. Nemmeno chi riceve le
+  segnalazioni ne ha un'altra, ed è voluto — è quello che rende utile ritirare
+  quel collegamento se finisce in giro. Prima bastava il nome del deposito, che
+  è scritto nel codice, per scaricarli tutti.
 
 C'è una seconda raccolta aperta a tutti, e va detto perché. Quando l'assistente
 ti aiuta a fare qualcosa su un sito, Filo può tenere da parte come ci è
@@ -352,5 +360,5 @@ segnalazioni di sicurezza con priorità.
 
 ---
 
-*Ultimo aggiornamento: 2026-09-11. Questo documento evolve insieme all'app;
+*Ultimo aggiornamento: 2026-09-14. Questo documento evolve insieme all'app;
 le voci 🔜 e 💭 verranno aggiornate a ✅ quando le misure entrano in funzione.*

@@ -311,18 +311,38 @@
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
+  // Chi guarda cambia: unica porta, e unico posto dove si buttano via le
+  // risposte tenute da parte. Un allegato si chiede una volta per indirizzo e
+  // la risposta resta in memoria anche quando è un no — ma quel no dipende da
+  // CHI sta guardando, e il pulsante per farsi riconoscere è in questa pagina.
+  // Senza svuotare, chi lo premeva continuava a vedere segnaposti al posto
+  // degli allegati finché non riapriva Gestione (#582, giro 3: stesso danno,
+  // stessa cura, l'altra superficie).
+  function setIsAdmin(v) {
+    const nuovo = !!v;
+    if (nuovo === isAdmin) return;
+    isAdmin = nuovo;
+    imgCache.clear();
+    // Anche le risposte sulle pillole dei documenti: dipendono da chi guarda
+    // esattamente come quelle delle immagini, e tenerne una sola delle due
+    // avrebbe lasciato metà del difetto in piedi.
+    fileWhyCache.clear();
+  }
+
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
-      isAdmin = !!(r && r.isAdmin);
+      setIsAdmin(!!(r && r.isAdmin));
     } catch (_) {
-      isAdmin = false;
+      setIsAdmin(false);
     }
     mgBanner.hidden = isAdmin;
   }
 
   mgSignInBtn.addEventListener('click', () => {
-    sendToMain({ type: 'auth_signin' }).catch(() => {});
+    // Finito l'accesso si richiede lo stato: è quello che toglie l'avviso di
+    // sola lettura e svuota le risposte di quando non eravamo nessuno.
+    sendToMain({ type: 'auth_signin' }).then(() => refreshAuth()).catch(() => {});
   });
 
   // ── Switch "Routine autonome" (interruttore master) ───────────────────────
@@ -1114,22 +1134,32 @@
   // segnaposto può spiegare all'owner perché non la vede (chiave non
   // configurata, decifratura fallita, download non riuscito…) invece di un muto
   // "non disponibile". null = fallita, non si ritenta.
+  //
+  // `soloDestinatario` viene dal main e NON si butta via: è la differenza fra
+  // «qualcosa si è rotto» e «questo allegato è di qualcun altro». Gestione sta
+  // nell'elenco delle app accanto a Editor e Feedback, senza nessun filtro,
+  // quindi ci arriva qualunque tester e vede le segnalazioni di tutti. Il
+  // riquadro dei feedback questa risposta la usa già; qui la si buttava, e la
+  // stessa segnalazione, con lo stesso allegato e lo stesso utente, diceva due
+  // cose diverse a seconda della pagina da cui la si guardava (#582, giro 6).
+  // Il canale è uno solo apposta: la frase la decide lui.
   const imgCache = new Map();
   async function resolveImageSrc(url) {
-    if (!url) return { dataUrl: null, error: '' };
+    if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
     if (imgCache.has(url)) return imgCache.get(url);
     let dataUrl = null;
     let error = '';
+    let soloDestinatario = false;
     try {
       const r = await sendToMain({ type: 'feedback_decrypt_image', url });
       if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
-      else if (r && r.error) error = String(r.error);
+      else if (r && r.error) { error = String(r.error); soloDestinatario = !!r.soloDestinatario; }
       else error = 'immagine non disponibile';
     } catch (_) {
       // rete/canale: trattala come non disponibile
       error = 'immagine non raggiungibile';
     }
-    const res = { dataUrl, error };
+    const res = { dataUrl, error, soloDestinatario };
     imgCache.set(url, res);
     return res;
   }
@@ -1147,18 +1177,58 @@
         const full = img.dataset.full;
         if (full) openLightbox(full);
       });
-      resolveImageSrc(url).then(({ dataUrl, error }) => {
+      resolveImageSrc(url).then(({ dataUrl, error, soloDestinatario }) => {
         img.classList.remove('mg-img-loading');
         if (dataUrl) {
           img.src = dataUrl;
           img.dataset.full = dataUrl;
         } else {
           img.classList.add('mg-img-failed');
-          img.alt = 'immagine non disponibile';
+          // «Non disponibile» fa sembrare un guasto quello che è solo roba di
+          // qualcun altro: la stessa frase che il riquadro ha smesso di dire.
+          // E non «consegnato»: se quell'allegato sia mai arrivato, da qui Filo
+          // non l'ha guardato. Resta l'unica cosa vera in ogni caso, cioè chi
+          // lo apre.
+          img.alt = soloDestinatario ? '(allegato riservato)' : 'immagine non disponibile';
           if (error) img.title = error;
         }
       });
     });
+  }
+
+  // Perché una pillola non si apre, DETTO PRIMA del clic e non dopo.
+  // Lo stesso canale che serve le immagini risponde anche qui, e a chi non
+  // riceve le segnalazioni risponde subito, senza toccare la rete: chiederglielo
+  // costa una domanda già scritta. Senza, la pillola di un allegato che non è
+  // suo arriva identica a una che si apre, e il tester lo scopre cliccando.
+  // Cache url → { error, soloDestinatario } | null (null = si apre).
+  const fileWhyCache = new Map();
+  async function fileClosedReason(url) {
+    if (!url) return null;
+    if (fileWhyCache.has(url)) return fileWhyCache.get(url);
+    let res = null;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_image', url });
+      if (!r || !r.ok) {
+        res = { error: String((r && r.error) || 'allegato non disponibile'), soloDestinatario: !!(r && r.soloDestinatario) };
+      }
+    } catch (_) {
+      res = { error: 'allegato non raggiungibile', soloDestinatario: false };
+    }
+    fileWhyCache.set(url, res);
+    return res;
+  }
+
+  function markFileClosed(a, motivo, soloDestinatario) {
+    a.title = motivo || '';
+    a.classList.add('mg-img-failed');
+    let nota = a.querySelector('.mg-file-note');
+    if (!nota) {
+      nota = document.createElement('span');
+      nota.className = 'mg-file-note';
+      a.appendChild(nota);
+    }
+    nota.textContent = soloDestinatario ? ' (riservato)' : ' (non disponibile)';
   }
 
   // I documenti allegati: al click si scaricano decifrati (stesso canale delle
@@ -1166,6 +1236,9 @@
   // decifratura fallisce, il motivo finisce nel `title` del link.
   function resolveBubbleFiles(bubble) {
     bubble.querySelectorAll('.mg-file-link').forEach((a) => {
+      if (!isAdmin) {
+        fileClosedReason(a.dataset.url || '').then((r) => { if (r) markFileClosed(a, r.error, r.soloDestinatario); });
+      }
       a.addEventListener('click', async (ev) => {
         ev.preventDefault();
         const url = a.dataset.url || '';
@@ -1182,8 +1255,7 @@
             dl.click();
             dl.remove();
           } else {
-            a.title = (r && r.error) ? String(r.error) : 'allegato non disponibile';
-            a.classList.add('mg-img-failed');
+            markFileClosed(a, (r && r.error) ? String(r.error) : 'allegato non disponibile', !!(r && r.soloDestinatario));
           }
         } catch (_) {
           a.title = 'allegato non raggiungibile';
@@ -3784,7 +3856,7 @@
     rerenderIfIdle(id) { return rerenderAfterLive(new Set([id])); },
     setLiveSources(src) { Object.assign(liveSources, src || {}); },
     isLiveOn() { return liveEnabled; },
-    setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },
+    setAdmin(v) { setIsAdmin(!!v); applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
     loadCaps,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.

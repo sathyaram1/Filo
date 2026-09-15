@@ -672,6 +672,11 @@
     .mg-bubble-file { margin-top: 8px; font-size: 13px; overflow-wrap: anywhere; }
     .mg-bubble-file a { color: var(--sn-accent); text-decoration: none; overflow-wrap: anywhere; word-break: break-word; }
     .mg-bubble-file a:hover { text-decoration: underline; }
+    /* Un allegato che chi guarda non apre: la pillola lo dice invece di
+       aspettare il clic, e smette di sembrare un collegamento che funziona. */
+    .mg-bubble-file a.mg-img-failed { color: var(--sn-muted); cursor: default; }
+    .mg-bubble-file a.mg-img-failed:hover { text-decoration: none; }
+    .mg-file-note { color: var(--sn-muted); font-style: italic; }
 
     /* ── Lightbox ────────────────────────────────────────────────────────── */
     .mg-lightbox {

@@ -197,3 +197,64 @@ test('In coda: allegare alla nota la salva subito nelle note (persistita)', asyn
   expect(upd.notes).toContain('crash.log');
   expect(upd.notes).toMatch(/@@filo-attachment .*"kind":"file"/);
 });
+
+// ── Il tipo si guarda PRIMA di caricare (#582, giro 7) ──────────────────────
+//
+// Il riquadro con cui si manda una segnalazione rifiuta subito un .html o un
+// .svg, con parole che dicono cosa si può allegare. Il compositore delle
+// risposte quel controllo non ce l'aveva: guardava solo quanti file e quanto
+// pesano, e il selettore che apre offre anche `image/*` e `text/*`, cioè anche
+// una pagina web e un disegno vettoriale. Il file partiva, il deposito lo
+// respingeva, e quello che si leggeva era il numero dell'errore del deposito.
+// Il confine reggeva; a non andare era ciò che si leggeva.
+test('nel compositore di una risposta un .svg e un .html sono rifiutati prima di partire', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+
+  await setupAdmin(app, page, {
+    _id: 'mock-att-tipi',
+    status: 'clarify',
+    text: 'il pulsante non risponde',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes: 'Puoi mandarmi uno screenshot del problema?',
+    createdAt: new Date().toISOString(),
+  });
+
+  // Conta i caricamenti: un tipo rifiutato non deve nemmeno partire.
+  await page.evaluate(() => {
+    window.__caricati = [];
+    const orig = window.SN_FEEDBACK.uploadAttachment;
+    window.SN_FEEDBACK.uploadAttachment = async (blob, name) => {
+      window.__caricati.push(String(name || ''));
+      return orig(blob, name);
+    };
+  });
+
+  await page.locator('[data-tab="inbox"]').click();
+  const card = page.locator('.fb-card');
+  const mount = card.locator('.fb-attach-mount[data-kind="reply"]');
+  await expect(card.locator('.fb-reply-text')).toBeVisible();
+
+  for (const file of [
+    { name: 'disegno.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>') },
+    { name: 'pagina.html', mimeType: 'text/html', buffer: Buffer.from('<h1>ciao</h1>') },
+  ]) {
+    await mount.locator('input[type="file"]').setInputFiles(file);
+    // Si legge cosa si può allegare, non il numero di un errore del deposito.
+    await expect(mount.locator('.fb-attach-status')).toContainText('non supportato');
+    await expect(mount.locator('.fb-attach-status')).not.toContainText('Caricamento non riuscito');
+    // E niente allegato nel compositore.
+    await expect(mount.locator('.fb-attach-thumb, .fb-attach-chip')).toHaveCount(0);
+  }
+  expect(await page.evaluate(() => window.__caricati)).toEqual([]);
+
+  // Controprova: i tipi ammessi passano ancora, compreso un .yaml, che lo
+  // strumento a riga di comando manda già e che il deposito accetta.
+  await mount.locator('input[type="file"]')
+    .setInputFiles({ name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('ciao') });
+  await expect(mount.locator('.fb-attach-chip')).toHaveCount(1);
+  await mount.locator('input[type="file"]')
+    .setInputFiles({ name: 'conf.yaml', mimeType: 'application/x-yaml', buffer: Buffer.from('a: 1') });
+  await expect(mount.locator('.fb-attach-chip')).toHaveCount(2);
+  expect(await page.evaluate(() => window.__caricati)).toEqual(['note.txt', 'conf.yaml']);
+});
