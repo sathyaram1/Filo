@@ -1661,9 +1661,8 @@ class TabManager {
       // Si ricontrolla l'URL FINALE, dopo i redirect: quello di partenza può
       // essere innocuo. Non blocca mai la navigazione.
       this._sbOnNavigate(tab, url);
-      // Geo-block livello 1 (deterministico): nuova navigazione → il segnale
-      // precedente decade; HTTP 451 è conclusivo, altrimenti vale l'eventuale
-      // redirect "di blocco" memorizzato durante questa navigazione.
+      // Il segnale della navigazione precedente decade. HTTP 451 è conclusivo,
+      // altrimenti vale il redirect "di blocco" visto in questo giro.
       const redirectHit = tab._geoRedirectHit || null;
       tab._geoRedirectHit = null;
       tab.geoBlock = null;
