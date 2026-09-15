@@ -154,8 +154,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     refreshPercent();
   }, { capture: true, passive: false });
 
-  // Qualsiasi tasto chiude la modalità — tranne mentre si edita la percentuale
-  // nel badge (gestito dal listener sull'input, che ferma la propagazione).
+  // Qualsiasi tasto chiude: l'eccezione del badge la ferma il suo input.
   document.addEventListener('keydown', (e) => {
     if (!zoomMode) return;
     if (isInBadge(e.target)) return;
