@@ -727,8 +727,6 @@
     return String(title || '').replace(/^\s*Filo\s*[—–-]\s*/i, '').trim();
   }
 
-  // Nome da mostrare sulla scheda. Le pagine filo:// interne usano l'etichetta
-  // pulita; tutto il resto usa il title della pagina (o l'URL come ripiego).
   function tabLabel(t) {
     const url = t.url || '';
     if (url.startsWith('filo://')) {
