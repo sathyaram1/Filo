@@ -11,19 +11,9 @@ const COMMANDS = {
   'Alt+H': 'open-help-sidebar',
 };
 
-// Su Mac le stesse quattro scorciatoie prendono un Ctrl in più.
-//
-// PERCHÉ: su Mac il tasto Alt si chiama Opzione e serve a SCRIVERE — è il tasto
-// morto degli accenti (Opzione+E poi "e" fa "é"). Queste scorciatoie sono
-// globali: valgono in tutto il sistema, non solo dentro Filo. Registrare
-// Opzione+E significherebbe togliere l'accento acuto a chi scrive in italiano,
-// in QUALSIASI programma, per tutto il tempo che Filo resta acceso — un danno
-// molto peggiore della comodità che dà la scorciatoia. Ctrl+Opzione non ha
-// questo ruolo e resta libero.
-//
-// La tabella qui sopra resta la forma canonica (è quella che il manifesto delle
-// capacità cita e che una sentinella negli unit test incrocia): qui si aggiunge
-// solo il modificatore che serve alla piattaforma.
+// Su Mac Alt è Opzione e SCRIVE (Opzione+E fa gli accenti): registrarlo
+// globalmente lo toglierebbe a ogni programma. Ctrl+Opzione è libero.
+// COMMANDS resta la forma canonica, qui si aggiunge solo il modificatore.
 function acceleratorePerPiattaforma(accel) {
   return process.platform === 'darwin' ? `Control+${accel}` : accel;
 }
