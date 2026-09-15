@@ -386,6 +386,18 @@
     q.className = 'sn-sidebar-feedback-q';
     q.textContent = 'Ha funzionato? Aiutami a migliorare:';
     wrap.appendChild(q);
+    // La domanda da sola sembrava un parere privato a chi scrive Filo, e
+    // invece il sì pubblica i passi dove li legge chiunque: dirlo dove si
+    // sceglie, non solo nella pagina che spiega la privacy (#584).
+    const nota = document.createElement('div');
+    nota.className = 'sn-sidebar-feedback-nota';
+    // La riga dice cosa succede, e dice il vero: dall'indirizzo e dai nomi dei
+    // pulsanti Filo toglie quello che ha la forma di un dato personale, e un
+    // modello guarda il resto e blocca tutto il percorso se ci riconosce una
+    // persona. Prometteva «senza il tuo nome» quando quel modello, di fatto,
+    // non vedeva niente di quello che stava per uscire (#584, terzo giro).
+    nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
+    wrap.appendChild(nota);
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
 
@@ -437,18 +449,34 @@
     conv.scrollTop = conv.scrollHeight;
   }
 
+  // Da questa pagina un percorso condiviso partirebbe? Lo sa solo il processo
+  // principale (protocollo, nome del sito, spazio nella coda), ed è la stessa
+  // risposta che darebbe la raccolta: una porta sola, o il riquadro promette
+  // una cosa e la raccolta ne fa un'altra (#584, settimo giro). Se la domanda
+  // non arriva a destinazione non si promette niente.
+  async function percorsoRaccoglibile() {
+    try {
+      const r = await chrome.runtime.sendMessage({
+        type: MSG.PATH_COLLECTABLE,
+        payload: { url: (session && session.initialUrl) || location.href },
+      });
+      return !!(r && r.raccoglibile);
+    } catch (_) { return false; }
+  }
+
   async function saveCurrentPath(success) {
     if (!session) return;
     try {
       await chrome.runtime.sendMessage({
         type: MSG.SAVE_PATH,
         payload: {
-          // Vuoto di proposito: da #585 il mittente si presenta al server con
-          // il token dell'identità dell'installazione, che il server verifica,
-          // e che il main allega alla richiesta. Un identificativo generato
-          // qui sarebbe autodichiarato, e chi attacca ne scriverebbe un altro
-          // a ogni invio.
-          clientId: '',
+          // Qui non parte NESSUN identificativo del mittente, neanche vuoto.
+          // Da #585 chi manda si presenta al server col token dell'identità
+          // dell'installazione, che il server verifica e che il processo
+          // principale allega al momento dell'invio; un identificativo
+          // generato in questa pagina sarebbe autodichiarato, e chi attacca ne
+          // scriverebbe un altro a ogni invio. Un campo vuoto che si porta
+          // dietro il nome è l'invito a riempirlo (#584).
           session: {
             rawUrl: session.initialUrl,
             rawSteps: session.executedSteps,
@@ -1102,9 +1130,17 @@
           && session && !session.feedbackShown
           && session.executedSteps.length > 0) {
         session.feedbackShown = true;
-        // Chat sempre aperta quando chiediamo feedback (l'utente deve vederlo).
-        expand({ ai: true });
-        renderFeedbackPrompt();
+        // …e solo se da qui partirebbe davvero qualcosa. Da un server di prova,
+        // dall'intranet, dal disco di rete e dalle pagine interne di Filo non
+        // si raccoglie niente (#584, sesto giro): chiedere lì vuol dire
+        // promettere una condivisione che non avviene e ringraziare per una
+        // risposta che non serve a nessuno. La domanda la fa il processo
+        // principale, con la stessa porta che usa la raccolta.
+        if (await percorsoRaccoglibile()) {
+          // Chat sempre aperta quando chiediamo feedback (l'utente deve vederlo).
+          expand({ ai: true });
+          renderFeedbackPrompt();
+        }
       }
     } catch (err) {
       if (thinking) { thinking.stop(); thinking.el.remove(); }
@@ -1165,5 +1201,10 @@
     runFiloAction, filoActionLabel,
     runPageAction, parseAssistantOutput,
     resolveImageEl, resolveLinkEl, resolveActionText,
+    // Il riquadrino «Ha funzionato?»: da lì il percorso finisce in una raccolta
+    // che legge chiunque, quindi quello che c'è scritto è una promessa (#584).
+    // `renderFeedbackPrompt` lo disegna e basta; chi decide se chiedere è
+    // `percorsoRaccoglibile`, ed è quella la porta che vale.
+    renderFeedbackPrompt, percorsoRaccoglibile,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

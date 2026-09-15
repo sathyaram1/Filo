@@ -214,13 +214,14 @@ I server applicano regole precise (Firebase Security Rules):
 
 C'è una seconda raccolta aperta a tutti, e va detto perché. Quando l'assistente
 ti aiuta a fare qualcosa su un sito, Filo può tenere da parte come ci è
-riuscito: il dominio, il percorso della pagina (senza la parte dopo il punto
-interrogativo) e una riga che riassume l'obiettivo, riscritta da un modello e
-scartata se non è generica. Serve a tutte le installazioni, che la rileggono per
+riuscito: il dominio, il percorso della pagina da cui si parte (senza la parte
+dopo il punto interrogativo), una riga che riassume l'obiettivo, riscritta da un
+modello e scartata se non è generica, i nomi degli elementi toccati e se la cosa
+è riuscita. Serve a tutte le installazioni, che la rileggono per
 il sito che hanno davanti, e per questo si legge senza credenziali. Lì dentro
 non c'è niente che dica da quale installazione arriva: nessun identificativo,
-nessun account. L'unica cosa che resta accanto al percorso è la versione di Filo
-che l'ha raccolto, che è la stessa per tutti quelli che hanno quella versione.
+nessun account, nemmeno la versione di Filo che l'ha raccolto. Le cose scritte
+qui sopra sono tutte quelle che partono, e non ce ne sono altre.
 Da settembre 2026 quei documenti non li scrive più il client: li scrive il
 server, che rifà la pulizia e tiene i limiti di frequenza.
 
@@ -245,11 +246,17 @@ arrivano sul progetto Firebase, non quando il file cambia nel repo. Nessun
 automatismo le pubblica: si fa a mano, con
 
 ```bash
-firebase deploy --only firestore:rules     # e --only storage:rules per storage.rules
+npm run deploy:regole                      # regole + indici di Firestore
+firebase deploy --only storage:rules       # le regole dello storage, a parte
 ```
 
 Finché quel comando non gira, una regola stretta nel repo è una porta ancora
 aperta in produzione, e il lavoro sembra finito mentre non lo è.
+
+Gli **indici** viaggiano con le regole nello stesso comando apposta. Una query
+che si appoggia a un indice non ancora pubblicato viene rifiutata dal server, e
+la funzione che dipende da quella query smette di dare risultati senza che si
+rompa niente di visibile: il caso peggiore, perché nessuno se ne accorge.
 
 **L'ordine conta**, e sbagliarlo costa il lavoro due volte. Prima si pubblicano
 le regole, poi si ruotano le chiavi dai pannelli dei servizi. Al contrario, le
@@ -290,10 +297,81 @@ quel sito.
 
 Prima di partire, da tutti e tre (elementi toccati, sezione di partenza, frase
 dell'obiettivo) vengono cancellati i dati che identificano una persona:
-indirizzi email, IBAN, codici fiscali, numeri lunghi e numeri scritti con spazi
-o trattini, come i telefoni e le carte. Al loro posto resta un segnaposto. La
-stessa cancellazione si rifà in lettura, perché nella raccolta ci sono anche
-documenti nati prima.
+indirizzi email, IBAN, codici fiscali, numeri lunghi, numeri scritti con spazi o
+trattini (i telefoni, le carte) e i soprannomi che cominciano con la chiocciola.
+Al loro posto resta un segnaposto. La stessa cancellazione si rifà in lettura,
+perché nella raccolta ci sono anche documenti nati prima.
+
+Il **nome del sito** invece non si ripulisce, e non si può: è anche l'indirizzo
+sotto cui il documento va a finire, quindi riscriverlo vorrebbe dire metterlo
+dove nessuno lo cercherà. O esce com'è, o il percorso non si pubblica. Quindi
+due difese. La prima: i siti che non sono di nessuno non si raccolgono affatto,
+e sono gli indirizzi numerici (il router di casa), i nomi di una parola sola
+(`localhost`, e l'host delle pagine interne di Filo, dove l'Aiuto si apre con lo
+stesso tasto), i suffissi di rete locale (`.local`, `.lan`, `.intranet`), i nomi
+riservati che non esistono e non esisteranno mai su Internet (`.localhost`, cioè
+il modo in cui i contenitori chiamano il servizio di prova sulla propria
+macchina; `.test`, che è il progetto in lavorazione e spesso porta il nome di un
+cliente; `.invalid`, `.example`) e le reti anonime (`.onion`, `.alt`, `.i2p`),
+dove il nome del sito è il segreto. Il punto finale della forma assoluta si
+toglie prima di guardare, o `localhost.` passerebbe dove `localhost` non passa.
+Lì un percorso non serve comunque a nessun altro, e il nome direbbe come si
+chiama la tua macchina o per chi lavori. Dove non si raccoglie, l'Aiuto non
+chiede nemmeno «Ha funzionato?»: una promessa di condivisione che non si avvera
+è peggio del silenzio. La seconda: su tutti gli altri decide il secondo
+modello, che il nome del sito ce l'ha davanti insieme al resto e sa che
+`mariorossi.github.io` dice di chi è il sito, non cos'è.
+
+Dalla sezione di partenza sparisce anche il **nome utente scritto a lettere**,
+quando si capisce da dove sta: dopo una parola che annuncia una persona
+(`/utente/`, `/usr/`, `/profilo/`, `/in/`, `/clienti/`) e in testa all'indirizzo
+sui siti dove il primo pezzo è sempre un profilo. E anche un pezzo più in là:
+moltissimi siti mettono dopo la parola un numero e subito dopo il nome per
+esteso della stessa persona, e di `/users/12345/mario-rossi` resta
+`/users/[ID]/[ID]`. Quella zona è lunga due pezzi e si chiude al primo che non
+ha la forma di un nome, così `/user/mariorossi/comments/abc` tiene «comments».
+
+Dentro quella zona un pezzo **tiene le parole da sezione finché ne trova**, e
+dalla prima parola che una sezione non è in poi resta un segnaposto. Serve
+perché le sezioni delle aree personali hanno la stessa forma di un cognome:
+`fatture-elettroniche` e `rossi-fatture` sono tutte e due due parole attaccate
+da un trattino. Chiedere che UNA sola parola fosse da sezione faceva uscire il
+cognome che le stava accanto; chiederlo a TUTTE cancellava le sezioni vere,
+perché quasi tutte hanno accanto una parola che nella lista non c'è. Con la
+regola sulla posizione il nome sta sempre dalla parte del segnaposto: di
+`fatture-elettroniche` resta `fatture-[ID]`, di `rossi-fatture` resta `[ID]`, e
+`note-spese` resta per intero. Vale anche per il primo pezzo dopo la parola che
+annuncia la persona, dove prima c'era un segnaposto e basta: `/utente/ordini` e
+`/utente/preferiti` arrivavano a chi legge scritti allo stesso modo.
+Di `/u/mario.rossi/ordini/847362`
+resta `/u/[ID]/ordini/[NUMERO]`: dice in che punto del sito si parte, che è
+l'unica cosa per cui chi riusa un percorso lo legge, e non dice su quale conto.
+Un nome utente è spesso lo stesso su più siti, e da solo rimetteva insieme i
+percorsi di una persona. Quello che nessuna di queste regole vede lo guarda il
+secondo modello, che ha davanti il nome del sito, l'indirizzo e i nomi degli
+elementi **come uscirebbero** e scarta tutto il percorso se ci riconosce
+qualcuno.
+
+Nel documento **non c'è niente del mittente**: nessun identificativo, e nemmeno
+lo user agent, che non serviva a chi legge e bastava — sistema, versione, lingua
+— a rimettere insieme i percorsi della stessa installazione.
+
+E non basta: su ogni documento Firestore scrive da sé l'ora di creazione, al
+microsecondo, e la rimanda a chiunque legga. Non c'è regola che la tolga. Due
+percorsi arrivati su due siti diversi a meno di un secondo l'uno dall'altro
+sono della stessa persona nella stessa sessione — la chiave che togliere
+l'identificativo doveva eliminare, rifatta con l'orologio. Quindi Filo **non
+spedisce un percorso quando lo fai**: lo tiene sul tuo computer e lo manda più
+tardi, a un'ora sorteggiata nelle ventiquattr'ore successive, uno alla volta.
+Due percorsi della stessa sessione partono a ore di distanza, in ordine
+qualsiasi, mescolati a quelli di tutti gli altri.
+
+Una cosa da sapere, perché è il prezzo dell'anonimato: **una volta partito**, un
+percorso non si può più ritrovare e cancellare, perché non porta niente che dica
+chi l'ha fatto. Nessuno può farlo, noi compresi. Si cancella un sito intero,
+dalla console, o niente. Prima di partire invece è ancora sul computer di chi
+l'ha fatto, per ore, e lì un modo di toglierlo sarebbe possibile: oggi non c'è
+e la scelta è dell'owner (segnalata con #584, sesto giro).
 
 È l'unico dato di Filo che attraversa il confine fra utenti. Quello che salvi tu
 finisce nel prompt dell'Aiuto di un altro, quindi valgono due regole insieme.
@@ -321,14 +399,35 @@ Il contratto della callable, per chi la implementa nel backend:
   stessa dalle due parti. Una copia scritta a mano diverge in silenzio;
 - tiene un **limite di frequenza per identità**, e anche per dominio di
   destinazione. Un attacco rende avvelenando lo stesso dominio molte volte;
-- scrive con l'Admin SDK e mette lui il `createdAt` (timestamp). La lettura
-  ordina per quel campo, un documento senza quel campo resta invisibile. Il
-  `clientId` invece **non entra nel documento**, perché la raccolta è leggibile
-  da chiunque e un identificativo stabile lì dentro legherebbe fra loro le
-  navigazioni di una stessa installazione;
+- scrive con l'Admin SDK **sotto il dominio**: il documento va in
+  `paths/<dominio>/entries/<id>`, non nella collezione piatta `paths`. Il
+  dominio è un segmento del percorso e non solo un campo, ed è quello che
+  permette a una lettura di chiedere un sito solo invece della raccolta intera
+  (vedi sotto). Un documento scritto nella vecchia forma piatta oggi non lo
+  legge più nessuno;
+- mette lui il `createdAt` (timestamp), **arrotondato al giorno**. La lettura
+  ordina per quel campo, e un documento senza quel campo resta invisibile.
+  L'arrotondamento è voluto: a chi riusa un percorso serve sapere se è fresco,
+  perché i siti cambiano e i selettori invecchiano, e il giorno risponde a
+  quella domanda; l'ora risponderebbe a un'altra, che non deve avere risposta.
+  Il `clientId` e lo user agent invece **non entrano nel documento**, perché la
+  raccolta è leggibile da chiunque e un identificativo stabile lì dentro
+  legherebbe fra loro le navigazioni di una stessa installazione;
 - risponde `{ result: { saved: true, id } }` oppure `{ result: { saved: false,
   reason } }`. Un rifiuto non è un errore dell'utente e non gli viene mostrato:
   la raccolta è best-effort.
+
+**In lettura si chiede un sito alla volta.** Prima i percorsi stavano tutti
+nella stessa collezione con la lettura aperta: una sola query con la chiave web
+del repo — che è pubblica per design — li scaricava tutti, e da lì si
+rimettevano insieme i percorsi della stessa persona su siti diversi. Chiudere la
+scrittura non toccava quella porta. Adesso il dominio è un segmento del percorso
+(`paths/<dominio>/entries`), e le regole reggono su tre cose insieme: la vecchia
+forma piatta è chiusa in lettura (ci stanno anche i documenti col vecchio
+identificativo dentro), l'elenco dei domini raccolti non si ottiene — direbbe da
+solo chi frequenta cosa — e una query di gruppo sulle sottocollezioni è negata,
+perché in `firestore.rules` non esiste nessun match ricorsivo che la autorizzi.
+Aggiungerlo rimetterebbe in piedi il download della raccolta intera.
 
 **In lettura sono contenuto esterno.** I percorsi restano leggibili da chiunque,
 perché servono anche all'Aiuto di chi non ha un account. Chi li mette in un

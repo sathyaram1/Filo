@@ -126,7 +126,14 @@ test('la pulizia condivisa scarta quello che non ha forma di percorso', () => {
   assert.equal(r.doc.domain, 'esempio.it');
   assert.equal(r.doc.initialUrl, '/conto', 'query e fragment non entrano nella raccolta pubblica');
   assert.equal(r.doc.steps.length, Safety.LIMITI.MAX_STEPS);
-  assert.equal(r.doc.clientId, '', 'un identificativo stabile nella raccolta pubblica legherebbe fra loro le navigazioni di un’installazione');
+  // Nel documento non c'è NIENTE del mittente (#584): né il clientId, che serve
+  // al server per i limiti di frequenza e viaggia accanto, né lo user agent,
+  // che non lo leggeva nessuno e da solo — sistema, versione, lingua — legava
+  // fra loro le navigazioni della stessa installazione.
+  assert.deepEqual(
+    Object.keys(r.doc).sort(),
+    ['domain', 'initialUrl', 'intent', 'steps', 'success'],
+    'il documento porta solo i campi del percorso: qualunque campo in più è il mittente che rientra');
 });
 
 test('i selettori perdono email e numeri lunghi prima di uscire dalla macchina', () => {
@@ -187,50 +194,14 @@ test('un rifiuto del server non passa per un salvataggio riuscito', async () => 
 // dell'INSTALLAZIONE: c'è in ogni copia di Filo, il server la verifica, e non
 // chiede nessun login. Il token del login Google, che quasi nessuno ha fatto,
 // lasciava partire richieste senza mittente.
+//
+// Si chiede AL MOMENTO DELL'INVIO e non quando il percorso viene raccolto,
+// perché in mezzo c'è la coda che lo trattiene per ore (#584) e un token di
+// allora sarebbe scaduto: la catena dei ripieghi sta in un modulo suo, e questa
+// è la prova su quel modulo.
 const googleAuth = require(join(ROOT, 'src', 'main', 'auth', 'google-auth.js'));
 const anonAuth = require(join(ROOT, 'src', 'main', 'auth', 'anon-auth.js'));
-require(join(ROOT, 'src', 'shared', 'messages.js'));
-
-// Fa partire il solo handler SAVE_PATH, con tutto il resto finto, e restituisce
-// quello che è arrivato alla pipeline di invio.
-async function inviaUnPercorso() {
-  const handlers = new Map();
-  let ricevuto = null;
-  globalThis.SN_PATHS_COLLECTOR = {
-    collectAndSave: async (args) => { ricevuto = args; return { saved: true, id: 'x' }; },
-  };
-  globalThis.SN_PROVIDERS = globalThis.SN_PROVIDERS || {};
-  globalThis.SN_COSTS = globalThis.SN_COSTS || {};
-  globalThis.SN_WEB_SEARCH = globalThis.SN_WEB_SEARCH || {};
-
-  const { MSG } = globalThis.SN_MSG;
-  const register = require(join(ROOT, 'src', 'main', 'services', 'handlers', 'ai.js'));
-  register((tipo, fn) => handlers.set(tipo, fn), {
-    MSG,
-    handleAIRequest: async () => ({ text: 'ok' }),
-    getEffectiveSettings: async () => ({ provider: 'openrouter', apiKeys: { openrouter: 'k' } }),
-    modelForAction: () => '', buildAttemptChain: () => [], providerRouting: () => ({}),
-    openWeightsBlockReason: () => null, auditServedByLater: () => {}, applyLimitToChain: (c) => c,
-    Defaults: {}, isAdmin: () => false, broadcastToTabs: () => {},
-  });
-
-  await handlers.get(MSG.SAVE_PATH)({
-    type: MSG.SAVE_PATH,
-    payload: {
-      clientId: '',
-      session: {
-        rawUrl: 'https://esempio.it/conto',
-        rawSteps: [{ selector: '#fatture', action: 'click' }],
-        rawUserMessages: ['dove sono le fatture?'],
-        success: true,
-      },
-    },
-  }, {}, 'filo://sidebar');
-
-  // L'handler non aspetta: la raccolta è telemetria best-effort.
-  for (let i = 0; i < 200 && !ricevuto; i++) await new Promise((r) => setTimeout(r, 10));
-  return ricevuto;
-}
+const identitaInvio = require(join(ROOT, 'src', 'main', 'auth', 'identita-invio.js'));
 
 async function conIdentita({ google, anonima }, fn) {
   const vecchioGoogle = googleAuth.getIdToken;
@@ -243,36 +214,35 @@ async function conIdentita({ google, anonima }, fn) {
   }
 }
 
-test('un percorso parte con l’identità dell’installazione, anche senza login Google', async () => {
-  const inviato = await conIdentita({
+test('un percorso parte con l\u2019identit\u00e0 dell\u2019installazione, anche senza login Google', async () => {
+  const token = await conIdentita({
     google: async () => null,
     anonima: async () => 'token-della-installazione',
-  }, inviaUnPercorso);
-  assert.ok(inviato, 'il percorso non è arrivato alla pipeline di invio');
-  assert.equal(inviato.idToken, 'token-della-installazione',
-    'senza identità il server può limitare solo per IP: il limite per identità chiesto da #585 resta senza niente sotto');
+  }, identitaInvio.ottieniIdToken);
+  assert.equal(token, 'token-della-installazione',
+    'senza identit\u00e0 il server pu\u00f2 limitare solo per IP: il limite per identit\u00e0 chiesto da #585 resta senza niente sotto');
 });
 
-test('il login Google non cambia identità: è la stessa, collegata all’installazione', async () => {
-  const inviato = await conIdentita({
+test('il login Google non cambia identit\u00e0: \u00e8 la stessa, collegata all\u2019installazione', async () => {
+  const token = await conIdentita({
     google: async () => 'token-di-chi-e-loggato',
     anonima: async () => 'token-della-installazione',
-  }, inviaUnPercorso);
-  assert.equal(inviato.idToken, 'token-della-installazione');
+  }, identitaInvio.ottieniIdToken);
+  assert.equal(token, 'token-della-installazione');
 });
 
-test('identità dell’installazione irraggiungibile: si ripiega, e la raccolta non salta', async () => {
+test('identit\u00e0 dell\u2019installazione irraggiungibile: si ripiega, e la raccolta non salta', async () => {
   const conGoogle = await conIdentita({
     google: async () => 'token-di-chi-e-loggato',
-    anonima: async () => { throw new Error('identità annullata sul server'); },
-  }, inviaUnPercorso);
-  assert.equal(conGoogle.idToken, 'token-di-chi-e-loggato');
+    anonima: async () => { throw new Error('identit\u00e0 annullata sul server'); },
+  }, identitaInvio.ottieniIdToken);
+  assert.equal(conGoogle, 'token-di-chi-e-loggato');
 
   const senzaNiente = await conIdentita({
     google: async () => { throw new Error('offline'); },
     anonima: async () => { throw new Error('nessuna connessione a internet'); },
-  }, inviaUnPercorso);
-  assert.ok(senzaNiente, 'un errore di identità ha fermato tutta la pipeline');
+  }, identitaInvio.ottieniIdToken);
+  assert.equal(senzaNiente, '', 'un errore di identit\u00e0 non deve propagarsi: la raccolta \u00e8 best-effort');
 });
 
 test('quello che la pulizia scarta non parte nemmeno', async () => {
@@ -340,7 +310,11 @@ test('la sezione di partenza e la frase dell’intento perdono anche loro i dati
   });
   assert.equal(r.ok, true);
   assert.ok(!r.doc.initialUrl.includes('IT60X0542811101000000123456'), 'un IBAN è rimasto nell’indirizzo di partenza');
-  assert.match(r.doc.initialUrl, /^\/clienti\/\[IBAN\]\/estratto$/);
+  // `clienti` è una delle parole che ANNUNCIANO una persona (#584): il pezzo
+  // dopo diventa un segnaposto prima ancora che la cancellazione per forme lo
+  // guardi, quindi qui esce `[ID]` e non `[IBAN]`. Copre lo stesso caso, con
+  // una rete in più: lì dentro un nome scritto a lettere non passerebbe.
+  assert.match(r.doc.initialUrl, /^\/clienti\/\[ID\]\/estratto$/);
   assert.ok(!r.doc.intent.includes('333 123 456'), 'un telefono è rimasto nella frase dell’intento');
   assert.ok(!r.doc.intent.includes('mario.rossi@x.it'), 'un indirizzo email è rimasto nella frase dell’intento');
 });
@@ -393,4 +367,37 @@ test('un percorso accorciato lo dice, invece di sparire a metà in silenzio', ()
   assert.ok(blocco.length <= Safety.LIMITI.MAX_PATH_CHARS + Safety.FENCE_START.length + Safety.FENCE_END.length + 200,
     'un solo percorso si è preso più della sua fetta');
   assert.match(blocco, /percorso più lungo/, 'il taglio deve essere dichiarato, non silenzioso');
+});
+
+// I segni che non si vedono, e le due mani che li tolgono (#584, quinto giro).
+//
+// La stessa famiglia di caratteri va tolta in due punti: qui, dove si decide
+// cosa entra nella raccolta, e in SN_CONST.unaRigaDiDati, che appiattisce il
+// testo di terzi prima di metterlo nella domanda ai due modelli. Sono due copie
+// di proposito — questo modulo il backend di sicurezza se lo incorpora da solo
+// e non può dipendere da constants.js — quindi la sentinella sta qui: se una
+// delle due impara un carattere nuovo e l'altra no, diventa rossa.
+//
+// Il blocco che conta davvero sono i caratteri «tag» U+E0000-U+E007F: una copia
+// invisibile dell'alfabeto, ed è con quelli che oggi si nasconde una frase
+// dentro un'altra. Prima passavano interi, dentro una difesa che nel proprio
+// nome prometteva di toglierli.
+test('i segni invisibili li tolgono tutte e due le mani, e sono gli stessi', () => {
+  const { unaRigaDiDati } = globalThis.SN_CONST;
+  const frasiNascoste = [
+    'Profilo\u{E0041}\u{E0042}\u{E0043}',          // caratteri tag: l'alfabeto invisibile
+    'Profilo​‌‍',                    // larghezza zero
+    'Profilo‮‭',                          // direzione del testo
+    'Profilo﻿',                                // marca d'ordine dei byte
+    'Profilo️',                                // selettore di variante
+    'Profilo⁦⁩',                          // isolamento direzionale
+  ];
+  for (const testo of frasiNascoste) {
+    assert.equal(unaRigaDiDati(testo, 500), 'Profilo',
+      `unaRigaDiDati ha lasciato passare dei segni invisibili in ${JSON.stringify(testo)}`);
+    assert.equal(Safety._internal.neutralizzaMarcature(testo).trim(), 'Profilo',
+      `la pulizia della raccolta ha lasciato passare dei segni invisibili in ${JSON.stringify(testo)}`);
+  }
+  // e il testo che si vede resta: non si censura, si appiattisce
+  assert.equal(unaRigaDiDati('Profilo di Mario\nRossi', 500), 'Profilo di Mario Rossi');
 });

@@ -1,0 +1,248 @@
+// Verifica #584, giro 2 — la coda che stacca l'orologio, e cosa resta dentro
+// il documento che finisce nella raccolta pubblica.
+//
+// Il giro 1 aveva trovato che, tolto il codice del mittente, a ricucire i
+// percorsi della stessa persona restava l'ora esatta che Firestore scrive da
+// sé su ogni documento. La correzione non spedisce più il percorso quando lo
+// fai: lo mette in coda e lo manda ore dopo, uno alla volta. Qui si prova a
+// romperla, e si guarda cosa il documento continua a portarsi dietro.
+//
+// Non apre Filo di proposito: è logica pura (una coda e un client REST). Le
+// REGOLE, provate col motore vero, stanno nei due file `*-motore-vero.mjs`
+// accanto.
+
+import { test, expect } from '@playwright/test';
+import { createRequire } from 'node:module';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, '..', '..', '..');
+
+require(join(ROOT, 'src', 'shared', 'constants.js'));
+// La pulizia condivisa col server (#585): pathsCollector la pretende su
+// globalThis, e senza questa riga il modulo non si carica nemmeno.
+require(join(ROOT, 'src', 'shared', 'pathsSafety.js'));
+require(join(ROOT, 'src', 'shared', 'paths.js'));
+require(join(ROOT, 'src', 'main', 'services', 'pathsCollector.js'));
+
+const { ACTIONS } = globalThis.SN_CONST;
+const Collector = globalThis.SN_PATHS_COLLECTOR;
+const { RITARDO_MIN_MS, RITARDO_MAX_MS } = Collector._internal;
+
+function invokeAIFinto(intento) {
+  return async ({ action }) => {
+    if (action === ACTIONS.HELP_INTENT_GUESS) return { text: intento };
+    if (action === ACTIONS.HELP_INTENT_JUDGE) return { text: '{"ok":true}' };
+    return { text: '' };
+  };
+}
+
+function montaRete() {
+  const scritture = [];
+  const orig = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    scritture.push({ url: String(url), body: JSON.parse(opts.body) });
+    return { ok: true, status: 200, json: async () => ({ result: { saved: true, id: 'xyz' } }), text: async () => '{}' };
+  };
+  return { scritture, smonta: () => { globalThis.fetch = orig; } };
+}
+
+async function raccogli(url, intento, passi) {
+  const r = await Collector.collectAndSave({
+    session: {
+      rawUrl: url,
+      rawSteps: passi || [{ selector: '#x', action: 'click' }],
+      rawUserMessages: [intento],
+      success: true,
+    },
+    invokeAI: invokeAIFinto(intento),
+  });
+  return r;
+}
+
+test.beforeEach(() => { Collector._reset(); Collector._setAuto(false); });
+test.afterEach(() => { Collector._reset(); });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La coda regge? (il rilievo del giro 1)
+
+test('su cento sessioni vere, i due percorsi della stessa sessione non escono mai vicini', async () => {
+  const rete = montaRete();
+  try {
+    const distanze = [];
+    for (let i = 0; i < 100; i += 1) {
+      Collector._reset();
+      Collector._setAuto(false);
+      await raccogli(`https://banca${i}.it/conto`, 'controllare il saldo');
+      await raccogli(`https://clinica${i}.it/prenota`, 'prenotare una visita');
+      const [a, b] = Collector._peek();
+      distanze.push(Math.abs(a.nonPrimaDi - b.nonPrimaDi));
+    }
+    const vicini = distanze.filter((d) => d < 5 * 60 * 1000).length;
+    const ordinate = [...distanze].sort((x, y) => x - y);
+    const mediana = ordinate[Math.floor(ordinate.length / 2)];
+
+    // il sorteggio è quello vero: qui si chiede che la finestra sia davvero
+    // larga, non che ogni singola coppia caschi bene
+    expect(vicini, 'due percorsi della stessa sessione a meno di cinque minuti').toBeLessThan(10);
+    expect(mediana, 'la distanza tipica fra due percorsi della stessa sessione').toBeGreaterThan(2 * 60 * 60 * 1000);
+    expect(Math.max(...distanze)).toBeLessThanOrEqual(RITARDO_MAX_MS - RITARDO_MIN_MS);
+  } finally { rete.smonta(); }
+});
+
+test('dieci percorsi maturi insieme escono uno per giro, non in un lampo', async () => {
+  const rete = montaRete();
+  try {
+    for (let i = 0; i < 10; i += 1) await raccogli(`https://sito${i}.it/x`, 'una cosa');
+    expect(Collector.inCoda()).toBe(10);
+    const dopoUnMese = Date.now() + 29 * 24 * 60 * 60 * 1000;
+    for (let giro = 1; giro <= 10; giro += 1) {
+      await Collector.flush({ now: dopoUnMese });
+      expect(rete.scritture.length, `al giro ${giro}`).toBe(giro);
+    }
+    expect(Collector.inCoda()).toBe(0);
+  } finally { rete.smonta(); }
+});
+
+test('niente parte nell’istante della sessione, nemmeno con dieci sessioni di fila', async () => {
+  const rete = montaRete();
+  try {
+    for (let i = 0; i < 10; i += 1) await raccogli(`https://sito${i}.it/x`, 'una cosa');
+    expect(rete.scritture.length, 'una sola scrittura immediata rimetterebbe l’orologio al suo posto').toBe(0);
+  } finally { rete.smonta(); }
+});
+
+test('quello che esce non porta nessun orario: la data la mette il server', async () => {
+  // Al secondo giro la data la scriveva il client, arrotondata al giorno. Dopo
+  // il riallineamento su main la scrive il server (contratto della callable,
+  // SECURITY.md §8), sempre arrotondata al giorno, e il client non la manda
+  // affatto: una data scelta da chi manda decideva anche chi sta in CIMA ai
+  // «percorsi già riusciti», e un percorso datato 2099 restava primo per
+  // sempre. Quello che questo test tiene fermo non cambia: nel documento che
+  // lascia la macchina non c'è nessun orario.
+  const rete = montaRete();
+  try {
+    await raccogli('https://esempio.it/x', 'una cosa');
+    await Collector.flush({ now: Date.now() + RITARDO_MAX_MS + 1000 });
+    expect(rete.scritture.length).toBe(1);
+    const documento = rete.scritture[0].body.data;
+    expect('createdAt' in documento).toBe(false);
+    expect(JSON.stringify(documento)).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+  } finally { rete.smonta(); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cosa resta dentro il documento
+
+// Era il rilievo di livello tre di questo giro: la pagina di partenza usciva
+// intera, nome utente e numero di conto compresi, mentre la stessa email e lo
+// stesso numero dentro l'elemento cliccato venivano sostituiti. Corretto nello
+// stesso giro; adesso questo test è la guardia.
+test('la pagina di partenza esce ripulita come i nomi degli elementi, non intera', async () => {
+  const rete = montaRete();
+  try {
+    // stessa informazione in due posti: dentro il selettore e dentro l'URL
+    await raccogli(
+      'https://forum-esempio.it/u/mario.rossi/ordini/847362',
+      'ritrovare un ordine',
+      [{ selector: '[aria-label="Ordini di mario.rossi@posta.it 847362"]', action: 'click' }],
+    );
+    await Collector.flush({ now: Date.now() + RITARDO_MAX_MS + 1000 });
+    expect(rete.scritture.length).toBe(1);
+    const campi = rete.scritture[0].body.data;
+
+    const selettore = campi.steps[0].selector;
+    expect(selettore).toContain('[EMAIL]');
+    expect(selettore).toContain('[NUMERO]');
+    expect(selettore).not.toContain('847362');
+
+    expect(campi.initialUrl).toBe('/u/[ID]/ordini/[NUMERO]');
+    const grezzo = JSON.stringify(rete.scritture[0].body);
+    expect(grezzo).not.toContain('mario.rossi');
+    expect(grezzo).not.toContain('847362');
+  } finally { rete.smonta(); }
+});
+
+// L'altra porta dello stesso rilievo: nei nomi degli elementi la pulizia per
+// forme prende email, codici, chiocciole e numeri lunghi, ma un nome scritto a
+// lettere («Profilo di Mario Rossi») nessuna regola lo distingue dal testo di un
+// pulsante. Quello lo ferma il giudice, che adesso guarda anche i selettori e
+// l'indirizzo: qui si controlla che se li trovi davvero davanti.
+test('il giudice vede i nomi degli elementi e la pagina di partenza, non solo la frase', async () => {
+  const rete = montaRete();
+  const visti = [];
+  try {
+    await Collector.collectAndSave({
+      session: {
+        rawUrl: 'https://esempio.it/area',
+        rawSteps: [{ selector: '[aria-label="Profilo di Mario Rossi"]', action: 'click' }],
+        rawUserMessages: ['aprimi il profilo'],
+        success: true,
+      },
+      invokeAI: async ({ action, payload }) => {
+        visti.push({ action, payload });
+        if (action === ACTIONS.HELP_INTENT_GUESS) return { text: 'aprire il profilo' };
+        return { text: '{"ok":true}' };
+      },
+    });
+    const giudice = visti.find((v) => v.action === ACTIONS.HELP_INTENT_JUDGE);
+    expect(giudice.payload.initialUrl).toBe('/area');
+    expect(JSON.stringify(giudice.payload.steps)).toContain('Profilo di Mario Rossi');
+  } finally { rete.smonta(); }
+});
+
+test('il documento che parte non porta nessun identificativo del mittente', async () => {
+  const rete = montaRete();
+  try {
+    await raccogli('https://esempio.it/x', 'una cosa');
+    await Collector.flush({ now: Date.now() + RITARDO_MAX_MS + 1000 });
+    const documento = { ...rete.scritture[0].body.data };
+    // Il clientId viaggia ACCANTO al documento, non dentro: è l'identità su cui
+    // il server tiene i limiti di frequenza (#585), e nella raccolta non entra.
+    delete documento.clientId;
+    expect(Object.keys(documento).sort()).toEqual(['domain', 'initialUrl', 'intent', 'steps', 'success']);
+  } finally { rete.smonta(); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La funzione chiesta dal feedback continua a funzionare
+
+test('l’assistente di pagina ritrova i percorsi riusciti di un sito, e li chiede filtrati al server', async () => {
+  const orig = globalThis.fetch;
+  const richieste = [];
+  globalThis.fetch = async (url, opts) => {
+    richieste.push({ url: String(url), body: JSON.parse(opts.body) });
+    return {
+      ok: true,
+      json: async () => [{
+        document: {
+          name: 'projects/p/databases/(default)/documents/paths/esempio.it/entries/e1',
+          createTime: '2026-09-12T04:11:02.998877Z',
+          fields: {
+            initialUrl: { stringValue: '/ordini' },
+            intent: { stringValue: 'vedere gli ordini' },
+            steps: { arrayValue: { values: [{ mapValue: { fields: {
+              selector: { stringValue: 'a#ordini' }, action: { stringValue: 'click' },
+            } } }] } },
+            success: { booleanValue: true },
+            createdAt: { timestampValue: '2026-09-12T00:00:00.000Z' },
+          },
+        },
+      }],
+      text: async () => '',
+    };
+  };
+  try {
+    const percorsi = await globalThis.SN_PATHS.listByDomain('esempio.it', { pageSize: 50 });
+    expect(percorsi.length).toBe(1);
+    const q = richieste[0].body.structuredQuery;
+    expect(richieste[0].url).toContain('/paths/esempio.it:runQuery');
+    expect(q.where.fieldFilter.field.fieldPath).toBe('success');
+    expect(q.limit).toBe(50);
+    const prompt = globalThis.SN_PATHS_SAFETY.formatKnownPathsForPrompt(percorsi);
+    expect(prompt).toContain('vedere gli ordini');
+    expect(prompt).toContain('a#ordini');
+  } finally { globalThis.fetch = orig; }
+});

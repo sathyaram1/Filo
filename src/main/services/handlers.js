@@ -152,8 +152,19 @@ async function buildMessages(action, payload) {
     }) }];
   }
   if (action === ACTIONS.HELP_INTENT_JUDGE) {
+    // domain, initialUrl e steps NON sono decorazione: sono le tre parti che la
+    // pulizia per forme non sa ripulire fino in fondo (un nome scritto a
+    // lettere è una parola come un'altra), e il giudice è l'unica cosa che le
+    // guarda prima che finiscano in una raccolta pubblica. Restavano fuori di
+    // qui mentre tutto il resto, il documento, le regole e la pagina che spiega
+    // la privacy, dava per scontato che le vedesse: il giudice riceveva
+    // «(nessuna)» e «(nessun elemento)» e approvava alla cieca (#584, terzo
+    // giro). Il nome del sito è rimasto fuori un giro in più, ed è quello che
+    // non si può nemmeno ripulire: è l'indirizzo del documento, quindi o esce
+    // così com'è o il percorso non si pubblica (#584, sesto giro).
     return [{ role: 'user', content: PROMPTS.helpIntentJudge({
       proposedIntent: payload.proposedIntent, userMessages: payload.userMessages,
+      domain: payload.domain, initialUrl: payload.initialUrl, steps: payload.steps,
     }) }];
   }
   if (action === ACTIONS.FILO_CHAT) {

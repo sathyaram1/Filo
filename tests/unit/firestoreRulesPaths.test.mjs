@@ -108,11 +108,27 @@ test('nessun client scrive in /paths: solo il server, via callable', () => {
   }
 });
 
-test('i percorsi restano leggibili da chiunque (l’Aiuto di chi non ha account)', () => {
+test('i percorsi restano leggibili da chiunque, ma UN DOMINIO ALLA VOLTA', () => {
   const paths = BLOCCHI.find((b) => b.nome === 'paths');
   const letture = paths.regole.filter((r) => r.verbi.some((v) => ['read', 'get', 'list'].includes(v)));
-  assert.deepEqual(letture.map((r) => r.cond), ['true'],
-    'chiudere la lettura spegnerebbe i percorsi noti per chi non ha fatto login: la difesa in lettura è l’incapsulamento nel prompt, non il divieto.');
+
+  // Chiudere la lettura spegnerebbe i percorsi noti per chi non ha fatto login,
+  // e non è quello che serve: la difesa in lettura è l'incapsulamento nel
+  // prompt (#585) più il fatto che non si possa chiedere TUTTO (#584).
+  assert.ok(letture.some((r) => r.cond === 'true'),
+    'una lettura deve restare aperta: i percorsi servono anche all’Aiuto di chi non ha un account');
+
+  // Il documento del dominio — dove stanno anche i vecchi documenti della forma
+  // piatta, col codice del mittente in chiaro — non si legge, e non si legge
+  // nemmeno l'elenco dei domini raccolti, che da solo direbbe chi frequenta cosa.
+  const primoLivello = letture.filter((r) => r.cond === 'false');
+  assert.ok(primoLivello.length >= 1,
+    '/paths/{domain} deve restare chiuso in lettura: lì sotto ci sono i documenti di prima e l’elenco dei domini');
+
+  // E una lista senza tetto non passa: una richiesta sola non deve poter
+  // portare via l’intera raccolta di un dominio.
+  assert.ok(letture.some((r) => /request\.query\.limit\s*<=\s*\d+/.test(r.cond)),
+    'la lista dei percorsi di un dominio deve passare da un tetto su request.query.limit');
 });
 
 test('una collezione con scrittura anonima o è dichiarata o non esiste', () => {

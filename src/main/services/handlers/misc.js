@@ -3,6 +3,9 @@
 
 const { safeFetch } = require('../safe-fetch');
 const auth = require('../../auth/google-auth');
+// L'identità da allegare a un invio che il server limita per identità: la
+// chiede la coda dei percorsi condivisi, al momento in cui spedisce.
+const identitaInvio = require('../../auth/identita-invio');
 // Registra SN_FEEDBACK_THREAD su globalThis (IIFE): ci serve ownerize() per
 // marcare gli invii dell'owner. Idempotente se già caricato dal loader.
 require('../../../shared/feedbackThread.js');
@@ -506,6 +509,21 @@ module.exports = function register(on, ctx) {
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
+
+  // Coda dei percorsi condivisi dell'Aiuto (#584). Ritarda apposta l'invio
+  // perché l'ora in cui Firestore riceve un percorso è pubblica e, se fosse
+  // quella della sessione, ricucirebbe i percorsi di una persona su domini
+  // diversi. Qui si riprende quello che era rimasto in coda alla chiusura.
+  //
+  // L'identità va chiesta AL MOMENTO DELL'INVIO, non quando il percorso viene
+  // raccolto: in mezzo passano ore e un token di allora sarebbe scaduto. Chi
+  // sia, e perché il mittente resti anonimo lo stesso, sta in
+  // src/main/auth/identita-invio.js.
+  try {
+    globalThis.SN_PATHS_COLLECTOR?.init?.({
+      ottieniIdToken: identitaInvio.ottieniIdToken,
+    });
+  } catch (_) {}
 
   on(MSG.SUBMIT_FEEDBACK, async (msg) => {
     try {
