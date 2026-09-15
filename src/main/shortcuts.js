@@ -38,8 +38,7 @@ function isInternalTab(tab) {
 }
 
 function dispatch(command, window) {
-  // Manda al webContents della tab attiva. Se è una pagina interna senza
-  // content script, nessuno raccoglie: ok, è il comportamento atteso.
+  // Su una pagina interna senza content script nessuno raccoglie: è atteso.
   const win = window || BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
   if (!win || !win._filoTabs) return;
   const active = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
