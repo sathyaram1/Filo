@@ -1,5 +1,4 @@
-// Preload della shell del browser (la finestra principale Filo).
-// Espone window.filoShell con API tab-control + IPC verso il main.
+// Preload della shell: espone window.filoShell (tab, download, finestra, account).
 
 const { contextBridge, ipcRenderer } = require('electron');
 
