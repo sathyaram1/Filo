@@ -28,12 +28,9 @@ function revealWindow(win) {
   } catch (_) {}
 }
 
-// Wiring comune a finestra normale e incognito: carica le impostazioni di
-// sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 function wireWindowCommon(win, tabs) {
-  // Carica le impostazioni di sicurezza correnti e applicale prima che si apra
-  // il primo tab — così la policy WebRTC è già attiva e il popup blocker
-  // funziona sul newtab e su qualunque pagina successiva.
+  // Le impostazioni di sicurezza vanno applicate PRIMA del primo tab: policy
+  // WebRTC e blocco dei popup devono valere già sul newtab.
   try {
     const Storage = globalThis.SN_STORAGE;
     if (Storage && typeof Storage.getSettings === 'function') {
