@@ -1463,17 +1463,12 @@ class TabManager {
         if (k === 'r') { event.preventDefault(); this.reload(tab.id); return; }
       }
     });
-    // Navigazione main-frame iniziata dalla pagina (click su link,
-    // window.location). Due casi richiedono di RICREARE la view invece di
-    // lasciarla navigare in-place, perché preload/partizione sono fissati alla
-    // creazione del WebContents:
-    //   1) SICUREZZA — confine di fiducia interno↔esterno: una pagina interna
-    //      che naviga verso il web (o viceversa) non deve riusare il preload
-    //      privilegiato. Ricreiamo con il preload corretto per la destinazione.
-    //   2) Privacy — sito diverso in modalità privacy: serve un'altra partizione.
-    // Best-effort: i redirect lato server a metà caricamento possono sfuggire a
-    // will-navigate; la rete di sicurezza è il gate d'origine in
-    // internal-preload.js, che non espone le API se l'origine non è filo:.
+    // Navigazione che nasce dalla pagina. Due casi impongono di RICREARE la
+    // vista invece di lasciarla navigare sul posto: il confine di fiducia
+    // interno/esterno (SICUREZZA: il preload privilegiato non va riusato per il
+    // web) e, in privacy, un sito diverso. I redirect a metà caricamento
+    // possono sfuggire a will-navigate: la rete sotto è il controllo d'origine
+    // in internal-preload.js.
     wc.on('will-navigate', (event, url) => {
       // SICUREZZA: blocca le navigazioni top-level verso schemi non-web
       // (file:// → leak hash NTLM via SMB su Windows; data:/javascript: →
