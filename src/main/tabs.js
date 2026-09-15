@@ -712,12 +712,9 @@ class TabManager {
     return best;
   }
 
-  // Inietta un blocco CSS (già sanificato a monte) nella scheda web attiva.
-  // insertCSS ignora la CSP del sito (come già facciamo per ::selection e per
-  // gli stili dei content script), così l'estetica si applica ovunque. Tracciamo
-  // le chiavi sulla tab per poterle rimuovere con clearPageStyle. Il CSS è
-  // effimero: una navigazione/reload lo azzera da sé (le chiavi diventano stale,
-  // removeInsertedCSS le ignora senza errori).
+  // Il CSS arriva già sanificato da monte. insertCSS ignora la CSP del sito, e
+  // le chiavi restano sulla scheda per poter tornare indietro; una navigazione
+  // lo azzera da sé.
   async applyPageStyle(css, tabArg = null) {
     if (!css || typeof css !== 'string') return { ok: false, reason: 'empty-css' };
     const tab = tabArg || this._activeWebTab();
