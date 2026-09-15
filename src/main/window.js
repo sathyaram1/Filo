@@ -41,11 +41,9 @@ function wireWindowCommon(win, tabs) {
   } catch (_) {}
 
   win.on('resize', () => tabs.layout());
-  // Se la finestra va a tutto schermo per una strada che non è quella di Filo
-  // (gesto o scorciatoia del sistema, gestore finestre), adottiamo la modalità
-  // invece di limitarci al layout: altrimenti resterebbe uno schermo intero che
-  // Filo non sa di avere, e l'Esc non avrebbe niente da spegnere. Le due cose
-  // sono la stessa cosa nei due versi — l'uscita era già simmetrica qui sotto.
+  // A tutto schermo per una strada che non è quella di Filo (gesto o tasto del
+  // sistema) si adotta comunque la modalità: altrimenti resta uno schermo intero
+  // che Filo non sa di avere, e l'Esc non ha niente da spegnere.
   win.on('enter-full-screen', () => {
     if (!tabs.contentFullscreen) tabs.setContentFullscreen(true);
     else tabs.layout();
