@@ -108,11 +108,8 @@ function iconSvg(name, size) {
     `stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }
 
-// Larghezza del menu adattata al contenuto. Con una larghezza fissa (200px) le
-// voci lunghe — tipicamente l'email dell'account loggato — venivano troncate/
-// ellissate e sembravano "non centrate" e schiacciate contro il bordo (feedback
-// alpha). Stimiamo la larghezza del testo più lungo e allarghiamo il menu fino a
-// un massimo ragionevole, mantenendo un minimo così i menu corti restano uguali.
+// A larghezza fissa le voci lunghe (l'email dell'account) venivano ellissate:
+// si stima il testo più lungo, fra un minimo e un massimo.
 const MENU_MIN_W = 200;
 const MENU_MAX_W = 340;
 function computeMenuWidth(entries) {
