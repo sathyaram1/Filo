@@ -45,9 +45,8 @@ function relIsUnsafe(rel) {
   return /(^|[\\/])\.\.([\\/]|$)/.test(String(rel || ''));
 }
 
-// Risolutore della richiesta filo:// → Response. Estratto come funzione pura
-// così possiamo registrarlo sia sulla sessione di default sia sulle sessioni
-// effimere delle finestre incognito (vedi registerFiloProtocolForSession).
+// Funzione a sé perché va registrata sia sulla sessione di default sia su
+// quelle effimere delle finestre incognito.
 async function filoHandler(request) {
   try {
     const url = new URL(request.url);
