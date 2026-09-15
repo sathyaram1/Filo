@@ -861,7 +861,6 @@
       card.appendChild(close);
 
       hostEl().appendChild(card);
-      // Applica subito il tetto: se questa card sfora, la più vecchia sparisce.
       enforceCap();
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
