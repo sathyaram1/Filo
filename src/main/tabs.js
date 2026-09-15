@@ -1802,10 +1802,8 @@ class TabManager {
       return { action: 'deny' };
     });
 
-    // #209 — hardening del popup di login appena consentito. La finestra creata
-    // da action:'allow' NON passa da _wireEvents (non è una tab): senza questo
-    // hook resterebbe senza le difese che ogni scheda ha. Qui arrivano SOLO i
-    // popup di login (ogni altro percorso del handler qui sopra ritorna 'deny').
+    // #209 — la finestra nata da 'allow' NON passa da _wireEvents: senza questo
+    // aggancio resterebbe senza le difese che ha ogni scheda.
     wc.on('did-create-window', (child) => {
       this._hardenAuthPopup(child);
     });
