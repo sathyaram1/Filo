@@ -135,7 +135,6 @@ function createIncognitoWindow() {
   win._filoIncognito = true;
   hideForTests(win, { main: true });
 
-  // La shell legge ?incognito=1 e applica il badge + tema scuro dedicato.
   win.loadURL('filo://shell/shell.html?incognito=1');
 
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT, incognito: true, partition });
