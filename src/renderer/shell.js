@@ -263,7 +263,6 @@
         ]);
       }
     });
-    // Il menu account usa azioni custom invece di url: ascolta la scelta.
     if (api.onMenuAction) {
       api.onMenuAction((action) => {
         if (action === 'auth-signout') doSignOut();
