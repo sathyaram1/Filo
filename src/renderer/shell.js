@@ -337,13 +337,9 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
-  // ── Drag & drop per riordinare le tab ─────────────────────────────────────
-  // Implementazione a pointer (mousedown/mousemove/mouseup) invece di HTML5
-  // draggable: il drag nativo è inaffidabile in Electron sopra le
-  // WebContentsView ed è praticamente non testabile da Playwright. Con i mouse
-  // event il riordino è deterministico e si lascia esercitare dai test.
-  // `drag` resta non-null per tutta la trascinata; `moved` diventa true solo
-  // oltre la soglia, così un semplice click non viene scambiato per drag.
+  // Riordino a mouse event, non col drag HTML5: quello è inaffidabile sopra le
+  // WebContentsView e non si lascia provare da Playwright. `drag` vale per
+  // tutta la trascinata, `moved` solo oltre la soglia — o un clic sarebbe drag.
   let drag = null; // { id, el, startX, moved }
   let suppressClickId = null; // id della tab il cui prossimo click va ignorato
 
