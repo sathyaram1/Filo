@@ -609,8 +609,7 @@ class TabManager {
       // §3.1 — scroll da ripristinare (percentuale), applicato una volta a fine
       // caricamento.
       restoreScrollPct: typeof restoreScrollPct === 'number' ? restoreScrollPct : null,
-      // Duplicazione tab: ripristina il livello di zoom della scheda sorgente
-      // (Electron zoom "level", 0 = 100%). Applicato una volta a fine caricamento.
+      // Zoom da ripristinare in una copia (0 = 100%), una volta a fine carico.
       restoreZoomLevel: typeof restoreZoomLevel === 'number' ? restoreZoomLevel : null,
       partition,
       partitionSite: isInternal ? null : Cookies.registrableOf(url),
