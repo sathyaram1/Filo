@@ -43,6 +43,13 @@ const FILE_ANALIZZATI = /(firestore\.rules|storage\.rules|PATTERNS\.md|patterns[
 // far vedere che lo riconoscono. Senza questo marcatore si accuserebbero da sé.
 const ESEMPIO_VOLUTO = /esempio del #569/;
 
+// L'unica uscita dalla regola, e si scrive sulla riga che la usa. Serve dove il
+// testo del file NON viene analizzato ma solo passato a qualcun altro (le regole
+// date in pasto agli emulatori veri: lì i fini riga non cambiano niente, e il
+// file gira fuori dal repo, dove la porta comune non si può importare).
+// Un'esenzione scritta si vede in revisione; una cartella esclusa in silenzio no.
+const NON_ANALIZZATO = /fini riga: non analizzato/;
+
 // Tutti i file di test, a QUALUNQUE profondità sotto tests/.
 //
 // Perché ricorsivo, e non la sola tests/unit: la regola vale per chiunque
