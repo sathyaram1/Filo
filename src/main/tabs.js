@@ -216,9 +216,8 @@ class TabManager {
       }, 5 * 60 * 1000);
       if (this._autoArchiveTimer.unref) this._autoArchiveTimer.unref();
     }
-    // Spazio extra riservato in alto (px): usato quando un dropdown della shell
-    // (es. menu App) deve restare visibile sopra la WebContentsView attiva. Si
-    // abbassa la view invece di nasconderla, evitando l'area vuota/bianca.
+    // Spazio riservato in alto perché un pannello della shell resti visibile:
+    // si ABBASSA la vista invece di nasconderla, o resta un'area bianca.
     this.topInset = 0;
     // Modalità "contenuto a tutto schermo": la WebContentsView attiva copre
     // l'intera finestra, nascondendo la barra (tab + indirizzo) della shell.
