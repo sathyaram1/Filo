@@ -1448,18 +1448,12 @@ class TabManager {
           }
         }
       }
-      // #404 — Ctrl/Cmd+T/W/L/R "da browser". La shell (src/renderer/shell.js)
-      // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi
-      // quando il focus è dentro una pagina (WebContentsView): risultato, le
-      // scorciatoie erano morte proprio mentre si naviga un sito — il caso più
-      // comune. Come per il salto di scheda qui sopra, le intercettiamo per-webContents
-      // così valgono anche dalle pagine. In un browser questi tasti sono
-      // riservati alla shell e vincono SEMPRE sulla pagina: preventDefault li
-      // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
-      // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
-      // europei serve a digitare caratteri mentre si scrive nella pagina.
-      // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
-      // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
+      // #404 — col fuoco dentro una pagina il keydown della barra non arriva, e
+      // queste scorciatoie erano morte proprio mentre si naviga un sito. In un
+      // browser sono della shell e vincono SEMPRE sulla pagina: il
+      // preventDefault gliele toglie (niente doppio ricarico su Ctrl+R).
+      // Alt escluso per non prendersi AltGr, che sui layout europei serve a
+      // scrivere mentre si è dentro la pagina.
       if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
         const k = String(input.key || '').toLowerCase();
         if (k === 't') { event.preventDefault(); this.openTab('filo://newtab/'); return; }
