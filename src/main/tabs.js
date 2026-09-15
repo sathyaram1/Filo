@@ -1713,11 +1713,9 @@ class TabManager {
       if (tab.audible !== audible) { tab.audible = audible; this._broadcast(); }
     });
 
-    // #151 — consumo dati delle tab proxate: i video via proxy bruciano GB in
-    // fretta (spec §1/§5). Se una tab PROXATA riproduce media per oltre 15 min
-    // (cumulativi), una nota discreta UNA volta per sessione. La soglia e il gate
-    // "già notato" stanno nella logica pura (geoBlockRules.shouldNoteVideoData);
-    // qui solo l'accumulo del tempo di riproduzione e il timer.
+    // #151 — un video via proxy brucia GB in fretta: dopo un po' di
+    // riproduzione una nota discreta, una volta per sessione. Soglia e regola
+    // stanno in geoBlockRules.shouldNoteVideoData; qui solo l'accumulo.
     wc.on('media-started-playing', () => {
       if (!tab.proxy || this._proxyVideoNoted) return;
       if (!tab._proxyMedia) tab._proxyMedia = { accumulatedMs: 0, playingSince: 0, timer: null };
