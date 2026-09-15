@@ -1398,7 +1398,6 @@ class TabManager {
     });
   }
 
-  // ─── eventi della WebContents → aggiorna stato + broadcast ─────────────
 
   _wireEvents(tab) {
     const wc = tab.view.webContents;
