@@ -281,16 +281,7 @@ ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
   deliver();
 });
 
-// ─── inject CSS condivisi + carica content script ──────────────────────────
-//
-// Equivalente a quanto faceva il manifest dell'estensione:
-//   "css": [theme.css, menu.css, popup.css, sidebar.css, highlight.css,
-//           spellcheck.css, feedback.css]
-//   "js":  [constants, i18n, messages, icons, extractContext, popup, menu,
-//           highlight, sidebar, spellcheck, feedback shared, feedback content,
-//           content]
-// Il timing è document_idle nell'estensione; qui caricamento subito dopo
-// DOMContentLoaded della pagina ospite.
+// CSS condivisi e content script, subito dopo il DOMContentLoaded della pagina.
 
 const STYLES = [
   'theme.css', 'menu.css', 'popup.css', 'sidebar.css',
