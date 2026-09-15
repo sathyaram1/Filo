@@ -1666,8 +1666,7 @@ class TabManager {
       const redirectHit = tab._geoRedirectHit || null;
       tab._geoRedirectHit = null;
       tab.geoBlock = null;
-      // Status dell'URL finale: serve al livello 2 (classificatore LLM) per
-      // riconoscere la coda ambigua (403, pagina vuota). 0 = non osservabile.
+      // Serve al livello 2 per la coda ambigua (403, pagina vuota). 0 = ignoto.
       tab._lastStatus = Number(httpResponseCode) || 0;
       if (!/^filo:\/\//i.test(url || '')) {
         if (GeoBlock.matchStatus(httpResponseCode)) {
