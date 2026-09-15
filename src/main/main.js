@@ -99,25 +99,14 @@ app.whenReady().then(async () => {
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
   } catch (_) {}
 
-  // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
-  // token si rinnova alla prima richiesta che lo serve). Vedi src/main/auth/.
+  // Le due identità: entrambe leggono solo file, niente rete all'avvio.
   try { require('./auth/google-auth').restore(); } catch (_) {}
-  // Identità dell'installazione (#598): l'account anonimo Firebase a cui sono
-  // legati crediti e chiave personale. Solo rilettura del file, niente rete.
   try { require('./auth/anon-auth').restore(); } catch (_) {}
 
-  // Carica in background la config "modelli predefiniti" condivisa da Firestore
-  // (modelli pubblici + eventuali chiavi ruotate dall'admin, se loggati). Non
-  // blocca l'avvio: finché non arriva si usano i default da costanti/build.
+  // I tre in background non bloccano l'avvio: finché la config remota non
+  // arriva valgono i default del codice, e senza chiavi resta l'analisi locale.
   try { require('./services/defaultsStore').refresh().catch(() => {}); } catch (_) {}
-
-  // Configura il rilevatore di siti pericolosi con chiave GSB/LLM/rete/sandbox
-  // dalle impostazioni. Non blocca: senza chiavi resta solo l'analisi locale.
   try { require('./services/handlers').wireSafebrowse().catch(() => {}); } catch (_) {}
-
-  // #410.1 — intercetta gli scaricamenti della navigazione (clic su un link a
-  // un file) sulla sessione predefinita: carica la cronologia persistita e
-  // aggancia will-download così la barra in alto ne mostra l'avanzamento.
   try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
 
   mainWindow = createMainWindow();
