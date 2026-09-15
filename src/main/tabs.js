@@ -236,8 +236,6 @@ class TabManager {
     // Chrome compatto: la shell decide quando (setChromeCompact), qui se ne
     // tiene solo l'altezza per il layout.
     this.chromeCompact = false;
-    // Altezza della sola fila di tab (senza barra indirizzi), in sync con
-    // `.tab-row { flex: 0 0 40px }` in src/renderer/shell.css.
     this.tabRowHeight = TAB_ROW_HEIGHT;
     // Snapshot delle impostazioni di sicurezza, ripopolato da setSecurity() ogni
     // volta che l'utente salva da Opzioni. I default qui rispecchiano quelli in
