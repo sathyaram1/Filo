@@ -1313,7 +1313,7 @@
       drawCanvas.addEventListener('pointerup', endStroke);
       drawCanvas.addEventListener('pointercancel', endStroke);
       window.addEventListener('resize', () => { if (!drawCanvas.hidden) sizeDrawCanvas(); });
-      // Il box (pagina) ha premuto "Cancella disegno": ripuliamo anche la barra.
+      // "Cancella disegno" sulla pagina deve cancellare anche qui.
       api.onFeedbackClearDraw?.(() => { clearDraw(); reportState(); });
     }
 
