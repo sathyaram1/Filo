@@ -98,7 +98,6 @@ contextBridge.exposeInMainWorld('filoShell', {
   // Finestra incognito: sessione effimera, storage solo in RAM.
   openIncognito: () => ipcRenderer.invoke('window:open-incognito'),
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
-  // Broadcast generici main→shell (es. SETTINGS_UPDATED per i token estetici).
   onBroadcast: (fn) => {
     const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
     ipcRenderer.on('filo:broadcast', wrapped);
