@@ -95,7 +95,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     close: () => ipcRenderer.invoke('window:close'),
   },
-  // Apre una nuova finestra incognito (sessione effimera + storage in RAM).
+  // Finestra incognito: sessione effimera, storage solo in RAM.
   openIncognito: () => ipcRenderer.invoke('window:open-incognito'),
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
   // Broadcast generici main→shell (es. SETTINGS_UPDATED per i token estetici).
