@@ -138,7 +138,6 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
 
   const isDark = nativeTheme.shouldUseDarkColors;
 
-  // Misure
   const ITEM_H = 36;
   const SEP_H = 9;
   const PAD = 8;
