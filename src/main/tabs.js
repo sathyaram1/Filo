@@ -876,8 +876,7 @@ class TabManager {
     return { ok: true };
   }
 
-  // "Torna in Italia" su TUTTE le tab instradate da un altro paese (comando
-  // "chiudi/togli tutte le tab proxate", #152). Ritorna quante ne ha riportate.
+  // #152 — ritorna quante schede ha riportato in diretta.
   clearAllProxies() {
     let n = 0;
     for (const t of this.tabs) {
