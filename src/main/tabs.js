@@ -1261,9 +1261,6 @@ class TabManager {
     this._maybeApplyDomainRule(tab, target);
   }
 
-  // true se navigare `tab` verso `url` richiede una partizione diversa da quella
-  // con cui la view è stata creata: in modalità privacy fra siti diversi, oppure
-  // entrando/uscendo dalla partition proxata di una tab "da un altro paese".
   _needsRepartition(tab, url) {
     const next = this._partitionForTab(tab, url);
     return (next || null) !== (tab.partition || null);
