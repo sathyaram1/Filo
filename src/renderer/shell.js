@@ -241,10 +241,8 @@
   }
 
   if (accountBtn) {
-    // Il menu dell'account apre SEMPRE (loggato o no) così la voce "Nuova
-    // finestra incognito" — spostata qui dal menu Impostazioni — è raggiungibile
-    // in entrambi gli stati. Da loggato mostra email + incognito + Esci; da
-    // sloggato mostra "Accedi con Google" + incognito.
+    // Il menu si apre SEMPRE, anche da sloggati: "Nuova finestra incognito"
+    // vive qui e deve restare raggiungibile in tutti e due gli stati.
     accountBtn.addEventListener('click', () => {
       if (authBusy) return;
       if (authProfile) {
