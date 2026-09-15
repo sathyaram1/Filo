@@ -617,10 +617,8 @@ class TabManager {
       // #145 — sta sulla scheda, non sulla vista, così sopravvive a una
       // ricreazione (una scheda proxata alla nascita la subisce subito).
       suppressAutoplay: !!suppressAutoplay,
-      // #441 — scheda nata da un link target=_blank / window.open (non aperta e
-      // indirizzata dall'utente): è la prima condizione perché possa essere
-      // riconosciuta come pagina-ponte di uno scaricamento (vedi
-      // handleDownloadStarted e src/shared/downloadTabs.js).
+      // #441 — nata da un link target=_blank, non da un indirizzo dell'utente:
+      // è la prima condizione per riconoscerla come pagina-ponte di un download.
       _openedByLink: !!openedByLink,
     };
 
