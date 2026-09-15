@@ -1773,9 +1773,7 @@ class TabManager {
     // classica di un popup; 'foreground-tab'/'background-tab' sono link cliccati.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition } = details;
-      // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
-      // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
-      // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
+      // SICUREZZA: stessa difesa di will-navigate, per l'altra porta.
       if (isWebUnsafeNav(url)) {
         openExternalScheme(url);
         return { action: 'deny' };
