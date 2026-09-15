@@ -1425,10 +1425,8 @@ class TabManager {
       this.setContentFullscreen(false);
     });
     wc.on('before-input-event', (event, input) => {
-      // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
-      // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,
-      // perché questo evento arriva PRIMA che il documento veda il tasto, ed è
-      // dentro quel giro che la pagina chiede.
+      // #514 — si segna qui perché questo evento arriva PRIMA che il documento
+      // veda il tasto, ed è dentro quel giro che la pagina chiede lo schermo.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
       if (input.type === 'keyDown' && input.key === 'Escape') {
         // Regola unica in tabs.js: handleFullscreenEscape decide (e sa quando
