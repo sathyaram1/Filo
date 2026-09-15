@@ -247,18 +247,23 @@ modifica:
   (`npx playwright test tests/<feature>.spec.mjs`); se non esiste, scrivilo;
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
   screenshot (`tests/agent/.out/`); `test:explore` (LLM) è facoltativo;
-- **nelle routine** (dal 2026-09-03): chi risolve NON lancia la suite
-  completa; la lancia il verificatore, una volta, prima di dare `pass`. Un
-  rosso fuori dalla lista dei rossi noti torna a chi risolve con l'elenco
-  degli spec rotti. Le regressioni restano responsabilità di chi le
-  introduce: i minimi qui sopra (unit + spec mirato) valgono sempre;
-- **in locale** → la suite completa NON si lancia (decisione owner
-  2026-09-10): sulla sua macchina dura quasi sette ore con un solo worker e i
-  rossi che trova sono quelli già scritti nei rossi noti. Si lancia
-  `npm run finish:check`: unit test più gli spec delle aree toccate dal ramo
-  (è lo stesso controllo del cancello di `npm run finish`). Vale anche per
-  chi verifica in locale. Se temi una regressione precisa altrove, lancia
-  quello spec: non rimandarla, e non lanciare tutto per trovarla.
+- **la suite completa non la lancia più nessuno** (decisione owner
+  2026-09-15): né chi risolve, né chi verifica, né una sessione locale. Gira
+  in GitHub, nel lavoro di release, che parte ogni sei ore: verde, e la patch
+  si pubblica; un rosso nuovo — fuori dai rossi noti del contenitore — e la
+  patch non esce, il rosso diventa un feedback e si corregge con calma, la
+  patch salta un giro. Una regressione è rara: non vale un'ora d'attesa a ogni
+  consegna;
+- **al suo posto**, nelle routine come in locale, chi verifica lancia
+  `npm run finish:check` (unit test più gli spec delle aree toccate dal ramo:
+  è lo stesso controllo del cancello di `npm run finish`) e le prove del giro,
+  `npx playwright test tests/verifica/<numero>` — quel percorso scritto
+  relativo alla radice del repo e con le barre normali (vedi più sotto). Un
+  rosso fuori dai rossi noti torna a chi risolve con l'elenco degli spec
+  rotti. Le regressioni restano responsabilità di chi le introduce: i minimi
+  qui sopra (unit + spec mirato) valgono sempre. Se temi una regressione
+  precisa altrove, lancia quello spec: non rimandarla, e non lanciare tutto
+  per trovarla.
 
 **Prima di consegnare, la verifica te la fai tu.** Vale nelle routine e in
 locale: da tutte e due le parti il lavoro passa poi da una verifica
