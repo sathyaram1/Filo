@@ -32,11 +32,48 @@ import { leggiTestoRepo, normalizzaFiniRiga } from '../helpers/testo.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const CARTELLA_UNIT = join(ROOT, 'tests', 'unit');
+const CARTELLA_TEST = join(ROOT, 'tests');
 
 // I file del repo che le sentinelle ANALIZZANO riga per riga: qui un CRLF non è
 // un carattere in più, è un test che mente. Chi ne aggiunge uno lo mette qui.
 const FILE_ANALIZZATI = /(firestore\.rules|storage\.rules|PATTERNS\.md|patterns[/\\])/;
+
+// Una riga che parla DEL difetto invece di commetterlo: la sentinella qui sotto
+// e le prove del giro di verifica se lo scrivono in casa, l'esempio malato, per
+// far vedere che lo riconoscono. Senza questo marcatore si accuserebbero da sé.
+const ESEMPIO_VOLUTO = /esempio del #569/;
+
+// Tutti i file di test, a QUALUNQUE profondità sotto tests/.
+//
+// Perché ricorsivo, e non la sola tests/unit: la regola vale per chiunque
+// analizzi un file del repo, e i test non stanno in una cartella sola. Guardarne
+// una è il modo in cui questo difetto è già tornato: chiuso nel #565 dentro il
+// file che l'aveva mostrato, è rientrato un anno dopo dal file accanto come
+// #569. Una prova messa fra quelle dell'app, in tests/rules/ o in una cartella
+// di verifica passava indisturbata.
+function tuttiIFileDiTest(cartella, dentro = []) {
+  for (const nome of readdirSync(cartella, { withFileTypes: true })) {
+    if (nome.name === 'node_modules' || nome.name.startsWith('.')) continue;
+    const p = join(cartella, nome.name);
+    if (nome.isDirectory()) tuttiIFileDiTest(p, dentro);
+    else if (nome.name.endsWith('.mjs')) dentro.push(p);
+  }
+  return dentro;
+}
+
+// I nomi di variabile che tengono il percorso di uno di quei file:
+// `const RULES = join(ROOT, 'firestore.rules')`. Senza questo passaggio basta
+// spostare il percorso una riga più su per sparire dal controllo, e la lettura
+// grezza torna invisibile.
+function variabiliColPercorso(sorgente) {
+  const nomi = new Set();
+  const assegnazione = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;]*)/g;
+  let m;
+  while ((m = assegnazione.exec(sorgente))) {
+    if (FILE_ANALIZZATI.test(m[2])) nomi.add(m[1]);
+  }
+  return nomi;
+}
 
 test('il repo pretende LF da qualunque checkout (.gitattributes)', () => {
   const percorso = join(ROOT, '.gitattributes');
