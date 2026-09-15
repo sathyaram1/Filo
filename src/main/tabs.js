@@ -1434,12 +1434,9 @@ class TabManager {
           return;
         }
       }
-      // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
-      // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
-      // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
-      // scorciatoie, lo decide un posto solo: src/shared/tasti.js.
-      // Intercettiamo qui (per-webContents) invece che con un globalShortcut
-      // OS-wide, così la combinazione resta disponibile alle altre app.
+      // Salto alla N-esima scheda. Quale combinazione sia lo decide un posto
+      // solo, src/shared/tasti.js (su Mac Opzione+cifra scrive un simbolo).
+      // Per-webContents e non globale, così le altre app se lo tengono.
       if (input.type === 'keyDown') {
         // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
         // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
