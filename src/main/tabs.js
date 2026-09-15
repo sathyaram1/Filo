@@ -22,9 +22,8 @@ const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda } = globalThis.SN_TASTI;
 
-// #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
-// un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
-// rotella, tocco, gesti — lo è).
+// #441 — il cursore che attraversa la pagina non è un'interazione con quella
+// scheda. Tutto il resto (clic, tasti, rotella, tocco, gesti) lo è.
 const HOVER_INPUT_TYPES = new Set([
   'mouseMove', 'mouseEnter', 'mouseLeave', 'pointerMove', 'pointerRawUpdate',
 ]);
