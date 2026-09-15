@@ -324,10 +324,8 @@ class TabManager {
     return this.setContentFullscreen(!this.contentFullscreen);
   }
 
-  // Fa uscire dal fullscreen HTML5 la pagina che l'aveva chiesto, quando a
-  // spegnere lo schermo intero è stato qualcun altro. Best-effort: se la scheda
-  // non c'è più (chiusa, processo caduto) resta solo da dimenticarla, così la
-  // deroga dell'Esc non sopravvive alla pagina che la giustificava.
+  // Se la scheda non c'è più resta da dimenticarla: la deroga dell'Esc non deve
+  // sopravvivere alla pagina che la giustificava.
   _exitPageFullscreen() {
     const owner = this.tabs.find((t) => t.id === this.pageFullscreenTabId);
     this.pageFullscreen = false;
