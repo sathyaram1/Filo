@@ -111,10 +111,8 @@ function assistenteLaterale() {
   try { require('./shortcuts').dispatch('open-help-sidebar', finestra()); } catch (_) {}
 }
 
-// Ctrl/Cmd+Z: dentro un campo di testo annulla quello che si sta scrivendo,
-// fuori torna alla pagina precedente. È la stessa regola di src/content/content.js
-// — quella strada vale dove il tasto arriva alla pagina, questa dove se lo
-// prende la barra dei menu.
+// Ctrl/Cmd+Z: nel campo di testo annulla, fuori torna indietro. Stessa regola di
+// src/content/content.js, che vale quando il tasto arriva alla pagina.
 async function annulla() {
   const wc = contenutoAFuoco();
   if (!wc) return;
