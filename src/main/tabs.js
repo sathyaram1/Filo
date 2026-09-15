@@ -2102,8 +2102,7 @@ class TabManager {
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 
-// Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
-// le pagine filo:// interne non hanno identità di sito da tinteggiare.
+// §1.2 — solo schemi web: una pagina filo:// non ha un sito da tinteggiare.
 function hostOf(url) {
   try {
     const u = new URL(url);
