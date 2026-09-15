@@ -112,8 +112,6 @@ function createIncognitoWindow() {
   // SENZA prefisso 'persist:': è quello che la rende una sessione in memoria.
   const partition = 'filo-incognito-' + randomUUID();
   const ses = session.fromPartition(partition);
-  // filo:// è registrato globalmente solo sulla sessione di default: i tab di
-  // questa partizione non lo vedrebbero. Registriamolo qui.
   registerFiloProtocolForSession(ses);
 
   const win = new BrowserWindow({
