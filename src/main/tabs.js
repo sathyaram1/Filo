@@ -182,20 +182,11 @@ const NATIVE_MENU_PAGES = [
   'filo://manage/',
 ];
 
-// Colore di selezione del testo coerente con la palette Filo, da iniettare sui
-// siti esterni. Il <link filo://style/theme.css> iniettato dal content script
-// viene bloccato dalla CSP di molti siti (repubblica, reddit, youtube…), quindi
-// la regola ::selection del tema non arriva mai e la selezione resta del blu di
-// sistema. insertCSS() inietta a livello di user-agent e ignora la CSL della
-// pagina, garantendo l'arancione Filo ovunque. Niente var() qui: i custom
-// properties non si risolvono in modo affidabile dentro ::selection.
-// CSS dei content script (menu tasto destro, popup, sidebar, ecc.). Sui siti
-// con CSP restrittiva (YouTube, Reddit, ...) il <link filo://style/...> iniettato
-// dal content script viene BLOCCATO dalla CSP della pagina: il menu Filo veniva
-// creato nel DOM ma senza stile (position:static, niente sfondo/z-index) →
-// invisibile, e l'utente percepiva "il tasto destro non funziona". Lo iniettiamo
-// quindi anche via wc.insertCSS dal main, che ignora la CSP (come già facciamo
-// per il colore della selezione). Stessa lista di page-preload.js.
+// Gli stili di Filo vanno iniettati DAL MAIN con insertCSS, che ignora la CSP
+// della pagina: il <link filo://style/...> del content script su molti siti
+// (YouTube, Reddit) viene bloccato, e il menu del tasto destro finiva nel DOM
+// senza stile — invisibile, cioè "il tasto destro non funziona".
+// Stessa lista di page-preload.js: le due vanno tenute insieme.
 const fs = require('node:fs');
 const CONTENT_STYLE_FILES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'highlight.css', 'spellcheck.css', 'feedback.css'];
 let CONTENT_SCRIPT_CSS = null;
