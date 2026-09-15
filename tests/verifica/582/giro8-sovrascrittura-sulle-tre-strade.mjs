@@ -102,5 +102,36 @@ riga('e quello che apre è ancora la SUA foto', 'FOTO-DEL-TESTER', testo);
 riga('cancellare l\'allegato di un altro', 403,
   (await fetch(`${BASE}/${enc}`, { method: 'DELETE' })).status);
 
+// 7. LA TERZA STRADA: il protocollo "resumable", che apre una sessione e
+//    scrive dopo. Va provato anche in creazione, o un 403 in sovrascrittura
+//    direbbe soltanto che questo protocollo non passa mai.
+async function resumable(percorso, corpo) {
+  const start = await fetch(`${BASE}?uploadType=resumable&name=${encodeURIComponent(percorso)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Type': 'image/png',
+    },
+    body: JSON.stringify({ name: percorso, contentType: 'image/png' }),
+  });
+  if (start.status !== 200) return start.status;
+  const sessione = start.headers.get('x-goog-upload-url') || start.headers.get('location');
+  if (!sessione) return start.status;
+  const fine = await fetch(sessione, {
+    method: 'POST',
+    headers: { 'X-Goog-Upload-Command': 'upload, finalize', 'X-Goog-Upload-Offset': '0', 'Content-Type': 'image/png' },
+    body: Buffer.from(corpo),
+  });
+  return fine.status;
+}
+
+riga('sovrascrivere col protocollo resumable', 403, await resumable(nome, 'FOTO-DI-UN-ESTRANEO'));
+riga('creare un allegato NUOVO col protocollo resumable', 200,
+  await resumable(nomeConEntropia(), 'ALLEGATO-NUOVO'));
+riga('dopo tutti i tentativi, il link del tester apre ancora la SUA foto', 'FOTO-DEL-TESTER',
+  await (await fetch(`${BASE}/${enc}?alt=media&token=${primo.codice}`)).text());
+
 console.log(rotte ? `\n${rotte} porte che dovevano essere chiuse non lo sono.` : '\nTutte chiuse.');
 process.exit(rotte ? 1 : 0);
