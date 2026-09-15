@@ -1,7 +1,6 @@
-// Tab manager: ogni tab è una WebContentsView attaccata alla BrowserWindow,
-// posizionata sotto la "shell" (tab bar + barra indirizzi).
-// La shell parla con il main via IPC (tabs:* canali); il main risponde con
-// broadcast tabs:updated alla shell perché ridisegni la barra.
+// Le schede: ogni scheda è una WebContentsView attaccata alla finestra, sotto
+// la barra della shell. Qui vivono il loro ciclo di vita, il layout, lo schermo
+// intero, il proxy per scheda e le guardie sulle navigazioni.
 
 const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow } = require('electron');
 const path = require('node:path');
