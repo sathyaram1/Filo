@@ -1778,24 +1778,11 @@ class TabManager {
         openExternalScheme(url);
         return { action: 'deny' };
       }
-      // #209 — i popup di login ("Continua con Google" e simili) NON sono
-      // pubblicità: vanno consentiti come VERA finestra popup (action 'allow'),
-      // così la relazione opener↔popup che l'OAuth usa per restituire l'esito
-      // resta intatta. Una nuova scheda (deny+openTab) la spezzerebbe.
-      //
-      // #209 (giro successivo) — 'allow' da solo NON basta: senza
-      // overrideBrowserWindowOptions Electron crea il popup con un
-      // BrowserWindow "nudo", senza ALCUN preload (il preload non è fra le
-      // security webPreferences ereditate dall'opener). Il popup nasce quindi
-      // SENZA page-preload.js: né l'esenzione anti-fingerprint per i login
-      // (services/fingerprint.js → isIdentityProviderHref) né nessun altro
-      // pezzo di quel preload raggiungono MAI la pagina di Google/Microsoft/…
-      // dentro il popup — solo la scheda opener (claude.ai) lo aveva. Diamo al
-      // popup le stesse webPreferences di una scheda esterna normale (vedi
-      // _makeView) così il preload gira anche lì, e la stessa partizione che
-      // avrebbe una scheda aperta su quella URL (Cookies.MODES.PRIVACY →
-      // partizione per-sito; altrimenti null = sessione condivisa), per non
-      // spezzare un eventuale login Google già presente in Filo.
+      // #209 — un popup di login non è pubblicità: va aperto come VERA finestra
+      // ('allow'), o si spezza la relazione opener↔popup su cui l'OAuth
+      // restituisce l'esito. Le webPreferences vanno date a mano: il preload
+      // non è fra quelle ereditate dall'opener, e un popup "nudo" non avrebbe
+      // né page-preload né l'esenzione anti-fingerprint per i login.
       if (tab.isInternal === false && isAuthPopup(url)) {
         return this._allowAuthPopup(url);
       }
