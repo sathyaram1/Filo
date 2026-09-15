@@ -394,10 +394,9 @@ if (!IS_SUBFRAME) {
     start();
   }
 } else {
-  // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
-  // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
-  // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),
-  // che monta e rigioca il clic.
+  // Clic, tasto o fuoco su un campo dicono "sto usando questa cosa": da lì il
+  // riquadro risponde come il resto della pagina. Il tasto destro ha la sua
+  // strada (il bridge sopra), che monta e rigioca il clic.
   for (const ev of ['pointerdown', 'keydown', 'focusin']) {
     try {
       window.addEventListener(ev, ensureContentScripts, { capture: true, passive: true, once: true });
@@ -405,9 +404,8 @@ if (!IS_SUBFRAME) {
   }
 }
 
-// Helper usato dal main per il save-for-later shortcut: estrae metadata
-// senza dipendere dal content script di estensione (che potrebbe non aver
-// finito di caricarsi).
+// Serve al "salva per dopo" del main: raccoglie i metadata senza dipendere dai
+// content script, che potrebbero non aver finito di caricarsi.
 window.__sn_collectSavePayload = () => {
   try {
     const desc = document.querySelector('meta[name="description"]')?.content
