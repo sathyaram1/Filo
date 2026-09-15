@@ -73,10 +73,8 @@ function registerIpcHandlers() {
 
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
-    // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
-    // dello storage che ne discende (anche dopo await) finisce nell'overlay in
-    // RAM invece che su disco. Copre TUTTE le azioni di memoria senza dover
-    // gattare ogni singolo case.
+    // runIncognito copre TUTTE le azioni in un colpo: ogni scrittura che ne
+    // discende, anche dopo un await, va nell'overlay in RAM invece che su disco.
     const run = () => handleMessage(msg, info);
     try {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
