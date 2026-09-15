@@ -412,8 +412,8 @@ class TabManager {
     } catch (_) {}
   }
 
-  // L'utente ha fatto qualcosa che non è l'Esc in questione: la volta dopo è una
-  // volta nuova. Lo chiama chi vede l'input VERO (mai la pagina).
+  // Lo chiama chi vede l'input VERO, mai la pagina: è ciò che rende il tetto
+  // inattaccabile da un evento fabbricato.
   azzeraRivendicazioniEsc() {
     this._escRivendicazioni = 0;
   }
