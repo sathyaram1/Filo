@@ -358,9 +358,8 @@ class TabManager {
       this.setContentFullscreen(false);
       return true;
     }
-    // La pagina si è già presa gli ultimi Esc uno dopo l'altro, senza che
-    // l'utente facesse nient'altro in mezzo: da qui in avanti non le crediamo
-    // più e usciamo noi. È il tetto che nessun sito può azzerare.
+    // Troppi Esc di fila senza nient'altro in mezzo: non le si crede più. È il
+    // tetto che nessun sito può azzerare.
     if ((this._escRivendicazioni || 0) >= ESC_RIVENDICAZIONI_MAX) {
       this.setContentFullscreen(false);
       return true;
