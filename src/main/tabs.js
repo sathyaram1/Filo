@@ -1961,9 +1961,7 @@ class TabManager {
     return true;
   }
 
-  // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque".
-  // L'azione riusa il percorso openBlockedPopup (apertura programmatica, che
-  // bypassa il blocco).
+  // #170.1 — un blocco si dice, e con una via d'uscita: "Apri comunque".
   _notifyBlocked(host, url) {
     try {
       const label = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
