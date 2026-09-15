@@ -456,11 +456,7 @@ class TabManager {
     this.annullaUscitaSchermoIntero();
   }
 
-  // Attiva/disattiva il "chrome compatto": quando true la barra indirizzi è
-  // nascosta dalla shell e la WebContentsView attiva risale a coprire anche il
-  // suo spazio (top = tabRowHeight invece di shellHeight). La shell lo richiama
-  // a ogni cambio di pagina attiva: compatto sui siti, esteso sulla home Filo.
-  // Idempotente.
+  // Idempotente. La shell la richiama a ogni cambio di pagina attiva.
   setChromeCompact(on) {
     on = !!on;
     if (this.chromeCompact === on) return on;
