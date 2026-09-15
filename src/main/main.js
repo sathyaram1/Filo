@@ -133,8 +133,8 @@ app.whenReady().then(async () => {
   if (process.env.FILO_SMOKE) {
     const fs = require('node:fs');
     const path = require('node:path');
-    // Aspetta una promessa fino a un tetto: nessuna attesa dello smoke può
-    // durare per sempre, o l'app resta appesa senza dire niente.
+    // Nessuna attesa dello smoke può durare per sempre: l'app resterebbe
+    // appesa senza dire niente.
     const entro = (promessa, ms, cosa) => Promise.race([
       promessa,
       new Promise((r) => setTimeout(() => { console.log(`[smoke] ${cosa}: scaduti ${ms}ms, proseguo`); r(null); }, ms)),
