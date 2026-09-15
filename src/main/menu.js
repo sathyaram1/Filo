@@ -190,9 +190,8 @@ function template() {
       { label: 'Rimpicciolisci', accelerator: 'CommandOrControl+-', click: () => zoom('out'), ...SOLO_SCRITTA },
       { label: 'Dimensione reale', accelerator: 'CommandOrControl+0', click: () => zoom('reset'), ...SOLO_SCRITTA },
       { type: 'separator' },
-      // Senza acceleratore, e non è una dimenticanza: in questa barra ci vanno
-      // SOLO i tasti che Filo fa già ovunque. Un tasto che qui funziona e su
-      // Windows no sarebbe la stessa asimmetria da cui nasce tutto #527.
+      // Senza acceleratore apposta: qui ci vanno SOLO i tasti che Filo fa già
+      // ovunque, o si ricrea l'asimmetria Mac/Windows di #527.
       { label: 'Schermo intero', click: schermoIntero },
     ],
   };
