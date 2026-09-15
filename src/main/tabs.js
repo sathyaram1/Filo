@@ -2051,9 +2051,8 @@ class TabManager {
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
       if (saved && Array.isArray(saved.tabs)) {
-        // Filtro url + colori in lockstep così `colors[i]` resta allineato al
-        // tab ripristinato in posizione i (un ripristino vecchio senza `colors`
-        // dà semplicemente colori tutti null).
+        // url e colori si filtrano INSIEME, o `colors[i]` finisce sulla scheda
+        // sbagliata.
         const savedColors = Array.isArray(saved.colors) ? saved.colors : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
