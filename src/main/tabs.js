@@ -1688,9 +1688,8 @@ class TabManager {
       // #514 — qui passa l'input VERO, che la pagina non può fabbricare: è il
       // posto dove il conto delle rivendicazioni dell'Esc riparte da zero.
       const esc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
-      // Anche il mouse passa di qui, e un clic è il gesto con cui una pagina
-      // può legittimamente prendersi lo schermo: l'Esc no (vedi
-      // `enter-html-full-screen`).
+      // Un clic è un gesto con cui una pagina può legittimamente prendersi lo
+      // schermo; l'Esc no.
       tab._ultimoInputEsc = esc;
       if (!esc) this.azzeraRivendicazioniEsc();
     });
