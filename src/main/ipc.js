@@ -132,10 +132,8 @@ function registerIpcHandlers() {
     }
   });
 
-  // ─── shell (modalità terminale della dashboard) ──────────────────────────
-  // Esegue un comando in streaming su una shell PERSISTENTE per scheda. SOLO
-  // per le pagine interne fidate (filo://): le pagine web esterne NON devono
-  // poter avviare una shell.
+  // Il terminale della dashboard. SOLO pagine filo://: una pagina web non deve
+  // poter avviare una shell. Vale per tutti i canali shell:* e net:* qui sotto.
   ipcMain.handle('shell:start', (event, { execId, command, cwd, shell } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
