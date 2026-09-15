@@ -608,8 +608,6 @@
       const isAudible = t.audible && !t.muted;
       if (isAudible) {
         el.classList.add('audible');
-        // Calcola il colore del bagliore: usa il colore identità se disponibile,
-        // altrimenti l'accento Filo come fallback. Desaturiamo già via CSS.
         const glowBase = hasColorIdentity(t.color) ? t.color
           : (t.identityColor || null);
         if (glowBase) {
