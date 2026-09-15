@@ -276,7 +276,6 @@ function registerIpcHandlers() {
     }
     return { ok: true };
   });
-  // Menu tasto destro su tab: apre una copia della tab (stesso URL).
   ipcMain.handle('tabs:duplicate', async (event, { id } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
