@@ -615,10 +615,8 @@
         }
       }
 
-      // Slot favicon / spinner. Quando la tab suona, l'icona audio SOSTITUISCE
-      // la favicon in questo slot: un unico indicatore, sempre visibile a
-      // qualsiasi larghezza (lo slot è a larghezza fissa), che non si sovrappone
-      // mai alla favicon né viene duplicato altrove nella tab.
+      // Quando la scheda suona l'icona audio SOSTITUISCE la favicon in questo
+      // slot: uno solo, a larghezza fissa, mai sovrapposto e mai doppio.
       const ico = document.createElement('div');
       if (t.loading) {
         ico.className = 'spinner';
