@@ -146,11 +146,9 @@
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
-    // La barra in alto è nascosta e le icone reali hanno rect nullo: i menu
-    // (Impostazioni, App, Account) si aprono sotto le icone, che ora vivono in
-    // alto a destra DENTRO la home. La home parte sotto la fila di tab (~40px) e
-    // le icone sono alte ~34px: ancoriamo appena sotto. Coordinate relative alla
-    // finestra shell. popup-menu.js riallinea/clampa per restare nello schermo.
+    // Le icone vivono DENTRO la home, non nella barra: qui il loro rect è nullo
+    // e la posizione va calcolata a mano. Coordinate relative alla finestra;
+    // popup-menu.js poi riallinea per restare nello schermo.
     if (r.width === 0 && r.height === 0) {
       x = Math.max(8, window.innerWidth - 250);
       y = 86;
