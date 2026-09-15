@@ -772,10 +772,8 @@ class TabManager {
     this.openTab('filo://newtab/');
   }
 
-  // §3.1 — archivia i metadati di una tab che sta per essere chiusa. Best-effort
-  // e non bloccante (l'archivio è async; la chiusura della view prosegue subito).
-  // NON archivia: sessioni incognito (privacy, §5), pagine interne filo:// e la
-  // newtab (non sono "siti" da ritrovare). Senza store caricato, è un no-op.
+  // §3.1 — non bloccante: la chiusura non aspetta l'archivio. NON archivia
+  // incognito (§5), pagine interne e nuova scheda: non sono cose da ritrovare.
   _archiveClosedTab(tab, reason = 'manual') {
     try {
       if (!tab || this.incognito) return;
