@@ -1438,8 +1438,7 @@ class TabManager {
       // solo, src/shared/tasti.js (su Mac Opzione+cifra scrive un simbolo).
       // Per-webContents e non globale, così le altre app se lo tengono.
       if (input.type === 'keyDown') {
-        // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
-        // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
+        // Su Mac il 9 vuol dire "l'ultima": lo 0 lì è già lo zoom.
         const idx = indiceSaltoScheda(input, undefined, this.tabs.length);
         if (idx != null) {
           const target = this.tabs[idx];
