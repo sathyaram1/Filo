@@ -1872,8 +1872,6 @@ class TabManager {
     pwc.on('did-create-window', (child) => this._hardenAuthPopup(child));
   }
 
-  // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
-  // mostra una chip "Bloccato popup da <host> — Apri" cliccabile per aprirlo.
   _notifyPopupBlocked(tabId, url) {
     try {
       let host = '';
