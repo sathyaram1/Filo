@@ -53,8 +53,7 @@ const { registerShortcuts } = require('./shortcuts');
 const { installaMenuApplicazione } = require('./menu');
 const { initAutoUpdater } = require('./updater');
 
-// Permette al protocollo filo:// di caricarsi con privilegi standard (CORS
-// libero, fetch, ecc.) — deve essere chiamato PRIMA di app.whenReady.
+// PRIMA di app.whenReady, o i privilegi dello schema non si applicano.
 require('./protocol').registerProtocolSchemes();
 
 let mainWindow = null;
