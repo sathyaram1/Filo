@@ -82,9 +82,6 @@ const ICON_PATHS = {
     '<path d="M12 3a13.5 13.5 0 0 1 0 18"/>' +
     '<path d="M12 3a13.5 13.5 0 0 0 0 18"/>',
 
-  // Mazzi (deck builder Commander): due carte a ventaglio, quella davanti
-  // dritta e quella dietro ruotata. Stesso disegno di src/shared/icons.js
-  // (le due famiglie di icone — barra e menu popup — vanno tenute allineate).
   decks:
     '<rect x="8" y="5" width="10" height="14" rx="1.5"/>' +
     '<path d="M6.5 7.2l-2.9.8 3.1 11 3.4-.9"/>',
