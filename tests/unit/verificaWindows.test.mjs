@@ -15,10 +15,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { leggiTestoRepo } from '../helpers/testo.mjs';
+import { ambienteDeiTest } from '../../scripts/run-unit-tests.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
