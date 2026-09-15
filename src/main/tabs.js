@@ -113,13 +113,9 @@ function isWebUnsafeNav(rawUrl) {
   return proto ? !WEB_NAV_SCHEMES.has(proto) : false;
 }
 
-// Schemi "azione del sistema operativo": NON sono pagine web (quindi bloccati da
-// isWebUnsafeNav), ma un browser completo li CONSEGNA all'OS invece di fallire —
-// `mailto:` apre il client di posta, `tel:`/`sms:` avviano chiamata/SMS. È una
-// ALLOWLIST volutamente minima: solo questi schemi notoriamente innocui passano
-// a shell.openExternal. Tutto il resto (file:, data:, javascript:, schemi
-// arbitrari che potrebbero lanciare altre app) resta BLOCCATO — non vogliamo che
-// un sito ostile inneschi handler di protocollo sconosciuti.
+// Schemi che un browser completo CONSEGNA al sistema invece di fallire (mailto,
+// tel, sms). Elenco volutamente minimo: tutto il resto resta bloccato, o un
+// sito ostile innescherebbe gestori di protocollo che non conosciamo.
 const OS_DELEGATED_SCHEMES = new Set(['mailto:', 'tel:', 'sms:']);
 function isOsDelegatedScheme(rawUrl) {
   let proto = '';
