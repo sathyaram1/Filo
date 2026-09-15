@@ -87,7 +87,12 @@ cartella esclusa in silenzio no.
 - `tests/unit/finiDiRiga.test.mjs` — la sentinella: pretende la riga in
   `.gitattributes`, prova che il lettore normalizzi davvero, e diventa rossa se
   un test torna a leggere per conto suo un file che analizza, o se ci cerca
-  dentro una stringa con un «a capo» in mezzo.
+  dentro una stringa con un «a capo» in mezzo. Guarda tutto `tests/`, a
+  qualunque profondità.
+- `tests/unit/verificaWindows.test.mjs` — tiene il lavoro su Windows allineato
+  al cancello (stesso sistema, stessa versione di Node, stesso comando) e
+  registra che gli unit test non aprono Filo, quindi non ne scaricano il
+  binario.
 - `tests/unit/firestoreRulesLivelli.test.mjs` — il caso da cui è nato, con la
   prova che rifà il ritaglio su una copia del file con i fini riga di Windows.
 - `.github/workflows/verifica-windows.yml` — gli unit test su Windows a ogni
