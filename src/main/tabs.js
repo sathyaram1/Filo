@@ -1809,19 +1809,10 @@ class TabManager {
     });
   }
 
-  // #209 — risposta 'allow' per un popup di login, con le webPreferences
-  // esplicite. Senza overrideBrowserWindowOptions Electron creerebbe il popup
-  // con un BrowserWindow "nudo", senza ALCUN preload (il preload non è fra le
-  // security webPreferences ereditate dall'opener): né l'esenzione
-  // anti-fingerprint per i login (services/fingerprint.js →
-  // isIdentityProviderHref) né nessun altro pezzo di page-preload.js
-  // raggiungerebbero MAI la pagina di Google/Microsoft/… dentro il popup —
-  // solo la scheda opener (es. claude.ai) lo aveva. Diamo al popup le stesse
-  // webPreferences di una scheda esterna normale (vedi _makeView) così il
-  // preload gira anche lì, e la stessa partizione che avrebbe una scheda
-  // aperta su quella URL (Cookies.MODES.PRIVACY → partizione per-sito;
-  // altrimenti null = sessione condivisa), per non spezzare un eventuale
-  // login Google già presente in Filo.
+  // #209 — le webPreferences vanno passate a mano: il preload non è fra quelle
+  // ereditate dall'opener, e un popup senza page-preload non avrebbe né
+  // l'esenzione anti-fingerprint per i login né il resto. Stessa partizione che
+  // avrebbe una scheda su quell'URL, o si spezza un login Google già presente.
   _allowAuthPopup(url) {
     const popupPartition = this._partitionFor(url);
     return {
