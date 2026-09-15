@@ -744,8 +744,7 @@
     return t.title || displayUrl(t.url) || 'Nuova scheda';
   }
 
-  // La "home" di Filo è la newtab (mappata sulla dashboard). Senza tab attiva
-  // trattiamo lo stato come home così la barra resta accessibile.
+  // Senza scheda attiva vale "home", o la barra diventa irraggiungibile.
   function isHomeUrl(url) {
     return !url || url.startsWith('filo://newtab/');
   }
