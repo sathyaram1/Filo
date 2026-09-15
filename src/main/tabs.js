@@ -1754,11 +1754,9 @@ class TabManager {
     // vanno spinti al content script, che disegna il menu di correzione.
     wc.on('context-menu', (_e, params) => {
       if (params.misspelledWord) {
-        // #405 — il click destro può essere avvenuto dentro un riquadro
-        // incorporato (iframe): il menu di correzione lo costruisce il content
-        // script DI QUEL frame, quindi i suggerimenti vanno consegnati lì.
-        // `wc.send` raggiunge solo il frame principale, e nei campi dentro un
-        // riquadro i suggerimenti nativi sarebbero caduti nel vuoto.
+        // #405 — il menu lo costruisce il content script DEL FRAME cliccato, e
+        // `wc.send` raggiunge solo il principale: nei campi dentro un riquadro
+        // i suggerimenti cadrebbero nel vuoto.
         const target = params.frame && !params.frame.detached ? params.frame : wc;
         try {
           target.send('filo:broadcast', {
