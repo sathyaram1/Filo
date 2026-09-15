@@ -1374,14 +1374,10 @@ class TabManager {
     }
   }
 
-  // ─── zoom da tastiera quando il focus è sulla barra di Filo ────────────
-  // Ctrl +/-/0 li gestisce il preload della pagina (wheel-zoom.js), ma quel
-  // keydown esiste solo se è la PAGINA ad avere il focus. Appena l'utente
-  // clicca una scheda il focus passa alla barra, i tasti arrivano qui e lo
-  // zoom sembrava morto — stessa asimmetria già vista con Ctrl+T/W/L/R (#404).
-  // Li intercettiamo sulla webContents della shell e li inoltriamo alla scheda
-  // attiva, che li fa rientrare dal solito punto: così la scelta su chi zooma
-  // (e l'opt-out dell'editor, che scala il foglio) resta una sola.
+  // #404 — col fuoco sulla barra il keydown non arriva alla pagina e lo zoom
+  // sembrava morto. I tasti si intercettano qui e si inoltrano alla scheda
+  // attiva, che li fa rientrare dalla porta di sempre (wheel-zoom.js): così la
+  // regola su chi zooma, e l'opt-out dell'editor, restano una sola.
   _wireShellZoomKeys() {
     const shellWc = this.win && this.win.webContents;
     if (!shellWc || typeof shellWc.on !== 'function') return;
