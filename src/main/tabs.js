@@ -1501,7 +1501,6 @@ class TabManager {
         openExternalScheme(url);
       }
     });
-    // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
       wc.on('console-message', (_e, level, message, line, source) => {
         const tag = ['log', 'warn', 'error'][level] || 'info';
