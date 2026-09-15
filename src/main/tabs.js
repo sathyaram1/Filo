@@ -98,14 +98,12 @@ function filoSingletonKey(url) {
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
 
-// SICUREZZA — schemi consentiti per le navigazioni ORIGINATE da contenuto web
-// (click su link, window.location, window.open) e dall'agente. Tutto il resto è
-// bloccato. In particolare `file://`: su Windows un percorso UNC
-// (file://attacker-host/share) fa partire l'autenticazione SMB e fa TRAPELARE
-// l'hash NTLM dell'utente a un sito ostile; `file:///C:/…` espone file locali.
-// `data:`/`javascript:` top-level sono vettori di phishing/script. Le pagine web
-// legittime navigano solo verso http(s); le interne verso filo://. La barra
-// indirizzi (navigazione esplicita dell'utente) NON passa da questo gate.
+// SICUREZZA — gli schemi ammessi per le navigazioni che NASCONO dal contenuto
+// web (link, window.open) e dall'agente: tutto il resto è bloccato. `file://`
+// soprattutto — su Windows un percorso UNC fa partire l'autenticazione SMB e
+// consegna l'hash NTLM a un sito ostile, e `file:///C:/…` espone i file locali;
+// `data:` e `javascript:` in cima sono phishing. La barra indirizzi, che è una
+// scelta esplicita dell'utente, NON passa di qui.
 const WEB_NAV_SCHEMES = new Set(['http:', 'https:', 'filo:', 'about:', 'blob:']);
 function isWebUnsafeNav(rawUrl) {
   let proto = '';
