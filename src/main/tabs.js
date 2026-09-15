@@ -28,25 +28,14 @@ const HOVER_INPUT_TYPES = new Set([
   'mouseMove', 'mouseEnter', 'mouseLeave', 'pointerMove', 'pointerRawUpdate',
 ]);
 
-// #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
-// conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
-// dire "quell'Esc me lo sono preso io".
-//
-// Due tempi, perché i due casi sono diversi e mescolarli è già costato.
-//  · Una pagina che RISPONDE (ha i pezzi di Filo dentro, si è presentata da
-//    sola appena montata) risponde in entrambi i casi: se il tasto era suo lo
-//    rivendica, se non lo era chiede lei l'uscita. Quindi qui l'attesa non è un
-//    ritardo — l'uscita arriva quando arriva la sua risposta — ed è solo la
-//    rete di sicurezza per il caso in cui quella risposta non arrivi MAI
-//    (renderer morto, script che gira all'infinito). Larga: una pagina
-//    impegnata mezzo secondo quando l'utente preme Esc rispondeva fuori tempo
-//    massimo, e usciva dallo schermo intero chiudendo insieme il riquadro che
-//    stava sopra — il danno di #514 da un'altra porta.
-//  · Una pagina che NON risponde (il visore PDF, una pagina d'errore, una
-//    scheda ancora vuota) non dirà niente per definizione: lì l'attesa è tutta
-//    ritardo, e resta corta.
-// In tutti e due i casi l'errore possibile è un'uscita in ritardo, mai restare
-// chiusi dentro.
+// #514 — quanto si aspetta la pagina prima di uscire dallo schermo intero per
+// conto nostro: il tempo di dire "quell'Esc me lo sono preso io".
+// Due tempi, perché i casi sono diversi. Una pagina che RISPONDE risponde
+// comunque, quindi l'attesa non è ritardo ma la rete per il caso in cui non
+// risponda mai: larga, o una pagina impegnata mezzo secondo arriva fuori tempo
+// e si porta via il riquadro che aveva aperto. Una pagina che NON risponde (un
+// PDF, una pagina d'errore) non dirà niente: lì è tutto ritardo, e resta corta.
+// L'errore possibile è sempre un'uscita tardiva, mai restare chiusi dentro.
 const ESC_ATTESA_MS = 400;
 const ESC_ATTESA_PAGINA_CHE_RISPONDE_MS = 2500;
 
