@@ -134,10 +134,8 @@ function openExternalScheme(rawUrl) {
 // da cui parte la vista quando la shell è in chrome compatto.
 const TAB_ROW_HEIGHT = 40;
 
-// Pagine interne su cui i content script (e quindi il menu Filo del tasto
-// destro) NON vengono iniettati — vedi CS_BLOCKLIST in internal-preload.js.
-// Qui forniamo un menu contestuale nativo così il tasto destro fa qualcosa
-// (taglia/copia/incolla) invece di restare inerte, es. nell'editor.
+// Pagine senza content script: qui il tasto destro apre un menu nativo, o
+// resterebbe inerte (niente taglia/copia/incolla).
 const NATIVE_MENU_PAGES = [
   'filo://options/', 'filo://preferences/', 'filo://security/', 'filo://history/',
   'filo://feedback/', 'filo://spellcheck/', 'filo://editor/', 'filo://admin-defaults/',
