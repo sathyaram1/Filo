@@ -1470,11 +1470,8 @@ class TabManager {
     // possono sfuggire a will-navigate: la rete sotto è il controllo d'origine
     // in internal-preload.js.
     wc.on('will-navigate', (event, url) => {
-      // SICUREZZA: blocca le navigazioni top-level verso schemi non-web
-      // (file:// → leak hash NTLM via SMB su Windows; data:/javascript: →
-      // phishing/script). Vale per le pagine web; le interne navigano filo://.
-      // I link "azione OS" (mailto:/tel:/sms:) non sono pagine: invece di
-      // fallire li consegniamo al sistema (apre posta/telefono), come un browser.
+      // SICUREZZA: niente schemi non-web in cima. mailto/tel/sms non sono
+      // pagine e vanno consegnati al sistema invece di fallire.
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
         openExternalScheme(url);
