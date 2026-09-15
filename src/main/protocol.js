@@ -104,10 +104,8 @@ async function registerFiloProtocol() {
   protocol.handle('filo', filoHandler);
 }
 
-// Registra filo:// su una sessione specifica. protocol.handle() globale copre
-// solo la sessione di default; le finestre incognito usano una partizione
-// effimera propria (session.fromPartition senza 'persist:'), e senza questa
-// registrazione le pagine interne filo:// non caricherebbero lì.
+// protocol.handle() globale copre solo la sessione di default: senza questa,
+// nella partizione effimera dell'incognito le pagine filo:// non caricano.
 function registerFiloProtocolForSession(sess) {
   try {
     sess.protocol.handle('filo', filoHandler);
