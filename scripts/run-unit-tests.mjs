@@ -148,12 +148,20 @@ function main() {
     return;
   }
 
+  const scaricato = binarioScaricato();
+  if (!scaricato) {
+    // Detto, non taciuto: chi legge il registro deve capire perché l'ambiente
+    // non è quello di sempre.
+    console.error('[test:unit] il binario di Filo non è installato: gli unit test girano lo stesso (nessuno lo apre).');
+  }
+
   const r = spawnSync(process.execPath, ['--test', ...flags, ...files], {
     stdio: 'inherit',
     // I test si aspettano la root del repo come cartella corrente, come quando
     // li lanciava npm. Così `npm run test:unit` e un lancio da fuori danno lo
     // stesso risultato.
     cwd: REPO_ROOT,
+    env: ambienteDeiTest(process.env, { scaricato }),
   });
   if (r.error) {
     console.error(`[test:unit] non sono riuscito a lanciare node: ${r.error.message}`);
