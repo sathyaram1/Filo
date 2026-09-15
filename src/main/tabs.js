@@ -1018,7 +1018,6 @@ class TabManager {
     if (!cands.length) return { archived: 0 };
     this._triageRunning = true;
     try {
-      // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
       let dupIdx = new Set();
       if (T) {
