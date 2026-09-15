@@ -1,10 +1,5 @@
-// Filo — entry point del processo main Electron.
-// Boota:
-//   - protocollo filo:// per pagine interne e asset
-//   - finestra principale con shell (tab bar + indirizzo)
-//   - manager dei tab basato su WebContentsView
-//   - servizi (storage, providers AI, saved pages, ecc.)
-//   - shortcut globali
+// Entry point del processo main: qui si decide solo l'ORDINE dell'avvio
+// (protocollo, servizi, barra dei menu, finestra). La logica sta nei moduli.
 
 const { app, BrowserWindow, nativeTheme, session } = require('electron');
 const path = require('node:path');
