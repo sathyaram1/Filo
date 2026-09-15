@@ -199,7 +199,6 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
     if (activePopup === popup) activePopup = null;
   });
 
-  // Ricezione della scelta (scoped al webContents del popup)
   popup.webContents.on('ipc-message', (_event, channel, url) => {
     if (channel === 'popup-menu:select') {
       onSelect(url);
