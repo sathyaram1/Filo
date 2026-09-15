@@ -1359,9 +1359,6 @@ class TabManager {
     const [w, h] = this.win.getContentSize();
     for (const tab of this.tabs) {
       if (tab.id === this.activeId) {
-        // Altezza di chrome riservata in alto: 0 a tutto schermo, solo la fila
-        // di tab se in chrome compatto (barra indirizzi nascosta), altrimenti
-        // l'intera shell. A questo si somma l'eventuale topInset dei dropdown.
         const chrome = this.contentFullscreen
           ? 0
           : ((this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset);
