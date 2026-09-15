@@ -1648,11 +1648,8 @@ class TabManager {
       // #441 — una pagina-ponte avvia il file entro pochi secondi da qui: oltre
       // quella finestra la scheda non è più un ponte.
       tab._navigatedAt = Date.now();
-      // Nuova pagina → il colore live (§1.1) del sito precedente non vale più: lo
-      // azzeriamo (la tab torna al neutro finché il content script non ricampiona).
-      // Il colore IDENTITÀ (§1.2) invece dipende dal DOMINIO: se navighiamo su un
-      // host già in cache lo applichiamo subito, altrimenti azzeriamo e aspettiamo
-      // che il content script lo ricalcoli per il nuovo sito.
+      // Il colore campionato (§1.1) muore con la pagina; quello identità (§1.2)
+      // dipende dal DOMINIO, quindi su un host già visto si riapplica subito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
       update({
         url: userUrl(url),
