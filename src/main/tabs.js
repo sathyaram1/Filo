@@ -558,11 +558,8 @@ class TabManager {
     // che sono la stessa pagina.
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
 
-    // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
-    // in una scheda, riportaci l'utente invece di duplicarla. Solo per aperture
-    // in primo piano volute dall'utente (click su menu/link) e non quando si
-    // chiede esplicitamente una copia (Duplica scheda → allowDuplicate). Le
-    // aperture in background (activate:false) creano schede vere, come prima.
+    // #252 — solo per le aperture in primo piano volute dall'utente: chi chiede
+    // una copia (Duplica) o apre in sottofondo vuole una scheda vera.
     if (activate && !allowDuplicate) {
       const key = filoSingletonKey(url);
       if (key) {
