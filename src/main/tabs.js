@@ -2098,10 +2098,7 @@ class TabManager {
   }
 }
 
-// Installa i blocchi estratti come metodi di TabManager (mixin). Le definizioni
-// vivono in moduli separati per leggibilità; qui li agganciamo al prototype così
-// `this._sbBroadcast(...)`, `this._geoTextCheck(...)`, ecc. restano metodi
-// d'istanza identici a prima del refactor.
+// I blocchi che vivono in moduli a parte diventano metodi d'istanza qui.
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 
