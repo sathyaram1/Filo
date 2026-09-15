@@ -48,8 +48,6 @@ function wireWindowCommon(win, tabs) {
     if (!tabs.contentFullscreen) tabs.setContentFullscreen(true);
     else tabs.layout();
   });
-  // Se l'utente esce dal fullscreen OS con un gesto/scorciatoia di sistema,
-  // ripristina anche la barra (esce dalla modalità contenuto a tutto schermo).
   win.on('leave-full-screen', () => {
     if (tabs.contentFullscreen) tabs.setContentFullscreen(false);
     else tabs.layout();
