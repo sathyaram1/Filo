@@ -12,11 +12,10 @@ const SHELL_HEIGHT = 88;
 // Finestre invisibili nei test: il perché sta in `test-window-mode.js`.
 const { HIDDEN, posizioneFuoriSchermo, hideForTests } = require('./test-window-mode');
 
-// Porta la finestra davanti a tutto: serve al primo disegno, perché in alcune
-// configurazioni la WebContentsView appena creata non ha un display surface
-// valido e resta un quadrato vuoto finché la finestra non riceve attenzione
-// esplicita dal compositor. Nei test la si mostra comunque (altrimenti i menu
-// nativi, che sono finestre figlie, non si aprono) ma invisibile e senza fuoco.
+// Serve al primo disegno: in certe configurazioni la WebContentsView appena
+// creata resta un quadrato vuoto finché la finestra non riceve attenzione dal
+// compositor. Nei test si mostra lo stesso (i menu nativi sono finestre figlie
+// e senza madre mostrata non si aprono), ma invisibile e senza fuoco.
 function revealWindow(win) {
   try {
     if (HIDDEN) {
