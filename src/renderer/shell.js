@@ -549,8 +549,7 @@
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
   }
 
-  // Le azioni del menu tornano qui (canale globale onMenuAction): filtriamo solo
-  // quelle `tab-…` e le applichiamo alla tab memorizzata in ctxTabId.
+  // Il canale è globale: qui si prendono solo le azioni `tab-…`.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
       const id = ctxTabId;
