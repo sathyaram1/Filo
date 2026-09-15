@@ -851,8 +851,7 @@
         card.appendChild(bar);
       }
 
-      // La X compare sempre per le notifiche infinite; per quelle a tempo è
-      // comunque utile poterle chiudere subito, quindi la mostriamo sempre.
+      // La X c'è sempre: anche una notifica a tempo si deve poter togliere.
       const close = document.createElement('button');
       close.type = 'button';
       close.className = 'shell-notif-close';
