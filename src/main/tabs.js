@@ -63,17 +63,12 @@ function tabDiWebContents(wc) {
   return null;
 }
 
-// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo.
-// Da quando il tasto arriva al documento (serve: è quello che chiude i riquadri
-// aperti sopra la pagina, e prendercelo prima li scavalcava), il browser lo
-// conta come gesto dell'utente. Una pagina che chiede lo schermo pieno dentro
-// il proprio gestore dell'Esc lo otteneva senza che nessuno avesse cliccato
-// niente: da lì il tasto di questa segnalazione diventava un testa o croce —
-// un Esc esce, il successivo rientra — perché la modalità tornava "della
-// pagina" e l'Esc dopo era suo. Si rifiuta qui, prima che succeda qualsiasi
-// cosa: un evento di uscita non può essere il permesso per entrare. Su ogni
-// altro permesso si resta al comportamento di prima (senza gestore, Electron
-// concede), e questo è il motivo del `callback(true)` finale.
+// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo. Il
+// browser lo conta come gesto dell'utente, quindi una pagina che chiedeva lo
+// schermo pieno dentro il proprio gestore dell'Esc lo otteneva senza che
+// nessuno avesse cliccato: il tasto diventava un testa o croce, un Esc esce e
+// il successivo rientra. Un evento di USCITA non può essere il permesso per
+// entrare. Ogni altro permesso resta com'era: di qui il `callback(true)` finale.
 function installaPermessi(ses) {
   if (!ses || ses._filoPermessi) return;
   ses._filoPermessi = true;
