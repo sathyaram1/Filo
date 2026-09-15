@@ -70,10 +70,8 @@ function dispatch(command, window) {
 
 async function saveForLater(win, tab) {
   const { handleMessage } = require('./services/handlers');
-  // Fotografiamo SUBITO i dati identificativi della scheda, prima di qualsiasi
-  // attesa: se la pagina naviga/redirect mentre raccogliamo metadata e
-  // miniatura, tab.url/tab.title potrebbero già puntare alla nuova pagina e
-  // finiremmo per salvare quella sbagliata (#334, cammino da scorciatoia).
+  // #334 — url e titolo si leggono SUBITO, prima di qualsiasi await: se la
+  // pagina naviga mentre raccogliamo metadata e miniatura, salveremmo l'altra.
   const url = tab.url;
   const title = tab.title;
   const favicon = tab.favicon || '';
