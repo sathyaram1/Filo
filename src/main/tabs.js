@@ -1533,7 +1533,7 @@ class TabManager {
       }
       const NE = globalThis.SN_NET_ERROR;
       const reason = (details && details.reason) || '';
-      // clean-exit = chiusura ordinata (nostre close/_recreateView): non è un crash.
+      // clean-exit è una chiusura nostra, non un crash.
       if (!NE || reason === 'clean-exit') return;
       const current = tab.url || '';
       if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
