@@ -14,12 +14,8 @@ if (process.platform === 'win32') {
   try { app.setAppUserModelId('ai.filo.desktop'); } catch (_) {}
 }
 
-// User agent pulito (vedi src/main/userAgent.js per il perché). Togliamo i
-// token `filo/<ver>` ed `Electron/<ver>` dalla UA di default così i login dei
-// siti esterni (Google, Claude, …) non scambiano Filo per un browser embedded
-// e non rifiutano l'accesso. `userAgentFallback` è il default ereditato da ogni
-// session/webContents che non imposta una UA propria, quindi vale per tutte le
-// tab. Va fissato PRIMA di whenReady.
+// UA pulita (il perché in src/main/userAgent.js). `userAgentFallback` è quella
+// che eredita ogni session, e va fissata PRIMA di whenReady.
 try {
   const { stripEmbeddedUaTokens } = require('./userAgent');
   const cleaned = stripEmbeddedUaTokens(app.userAgentFallback || '', app.getName());
