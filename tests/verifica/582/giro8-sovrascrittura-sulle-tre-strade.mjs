@@ -9,9 +9,11 @@
 //   L'attrezzo dei giri passati carica con l'SDK di Firebase (`uploadBytes`) e
 //   su quella strada la sovrascrittura risulta negata. Filo però non carica
 //   così: `src/shared/feedback.js` (uploadImage) e l'agente esploratore fanno
-//   una POST diretta a `…/o?uploadType=media&name=…`. Sono due strade per la
-//   stessa cosa, e la segnalazione chiedeva proprio che la sovrascrittura non
-//   si potesse: vanno misurate tutte e due.
+//   una POST diretta a `…/o?uploadType=media&name=…`. Il deposito ne accetta
+//   una terza, il protocollo "resumable", che apre prima una sessione e scrive
+//   dopo: se le regole si guardassero solo all'apertura, di lì si passerebbe.
+//   Sono tre strade per la stessa cosa, e la segnalazione chiedeva proprio che
+//   la sovrascrittura non si potesse: vanno misurate tutte e tre.
 //
 //   Il nome usato qui PASSA il controllo dell'entropia. Con un nome che non lo
 //   passa il rifiuto arriva dalla forma del nome e non dice niente sulla
