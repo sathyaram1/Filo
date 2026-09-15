@@ -775,12 +775,8 @@
   // la si chiude. È la base su cui passano tutti gli avvisi della shell.
   const NOTIFS = (() => {
     let host = null;
-    // Tetto al numero di card impilate insieme. Senza limite una raffica di
-    // eventi (es. tempesta di popup bloccati, o ripristino con molte schede su
-    // siti in blacklist) fa crescere lo stack oltre l'altezza della finestra e
-    // spinge le più vecchie fuori schermo, dove non si possono più chiudere.
-    // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
-    // vengono rimosse subito, senza attendere il timeout.
+    // Senza tetto una raffica di eventi (una tempesta di popup bloccati) spinge
+    // le più vecchie fuori schermo, dove non si possono più chiudere.
     const MAX_STACK = 5;
     function hostEl() {
       if (!host) {
