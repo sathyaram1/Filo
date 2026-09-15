@@ -1564,9 +1564,8 @@ class TabManager {
       let current = '';
       try { current = wc.getURL() || ''; } catch (_) {}
       if (current.startsWith('filo://')) return; // pagine interne: CSS via <link>
-      // cssOrigin 'user' + !important: le dichiarazioni !important di origine
-      // "user" battono qualsiasi regola d'autore della pagina (così l'arancione
-      // Filo della selezione vince anche su repubblica, ecc.).
+      // cssOrigin 'user' più !important è l'unica combinazione che batte le
+      // regole d'autore della pagina.
       try { wc.insertCSS(PAGE_SELECTION_CSS, { cssOrigin: 'user' }); } catch (_) {}
       // CSS dei content script (menu, popup, sidebar...) come stylesheet
       // d'autore: equivale al <link filo://style/...> ma ignora la CSP della
