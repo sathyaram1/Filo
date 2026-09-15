@@ -260,10 +260,8 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
-// ─── shortcut hook ─────────────────────────────────────────────────────────
-// Lo shortcut globale fa un webContents.send('shortcut:triggered'); il content
-// script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
-// Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
+// Adattatore: l'evento IPC grezzo diventa il messaggio del catalogo che i
+// content script ascoltano.
 ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
   // Il payload deve usare il type MSG.SHORTCUT_TRIGGERED del catalogo messaggi.
   // Lo prendiamo dai constants caricati sopra (SN_MSG popolato da messages.js).
