@@ -233,12 +233,8 @@ class TabManager {
     // se nessuno se l'è preso (vedi handleFullscreenEscape).
     this._escUscitaTimer = null;
     this._escRivendicazioni = 0;
-    // Chrome compatto: fuori dalla home di Filo la barra indirizzi (icone di
-    // navigazione + campo URL) viene nascosta, lasciando solo la fila di tab +
-    // controlli finestra. In questo stato la WebContentsView risale a coprire
-    // anche lo spazio della barra indirizzi (altezza = solo la tab-row). La
-    // shell decide quando attivarlo (setChromeCompact) in base alla pagina
-    // attiva; qui ne teniamo solo l'altezza per il layout.
+    // Chrome compatto: la shell decide quando (setChromeCompact), qui se ne
+    // tiene solo l'altezza per il layout.
     this.chromeCompact = false;
     // Altezza della sola fila di tab (senza barra indirizzi), in sync con
     // `.tab-row { flex: 0 0 40px }` in src/renderer/shell.css.
