@@ -41,12 +41,9 @@ const filoApi = {
     ipcRenderer.on('filo:answer', wrapped);
     return () => ipcRenderer.removeListener('filo:answer', wrapped);
   },
-  // Le AZIONI in diretta durante una FILO_CHAT (tool calling nativo). Il main
-  // pusha sul canale 'filo:action' { reqId, kind, ... }: kind 'start' (il
-  // modello ha appena nominato un'azione: { type }), 'done' (eseguita, con
-  // l'azione completa di esito: { action }) e 'round' (un giro con azioni si è
-  // chiuso: il testo scritto in quel giro è una nota di lavoro, non la
-  // risposta: { text }). Il chiamante filtra per reqId. Ritorna un unsubscribe.
+  // { reqId, kind, ... }: 'start' { type } l'azione è stata nominata, 'done'
+  // { action } eseguita con esito, 'round' { text } fine di un giro — quel testo
+  // è una nota di lavoro, non la risposta.
   onAction: (fn) => {
     const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
     ipcRenderer.on('filo:action', wrapped);
