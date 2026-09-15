@@ -1,11 +1,6 @@
-// Shortcut globali — equivalente di chrome.commands ma a livello OS.
-// Alt+E/T/S/H replicano i 4 comandi dell'estensione, ma valgono ovunque
-// (anche con Filo in background).
-//
-// Quando uno shortcut si attiva, mandiamo un broadcast 'shortcut:triggered'
-// alla webContents del tab attivo: il preload page-preload.js lo intercetta
-// e lo gira al content script come MSG.SHORTCUT_TRIGGERED, identico al
-// vecchio comportamento extension.
+// Le quattro scorciatoie GLOBALI (valgono in tutto il sistema, anche con Filo
+// in background). Si consegnano alla tab attiva come 'shortcut:triggered', che
+// page-preload gira al content script.
 
 const { globalShortcut, BrowserWindow } = require('electron');
 
