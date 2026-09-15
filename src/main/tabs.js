@@ -682,9 +682,8 @@ class TabManager {
     this._broadcast();
   }
 
-  // Contatore monotòno di attivazione: ordina le tab per "ultima volta vista"
-  // in modo deterministico anche quando due attivazioni cadono nello stesso ms
-  // (Date.now() non basta). Ogni activate/apertura-attiva incrementa il seq.
+  // Contatore crescente invece di Date.now(): due attivazioni possono cadere
+  // nello stesso millisecondo, e l'ordine deve restare deciso.
   _nextActivationSeq() {
     this._activationSeq = (this._activationSeq || 0) + 1;
     return this._activationSeq;
