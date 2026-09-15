@@ -164,9 +164,7 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
-  // Esiste questo comando nella shell? Usato dall'evidenziazione live della
-  // dashboard (modalità terminale) per colorare di rosso i "/comando" che non
-  // verrebbero riconosciuti. Solo pagine interne filo:// (come shell:start).
+  // Serve a colorare di rosso un "/comando" inesistente mentre lo si scrive.
   ipcMain.handle('shell:which', async (event, { command, shell, cwd } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
