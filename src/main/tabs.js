@@ -2041,9 +2041,8 @@ class TabManager {
     }, 400);
   }
 
-  // Riapre i tab della sessione precedente. Ritorna true se ha ripristinato
-  // qualcosa, false se non c'era nulla da ripristinare (il chiamante aprirà
-  // allora un newtab vuoto).
+  // Ritorna false se non c'era niente da ripristinare: allora il chiamante apre
+  // una scheda vuota.
   async restoreSession() {
     if (this.incognito) return false; // incognito: nessuna sessione da ripristinare
     let urls = [];
