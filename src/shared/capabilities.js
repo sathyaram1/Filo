@@ -316,9 +316,9 @@
     // ──────────────────── Assistente e agente di pagina ──────────────────────
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
-      desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu).',
+      desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Alla fine ti chiede se ha funzionato. Se rispondi, Filo condivide i passi di quel percorso con chi userà l’assistente sullo stesso sito, senza i tuoi dati e senza niente che dica chi sei.',
       invoke: 'Alt+H (Ctrl+Alt+H su Mac).',
-      doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma.',
+      doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Il percorso condiviso non porta il tuo nome, il tuo browser né l’ora in cui l’hai fatto; se chiudi il riquadro senza rispondere, Filo non condivide niente. Da quello che è solo tuo — il router di casa, un disco di rete, l’intranet dell’ufficio, un server di prova, le pagine interne di Filo — non condivide e non te lo chiede nemmeno.',
     },
     {
       id: 'web-search-assistant', title: 'Ricerca sul web dell’assistente', category: 'assistant',

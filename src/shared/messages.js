@@ -338,6 +338,14 @@
     // di sanitizzazione 2-LLM in pathsCollector.js prima di toccare Firestore).
     SAVE_PATH: 'save_path',                        // { path: { domain, initialUrl, sanitizedSteps, rawUserMessages, success } }
 
+    // Aiuto: «se l'utente rispondesse, da qui partirebbe qualcosa?». Lo chiede
+    // il riquadrino «Ha funzionato?» prima di comparire, perché prometteva di
+    // condividere anche dove non si raccoglie niente — le pagine interne di
+    // Filo, il server di prova, l'intranet, il disco di rete (#584). La
+    // risposta la dà la stessa porta che usa la raccolta, così le due non
+    // possono divergere. → { ok, raccoglibile, reason }
+    PATH_COLLECTABLE: 'path_collectable',          // { url }
+
     // Invio feedback alpha → Firestore/Storage. Va instradato dal main process
     // perché le CSP delle pagine ospiti bloccano fetch diretti dal preload.
     SUBMIT_FEEDBACK: 'submit_feedback',           // { text, url, title, userAgent, clientId, images: [{dataUrl}] }

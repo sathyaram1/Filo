@@ -1,11 +1,6 @@
 // Handler di dominio: richieste AI one-shot, sintesi vocale, test dei
 // provider/modelli dalle Opzioni, ricerca web e raccolta dei path "Aiuto".
 
-const auth = require('../../auth/google-auth');
-// L'identità dell'INSTALLAZIONE (l'account anonimo di crediti e portafoglio).
-// Serve a chi manda un percorso condiviso: vedi MSG.SAVE_PATH più sotto.
-const identity = require('../../auth/anon-auth');
-
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
@@ -608,42 +603,41 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // «Da qui si raccoglie?» — la domanda che il riquadrino «Ha funzionato?» si
+  // fa prima di comparire. Non ha potere: dice soltanto, su un indirizzo che
+  // chi chiede ha già davanti, se una risposta servirebbe a qualcosa. La
+  // risposta la dà la stessa porta della raccolta (#584, settimo giro).
+  on(MSG.PATH_COLLECTABLE, async (msg) => {
+    try {
+      const r = await PathsCollector.raccoglibile(msg?.payload?.url);
+      return { ok: true, raccoglibile: !!r.ok, reason: r.reason || '' };
+    } catch (e) {
+      // Nel dubbio non si promette niente: meglio non chiedere che chiedere
+      // per niente.
+      return { ok: true, raccoglibile: false, reason: e?.message || String(e) };
+    }
+  });
+
   on(MSG.SAVE_PATH, async (msg, sender, origin) => {
     (async () => {
       try {
         const settings = await getEffectiveSettings();
         if (!settings.apiKeys?.[settings.provider]) return;
-        const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
-        const cid = msg.payload?.clientId || '';
-        // #585: il percorso non si scrive più dal client, lo scrive il server,
-        // che per limitarne la frequenza deve sapere DA CHI arriva.
+        // Niente user agent e nessun identificativo del mittente (#584): nel
+        // documento non ci entrano, e sistema operativo più versione più lingua
+        // bastavano a rimettere insieme i percorsi della stessa installazione su
+        // domini diversi. Il `clientId` del contratto della callable resta un
+        // ripiego del server e Filo non ne genera nessuno: portarselo dietro
+        // vuoto, fin dentro la coda sul disco, era solo l'invito a riempirlo.
         //
-        // L'identità da allegare è quella dell'INSTALLAZIONE: ogni copia di
-        // Filo ne ha una (è quella su cui poggiano crediti e portafoglio), il
-        // server la verifica, e resta la stessa anche dopo un login Google,
-        // che a quell'identità si collega. Il login Google invece è opzionale:
-        // chiedere quello voleva dire mandare quasi sempre una richiesta senza
-        // mittente, e lasciare al server il solo indirizzo IP — cioè il limite
-        // per identità chiesto dal feedback senza niente sotto.
-        //
-        // Il mittente resta ANONIMO lo stesso: l'identità viaggia accanto al
-        // documento e non ci entra (vedi sanitizeSubmission), perché la
-        // raccolta la legge chiunque.
-        //
-        // Un'identità irraggiungibile (offline, oppure annullata sul server)
-        // non deve far saltare la raccolta, che è telemetria best-effort: si
-        // ripiega sul login Google se c'è, altrimenti si invia senza e il
-        // server si arrangia con quello che ha.
-        let idToken = '';
-        try { idToken = (await identity.getIdToken()) || ''; } catch (_) { idToken = ''; }
-        if (!idToken) {
-          try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
-        }
+        // L'identità per i limiti di frequenza NON si prende qui: il percorso
+        // non parte adesso, entra in una coda e parte ore dopo (#584, secondo
+        // giro), e un token preso adesso a quel punto è scaduto. Chi manda se
+        // lo fa dare al momento dell'invio, da `ottieniIdToken` (vedi l'init
+        // della coda in handlers/misc.js).
         const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
-        const r = await PathsCollector.collectAndSave({
-          session: msg.payload?.session, invokeAI, userAgent: ua, clientId: cid, idToken,
-        });
-        if (r?.saved) console.info('[Filo] path salvato:', r.id, r.intent);
+        const r = await PathsCollector.collectAndSave({ session: msg.payload?.session, invokeAI });
+        if (r?.saved) console.info('[Filo] percorso in coda:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }
     })();
     return { ok: true };

@@ -771,14 +771,64 @@ service cloud.firestore {
     // frequenza per identità e scrive con l'Admin SDK, che bypassa queste
     // regole. Il mittente resta anonimo: a cambiare è la strada, non il login.
     //
-    // La lettura resta pubblica — serve all'Aiuto di chiunque, anche sloggato —
-    // ma quello che si legge qui è CONTENUTO ESTERNO: chi lo mette in un prompt
-    // lo incapsula e lo dichiara dati, mai ordini (src/shared/pathsSafety.js →
-    // formatKnownPathsForPrompt, e il blocco "Percorsi condivisi" del prompt
-    // Aiuto in src/shared/constants.js).
-    match /paths/{doc} {
-      allow read: if true;
-      allow create, update, delete: if false;
+    // La lettura resta aperta a chiunque — serve all'Aiuto di chiunque, anche
+    // sloggato — ma UN DOMINIO ALLA VOLTA, e quello che si legge qui è
+    // CONTENUTO ESTERNO: chi lo mette in un prompt lo incapsula e lo dichiara
+    // dati, mai ordini (src/shared/pathsSafety.js → formatKnownPathsForPrompt,
+    // e il blocco "Percorsi condivisi" del prompt Aiuto in
+    // src/shared/constants.js).
+    //
+    // IL DOMINIO È UN SEGMENTO DEL PERCORSO (audit pre-alpha, #584). Prima i
+    // documenti stavano tutti in `paths/{doc}` con `allow read: if true`: con
+    // la chiave web — che sta nel repo pubblico ed è pubblica per design — una
+    // sola query scaricava la collezione INTERA, e in ogni documento c'era un
+    // `clientId` in chiaro. Da lì si ricucivano i percorsi della stessa persona
+    // su domini diversi: il profilo di navigazione che tutto il resto dell'app
+    // si sforza di non far uscire. Chiudere la scrittura (#585) non tocca
+    // quella porta: si entrava in lettura.
+    //
+    // Ora i percorsi stanno in `paths/<dominio>/entries`: si chiede un dominio
+    // alla volta e si riceve solo quello. L'elenco completo non è più un
+    // oggetto leggibile, e questo poggia su TRE cose insieme — toccarne una
+    // sola riapre la porta:
+    //   1. `paths/{domain}` (dove stanno anche i vecchi documenti piatti) è
+    //      chiuso in lettura: né i documenti di prima, né l'elenco dei domini
+    //      raccolti (che da solo direbbe chi frequenta cosa);
+    //   2. `entries` si legge solo sotto un dominio NOMINATO;
+    //   3. una collection group query su `entries` è negata perché in questo
+    //      file non esiste nessun match ricorsivo `/{p=**}/entries/{doc}`:
+    //      senza quello il motore rifiuta le query di gruppo. Aggiungerlo
+    //      significherebbe rimettere in piedi il download dell'intera raccolta.
+    //
+    // E il documento non porta NULLA del mittente: niente `clientId`, niente
+    // `userAgent` — per riusare un percorso non serve sapere chi l'ha fatto.
+    //
+    // L'OROLOGIO NON LO CHIUDONO QUESTE REGOLE, e vale la pena saperlo qui.
+    // Su ogni documento Firestore scrive da sé `createTime`, al microsecondo, e
+    // lo rimanda a chiunque legga: non c'è regola che lo tolga. Finché un
+    // percorso partiva nell'istante in cui veniva fatto, due percorsi su domini
+    // diversi nati a meno di un secondo l'uno dall'altro erano della stessa
+    // persona — la ricucitura che togliere il `clientId` doveva impedire
+    // (#584, secondo giro). La difesa sta nel client, in pathsCollector.js: il
+    // percorso entra in una coda e parte ore dopo, da solo.
+    match /paths/{domain} {
+      // Vecchia forma piatta + elenco dei domini: chiusi, per sempre.
+      allow read, write: if false;
+
+      match /entries/{doc} {
+        // Lettura per dominio. Il tetto sulla `limit` non protegge un segreto
+        // (questi dati sono condivisi per progetto): tiene solo la singola
+        // richiesta a una manciata di percorsi, quanti ne consuma il prompt.
+        allow get: if true;
+        allow list: if request.query.limit <= 200;
+
+        // Nessun client scrive (#585): il percorso entra solo dalla callable
+        // `pathSubmit`, che usa l'Admin SDK e bypassa queste regole. Qui non
+        // c'è nessun controllo di forma perché non servirebbe a niente: una
+        // regola non vede mai la scrittura che deve fermare, e quella che vede
+        // la ferma sempre.
+        allow create, update, delete: if false;
+      }
     }
 
     // ── Collezioni del backend di sicurezza (filo-security, DESIGN §13) ──────
