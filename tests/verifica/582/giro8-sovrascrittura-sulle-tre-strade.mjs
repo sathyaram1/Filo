@@ -1,5 +1,5 @@
-// Verifica #582, giro 8 — la sovrascrittura, misurata sulle DUE strade di
-// caricamento che esistono davvero.
+// Verifica #582, giro 8 — la sovrascrittura, misurata su TUTTE le strade di
+// caricamento che il deposito accetta.
 //
 // NON è uno spec: il nome finisce in `.mjs` e non in `.spec.mjs` apposta, così
 // la suite non prova a lanciarlo (vuole l'emulatore ufficiale di Storage e
