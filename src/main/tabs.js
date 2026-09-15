@@ -542,12 +542,9 @@ class TabManager {
       ];
     }
     const view = new WebContentsView({ webPreferences });
-    // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
-    // (privacy per-sito, proxy "apri da un altro paese"): senza questo, un
-    // download partito da una scheda proxata/privacy resterebbe "al buio".
-    // Le finestre incognito sono ESCLUSE di proposito: "nessuna traccia" vale
-    // anche per i download, che quindi non entrano nella cronologia condivisa
-    // (in incognito il browser usa comunque il suo salvataggio nativo).
+    // #410.1 — anche le sessioni non predefinite (privacy, proxy), o un
+    // download partito da lì resterebbe al buio. Incognito ESCLUSO apposta:
+    // "nessuna traccia" vale anche per gli scaricamenti.
     if (!this.incognito) {
       try { require('./services/downloads').attachSession(view.webContents.session); } catch (_) {}
     }
