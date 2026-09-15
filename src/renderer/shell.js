@@ -141,8 +141,7 @@
     return entries;
   }
 
-  // Popup menu custom: BrowserWindow frameless che appare sopra le
-  // WebContentsView native, stilizzato come il menu tasto destro.
+  // Il menu è una finestra a sé: un dropdown HTML finirebbe sotto la pagina.
   function showNativeMenu(btn, entries) {
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
