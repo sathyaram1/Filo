@@ -623,7 +623,6 @@
       } else if (isAudible) {
         ico.className = 'favicon favicon-audible';
         ico.innerHTML = AUDIO_IND_SVG;
-        // Clic sullo slot favicon-audible muta la tab.
         ico.setAttribute('role', 'button');
         ico.title = 'Silenzia';
         ico.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
