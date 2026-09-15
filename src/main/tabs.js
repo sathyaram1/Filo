@@ -866,8 +866,6 @@ class TabManager {
     return { ok: true, country: code, tier: resolved.tier };
   }
 
-  // "Torna in Italia": rimuove il proxy dalla tab, che viene ricreata nella
-  // sessione normale (stesso URL, connessione diretta).
   clearTabProxy(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return { ok: false, error: 'no_tab' };
