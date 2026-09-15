@@ -349,10 +349,8 @@ function registerIpcHandlers() {
   });
   ipcMain.on('shell:tooltip-hide', () => hideTooltip());
 
-  // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────
-  // La shell ci dice se c'è un disegno sulla sua barra: lo rilanciamo ai content
-  // script (box feedback) così "Cancella disegno" compare anche quando si è
-  // disegnato SOLO sulla barra e l'invio allega lo screenshot annotato.
+  // Un disegno fatto SOLO sulla barra in alto deve comunque far comparire
+  // "Cancella disegno" nel box feedback, che vive in un'altra pagina.
   ipcMain.on('shell:feedback-draw-state', (_event, { has } = {}) => {
     try {
       const { MSG } = globalThis.SN_MSG;
