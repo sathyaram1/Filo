@@ -222,7 +222,7 @@ function buildHTML(entries, isDark, margin = 26) {
       const ico = iconSvg(e.icon, 16);
       // Niente colonna icona se l'icona non c'è: vuota spinge il testo a destra.
       const icoSpan = ico ? `<span class="ico">${ico}</span>` : '';
-      // Escape HTML nel label per sicurezza
+      // L'etichetta arriva da fuori e finisce in HTML: va sempre sfuggita.
       const label = (e.label || '').replace(/[<>&"]/g, (ch) =>
         ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch]);
       if (e.disabled) {
