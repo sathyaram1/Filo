@@ -815,8 +815,8 @@
       card.classList.remove('show');
       setTimeout(() => { try { card.remove(); } catch (_) {} syncOverflow(); }, 220);
     }
-    // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
-    // actions: [{ label, onClick }] }. Senza opts usa la config delle Preferenze.
+    // opts: { durationSec, sound (toneId|false), actions: [{ label, onClick }] }.
+    // Senza opts valgono le Preferenze.
     function show(text, opts) {
       if (!text) return null;
       opts = opts || {};
