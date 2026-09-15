@@ -244,8 +244,8 @@ class TabManager {
     // una isolata ma PERSISTENTE, così si resta connessi.
     this.cookieMode = Cookies.MODES.DEFAULT;
     this.trustedSites = [];
-    // #151 — nota consumo dati per tab proxate che riproducono video a lungo
-    // (spec §5: una volta per SESSIONE, non bloccante). Flag globale di sessione.
+    // #151 — l'avviso sul consumo dati si dà una volta per sessione, non a ogni
+    // video: ripeterlo sarebbe rumore.
     this._proxyVideoNoted = false;
     // #152 — regole proxy persistenti per dominio ("questo sito sempre da X").
     // Cache in-memory per la decisione SINCRONA "born proxied" in navigazione
