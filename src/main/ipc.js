@@ -36,20 +36,14 @@ function senderInfo(event) {
     tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,
     url: wc.getURL(),
     isShell: win ? win.webContents === wc : false,
-    // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
-    // direttamente, non oltre il confine IPC) + flag incognito, così i servizi
-    // aprono i tab nella finestra giusta e l'IPC instrada lo storage in RAM.
+    // `win`, `wc` e `frame` sono oggetti vivi: l'handler è chiamato in-process,
+    // non attraversano mai il confine IPC. Servono ad aprire le schede nella
+    // finestra giusta e a spingere dati fuori dal ciclo richiesta/risposta.
     win: win || null,
     isIncognito: !!win?._filoIncognito,
-    // webContents grezzo del mittente: serve agli handler che vogliono PUSHARE
-    // dati alla scheda fuori dal ciclo richiesta/risposta (es. il reasoning in
-    // diretta della chat → canale 'filo:reasoning'). In-process, mai oltre IPC.
     wc,
-    // #405 — frame ESATTO che ha parlato. Da quando i content script girano
-    // anche nei riquadri incorporati, "la scheda" non basta più a sapere chi
-    // ha chiesto qualcosa: le risposte push (stream della spiegazione,
-    // chiusura dei menu degli altri frame) devono tornare al frame giusto e
-    // non al solo frame principale.
+    // #405 — il frame ESATTO: con i content script attivi anche nei riquadri
+    // incorporati, "la scheda" non basta a sapere a chi rispondere.
     frame: event.senderFrame || null,
   };
 }
