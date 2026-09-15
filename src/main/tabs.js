@@ -201,9 +201,9 @@ function getContentScriptCss() {
   return CONTENT_SCRIPT_CSS;
 }
 
-/* Segue i token estetici (#146.1): colore/opacità della selezione arrivano
-   dalle variabili di theme.css (iniettato anche qui), con fallback letterale
-   per il primissimo paint quando [data-sn-theme] non è ancora impostato. */
+/* #146.1 — il colore viene dalle variabili del tema; il valore letterale è il
+   ripiego per il primo paint, prima che [data-sn-theme] esista. Niente var()
+   nella regola nuda: dentro ::selection non si risolve in modo affidabile. */
 const PAGE_SELECTION_CSS = `
 ::selection { background-color: rgba(196, 90, 59, 0.30) !important; }
 ::-moz-selection { background-color: rgba(196, 90, 59, 0.30) !important; }
