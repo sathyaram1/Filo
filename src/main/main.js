@@ -57,16 +57,9 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// Configura le lingue del correttore ortografico NATIVO (Hunspell) di Electron.
-// Senza questa chiamata Electron usa solo la lingua di sistema: su molte
-// configurazioni i suggerimenti dietro lo zigzag rosso non arrivano (il main
-// li inoltra al menu di correzione via `_spell:native`, vedi tabs.js). La
-// vecchia estensione Chrome aveva i dizionari pronti d'ufficio; qui li
-// attiviamo esplicitamente — italiano (l'app è italiana) + lingua di sistema —
-// così la correzione in cima al menu funziona anche senza chiave LLM. NON
-// forziamo più l'inglese (#169): con il dizionario inglese sempre attivo le
-// parole italiane errate ricevevano suggerimenti inglesi ("funzion"→"function").
-// Su macOS la chiamata è ignorata (Electron usa NSSpellChecker), nessun problema.
+// Senza queste lingue Hunspell resta sulla sola lingua di sistema e i
+// suggerimenti dietro lo zigzag non arrivano. #169: l'inglese NON si forza, o
+// le parole italiane sbagliate ricevono correzioni inglesi. Su macOS è ignorata.
 function configureSpellchecker() {
   try {
     const ses = session.defaultSession;
