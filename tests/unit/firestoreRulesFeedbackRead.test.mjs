@@ -19,15 +19,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { leggiTestoRepo } from '../helpers/testo.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
+const RULES = leggiTestoRepo(join(ROOT, 'firestore.rules'));
 
 require(join(ROOT, 'src', 'shared', 'feedbackPublicView.js'));
 const VIEW = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
@@ -158,7 +158,7 @@ test('gli allegati dei feedback non si elencano e non si scaricano col solo indi
   // allegati e il token torna a essere revocabile. Verificato #583 giro 8 con
   // l'emulatore ufficiale di Storage (link col token 200, solo indirizzo 403,
   // token sbagliato 403).
-  const STORAGE = readFileSync(join(ROOT, 'storage.rules'), 'utf8');
+  const STORAGE = leggiTestoRepo(join(ROOT, 'storage.rules'));
   // Il blocco si chiama `/feedback/{file}` da quando #582 ha ristretto la
   // scrittura a un solo segmento (le sottocartelle cadono nel diniego finale).
   // La forma larga `{file=**}` resta cercata perché se qualcuno la rimettesse

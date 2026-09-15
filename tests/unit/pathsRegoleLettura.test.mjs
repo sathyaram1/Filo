@@ -30,13 +30,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { leggiTestoRepo } from '../helpers/testo.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
+const RULES = leggiTestoRepo(join(ROOT, 'firestore.rules'));
 
 // Il file senza commenti: una regola non esiste perché è scritta dentro un
 // commento, e un commento che cita `allow read: if true` non deve far passare

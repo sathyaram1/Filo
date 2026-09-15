@@ -18,7 +18,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readFileSync } from 'node:fs';
+import { leggiTestoRepo } from '../helpers/testo.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -61,7 +61,7 @@ test('senza il segno nel messaggio non si tocca niente (retrocompat)', async () 
 
 // ── b. le regole ────────────────────────────────────────────────────────────
 
-const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
+const RULES = leggiTestoRepo(join(ROOT, 'firestore.rules'));
 
 /** Il blocco `match /feedback/{doc}` intero. */
 function bloccoFeedback() {
