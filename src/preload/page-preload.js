@@ -308,9 +308,8 @@ function loadScripts() {
   // — un avviso "sito pericoloso" dentro un video — e lì non si caricano.
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
-  // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
-  // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina
-  // (traduzione, sentinella del testo nuovo) lo riconosce da quel marchio.
+  // PRIMO fra i moduli che toccano il DOM: è il marchio con cui la UI di Filo
+  // dentro la pagina si distingue dalla pagina per chi la percorre.
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
