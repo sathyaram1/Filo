@@ -8,10 +8,11 @@
 //   verde su una cosa diversa da quella che poi ferma la pubblicazione, ed è
 //   peggio che non averlo.
 //
-//   Tiene insieme anche la rinuncia al binario di Electron: gli unit test non
-//   aprono Filo, quindi non serve scaricarlo. Il giorno in cui un unit test
-//   avesse bisogno del binario, questa sentinella lo dice invece di lasciare un
-//   rosso incomprensibile su una macchina sola.
+//   Tiene insieme anche la rinuncia al binario di Electron con ciò che la rende
+//   possibile: gli unit test non aprono Filo, ma alcuni caricano i sorgenti
+//   dell'app, e un sorgente dell'app chiede quel modulo appena viene caricato.
+//   Chi salta lo scaricamento deve quindi compensarne l'assenza, altrimenti il
+//   lavoro nasce rosso e resta rosso.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
