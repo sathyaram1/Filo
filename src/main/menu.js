@@ -121,9 +121,8 @@ async function annulla() {
   try { c && c.tabs.goBack(c.tab.id); } catch (_) {}
 }
 
-// Ctrl/Cmd+Shift+Z: solo "ripeti", e solo mentre si scrive. Fuori da un campo
-// di testo non significa niente (Filo non ha un "avanti" su questo tasto), e
-// una voce che non fa niente è meglio di una che fa una cosa a sorpresa.
+// Solo mentre si scrive: fuori da un campo Filo non ha un "avanti" su questo
+// tasto, e una voce che non fa niente è meglio di una che sorprende.
 async function ripeti() {
   const wc = contenutoAFuoco();
   if (!wc) return;
