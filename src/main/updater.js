@@ -20,10 +20,8 @@ function initAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  // La versione trovata sul feed, se ce n'è una più nuova di quella in uso.
-  // Serve al ripiego qui sotto: un errore PRIMA di aver trovato un
-  // aggiornamento (feed irraggiungibile, rete assente) non riguarda l'utente e
-  // non va scritto da nessuna parte.
+  // Un errore PRIMA di aver trovato una versione nuova (rete assente, feed
+  // irraggiungibile) non riguarda l'utente e non va scritto da nessuna parte.
   let versioneTrovata = null;
 
   autoUpdater.on('error', (err) => {
