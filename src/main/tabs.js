@@ -352,8 +352,8 @@ class TabManager {
   // Ritorna true se l'ha gestito: chi chiama fa il preventDefault.
   handleFullscreenEscape(tabId = null) {
     if (!this.contentFullscreen) return false;
-    // Dalla barra di Filo, o da una scheda che non è quella davanti: la pagina
-    // quel tasto non lo vedrà mai, quindi decidiamo subito noi.
+    // Dalla barra, o da una scheda che non è davanti: la pagina quel tasto non
+    // lo vedrà mai, quindi si decide subito.
     if (tabId == null || tabId !== this.activeId) {
       this.setContentFullscreen(false);
       return true;
