@@ -828,12 +828,9 @@ class TabManager {
     this.setMuted(id, !tab.muted);
   }
 
-  // ─── proxy per-tab ("Apri da un altro paese", vedi proxy-per-tab-spec.md) ──
-
-  // Instrada la tab attraverso un endpoint nel paese richiesto. La tab viene
-  // ricreata nella partition dedicata proxy:<tabId> (cookie jar separato dal
-  // resto del browser) con il proxy applicato alla sua session; la scelta vive
-  // finché vive la tab. `tier` è 'datacenter' (default) o 'residential'.
+  // "Apri da un altro paese" (proxy-per-tab-spec.md). La scheda si ricrea nella
+  // partizione proxy:<tabId>, con i suoi cookie separati, e ci resta finché
+  // vive. `tier` è 'datacenter' (default) o 'residential'.
   async setTabProxy(id, country, { tier } = {}) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return { ok: false, error: 'no_tab' };
