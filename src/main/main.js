@@ -118,18 +118,9 @@ app.whenReady().then(async () => {
 
   initAutoUpdater();
 
-  // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
-  // verifica che i content script si caricano in quest'ultima, cattura
-  // screenshot di entrambe, scrive un report e si chiude.
-  //
-  // ORDINE: il sentinel — l'unica cosa che lo script fuori sta aspettando — si
-  // scrive appena lo stato delle schede è quello da riportare, PRIMA delle
-  // catture. Le catture sono diagnostica: aprono altre finestre e aspettano che
-  // finiscano di caricare, cioè dipendono dalla rete e da quanto è carica la
-  // macchina. Scrivendo il sentinel dopo, una cattura lenta diventava
-  // indistinguibile da un'app che non parte — «sentinel non scritto entro 20 s»
-  // su un avvio andato benissimo. Adesso l'esito è deciso dal boot, e il resto
-  // può prendersi il suo tempo (o fallire) senza cambiarlo.
+  // Smoke: l'ORDINE è la regola. Il sentinel è l'unica cosa che lo script fuori
+  // aspetta e si scrive appena le schede sono pronte, PRIMA delle catture: se
+  // viene dopo, una cattura lenta è indistinguibile da un'app che non parte.
   if (process.env.FILO_SMOKE) {
     const fs = require('node:fs');
     const path = require('node:path');
