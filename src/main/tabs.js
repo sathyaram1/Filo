@@ -222,11 +222,8 @@ class TabManager {
     // Contenuto a tutto schermo: la vista attiva copre la finestra e la barra
     // resta sotto. Si esce con Esc.
     this.contentFullscreen = false;
-    // true quando il fullscreen è stato richiesto DALLA pagina (HTML5
-    // requestFullscreen: pulsante "schermo intero" di YouTube/player video).
-    // In quel caso l'Esc deve passare alla pagina perché esca dal suo
-    // fullscreen (poi `leave-html-full-screen` ripristina la shell), invece di
-    // intercettarlo noi e lasciare la pagina convinta di essere a tutto schermo.
+    // Schermo pieno chiesto DALLA pagina (il pulsante di un lettore video): lì
+    // l'Esc deve arrivarle, o resta convinta di essere a tutto schermo.
     this.pageFullscreen = false;
     // Quale scheda ha chiesto quel fullscreen. Serve perché la deroga qui sopra
     // vale SOLO per lei: un Esc che arriva da un'altra scheda (o dalla barra di
