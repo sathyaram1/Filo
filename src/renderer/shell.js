@@ -1118,8 +1118,8 @@
         actions.appendChild(b);
       };
       if (isActive(r)) {
-        // Gli scaricamenti "a mano" (Salva immagine/video come…) non si mettono
-        // in pausa: meglio nessun pulsante che uno che non fa niente.
+        // Gli scaricamenti "a mano" non si mettono in pausa: meglio nessun
+        // pulsante di uno che non fa niente.
         if (r.canPause !== false) {
           if (r.state === 'paused') addBtn('Riprendi', () => api.downloads.resume(r.id).catch(() => {}));
           else addBtn('Pausa', () => api.downloads.pause(r.id).catch(() => {}));
