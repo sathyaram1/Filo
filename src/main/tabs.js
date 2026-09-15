@@ -2012,12 +2012,9 @@ class TabManager {
 
   // ─── persistenza sessione (riapri i tab alla riapertura di Filo) ──────────
 
-  // Stato minimale da salvare/ripristinare: gli URL dei tab, quale era attivo e
-  // il colore identità di ciascuno. `colors` è allineato indice-per-indice a
-  // `tabs`: serve a far ripartire la barra già tinta (§1.2) e a dare al riordino
-  // cromatico della riapertura (§1.3) i dati subito, senza aspettare che i
-  // content script ricalcolino il colore di ogni sito. Campo aggiuntivo: un
-  // ripristino vecchio senza `colors` continua a funzionare (viene ignorato).
+  // Lo stato salvato fra una sessione e l'altra. `colors` è allineato
+  // indice-per-indice a `tabs`: fa ripartire la barra già tinta e dà subito i
+  // dati al riordino cromatico. Un salvataggio vecchio senza `colors` regge.
   sessionState() {
     const kept = this.tabs
       .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank');
