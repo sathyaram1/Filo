@@ -85,18 +85,9 @@ async function filoHandler(request) {
     }
 
     const res = await net.fetch(pathToFileURL(resolved).href);
-    // CSP solo per i documenti HTML (le pagine privilegiate filo://): rete di
-    // sicurezza contro un eventuale XSS futuro su una pagina che ha accesso a
-    // storage + shellExec. Oggi nessun XSS sfruttabile (gli innerHTML esaminati
-    // escapano a monte), ma se in futuro un sink non escapato venisse introdotto,
-    // questa CSP impedisce l'esecuzione di script inline/eval iniettati.
-    //   - script-src 'self' filo:  → niente inline/eval; copre tutti gli host
-    //     filo:// (shared/shell/<page>). Verificato: nessun <script> inline,
-    //     nessun eval/new Function, nessun handler on*= nelle pagine.
-    //   - style-src include 'unsafe-inline' perché le pagine usano attributi
-    //     style= e stili dinamici (non un vettore di esecuzione codice).
-    //   - img/media/connect permissivi (https:, data:, blob:) per non rompere
-    //     favicon, anteprime e risorse caricate dalle pagine.
+    // CSP solo sui documenti HTML: le pagine filo:// hanno storage e shellExec,
+    // e senza script inline/eval un XSS futuro non diventa esecuzione. Lo
+    // 'unsafe-inline' è solo per gli stili (le pagine usano attributi style=).
     const ct = res.headers.get('content-type') || '';
     if (/text\/html/i.test(ct)) {
       const headers = new Headers(res.headers);
