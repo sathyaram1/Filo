@@ -53,9 +53,8 @@ async function staScrivendo(wc) {
   try {
     return !!(await dove.executeJavaScript(sorgente, false));
   } catch (_) {
-    // Nel dubbio si annulla, non si naviga: annullare quando non c'è niente da
-    // annullare non fa nulla, mentre andare indietro mentre si scrive porta via
-    // il testo appena battuto.
+    // Nel dubbio si annulla: un annulla a vuoto non fa niente, un "indietro"
+    // mentre si scrive porta via il testo appena battuto.
     return true;
   }
 }
