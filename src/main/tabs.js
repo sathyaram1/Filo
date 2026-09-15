@@ -384,9 +384,8 @@ class TabManager {
     if (!wc || wc.isDestroyed?.()) return false;
     const type = globalThis.SN_MSG?.MSG?.ESC_INOLTRATO || 'esc_inoltrato';
     // Al frame con cui l'utente sta interagendo, dove sarebbe arrivato il tasto
-    // vero: il menu del tasto destro aperto dentro un riquadro incorporato vive
-    // lì, e consegnarlo al frame principale lo lascerebbe aperto (#405 tiene
-    // aggiornato `_filoActiveFrame` a ogni interazione).
+    // vero: un menu aperto dentro un riquadro incorporato vive lì, e mandarlo
+    // al frame principale lo lascerebbe aperto (#405 tiene `_filoActiveFrame`).
     let frame = null;
     try {
       const attivo = wc._filoActiveFrame;
