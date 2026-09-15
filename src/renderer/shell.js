@@ -1182,7 +1182,6 @@
       if (panelOpen) renderPanel();
     });
 
-    // Cronologia iniziale (sopravvive al riavvio).
     api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
   }
 
