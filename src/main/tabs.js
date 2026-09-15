@@ -1911,9 +1911,8 @@ class TabManager {
     if (!decision.close) return;
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return;
-    // La pagina-ponte aveva contenuto: l'utente deve poter tornare indietro se
-    // quella scheda gli serviva davvero (chiudere da soli qualcosa di visibile
-    // senza via di ritorno sarebbe peggio dell'attrito che togliamo).
+    // Chiudere da soli qualcosa di visibile senza via di ritorno sarebbe peggio
+    // dell'attrito che stiamo togliendo.
     const undo = decision.reason === 'bridge'
       ? { title: tab.title, url: tab.url }
       : null;
