@@ -107,9 +107,18 @@ export function collectTestFiles(dir = UNIT_DIR) {
 // farci partire l'app per sbaglio, e chi ci provasse leggerebbe quel percorso
 // nell'errore.
 
-/** Vero se il binario di Filo è stato scaricato. */
-export function binarioScaricato(root = REPO_ROOT) {
-  return existsSync(join(root, 'node_modules', 'electron', 'path.txt'));
+/**
+ * Vero se `require('electron')` risponde. Si CHIEDE, invece di cercare il file
+ * col percorso: la cosa che conta non è quale file c'è sul disco, è se il
+ * modulo risponde o solleva, che è precisamente ciò che fa morire i test.
+ */
+export function binarioScaricato() {
+  try {
+    createRequire(import.meta.url)('electron');
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
