@@ -18,11 +18,9 @@ const shellSessions = new Map(); // webContents.id → sessione shell persistent
 
 function senderInfo(event) {
   const wc = event.sender;
-  // BrowserWindow.fromWebContents() può ritornare null per le WebContentsView
-  // figlie: in quel caso iteriamo tutte le finestre per trovare il TabManager
-  // che possiede questa wc. Senza il fallback, sender.tab restava null e i
-  // bottoni back/forward/reload/closeTab del menu (che leggono sender.tab.id)
-  // non facevano nulla (feedback alpha).
+  // `fromWebContents` torna null per le WebContentsView figlie: senza il giro
+  // su tutte le finestre `tab` resta null e le voci del menu che leggono il suo
+  // id (indietro, ricarica, chiudi) non fanno niente.
   let win = BrowserWindow.fromWebContents(wc);
   let tab = null;
   if (win?._filoTabs) {
