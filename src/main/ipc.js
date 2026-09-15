@@ -193,7 +193,7 @@ function registerIpcHandlers() {
     try { return { ok: true, cwd: defaultCwd() }; } catch (_) { return { ok: false }; }
   });
 
-  // Testo grezzo verso lo stdin del comando interattivo in corso (casella stdin).
+  // Testo grezzo verso lo stdin del comando interattivo in corso.
   ipcMain.on('shell:input', (event, { text } = {}) => {
     const s = shellSessions.get(event.sender.id);
     if (s) s.write(String(text == null ? '' : text));
