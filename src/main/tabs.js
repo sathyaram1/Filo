@@ -885,10 +885,8 @@ class TabManager {
     return n;
   }
 
-  // ─── regole proxy persistenti per dominio (#152) ───────────────────────────
-
-  // Ricarica la cache in-memory delle regole dallo storage (memoria a lungo
-  // termine di Filo). Best-effort: in caso d'errore tiene la cache precedente.
+  // In caso d'errore si tiene la copia precedente: meglio regole vecchie che
+  // nessuna regola.
   async loadProxyRules() {
     try {
       const FM = globalThis.SN_FILO_MEMORY;
