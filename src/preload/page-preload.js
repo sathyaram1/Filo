@@ -112,10 +112,8 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
 
-// ─── chrome.* shim per i content script ────────────────────────────────────
-//
-// Gira nel preload context (mondo isolato), invisibile alla pagina. I content
-// script importati sotto useranno questo chrome via globalThis.
+// Shim chrome.* nel mondo isolato: invisibile alla pagina, che non deve poterlo
+// né vedere né chiamare.
 
 let streamCounter = 0;
 
