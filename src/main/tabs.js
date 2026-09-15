@@ -255,8 +255,7 @@ class TabManager {
     this._wireShellZoomKeys();
   }
 
-  // Aggiorna le impostazioni di sicurezza e le riapplica a tutti i tab esistenti.
-  // Chiamato dal main subito dopo che l'utente salva da Opzioni.
+  // Le impostazioni nuove valgono anche per le schede GIÀ aperte.
   setSecurity(security) {
     this.security = {
       protectIpLeak: security?.protectIpLeak !== false,
