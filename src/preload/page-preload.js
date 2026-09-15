@@ -303,13 +303,9 @@ const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
 function loadScripts() {
-  // Ordine identico a quello del manifest dell'estensione legacy.
-  // `PAGE_ONLY` marca i moduli che descrivono o modificano la SCHEDA nel suo
-  // insieme (banner del sito pericoloso, proposta geografica, banner cookie,
-  // colore della tab): dentro un riquadro incorporato parlerebbero del
-  // rettangolo sbagliato — un avviso "sito pericoloso" disegnato dentro un
-  // video, il colore della scheda preso da una pubblicità — quindi lì non si
-  // caricano affatto (#405).
+  // #405 — `PAGE_ONLY` marca i moduli che parlano della SCHEDA intera (banner,
+  // colore della tab): in un riquadro descriverebbero il rettangolo sbagliato
+  // — un avviso "sito pericoloso" dentro un video — e lì non si caricano.
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
   // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
