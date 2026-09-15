@@ -3,10 +3,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('filoShell', {
-  // Su quale sistema gira Filo: 'darwin' (Mac), 'win32' (Windows), 'linux'.
-  // Serve alla barra in alto per NON mentire — il suggerimento del pulsante
-  // "Nuova scheda" nomina un tasto, e su Mac quel tasto è un altro. È un dato
-  // pubblico del sistema, non un'informazione dell'utente.
+  // 'darwin' | 'win32' | 'linux': serve alla barra per nominare il tasto giusto
+  // nei suggerimenti (su Mac è Cmd, non Ctrl). Dato del sistema, non dell'utente.
   sistema: process.platform,
   tabs: {
     open: (url) => ipcRenderer.invoke('tabs:open', { url }),
