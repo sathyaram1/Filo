@@ -299,9 +299,8 @@ class TabManager {
   // stati divergono. Ritorna lo stato risultante.
   setContentFullscreen(on) {
     on = !!on;
-    // La modalità cambia per una strada qualunque (voce di menu, gesto di
-    // sistema, assistente): un'uscita rimasta in attesa di una risposta parla
-    // di un momento che non c'è più.
+    // La modalità è cambiata: un'uscita ancora in attesa parla di un momento
+    // che non c'è più.
     this.annullaUscitaSchermoIntero();
     this.azzeraRivendicazioniEsc();
     if (this.contentFullscreen === on) return on;
