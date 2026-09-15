@@ -1042,7 +1042,7 @@ class TabManager {
         } catch (_) { decisions = []; }
       }
 
-      // 3) Fondi: i duplicati deterministici vincono sempre su "keep".
+      // I duplicati vincono sempre su un "tieni" dell'LLM.
       const byIndex = new Map();
       for (const d of decisions) {
         if (d && typeof d.i === 'number') byIndex.set(d.i, d);
