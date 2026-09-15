@@ -689,8 +689,6 @@ class TabManager {
     return this._activationSeq;
   }
 
-  // Tab rimasta vista più di recente (= la penultima che l'utente stava
-  // guardando prima di quella corrente). Ignora le tab mai attivate.
   _mostRecentlyActiveTab() {
     let best = null;
     for (const t of this.tabs) {
