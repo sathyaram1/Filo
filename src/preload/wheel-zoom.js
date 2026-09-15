@@ -1,47 +1,11 @@
-// Modalità zoom con la rotella, attivata dal click centrale (rotella del mouse).
+// La porta UNICA dello zoom della pagina: modalità rotella (click centrale, al
+// posto dell'autoscroll nativo) e, con `opts.pageZoom`, Ctrl/Cmd + rotella,
+// pinch e tasti. Gira nel preload, uguale su pagine web e pagine filo://.
 //
-// PERCHÉ ESISTE
-//   Il click centrale di Chromium attiva l'autoscroll nativo: compare l'ancora
-//   e per scrollare devi spostare il mouse su/giù rispetto al punto cliccato.
-//   Un alpha tester l'ha trovato scomodo e ha chiesto di sostituirlo con una
-//   "modalità zoom": un click sulla rotella la attiva, mentre è attiva la
-//   rotella zooma/dezooma la pagina (invece di scrollare).
-//
-// COME SI CHIUDE (feedback alpha)
-//   Una volta attiva, QUALSIASI interazione la chiude: un altro click (sinistro,
-//   destro o centrale) e qualsiasi tasto della tastiera. L'unica eccezione è
-//   l'interazione col badge stesso, che ospita la percentuale di zoom editabile.
-//
-// IL BADGE
-//   In alto a destra un badge mostra "zoom 100%, rotella per zoomare". La
-//   percentuale è un campo editabile: l'utente può digitare un valore e premere
-//   Invio per impostare lo zoom esatto. Niente emoji, niente menzione di Esc.
-//   Uscendo NON si azzera lo zoom raggiunto: si torna solo a scrollare.
-//
-// Gira nel contesto del preload (ha accesso a `webFrame` di Electron), sia sulle
-// pagine web (page-preload) sia sulle pagine interne filo:// (internal-preload).
-//
-// ZOOM CON CTRL (opts.pageZoom)
-//   Oltre alla modalità rotella, se `opts.pageZoom` è attivo la pagina zooma
-//   anche tenendo Ctrl/Cmd: pizzicando il trackpad, con Ctrl+rotella e da
-//   tastiera con Ctrl + / Ctrl - / Ctrl 0. Pinch e Ctrl+rotella arrivano
-//   entrambi come `wheel` con ctrlKey=true. È attivo sia sulle pagine web
-//   esterne (page-preload) sia sulle pagine interne filo:// (internal-preload):
-//   lo zoom deve funzionare allo stesso modo ovunque.
-//
-//   OPT-OUT PER LE PAGINE CHE ZOOMANO DA SÉ
-//   Una pagina che implementa il proprio zoom (l'editor scala il foglio via CSS
-//   invece dell'intera finestra) si tira fuori marcando
-//   `document.documentElement.dataset.filoOwnZoom = '1'`. Il controllo avviene
-//   al momento dell'evento, quindi il marker può essere messo quando vuole:
-//   senza, lo zoom verrebbe applicato due volte.
-//
-//   QUANDO IL FOCUS È SULLA BARRA DI FILO
-//   Se l'utente ha appena cliccato una scheda, i tasti vanno alla barra e non
-//   alla pagina: nessun keydown arriva qui. Il main (tabs.js) intercetta lì
-//   Ctrl +/-/0 e li inoltra alla scheda attiva come `filo:zoom-key`, che
-//   rientra da questo stesso modulo — così la regola su chi zooma resta una
-//   sola. Serve `opts.ipcRenderer`.
+// Chi passa di qui rispetta l'opt-out `dataset.filoOwnZoom = '1'`, con cui una
+// pagina che scala da sé (l'editor) evita il doppio zoom. Per questo anche i
+// tasti presi dalla barra di Filo rientrano da qui invece di agire per conto
+// loro: la regola su chi zooma deve restare una sola.
 
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
