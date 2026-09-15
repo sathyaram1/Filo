@@ -59,6 +59,14 @@ costano dieci riletture, in un turno solo una. Quindi:
   uno alla volta).
 - **Si legge la parte, non il file.** Intervalli di righe, uscite filtrate
   (`tail`, `grep`), mai un file da centinaia di KB intero per una sezione.
+- **Attese.** La cache del contesto dura cinque minuti e ogni chiamata la
+  rinnova: una chiamata bloccante da dieci minuti la trova sempre scaduta, e il
+  turno dopo riscrive tutto il contesto (~250.000 token, circa 1,6 $ — sette
+  attese così lo riscrivono sette volte). Un comando che può superare i due
+  minuti si lancia in sottofondo (l'harness avvisa quando finisce); se serve
+  aspettarlo attivamente, a pezzi da quattro minuti al massimo per chiamata,
+  mai da dieci. Il timeout della chiamata si dimensiona sulla durata vera del
+  comando, mai sotto.
 - **Sessioni che finiscono.** Un compito nuovo in una sessione lunga paga tutto
   il passato a ogni turno: a un cambio di argomento si riparte.
 
