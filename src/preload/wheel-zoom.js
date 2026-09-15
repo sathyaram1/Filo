@@ -191,8 +191,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       setLevel(next);
     }, { capture: true, passive: false });
 
-    // Da tastiera: Ctrl + / Ctrl - / Ctrl 0. Accettiamo anche il tastierino
-    // numerico via `code` (lì `key` è già '+'/'-'/'0', ma non su tutti i layout).
+    // Si guarda anche `code`: sul tastierino numerico `key` non è affidabile
+    // su tutti i layout.
     document.addEventListener('keydown', (e) => {
       if (zoomMode) return; // in modalità rotella un tasto qualsiasi esce
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
