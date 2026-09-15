@@ -452,7 +452,6 @@ class TabManager {
   // ricevono, e un riquadro dentro un iframe parla per la sua pagina.
   escConsumato(tabId = null) {
     if (tabId != null && tabId !== this.activeId) return;
-    // Conta solo se c'era davvero un'uscita in attesa: è quella la rivendicazione.
     if (this._escUscitaTimer) this._escRivendicazioni = (this._escRivendicazioni || 0) + 1;
     this.annullaUscitaSchermoIntero();
   }
