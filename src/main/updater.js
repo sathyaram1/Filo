@@ -45,15 +45,9 @@ function initAutoUpdater() {
   });
 }
 
-// Scrive fra le notifiche che c'è una versione nuova e va presa a mano.
-//
-// Solo su Mac, e solo se una versione nuova ESISTE davvero: altrove
-// l'aggiornamento si installa da sé e un avviso sarebbe rumore; senza una
-// versione trovata l'errore è del controllo, non dell'installazione, e non
-// cambia niente per l'utente.
-//
-// Una notifica per versione: se l'app riparte dieci volte prima che l'utente
-// scarichi, la scheda resta una. Chi l'ha già scartata non se la ritrova.
+// Un aggiornamento che non si installa e tace lascia l'utente su una versione
+// vecchia per sempre: su Mac lo scriviamo fra le notifiche. Solo su Mac e solo
+// con una versione trovata (altrove è rumore), e una sola scheda per versione.
 async function avvisaSeAggiornamentoBloccato(versione) {
   if (process.platform !== 'darwin' || !versione) return;
   try {
