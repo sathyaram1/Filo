@@ -316,8 +316,7 @@
       if (!text) return;
       showTimer = setTimeout(() => {
         const r = t.getBoundingClientRect();
-        // Punto di ancoraggio: sotto il bottone, centrato. Il main rifinisce la
-        // posizione una volta misurato il testo (e potrà flipparlo se necessario).
+        // Ancora provvisoria: il main la rifinisce dopo aver misurato il testo.
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
