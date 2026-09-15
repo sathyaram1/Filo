@@ -388,8 +388,8 @@ function registerIpcHandlers() {
 }
 
 async function openInternalPage(name) {
-  // Vedi filoWin() in handlers.js: getAllWindows()[0] può essere una finestra
-  // figlia (tooltip/popup) senza _filoTabs. Cerca quella che possiede i tab.
+  // La prima finestra può essere una figlia (tooltip, menu) senza schede: si
+  // cerca quella che le possiede. Stessa cura di filoWin() in handlers.js.
   const wins = BrowserWindow.getAllWindows();
   const win = wins.find((w) => w._filoTabs) || wins[0];
   if (!win || !win._filoTabs) return;
