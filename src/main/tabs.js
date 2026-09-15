@@ -965,7 +965,7 @@ class TabManager {
     const hours = Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6;
     if (Date.now() - this._lastAppInteractionAt < hours * 3600 * 1000) return;
     await this.runAutoTriage({ trigger: 'idle' });
-    // Evita ritrigger immediato finché l'utente non torna a usare Filo.
+    // Senza questo il giro ripartirebbe subito, all'infinito.
     this._lastAppInteractionAt = Date.now();
   }
 
