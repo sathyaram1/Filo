@@ -759,8 +759,7 @@ class TabManager {
     return true;
   }
 
-  // Chiude TUTTE le tab e lascia una singola newtab fresca (come Chrome quando
-  // si chiude l'ultima scheda: la finestra resta, con una scheda vuota).
+  // Resta una scheda vuota: la finestra non si chiude da sé.
   closeAllTabs() {
     for (const tab of this.tabs) {
       this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
