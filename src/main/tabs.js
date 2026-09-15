@@ -720,9 +720,8 @@ class TabManager {
     const tab = tabArg || this._activeWebTab();
     if (!tab || !tab.view || !tab.view.webContents) return { ok: false, reason: 'no-web-tab' };
     try {
-      // insertCSS è ASINCRONO: ritorna una Promise che risolve nella "chiave"
-      // da passare a removeInsertedCSS per togliere lo stile. Va attesa, altrimenti
-      // memorizzeremmo la Promise come chiave e il ripristino non troverebbe lo stile.
+      // La Promise va ATTESA: senza, si memorizzerebbe la promessa al posto
+      // della chiave e il ripristino non troverebbe niente da togliere.
       const key = await tab.view.webContents.insertCSS(css);
       (tab._filoStyleKeys || (tab._filoStyleKeys = [])).push(key);
       return { ok: true, key, tabId: tab.id };
