@@ -614,9 +614,8 @@ class TabManager {
       partition,
       partitionSite: isInternal ? null : Cookies.registrableOf(url),
       proxy: null,
-      // #145 — tab nata da un ripristino di sessione: l'autoplay resta bloccato
-      // (vedi _makeView). Memorizzato sulla tab così sopravvive a _recreateView
-      // (es. se la tab viene proxata alla nascita per una regola di dominio).
+      // #145 — sta sulla scheda, non sulla vista, così sopravvive a una
+      // ricreazione (una scheda proxata alla nascita la subisce subito).
       suppressAutoplay: !!suppressAutoplay,
       // #441 — scheda nata da un link target=_blank / window.open (non aperta e
       // indirizzata dall'utente): è la prima condizione perché possa essere
