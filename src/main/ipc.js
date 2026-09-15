@@ -374,8 +374,7 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
-  // ─── apertura finestra incognito ─────────────────────────────────────────
-  // Lazy require di window.js per evitare un ciclo di import al boot.
+  // Require pigro: window.js richiede questo file, e al boot sarebbe un ciclo.
   ipcMain.handle('window:open-incognito', () => {
     try {
       const { createIncognitoWindow } = require('./window');
