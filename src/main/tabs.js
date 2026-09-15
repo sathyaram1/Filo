@@ -804,8 +804,7 @@ class TabManager {
             : null,
         }),
       ).then((entry) => {
-        // §3.1/§3.2 — arricchisci (riassunto + embedding + snippet) in background,
-        // così la tab è cercabile semanticamente e mostra una sintesi. Best-effort.
+        // §3.1/§3.2 — in sottofondo: la chiusura non deve aspettare un LLM.
         if (entry && entry.id) {
           try { globalThis.SN_TAB_ENRICH && globalThis.SN_TAB_ENRICH(entry.id, enrichPayload); } catch (_) {}
         }
