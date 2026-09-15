@@ -1,15 +1,6 @@
-// Protocollo filo:// — serve pagine interne e asset.
-//
-// URL schema:
-//   filo://shell/<file>          → src/renderer/<file>   (chrome del browser)
-//   filo://newtab/                → src/pages/dashboard/dashboard.html
-//   filo://<page>/<file?>         → src/pages/<page>/<file or page.html>
-//   filo://asset/<path>           → assets/<path>
-//   filo://style/<file>           → src/styles/<file>
-//   filo://shared/<file>          → src/shared/<file>
-//
-// Privilegi: il protocollo è registrato come "standard, secure, supportsFetchAPI"
-// così la fetch() funziona e le politiche CORS sono ragionevoli.
+// Protocollo filo://: serve pagine interne e asset dal disco (la tabella
+// host → cartella sta in filoHandler). Registrato standard+secure+fetch, quindi
+// non deve MAI servire un file fuori dalla root del progetto.
 
 const { protocol, net } = require('electron');
 const path = require('node:path');
