@@ -373,8 +373,7 @@ function ensureContentScripts() {
   try { start(); } catch (e) { console.error('[Filo CS] avvio nel riquadro', e); }
 }
 
-// Chiama `fn` quando i content script del riquadro hanno finito di installare i
-// propri listener (content.js marca `filoContentReady` a fine init).
+// `filoContentReady` è il marchio che content.js mette a fine init.
 function waitForContentScripts(fn) {
   const deadline = Date.now() + 3000;
   const tick = () => {
