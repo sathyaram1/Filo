@@ -883,8 +883,7 @@
     return { show, dismiss };
   })();
 
-  // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
-  // passa per il sistema di notifiche, così rispetta la durata configurata.
+  // Anche il vecchio toast passa di qui, o non rispetterebbe la durata scelta.
   function showToast(text) { return NOTIFS.show(text); }
 
   // ── Aprire uno scaricamento: se il file non c'è più, DILLO ──────────────
