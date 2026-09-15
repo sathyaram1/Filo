@@ -790,8 +790,6 @@
       }
       return host;
     }
-    // Rimuove immediatamente (senza animazione) le card più vecchie oltre il
-    // tetto, così lo stack non supera mai MAX_STACK elementi vivi.
     function enforceCap() {
       const h = hostEl();
       const live = Array.from(h.children).filter((c) => c.dataset.closing !== '1');
