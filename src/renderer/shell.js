@@ -100,22 +100,13 @@
     }
   }
 
-  // Registro app del launcher. Il Feedback vive qui fra le App.
-  //
-  // "Aperti per dopo" sta qui perché è la CONTROPARTE di "Salva per dopo": il
-  // salvataggio chiude la scheda, quindi senza un ingresso sempre visibile la
-  // lista di ciò che hai messo da parte resta irraggiungibile (l'icona dedicata
-  // del menu del tasto destro è stata ritirata e l'icona Home porta alla nuova
-  // scheda, non lì). È l'analogo di "Scaricamenti": una lista di cose messe da
-  // parte, non un'azione.
-  // "Feedback" (la posta delle segnalazioni) e "Gestione" sono superfici
-  // dell'owner: da quando i feedback li legge solo chi li gestisce (#583) a un
-  // utente comune aprirebbero una pagina che non ha niente da mostrare, con un
-  // invito ad accedere come amministratore che non porta da nessuna parte
-  // (amministratori non si diventa accedendo). Compaiono solo all'admin, come
-  // già fa "Modelli predefiniti" nel menu Impostazioni. Chi vuole MANDARE un
-  // feedback non passa di qui: passa dal menu del tasto destro, che il
-  // cambiamento non tocca.
+  // Registro delle app del launcher.
+  // "Aperti per dopo" ci sta perché "Salva per dopo" chiude la scheda: senza un
+  // ingresso sempre visibile la lista sarebbe irraggiungibile.
+  // #583 — "Feedback" e "Gestione" sono superfici dell'owner e compaiono solo
+  // all'admin: a un altro aprirebbero una pagina vuota, con un invito ad
+  // accedere che non porta da nessuna parte. MANDARE un feedback si fa dal menu
+  // del tasto destro, che questo non tocca.
   function buildApps() {
     const entries = [
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
