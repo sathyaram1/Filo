@@ -553,10 +553,9 @@ class TabManager {
   }
 
   openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false } = {}) {
-    // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
-    // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
-    // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
-    // ingresso convergono su un solo URL, qualunque chiamante li apra.
+    // #252 — un indirizzo solo per ogni pagina interna: la forma che produce lo
+    // shim torna a quella canonica del menu, o la deduplica non riconoscerebbe
+    // che sono la stessa pagina.
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
 
     // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
