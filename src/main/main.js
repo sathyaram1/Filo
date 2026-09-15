@@ -198,8 +198,6 @@ app.whenReady().then(async () => {
             },
           });
           captureWin.loadURL(url);
-          // Con un tetto: una pagina che non finisce mai di caricare (rete
-          // lenta, richiesta appesa) non deve bloccare la chiusura dell'app.
           await entro(
             new Promise((res) => captureWin.webContents.once('did-stop-loading', res)),
             15_000, `attesa caricamento ${label}`,
