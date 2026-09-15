@@ -1405,18 +1405,11 @@ class TabManager {
       Object.assign(tab, patch);
       this._broadcast();
     };
-    // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
-    // Esc deve riportare la shell. Intercettiamo il tasto prima che la pagina lo
-    // gestisca (vale anche per i siti esterni, senza dipendere dai content script).
-    // Fullscreen richiesto dalla pagina (pulsante "schermo intero" di un player
-    // video, requestFullscreen()): Electron emette enter/leave-html-full-screen.
-    // Senza questi handler la view restava confinata sotto la barra e il video
-    // non copriva davvero lo schermo. Riusiamo la stessa modalità del menu
-    // (view a tutta finestra + fullscreen OS), marcandola come page-initiated.
-    // Qui la richiesta è già passata: chi non doveva ottenerla si ferma prima,
-    // nel gestore dei permessi della sessione (#514, `installaPermessi`). Non
-    // si rifiuta da qui perché quando questo evento arriva la finestra è già a
-    // tutto schermo e la modalità è già stata adottata.
+    // Schermo pieno chiesto dalla pagina: senza questi gestori la vista
+    // resterebbe confinata sotto la barra e il video non coprirebbe niente. Si
+    // riusa la stessa modalità del menu, marcandola come "della pagina".
+    // Qui NON si rifiuta: quando l'evento arriva la finestra è già a tutto
+    // schermo. Chi non doveva ottenerlo si ferma prima, in `installaPermessi`.
     wc.on('enter-html-full-screen', () => {
       this.pageFullscreen = true;
       this.pageFullscreenTabId = tab.id;
