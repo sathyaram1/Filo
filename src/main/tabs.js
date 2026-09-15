@@ -1946,11 +1946,9 @@ class TabManager {
     } catch (_) {}
   }
 
-  // #170.3 — decide se bloccare una navigazione top-level verso un sito in
-  // blacklist e, in caso, mostra la notifica. Ritorna true se ha bloccato.
-  // Le aperture originate da Filo (openTab dell'azione NAVIGA, navigazione
-  // interna filo://) non passano da qui (loadURL programmatico non emette
-  // will-navigate), quindi sono naturalmente consentite.
+  // #170.3 — ritorna true se ha bloccato. Le aperture che nascono da Filo non
+  // passano di qui (un loadURL programmatico non emette will-navigate), quindi
+  // restano consentite da sé.
   _maybeBlockNavigation(tab, url, { fromUrl = '' } = {}) {
     let decision;
     try {
