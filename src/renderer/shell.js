@@ -696,8 +696,6 @@
     fwdBtn.disabled = !(a && a.canFwd);
     reloadBtn.disabled = !a;
 
-    // Chrome compatto: la barra indirizzi (icone + URL) si vede SOLO sulla home
-    // di Filo. Sui siti resta solo la fila di tab + i controlli finestra.
     applyChrome(isHomeUrl(a ? a.url : null));
   }
 
