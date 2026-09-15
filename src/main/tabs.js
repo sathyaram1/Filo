@@ -108,8 +108,8 @@ const WEB_NAV_SCHEMES = new Set(['http:', 'https:', 'filo:', 'about:', 'blob:'])
 function isWebUnsafeNav(rawUrl) {
   let proto = '';
   try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
-  // URL relativo/non parsabile → Electron lo risolve sull'origine corrente
-  // (stessa pagina web): non è un cambio di schema, non bloccare.
+  // URL relativo o illeggibile: Electron lo risolve sull'origine corrente, non
+  // è un cambio di schema.
   return proto ? !WEB_NAV_SCHEMES.has(proto) : false;
 }
 
