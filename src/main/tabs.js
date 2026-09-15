@@ -2082,10 +2082,8 @@ class TabManager {
       this._restoring = false;
     }
     this._persistSession();
-    // §2.1 decisione utente: a ogni riapertura Filo riordina/archivia le tab.
-    // Lo facciamo dopo un attimo, così le pagine hanno tempo di caricarsi e di
-    // fornire un estratto del contenuto all'LLM. No-op se la pref è disattivata
-    // o manca la chiave.
+    // §2.1 — dopo un attimo, così le pagine fanno in tempo a caricarsi e a dare
+    // all'LLM un estratto del contenuto.
     this._maybeTriageOnReopen();
     return true;
   }
