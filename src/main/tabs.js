@@ -1541,12 +1541,10 @@ class TabManager {
       const now = Date.now();
       if (tab._crashRecoveryAt && now - tab._crashRecoveryAt < 2000) return;
       tab._crashRecoveryAt = now;
-      // RICREA la view invece di riusare il webContents crashato: un loadURL
-      // sul processo appena morto fa crashare anche il renderer respawnato
-      // quando c'è un preload (verificato con forcefullyCrashRenderer: loop di
-      // 'render-process-gone' finché non si passa a una view nuova). La view
-      // nuova è configurata per l'URL BERSAGLIO (preload/partition giusti per
-      // il "Riprova") ma parte dalla pagina d'errore.
+      // Si RICREA la vista: un loadURL sul processo appena morto fa crashare
+      // anche il renderer nuovo quando c'è un preload, e si entra in un giro di
+      // 'render-process-gone' senza fine. La vista nuova è configurata per
+      // l'URL BERSAGLIO, così il "Riprova" ha già tutto giusto.
       setTimeout(() => {
         try {
           if (!this.tabs.some((t) => t.id === tab.id)) return; // scheda chiusa nel frattempo
