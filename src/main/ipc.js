@@ -49,8 +49,7 @@ function senderInfo(event) {
 }
 
 function registerIpcHandlers() {
-  // Alla chiusura di Filo non lasciamo shell orfane: nessuna persistenza dopo
-  // l'uscita (alla riapertura si parte da una shell pulita).
+  // Niente shell orfane dopo l'uscita: alla riapertura si riparte puliti.
   app.on('before-quit', () => {
     for (const s of shellSessions.values()) { try { s.kill(); } catch (_) {} }
     shellSessions.clear();
