@@ -81,13 +81,17 @@ test('#569 giro 2: gli unit test passano anche quando il binario dell\'app non √
       const nome = relative(UNIT, percorso).replace(/[\\/]/g, '__');
       writeFileSync(join(cartellaUnit, nome), ponte(percorso), 'utf8');
     }
+    const finta = join(base, 'finta-assenza.cjs');
+    writeFileSync(finta, FINTA_ASSENZA, 'utf8');
 
     // L'ambiente di questo processo porta i segni di `node --test` (per esempio
     // NODE_TEST_CONTEXT): passati al lanciatore lo farebbero uscire subito e
     // VERDE, cio√® una prova che non prova niente. Si tolgono.
     const ambiente = { ...process.env };
     delete ambiente.NODE_TEST_CONTEXT;
-    delete ambiente.NODE_OPTIONS;
+    // Le virgolette servono: la cartella temporanea ha uno spazio nel nome.
+    ambiente.NODE_OPTIONS = `--require "${finta}"`;
+    delete ambiente.ELECTRON_OVERRIDE_DIST_PATH;
 
     const esito = spawnSync(
       process.execPath,
