@@ -597,8 +597,6 @@
       if (t.id !== state.activeId && t.identityColor && tabOpacity > 0) {
         const tint = attenuateIdentity(t.identityColor);
         if (tint) {
-          // `opacita_tab` controlla la frazione di tinta nel mix col fondo del
-          // tab bar: 0.6 (default) ≈ tinta percepibile ma sobria, 1 = piena.
           const pct = Math.round(tabOpacity * 100);
           el.style.setProperty(
             '--tab-bg-eff',
