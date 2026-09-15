@@ -1,5 +1,6 @@
-// Shell renderer: tab bar + barra indirizzi.
-// Sottoscrive a `filoShell.tabs.onUpdate` per il rerender.
+// La barra in alto di Filo: fila delle schede, icone, notifiche, pannello degli
+// scaricamenti. Vive fuori dalle WebContentsView, quindi è l'unica superficie
+// che resta visibile sopra qualunque pagina.
 
 (() => {
   const api = window.filoShell;
