@@ -240,10 +240,8 @@ class TabManager {
     // I default qui ricalcano DEFAULT_SETTINGS.security: se setSecurity non
     // viene mai chiamata la protezione dev'essere comunque accesa.
     this.security = { protectIpLeak: true, blockPopups: true };
-    // Modalità cookie corrente ('manual' | 'default' | 'privacy') + siti fidati.
-    // Ripopolata da setSecurity quando l'utente salva. In 'privacy' ogni sito
-    // naviga in una partizione effimera dedicata; i siti fidati ricevono invece
-    // una partizione isolata ma PERSISTENTE (restano connessi).
+    // In 'privacy' ogni sito ha una partizione effimera; i siti fidati ne hanno
+    // una isolata ma PERSISTENTE, così si resta connessi.
     this.cookieMode = Cookies.MODES.DEFAULT;
     this.trustedSites = [];
     // #151 — nota consumo dati per tab proxate che riproducono video a lungo
