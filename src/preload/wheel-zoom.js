@@ -143,7 +143,6 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     }
   }, true);
 
-  // La rotella, in modalità zoom, zooma invece di scrollare.
   document.addEventListener('wheel', (e) => {
     if (!zoomMode) return;
     e.preventDefault();
