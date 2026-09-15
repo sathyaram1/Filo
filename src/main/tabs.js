@@ -1750,9 +1750,8 @@ class TabManager {
       try { callback(false); } catch (_) {}
     });
 
-    // Spellcheck nativo: Electron è l'unico a conoscere i suggerimenti
-    // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
-    // content script perché li mostri nel menu di correzione custom.
+    // I suggerimenti della parola sotto lo zigzag li conosce solo Electron:
+    // vanno spinti al content script, che disegna il menu di correzione.
     wc.on('context-menu', (_e, params) => {
       if (params.misspelledWord) {
         // #405 — il click destro può essere avvenuto dentro un riquadro
