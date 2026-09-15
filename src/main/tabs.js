@@ -530,7 +530,6 @@ class TabManager {
       // true, quindi la pagina (e le terze parti nell'iframe) non guadagnano
       // nulla: Node e lo shim restano nel mondo isolato del preload.
       ...(isInternal ? {} : { nodeIntegrationInSubFrames: true }),
-      // partition: incognito (effimera della finestra) o per-sito in privacy.
       ...(partition ? { partition } : {}),
     };
     // #145 — le tab RIPRISTINATE alla riapertura di Filo non devono far ripartire
