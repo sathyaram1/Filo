@@ -868,7 +868,6 @@
       card.classList.add('show');
       syncOverflow();
 
-      // Suono opzionale alla comparsa.
       const wantSound = opts.sound !== undefined
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
