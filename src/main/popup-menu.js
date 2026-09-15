@@ -48,7 +48,6 @@ const ICON_PATHS = {
     '<path d="M16.5 8.5a5 5 0 0 1 0 7"/>' +
     '<path d="M19 6a8 8 0 0 1 0 12"/>',
 
-  // Altoparlante barrato (audio mutato) — voce "Riattiva audio".
   mute:
     '<path d="M4 9v6h4l5 4V5L8 9z"/>' +
     '<path d="M17 9l4 6"/><path d="M21 9l-4 6"/>',
