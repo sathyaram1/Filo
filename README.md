@@ -130,9 +130,12 @@ npm test               # suite Playwright completa (~390 spec, ~1.600 casi): non
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 
-In locale NON lanciare la suite completa: sulla macchina di chi sviluppa Filo
-dura quasi sette ore con un solo worker. Si lancia `npm run finish:check`, più
-lo spec mirato della feature toccata (`npx playwright test
+La suite completa non la lancia più nessuno a mano (decisione owner
+2026-09-15): gira in GitHub, nel lavoro di release, ogni sei ore prima di
+pubblicare — se è verde la patch esce, se ha un rosso nuovo la patch salta un
+giro e il rosso diventa un feedback. Sulla macchina di chi sviluppa Filo
+durerebbe quasi sette ore con un solo worker. Si lancia `npm run finish:check`,
+più lo spec mirato della feature toccata (`npx playwright test
 tests/<feature>.spec.mjs`). Vedi CLAUDE.md § Verifica.
 
 ## Sviluppo
