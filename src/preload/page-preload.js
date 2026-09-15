@@ -354,9 +354,8 @@ function loadScripts() {
 function start() {
   injectStyles();
   loadScripts();
-  // Marker DOM-visibile per i test: i moduli SN_* girano nel mondo isolato
-  // del preload, ma il DOM è condiviso. Annoto sul documentElement quali
-  // moduli si sono caricati con successo così smoke/Playwright può verificare.
+  // I moduli girano nel mondo isolato: il DOM è l'unico posto da cui i test
+  // possono vedere che si sono caricati.
   try {
     const loaded = ['SN_CONST', 'SN_MSG', 'SN_I18N', 'SN_ICONS', 'SN_EXTRACT',
       'SN_POPUP', 'SN_MENU', 'SN_HIGHLIGHT', 'SN_SIDEBAR', 'SN_SPELLCHECK',
