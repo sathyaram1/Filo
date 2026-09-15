@@ -1,12 +1,6 @@
-// IPC routing: traduce le chiamate dal renderer (shell, pagine interne,
-// content script via preload) al handler centrale dei servizi.
-//
-// Canali esposti:
-//   filo:message     — invoke(msg) → response. Equivalente a chrome.runtime.sendMessage.
-//   ai-stream:start  — invoke({ requestId, action, payload }). Il main streamma
-//                      via ai-stream:<requestId>:delta / :done / :error fino al renderer.
-//   ai-stream:abort  — send({ requestId })
-//   tabs:*           — controllo del TabManager dalla shell renderer.
+// Instradamento IPC: da shell, pagine interne e content script agli handler dei
+// servizi. Qui non c'è logica di dominio, solo smistamento e confini (chi può
+// chiedere cosa, in quale finestra, con quale storage).
 
 const { ipcMain, BrowserWindow, app } = require('electron');
 const path = require('node:path');
