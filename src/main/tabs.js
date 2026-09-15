@@ -1885,21 +1885,14 @@ class TabManager {
     this.openTab(url, { activate: true });
   }
 
-  // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova
-  // scheda che, servita con Content-Disposition:attachment, diventa subito uno
-  // scaricamento: nessuna pagina si committa mai e la scheda resta a about:blank
-  // — bianca, titolo "Nuova scheda", attiva — che l'utente deve chiudere a mano.
-  // #441 — stesso attrito, un passo più in là: certi siti aprono una pagina
-  // intermedia ("Grazie, il download partirà a breve…") che avvia il file da
-  // sola. Ha contenuto vero, quindi la regola del #412 non la tocca, ma resta
-  // una scheda usa e getta. La chiudiamo solo con la firma stretta descritta in
-  // src/shared/downloadTabs.js (nata da un link, mai navigata dentro, mai
-  // toccata dall'utente, download partito entro pochi secondi dal caricamento)
-  // e, siccome lì qualcosa da perdere c'era, con un avviso "Riapri".
-  // Il gestore download (services/downloads.js) ci passa la webContents che ha
-  // originato lo scaricamento. La scheda superflua NON viene archiviata (non è
-  // un sito che l'utente ha visitato per il suo contenuto): non passa da
-  // closeTab.
+  // #412 — un link "Scarica" con target=_blank apre una scheda che diventa
+  // subito scaricamento: nessuna pagina si committa e resta un about:blank
+  // bianco da chiudere a mano.
+  // #441 — un passo più in là: certi siti aprono una pagina intermedia che
+  // avvia il file da sola. Ha contenuto vero, quindi si chiude solo con la
+  // firma stretta di src/shared/downloadTabs.js, e con un avviso "Riapri" —
+  // lì qualcosa da perdere c'era.
+  // Queste schede NON si archiviano: non sono siti visitati per il contenuto.
   handleDownloadStarted(wc) {
     if (!wc) return;
     const tab = this.tabs.find((t) => {
