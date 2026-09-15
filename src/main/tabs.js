@@ -1567,9 +1567,6 @@ class TabManager {
       // cssOrigin 'user' più !important è l'unica combinazione che batte le
       // regole d'autore della pagina.
       try { wc.insertCSS(PAGE_SELECTION_CSS, { cssOrigin: 'user' }); } catch (_) {}
-      // CSS dei content script (menu, popup, sidebar...) come stylesheet
-      // d'autore: equivale al <link filo://style/...> ma ignora la CSP della
-      // pagina, che altrimenti lo bloccherebbe (YouTube, Reddit, ...).
       try { wc.insertCSS(getContentScriptCss()); } catch (_) {}
       // GPC (Global Privacy Control): proprietà JS nel mondo della pagina, gemella
       // dell'header Sec-GPC. executeJavaScript gira nel main world e ignora la CSP
