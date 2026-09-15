@@ -147,8 +147,8 @@ function createIncognitoWindow() {
     revealWindow(win);
   });
 
-  // Alla chiusura dell'ULTIMA finestra incognito, azzera l'overlay in RAM: nulla
-  // di ciò che è stato scritto durante la sessione sopravvive.
+  // Solo alla chiusura dell'ULTIMA incognito: le altre stanno ancora leggendo
+  // lo stesso overlay in RAM.
   win.on('closed', () => {
     const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);
     if (!stillOpen) {
