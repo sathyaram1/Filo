@@ -1832,16 +1832,10 @@ class TabManager {
     };
   }
 
-  // #209 — applica al popup di login le STESSE difese di una scheda normale.
-  // La finestra nasce fuori da _wireEvents, quindi va cablata qui:
-  //   - policy WebRTC anti IP-leak (come _applySecurity sulle tab);
-  //   - blocco navigazioni verso schemi non-web (file:// → leak hash NTLM via
-  //     SMB su Windows, data:/javascript: → phishing), come il will-navigate
-  //     delle tab; mailto:/tel:/sms: consegnati all'OS;
-  //   - gate sulle aperture di ULTERIORI finestre dal popup: un secondo popup
-  //     di login concatenato (es. scelta account → verifica) resta una vera
-  //     finestra (ricorsivamente hardened), tutto il resto torna dentro Filo
-  //     come scheda normale — mai finestre libere non gestite.
+  // #209 — le STESSE difese di una scheda: anti IP-leak WebRTC, blocco degli
+  // schemi non-web, e controllo sulle finestre che il popup a sua volta apre.
+  // Un secondo popup di login concatenato resta una vera finestra, difesa allo
+  // stesso modo; tutto il resto rientra come scheda. Mai finestre libere.
   _hardenAuthPopup(win) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
