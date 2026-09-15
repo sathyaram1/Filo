@@ -219,9 +219,8 @@ class TabManager {
     // Spazio riservato in alto perché un pannello della shell resti visibile:
     // si ABBASSA la vista invece di nasconderla, o resta un'area bianca.
     this.topInset = 0;
-    // Modalità "contenuto a tutto schermo": la WebContentsView attiva copre
-    // l'intera finestra, nascondendo la barra (tab + indirizzo) della shell.
-    // Attivata dal menu (voce "Schermo intero"); si esce con Esc.
+    // Contenuto a tutto schermo: la vista attiva copre la finestra e la barra
+    // resta sotto. Si esce con Esc.
     this.contentFullscreen = false;
     // true quando il fullscreen è stato richiesto DALLA pagina (HTML5
     // requestFullscreen: pulsante "schermo intero" di YouTube/player video).
