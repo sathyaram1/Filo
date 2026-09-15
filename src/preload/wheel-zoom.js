@@ -21,7 +21,6 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   let percentInput = null;
   let suppressContextMenu = false;
 
-  // Percentuale di zoom corrente (100 = nessuno zoom).
   function currentPercent() {
     try { return Math.round(webFrame.getZoomFactor() * 100); }
     catch (_) { return 100; }
