@@ -27,8 +27,7 @@ function schedaAttiva() {
   return tab ? { win, tabs, tab } : null;
 }
 
-// La webContents che ha davvero il cursore: può essere la shell (la fila delle
-// schede) o la pagina dentro la scheda attiva.
+// Può essere la shell (la fila delle schede) o la pagina dentro la scheda.
 function contenutoAFuoco() {
   try {
     const { webContents } = require('electron');
