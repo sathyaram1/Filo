@@ -52,12 +52,9 @@ function dispatch(command, window) {
     return;
   }
   const wc = active.view.webContents;
-  // #405 — Spiegazione e Traduci lavorano sul testo SELEZIONATO, che può stare
-  // dentro un riquadro incorporato (un video, una mappa, un blocco commenti).
-  // `webContents.send` parla solo col frame principale: lì la selezione non
-  // esiste e la scorciatoia sembrava rotta. Consegniamo al frame con cui
-  // l'utente ha interagito per ultimo. Le altre scorciatoie riguardano la
-  // scheda intera (la sidebar Aiuto) e restano al frame principale.
+  // #405 — la selezione può stare in un riquadro incorporato, e
+  // `webContents.send` parla solo col frame principale: i comandi che lavorano
+  // sul testo selezionato vanno all'ultimo frame toccato dall'utente.
   const SELECTION_COMMANDS = new Set(['explain-selection', 'translate-selection']);
   let target = wc;
   if (SELECTION_COMMANDS.has(command)) {
