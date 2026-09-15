@@ -1137,11 +1137,9 @@ class TabManager {
     this._broadcast();
   }
 
-  // Colore IDENTITÀ del sito (§1.2): theme-color/manifest/favicon calcolato dal
-  // content script. Lo cachiamo per dominio (calcolo una volta sola, come da
-  // spec) e lo mettiamo sullo snapshot; la shell lo applica ATTENUATO alle tab
-  // inattive. A differenza del colore live (§1.1) non cambia con lo scroll né si
-  // azzera a ogni navigazione: persiste finché la tab resta sullo stesso dominio.
+  // §1.2 — a differenza del colore campionato (§1.1) NON cambia con lo scroll
+  // né si azzera a ogni navigazione: vale finché la scheda resta sul dominio,
+  // e si calcola una volta sola per dominio.
   setTabIdentityColor(id, color) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
