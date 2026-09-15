@@ -761,9 +761,8 @@
     try { api.tabs.setChromeCompact?.(compact); } catch (_) {}
   }
 
-  // §6 — la rotellina verticale del mouse scrolla la striscia delle tab in
-  // orizzontale (la tab bar non ha scroll verticale). Solo quando c'è davvero
-  // overflow, così non intercettiamo gesti inutili.
+  // §6 — la rotella verticale scorre la striscia in orizzontale, ma solo se
+  // c'è davvero overflow: altrimenti si ruberebbe un gesto per niente.
   tabsEl.addEventListener('wheel', (e) => {
     if (tabsEl.scrollWidth <= tabsEl.clientWidth) return;
     const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
