@@ -1338,9 +1338,8 @@
       }
     }
     api.onFeedbackDim(setDim);
-    // Rete di sicurezza: se l'utente cambia tab mentre il box è aperto, il
-    // content script di quella pagina non riceve più eventi e non potrà
-    // togliere la penombra → la togliamo qui appena la tab attiva cambia.
+    // Cambiando scheda a box aperto, il content script di quella pagina non
+    // riceve più eventi e la penombra resterebbe: la togliamo noi.
     api.tabs.onUpdate((snap) => {
       if (document.documentElement.dataset.feedbackDim && snap && snap.activeId !== dimTabId) {
         setDim(false);
