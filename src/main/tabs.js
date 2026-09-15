@@ -247,10 +247,9 @@ class TabManager {
     // #151 — l'avviso sul consumo dati si dà una volta per sessione, non a ogni
     // video: ripeterlo sarebbe rumore.
     this._proxyVideoNoted = false;
-    // #152 — regole proxy persistenti per dominio ("questo sito sempre da X").
-    // Cache in-memory per la decisione SINCRONA "born proxied" in navigazione
-    // (will-navigate/navigate/openTab non possono attendere lo storage async).
-    // Sorgente di verità: SN_FILO_MEMORY.listProxyRules (storage.json).
+    // #152 — copia in memoria delle regole "questo sito sempre da X": in
+    // navigazione la decisione è SINCRONA e non può attendere lo storage. La
+    // verità sta in SN_FILO_MEMORY.listProxyRules.
     this._proxyRules = {};
     this.loadProxyRules().catch(() => {});
     // Ctrl +/-/0 premuti mentre il focus è sulla barra (vedi _wireShellZoomKeys).
