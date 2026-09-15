@@ -9,9 +9,8 @@
     return;
   }
 
-  // Come si chiamano i tasti sul sistema di chi guarda: su Mac la scheda nuova
-  // si apre con Cmd+T, e il suggerimento deve dire quello. L'HTML è uno solo
-  // per tutti i sistemi, quindi la scritta si compone qui.
+  // L'HTML è uno solo per tutti i sistemi: il nome del tasto si compone qui,
+  // o su Mac il suggerimento direbbe Ctrl dove si preme Cmd.
   const TASTI = window.SN_TASTI;
   const tasto = (accel) => (TASTI ? TASTI.etichetta(accel) : accel);
 
