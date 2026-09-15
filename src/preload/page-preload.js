@@ -97,17 +97,10 @@ if (!IS_SUBFRAME) {
   try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
 }
 
-// ─── Protezione anti-fingerprinting ────────────────────────────────────────
-//
-// Inietta nel MAIN WORLD (prima degli script di pagina) gli override di
-// canvas/WebGL/audio che aggiungono rumore deterministico per-sito ai segnali
-// ad alta entropia. Il seed arriva SINCRONO dal main (HMAC col master secret),
-// così il secret non tocca mai il mondo non fidato della pagina. Solo http(s);
-// se la protezione è spenta (livello 0) non iniettiamo nulla.
-// Solo nel frame principale: la protezione si applica alla pagina che l'utente
-// ha aperto. Estenderla a ogni riquadro incorporato cambierebbe i segnali di
-// widget di terze parti (mappe, player) che oggi non tocchiamo — è una scelta
-// a sé, non un effetto collaterale del tasto destro nei riquadri (#405).
+// Anti-fingerprint nel MAIN WORLD, prima degli script di pagina. Il seed arriva
+// SINCRONO dal main: il master secret non tocca mai il mondo non fidato. Solo
+// http(s) e solo nel frame principale — coprire anche i riquadri cambierebbe i
+// segnali dei widget di terzi, ed è una scelta a sé, non una conseguenza (#405).
 if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
