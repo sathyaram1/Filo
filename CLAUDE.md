@@ -396,6 +396,11 @@ caso preciso, il motivo e il feedback che li toglierà: quelli del contenitore
 senza schermo delle routine e quelli della macchina dell'owner, in due elenchi
 separati. Un rosso che non è lì dentro è una regressione.
 
+**Nel contenitore delle routine** (Linux, senza schermo, da root) gli spec che
+aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`
+(lo dice già `scripts/ensure-electron.mjs`). Senza, Electron non parte proprio:
+quel rosso non è un rosso del codice, e ogni giro lo riscopriva da capo.
+
 Modelli per gli strumenti di test (`test:explore`): open via OpenRouter, chiave
 in `tests/agent/.env` — MAI chiavi del produttore dei pesi (politica modelli).
 
