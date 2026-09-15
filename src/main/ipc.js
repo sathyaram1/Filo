@@ -332,8 +332,7 @@ function registerIpcHandlers() {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
     showPopupMenu(win, entries, x, y, (value) => {
-      // Le voci con `action` custom tornano al renderer chiamante; quelle con
-      // `url` (default) aprono un nuovo tab.
+      // `@action:` torna al renderer che l'ha chiesto, tutto il resto è un url.
       if (typeof value === 'string' && value.startsWith('@action:')) {
         try { event.sender.send('shell:menu-action', value.slice('@action:'.length)); } catch (_) {}
       } else if (value) {
