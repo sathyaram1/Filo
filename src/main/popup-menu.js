@@ -151,9 +151,8 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   const WIN_W = WIDTH + MARGIN * 2;
   const WIN_H = contentH + MARGIN * 2;
 
-  // Posizione in coordinate schermo. Il menu visibile (dentro il gutter) deve
-  // restare ancorato vicino al pulsante: il suo bordo sinistro a `x`, il bordo
-  // superiore ~6px sotto `y`.
+  // Coordinate schermo, e il gutter va scontato: il menu VISIBILE deve restare
+  // ancorato al pulsante (bordo sinistro su `x`, alto ~6px sotto `y`).
   const cb = parentWin.getContentBounds();
   let popX = cb.x + x - MARGIN;
   let popY = cb.y + y + 6 - MARGIN;
