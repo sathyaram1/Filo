@@ -263,10 +263,8 @@ try {
 // Adattatore: l'evento IPC grezzo diventa il messaggio del catalogo che i
 // content script ascoltano.
 ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
-  // Il payload deve usare il type MSG.SHORTCUT_TRIGGERED del catalogo messaggi.
-  // Lo prendiamo dai constants caricati sopra (SN_MSG popolato da messages.js).
-  // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
-  // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
+  // `context` è opzionale: la voce "Aiuto" ci mette url e titolo della scheda,
+  // così l'agente sa da dove è stato chiamato.
   const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
   const deliver = () => {
     for (const fn of broadcastListeners) {
