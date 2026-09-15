@@ -2029,8 +2029,7 @@ class TabManager {
     return globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
   }
 
-  // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon),
-  // collassiamo le scritture ravvicinate.
+  // _broadcast scatta a ogni titolo e favicon: le scritture vicine si fondono.
   _persistSession() {
     if (this.incognito) return; // incognito: nessuna sessione salvata su disco
     if (this._restoring) return; // non sovrascrivere mentre stiamo ripristinando
