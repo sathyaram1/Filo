@@ -501,10 +501,8 @@
         : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
       { label: 'Aiuto', icon: 'help', action: 'tab-help' },
     ];
-    // "Apri da un altro paese" (proxy per-tab): solo se un endpoint è
-    // configurato — una voce che non può funzionare non deve comparire.
-    // Il click diretto usa il default (ultima location usata, altrimenti USA);
-    // la freccia apre la lista paesi. Su tab già proxata: "Torna in Italia".
+    // Solo con un endpoint configurato: una voce che non può funzionare non
+    // deve comparire. Clic = ultima location usata, freccia = lista paesi.
     try { ctxProxyStatus = await api.tabs.proxyStatus(); } catch (_) { ctxProxyStatus = null; }
     if (ctxProxyStatus && ctxProxyStatus.configured) {
       if (t.proxy) {
