@@ -1256,10 +1256,8 @@ class TabManager {
     } else {
       tab.view.webContents.loadURL(target);
     }
-    // #152 — born proxied: se il dominio di destinazione ha una regola
-    // persistente e la scheda non è già instradata su quel paese, instradala.
-    // Dopo il caricamento normale (mai prima): se il provider non è configurato
-    // resta la connessione diretta appena caricata, senza appendere la scheda.
+    // #152 — DOPO il caricamento normale, mai prima: senza fornitore resta la
+    // connessione diretta già caricata, invece di una scheda appesa.
     this._maybeApplyDomainRule(tab, target);
   }
 
