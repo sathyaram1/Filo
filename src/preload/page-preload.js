@@ -42,20 +42,11 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
   } catch (_) { /* il blocco non deve MAI impedire il caricamento della pagina */ }
 }
 
-// ─── Bridge contextmenu installato a document_start ─────────────────────────
-//
-// Alcuni siti (YouTube, Reddit, …) registrano il PROPRIO listener `contextmenu`
-// in fase di CATTURA su window al primo script di pagina e lo bloccano con
-// stopImmediatePropagation() per mostrare il loro menu. Se il nostro content
-// script si registrasse solo a DOMContentLoaded arriverebbe DOPO il loro
-// listener window+capture: a parità di target/fase vince chi si registra prima,
-// quindi il loro stopImmediatePropagation impediva al nostro handler di partire
-// e il menu Filo non compariva (feedback alpha: «tasto destro non funziona su
-// YouTube»). Il preload gira PRIMA di qualunque script di pagina: registrando
-// qui — subito, a document_start — il listener window+capture, siamo sempre i
-// primi a ricevere l'evento, su ogni sito. Il vero handler (in content.js, che
-// ha bisogno di settings/spellcheck/Menu) si installa più tardi via
-// __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
+// Il listener `contextmenu` va registrato QUI, prima di ogni script di pagina:
+// certi siti (YouTube, Reddit) registrano il proprio su window+capture e lo
+// fermano con stopImmediatePropagation, e a parità di fase vince chi arriva
+// prima — registrandoci al DOMContentLoaded il menu di Filo non compariva.
+// L'handler vero si aggancia dopo via __snSetContextMenuHandler.
 let contextMenuHandler = null;
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
