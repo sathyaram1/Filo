@@ -28,9 +28,8 @@
   const winMaxBtn = document.getElementById('win-max');
   const winCloseBtn = document.getElementById('win-close');
 
-  // Popola i bottoni del chrome con le SVG della libreria condivisa
-  // (`src/shared/icons.js`) così la barra in alto ha la stessa famiglia
-  // visiva del menu tasto destro.
+  // Icone da src/shared/icons.js: la barra deve stare nella stessa famiglia
+  // visiva del menu del tasto destro.
   const ICONS = window.SN_ICONS || {};
   function setIcon(el, name, size) {
     if (!el || typeof ICONS[name] !== 'function') return;
