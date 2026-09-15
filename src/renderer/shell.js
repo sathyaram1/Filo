@@ -800,9 +800,8 @@
         try { c.remove(); } catch (_) {}
       }
     }
-    // Se anche col tetto lo stack eccede l'altezza della finestra (finestra
-    // molto bassa), il contenitore diventa scrollabile: attiviamo i pointer
-    // events per poter afferrare la scrollbar e teniamo in vista la più recente.
+    // Finestra molto bassa: anche col tetto lo stack sfora, quindi il
+    // contenitore diventa scorrevole e si tiene in vista la più recente.
     function syncOverflow() {
       const h = hostEl();
       const scrollable = h.scrollHeight > h.clientHeight + 1;
