@@ -163,12 +163,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     exit();
   }, true);
 
-  // ── Zoom della pagina con Ctrl/Cmd (solo se opts.pageZoom) ──────────────
-  // Indipendente dalla modalità rotella: basta tenere Ctrl (o pizzicare il
-  // trackpad). Usa il livello di zoom del webFrame, così scala l'intera pagina
-  // (testo + immagini) come il classico zoom del browser.
   if (pageZoom) {
-    // La pagina zooma da sé (vedi commento in testa): non ci mettiamo in mezzo.
     function pageHandlesZoom() {
       try { return document.documentElement.dataset.filoOwnZoom === '1'; }
       catch (_) { return false; }
