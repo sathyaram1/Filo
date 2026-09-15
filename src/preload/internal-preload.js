@@ -100,12 +100,9 @@ const filoApi = {
   siteResolves: (opts) => ipcRenderer.invoke('net:resolves', opts),
 };
 
-// Espone window.filo SOLO su origine filo:// (vedi IS_FILO_ORIGIN sopra).
 if (IS_FILO_ORIGIN) window.filo = filoApi;
 
-// Shim chrome.* compatibile con il codice estensione: i file portati lo usano
-// senza sapere che siamo in Electron. Overscriviamo l'oggetto chrome stub
-// che Chromium predefinisce nel renderer.
+// Shim chrome.*: i moduli portati lo usano senza sapere che siamo in Electron.
 const chromeShim = {
   runtime: {
     id: 'filo-desktop',
