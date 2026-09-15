@@ -1053,7 +1053,6 @@
       const list = panel.querySelector('#dl-panel-list');
       list.textContent = '';
       const all = Array.from(dls.values()).sort((a, b) => {
-        // Attivi in cima, poi per data d'inizio decrescente.
         const aa = isActive(a) ? 0 : 1; const bb = isActive(b) ? 0 : 1;
         if (aa !== bb) return aa - bb;
         return String(b.startedAt || '').localeCompare(String(a.startedAt || ''));
