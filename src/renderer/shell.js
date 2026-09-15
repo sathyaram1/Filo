@@ -592,11 +592,8 @@
         }
       }
 
-      // Tab INATTIVE: tinta identità attenuata del sito (§1.2). Smorziamo la
-      // saturazione e poi mescoliamo col neutro del tab bar via CSS, così la
-      // tinta è appena percepibile ma riconoscibile a livello subliminale.
-      // Usiamo la variabile --tab-bg-eff (non `background` diretto) per non
-      // rompere il feedback di hover, che è definito in CSS sulla stessa var.
+      // §1.2 — si scrive --tab-bg-eff, non `background`: l'hover è definito in
+      // CSS sulla stessa variabile e uno sfondo diretto lo spegnerebbe.
       if (t.id !== state.activeId && t.identityColor && tabOpacity > 0) {
         const tint = attenuateIdentity(t.identityColor);
         if (tint) {
