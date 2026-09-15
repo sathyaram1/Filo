@@ -1458,8 +1458,7 @@ class TabManager {
         const k = String(input.key || '').toLowerCase();
         if (k === 't') { event.preventDefault(); this.openTab('filo://newtab/'); return; }
         if (k === 'w') { event.preventDefault(); this.closeTab(tab.id); return; }
-        // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
-        // Ctrl+L apre la home di Filo, esattamente come nella shell.
+        // L'indirizzo si scrive dalla home, quindi Ctrl+L apre la home.
         if (k === 'l') { event.preventDefault(); this.navigate(tab.id, 'filo://newtab/'); return; }
         if (k === 'r') { event.preventDefault(); this.reload(tab.id); return; }
       }
