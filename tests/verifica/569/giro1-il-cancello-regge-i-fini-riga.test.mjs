@@ -151,7 +151,7 @@ test('#569 giro 1: la sentinella del ramo riconosce la forma malata (non è una 
   // Si dà in pasto alla stessa regex della sentinella un pezzo di test scritto
   // com'era scritto quello che ha fermato la pubblicazione: deve riconoscerlo.
   const conACapoInMezzo = /\.(indexOf|lastIndexOf|includes|startsWith|endsWith|split)\(\s*(['"`])(?:(?!\2)[^\\])+\\n/;
-  const malata = String.raw`  const i = regole.indexOf('allow update: if\n        isAdmin()');`;
+  const malata = String.raw`  const i = regole.indexOf('allow update: if\n        isAdmin()');`; // esempio del #569
   assert.ok(conACapoInMezzo.test(malata), 'la forma del #569 deve essere riconosciuta');
 
   // E non deve gridare su quella sana: un «a capo» in TESTA regge (il \r sta
