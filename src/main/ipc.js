@@ -65,10 +65,8 @@ function registerIpcHandlers() {
     }
   });
 
-  // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
-  // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
-  // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
-  // messaggio: conta solo il mittente.
+  // #405 — nessun dato, conta solo il mittente: segna l'ultimo frame toccato,
+  // così le scorciatoie sulla selezione vanno da chi ha davvero il testo.
   ipcMain.on('filo:frame-active', (event) => {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
