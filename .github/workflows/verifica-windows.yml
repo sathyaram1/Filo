@@ -55,5 +55,16 @@ jobs:
       - name: Install dipendenze
         run: npm ci
 
+      # I test rossi stanno in mezzo a decine di migliaia di righe di TAP, e chi
+      # apre il registro vede la coda: senza questo riepilogo in fondo, "quale
+      # test e' rosso?" costa una ricerca dentro il log intero (o rifare la
+      # suite). Stessa cura del cancello di pubblicazione, che l'elenco dei
+      # rossi lo mette in cima all'allarme.
       - name: Unit test (gli stessi del cancello)
-        run: npm run test:unit
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:unit 2>&1 | tee unit.log && esito=0 || esito=1
+          echo "──────── test rossi ────────"
+          grep -E '^[[:space:]]*(not ok|location:|error:)' unit.log | head -120 || echo "(nessun test rosso)"
+          exit $esito
