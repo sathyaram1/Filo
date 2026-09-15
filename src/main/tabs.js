@@ -797,9 +797,8 @@ class TabManager {
           reason: reason || 'manual',
           coOpenUrls,
           scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
-          // §"Apri da un altro paese": se la tab era instradata da un altro
-          // paese, salva la location così la riapertura dall'archivio rinasce
-          // proxata sulla stessa location (vedi REOPEN_ARCHIVED_TAB).
+          // La location si salva, o riaprendo dall'archivio la scheda
+          // rinascerebbe diretta invece che dal paese scelto.
           proxy: tab.proxy && tab.proxy.country
             ? { country: tab.proxy.country, tier: tab.proxy.tier || null }
             : null,
