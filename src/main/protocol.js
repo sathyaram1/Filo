@@ -69,9 +69,8 @@ async function filoHandler(request) {
     } else if (host === 'shared') {
       fsPath = path.join(SRC, 'shared', rel);
     } else if (host === 'src') {
-      // Passthrough per i casi legacy in cui il codice estensione
-      // chiama chrome.runtime.getURL('src/pages/X/Y.html'): lo shim
-      // costruisce filo://src/pages/X/Y.html e atterriamo qui.
+      // Il codice portato chiama chrome.runtime.getURL('src/...') e lo shim
+      // costruisce filo://src/..., che atterra qui.
       fsPath = path.join(SRC, rel);
     } else {
       // filo://<page>/<file?> → src/pages/<page>/<file or page.html>
