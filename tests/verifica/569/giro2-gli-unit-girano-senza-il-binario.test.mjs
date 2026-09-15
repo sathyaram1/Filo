@@ -44,28 +44,30 @@ function unitTestVeri(cartella, dentro = []) {
 }
 
 /**
- * Un test-ponte che installa la finta assenza del binario e poi importa il
- * test vero. Il test vero resta dov'è, quindi legge i suoi file con i percorsi
- * giusti: qui cambia solo cosa risponde `require('electron')`.
+ * La finta assenza del binario. Copia fedele di come si comporta
+ * `node_modules/electron/index.js` quando lo scaricamento è stato saltato: con
+ * la variabile d'ambiente che dice dove sarebbe il binario torna un percorso,
+ * senza solleva. Si carica in OGNI processo (il lanciatore e i suoi figli), così
+ * anche il lanciatore vede il mondo come lo vedrebbe su quel computer.
  */
-function ponte(percorsoVero) {
-  return `import { createRequire } from 'node:module';
-import { join } from 'node:path';
-const require = createRequire(import.meta.url);
-const Module = require('module');
+const FINTA_ASSENZA = `const Module = require('module');
+const path = require('path');
 const originale = Module._load;
 Module._load = function (richiesta, ...resto) {
   if (richiesta === 'electron') {
-    // Copia fedele di node_modules/electron/index.js quando il binario non è
-    // stato scaricato: con la variabile d'ambiente torna un percorso, senza
-    // solleva.
-    if (process.env.ELECTRON_OVERRIDE_DIST_PATH) return join(process.env.ELECTRON_OVERRIDE_DIST_PATH, 'electron');
+    if (process.env.ELECTRON_OVERRIDE_DIST_PATH) return path.join(process.env.ELECTRON_OVERRIDE_DIST_PATH, 'electron');
     throw new Error('Electron failed to install correctly, please delete node_modules/electron and try installing again');
   }
   return originale.call(this, richiesta, ...resto);
 };
-await import(${JSON.stringify(pathToFileURL(percorsoVero).href)});
 `;
+
+/**
+ * Un test-ponte che importa il test vero. Il test vero resta dov'è, quindi legge
+ * i suoi file con i percorsi giusti: cambia solo l'ambiente attorno.
+ */
+function ponte(percorsoVero) {
+  return `await import(${JSON.stringify(pathToFileURL(percorsoVero).href)});\n`;
 }
 
 test('#569 giro 2: gli unit test passano anche quando il binario dell\'app non è stato scaricato', () => {
