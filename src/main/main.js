@@ -179,12 +179,9 @@ app.whenReady().then(async () => {
           console.log(`[smoke] capture ${label} threw:`, e?.stack || e?.message || String(e));
         }
       };
-      // Cattura: shell (= primary webContents), tab attiva (di solito fallisce
-      // — vedi electron#24694), e composito via desktopCapturer.
       await dump('shell', mainWindow.webContents);
-      // captureUrl: apre URL in una BrowserWindow dedicata e cattura il
-      // primary. Workaround a electron#24694 (capturePage su WebContentsView
-      // restituisce empty image in molte configurazioni).
+      // Aggiro electron#24694: capturePage su una WebContentsView torna
+      // un'immagine vuota, quindi l'URL si riapre in una finestra dedicata.
       const captureUrl = async (label, url, preloadName) => {
         try {
           const captureWin = new BrowserWindow({
