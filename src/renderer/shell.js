@@ -57,9 +57,8 @@
     const v = tabColor && Number(tabColor.opacita_tab);
     if (Number.isFinite(v)) tabOpacity = Math.max(0, Math.min(1, v));
   }
-  // Config notifiche (spec #170.1): durata, suono on/off, suono scelto. Letta
-  // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
-  // notifiche successive rispettano i nuovi valori senza riavviare.
+  // #170.1 — durata e suono delle notifiche, riletti dal vivo: un cambio nelle
+  // preferenze deve valere dalla notifica dopo, non dal riavvio.
   let notifConfig = { durationSec: 5, soundEnabled: false, sound: 'default' };
   function applyNotifConfig(notifications) {
     if (!notifications || typeof notifications !== 'object') return;
