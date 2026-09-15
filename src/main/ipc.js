@@ -150,8 +150,7 @@ function registerIpcHandlers() {
       if (session) { try { session.kill(); } catch (_) {} }
       session = createSession({ shell: wantShell, cwd });
       shellSessions.set(key, session);
-      // La shell muore con la scheda: chiudere la scheda è il modo più
-      // intuitivo per uccidere un processo collegato.
+      // Chiudere la scheda è il modo più intuitivo di uccidere il processo.
       event.sender.once('destroyed', () => {
         const s = shellSessions.get(key);
         if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(key); }
