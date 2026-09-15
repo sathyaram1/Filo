@@ -1152,9 +1152,8 @@
       dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
-      // I file possono essere spariti dal disco mentre il pannello era chiuso
-      // (nessun evento lo annuncia): ri-leggendo la lista all'apertura le voci
-      // ormai vuote si mostrano già attenuate, senza aspettare un clic a vuoto.
+      // Un file può sparire dal disco a pannello chiuso e nessun evento lo
+      // annuncia: la lista si rilegge all'apertura, non dopo un clic a vuoto.
       api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
     }
     function closePanel() {
