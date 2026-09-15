@@ -435,10 +435,9 @@
     return L > 0.45 ? '#1a1918' : '#f8f6f0';
   }
 
-  // Un colore "ha identità" solo se ha croma sufficiente: bianco/nero/grigio
-  // (es. l'header bianco di YouTube campionato per il vetro smerigliato §1.1)
-  // non rappresentano il sito. Soglia allineata a SN_TAB_COLOR
-  // (src/shared/tabColor.js) e al campionatore favicon in pageColor.js.
+  // Un colore "ha identità" solo con croma bastante: il bianco dell'header di
+  // YouTube non rappresenta il sito. Soglia allineata a SN_TAB_COLOR
+  // (src/shared/tabColor.js) e al campionatore in pageColor.js: vanno insieme.
   function hasColorIdentity(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return false;
