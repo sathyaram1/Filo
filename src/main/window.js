@@ -9,8 +9,7 @@ const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
 
-// Finestre invisibili durante i test automatici: perché e come, in
-// `test-window-mode.js` (vale anche per menu e tooltip, che sono finestre a sé).
+// Finestre invisibili nei test: il perché sta in `test-window-mode.js`.
 const { HIDDEN, posizioneFuoriSchermo, hideForTests } = require('./test-window-mode');
 
 // Porta la finestra davanti a tutto: serve al primo disegno, perché in alcune
