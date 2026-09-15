@@ -266,9 +266,8 @@ app.whenReady().then(async () => {
   });
 });
 
-// Alla chiusura salva sincronicamente la sessione (tab aperti) così alla
-// prossima apertura vengono ripristinati anche se l'utente esce subito dopo
-// aver aperto/chiuso un tab (il salvataggio normale è con debounce).
+// Salvataggio SINCRONO delle schede aperte: quello normale ha un debounce, e
+// chi esce subito dopo aver aperto una scheda la perderebbe.
 app.on('before-quit', () => {
   try {
     const tm = mainWindow?._filoTabs;
