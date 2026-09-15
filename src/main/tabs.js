@@ -1972,21 +1972,10 @@ class TabManager {
     } catch (_) {}
   }
 
-  // ─── rilevamento siti pericolosi ─────────────────────────────────────────
-  // (vedi src/main/services/safebrowse/ e src/main/tabs/tabSafebrowse.js).
-  // I metodi safebrowse (_sbState, _sbApplyState, _sbBroadcast, safebrowseGet,
-  // _sbOnNavigate, safebrowseProceed, safebrowseDismiss) sono estratti in
-  // tabSafebrowse.js e installati sul prototype in fondo a questo file (mixin).
+  // I metodi `_sb*` (siti pericolosi) e `_geo*` (blocco geografico) vivono in
+  // src/main/tabs/tabSafebrowse.js e tabGeoBlock.js, agganciati al prototype in
+  // fondo a questo file.
 
-  // ─── rilevamento geo-block (livello 1 deterministico) + regole d'azione ───
-  // (vedi src/main/services/geoBlock.js, proxy-per-tab-spec.md §4-§5 e
-  // src/main/tabs/tabGeoBlock.js). I metodi geo-block (_geoBlockDetected,
-  // _geoActOnDetected, _geoCountryLabel, _geoToast, _geoBroadcastPropose,
-  // _geoState, geoProposeAccept, geoProposeDismiss, _geoTextCheck,
-  // _geoLevel2Check) sono estratti in tabGeoBlock.js e installati sul prototype
-  // in fondo a questo file (mixin).
-
-  // ─── snapshot stato per la shell ────────────────────────────────────────
 
   snapshot() {
     return {
