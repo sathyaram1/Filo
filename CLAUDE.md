@@ -96,6 +96,29 @@ costano dieci riletture, in un turno solo una. Quindi:
   `tests/agent/.out/`, ecc.: output rigenerato, gitignorato). Se un PNG risulta
   tracciato: `git rm --cached <file>`.
 
+## Commenti nel codice
+
+Nessun umano legge il codice di Filo: i commenti sono per gli agenti, e ogni
+riga si ripaga a ogni lettura del file (misurato il 15/09/2026: il 37% dei
+caratteri di `src/` era commento). Quindi:
+
+- **Un commento dice il PERCHÉ**: l'intento, l'invariante, il caso che ha fatto
+  nascere la guardia. **Mai il COSA**: se rileggendo il codice sotto lo si
+  ricostruisce, non si scrive; se lo trovi, lo togli.
+- **Una o due righe.** Il racconto (com'era prima, i tentativi sbagliati, la
+  cronaca dell'incidente) sta nel feedback o nel file di pattern, non qui. Il
+  numero del feedback (`#nnn`) si può citare, ma da una routine i feedback non
+  si leggono: la regola deve reggere da sola nel commento.
+- **Una regola vive in un posto solo**, in quest'ordine di preferenza:
+  sentinella in `tests/unit/` > file di pattern > CLAUDE.md > commento. Gli
+  altri posti rimandano, non copiano. Un «NON cambiare» che si può verificare a
+  macchina è una sentinella, non un commento.
+- **Intestazione di file: tre righe al massimo.** Cos'è, cosa non deve fare,
+  dove stanno le sue regole. Serve a decidere se aprire il file senza aprirlo.
+- **Niente cronologia** («spostato da», «prima era così», date di modifica: le
+  tiene git) e niente commento che ripete il nome della funzione o descrive
+  una riga ovvia.
+
 ## Filo gira anche su Mac
 
 Filo si scrive e si prova su Windows, e si scarica anche su Mac
