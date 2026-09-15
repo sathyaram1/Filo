@@ -27,11 +27,7 @@ function posizioneFuoriSchermo() {
 
 const HIDDEN = process.env.FILO_HIDE_WINDOW === '1';
 
-/**
- * Rende invisibile una finestra durante i test (no-op fuori dai test).
- * `main: true` per la finestra principale: oltre alla trasparenza la sposta
- * fuori schermo e la tiene lì anche dopo un giro a tutto schermo.
- */
+/** No-op fuori dai test. `main: true` aggiunge il fuori schermo e lo ridifende. */
 function hideForTests(win, { main = false } = {}) {
   if (!HIDDEN || !win) return false;
   try {
