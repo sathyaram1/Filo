@@ -1552,14 +1552,10 @@ class TabManager {
         } catch (_) {}
       }, 300);
     });
-    // Colore selezione testo coerente con Filo sui siti esterni. insertCSS
-    // ignora la CSP della pagina (che invece blocca il <link filo://> del
-    // content script). Reiniettiamo a ogni dom-ready perché lo stylesheet
-    // utente non sopravvive alle navigazioni a documento intero.
-    // Reiniettiamo a ogni dom-ready perché gli stylesheet inseriti non
-    // sopravvivono alle navigazioni a documento intero. Il guard è sull'URL
-    // CORRENTE (non su tab.isInternal, fissato alla creazione): così anche una
-    // newtab interna che naviga verso un sito esterno riceve gli stili.
+    // Gli stili si rimettono a OGNI dom-ready: non sopravvivono a una
+    // navigazione di documento intero. Il controllo guarda l'URL CORRENTE e non
+    // `tab.isInternal`, che è fissato alla creazione: una nuova scheda che
+    // naviga verso un sito esterno deve riceverli lo stesso.
     wc.on('dom-ready', () => {
       // Qui NON si annuncia lo schermo intero. Ci si era provato, e l'annuncio
       // arrivava prima che il content script avesse un orecchio: si perdeva, e
