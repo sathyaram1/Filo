@@ -952,7 +952,6 @@ class TabManager {
     return { ok: true, domain: dom };
   }
 
-  // ─── §2.1 auto-archiviazione / riordino ─────────────────────────────────
 
   async _readSettings() {
     try { return await globalThis.SN_STORAGE?.getSettings?.(); } catch (_) { return null; }
