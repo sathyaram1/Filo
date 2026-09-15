@@ -1526,8 +1526,7 @@ class TabManager {
         if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc));
       } catch (_) {}
     });
-    // #327 — renderer morto (crash/oom): stessa scheda bianca, stessa cura.
-    // loadURL su un webContents col renderer morto ne rilancia uno nuovo.
+    // #327 — renderer morto: stessa scheda bianca, stessa cura.
     wc.on('render-process-gone', (_e, details) => {
       if (process.env.NODE_ENV !== 'production') {
         console.error(`[tab:${tab.id.slice(0, 6)}] render-process-gone`, details);
