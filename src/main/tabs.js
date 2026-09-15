@@ -731,8 +731,7 @@ class TabManager {
     }
   }
 
-  // Rimuove tutte le modifiche estetiche che Filo ha iniettato nella scheda web
-  // attiva. Reversibilità dell'azione STILE_PAGINA (#185).
+  // #185 — se si può cambiare lo stile si deve poter tornare indietro.
   async clearPageStyle(tabArg = null) {
     const tab = tabArg || this._activeWebTab();
     if (!tab || !tab.view || !tab.view.webContents) return { ok: false, reason: 'no-web-tab' };
