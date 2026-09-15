@@ -303,9 +303,7 @@ function registerIpcHandlers() {
     win._filoTabs.openBlockedPopup(url);
     return { ok: true };
   });
-  // Proxy per-tab ("Apri da un altro paese"): instrada/de-instrada una singola
-  // tab attraverso un endpoint in un altro paese. La lista location curate
-  // serve al menu tasto destro sulla tab (feedback UI separato).
+  // Proxy di UNA scheda sola: nella UI è "Apri da un altro paese".
   ipcMain.handle('tabs:set-proxy', async (event, { id, country, tier } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
