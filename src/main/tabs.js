@@ -209,8 +209,8 @@ class TabManager {
     this._lastAppInteractionAt = Date.now();
     this._triageRunning = false;
     if (!this.incognito) {
-      // Controllo periodico dell'inattività (ogni 5 min). La soglia vera (ore) e
-      // l'on/off vivono nelle preferenze e si leggono ad ogni tick.
+      // Soglia e interruttore stanno nelle preferenze e si rileggono a ogni
+      // giro: un cambio deve valere senza riavviare.
       this._autoArchiveTimer = setInterval(() => {
         this._autoArchiveTick().catch(() => {});
       }, 5 * 60 * 1000);
