@@ -86,6 +86,46 @@ export function collectTestFiles(dir = UNIT_DIR) {
   return out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
+// ─── Il binario di Filo, che qui non serve ma può fermare tutto ──────────────
+//
+// Gli unit test sono logica pura: nessuno apre Filo. Alcuni però caricano i
+// SORGENTI dell'app per provarli (le scorciatoie, l'aggiornamento, il menu), e
+// un sorgente dell'app comincia chiedendo `require('electron')`. Quel modulo non
+// è l'app: è tre righe che restituiscono il PERCORSO del binario scaricato
+// durante l'installazione. Se il binario non c'è, non risponde «non c'è»:
+// SOLLEVA un errore, e il test muore per un motivo che col test non c'entra.
+//
+// Succede più spesso di quanto sembri: chi installa saltando lo scaricamento
+// (il lavoro automatico su Windows lo fa apposta, quei 263 MB non li apre
+// nessuno), chi ha avuto lo scaricamento fallito, chi ha una copia appena presa.
+// In tutti quei casi `npm run test:unit` usciva rosso su due test sani, senza
+// che niente fosse rotto.
+//
+// La cura: se il binario non c'è, si dice a quel modulo DOVE sarebbe stato.
+// Torna un percorso, come sempre, e i test che volevano solo leggere il
+// sorgente girano. Il percorso punta a una cartella che non esiste: nessuno può
+// farci partire l'app per sbaglio, e chi ci provasse leggerebbe quel percorso
+// nell'errore.
+
+/** Vero se il binario di Filo è stato scaricato. */
+export function binarioScaricato(root = REPO_ROOT) {
+  return existsSync(join(root, 'node_modules', 'electron', 'path.txt'));
+}
+
+/**
+ * L'ambiente con cui far girare gli unit test. PURA.
+ * Tocca una cosa sola, e solo quando serve: se il binario manca e nessuno ha già
+ * detto dove cercarlo, lo dichiara. Con il binario installato l'ambiente esce
+ * identico a com'è entrato.
+ */
+export function ambienteDeiTest(env = process.env, { scaricato = true, root = REPO_ROOT } = {}) {
+  const fuori = { ...env };
+  if (!scaricato && !fuori.ELECTRON_OVERRIDE_DIST_PATH) {
+    fuori.ELECTRON_OVERRIDE_DIST_PATH = join(root, 'node_modules', 'electron', 'dist');
+  }
+  return fuori;
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 function main() {
