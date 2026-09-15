@@ -408,9 +408,8 @@
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6"/><path d="M21 9l-4 6"/></svg>';
 
-  // Indicatore "audio in riproduzione": altoparlante con onde, così si
-  // riconoscono a colpo d'occhio le tab che stanno suonando — anche quelle in
-  // background. Cliccabile per silenziare al volo (parità col menu "Muta").
+  // Le schede che suonano si riconoscono a colpo d'occhio anche in secondo
+  // piano, e l'icona muta al clic: stessa cosa della voce "Muta" nel menu.
   const AUDIO_IND_SVG =
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
