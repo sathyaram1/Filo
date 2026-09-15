@@ -1019,7 +1019,6 @@
       const title = document.createElement('span');
       title.className = 'dl-panel-title';
       title.textContent = 'Scaricamenti';
-      // Punto d'accesso alla pagina completa (cronologia + azioni per voce).
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'dl-panel-clear';
