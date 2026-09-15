@@ -110,6 +110,14 @@ test('#569 giro 2: gli unit test passano anche quando il binario dell\'app non Ã
       .map((r) => r.replace(new RegExp(cartellaUnit.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '<ponte>'))
       .join('\n');
 
+    // Una corsa che non ha eseguito niente esce verde: qui il verde deve
+    // valere solo se i test sono girati davvero.
+    const passati = Number((/^# pass (\d+)/m.exec(uscita) || [])[1] || 0);
+    assert.ok(
+      passati > 1000,
+      `il lanciatore ha eseguito troppo poco (${passati} test passati): la prova non ha provato niente.\n${uscita.slice(-1500)}`,
+    );
+
     assert.equal(
       esito.status,
       0,
