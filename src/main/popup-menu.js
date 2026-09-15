@@ -188,8 +188,7 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   const html = buildHTML(entries, isDark, MARGIN);
   popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
-  // Nei test la finestra madre è invisibile: il menu è una finestra a sé e
-  // altrimenti comparirebbe da solo sullo schermo (vedi test-window-mode.js).
+  // Finestra a sé: senza questa, nei test comparirebbe da sola sullo schermo.
   hideForTests(popup);
   popup.once('ready-to-show', () => popup.show());
 
