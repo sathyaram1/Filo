@@ -216,8 +216,7 @@ app.whenReady().then(async () => {
         if (tabCaptureWin) tabCaptureWin.close();
       }
 
-      // Test pagina esterna + content script: apri una pagina file:// che
-      // non è filo:// e verifica che i content script si carichino bene.
+      // Una pagina che NON è filo://: è l'unico modo di provare i content script.
       const testPageUrl = 'file:///' + path.join(__dirname, '..', '..', 'tests', 'fixtures', 'test-page.html').replace(/\\/g, '/');
       const csWin = await captureUrl('test-page', testPageUrl, 'page-preload.js');
       if (csWin) {
