@@ -705,9 +705,9 @@
     return url;
   }
 
-  // Etichette pulite per le schede delle pagine interne di Filo: niente prefisso
-  // "Filo —", e il nome è quello del tasto che apre la pagina (es. "Modelli" per
-  // le Opzioni). La newtab è "Home". Le pagine web esterne tengono il loro title.
+  // Il nome sulla scheda di una pagina interna è quello del TASTO che la apre
+  // (le Opzioni sono "Modelli"), senza prefisso: due nomi per la stessa cosa
+  // sono un modo di non farla trovare. Le pagine web tengono il loro titolo.
   const FILO_TAB_LABELS = {
     'newtab': 'Home',
     'options/options.html': 'Modelli',
