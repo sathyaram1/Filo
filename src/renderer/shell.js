@@ -1234,13 +1234,9 @@
   });
   api.tabs.snapshot().then((snap) => { state = snap; render(); });
 
-  // ─── Velo d'ombra "modalità annotazione" feedback ──────────────────────────
-  // Il box feedback vive in un content script sulla pagina e da lì oscura solo
-  // l'area pagina. Quando si apre, il main ci avvisa via `shell:feedback-dim`
-  // così copriamo ANCHE la barra in alto di Filo con lo stesso velo: tutta la
-  // app entra in penombra, segnalando che si è in modalità annotazione. Il velo
-  // intercetta i click (cursore a mirino) per evitare interazioni accidentali
-  // con tab/indirizzo mentre si sta dando un feedback.
+  // Il box feedback vive sulla pagina e da lì oscura solo la pagina: la barra
+  // la deve oscurare la shell, o l'app resta a metà in penombra. Il velo
+  // intercetta anche i clic, così non si tocca una scheda per sbaglio.
   if (api.onFeedbackDim) {
     let dimTabId = null;
 
