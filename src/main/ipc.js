@@ -206,7 +206,6 @@ function registerIpcHandlers() {
     if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(event.sender.id); }
   });
 
-  // ─── tab control dalla shell ─────────────────────────────────────────────
   const winFor = (event) => {
     const wc = event.sender;
     for (const w of BrowserWindow.getAllWindows()) {
