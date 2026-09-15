@@ -1568,11 +1568,9 @@ class TabManager {
       // regole d'autore della pagina.
       try { wc.insertCSS(PAGE_SELECTION_CSS, { cssOrigin: 'user' }); } catch (_) {}
       try { wc.insertCSS(getContentScriptCss()); } catch (_) {}
-      // GPC (Global Privacy Control): proprietà JS nel mondo della pagina, gemella
-      // dell'header Sec-GPC. executeJavaScript gira nel main world e ignora la CSP
-      // (un <script> iniettato verrebbe bloccato dalla CSP di molti siti). Spenta
-      // in modalità manuale. È un segnale "future-proof": oggi pochi siti UE lo
-      // rispettano, il lavoro vero lo fa il rifiuto del banner CMP.
+      // GPC: gemella dell'header Sec-GPC, via executeJavaScript perché uno
+      // <script> iniettato lo bloccherebbe la CSP. È un segnale per il futuro:
+      // oggi pochi siti lo rispettano, il lavoro lo fa il rifiuto del banner.
       if (this.cookieMode !== Cookies.MODES.MANUAL) {
         try {
           wc.executeJavaScript(
