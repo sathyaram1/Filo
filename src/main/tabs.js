@@ -744,10 +744,8 @@ class TabManager {
     return { ok: true, removed };
   }
 
-  // Sposta la tab `id` alla posizione `toIndex` nell'ordine della barra (drag &
-  // drop nella shell). Riordina solo l'array `this.tabs` (l'ordine non incide
-  // sul layout delle WebContentsView native, solo su snapshot + sessione) e
-  // ridisegna. Ritorna true se l'ordine è cambiato.
+  // L'ordine non tocca il layout delle viste native: conta solo per lo snapshot
+  // e per la sessione salvata. Ritorna true se è cambiato.
   moveTab(id, toIndex) {
     const from = this.tabs.findIndex((t) => t.id === id);
     if (from < 0) return false;
