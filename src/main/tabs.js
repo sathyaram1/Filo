@@ -430,7 +430,7 @@ class TabManager {
       this._escUscitaTimer = null;
       if (this.contentFullscreen) this.setContentFullscreen(false);
     }, attesa);
-    // Un timer non deve tenere sveglio il processo se non c'è altro da fare.
+    // Un timer non deve tenere sveglio il processo.
     try { this._escUscitaTimer.unref?.(); } catch (_) {}
   }
 
