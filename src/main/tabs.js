@@ -1477,9 +1477,8 @@ class TabManager {
         openExternalScheme(url);
         return;
       }
-      // #170.3 — Blocco apertura siti in blacklist. Click su un link generico
-      // (o window.location) verso un sito in blacklist: blocca, TRANNE se la
-      // pagina di partenza è un motore di ricerca (l'utente l'ha cercato).
+      // #170.3 — si blocca, TRANNE se si arriva da un motore di ricerca:
+      // quello l'utente l'ha cercato apposta.
       if (this._maybeBlockNavigation(tab, url, { fromUrl: wc.getURL() })) {
         event.preventDefault();
         return;
