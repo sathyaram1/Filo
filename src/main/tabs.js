@@ -1302,10 +1302,8 @@ class TabManager {
     try { view.webContents.setAudioMuted(!!tab.muted); } catch (_) {}
     this.win.contentView.addChildView(view);
     if (wasActive) this.activeId = tab.id;
-    // layout() dà alla scheda attiva i bounds pieni e a TUTTE le altre {0,0,0,0}.
-    // Va chiamato anche quando si ricrea una scheda NON attiva: la sua view
-    // appena creata avrebbe altrimenti bounds di default e potrebbe disegnarsi
-    // sopra la scheda attiva.
+    // Anche ricreando una scheda NON attiva: senza layout la vista nuova tiene
+    // i bounds di default e si disegna sopra quella attiva.
     this.layout();
     view.webContents.loadURL(opts.loadUrl || url);
     // Visibilità coerente con lo stato attivo: solo la scheda attiva è visibile,
