@@ -904,8 +904,6 @@
     return api.downloads.openFolder(id).then((res) => {
       if (!res) return;
       if (res.ok === false) { NOTIFS.show(res.error || 'Non è stato possibile aprire la cartella'); return; }
-      // Cartella aperta, ma il file dentro non c'è più: meglio dirlo che
-      // lasciare l'utente a cercarlo.
       if (res.missing) NOTIFS.show('Il file non c’è più: ho aperto la cartella dov’era');
     }).catch(() => {});
   }
