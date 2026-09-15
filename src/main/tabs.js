@@ -1110,11 +1110,8 @@ class TabManager {
     return changed;
   }
 
-  // Riordino cromatico ESPLICITO ("/riordina"): riordina la striscia per colore
-  // come alla riapertura di Filo (§1.3), ma SENZA archiviare/chiudere nulla — a
-  // differenza del triage tutte le tab restano aperte. Ribroadcasta (e quindi
-  // ripersiste la sessione col nuovo ordine) solo se l'ordine è cambiato davvero.
-  // Ritorna { reordered } così la dashboard può dare feedback all'utente.
+  // Riordino chiesto a mano: come §1.3 ma senza chiudere NIENTE. Ritorna
+  // { reordered } così la dashboard può dire cos'è successo.
   reorderTabs() {
     const reordered = this.reorderTabsByColor();
     if (reordered) this._broadcast();
