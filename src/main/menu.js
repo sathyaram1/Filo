@@ -129,8 +129,6 @@ async function ripeti() {
   if (await staScrivendo(wc)) { try { wc.redo(); } catch (_) {} }
 }
 
-// ─── la barra ───────────────────────────────────────────────────────────────
-
 function template() {
   const menuFilo = {
     label: 'Filo',
