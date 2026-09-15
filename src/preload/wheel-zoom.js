@@ -175,9 +175,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       refreshPercent();
     }
 
-    // Pinch del trackpad e Ctrl+rotella → wheel con ctrlKey=true. Passo
-    // proporzionale al delta così il pinch (incrementi piccoli) resta fluido.
-    // In modalità rotella ci pensa già l'handler sopra: qui ci tiriamo fuori.
+    // Pinch del trackpad e Ctrl+rotella arrivano entrambi come `wheel` con
+    // ctrlKey=true; in modalità rotella ci pensa già l'handler sopra.
     document.addEventListener('wheel', (e) => {
       if (zoomMode) return;
       if (!(e.ctrlKey || e.metaKey)) return;
