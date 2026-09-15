@@ -183,8 +183,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       if (pageHandlesZoom()) return;
       e.preventDefault();
       e.stopPropagation();
-      // ~0.005/unità: un notch di rotella (deltaY≈100) ≈ un passo di Ctrl +/-
-      // (ZOOM_STEP=0.5); il pinch del trackpad (delta piccoli) resta fluido.
+      // Passo proporzionale al delta: uno scatto di rotella (~100) vale un
+      // passo di Ctrl +/-, e il pinch a delta piccoli resta fluido.
       let next;
       try { next = webFrame.getZoomLevel() - e.deltaY * 0.005; }
       catch (_) { return; }
