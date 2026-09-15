@@ -96,8 +96,6 @@ function createMainWindow() {
   wireWindowCommon(win, tabs);
 
   win.webContents.once('did-finish-load', async () => {
-    // Riapre i tab della sessione precedente; se non c'è nulla da ripristinare
-    // apre un newtab vuoto come sempre.
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
