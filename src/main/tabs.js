@@ -1705,10 +1705,9 @@ class TabManager {
     });
 
     // §2.1 — una scheda che suona NON si archivia mai.
-    // In Electron 32+ l'audible sta SULL'oggetto evento (un solo argomento); in
-    // quelli più vecchi arriva come (event, {audible}) o (event, audible). Su
-    // Electron 33 leggere solo il secondo argomento dava sempre false →
-    // l'indicatore audio non si attivava mai. audibleFromEvent normalizza tutto.
+    // La forma dell'evento cambia da una versione di Electron all'altra:
+    // leggere solo il secondo argomento dava sempre false e l'indicatore audio
+    // non si accendeva mai. audibleFromEvent le normalizza tutte.
     wc.on('audio-state-changed', (e, arg) => {
       const audible = audibleFromEvent(e, arg);
       if (tab.audible !== audible) { tab.audible = audible; this._broadcast(); }
