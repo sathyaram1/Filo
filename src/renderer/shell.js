@@ -684,8 +684,7 @@
       tabsEl.appendChild(el);
     }
 
-    // §6 — con la striscia scrollabile, assicuriamoci che la scheda attiva sia
-    // sempre visibile (può finire fuori vista dopo che ne apri molte).
+    // §6 — con molte schede la striscia scorre: l'attiva deve restare in vista.
     const activeEl = tabsEl.querySelector('.tab.active');
     if (activeEl) {
       try { activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (_) {}
