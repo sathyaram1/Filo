@@ -664,8 +664,8 @@ class TabManager {
     }
     // Un'attesa rivolta a questa scheda non ha più nessuno che risponda.
     this.annullaUscitaSchermoIntero();
-    // §3.1/§4 — "Chiudi = archivia": prima di distruggere la view salviamo i
-    // metadati della tab nell'archivio (consultabile da filo://archive).
+    // §3.1/§4 — chiudere è archiviare: i metadati si salvano PRIMA di
+    // distruggere la vista, o non c'è più niente da leggere.
     this._archiveClosedTab(tab);
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
