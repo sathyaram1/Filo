@@ -1347,16 +1347,9 @@
     });
   }
 
-  // ─── Chip "popup bloccato" ─────────────────────────────────────────────
-  // Quando il main blocca un window.open() non richiesto invia
-  // 'tabs:popup-blocked' con { tabId, url, host }. Mostriamo una chip ancorata
-  // sotto la barra indirizzi: "Bloccato popup da <host>  [Apri] [×]".
-  // - Click "Apri": apre il popup come nuovo tab (bypass blocco).
-  // - Click "×" o auto-dismiss dopo 8s: chip svanisce.
-  // Riusiamo `reserveTop` (lo stesso meccanismo che già si usa per i menu
-  // dropdown) per evitare che la chip finisca sopra l'area WebContentsView
-  // di un'altra tab: la posizioniamo dentro la shell (DOM HTML), quindi non
-  // serve riservare spazio extra — è già sopra l'area pagina.
+  // Un popup bloccato va detto, con la via d'uscita: "Apri" lo apre come
+  // scheda. La chip sta dentro la shell, quindi è già sopra l'area pagina e non
+  // serve riservare spazio.
   if (api.tabs.onPopupBlocked) {
     const chipHost = document.createElement('div');
     chipHost.id = 'popup-chips';
