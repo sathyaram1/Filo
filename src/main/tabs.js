@@ -1032,7 +1032,6 @@ class TabManager {
         );
       }
 
-      // 2) LLM per il resto (giudizio). No-op sui duplicati (già decisi sopra).
       const decide = globalThis.SN_TAB_TRIAGE_DECIDE;
       let decisions = [];
       if (typeof decide === 'function') {
