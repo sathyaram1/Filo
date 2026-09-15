@@ -621,7 +621,6 @@
       if (t.loading) {
         ico.className = 'spinner';
       } else if (isAudible) {
-        // L'icona audio prende il posto della favicon (nessun overlay sotto).
         ico.className = 'favicon favicon-audible';
         ico.innerHTML = AUDIO_IND_SVG;
         // Clic sullo slot favicon-audible muta la tab.
