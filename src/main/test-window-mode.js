@@ -35,13 +35,9 @@ function hideForTests(win, { main = false } = {}) {
     if (!main) return true;
     const via = posizioneFuoriSchermo();
     win.setPosition(via.x, via.y);
-    // Uscendo dal tutto schermo il sistema rimette la finestra dov'era prima di
-    // entrarci, cioè potenzialmente sullo schermo: riportiamola via.
-    // La bandierina non è prudenza teorica: su X11 (i contenitori delle routine)
-    // spostare la finestra qui dentro fa riemettere `leave-full-screen` al
-    // sistema, e senza guardia il gestore rientra in se stesso finché il
-    // processo non muore per stack esaurito. È la ragione per cui il tutto
-    // schermo "non si poteva provare in un contenitore".
+    // Uscendo dal tutto schermo il sistema rimette la finestra dov'era: via di
+    // nuovo. La bandierina è obbligatoria: su X11 spostarla qui dentro riemette
+    // `leave-full-screen` e senza guardia si rientra fino allo stack esaurito.
     let riposizionando = false;
     win.on('leave-full-screen', () => {
       if (riposizionando) return;
