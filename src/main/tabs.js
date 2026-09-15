@@ -1266,13 +1266,10 @@ class TabManager {
     return (next || null) !== (tab.partition || null);
   }
 
-  // true se l'URL di destinazione attraversa il confine di FIDUCIA della view.
-  // La view nasce con un preload scelto in base all'internal-ness dell'URL:
-  // filo:// → preload privilegiato + contextIsolation:false (espone window.filo
-  // e chrome.storage); web esterno → preload isolato. Quel preload è legato al
-  // WebContents e NON cambia con un loadURL. Navigare una scheda interna verso un
-  // sito esterno sullo stesso WebContents farebbe quindi girare contenuto NON
-  // fidato col preload privilegiato (lettura chiavi API + dati). Va ricreata.
+  // Il confine di FIDUCIA: una pagina filo:// nasce col preload privilegiato,
+  // un sito esterno con quello isolato, e il preload non cambia con un loadURL.
+  // Navigare da interno a esterno sullo stesso WebContents farebbe girare
+  // contenuto non fidato con accesso a chiavi e dati.
   _crossesTrustBoundary(tab, url) {
     const nextInternal = String(url || '').startsWith('filo://');
     return nextInternal !== !!tab.isInternal;
