@@ -138,7 +138,7 @@ app.whenReady().then(async () => {
       const tabs = mainWindow?._filoTabs;
       const ready = tabs && tabs.tabs.length > 0 && tabs.tabs.some((t) => !t.loading);
       if (!ready) { setTimeout(checkReady, 250); return; }
-      // Diamo un attimo al renderer per dipingere dopo did-stop-loading.
+      // did-stop-loading non vuol dire dipinto: un attimo al renderer.
       await new Promise((r) => setTimeout(r, 800));
       const outDir = path.dirname(process.env.FILO_SMOKE);
       // Il verdetto, subito: da qui in poi è tutta diagnostica.
