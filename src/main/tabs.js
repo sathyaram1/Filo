@@ -919,10 +919,8 @@ class TabManager {
     return true;
   }
 
-  // Salva la regola "questo sito sempre da <paese>" e la applica subito alle
-  // tab già aperte su quel dominio. `domain` può essere un host nudo o una URL:
-  // lo riduciamo al dominio registrabile — la STESSA chiave usata dal match in
-  // navigazione (_ruleForUrl), così la regola scatta davvero alla riapertura.
+  // `domain` si riduce al dominio registrabile, la STESSA chiave che usa il
+  // confronto in navigazione: con un'altra la regola non scatterebbe mai.
   async setDomainProxyRule(country, { domain } = {}) {
     const code = ProxyTab.normalizeCountry(country);
     if (!code) return { ok: false, error: 'bad_country' };
