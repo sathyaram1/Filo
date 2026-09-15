@@ -303,8 +303,6 @@ function bootContentScripts() {
   injectContentScriptStyles();
   loadContentScripts();
 }
-// I content script (e il loro accesso a chrome.*) girano solo sulle pagine
-// interne fidate. Su origine non-filo non iniettiamo nulla.
 if (IS_FILO_ORIGIN) {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bootContentScripts, { once: true });
