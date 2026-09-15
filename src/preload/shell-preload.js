@@ -39,10 +39,7 @@ contextBridge.exposeInMainWorld('filoShell', {
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),
     proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
   },
-  // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
-  // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal
-  // main via il canale 'shell:download'. I type dei messaggi corrispondono a
-  // MSG.* in src/shared/messages.js.
+  // I `type` corrispondono a MSG.* in src/shared/messages.js.
   downloads: {
     list: () => ipcRenderer.invoke('filo:message', { type: 'downloads_list' }),
     clear: () => ipcRenderer.invoke('filo:message', { type: 'downloads_clear' }),
