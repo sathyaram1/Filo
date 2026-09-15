@@ -338,29 +338,18 @@ class TabManager {
     } catch (_) {}
   }
 
-  // Esc esce dallo schermo intero. Regola UNICA, valida per ogni porta d'ingresso
-  // (menu del tasto destro, barra laterale, barra dei menu su Mac, comando
-  // dell'assistente, pulsante del player di un sito, schermo intero del sistema)
-  // e per ogni posto da cui il tasto può arrivare: la pagina (before-input-event
-  // sulla scheda) o la barra di Filo, che a tutto schermo è nascosta sotto la
-  // pagina ma continua a tenere il fuoco se l'ultimo clic era lì — era il buco
-  // di #514: Esc non faceva niente e si restava chiusi dentro.
-  //
-  // `tabId` è la scheda da cui arriva il tasto, `null` se arriva dalla barra.
-  // Ritorna true se ha gestito il tasto: chi chiama fa il preventDefault.
-  //
-  // La regola, in una riga: **l'Esc premuto sulla pagina è prima della pagina,
-  // e la modalità esce solo se nessuno se l'è preso.** Prendercelo noi prima
-  // che la pagina lo veda vuol dire scavalcare tutto quello che Filo apre sopra
-  // la pagina e che si chiude con Esc — il menu del tasto destro, la risposta,
-  // un'immagine ingrandita, una domanda di conferma, il QR, la selezione di una
-  // parte dello schermo. Erano sei riquadri conosciuti e infiniti da scrivere:
-  // una lista da tenere aggiornata a mano invecchia male, quindi non c'è più
-  // lista (#514). Chi consuma il tasto lo dice (MSG.ESC_CONSUMATO) e l'uscita
-  // in attesa si annulla; chi non dice niente esce, e se la pagina non risponde
-  // affatto (nessun content script, renderer bloccato) esce lo stesso allo
-  // scadere dell'attesa. Il caso peggiore è un'uscita in ritardo di mezzo
-  // istante, mai restare chiusi dentro senza uscite.
+  // #514 — la regola UNICA dell'Esc a schermo intero, per ogni porta d'ingresso
+  // e per ogni posto da cui il tasto arriva (la pagina o la barra di Filo, che
+  // a tutto schermo è nascosta ma può tenere il fuoco).
+  // In una riga: l'Esc premuto sulla pagina è PRIMA della pagina, e la modalità
+  // esce solo se nessuno se l'è preso. Prendercelo prima vorrebbe dire
+  // scavalcare tutto quello che Filo apre sopra la pagina e si chiude con Esc —
+  // menu, risposta, immagine ingrandita, conferma, QR: una lista da tenere a
+  // mano invecchia male, quindi non c'è lista. Chi consuma il tasto lo dice
+  // (MSG.ESC_CONSUMATO) e l'uscita si annulla; chi tace esce, e chi non risponde
+  // affatto esce allo scadere dell'attesa.
+  // `tabId` è la scheda da cui arriva il tasto, null se arriva dalla barra.
+  // Ritorna true se l'ha gestito: chi chiama fa il preventDefault.
   handleFullscreenEscape(tabId = null) {
     if (!this.contentFullscreen) return false;
     // Dalla barra di Filo, o da una scheda che non è quella davanti: la pagina
