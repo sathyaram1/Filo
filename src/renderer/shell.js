@@ -737,7 +737,7 @@
       if (FILO_TAB_LABELS[key]) return FILO_TAB_LABELS[key];
       const host = key.split('/')[0];
       if (FILO_TAB_LABELS[host]) return FILO_TAB_LABELS[host];
-      // Pagina interna non mappata: almeno togli il prefisso "Filo —".
+      // Pagina interna non mappata: almeno via il prefisso.
       const clean = stripFiloPrefix(t.title);
       if (clean) return clean;
     }
