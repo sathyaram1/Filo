@@ -358,7 +358,6 @@ function registerIpcHandlers() {
     } catch (_) {}
   });
 
-  // ─── controlli finestra (min / max / close) ──────────────────────────────
   ipcMain.handle('window:minimize', (event) => {
     const win = winFor(event); if (win) win.minimize();
     return { ok: true };
