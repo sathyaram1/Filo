@@ -401,10 +401,8 @@
     window.addEventListener('mouseup', onTabPointerUp);
   }
 
-  // ── Menu contestuale (tasto destro) su una tab ────────────────────────────
-  // Riusa il popup-menu nativo della shell (sopra le WebContentsView). Le voci
-  // portano `action` custom prefissate `tab-`; la scelta torna via onMenuAction
-  // e si applica alla tab su cui si era aperto il menu (ctxTabId).
+  // Le voci portano azioni prefissate `tab-`; la scelta torna via onMenuAction
+  // e si applica alla scheda su cui si era aperto il menu (ctxTabId).
   const MUTE_IND_SVG =
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
