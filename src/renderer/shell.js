@@ -166,10 +166,7 @@
     });
   }
 
-  // ── Account "Accedi con Google" ───────────────────────────────────────────
-  // Lo stato vive nel main; qui mostriamo solo il profilo pubblico. Quando
-  // loggato, l'icona diventa l'avatar (foto Google) e il click apre un menu
-  // con "Esci"; quando non loggato, il click avvia il login.
+  // I token vivono nel main: qui arriva solo il profilo pubblico.
   let authProfile = null;
   let authBusy = false;
   // Gate UX della voce admin "Modelli predefiniti". La garanzia forte resta nel
