@@ -698,11 +698,9 @@ class TabManager {
     return best;
   }
 
-  // La scheda WEB (non filo://) su cui agire quando Filo cambia l'estetica del
-  // contenuto via chat (#185). Di norma è la scheda attiva; ma la chat di Filo
-  // vive in una scheda interna (dashboard/newtab), quindi se l'attiva è interna
-  // ripieghiamo sull'ultima scheda web che l'utente ha guardato (activateSeq più
-  // alto). Null se non c'è alcuna pagina web aperta.
+  // #185 — la chat di Filo vive in una scheda interna, quindi "la scheda su cui
+  // agire" non può essere l'attiva: se l'attiva è interna si prende l'ultima
+  // pagina web guardata.
   _activeWebTab() {
     const active = this.tabs.find((t) => t.id === this.activeId);
     if (active && !active.isInternal) return active;
