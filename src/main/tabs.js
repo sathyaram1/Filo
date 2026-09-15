@@ -654,10 +654,9 @@ class TabManager {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
-    // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
-    // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
-    // acceso con la deroga dell'Esc appesa a una pagina che non esiste più:
-    // nessun tasto ne uscirebbe. Spegniamolo insieme a lei (#514).
+    // #514 — chiudendo la scheda che aveva chiesto lo schermo pieno, la deroga
+    // dell'Esc resterebbe appesa a una pagina che non c'è più e nessun tasto ne
+    // uscirebbe: la modalità se ne va con lei.
     if (this.pageFullscreenTabId === id) {
       this.pageFullscreen = false;
       this.pageFullscreenTabId = null;
