@@ -52,8 +52,16 @@ jobs:
         with:
           node-version: 20
 
+      # Gli unit test non aprono mai Filo: sono logica pura, girano senza
+      # Electron. Senza questa riga `npm ci` scarica comunque l'app (263 MB una
+      # volta aperta) a ogni partenza, su ogni ramo, per non usarla mai.
+      # Se un domani un unit test avesse bisogno del binario, la riga va tolta:
+      # una sentinella (tests/unit/verificaWindows.test.mjs) tiene insieme le
+      # due cose.
       - name: Install dipendenze
         run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
       # I test rossi stanno in mezzo a decine di migliaia di righe di TAP, e chi
       # apre il registro vede la coda: senza questo riepilogo in fondo, "quale
