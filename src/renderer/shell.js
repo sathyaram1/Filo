@@ -524,11 +524,8 @@
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
   }
 
-  // Secondo livello di "Apri da un altro paese": la lista delle location
-  // curate, riaperta nello stesso punto del menu tab.
-  // Instrada una tab "da un altro paese". Un solo tentativo per click (mai
-  // retry automatici): se il fornitore non risponde, mostra un messaggio onesto
-  // invece di lasciare l'utente senza riscontro.
+  // Un solo tentativo per clic, mai ritentativi automatici: se il fornitore non
+  // risponde si dice, invece di lasciare l'utente davanti al nulla.
   async function proxyTab(id, country) {
     let res = null;
     try { res = await api.tabs.setProxy(id, country); } catch (_) { res = { ok: false, error: 'proxy_failed' }; }
