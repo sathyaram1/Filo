@@ -43,7 +43,6 @@ const ICON_PATHS = {
     '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
     '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
 
-  // Altoparlante con onde sonore (audio attivo) — voce "Muta".
   sound:
     '<path d="M4 9v6h4l5 4V5L8 9z"/>' +
     '<path d="M16.5 8.5a5 5 0 0 1 0 7"/>' +
