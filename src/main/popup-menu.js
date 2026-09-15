@@ -207,7 +207,6 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   });
 }
 
-// ── Genera l'HTML inline ──────────────────────────────────────────────────
 function buildHTML(entries, isDark, margin = 26) {
   const c = isDark
     ? { bg: 'rgba(30,29,27,0.98)', fg: '#e5e3dc', muted: '#8a8780',
