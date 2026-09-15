@@ -833,7 +833,6 @@
         : notifConfig.durationSec;
       const infinite = !(Number.isFinite(durationSec) && durationSec > 0);
 
-      // Azioni opzionali (es. "Apri comunque" per i blocchi #170.3).
       if (Array.isArray(opts.actions) && opts.actions.length) {
         const bar = document.createElement('div');
         bar.className = 'shell-notif-actions';
