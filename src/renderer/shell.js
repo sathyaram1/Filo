@@ -1197,7 +1197,6 @@
     winCloseBtn?.addEventListener('click', () => api.window.close());
   }
 
-  // Scorciatoie globali a livello shell.
   window.addEventListener('keydown', (e) => {
     const meta = e.ctrlKey || e.metaKey;
     if (meta && e.key.toLowerCase() === 't') {
