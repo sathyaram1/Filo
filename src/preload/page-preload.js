@@ -289,7 +289,7 @@ const STYLES = [
 ];
 
 function injectStyles() {
-  // Skip se il documento non è una pagina (es. about:blank, data:, view-source).
+  // Non è una pagina: about:blank, data:, view-source.
   if (!document.head) return;
   for (const f of STYLES) {
     const link = document.createElement('link');
