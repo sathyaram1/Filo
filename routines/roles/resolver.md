@@ -93,8 +93,8 @@ lavora a mano in locale. Ogni giro di verifica in più è un agente intero.
 accanto alle altre (`tests/<feature>.spec.mjs`, o `tests/unit/` per la logica
 pura), come dicono i minimi. È la guardia contro il ritorno del difetto: se
 finisse in `tests/verifica/<numero>/` sarebbe verde il giorno in cui la scrivi
-e non girerebbe mai più — quella cartella la suite completa non la raccoglie,
-nemmeno dopo la fusione. Lì dentro stanno solo le prove dei giri di verifica,
+e non girerebbe mai più — quella cartella la suite completa (quella che gira in
+GitHub prima di ogni pubblicazione) non la raccoglie, nemmeno dopo la fusione. Lì dentro stanno solo le prove dei giri di verifica,
 che sono la memoria di un giro, e le scrive chi verifica.
 
 Se il ramo ha già `tests/verifica/<numero>/` (un giro di verifica passato, un
