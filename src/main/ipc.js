@@ -282,8 +282,6 @@ function registerIpcHandlers() {
     const newId = await win._filoTabs.duplicateTab(id);
     return { ok: !!newId, id: newId };
   });
-  // Menu tasto destro su tab: "Aiuto" → apre la sidebar Aiuto su quella scheda
-  // col contesto della tab.
   ipcMain.handle('tabs:help', (event, { id } = {}) => {
     const win = winFor(event);
     if (win?._filoTabs) win._filoTabs.openHelp(id);
