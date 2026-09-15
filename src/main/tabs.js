@@ -1416,9 +1416,9 @@ class TabManager {
       this.setContentFullscreen(true);
     });
     wc.on('leave-html-full-screen', () => {
-      // Solo la scheda che il fullscreen l'aveva davvero chiesto spegne la
-      // modalità: l'uscita di una pagina a cui l'abbiamo appena rifiutato non
-      // deve portare via lo schermo intero che l'utente aveva acceso lui.
+      // Solo la scheda che l'aveva chiesto spegne la modalità: l'uscita di una
+      // pagina appena rifiutata non deve portarsi via lo schermo intero acceso
+      // dall'utente.
       if (!this.pageFullscreen || this.pageFullscreenTabId !== tab.id) return;
       this.pageFullscreen = false;
       this.pageFullscreenTabId = null;
