@@ -205,8 +205,7 @@ class TabManager {
     // §1.2 — così una scheda nuova su un dominio già visto ha subito la sua
     // tinta, senza aspettare che il content script rifaccia il calcolo.
     this._identityColorCache = new Map();
-    // §2.1 — ultima interazione dell'utente con Filo (qualsiasi tab/azione). Il
-    // timer di auto-archiviazione misura l'inattività dell'APP da qui.
+    // §2.1 — l'auto-archiviazione misura l'inattività dell'APP INTERA da qui.
     this._lastAppInteractionAt = Date.now();
     this._triageRunning = false;
     if (!this.incognito) {
