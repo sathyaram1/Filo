@@ -897,8 +897,7 @@ class TabManager {
     return this._proxyRules;
   }
 
-  // Regola persistente per l'URL (match sul dominio registrabile), o null.
-  // Sincrono: usato in will-navigate dove non si può attendere lo storage.
+  // SINCRONO: lo chiama will-navigate, dove non si può attendere lo storage.
   _ruleForUrl(url) {
     if (!url || url.startsWith('filo://') || !/^https?:\/\//i.test(url)) return null;
     const dom = Cookies.registrableOf(url);
