@@ -418,10 +418,8 @@ class TabManager {
     this._escRivendicazioni = 0;
   }
 
-  // Mette l'uscita in attesa: parte solo se nessuno rivendica il tasto. Quanto
-  // si aspetta dipende da chi c'è dall'altra parte (vedi ESC_ATTESA_MS): una
-  // pagina che risponde risponde comunque, e l'attesa è solo la rete di
-  // sicurezza per il caso in cui non risponda mai.
+  // L'uscita parte solo se nessuno rivendica il tasto; quanto si aspetta
+  // dipende da chi c'è dall'altra parte (ESC_ATTESA_MS).
   armaUscitaSchermoIntero(tabId = null) {
     this.annullaUscitaSchermoIntero();
     const tab = tabId != null ? this.tabs.find((t) => t.id === tabId) : null;
