@@ -1880,8 +1880,7 @@ class TabManager {
     } catch (_) {}
   }
 
-  // Chiamato da IPC quando l'utente clicca "Apri" sulla chip — il popup era
-  // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco.
+  // L'utente ha detto che quel popup lo voleva: si apre scavalcando il blocco.
   openBlockedPopup(url) {
     this.openTab(url, { activate: true });
   }
