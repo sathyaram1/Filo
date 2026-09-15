@@ -953,7 +953,6 @@
     const dlFill = document.getElementById('dl-ind-fill');
     setIcon(dlIcon, 'download', 15);
 
-    // id → record (lo schema pubblico definito nel main).
     const dls = new Map();
     let panelOpen = false;
     let panel = null;
