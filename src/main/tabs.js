@@ -2150,8 +2150,7 @@ function mapCertError(error) {
   return 'untrusted';
 }
 
-// normalizeUrl / isLocalHost vivono ora in src/shared/urlNav.js (#398): la stessa
-// logica serve anche al campo "nuova scheda" della dashboard, che prima aveva una
-// copia più povera. Sono importati in cima al file da globalThis.SN_URL_NAV.
+// #398 — normalizeUrl e isLocalHost stanno in src/shared/urlNav.js: la stessa
+// logica serve al campo "nuova scheda" della dashboard, e una sola ne esiste.
 
 module.exports = { TabManager, normalizeUrl, isWebUnsafeNav };
