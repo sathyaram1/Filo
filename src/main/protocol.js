@@ -39,11 +39,8 @@ function registerProtocolSchemes() {
   ]);
 }
 
-// Un segmento `..` rimasto in `rel` (path relativo già decodificato) significa
-// tentativo di uscire dalla cartella attesa. Lo schema filo è "standard": il
-// parser normalizza i `..` NON codificati, ma i `..` percent-encoded (%2e%2e)
-// sopravvivono e ridiventano `..` solo dopo decodeURIComponent — finendo in
-// path.join. Esportato per i test.
+// Il parser dello schema normalizza i `..` in chiaro, ma quelli percent-encoded
+// (%2e%2e) ridiventano `..` dopo decodeURIComponent e arrivano a path.join.
 function relIsUnsafe(rel) {
   return /(^|[\\/])\.\.([\\/]|$)/.test(String(rel || ''));
 }
