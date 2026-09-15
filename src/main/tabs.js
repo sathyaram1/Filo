@@ -672,10 +672,9 @@ class TabManager {
     try { tab.view.webContents.close(); } catch (_) {}
     this.tabs.splice(idx, 1);
     if (this.activeId === id) {
-      // Chiudendo la tab attiva, torna alla PENULTIMA tab che l'utente stava
-      // guardando (la più recente per lastActiveAt fra quelle rimaste), non
-      // semplicemente a quella a sinistra. Fallback all'adiacente se nessuna
-      // delle rimanenti è mai stata attivata (es. tutte aperte in background).
+      // Si torna alla PENULTIMA scheda guardata, non a quella a sinistra: è
+      // quella che l'utente si aspetta. Se nessuna è mai stata attivata (tutte
+      // aperte in sottofondo) vale l'adiacente.
       const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
       if (next) this.activate(next.id);
       else this.openTab('filo://newtab/'); // niente tab → nuovo newtab
