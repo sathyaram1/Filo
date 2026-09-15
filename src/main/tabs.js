@@ -83,13 +83,9 @@ function installaPermessi(ses) {
   } catch (_) {}
 }
 
-// #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
-// volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
-// pagine Impostazioni, gli editor…). Riaprirla mentre è già aperta deve
-// riportare l'utente sulla scheda esistente, non crearne un doppione. L'unica
-// pagina filo:// NON singleton è la nuova scheda (`filo://newtab/`): di quella
-// se ne vogliono quante se ne aprono. La chiave d'identità è host+path (query
-// e hash esclusi: un ?highlight non rende la pagina "un'altra pagina").
+// #252 — di una pagina interna ha senso UNA scheda sola: riaprirla deve
+// riportare a quella, non fare un doppione. L'unica eccezione è la nuova
+// scheda. L'identità è host+path: un ?highlight non fa un'altra pagina.
 function filoSingletonKey(url) {
   const s = String(url || '');
   if (!s.startsWith('filo://')) return null;
