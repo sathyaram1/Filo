@@ -135,13 +135,14 @@ test('nessuna ricerca su un file del repo contiene un «a capo» in mezzo', () =
   // checkout: segnalarla sarebbe rumore, e il rumore fa spegnere le sentinelle.
   const conACapoInMezzo = /\.(indexOf|lastIndexOf|includes|startsWith|endsWith|split)\(\s*(['"`])(?:(?!\2)[^\\])+\\n/;
   const colpevoli = [];
-  for (const nome of readdirSync(CARTELLA_UNIT)) {
-    if (!nome.endsWith('.mjs')) continue;
-    if (nome === 'finiDiRiga.test.mjs') continue; // la regex qui sopra si nomina da sé
-    const sorgente = leggiTestoRepo(join(CARTELLA_UNIT, nome));
+  for (const percorso of tuttiIFileDiTest(CARTELLA_TEST)) {
+    const rel = relative(ROOT, percorso).replace(/\\/g, '/');
+    if (rel === 'tests/unit/finiDiRiga.test.mjs') continue; // la regex qui sopra si nomina da sé
+    const sorgente = leggiTestoRepo(percorso);
     if (!FILE_ANALIZZATI.test(sorgente)) continue;
     sorgente.split('\n').forEach((riga, i) => {
-      if (conACapoInMezzo.test(riga)) colpevoli.push(`${nome}:${i + 1}: ${riga.trim().slice(0, 100)}`);
+      if (ESEMPIO_VOLUTO.test(riga)) return;
+      if (conACapoInMezzo.test(riga)) colpevoli.push(`${rel}:${i + 1}: ${riga.trim().slice(0, 100)}`);
     });
   }
   assert.deepEqual(
