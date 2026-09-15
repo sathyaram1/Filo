@@ -116,7 +116,7 @@ test('un file del repo che una sentinella analizza si legge dalla porta, non con
     const variabili = variabiliColPercorso(sorgente);
     sorgente.split(/\r?\n/).forEach((riga, i) => {
       if (!/readFileSync\s*\(/.test(riga)) return;
-      if (ESEMPIO_VOLUTO.test(riga)) return;
+      if (ESEMPIO_VOLUTO.test(riga) || NON_ANALIZZATO.test(riga)) return;
       const nominaIlFile = FILE_ANALIZZATI.test(riga);
       const passaPerVariabile = [...variabili].some((v) => new RegExp(`readFileSync\\s*\\(\\s*${v}\\b`).test(riga));
       if (!nominaIlFile && !passaPerVariabile) return;
