@@ -39,8 +39,9 @@ test('le quattro frasi che promettono l’anonimato ci sono ancora, dopo il riba
 
   // 3. Le note di versione.
   const note = leggi('src/shared/patchNotes.js');
-  expect(note).toContain('non dice più chi l’ha fatto');
+  expect(note).toContain('con le altre installazioni non dice più chi');
   expect(note).toContain('può chiederli solo un sito per volta');
+  expect(note).toContain('un indirizzo che non è un sito pubblico');
 
   // 4. La pagina che spiega la sicurezza.
   const sec = leggi('SECURITY.md');
