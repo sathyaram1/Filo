@@ -80,6 +80,13 @@ test('#569 giro 2: gli unit test passano anche quando il binario dell\'app non √
       writeFileSync(join(cartellaUnit, nome), ponte(percorso), 'utf8');
     }
 
+    // L'ambiente di questo processo porta i segni di `node --test` (per esempio
+    // NODE_TEST_CONTEXT): passati al lanciatore lo farebbero uscire subito e
+    // VERDE, cio√® una prova che non prova niente. Si tolgono.
+    const ambiente = { ...process.env };
+    delete ambiente.NODE_TEST_CONTEXT;
+    delete ambiente.NODE_OPTIONS;
+
     const esito = spawnSync(
       process.execPath,
       [join(ROOT, 'scripts', 'run-unit-tests.mjs')],
@@ -88,7 +95,7 @@ test('#569 giro 2: gli unit test passano anche quando il binario dell\'app non √
         encoding: 'utf8',
         maxBuffer: 1024 * 1024 * 64,
         env: {
-          ...process.env,
+          ...ambiente,
           FILO_UNIT_DIR: cartellaUnit,
           // Le stesse condizioni del lavoro su Windows.
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1',
