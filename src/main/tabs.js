@@ -1346,10 +1346,9 @@ class TabManager {
     tab.view.webContents.reload();
   }
 
-  // Nasconde/mostra la view del tab attivo. Serve alla shell per far apparire
-  // dropdown HTML (es. menu App) sopra l'area contenuti: le WebContentsView
-  // native vengono sempre composte sopra l'HTML della shell e ignorano lo
-  // z-index CSS, quindi un menu che sborda nell'area pagina finirebbe coperto.
+  // Le WebContentsView native si compongono SEMPRE sopra l'HTML della shell e
+  // ignorano lo z-index: un pannello che sborda nell'area pagina finirebbe
+  // sotto, quindi la vista si nasconde.
   setActiveVisible(visible) {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (tab) tab.view.setVisible?.(visible);
