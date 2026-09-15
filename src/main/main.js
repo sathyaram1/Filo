@@ -4,8 +4,7 @@
 const { app, BrowserWindow, nativeTheme, session } = require('electron');
 const path = require('node:path');
 
-// In test mode, redirigi anche userData (cookies, cache, ecc.) sotto la
-// directory temp così l'isolamento è completo.
+// Anche userData (cookie, cache) va nella temp, o l'isolamento non è completo.
 if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
