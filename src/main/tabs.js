@@ -644,8 +644,7 @@ class TabManager {
     if (activate) {
       for (const t of this.tabs) t.view.setVisible?.(t.id === id);
     }
-    // #152 — born proxied: se il dominio ha una regola persistente, la scheda
-    // nasce instradata da quel paese (ricrea la view nella partition proxata).
+    // #152 — con una regola sul dominio la scheda nasce già instradata.
     this._maybeApplyDomainRule(tab, url);
     this._broadcast();
     return id;
