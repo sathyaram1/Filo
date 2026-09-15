@@ -1197,9 +1197,8 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     this.activeId = id;
-    // §2.1 segnale: quando una tab diventa attiva è "usata adesso". Aggiorna sia
-    // il momento di ultima attivazione sia l'ultima interazione (proxy grossolano;
-    // il content script raffina con i veri eventi di input).
+    // §2.1 — una scheda che diventa attiva è "usata adesso". Approssimazione
+    // grossolana: il content script la raffina con gli eventi veri.
     const now = Date.now();
     tab.lastActiveAt = now;
     tab.lastInteractionAt = now;
