@@ -240,9 +240,8 @@ function buildHTML(entries, isDark, margin = 26) {
           `${icoSpan}` +
           `<span class="lbl">${label}</span></button>`;
         if (e.subAction) {
-          // Voce a due zone di click: il corpo esegue `action`, la freccia a
-          // destra manda `subAction` (il chiamante riapre il menu col secondo
-          // livello — es. la lista paesi di "Apri da un altro paese").
+          // Due zone di click: il corpo fa `action`, la freccia `subAction`
+          // (il chiamante riapre il menu col secondo livello).
           const escSub = ('@action:' + e.subAction).replace(/'/g, "\\'");
           items += `<div class="row">${main}` +
             `<button class="subarrow" aria-label="Altre opzioni" ` +
