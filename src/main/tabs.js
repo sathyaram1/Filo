@@ -2070,10 +2070,9 @@ class TabManager {
       // #145 — i media delle schede ripristinate restano in pausa all'avvio.
       urls.forEach((url, i) => {
         const id = this.openTab(url, { activate: false, suppressAutoplay: true });
-        // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
-        // riparte già tinta e il riordino cromatico alla riapertura ha i dati
-        // pronti senza attendere il ricalcolo dei content script. Seeda anche la
-        // cache per host, così una did-navigate sullo stesso dominio lo conserva.
+        // §1.2/§1.3 — la barra riparte già tinta, senza aspettare che i content
+        // script ricalcolino. Si semina anche la cache per host, o la prima
+        // navigazione sullo stesso dominio butterebbe via il colore.
         if (id && colors[i]) this.setTabIdentityColor(id, colors[i]);
       });
       if (activeIndex < 0 || activeIndex >= this.tabs.length) activeIndex = this.tabs.length - 1;
