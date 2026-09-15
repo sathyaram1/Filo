@@ -96,15 +96,24 @@ test('il lettore normalizza davvero CRLF e CR soli', () => {
 });
 
 test('un file del repo che una sentinella analizza si legge dalla porta, non con readFileSync', () => {
+  // Le prove dei giri di verifica passati sono memoria congelata: non si
+  // riscrivono, quindi questa regola di stile non le riguarda. Il difetto vero
+  // (la ricerca con un «a capo» in mezzo) le riguarda eccome, ed è il controllo
+  // qui sotto, che infatti scende anche lì.
   const colpevoli = [];
-  for (const nome of readdirSync(CARTELLA_UNIT)) {
-    if (!nome.endsWith('.mjs')) continue;
-    if (nome === 'finiDiRiga.test.mjs') continue; // qui readFileSync serve a leggere i test stessi
-    const sorgente = readFileSync(join(CARTELLA_UNIT, nome), 'utf8');
+  for (const percorso of tuttiIFileDiTest(CARTELLA_TEST)) {
+    const rel = relative(ROOT, percorso).replace(/\\/g, '/');
+    if (rel === 'tests/unit/finiDiRiga.test.mjs') continue; // qui readFileSync serve a leggere i test stessi
+    if (rel.startsWith('tests/verifica/')) continue;
+    const sorgente = readFileSync(percorso, 'utf8');
+    const variabili = variabiliColPercorso(sorgente);
     sorgente.split(/\r?\n/).forEach((riga, i) => {
       if (!/readFileSync\s*\(/.test(riga)) return;
-      if (!FILE_ANALIZZATI.test(riga)) return;
-      colpevoli.push(`${nome}:${i + 1}: ${riga.trim().slice(0, 100)}`);
+      if (ESEMPIO_VOLUTO.test(riga)) return;
+      const nominaIlFile = FILE_ANALIZZATI.test(riga);
+      const passaPerVariabile = [...variabili].some((v) => new RegExp(`readFileSync\\s*\\(\\s*${v}\\b`).test(riga));
+      if (!nominaIlFile && !passaPerVariabile) return;
+      colpevoli.push(`${rel}:${i + 1}: ${riga.trim().slice(0, 100)}`);
     });
   }
   assert.deepEqual(
