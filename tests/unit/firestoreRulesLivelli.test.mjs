@@ -13,27 +13,35 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { leggiTestoRepo } from '../helpers/testo.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Fine riga normalizzata: in una cartella di lavoro git può estrarre il file
-// con `\r\n`, e una sentinella che cerca `\n` diventava rossa senza motivo.
-const RULES = readFileSync(join(__dirname, '..', '..', 'firestore.rules'), 'utf8').replace(/\r\n/g, '\n');
+const RULES = leggiTestoRepo(join(__dirname, '..', '..', 'firestore.rules'));
 
-function bloccoUpdate(guardia) {
-  const i = RULES.indexOf(`allow update: if\n        ${guardia}()`);
-  assert.notEqual(i, -1, `manca il ramo di update con ${guardia}()`);
+// Il ritaglio del ramo di update, dato il TESTO delle regole. Il testo entra
+// come parametro — e non si legge qui dentro — perché la prova qui sotto glielo
+// passa coi fini riga di Windows.
+//
+// Niente «a capo» dentro una stringa da cercare: `indexOf('…if\n        isAdmin()')`
+// era il difetto del #569. Su un checkout di Windows quel file arriva con CRLF,
+// la stringa non si trova più e la sentinella diceva «manca il ramo di update
+// con isAdmin()» su un file che quel ramo ce l'aveva. `\s+` copre tutti e due i
+// fini riga e anche un rientro cambiato.
+function bloccoUpdate(testo, guardia) {
+  const inizio = new RegExp(`allow update: if\\s+${guardia}\\(\\)`).exec(testo);
+  assert.notEqual(inizio, null, `manca il ramo di update con ${guardia}()`);
   // Fino alla regola dopo: un «;» dentro un commento chiuderebbe il blocco
   // troppo presto.
-  const fine = RULES.indexOf('\n      allow ', i + 1);
-  return RULES.slice(i, fine === -1 ? undefined : fine);
+  const resto = testo.slice(inizio.index);
+  const dopo = /\n\s*allow /.exec(resto.slice(1));
+  return dopo ? resto.slice(0, dopo.index + 1) : resto;
 }
 
 test('livelli: ammesso negli hasOnly del triage admin e della routine, con il vincolo di forma', () => {
   for (const guardia of ['isAdmin', 'isRoutine']) {
-    const blocco = bloccoUpdate(guardia);
+    const blocco = bloccoUpdate(RULES, guardia);
     assert.match(blocco, /'livelli'/, `${guardia}: 'livelli' deve stare nell'hasOnly`);
     assert.match(blocco, /livelliValidi\(request\.resource\.data\)/, `${guardia}: il vincolo di forma va applicato`);
   }
