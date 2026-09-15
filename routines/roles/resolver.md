@@ -72,11 +72,14 @@ né per "spezzare di fatto".
 È tutto in CLAUDE.md e vale per intero: sintomo-vs-causa, invarianti UX e
 deviazioni dichiarate, la Verifica coi minimi per tipo di modifica (unit,
 spec mirato, visivo), le fonti di verità da aggiornare nello stesso commit.
-**Niente suite completa prima di consegnare** (dal 2026-09-03): la lancia il
-verificatore, una volta, prima di lasciar passare il lavoro; un rosso nuovo è
-un suo rilievo, e dal 2026-09-05 (feedback #561) si corregge prima che il
-lavoro passi. Venticinque minuti di attesa a ogni consegna erano metà del costo
-di un giro. Non fondere su `main`: l'hook
+**Niente suite completa prima di consegnare** — e dal 2026-09-15 non la lancia
+più nemmeno il verificatore: gira in GitHub, nel lavoro di release, ogni sei
+ore prima di pubblicare, e un rosso nuovo lì ferma la patch e diventa un
+feedback. Quello che ti torna indietro è un rosso di `npm run finish:check` o
+delle prove del giro, ed è un rilievo del verificatore che dal 2026-09-05
+(feedback #561) si corregge prima che il lavoro passi. Venticinque minuti di
+attesa a ogni consegna erano metà del costo di un giro. Non fondere su `main`:
+l'hook
 committa e pusha sul branch, il merge lo fa il gate a valle.
 
 ## Prima di consegnare: la verifica la fai tu, per primo
