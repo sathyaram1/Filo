@@ -237,10 +237,8 @@ class TabManager {
     // tiene solo l'altezza per il layout.
     this.chromeCompact = false;
     this.tabRowHeight = TAB_ROW_HEIGHT;
-    // Snapshot delle impostazioni di sicurezza, ripopolato da setSecurity() ogni
-    // volta che l'utente salva da Opzioni. I default qui rispecchiano quelli in
-    // DEFAULT_SETTINGS.security così se setSecurity non viene mai chiamato la
-    // protezione è comunque attiva.
+    // I default qui ricalcano DEFAULT_SETTINGS.security: se setSecurity non
+    // viene mai chiamata la protezione dev'essere comunque accesa.
     this.security = { protectIpLeak: true, blockPopups: true };
     // Modalità cookie corrente ('manual' | 'default' | 'privacy') + siti fidati.
     // Ripopolata da setSecurity quando l'utente salva. In 'privacy' ogni sito
