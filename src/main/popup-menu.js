@@ -130,9 +130,7 @@ function computeMenuWidth(entries) {
   return Math.min(MENU_MAX_W, needed);
 }
 
-// ── Mostra il menu ────────────────────────────────────────────────────────
 function showPopupMenu(parentWin, entries, x, y, onSelect) {
-  // Chiudi un eventuale popup precedente
   if (activePopup && !activePopup.isDestroyed()) {
     activePopup.close();
     activePopup = null;
