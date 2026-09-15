@@ -1093,10 +1093,8 @@ class TabManager {
     return { archived: toArchive.length };
   }
 
-  // §1.3 — riordina la striscia per colore (arcobaleno) in base all'identityColor.
-  // Le tab senza colore (interne, identità ignota) restano in coda nell'ordine.
-  // Ritorna true se l'ordine è effettivamente cambiato (per decidere se
-  // ribroadcastare alla shell).
+  // §1.3 — le schede senza colore restano in coda nel loro ordine. Ritorna true
+  // solo se l'ordine è cambiato davvero.
   reorderTabsByColor() {
     const before = this.tabs;
     const withIdx = before.map((t, i) => ({ t, i }));
