@@ -199,10 +199,8 @@ function registerIpcHandlers() {
     if (s) s.write(String(text == null ? '' : text));
   });
 
-  // Stop: uccide l'intera shell della scheda (e l'albero di processi). Il
-  // comando successivo ne ricrea una pulita; la cwd è preservata dalla
-  // dashboard (che la ripassa). Le variabili impostate prima dello Stop vanno
-  // perse: è il compromesso per un'interruzione affidabile su Windows.
+  // Uccide la shell intera, non il solo comando: su Windows è l'unico modo di
+  // interrompere in modo affidabile. Costo accettato: le variabili si perdono.
   ipcMain.on('shell:abort', (event) => {
     const s = shellSessions.get(event.sender.id);
     if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(event.sender.id); }
