@@ -723,7 +723,6 @@
     'spellcheck/spellcheck.html': 'Correttore',
   };
 
-  // Toglie un eventuale prefisso "Filo — " / "Filo -" da un titolo di pagina.
   function stripFiloPrefix(title) {
     return String(title || '').replace(/^\s*Filo\s*[—–-]\s*/i, '').trim();
   }
