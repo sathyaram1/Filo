@@ -862,8 +862,6 @@ class TabManager {
     // La ricreazione applica anche l'anti-leak WebRTC. Vale pure per il cambio
     // paese: stessa partizione, proxy aggiornato, ricarica dal nuovo endpoint.
     this._recreateView(tab, tab.url || 'filo://newtab/');
-    // Memorizza l'ultima location usata: è il default del prossimo click
-    // diretto su "Apri da un altro paese". Best-effort.
     try { globalThis.SN_STORAGE?.updateSettings?.({ proxy: { lastCountry: code } }); } catch (_) {}
     return { ok: true, country: code, tier: resolved.tier };
   }
