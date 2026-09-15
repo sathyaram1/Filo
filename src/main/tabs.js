@@ -1056,9 +1056,8 @@ class TabManager {
     }
   }
 
-  // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive' (mai la
-  // attiva o con audio — salvaguardia), poi riordina cromaticamente i superstiti
-  // (§1.3) e mostra il toast (§2.3). `cands` è l'elenco indicizzato passato all'LLM.
+  // Mai la scheda attiva né una con audio, qualunque cosa dica l'LLM: è la
+  // salvaguardia. `cands` è l'elenco indicizzato che gli era stato passato.
   applyTriageDecisions(cands, decisions) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
