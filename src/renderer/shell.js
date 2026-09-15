@@ -645,8 +645,6 @@
         el.appendChild(m);
       }
 
-      // Indicatore "aperta da un altro paese": globo + codice paese accanto al
-      // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
       if (t.proxy && t.proxy.country) {
         const p = document.createElement('span');
         p.className = 'proxy-ind';
