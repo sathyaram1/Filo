@@ -384,11 +384,8 @@
     if (!d.moved) return;
     // Il click che segue il mouseup non deve riattivare/spostare la tab.
     suppressClickId = d.id;
-    // La posizione di rilascio è quella del NODO effettivamente trascinato, non
-    // la prima occorrenza dell'id: usare l'identità del nodo (indexOf(d.el)) è
-    // robusto anche se in barra esistesse un secondo .tab con lo stesso id, dove
-    // indexOf(id) prenderebbe la posizione sbagliata. Se il nodo non è in barra
-    // (non dovrebbe capitare), ripiego sull'id.
+    // La posizione si prende dall'IDENTITÀ del nodo, non dall'id: con un
+    // doppione in barra, cercare per id darebbe la posizione sbagliata.
     const nodes = [...tabsEl.querySelectorAll('.tab')];
     let toIndex = nodes.indexOf(d.el);
     if (toIndex < 0) toIndex = nodes.map((x) => x.dataset.id).indexOf(d.id);
