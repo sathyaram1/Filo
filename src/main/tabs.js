@@ -46,10 +46,8 @@ const ESC_ATTESA_PAGINA_CHE_RISPONDE_MS = 2500;
 // che si possono impilare, e riparte da zero a ogni altro gesto dell'utente.
 const ESC_RIVENDICAZIONI_MAX = 3;
 
-// #514 — la scheda a cui appartiene una WebContents, in qualunque finestra. La
-// sessione è condivisa fra finestre e schede, mentre "l'ultimo tasto era l'Esc"
-// è una cosa della singola scheda: il gestore dei permessi deve poter risalire
-// dall'una all'altra.
+// #514 — la sessione è condivisa fra finestre e schede, ma "l'ultimo tasto era
+// l'Esc" è della singola scheda: il gestore dei permessi deve poter risalire.
 function tabDiWebContents(wc) {
   try {
     for (const w of BrowserWindow.getAllWindows()) {
