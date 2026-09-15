@@ -448,10 +448,8 @@ class TabManager {
     this._escUscitaTimer = null;
   }
 
-  // La pagina davanti dice che quell'Esc se l'è preso un riquadro di Filo.
   // Tollerante sul mittente: le schede in secondo piano il tasto non lo
-  // ricevono, e un riquadro dentro un riquadro incorporato parla per la sua
-  // pagina.
+  // ricevono, e un riquadro dentro un iframe parla per la sua pagina.
   escConsumato(tabId = null) {
     if (tabId != null && tabId !== this.activeId) return;
     // Conta solo se c'era davvero un'uscita in attesa: è quella la rivendicazione.
