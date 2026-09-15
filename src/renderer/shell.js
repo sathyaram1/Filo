@@ -605,9 +605,6 @@
         }
       }
 
-      // Audio in riproduzione: aggiunge classe per il bagliore animato.
-      // Il colore del bagliore viene calcolato dal colore identità della tab
-      // (desaturato, come la tinta §1.2) e impostato come variabile CSS inline.
       const isAudible = t.audible && !t.muted;
       if (isAudible) {
         el.classList.add('audible');
