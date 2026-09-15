@@ -16,9 +16,10 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { leggiTestoRepo } from '../helpers/testo.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const INDICE = join(ROOT, 'PATTERNS.md');
@@ -29,7 +30,7 @@ const CARTELLA = join(ROOT, 'patterns');
 // supera davvero, il file è tornato a contenere i racconti.
 const TETTO_INDICE = 60 * 1024;
 
-const testo = readFileSync(INDICE, 'utf8');
+const testo = leggiTestoRepo(INDICE);
 
 // Le righe si spezzano togliendo anche il ritorno a capo di Windows. Con un
 // checkout a CRLF ogni riga finiva per `\r`, che per una regex è un fine riga
@@ -51,7 +52,7 @@ const fileDellaCartella = readdirSync(CARTELLA)
   .sort();
 
 function titoloDelFile(slug) {
-  const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
+  const contenuto = leggiTestoRepo(join(CARTELLA, `${slug}.md`));
   const prima = contenuto.split(/\r?\n/)[0];
   return prima.startsWith('# ') ? prima.slice(2).trim() : null;
 }
@@ -124,7 +125,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
     // diventare rossa — un racconto svuotato di tutto tranne titolo e ritorno
     // passava. Un controllo che non può fallire non è un controllo.
     const vuoti = fileDellaCartella.filter((slug) => {
-      const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
+      const contenuto = leggiTestoRepo(join(CARTELLA, `${slug}.md`));
       const corpo = contenuto
         .split(/\r?\n/)
         .slice(1)
@@ -155,7 +156,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
         const percorso = join(dir, voce.name);
         if (voce.isDirectory()) { scendi(percorso); continue; }
         if (!estensioni.some((e) => voce.name.endsWith(e))) continue;
-        const contenuto = readFileSync(percorso, 'utf8');
+        const contenuto = leggiTestoRepo(percorso);
         const nome = percorso.slice(ROOT.length + 1);
         for (const m of contenuto.matchAll(RIMANDO)) {
           if (!esistenti.has(m[1])) rimandi.push(`${nome} → ${m[0]}`);
@@ -175,7 +176,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
     // ricerca — non solo dall'indice. Chi ci atterra così deve poter tornare
     // all'elenco delle altre regole senza sapere che esiste.
     const senzaRitorno = fileDellaCartella.filter((slug) => {
-      const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
+      const contenuto = leggiTestoRepo(join(CARTELLA, `${slug}.md`));
       return !contenuto.includes('](../PATTERNS.md)');
     });
     assert.deepEqual(senzaRitorno, [], 'racconti senza il rimando all\'indice');
@@ -189,7 +190,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
     const POSIZIONALE = /(?:pattern|regola|sezione|racconto|rete di sicurezza)[^.]{0,60}?qui (?:sopra|sotto)|qui (?:sopra|sotto)[^.]{0,60}?(?:pattern|regola|sezione|racconto)/i;
     const colpevoli = [];
     for (const slug of fileDellaCartella) {
-      const testoPiatto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8').replace(/\s+/g, ' ');
+      const testoPiatto = leggiTestoRepo(join(CARTELLA, `${slug}.md`)).replace(/\s+/g, ' ');
       const m = testoPiatto.match(POSIZIONALE);
       if (m) colpevoli.push(`${slug}: «${m[0].trim()}»`);
     }
@@ -202,7 +203,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
     const titoli = fileDellaCartella.map((slug) => ({ slug, titolo: titoloDelFile(slug) }));
     const scollegati = [];
     for (const { slug } of titoli) {
-      const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
+      const contenuto = leggiTestoRepo(join(CARTELLA, `${slug}.md`));
       for (const altro of titoli) {
         if (altro.slug === slug || !altro.titolo) continue;
         if (contenuto.includes(altro.titolo) && !contenuto.includes(`(${altro.slug}.md)`)) {

@@ -43,13 +43,13 @@ import {
   doc, setDoc, getDoc, deleteDoc, updateDoc, getDocs, collection, collectionGroup,
   query, limit, orderBy, addDoc, Timestamp,
 } from 'firebase/firestore';
-import { readFileSync } from 'node:fs';
+import { leggiTestoRepo } from '../helpers/testo.mjs';
 
 const REGOLE = process.env.RULES_FILE || 'firestore.rules';
 
 const env = await initializeTestEnvironment({
   projectId: 'filo-prova-584',
-  firestore: { host: '127.0.0.1', port: 8089, rules: readFileSync(REGOLE, 'utf8') },
+  firestore: { host: '127.0.0.1', port: 8089, rules: leggiTestoRepo(REGOLE) },
 });
 await env.clearFirestore();
 

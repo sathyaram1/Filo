@@ -19,13 +19,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { leggiTestoRepo } from '../helpers/testo.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
+const RULES = leggiTestoRepo(join(ROOT, 'firestore.rules'));
 
 /** Il blocco `allow create` anonimo di /feedback (quello con hasOnly). */
 function createAnonimaDiFeedback() {

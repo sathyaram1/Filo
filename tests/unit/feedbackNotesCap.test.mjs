@@ -123,8 +123,8 @@ test('il salvataggio dalla dashboard non spedisce mai note oltre il tetto', asyn
 
 /** Il tetto dichiarato nelle regole Firestore (i due rami devono concordare). */
 async function tettoDelleRegole() {
-  const { readFileSync } = await import('node:fs');
-  const rules = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
+  const { leggiTestoRepo } = await import('../helpers/testo.mjs');
+  const rules = leggiTestoRepo(join(ROOT, 'firestore.rules'));
   const limits = [...rules.matchAll(/get\('notes', ''\)\.size\(\) <= (\d+)/g)].map((m) => Number(m[1]));
   assert.ok(limits.length >= 2, 'attesi i due rami (admin e routine) che limitano le note');
   for (const l of limits) assert.equal(l, limits[0], 'i due rami delle regole devono avere lo stesso tetto');

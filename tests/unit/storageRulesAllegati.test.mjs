@@ -30,13 +30,14 @@ import { dirname, join } from 'node:path';
 import '../../src/shared/feedbackAttachTypes.js';
 import '../../src/shared/feedback.js';
 import { mimeDiAllegato } from '../../scripts/claude-feedback.mjs';
+import { leggiTestoRepo } from '../helpers/testo.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 // `STORAGE_RULES_FILE` serve a una cosa sola: puntare la sentinella alle regole
 // di PRIMA (`git show main:storage.rules > /tmp/vecchie.rules`) e vederla
 // diventare rossa. Un test che non si sa far fallire non prova niente.
-const RULES = readFileSync(process.env.STORAGE_RULES_FILE || join(ROOT, 'storage.rules'), 'utf8');
+const RULES = leggiTestoRepo(process.env.STORAGE_RULES_FILE || join(ROOT, 'storage.rules'));
 
 const FB = globalThis.SN_FEEDBACK;
 const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
