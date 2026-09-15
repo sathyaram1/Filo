@@ -77,10 +77,8 @@ async function filoHandler(request) {
       fsPath = path.join(SRC, 'pages', host, rel || `${host}.html`);
     }
 
-    // Sicurezza: non lasciare uscire dalla root del progetto. Il confine deve
-    // includere il separatore: senza, una cartella sorella il cui path inizia
-    // con la stringa ROOT (es. "Filo-altro" accanto a "Filo") passerebbe il
-    // check. Consentiamo ROOT esatta o un percorso sotto ROOT + separatore.
+    // Il confine include il separatore: senza, una cartella sorella che inizia
+    // con la stessa stringa ("Filo-altro" accanto a "Filo") passerebbe.
     const resolved = path.resolve(fsPath);
     if (resolved !== ROOT && !resolved.startsWith(ROOT + path.sep)) {
       return new Response('Forbidden', { status: 403 });
