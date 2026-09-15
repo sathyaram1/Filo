@@ -328,7 +328,6 @@ function registerIpcHandlers() {
     };
   });
 
-  // ─── popup menu custom (sopra le WebContentsView) ────────────────────────
   ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
