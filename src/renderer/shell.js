@@ -886,12 +886,9 @@
   // Anche il vecchio toast passa di qui, o non rispetterebbe la durata scelta.
   function showToast(text) { return NOTIFS.show(text); }
 
-  // ── Aprire uno scaricamento: se il file non c'è più, DILLO ──────────────
-  // Il main risponde { ok:false, missing:true, error } quando il percorso non
-  // punta più a niente (file spostato, rinominato o cestinato dopo). Prima quella
-  // risposta veniva buttata via e il clic non produceva nulla: il silenzio è
-  // indistinguibile da un'app bloccata. Ora l'esito diventa un avviso, con la
-  // cartella come via d'uscita (il file potrebbe essere lì rinominato).
+  // Se il file non c'è più il main risponde { missing: true }, e va DETTO: un
+  // clic che non produce niente è indistinguibile da un'app bloccata. La
+  // cartella resta come via d'uscita, il file potrebbe essere lì rinominato.
   function openDownloadFile(id) {
     if (!api.downloads) return Promise.resolve();
     return api.downloads.openFile(id).then((res) => {
