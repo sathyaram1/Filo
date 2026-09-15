@@ -2067,8 +2067,7 @@ class TabManager {
 
     this._restoring = true;
     try {
-      // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
-      // al boot (niente più video YouTube che ripartono tutti insieme).
+      // #145 — i media delle schede ripristinate restano in pausa all'avvio.
       urls.forEach((url, i) => {
         const id = this.openTab(url, { activate: false, suppressAutoplay: true });
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
