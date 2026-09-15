@@ -813,7 +813,6 @@
       card.dataset.closing = '1';
       if (card._timer) clearTimeout(card._timer);
       card.classList.remove('show');
-      // attende la transizione prima di rimuovere dal DOM
       setTimeout(() => { try { card.remove(); } catch (_) {} syncOverflow(); }, 220);
     }
     // showNotification(text, opts?) — opts: { durationSec, sound (toneId|false),
