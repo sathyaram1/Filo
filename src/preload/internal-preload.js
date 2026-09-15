@@ -282,16 +282,9 @@ function loadContentScripts() {
     document.documentElement.dataset.filoContentScripts = '1';
   } catch (_) {}
 }
-// Self è già aliasato a window/globalThis via il primo `globalThis.self = ...`
-// del shim chrome più sotto? No — non l'abbiamo fatto qui. I content script
-// usano `self.SN_*`. Con contextIsolation:false, `self` è già aliased a
-// window dal browser (è una proprietà standard del WindowOrWorkerGlobalScope).
-// Sovrascrivi lo stub di Chromium PRIMA di caricare i content script, così
-// chrome.runtime.sendMessage è già il nostro shim IPC quando content.js fa
-// fetchSettings() durante init().
-// Installa lo shim chrome.* SOLO su origine filo:// (vedi IS_FILO_ORIGIN). Su
-// un'origine non-filo finita qui per errore non esponiamo storage/IPC alla
-// pagina non fidata.
+// Lo stub chrome di Chromium va sovrascritto PRIMA dei content script: quando
+// content.js legge le impostazioni in init(), sendMessage dev'essere già il
+// nostro. E solo su origine filo:, come tutto il resto delle API privilegiate.
 if (IS_FILO_ORIGIN) {
   try {
     Object.defineProperty(window, 'chrome', {
