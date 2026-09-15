@@ -435,8 +435,7 @@ class TabManager {
   }
 
   // La pagina si è presentata: ha i pezzi di Filo dentro e a un Esc risponde
-  // (rivendicandolo o chiedendo lei l'uscita). Da qui in poi il main la aspetta
-  // invece di uscire a tempo. Lo dichiara il content script appena montato.
+  // comunque, quindi da qui in poi il main la aspetta invece di uscire a tempo.
   paginaRispondeAllEsc(tabId) {
     if (tabId == null) return;
     const t = this.tabs.find((x) => x.id === tabId);
