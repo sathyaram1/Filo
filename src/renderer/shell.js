@@ -1064,7 +1064,6 @@
         list.appendChild(empty);
       }
       for (const r of all) list.appendChild(renderRow(r));
-      // Il pannello ha cambiato altezza: aggiorna lo spazio riservato.
       if (panelOpen) reserveForPanel();
     }
 
