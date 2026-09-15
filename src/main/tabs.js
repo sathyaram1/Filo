@@ -1297,8 +1297,8 @@ class TabManager {
     tab.partitionSite = tab.isInternal ? null : Cookies.registrableOf(url);
     this._wireEvents(tab);
     this._applySecurity(tab);
-    // Lo stato "mutato" è una scelta dell'utente sulla tab, non sul WebContents:
-    // la nuova view nasce con audio attivo, quindi riapplichiamo tab.muted.
+    // Il silenzio è una scelta dell'utente sulla SCHEDA: la vista nuova nasce
+    // con l'audio acceso e va rimessa com'era.
     try { view.webContents.setAudioMuted(!!tab.muted); } catch (_) {}
     this.win.contentView.addChildView(view);
     if (wasActive) this.activeId = tab.id;
