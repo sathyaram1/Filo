@@ -23,7 +23,7 @@
 //   quando è stata scritta, non lo è più da quando queste regole pretendono un
 //   nome con entropia.
 //
-// ESITO AL GIRO 8 (2026-09-15): 11 controlli su 11, tutto chiuso.
+// ESITO AL GIRO 8 (2026-09-15): 14 controlli su 14, tutto chiuso.
 //   Il caricamento dalla strada dell'app passa e il deposito rilascia il codice
 //   di scarico; il link col codice apre, il solo indirizzo no, i metadati no;
 //   elencare non si può, né la cartella né la radice; sovrascrivere l'allegato
