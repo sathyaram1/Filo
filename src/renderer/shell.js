@@ -1240,10 +1240,8 @@
   if (api.onFeedbackDim) {
     let dimTabId = null;
 
-    // ── Disegno annotazione sulla barra in alto ──────────────────────────
-    // Permette di disegnare a mano libera su tab+barra indirizzi (la parte di
-    // Filo non coperta dalla WebContentsView), così l'annotazione copre TUTTA
-    // l'app. I tratti sono identici a quelli della pagina (rosso, spessore 3).
+    // Si disegna anche sulla barra, o l'annotazione coprirebbe solo mezza app.
+    // Tratti identici a quelli della pagina: è lo stesso disegno.
     const drawCanvas = document.getElementById('feedback-draw');
     const STROKE_COLOR = '#ff3b30';
     const STROKE_WIDTH = 3;
