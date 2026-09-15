@@ -846,9 +846,8 @@ class TabManager {
     const resolved = ProxyTab.resolve(code, { tier, settings });
     if (!resolved) return { ok: false, error: 'not_configured' };
     const partition = `proxy:${tab.id}`;
-    // Niente prefisso persist: → la session proxata è effimera (in RAM): i suoi
-    // cookie non sopravvivono alla chiusura dell'app. setProxy va applicato e
-    // ATTESO prima di creare la view, o le prime richieste partirebbero dirette.
+    // Sessione effimera (niente 'persist:'). setProxy va ATTESO prima di creare
+    // la vista, o le prime richieste partono dirette.
     const ses = session.fromPartition(partition);
     try {
       await ses.setProxy({
