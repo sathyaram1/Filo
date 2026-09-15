@@ -189,7 +189,6 @@ function registerIpcHandlers() {
     }
   });
 
-  // Directory iniziale da mostrare nella riga grigia quando si attiva il terminale.
   ipcMain.handle('shell:home', () => {
     try { return { ok: true, cwd: defaultCwd() }; } catch (_) { return { ok: false }; }
   });
