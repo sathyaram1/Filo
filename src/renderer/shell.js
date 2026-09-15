@@ -446,10 +446,8 @@
     return Math.max(p[0], p[1], p[2]) - Math.min(p[0], p[1], p[2]) >= 24;
   }
 
-  // Colore identità attenuato (§1.2): smorza la saturazione del colore del sito
-  // a una frazione dell'originale (tinta "subliminale"). La luminosità non la
-  // tocchiamo qui: la spostiamo verso il neutro del tab bar mescolandola con
-  // --tab-bg via CSS color-mix (così resta giusta sia in tema chiaro che scuro).
+  // §1.2 — qui si smorza solo la saturazione. La luminosità la sposta il
+  // color-mix CSS con --tab-bg, così resta giusta in tema chiaro e scuro.
   function attenuateIdentity(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return null;
