@@ -243,14 +243,10 @@ const chromeShim = {
 globalThis.chrome = chromeShim;
 globalThis.self = globalThis; // i moduli IIFE controllano `self` come fallback
 
-// ─── #405 — quale frame sta usando l'utente ────────────────────────────────
-//
-// Le scorciatoie globali (Alt+E Spiegazione, Alt+T Traduci) lavorano sul testo
-// selezionato. Con i riquadri incorporati il testo selezionato può stare dentro
-// il riquadro, ma `webContents.send` consegna SOLO al frame principale: la
-// scorciatoia arrivava a chi non aveva nessuna selezione e non succedeva nulla.
-// Ogni frame segnala al main quando l'utente ci sta interagendo (limitato a una
-// segnalazione ogni mezzo secondo), così il main sa a chi consegnare.
+// #405 — `webContents.send` consegna SOLO al frame principale, ma il testo
+// selezionato può stare in un riquadro: ogni frame segnala al main quando
+// l'utente ci interagisce (al più una volta ogni mezzo secondo), così il main
+// sa a chi consegnare le scorciatoie che lavorano sulla selezione.
 try {
   let lastClaim = 0;
   const claim = () => {
