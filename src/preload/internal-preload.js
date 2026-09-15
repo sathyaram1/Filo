@@ -1,9 +1,6 @@
-// Preload per le pagine interne (filo://...).
-//
-// contextIsolation è DISATTIVATO per queste pagine (vedi tabs.js): è codice
-// nostro fidato e ha bisogno di chrome.* in scope globale per riusare 1:1
-// quanto portato dall'estensione. Possiamo assegnare direttamente window.*
-// e l'assegnazione è visibile alla pagina.
+// Preload PRIVILEGIATO delle pagine filo://: espone window.filo e lo shim
+// chrome.*, con contextIsolation disattivato (codice nostro, che usa chrome.* in
+// scope globale). Niente di tutto questo deve uscire da un'origine filo:.
 
 const { ipcRenderer, webFrame } = require('electron');
 
