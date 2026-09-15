@@ -1211,9 +1211,8 @@ class TabManager {
     this._broadcast();
   }
 
-  // §2.1 — segnali di attività riportati dal content script (input, scroll,
-  // form sporco). Merge parziale sullo snapshot. Best-effort: throttled lato
-  // pagina, qui non rimbalziamo se nulla cambia in modo significativo.
+  // §2.1 — segnali di attività dal content script (input, scroll, modulo
+  // sporco). Già limitati lato pagina; qui non si rimbalza se nulla cambia.
   setTabActivity(id, activity) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !activity || typeof activity !== 'object') return;
