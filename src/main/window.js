@@ -84,8 +84,8 @@ function createMainWindow() {
     autoHideMenuBar: true,
   });
 
-  // Invisibile fin dalla nascita, non dal primo disegno: fra i due momenti
-  // passano centinaia di millisecondi in cui la finestra esiste già.
+  // Invisibile dalla nascita: fra questa e il primo disegno passano centinaia
+  // di millisecondi in cui la finestra esiste già.
   hideForTests(win, { main: true });
 
   win.loadURL('filo://shell/shell.html');
