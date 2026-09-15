@@ -220,9 +220,7 @@ function buildHTML(entries, isDark, margin = 26) {
       items += '<div class="sep"></div>';
     } else {
       const ico = iconSvg(e.icon, 16);
-      // Mostra la colonna icona solo se l'icona esiste davvero: una colonna
-      // vuota spingeva il testo a destra e faceva sembrare le voci senza icona
-      // (es. l'email dell'account) "non centrate" (feedback alpha).
+      // Niente colonna icona se l'icona non c'è: vuota spinge il testo a destra.
       const icoSpan = ico ? `<span class="ico">${ico}</span>` : '';
       // Escape HTML nel label per sicurezza
       const label = (e.label || '').replace(/[<>&"]/g, (ch) =>
