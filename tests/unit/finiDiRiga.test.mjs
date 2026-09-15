@@ -39,7 +39,9 @@ const CARTELLA_UNIT = join(ROOT, 'tests', 'unit');
 const FILE_ANALIZZATI = /(firestore\.rules|storage\.rules|PATTERNS\.md|patterns[/\\])/;
 
 test('il repo pretende LF da qualunque checkout (.gitattributes)', () => {
-  const attributi = leggiTestoRepo(join(ROOT, '.gitattributes'));
+  const percorso = join(ROOT, '.gitattributes');
+  assert.ok(existsSync(percorso), 'manca .gitattributes: senza, i fini riga dei file tracciati li decide la macchina che scarica il repo (e su Windows diventano CRLF)');
+  const attributi = leggiTestoRepo(percorso);
   const riga = attributi
     .split('\n')
     .map((r) => r.trim())
