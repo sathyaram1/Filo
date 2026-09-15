@@ -1,17 +1,6 @@
-// Preload per le pagine web caricate dentro i tab del browser.
-//
-// Equivalente al "content script" Manifest V3 dell'estensione:
-//   - inietta i CSS condivisi (theme, menu, popup, sidebar, highlight,
-//     spellcheck, feedback)
-//   - espone chrome.* dentro il mondo isolato del preload (NON in main world:
-//     la pagina è codice non fidato; i content script girano qui)
-//   - carica i moduli SN_* (shared) via require()
-//   - carica i content script via require()
-//
-// contextIsolation è TRUE per queste pagine, quindi globalThis qui è isolato
-// dal main world della pagina. Le scritture su globalThis NON sono visibili
-// alla pagina, ma il DOM (document, window) è condiviso. Esattamente come
-// in Chrome con i content script.
+// Preload delle pagine web: inietta CSS e content script di Filo.
+// La pagina è codice NON fidato, quindi tutto gira nel mondo isolato del
+// preload (contextIsolation) — di condiviso c'è solo il DOM.
 
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
