@@ -1639,9 +1639,8 @@ class TabManager {
       // Documento nuovo: chi rispondeva era il vecchio. Il nuovo si ripresenta
       // da sé appena montato; fino ad allora vale l'attesa corta.
       tab._rispondeAllEsc = false;
-      // Documento nuovo: i riquadri di Filo aperti in quello vecchio sono andati
-      // via con lui. Se un Esc era in attesa della risposta del documento
-      // vecchio, quella risposta non arriverà mai: l'uscita parte adesso.
+      // I riquadri del documento vecchio se ne sono andati con lui: una
+      // risposta in attesa non arriverà mai, l'uscita parte adesso.
       if (this._escUscitaTimer) {
         this.annullaUscitaSchermoIntero();
         if (this.contentFullscreen) this.setContentFullscreen(false);
