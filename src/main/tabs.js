@@ -969,11 +969,9 @@ class TabManager {
     this._lastAppInteractionAt = Date.now();
   }
 
-  // Candidati archiviabili: schede web + pagine interne EFFIMERE (home/nuova
-  // scheda, impostazioni), non attiva, non in riproduzione audio. Prima erano
-  // esclusi TUTTI i filo:// interni, quindi il riordino poteva chiudere un sito
-  // (es. YouTube) ma mai le impostazioni aperte o le home duplicate. (Incognito
-  // è escluso a monte: niente timer in incognito.)
+  // Archiviabili: schede web e pagine interne EFFIMERE (home, impostazioni),
+  // purché non attive e senza audio. Escludere tutte le filo:// significava
+  // chiudere YouTube ma mai le impostazioni aperte o le home doppie.
   _triageCandidates() {
     const T = globalThis.SN_TAB_TRIAGE;
     return this.tabs.filter((t) => {
