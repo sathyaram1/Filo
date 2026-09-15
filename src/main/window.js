@@ -105,13 +105,11 @@ function createMainWindow() {
   return win;
 }
 
-// Finestra incognito: sessione web effimera (cookie/cache/localStorage in RAM,
-// svaniscono alla chiusura) + storage filo:// instradato sull'overlay in memoria
-// dello shim (vedi src/main/shim/storage.js). La finestra è marcata con
-// win._filoIncognito così l'IPC avvolge i suoi messaggi in runIncognito().
+// Incognito: niente deve sopravvivere alla chiusura. Sessione web effimera più
+// storage filo:// dirottato sull'overlay in RAM dello shim; `_filoIncognito`
+// è il marcatore che fa avvolgere i messaggi dell'IPC in runIncognito().
 function createIncognitoWindow() {
-  // Partizione unica e SENZA prefisso 'persist:' → sessione in memoria, isolata
-  // da quella normale e da eventuali altre finestre incognito.
+  // SENZA prefisso 'persist:': è quello che la rende una sessione in memoria.
   const partition = 'filo-incognito-' + randomUUID();
   const ses = session.fromPartition(partition);
   // filo:// è registrato globalmente solo sulla sessione di default: i tab di
