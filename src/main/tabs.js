@@ -1537,8 +1537,7 @@ class TabManager {
       if (!NE || reason === 'clean-exit') return;
       const current = tab.url || '';
       if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
-      // Anti-loop: se il renderer muore di nuovo mentre stiamo già recuperando
-      // (o il recupero stesso crasha), non insistere a raffica.
+      // Se muore di nuovo mentre stiamo recuperando, non si insiste a raffica.
       const now = Date.now();
       if (tab._crashRecoveryAt && now - tab._crashRecoveryAt < 2000) return;
       tab._crashRecoveryAt = now;
