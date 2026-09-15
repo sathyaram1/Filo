@@ -225,10 +225,9 @@ class TabManager {
     // Schermo pieno chiesto DALLA pagina (il pulsante di un lettore video): lì
     // l'Esc deve arrivarle, o resta convinta di essere a tutto schermo.
     this.pageFullscreen = false;
-    // Quale scheda ha chiesto quel fullscreen. Serve perché la deroga qui sopra
-    // vale SOLO per lei: un Esc che arriva da un'altra scheda (o dalla barra di
-    // Filo) alla pagina non arriverebbe mai, e lasciarlo passare chiuderebbe
-    // dentro allo schermo intero senza uscite (#514).
+    // #514 — la deroga qui sopra vale SOLO per quella scheda: un Esc da
+    // un'altra, o dalla barra, alla pagina non arriverebbe mai, e lasciarlo
+    // passare chiuderebbe l'utente dentro senza uscite.
     this.pageFullscreenTabId = null;
     // Uscita dallo schermo intero messa in attesa: l'Esc premuto sulla pagina
     // è prima suo (un riquadro di Filo aperto sopra la pagina lo usa per
