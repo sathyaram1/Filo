@@ -232,9 +232,8 @@ function buildHTML(entries, isDark, margin = 26) {
           `${icoSpan}` +
           `<span class="lbl">${label}</span></div>`;
       } else {
-        // Le voci possono trasportare un `url` (apre un tab) oppure una
-        // `action` custom (instradata al renderer chiamante). Codifichiamo
-        // l'action con un prefisso sentinella per non confonderla con un url.
+        // Una voce porta un `url` oppure una `action`: il prefisso sentinella
+        // '@action:' è quello che distingue le due cose a valle.
         const value = e.action ? ('@action:' + e.action) : (e.url || '');
         const escVal = value.replace(/'/g, "\\'");
         const main = `<button class="item" onclick="popupApi.select('${escVal}')">` +
