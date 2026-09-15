@@ -64,8 +64,11 @@ const REGOLE_FIRESTORE = process.env.FIRESTORE_RULES_FILE || 'firestore.rules';
 
 const env = await initializeTestEnvironment({
   projectId: 'filo-prova-582',
-  firestore: { host: '127.0.0.1', port: 8089, rules: readFileSync(REGOLE_FIRESTORE, 'utf8') },
-  storage: { host: '127.0.0.1', port: 9199, rules: readFileSync(REGOLE_STORAGE, 'utf8') },
+  // Le regole si danno in pasto all'emulatore, non si analizzano riga per riga:
+  // i fini riga non cambiano niente, e questo file gira fuori dal repo, dove la
+  // porta comune (tests/helpers/testo.mjs) non si può importare.
+  firestore: { host: '127.0.0.1', port: 8089, rules: readFileSync(REGOLE_FIRESTORE, 'utf8') }, // fini riga: non analizzato
+  storage: { host: '127.0.0.1', port: 9199, rules: readFileSync(REGOLE_STORAGE, 'utf8') }, // fini riga: non analizzato
 });
 
 await env.clearFirestore();
