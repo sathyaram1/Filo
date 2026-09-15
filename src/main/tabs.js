@@ -532,12 +532,9 @@ class TabManager {
       ...(isInternal ? {} : { nodeIntegrationInSubFrames: true }),
       ...(partition ? { partition } : {}),
     };
-    // #145 — le tab RIPRISTINATE alla riapertura di Filo non devono far ripartire
-    // i media da sole (es. i video YouTube che ripartivano tutti insieme al boot).
-    // Passiamo un flag al preload della pagina (page-preload.js), che mette in
-    // pausa qualunque media tenti di autopartire finché l'utente non interagisce
-    // con quella scheda. NB: webPreferences.autoplayPolicy non è onorato dalle
-    // WebContentsView in Electron 33, perciò il blocco lo fa il preload.
+    // #145 — le schede ripristinate non devono far ripartire i media da sole.
+    // Il blocco lo fa il preload perché `autoplayPolicy` non è onorato dalle
+    // WebContentsView: se un giorno lo fosse, quella è la strada giusta.
     if (opts.suppressAutoplay && !isInternal) {
       webPreferences.additionalArguments = [
         ...(webPreferences.additionalArguments || []),
