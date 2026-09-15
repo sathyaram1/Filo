@@ -1,0 +1,59 @@
+# Fa girare gli unit test su Windows, su ogni ramo, prima della fusione.
+#
+# PERCHE' ESISTE
+#   Il cancello prima della pubblicazione (release.yml) lancia `npm run
+#   test:unit` su windows-latest. E' l'UNICO posto dove quei test girano su
+#   Windows: la verifica di un lavoro e il cancello di fusione girano in un
+#   contenitore Linux. Un test che e' rosso solo su Windows passa quindi tutti i
+#   controlli, entra nel ramo principale, e si manifesta ore dopo come
+#   "nessuna versione pubblicata" — con gli utenti fermi all'ultima versione
+#   buona e un allarme che dice che qualcosa e' rotto ma non dove, perche' la
+#   macchina che lo sa e' la stessa che non ce l'ha piu' sotto mano.
+#
+#   E' successo: dall'11/09/2026 al 15/09/2026 nessuna versione e' uscita per
+#   un solo test rosso su Windows, mentre la stessa suite era verde su Linux a
+#   ogni giro.
+#
+#   Qui gli stessi test girano sullo stesso sistema del cancello, su QUALUNQUE
+#   ramo: chi rompe qualcosa lo scopre sul suo ramo, in un paio di minuti,
+#   invece che sei ore dopo la fusione e per bocca di un allarme.
+#
+# COSA NON PROVA
+#   Solo gli unit test, come il cancello. Gli spec Playwright restano dove
+#   sono (verifica del lavoro e cancello di fusione): qui servirebbe uno
+#   schermo e costerebbe mezz'ora a ogni salvataggio.
+
+name: Verifica unit su Windows
+
+on:
+  workflow_dispatch: {}
+  push:
+
+permissions:
+  contents: read
+
+# Il salvataggio automatico spedisce il ramo a ogni modifica di file: senza
+# questo, una sessione di lavoro accenderebbe decine di macchine per gli stessi
+# test. Con `cancel-in-progress` resta viva solo l'ultima spinta di ogni ramo.
+concurrency:
+  group: verifica-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Stessa versione di Node del cancello di pubblicazione: un test che si
+      # rompe per la versione di Node deve rompersi anche qui.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        run: npm ci
+
+      - name: Unit test (gli stessi del cancello)
+        run: npm run test:unit
