@@ -75,8 +75,7 @@ const ICON_PATHS = {
     '<path d="M13 6.7L17.5 16.3"/>' +
     '<path d="M7.5 18L16.5 18"/>',
 
-  // Globo con meridiani — voce "Apri da un altro paese" / "Torna in Italia"
-  // (mai un lucchetto da security tool: il tono è "viaggio", non "sicurezza").
+  // "Apri da un altro paese": un globo, mai un lucchetto — il tono è viaggio.
   globe:
     '<circle cx="12" cy="12" r="9"/>' +
     '<path d="M3 12h18"/>' +
