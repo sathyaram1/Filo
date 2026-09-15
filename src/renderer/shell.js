@@ -122,10 +122,8 @@
     }
     return entries;
   }
-  // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
-  // tre pagine interne dedicate. La voce "Modelli predefiniti" appare SOLO agli
-  // admin (gli utenti comuni non la vedono affatto). `buildSettings()` ricostruisce
-  // la lista ad ogni apertura del menu, così riflette lo stato auth corrente.
+  // "Modelli predefiniti" appare SOLO agli admin. La lista si ricostruisce a
+  // ogni apertura del menu, o resterebbe ferma allo stato di accesso di prima.
   function buildSettings() {
     const entries = [
       { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
