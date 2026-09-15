@@ -314,8 +314,7 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
   });
-  // Stato per il menu della shell: la voce compare solo se un endpoint è
-  // configurato; defaultCountry = ultima location usata, altrimenti il default.
+  // Il menu mostra la voce solo se un endpoint è configurato.
   ipcMain.handle('tabs:proxy-status', async () => {
     const ProxyTab = require('./services/proxyTab');
     let settings = null;
