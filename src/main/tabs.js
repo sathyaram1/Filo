@@ -1685,10 +1685,8 @@ class TabManager {
       const type = (input && input.type) || '';
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
-      // #514 — qui passa l'input VERO, quello che la pagina non può fabbricare:
-      // è il posto giusto per far ripartire da zero il conto delle
-      // rivendicazioni dell'Esc. Tutto tranne l'Esc stesso conta come "l'utente
-      // ha fatto altro": un clic per aprire un riquadro, una lettera scritta.
+      // #514 — qui passa l'input VERO, che la pagina non può fabbricare: è il
+      // posto dove il conto delle rivendicazioni dell'Esc riparte da zero.
       const esc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
       // Anche il mouse passa di qui, e un clic è il gesto con cui una pagina
       // può legittimamente prendersi lo schermo: l'Esc no (vedi
