@@ -342,7 +342,6 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
-  // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
   ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {
     const win = winFor(event);
     if (!win) return;
