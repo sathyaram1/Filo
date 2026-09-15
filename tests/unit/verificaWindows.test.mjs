@@ -48,19 +48,23 @@ test('non scarica il binario di Electron, perché gli unit test non aprono Filo'
     'senza questa riga ogni partenza scarica l\'app (263 MB aperta) per non usarla mai',
   );
 
-  // L'altra metà della promessa: se un unit test cominciasse davvero ad aprire
-  // Filo, saltare lo scaricamento lo farebbe morire sul runner e basta.
-  const colpevoli = [];
-  for (const nome of readdirSync(join(ROOT, 'tests', 'unit'))) {
-    if (!nome.endsWith('.mjs')) continue;
-    const sorgente = leggiTestoRepo(join(ROOT, 'tests', 'unit', nome));
-    if (/^\s*import[^\n]*from\s*'electron'/m.test(sorgente) || /require\(\s*'electron'\s*\)/.test(sorgente)) {
-      colpevoli.push(nome);
-    }
-  }
-  assert.deepEqual(
-    colpevoli,
-    [],
-    'questi unit test vogliono Electron: o tornano logica pura, o il lavoro su Windows deve ricominciare a scaricare il binario',
+  // L'altra metà della promessa, e quella che conta davvero.
+  //
+  // Per un giro questa metà è stata un elenco di unit test che chiedono
+  // `electron` per nome: verde, mentre il lavoro su Windows era rosso a ogni
+  // partenza. I due test che morivano non nominavano `electron`: caricavano un
+  // SORGENTE dell'app, ed era il sorgente a chiederlo. Due estremi verdi e il
+  // pezzo in mezzo scoperto (patterns/due-estremi-verdi-non-fanno-un-filo.md).
+  //
+  // Adesso la promessa la mantiene il lanciatore: se il modulo non risponde,
+  // gli dice dove sarebbe stato il binario, e chi voleva solo leggere il
+  // sorgente gira lo stesso. Il comportamento è provato in
+  // tests/unit/unitSenzaBinario.test.mjs, sui test veri; qui si tiene fermo che
+  // la rinuncia allo scaricamento e la sua compensazione restino insieme.
+  assert.equal(
+    ambienteDeiTest({}, { scaricato: false, root: '/repo' }).ELECTRON_OVERRIDE_DIST_PATH,
+    join('/repo', 'node_modules', 'electron', 'dist'),
+    'il lavoro su Windows salta lo scaricamento dell\'app, ma il lanciatore degli unit test non compensa più '
+    + 'la sua assenza: ogni unit test che carica un sorgente dell\'app tornerà rosso su quel computer, e solo lì',
   );
 });
