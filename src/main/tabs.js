@@ -202,9 +202,8 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
-    // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
-    // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
-    // aspettare che il content script ricalcoli.
+    // §1.2 — così una scheda nuova su un dominio già visto ha subito la sua
+    // tinta, senza aspettare che il content script rifaccia il calcolo.
     this._identityColorCache = new Map();
     // §2.1 — ultima interazione dell'utente con Filo (qualsiasi tab/azione). Il
     // timer di auto-archiviazione misura l'inattività dell'APP da qui.
