@@ -1,22 +1,10 @@
 // Stage 4: giudizio LLM — metadata-only e MONOTÒNO.
-//
-// Vincoli (vedi spec):
-//   - Riceve SOLO metadati e provenienza (dominio, eTLD+1, brand somigliante,
-//     età, stato certificato, origine link, presenza input sensibili). MAI il
-//     contenuto della pagina come istruzione → niente prompt injection dalla
-//     pagina.
-//   - Output vincolato e monotòno: può solo ALZARE il sospetto. Non può
-//     dichiarare sicuro un sito, né portare da solo a "pericoloso".
-//   - Se l'iniezione riuscisse, il caso peggiore è che il contributo si annulli:
-//     i segnali deterministici restano il pavimento.
-//
-// `runLlm(messages)` è iniettato dall'orchestratore (usa la pipeline provider
-// del main). Ritorna la stringa di risposta dell'assistente.
+// Riceve SOLO metadati e provenienza (dominio, eTLD+1, brand somigliante, età, stato del certificato, origine del link, presenza di input sensibili), MAI il contenuto della pagina come istruzione: niente prompt injection dalla pagina.
+// L'output può solo ALZARE il sospetto: non dichiara sicuro un sito né porta da solo a "pericoloso", quindi anche un'iniezione riuscita al massimo annulla il contributo — i segnali deterministici restano il pavimento. `runLlm(messages)` è iniettato dall'orchestratore.
 
 'use strict';
 
-// Insieme FISSO di motivazioni selezionabili (chiave → testo per l'utente).
-// L'LLM può solo scegliere una di queste, mai testo libero.
+// Insieme FISSO di motivazioni: l'LLM può solo sceglierne una, mai testo libero.
 const REASONS = {
   brand_mimic: 'Il nome del dominio richiama un servizio noto pur non essendo il suo indirizzo ufficiale.',
   recent_domain: 'Il dominio risulta creato da poco.',
@@ -42,7 +30,7 @@ const SYSTEM = [
 ].join('\n');
 
 function buildUserMessage(meta) {
-  // Solo metadati/provenienza. Niente HTML, niente testo della pagina.
+  // Solo metadati e provenienza. Niente HTML, niente testo della pagina.
   const lines = [
     `dominio_mostrato: ${meta.host || ''}`,
     `dominio_registrabile: ${meta.registrable || ''}`,
@@ -61,13 +49,12 @@ function buildUserMessage(meta) {
 
 function parse(text) {
   if (!text || typeof text !== 'string') return null;
-  // Estrai il primo oggetto JSON dalla risposta (tollerante a code-fence).
+  // Estrae il primo oggetto JSON dalla risposta (tollerante a code-fence).
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) return null;
   let obj;
   try { obj = JSON.parse(m[0]); } catch (_) { return null; }
-  // Monotòno: accettiamo SOLO un esito che alza il sospetto. suspicious:false
-  // viene ignorato (l'LLM non può rendere sicuro).
+  // Monotòno: suspicious:false viene ignorato, l'LLM non può rendere sicuro un sito.
   if (obj.suspicious !== true) return { suspicious: false, reason: null };
   const key = typeof obj.reason === 'string' ? obj.reason : null;
   const reasonText = key && REASONS[key] ? REASONS[key] : null;
@@ -75,8 +62,7 @@ function parse(text) {
   return { suspicious: true, reasonKey: key && REASONS[key] ? key : null, reason: reasonText, confidence };
 }
 
-// Giudica. Ritorna { suspicious, reason, confidence } o null se l'LLM non è
-// disponibile / ha fallito. NON lancia mai.
+// Ritorna { suspicious, reason, confidence } o null se l'LLM manca o ha fallito. NON lancia mai.
 async function judge(meta, runLlm) {
   if (typeof runLlm !== 'function') return null;
   try {

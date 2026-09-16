@@ -1,15 +1,6 @@
-// Motore di decisione: dai segnali (locali sincroni + dati asincroni di rete,
-// quando disponibili) calcola UN verdetto con livello e messaggio specifico.
-//
-// Livelli (esattamente due avvisi, vedi spec):
-//   'safe'       — nessun avviso.
-//   'sospetto'   — banner chiudibile con "ok".
-//   'pericoloso' — interstitial bloccante (scrivere "confermo").
-//
-// Principio: "pericoloso" poggia SOLO su segnali che l'attaccante non può
-// nascondere (blacklist, dominio, certificato, età). Il contenuto rinforza,
-// mai da solo. L'LLM è monotòno: può alzare a "sospetto", mai a "pericoloso",
-// mai dichiarare sicuro (applicato da chi orchestra, non qui).
+// Motore di decisione: dai segnali (locali sincroni + dati di rete, quando ci sono) calcola UN verdetto con livello e messaggio specifico.
+// Livelli: 'safe' nessun avviso, 'sospetto' banner chiudibile, 'pericoloso' interstitial bloccante.
+// Principio: "pericoloso" poggia SOLO su segnali che l'attaccante non può nascondere (blacklist, dominio, certificato, età); il contenuto rinforza, mai da solo. L'LLM è monotòno: può alzare a "sospetto", mai a "pericoloso" e mai dichiarare sicuro (lo applica chi orchestra).
 
 'use strict';
 
@@ -53,11 +44,10 @@ function gsbText(category) {
   }
 }
 
-// Costruisce il messaggio specifico dai segnali fidati. `lead` è il segnale
-// guida; gli altri diventano frasi di rinforzo.
+// `lead` è il segnale guida; gli altri diventano frasi di rinforzo.
 function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox }) {
   const dom = norm.registrableUnicode || norm.registrable || norm.host;
-  // 1) Blacklist: prevale su tutto.
+  // Blacklist: prevale su tutto.
   if (gsb && gsb.listed) {
     return {
       title: 'Sito segnalato come pericoloso',
@@ -72,21 +62,18 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
   if (sandbox && sandbox.verdict === 'dangerous') facts.push('analizzato in isolamento, mostra comportamento ingannevole');
   const tail = facts.length ? (', ' + joinIt(facts) + '.') : '.';
 
-  // 2) Impersonazione stretta.
   if (imp && imp.kind === 'strict_impersonation') {
     return {
       title: `Attenzione: questo non è ${imp.brand.display}`,
       body: `Questo non è ${imp.brand.display}. Il dominio è ${dom}${tail}`,
     };
   }
-  // 3) Impersonazione larga.
   if (imp && imp.kind === 'broad_impersonation') {
     return {
       title: `${imp.brand.display}? Controlla l'indirizzo`,
       body: `${dom} usa il nome "${imp.brand.display}" ma non è un indirizzo ufficiale di ${imp.brand.display}${tail}`,
     };
   }
-  // 4) Solo segnali non legati all'identità.
   if (cert && CERT_BAD.has(cert.status)) {
     return { title: 'Connessione non sicura', body: `La connessione a ${dom} non è protetta: ${certText(cert.status)}.` };
   }
@@ -104,9 +91,7 @@ function joinIt(arr) {
   return arr.slice(0, -1).join(', ') + ' e ' + arr[arr.length - 1];
 }
 
-// Valutazione completa. `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays,
-// sandbox, llm }. `ctx` opzionale (indizi pagina): { hasPassword, hasPayment,
-// mixedContent, autoDownload, urlPath }.
+// `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays, sandbox, llm }; `ctx` sono gli indizi di pagina: { hasPassword, hasPayment, mixedContent, autoDownload, urlPath }.
 function evaluate(url, ctx = {}, asyncData = {}) {
   const norm = normalize(url);
   if (!norm || !norm.ok) {
@@ -141,8 +126,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const doubleExt = sigs.some((s) => s.kind === 'double_extension');
   const sensitive = hasPassword || hasPayment;
 
-  // La whitelist certifica l'IDENTITÀ: niente impersonazione/LLM. Restano i
-  // controlli indipendenti dal contenuto (certificato, trasporto).
+  // La whitelist certifica l'IDENTITÀ: niente impersonazione né LLM. Restano i controlli indipendenti dal contenuto (certificato, trasporto).
   if (whitelisted) {
     if (certBad) {
       const message = buildMessage({ level: 'sospetto', norm, cert });
@@ -151,8 +135,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return { level: 'safe', reasons: ['whitelisted'], norm, message: null, needsLlm: false, whitelisted };
   }
 
-  // ── PERICOLOSO ────────────────────────────────────────────────────────
-  // strict impersonation da sola basta; oppure rinforzi forti combinati.
+  // PERICOLOSO: la strict impersonation da sola basta, altrimenti servono rinforzi forti combinati.
   const strongCombo =
     (broad && (young || certBad)) ||
     (sandboxBad) ||
@@ -167,12 +150,11 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     };
   }
 
-  // ── SOSPETTO ──────────────────────────────────────────────────────────
   const llmSus = llm && llm.suspicious;
   const suspectTriggers = !!(broad || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || doubleExt || sandboxSus || llmSus);
   if (suspectTriggers) {
     const message = buildMessage({ level: 'sospetto', norm, imp: broad, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
-    // LLM rinforza il testo se ha una motivazione fissa.
+    // L'LLM rinforza il testo solo se ha una motivazione.
     if (llmSus && llm.reason && !broad && !young && !certBad) {
       message.body = `${message.body} ${llm.reason}`.trim();
     }
@@ -183,10 +165,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     };
   }
 
-  // ── SAFE ──────────────────────────────────────────────────────────────
-  // needsLlm: c'è un segnale non conclusivo che merita il giudizio LLM (mai su
-  // siti puliti senza alcun indizio, mai whitelist). Qui scatta se c'è un
-  // indizio debole isolato (es. http+nessun altro) e mancano i dati di rete.
+  // needsLlm: c'è un indizio debole isolato che merita il giudizio LLM (es. http e nient'altro, con i dati di rete ancora assenti). Mai su siti puliti senza indizi, mai su whitelist.
   const weakHint = sigs.some((s) => s.kind === 'insecure_transport') || (ageDays == null && (broad || sensitive));
   return { level: 'safe', reasons: reasons.length ? reasons : ['clean'], norm, message: null, needsLlm: !!weakHint && !whitelisted, whitelisted };
 }

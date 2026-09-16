@@ -1,7 +1,4 @@
-// Chiamate di rete della pipeline (stage 1 + parte di stage 3). TUTTE
-// best-effort e asincrone: non lanciano mai, ritornano null su qualsiasi
-// errore, e NON bloccano mai la navigazione (il chiamante le usa per arricchire
-// il verdetto, non per decidere se caricare). Timeout corti.
+// Chiamate di rete della pipeline: TUTTE best-effort e asincrone — non lanciano mai, ritornano null su qualsiasi errore e non bloccano mai la navigazione, perché servono ad arricchire il verdetto, non a decidere se caricare. Timeout corti.
 
 'use strict';
 
@@ -21,9 +18,7 @@ async function fetchJson(url, opts = {}, timeoutMs = TIMEOUT_MS) {
   }
 }
 
-// ── Google Safe Browsing v4 (stage 1: blacklist) ──────────────────────────
-// Richiede una API key (Google Cloud, API "Safe Browsing"). Senza chiave →
-// null (lo stage 1 viene semplicemente saltato; gli altri stage reggono).
+// Google Safe Browsing v4 (stage 1, blacklist): richiede una API key. Senza chiave → null, lo stage 1 viene saltato e gli altri reggono.
 const GSB_THREATS = {
   SOCIAL_ENGINEERING: 'phishing',
   MALWARE: 'malware',
@@ -55,10 +50,7 @@ async function safeBrowsingLookup(rawUrl, apiKey) {
   return { listed: true, category: GSB_THREATS[m.threatType] || 'phishing', threatType: m.threatType };
 }
 
-// ── RDAP: età del dominio (stage 3) ───────────────────────────────────────
-// rdap.org fa da bootstrap e redirige al server RDAP del registro giusto.
-// Cerca l'evento "registration". Ritorna l'età in giorni, o null se non
-// disponibile (molti ccTLD non espongono RDAP).
+// RDAP, età del dominio (stage 3): rdap.org fa da bootstrap e redirige al registro giusto. null se non disponibile — molti ccTLD non espongono RDAP.
 async function rdapAgeDays(registrable) {
   if (!registrable) return null;
   const data = await fetchJson(`https://rdap.org/domain/${encodeURIComponent(registrable)}`, {
@@ -73,10 +65,7 @@ async function rdapAgeDays(registrable) {
   return days >= 0 ? days : null;
 }
 
-// ── Certificate Transparency: età del primo certificato (stage 3) ─────────
-// crt.sh espone JSON. Prendiamo il not_before più vecchio come "prima volta che
-// il dominio ha avuto un certificato" — proxy dell'età. Best-effort, lento:
-// timeout più generoso ma comunque non bloccante.
+// Certificate Transparency (stage 3): il not_before più vecchio su crt.sh è un proxy dell'età del dominio. Lento: timeout più generoso, comunque non bloccante.
 async function ctFirstSeenDays(registrable) {
   if (!registrable) return null;
   const data = await fetchJson(

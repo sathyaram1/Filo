@@ -1,19 +1,6 @@
-// Stage 5: sandbox (detonation).
-//
-// Per la coda sospetta in cui la destinazione vera è incerta (redirect,
-// accorciatori): apri il link in anticipo in una finestra NASCOSTA e ISOLATA,
-// senza cookie né dati dell'utente, segui i redirect, esegui il JS, e osserva
-// URL finale + download. Verdetto in cache (gestita da index.js).
-//
-// Principi (vedi spec):
-//   - "sembra pulito" vale poco (gli attacchi mascherano il contenuto agli
-//     scanner) → al massimo 'clean', mai una patente di sicurezza.
-//   - "sembra pericoloso" è un forte rinforzo → 'dangerous'.
-//   - Non bloccare MAI il click su questo controllo (è sempre async/background).
-//   - Niente caccia alla perfezione anti-rilevamento.
-//
-// Richiede Electron (BrowserWindow/session) → funziona solo a runtime nel main.
-// In ambiente senza Electron ritorna null.
+// Stage 5: sandbox (detonation). Per la coda sospetta in cui la destinazione vera è incerta (redirect, accorciatori): il link si apre in anticipo in una finestra NASCOSTA e ISOLATA, senza cookie né dati dell'utente, si seguono i redirect, si esegue il JS e si osservano URL finale e download.
+// "Sembra pulito" vale poco — gli attacchi mascherano il contenuto agli scanner — quindi al massimo 'clean', mai una patente di sicurezza; "sembra pericoloso" è invece un forte rinforzo. Non blocca MAI il click: è sempre in background.
+// Richiede Electron (BrowserWindow/session): in ambiente senza Electron ritorna null.
 
 'use strict';
 
@@ -27,8 +14,7 @@ function electron() {
   return _electron;
 }
 
-// `evaluateFinal(finalUrl)` è iniettata: ri-valuta l'URL finale con l'engine
-// (segnali locali) per capire se la destinazione vera è ingannevole.
+// `evaluateFinal(finalUrl)` è iniettata: ri-valuta l'URL finale coi segnali locali per capire se la destinazione vera è ingannevole.
 async function detonate(url, evaluateFinal) {
   const el = electron();
   if (!el || !el.BrowserWindow || !el.session) return null;
@@ -91,8 +77,7 @@ async function detonate(url, evaluateFinal) {
 
       wc.on('did-stop-loading', async () => {
         clearTimeout(timer);
-        // Verdetto: download forzato → pericoloso. Altrimenti valuta l'URL
-        // finale: se la destinazione vera è impersonazione/blacklist → pericoloso.
+        // Download forzato → pericoloso. Altrimenti decide l'URL finale: se la destinazione vera è impersonazione o blacklist → pericoloso.
         if (downloadStarted) return done('dangerous');
         let verdict = 'clean';
         if (typeof evaluateFinal === 'function' && finalUrl && finalUrl !== url) {

@@ -1,19 +1,6 @@
-// SN_SAFEBROWSE: punto d'ingresso del rilevamento siti pericolosi.
-//
-// Espone:
-//   checkSync(url, ctx)            verdetto immediato dai SOLI segnali locali +
-//                                  dati di rete già in cache (mai blocca).
-//   analyze(url, ctx, onUpdate)    come sopra ma avvia in background le chiamate
-//                                  di rete (GSB/RDAP/CT/sandbox/LLM); quando un
-//                                  dato arriva e cambia il verdetto, richiama
-//                                  onUpdate(verdict). Le chiamate NON bloccano.
-//   recordCert(registrable, st)    registra l'esito del certificato visto da
-//                                  Electron (certificate-error / did-navigate).
-//   setProviders(fns)              inietta i fetcher di rete (Task 4/5).
-//
-// Tutte le forme normalizzate, segnali, brand e whitelist sono raggiungibili da
-// qui per i test. Pattern: registra su globalThis (come gli altri moduli) e
-// anche su module.exports per require diretto.
+// SN_SAFEBROWSE: punto d'ingresso del rilevamento siti pericolosi. checkSync(url, ctx) dà il verdetto immediato dai soli segnali locali e dai dati di rete già in cache, e non blocca mai; analyze(url, ctx, onUpdate) fa lo stesso ma avvia in background GSB/RDAP/CT/sandbox/LLM e richiama onUpdate quando un dato cambia il verdetto.
+// recordCert registra l'esito del certificato visto da Electron; setProviders inietta i fetcher di rete.
+// Forme normalizzate, segnali, brand e whitelist sono raggiungibili da qui per i test; il modulo si registra su globalThis e su module.exports.
 
 'use strict';
 
@@ -28,7 +15,6 @@ const net = require('./net');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
 
-// ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
   constructor(ttlMs) { this.ttl = ttlMs; this.m = new Map(); }
   get(k) {
@@ -43,23 +29,18 @@ class TtlCache {
 }
 
 const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
-// Verdetti calcolati: TTL breve (un dominio può diventare malevolo dopo essere
-// stato visto pulito). Età dominio: stabile, TTL lungo.
+// Verdetti: TTL breve, perché un dominio può diventare malevolo dopo essere stato visto pulito. Età del dominio: stabile, TTL lungo.
 const gsbCache = new TtlCache(30 * MIN);
 const ageCache = new TtlCache(7 * DAY);
 const certCache = new TtlCache(HOUR);
 const sandboxCache = new TtlCache(30 * MIN);
 const llmCache = new TtlCache(HOUR);
 
-// Fetcher di rete iniettabili (default: assenti = best-effort no-op).
+// Fetcher di rete iniettabili; assenti = best-effort no-op.
 let providers = { gsb: null, rdap: null, ct: null, sandbox: null, llm: null };
 function setProviders(fns) { providers = { ...providers, ...(fns || {}) }; }
 
-// Configura i provider dai moduli reali, usando le impostazioni correnti.
-//   opts.gsbKey       chiave Google Safe Browsing (se assente → stage 1 saltato)
-//   opts.runLlm       funzione (messages) → testo, per il giudice LLM
-//   opts.enableSandbox  abilita la detonation (default true se Electron c'è)
-//   opts.enableNetwork  abilita RDAP/CT (default true)
+// opts.gsbKey assente → stage 1 saltato; opts.runLlm è (messages) → testo per il giudice; enableSandbox ed enableNetwork accendono detonation e RDAP/CT.
 function configure(opts = {}) {
   const { gsbKey, runLlm, enableSandbox = true, enableNetwork = true } = opts;
   setProviders({
@@ -71,12 +52,11 @@ function configure(opts = {}) {
   });
 }
 
-// Esito certificato osservato dalla webview reale (la fonte più affidabile).
+// Esito del certificato osservato dalla webview reale: la fonte più affidabile.
 function recordCert(registrable, status) {
   if (registrable && status) certCache.set(registrable, { status });
 }
 
-// Assembla i dati di rete già noti (da cache) per il dominio.
 function assembleCached(norm) {
   if (!norm || !norm.registrable) return {};
   const reg = norm.registrable;
@@ -95,14 +75,13 @@ function checkSync(url, ctx = {}) {
   return engine.evaluate(url, ctx, asyncData);
 }
 
-// Avvia le chiamate di rete mancanti in background. Aggiorna le cache e, se il
-// verdetto cambia, richiama onUpdate. Ritorna SUBITO il verdetto sincrono.
+// Ritorna SUBITO il verdetto sincrono, poi aggiorna le cache in background e richiama onUpdate se il verdetto cambia.
 function analyze(url, ctx = {}, onUpdate) {
   const norm = normalizeMod.normalize(url);
   if (!norm || !norm.ok) return engine.evaluate(url, ctx, {});
   const first = engine.evaluate(url, ctx, assembleCached(norm));
 
-  // Se è già pericoloso da blacklist/strict, non serve altro.
+  // Se è già pericoloso da blacklist o strict impersonation, non serve altro.
   if (first.level === 'pericoloso' && (first.reasons || []).some((r) => /^gsb_|strict/.test(r))) {
     return first;
   }
@@ -123,13 +102,13 @@ function analyze(url, ctx = {}, onUpdate) {
   }
   if (providers.ct && need.ageDays === undefined && !need.cert) {
     tasks.push(Promise.resolve(providers.ct(reg, norm)).then((r) => {
-      // CT dà l'età del PRIMO certificato: usala solo se RDAP non ha risposto.
+      // CT dà l'età del PRIMO certificato: si usa solo se RDAP non ha risposto.
       if (r && typeof r.firstSeenDays === 'number' && ageCache.get(reg) === undefined) {
         ageCache.set(reg, r.firstSeenDays);
       }
     }).catch(() => {}));
   }
-  // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
+  // LLM e sandbox solo se c'è un sospetto non conclusivo: mai su pulito o whitelist.
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
   if (worthDeepening && providers.llm && need.llm === undefined) {
     tasks.push(Promise.resolve(providers.llm(buildLlmMeta(norm, ctx, first))).then((r) => {
@@ -151,7 +130,7 @@ function analyze(url, ctx = {}, onUpdate) {
   return first;
 }
 
-// Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza/identità.
+// Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza e identità.
 function buildLlmMeta(norm, ctx, verdict) {
   const imp = verdict.imp || null;
   return {
@@ -183,8 +162,7 @@ const API = {
   recordCert,
   setProviders,
   configure,
-  // Quali stadi di rilevamento sono attivi dopo l'ultima configure() (diagnostica
-  // e test): gsb=true significa che la chiave Google Safe Browsing è in uso.
+  // Quali stadi di rilevamento sono attivi dopo l'ultima configure() (diagnostica e test).
   activeProviders() {
     return {
       gsb: !!providers.gsb,
@@ -194,9 +172,7 @@ const API = {
       sandbox: !!providers.sandbox,
     };
   },
-  // cache (per test / invalidazione)
   _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache },
-  // sotto-moduli (per test)
   normalize: normalizeMod.normalize,
   parseHost: normalizeMod.parseHost,
   signals,

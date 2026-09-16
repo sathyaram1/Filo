@@ -1,33 +1,20 @@
-// Public Suffix List (sottoinsieme curato) + estrazione del dominio
-// registrabile (eTLD+1).
-//
-// NON è la PSL completa (~9000 voci): è un sottoinsieme che copre i TLD comuni
-// e i ccSLD più diffusi (co.uk, com.au, com.br, ...). Per i suffissi non
-// elencati ricadiamo sulla regola implicita "*" del PSL (ogni etichetta è un
-// suffisso valido), quindi l'eTLD+1 resta sempre calcolabile e ragionevole.
-// Quando serviranno casi più esotici, basta aggiungere righe a SUFFIX_RULES.
-//
-// L'algoritmo segue publicsuffix.org: cerca la regola che combacia con il
-// maggior numero di etichette (con gestione di wildcard `*` ed eccezioni `!`),
-// poi il dominio registrabile è "suffisso + 1 etichetta".
+// Public Suffix List (sottoinsieme curato) + estrazione del dominio registrabile (eTLD+1).
+// NON è la PSL completa: copre i TLD comuni e i ccSLD più diffusi; per i suffissi non elencati vale la regola implicita "*" (ogni etichetta è un suffisso valido), quindi l'eTLD+1 resta sempre calcolabile. Per casi più esotici basta aggiungere righe a SUFFIX_RULES.
+// L'algoritmo segue publicsuffix.org: vince la regola che combacia col maggior numero di etichette (con wildcard `*` ed eccezioni `!`), e il registrabile è suffisso + 1 etichetta.
 
 'use strict';
 
-// Regole "normali" (la maggioranza). Una riga per suffisso pubblico.
 const NORMAL = new Set([
-  // gTLD generici più comuni
   'com', 'net', 'org', 'info', 'biz', 'name', 'pro', 'mobi', 'app', 'dev',
   'io', 'co', 'ai', 'me', 'tv', 'cc', 'xyz', 'online', 'site', 'shop', 'store',
   'tech', 'cloud', 'page', 'blog', 'live', 'news', 'email', 'wiki', 'fun',
   'gg', 'sh', 'ly', 'to', 'fm', 'ws', 'top', 'club', 'vip', 'pw', 'link',
-  // ccTLD a una etichetta
   'it', 'de', 'fr', 'es', 'nl', 'be', 'at', 'ch', 'pt', 'ie', 'dk', 'se',
   'no', 'fi', 'pl', 'cz', 'sk', 'gr', 'ro', 'hu', 'ru', 'ua', 'tr', 'us',
   'ca', 'mx', 'ar', 'cl', 'pe', 'cn', 'jp', 'kr', 'in', 'au', 'nz', 'za',
   'br', 'eu', 'is', 'lt', 'lv', 'ee', 'si', 'hr', 'bg', 'rs', 'lu', 'li',
   'sg', 'hk', 'tw', 'th', 'my', 'id', 'ph', 'vn', 'il', 'ae', 'sa', 'ma',
   'gov', 'edu', 'mil', 'int',
-  // ccSLD multi-etichetta diffusi
   'co.uk', 'org.uk', 'me.uk', 'ltd.uk', 'plc.uk', 'net.uk', 'sch.uk',
   'gov.uk', 'ac.uk', 'nhs.uk', 'police.uk',
   'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au', 'id.au', 'asn.au',
@@ -59,37 +46,31 @@ const NORMAL = new Set([
   'co.at', 'or.at', 'gv.at', 'ac.at',
 ]);
 
-// Suffissi serviti come "wildcard": ogni etichetta sotto di essi è un suffisso
-// pubblico (es. `*.ck` → `foo.ck` è suffisso). Raro, ma incluso per correttezza.
+// Wildcard: ogni etichetta sotto di essi è un suffisso pubblico (`*.ck` → `foo.ck`). Raro, incluso per correttezza.
 const WILDCARD = new Set([
   'ck', 'jm', 'kw', 'mm', 'np',
 ]);
 
-// Eccezioni alle wildcard (regola `!suffix`): rendono il suffisso un dominio
-// registrabile invece che pubblico (es. `!www.ck`).
+// Eccezioni alle wildcard (`!suffix`): rendono il suffisso un dominio registrabile invece che pubblico.
 const EXCEPTION = new Set([
   'www.ck',
 ]);
 
-// Estrae l'eTLD+1 (dominio registrabile) e il public suffix da un hostname.
-// `host` deve già essere in forma ascii/punycode minuscola e senza porta.
-// Ritorna { registrable, publicSuffix, sld, labels } oppure null per input
-// invalido (IP, host vuoto, singola etichetta senza punto).
+// `host` dev'essere già in forma ascii/punycode minuscola e senza porta. Ritorna { registrable, publicSuffix, sld, labels } o null per input invalido (IP, vuoto, singola etichetta).
 function getDomainInfo(host) {
   if (!host || typeof host !== 'string') return null;
   host = host.replace(/\.$/, '').toLowerCase();
   if (!host || host.includes(' ')) return null;
-  // Gli indirizzi IP non hanno eTLD+1.
   if (isIpAddress(host)) {
     return { registrable: host, publicSuffix: '', sld: host, labels: [host], isIp: true };
   }
   const labels = host.split('.');
   if (labels.length < 2) {
-    // Singola etichetta (es. "localhost"): nessun dominio registrabile.
+    // Singola etichetta ("localhost"): nessun dominio registrabile.
     return { registrable: host, publicSuffix: host, sld: host, labels, single: true };
   }
 
-  // Cerca, dalla regola più specifica (più etichette) alla meno specifica.
+  // Si cerca dalla regola più specifica (più etichette) alla meno specifica.
   let suffixLabels = 0; // numero di etichette del public suffix scelto
   for (let i = 0; i < labels.length; i++) {
     const candidate = labels.slice(i).join('.');
@@ -102,23 +83,19 @@ function getDomainInfo(host) {
       suffixLabels = labels.length - i;
       break;
     }
-    // Wildcard: se la parte DOPO la prima etichetta del candidato è una
-    // wildcard, allora candidate è un public suffix.
+    // Wildcard: se la parte dopo la prima etichetta del candidato è una wildcard, allora candidate è un public suffix.
     const parent = labels.slice(i + 1).join('.');
     if (parent && WILDCARD.has(parent)) {
       suffixLabels = labels.length - i;
       break;
     }
   }
-  // Regola implicita "*": se nessuna regola combacia, il TLD (ultima etichetta)
-  // è il public suffix.
+  // Regola implicita "*": se nessuna regola combacia, il public suffix è il TLD.
   if (suffixLabels === 0) suffixLabels = 1;
 
-  // Il dominio registrabile = public suffix + 1 etichetta.
   const regLabels = suffixLabels + 1;
   if (labels.length < regLabels) {
-    // Il dominio è esattamente un public suffix (es. "co.uk" da solo): nessun
-    // dominio registrabile.
+    // Il dominio è esattamente un public suffix ("co.uk" da solo): nessun registrabile.
     const ps = labels.join('.');
     return { registrable: ps, publicSuffix: ps, sld: '', labels, suffixOnly: true };
   }
@@ -129,11 +106,9 @@ function getDomainInfo(host) {
 }
 
 function isIpAddress(host) {
-  // IPv4
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
     return host.split('.').every((n) => Number(n) <= 255);
   }
-  // IPv6 (forma con due-punti, eventualmente fra parentesi)
   const h = host.replace(/^\[|\]$/g, '');
   if (h.includes(':') && /^[0-9a-f:]+$/i.test(h)) return true;
   return false;
