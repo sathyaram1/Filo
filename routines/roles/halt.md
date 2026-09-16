@@ -7,7 +7,7 @@ Dispatch non è riuscito a consegnarti un lavoro (il motivo è nel payload:
 
 1. Se hai un biglietto, **dichiara il guasto al canale nel rilascio**:
    ```bash
-   node scripts/routine-channel.mjs release <biglietto> --guasto "<message del payload>"
+   node scripts/routine-channel.mjs release <biglietto> --role halt --guasto "<message del payload>"
    ```
    È così che il server smette di dare lavoro per questo giro e l'orchestratore
    lo scopre alla prossima richiesta di biglietto. Registrarlo è tutto: il tuo
