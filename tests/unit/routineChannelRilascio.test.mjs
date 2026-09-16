@@ -150,13 +150,15 @@ test('400 report_malformed: si rilascia senza rapporto, e lo si dice', async () 
   const corpi = [];
   const fetchImpl = async (u, init) => {
     const b = JSON.parse(init.body); corpi.push(b);
-    return b.report ? reply(400, { ok: false, reason: 'report_malformed' }) : reply(200, { ok: true });
+    return b.report ? reply(400, { ok: false, reason: 'report_malformed', detail: 'campo x' }) : reply(200, { ok: true });
   };
   const r = await releaseConRapporto('t', '', RAPPORTO, { fetchImpl, ...quiet });
   assert.equal(r.ok, true);
   assert.equal(r.rapporto, 'scartato');
   assert.equal(corpi.length, 2);
-  assert.match(r.avviso, /report_malformed/);
+  // Il dettaglio del server sta nella PRIMA risposta: fino al giro 2 della
+  // verifica si leggeva la seconda (senza rapporto) e il dettaglio spariva.
+  assert.match(r.avviso, /report_malformed: campo x/);
 });
 
 test('un altro rifiuto del server NON viene ritentato senza rapporto: il no è una risposta', async () => {
