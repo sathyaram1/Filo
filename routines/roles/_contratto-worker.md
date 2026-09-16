@@ -60,6 +60,25 @@ tetto delle otto ore — e lì guarda da quando il ramo non si muove. Quindi
 l'unica cosa da NON fare è morire in silenzio: se ti accorgi che non puoi
 proseguire, dichiaralo nel rilascio invece di lasciare il lavoro appeso.
 
+## Comandi lunghi
+
+La cache del contesto dura cinque minuti e ogni chiamata la rinnova. Una
+chiamata bloccante da dieci minuti la trova sempre scaduta, e il turno dopo
+riscrive tutto il contesto: ~250.000 token, circa 1,6 $ — e un ciclo di sette
+attese così lo paga sette volte. Quindi:
+
+- un comando che può superare i **due minuti** si lancia in **sottofondo**
+  (l'harness ti avvisa quando finisce);
+- se devi aspettarlo attivamente, aspetta a pezzi da **quattro minuti al
+  massimo** per chiamata (`timeout 240 tail --pid=<pid> -f /dev/null`, o un
+  ciclo `until` con tetto 240 s), mai da dieci;
+- il timeout della chiamata si dimensiona sulla **durata vera** del comando,
+  mai sotto: un comando ucciso a metà va rifatto da capo.
+
+Lunghi di sicuro: le prove di un feedback (otto minuti e mezzo),
+`npm run finish:check` (da quindici a quarantacinque minuti), l'installazione
+di Electron.
+
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 
 - **exit 4 — RIFIUTATO**: il server ha guardato ruolo, ramo e stato vero e ha
