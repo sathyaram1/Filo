@@ -93,4 +93,46 @@ function hideForTests(win, { main = false } = {}) {
   return true;
 }
 
-module.exports = { HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests };
+// NIENTE APERTURE DI SISTEMA DURANTE I TEST.
+//
+// `shell.openExternal(url)` e `shell.openPath(p)` chiedono al sistema di aprire
+// il browser o il gestore file. Su Linux passano da `xdg-open` e ne aspettano
+// l'uscita: in un contenitore senza desktop (la suite in GitHub) non esce mai,
+// la promise resta appesa, l'IPC che l'aspettava non risponde e l'app non si
+// chiude più (tre spec, quindici «Worker teardown timeout» nella prima corsa,
+// 2026-09-16). Su Windows e Mac si apre davvero il browser di chi lancia i
+// test, che non è meglio. Quindi in modalità test le due funzioni non aprono
+// niente e risolvono subito — openPath con '' , che per Electron è «riuscito»
+// — e lo dicono su stderr, così una prova che voglia asserirlo può leggerla:
+//   [test] openExternal soppresso: <url>
+//   [test] openPath soppresso: <percorso>
+// Vale su ogni piattaforma e mai in produzione.
+//
+// La modalità test è NODE_ENV=test: la fixture e ogni spec che apre Filo per
+// conto suo lo impostano (una sentinella negli unit test lo controlla per il
+// fattore di scala, e la stessa lista di lanci vale qui).
+
+/** Vero se l'ambiente è quello dei test automatici. PURA. */
+function inModalitaTest(env = process.env) {
+  return !!env && env.NODE_ENV === 'test';
+}
+
+/**
+ * Sostituisce openExternal/openPath dello `shell` di Electron con versioni che
+ * non aprono niente. No-op fuori dalla modalità test (lo shell resta com'è).
+ * Ritorna true se ha sostituito.
+ */
+function silenziaApertureDiSistema(shell, {
+  inTest = inModalitaTest(),
+  avvisa = (riga) => { try { process.stderr.write(riga + '\n'); } catch (_) {} },
+} = {}) {
+  if (!inTest || !shell) return false;
+  shell.openExternal = async (url) => { avvisa(`[test] openExternal soppresso: ${url}`); };
+  shell.openPath = async (p) => { avvisa(`[test] openPath soppresso: ${p}`); return ''; };
+  return true;
+}
+
+module.exports = {
+  HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests,
+  inModalitaTest, silenziaApertureDiSistema,
+};
