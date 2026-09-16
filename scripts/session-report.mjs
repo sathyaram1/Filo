@@ -22,7 +22,10 @@
 //   lavoro con ogni carattere non alfanumerico sostituito da `-`. Contano
 //   anche i transcript dei sotto-agenti (`<sessione>/subagents/*.jsonl`): nelle
 //   routine chi rilascia è un sotto-agente dell'orchestratore, e il suo
-//   transcript è l'ultimo scritto. Da una cartella di lavoro separata (git
+//   transcript è l'ultimo scritto. I sotto-agenti di un sotto-agente stanno
+//   nella stessa cartella, accanto a lui: si riconoscono dal tempo (cominciano
+//   fra la sua chiamata Agent e il risultato) e si sommano nel suo rapporto,
+//   come quelli di una sessione (figliDelSottoAgente). Da una cartella di lavoro separata (git
 //   worktree) si guarda anche la cartella del checkout principale, dove Claude
 //   Code li scrive davvero.
 //   `since` (il rilascio lo prende dal marcatore del biglietto) limita il conto
