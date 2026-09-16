@@ -55,6 +55,12 @@
 //         richieste di biglietto successive escono con 3 — e il pacemaker
 //         rispetta una pausa prima di riaccendere. Non "riportarlo" a parole:
 //         il tuo testo di ritorno non lo legge nessuna macchina.
+//         Prima di parlare col server spedisce il ramo corrente su origin
+//         (--force-with-lease se la storia è stata riscritta): se il push
+//         fallisce NON rilascia ed esce diverso da zero. `--senza-push` dove
+//         non c'è un repo. Allega da solo il rapporto di fine sessione
+//         (session-report.mjs; `--role <ruolo>` per firmarlo; `--senza-rapporto`
+//         per saltarlo).
 //
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
