@@ -483,7 +483,7 @@ if (isMain) {
   // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
   // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
   // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
-  const CAMPI_BANDIERA = new Set(['json']);
+  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto']);
   const args = [];
   const flags = [];
   const data = {};
