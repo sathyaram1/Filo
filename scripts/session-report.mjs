@@ -231,9 +231,55 @@ function righeDelFile(file) {
 }
 
 /**
- * Il rapporto di questa sessione. Non lancia mai per un transcript assente o
- * illeggibile: torna il rapporto minimo con la nota. (Un errore di
- * programmazione qui dentro sì: lo prende chi chiama.)
+ * I transcript dei sotto-agenti di una sessione. Claude Code li scrive in
+ * `<cartella>/<nome della sessione>/subagents/*.jsonl` (verificato su file
+ * veri il 16/09/2026), coi loro token. Le regole del repo dicono di delegare
+ * le esplorazioni: e' li' che una sessione spende la parte piu' grossa, e un
+ * rapporto che li ignorava diceva 29 $ per una sessione in cui UN solo
+ * sotto-agente su diciassette ne valeva 55 (giro del 14/09, verifica).
+ */
+export function transcriptSottoAgenti(file) {
+  const dir = join(dirname(file), basename(file, '.jsonl'), 'subagents');
+  if (!existsSync(dir)) return [];
+  try {
+    return readdirSync(dir).filter((n) => n.endsWith('.jsonl')).sort().map((n) => join(dir, n));
+  } catch (_) {
+    return [];
+  }
+}
+
+const arrotonda = (x) => Math.round(x * 10000) / 10000;
+
+/**
+ * Somma nel rapporto della sessione i numeri di un sotto-agente: costo,
+ * token, turni, strumenti, modelli. Muta `rep` e lo restituisce. PURA.
+ */
+export function sommaSottoAgente(rep, sub) {
+  rep.subagentRuns += 1;
+  rep.subagentCostUsd = arrotonda(rep.subagentCostUsd + (Number(sub.costUsd) || 0));
+  rep.costUsd = arrotonda(rep.costUsd + (Number(sub.costUsd) || 0));
+  rep.turns += Number(sub.turns) || 0;
+  rep.coldTurns += Number(sub.coldTurns) || 0;
+  for (const k of Object.keys(rep.tokens)) rep.tokens[k] += Number(sub.tokens && sub.tokens[k]) || 0;
+  const st = sub.tools || {};
+  rep.tools.total += Number(st.total) || 0;
+  rep.tools.timeouts += Number(st.timeouts) || 0;
+  rep.tools.errors += Number(st.errors) || 0;
+  for (const [nome, n] of Object.entries(st.byName || {})) rep.tools.byName[nome] = (rep.tools.byName[nome] || 0) + (Number(n) || 0);
+  rep.subagents += Number(sub.subagents) || 0;
+  rep.longestToolS = Math.max(rep.longestToolS, Number(sub.longestToolS) || 0);
+  for (const m of Array.isArray(sub.models) ? sub.models : []) if (!rep.models.includes(m)) rep.models.push(m);
+  for (const n of Array.isArray(sub.notes) ? sub.notes : []) {
+    const nota = `sotto-agente: ${n}`;
+    if (!rep.notes.includes(nota)) rep.notes.push(nota);
+  }
+  return rep;
+}
+
+/**
+ * Il rapporto di questa sessione, sotto-agenti compresi. Non lancia mai per
+ * un transcript assente o illeggibile: torna il rapporto minimo con la nota.
+ * (Un errore di programmazione qui dentro sì: lo prende chi chiama.)
  */
 export async function generaRapporto({ transcript = '', role = '', ticket = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
   const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
@@ -245,6 +291,13 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
   try {
     const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket });
     if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
+    for (const f of transcriptSottoAgenti(trovato.file)) {
+      try {
+        sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket }));
+      } catch (e) {
+        rep.notes.push(`transcript di un sotto-agente illeggibile (${f}): ${String((e && e.message) || e)}`);
+      }
+    }
     return rep;
   } catch (e) {
     const rep = rapportoVuoto({ role, ticket });
