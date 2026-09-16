@@ -368,12 +368,24 @@
   // ── I bilanci ─────────────────────────────────────────────────────────────
   //
   // Tre bilanci per feedback (spec §4): x giri per i livelli 3 e 2, y per gli 1,
-  // z per gli 0. I DEFAULT vivono in feedbackTransitions.js (VERIFIER_CAPS,
-  // fonte unica incorporata dal server); i valori effettivi li detta l'owner
-  // dalla dashboard. Il tetto alto è lo stesso della dashboard.
+  // z per gli 0. I numeri li detta SOLO l'owner dalla dashboard
+  // (config/routines): nel codice non c'è un default (decisione del
+  // 2026-09-16), e un bilancio mancante non vale 0 né altro — decideRound si
+  // ferma con un errore che dice quale manca. Il tetto alto è lo stesso della
+  // dashboard.
   const CAP_MIN = 0;
   const CAP_MAX = 10;
   const CAP_KEYS = ['cap2', 'cap1', 'cap0'];
+
+  /** I bilanci che mancano (né in `caps` né in `defaults`): [] se ci sono tutti. PURA. */
+  function missingCaps(caps, defaults) {
+    const def = defaults && typeof defaults === 'object' ? defaults : {};
+    const src = caps && typeof caps === 'object' ? caps : {};
+    return CAP_KEYS.filter((k) => {
+      const raw = src[k] != null ? src[k] : def[k];
+      return !Number.isFinite(Number(raw)) || raw === '' || raw === true || raw === false;
+    });
+  }
 
   function normalizeCaps(caps, defaults) {
     const def = defaults && typeof defaults === 'object' ? defaults : {};
