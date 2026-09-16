@@ -4,7 +4,6 @@
     "tests/board-offline-error",
     "tests/filo-terminal-context",
     "tests/tab-reorder-reopen",
-    "tests/verifier-stress-410",
     "tests/verify-495-avversariale",
     "tests/verify-495-vfx3",
     "tests/verify-514-g11",
