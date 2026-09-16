@@ -115,7 +115,15 @@ git -c user.email=claude@local -c user.name=claude-local commit -q -m "cap-obser
 # `git push origin HEAD` regge ai veleni provati (push.default, remote.*.push),
 # ma la regola vale senza eccezioni proprio per non doverla riverificare a ogni
 # forma nuova. Se la HEAD e' staccata non c'e' ramo da spedire: si salta.
+#
+# LA SPEDIZIONE NON TACE (stessa regola di auto-commit-merge.sh): un push
+# rifiutato scrive UNA riga su stderr col motivo di git, invece di sparire
+# dietro un `|| true`. La nota diagnostica resta comunque committata qui, e il
+# hook non fallisce mai la sessione: l'uscita e' zero in ogni caso.
 if is_spedibile "$CUR_BRANCH"; then
-  git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" >/dev/null 2>&1 || true
+  if ! esito=$(git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" 2>&1); then
+    motivo=$(printf '%s\n' "$esito" | grep -vE '^hint:|^To |^[[:space:]]*$' | head -3 | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+    echo "[cap-observe] il ramo '$CUR_BRANCH' NON e' arrivato su origin (la nota diagnostica resta committata in locale): $motivo" >&2
+  fi
 fi
 exit 0
