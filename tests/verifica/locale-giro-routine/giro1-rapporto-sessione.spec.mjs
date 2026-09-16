@@ -78,7 +78,7 @@ test.describe('rapporto di fine sessione — dai numeri del transcript', () => {
     // sessione madre dice 29 $, UN solo sotto-agente dei suoi diciassette ne
     // vale 55. Un costo che ignora i sotto-agenti è un costo sbagliato di
     // parecchie volte proprio nelle sessioni che costano di più.
-    test.fail(true, 'rilievo aperto del giro 1: il rapporto legge solo il transcript della sessione madre');
+    // Rilievo del giro 1, corretto nello stesso giro: i sotto-agenti si sommano.
     const { file } = scriviTranscript();
     const rep = await generaRapporto({ transcript: file, role: 'verifier' });
     expect(rep.tokens.output).toBe(70 + 1000);
