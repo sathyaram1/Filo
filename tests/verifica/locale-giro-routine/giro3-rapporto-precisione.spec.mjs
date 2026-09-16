@@ -44,9 +44,9 @@ test.describe('rapporto di fine sessione — i numeri davanti ai transcript veri
     // a zero. Il rapporto li conta come turni e aggiunge la nota «modello
     // sconosciuto «<synthetic>»: costo calcolato a tariffa opus» — su un
     // costo che è zero. Rilievo del giro 3, livello 1: un turno in più e una
-    // nota falsa in quasi ogni rapporto che l'owner legge.
-    test.fail(true, 'rilievo del giro 3: la riga «<synthetic>» conta come turno e produce la nota del modello sconosciuto');
-    const zero = { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 };
+    // nota falsa in quasi ogni rapporto che l'owner legge. Corretto nello
+    // stesso giro: quelle righe si saltano.
+    const zero ={ input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 };
     const righe = [
       { type: 'assistant', timestamp: '2026-09-16T10:00:00.000Z', sessionId: 's', message: { id: 'm1', model: 'claude-opus-5', usage: USO, content: [{ type: 'text', text: 'ciao' }] } },
       { type: 'assistant', timestamp: '2026-09-16T10:00:05.000Z', sessionId: 's', message: { id: 'sint-1', model: '<synthetic>', role: 'assistant', stop_reason: 'stop_sequence', usage: zero, content: [{ type: 'text', text: 'Request interrupted' }] } },
