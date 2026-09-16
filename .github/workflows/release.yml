@@ -90,6 +90,8 @@ jobs:
   suite:
     runs-on: ubuntu-latest
     timeout-minutes: 240
+    outputs:
+      sha: ${{ steps.provato.outputs.sha }}
     steps:
       - name: Checkout (main, o il ramo scelto con solo_suite)
         uses: actions/checkout@v4
@@ -99,6 +101,17 @@ jobs:
           # vuoto e si cade su main.
           ref: ${{ inputs.solo_suite && github.ref || 'main' }}
           fetch-depth: 0
+
+      # Il commit che questa suite prova. La seconda meta' (release) lo
+      # confronta con quello che sta per costruire: la suite dura un'ora e un
+      # quarto, e in quell'ora su main possono entrare altre fusioni — codice
+      # mai passato di qui, che senza il confronto uscirebbe agli utenti
+      # (giro del 14/09, verifica). Si legge PRIMA del controllo "c'e'
+      # qualcosa di nuovo", cosi' c'e' anche quando la suite non gira.
+      - name: Il commit che la suite prova
+        id: provato
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
