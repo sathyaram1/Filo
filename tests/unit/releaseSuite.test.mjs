@@ -116,3 +116,47 @@ describe('`solo_suite`: provare la suite su un ramo senza pubblicare', () => {
     assert.match(senzaCommenti(job('release-mac')), /needs:\s*release/, 'il Mac resta appeso a Windows');
   });
 });
+
+// La suite prova main all'inizio e dura un'ora e un quarto; il lavoro Windows
+// riprendeva main COM'È dopo, e quello che era entrato nel frattempo usciva
+// senza essere mai passato dalla suite (giro del 14/09, verifica).
+describe('si pubblica SOLO il commit che la suite ha provato', () => {
+  test('la suite dice quale commit ha provato, prima ancora di decidere se girare', () => {
+    const suite = senzaCommenti(job('suite'));
+    assert.match(suite, /outputs:\s*\n\s*sha:\s*\$\{\{\s*steps\.provato\.outputs\.sha\s*\}\}/, 'la suite deve esporre il commit provato');
+    assert.match(suite, /id:\s*provato[\s\S]*?git rev-parse HEAD/, 'il commit provato si legge dal checkout');
+    assert.ok(suite.indexOf('id: provato') < suite.indexOf('git fetch --tags --force'),
+      'si legge PRIMA del controllo "c\'è qualcosa di nuovo": deve esserci anche quando la suite non gira');
+  });
+
+  test('il lavoro Windows lo confronta due volte: prima del numero di versione e dopo l\'allineamento', () => {
+    const release = senzaCommenti(job('release'));
+    const primaDelBump = release.slice(0, release.indexOf('release-bump.mjs'));
+    assert.match(primaDelBump, /needs\.suite\.outputs\.sha/, 'prima di chiedere il numero: se main si è mosso non si pubblica');
+    assert.match(primaDelBump, /should_release=false/, 'main mosso → should_release=false, senza feedback: la prossima corsa riprova');
+    const dopoIlPull = release.slice(release.indexOf('git pull --rebase origin main'));
+    assert.match(dopoIlPull, /needs\.suite\.outputs\.sha/, 'dopo il pull: sotto il commit di release deve esserci il commit provato');
+    assert.match(dopoIlPull, /HEAD~1/);
+    assert.match(dopoIlPull, /exit 1/, 'codice mai provato non si costruisce');
+  });
+});
+
+// Nel contenitore delle routine (Linux, senza schermo, da root) un comando
+// con xvfb-run ma senza la sandbox spenta non fa partire Electron: un testo
+// che lo scrive a metà è la trappola che ogni giro riscopriva (giro del
+// 14/09, verifica: il ruolo di chi sonda lo scriveva a metà).
+describe('il comando del contenitore è scritto intero, dovunque compaia', () => {
+  test('ogni riga con `xvfb-run -a` in CLAUDE.md, nei ruoli e nei rossi noti porta anche ELECTRON_DISABLE_SANDBOX=1', () => {
+    const files = ['CLAUDE.md', 'tests/rossi-noti.json',
+      ...readdirSync(resolve(ROOT, 'routines', 'roles')).filter((n) => n.endsWith('.md')).map((n) => `routines/roles/${n}`)];
+    let trovate = 0;
+    for (const f of files) {
+      for (const riga of readFileSync(resolve(ROOT, f), 'utf8').split(/\r?\n/)) {
+        if (!/xvfb-run -a/.test(riga)) continue;
+        trovate += 1;
+        assert.match(riga, /ELECTRON_DISABLE_SANDBOX=1/, `${f}: «${riga.trim().slice(0, 120)}» — metà comando`);
+      }
+    }
+    assert.ok(trovate >= 3, 'il comando del contenitore deve stare scritto in CLAUDE.md, nei ruoli e nei rossi noti');
+  });
+});
