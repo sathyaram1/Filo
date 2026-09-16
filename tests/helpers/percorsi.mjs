@@ -46,7 +46,8 @@ export function tempCanonico() {
 // basterebbe: chi non sa che esiste non lo accende. Quindi lo spazio c'è sempre,
 // per tutti, e quella differenza fra le due macchine sparisce invece di restare
 // in attesa di essere riprodotta. La suite intera (1486 casi) è stata girata su
-// percorsi spaziati prima di renderlo la regola.
+// percorsi spaziati prima di renderlo la regola (una volta: dal 2026-09-15 la
+// suite gira solo in GitHub Actions nel lavoro di release, nessuno la lancia).
 export const SPAZIO = 'con spazio-';
 
 // Una cartella temporanea nuova, già canonica e con uno spazio nel nome. Da
