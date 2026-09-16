@@ -286,6 +286,12 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '' 
     if (Number.isFinite(ms)) { if (ms < primoMs) primoMs = ms; if (ms > ultimoMs) ultimoMs = ms; }
     const msg = e.message && typeof e.message === 'object' ? e.message : null;
     if (!msg) continue;
+    // Le righe col modello «<synthetic>» (una richiesta interrotta, un errore
+    // dell'API) hanno usage a zero e non sono un turno: contate, gonfiavano i
+    // turni e lasciavano in ogni rapporto la nota del modello sconosciuto
+    // (giro del 14/09, terza verifica: 36 righe così nei transcript di una
+    // macchina sola).
+    if (e.type === 'assistant' && /^<[^>]*>$/.test(String(msg.model || ''))) continue;
 
     if (e.type === 'assistant') {
       const u = msg.usage && typeof msg.usage === 'object' ? msg.usage : null;
