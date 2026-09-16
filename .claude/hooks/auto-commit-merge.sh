@@ -133,10 +133,10 @@ spedisci_ramo() {
   case "$esito" in
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
       esito2=$(git push --force-with-lease="refs/heads/$ramo" origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
-      echo "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")" >&2
+      segnala_fallimento "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")"
       return 1 ;;
   esac
-  echo "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin: $(motivo_git "$esito")" >&2
+  segnala_fallimento "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin: $(motivo_git "$esito")"
   return 1
 }
 
