@@ -480,43 +480,39 @@ async function setAutomationProberIdle(on, idToken) {
 // I tre bilanci dei giri di correzione (config/routines, campi `cap2`,
 // `cap1`, `cap0` — feedback #561) e il testo della fase 2 (`fixInstructions`).
 // Li applica il SERVER quando registra la critica; qui la dashboard li legge e
-// li scrive. I DEFAULT vengono dalla fonte unica
-// (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS: la stessa che il server
-// incorpora al deploy); il range da SN_CONST.AUTOMATION. Clamp prudente sia in
-// lettura sia in scrittura. Lo 0 è un valore valido per tutti e tre.
-const CAP_KEYS = ['cap2', 'cap1', 'cap0'];
+// li scrive. Non c'è un default: i numeri stanno SOLO nel documento (decisione
+// dell'owner del 2026-09-16 — un default nel codice faceva ragionare la
+// verifica locale con 5/2/0 mentre la dashboard diceva 10/1/0). Un campo che
+// nel documento non c'è torna `null`, e la dashboard lo mostra vuoto. Il range
+// da SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura. Lo 0
+// è un valore valido per tutti e tre.
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap2', 'cap1', 'cap0'];
 const FIX_INSTRUCTIONS_MAX = Number(globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION && globalThis.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
 
-function automationDefaults() {
+function automationRange() {
   const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
-  const CAPS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS) || {};
   return {
-    defs: {
-      cap2: Number.isFinite(CAPS.cap2) ? CAPS.cap2 : 5,
-      cap1: Number.isFinite(CAPS.cap1) ? CAPS.cap1 : 2,
-      cap0: Number.isFinite(CAPS.cap0) ? CAPS.cap0 : 0,
-    },
     min: Number.isFinite(A.CAP_MIN) ? A.CAP_MIN : 0,
     max: Number.isFinite(A.CAP_MAX) ? A.CAP_MAX : 10,
   };
 }
 
-function clampCap(n, def) {
-  const { min, max } = automationDefaults();
+/** Il bilancio nel range, o `null` se non è un numero. */
+function clampCap(n) {
+  const { min, max } = automationRange();
   const v = Math.round(Number(n));
-  if (!Number.isFinite(v)) return def;
+  if (n === '' || n === null || n === undefined || !Number.isFinite(v)) return null;
   return Math.min(max, Math.max(min, v));
 }
 
 async function getRoutineCaps(idToken) {
-  const { defs } = automationDefaults();
   // SOLO config/routines: è il documento che il server legge davvero, e
   // mostrare un valore pescato altrove significa mostrare una regola che
   // nessuno applica (vedi il commento in getAutomationProberIdle).
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  const out = Object.assign({}, defs, { fixInstructions: '' });
+  const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '' };
   for (const k of CAP_KEYS) {
-    if (doc && doc[k] != null) out[k] = clampCap(doc[k], defs[k]);
+    if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
   }
   if (doc && typeof doc.fixInstructions === 'string') out.fixInstructions = doc.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX);
   return out;
@@ -524,13 +520,16 @@ async function getRoutineCaps(idToken) {
 
 async function setRoutineCaps(patch, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per cambiare i bilanci del verificatore.');
-  const { defs } = automationDefaults();
   const p = patch && typeof patch === 'object' ? patch : {};
   const fields = {};
   const mask = [];
   for (const k of CAP_KEYS) {
     if (p[k] == null) continue;
-    fields[k] = toFsValue(clampCap(p[k], defs[k]));
+    const v = clampCap(p[k]);
+    // Un bilancio non numerico non si scrive: non c'è un default con cui
+    // sostituirlo, e un campo assente ferma la verifica con un errore chiaro.
+    if (v === null) throw new Error(`${k}: serve un numero (0 compreso), non «${String(p[k])}».`);
+    fields[k] = toFsValue(v);
     mask.push(k);
   }
   if (typeof p.fixInstructions === 'string') {
