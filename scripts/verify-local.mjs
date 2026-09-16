@@ -831,6 +831,7 @@ if (isMain) {
     const state = withRequest(readState(), b, { request, sha: headSha() });
     writeState(state);
     console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe(), history: historyFromRounds(state[b].rounds) }));
+    console.log(bilanciText(capsStart));
     process.exit(0);
   }
 
