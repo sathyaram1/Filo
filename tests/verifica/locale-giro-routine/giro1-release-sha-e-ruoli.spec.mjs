@@ -56,7 +56,7 @@ test.describe('ruoli e CLAUDE.md — nessuno chiede più la suite, e il contenit
     // ELECTRON_DISABLE_SANDBOX=1, nel contenitore da root Electron non parte,
     // e un comando scritto a metà nel testo che uno legge è la trappola che il
     // punto 7 voleva togliere.
-    test.fail(true, 'rilievo aperto del giro 1: in prober.md il comando con xvfb-run manca della sandbox spenta');
+    // Rilievo del giro 1, corretto nello stesso giro: il comando è intero.
     const p = leggi('routines/roles/prober.md');
     for (const riga of p.split('\n')) {
       if (/xvfb-run/.test(riga)) expect(riga, riga.trim()).toMatch(/ELECTRON_DISABLE_SANDBOX=1/);
