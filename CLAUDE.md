@@ -252,8 +252,12 @@ modifica:
   in GitHub, nel lavoro di release, che parte ogni sei ore: verde, e la patch
   si pubblica; un rosso nuovo — fuori dai rossi noti del contenitore — e la
   patch non esce, il rosso diventa un feedback e si corregge con calma, la
-  patch salta un giro. Una regressione è rara: non vale un'ora d'attesa a ogni
-  consegna;
+  patch salta un giro. È il job `suite` di `.github/workflows/release.yml`
+  (Linux senza schermo; `scripts/suite-verdict.mjs` toglie dal conto i rossi
+  noti del contenitore, `tests/rossi-noti.json`); `gh workflow run
+  release.yml --ref <ramo> -f solo_suite=true` prova la sola suite su un
+  ramo, senza pubblicare. Una regressione è rara: non vale un'ora d'attesa a
+  ogni consegna;
 - **al suo posto**, nelle routine come in locale, chi verifica lancia
   `npm run finish:check` (unit test più gli spec delle aree toccate dal ramo:
   è lo stesso controllo del cancello di `npm run finish`) e le prove del giro,
