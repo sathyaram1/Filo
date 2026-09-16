@@ -107,9 +107,9 @@ export function raccogliCasi(json) {
         });
       }
     }
-    for (const s of Array.isArray(suite.suites) ? suite.suites : []) visita(s, fileQui, corniceQui);
+    for (const s of Array.isArray(suite.suites) ? suite.suites : []) visita(s, fileQui, corniceQui, false);
   };
-  for (const s of Array.isArray(json?.suites) ? json.suites : []) visita(s, '', null);
+  for (const s of Array.isArray(json?.suites) ? json.suites : []) visita(s, '', [], true);
   return out;
 }
 
