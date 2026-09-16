@@ -295,10 +295,12 @@ function runHookStderr(work, env = {}) {
   return String(r.stderr || '');
 }
 
-/** Commit di un file col nome dato, sul ramo corrente. */
+/** Commit di un file col nome dato, sul ramo corrente (solo quello: con
+ * `add -A` finivano nel commit anche gli hook copiati, e un `reset --hard`
+ * dopo li cancellava). */
 function commitFile(work, name, content = 'x\n') {
   writeFileSync(resolve(work, name), content, 'utf8');
-  git(work, ['add', '-A']);
+  git(work, ['add', name]);
   git(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', name]);
 }
 
