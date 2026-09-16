@@ -462,7 +462,7 @@
     `<path d="M4 10h11a5 5 0 0 1 0 10h-4"/>` +
     `<path d="M8 6l-4 4 4 4"/>`;
 
-  // --- PREVISTE: posta letta (busta aperta) e posta inviata (busta + freccia).
+  // PREVISTE: posta letta (busta aperta), posta inviata (busta + freccia).
   const mailOpen =
     `<path d="M4 9.5l8-5.5 8 5.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/>` +
     `<path d="M4 9.5l8 5.5 8-5.5"/>`;
@@ -472,92 +472,92 @@
     `<path d="M15 19.5h6"/>` +
     `<path d="M18.5 17l2.5 2.5-2.5 2.5"/>`;
 
-  // --- PREVISTE: leggi la pagina aperta (finestra con righe di testo).
+  // PREVISTE: leggi la pagina (finestra con righe).
   const readPage =
     `<rect x="3" y="4.5" width="18" height="15" rx="2"/>` +
     `<path d="M3 8.5h18"/>` +
     `<path d="M7 12.5h10"/>` +
     `<path d="M7 16h6"/>`;
 
-  // --- PREVISTE: clicca nella pagina (freccia del puntatore).
+  // PREVISTE: clicca nella pagina (freccia del puntatore).
   const click =
     `<path d="M5 3.5l6 14.5 2-6 6-2z"/>` +
     `<path d="M13.5 12.5l5.5 5.5"/>`;
 
-  // --- PREVISTE: scrivi in un campo (casella con il cursore).
+  // PREVISTE: scrivi in un campo (casella col cursore).
   const typeText =
     `<rect x="3" y="7.5" width="18" height="9" rx="2"/>` +
     `<path d="M7 10.5v3"/>`;
 
-  // --- PREVISTE: modifica un file (matita).
+  // PREVISTE: modifica un file (matita).
   const pencil =
     `<path d="M4 20l4.5-1L19 8.5a2 2 0 0 0-3-3L5.5 15.5z"/>` +
     `<path d="M14 7.5l3 3"/>`;
 
-  // --- PREVISTE: crea un file (foglio con "+").
+  // PREVISTE: crea un file (foglio con «+»).
   const fileNew =
     `<path d="M14 3.5H6v17h12V7.5z"/>` +
     `<path d="M14 3.5v4h4"/>` +
     `<path d="M12 11v6"/>` +
     `<path d="M9 14h6"/>`;
 
-  // --- PREVISTE: allega (graffetta).
+  // PREVISTE: allega (graffetta).
   const attach =
     `<path d="M20.5 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2"/>`;
 
-  // --- PREVISTE: foto / telecamera (corpo con obiettivo).
+  // PREVISTE: foto (corpo con obiettivo).
   const camera =
     `<rect x="3" y="8" width="18" height="12" rx="2"/>` +
     `<path d="M8 8l1.5-2.5h5L16 8"/>` +
     `<circle cx="12" cy="14" r="3.2"/>`;
 
-  // --- PREVISTE: ascolta (microfono).
+  // PREVISTE: ascolta (microfono).
   const mic =
     `<rect x="9" y="3.5" width="6" height="10" rx="3"/>` +
     `<path d="M6 11.5a6 6 0 0 0 12 0"/>` +
     `<path d="M12 17.5v3"/>` +
     `<path d="M9 20.5h6"/>`;
 
-  // --- PREVISTE: memoria di Filo (cervello a due lobi).
+  // PREVISTE: memoria di Filo (cervello).
   const memory =
     `<path d="M9.5 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1.5 5A3 3 0 0 0 9.5 20c1.3 0 2.5-.8 2.5-2V6a2.5 2.5 0 0 0-2.5-2z"/>` +
     `<path d="M14.5 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1.5 5A3 3 0 0 1 14.5 20c-1.3 0-2.5-.8-2.5-2V6a2.5 2.5 0 0 1 2.5-2z"/>`;
 
-  // --- PREVISTE: copia (due fogli sovrapposti).
+  // PREVISTE: copia (due fogli sovrapposti).
   const copy =
     `<rect x="9" y="9" width="11" height="11" rx="2"/>` +
     `<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/>`;
 
-  // --- PREVISTE: promemoria / notifica (campanella).
+  // PREVISTE: promemoria (campanella).
   const bell =
     `<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/>` +
     `<path d="M10 20.5a2 2 0 0 0 4 0"/>`;
 
-  // --- PREVISTE: automazione ricorrente (due frecce a ciclo).
+  // PREVISTE: automazione ricorrente (frecce a ciclo).
   const repeat =
     `<path d="M17 3l3 3-3 3"/>` +
     `<path d="M20 6H8a4 4 0 0 0-4 4v1"/>` +
     `<path d="M7 21l-3-3 3-3"/>` +
     `<path d="M4 18h12a4 4 0 0 0 4-4v-1"/>`;
 
-  // --- PREVISTE: chiede all'utente (cerchio con "?").
+  // PREVISTE: chiede all'utente (cerchio con «?»).
   const question =
     `<circle cx="12" cy="12" r="8.5"/>` +
     `<path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7"/>` +
     `<path d="M12 17h.01"/>`;
 
-  // --- PREVISTE: schede aperte (finestra con la linguetta di una scheda).
+  // PREVISTE: schede aperte (finestra con linguetta).
   const tabs =
     `<path d="M3 7.5h18v10.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>` +
     `<path d="M3 7.5V5.5A1.5 1.5 0 0 1 4.5 4h5A1.5 1.5 0 0 1 11 5.5v2"/>` +
     `<path d="M3 11.5h18"/>`;
 
-  // --- PREVISTE: posizione (goccia del segnaposto).
+  // PREVISTE: posizione (goccia del segnaposto).
   const location =
     `<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/>` +
     `<circle cx="12" cy="10" r="2.5"/>`;
 
-  // --- PREVISTE: piano di lavoro (elenco puntato).
+  // PREVISTE: piano di lavoro (elenco puntato).
   const list =
     `<path d="M5 6.5h.01"/>` +
     `<path d="M9 6.5h11"/>` +
@@ -566,12 +566,12 @@
     `<path d="M5 17.5h.01"/>` +
     `<path d="M9 17.5h11"/>`;
 
-  // --- PREVISTE: genera (immagine, testo…): due scintille.
+  // PREVISTE: genera (due scintille).
   const sparkles =
     `<path d="M11 3.5l1.8 5.2 5.2 1.8-5.2 1.8L11 17.5l-1.8-5.2L4 10.5l5.2-1.8z"/>` +
     `<path d="M18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>`;
 
-  // --- STATI del lavoro: ragionamento (nuvola di pensiero), fatto, avviso, bloccato.
+  // STATI del lavoro: ragionamento, fatto, avviso, bloccato.
   const reasoning =
     `<path d="M7.5 16.5h9a3.5 3.5 0 0 0 .5-7A5 5 0 0 0 7.3 8.6 4 4 0 0 0 7.5 16.5z"/>` +
     `<path d="M6 18.5h.01"/>` +

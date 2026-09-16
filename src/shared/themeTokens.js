@@ -1,14 +1,12 @@
-// Registro dei token estetici (#146.1): ogni variabile estetica ha nome stabile, tipo,
-// default e — per i token specifici — una CATEGORIA da cui eredita, così l'utente cambia il
-// singolo elemento o l'intera categoria con una modifica sola; l'override specifico vince.
-// Gli override vivono in `settings.themeTokens`, chiave in REPLACE_KEYS: ogni salvataggio
-// sostituisce l'intera mappa, quindi togliere una chiave equivale a tornare al predefinito.
-// L'eredità categoria→specifico è implementata DUE volte di proposito: nel CSS (theme.css),
-// così il rendering segue la catena senza JS, e qui (`effectiveValue`), così preferenze e
-// test calcolano il valore effettivo senza interrogare il DOM.
-// SICUREZZA: gli override finiscono in <style> iniettati in TUTTE le superfici, comprese le
-// pagine web esterne, quindi `validate` è una whitelist severa per tipo: niente ';', '}',
-// 'url(' o altro che permetta di uscire dalla dichiarazione CSS.
+// Registro dei token estetici (#146.1): nome stabile, tipo, default e — per i token
+// specifici — una CATEGORIA da cui ereditano, così si cambia il singolo elemento o l'intera
+// categoria con una modifica sola (l'override specifico vince). Gli override vivono in
+// `settings.themeTokens`, chiave in REPLACE_KEYS: ogni salvataggio sostituisce l'intera
+// mappa, quindi togliere una chiave torna al predefinito. L'eredità è scritta DUE volte di
+// proposito: nel CSS, perché il rendering segua la catena senza JS, e qui in
+// `effectiveValue`, perché preferenze e test calcolino il valore effettivo senza DOM.
+// SICUREZZA: finiscono in <style> iniettati in TUTTE le superfici, pagine web comprese,
+// quindi `validate` è una whitelist severa per tipo: niente ';', '}', 'url('.
 
 (function (global) {
   'use strict';
@@ -52,11 +50,10 @@
       dashCss: ['--dash-ink'],
       default: { light: '#1a1918', dark: '#e5e3dc' },
     },
-    // Barra in alto (fascia dietro le schede + schede non attive): superficie della SOLA shell,
-    // quindi solo `shellCss`. Mappa insieme `--bg-deep` e `--tab-bg` così «rendi la barra verde
-    // scuro» colora l'intera fascia: senza questo token non c'era modo di cambiare SOLO la
-    // barra — `background` tingeva tutte le superfici e `colore_tab` agiva sulle singole tab
-    // (#184). Finché non lo si sovrascrive, `--tab-bg` resta il suo neutro.
+    // Barra in alto: superficie della SOLA shell, quindi solo `shellCss`. Mappa insieme
+    // `--bg-deep` e `--tab-bg` così «rendi la barra verde scuro» colora l'intera fascia: prima
+    // non c'era modo di cambiare solo la barra — `background` tingeva tutto e `colore_tab`
+    // agiva sulle singole tab (#184).
     topbar: {
       label: 'Barra in alto',
       type: 'color',
@@ -85,19 +82,18 @@
       css: '--sn-error',
       default: { light: '#b91c1c', dark: '#ff6b6b' },
     },
-    // Sfondo al passaggio del mouse (voci di menu, righe, bottoni secondari, azioni-carta):
-    // era l'unico colore di superficie delle pagine filo:// non esposto come token, e «rendi
-    // più evidente l'hover» non aveva un appiglio. Sola pagina: la shell deriva i suoi hover
-    // per color-mix dei propri token.
+    // Sfondo al passaggio del mouse (menu, righe, bottoni secondari): era l'unico colore di
+    // superficie non esposto come token, e «rendi più evidente l'hover» non aveva appiglio.
+    // Sola pagina: la shell deriva i suoi hover per color-mix.
     hover: {
       label: 'Sfondo al passaggio del mouse',
       type: 'color',
       css: '--sn-hover',
       default: { light: '#ffffff', dark: '#282725' },
     },
-    // Sfondo di menu, popup, barra laterale e dropdown: variante quasi-opaca dello sfondo
-    // (alpha 0.98 col blur dietro), distinta da `background` perché tinge SOLO le superfici
-    // sovrapposte. Accetta rgba(...) per chi vuole tenere la trasparenza. Sola pagina.
+    // Sfondo di menu, popup, sidebar e dropdown: variante quasi-opaca dello sfondo (alpha 0.98
+    // col blur dietro), distinta da `background` perché tinge SOLO le superfici sovrapposte.
+    // Accetta rgba(...) per tenere la trasparenza.
     overlay: {
       label: 'Sfondo di menu e popup',
       type: 'color',
@@ -236,10 +232,9 @@
     return null;
   }
 
-  // Leggibilità testo/sfondo: serve al gate dei livelli (#146.2/#146.4) — se Filo, su
-  // richiesta in chat, rende il testo praticamente uguale allo sfondo, la modifica diventa
-  // un'azione di livello 2 (conferma prima di applicare) invece di livello 1. Luminanza
-  // relativa e rapporto WCAG: due colori identici danno 1.0, nero su bianco ~21.
+  // Leggibilità testo/sfondo per il gate dei livelli (#146.2/#146.4): se Filo rende il testo
+  // quasi uguale allo sfondo, la modifica sale a livello 2 (conferma) invece di 1. Rapporto
+  // di contrasto WCAG: colori identici 1.0, nero su bianco ~21.
   function _rgbArray(color) {
     const t = toRgbTriplet(color);
     if (!t) return null;
@@ -269,9 +264,9 @@
     return (hi + 0.05) / (lo + 0.05);
   }
 
-  // Soglia di illeggibilità estrema, tenuta vicino a 1 di proposito: si intercettano SOLO i
-  // casi gravi (testo ≈ sfondo), non ogni scelta a basso contrasto ancora leggibile — un
-  // popup di conferma a ogni ritocco sarebbe più fastidioso che utile.
+  // Soglia di illeggibilità estrema, vicino a 1 di proposito: solo i casi gravi (testo ≈
+  // sfondo), non ogni basso contrasto ancora leggibile — un popup a ogni ritocco sarebbe
+  // più fastidioso che utile.
   const LEGIBILITY_MIN_RATIO = 1.6;
 
   // Le coppie testo-su-superficie che contano per la leggibilità: il testo
@@ -299,8 +294,8 @@
   }
 
   // Emette SOLO le variabili sovrascritte: i default restano in theme.css e l'eredità la fa
-  // la catena var() nativa. Il selettore html[data-sn-theme] (0,1,1) vince sui blocchi di
-  // theme.css (0,1,0) a prescindere dall'ordine dei fogli.
+  // la catena var(). html[data-sn-theme] (0,1,1) vince sui blocchi di theme.css (0,1,0) a
+  // prescindere dall'ordine dei fogli.
   function declsFor(overrides, { shell = false } = {}) {
     const { clean } = sanitize(overrides);
     const decls = [];

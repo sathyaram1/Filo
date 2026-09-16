@@ -1,10 +1,8 @@
-// Onboarding: la micro-intervista del primo avvio (#524). Filo accoglie con UNA
-// conversazione, non con un modulo a passi: qui sta la parte PURA — elenco delle cose da
-// spuntare, stato della conversazione, chiusura e resa per il prompt — testabile senza
-// Electron e senza LLM. La persistenza sta in filoMemory.js, l'azione e l'iniezione nel
-// prompt in handlers.js, la chat in dashboard.js.
-// REGOLA: il segno «già accolto» si scrive alla FINE, o chi chiude la finestra a metà
-// intervista non rivede più il benvenuto.
+// Onboarding: la micro-intervista del primo avvio (#524). Qui la parte PURA — elenco delle
+// cose da spuntare, stato della conversazione, chiusura, resa per il prompt — testabile
+// senza Electron e senza LLM. Persistenza in filoMemory.js, azione e prompt in handlers.js,
+// chat in dashboard.js. REGOLA: il segno «già accolto» si scrive alla FINE, o chi chiude la
+// finestra a metà intervista non rivede più il benvenuto.
 
 (function (global) {
   'use strict';
@@ -90,18 +88,15 @@
   const ITEM_BY_ID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
   // L'uscita che NON passa dal modello. Il benvenuto promette «scrivi «basta così» e
-  // chiudiamo», e una promessa che dipende dalla buona volontà del modello non è una
-  // promessa: un modello piccolo se ne dimentica, un provider giù non risponde, e chi apre
-  // Filo senza rete resterebbe chiuso dentro l'accoglienza. Perciò la parola di stop la
-  // riconosce l'APP, prima di qualunque chiamata.
-  // Il riconoscimento è volutamente STRETTO — l'intera frase deve essere una richiesta di
-  // uscita, non contenerne una: «basta che tu non sia prolisso» è una risposta, non un modo
-  // di chiudere. E CHIEDERE DI USCIRE ≠ DIRE DI NO A UNA PROPOSTA: durante l'intervista Filo
-  // propone (accesso Google, tema scuro), e «no grazie» è un no a QUELLA proposta —
-  // trattarlo da parola di stop chiudeva tutto al primo rifiuto. Da qui due elenchi:
-  // STOP_PHRASES    chiedono di uscire e non vogliono dire altro: chiude l'app, sempre;
-  // DECLINE_PHRASES rifiutano qualcosa, e cosa lo dice la domanda a cui rispondono:
-  // le gestisce il modello, che quella domanda ce l'ha davanti.
+  // chiudiamo», ma una promessa affidata al modello non è una promessa: un modello piccolo
+  // se ne dimentica, un provider giù non risponde, e chi apre Filo senza rete resterebbe
+  // chiuso dentro l'accoglienza. Quindi la parola di stop la riconosce l'APP, prima di ogni
+  // chiamata, ed è riconosciuta STRETTA: l'intera frase deve essere una richiesta di uscita,
+  // perché «basta che tu non sia prolisso» è una risposta, non un congedo.
+  // CHIEDERE DI USCIRE ≠ DIRE DI NO A UNA PROPOSTA: Filo propone (accesso Google, tema
+  // scuro) e «no grazie» è un no a QUELLA proposta — trattarlo da stop chiudeva tutto al
+  // primo rifiuto. Da qui due elenchi: STOP_PHRASES chiudono sempre, anche col modello muto;
+  // DECLINE_PHRASES le gestisce il modello, che ha davanti la domanda a cui si riferiscono.
   const STOP_PHRASES = [
     'basta', 'basta cosi', 'basta con le domande', 'basta domande',
     'basta le domande', 'niente intervista', 'niente domande',
@@ -215,9 +210,8 @@
           thread: normalizeThread(p.thread),
         }))
         // Solo le conversazioni VERE: una senza risposte non dice niente e occupava un posto dei
-        // cinque — bastavano cinque rilanci a vuoto per buttare fuori la prima conversazione con
-        // Filo. Il filtro sta qui e non solo dove si archivia, così ripulisce anche gli archivi
-        // già sporcati.
+        // cinque, così bastavano cinque rilanci a vuoto per buttare fuori la prima conversazione
+        // con Filo. Il filtro sta qui, non solo dove si archivia, così ripulisce anche l'esistente.
         .filter((p) => hasUserTurn(p.thread))
         .slice(-PAST_CAP)
       : [];
@@ -254,11 +248,10 @@
     return { state: next, applied: valid.filter((x) => !cur.ticked.includes(x)) };
   }
 
-  // Da qui passano TUTTE le strade che chiudono l'intervista (il modello che dichiara `fine`,
-  // la parola di stop, «Salta», il tetto duro): è l'unico posto dove decidere se l'utente
-  // merita una riga di spiegazione. Il congedo in chat dura pochi istanti e il segno «già
-  // accolto» è definitivo, quindi se l'intervista si chiude PRIMA della fine lo dice la
-  // home, dove la riga resta finché non la si toglie.
+  // Da qui passano TUTTE le strade che chiudono l'intervista (`fine` dal modello, parola di
+  // stop, «Salta», tetto duro): è l'unico posto dove decidere se l'utente merita una riga di
+  // spiegazione. Il congedo in chat dura pochi istanti e il segno «già accolto» è definitivo,
+  // quindi una chiusura anticipata la dice la home, dove la riga resta finché non si toglie.
   function close(state, nowIso) {
     const cur = normalize(state);
     if (cur.done) return cur;
@@ -276,10 +269,10 @@
   }
 
   // Ricomincia da capo (il pulsante in Preferenze): si riparte dal benvenuto, ma l'intervista
-  // di PRIMA non si butta — finisce nell'archivio, da dove si rilegge. Si archivia solo ciò
-  // che è davvero una conversazione: senza nemmeno una risposta l'archivio si riempiva di
-  // voci «0 tue risposte», e siccome se ne tengono cinque bastava aprire e chiudere sei
-  // volte per buttare fuori la prima conversazione vera.
+  // di PRIMA finisce nell'archivio invece di sparire. Si archivia solo ciò che è davvero una
+  // conversazione: senza nemmeno una risposta l'archivio si riempiva di voci «0 tue
+  // risposte», e visto che se ne tengono cinque bastava aprire e chiudere sei volte per
+  // perdere la prima conversazione vera.
   function restart(prev, nowIso) {
     const cur = normalize(prev);
     const at = nowIso || new Date().toISOString();
@@ -316,10 +309,9 @@
   }
 
   // Accoda un turno SALTANDO la ripetizione immediata dello stesso messaggio: lo stesso
-  // messaggio subito dopo sé stesso non è un turno nuovo, è lo stesso turno ripartito
-  // (finestra riaperta mentre Filo scriveva, «Riprova» dopo un errore, una seconda scheda
-  // aperta durante l'attesa). Altrimenti la risposta contava per due dei cinque scambi e un
-  // intoppo di rete costava una delle cose che Filo doveva scoprire o dire.
+  // messaggio subito dopo sé stesso è lo stesso turno ripartito (finestra riaperta mentre
+  // Filo scriveva, «Riprova», una seconda scheda aperta durante l'attesa). Altrimenti contava
+  // per due dei cinque scambi, e un intoppo di rete costava una cosa da scoprire o da dire.
   function appendTurn(state, turn) {
     const cur = normalize(state);
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';
