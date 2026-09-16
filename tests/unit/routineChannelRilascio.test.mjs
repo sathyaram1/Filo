@@ -19,7 +19,10 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
-const { heartbeat, release, releaseConRapporto, pushRamoCorrente, statoContenitore } = mod;
+const {
+  heartbeat, release, releaseConRapporto, pushRamoCorrente, statoContenitore,
+  memoriaContenitore, uptimeContenitore, rssProcessi, commitRestante,
+} = mod;
 
 const reply = (status, body) => ({ status, ok: status < 300, text: async () => JSON.stringify(body) });
 const quiet = { sleep: async () => {} };
