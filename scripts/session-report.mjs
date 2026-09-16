@@ -268,6 +268,27 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '' 
     }
   }
 
+  // I conti, a fine lettura, con l'ULTIMA usage di ogni messaggio (in ordine
+  // di prima comparsa: il primo turno non è mai «freddo»).
+  let costo = 0;
+  for (const { u, model } of usi.values()) {
+    const input = Number(u.input_tokens) || 0;
+    const cw = Number(u.cache_creation_input_tokens) || 0;
+    const cr = Number(u.cache_read_input_tokens) || 0;
+    const out = Number(u.output_tokens) || 0;
+    rep.turns += 1;
+    if (rep.turns > 1 && cr === 0 && cw >= 20000) rep.coldTurns += 1;
+    rep.tokens.input += input;
+    rep.tokens.cacheWrite += cw;
+    rep.tokens.cacheRead += cr;
+    rep.tokens.output += out;
+    if (typeof model === 'string' && model) modelli.add(model);
+    const fam = famigliaPrezzo(model);
+    if (!fam.known && model) sconosciuti.add(String(model));
+    const p = PREZZI[fam.key];
+    costo += (input * p.input + cw * p.cacheWrite + cr * p.cacheRead + out * p.output) / 1e6;
+  }
+
   rep.models = [...modelli];
   if (Number.isFinite(primoMs)) rep.startedAt = new Date(primoMs).toISOString();
   if (Number.isFinite(ultimoMs)) rep.endedAt = new Date(ultimoMs).toISOString();
