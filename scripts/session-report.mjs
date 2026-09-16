@@ -35,7 +35,7 @@
 import { createReadStream, existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import os from 'node:os';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // ─── Prezzi ($ per milione di token) ─────────────────────────────────────────
