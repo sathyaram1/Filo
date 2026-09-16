@@ -441,6 +441,43 @@ export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
 }
 
+/**
+ * Committa quello che è rimasto fuori dai commit, prima di spedire. L'hook di
+ * salvataggio parte solo su Edit/Write: un file nato da una shell (rm, mv, un
+ * generatore) al rilascio non era in nessun commit, il rilascio spediva HEAD,
+ * diceva «spedito» e quel lavoro moriva col contenitore (giro del 14/09,
+ * verifica). Stesse regole dell'hook: niente commit su un ramo protetto o a
+ * HEAD staccata; l'autore dice la provenienza (routine o locale). Torna
+ * { ok, skipped, committed: [file…], reason }: un `ok` falso ferma il rilascio.
+ */
+export function commitRestante(root, { exec = execFileSync, env = process.env } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (e) {
+      return { ok: false, out: String((e && (e.stderr || e.stdout)) || (e && e.message) || '').trim() };
+    }
+  };
+  const head = run(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (!head.ok) return { ok: false, skipped: false, committed: [], reason: `stato di git illeggibile: ${head.out}` };
+  if (head.out === 'HEAD') return { ok: true, skipped: true, committed: [], reason: 'HEAD staccata: non committo' };
+  const def = run(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok ? def.out.replace(/^origin\//, '') : '';
+  if (isProtectedBranch(head.out, principale)) return { ok: true, skipped: true, committed: [], reason: `'${head.out}' è un ramo protetto: non committo` };
+  const st = statoDirectory(root);
+  if (!st.ok) return { ok: false, skipped: false, committed: [], reason: `non so cosa c'è fuori dai commit: ${st.motivo}` };
+  if (!st.lines.length) return { ok: true, skipped: false, committed: [], reason: '' };
+  const add = run(['add', '-A']);
+  if (!add.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(add.out) };
+  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
+  const nome = routine ? 'claude-routine' : 'claude-local';
+  const email = routine ? 'claude@routine' : 'claude@local';
+  const elenco = `${st.lines.slice(0, 3).join(', ')}${st.lines.length > 3 ? ` (+${st.lines.length - 3} file)` : ''}`;
+  const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: rilascio — ${elenco}`]);
+  if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
+  return { ok: true, skipped: false, committed: st.lines, reason: '' };
+}
+
 /** Le righe di git che dicono qualcosa (via i `hint:` e le vuote), in una riga. */
 function pulisciGit(testo) {
   return String(testo || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^hint:|^To /.test(l)).slice(0, 3).join(' ');
