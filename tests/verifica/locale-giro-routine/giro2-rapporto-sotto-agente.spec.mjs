@@ -46,8 +46,8 @@ test.describe('rapporto di fine sessione — nella forma vera delle routine', ()
     // e ogni rilascio ripete i costi dei rilasci prima. Su una sessione vera di
     // questa macchina (16/09): il sotto-agente che rilascia vale 25 turni e
     // 2,9 $; il rapporto che allegherebbe dice 1169 turni, 235 $ e 27 ore.
-    // Rilievo del giro 2, livello 2.
-    test.fail(true, 'rilievo del giro 2: il rapporto è quello della sessione madre con tutti i sotto-agenti, non del worker che rilascia');
+    // Rilievo del giro 2, livello 2, corretto nello stesso giro: conta il
+    // transcript con l'ultimo messaggio dell'assistente, sotto-agenti compresi.
     const { progetto, config } = cartellaRoutine();
     const rep = await generaRapporto({ role: 'verifier', cwd: progetto, configDir: config });
     expect(rep.sessionId).toBe('w2');
