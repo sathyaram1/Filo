@@ -48,18 +48,41 @@ import { fileURLToPath } from 'node:url';
 
 // ─── Prezzi ($ per milione di token) ─────────────────────────────────────────
 // Fonte: skill `claude-api` (tabella modelli del 2026-06-24 e note su cache):
-// scrittura in cache a 5 minuti = 1,25× l'input, lettura = 0,1× l'input,
-// tranne Fable 5.1 (lettura 0,25 $/M) e Fable 5 (1 $/M). Sonnet 4.x costa
-// 3/15, Sonnet 5 costa 2/10. Un modello sconosciuto paga la tariffa opus, con
-// una nota nel rapporto.
+// scrittura in cache a 5 minuti = 1,25× l'input, a UN'ORA = 2× l'input
+// (`cacheWrite1h`), lettura = 0,1× l'input, tranne Fable 5.1 (lettura
+// 0,25 $/M) e Fable 5 (1 $/M). Sonnet 4.x costa 3/15, Sonnet 5 costa 2/10.
+// Un modello sconosciuto paga la tariffa opus, con una nota nel rapporto.
+//
+// Le due durate si distinguono nel transcript (`usage.cache_creation.
+// ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`; la somma è
+// `cache_creation_input_tokens`). Fino al giro 4 della verifica (16/09/2026)
+// tutto era prezzato a 1,25×: su questa macchina un messaggio su cinque
+// scrive a un'ora, e il costo usciva più basso del 18-39% su ogni sessione.
 export const PREZZI = Object.freeze({
-  opus: { input: 5, cacheWrite: 6.25, cacheRead: 0.5, output: 25 },
-  sonnet: { input: 2, cacheWrite: 2.5, cacheRead: 0.2, output: 10 },
-  'sonnet-4': { input: 3, cacheWrite: 3.75, cacheRead: 0.3, output: 15 },
-  haiku: { input: 1, cacheWrite: 1.25, cacheRead: 0.1, output: 5 },
-  fable: { input: 10, cacheWrite: 12.5, cacheRead: 0.25, output: 50 },
-  'fable-5': { input: 10, cacheWrite: 12.5, cacheRead: 1, output: 50 },
+  opus: { input: 5, cacheWrite: 6.25, cacheWrite1h: 10, cacheRead: 0.5, output: 25 },
+  sonnet: { input: 2, cacheWrite: 2.5, cacheWrite1h: 4, cacheRead: 0.2, output: 10 },
+  'sonnet-4': { input: 3, cacheWrite: 3.75, cacheWrite1h: 6, cacheRead: 0.3, output: 15 },
+  haiku: { input: 1, cacheWrite: 1.25, cacheWrite1h: 2, cacheRead: 0.1, output: 5 },
+  fable: { input: 10, cacheWrite: 12.5, cacheWrite1h: 20, cacheRead: 0.25, output: 50 },
+  'fable-5': { input: 10, cacheWrite: 12.5, cacheWrite1h: 20, cacheRead: 1, output: 50 },
 });
+
+/**
+ * Le scritture in cache di una usage, divise per durata: { cw5m, cw1h }.
+ * Con il dettaglio (`cache_creation`) si prende quello; senza (un transcript
+ * vecchio) tutto il totale vale come cinque minuti. Se il dettaglio non torna
+ * col totale, la differenza si conta a cinque minuti: non si perde niente.
+ * PURA.
+ */
+export function scrittureCache(u) {
+  const tot = Number(u && u.cache_creation_input_tokens) || 0;
+  const det = u && u.cache_creation && typeof u.cache_creation === 'object' ? u.cache_creation : null;
+  if (!det) return { cw5m: tot, cw1h: 0 };
+  const cw1h = Math.max(0, Number(det.ephemeral_1h_input_tokens) || 0);
+  const cw5m = Math.max(0, Number(det.ephemeral_5m_input_tokens) || 0);
+  const resto = Math.max(0, tot - cw1h - cw5m);
+  return { cw5m: cw5m + resto, cw1h };
+}
 
 /** La famiglia di prezzo di un modello. PURA. `known` è falso se si ripiega su opus. */
 export function famigliaPrezzo(model) {
