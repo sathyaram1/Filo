@@ -1,21 +1,10 @@
-// Suoni dell'interfaccia (toni sintetici, nessun file audio).
-//
-// PERCHÉ ESISTE
-//   Sia le Preferenze (anteprima suoneria/notifica) sia la shell del browser
-//   (suono opzionale quando compare una notifica in basso a destra, spec
-//   #170.1) devono riprodurre brevi toni. Prima la sequenza di note + il player
-//   AudioContext vivevano solo dentro preferences.js: questo modulo li estrae in
-//   un punto condiviso così la shell, le Preferenze e — in futuro — il timer
-//   suonano gli STESSI toni senza duplicare codice.
-//
-//   IIFE su globalThis come gli altri moduli shared/: chi lo carica trova
-//   `SN_SOUNDS` su globalThis (nelle pagine filo:// e nella shell via
-//   <script src="filo://shared/sounds.js">).
+// Toni sintetici dell'interfaccia (nessun file audio): Preferenze, shell e timer
+// devono suonare gli STESSI motivi. IIFE su globalThis: `SN_SOUNDS`.
 (function (global) {
   'use strict';
 
-  // Sequenze [frequenzaHz, durataMs]; freq 0 = pausa. Gli stessi quattro
-  // motivi della suoneria del timer, riusati per le notifiche.
+  // Sequenze [frequenzaHz, durataMs], freq 0 = pausa: gli stessi motivi della
+  // suoneria del timer, riusati per le notifiche.
   const TONES = {
     default: [[880, 150], [0, 80], [880, 150], [0, 80], [880, 150], [0, 400]],
     gentle:  [[523, 200], [0, 100], [659, 200], [0, 100], [784, 300], [0, 600]],
@@ -26,7 +15,6 @@
   };
   const TONE_IDS = Object.keys(TONES);
 
-  // Etichette leggibili (per i <select> delle Preferenze).
   const TONE_LABELS = {
     default: 'Standard',
     gentle: 'Delicata',
@@ -42,8 +30,8 @@
     return _ctx;
   }
 
-  // Riproduce un tono. Non lancia mai (audio non disponibile/headless =
-  // no-op silenzioso). Ritorna true se la riproduzione è stata avviata.
+  // Non lancia mai: senza audio (headless) è un no-op silenzioso.
+  // true se la riproduzione è partita.
   function play(toneId) {
     try {
       const c = ctx();

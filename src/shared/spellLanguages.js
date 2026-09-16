@@ -1,15 +1,6 @@
-// Sceglie le lingue del correttore ortografico nativo (Hunspell/Chromium).
-//
-// Filo è un'app italiana: l'italiano va sempre attivato per primo (così i
-// suggerimenti per le parole italiane — la stragrande maggioranza del testo —
-// compaiono in cima). La lingua di sistema viene aggiunta dopo, SE diversa.
-//
-// Bug #169: la versione precedente forzava SEMPRE anche 'en-US'/'en' nella
-// lista. Con il dizionario inglese attivo, Chromium fonde i suggerimenti delle
-// due lingue: parole italiane errate (es. "funzion") ricevevano correzioni
-// inglesi ("function") in cima. Caricando l'inglese SOLO quando è la lingua di
-// sistema, un utente italiano su sistema italiano ottiene suggerimenti
-// puramente italiani ("funzione").
+// Lingue del correttore nativo: italiano sempre per primo, l'inglese solo se è
+// la lingua di sistema. Col dizionario inglese attivo Chromium fonde i suggerimenti
+// e una parola italiana errata («funzion») riceve correzioni inglesi («function») (#169).
 
 (function (global) {
   'use strict';
@@ -18,9 +9,8 @@
     return String(s || '').toLowerCase().split('-')[0];
   }
 
-  // available: lista dei codici dizionario disponibili (es. ['it','en-US',…]).
-  // locale: lingua di sistema (app.getLocale(), es. 'it-IT' o 'en-US').
-  // Ritorna i codici da attivare, italiano per primo, senza inglese forzato.
+  // `available`: codici dizionario disponibili. `locale`: lingua di sistema
+  // (app.getLocale(), es. 'it-IT').
   function select(available, locale) {
     const list = Array.isArray(available) ? available : [];
     if (!list.length) return [];
