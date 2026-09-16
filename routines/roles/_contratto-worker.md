@@ -47,8 +47,8 @@ credi facciano — senza dirtelo. Se scrivi `scripts/…` a mano, stai tornando 
 
 ## Il battito non è affar tuo
 
-Il semaforo che tiene il tuo lavoro cade dopo un'ora di silenzio, e la suite
-completa in cloud può durarne di più. Il battito che lo tiene vivo lo avvia
+Il semaforo che tiene il tuo lavoro cade dopo un'ora di silenzio, e un controllo
+lungo può durarne di più. Il battito che lo tiene vivo lo avvia
 **dispatch**, in sottofondo, nel momento in cui ti consegna il ruolo: non
 lanciarlo, non cercarlo, non fermarlo. Se leggi in un prompt che devi avviarlo
 tu, quel prompt è vecchio.
