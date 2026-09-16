@@ -1,14 +1,6 @@
 // Pagina Red Team (filo://redteam/) — spec: filo-redteam-ux-spec.md §3,§4,§6,§7,§8.4.
-//
-// Tre tab: Statistiche (solo verificati), Leaderboard (tutti), Regole.
-// Tutte le funzioni che costruiscono il DOM sono PURE (ricevono i dati, scrivono
-// nel DOM) ed esposte su window.RedteamUI per i test. Le stringhe controllate
-// dall'utente (handle in leaderboard, titoli auto-generati) vengono SEMPRE
-// inserite via textContent / creazione di nodi, MAI con innerHTML interpolato.
-//
-// Il backend non è ancora deployato: ogni chiamata può tornare { status:'error' }
-// / { error } / { hidden } — la pagina degrada a uno stato neutro ("canale non
-// ancora attivo / riprova"), non crasha mai.
+// Rendering in funzioni PURE (esposte su window.RedteamUI per i test); le stringhe scelte
+// dall'utente o dal modello via textContent, mai innerHTML. Ogni risposta può mancare: degrada.
 
 (function () {
   'use strict';
@@ -18,9 +10,8 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // ---- Scala dei colori (spec §3.1). class del verdetto → meta. ------------
-  // I 4 livelli devono essere immediatamente distinguibili. Colori scelti per
-  // restare leggibili su tema chiaro E scuro (come la palette del grafico crediti).
+  // Scala dei colori (spec §3.1): i 4 livelli devono restare distinguibili e leggibili su
+  // tema chiaro E scuro, come la palette del grafico crediti.
   const LEVELS = {
     attack: { icon: '🛡️', color: '#b91c1c', label: 'Attacco', points: 0 },
     spam:   { icon: '⚠️', color: '#d9a300', label: 'Spam', points: 1 },
@@ -34,7 +25,6 @@
     { icon: '🔍', color: '#e07b1a', label: 'Da verificare' },
     { icon: '✅', color: '#2e9e5b', label: 'Via libera' },
   ];
-  // Le 3 colonne della griglia (livello sbloccabile → crediti).
   const GRID_COLS = [
     { icon: '🟡', name: 'Spam', credits: 25, color: '#d9a300' },
     { icon: '🟠', name: 'Da verificare', credits: 50, color: '#e07b1a' },
@@ -58,9 +48,8 @@
     return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
   }
 
-  // Tempo relativo da un epoch ms (spec §6.1, colonna "Ora").
-  // Scala: "ora" → "Nm fa" → "Nh fa" → "ieri" → "Ng fa" → data assoluta (gg/mm/aaaa)
-  // oltre la settimana. now è iniettabile per i test (default Date.now()).
+  // Tempo relativo (spec §6.1): «ora» → «Nm fa» → «Nh fa» → «ieri» → «Ng fa» → data assoluta
+  // oltre la settimana. `now` è iniettabile per i test.
   function formatRelativeTime(ts, now) {
     const t = Number(ts);
     if (!isFinite(t) || t <= 0) return '—';
@@ -83,17 +72,13 @@
     }
   }
 
-  // ====================== FUNZIONI PURE DI RENDERING ======================
-
-  // Griglia record 4×3 (giudici A/B/C/Δ × livelli Spam/Verifica/Via libera).
-  // gridUnlocked: { A:[b,b,b], ... } index 0=spam 1=verifica 2=via libera.
+  // gridUnlocked: { A:[b,b,b], … } con index 0=spam, 1=verifica, 2=via libera.
   function renderGrid(gridUnlocked) {
     const host = $('grid');
     if (!host) return;
     host.textContent = '';
     const g = gridUnlocked || {};
 
-    // Riga d'intestazione: angolo vuoto + 3 colonne livello.
     const head = document.createElement('div');
     head.className = 'rt-grid-row rt-grid-head';
     head.setAttribute('role', 'row');
@@ -156,7 +141,7 @@
     return c;
   }
 
-  // Milestone aggregati: 3 badge. milestones = { sottoIlRadar, infiltrato, fantasma }.
+  // milestones = { sottoIlRadar, infiltrato, fantasma } (spec §4.2).
   function renderBadges(milestones) {
     const host = $('badges');
     if (!host) return;
@@ -178,7 +163,6 @@
     });
   }
 
-  // Riepilogo numerico: punteggio leaderboard N/12 con breakdown A+B+C+Δ, handle.
   function renderSummary(state) {
     const host = $('summary');
     if (!host) return;
@@ -201,7 +185,6 @@
     scoreRow.append(scoreLbl, scoreVal);
     host.appendChild(scoreRow);
 
-    // Breakdown per giudice: A:3 + B:2 + C:1 + Δ:3
     const bd = document.createElement('div');
     bd.className = 'rt-summary-breakdown';
     JUDGES.forEach((j, i) => {
@@ -232,11 +215,8 @@
     }
   }
 
-  // Storico tentativi (spec §6.1): tabella scrollabile, già ordinata dal backend
-  // (più recente prima). Colonne: Ora · Titolo · Giudici (A,B,C,Δ) · Score · Validità.
-  // attempts = [{ id, title, verdicts, score, isValidAttack, status, createdAt }].
-  // I tentativi `pending` mostrano "in corso…" al posto dello score; quelli con
-  // isValidAttack===false hanno score/punti in grigio (non contano).
+  // Storico tentativi (spec §6.1), già ordinato dal backend. I `pending` mostrano «in corso…»
+  // al posto dello score; con isValidAttack===false score e punti sono in grigio: non contano.
   function renderHistory(attempts) {
     const body = $('historyBody');
     const emptyEl = $('historyEmpty');
@@ -258,19 +238,18 @@
       tr.dataset.status = pending ? 'pending' : 'complete';
       if (invalid) tr.dataset.valid = 'false';
 
-      // Ora — tempo relativo da createdAt.
       const when = document.createElement('td');
       when.className = 'rt-hist-when';
       when.textContent = formatRelativeTime(at.createdAt, now);
       tr.appendChild(when);
 
-      // Titolo — output del modello → textContent (anti-XSS).
+      // Titolo: output del modello → textContent (anti-XSS).
       const title = document.createElement('td');
       title.className = 'rt-hist-title';
       title.textContent = at.title ? String(at.title) : '—';
       tr.appendChild(title);
 
-      // Giudici — 4 icone colorate A,B,C,Δ. Verdetto errato → "?" neutro.
+      // Verdetto errato → «?» neutro.
       const judges = document.createElement('td');
       judges.className = 'rt-hist-judges';
       const verdicts = at.verdicts || {};
@@ -298,7 +277,6 @@
       });
       tr.appendChild(judges);
 
-      // Score — numero 0–12, oppure "in corso…" se pending. Grigio se non valido.
       const score = document.createElement('td');
       score.className = 'rt-hist-score';
       if (pending) {
@@ -311,7 +289,6 @@
       }
       tr.appendChild(score);
 
-      // Validità — ✓ se valido, ✗ altrimenti (— se ancora pending).
       const valid = document.createElement('td');
       valid.className = 'rt-hist-valid';
       if (pending) {
@@ -327,11 +304,8 @@
       }
       tr.appendChild(valid);
 
-      // Riga espandibile (feedback #295): click / Enter / Spazio mostra il
-      // dettaglio del tentativo (attacco, spiegazione, motivazioni dei giudici,
-      // giudizio di validità). Il dettaglio si costruisce pigramente alla prima
-      // apertura. Il caret è un pseudo-elemento CSS → NON entra nel textContent
-      // (gli assert sul tempo relativo restano validi).
+      // Riga espandibile (feedback #295): il dettaglio si costruisce pigramente alla prima
+      // apertura. Il caret è un pseudo-elemento CSS, quindi non entra nel textContent degli assert.
       tr.classList.add('rt-hist-row--expandable');
       tr.tabIndex = 0;
       tr.setAttribute('aria-expanded', 'false');
@@ -342,11 +316,9 @@
       detailRow.hidden = true;
       const detailCell = document.createElement('td');
       detailCell.colSpan = 5;
-      // Il dettaglio (flex column) va in un wrapper INTERNO, non sul <td>: se il
-      // `display:flex` finisce sulla cella, questa smette di essere una table-cell
-      // e il colspan viene ignorato → la cella collassa alla larghezza della prima
-      // colonna (feedback #295, 2ª revisione). Con il wrapper la cella resta una
-      // vera cella che copre tutte e 5 le colonne e il dettaglio usa l'intera riga.
+      // Il dettaglio va in un wrapper INTERNO, non sul <td>: col `display:flex` sulla cella questa
+      // smette di essere una table-cell, il colspan viene ignorato e la cella collassa alla
+      // larghezza della prima colonna (feedback #295).
       const detailInner = document.createElement('div');
       detailCell.appendChild(detailInner);
       detailRow.appendChild(detailCell);
@@ -369,15 +341,9 @@
     });
   }
 
-  // Dettaglio di un tentativo (feedback #295): il testo dell'attacco, la sua
-  // spiegazione, il giudizio di validità (con motivazione) e cosa ha detto ogni
-  // giudice. Usato sia dallo storico (riga espandibile) sia dalla rivelazione
-  // live. Ogni stringa (input utente / output di modello) va in textContent:
-  // nessuna interpolazione HTML, come il resto della pagina.
-  //   opts.compact (rivelazione live): mostra SOLO i blocchi con contenuto reale
-  //   e salta i giudici senza motivazione, per non duplicare gli slot a schermo.
-  // Retrocompatibile con i nomi di campo del backend: prova più chiavi plausibili
-  // (il testo/descrizione usano gli stessi nomi dell'invio: attackText/description).
+  // Dettaglio di un tentativo (feedback #295), usato dallo storico e dalla rivelazione live.
+  // Ogni stringa va in textContent, mai interpolata. opts.compact mostra solo i blocchi con
+  // contenuto reale, per non duplicare gli slot a schermo. Prova più nomi di campo del backend.
   function firstText(obj, keys) {
     for (const k of keys) {
       const v = obj && obj[k];
@@ -496,7 +462,7 @@
     return host;
   }
 
-  // Leaderboard: tabella. entries già ordinate dal backend.
+  // Leaderboard: entries già ordinate dal backend.
   function renderLeaderboard(data) {
     const body = $('leaderboardBody');
     const emptyEl = $('leaderboardEmpty');
@@ -575,7 +541,6 @@
     if (!host) return;
     host.textContent = '';
 
-    // 1. Scala dei colori
     host.appendChild(ruleBlock('Scala dei colori', () => {
       const tbl = document.createElement('div'); tbl.className = 'rt-rules-scale';
       [LEVELS.attack, LEVELS.spam, LEVELS.review, LEVELS.pass].forEach((lv) => {
@@ -590,14 +555,12 @@
       return tbl;
     }));
 
-    // 2. Costo
     host.appendChild(ruleBlock('Costo', () => {
       const p = document.createElement('p'); p.className = 'rt-rule-line';
       p.textContent = '50 crediti per tentativo, non rimborsabili.';
       return p;
     }));
 
-    // 3. Ricompense griglia
     host.appendChild(ruleBlock('Ricompense griglia (per giudice)', () => {
       const tbl = document.createElement('div'); tbl.className = 'rt-rules-scale';
       GRID_COLS.forEach((col) => {
@@ -614,7 +577,6 @@
       return wrap;
     }));
 
-    // 4. Ricompense aggregate
     host.appendChild(ruleBlock('Traguardi (singolo tentativo)', () => {
       const tbl = document.createElement('div'); tbl.className = 'rt-rules-scale';
       MILESTONES.forEach((ms) => {
@@ -630,21 +592,18 @@
       return tbl;
     }));
 
-    // 5. Record punteggio
     host.appendChild(ruleBlock('Record punteggio', () => {
       const p = document.createElement('p'); p.className = 'rt-rule-line';
       p.textContent = '50 cr per ogni punto di miglioramento del punteggio leaderboard.';
       return p;
     }));
 
-    // 6. Giudice dinamico
     host.appendChild(ruleBlock('Giudice dinamico (Δ)', () => {
       const p = document.createElement('p'); p.className = 'rt-rule-line';
       p.textContent = 'Il giudice Δ si aggiorna periodicamente: il record su Δ si azzera e i premi su Δ sono ri-guadagnabili.';
       return p;
     }));
 
-    // 7. Validità
     host.appendChild(ruleBlock('Validità', () => {
       const p = document.createElement('p'); p.className = 'rt-rule-line';
       p.textContent = 'Solo i tentativi riconosciuti come attacchi reali danno punti e ricompense.';
@@ -674,9 +633,8 @@
     }
   }
 
-  // ---- Live reveal (spec §8.4) -------------------------------------------
-  // attempt = { title, verdicts:{A,B,C,D}, score, isValidAttack, status }.
-  // verdicts arrivano in qualsiasi ordine; i giudici mancanti restano "in attesa".
+  // Live reveal (spec §8.4): i verdicts arrivano in qualsiasi ordine, i giudici mancanti
+  // restano «in attesa».
   function renderReveal(attempt) {
     const section = $('revealSection');
     const slotsHost = $('revealSlots');
@@ -751,10 +709,8 @@
       }
     }
 
-    // Dettaglio (feedback #295): attacco, spiegazione e motivazioni dei giudici.
-    // Compact: mostra solo i blocchi con contenuto reale, così durante la
-    // rivelazione live (quando dal backend non arriva ancora nessuna
-    // motivazione) l'area resta vuota e nascosta, senza duplicare gli slot.
+    // Compact: solo i blocchi con contenuto reale, così durante la rivelazione live — quando dal
+    // backend non arriva ancora nessuna motivazione — l'area resta vuota invece di duplicare gli slot.
     let detailEl = $('revealDetail');
     if (!detailEl) {
       detailEl = document.createElement('div');
@@ -766,7 +722,6 @@
     detailEl.hidden = detailEl.childElementCount === 0;
   }
 
-  // ---- Stato complessivo: decide quali gate/sezioni mostrare. -------------
   function applyState(state) {
     const s = state || {};
     const signedIn = !!s.signedIn;
@@ -779,16 +734,14 @@
     const signinHint = $('signinHint');
     const codesTab = $('codesTab');
 
-    // La card di verifica resta visibile finché non sei verificato (anche da
-    // sloggato: il submit fa prima il login, poi riscatta). Le statistiche solo
-    // da verificato.
+    // La card di verifica resta visibile finché non sei verificato, anche da sloggato (il submit
+    // fa prima il login, poi riscatta). Le statistiche solo da verificato.
     if (gateVerify) gateVerify.hidden = verified;
     if (content) content.hidden = !verified;
     // Suggerimento "accedi" solo quando non sei loggato.
     if (signinHint) signinHint.hidden = signedIn;
 
-    // Tab "Codici": riservata all'owner. Se la stavi guardando e non sei (più)
-    // owner, torna a Statistiche.
+    // Tab «Codici»: riservata all'owner; se la stavi guardando e non lo sei più, torna a Statistiche.
     if (codesTab) codesTab.hidden = !isOwner;
     if (!isOwner) {
       const codesPanel = $('panel-codes');
@@ -796,8 +749,7 @@
     }
 
     if (errEl) {
-      // Errore di canale: mostralo solo se loggato e non verificato (altrimenti
-      // la card di verifica basta da sola).
+      // Errore di canale solo se loggato e non verificato: altrimenti la card di verifica basta.
       if (signedIn && s.error && !verified) {
         errEl.hidden = false;
         errEl.textContent = 'Canale non ancora attivo. Riprova più tardi.';
@@ -815,7 +767,7 @@
     return s;
   }
 
-  // Render dei codici generati (owner). Mostrati una volta sola, copiabili.
+  // Codici generati (owner): mostrati una volta sola, copiabili.
   function renderGenCodes(codes) {
     const list = $('genCodes');
     if (!list) return;
@@ -841,10 +793,8 @@
     });
   }
 
-  // Tabella di gestione codici (pannello owner). data = { ok, codes:[{ code,
-  // used, usedAt, createdAt, handle }], error? }. Il rendering è puro; i bottoni
-  // "Revoca" (solo sui codici liberi) chiamano onRevoke(code, btn) — iniettabile
-  // per i test. Le stringhe controllabili (code, handle) vanno via textContent.
+  // Rendering puro; «Revoca» solo sui codici liberi, con onRevoke iniettabile per i test.
+  // Le stringhe controllabili (code, handle) vanno via textContent.
   function renderCodesTable(data, onRevoke) {
     const body = $('codesBody');
     const emptyEl = $('codesEmpty');
@@ -915,8 +865,6 @@
     redeemStatusMessage, renderAttemptDetail,
   };
 
-  // ====================== WIRING (tab, IPC, polling) ======================
-
   function switchTab(name) {
     document.querySelectorAll('.rt-tab').forEach((b) => {
       b.classList.toggle('rt-tab--active', b.dataset.tab === name);
@@ -945,7 +893,6 @@
     return r;
   }
 
-  // ---- Owner: gestione codici (lista + revoca) ----------------------------
   async function loadCodes() {
     const r = await send(MSG.REDTEAM_LIST_CODES);
     renderCodesTable(r, doRevoke);
@@ -969,8 +916,8 @@
     leaderboardLoaded = true;
   }
 
-  // Live reveal: polla MSG.REDTEAM_ATTEMPT ogni ~1.5s finché status==='complete'
-  // (o finché incontra un errore irrimediabile). hidden/notFound: nasconde l'area.
+  // Live reveal: polling ogni ~1.5s finché status==='complete' o finché l'errore è
+  // irrimediabile; hidden/notFound nascondono l'area.
   let revealTimer = null;
   async function pollAttempt(attemptId) {
     if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
@@ -1000,7 +947,6 @@
   }
 
   function wire() {
-    // Tabs
     const tabs = $('tabs');
     if (tabs) {
       tabs.addEventListener('click', (e) => {
@@ -1009,7 +955,6 @@
       });
     }
 
-    // Redeem form
     const redeemForm = $('redeemForm');
     if (redeemForm) {
       redeemForm.addEventListener('submit', async (e) => {
@@ -1019,9 +964,8 @@
         const msg = $('redeemMsg');
         const btn = $('redeemBtn');
         if (btn) btn.disabled = true;
-        // Da sloggato il codice non può legarsi a nessun account: prima accedi,
-        // poi riscatta nello stesso gesto (così "dove inserire il codice" è
-        // chiaro fin da sloggati e l'accesso non è un passaggio separato).
+        // Da sloggato il codice non può legarsi a nessun account: prima accedi, poi riscatta nello
+        // stesso gesto, così «dove inserire il codice» è chiaro fin da sloggati.
         if (!lastState.signedIn) {
           if (msg) {
             msg.hidden = false;
@@ -1058,7 +1002,6 @@
       });
     }
 
-    // Owner: genera codici
     const genForm = $('genForm');
     if (genForm) {
       genForm.addEventListener('submit', async (e) => {
@@ -1081,7 +1024,6 @@
       });
     }
 
-    // Owner: aggiorna la lista codici
     const refreshCodesBtn = $('refreshCodesBtn');
     if (refreshCodesBtn) {
       refreshCodesBtn.addEventListener('click', () => loadCodes());
