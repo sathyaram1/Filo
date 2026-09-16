@@ -134,6 +134,17 @@ describe('le funzioni pure', () => {
     assert.equal(verdetto(jsonSintetico({ conNuovo: false }), NOTI.contenitore.specs).nuovi.length, 0);
   });
 
+  test('i teardown scaduti sono avvisi da soli, rossi se c\'è un altro rosso; il resto è sempre rosso', () => {
+    const td = { message: '[31mWorker teardown timeout of 60000ms exceeded.[39m\n…' };
+    const altro = { message: 'Error: Cannot find module x' };
+    assert.equal(primaRiga(td), 'Worker teardown timeout of 60000ms exceeded.', 'senza colori, prima riga');
+    assert.deepEqual(classificaErroriGlobali([td, td], false), { rossi: [], avvisi: [primaRiga(td), primaRiga(td)] });
+    assert.deepEqual(classificaErroriGlobali([td], true), { rossi: [primaRiga(td)], avvisi: [] });
+    assert.deepEqual(classificaErroriGlobali([td, altro], false), { rossi: ['Error: Cannot find module x', primaRiga(td)], avvisi: [] });
+    assert.deepEqual(classificaErroriGlobali([altro], false), { rossi: ['Error: Cannot find module x'], avvisi: [] });
+    assert.deepEqual(classificaErroriGlobali(undefined, false), { rossi: [], avvisi: [] });
+  });
+
   test('gli argomenti: file, --out, --rossi; un\'opzione ignota è un errore', () => {
     assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json']), { file: 'r.json', out: 'n.txt', rossi: 'k.json' });
     assert.throws(() => leggiArgomenti(['r.json', '--boh']), /non capita/);
