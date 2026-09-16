@@ -63,9 +63,12 @@ test.describe('rapporto di fine sessione — dai numeri del transcript', () => {
     expect(r.status).toBe(0);
     const rep = JSON.parse(r.stdout);
     expect(rep.role).toBe('verifier');
-    expect(rep.turns).toBe(2);
-    expect(r.stderr).toMatch(/costo stimato: \$0\.34/);
+    // La sessione madre (2 turni, 0,346 $) più il suo sotto-agente (1 turno, 0,65 $).
+    expect(rep.turns).toBe(3);
+    expect(rep.subagentRuns).toBe(1);
+    expect(r.stderr).toMatch(/costo stimato: \$0\.996/);
     expect(r.stderr).toMatch(/strumenti: 2 \(timeout 1, errori 1, sotto-agenti 1/);
+    expect(r.stderr).toMatch(/sotto-agenti letti: 1, il loro costo \$0\.6500/);
     const senza = spawnSync(process.execPath, [SCRIPT, '--transcript', join(file, '..', 'non-esiste.jsonl')], { cwd: ROOT, encoding: 'utf8' });
     expect(senza.status).toBe(0);
     expect(JSON.parse(senza.stdout).notes.join(' ')).toMatch(/assente/);
