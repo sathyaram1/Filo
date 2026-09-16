@@ -394,3 +394,26 @@ describe('release da riga di comando', () => {
     } finally { srv.close(); }
   });
 });
+
+// ─── Giro 2 della verifica (16/09/2026): il lease dopo un fetch ─────────────
+// --force-with-lease senza valore atteso si fida del ref remoto che la copia
+// conosce: dopo un `git fetch` quel ref è già il commit dell'altro, il lease
+// combacia e il rinvio lo sovrascrive. --force-if-includes lo rifiuta.
+test('qualcun altro ha spinto E questa copia lo ha già scaricato con un fetch: il rinvio NON sovrascrive il suo commit', () => {
+  const { base, origin, work } = scena();
+  g(work, ['checkout', '-q', '-b', 'worker/9']);
+  commitFile(work, 'a.js');
+  assert.equal(pushRamoCorrente(work).ok, true);
+  const altro = resolve(base, 'altro');
+  g(base, ['clone', '-q', origin, altro]);
+  g(altro, ['checkout', '-q', 'worker/9']);
+  commitFile(altro, 'di-un-altro.js');
+  g(altro, ['push', '-q', 'origin', 'worker/9']);
+  const b = g(altro, ['rev-parse', 'HEAD']);
+  g(work, ['fetch', '-q', 'origin']);
+  g(work, ['reset', '-q', '--hard', 'HEAD~1']);
+  commitFile(work, 'c.js');
+  const r = pushRamoCorrente(work);
+  assert.equal(r.ok, false, `il push doveva essere rifiutato: ${JSON.stringify(r)}`);
+  assert.equal(remoteSha(origin, 'worker/9'), b, 'il commit dell\'altro resta su origin');
+});

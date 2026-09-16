@@ -179,3 +179,94 @@ test('i sotto-agenti entrano nel conto: costo, token, turni e strumenti sommati,
     assert.equal(senza.subagentCostUsd, 0);
   } finally { rmSync(casa, { recursive: true, force: true }); }
 });
+
+// ─── Giro 2 della verifica (16/09/2026) ──────────────────────────────────────
+// Tre porte trovate lì: la prima riga di un messaggio su più righe porta un
+// output parziale; chi rilascia nelle routine è un SOTTO-AGENTE
+// dell'orchestratore, col transcript in <sessione>/subagents/; da una
+// cartella di lavoro separata (worktree) i transcript stanno nella cartella
+// del checkout principale.
+
+const turnoDi = (id, ts, cw, out, sessionId, model = 'claude-opus-5') => JSON.stringify({
+  type: 'assistant', timestamp: ts, sessionId,
+  message: { id, model, usage: { input_tokens: 10, cache_creation_input_tokens: cw, cache_read_input_tokens: 0, output_tokens: out }, content: [{ type: 'text', text: id }] },
+});
+
+test('un messaggio su più righe: vale l\'ULTIMA usage, perché l\'output della prima riga è parziale', async () => {
+  const primo = { input_tokens: 2, cache_creation_input_tokens: 32076, cache_read_input_tokens: 29159, output_tokens: 5 };
+  const ultimo = { ...primo, output_tokens: 163, output_tokens_details: { thinking_tokens: 13 } };
+  const righe = [
+    JSON.stringify({ type: 'assistant', timestamp: T('00:00'), sessionId: 's', message: { id: 'm1', model: 'claude-opus-5', usage: primo, content: [{ type: 'text', text: 'penso' }] } }),
+    JSON.stringify({ type: 'assistant', timestamp: T('00:01'), sessionId: 's', message: { id: 'm1', model: 'claude-opus-5', usage: ultimo, content: [{ type: 'tool_use', id: 't1', name: 'Bash' }] } }),
+  ];
+  const rep = await analizzaRighe(righe, {});
+  assert.equal(rep.turns, 1);
+  assert.equal(rep.tokens.output, 163);
+  assert.equal(rep.tokens.cacheWrite, 32076);
+  assert.equal(rep.tools.total, 1);
+  assert.ok(Math.abs(rep.costUsd - (2 * 5 + 32076 * 6.25 + 29159 * 0.5 + 163 * 25) / 1e6) < 1e-4);
+});
+
+test('chi rilascia è un sotto-agente: il rapporto è il suo, non la sessione madre con tutti i sotto-agenti', async () => {
+  const base = cartellaTemporanea('filo-rapporto-sotto-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(dir, 'orch.jsonl'), [turnoDi('o1', T('00:00'), 30000, 50, 'orch'), turnoDi('o2', T('01:00'), 1000, 50, 'orch')].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-w1.jsonl'), [turnoDi('a1', T('02:00'), 100000, 500, 'w1'), turnoDi('a2', T('10:00'), 1000, 500, 'w1')].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-w2.jsonl'), [turnoDi('b1', T('20:00'), 40000, 100, 'w2'), turnoDi('b2', T('25:00'), 1000, 100, 'w2')].join('\n') + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 3600, t - 3600);
+    utimesSync(join(sub, 'agent-w1.jsonl'), t - 2400, t - 2400);
+    utimesSync(join(sub, 'agent-w2.jsonl'), t, t);
+    // Il worker 2 sta rilasciando: il suo transcript è l'ultimo scritto.
+    const rep = await generaRapporto({ role: 'verifier', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w2');
+    assert.equal(rep.turns, 2);
+    assert.equal(rep.durationS, 300);
+    assert.equal(rep.tokens.cacheWrite, 41000);
+    assert.equal(rep.subagentRuns, 0);
+    assert.ok(rep.notes.some((n) => /sotto-agente della sessione orch/.test(n)), rep.notes.join(' | '));
+    // L'orchestratore che rilascia il biglietto di un worker morto: il suo
+    // transcript è l'ultimo scritto, e la finestra del biglietto (`since`)
+    // lascia fuori i suoi turni di prima e il worker 1.
+    utimesSync(join(dir, 'orch.jsonl'), t + 1, t + 1);
+    const orch = await generaRapporto({ role: 'orchestrator', cwd: progetto, configDir: config, since: T('15:00') });
+    assert.equal(orch.sessionId, 'orch');
+    assert.equal(orch.subagentRuns, 2, 'i due file dei sotto-agenti si leggono…');
+    assert.equal(orch.turns, 2, '…ma nella finestra ci sono solo i turni del worker 2');
+    assert.equal(orch.tokens.cacheWrite, 41000);
+    // Senza finestra, la sessione madre resta la somma di tutto (era così prima).
+    const tutto = await generaRapporto({ cwd: progetto, configDir: config });
+    assert.equal(tutto.turns, 6);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('da una cartella di lavoro separata (worktree) si trova la cartella dei transcript del checkout principale', async () => {
+  const base = cartellaTemporanea('filo-rapporto-worktree-');
+  try {
+    const repo = join(base, 'repo');
+    const g = (cwd, ...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    mkdirSync(repo);
+    g(repo, 'init', '-q');
+    writeFileSync(join(repo, 'a.txt'), 'a\n');
+    g(repo, 'add', '-A');
+    g(repo, 'commit', '-q', '-m', 'base');
+    mkdirSync(join(repo, '.claude', 'worktrees'), { recursive: true });
+    const wt = join(repo, '.claude', 'worktrees', 'lavoro');
+    g(repo, 'worktree', 'add', '-q', wt, '-b', 'claude/lavoro');
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(repo));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'sess.jsonl'), turnoDi('m1', T('00:00'), 30000, 50, 'sess') + '\n');
+    const rep = await generaRapporto({ cwd: wt, configDir: config });
+    assert.equal(rep.sessionId, 'sess', rep.notes.join(' | '));
+    assert.equal(rep.turns, 1);
+    // Dal checkout principale, come prima.
+    assert.equal((await generaRapporto({ cwd: repo, configDir: config })).sessionId, 'sess');
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});

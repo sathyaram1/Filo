@@ -160,3 +160,16 @@ describe('il comando del contenitore è scritto intero, dovunque compaia', () =>
     assert.ok(trovate >= 3, 'il comando del contenitore deve stare scritto in CLAUDE.md, nei ruoli e nei rossi noti');
   });
 });
+
+// ─── Giro 2 della verifica (16/09/2026): un Electron appeso non lascia il giro muto ──
+// Col solo tetto del job, un passo appeso faceva annullare il job PRIMA del
+// verdetto: niente feedback, patch non pubblicata, e lo si scopriva solo
+// guardando le Actions.
+test('il passo della suite ha un tetto suo, sotto quello del job: scaduto, il verdetto e l\'allarme girano lo stesso', () => {
+  const suite = senzaCommenti(job('suite'));
+  const passo = suite.slice(suite.indexOf('name: Suite Playwright completa'));
+  const m = passo.match(/timeout-minutes:\s*(\d+)/);
+  assert.ok(m, 'il passo che lancia Playwright deve avere un timeout-minutes suo');
+  assert.ok(Number(m[1]) < 240, 'il tetto del passo deve stare sotto quello del job, o è il job a morire prima del verdetto');
+  assert.match(suite, /tetto del passo/, 'l\'allarme deve dire che la suite può essere stata interrotta dal tetto');
+});

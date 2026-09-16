@@ -151,17 +151,60 @@ function candidatiIn(cartella) {
   const out = [];
   for (const n of readdirSync(cartella)) {
     const p = join(cartella, n);
-    if (n.endsWith('.jsonl')) { out.push({ p, m: statSync(p).mtimeMs }); continue; }
+    if (n.endsWith('.jsonl')) { out.push({ p, m: recenzaDi(p) }); continue; }
     const sub = join(p, 'subagents');
     let figli = [];
     try { figli = readdirSync(sub); } catch (_) { continue; }
     for (const f of figli) {
       if (!f.endsWith('.jsonl')) continue;
       const pf = join(sub, f);
-      out.push({ p: pf, m: statSync(pf).mtimeMs });
+      out.push({ p: pf, m: recenzaDi(pf) });
     }
   }
   return out;
+}
+
+/**
+ * Quanto è «recente» un transcript: la data dell'ultimo messaggio
+ * dell'assistente che contiene, e la data di scrittura del file solo se non
+ * se ne trova uno in coda. La sessione madre, ferma ad aspettare un
+ * sotto-agente, continua a ricevere righe di servizio (code, promemoria,
+ * allegati) e il suo file può risultare scritto DOPO quello del sotto-agente
+ * che sta rilasciando: ma un messaggio dell'assistente, in quel momento, lo
+ * scrive solo il sotto-agente.
+ */
+function recenzaDi(file) {
+  const dalContenuto = ultimoAssistantMs(file);
+  if (Number.isFinite(dalContenuto)) return dalContenuto;
+  try { return statSync(file).mtimeMs; } catch (_) { return 0; }
+}
+
+const CODA_BYTE = 512 * 1024;
+
+/** La data dell'ultimo messaggio dell'assistente negli ultimi 512 KB del file, o NaN. */
+export function ultimoAssistantMs(file) {
+  let fd = null;
+  try {
+    const size = statSync(file).size;
+    if (!size) return NaN;
+    const da = Math.max(0, size - CODA_BYTE);
+    const buf = Buffer.alloc(size - da);
+    fd = openSync(file, 'r');
+    readSync(fd, buf, 0, buf.length, da);
+    const righe = buf.toString('utf8').split('\n');
+    for (let i = righe.length - 1; i >= 0; i -= 1) {
+      const r = righe[i];
+      if (!r.includes('"type":"assistant"')) continue;
+      const m = r.match(/"timestamp":"([^"]+)"/);
+      const ms = m ? Date.parse(m[1]) : NaN;
+      if (Number.isFinite(ms)) return ms;
+    }
+    return NaN;
+  } catch (_) {
+    return NaN;
+  } finally {
+    if (fd !== null) { try { closeSync(fd); } catch (_) { /* già chiuso */ } }
+  }
 }
 
 /**

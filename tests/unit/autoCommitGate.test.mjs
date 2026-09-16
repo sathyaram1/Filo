@@ -410,3 +410,29 @@ describe('la spedizione non tace: storia divergente e push fallito', () => {
     assert.equal(json.hookSpecificOutput.hookEventName, 'PostToolUse');
   });
 });
+
+// ─── Giro 2 della verifica (16/09/2026): il lease dopo un fetch ─────────────
+describe('il rinvio dopo un rebase non calpesta il lavoro degli altri nemmeno dopo un fetch', () => {
+  test('un altro ha spinto e questa copia lo ha scaricato con un fetch: il rinvio viene rifiutato e origin resta suo', () => {
+    const { base, origin, work } = scene();
+    git(work, ['checkout', '-q', '-b', 'claude/fetch']);
+    commitFile(work, 'a.js');
+    git(work, ['push', '-q', 'origin', 'claude/fetch']);
+    const altro = resolve(base, 'altro');
+    git(base, ['clone', '-q', origin, altro]);
+    git(altro, ['checkout', '-q', 'claude/fetch']);
+    commitFile(altro, 'di-un-altro.js');
+    git(altro, ['push', '-q', 'origin', 'claude/fetch']);
+    const b = git(altro, ['rev-parse', 'HEAD']);
+    // Il fetch porta origin/claude/fetch al commit dell'altro: un lease «nudo» combacerebbe.
+    git(work, ['fetch', '-q', 'origin']);
+    git(work, ['reset', '-q', '--hard', 'HEAD~1']);
+    writeFileSync(resolve(work, 'c.js'), 'riscritto\n', 'utf8');
+
+    const stderr = runHookStderr(work);
+
+    assert.equal(git(work, ['ls-remote', origin, 'refs/heads/claude/fetch']).split(/\s/)[0], b,
+      'il commit dell\'altro deve restare su origin anche se questa copia lo aveva già scaricato');
+    assert.match(stderr, /claude\/fetch.*NON e' arrivato su origin/);
+  });
+});
