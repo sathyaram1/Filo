@@ -109,9 +109,60 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
 }
 
 /**
- * Trova il transcript. `explicit` vince, poi `env`, poi il `.jsonl` più
- * recente della cartella del progetto. Torna { file, note } — `file` vuoto se
- * non c'è niente, con la nota che spiega dove si è guardato.
+ * Il checkout principale di una cartella di lavoro separata (git worktree),
+ * o '' se `cwd` è già il checkout principale, un repo nudo, o non è git.
+ * Claude Code scrive i transcript nella cartella del progetto da cui la
+ * sessione è partita: chi lavora in `.claude/worktrees/<nome>` li trova lì.
+ */
+export function checkoutPrincipale(cwd) {
+  try {
+    const comune = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (!comune || basename(comune) !== '.git') return '';
+    const principale = resolve(dirname(comune));
+    return principale === resolve(cwd) ? '' : principale;
+  } catch (_) {
+    return '';
+  }
+}
+
+/** Un transcript è quello di un sotto-agente se sta in `<sessione>/subagents/`. PURA. */
+export function eSottoAgente(file) {
+  return basename(dirname(file)) === 'subagents';
+}
+
+/**
+ * I transcript di una cartella del progetto, con la data dell'ultima
+ * scrittura: i `.jsonl` delle sessioni E quelli dei loro sotto-agenti
+ * (`<sessione>/subagents/*.jsonl`). Nelle routine i worker SONO sotto-agenti
+ * dell'orchestratore (routines/roles/orchestrator.md): il transcript scritto
+ * più di recente è quello di chi sta rilasciando, e fino al 16/09/2026 il
+ * rapporto guardava solo le sessioni, cioè prendeva l'orchestratore con
+ * dentro tutti i worker del giro (verifica del giro 2).
+ */
+function candidatiIn(cartella) {
+  const out = [];
+  for (const n of readdirSync(cartella)) {
+    const p = join(cartella, n);
+    if (n.endsWith('.jsonl')) { out.push({ p, m: statSync(p).mtimeMs }); continue; }
+    const sub = join(p, 'subagents');
+    let figli = [];
+    try { figli = readdirSync(sub); } catch (_) { continue; }
+    for (const f of figli) {
+      if (!f.endsWith('.jsonl')) continue;
+      const pf = join(sub, f);
+      out.push({ p: pf, m: statSync(pf).mtimeMs });
+    }
+  }
+  return out;
+}
+
+/**
+ * Trova il transcript. `explicit` vince, poi `env`, poi il `.jsonl` scritto
+ * più di recente — sessione o sotto-agente — nella cartella del progetto (e,
+ * da una cartella di lavoro separata, in quella del checkout principale).
+ * Torna { file, note } — `file` vuoto se non c'è niente, con la nota che
+ * spiega dove si è guardato.
  */
 export function trovaTranscript({ explicit = '', env = process.env, cwd = process.cwd(), configDir = '' } = {}) {
   const dichiarato = String(explicit || env.FILO_TRANSCRIPT || '').trim();
@@ -119,18 +170,26 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
     return existsSync(dichiarato) ? { file: dichiarato, note: '' } : { file: '', note: `transcript indicato ma assente: ${dichiarato}` };
   }
   const base = configDir || env.CLAUDE_CONFIG_DIR || join(os.homedir(), '.claude');
-  const cartella = join(base, 'projects', slugProgetto(resolve(cwd)));
-  if (!existsSync(cartella)) return { file: '', note: `nessuna cartella di transcript per questa sessione (${cartella})` };
-  let candidati = [];
-  try {
-    candidati = readdirSync(cartella)
-      .filter((n) => n.endsWith('.jsonl'))
-      .map((n) => { const p = join(cartella, n); return { p, m: statSync(p).mtimeMs }; })
-      .sort((a, b) => b.m - a.m);
-  } catch (e) {
-    return { file: '', note: `cartella dei transcript illeggibile (${cartella}): ${String(e && e.message)}` };
+  const cartelle = [];
+  for (const dir of [resolve(cwd), checkoutPrincipale(cwd)]) {
+    if (!dir) continue;
+    const c = join(base, 'projects', slugProgetto(dir));
+    if (!cartelle.includes(c)) cartelle.push(c);
   }
-  if (!candidati.length) return { file: '', note: `nessun transcript in ${cartella}` };
+  const guardate = [];
+  const candidati = [];
+  for (const cartella of cartelle) {
+    if (!existsSync(cartella)) continue;
+    guardate.push(cartella);
+    try {
+      candidati.push(...candidatiIn(cartella));
+    } catch (e) {
+      return { file: '', note: `cartella dei transcript illeggibile (${cartella}): ${String(e && e.message)}` };
+    }
+  }
+  if (!guardate.length) return { file: '', note: `nessuna cartella di transcript per questa sessione (${cartelle.join(' né ')})` };
+  if (!candidati.length) return { file: '', note: `nessun transcript in ${guardate.join(' né ')}` };
+  candidati.sort((a, b) => b.m - a.m);
   return { file: candidati[0].p, note: '' };
 }
 
