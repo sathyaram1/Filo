@@ -268,4 +268,20 @@ if [ -f "$TICKET_FILE" ] && command -v node >/dev/null 2>&1; then
   fi
 fi
 
+# ─── UN PUSH FALLITO ARRIVA ALLA SESSIONE ────────────────────────────────────
+#
+# Fino al 2026-09-16 (giro del 14/09, verifica) il fallimento stava solo su
+# stderr, con uscita 0. Per Claude Code, stderr di un hook che esce con 0 va
+# al solo registro di debug: non alla sessione, non a chi guarda — e in una
+# routine non guarda nessuno. Era ancora un push a vuoto in silenzio.
+# L'unico canale da un hook PostToolUse alla sessione e' un JSON su stdout con
+# `additionalContext` (l'uscita 2 non vale per questo evento; un'uscita
+# diversa da zero mostra la prima riga di stderr a chi guarda, e basta).
+# Quando tutto e' arrivato, stdout resta vuoto: niente contesto a ogni Edit.
+if [ -s "$FALLIMENTI_FILE" ]; then
+  TESTO=$(sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/ /g' "$FALLIMENTI_FILE" | awk 'NR>1{printf "\\n"}{printf "%s",$0}')
+  printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"SALVATAGGIO: %s\\nIl lavoro e'"'"' committato in locale ma NON e'"'"' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."}}\n' "$HOOK_EVENT" "$TESTO"
+fi
+rm -f "$FALLIMENTI_FILE" 2>/dev/null
+
 exit 0
