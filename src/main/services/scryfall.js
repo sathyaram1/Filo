@@ -1,17 +1,6 @@
-// Client Scryfall (DECK-BUILDER-SPEC.md §13.2-§13.3) — parte I/O, main process.
-// La logica pura (query, semplificazione carte, TTL) è in SN_SCRYFALL_Q
-// (src/shared/scryfallQuery.js).
-//
-// Cache (§13.3):
-//   - dati carta: permanenti per i campi statici, il PREZZO si considera
-//     stantio dopo PRICE_TTL_MS → chi vuole prezzi freschi passa maxAgeMs
-//   - simboli di mana (symbology): permanente (symbol → svg_uri; l'SVG lo
-//     carica il renderer via <img>, la CSP filo:// consente https:)
-//   - immagini carta: URL diretti https://cards.scryfall.io — le cachea il
-//     browser (HTTP cache di Chromium), non duplichiamo su disco
-//
-// Rate limit di cortesia (~10 req/s): coda interna serializzata con distanza
-// minima fra le richieste. Tutte le chiamate passano da qui.
+// Client Scryfall (DECK-BUILDER-SPEC.md §13.2-§13.3), parte I/O; la logica pura (query, semplificazione carte, TTL) è in SN_SCRYFALL_Q.
+// Cache (§13.3): i campi statici della carta sono permanenti, il PREZZO si considera stantio dopo PRICE_TTL_MS (chi lo vuole fresco passa maxAgeMs); i simboli di mana sono permanenti; le immagini restano URL diretti di Scryfall, le cachea il browser e non si duplicano su disco.
+// Rate limit di cortesia (~10 req/s): coda interna serializzata con distanza minima, e tutte le chiamate passano da qui.
 
 (function (global) {
   'use strict';
@@ -23,10 +12,7 @@
   const MIN_GAP_MS = 110;               // ~9 req/s, sotto il tetto di cortesia
   const PRICE_TTL_MS = 6 * 60 * 60 * 1000; // prezzi: stantii dopo 6 ore
 
-  // User-Agent identificativo, OBBLIGATORIO: l'API Scryfall risponde
-  // 400 `generic_user_agent` alle richieste con la UA di default della
-  // libreria HTTP (il fetch di Node/Electron nel main) — senza questo header
-  // OGNI chiamata fallisce in produzione (ricerca in chat, hover sui nomi…).
+  // User-Agent identificativo OBBLIGATORIO: con la UA di default del fetch di Node/Electron l'API risponde 400 `generic_user_agent`, e senza questo header in produzione fallisce OGNI chiamata.
   let USER_AGENT = 'Filo/0.0.0 (https://singolarita.com)';
   try {
     USER_AGENT = `Filo/${require('../../../package.json').version} (https://singolarita.com)`;
@@ -36,7 +22,6 @@
   let _fetch = (...args) => fetch(...args);
   function _setFetch(fn) { _fetch = fn || ((...args) => fetch(...args)); }
 
-  // ── Coda rate-limited ────────────────────────────────────────────────────
   let chain = Promise.resolve();
   let lastAt = 0;
   function throttled(fn) {
@@ -58,10 +43,7 @@
       });
       if (res.status === 404) return null; // "nessun risultato" per Scryfall
       if (!res.ok) {
-        // Scryfall spiega gli errori nel body JSON (`details`, es. la sintassi
-        // sbagliata di una query 400): recuperalo, così chi gestisce l'errore
-        // può correggere la query o spiegare il problema all'utente invece di
-        // mostrare un codice HTTP nudo (#331).
+        // Scryfall spiega gli errori nel body JSON (`details`, es. la sintassi sbagliata di una query): recuperarlo permette di correggere la query o spiegare il problema all'utente invece di mostrare un codice HTTP nudo (#331).
         let details = '';
         try {
           const body = await res.json();
@@ -76,8 +58,7 @@
     });
   }
 
-  // ── Ricerca (§4): il vincolo di identity lo aggiunge il chiamante via
-  //    buildSearchQuery; qui si esegue e si semplifica. ─────────────────────
+  // Ricerca (§4): il vincolo di identity lo aggiunge il chiamante via buildSearchQuery, qui si esegue e si semplifica.
   async function search(userQuery, { identity } = {}) {
     const q = Q.buildSearchQuery(userQuery, identity);
     if (!q) return { cards: [], hasMore: false, query: q };
@@ -98,7 +79,7 @@
     return card;
   }
 
-  // ── Cache dati carta (chiave: scryfall_id) ───────────────────────────────
+  // Cache dati carta, chiave = scryfall_id.
 
   async function readCardCache() {
     const res = await chrome.storage.local.get(STORAGE_KEYS.SCRYFALL_CARDS);
@@ -114,11 +95,7 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.SCRYFALL_CARDS]: map });
   }
 
-  // Carte per id, dalla cache quando abbastanza fresche (default: i campi
-  // statici non scadono → Infinity). Chi vuole PREZZI freschi passa
-  // maxAgeMs = PRICE_TTL_MS. Le mancanti/stantie si scaricano una a una
-  // (la coda rate-limited le serializza). Ritorna una mappa id → card
-  // (id introvabili semplicemente assenti).
+  // Dalla cache quando abbastanza fresche (default: i campi statici non scadono). Chi vuole PREZZI freschi passa maxAgeMs = PRICE_TTL_MS; le mancanti si scaricano una a una. Gli id introvabili restano semplicemente assenti dalla mappa.
   async function cards(ids, { maxAgeMs = Infinity } = {}) {
     const wanted = [...new Set((ids || []).map(String).filter(Boolean))];
     const map = await readCardCache();
@@ -126,8 +103,7 @@
     const missing = [];
     for (const id of wanted) {
       const e = map[id];
-      // `producedMana`/`oracleText === undefined` = entry scritta prima che il
-      // campo esistesse (schema vecchio): si rifetcha per avere il dato nuovo.
+      // Campo `undefined` = entry scritta prima che il campo esistesse (schema vecchio): si rifetcha per avere il dato nuovo.
       if (e && Q.isFresh(e.fetchedAt, maxAgeMs) && e.card
           && e.card.producedMana !== undefined && e.card.oracleText !== undefined) out[id] = e.card;
       else missing.push(id);
@@ -152,9 +128,7 @@
     return map[String(id)] || null;
   }
 
-  // ── Conteggio ristampe per nome (modulo "Prezzo e dati", §5.2) ───────────
-  // `unique=prints` conta tutte le stampe della carta; il numero cambia solo
-  // quando esce un set nuovo → cache permanente per nome (minuscolo).
+  // Conteggio ristampe per nome (§5.2): `unique=prints` conta tutte le stampe, e il numero cambia solo quando esce un set nuovo → cache permanente.
   async function prints(name) {
     const n = String(name || '').trim();
     if (!n) return null;
@@ -170,7 +144,7 @@
     return count;
   }
 
-  // ── Simboli di mana (symbology): symbol → svg_uri, cache permanente ──────
+  // Simboli di mana (symbology): symbol → svg_uri, cache permanente.
   async function symbols() {
     const res = await chrome.storage.local.get(STORAGE_KEYS.SCRYFALL_SYMBOLS);
     const cached = res[STORAGE_KEYS.SCRYFALL_SYMBOLS];

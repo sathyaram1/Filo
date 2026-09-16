@@ -1,36 +1,12 @@
-// Helper: risolve il modello (nickname catena) per uno slot di supporto.
-//
-// PERCHÉ ESISTE
-//   DD1 ha creato il doc Firestore `config/supportModels` con uno slot per
-//   funzione di supporto (sanitizer, judge1, judge2, judge3, judgeDynamic,
-//   judgeRedTeam, judgePriority). I chiamanti che devono
-//   scegliere il modello per un task di supporto usano questa funzione per
-//   leggere lo slot dalla config remota con fallback al valore hard-coded
-//   passato come parametro — garantendo la backward-compat se la config è
-//   assente/vuota.
-//
-// INVARIANTE DURA
-//   Se la config non c'è (rete giù, doc non ancora creato, slot vuoto),
-//   il comportamento è identico a oggi: la funzione ritorna il fallback.
-//   Nessuna regressione possibile.
-//
-// USO TIPICO
-//   // in un chiamante (backend, routine cloud, main process):
-//   const modelRef = await resolveSupportModel('sanitizer', 'flash');
-//   // modelRef è una catena di nickname (es. "flash, flash-or") o il fallback.
-//   // Il chiamante la passa a buildAttemptChain(settings, modelRef) come sempre.
-//
-// ZERO DIPENDENZE ESTERNE DAL CHIAMANTE
-//   La funzione accetta un getter opzionale (per i test, dove non si vuole rete).
-//   In produzione usa supportModelsStore.get() direttamente.
+// Risolve il modello (catena di nickname) per uno slot di supporto — sanitizer, judge1…judgePriority — leggendolo dalla config remota `config/supportModels`.
+// INVARIANTE DURA: se la config non c'è (rete giù, doc non creato, slot vuoto) ritorna il fallback passato dal chiamante, cioè il comportamento di prima. Nessuna regressione possibile.
+// Il getter è iniettabile per i test; in produzione usa supportModelsStore.get(). Il risultato si passa a buildAttemptChain come qualunque altra catena.
 
 'use strict';
 
 const SupportModels = require('./supportModelsStore');
 
-// Valori di default raccomandati per ogni slot (mirror dei default del backend).
-// Cambiarli qui cambia solo il fallback in-process; il valore vero è sul doc
-// Firestore che l'owner configura dalla dashboard.
+// Mirror dei default del backend: cambiarli qui cambia solo il fallback in-process, il valore vero è sul doc Firestore che l'owner configura dalla dashboard.
 const SLOT_DEFAULTS = {
   sanitizer:     'flash',
   judge1:        'flash, flash-or',
@@ -41,16 +17,9 @@ const SLOT_DEFAULTS = {
   judgePriority: 'flash',
 };
 
-/**
- * Risolve il modello per uno slot di supporto.
- *
- * @param {string} slot         - Uno di: sanitizer, judge1, judge2, judge3, judgeDynamic, judgeRedTeam, judgePriority
- * @param {string} [hardcoded]  - Fallback hard-coded se la config è assente/vuota.
- *                                 Se omesso, usa SLOT_DEFAULTS[slot] oppure 'flash'.
- * @param {Function} [getConfig] - Getter asincrono che ritorna { [slot]: string }.
- *                                 In produzione = SupportModels.get. Iniettabile per i test.
- * @returns {Promise<string>}   - Catena di nickname (es. "flash, flash-or").
- */
+/** @param {string} slot sanitizer | judge1 | judge2 | judge3 | judgeDynamic | judgeRedTeam | judgePriority
+* @param {string} [hardcoded] fallback se la config è assente/vuota; omesso → SLOT_DEFAULTS[slot] oppure 'flash'.
+* @param {Function} [getConfig] getter asincrono { [slot]: string }, iniettabile per i test. @returns {Promise<string>} catena di nickname. */
 async function resolveSupportModel(slot, hardcoded, getConfig) {
   const fallback = (typeof hardcoded === 'string' && hardcoded.trim())
     ? hardcoded.trim()

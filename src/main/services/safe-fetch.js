@@ -1,19 +1,6 @@
-// Fetch "SSRF-safe" per le richieste che il MAIN process fa verso URL forniti
-// dal renderer (es. anteprima Open Graph di un link). Senza queste guardie, una
-// pagina potrebbe far colpire al processo main servizi locali/interni
-// (127.0.0.1, 169.254.169.254 metadata cloud, host di rete privata) e leggerne
-// parte della risposta.
-//
-// Difese:
-//   - solo schemi http/https;
-//   - blocco di loopback / link-local / reti private / multicast, sia per IP
-//     letterali sia risolvendo il DNS dell'hostname;
-//   - redirect gestiti a mano: OGNI hop viene rivalidato (un redirect verso un
-//     IP privato non sfugge come farebbe con redirect:'follow').
-//
-// Limite residuo noto (accettato per l'alpha): tra la risoluzione DNS e la
-// connessione effettiva resta una finestra di DNS-rebinding (TOCTOU); chiuderla
-// del tutto richiederebbe di pinnare l'IP risolto sulla connessione.
+// Fetch "SSRF-safe" per le richieste che il MAIN fa verso URL forniti dal renderer: senza queste guardie una pagina potrebbe far colpire al processo main servizi locali o interni (127.0.0.1, metadata cloud, rete privata) e leggerne parte della risposta.
+// Difese: solo schemi http/https; blocco di loopback, link-local, reti private e multicast sia per IP letterali sia risolvendo il DNS dell'hostname; redirect gestiti a mano, con OGNI hop rivalidato (con redirect:'follow' un redirect verso un IP privato sfuggirebbe).
+// Limite residuo noto e accettato: fra la risoluzione DNS e la connessione resta una finestra di DNS-rebinding; chiuderla vorrebbe dire pinnare l'IP risolto sulla connessione.
 
 const dns = require('node:dns').promises;
 const net = require('node:net');
@@ -66,8 +53,7 @@ async function assertPublicHost(hostname) {
   }
 }
 
-// GET con validazione anti-SSRF. Ritorna la Response (con body leggibile) come
-// fetch. Lancia su schema non http/https, host privato o troppi redirect.
+// GET con validazione anti-SSRF. Lancia su schema non http/https, host privato o troppi redirect.
 async function safeFetch(rawUrl, { signal, maxRedirects = 5, headers } = {}) {
   let current = String(rawUrl || '');
   for (let i = 0; i <= maxRedirects; i++) {
