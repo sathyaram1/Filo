@@ -1,13 +1,6 @@
-// Pagina dei documenti di trasparenza dentro Filo.
-//
-// Il contenuto NON vive qui: arriva da src/shared/transparency.js, generato dai
-// markdown in transparency/ (vedi scripts/build-transparency.mjs). Questa pagina
-// si limita a scegliere quale documento mostrare e a montare le glosse.
-//
-// Il documento sta nella QUERY (?doc=models), non in un pannello a schede: così
-// l'indirizzo dice sempre cosa stai leggendo e un link a una sezione precisa
-// (?doc=models#i-punti-deboli) porta davvero lì. È l'uso principale di queste
-// pagine — vengono citate e linkate, non sfogliate.
+// Documenti di trasparenza: il contenuto arriva da src/shared/transparency.js, generato dai
+// markdown in transparency/. Il documento sta nella QUERY (?doc=models), non in schede, così
+// l'indirizzo dice cosa stai leggendo e un link a una sezione precisa porta davvero lì.
 
 (function () {
   'use strict';
@@ -30,9 +23,8 @@
     for (const item of T.NAV) {
       const doc = T.get(item.id);
       if (!doc) {
-        // Sezione non ancora scritta: resta visibile e spenta. Farla sparire
-        // darebbe l'impressione che Filo non abbia niente da dire su privacy o
-        // sicurezza, che è il contrario di quello che questa pagina promette.
+        // Sezione non ancora scritta: resta visibile e spenta. Farla sparire direbbe che Filo non ha
+        // niente da dire su privacy o sicurezza, il contrario di quello che la pagina promette.
         const span = document.createElement('span');
         span.className = 'sn-nav-item is-soon';
         span.textContent = item.label;
