@@ -182,9 +182,10 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   # fotografia poteva cogliere un lavoro a meta'. In piu' ogni pubblicazione
   # spostava il ramo principale sotto i piedi delle routine in corso, e faceva
   # giudicare al cancello di sicurezza una versione diversa da quella poi fusa.
-  # Durabilita': ogni ramo di lavoro viene spedito subito. E' il pezzo che ha
-  # salvato il lavoro dopo le interruzioni improvvise, e vale anche in locale
-  # ora che la fusione sul ramo principale e' differita.
+  # Durabilita': ogni ramo di lavoro viene spedito subito, anche quando la sua
+  # storia e' stata riscritta da un rebase (spedisci_ramo, piu' su). E' il
+  # pezzo che ha salvato il lavoro dopo le interruzioni improvvise, e vale
+  # anche in locale ora che la fusione sul ramo principale e' differita.
   #
   # LA DESTINAZIONE SI DICHIARA. `git push origin "$BRANCH"` dice a git COSA
   # spedire ma non DOVE: la destinazione la sceglie la configurazione locale.
