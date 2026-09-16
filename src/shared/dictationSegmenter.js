@@ -1,6 +1,6 @@
-// Dettatura «in diretta»: spezza il flusso del microfono in segmenti di parlato. Il modello di trascrizione lavora su spezzoni chiusi, ma chi detta vuole vedere il testo comparire mentre parla.
-// Si ascolta a blocchi e si riconosce la voce dall'energia del segnale: ogni `interimEveryMs` di parlato lo spezzone corrente si manda com'è (trascrizione PROVVISORIA, mostrata ma non inserita), e a una pausa di `silenceMs` o oltre `maxSegmentMs` si chiude (DEFINITIVA, inserita nel campo).
-// Il tempo si misura sui campioni, non sull'orologio: stessa sequenza, stessi eventi, quindi verificabile in un unit test. Qui solo logica pura: la cattura audio sta in src/content/tts.js, la trascrizione nel main.
+// Dettatura «in diretta»: spezza il flusso del microfono in segmenti di parlato, perché il modello di trascrizione lavora su spezzoni chiusi mentre chi detta vuole vedere il testo comparire.
+// Si ascolta a blocchi riconoscendo la voce dall'energia del segnale: ogni `interimEveryMs` di parlato lo spezzone corrente si manda com'è (PROVVISORIA, mostrata ma non inserita), e a una pausa di `silenceMs` o oltre `maxSegmentMs` si chiude (DEFINITIVA).
+// Il tempo si misura sui campioni, non sull'orologio: stessa sequenza, stessi eventi, quindi verificabile in un unit test. Qui solo logica pura: la cattura sta in src/content/tts.js, la trascrizione nel main.
 
 (function (global) {
   'use strict';
@@ -75,7 +75,7 @@
     return out;
   }
 
-  // Opzioni, tutte in millisecondi salvo sampleRate (frequenza dei campioni che riceve push): frameMs granularità dell'analisi, interimEveryMs ogni quanto parlato mandare una provvisoria, silenceMs pausa che chiude uno spezzone, minSpeechMs sotto cui lo spezzone si butta, maxSegmentMs durata oltre cui si chiude comunque, leadMs silenzio tenuto prima della prima parola (attacco pulito).
+  // Opzioni in millisecondi salvo sampleRate: frameMs granularità dell'analisi, interimEveryMs ogni quanto parlato mandare una provvisoria, silenceMs pausa che chiude uno spezzone, minSpeechMs sotto cui lo spezzone si butta, maxSegmentMs durata oltre cui si chiude comunque, leadMs silenzio tenuto prima della prima parola (attacco pulito).
   // onInterim/onFinal({ samples, sampleRate, ms, speechMs }).
   function createSegmenter(opts) {
     const o = Object.assign({
@@ -93,7 +93,7 @@
     let silenceRun = 0;
     let sinceInterim = 0;
     let interimDirty = false;            // voce nuova dopo l'ultima provvisoria
-    // Rumore di fondo: media mobile dell'energia dei blocchi senza voce. Parte bassa e si adatta; la soglia sta sopra di un margine fisso, così un ventilatore non diventa «parlato».
+    // Rumore di fondo: media mobile dell'energia dei blocchi senza voce, che parte bassa e si adatta. La soglia sta sopra di un margine fisso, così un ventilatore non diventa «parlato».
     let noise = 0.004;
     const emitted = { interim: 0, final: 0 };
 
