@@ -43,7 +43,7 @@
       },
       {
         "spec": "tests/manage-frase-non-si-perde",
-        "caso": "anche con quattro azioni i tasti restano su una riga sola; un messaggio d’esito lungo non manda i tasti a capo",
+        "caso": ["anche con quattro azioni i tasti restano su una riga sola", "un messaggio d esito lungo non manda i tasti a capo"],
         "perche": "le due prove MISURANO dove cadono i tasti della barra dell’owner, e i tasti vanno a capo o no a seconda di quanto è larga la finestra e di quanto è grande il testo: due cose che nel contenitore senza schermo non sono quelle della macchina di chi sviluppa Filo (là lo schermo sta al 125%). Il numero dei tasti è quello atteso, sei: a divergere è solo il numero di righe, due invece di una. Rosso identico su main: misurato il 2026-09-14 da una copia di lavoro su origin/main nello stesso contenitore, mentre si riallineava il ramo del #583 — non è di nessun ramo. Da risolvere (misurare che i tasti ci stiano, non a quale altezza cadono, oppure fissare la larghezza della finestra nella prova) e poi togliere la voce.",
         "feedback": "da aprire: rossi del contenitore trovati dal riallineamento del #583"
       }
