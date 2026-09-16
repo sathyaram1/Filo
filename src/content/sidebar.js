@@ -1,5 +1,5 @@
-// Sidebar Aiuto: agente vision multi-turn. Espansa è pannello, conversazione e input; collassata è la sola barra d'input. Il click fuori collassa, il focus riapre, e l'AI può chiedere `collapse` dopo la sua risposta.
-// Le azioni dell'utente diventano una riga grigia di log, non un finto messaggio suo; nella cronologia mandata all'AI restano come marcatore testuale, così l'agente sa cos'è successo.
+// Sidebar Aiuto: agente vision multi-turn. Espansa mostra la conversazione, collassata la sola barra d'input; il click fuori collassa, il focus riapre, e l'AI può chiedere `collapse` dopo la risposta.
+// Le azioni dell'utente diventano una riga grigia di log, non un finto messaggio suo; all'AI arrivano come marcatore testuale nella cronologia.
 
 (function (global) {
   'use strict';
@@ -20,8 +20,8 @@
   let aiPrefersOpen = false;
   let docClickHandler = null;
 
-  // Telemetria di sessione: resta locale finché l'utente non clicca 👍/👎, e parte solo a fine task per arricchire il database dei percorsi (pathsCollector.js).
-  // executedSteps tiene SOLO le azioni davvero eseguite e mai il value di un fill; rawUserMessages serve al judge lato server.
+  // Telemetria di sessione: resta locale finché l'utente non clicca 👍/👎, poi arricchisce il database dei percorsi (pathsCollector.js).
+  // executedSteps tiene solo le azioni davvero eseguite, mai il value di un fill; rawUserMessages serve al judge lato server.
   let session = null;
   function newSession() {
     return {
@@ -210,7 +210,7 @@
     if (!conv) return null;
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
-    // #418 — le risposte di Filo si rendono con la formattazione leggera di popup e chat della home (grassetto, corsivo, codice, elenchi, link cliccabili); il testo dell'utente resta letterale.
+    // #418 — le risposte di Filo hanno la formattazione leggera di popup e chat della home (grassetto, corsivo, codice, elenchi, link); il testo dell'utente resta letterale.
     if (role === 'assistant' && global.SN_MARKDOWN) {
       msg.innerHTML = global.SN_MARKDOWN.render(text);
     } else {
@@ -322,8 +322,7 @@
     return log;
   }
 
-  // Riquadro «Ha funzionato?»: compare quando l'AI dichiara conclusa la sessione e l'utente ha eseguito almeno un'azione.
-  // Le risposte alimentano la collection `paths` via SAVE_PATH; la sanitizzazione a due LLM sta in pathsCollector.js.
+  // Riquadro «Ha funzionato?»: compare a sessione conclusa se l'utente ha eseguito almeno un'azione; le risposte alimentano `paths` via SAVE_PATH (sanitizzazione a due LLM in pathsCollector.js).
   function renderFeedbackPrompt() {
     const conv = convEl();
     if (!conv) return;
@@ -333,13 +332,10 @@
     q.className = 'sn-sidebar-feedback-q';
     q.textContent = 'Ha funzionato? Aiutami a migliorare:';
     wrap.appendChild(q);
-    // La domanda da sola sembrava un parere privato a chi scrive Filo, e
-    // invece il sì pubblica i passi dove li legge chiunque: dirlo dove si
-    // sceglie, non solo nella pagina che spiega la privacy (#584).
+    // La domanda da sola sembrava un parere privato a chi scrive Filo, e invece il sì pubblica i passi dove li legge chiunque: va detto qui, dove si sceglie, non solo nella pagina sulla privacy (#584).
     const nota = document.createElement('div');
     nota.className = 'sn-sidebar-feedback-nota';
-    // La riga dice il vero e va tenuta vera: da indirizzo e nomi dei pulsanti Filo toglie ciò che ha la forma di un dato personale, e un modello guarda il resto e blocca l'intero percorso se ci riconosce una persona.
-    // Non promettere più di quanto quel modello veda davvero (#584): prometteva «senza il tuo nome» quando di fatto non vedeva niente di quello che stava per uscire.
+    // La riga è una promessa e va tenuta vera: Filo toglie da indirizzo e nomi dei pulsanti ciò che ha la forma di un dato personale, e un modello blocca l'intero percorso se nel resto riconosce una persona (#584).
     nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
     wrap.appendChild(nota);
     const row = document.createElement('div');
@@ -393,8 +389,8 @@
     conv.scrollTop = conv.scrollHeight;
   }
 
-  // Se da questa pagina un percorso partirebbe davvero lo sa solo il processo principale (protocollo, sito, spazio in coda): si chiede a lui, la stessa porta che usa la raccolta,
-  // o il riquadro promette una cosa e la raccolta ne fa un'altra (#584). Se la domanda non arriva a destinazione non si promette niente.
+  // Se da questa pagina un percorso partirebbe davvero lo sa solo il processo principale (protocollo, sito, spazio in coda), ed è la stessa porta che usa la raccolta:
+  // una sola, o il riquadro promette una cosa e la raccolta ne fa un'altra (#584). Se la domanda non arriva a destinazione non si promette niente.
   async function percorsoRaccoglibile() {
     try {
       const r = await chrome.runtime.sendMessage({
@@ -411,8 +407,8 @@
       await chrome.runtime.sendMessage({
         type: MSG.SAVE_PATH,
         payload: {
-          // Qui non parte NESSUN identificativo del mittente, neanche vuoto: chi manda si presenta al server col token dell'identità dell'installazione, che il server verifica e che il processo principale allega all'invio (#585).
-          // Un identificativo generato in questa pagina sarebbe autodichiarato, e chi attacca ne scriverebbe uno diverso a ogni invio; un campo vuoto che si porta dietro il nome è l'invito a riempirlo.
+          // Nessun identificativo del mittente parte da qui, neanche vuoto: chi manda si presenta col token dell'identità dell'installazione, che il server verifica e il processo principale allega all'invio (#585).
+          // Uno generato in questa pagina sarebbe autodichiarato, e chi attacca ne scriverebbe un altro a ogni invio; un campo vuoto col nome giusto invita a riempirlo.
           session: {
             rawUrl: session.initialUrl,
             rawSteps: session.executedSteps,
@@ -468,7 +464,7 @@
           };
         }
       }
-      // Azione tipizzata di Filo, le stesse che può emettere la chat della dashboard. NON si esegue qui: passa dal registro dei livelli di sicurezza nel main e, se serve, dal popup di conferma (vedi submit()).
+      // Non si esegue qui: passa dal registro dei livelli di sicurezza nel main (vedi submit()).
       if (obj.action === 'filo' && obj.filo && typeof obj.filo === 'object'
         && typeof obj.filo.type === 'string' && obj.filo.type.trim()) {
         return {
@@ -478,8 +474,7 @@
           status: obj.status === 'continue' ? 'continue' : 'done',
         };
       }
-      // Azione SULLA PAGINA, le stesse del menu tasto destro su testo, immagine e link. Non sono azioni del main: vivono in actions.js e tts.js e le esegue la sidebar con runPageAction(),
-      // col popup di conferma di Filo quando l'azione esce verso l'esterno. Vedi PROMPTS.help().
+      // La esegue la sidebar con runPageAction(): vedi la sezione delle azioni sulla pagina, più sotto.
       if (obj.action === 'page' && obj.page && typeof obj.page === 'object'
         && typeof obj.page.op === 'string' && PAGE_ACTIONS[obj.page.op]) {
         return {
@@ -523,8 +518,8 @@
     }
   }
 
-  // Le azioni tipizzate non si eseguono localmente: passano da executeFiloAction nel main, che consulta il registro dei livelli di sicurezza (src/shared/actionLevels.js) e, per i livelli ≥ 2, rimanda una spiegazione da mostrare nel popup di conferma (SN_CONFIRM_UI).
-  // È lo stesso popup della chat della dashboard: la sidebar non è un canale privilegiato — stesso registro, stesse conferme, stesse regole.
+  // Le azioni tipizzate non si eseguono localmente: passano da executeFiloAction nel main, che consulta il registro dei livelli (src/shared/actionLevels.js) e per i livelli ≥ 2 rimanda la spiegazione per il popup di conferma (SN_CONFIRM_UI), lo stesso della chat della dashboard.
+  // La sidebar non è un canale privilegiato: stesso registro, stesse conferme, stesse regole.
 
   // Etichetta breve per la riga di log in chat (cosa Filo ha fatto/sta facendo).
   function filoActionLabel(action) {
@@ -566,9 +561,8 @@
     return done;
   }
 
-  // Azioni sulla pagina: a differenza di quelle tipizzate non passano dal main, vivono nel content script (SN_ACTIONS, SN_TTS) e operano sull'elemento o sulla selezione corrente.
-  // Quelle che escono verso l'esterno (cerca sul web, condividi) chiedono conferma con lo stesso popup di Filo; copia, leggi e salva-per-dopo sono locali e immediate.
-  // SN_ACTIONS e SN_TTS sono caricati DOPO sidebar.js, quindi si risolvono al volo dentro la funzione e non in cima all'IIFE.
+  // Azioni sulla pagina: non passano dal main, vivono nel content script (SN_ACTIONS, SN_TTS) e operano sull'elemento o sulla selezione. Quelle che escono verso l'esterno (cerca sul web, condividi) chiedono conferma con lo stesso popup di Filo; copia, leggi e salva-per-dopo sono immediate.
+  // SN_ACTIONS e SN_TTS si caricano DOPO sidebar.js: si risolvono dentro la funzione, non in cima all'IIFE.
   const PAGE_ACTIONS = {
     copy:         { target: 'text',  confirm: false, label: 'copia testo' },
     cut:          { target: 'text',  confirm: false, label: 'taglia testo' },
@@ -609,7 +603,6 @@
         || imgs.find((im) => (im.currentSrc || im.src || '').includes(wanted));
       if (hit) return hit;
     }
-    // Fallback: l'immagine visibile più grande (di norma l'immagine "principale").
     let best = null; let bestArea = 0;
     for (const im of imgs) {
       const r = im.getBoundingClientRect();
@@ -713,8 +706,6 @@
     return true;
   }
 
-  // ---------- Submit / loop ----------
-
   function buildPayload(userMessage, userAction) {
     const screenshot = null; // riempito dopo
     const outline = (() => { try { return Extract?.extractInteractiveOutline?.() || ''; } catch (_) { return ''; } })();
@@ -741,7 +732,7 @@
     return null;
   }
 
-  // Aspetta che la pagina si stabilizzi dopo un'azione: le SPA cambiano contenuto e URL in modo asincrono. Esce quando l'URL è cambiato E il DOM è quieto da `quietMs`, oppure dopo `maxMs`.
+  // Le SPA cambiano contenuto e URL in modo asincrono: si esce quando l'URL è cambiato E il DOM è quieto da `quietMs`, oppure dopo `maxMs`.
   function waitForPageSettle({ initialUrl, minMs = 250, quietMs = 350, maxMs = 2500 } = {}) {
     return new Promise((resolve) => {
       const start = Date.now();
@@ -847,7 +838,7 @@
         return;
       }
 
-      // I comandi rapidi della barra di Filo li eseguiamo in autonomia, come reveal e hover: quei bottoni vivono nella shell, non nella pagina, e l'utente non potrebbe cliccarli nel flusso normale.
+      // I bottoni della barra vivono nella shell, non nella pagina: l'utente non potrebbe cliccarli, quindi li eseguiamo noi.
       if (parsed.kind === 'shell') {
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         const human = {
@@ -867,7 +858,7 @@
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
         }
-        // Le azioni shell non cambiano il DOM che l'agente vede, o sostituiscono la pagina del tutto: si prosegue solo su status:"continue" e solo se la pagina non è cambiata, così l'AI può concatenare passi.
+        // Le azioni shell non cambiano il DOM che l'agente vede, o sostituiscono la pagina: si prosegue solo su status:"continue" e solo se la pagina non è cambiata.
         if (parsed.status === 'continue' && okShell && parsed.command !== 'home') {
           const note = `ho eseguito il comando Filo "${parsed.command}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
           setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
@@ -877,7 +868,6 @@
         return;
       }
 
-      // Azione tipizzata di Filo: si passa dal registro dei livelli di sicurezza del main e, quando serve, dal popup di conferma — nessun canale privilegiato per la sidebar.
       if (parsed.kind === 'filo_action') {
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (parsed.display) {
@@ -889,7 +879,6 @@
         return;
       }
 
-      // Azione SULLA PAGINA: le stesse del menu tasto destro, eseguite dal content script.
       if (parsed.kind === 'page_action') {
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (parsed.display) {
@@ -922,7 +911,7 @@
         renderChoices(assistantEl, parsed.choices);
       }
 
-      // Il tooltip on-page usa SOLO highlight.note, non il testo della chat, per non duplicare il messaggio nel riquadrino. Per i fill il riquadro c'è comunque: contiene valore e bottone Accetta.
+      // Il tooltip usa SOLO highlight.note, non il testo della chat, per non duplicare il messaggio; per i fill il riquadro resta comunque (valore + Accetta).
       Highlight.clear();
       if (parsed.highlight) {
         const act = parsed.highlight.action;
@@ -931,7 +920,6 @@
           const result = Highlight.autoAction(parsed.highlight.selector, act);
           const targetLabel = result.target ? describeElementBriefly(result.target) : '';
           if (result.ok) {
-            // Traccia lo step per la telemetria a fine sessione.
             if (session) session.executedSteps.push({
               selector: parsed.highlight.selector,
               action: act,
@@ -995,8 +983,7 @@
           && session && !session.feedbackShown
           && session.executedSteps.length > 0) {
         session.feedbackShown = true;
-        // …e solo se da qui partirebbe davvero qualcosa: da un server di prova, dall'intranet, da un disco di rete e dalle pagine interne non si raccoglie niente (#584).
-        // Chiedere lì promette una condivisione che non avviene e ringrazia per una risposta che non serve; a rispondere è il processo principale, con la stessa porta della raccolta.
+        // …e solo se da qui partirebbe davvero qualcosa: decide `percorsoRaccoglibile` (#584).
         if (await percorsoRaccoglibile()) {
           // Chat sempre aperta quando chiediamo feedback (l'utente deve vederlo).
           expand({ ai: true });
