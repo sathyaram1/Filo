@@ -86,6 +86,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
+import { readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { isProtectedBranch } from './lib/branch-integrity.mjs';
