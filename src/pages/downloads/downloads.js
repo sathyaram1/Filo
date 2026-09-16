@@ -1,10 +1,6 @@
-// Pagina elenco scaricamenti (#410.3). Legge la cronologia persistita dal
-// gestore download del main (#410.1) e la mostra dal più recente. Ogni voce ha
-// azioni puntuali (clic sinistro = azione primaria, tasto destro = menu con
-// tutte le azioni). Gli scaricamenti in corso mostrano barra + percentuale live,
-// aggiornate da un segnale broadcast del main (contentless: la pagina ri-legge
-// la lista dal canale interno, così nessun percorso su disco viaggia verso le
-// schede di siti esterni).
+// Elenco scaricamenti (#410.3): cronologia persistita dal main, dal più recente. Clic
+// sinistro = azione primaria, tasto destro = menu completo. Gli aggiornamenti live arrivano
+// come segnale contentless: nessun percorso su disco viaggia verso le schede dei siti.
 
 (function () {
   'use strict';
@@ -52,7 +48,6 @@
     } catch (_) { return ''; }
   }
 
-  // ─── feedback effimero (ogni azione riceve conferma, filo_design) ──────────
   let flashTimer = null;
   function flash(text) {
     let el = $('dl-flash');
@@ -71,17 +66,15 @@
     flashTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
   }
 
-  // ─── azioni (una sola implementazione, condivisa da bottoni e menu) ────────
+  // Una sola implementazione delle azioni, condivisa da bottoni e menu.
   async function reload() {
     const r = await chrome.runtime.sendMessage({ type: MSG.DOWNLOADS_LIST });
     items = (r && r.items) || [];
     render();
   }
 
-  // Il file di uno scaricamento concluso può sparire dopo (spostato, rinominato,
-  // cestinato): il main se ne accorge guardando il disco e risponde
-  // { ok:false, missing:true, error } con la frase da mostrare. La riga viene
-  // ridisegnata subito come "non più disponibile", così l'utente non riprova.
+  // Il file di uno scaricamento concluso può sparire (spostato, cestinato): il main guarda il
+  // disco e risponde missing, e la riga diventa subito «non più disponibile» — non si riprova.
   async function openFile(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id });
     if (!res || res.ok !== false) return;
@@ -138,7 +131,6 @@
     reload();
   }
 
-  // ─── menu contestuale (tasto destro) — set completo di azioni ──────────────
   let openMenu = null;
   function closeCtxMenu() {
     if (!openMenu) return;
@@ -153,27 +145,23 @@
   function onMenuKeydown(e) { if (e.key === 'Escape') closeCtxMenu(); }
 
   function menuActionsFor(r) {
-    // Ogni voce dichiara label + handler; la lista dipende dallo stato così ogni
-    // azione compare solo quando ha senso (niente "Apri file" su un download mai
-    // completato). Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
+    // La lista dipende dallo stato, così ogni azione compare solo quando ha senso (niente «Apri
+    // file» su un download mai completato). Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
     const acts = [];
     if (isActive(r)) {
-      // canPause === false: scaricamento "a mano" (Salva immagine/video come…),
-      // che non si può sospendere. Meglio non offrire l'azione che offrirne una
-      // muta.
+      // canPause === false: scaricamento «a mano» (Salva immagine come…), che non si può
+      // sospendere. Meglio non offrire l'azione che offrirne una muta.
       if (r.canPause !== false) {
         if (r.state === 'paused') acts.push(['Riprendi', () => resume(r)]);
         else acts.push(['Pausa', () => pause(r)]);
       }
       acts.push(['Annulla', () => cancel(r)]);
     } else if (r.state === 'completed') {
-      // Se il file non è più sul disco "Apri file" non ha niente da aprire:
-      // resta la cartella (e più sotto "Ri-scarica", che è la via per riaverlo).
+      // Senza il file «Apri file» non ha niente da aprire: restano la cartella e «Ri-scarica».
       if (!r.missing) acts.push(['Apri file', () => openFile(r)]);
       acts.push(['Apri cartella', () => openFolder(r)]);
     } else {
-      // interrupted / cancelled: il file completo non c'è, ma la cartella e la
-      // sorgente restano utili.
+      // interrupted/cancelled: il file completo non c'è, ma cartella e sorgente restano utili.
       acts.push(['Apri cartella', () => openFolder(r)]);
     }
     if (r.savePath) acts.push(['Copia percorso', () => copyPath(r)]);
@@ -213,13 +201,11 @@
     }, 0);
   }
 
-  // ─── rendering ─────────────────────────────────────────────────────────────
   function renderItem(r) {
     const row = document.createElement('div');
     row.className = 'dl-item';
     row.dataset.state = r.state;
-    // Il file scaricato non è più al suo posto: la voce si attenua e perde
-    // "Apri file" — l'utente lo vede prima ancora di cliccare.
+    // File non più al suo posto: la voce si attenua e perde «Apri file», prima ancora del clic.
     if (r.missing) row.dataset.missing = '1';
     row.dataset.id = r.id;
     row.tabIndex = 0;
@@ -268,8 +254,7 @@
       row.appendChild(path);
     }
 
-    // Bottoni rapidi inline (parità col menu contestuale, discoverabili senza
-    // tasto destro). Il menu resta l'elenco completo.
+    // Bottoni inline per scoprire le azioni senza tasto destro; il menu resta l'elenco completo.
     const actions = document.createElement('div');
     actions.className = 'dl-actions';
     const addBtn = (label, fn) => {
@@ -290,8 +275,7 @@
       addBtn('Apri file', () => openFile(r));
       addBtn('Apri cartella', () => openFolder(r));
     } else if (r.missing) {
-      // Senza il file, la cosa utile è riaverlo: la cartella resta a portata
-      // dal menu del tasto destro.
+      // Senza il file la cosa utile è riaverlo; la cartella resta a portata dal tasto destro.
       if (isHttp(r.url)) addBtn('Ri-scarica', () => redownload(r));
     } else if (isHttp(r.url)) {
       addBtn('Ri-scarica', () => redownload(r));
@@ -299,8 +283,8 @@
     addBtn('Rimuovi', () => removeItem(r));
     row.appendChild(actions);
 
-    // Clic sinistro sulla riga = azione primaria: apri il file se completato (e
-    // se il file c'è ancora: su una voce svuotata il clic non prometterebbe nulla).
+    // Clic sinistro = azione primaria: apri il file se completato e se il file c'è ancora (su
+    // una voce svuotata il clic non prometterebbe nulla).
     if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
@@ -336,7 +320,6 @@
       });
     }
 
-    // Conteggio (scaricamenti attivi evidenziati).
     const active = items.filter(isActive).length;
     $('count').textContent = items.length
       ? (active ? `${items.length} in elenco · ${active} in corso` : `${items.length} in elenco`)
@@ -355,7 +338,6 @@
     for (const r of filtered) list.appendChild(renderItem(r));
   }
 
-  // ─── live: il main segnala "qualcosa è cambiato" (senza dati) → ri-leggiamo ─
   let liveTimer = null;
   function scheduleReload() {
     clearTimeout(liveTimer);
@@ -385,17 +367,14 @@
       render();
     });
 
-    // Tornando su questa scheda dopo essere andati a spostare/cancellare i file
-    // nel gestore di sistema, la lista va riletta: nessun evento annuncia una
-    // cartella svuotata da fuori, e senza rilettura le voci resterebbero
-    // "aperibili" pur non avendo più un file dietro.
+    // Tornando su questa scheda dopo aver spostato o cancellato i file da fuori, la lista va
+    // riletta: nessun evento annuncia una cartella svuotata, e le voci resterebbero «aperibili».
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) scheduleReload();
     });
     window.addEventListener('focus', scheduleReload);
 
-    // Aggiornamenti live: il main pusha un segnale contentless quando parte/
-    // avanza/finisce uno scaricamento. Ri-leggiamo la lista dal canale interno.
+    // Il main pusha un segnale contentless a ogni cambiamento: si rilegge la lista dal canale interno.
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();
