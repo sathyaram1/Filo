@@ -34,6 +34,7 @@
 
 import { createReadStream, existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
