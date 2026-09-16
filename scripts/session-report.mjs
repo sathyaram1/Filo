@@ -612,8 +612,9 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     const sottoAgente = eSottoAgente(trovato.file);
     if (sottoAgente) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
     // Una sessione ha i suoi sotto-agenti in <sessione>/subagents/; un
-    // sotto-agente li ha ACCANTO a se', e li si riconosce dal tempo.
-    const figli = sottoAgente ? figliDelSottoAgente(trovato.file, finestre) : transcriptSottoAgenti(trovato.file);
+    // sotto-agente li ha ACCANTO a se', e li si riconosce dal meta (o, in
+    // mancanza, dal tempo, e allora il rapporto lo dice).
+    const figli = sottoAgente ? figliDelSottoAgente(trovato.file, finestre, rep.notes) : transcriptSottoAgenti(trovato.file);
     for (const f of figli) {
       try {
         sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket, since }));
