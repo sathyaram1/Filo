@@ -128,8 +128,9 @@ quando il lavoro sta per passare), è:
 Prima di tutto questo confronta gli spec toccati e gli unit test: i controlli
 automatici sono l'ultimo passo, non il primo.
 
-- Rossi **fuori dalla lista dei rossi noti** → rilievo di livello **2**, con
-  l'elenco esatto degli spec rotti nella critica.
+- Rossi di `finish:check` o delle prove del giro **fuori dalla lista dei rossi
+  noti** → rilievo di livello **2**, con l'elenco esatto degli spec rotti nella
+  critica.
 - I rossi d'ambiente sono **scritti**, non a memoria: stanno in
   `tests/rossi-noti.json`, con il caso preciso, il motivo e il feedback che li
   toglierà. `contenitore.specs` sono quelli dei contenitori senza schermo delle
