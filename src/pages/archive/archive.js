@@ -24,8 +24,7 @@
     render();
   }
 
-  // Hue del colore identità per l'ordine cromatico. Le tab senza colore vanno in fondo
-  // (hue = Infinity), così i siti colorati guidano l'occhio.
+  // Le tab senza colore vanno in fondo (hue = Infinity): i siti colorati guidano l'occhio.
   function hueOf(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return Infinity;
@@ -42,9 +41,8 @@
     return (h / 6) * 360;
   }
 
-  // Tinta identità ATTENUATA per lo sfondo della chip, stessa logica delle tab in alto (§1.2):
-  // saturazione al ~18% e luminosità lasciata al CSS, così una scheda molto satura non diventa
-  // un blocco acceso. null per grigi o valori non parsabili → la chip usa il neutro.
+  // Tinta identità ATTENUATA come le tab in alto (§1.2): saturazione al ~18% e luminosità al
+  // CSS, così una scheda molto satura non diventa un blocco acceso. null → la chip usa il neutro.
   function tintOf(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return null;
@@ -143,7 +141,6 @@
     if (!semanticResults.length) { showEmpty(); return; }
     $('empty').hidden = true;
     const wrap = document.createElement('div');
-    // Risultati per pertinenza: chip compatte che vanno a capo, non la riga scorrevole dei giorni.
     wrap.className = 'arc-results';
     for (const t of semanticResults) wrap.appendChild(renderTab(t, { showScore: true }));
     list.appendChild(wrap);
@@ -167,7 +164,6 @@
     }
     $('empty').hidden = true;
 
-    // Giorni in ordine cronologico decrescente, i più recenti in alto.
     const groups = new Map();
     for (const t of filtered) {
       const k = dayKey(t.closedAt);
@@ -178,7 +174,6 @@
 
     for (const k of orderedDays) {
       const items = groups.get(k);
-      // Ordine cromatico dentro il giorno (arcobaleno); i senza colore in fondo.
       items.sort((a, b) => hueOf(a.identityColor) - hueOf(b.identityColor));
 
       const day = document.createElement('div');
@@ -218,9 +213,8 @@
     render();
   }
 
-  // Menu contestuale con «Riapri» ed «Elimina» invece di bottoni sempre visibili, coerente con
-  // le chip compatte. Riusa .sn-select-pop/.sn-select-option, come gli altri menu di Filo
-  // (patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md).
+  // Menu contestuale invece di bottoni sempre visibili, coerente con le chip compatte. Riusa le
+  // classi dei menu di Filo (patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md).
   let openMenu = null;
   function closeCtxMenu() {
     if (!openMenu) return;
@@ -287,7 +281,7 @@
     }
 
     const titleText = t.title || t.url || '';
-    // Tooltip: URL, orario e snippet non stanno nella chip compatta ma restano consultabili.
+    // URL, orario e snippet non stanno nella chip compatta ma restano nel tooltip.
     const tipParts = [titleText, t.url, timeLabel(t.closedAt)];
     if (t.snippet) tipParts.push(t.snippet);
     row.title = tipParts.filter(Boolean).join('\n');
@@ -309,8 +303,7 @@
       row.appendChild(sc);
     }
 
-    // Click sinistro = «Riapri»: la chip ha role=button e ne ha l'aspetto, deve rispondere al
-    // click come le card di «Aperti per dopo».
+    // Click sinistro = «Riapri»: la chip ha role=button e deve rispondere come le card sorelle.
     row.addEventListener('click', () => { reopenTab(t); });
     // Tasto destro = menu contestuale, centrale in Filo.
     row.addEventListener('contextmenu', (e) => {
@@ -333,10 +326,9 @@
     return row;
   }
 
-  // La rotellina verticale scrolla in orizzontale la riga di un giorno (come la barra delle tab
-  // in alto): senza, con molte schede le eccedenti restavano irraggiungibili col solo mouse.
-  // Delegato su #list, scrolla solo con overflow vero; i risultati della ricerca vanno a capo
-  // e non hanno .arc-tabs, quindi non vengono intercettati.
+  // La rotellina verticale scrolla in orizzontale la riga di un giorno (come la barra delle
+  // tab): senza, con molte schede le eccedenti restavano irraggiungibili col solo mouse.
+  // Delegato su #list, scrolla solo con overflow vero; i risultati vanno a capo, fuori di qui.
   function onListWheel(e) {
     const row = e.target.closest && e.target.closest('.arc-tabs');
     if (!row) return;
@@ -350,13 +342,11 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
     $('list').addEventListener('wheel', onListWheel, { passive: false });
-    // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
     $('search').addEventListener('input', () => {
       semanticResults = null;
       $('searchNote').hidden = true;
       render();
     });
-    // Invio o bottone = ricerca semantica nei contenuti.
     $('search').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); runSemanticSearch(); }
     });
