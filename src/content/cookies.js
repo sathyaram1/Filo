@@ -1,24 +1,6 @@
-// Gestione cookie / consenso — lato pagina (content script).
-//
-// Vive sulle pagine web esterne (page-preload.js, mondo isolato). Si occupa
-// delle due cose che si possono fare solo dal DOM della pagina:
-//
-//   1) Rifiuto automatico dei banner CMP ("Consent Management Platform"):
-//      OneTrust, Cookiebot, Didomi, Quantcast/TCF, Sourcepoint, Usercentrics,
-//      CookieYes, Iubenda, TrustArc, Osano, Complianz, Termly, ... Cerchiamo il
-//      pulsante "rifiuta tutto" e lo premiamo. Se il CMP nasconde il rifiuto
-//      dietro "Impostazioni", apriamo il pannello e poi rifiutiamo lì dentro.
-//
-//   2) Riscrittura degli embed YouTube in youtube-nocookie.com (privacy-enhanced
-//      mode): nessun cookie finché l'utente non preme play.
-//
-// Tutto è guidato dalla modalità (settings.security.cookies.mode):
-//   - 'manual'  → inattivo (banner mostrati normalmente).
-//   - 'default' → attivo.
-//   - 'privacy' → attivo (uguale a default qui; l'isolamento del jar è lato main).
-//
-// GPC (navigator.globalPrivacyControl + header Sec-GPC) NON sta qui: la
-// proprietà è iniettata da tabs.js nel main world, l'header da services/cookies.js.
+// Cookie e consenso lato pagina: rifiuto automatico dei banner CMP (OneTrust, Cookiebot, Didomi, TCF, Usercentrics…) e riscrittura degli embed YouTube in youtube-nocookie.
+// Inattivo con settings.security.cookies.mode = 'manual'; 'privacy' qui è uguale a 'default' (l'isolamento del jar sta nel main).
+// Il GPC non è qui: la proprietà la inietta tabs.js nel main world, l'header services/cookies.js.
 
 (function (global) {
   'use strict';
@@ -36,8 +18,6 @@
   let active = false;     // CMP-reject + nocookie attivi?
   let observer = null;
   const openedSettings = new Set(); // CMP per cui abbiamo già aperto "Impostazioni"
-
-  // ─── util ──────────────────────────────────────────────────────────────────
 
   function isVisible(el) {
     if (!el) return false;
@@ -63,9 +43,7 @@
     return false;
   }
 
-  // querySelector che entra anche negli shadow root aperti dei root indicati.
-  // Alcuni CMP (Usercentrics) montano l'UI dentro uno shadow DOM, irraggiungibile
-  // con un querySelector classico.
+  // querySelector che entra anche negli shadow root aperti: alcuni CMP (Usercentrics) montano l'UI lì dentro, irraggiungibile altrimenti.
   function queryIn(root, selectors) {
     for (const sel of selectors) {
       let el = null;
@@ -84,12 +62,8 @@
     return roots;
   }
 
-  // ─── ruleset CMP ─────────────────────────────────────────────────────────
-  //
-  // Per ogni CMP: `reject` = selettori del pulsante "rifiuta tutto" diretto.
-  // `openSettings` = selettore per aprire il pannello impostazioni quando il
-  // rifiuto non è in prima battuta. `rejectInSettings` = rifiuto dentro al
-  // pannello. `shadowHosts` = id di host shadow-DOM in cui cercare.
+  // Per ogni CMP: `reject` = pulsante "rifiuta tutto" diretto; `openSettings` + `rejectInSettings` = quando il rifiuto sta dietro un pannello;
+  // `shadowHosts` = id degli host shadow-DOM in cui cercare.
 
   const CMPS = [
     {
@@ -192,8 +166,6 @@
     return false;
   }
 
-  // Fallback testuale: cerca un button/link con testo di rifiuto dentro un
-  // contenitore di consenso. Conservativo per costruzione.
   function textRejectFallback(roots) {
     for (const root of roots) {
       let nodes = [];
@@ -210,7 +182,6 @@
     return null;
   }
 
-  // Un giro di rifiuto su tutti i root (document + shadow root noti).
   function tryReject() {
     const extraRoots = [];
     for (const cmp of CMPS) {
@@ -220,12 +191,10 @@
 
     for (const cmp of CMPS) {
       const searchRoots = cmp.shadowHosts ? [document, ...shadowRootsOf(cmp.shadowHosts)] : [document];
-      // 1) rifiuto diretto
       for (const root of searchRoots) {
         const btn = queryIn(root, cmp.reject);
         if (btn && clickEl(btn)) return true;
       }
-      // 2) apri impostazioni → rifiuta dentro
       if (cmp.openSettings && cmp.rejectInSettings) {
         if (!openedSettings.has(cmp.name)) {
           for (const root of searchRoots) {
@@ -242,13 +211,10 @@
         }
       }
     }
-    // 3) fallback testuale
     const fb = textRejectFallback(roots);
     if (fb && clickEl(fb)) return true;
     return false;
   }
-
-  // ─── riscrittura embed YouTube → nocookie ──────────────────────────────────
 
   function nocookieUrl(src) {
     try {
@@ -272,8 +238,6 @@
       }
     }
   }
-
-  // ─── scan + observer ────────────────────────────────────────────────────────
 
   let scanScheduled = false;
   function scheduleScan() {
@@ -323,9 +287,6 @@
     setActive(mode !== 'manual');
   }
 
-  // ─── bootstrap ───────────────────────────────────────────────────────────
-
-  // Aggiorna a caldo quando l'utente cambia modalità nelle impostazioni.
   try {
     chrome.runtime.onMessage.addListener((m) => {
       if (m && m.type === T_UPDATE) applyMode(m.mode);
