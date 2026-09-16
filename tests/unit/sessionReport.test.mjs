@@ -306,3 +306,44 @@ test('una riga col modello «<synthetic>» (zero token) non è un turno e non la
   assert.deepEqual(rep.models, ['claude-opus-5']);
   assert.deepEqual(rep.notes, []);
 });
+
+// ─── Giro 4 della verifica (16/09/2026): la cache a un'ora costa il doppio ──
+test('una scrittura in cache a un\'ora è prezzata a 2× l\'input, quella a cinque minuti a 1,25×; senza dettaglio vale cinque minuti', async () => {
+  const soloUnOra = [assistant('u1', 'claude-opus-5', {
+    input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 100000,
+    cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 100000 },
+  }, [], T('00:00'))];
+  const a = await analizzaRighe(soloUnOra);
+  assert.equal(a.costUsd, 1.0, '100.000 token a un\'ora, Opus: 10 $/M → 1,00 $ (non 0,625)');
+  assert.equal(a.tokens.cacheWrite, 100000);
+  assert.equal(a.tokens.cacheWrite1h, 100000);
+
+  const miste = [assistant('u2', 'claude-fable-5-1', {
+    input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 200000,
+    cache_creation: { ephemeral_5m_input_tokens: 100000, ephemeral_1h_input_tokens: 100000 },
+  }, [], T('00:00'))];
+  const b = await analizzaRighe(miste);
+  // Fable 5.1: 100.000 × 12,5 + 100.000 × 20 = 3,25 $
+  assert.equal(b.costUsd, 3.25);
+  assert.equal(b.tokens.cacheWrite1h, 100000);
+
+  const senzaDettaglio = [assistant('u3', 'claude-opus-5', {
+    input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 100000,
+  }, [], T('00:00'))];
+  const c = await analizzaRighe(senzaDettaglio);
+  assert.equal(c.costUsd, 0.625, 'un transcript senza il dettaglio per durata: tutto a cinque minuti, come prima');
+  assert.equal(c.tokens.cacheWrite1h, 0);
+
+  // Il dettaglio che non torna col totale: la differenza si conta a cinque minuti.
+  const storto = [assistant('u4', 'claude-opus-5', {
+    input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 100000,
+    cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 40000 },
+  }, [], T('00:00'))];
+  const d = await analizzaRighe(storto);
+  assert.equal(d.costUsd, Math.round((40000 * 10 + 60000 * 6.25) / 1e6 * 10000) / 10000);
+  assert.equal(d.tokens.cacheWrite, 100000);
+  for (const k of ['opus', 'sonnet', 'sonnet-4', 'haiku', 'fable', 'fable-5']) {
+    assert.equal(PREZZI[k].cacheWrite1h, PREZZI[k].input * 2, `${k}: la scrittura a un'ora è 2× l'input`);
+  }
+  assert.match(riassunto(a)[2], /di cui a un'ora 100000/);
+});

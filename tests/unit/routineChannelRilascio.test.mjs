@@ -470,3 +470,21 @@ describe('commitRestante: con un rebase o una fusione a metà non committa', () 
     assert.deepEqual(dopo.committed, ['nato-da-shell.txt']);
   });
 });
+
+// ─── Giro 4 della verifica (16/09/2026): il no del server remoto ────────────
+test('«[remote rejected]» (pre-receive, regola del repo, push protection): non è storia divergente, niente lease, il motivo del remoto nella causa', () => {
+  const { origin, work } = scena();
+  g(work, ['checkout', '-q', '-b', 'worker/10']);
+  commitFile(work, 'a.js');
+  assert.equal(pushRamoCorrente(work).ok, true);
+  writeFileSync(resolve(origin, 'hooks', 'pre-receive'), '#!/bin/sh\nprintf "GH013: push declined due to repository rule violations\n" >&2\nexit 1\n', 'utf8');
+  chmodSync(resolve(origin, 'hooks', 'pre-receive'), 0o755);
+  commitFile(work, 'b.js');
+  const r = pushRamoCorrente(work);
+  assert.equal(r.ok, false);
+  assert.equal(r.forced, undefined);
+  assert.match(r.reason, /server remoto ha rifiutato/i, 'la diagnosi giusta: è il server a dire di no');
+  assert.doesNotMatch(r.reason, /force-with-lease|qualcun altro ha spinto/i, 'non è storia divergente: un rebase non lo cura');
+  assert.match(r.reason, /GH013/, 'col motivo del remoto');
+  assert.notEqual(remoteSha(origin, 'worker/10'), g(work, ['rev-parse', 'HEAD']));
+});
