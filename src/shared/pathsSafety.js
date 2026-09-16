@@ -1,13 +1,10 @@
-// I percorsi condivisi (`paths`) sono l'unico contenuto di Filo scritto da un utente e
-// LETTO nel prompt di un altro: chi li avvelena non colpisce sé stesso ma chi visiterà quel
-// dominio. In SCRITTURA `sanitizeSubmission()` è la pulizia deterministica che decide cosa
-// entra (forma del dominio, una riga di intento, selettori redatti e tagliati, azioni note,
-// tetto ai passi): la applica il client prima di inviare e la RIAPPLICA il server prima di
-// scrivere, e sta in src/shared/ perché è da qui che il backend di sicurezza incorpora i
-// moduli condivisi al deploy — una copia a mano divergerebbe in silenzio.
+// I percorsi condivisi (`paths`) sono l'unico contenuto di Filo scritto da un utente e LETTO
+// nel prompt di un altro: chi li avvelena colpisce chi visiterà quel dominio. In SCRITTURA
+// `sanitizeSubmission()` decide cosa entra (dominio, una riga di intento, selettori redatti,
+// azioni note, tetto ai passi): la applica il client e la RIAPPLICA il server, e sta in
+// src/shared/ perché è da qui che il backend incorpora i moduli al deploy.
 // In LETTURA `formatKnownPathsForPrompt()` impacchetta i percorsi fra due marcature e li
-// ripulisce di nuovo: nella raccolta restano documenti scritti quando chiunque poteva
-// scriverli, e un percorso inviato in buona fede può contenere il testo di una pagina ostile.
+// ripulisce di nuovo: nella raccolta restano documenti scritti quando poteva farlo chiunque.
 
 (function (global) {
   'use strict';
@@ -55,16 +52,15 @@
   const DOMINIO_RE = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
 
   // I SITI CHE NON SONO DI NESSUNO (#584). Il nome del sito è l'unica delle quattro cose che
-  // un percorso pubblica a non poter essere ripulita — è anche l'indirizzo Firestore sotto cui
-  // il documento finisce — quindi o esce com'è o non esce. Per i siti pubblici esce, e lo
-  // guarda il modello che giudica; per gli indirizzi che non portano da nessuna parte fuori da
-  // casa di chi naviga (router, NAS, `localhost`, intranet, pagine interne di Filo) un percorso
-  // non serve a nessun altro, mentre il nome dice dove lavori o come si chiama la tua
-  // macchina: lì il prezzo della condivisione è tutto e il guadagno zero.
-  // La lista guarda l'ultimo pezzo del nome e tiene tre famiglie: i suffissi delle reti
-  // private, i nomi che per convenzione non esisteranno mai su Internet (`app.localhost` è
-  // come si chiamano da soli i contenitori, `progetto-rossi.test` ha il nome del cliente
-  // dentro, più `.invalid` e `.example`) e le reti anonime, dove il nome del sito È il segreto.
+  // un percorso pubblica a non poter essere ripulita — è anche l'indirizzo Firestore del
+  // documento — quindi o esce com'è o non esce. Per i siti pubblici esce e lo guarda il
+  // modello che giudica; per gli indirizzi che non portano fuori da casa di chi naviga
+  // (router, NAS, `localhost`, intranet, pagine interne di Filo) il percorso non serve a
+  // nessun altro mentre il nome dice dove lavori: lì il prezzo è tutto e il guadagno zero.
+  // La lista guarda l'ultimo pezzo del nome: suffissi delle reti private, nomi che per
+  // convenzione non esisteranno mai su Internet (`app.localhost` dei contenitori,
+  // `progetto-rossi.test` col nome del cliente, `.invalid`, `.example`) e reti anonime, dove
+  // il nome del sito È il segreto.
   const SUFFISSI_PRIVATI = new Set([
     // reti private e nomi di casa
     'local', 'internal', 'lan', 'home', 'corp', 'intranet', 'localdomain', 'arpa',
@@ -101,12 +97,11 @@
   }
 
   // I SEGNI CHE NON SI VEDONO: un'etichetta che a occhio dice «Profilo» può portarsi dietro
-  // una frase intera scritta con caratteri invisibili, arrivare davanti ai modelli che
-  // decidono se un percorso è anonimo e poi finire pubblicata. Si tolgono larghezza zero e
-  // marcatori di direzione, i caratteri «tag» U+E0000-U+E007F (una copia invisibile
-  // dell'alfabeto: è con quelli che oggi si nasconde davvero del testo) e i selettori di
-  // variante U+FE00-U+FE0F. La stessa famiglia la toglie SN_CONST.unaRigaDiDati, e una
-  // sentinella negli unit test diventa rossa se le due divergono.
+  // una frase scritta con caratteri invisibili, arrivare davanti ai modelli che giudicano e
+  // poi finire pubblicata. Si tolgono larghezza zero e marcatori di direzione, i caratteri
+  // «tag» U+E0000-U+E007F (copia invisibile dell'alfabeto: è con quelli che si nasconde
+  // davvero del testo) e i selettori di variante. La stessa famiglia la toglie
+  // SN_CONST.unaRigaDiDati, e una sentinella diventa rossa se le due divergono.
   const INVISIBILI_RE = /[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufe00-\ufe0f\ufeff]|[\u{E0000}-\u{E007F}]/gu;
 
   // Toglie ciò che, in un testo diretto al prompt, servirebbe solo a fingere di esserne la
@@ -123,12 +118,11 @@
   }
 
   // Cancella i dati personali da OGNI campo che esce dal computer di chi naviga: elementi
-  // toccati, sezione di partenza e frase dell'intento (che la scrive un modello, ma leggendo
-  // gli altri due). Prima valeva solo per gli elementi e solo per email e cifre attaccate:
-  // un IBAN, un codice fiscale o un telefono scritto con gli spazi usciva intero, e sono
-  // proprio le etichette delle pagine dove l'Aiuto serve di più (banca, operatore).
+  // toccati, sezione di partenza e frase dell'intento. Prima valeva solo per gli elementi e
+  // solo per email e cifre attaccate: un IBAN, un codice fiscale o un telefono con gli spazi
+  // usciva intero, e sono proprio le etichette delle pagine dove l'Aiuto serve di più.
   // L'ordine conta: prima le forme con lettere e cifre insieme, poi le cifre, o la regola
-  // delle cifre spezzerebbe l'IBAN a metà e quel che resta non lo riconosce più nessuno.
+  // delle cifre spezzerebbe l'IBAN a metà.
   function redigiDatiPersonali(testo) {
     if (typeof testo !== 'string' || !testo) return '';
     return testo
@@ -198,18 +192,16 @@
   // La sezione di partenza, a pezzi. Query e frammento si buttano, ma il percorso porta
   // spesso addosso chi sei anche senza codici: `/u/mario.rossi/ordini/847362` dice il nome, e
   // un nome utente è spesso lo stesso su più siti — due percorsi che lo contengono sono della
-  // stessa persona e per di più le danno un nome. La cancellazione per forme non lo vede:
-  // `mariorossi` è una parola come un'altra. Quindi il percorso si guarda PEZZO PER PEZZO:
-  // 1. il pezzo che segue una parola che ANNUNCIA una persona (`/u/`, `/user/`, `/profilo/`,
-  // `/clienti/`…) è un nome: segnaposto;
-  // 2. sui siti dove il nome utente è il PRIMO pezzo (github.com/mariorossi) il primo pezzo
-  // è un nome, a meno che non sia una sezione pubblica riconoscibile (`/explore`);
-  // 3. per tutto il resto si tolgono le FORME che identificano: email, IBAN, codici fiscali,
-  // numeri lunghi, esadecimali, UUID, token misti, cifre da cinque in su.
+  // stessa persona. La cancellazione per forme non lo vede, quindi si guarda PEZZO PER PEZZO:
+  // 1. il pezzo dopo una parola che ANNUNCIA una persona (`/u/`, `/profilo/`, `/clienti/`…)
+  // è un nome: segnaposto;
+  // 2. sui siti col nome utente in testa (github.com/mariorossi) il PRIMO pezzo è un nome,
+  // salvo che sia una sezione pubblica riconoscibile (`/explore`);
+  // 3. per il resto si tolgono le FORME che identificano: email, IBAN, codici, UUID, token
+  // misti, cifre da cinque in su.
   // La terza regola è per SOTTRAZIONE: tenendo solo i pezzi di sole lettere sparivano
-  // `carta-identita.html`, `v2`, `user_settings`, e su ventisette indirizzi veri quattro
-  // perdevano l'indirizzo per intero — un indirizzo ridotto a `/[ID]` non dice più da che
-  // punto del sito si parte, che è l'unica cosa per cui chi riusa un percorso lo legge.
+  // `carta-identita.html`, `v2`, `user_settings`, e un indirizzo ridotto a `/[ID]` non dice
+  // più da che punto del sito si parte, l'unica cosa per cui lo si legge.
   const MARCATORI_PERSONA = new Set([
     'u', 'user', 'users', 'utente', 'utenti', 'profile', 'profil', 'profilo',
     'profili', 'member', 'members', 'membro', 'membri', 'people', 'persone',
@@ -298,28 +290,23 @@
   }
 
   // IL NOME CHE STA UN PEZZO PIÙ IN LÀ: dopo il marcatore moltissimi siti mettono un numero e
-  // SUBITO DOPO il nome per esteso della stessa persona (`/users/12345/mario-rossi` è la forma
-  // dei forum e dei siti di domande e risposte), e fermarsi al primo pezzo era un pezzo troppo
-  // presto. Quindi dopo il marcatore si resta in una ZONA della persona, lunga al massimo due
-  // pezzi, dove anche un pezzo con la FORMA di un nome per esteso diventa segnaposto: due o
-  // più parole attaccate da `-`, `.` o `_`, oppure una maiuscola in mezzo (`MarioRossi`).
-  // La zona si chiude al primo pezzo senza quella forma, così `/user/mariorossi/comments/abc`
-  // tiene «comments». Una parola sola tutta minuscola non si distingue dal nome di una
-  // sezione e resta: lì la rete è il modello che giudica, come per tutti gli altri siti.
+  // SUBITO DOPO il nome per esteso della stessa persona (`/users/12345/mario-rossi`). Quindi
+  // si resta in una ZONA della persona, al massimo due pezzi, dove anche un pezzo con la FORMA
+  // di un nome per esteso diventa segnaposto: due o più parole attaccate da `-`, `.` o `_`,
+  // oppure una maiuscola in mezzo (`MarioRossi`). La zona si chiude al primo pezzo senza
+  // quella forma, così `/user/mariorossi/comments/abc` tiene «comments»; una parola sola tutta
+  // minuscola non si distingue da una sezione e resta.
   const NOME_PER_ESTESO_RE = /^(?:\d+[-_.])?[A-Za-z][A-Za-z]*(?:[-_.][A-Za-z][A-Za-z]*)+$|^[a-z]+[A-Z][a-z]+/;
 
   // LE PAROLE CHE FANNO UNA SEZIONE, NON UN COGNOME. La forma non distingue `mario-rossi` da
-  // `note-spese`, e le sezioni delle aree personali si chiamano proprio così perché stanno
-  // dietro allo stesso marcatore che annuncia la persona (`/clienti/12345/note-spese`): il
-  // punto di partenza usciva `/clienti/[ID]/[ID]`, che non dice più da dove si parte.
-  // Le due risposte provate prima erano sbagliate in direzioni opposte: bastava UNA parola da
-  // sezione a salvare tutto il pezzo, e usciva il cognome accanto (`rossi-fatture`); pretenderle
-  // TUTTE faceva sparire le sezioni vere, che quasi sempre ne hanno una fuori lista
-  // (`fatture-elettroniche`). La domanda giusta è sulla POSIZIONE (`redigiNellaZona`): si
-  // tengono le parole da sezione finché ce ne sono, e dalla prima che non lo è in poi resta un
-  // segnaposto — il nome sta sempre dalla parte del segnaposto. Articoli, preposizioni e
-  // possessivi stanno in lista perché `metodi-di-pagamento` e `my-orders` siano sezioni
-  // intere; `carta` e `piano`, cognomi italiani veri, restano fuori.
+  // `note-spese`, e le sezioni delle aree personali stanno dietro allo stesso marcatore
+  // (`/clienti/12345/note-spese`): il punto di partenza usciva `/clienti/[ID]/[ID]`, che non
+  // dice più da dove si parte. Le due risposte provate prima sbagliavano in direzioni opposte:
+  // UNA parola da sezione che salva il pezzo faceva uscire il cognome accanto
+  // (`rossi-fatture`), pretenderle TUTTE faceva sparire le sezioni vere
+  // (`fatture-elettroniche`). La domanda giusta è sulla POSIZIONE (`redigiNellaZona`).
+  // Articoli e preposizioni stanno in lista perché `metodi-di-pagamento` sia una sezione
+  // intera; `carta` e `piano`, cognomi veri, restano fuori.
   const PAROLE_DI_SEZIONE = new Set([
     // articoli, preposizioni, possessivi: da soli non dicono niente, e senza di loro
     // `metodi-di-pagamento` non sarebbe una sezione intera
@@ -486,12 +473,11 @@
   // LA pulizia: quella che il client applica prima di inviare e che il server RIAPPLICA prima
   // di scrivere. Ritorna { ok, doc } oppure { ok:false, reason }.
   // NEL DOCUMENTO NON C'È NIENTE DEL MITTENTE (#584): né il `clientId`, che serve al server
-  // come identità per i limiti di frequenza e viaggia ACCANTO al documento, né lo `userAgent`,
-  // che non leggeva nessuno e da solo (sistema, versione, lingua) bastava a rimettere insieme
-  // i percorsi della stessa installazione su domini diversi.
-  // `domain` resta come dato di comodo ma non decide più dove il documento finisce: il dominio
-  // è un SEGMENTO del percorso Firestore (`paths/<dominio>/entries`), ed è così che una lettura
-  // può chiedere un sito solo invece della raccolta intera.
+  // per i limiti di frequenza e viaggia ACCANTO al documento, né lo `userAgent`, che da solo
+  // (sistema, versione, lingua) bastava a rimettere insieme i percorsi della stessa
+  // installazione su domini diversi. `domain` resta come dato di comodo ma non decide più
+  // dove il documento finisce: il dominio è un SEGMENTO del percorso Firestore, ed è così
+  // che una lettura può chiedere un sito solo invece della raccolta intera.
   function sanitizeSubmission(raw) {
     if (!raw || typeof raw !== 'object') return { ok: false, reason: 'payload vuoto' };
 
