@@ -116,8 +116,8 @@ test.describe('hook di salvataggio — nel mezzo di un conflitto', () => {
     // Stessa scena con `git merge` (il ramo resta un ramo, non una HEAD
     // staccata): l'hook chiude la fusione con b.txt ancora pieno di segni e
     // la spedisce su origin. Rilievo del giro 3, livello 1: è la strada su cui
-    // i segni di conflitto arrivano al server e a chi verifica.
-    test.fail(true, 'rilievo del giro 3: la fusione viene chiusa e spedita con un file ancora in conflitto');
+    // i segni di conflitto arrivano al server e a chi verifica. Corretto nello
+    // stesso giro.
     const s = scenario('merge');
     mainDiverge(s);
     const m = gitTenta(s.lavoro, 'merge', 'main');
