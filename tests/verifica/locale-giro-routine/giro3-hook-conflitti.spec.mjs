@@ -91,8 +91,8 @@ test.describe('hook di salvataggio — nel mezzo di un conflitto', () => {
     // nessuno, e senza spedire niente) e il commit che il rebase stava
     // riportando — «mio» — sparisce: al suo posto «auto: a.txt, b.txt», con
     // dentro <<<<<<< e >>>>>>>. `git rebase --continue` poi dice
-    // «Successfully rebased». Rilievo del giro 3, livello 1.
-    test.fail(true, 'rilievo del giro 3: l\'hook committa i file ancora in conflitto e inghiotte il commit che il rebase stava riportando');
+    // «Successfully rebased». Rilievo del giro 3, livello 1, corretto nello
+    // stesso giro: con un rebase o una fusione a metà l'hook non committa.
     const s = scenario('rebase');
     mainDiverge(s);
     const reb = gitTenta(s.lavoro, 'rebase', 'main');
