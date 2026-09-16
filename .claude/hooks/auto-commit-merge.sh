@@ -201,10 +201,12 @@ spedisci_ramo() {
       # giro 2). Con --force-if-includes git rifiuta se quel commit non e' mai
       # passato dalla storia locale di questo ramo.
       esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
-      segnala_fallimento "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")"
+      segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")" \
+        "il suo ramo '$ramo' non e' su origin, storia divergente e rinvio rifiutato: $(motivo_git "$esito2")"
       return 1 ;;
   esac
-  segnala_fallimento "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin: $(motivo_git "$esito")"
+  segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin: $(motivo_git "$esito")" \
+    "il suo ramo '$ramo' non e' su origin: $(motivo_git "$esito")"
   return 1
 }
 
