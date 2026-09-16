@@ -1,5 +1,5 @@
-// Modello dati dei mazzi Commander (DECK-BUILDER-SPEC.md §13.1), SOLO logica pura: creazione, patch, invarianti. La persistenza vive in src/main/services/deckStore.js.
-// Invariante centrale: `versione` incrementa a OGNI modifica, ed è la chiave di invalidazione dei pareri LLM (§6.2), cacheati per (carta, versione mazzo) e marcati stantii quando la versione avanza.
+// Modello dati dei mazzi Commander (DECK-BUILDER-SPEC.md §13.1), solo logica pura; la persistenza vive in src/main/services/deckStore.js.
+// Invariante centrale: `versione` incrementa a OGNI modifica, ed è la chiave di invalidazione dei pareri LLM (§6.2), cacheati per (carta, versione mazzo).
 
 (function (global) {
   'use strict';
@@ -14,8 +14,8 @@
     return NOMI_SEGNAPOSTO.includes(String(nome || '').trim());
   }
 
-  // L'override di gruppo è PER-VISTA — una mappa { raggruppamento: gruppo } — così uno spostamento fatto «per tipo» vale solo lì e non inquina le altre viste (#316).
-  // Il vecchio formato a stringa unica si assegna alla vista corrente del mazzo: non sapendo in quale vista fu creato, la carta resta dove l'utente la vede aprendo il mazzo e smette di seguire ogni altra vista. Ritorna la mappa pulita, o null se non c'è nulla di valido.
+  // L'override di gruppo è PER-VISTA — mappa { raggruppamento: gruppo } — così uno spostamento fatto «per tipo» vale solo lì (#316).
+  // Il vecchio formato a stringa unica va alla vista corrente del mazzo: la carta resta dove l'utente la vede aprendo il mazzo e smette di seguire le altre viste.
   function normalizeOverride(raw, defaultView) {
     if (!raw) return null;
     if (typeof raw === 'string') {
@@ -49,8 +49,7 @@
 
   function nowIso() { return new Date().toISOString(); }
 
-  // Il commander è un PARAMETRO del mazzo (§8.4), non una carta dell'elenco: qui c'è il suo scryfall_id.
-  // `commanderMeta` è la cache di presentazione (nome, color identity, art crop) scritta quando il commander viene impostato o risolto: la libreria la usa senza rifare un lookup a ogni render.
+  // Il commander è un PARAMETRO del mazzo (§8.4), non una carta dell'elenco. `commanderMeta` è la cache di presentazione scritta quando viene impostato o risolto, così la libreria non rifà un lookup a ogni render.
   function newDeck({ nome } = {}) {
     const t = nowIso();
     const nomeScelto = String(nome || '').trim();
@@ -119,8 +118,7 @@
     return { deck: next, added: true };
   }
 
-  // Copia o sposta VERSO un altro mazzo: se manca si aggiunge, se c'è le quantità si SOMMANO e i tag si uniscono — mai un no-op silenzioso che farebbe sparire copie (chi «sposta» rimuove dall'origine solo dopo che questo merge è salvato).
-  // { deck, added:true } se la carta era nuova, { deck, merged:true } se le copie sono state sommate.
+  // Copia o sposta VERSO un altro mazzo: se manca si aggiunge, se c'è le quantità si SOMMANO e i tag si uniscono — mai un no-op silenzioso che farebbe sparire copie (chi «sposta» rimuove dall'origine solo dopo che il merge è salvato).
   function mergeCard(deck, scryfallId, { qty = 1, tags = [] } = {}) {
     const id = String(scryfallId || '').trim();
     if (!id) return { deck, added: false, merged: false };
@@ -186,8 +184,8 @@
     return touch(next);
   }
 
-  // L'app mostra tutti i prezzi in formato italiano, quindi il tetto con la virgola decimale è l'input più naturale: qui la virgola vale quanto il punto, e si tollerano il simbolo €, gli spazi e il separatore delle migliaia.
-  // Ritorna { ok:true, value } (null = nessun tetto) oppure { ok:false } se il testo non è un numero: in quel caso il chiamante non salva niente, perché il tetto non si stravolge né si cancella in silenzio.
+  // L'app mostra i prezzi in formato italiano, quindi il tetto con la virgola decimale è l'input naturale: virgola e punto valgono uguale, e si tollerano €, spazi e separatore delle migliaia.
+  // { ok:false } se il testo non è un numero: il chiamante non salva niente, perché il tetto non si stravolge né si cancella in silenzio.
   function parseBudgetInput(text) {
     if (text === null || text === undefined) return { ok: true, value: null };
     let s = String(text).replace(/€/g, '').replace(/\s+/g, '');
@@ -283,8 +281,7 @@
     return n >= 7 ? '7+' : String(n);
   }
 
-  // `tagOrder` è l'ordine dei gruppi-tag, per la regola «primo gruppo che matcha» (§8.1).
-  // L'override esplicito dell'utente vince, ma SOLO nella vista in cui è stato fatto: è una mappa per-vista (#316), non un valore unico che seguirebbe la carta ovunque.
+  // `tagOrder` è l'ordine dei gruppi-tag, per la regola «primo gruppo che matcha» (§8.1). L'override dell'utente vince, ma SOLO nella vista in cui è stato fatto: è una mappa per-vista (#316), non un valore che seguirebbe la carta ovunque.
   function groupOf(entry, card, raggruppamento, tagOrder = []) {
     const ov = entry && entry.gruppo_override;
     if (ov && typeof ov === 'object' && ov[raggruppamento]) return ov[raggruppamento];
@@ -307,8 +304,7 @@
     return seen;
   }
 
-  // Ogni carta appare UNA sola volta (il gruppo lo decide groupOf); dentro il gruppo si ordina per CMC crescente, poi per nome.
-  // I gruppi seguono l'ordine canonico della vista; quelli extra (override o tag ignoti) vanno in coda, in ordine alfabetico.
+  // Ogni carta appare UNA sola volta; dentro il gruppo si ordina per CMC crescente, poi per nome. I gruppi extra (override o tag ignoti) vanno in coda, in ordine alfabetico.
   function groupDeck(deck, cardsById) {
     const view = deck.raggruppamento || 'tipo';
     const tagOrder = view === 'tag' ? tagOrderOf(deck) : [];
@@ -382,8 +378,7 @@
     };
   }
 
-  // L'override è PER-VISTA (#316): agisce solo sulla vista `view`, senza toccare quelli fatti altrove. Gruppo vuoto o null lo rimuove da QUELLA vista e la carta torna al raggruppamento naturale lì.
-  // Con una `view` non valida si usa il raggruppamento corrente del mazzo. Rimettere lo stesso override è un no-op: mazzo invariato, stesso riferimento, versione ferma.
+  // L'override agisce solo sulla vista `view`, senza toccare quelli fatti altrove (#316); gruppo vuoto o null lo rimuove da QUELLA vista. Con una `view` non valida vale il raggruppamento corrente del mazzo, e rimettere lo stesso override è un no-op: stesso riferimento, versione ferma.
   function setGroupOverride(deck, scryfallId, gruppo, view) {
     const id = String(scryfallId || '');
     const v = RAGGRUPPAMENTI.includes(view) ? view : (deck.raggruppamento || 'tipo');
@@ -411,8 +406,8 @@
     return touch({ ...deck, raggruppamento: view });
   }
 
-  // Aggiunge UN tag a UNA carta (#344, trascinandola su una categoria della vista per tag). Tag già presente = no-op, versione ferma.
-  // L'eventuale override manuale della sola VISTA TAG viene rimosso: il trascinamento è un gesto di raggruppamento esplicito e deve vincere, altrimenti la carta resterebbe bloccata nel vecchio gruppo forzato invece di comparire sotto il nuovo tag. Gli override delle altre viste (#316) restano: sono indipendenti e coi tag non c'entrano.
+  // Aggiunge UN tag a UNA carta (#344, trascinandola su una categoria della vista per tag); tag già presente = no-op.
+  // L'override manuale della sola VISTA TAG viene rimosso: il trascinamento è un gesto di raggruppamento esplicito e deve vincere, altrimenti la carta resterebbe bloccata nel vecchio gruppo forzato. Gli override delle altre viste restano.
   function addTagToCard(deck, scryfallId, tag) {
     const id = String(scryfallId || '');
     const t = String(tag || '').trim();
@@ -432,8 +427,7 @@
     return changed ? touch({ ...deck, carte }) : deck;
   }
 
-  // Sostituisce TUTTI i tag di una carta; [] li toglie tutti. I tag si normalizzano e si rendono unici conservando l'ordine.
-  // Come addTagToCard rimuove l'override manuale della sola vista tag. Mazzo INVARIATO se l'insieme risultante è già quello attuale.
+  // Sostituisce TUTTI i tag ([] li toglie), normalizzati e resi unici conservando l'ordine. Come addTagToCard rimuove l'override della sola vista tag. Mazzo invariato se l'insieme è già quello attuale.
   function replaceCardTags(deck, scryfallId, tags) {
     const id = String(scryfallId || '');
     const uniq = [];
