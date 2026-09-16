@@ -39,7 +39,7 @@
 //
 // I file sono decine di MB: si leggono riga per riga, mai interi.
 
-import { createReadStream, existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, createReadStream, existsSync, openSync, readSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
