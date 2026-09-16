@@ -274,7 +274,7 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
  * tool_use di nome Agent o Task; `longestToolS` = distanza massima fra un
  * tool_use e il suo tool_result.
  */
-export async function analizzaRighe(righe, { role = '', ticket = '', since = '' } = {}) {
+export async function analizzaRighe(righe, { role = '', ticket = '', since = '', finestreAgent = null } = {}) {
   const rep = rapportoVuoto({ role, ticket });
   // L'usage di ogni messaggio, per id: un messaggio su più righe (pensa, poi
   // chiama uno strumento) porta sulla PRIMA riga un output parziale (2, 5, 7
