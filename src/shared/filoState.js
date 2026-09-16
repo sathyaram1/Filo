@@ -1,30 +1,19 @@
-// Assemblatore programmatico del "Filo State" (sezione 5 di filo-architettura.md).
-//
-// Non coinvolge LLM. Raccoglie:
-//   - TEMPO (data/ora, sessione, ultima interazione)
-//   - TAB APERTE (URL/titolo/focus, ultima attività via chrome.tabs)
-//   - PROCESSI ATTIVI (timer, notifiche pending)
-//   - NOTIFICHE NON GESTITE
-//   - AZIONI RECENTI (ultime 24h dal raw log)
-//   - DASHBOARD ATTUALE (cache dell'ultimo output del Generatore Dashboard)
-//
-// Esposto come funzione che ritorna sia l'oggetto strutturato sia un testo
-// pronto per essere inserito nei prompt LLM.
+// Assemblatore del «Filo State» (§5 di filo-architettura.md), senza LLM: tempo, schede
+// aperte, processi attivi, notifiche non gestite, azioni delle ultime 24h, dashboard.
+// Ritorna sia l'oggetto strutturato sia il testo pronto per i prompt.
 
 (function (global) {
   'use strict';
 
   const Mem = global.SN_FILO_MEMORY;
 
-  // chrome.tabs non è disponibile in tutti i contesti (es. in un content script
-  // top-frame con permessi limitati). Gestione difensiva: se non c'è, ritorna [].
+  // chrome.tabs non c'è in tutti i contesti (content script con permessi limitati): senza, [].
   async function listTabs() {
     try {
       if (!global.chrome?.tabs?.query) return [];
       const tabs = await chrome.tabs.query({});
-      // Ordina per ultima attività (più recente prima). chrome.tabs espone
-      // lastAccessed in versioni recenti di Chrome; quando non c'è ripieghiamo
-      // su `id` (proxy debole per recency: id più alti = aperti più di recente).
+      // `lastAccessed` manca nelle versioni vecchie di Chrome: si ripiega su `id`, proxy debole
+      // della recency (id più alti = aperti più di recente).
       const sorted = [...tabs].sort((a, b) => {
         const la = a.lastAccessed || 0;
         const lb = b.lastAccessed || 0;
@@ -62,11 +51,10 @@
     return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${days[dt.getDay()]} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   }
 
-  // Saldo crediti corrente: così Filo può rispondere in chat a "quanti crediti
-  // mi restano?" senza che l'utente debba aprire la pagina Crediti (#359). Legge
-  // il motore crediti a runtime (non è disponibile in tutti i contesti in cui
-  // SN_FILO_STATE potrebbe caricarsi → guardia difensiva). getPublic() applica il
-  // refill di mezzanotte e ritorna la vista SENZA il costo € (che resta privato).
+  // Il saldo serve a rispondere in chat a «quanti crediti mi restano?» senza aprire la pagina
+  // Crediti (#359). Il motore si legge a runtime perché non c'è in tutti i contesti in cui
+  // questo modulo può caricarsi; getPublic() applica il refill di mezzanotte e non espone il
+  // costo in €, che resta privato.
   async function readCredits() {
     try {
       const Credits = global.SN_CREDITS;
@@ -110,19 +98,16 @@
         session: sessionInfo,
       },
       tabs,
-      // Filtra i timer scaduti (non in pausa): se Filo era chiuso alla scadenza
-      // non c'è stata notifica, quindi mostrarli come "processi attivi" al boot
-      // confonde l'LLM ("Il timer sta per suonare" in modo permanente).
-      // gcTimers() li pulisce sul disco, qui ce ne assicuriamo come rete di
-      // sicurezza nel caso assemble() venga chiamato prima di gcTimers().
+      // I timer scaduti e non in pausa si filtrano: se Filo era chiuso alla scadenza non c'è
+      // stata notifica, e mostrarli come processi attivi fa dire all'LLM «il timer sta per
+      // suonare» per sempre. Rete di sicurezza se assemble() gira prima di gcTimers().
       timers: timers
         .map((t) => ({
           id: t.id,
           kind: t.kind || 'timer', // 'alarm' per le sveglie (#322)
           label: t.label,
-          // Giorni in cui la sveglia si ripete (['lun','mer']); assente = una
-          // volta sola. Serve all'agente per rispondere "quali sveglie ho?" e
-          // per capire a quale l'utente si riferisce.
+          // Ricorrenza della sveglia (assente = una volta sola): serve all'agente per dire quali
+          // sveglie ci sono e per capire a quale l'utente si riferisce.
           repeat: Array.isArray(t.repeat) && t.repeat.length ? t.repeat : null,
           endsAt: t.endsAt,
           paused: !!t.paused,
@@ -148,7 +133,6 @@
   function renderForPrompt(state) {
     const lines = [];
     lines.push('═══ FILO STATE ═══', '');
-    // TEMPO
     lines.push('TEMPO');
     lines.push(`Data: ${state.time.humanNow}`);
     if (state.time.timeSinceLastInteractionMin != null) {
@@ -159,16 +143,14 @@
       lines.push(`Inizio sessione: ${formatDate(state.time.session.startedAt)} (${state.time.session.ageMin} min fa, ${state.time.session.count} interazioni)`);
     }
     lines.push('');
-    // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
-    // questo saldo (si ricarica di DAILY_REFILL ogni giorno a mezzanotte: letto
-    // dal valore in vigore, non scritto a mano, così resta veritiero se cambia).
+    // Il refill giornaliero si legge dal valore in vigore, non scritto a mano, così la frase
+    // resta veritiera se cambia.
     if (state.credits) {
       const refill = global.SN_CONST?.CREDIT?.DAILY_REFILL ?? 100;
       lines.push('CREDITI');
       lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
       lines.push('');
     }
-    // TAB APERTE
     lines.push('TAB APERTE');
     if (!state.tabs.length) lines.push('(nessuna)');
     else {
@@ -182,18 +164,17 @@
       if (state.tabs.length > 12) lines.push(`...altre ${state.tabs.length - 12} tab`);
     }
     lines.push('');
-    // PROCESSI
     lines.push('PROCESSI ATTIVI');
     if (!state.timers.length) lines.push('(nessuno)');
     else {
       state.timers.forEach((t) => {
         if (t.kind === 'alarm') {
-          // #322 — le sveglie si descrivono con l'orario assoluto, non col
-          // countdown (che per una sveglia a ore di distanza confonderebbe).
+          // #322 — le sveglie si descrivono con l'orario assoluto, non col countdown, che a ore di
+          // distanza confonderebbe.
           const d = new Date(t.endsAt);
           const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          // Ricorrenza: dicitura unica con la colonna destra (SN_FILO_MEMORY),
-          // così l'agente e l'utente leggono la stessa cosa.
+          // Dicitura unica con la colonna destra (SN_FILO_MEMORY): l'agente e l'utente leggono la
+          // stessa cosa.
           const M = global.SN_FILO_MEMORY;
           const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
           lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`);
@@ -204,12 +185,10 @@
       });
     }
     lines.push('');
-    // NOTIFICHE
     lines.push('NOTIFICHE NON GESTITE');
     if (!state.notifications.length) lines.push('(nessuna)');
     else state.notifications.forEach((n) => lines.push(`- [${n.ageRel}] ${n.kind}: ${n.text}`));
     lines.push('');
-    // AZIONI RECENTI
     lines.push('AZIONI RECENTI (ultime 24h)');
     if (!state.recentActions.length) lines.push('(nessuna)');
     else {
@@ -218,7 +197,6 @@
       });
     }
     lines.push('');
-    // DASHBOARD CORRENTE
     lines.push('DASHBOARD ATTUALE');
     if (state.dashboard) {
       lines.push(`Messaggio: "${(state.dashboard.message || '').slice(0, 200)}"`);
