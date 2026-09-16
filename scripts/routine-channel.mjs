@@ -646,7 +646,34 @@ if (isMain) {
       process.exit(1);
     }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
-    const r = await release(args[0], guasto);
+    // PRIMA del server: il ramo corrente va su origin. Un commit fatto a mano
+    // dal worker non passa dall'hook, e senza questo push moriva col
+    // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e
+    // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
+    // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
+    if (data['senza-push'] !== true) {
+      const p = pushRamoCorrente(ROOT);
+      if (!p.ok) {
+        console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
+        console.error('Non ho rilasciato niente: sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
+        process.exit(1);
+      }
+      console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
+    }
+    // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da
+    // solo qui. Se lo script fallisce si rilascia comunque, con la nota.
+    let rapporto = null;
+    if (data['senza-rapporto'] !== true) {
+      const ruolo = typeof data.role === 'string' ? data.role : '';
+      try {
+        const { generaRapporto } = await import('./session-report.mjs');
+        rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT });
+      } catch (e) {
+        rapporto = { v: 1, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
+      }
+    }
+    const r = await releaseConRapporto(args[0], guasto, rapporto);
+    if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
     // evita dieci minuti di processo che batte per un morto.
