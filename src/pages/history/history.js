@@ -29,10 +29,8 @@
     render();
   }
 
-  // Popola il menu "filtra per tipo" con SOLO i tipi di azione realmente
-  // presenti in cronologia (niente opzioni per funzioni mai usate), ciascuno con
-  // la sua etichetta leggibile. Così il filtro copre da sé ogni azione — comprese
-  // quelle nuove — senza restare disallineato da una lista hard-coded.
+  // Il menu «filtra per tipo» elenca SOLO i tipi presenti in cronologia: così copre da sé ogni
+  // azione nuova, senza restare disallineato da una lista scritta a mano.
   function buildFilterOptions() {
     const sel = $('filter');
     const current = sel.value;
@@ -69,12 +67,9 @@
     if (filter) filtered = filtered.filter((it) => it.action === filter);
     if (q) {
       filtered = filtered.filter((it) => {
-        // Cerca SOLO sui testi che la voce mostra davvero — non su
-        // JSON.stringify(it.input), che infilava nell'ago i NOMI dei campi
-        // interni del payload (selection, userMessage, title, url…) e la
-        // punteggiatura JSON, facendo "trovare" parole che l'utente non vede
-        // da nessuna parte. Qui usiamo l'input formattato come in lista,
-        // l'etichetta dell'azione, il modello, l'output e l'origine.
+        // Cerca SOLO sui testi che la voce mostra davvero: con JSON.stringify(it.input) finivano
+        // nell'ago i NOMI dei campi interni e la punteggiatura JSON, e si «trovavano» parole che
+        // l'utente non vede da nessuna parte.
         const haystack = [
           formatActionLabel(it.action),
           formatInput(it.input),
@@ -87,9 +82,8 @@
     }
 
     if (!filtered.length) {
-      // Distingui "cronologia realmente vuota" da "nessun risultato per la
-      // ricerca/filtro": mostrare il testo di vuoto assoluto durante una
-      // ricerca fa credere che la cronologia sia stata cancellata.
+      // Distingui «cronologia vuota» da «nessun risultato»: il vuoto assoluto durante una ricerca
+      // fa credere che la cronologia sia stata cancellata.
       const empty = $('empty');
       if (items.length && q) empty.textContent = I18n.t('history_no_results');
       else if (items.length && filter) empty.textContent = I18n.t('history_no_results_filter');
@@ -111,9 +105,8 @@
     const meta = document.createElement('div');
     meta.className = 'sn-history-meta';
     const left = document.createElement('span');
-    // Chi ha davvero servito la risposta (host upstream via OpenRouter, #421):
-    // mostrato quando disponibile, così la politica sui fornitori è verificabile
-    // a colpo d'occhio dalla cronologia.
+    // Chi ha davvero servito la risposta (host upstream via OpenRouter, #421): così la politica
+    // sui fornitori è verificabile a colpo d'occhio dalla cronologia.
     const via = it.servedBy ? ` • via ${it.servedBy}` : '';
     left.textContent = `${formatActionLabel(it.action)} • ${it.model || ''}${via} • ${formatDate(it.timestamp)}`;
     meta.appendChild(left);
@@ -126,11 +119,9 @@
     }
     const right = document.createElement('span');
     right.className = 'sn-history-meta-right';
-    // Riuso del testo in ingresso (#422): quanta parte del prompt il fornitore
-    // ha riusato da una richiesta precedente invece di rielaborarla. È il modo
-    // per vedere se tenere le istruzioni fisse in testa sta funzionando davvero:
-    // se resta a zero, non sta funzionando. Mostrato solo quando conosciamo i
-    // token in ingresso (chiamate servite dalla cache locale non ne hanno).
+    // Riuso del testo in ingresso (#422): quanta parte del prompt il fornitore ha riusato invece
+    // di rielaborarla. È il modo di vedere se tenere le istruzioni fisse in testa funziona: se
+    // resta a zero, non funziona. Solo quando conosciamo i token in ingresso.
     const inTok = Number(it.usage?.promptTokens) || 0;
     if (inTok > 0) {
       const reused = Number(it.usage?.cachedPromptTokens) || 0;
@@ -143,9 +134,8 @@
         : I18n.t('history_reuse_none_title', formatTokens(inTok));
       right.appendChild(chip);
     }
-    // Tempi del turno: quando ha cominciato a ragionare, quando ha scritto la
-    // prima parola (o nominato la prima azione), quando ha finito. Solo per le
-    // richieste in diretta che li hanno misurati.
+    // Tempi del turno: inizio del ragionamento, prima parola (o prima azione nominata), fine.
+    // Solo per le richieste in diretta che li hanno misurati.
     const tm = it.timing;
     if (tm && Number(tm.totalMs) > 0) {
       const fmt = (ms) => (ms == null ? '—' : `${(Number(ms) / 1000).toFixed(1)} s`);
@@ -161,9 +151,8 @@
     cost.textContent = it.costEur ? `€${it.costEur.toFixed(4)}` : '—';
     right.appendChild(cost);
 
-    // Rimozione puntuale della singola voce: simmetrica alle altre liste di Filo
-    // ("Aperti per dopo", cronologia appunti) che hanno il tasto Rimuovi per
-    // elemento. Compare all'hover sulla voce per non appesantire la lista.
+    // Rimozione puntuale della voce, simmetrica alle altre liste di Filo. Compare all'hover per
+    // non appesantire la lista.
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'sn-history-remove';
@@ -226,8 +215,7 @@
     return new Date(iso).toLocaleString('it-IT');
   }
 
-  // Conteggi di token nel formato dei numeri italiano (1.234), per il
-  // suggerimento del riuso.
+  // Numeri nel formato italiano (1.234).
   function formatTokens(n) {
     return Number(n || 0).toLocaleString('it-IT');
   }
@@ -244,9 +232,8 @@
       if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.CLEAR_HISTORY });
       items = [];
-      // Svuotando la cronologia spariscono tutti i tipi: riallinea il menu
-      // "filtra per tipo" come fa la rimozione della singola voce, altrimenti
-      // resterebbero opzioni per dati che non esistono più.
+      // Svuotando la cronologia spariscono tutti i tipi: riallinea il menu come fa la rimozione
+      // della singola voce, o resterebbero opzioni per dati che non esistono più.
       buildFilterOptions();
       render();
     });
