@@ -258,6 +258,47 @@ describe('pushRamoCorrente', () => {
 
 // ─── La riga di comando, tutta insieme ───────────────────────────────────────
 
+// L'hook committa solo su Edit/Write: un file nato da una shell al rilascio
+// restava fuori dai commit, il rilascio spediva HEAD e diceva «spedito», e
+// quel lavoro moriva col contenitore (giro del 14/09, verifica).
+describe('commitRestante: quello che è rimasto fuori dai commit parte col rilascio', () => {
+  test('un file nato da una shell viene committato (con la provenienza) e poi spedito', () => {
+    const { origin, work } = scena();
+    g(work, ['checkout', '-q', '-b', 'worker/20']);
+    writeFileSync(resolve(work, 'nato-da-shell.txt'), 'x\n', 'utf8');
+    const c = commitRestante(work, { env: { FILO_ROUTINE: '1' } });
+    assert.equal(c.ok, true);
+    assert.equal(c.skipped, false);
+    assert.deepEqual(c.committed, ['nato-da-shell.txt']);
+    assert.equal(g(work, ['status', '--porcelain']), '', 'niente resta fuori');
+    assert.equal(g(work, ['log', '-1', '--format=%an <%ae>']), 'claude-routine <claude@routine>');
+    assert.equal(g(work, ['log', '-1', '--format=%s']), 'auto: rilascio — nato-da-shell.txt');
+    assert.equal(pushRamoCorrente(work).ok, true);
+    assert.ok(g(origin, ['ls-tree', '--name-only', 'worker/20']).includes('nato-da-shell.txt'), 'il file è arrivato su origin');
+    // in locale l'autore è quello locale
+    writeFileSync(resolve(work, 'altro.txt'), 'y\n', 'utf8');
+    assert.equal(commitRestante(work, { env: {} }).ok, true);
+    assert.equal(g(work, ['log', '-1', '--format=%an']), 'claude-local');
+  });
+
+  test('directory pulita: niente commit; ramo protetto o HEAD staccata: si salta e si dice', () => {
+    const { work } = scena();
+    writeFileSync(resolve(work, 'su-main.txt'), 'x\n', 'utf8');
+    const suMain = commitRestante(work);
+    assert.deepEqual(suMain, { ok: true, skipped: true, committed: [], reason: "'main' è un ramo protetto: non committo" });
+    assert.notEqual(g(work, ['status', '--porcelain']), '', 'sul ramo principale non si committa');
+    g(work, ['checkout', '-q', '-b', 'worker/21']);
+    g(work, ['add', '-A']);
+    g(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'pulito']);
+    assert.deepEqual(commitRestante(work), { ok: true, skipped: false, committed: [], reason: '' });
+    g(work, ['checkout', '-q', '--detach']);
+    writeFileSync(resolve(work, 'staccata.txt'), 'x\n', 'utf8');
+    const staccata = commitRestante(work);
+    assert.equal(staccata.skipped, true);
+    assert.match(staccata.reason, /staccata/);
+  });
+});
+
 function fintoServer(rispondi) {
   const ricevute = [];
   const srv = createServer((req, res) => {
