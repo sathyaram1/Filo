@@ -1,6 +1,6 @@
-// F4 — feedback autonomo di Filo, logica PURA: compone un auto-feedback sanitizzato quando l'agente di chat rileva con ALTA CONFIDENZA una richiesta fuori capacità (confrontata col manifesto SN_CAPABILITIES), una lamentela di sfuggita su qualcosa di rotto, o una capacità che ESISTE ma che l'assistente non sa azionare e spiega a parole (#419).
-// Privacy: il feedback di compose() è GENERICO — nessun URL, nessun testo utente verbatim; il contesto allegato è l'id strutturale del gap più una descrizione derivata dal manifesto.
-// composeProposal() è l'altra faccia (#360): invece di partire di nascosto, Filo mette in chat una segnalazione GIÀ SCRITTA col tasto di conferma. Siccome l'utente la legge prima che parta, lì la sua richiesta può essere citata per intero — è quello che scriverebbe a mano nel box, e senza di essa la segnalazione non servirebbe a chi sviluppa.
+// F4 — feedback autonomo di Filo, logica PURA: compone un auto-feedback quando l'agente rileva con ALTA CONFIDENZA una richiesta fuori capacità (confrontata col manifesto SN_CAPABILITIES), una lamentela di sfuggita, o una capacità che ESISTE ma che l'assistente non sa azionare e spiega a parole (#419).
+// Privacy: il feedback di compose() è GENERICO — nessun URL, nessun testo utente verbatim, solo l'id strutturale del gap e una descrizione derivata dal manifesto.
+// composeProposal() è l'altra faccia (#360): la segnalazione compare in chat già scritta, col tasto di conferma. Siccome l'utente la legge prima che parta, lì la sua richiesta si può citare per intero — senza, la segnalazione non servirebbe a chi sviluppa.
 
 (function (global) {
   'use strict';
@@ -24,8 +24,7 @@
     'al momento non è possibile',
     'per ora non è possibile',
     'questa funzionalità non è disponibile',
-    // #360: a «quanti crediti ho?» Filo ammise di non saperlo con parole che nessuna frase qui sopra intercettava, il gap passò inosservato e nessuna segnalazione fu proposta.
-    // Queste sono le formulazioni con cui ammette di non avere un dato o un canale per ottenerlo, tenute strette (serve il «non ho / non posso / non riesco» attaccato) per non scattare su una frase qualunque.
+    // #360: a «quanti crediti ho?» Filo ammise di non saperlo con parole che le frasi qui sopra non intercettavano, e il gap passò inosservato. Queste sono le formulazioni con cui ammette di non avere un dato o un canale, tenute strette (serve il «non ho / non posso / non riesco» attaccato) per non scattare su una frase qualunque.
     'non ho accesso',
     'non posso accedere',
     'non ho modo di',
@@ -63,9 +62,8 @@
   // Alta confidenza = almeno una frase segnale E una risposta relativamente lunga: l'agente ha spiegato il rifiuto, non è un errore di parsing o un «(vuoto)».
   const MIN_REPLY_LENGTH = 30;
 
-  // #419, il buco muto. Il caso peggiore non è Filo che ammette di non saper fare una cosa — lì l'ammissione stessa fa scattare la rete qui sopra — ma la funzione che ESISTE nel manifesto, che l'utente chiede, e che l'assistente, non avendo un'azione per comandarla, si limita a spiegare a parole.
-  // Quella risposta non contiene nessuna ammissione: è indistinguibile da una riuscita, e senza rete il buco resta invisibile a tutti.
-  // Segnale = indicazioni manuali («clicca», «tasto destro», «in alto a destra») su una capacità riconoscibile nel manifesto, senza che nel turno sia stata eseguita nessuna azione.
+  // #419, il buco muto: non Filo che ammette di non saper fare una cosa — lì l'ammissione fa scattare la rete qui sopra — ma la funzione che ESISTE nel manifesto e che l'assistente, non avendo un'azione per comandarla, spiega a parole. Quella risposta è indistinguibile da una riuscita, e senza rete il buco resta invisibile a tutti.
+  // Segnale = indicazioni manuali («clicca», «tasto destro») su una capacità riconoscibile nel manifesto, senza nessuna azione eseguita nel turno.
   const MANUAL_HOWTO_PHRASES = [
     'clicca',
     'cliccando',
@@ -209,8 +207,8 @@
       || guessCapabilityId(replyNorm, capabilities);
   }
 
-  // Ritorna { kind: null }, oppure { kind: 'capability-gap', capabilityId?, genericDesc }, { kind: 'complaint', genericDesc }, { kind: 'capability-uncommandable', capabilityId, genericDesc } (#419).
-  // `textReply` è la risposta dell'agente, non dell'utente: più sicuro. `userMessage` serve SOLO a rilevare segnali di lamentela nelle sue parole, mai a finire nel feedback. `capabilities` è SN_CAPABILITIES.all(), per il match dell'id.
+  // Ritorna { kind: null } oppure { kind, capabilityId?, genericDesc } con kind 'capability-gap', 'complaint' o 'capability-uncommandable' (#419).
+  // Si guarda la risposta dell'agente, non dell'utente: più sicuro. `userMessage` serve SOLO a rilevare segnali di lamentela nelle sue parole, mai a finire nel feedback.
   function analyzeReply(textReply, actions, userMessage, capabilities) {
     const reply = String(textReply || '');
     if (reply.length < MIN_REPLY_LENGTH) return { kind: null };
@@ -295,8 +293,7 @@
     return null;
   }
 
-  // Proposta di segnalazione in chat (#360): quando Filo ammette una mancanza, l'utente non deve chiedergli di segnalarla — compare già scritta col tasto di conferma. Qui si compone solo il contenuto dell'azione: l'anteprima e l'OK (livello 2) li chiede il sistema, quindi niente parte da solo.
-  // A differenza di compose() questo testo CITA la richiesta dell'utente, che la legge prima di autorizzare: è ciò che rende la segnalazione utile.
+  // Proposta in chat (#360): quando Filo ammette una mancanza la segnalazione compare già scritta, e l'anteprima con l'OK (livello 2) la chiede il sistema, quindi niente parte da solo. A differenza di compose() questo testo CITA la richiesta dell'utente, che la legge prima di autorizzare: è ciò che la rende utile.
 
   // Prima frase sensata, per citare l'ammissione di Filo senza trascinarsi dietro tutta la risposta.
   function firstSentence(s, max) {
@@ -372,8 +369,7 @@
     return null;
   }
 
-  // Bonus giornaliero crediti, PURO: ritorna il delta se il setting è ON e il bonus non è già stato concesso OGGI — un secondo refill nello stesso giorno non ripaga.
-  // L'applicazione (storage, emitChange) spetta ad applyRefill in creditStore.js. Lo stato porta `lastAutoFeedbackBonusDate` per l'idempotenza.
+  // Bonus giornaliero crediti, PURO: il delta se il setting è ON e il bonus non è già stato dato OGGI (`lastAutoFeedbackBonusDate`), così un secondo refill nello stesso giorno non ripaga. L'applicazione spetta ad applyRefill in creditStore.js.
   function calcAutoFeedbackBonus(state, today, autoFeedbackEnabled) {
     if (!autoFeedbackEnabled) return 0;
     const last = String(state.lastAutoFeedbackBonusDate || '');

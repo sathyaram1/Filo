@@ -1,6 +1,6 @@
-// La vista pubblica dei feedback (#583): quali feedback hanno una scheda leggibile da chiunque, e con quali campi dentro. Logica pura, la esegue il main dell'owner (handlers/auth.js), che ha l'autorità per scrivere e la chiave per leggere lo status vero.
-// Le regole di Firestore decidono SE un documento si legge, non quali campi tornano: finché la bacheca scaricava i documenti interi, testo, URL, user agent e link agli screenshot erano già arrivati sul computer di chi guardava, anche quando «filtrati in pagina». L'unico modo di dare alla bacheca i soli campi pubblici è scriverli altrove, nella collezione `feedback-public` — stesso id, dentro solo questa allowlist, che le firestore.rules ripetono come rete (una scrittura con un campo fuori elenco viene respinta INTERA).
-// Non pubblica mai nulla che sia passato dalle mani della sicurezza — attacchi, spam, file sospetti, bocciature d'audit, blocchi del pipeline — né un feedback il cui status non si riesca a leggere: in dubbio niente scheda, perché una scheda mancante è un fix che non compare, una di troppo è materiale segnalato pubblicato.
+// La vista pubblica dei feedback (#583): quali feedback hanno una scheda leggibile da chiunque e con quali campi. Logica pura; la esegue il main dell'owner (handlers/auth.js), che ha l'autorità per scrivere e la chiave per leggere lo status vero.
+// Le regole di Firestore decidono SE un documento si legge, non quali campi tornano: finché la bacheca scaricava i documenti interi, testo, URL, user agent e link agli screenshot erano già arrivati sul computer di chi guardava, anche se «filtrati in pagina». Quindi i campi pubblici si scrivono altrove, in `feedback-public` (stesso id), e le firestore.rules ripetono l'allowlist come rete: una scrittura con un campo fuori elenco è respinta INTERA.
+// Niente scheda per ciò che è passato dalle mani della sicurezza (attacchi, spam, file sospetti, bocciature d'audit, blocchi del pipeline) né per uno status illeggibile: una scheda mancante è un fix che non compare, una di troppo è materiale segnalato pubblicato.
 
 (function (global) {
   'use strict';
@@ -29,8 +29,7 @@
     'resolvedAt',        // data di chiusura (ISO)
     'clientIdTag',       // impronta di QUESTA scheda per chi l'ha segnalata (vedi sotto)
     'userNote',          // la frase per chi ha segnalato (l'unico dei due testi in chiaro)
-    // I crediti che spettano a chi ha segnalato stanno qui perché l'annuncio della ricompensa gira sulla sua macchina, che dei feedback veri non legge più niente: senza il numero ogni ricompensa scenderebbe in silenzio alla fascia più bassa, e non si rimedia dopo — un feedback premiato resta premiato.
-    // È la CIFRA, non la priorità: quanto contava la segnalazione resta un giudizio interno, fuori dalla scheda.
+    // I crediti stanno qui perché l'annuncio della ricompensa gira sulla macchina di chi ha segnalato, che dei feedback veri non legge più niente: senza il numero ogni ricompensa scenderebbe in silenzio alla fascia più bassa, e un feedback premiato resta premiato. È la CIFRA, non la priorità, che resta un giudizio interno.
     'reward',
     'publishedAt',       // quando questa scheda è stata scritta (diagnostica)
   ]);
@@ -38,8 +37,7 @@
   // Campi della scheda che NON scrive il publisher: li scrivono gli utenti (un voto, una riapertura) con le regole chiave==uid. Il publisher scrive sempre con una maschera sui soli CARD_FIELDS, o il primo aggiornamento cancellerebbe i voti di tutti.
   const USER_FIELDS = Object.freeze(['votes', 'reopenRequests']);
 
-  // Stati CHIUSI che meritano una scheda: `done` è il fix uscito (il gate DB3 lo applica la bacheca), `archived` serve al popup delle ricompense, che premia anche ciò che l'owner ha chiuso archiviandolo.
-  // Gli stati terminali della sicurezza non sono qui, e non basterebbe: il guard sotto li rifiuta anche se qualcuno li aggiungesse.
+  // Stati CHIUSI che meritano una scheda: `done` è il fix uscito (il gate DB3 lo applica la bacheca), `archived` serve al popup delle ricompense, che premia anche ciò che l'owner ha chiuso archiviandolo. Gli stati terminali della sicurezza non sono qui, e il guard sotto li rifiuta comunque.
   const PUBLISHABLE_STATUSES = Object.freeze(['done', 'archived']);
 
   // Classi di verdetto che segnalano un rischio: una sola basta per non pubblicare. Il panel può aver deciso «aligned» a maggioranza mentre un giudice gridava «attacco», e la bacheca non è il posto dove scoprire chi aveva ragione.
@@ -148,9 +146,8 @@
   }
 
   /**
-  * I voti e le riaperture rimasti sul DOCUMENTO e non ancora sulla scheda. PURA, e serve una volta sola, al passaggio.
-  * Senza portarli dentro, il giorno in cui le regole vanno in produzione ogni conteggio riparte da zero e un fix già segnalato come rotto torna in bacheca riapribile una seconda volta: proprio il doppione che quel segnale doveva impedire.
-  * Si portano solo le chiavi che la scheda NON ha: chi ha votato dopo il passaggio ha ragione lui, e una ripubblicazione non gli cancella il voto. Quando non c'è più niente da portare torna `{}` e il travaso smette da sé.
+  * I voti e le riaperture rimasti sul DOCUMENTO e non ancora sulla scheda. PURA, serve una volta sola al passaggio: senza portarli dentro ogni conteggio riparte da zero e un fix già segnalato come rotto torna riapribile una seconda volta, il doppione che quel segnale doveva impedire.
+  * Si portano solo le chiavi che la scheda NON ha: chi ha votato dopo il passaggio ha ragione lui. Quando non c'è più niente torna `{}` e il travaso smette da sé.
   */
   function carryUserFields(fb, before) {
     const out = {};
@@ -178,9 +175,8 @@
   }
 
   /**
-  * Cosa va scritto e cosa tolto per far combaciare la vista con la realtà. PURA.
-  * `opts.complete` dice che i feedback passati sono TUTTI quelli che esistono (il caricamento non ha toccato il tetto): solo allora una scheda senza feedback è un orfano da togliere, altrimenti sarebbe un feedback più vecchio del tetto e toglierlo svuoterebbe la bacheca a ogni giro.
-  * @returns {{ upsert: Array<{id:string, card:object}>, remove: string[] }}
+  * Cosa scrivere e cosa togliere per far combaciare la vista con la realtà. PURA.
+  * `opts.complete` dice che i feedback passati sono TUTTI quelli che esistono: solo allora una scheda senza feedback è un orfano da togliere, altrimenti sarebbe un feedback più vecchio del tetto della pagina e toglierlo svuoterebbe la bacheca a ogni giro.
   */
   function planSync(published, feedbacks, opts) {
     const complete = !!(opts && opts.complete);
@@ -204,8 +200,7 @@
         upsert.push({ id, card: daPortare ? { ...card, ...carry } : card });
       }
     }
-    // Una scheda che non deve più esserci si TOGLIE: un fix riaperto o riclassificato non resta in bacheca perché nessuno l'ha cancellato.
-    // Si tolgono solo le schede dei feedback davvero guardati: un caricamento parziale non deve svuotare la bacheca dei più vecchi. Con `complete` si toglie anche una scheda rimasta senza il suo feedback.
+    // Una scheda che non deve più esserci si TOGLIE: un fix riaperto o riclassificato non resta in bacheca perché nessuno l'ha cancellato. Ma solo per i feedback davvero guardati: un caricamento parziale non deve svuotare la bacheca dei più vecchi.
     const seen = new Set(
       (Array.isArray(feedbacks) ? feedbacks : [])
         .map((f) => (f && f._id ? String(f._id) : ''))
@@ -220,8 +215,7 @@
   }
 
   /**
-  * Riunisce ai feedback i voti e le riaperture, che vivono sulla SCHEDA perché è l'unico documento che chi vota può aprire. PURA.
-  * Così chi fa i conti dal lato owner continua a leggere `fb.votes` come sempre, e i voti dati prima del passaggio non si perdono: la scheda vince chiave per chiave, non cancella il resto.
+  * Riunisce ai feedback i voti e le riaperture, che vivono sulla SCHEDA perché è l'unico documento che chi vota può aprire. PURA: la scheda vince chiave per chiave e non cancella il resto, così chi fa i conti dal lato owner continua a leggere `fb.votes` come sempre.
   */
   function mergeUserFields(rows, cards) {
     if (!Array.isArray(rows) || rows.length === 0) return Array.isArray(rows) ? rows : [];
