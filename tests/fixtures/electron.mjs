@@ -89,7 +89,7 @@ export const test = base.extend({
       },
     });
     await use(app);
-    try { await app.close(); } catch (_) {}
+    await chiudiApp(app);
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   },
 
