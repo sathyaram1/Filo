@@ -133,7 +133,12 @@ npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 La suite completa non la lancia più nessuno a mano (decisione owner
 2026-09-15): gira in GitHub, nel lavoro di release, ogni sei ore prima di
 pubblicare — se è verde la patch esce, se ha un rosso nuovo la patch salta un
-giro e il rosso diventa un feedback. Sulla macchina di chi sviluppa Filo
+giro e il rosso diventa un feedback. È il job `suite` di
+`.github/workflows/release.yml` (Linux senza schermo; i rossi noti del
+contenitore, `tests/rossi-noti.json`, sono tolti dal conto da
+`scripts/suite-verdict.mjs`). Per provare la suite su un ramo senza
+pubblicare: `gh workflow run release.yml --ref <ramo> -f solo_suite=true`.
+Sulla macchina di chi sviluppa Filo
 durerebbe quasi sette ore con un solo worker. Si lancia `npm run finish:check`,
 più lo spec mirato della feature toccata (`npx playwright test
 tests/<feature>.spec.mjs`). Vedi CLAUDE.md § Verifica.
