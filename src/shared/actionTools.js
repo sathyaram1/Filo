@@ -1,23 +1,6 @@
-// Le azioni della chat come STRUMENTI del modello (tool calling nativo).
-//
-// Prima il modello scriveva un JSON nel testo (`{"text": …, "actions": […]}`)
-// e il main lo rileggeva: il testo doveva venire PRIMA delle azioni, quindi
-// «cerco, leggo, poi rispondo» costava un turno automatico per ogni passo, e
-// un JSON rotto scatenava ritentativi silenziosi. Adesso ogni azione è uno
-// strumento dichiarato al fornitore: il modello alterna ragionamento, azione,
-// risultato e testo in un giro solo gestito dal main (handleFiloChat), e le
-// azioni arrivano in streaming come il testo.
-//
-// UNA fonte per le azioni: qui stanno descrizione e parametri di ogni
-// strumento; il LIVELLO di sicurezza sta nel registro (actionLevels.js) e
-// resta l'unico a decidere se un'azione si esegue subito, chiede conferma o
-// pretende «conferma» digitato. Una sentinella negli unit test pretende che i
-// due elenchi combacino: uno strumento senza livello non si esegue, un livello
-// senza strumento non si può chiamare.
-//
-// Il nome dello strumento È il tipo dell'azione (`CERCA_WEB`), e gli argomenti
-// sono i campi dell'azione: `{type: nome, ...argomenti}` entra pari pari in
-// executeFiloAction, che continua ad accettare anche i vecchi alias.
+// Le azioni della chat come STRUMENTI del modello (tool calling nativo): ragionamento, azione, risultato e testo in un giro solo gestito dal main (handleFiloChat), tutto in streaming.
+// Qui descrizione e parametri di ogni strumento; il LIVELLO di sicurezza sta solo in actionLevels.js, e una sentinella negli unit test pretende che i due elenchi combacino.
+// Il nome dello strumento È il tipo dell'azione: `{type: nome, ...argomenti}` entra pari pari in executeFiloAction.
 
 (function (global) {
   'use strict';
@@ -26,9 +9,7 @@
   const B = (description) => ({ type: 'boolean', description });
   const I = (description) => ({ type: 'integer', description });
 
-  // Descrizione del sistema (shell, percorsi) per i testi che ne dipendono: la
-  // dà constants.js, che sa distinguere Windows da Mac e Linux. Senza (unit
-  // test che non lo caricano) restano frasi neutre.
+  // Descrizione del sistema (shell, percorsi) per i testi che ne dipendono: la dà constants.js, che distingue Windows da Mac e Linux. Senza, restano frasi neutre.
   function sistemaInfo(sistema) {
     try {
       const C = global.SN_CONST;
@@ -45,10 +26,7 @@
     ],
   };
 
-  // Ogni voce: `description` (testo o funzione del contesto), `properties`,
-  // `required`. `risultato: true` marca gli strumenti il cui esito (risultati
-  // di ricerca, testo di un documento, output di un comando) torna al modello
-  // per intero: gli altri tornano una riga di conferma.
+  // `risultato: true`: l'esito torna al modello per intero (ricerche, testo di un documento, output di un comando); gli altri tornano una riga di conferma.
   const TOOLS = {
     NAVIGA: {
       description: 'APRE SUBITO un sito in una nuova scheda. Usalo quando l\'utente chiede di aprire qualcosa. Con `background: true` la scheda si apre in SECONDO PIANO (l\'utente resta dov\'è, la musica parte lo stesso): usalo per ciò che si ascolta e basta, o quando l\'utente chiede di non cambiare scheda. Se stai solo PROPONENDO dei siti tra cui scegliere, non usarlo: elenca i link nel testo.',
@@ -297,7 +275,7 @@
 
   const NAMES = Object.keys(TOOLS);
 
-  // Le definizioni nel formato che OpenRouter (stile OpenAI) capisce.
+  // Formato che OpenRouter (stile OpenAI) capisce.
   function definitions({ sistema, onboarding = false } = {}) {
     const ctx = { sistema };
     const out = [];
@@ -321,17 +299,12 @@
     return out;
   }
 
-  // Gli strumenti che riportano un esito completo al modello (non solo «fatto»).
   function haRisultato(type) {
     const t = TOOLS[String(type || '').toUpperCase()];
     return !!(t && t.risultato);
   }
 
-  // Le chiamate del modello → azioni per executeFiloAction. Ogni voce porta
-  // `_callId` (per rispondere al fornitore con `tool_call_id`) e, se gli
-  // argomenti non erano JSON, `_argsError`: l'azione non si esegue e il
-  // modello riceve l'errore come esito, così può riprovare con argomenti buoni
-  // invece di restare senza risposta.
+  // Ogni voce porta `_callId` (per il `tool_call_id` della risposta) e, se gli argomenti non erano JSON, `_argsError`: l'azione non si esegue e l'errore torna al modello come esito, così riprova invece di restare senza risposta.
   function toolCallsToActions(toolCalls) {
     const out = [];
     for (const c of Array.isArray(toolCalls) ? toolCalls : []) {
@@ -359,10 +332,7 @@
     return out;
   }
 
-  // Tolleranza per il vecchio formato: un modello che ignora gli strumenti e
-  // scrive il JSON `{"text": …, "actions": […]}` nel testo. Non è più
-  // descritto nel prompt e non si ritenta: si accetta se c'è, così le azioni
-  // passano comunque dal registro invece di finire in chat come JSON grezzo.
+  // Tolleranza per un modello che ignora gli strumenti e scrive il JSON con testo e azioni: non si ritenta, ma se c'è si accetta, così le azioni passano dal registro invece di finire in chat come JSON grezzo.
   function legacyEnvelope(text) {
     if (!text) return null;
     let t = String(text).trim();
@@ -381,10 +351,7 @@
     };
   }
 
-  // Il messaggio dell'assistente da rimandare al fornitore per un giro con
-  // chiamate: testo (anche vuoto), le chiamate così come le ha fatte, e il
-  // ragionamento così come è arrivato (`reasoning_details`), che il fornitore
-  // reinserisce al posto giusto: il modello riprende da dove aveva lasciato.
+  // Per un giro con chiamate il fornitore rivuole testo, chiamate e ragionamento com'era (`reasoning_details`): li rimette al posto giusto e il modello riprende da dove aveva lasciato.
   function assistantMessage({ text, toolCalls, reasoningDetails }) {
     const msg = { role: 'assistant', content: text ? String(text) : '' };
     const calls = (Array.isArray(toolCalls) ? toolCalls : []).map((c, i) => ({

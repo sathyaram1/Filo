@@ -1,16 +1,6 @@
-// Hash deterministico del clientId (S1.F2.2).
-//
-// PERCHÉ ESISTE
-//   Con la cifratura attiva (S1.2), `clientId` viene cifrato nel documento
-//   feedback. Ma la macchina utente NON ha la chiave privata → non può decifrarlo
-//   per il match "questo feedback è dell'install corrente" (popup ricompense C5).
-//   Soluzione: conservare accanto al clientId cifrato un `clientIdHash` SHA-256
-//   troncato a 32 char hex (16 byte), IN CHIARO. Il match C5 usa l'hash.
-//   Con cifratura DORMIENTE il clientId resta in chiaro, ma `clientIdHash` viene
-//   comunque scritto per uniformità (il match può essere basato solo sull'hash).
-//
-// DETERMINISTICA: stesso input → stesso output sempre (no salt, no nonce).
-// Cross-ambiente: usa WebCrypto (disponibile in Node 22+ e browser).
+// Hash deterministico del clientId (S1.F2.2): SHA-256 troncato a 32 caratteri hex, scritto IN CHIARO accanto al clientId cifrato.
+// Serve perché con la cifratura attiva la macchina utente non ha la chiave privata e non può decifrare il clientId per riconoscere «questo feedback è di questa installazione» (popup ricompense C5): il match usa l'hash. Si scrive anche a cifratura dormiente, per uniformità.
+// Deterministica (niente salt né nonce) e cross-ambiente: WebCrypto, presente in Node 22+ e nel browser.
 
 (function (global) {
   'use strict';
@@ -23,20 +13,13 @@
     return c.subtle;
   }
 
-  /**
-   * Calcola SHA-256 del clientId e ritorna i primi 32 caratteri hex (16 byte).
-   * Deterministica: stesso input → stesso output.
-   *
-   * @param {string} clientId
-   * @returns {Promise<string>} 32 char hex (es. "a3f1e2b8c4d5...")
-   */
+  // Primi 32 caratteri hex su 32 byte di digest.
   async function hashClientId(clientId) {
     const s = String(clientId || '');
     const enc = new TextEncoder();
     const buf = enc.encode(s);
     const hashBuf = await subtle().digest('SHA-256', buf);
     const bytes = new Uint8Array(hashBuf);
-    // Converti in hex e tronca a 32 char (16 byte su 32 totali)
     let hex = '';
     for (let i = 0; i < 16; i++) {
       hex += bytes[i].toString(16).padStart(2, '0');
@@ -44,19 +27,8 @@
     return hex;
   }
 
-  // ── L'impronta per UNA scheda pubblica (#583) ─────────────────────────────
-  //
-  // Sulla scheda pubblica di un fix serve un modo, per chi ha mandato quel
-  // feedback, di riconoscerlo come suo quando Filo gli annuncia la ricompensa.
-  // Mettere lì `clientIdHash` così com'è funzionerebbe, ma sarebbe lo STESSO
-  // valore su tutte le schede della stessa installazione: chiunque legge la
-  // bacheca (è pubblica per definizione) potrebbe raggruppare i fix e dire
-  // «queste dodici cose le ha mandate la stessa persona».
-  //
-  // Con l'id della scheda dentro l'impronta, ogni scheda ne ha una diversa e
-  // quel raggruppamento non si fa più. Chi ha mandato il feedback la ricalcola
-  // lo stesso, perché conosce entrambe le cose: l'id della scheda che sta
-  // guardando e l'impronta del proprio clientId.
+  // L'impronta per UNA scheda pubblica (#583): sulla scheda del fix chi ha mandato il feedback deve riconoscerlo come suo quando Filo gli annuncia la ricompensa.
+  // Mettere lì `clientIdHash` com'è darebbe lo stesso valore su tutte le schede della stessa installazione, e chiunque legge la bacheca (che è pubblica) potrebbe dire «queste dodici cose le ha mandate la stessa persona». Con l'id della scheda dentro l'impronta ogni scheda ne ha una diversa, e chi ha mandato il feedback la ricalcola lo stesso perché conosce entrambe le cose.
   function tagInput(docId, clientIdHash) {
     const a = String(docId || '');
     const b = String(clientIdHash || '');
@@ -70,11 +42,7 @@
     return hex;
   }
 
-  /**
-   * Impronta della scheda `docId` per l'installazione il cui clientId ha
-   * impronta `clientIdHash`. Torna '' se manca uno dei due.
-   * @returns {Promise<string>} 32 char hex
-   */
+  // Torna '' se manca uno dei due.
   async function cardTag(docId, clientIdHash) {
     const base = tagInput(docId, clientIdHash);
     if (!base) return '';
@@ -82,12 +50,7 @@
     return hexTronco(new Uint8Array(await subtle().digest('SHA-256', buf)));
   }
 
-  /**
-   * La stessa cosa, SINCRONA. La usa chi PUBBLICA le schede, che gira nel
-   * processo principale e negli script, dove `require` c'è: in una pagina un
-   * SHA-256 sincrono non esiste, e in pagina nessuno pubblica schede.
-   * @returns {string} 32 char hex
-   */
+  // La stessa cosa SINCRONA, per chi PUBBLICA le schede: gira nel main e negli script, dove `require` c'è. In una pagina uno SHA-256 sincrono non esiste, e in pagina nessuno pubblica schede.
   function cardTagSync(docId, clientIdHash) {
     const base = tagInput(docId, clientIdHash);
     if (!base) return '';

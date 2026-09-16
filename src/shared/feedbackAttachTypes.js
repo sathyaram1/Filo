@@ -1,48 +1,23 @@
-// Allowlist dei tipi di allegato ammessi nel box "Invia feedback".
-//
-// Perché esiste: il box permette di allegare file sia con il pulsante "Allega"
-// sia trascinandoli dentro (drag & drop). L'attributo `accept` di un <input
-// type=file> è solo un suggerimento per il picker e NON vincola né la selezione
-// "Tutti i file" del picker né i file letti da `dataTransfer.files` nel drop.
-// Serve quindi un gate deterministico lato client, condiviso da ENTRAMBI i
-// cammini, che rifiuti i tipi "attivi" (eseguibili nel dominio di Google
-// Storage quando chi fa triage apre il link): text/html, image/svg+xml, ecc.
-//
-// Questa è la prima linea (UX: rifiuto immediato con messaggio). La cintura
-// vera è `storage.rules` (stessa allowlist lato server). Tieni le due liste
-// allineate.
-//
-// classify({ name, type }) -> 'image' | 'file' | null
-//   'image' → anteprima immagine (raster)
-//   'file'  → pillola allegato (pdf/txt/md/csv/json…)
-//   null    → tipo NON ammesso, va rifiutato
+// Allowlist degli allegati ammessi nel box «Invia feedback», per il pulsante «Allega» e per il trascinamento: `accept` su un <input type=file> è solo un suggerimento e non vincola né «Tutti i file» né il drop.
+// Serve un gate deterministico che rifiuti i tipi ATTIVI (text/html, image/svg+xml…), eseguibili nel dominio di Google Storage quando chi fa triage apre il link. Prima linea soltanto: la cintura è `storage.rules`, con la stessa allowlist — da tenere allineate.
+// classify({ name, type }) → 'image' | 'file' | null (non ammesso).
 
 (function (global) {
   'use strict';
 
-  // Immagini raster ammesse. NIENTE image/svg+xml: l'SVG è un documento attivo
-  // (può contenere <script>) e non va accettato come "immagine".
+  // Immagini raster. NIENTE image/svg+xml: un SVG è un documento attivo (può contenere <script>).
   const RASTER_IMAGE_MIME = new Set([
     'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp',
   ]);
 
-  // Documenti passivi ammessi per MIME esplicito. Deve combaciare con
-  // storage.rules. NIENTE text/html / application/xhtml+xml / text/xml.
+  // Documenti passivi ammessi per MIME esplicito, da tenere uguale a storage.rules. NIENTE text/html, application/xhtml+xml, text/xml.
   const DOC_MIME = new Set([
     'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
-    // `.tsv` e `.yaml` col loro tipo esplicito. Le storage.rules li ammettono
-    // già e `npm run feedback:apri` li manda; senza questi due, un .yaml che il
-    // sistema operativo tipizza `application/x-yaml` veniva rifiutato qui
-    // mentre il deposito lo avrebbe accettato, e lo strumento a riga di comando
-    // poteva mandare quello che una persona non poteva allegare (#582, giro 7).
+    // `.tsv` e `.yaml` col loro tipo esplicito: senza, un .yaml tipizzato `application/x-yaml` era rifiutato qui mentre il deposito lo accettava, e la riga di comando mandava quello che una persona non poteva allegare (#582).
     'text/tab-separated-values', 'application/x-yaml',
   ]);
 
-  // Estensioni ammesse SOLO quando il MIME è vuoto o generico
-  // (application/octet-stream): il sistema operativo non sempre mappa .md/.yml/
-  // .log/.csv a un MIME, e il picker le elenca via `accept`. Non usiamo mai
-  // l'estensione per "salvare" un MIME esplicito e pericoloso (es. un .txt che
-  // il SO tipizza text/html resta rifiutato).
+  // Estensioni ammesse SOLO con MIME vuoto o generico: il sistema non sempre mappa .md/.yml/.log/.csv. Mai per «salvare» un MIME esplicito pericoloso: un .txt tipizzato text/html resta rifiutato.
   const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
   const DOC_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'log', 'yml', 'yaml', 'pdf']);
 
@@ -51,8 +26,7 @@
     return m ? m[1].toLowerCase() : '';
   }
 
-  // Un MIME "generico" non dice nulla sul contenuto: solo in questo caso ci
-  // fidiamo dell'estensione.
+  // Un MIME generico non dice nulla sul contenuto: solo lì ci fidiamo dell'estensione.
   function isGenericMime(t) {
     return !t || t === 'application/octet-stream';
   }
@@ -62,15 +36,12 @@
     const type = String(file.type || '').toLowerCase().trim();
     const ext = extOf(file.name);
 
-    // 1) MIME esplicito e ammesso → decide da solo (nessun override via estensione).
     if (RASTER_IMAGE_MIME.has(type)) return 'image';
     if (DOC_MIME.has(type)) return 'file';
 
-    // 2) MIME esplicito ma NON in allowlist (text/html, image/svg+xml, …) → rifiuta,
-    //    a prescindere dall'estensione. È il caso del .html trascinato.
+    // MIME esplicito ma fuori allowlist (text/html, image/svg+xml…) → rifiuto a prescindere dall'estensione: è il caso del .html trascinato.
     if (!isGenericMime(type)) return null;
 
-    // 3) MIME vuoto/generico → decidi dall'estensione dell'allowlist.
     if (IMAGE_EXT.has(ext)) return 'image';
     if (DOC_EXT.has(ext)) return 'file';
     return null;
