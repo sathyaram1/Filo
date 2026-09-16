@@ -1,32 +1,11 @@
-// Combobox custom in stile Filo: input editabile + dropdown tematizzato, al
-// posto del popup NATIVO della <datalist> (che usa i colori di sistema, fuori
-// palette). Riusa le classi .sn-select-pop / .sn-select-option (theme.css) così
-// ogni menu a tendina di Filo si vede e si comporta allo stesso modo.
-//
-// PERCHÉ ESISTE
-//   Nasce estraendo la logica che viveva in modelChainEditor.js (dropdown dei
-//   nickname per-azione): lo stesso comportamento serviva anche al campo
-//   "stringa modello" del registry (Opzioni), che invece usava ancora la
-//   <datalist> nativa — incoerente con il resto. Un'unica sorgente evita due
-//   dropdown che divergono.
-//
-// Convenzione IIFE su globalThis come gli altri moduli shared/*.
+// Combobox in stile Filo: input editabile più tendina tematizzata, al posto del popup NATIVO della <datalist>, che usa i colori di sistema e cade fuori palette.
+// Riusa .sn-select-pop / .sn-select-option (theme.css) così ogni menu a tendina di Filo si vede e si comporta allo stesso modo: una sorgente sola invece di due tendine che divergono.
 
 (function (global) {
   'use strict';
 
-  // Attacca un dropdown custom a `input`, ancorato dentro `host` (che deve
-  // essere position:relative). L'input resta editabile: si può scrivere a mano
-  // o scegliere dalla lista; digitando, la lista si filtra. Ritorna close().
-  //
-  // opts:
-  //   readOptions: () => [{ value, label }]   sorgente di verità (letta a ogni build)
-  //   onPick:      (value) => void            invocata alla scelta dalla tendina
-  //   validate:    (value) => { ok, reason }  opzionale: opzioni non valide disabilitate
-  //   popClass:    string                     classe extra sul popup (posizionamento)
-  //   valueClass:  string                     classe dello span del valore (default .sn-combo-opt-name)
-  //   labelClass:  string                     classe dello span dell'etichetta (default .sn-combo-opt-label)
-  //   sizeInput:   bool                        tieni input.size = lunghezza testo (pillole catena)
+  // Attacca una tendina custom a `input`, ancorata dentro `host` (che dev'essere position:relative). L'input resta editabile: si scrive a mano o si sceglie dalla lista, e digitando la lista si filtra. Ritorna close().
+  // opts: readOptions () => [{ value, label }] (riletta a ogni build), onPick(value), validate(value) => { ok, reason } (le non valide restano visibili ma disabilitate), popClass, valueClass, labelClass, sizeInput (tiene input.size sulla lunghezza del testo).
   function attach(host, input, opts) {
     const o = opts || {};
     const readOptions = typeof o.readOptions === 'function' ? o.readOptions : () => [];
@@ -43,9 +22,7 @@
 
     let optionEls = [];
     let hoverEl = null;
-    // Filtro applicato alla lista: vuoto = mostra tutto. Si popola solo quando
-    // l'utente DIGITA (non al semplice focus), così aprendo un campo già
-    // compilato si vedono comunque tutte le opzioni per cambiarlo.
+    // Il filtro si popola solo quando l'utente DIGITA, non al semplice focus: aprendo un campo già compilato si vedono comunque tutte le opzioni per cambiarlo.
     let filterText = '';
 
     function fit() {

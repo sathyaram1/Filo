@@ -1,31 +1,14 @@
-// Aggiornamento continuo della lista dei feedback (dashboard di gestione).
-//
-// La dashboard non ricarica mai tutto: a ogni giro chiede a Firestore le sole
-// VERSIONI (id + ultima scrittura, pochi byte), confronta con quello che ha
-// già in mano, e riscarica soltanto i documenti cambiati o nuovi. Qui vive la
-// logica pura — confronto e fusione — così si può provare senza rete.
-//
-// Espone SN_FEEDBACK_LIVE = { POLL_MS, diffVersions, applyChanges }.
+// Aggiornamento continuo della lista dei feedback (dashboard di gestione): qui sta la logica pura — confronto e fusione — così si prova senza rete.
+// La dashboard non ricarica mai tutto: a ogni giro chiede le sole VERSIONI (id + ultima scrittura, pochi byte) e riscarica solo i documenti cambiati o nuovi.
 
 (function (global) {
   'use strict';
 
-  // Ogni quanto la dashboard chiede "cosa è cambiato?". Un giro costa una
-  // lettura per feedback in pagina (500 al tetto), quindi il ritmo è anche una
-  // spesa: un minuto tiene la lista al passo con le routine (che lavorano per
-  // minuti, non secondi) per pochi euro al mese di letture.
+  // Ogni quanto la dashboard chiede «cosa è cambiato?». Un giro costa una lettura per feedback in pagina (500 al tetto), quindi il ritmo è anche una spesa: un minuto tiene il passo con le routine (che lavorano per minuti, non secondi) per pochi euro al mese.
   const POLL_MS = 60 * 1000;
 
-  // Confronta la lista locale con le versioni appena lette.
-  //   local:  documenti in mano (con `_id` e, se arrivano da Firestore, `_updateTime`)
-  //   remote: [{ _id, _updateTime }] — l'elenco corrente, nell'ordine della pagina
-  // Ritorna { changed, added, removed } (array di id):
-  //   changed — presente in entrambi, ma scritto dopo l'ultima lettura
-  //             (o senza versione locale: non sappiamo cos'abbiamo, rileggiamo);
-  //   added   — nuovo, mai visto;
-  //   removed — non più in pagina: cancellato, oppure scivolato oltre il tetto
-  //             perché ne sono entrati di più recenti. In entrambi i casi un
-  //             ricaricamento non lo mostrerebbe, quindi neanche noi.
+  // local: documenti in mano (`_id` e, se vengono da Firestore, `_updateTime`); remote: [{ _id, _updateTime }] nell'ordine della pagina. Ritorna { changed, added, removed } di id.
+  // Senza versione locale si rilegge comunque: non sappiamo cosa abbiamo. `removed` copre sia il cancellato sia lo scivolato oltre il tetto — un ricaricamento non lo mostrerebbe, quindi neanche noi.
   function diffVersions(local, remote) {
     const seen = new Map();
     for (const fb of Array.isArray(local) ? local : []) {
@@ -52,10 +35,7 @@
     return Number.isFinite(t) ? t : 0;
   }
 
-  // Applica un giro alla lista: i documenti `fresh` sostituiscono (o
-  // aggiungono) quelli con lo stesso id, gli id `removed` escono. Ritorna una
-  // lista NUOVA, dal più recente al più vecchio come quella del caricamento
-  // iniziale; la lista d'ingresso non viene toccata.
+  // Ritorna una lista NUOVA, dal più recente al più vecchio come quella del caricamento iniziale; la lista d'ingresso non viene toccata.
   function applyChanges(list, { fresh = [], removed = [] } = {}) {
     const drop = new Set((removed || []).map(String));
     const byId = new Map();

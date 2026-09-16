@@ -1,15 +1,5 @@
-// Modello di storage dell'editor: una COLLEZIONE di file (non più un solo doc).
-//
-// Ogni "file" è un documento nel formato serializzato dell'editor
-// (meta / content / comments / modules), più un `id` stabile. La collezione
-// tiene la lista dei file e un puntatore `activeId` al file corrente, così alla
-// riapertura si torna sull'ultimo file aperto.
-//
-// Questo modulo è LOGICA PURA (nessun DOM, nessun localStorage): trasforma
-// oggetti collezione e migra il vecchio documento singolo. La persistenza vera
-// (localStorage) e il parse/serialize legati al DOM restano in editor.js. Così
-// la migrazione e le operazioni sulla collezione sono unit-testabili senza
-// aprire Electron (vedi tests/unit/editorStore.test.mjs).
+// Modello di storage dell'editor: una COLLEZIONE di file (non più un solo doc), ognuno nel formato serializzato dell'editor più un `id` stabile, con `activeId` per riaprire sull'ultimo file aperto.
+// LOGICA PURA — niente DOM, niente localStorage: la persistenza e il parse/serialize legati al DOM restano in editor.js, così migrazione e operazioni sulla collezione si provano senza Electron.
 
 (function (global) {
   'use strict';
@@ -21,7 +11,6 @@
     return 'file-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   }
 
-  // Assicura che un file serializzato abbia sempre meta, id e titolo.
   function normalizeFile(raw, idFactory) {
     const mkId = idFactory || defaultIdFactory;
     const f = raw && typeof raw === 'object' ? { ...raw } : {};
@@ -32,10 +21,7 @@
     return f;
   }
 
-  // Migra a una collezione v2 partendo da (in ordine di priorità):
-  //  1) una collezione già presente e valida (solo normalizzata);
-  //  2) il vecchio documento singolo (`legacyDoc`) → diventa il primo file;
-  //  3) niente → un unico file vuoto prodotto da `blankFactory`.
+  // Migra a una collezione v2 da, in ordine di priorità: una collezione già valida (solo normalizzata), il vecchio documento singolo (diventa il primo file), oppure niente → un unico file vuoto.
   // `idFactory` e `blankFactory` sono iniettati così il modulo resta puro.
   function migrateToCollection(opts) {
     const o = opts || {};
@@ -69,7 +55,7 @@
     return findFile(collection, collection.activeId) || collection.files[0];
   }
 
-  // Aggiunge un file (già serializzato) e lo rende attivo. Ritorna il file.
+  // Il file aggiunto diventa anche quello attivo.
   function addFile(collection, file, idFactory) {
     const f = normalizeFile(file, idFactory);
     collection.files.push(f);
@@ -77,7 +63,7 @@
     return f;
   }
 
-  // Sostituisce il contenuto del file `id` con `serialized` (mantiene l'id).
+  // L'id sopravvive alla sostituzione.
   function replaceFile(collection, id, serialized) {
     const idx = collection.files.findIndex((f) => f.id === id);
     const next = { ...serialized, id };
@@ -88,10 +74,8 @@
     return next;
   }
 
-  // Rimuove il file `id`. Se era attivo, l'attivo passa al vicino (il precedente
-  // se esiste, altrimenti il primo). Se la collezione resta VUOTA, `activeId`
-  // diventa null: sta al chiamante crearne uno nuovo (invariante "almeno un
-  // file"). Ritorna { removed: bool, emptied: bool }.
+  // Se era attivo, l'attivo passa al vicino (il precedente se esiste, altrimenti il primo).
+  // Se la collezione resta VUOTA `activeId` diventa null: crearne uno nuovo sta al chiamante (invariante «almeno un file»). Ritorna { removed, emptied }.
   function removeFile(collection, id) {
     const idx = collection.files.findIndex((f) => f.id === id);
     if (idx < 0) return { removed: false, emptied: false };
