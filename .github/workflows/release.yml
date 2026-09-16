@@ -63,7 +63,179 @@ concurrency:
   cancel-in-progress: false  # non interrompere un publish a meta'
 
 jobs:
+  # ─── PRIMA DI TUTTO: LA SUITE COMPLETA ─────────────────────────────────────
+  # Dal 2026-09-15 la suite Playwright completa (~390 spec, ~1.600 casi) non la
+  # lancia più nessun agente, né in locale né nelle routine: gira QUI, prima di
+  # ogni pubblicazione, su una macchina Linux senza schermo come quella delle
+  # routine. Per questo ELECTRON_DISABLE_SANDBOX=1 e xvfb-run -a: senza quei
+  # due Electron non parte proprio (lo dice anche scripts/ensure-electron.mjs).
+  # Un solo worker (Electron e le scorciatoie globali non reggono la
+  # concorrenza): nel contenitore delle routine ci mette un'ora e un quarto.
+  #
+  # Il verdetto NON è «tutto verde»: nel contenitore senza schermo ci sono
+  # rossi d'ambiente scritti in tests/rossi-noti.json (contenitore.specs) e
+  # scripts/suite-verdict.mjs li toglie dal conto. Resta un rosso NUOVO? La
+  # versione non esce, il rosso diventa un feedback (lo stesso allarme del
+  # cancello unit qui sotto) e la patch salta un giro. Un flaky ripassato al
+  # retry non conta: assorbirlo è già il compito dei retry.
+  #
+  # Esito e tracce (JSON dei risultati, screenshot e trace dei rossi) restano
+  # allegati all'esecuzione per sette giorni: chi prende il feedback parte da
+  # lì, non rilancia un'ora di suite per vedere cos'è successo.
+  #
+  # `solo_suite` (avvio a mano): fa girare SOLO questo lavoro, sempre, anche
+  # senza niente di nuovo, sul RAMO da cui si è lanciato, e senza pubblicare né
+  # aprire feedback: è il modo di provare la suite su un ramo.
+  #   gh workflow run release.yml --ref <ramo> -f solo_suite=true
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout (main, o il ramo scelto con solo_suite)
+        uses: actions/checkout@v4
+        with:
+          # Con solo_suite si prova il ramo da cui si e' lanciato; altrimenti
+          # quello che si sta per pubblicare, cioe' main. Su cron `inputs` e'
+          # vuoto e si cade su main.
+          ref: ${{ inputs.solo_suite && github.ref || 'main' }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # STESSA logica del passo omonimo del lavoro Windows: se cambia una delle
+      # due, cambia anche l'altra (la sentinella in tests/unit/releaseSuite
+      # le confronta). In piu': con solo_suite si gira sempre.
+      - name: C'e' qualcosa di nuovo da provare?
+        id: check
+        shell: bash
+        run: |
+          if [ "${{ inputs.solo_suite }}" = "true" ]; then
+            echo "solo_suite: la suite gira comunque, e non si pubblica niente."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --tags --force
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "Nessun tag precedente -> si prova."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            AHEAD=$(git rev-list --count "${LAST_TAG}..HEAD")
+            echo "Commit dopo $LAST_TAG: $AHEAD"
+            if [ "$AHEAD" -gt 0 ]; then
+              echo "run=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Niente di nuovo dal tag: la suite non gira (uscita verde)."
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Install dipendenze
+        if: steps.check.outputs.run == 'true'
+        run: npm ci
+
+      # `npm ci` scarica il binario di Electron da solo (qui github e'
+      # raggiungibile); lo script e' idempotente e serve se un giorno non lo
+      # facesse: senza binario nessuno spec parte, e la suite sarebbe «rossa»
+      # per un motivo che non c'entra col codice.
+      - name: Binario di Electron
+        if: steps.check.outputs.run == 'true'
+        run: node scripts/ensure-electron.mjs
+
+      - name: Schermo virtuale (xvfb)
+        if: steps.check.outputs.run == 'true'
+        shell: bash
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y xvfb
+          fi
+
+      # Il JSON va in un file (PLAYWRIGHT_JSON_OUTPUT_NAME), la lista a schermo
+      # per seguire l'esecuzione. `continue-on-error`: il verdetto lo da' lo
+      # script dopo, non l'uscita di Playwright, che e' rossa anche per i soli
+      # rossi noti.
+      - name: Suite Playwright completa
+        if: steps.check.outputs.run == 'true'
+        id: suite
+        continue-on-error: true
+        shell: bash
+        run: ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_JSON_OUTPUT_NAME=suite-risultati.json xvfb-run -a npx playwright test --reporter=list,json
+
+      # Uscita 0: nessun rosso nuovo. 1: rossi nuovi (elenco in rossi-nuovi.txt,
+      # intero). 2: la suite non e' partita o non ha lasciato un esito
+      # leggibile, che NON e' un verde.
+      - name: Verdetto (rossi nuovi fuori dai rossi noti del contenitore)
+        if: steps.check.outputs.run == 'true'
+        id: verdetto
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt 2>&1 | tee verdetto.log
+
+      - name: Conserva esito e tracce (7 giorni)
+        if: always() && steps.check.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-playwright-${{ github.run_id }}
+          path: |
+            suite-risultati.json
+            rossi-nuovi.txt
+            verdetto.log
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Stesso allarme del cancello unit (stessa credenziale, stesso script):
+      # il rosso diventa un feedback in coda e al prossimo giro una routine lo
+      # prende in carico. Non con solo_suite: una prova su un ramo non e' una
+      # pubblicazione fermata, e un feedback aperto per un ramo di lavoro
+      # sarebbe rumore in coda (l'elenco resta nel registro e nell'artifact).
+      - name: Rosso nuovo - apri un feedback e fermati
+        if: steps.check.outputs.run == 'true' && steps.verdetto.outcome == 'failure'
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          SOLO_SUITE: ${{ inputs.solo_suite }}
+        shell: bash
+        run: |
+          echo "::error::Suite Playwright con rossi nuovi (o non partita): pubblicazione annullata."
+          if [ "$SOLO_SUITE" = "true" ]; then
+            echo "solo_suite: nessun feedback aperto, l'elenco dei rossi sta qui sopra e nell'artifact."
+            exit 1
+          fi
+          PREMESSA="La suite Playwright completa, che gira prima di ogni pubblicazione, ha trovato dei rossi NUOVI sul ramo principale (fuori dai rossi noti del contenitore in tests/rossi-noti.json): la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. Il JSON dei risultati e le tracce dei rossi (screenshot, trace) stanno nell artifact di questa esecuzione (Actions), per sette giorni."
+          # L'elenco intero sta in rossi-nuovi.txt (allegato): qui un tetto, e
+          # il taglio si DICE col numero di quelli rimasti fuori. Un elenco
+          # mozzato senza avviso fa credere di avere tutti i rossi.
+          ROSSI_TUTTE=$(cat rossi-nuovi.txt 2>/dev/null || true)
+          ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
+          N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
+          if [ "${N_TUTTE:-0}" -gt 80 ]; then
+            ROSSI="${ROSSI}
+          … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno in rossi-nuovi.txt, nell'artifact di questa esecuzione (Actions)"
+          fi
+          VERDETTO=$(tail -c 2500 verdetto.log 2>/dev/null || echo "(nessun verdetto: la suite non e partita)")
+          TESTO="${PREMESSA}
+
+          Rossi nuovi (${N_TUTTE:-0}):
+          ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}
+
+
+          Verdetto:
+          ${VERDETTO}"
+          node scripts/build-alarm.mjs "Suite Playwright rossa: nessuna versione pubblicata" "$TESTO" || echo "::warning::allarme non consegnato"
+          exit 1
+
   release:
+    needs: suite
+    # Con solo_suite non si pubblica niente. Su cron `inputs` e' vuoto e la
+    # condizione resta vera; `success()` va detto: senza, un `if` scritto a
+    # mano lo sostituisce, e il lavoro partirebbe anche a suite rossa.
+    if: ${{ success() && !inputs.solo_suite }}
     runs-on: windows-latest
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
