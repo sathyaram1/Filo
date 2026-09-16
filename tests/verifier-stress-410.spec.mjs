@@ -97,7 +97,8 @@ test('nome file lunghissimo (600 caratteri): niente crash, avviso di dimensioni 
   try {
     const page = await testServer.openReady(openTab, linkPage([s.url()]));
     await page.locator('#dl0').click();
-    await expect.poll(async () => (await listItems(shell)).length, { timeout: 20000 }).toBeGreaterThan(0);
+    // Fine dello scaricamento, non comparsa della voce (vedi il caso ostile).
+    await expect.poll(async () => (await listItems(shell))[0]?.state ?? null, { timeout: 20000 }).toBe('completed');
     const it = (await listItems(shell))[0];
     expect(existsSync(it.savePath)).toBe(true);
     // il toast non deve diventare un muro di testo: la larghezza del riquadro
