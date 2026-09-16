@@ -1,33 +1,17 @@
-// Persistenza del sistema di memoria di Filo.
-//
-// Tre livelli (vedi filo-architettura.md sezione 4):
-//   - raw_log: storico completo di interazioni utente/Filo. Volume previsto
-//     ~1MB/anno → niente retention policy stringente, basta un cap difensivo.
-//   - lessons buffer: lezioni estratte dall'agente Creatore Lezioni, in attesa
-//     di compattazione (svuotato dal Compattatore quando supera 3000 char).
-//   - moduli: PROFILO, PREFERENZE, e N espansioni dinamiche. Sempre persistenti.
-//
-// In aggiunta gestiamo qui anche due store legati alla dashboard:
-//   - timers: countdown attivi (azione TIMER).
-//   - notifications: voci della colonna destra.
-//
-// Gli appunti NON stanno più qui: l'azione SALVA_APPUNTO li scrive nei file
-// dell'editor (src/main/services/editorFiles.js), che è anche l'unico posto che
-// conosce ancora il vecchio archivio, per svuotarlo una volta sola alla prima
-// partenza dopo l'aggiornamento.
-//
-// Caricato nel service worker via importScripts e nelle pagine via <script>.
+// Persistenza della memoria di Filo (filo-architettura.md §4): raw_log (storico completo,
+// solo un cap difensivo), buffer delle lezioni in attesa di compattazione, moduli sempre
+// persistenti (PROFILO, PREFERENZE, espansioni). Qui stanno anche i timer e le notifiche
+// della colonna destra. Gli appunti NON sono più qui: l'azione SALVA_APPUNTO scrive nei
+// file dell'editor (src/main/services/editorFiles.js).
 
 (function (global) {
   'use strict';
 
   const KEYS = global.SN_CONST.STORAGE_KEYS;
 
-  // Limite difensivo sul raw log per non saturare chrome.storage (~10MB totali).
-  // 5000 entry ≈ pochi MB con messaggi corti.
+  // Cap difensivo sul raw log per non saturare chrome.storage (~10MB totali).
   const RAW_LOG_CAP = 5000;
-  // Quando il buffer di lezioni supera questa soglia in caratteri, il
-  // Compattatore va eseguito (vedi spec sezione 4.2).
+  // Sopra questa soglia in caratteri il Compattatore va eseguito (spec §4.2).
   const LESSONS_BUFFER_TRIGGER_CHARS = 3000;
   // Cap difensivo per le notifiche.
   const NOTIFICATIONS_CAP = 100;
@@ -41,11 +25,9 @@
     });
   }
 
-  // Tronca a `max` unità visibili senza spezzare un carattere a metà.
-  // `String.slice` conta unità UTF-16: tagliare in mezzo a un'emoji (coppia
-  // surrogata) lascerebbe un surrogato solitario, mostrato come glifo rotto in
-  // un'etichetta di timer/sveglia. Contiamo per grafema (Intl.Segmenter, quando
-  // c'è, tiene insieme anche emoji composte) con ripiego a code point.
+  // Tronca senza spezzare un carattere: `String.slice` conta unità UTF-16, e tagliare in
+  // mezzo a un'emoji lascerebbe un surrogato solitario, cioè un glifo rotto nell'etichetta di
+  // un timer. Si conta per grafema (Intl.Segmenter quando c'è), con ripiego a code point.
   function truncateSafe(str, max) {
     const s = String(str == null ? '' : str);
     let units;
@@ -71,7 +53,7 @@
     await chrome.storage.local.set({ [key]: value });
   }
 
-  // ===== Raw log =====
+  // Raw log
 
   async function appendRaw(entry) {
     const list = await getRaw(KEYS.FILO_RAW_LOG, []);
@@ -96,7 +78,7 @@
     return out.slice(0, limit);
   }
 
-  // ===== Lessons buffer =====
+  // Lessons buffer
 
   async function getLessonsBuffer() {
     return getRaw(KEYS.FILO_LESSONS_BUFFER, []);
@@ -119,7 +101,7 @@
     await setRaw(KEYS.FILO_LESSONS_BUFFER, []);
   }
 
-  // ===== Moduli =====
+  // Moduli
 
   // Forma in storage: { PROFILO: "...", PREFERENZE: "...", <ESPANSIONE>: "..." }
   async function getMemory() {
@@ -132,7 +114,7 @@
     await setRaw(KEYS.FILO_MEMORY, memory);
   }
 
-  // Aggiorna alcuni moduli senza toccare gli altri (semantica patch).
+  // Semantica patch: aggiorna alcuni moduli senza toccare gli altri.
   async function patchMemory(patch) {
     const cur = await getMemory();
     const next = { ...cur, ...patch };
@@ -140,9 +122,8 @@
     return next;
   }
 
-  // Parsing dell'output del Compattatore: blocchi "NOME:\ncontenuto multilinea"
-  // separati da una riga vuota. Tollerante: il primo elemento prima del primo
-  // header viene scartato.
+  // Output del Compattatore: blocchi «NOME:\ncontenuto» separati da una riga vuota.
+  // Tollerante: quello che precede il primo header si scarta.
   function parseCompactorOutput(text) {
     if (!text) return {};
     const trimmed = String(text).trim();
@@ -171,7 +152,6 @@
     return out;
   }
 
-  // Rendering dei moduli memoria per inserirli nei prompt.
   function renderMemoryForPrompt(memory) {
     if (!memory || typeof memory !== 'object') return { profilo: '', preferenze: '', espansioni: '' };
     const profilo = memory.PROFILO || '';
@@ -186,22 +166,16 @@
     return { profilo, preferenze, espansioni };
   }
 
-  // ===== Onboarding (#524) =====
-  //
-  // Lo stato della micro-intervista di benvenuto sta in UNA chiave e passa
-  // sempre da `SN_ONBOARDING.normalize`: qualunque cosa ci sia in storage
-  // (assente, vecchia, manomessa) torna una forma usabile, perché queste
-  // letture stanno sul cammino di apertura della home.
+  // Onboarding (#524): lo stato sta in UNA chiave e passa sempre da `SN_ONBOARDING.normalize`,
+  // perché queste letture stanno sul cammino di apertura della home.
 
   function Onb() {
     return global.SN_ONBOARDING;
   }
 
-  // Il segno "già accolto" è UNO: `done` qui dentro, scritto quando
-  // l'intervista FINISCE. La vecchia chiave FILO_WELCOMED sopravvive solo come
-  // segnale di migrazione — chi era già stato accolto dalla versione precedente
-  // non si ritrova l'intervista addosso a un aggiornamento — e non viene più
-  // scritta da nessuno: appena esiste lo stato qui, comanda lui.
+  // Il segno «già accolto» è UNO: `done`, scritto quando l'intervista FINISCE. La vecchia
+  // chiave FILO_WELCOMED sopravvive solo come segnale di migrazione — chi era già stato
+  // accolto non si ritrova l'intervista addosso — e non la scrive più nessuno.
   async function getOnboarding() {
     const raw = await getRaw(KEYS.FILO_ONBOARDING, null);
     const O = Onb();
@@ -219,26 +193,20 @@
     return next;
   }
 
-  // ===== Notes / appunti =====
-  //
-  // Non esistono più qui: gli appunti sono file dell'editor (ci scrive Filo
-  // stesso), non un elenco a parte. Il vecchio archivio è già stato svuotato
-  // dalla migrazione una-tantum in src/main/services/editorFiles.js — l'unico
-  // punto rimasto che conosce quella chiave.
+  // Gli appunti non esistono più qui: sono file dell'editor. Il vecchio archivio l'ha già
+  // svuotato la migrazione una-tantum in editorFiles.js.
 
-  // ===== Timer =====
+  // Timer
 
   async function listTimers() {
     return getRaw(KEYS.FILO_TIMERS, []);
   }
 
   async function addTimer({ label, seconds }) {
-    // Una durata non interpretabile o non positiva (0, negativa, NaN) NON crea un
-    // timer: torniamo null e i chiamanti non lo trasmettono né lo segnano eseguito
-    // (`if (t) broadcastLiveUpdate()`, `executed: !!entry`). Stessa filosofia di
-    // addAlarm: meglio "non ho capito la durata" che programmare un timer fasullo.
-    // (Prima un `Math.max(1, …)` forzava il minimo a 1s e rendeva questa guardia
-    // irraggiungibile: un input malformato creava un timer di 1s che suonava subito.)
+    // Una durata non interpretabile o non positiva NON crea un timer: si torna null e il
+    // chiamante non lo trasmette né lo segna eseguito. Meglio «non ho capito la durata» che un
+    // timer fasullo — un `Math.max(1, …)` rendeva la guardia irraggiungibile e faceva suonare
+    // subito un timer di 1s.
     const sec = Math.round(Number(seconds) || 0);
     if (sec <= 0) return null;
     const list = await listTimers();
@@ -261,12 +229,10 @@
     return filtered;
   }
 
-  // Mette in pausa un countdown: congela il tempo rimanente in `remainingMs` e
-  // marca `paused: true`. Da quel momento `endsAt` non è più affidabile per il
-  // rendering (il "now" avanza mentre il timer è fermo) — chi mostra un timer in
-  // pausa DEVE usare `remainingMs`. Le sveglie (kind:'alarm') hanno un orario
-  // assoluto: metterle in pausa non ha senso, quindi le ignoriamo. Un timer che
-  // sta già suonando (`ringing`) o già in pausa resta invariato.
+  // In pausa il tempo rimanente si congela in `remainingMs` e `endsAt` non è più affidabile
+  // per il rendering: chi mostra un timer in pausa DEVE usare `remainingMs`. Le sveglie hanno
+  // un orario assoluto e non si mettono in pausa; un timer che suona o già in pausa resta
+  // com'è.
   async function pauseTimer(id) {
     const list = await listTimers();
     const idx = list.findIndex((t) => t.id === id);
@@ -280,9 +246,8 @@
     return list;
   }
 
-  // Riprende un timer in pausa: ricalcola `endsAt = adesso + remainingMs` così il
-  // conto alla rovescia riparte esattamente da dove era stato fermato, e rimuove
-  // il campo temporaneo. No-op su un timer non in pausa.
+  // Riprende ricalcolando `endsAt = adesso + remainingMs`, così il conto riparte esattamente
+  // da dov'era. No-op su un timer non in pausa.
   async function resumeTimer(id) {
     const list = await listTimers();
     const idx = list.findIndex((t) => t.id === id);
@@ -300,21 +265,14 @@
     return list;
   }
 
-  // ===== Sveglie (#322) =====
-  //
-  // Una sveglia è un timer con scadenza ASSOLUTA: vive nella STESSA lista dei
-  // timer (kind: 'alarm') così eredita gratis tutto il flusso già rodato —
-  // gcTimers → ringing → suoneria + card "Ferma" nella dashboard. Prima
-  // l'azione SVEGLIA creava solo una notifica statica che non suonava mai.
+  // Una sveglia (#322) è un timer con scadenza ASSOLUTA e vive nella STESSA lista
+  // (kind: 'alarm'), così eredita gratis il flusso già rodato: gcTimers → ringing → suoneria
+  // e card «Ferma».
 
-  // Converte l'orario richiesto in un timestamp assoluto (ms). Regole:
-  //   - "HH:MM" / "H:MM" / "H" (anche col punto: "7.30"): la PROSSIMA
-  //     occorrenza — oggi se ancora futura, altrimenti domani (chi chiede
-  //     "sveglia alle 7" alle 23 intende domattina).
-  //   - stringa ISO / data completa: quel momento esatto; se è già passato
-  //     → null (non ha senso una sveglia nel passato).
-  // Ritorna null se non interpretabile: meglio "non ho capito l'orario" che
-  // fingere di aver programmato qualcosa.
+  // «HH:MM», «H», anche col punto: la PROSSIMA occorrenza — oggi se ancora futura, altrimenti
+  // domani (chi chiede «sveglia alle 7» alle 23 intende domattina). Una data completa o ISO
+  // vale per quel momento esatto, e se è passato torna null. Null anche se non
+  // interpretabile: meglio «non ho capito l'orario» che fingere di aver programmato.
   function resolveAlarmTime(raw, nowMs = Date.now()) {
     const s = String(raw ?? '').trim();
     if (!s) return null;
@@ -334,14 +292,9 @@
     return null;
   }
 
-  // ===== Ricorrenza settimanale delle sveglie =====
-  //
-  // Una sveglia può ripetersi nei giorni della settimana ("il lunedì e il
-  // mercoledì"). Il dato canonico è un array di token brevi in `repeat`
-  // (['lun','mer']) più l'orario in `atTime` ("07:55"): `endsAt` resta la
-  // PROSSIMA occorrenza — così tutto il flusso esistente (gcTimers → ringing →
-  // suoneria + notifica) continua a funzionare senza saperne nulla. Al suono la
-  // sveglia NON si consuma: si ricalcola l'occorrenza successiva.
+  // Ricorrenza settimanale: il dato canonico è `repeat` (['lun','mer']) più `atTime`, mentre
+  // `endsAt` resta la PROSSIMA occorrenza, così il flusso esistente continua a funzionare
+  // senza saperne nulla. Al suono la sveglia non si consuma: si ricalcola l'occorrenza dopo.
 
   const DOW_TOKENS = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab']; // indice = Date#getDay()
   const DOW_ORDER = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];  // ordine di lettura
@@ -378,11 +331,9 @@
     tuttiigg: DOW_ORDER,
   };
 
-  // Interpreta la ricorrenza chiesta e la riduce ai token canonici, ordinati da
-  // lunedì a domenica. Accetta un array (['lun','mercoledì']), una stringa con
-  // separatori ("lun, mer", "lunedì e mercoledì") o una scorciatoia ("feriali",
-  // "weekend", "ogni giorno"). Quello che non si riconosce viene ignorato:
-  // ritorna [] = sveglia a occorrenza singola (il comportamento di sempre).
+  // Accetta un array, una stringa con separatori o una scorciatoia («feriali», «weekend»,
+  // «ogni giorno») e riduce ai token canonici, da lunedì a domenica. Quello che non si
+  // riconosce si ignora: [] = sveglia a occorrenza singola, il comportamento di sempre.
   function normalizeRepeat(raw) {
     const found = new Set();
     const eat = (value) => {
@@ -405,9 +356,7 @@
     return DOW_ORDER.filter((d) => found.has(d));
   }
 
-  // Orario "puro" (ore/minuti locali) da "HH:MM", "H", "7.30" o da una data-ora
-  // ISO. Serve per una sveglia ricorrente: il giorno lo decide la ricorrenza,
-  // dell'input ci interessa solo l'ora.
+  // Per una sveglia ricorrente il giorno lo decide la ricorrenza: dell'input serve solo l'ora.
   function parseClock(raw) {
     const s = String(raw ?? '').trim();
     if (!s) return null;
@@ -429,10 +378,8 @@
     return `${String(clock.h).padStart(2, '0')}:${String(clock.m).padStart(2, '0')}`;
   }
 
-  // Prossima occorrenza STRETTAMENTE futura di `clock` in uno dei `days`.
-  // Guarda da oggi (i=0) a fra sette giorni compresi: così una sveglia del solo
-  // lunedì chiesta lunedì dopo l'orario finisce al lunedì successivo, e una
-  // chiesta prima dell'orario suona oggi.
+  // Prossima occorrenza STRETTAMENTE futura: si guarda da oggi a fra sette giorni compresi,
+  // così una sveglia del solo lunedì chiesta lunedì dopo l'orario finisce al lunedì dopo.
   function nextRecurrence(clock, days, nowMs = Date.now()) {
     const wanted = normalizeRepeat(days);
     if (!clock || !wanted.length) return null;
@@ -459,9 +406,8 @@
     return nextRecurrence(clock, t.repeat, nowMs);
   }
 
-  // Dicitura leggibile della ricorrenza: "ogni giorno", "feriali", "weekend"
-  // oppure l'elenco dei giorni ("lun+mer"). Unica per stato dell'agente e
-  // colonna destra: se cambia, cambia in un posto solo.
+  // Dicitura unica per lo stato dell'agente e la colonna destra: se cambia, cambia in un
+  // posto solo.
   function formatRepeat(days) {
     const d = normalizeRepeat(days);
     if (!d.length) return '';
@@ -495,13 +441,9 @@
     return entry;
   }
 
-  // ===== Trovare "quale sveglia intende" =====
-  //
-  // L'utente non dice mai un id: dice "la sveglia della palestra", "quella
-  // delle 7", "tutte le sveglie". Questa è la parte pura che, data la lista e
-  // il riferimento, decide su quali entry agire. Ritorna sempre un array (vuoto
-  // = non ho capito a cosa ti riferisci): chi la chiama non cancella nulla
-  // quando è vuoto, invece di indovinare.
+  // L'utente non dice mai un id: dice «la sveglia della palestra», «quella delle 7», «tutte».
+  // Ritorna sempre un array, e vuoto vuol dire «non ho capito a cosa ti riferisci»: chi
+  // chiama non cancella niente invece di indovinare.
 
   function normText(s) {
     return String(s == null ? '' : s)
@@ -521,8 +463,8 @@
   // 'timer' (countdown); assente = entrambi.
   function resolveTimerRefs(list, ref = {}) {
     const all = Array.isArray(list) ? list : [];
-    // Riferimento già risolto altrove (il main lo risolve prima del popup di
-    // conferma e poi agisce su QUESTI, non su una nuova ricerca).
+    // Riferimento già risolto altrove (il main lo risolve prima del popup di conferma e poi
+    // agisce su QUESTI).
     if (Array.isArray(ref.ids)) {
       const set = new Set(ref.ids);
       return all.filter((t) => set.has(t.id));
@@ -554,9 +496,8 @@
       });
       if (byWord.length) return byWord;
     }
-    // 4) riferimento all'ORARIO ("quella delle 7", "la sveglia delle 07:30").
-    // Sul testo GREZZO: la normalizzazione toglie i due punti e "06:30"
-    // diventerebbe "06 30", cioè le 6 in punto.
+    // Sul testo GREZZO: la normalizzazione toglie i due punti e «06:30» diventerebbe «06 30»,
+    // cioè le 6 in punto.
     const hm = /(\d{1,2})(?:[:.](\d{2}))?/.exec(String(ref.label || ''));
     if (hm) {
       const want = fmtClock({ h: Number(hm[1]), m: Number(hm[2] || 0) });
@@ -579,10 +520,8 @@
     return { removed: targets, list: kept };
   }
 
-  // Sposta una sveglia (nuovo orario e/o nuova ricorrenza) o rimette in moto un
-  // countdown con una durata nuova. Ritorna { updated, list }: `updated` vuoto
-  // significa "non ho capito quale, o il nuovo orario non è interpretabile" —
-  // e allora non si tocca niente.
+  // Sposta una sveglia o rimette in moto un countdown. `updated` vuoto = non ho capito quale,
+  // o il nuovo orario non è interpretabile: allora non si tocca niente.
   async function updateTimersByRef(ref = {}, { time, repeat, seconds, nowMs } = {}) {
     const now = Number.isFinite(nowMs) ? nowMs : Date.now();
     const list = await listTimers();
@@ -593,8 +532,7 @@
     const next = list.map((t) => {
       if (!ids.has(t.id)) return t;
       if (t.kind === 'alarm') {
-        // Ricorrenza: quella chiesta ora, se assente quella che la sveglia ha
-        // già (spostare l'orario non deve far perdere "il lunedì e il mercoledì").
+        // Spostare l'orario non deve far perdere «il lunedì e il mercoledì».
         const asked = normalizeRepeat(repeat);
         const days = asked.length ? asked : normalizeRepeat(t.repeat);
         const clock = parseClock(time) || parseClock(t.atTime) || parseClock(t.endsAt);
@@ -622,12 +560,9 @@
     return { updated, list: next };
   }
 
-  // Pulizia: i timer scaduti (endsAt <= now) e non in pausa vengono marcati
-  // `ringing: true` invece di essere eliminati, così la UI può far suonare la
-  // suoneria e mostrare un controllo "Ferma". I timer in stato `ringing` restano
-  // finché l'utente li ferma esplicitamente (via stopTimerAlarm) oppure fino
-  // alla prossima apertura di Filo (in quel caso vengono rimossi silenziosamente
-  // perché la suoneria non avrebbe senso senza la UI aperta).
+  // I timer scaduti e non in pausa si marcano `ringing` invece di sparire, così la UI suona e
+  // mostra «Ferma». Restano finché l'utente ferma, o fino alla prossima apertura di Filo dove
+  // si tolgono in silenzio: senza UI aperta la suoneria non avrebbe senso.
   async function gcTimers() {
     const list = await listTimers();
     const now = Date.now();
@@ -642,11 +577,8 @@
         // premuto Ferma). Non invalidiamo la cache ogni secondo.
         result.push(t);
       } else if (isRecurring(t)) {
-        // Sveglia RICORRENTE: suona, ma non si consuma. Insieme a `ringing`
-        // spostiamo già `endsAt` sull'occorrenza successiva, così il tick dopo
-        // non la vede più scaduta e la settimana prossima suona di nuovo. Se
-        // per qualche motivo la prossima non è calcolabile, si comporta come
-        // una sveglia normale (suona una volta e la si ferma).
+        // Sveglia RICORRENTE: suona e non si consuma — insieme a `ringing` si sposta già `endsAt`
+        // sull'occorrenza successiva. Se non è calcolabile, si comporta come una sveglia normale.
         const next = nextAlarmOccurrence(t, now);
         result.push(next ? { ...t, ringing: true, endsAt: new Date(next).toISOString() } : { ...t, ringing: true });
         changed = true;
@@ -658,18 +590,16 @@
     }
     if (changed) {
       await setRaw(KEYS.FILO_TIMERS, result);
-      // Invalida la cache della dashboard affinché eventuali suggerimenti
-      // "il timer sta per suonare" vengano rigenerati.
+      // Invalida la cache della dashboard: i suggerimenti «il timer sta per suonare» vanno
+      // rigenerati.
       await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
     }
     return result;
   }
 
-  // Silenzia un timer in stato ringing rimuovendolo dalla lista.
-  // ECCEZIONE: una sveglia RICORRENTE non si cancella premendo "Ferma" — fermare
-  // la sveglia di stamattina non vuol dire disdire quella di mercoledì. Resta in
-  // lista, muta, già puntata sull'occorrenza successiva. Per toglierla davvero
-  // c'è la × (deleteTimer), come per tutte le altre.
+  // ECCEZIONE: una sveglia RICORRENTE non si cancella premendo «Ferma» — fermare quella di
+  // stamattina non disdice quella di mercoledì. Resta in lista, muta, già puntata
+  // sull'occorrenza dopo; per toglierla davvero c'è la ×.
   async function stopTimerAlarm(id) {
     const list = await listTimers();
     const idx = list.findIndex((t) => t.id === id);
@@ -691,7 +621,7 @@
     return filtered;
   }
 
-  // ===== Notifications =====
+  // Notifications
 
   async function listNotifications({ includeDismissed = false } = {}) {
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
@@ -727,7 +657,7 @@
     return list;
   }
 
-  // ===== Dashboard cache =====
+  // Dashboard cache
 
   async function getDashboardCache() {
     return getRaw(KEYS.FILO_DASHBOARD_CACHE, null);
@@ -738,20 +668,16 @@
       ts: new Date().toISOString(),
       message: payload?.message || '',
       suggestions: Array.isArray(payload?.suggestions) ? payload.suggestions : [],
-      // #155 — firma degli input con cui è stato generato questo messaggio:
-      // serve a capire se la home andrebbe ricalcolata (input cambiati).
+      // #155 — firma degli input con cui è stato generato il messaggio: dice se la home andrebbe
+      // ricalcolata.
       signature: payload?.signature || '',
     });
   }
 
-  // ===== Proxy: regole persistenti per dominio (#152) =====
-  //
-  // "questo sito sempre dagli USA" → la regola vive qui (memoria a lungo
-  // termine di Filo, stessa persistenza di profilo/preferenze: storage.local
-  // → storage.json), quindi SOPRAVVIVE al riavvio. Alla navigazione verso il
-  // dominio la tab nasce già instradata (TabManager._maybeApplyDomainRule).
-  // La chiave è il dominio registrabile (eTLD+1) calcolato dal chiamante (che
-  // ha l'estrazione PSL); qui solo una normalizzazione difensiva.
+  // Regole proxy per dominio (#152): «questo sito sempre dagli USA» vive nella memoria a
+  // lungo termine, quindi sopravvive al riavvio e la tab nasce già instradata. La chiave è il
+  // dominio registrabile (eTLD+1) calcolato dal chiamante, che ha la PSL: qui solo una
+  // normalizzazione difensiva.
   function normProxyDomain(domain) {
     return String(domain || '').trim().toLowerCase().replace(/^www\./, '');
   }
@@ -786,7 +712,7 @@
     return rules[normProxyDomain(domain)] || null;
   }
 
-  // ===== Session =====
+  // Session
 
   async function getSession() {
     const s = await getRaw(KEYS.FILO_SESSION, null);
@@ -816,27 +742,17 @@
   }
 
   global.SN_FILO_MEMORY = {
-    // raw log
     appendRaw, listRaw,
-    // lessons
     getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer,
     LESSONS_BUFFER_TRIGGER_CHARS,
-    // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
-    // onboarding (#524)
     getOnboarding, setOnboarding,
-    // timer + sveglie (#322)
     listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, pauseTimer, resumeTimer, gcTimers, stopTimerAlarm,
-    // ricorrenza + gestione dalla chat
     normalizeRepeat, parseClock, nextRecurrence, nextAlarmOccurrence, formatRepeat, isRecurring,
     resolveTimerRefs, removeTimersByRef, updateTimersByRef,
-    // notifications
     listNotifications, addNotification, dismissNotification,
-    // dashboard cache
     getDashboardCache, setDashboardCache,
-    // proxy: regole persistenti per dominio (#152)
     listProxyRules, setProxyRule, removeProxyRule, getProxyRule,
-    // session
     getSession, setSession, touchSession,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

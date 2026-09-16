@@ -1,24 +1,11 @@
-// Mappa "linguaggio naturale → preferenza dell'app" usata quando Filo modifica
-// le impostazioni su richiesta dell'utente dalla chat (azione IMPOSTA_PREFERENZA).
-//
-// È volutamente un modulo condiviso (IIFE su globalThis): la conoscenza di
-// QUALI preferenze sono modificabili e COME interpretarne i valori è la stessa
-// esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
-//
-// Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS }.
-// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk }
-// oppure null se chiave/valore non sono validi. Solo le preferenze qui elencate
-// sono scrivibili. Dal #146.5 l'elenco copre TUTTE le impostazioni della pagina
-// Opzioni (modelli, provider, chiavi API, sicurezza/privacy, limite di spesa,
-// funzionalità) oltre a quelle estetiche/comportamentali: ognuna dichiara il
-// proprio `level` (1 = applica subito, 2 = popup di conferma). Le impostazioni
-// sensibili (sicurezza, modelli, chiavi, provider, costi) sono di livello 2.
-//
-// REGOLA (#183): ogni setter di livello 2 DEVE dichiarare anche `risk` — una
-// frase in chiaro che spiega cosa controlla l'impostazione e quali sono gli
-// eventuali rischi. È il testo che il popup di conferma mostra all'utente
-// (lo compone actionLevels.describe). Un setter di livello 2 senza `risk` è
-// un bug: il test tests/unit/preferences.test.mjs lo intercetta.
+// Mappa «linguaggio naturale → preferenza» per quando Filo cambia le impostazioni dalla
+// chat (azione IMPOSTA_PREFERENZA). Modulo condiviso perché quali preferenze sono
+// scrivibili e come si interpretano i valori è la stessa conoscenza della pagina
+// Preferenze, e deve restare testabile senza Electron. Solo le preferenze elencate qui sono
+// scrivibili; ognuna dichiara il proprio `level` (1 = applica subito, 2 = popup di
+// conferma), e le sensibili (sicurezza, modelli, chiavi, provider, costi) sono di livello 2.
+// REGOLA (#183): ogni setter di livello 2 DEVE dichiarare anche `risk`, la frase in chiaro
+// che il popup mostra; senza, tests/unit/preferences.test.mjs diventa rosso.
 
 (function (global) {
   'use strict';
@@ -33,28 +20,20 @@
     return null;
   }
 
-  // Maschera una chiave API per l'etichetta di conferma: mostra i primi/ultimi
-  // caratteri (così l'utente riconosce QUALE chiave sta impostando) senza
-  // stampare l'intero segreto nel popup. Vedi i setter `chiave_*`.
+  // Maschera la chiave API nell'etichetta di conferma: i primi e gli ultimi caratteri bastano
+  // a riconoscere QUALE chiave si sta impostando, senza stampare il segreto nel popup.
   function maskKey(k) {
     const s = String(k == null ? '' : k).trim();
     if (s.length <= 8) return '••••';
     return `${s.slice(0, 4)}…${s.slice(-4)}`;
   }
 
-  // Interpreta un numero scritto in linguaggio naturale tollerando il formato
-  // italiano (punto = separatore delle migliaia, virgola = decimale) SENZA
-  // rompere il formato inglese (punto decimale). Nasce dal bug: "2.500 euro"
-  // veniva letto come 2,50 perché il punto delle migliaia finiva per fare da
-  // separatore decimale. Regole di disambiguazione (nell'ordine):
-  //   • se c'è una virgola → è SEMPRE il decimale, e ogni punto è migliaia:
-  //       "2.500,50" → 2500.50   "1.234,5" → 1234.5   "2,50" → 2.5
-  //   • se ci sono SOLO punti e la stringa è fatta di gruppi da 3 cifre
-  //     (es. "2.500", "1.000", "1.234.567") → sono separatori di migliaia:
-  //       "2.500" → 2500   "1.000" → 1000
-  //   • altrimenti il punto è decimale (formato inglese), invariato:
-  //       "1.5" → 1.5   "2.50" → 2.5   "0.9" → 0.9
-  // Ritorna un numero finito oppure NaN.
+  // Numero in linguaggio naturale, formato italiano senza rompere quello inglese: «2.500
+  // euro» veniva letto 2,50 perché il punto delle migliaia faceva da decimale. Nell'ordine:
+  // - c'è una virgola → è lei il decimale e ogni punto è migliaia («2.500,50» → 2500.50);
+  // - solo punti, in gruppi esatti da 3 cifre → migliaia («2.500» → 2500);
+  // - altrimenti il punto è decimale, formato inglese («1.5» → 1.5).
+  // NaN se non è un numero.
   function parseItalianNumber(raw) {
     let s = String(raw == null ? '' : raw).trim().replace(/[^0-9.,-]/g, '');
     if (!s) return NaN;
@@ -69,14 +48,11 @@
     return Number.isFinite(n) ? n : NaN;
   }
 
-  // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
-  // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
-  // annidati vicini); `label` è la conferma leggibile per l'utente.
-  // `level` (opzionale, default 1) è il livello di sicurezza quando è FILO a
-  // cambiare la preferenza via chat (#146.2, vedi actionLevels.js): 1 applica
-  // subito, 2 chiede conferma con popup. `risk` (obbligatorio quando level=2,
-  // #183) è la spiegazione in chiaro mostrata nel popup: cosa controlla
-  // l'impostazione e quali rischi comporta toccarla.
+  // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }. `partial` è il pezzo
+  // di settings da fondere (deepMerge preserva i campi annidati vicini), `label` la conferma
+  // leggibile. `level` (default 1) è il livello di sicurezza quando è FILO a cambiare la
+  // preferenza via chat (#146.2): 2 chiede conferma col popup. `risk` è obbligatorio con
+  // level=2 (#183): cosa controlla l'impostazione e quali rischi comporta toccarla.
   const PREF_SETTERS = [
     {
       keys: ['tema', 'theme', 'aspetto'],
@@ -173,9 +149,8 @@
         + 'vengono interpretati i comandi che Filo lancia.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        // 'sh' e 'zsh' sono i nomi che ha senso pronunciare su Mac e Linux: là
-        // powershell/cmd non esistono e il main ricade comunque su /bin/sh —
-        // ma se l'utente li chiede per nome, la richiesta deve arrivare.
+        // 'sh' e 'zsh' sono i nomi che ha senso pronunciare su Mac e Linux, dove powershell e cmd
+        // non esistono: il main ricade comunque su /bin/sh, ma la richiesta per nome deve arrivare.
         const map = {
           powershell: 'powershell', ps: 'powershell',
           cmd: 'cmd', 'prompt dei comandi': 'cmd', prompt: 'cmd',
@@ -206,9 +181,8 @@
       },
     },
     {
-      // La voce TTS è una stringa URI (voiceURI o nome del sistema): si imposta
-      // passando la stringa esatta come valore (il sistema la riconosce all'avvio).
-      // Reversibile (puoi cambiarla di nuovo) → livello 1.
+      // La voce TTS è una stringa URI (voiceURI o nome di sistema): si passa esatta, il sistema
+      // la riconosce all'avvio. Reversibile → livello 1.
       keys: ['voce', 'voce lettura', 'voce tts', 'ttsvoice', 'voce del sistema'],
       build(v) {
         const s = String(v == null ? '' : v).trim();
@@ -217,9 +191,8 @@
       },
     },
     {
-      // Voce del MODELLO di lettura (quella naturale): si indica per nome
-      // ("Sara", "Nicola") o per id ("if_sara"); "automatica" torna a seguire
-      // la lingua del testo. Reversibile → livello 1.
+      // Voce del MODELLO di lettura: per nome («Sara», «Nicola») o per id («if_sara»);
+      // «automatica» torna a seguire la lingua del testo. Reversibile → livello 1.
       keys: ['voce_modello', 'voce del modello', 'voce naturale', 'voce modello', 'ttsmodelvoice'],
       build(v) {
         const s = String(v == null ? '' : v).trim();
@@ -230,9 +203,8 @@
         }
         const Voices = global.SN_TTS_VOICES;
         if (Voices) {
-          // Si cerca fra TUTTI i cataloghi: quale modello legge non lo sa
-          // questa pagina, e una voce di un altro modello viene comunque
-          // ignorata al momento della lettura (resolveVoice).
+          // Si cerca fra TUTTI i cataloghi: quale modello legge non lo sa questa pagina, e una voce
+          // di un altro modello viene comunque ignorata al momento della lettura.
           const hit = Voices.allVoices().find((x) => x.id === low || x.id.toLowerCase() === low
             || x.label.toLowerCase() === low || x.label.toLowerCase().split(' ')[0] === low);
           if (!hit) return null;
@@ -242,7 +214,7 @@
       },
     },
 
-    // ── Funzionalità (interruttori) — reversibili, nessun rischio → livello 1 ──
+    // Funzionalità (interruttori): reversibili, nessun rischio → livello 1
     {
       keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione'],
       build(v) {
@@ -276,7 +248,7 @@
       },
     },
 
-    // ── Sicurezza / privacy — livello 2 (popup di conferma prima di applicare) ──
+    // Sicurezza / privacy: livello 2 (popup di conferma prima di applicare)
     {
       keys: ['protezione_ip', 'protezione ip', 'proteggi ip', 'protezione ip locale', 'webrtc', 'protezione webrtc', 'ip locale'],
       level: 2,
@@ -347,7 +319,7 @@
       },
     },
 
-    // ── Modelli / provider / chiavi / costi — livello 2 (conferma) ──
+    // Modelli / provider / chiavi / costi: livello 2 (conferma)
     {
       keys: ['modelli_predefiniti', 'modelli predefiniti', 'usa modelli predefiniti', 'modelli di default', 'configurazione predefinita modelli'],
       level: 2,
@@ -426,14 +398,11 @@
       },
     },
 
-    // ── Colore identità delle tab — cosmetico, reversibile → livello 1 ──
-    // Mappa le richieste verbali ("voglio colori più vivaci nelle tab", "rendile
-    // più neutre", "niente colore", "Poste è verde non gialla") sui sei parametri
-    // di src/shared/tabColor.js. I valori sono preset ASSOLUTI (non delta: il
-    // setter non vede lo stato corrente), così il risultato è deterministico e
-    // l'utente vede subito cambiare il colore delle tab. Il merge in storage è
-    // profondo su `tabColor`, quindi un preset parziale lascia intatti gli altri
-    // parametri. La regolazione fine dei singoli numeri sta nelle Preferenze.
+    // Colore identità delle tab, cosmetico e reversibile → livello 1. Mappa le richieste
+    // verbali («colori più vivaci», «rendile più neutre», «niente colore») sui sei parametri di
+    // tabColor.js. I valori sono preset ASSOLUTI, non delta — il setter non vede lo stato
+    // corrente — così il risultato è deterministico; il merge è profondo, quindi un preset
+    // parziale lascia intatti gli altri parametri.
     {
       keys: ['colore_tab', 'colore delle tab', 'colore tab', 'colori tab', 'colori delle tab',
         'colore schede', 'colori schede', 'tinta tab', 'tinta delle tab', 'vivacita tab', 'vivacità tab'],
@@ -460,7 +429,7 @@
       },
     },
 
-    // ── Suoneria timer — reversibile, innocuo → livello 1 ──
+    // Suoneria timer: reversibile, innocua → livello 1
     {
       keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
       level: 1,
@@ -480,8 +449,7 @@
     },
   ];
 
-  // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce
-  // il partial. Ritorna { partial, label } o null se chiave/valore non validi.
+  // Match esatto sulla chiave, poi fuzzy. null se chiave o valore non sono validi.
   function buildPreferencePartial(rawKey, rawVal) {
     const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
     if (!key) return null;
