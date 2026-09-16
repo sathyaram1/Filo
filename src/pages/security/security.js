@@ -1,5 +1,4 @@
-// Logica pagina Sicurezza: due toggle (proteggi IP via WebRTC + blocca popup)
-// + box informativo sui servizi P2P. Le impostazioni sono in settings.security.
+// Pagina Sicurezza: proteggi IP via WebRTC e blocca popup; impostazioni in settings.security.
 
 (function () {
   'use strict';
@@ -11,10 +10,8 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // Estrae l'host del fornitore proxy dal template datacenter configurato
-  // (es. 'socks5://user-{country}:pass@gate.provider.com:7000' → 'gate.provider.com').
-  // Ritorna '' se non configurato o non parsabile. La pagina mostra l'host per
-  // dichiarare onestamente per chi passa il traffico delle tab "da un altro paese".
+  // Estrae l'host del fornitore proxy dal template datacenter configurato; '' se manca o non è
+  // parsabile. La pagina lo mostra per dichiarare per chi passa il traffico delle tab.
   function proxyProviderHost(proxy) {
     const tmpl = String((proxy && proxy.datacenter) || '').trim();
     if (!tmpl) return '';
@@ -105,10 +102,8 @@
     }
   }
 
-  // Metà mancante dell'esportazione: ricarica un .zip esportato da Filo.
-  // Due passi voluti — prima leggiamo il file e diciamo COSA contiene, poi
-  // chiediamo conferma: l'utente sa cosa sta per rimettere dentro prima di
-  // dire sì. Il popup è quello di Filo (SN_CONFIRM_UI), mai il confirm nativo.
+  // Due passi voluti: prima si legge il file e si dice COSA contiene, poi si chiede conferma,
+  // così l'utente sa cosa sta per rimettere dentro. Popup di Filo, mai il confirm nativo.
   function showImportHint(text, isError) {
     const hint = $('sec-import-hint');
     hint.textContent = text;
@@ -163,8 +158,7 @@
       });
       if (res && res.ok) {
         showImportHint(I18n.t('security_import_done'), false);
-        // I dati appena rimessi dentro devono comparire: la pagina si ricarica
-        // per mostrare le impostazioni importate invece di quelle vecchie.
+        // La pagina si ricarica: i dati appena rimessi dentro devono comparire al posto dei vecchi.
         setTimeout(() => location.reload(), 1200);
       } else {
         showImportHint(I18n.t('security_import_fail'), true);
@@ -182,8 +176,7 @@
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
     const sec = settings.security || {};
-    // "Apri da un altro paese": se è configurato un fornitore proxy, mostra il
-    // suo host nella riga privacy (onestà: dichiariamo per chi passa il traffico).
+    // Onestà: se un fornitore proxy è configurato, il suo host si dichiara nella riga privacy.
     const provHost = proxyProviderHost(settings.proxy);
     const provEl = $('sec-proxy-box-provider');
     if (provEl) {
@@ -194,9 +187,8 @@
         provEl.style.display = 'none';
       }
     }
-    // Default-on: il merge con DEFAULT_SETTINGS.security mette già true/true se
-    // l'utente non ha mai salvato, quindi qui leggiamo "!== false" per
-    // riflettere il default anche in casi limite (es. chiave esistente ma null).
+    // Default-on: il merge con DEFAULT_SETTINGS.security mette già true, quindi qui si legge
+    // «!== false» per reggere anche i casi limite (chiave esistente ma null).
     $('sec-protect-ip').checked = sec.protectIpLeak !== false;
     $('sec-block-popups').checked = sec.blockPopups !== false;
     $('sec-adblock').checked = (sec.adblock || {}).enabled !== false;
@@ -204,8 +196,7 @@
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
     $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
-    // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
-    // subito che non bloccheranno nulla invece di lasciarle passare mute.
+    // Voci salvate da prima del controllo, o non valide: dillo subito invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     syncSiteBlockEnabled();
     const sb = sec.safeBrowse || {};
@@ -233,8 +224,6 @@
     $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
   }
 
-  // ─── protezione fingerprinting ─────────────────────────────────────────────
-
   function currentFpMode() {
     const checked = document.querySelector('input[name="fp-mode"]:checked');
     return checked ? checked.value : 'default';
@@ -249,8 +238,6 @@
     saveFingerprint._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
-  // ─── gestione cookie ──────────────────────────────────────────────────────
-
   let cookieWhitelist = [];
 
   function currentMode() {
@@ -258,9 +245,8 @@
     return checked ? checked.value : 'default';
   }
 
-  // I "siti fidati" hanno effetto SOLO in "Privacy massima" (dove ogni sito è
-  // isolato/effimero): lì la lista è attiva. In "Automatico"/"Manuale" i login
-  // restano comunque, quindi la lista è informativa (disabilitata + nota).
+  // I «siti fidati» hanno effetto SOLO in «Privacy massima», dove ogni sito è isolato: altrove
+  // i login restano comunque, quindi la lista è informativa (disabilitata, con nota).
   function syncCookieMode() {
     const privacy = currentMode() === 'privacy';
     $('sec-cookies-trusted-note').style.display = privacy ? 'none' : 'block';
@@ -271,9 +257,8 @@
     for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !privacy;
   }
 
-  // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
-  // www. e porta, lascia il bare host minuscolo. "https://www.Gmail.com/x" →
-  // "gmail.com". Ritorna '' se non estraibile.
+  // Pulisce l'input in un dominio confrontabile (via schema, path, www e porta, minuscolo):
+  // «https://www.Gmail.com/x» → «gmail.com». '' se non estraibile.
   function cleanDomain(raw) {
     let s = String(raw || '').trim().toLowerCase();
     if (!s) return '';
@@ -317,8 +302,7 @@
     }
   }
 
-  // Mostra (o nasconde, con msg vuoto) un avviso inline sotto il campo "siti
-  // fidati". Senza questo, un input rifiutato spariva senza spiegazione.
+  // Senza questo avviso, un input rifiutato spariva senza spiegazione.
   function setWhitelistError(msg) {
     const el = $('cookie-wl-error');
     if (!el) return;
@@ -332,8 +316,7 @@
     if (!raw) { setWhitelistError(''); return; }
     const domain = cleanDomain(raw);
     if (!domain) {
-      // Input non vuoto ma non è un dominio valido: avvisa invece di svuotare
-      // in silenzio. Lascia il testo nel campo così l'utente può correggerlo.
+      // Non è un dominio valido: avvisa invece di svuotare in silenzio, e lascia il testo correggibile.
       setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
       input.focus();
       return;
@@ -364,8 +347,7 @@
     saveCookies._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
-  // I sotto-controlli del rilevamento siti pericolosi sono attivi solo quando il
-  // controllo principale è acceso.
+  // I sotto-controlli valgono solo quando il controllo principale è acceso.
   function syncSafebrowseEnabled() {
     const on = $('sec-safebrowse').checked;
     const sub = $('sec-safebrowse-sub');
@@ -375,7 +357,6 @@
     }
   }
 
-  // Disabilita i sotto-controlli del blocco siti quando il blocco è spento.
   function syncSiteBlockEnabled() {
     const on = !!$('sec-siteblock').checked;
     const sub = $('sec-siteblock-sub');
@@ -384,9 +365,8 @@
     $('sec-siteblock-blacklist').disabled = !on;
   }
 
-  // Mostra (o nasconde, con lista vuota) un avviso inline sotto la blacklist
-  // che nomina le righe scartate perché non sono domini validi. Senza questo,
-  // una voce tipo "facebook" veniva salvata muta ma non bloccava mai il sito.
+  // Avviso inline che nomina le righe scartate: senza, una voce come «facebook» veniva salvata
+  // muta e non bloccava mai il sito.
   function setBlacklistError(invalidRows) {
     const el = $('sec-siteblock-blacklist-error');
     if (!el) return;
@@ -399,10 +379,8 @@
     }
   }
 
-  // Normalizza e valida ogni riga della blacklist come il campo "siti fidati":
-  // scarta schema/path/www, minuscolo, e tiene solo domini con estensione
-  // (niente IP o nomi a etichetta singola come "facebook"). Ritorna i domini
-  // validi (deduplicati) e le righe scartate così com'erano, per l'avviso.
+  // Stessa normalizzazione dei «siti fidati», e tiene solo domini con estensione (niente IP né
+  // etichette singole). Ritorna i validi deduplicati e le righe scartate com'erano, per l'avviso.
   function parseBlacklist(raw) {
     const valid = [];
     const seen = new Set();
@@ -458,8 +436,7 @@
     $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); save(); });
     $('sec-siteblock-lists').addEventListener('change', save);
     $('sec-siteblock-blacklist').addEventListener('change', save);
-    // Mentre l'utente corregge le righe, togli l'avviso precedente (rivalutato
-    // al prossimo salvataggio su blur).
+    // Mentre si corregge, l'avviso precedente sparisce (rivalutato al salvataggio su blur).
     $('sec-siteblock-blacklist').addEventListener('input', () => setBlacklistError([]));
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
@@ -476,7 +453,6 @@
     $('cookie-wl-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); addWhitelistDomain(); }
     });
-    // Mentre l'utente corregge il valore, togli l'avviso d'errore precedente.
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
