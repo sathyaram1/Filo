@@ -271,6 +271,9 @@ export function ultimoAssistantMs(file) {
  * Trova il transcript. `explicit` vince, poi `env`, poi il `.jsonl` scritto
  * più di recente — sessione o sotto-agente — nella cartella del progetto (e,
  * da una cartella di lavoro separata, in quella del checkout principale).
+ * Se il più recente è un sotto-agente il cui meta punta a un lanciatore
+ * nella stessa cartella, si risale a lui: al rilascio un figlio in sottofondo
+ * ancora vivo è più recente del worker, ma il rapporto è del worker (giro 6).
  * Torna { file, note } — `file` vuoto se non c'è niente, con la nota che
  * spiega dove si è guardato.
  */
