@@ -30,6 +30,8 @@ import {
   vocePerCaso,
   verdetto,
   leggiArgomenti,
+  primaRiga,
+  classificaErroriGlobali,
 } from '../../scripts/suite-verdict.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
