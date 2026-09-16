@@ -1,10 +1,6 @@
-// Pagina d'errore di rete (filo://error/error.html?url=…&code=…&desc=…).
-// Caricata dal main (tabs.js) quando una navigazione fallisce o il renderer
-// della scheda muore. Tutta la logica di parsing/traduzione vive in
-// src/shared/netError.js (SN_NET_ERROR); qui solo il rendering e il "Riprova".
-//
-// NB: questa pagina gira anche in una view "esterna" (preload di pagina,
-// contextIsolation attiva): niente chrome.* qui dentro — solo DOM standard.
+// Pagina d'errore di rete, caricata dal main quando una navigazione fallisce o il renderer
+// della scheda muore. Parsing e traduzione vivono in SN_NET_ERROR; qui rendering e «Riprova».
+// Gira anche in una view esterna (contextIsolation): niente chrome.* qui, solo DOM standard.
 
 (function () {
   'use strict';
@@ -17,8 +13,7 @@
 
   const msg = NE ? NE.describe(code, desc) : { title: 'Impossibile caricare la pagina', hint: '', offline: false };
 
-  // Host del bersaglio, per titolo scheda + riga sotto al titolo. textContent
-  // ovunque: l'URL arriva dalla query string, mai iniettarlo come HTML.
+  // textContent ovunque: l'URL arriva dalla query string, mai iniettarlo come HTML.
   let host = '';
   try { host = target ? (new URL(target).host || target) : ''; } catch (_) { host = target || ''; }
 
@@ -26,15 +21,13 @@
   document.getElementById('err-host').textContent = host ? host : '';
   document.getElementById('err-hint').textContent = msg.hint || '';
 
-  // Dettaglio tecnico in piccolo (es. "ERR_NAME_NOT_RESOLVED (-105)"): utile a
-  // chi cerca aiuto o segnala il problema, invisibile come rumore per gli altri.
+  // Dettaglio tecnico in piccolo: utile a chi cerca aiuto o segnala, rumore per gli altri.
   const detailBits = [];
   if (desc) detailBits.push(desc);
   if (code && String(code) !== (NE && NE.CRASH_CODE)) detailBits.push(`(${code})`);
   document.getElementById('err-detail').textContent = detailBits.join(' ');
 
-  // Il titolo del documento diventa il titolo della scheda (via
-  // page-title-updated): il sito fallito, non più "Nuova scheda".
+  // Il titolo del documento diventa il titolo della scheda: il sito fallito, non «Nuova scheda».
   document.title = host || msg.title;
 
   const retryBtn = document.getElementById('err-retry');
