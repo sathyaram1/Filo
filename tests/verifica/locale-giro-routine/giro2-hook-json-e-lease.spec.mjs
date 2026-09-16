@@ -106,7 +106,7 @@ test.describe('hook di salvataggio — il rinvio dopo un rebase e il lavoro degl
     writeFileSync(join(s.lavoro, 'b.txt'), 'due\n');
     hook(s.lavoro, JSON.stringify({ hook_event_name: 'PostToolUse' }));
     const suOrigin = git(s.origin, 'rev-parse', 'claude/prova');
-    const contiene = git(s.origin, 'merge-base', '--is-ancestor', diAltri, suOrigin) === '' ? true : false;
+    const contiene = spawnSync('git', ['merge-base', '--is-ancestor', diAltri, suOrigin], { cwd: s.origin }).status === 0;
     expect(contiene, `origin è a ${suOrigin}, il commit dell'altro (${diAltri}) non c'è più`).toBe(true);
   });
 });
