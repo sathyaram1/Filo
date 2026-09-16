@@ -24,8 +24,8 @@ test.describe('rapporto di fine sessione — i numeri davanti ai transcript veri
     // «timed out». Nei transcript veri il timeout di Claude Code è un
     // tool_result in errore che COMINCIA con «Command timed out after …».
     // Rilievo del giro 3, livello 1: chi legge codice o spec — cioè ogni
-    // worker — porta nel rapporto timeout che non ci sono stati.
-    test.fail(true, 'rilievo del giro 3: le parole «timed out» dentro un file letto contano come un timeout');
+    // worker — porta nel rapporto timeout che non ci sono stati. Corretto
+    // nello stesso giro: conta solo un risultato in errore che comincia così.
     const righe = [
       { type: 'assistant', timestamp: '2026-09-16T10:00:00.000Z', sessionId: 's', message: { id: 'm1', model: 'claude-opus-5', usage: USO, content: [{ type: 'tool_use', id: 't1', name: 'Read' }] } },
       { type: 'user', timestamp: '2026-09-16T10:00:01.000Z', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: "    12\tif (/timed out/i.test(testo)) rep.tools.timeouts += 1; // 'Command timed out after 2m 0s'" }] } },
