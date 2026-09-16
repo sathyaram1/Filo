@@ -125,7 +125,9 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     durationS: 0,
     turns: 0,
     coldTurns: 0,
-    tokens: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 },
+    // cacheWrite è il totale delle scritture in cache; cacheWrite1h la parte a
+    // un'ora (già dentro il totale), che costa il doppio di quella a cinque minuti.
+    tokens: { input: 0, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 0 },
     costUsd: 0,
     tools: { total: 0, byName: {}, timeouts: 0, errors: 0 },
     subagents: 0,
