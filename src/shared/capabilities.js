@@ -1,32 +1,11 @@
-// SINGOLA SORGENTE del "manifesto delle capacità" di Filo: l'elenco curato di
-// TUTTO ciò che Filo sa fare, visibile all'utente. Serve all'agente dentro
-// Filo per rispondere con verità a "puoi fare X?" e per riconoscere "non posso
-// fare Y", e come base per il feedback autonomo.
-//
-// Pattern: IIFE su globalThis come patchNotes.js. Caricato dal loader
-// (src/main/services/loader.js) e disponibile come globalThis.SN_CAPABILITIES.
-//
-// REGOLA DI SINCRONIZZAZIONE (anti-stale, come "Patch notes"): ogni volta che
-// aggiungi/modifichi/rimuovi una capacità VISIBILE all'utente, aggiorna QUI la
-// voce corrispondente. Una voce che mente (descrive una feature che non c'è più,
-// o ne manca una nuova) è peggio che assente: l'agente prometterebbe il falso.
-//
-// Formato di una voce:
-//   {
-//     id:       'kebab-case-stabile',   // identificatore stabile (non cambiarlo)
-//     title:    'Titolo per l’utente',  // breve, in italiano
-//     category: 'una di CATEGORIES',
-//     desc:     'Cosa fa, in termini utente. Niente nomi di file/funzioni.',
-//     invoke:   'Come si attiva (shortcut / voce di menu / pagina).',
-//     doesNot:  'Confine: cosa NON fa (opzionale, ma prezioso per F4).',
-//   }
-//
-// `desc`/`invoke`/`doesNot` sono per l'utente finale, non tecnici.
+// SINGOLA SORGENTE del manifesto delle capacità: l'elenco curato di tutto ciò che Filo sa fare, visibile all'utente. Serve all'agente per rispondere con verità a «puoi fare X?», riconoscere «non posso fare Y» e come base per il feedback autonomo.
+// Ogni volta che una capacità visibile nasce, cambia o sparisce, la voce qui va aggiornata: una voce che mente è peggio di una assente, perché l'agente prometterebbe il falso.
+// Voce: { id kebab-case stabile (non cambiarlo), title breve in italiano, category fra CATEGORIES, desc cosa fa, invoke come si attiva, doesNot cosa NON fa (opzionale, prezioso per F4) }. desc, invoke e doesNot sono per l'utente finale, mai tecnici.
 
 (function (global) {
   'use strict';
 
-  // Categorie: l'indice compatto (vedi index()) le usa per il raggruppamento.
+  // L'indice compatto (index()) le usa per il raggruppamento.
   const CATEGORIES = {
     navigation: 'Navigazione e schede',
     selection: 'Azioni sul testo selezionato',
@@ -43,7 +22,6 @@
   };
 
   const CAPABILITIES = [
-    // ─────────────────────────── Navigazione e schede ───────────────────────
     {
       id: 'new-tab', title: 'Apri una nuova scheda', category: 'navigation',
       desc: 'Apre una nuova scheda sulla home di Filo.',
@@ -123,7 +101,6 @@
       doesNot: 'Se chiedi di guardare o leggere qualcosa, la scheda si apre davanti come sempre.',
     },
 
-    // ─────────────────────── Azioni sul testo selezionato ────────────────────
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione.',
@@ -157,7 +134,6 @@
       invoke: 'Seleziona il testo e usa la voce di ricerca nel menu del tasto destro.',
     },
 
-    // ─────────────────────── Scrittura e correzione ──────────────────────────
     {
       id: 'spellcheck', title: 'Correttore mentre scrivi', category: 'writing',
       desc: 'Mentre scrivi in un campo di testo, segnala gli errori: zigzag rosso per l’ortografia (suggerimenti del sistema) e zigzag blu per gli errori di contesto rilevati dall’AI.',
@@ -182,7 +158,6 @@
       doesNot: 'Non gioca partite. L\'import non gestisce sideboard/maybeboard (vengono ignorati) né commander in coppia (partner): solo la prima carta della sezione "Commander" diventa il commander del mazzo, le altre entrano come carte normali.',
     },
 
-    // ─────────────────────── Lettura e traduzione ───────────────────────────
     {
       id: 'translate-page', title: 'Traduci l’intera pagina', category: 'reading',
       desc: 'Traduce tutto il testo visibile della pagina — titolo, sommario, didascalie, riquadri laterali, voci di menu e testo dei link, non solo i paragrafi, compreso il testo dentro i componenti con cui sono costruiti i siti moderni — mantenendo impaginazione, link, immagini e illustrazioni; mentre lavora mostra a che punto è arrivata, e puoi tornare all’originale quando vuoi. Cambia lingua anche il nome della scheda in alto. Traduce anche le scritte che non stanno nel testo: il grigio dentro i campi di ricerca, i suggerimenti che compaiono fermando il mouse, le descrizioni delle immagini, le voci dei menu a tendina e le scritte sui bottoni dei moduli. Entra anche nei riquadri incorporati, che sono pagine dentro la pagina: i post di altri siti, i blocchi commenti, i moduli di iscrizione. Il testo che il sito carica mentre la traduzione sta ancora lavorando entra nello stesso giro. Quello che arriva dopo — scorrendo, cambiando schermata senza ricaricare — e quello che scopri aprendo una sezione ripiegata si traducono dal menu, senza rifare il resto. Se si interrompe a metà (rete che salta, credito finito) te lo dice, con il motivo e il punto in cui si è fermata, e puoi riprenderla: completa solo i pezzi mancanti senza rifare quelli già tradotti. Le pagine lunghissime le traduce a tratti: te lo dice, e la ripresa arriva in fondo.',
@@ -190,7 +165,6 @@
       doesNot: 'Non traduce il testo dentro le immagini, i video, i riquadri di codice, le illustrazioni (grafici, loghi, icone disegnate nella pagina) e le formule, che restano intatte con i loro colori; non tocca quello che scrivi tu nei campi né i valori che il sito rimanda indietro quando invii un modulo (per questo la scritta su un bottone di invio che porta con sé un valore resta com\'è); non traduce quello che al momento è ripiegato o nascosto — lo offre quando lo apri; non traduce le pagine dove non trova testo (in quel caso te lo dice). Se un sito tiene chiusi certi suoi componenti, o chiude a chiave un riquadro incorporato, quel testo non è leggibile da nessuno script e resta nella lingua originale: in quel caso l’avviso dice che una parte è rimasta fuori, invece di dichiarare la pagina tradotta.',
     },
 
-    // ─────────────────── Immagini e cattura schermo ──────────────────────────
     {
       id: 'explain-image', title: 'Spiega un’immagine', category: 'media',
       desc: 'Descrive un’immagine della pagina, direttamente lì sotto.',
@@ -252,7 +226,6 @@
       invoke: 'Menu del tasto destro → "QR code della pagina".',
     },
 
-    // ─────────────────────────────── Link ────────────────────────────────────
     {
       id: 'explain-link', title: 'Spiega un link', category: 'links',
       desc: 'Spiega dove porta un link senza aprirlo, e segnala se sembra sospetto (phishing).',
@@ -271,7 +244,6 @@
       doesNot: 'Se il link non porta davvero da nessuna parte (al posto dell’indirizzo il sito ci ha messo un frammento di codice) Filo te lo dice invece di copiare una stringa che non apre niente.',
     },
 
-    // ────────────────────────────── Appunti ──────────────────────────────────
     {
       id: 'paste-clipboard', title: 'Incolla con cronologia', category: 'clipboard',
       desc: 'Incolla testo o immagini dagli appunti; puoi scegliere da una cronologia ricercabile di ciò che hai copiato di recente, rimuovere una singola voce (es. una password copiata per sbaglio) o svuotare tutta la cronologia.',
@@ -283,7 +255,6 @@
       invoke: 'Menu del tasto destro → "Copia" / "Taglia".',
     },
 
-    // ──────────────────────── Salva per dopo e archivio ──────────────────────
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
@@ -313,7 +284,6 @@
       doesNot: 'Non ti fa scegliere dove salvare ogni file (finiscono nella cartella Download di sistema) e non riguarda «Salva immagine/video come…» dal tasto destro. Togliere una voce dall’elenco non cancella il file dal disco, e Filo non va a cercare dove è finito un file che hai spostato: ti dice che lì non c’è più e ti apre la cartella dov’era.',
     },
 
-    // ──────────────────── Assistente e agente di pagina ──────────────────────
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
       desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Alla fine ti chiede se ha funzionato. Se rispondi, Filo condivide i passi di quel percorso con chi userà l’assistente sullo stesso sito, senza i tuoi dati e senza niente che dica chi sei.',
@@ -391,7 +361,6 @@
       doesNot: 'Restano dentro Filo: non sono notifiche del sistema operativo.',
     },
 
-    // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
       desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Red Team, Cronologia, Impostazioni, App e Profilo.',
@@ -415,7 +384,6 @@
       doesNot: 'Non mostra segnalazioni in lavorazione né dettagli tecnici o di sicurezza: solo i miglioramenti già usciti. Ogni miglioramento si può segnalare come "ancora rotto" una volta sola.',
     },
 
-    // ───────────────────────────── Impostazioni ──────────────────────────────
     {
       id: 'options-models', title: 'Modelli e chiavi AI', category: 'settings',
       desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile. Puoi anche affidarti ai modelli predefiniti di Filo.',
@@ -468,7 +436,6 @@
       doesNot: 'Non è un modulo a passi e non ha campi da compilare. È una conversazione, al massimo cinque scambi, e non è obbligatoria: se la chiudi Filo usa i valori predefiniti e impara di te strada facendo. Rifarla non cancella quella di prima.',
     },
 
-    // ────────────────────────────── Crediti ──────────────────────────────────
     {
       id: 'credits', title: 'Crediti e consumi', category: 'credits',
       desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
@@ -482,37 +449,26 @@
     },
   ];
 
-  // ── API ────────────────────────────────────────────────────────────────────
-
-  // Indice COMPATTO (id + titolo + categoria), pensato per stare sempre in
-  // contesto all'agente senza pesare: il dettaglio si recupera con get(id).
+  // Indice COMPATTO pensato per stare sempre in contesto all'agente senza pesare: il dettaglio si recupera con get(id).
   function index() {
     return CAPABILITIES.map((c) => ({ id: c.id, title: c.title, category: c.category }));
   }
 
-  // Dettaglio completo di una capacità per id (o undefined).
   function get(id) {
     return CAPABILITIES.find((c) => c.id === id);
   }
 
-  // Tutte le capacità di una categoria.
   function byCategory(category) {
     return CAPABILITIES.filter((c) => c.category === category);
   }
 
-  // Tutte le capacità (copia per non far mutare l'originale).
+  // Copia, per non far mutare l'originale.
   function all() {
     return CAPABILITIES.slice();
   }
 
-  // ── Rendering per il prompt dell'agente (F2) ────────────────────────────────
-  //
-  // Indice COMPATTO da tenere sempre in contesto all'agente di chat: una riga per
-  // capacità (titolo + id stabile), raggruppata per categoria. Pesa poco (~44
-  // righe) e basta all'agente per capire SE Filo sa fare una cosa; per il COME
-  // esatto (invoke) e i limiti (doesNot) c'è renderDetailForPrompt(ids), che
-  // l'agente recupera on-demand con l'azione CAPACITA_DETTAGLIO. L'id tra []
-  // serve all'agente per chiedere il dettaglio della voce giusta.
+  // Indice per il prompt dell'agente (F2): una riga per capacità, raggruppata per categoria. Basta a capire SE Filo sa fare una cosa; il COME esatto e i limiti arrivano da renderDetailForPrompt, che l'agente chiede on-demand con CAPACITA_DETTAGLIO.
+  // L'id fra [] serve all'agente per chiedere il dettaglio della voce giusta.
   function renderIndexForPrompt() {
     const lines = [];
     for (const [cat, label] of Object.entries(CATEGORIES)) {
@@ -524,10 +480,7 @@
     return lines.join('\n');
   }
 
-  // Dettaglio completo (cosa fa / come si attiva / limiti) di una o più capacità
-  // per id, formattato per essere reinserito nel contesto dell'agente come
-  // OSSERVAZIONE (dati, non istruzioni). Gli id sconosciuti vengono segnalati
-  // esplicitamente così l'agente non finge di averli trovati.
+  // Dettaglio di una o più capacità, formattato per rientrare nel contesto come OSSERVAZIONE (dati, non istruzioni). Gli id sconosciuti sono segnalati esplicitamente, così l'agente non finge di averli trovati.
   function renderDetailForPrompt(ids) {
     const list = Array.isArray(ids) ? ids : (ids ? [ids] : []);
     if (!list.length) return '(nessuna capacità richiesta)';
