@@ -18,7 +18,8 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const { coordinataFuoriSchermo } = require(join(__dirname, '..', '..', 'src', 'main', 'test-window-mode.js'));
+const { coordinataFuoriSchermo, inModalitaTest, silenziaApertureDiSistema } =
+  require(join(__dirname, '..', '..', 'src', 'main', 'test-window-mode.js'));
 
 // Il limite vero è 32767: si sta sotto con margine.
 const LIMITE = 32000;
