@@ -25,9 +25,7 @@
     return state.months[month];
   }
 
-  // Stima costo (USD) -> ritorna EUR. Se il fornitore ha già detto quanto è
-  // costata la chiamata (`usage.costUsd`: voce, dettatura, indicizzazione, che
-  // non si contano a token), quel numero vale più di qualunque listino.
+  // Se il fornitore ha già detto quanto è costata la chiamata (`usage.costUsd`: voce, dettatura, indicizzazione, che non si contano a token), quel numero vale più di qualunque listino.
   function estimateCostEur({ usage, pricing, usdToEur }) {
     const direct = usage && Number(usage.costUsd);
     if (Number.isFinite(direct) && direct > 0) return direct * (usdToEur || 0.92);
@@ -50,16 +48,8 @@
     m.byAction[action] = (m.byAction[action] || 0) + eur;
     m.byProvider[provider] = (m.byProvider[provider] || 0) + eur;
     await setState(state);
-    // Conteggio crediti (gamification): 1 credito = 0,08 centesimi. Il costo €
-    // resta qui dietro le quinte; il motore crediti converte e scala il saldo.
-    // Coperti così TUTTI i call site AI senza ritoccarli uno per uno.
-    //
-    // I crediti usano un costo NOZIONALE, non `eur`: `eur` è 0 quando non c'è
-    // un listino per il modello, e un saldo che non si muove sembra rotto. Il
-    // prezzo nozionale (listino del modello) fa scendere i crediti anche allora,
-    // senza toccare il limite di spesa REALE qui sopra (che resta su `eur`).
-    // Precedenza: prezzo reale passato → listino nozionale del modello →
-    // ripiego, così una chiamata reale non costa mai 0 crediti.
+    // I crediti usano un costo NOZIONALE, non `eur`: `eur` è 0 quando non c'è un listino per il modello, e un saldo che non si muove sembra rotto. Il limite di spesa REALE resta su `eur`.
+    // Precedenza: prezzo reale passato → listino nozionale del modello → ripiego, così una chiamata reale non costa mai 0 crediti.
     const C = global.SN_CONST || {};
     const creditPricing = pricing
       || (C.notionalPricingFor && C.notionalPricingFor(model))
@@ -69,9 +59,7 @@
     try {
       await global.SN_CREDITS?.recordConsumption({ action, costEur: creditEur, provider, model, usage });
     } catch (_) { /* i crediti non devono mai far fallire una chiamata AI */ }
-    // Registro d'uso sul server (#598): una riga per chiamata fatta con la
-    // chiave personale. Decide l'handler wallet se scriverla; qui si passa
-    // solo quello che si sa. Best-effort come i crediti.
+    // Registro d'uso sul server (#598): una riga per chiamata fatta con la chiave personale. Qui si passa solo quello che si sa, decide l'handler wallet se scriverla. Best-effort come i crediti.
     try {
       await global.SN_WALLET_MAIN?.recordUsage({ action, provider, model, servedBy: usage && usage.servedBy, usage });
     } catch (_) {}

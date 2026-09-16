@@ -1,17 +1,6 @@
-// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7) —
-// parte I/O, main process. La logica pura (staleness, parsing, piano di
-// tagging con cache) è in SN_DECK_OPINIONS (src/shared/deckOpinions.js).
-//
-// Cache (§6.2, §13.3):
-//   - pareri:   STORAGE_KEYS.DECK_OPINIONS  { deckId → { cardId → { text, versione, at } } }
-//               un parere per (carta, mazzo); si SOSTITUISCE al ricalcolo, non
-//               si cancella quando diventa stantio (resta visibile marcato).
-//   - tag:      STORAGE_KEYS.DECK_TAG_CACHE { cardId → { tag → bool } }
-//               SOLO tag context-free: permanente e condivisa fra i mazzi.
-//
-// Economia (§6.3): mai chiamate spontanee — si calcola solo ciò che il
-// chiamante chiede (hover col modulo attivo, aggiunta al mazzo, batch
-// esplicito). Il batch è UNA chiamata LLM per tutte le carte richieste.
+// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7), parte I/O; la logica pura (staleness, parsing, piano di tagging) è in SN_DECK_OPINIONS.
+// Un parere per (carta, mazzo): si SOSTITUISCE al ricalcolo e non si cancella quando diventa stantio (resta visibile marcato). La cache tag è per carta, permanente e condivisa fra i mazzi: solo tag context-free.
+// Economia (§6.3): mai chiamate spontanee, si calcola solo ciò che il chiamante chiede, e il batch è UNA chiamata LLM per tutte le carte.
 
 (function (global) {
   'use strict';
@@ -20,8 +9,7 @@
   const P = global.SN_DECK_OPINIONS;
   const Q = global.SN_SCRYFALL_Q;
 
-  // Tetto di carte per batch: un mazzo Commander è ≤100; oltre è un errore del
-  // chiamante, non un caso d'uso.
+  // Un mazzo Commander è ≤100 carte: oltre il tetto è un errore del chiamante, non un caso d'uso.
   const MAX_BATCH = 120;
 
   async function readOpinions() {
@@ -46,7 +34,7 @@
     return { text: entry.text, versione: entry.versione, stale: P.isStale(entry, deck) };
   }
 
-  // Pareri già in cache per gli id dati (mai LLM). { cardId → {text, versione, stale} }.
+  // Solo cache, mai LLM.
   async function getOpinions(deck, cardIds) {
     const all = await readOpinions();
     const byDeck = all[deck.id] || {};
@@ -55,7 +43,6 @@
     return out;
   }
 
-  // Riga di contesto per il prompt: la carta come la vede l'LLM.
   function cardPromptLine(card) {
     const parts = [
       `- [id: ${card.id}] ${card.name}`,
@@ -74,14 +61,7 @@
     }).join('\n');
   }
 
-  // Calcola (o ricalcola) i pareri per gli id dati. UNA chiamata LLM per i
-  // soli id da (ri)fare secondo `mode`:
-  //   'missing' (default) — solo i pareri ASSENTI: uno stantio resta com'è,
-  //                         visibile e marcato (§6.2: refresh mai automatico);
-  //   'stale'             — assenti + stantii (il "batch completo su
-  //                         richiesta": "valuta il mazzo");
-  //   'force'             — tutti (refresh esplicito della singola carta).
-  // Ritorna { opinions: { cardId → {text, versione, stale} }, sintesi, computed }.
+  // mode: 'missing' (default) solo i pareri ASSENTI — uno stantio resta com'è, §6.2: il refresh non è mai automatico; 'stale' assenti + stantii ("valuta il mazzo"); 'force' tutti (refresh esplicito di una carta).
   async function computeOpinions({ deck, cards, cardIds, mode = 'missing', wantSintesi = false, handleAIRequest }) {
     const ids = [...new Set((cardIds || []).map(String).filter((id) => cards[id]))].slice(0, MAX_BATCH);
     const all = await readOpinions();
@@ -125,8 +105,7 @@
     return { opinions: out, sintesi, computed: need.length };
   }
 
-  // Il mazzo è stato eliminato: via anche i suoi pareri (la cache tag resta:
-  // è per carta, cross-mazzo).
+  // Mazzo eliminato: via anche i suoi pareri. La cache tag resta, è per carta e cross-mazzo.
   async function dropDeck(deckId) {
     const all = await readOpinions();
     if (!all[deckId]) return;
@@ -134,9 +113,7 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.DECK_OPINIONS]: all });
   }
 
-  // Auto-tag (§7): giudica carta-per-tag col modello economico, riusando la
-  // cache (carta, tag) per i tag context-free. Ritorna il mazzo con i tag
-  // applicati (NON salvato: il chiamante persiste) + conteggi per la reply.
+  // Auto-tag (§7): riusa la cache (carta, tag) per i tag context-free e ritorna il mazzo coi tag applicati ma NON salvato — persiste il chiamante.
   async function autoTag({ deck, cards, tags, handleAIRequest }) {
     const norm = (tags || []).map(P.normTag).filter(Boolean);
     if (!norm.length || !deck.carte.length) {
@@ -160,7 +137,6 @@
         origin: 'filo://decks',
       });
       const raw = P.parseTagBatch(r.text);
-      // Solo id davvero richiesti e solo tag davvero richiesti.
       for (const [id, ts] of Object.entries(raw)) {
         if (!plan.judgeIds.includes(id)) continue;
         judged[id] = ts.filter((t) => norm.includes(t));
@@ -181,14 +157,8 @@
     };
   }
 
-  // Filtro semantico dei risultati di ricerca (§4.1): dato l'ordine dei
-  // candidati (già filtrati per colore da Scryfall) e un criterio in
-  // linguaggio naturale, tiene solo le carte che lo rispettano. UNA sola
-  // chiamata LLM per i soli id NON ancora in cache per quel criterio; il
-  // giudizio (carta, criterio) → bool è cacheato permanentemente cross-ricerca.
-  // `cards` è la mappa id → card (per il testo Oracle nel prompt).
-  // Ritorna { keepIds, judgedCount, fromCacheCount }: keepIds preserva l'ordine
-  // dei candidati. Se il criterio è vuoto, non filtra (tiene tutto).
+  // Filtro semantico dei risultati di ricerca (§4.1): UNA chiamata LLM per i soli id non ancora in cache per quel criterio, e il giudizio (carta, criterio) resta cacheato cross-ricerca.
+  // Criterio vuoto: non filtra, tiene tutto.
   async function filterSearch({ criterion, cardIds, cards, handleAIRequest }) {
     const ids = (cardIds || []).map(String).filter((id) => cards && cards[id]);
     const crit = P.normCriterion(criterion);
@@ -218,7 +188,7 @@
     }
 
     const keepSet = new Set([...plan.keepFromCache, ...Object.keys(judged).filter((id) => judged[id])]);
-    // Preserva l'ordine originale dei candidati.
+    // keepIds preserva l'ordine originale dei candidati.
     const keepIds = ids.filter((id) => keepSet.has(id));
     return {
       keepIds,

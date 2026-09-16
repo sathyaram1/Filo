@@ -1,9 +1,5 @@
-// Persistenza dei mazzi Commander (DECK-BUILDER-SPEC.md §13.1): storage
-// interamente locale, come l'archivio tab — chrome.storage.local (storage.json
-// in %APPDATA%/Filo, o $FILO_USER_DATA nei test). Sync cloud fuori scope alpha.
-//
-// La logica di modello (creazione, invarianti, versione) è in SN_DECKS
-// (src/shared/decks.js): qui SOLO lettura/scrittura della lista.
+// Persistenza dei mazzi Commander (DECK-BUILDER-SPEC.md §13.1): storage interamente locale, sync cloud fuori scope alpha.
+// Qui SOLO lettura/scrittura della lista: creazione, invarianti e versione stanno in SN_DECKS (src/shared/decks.js).
 
 (function (global) {
   'use strict';
@@ -35,8 +31,7 @@
     return deck;
   }
 
-  // Sostituisce il mazzo con lo stesso id (il chiamante ha già applicato le
-  // funzioni di modello, versione compresa). Ritorna il mazzo salvato o null.
+  // Il chiamante ha già applicato le funzioni di modello, versione compresa.
   async function put(deck) {
     const clean = Decks.sanitizeDeck(deck);
     if (!clean) return null;
