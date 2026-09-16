@@ -342,11 +342,12 @@ export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
   const def = run(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
   const principale = def.ok ? def.out.replace(/^origin\//, '') : '';
   if (isProtectedBranch(ramo, principale)) return { ok: true, skipped: true, branch: ramo, reason: `'${ramo}' è un ramo protetto: non si spedisce da qui` };
-  const refspec = `HEAD:refs/heads/${ramo}`;
-  const push = run(['push', 'origin', refspec]);
+  // La destinazione si dichiara sulla riga stessa (sorgente:destinazione),
+  // come nell'hook: una sentinella negli unit test la cerca lì.
+  const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
   if (push.ok) return { ok: true, skipped: false, branch: ramo };
   if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
-    const lease = run(['push', '--force-with-lease', 'origin', refspec]);
+    const lease = run(['push', '--force-with-lease', 'origin', `HEAD:refs/heads/${ramo}`]);
     if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
