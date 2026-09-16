@@ -98,6 +98,10 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     costUsd: 0,
     tools: { total: 0, byName: {}, timeouts: 0, errors: 0 },
     subagents: 0,
+    // I transcript dei sotto-agenti letti e sommati, e la loro parte del costo
+    // (che sta gia' dentro costUsd e nei totali qui sopra).
+    subagentRuns: 0,
+    subagentCostUsd: 0,
     longestToolS: 0,
     notes: [],
   };
