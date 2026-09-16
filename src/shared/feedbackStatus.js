@@ -14,9 +14,8 @@
     throw new Error('SN_FB_TRANSITIONS mancante: carica shared/feedbackTransitions.js prima di feedbackStatus.js');
   }
 
-  // Solo la PRESENTAZIONE: la lista degli stati vive in feedbackTransitions.
-  // tab: 'inbox' Ricevuti | 'queue' In coda | 'resolved' Risolti | 'archived' Archiviati. `done` è l'unico ambivalente (queue finché il fix non è in una versione rilasciata, poi resolved): tabFor accetta opts.shipped per scioglierlo.
-  // color: bordo e badge in dashboard, null = nessun colore di rischio. terminal: ci resta finché l'owner non lo riapre.
+  // Solo la PRESENTAZIONE: la lista degli stati vive in feedbackTransitions. tab: 'inbox' | 'queue' | 'resolved' | 'archived'; color per bordo e badge in dashboard, null = nessun rischio; terminal = ci resta finché l'owner non lo riapre.
+  // `done` è l'unico ambivalente (queue finché il fix non è in una versione rilasciata, poi resolved): tabFor accetta opts.shipped per scioglierlo.
   const STATUSES = {
     unlabeled:           { tab: 'inbox',    color: '#ffffff', label: 'Non filtrato',      severity: 4 },
     suspicious_file:     { tab: 'inbox',    color: '#111111', label: 'File sospetto',     severity: 5 },
@@ -129,13 +128,12 @@
     return ((now == null ? Date.now() : now) - t) > WORKING_TTL_MS;
   }
 
-  // Il battito arriva ogni dieci minuti finché una sessione è viva e collegata, e il server lo specchia sul feedback (`beatAt`) perché i semafori stanno in una collezione che l'app non legge.
-  // Venticinque minuti tollerano due battiti persi di fila senza dichiarare morto chi è vivo.
+  // Il battito arriva ogni dieci minuti finché una sessione è viva, e il server lo specchia sul feedback (`beatAt`) perché i semafori stanno in una collezione che l'app non legge. Venticinque minuti tollerano due battiti persi di fila senza dichiarare morto chi è vivo.
   const BEAT_STALE_MS = 25 * 60 * 1000;
 
   /**
-  * Qualcuno sta lavorando a questo feedback in questo momento? Vale l'ULTIMO segno di vita: il battito, oppure la presa in carico per i pochi minuti prima che arrivi il primo battito.
-  * Guardare solo la presa in carico rendeva la scheda bugiarda su ogni lavorazione lunga — cioè su tutte, visto che la sola suite completa dura mezz'ora.
+  * Qualcuno ci sta lavorando ORA? Vale l'ULTIMO segno di vita: il battito, o la presa in carico per i pochi minuti prima che il primo battito arrivi.
+  * Guardare solo la presa in carico rendeva la scheda bugiarda su ogni lavorazione lunga, cioè su tutte: la sola suite completa dura mezz'ora.
   */
   function isBeating(fb, now) {
     const t = (now == null ? Date.now() : now);
@@ -149,9 +147,8 @@
   // Effetto voluto e innocuo: i confermati rientrano nella query dei candidati aperti delle routine, dove il filtro sullo status fine li scarta subito.
   const PUBLIC_MAP = DATA.PUBLIC_MAP;
 
-  // Lunghezza fissa dello status cifrato (#476). La cifratura non imbottisce: il cifrato è lungo quanto il chiaro più un preambolo fisso, e siccome gli stati hanno nomi di lunghezza diversa CONTARE i caratteri equivale a leggerli — con letture pubbliche.
-  // Misurato sul database vero: `attack_confirmed` e `spam_confirmed` avevano una lunghezza tutta loro, e bastava quella per pescare dal mucchio i feedback beccati, senza chiave e senza login.
-  // Rimedio: prima di cifrare lo status va a lunghezza FISSA (il valore sta nei DATI) con spazi in coda, e chi decifra li toglie. Vale per TUTTI gli stati: se solo i due confermati fossero uguali, sarebbero riconoscibili proprio per quello.
+  // Lunghezza fissa dello status cifrato (#476). La cifratura non imbottisce, e siccome gli stati hanno nomi di lunghezza diversa CONTARE i caratteri del campo cifrato equivale a leggerlo — con letture pubbliche: sul database vero bastava la lunghezza per pescare i feedback beccati, senza chiave e senza login.
+  // Rimedio: prima di cifrare lo status va a lunghezza FISSA (il valore sta nei DATI) con spazi in coda, e chi decifra li toglie. Vale per TUTTI gli stati: se solo i confermati fossero uguali, sarebbero riconoscibili proprio per quello.
   const CIPHER_PAD = DATA.CIPHER_PAD;
 
   /** Status pronto per la cifratura: lunghezza fissa, così il cifrato non parla. */
@@ -166,8 +163,8 @@
   }
 
   /**
-  * Il feedback risulta RISOLTO a chi l'ha mandato? È il grilletto della ricompensa e del popup sulla macchina dell'utente, che non ha la chiave privata e può guardare SOLO l'enum grossolano in chiaro.
-  * Vive accanto alla mappa perché è la stessa decisione: se qualcuno rimettesse i confermati su 'closed', questa funzione comincerebbe a premiare gli attacchi, e il test che la sorveglia diventa rosso subito.
+  * Il feedback risulta RISOLTO a chi l'ha mandato? È il grilletto della ricompensa sulla macchina dell'utente, che non ha la chiave privata e vede SOLO l'enum grossolano in chiaro.
+  * Vive accanto alla mappa perché è la stessa decisione: rimettere i confermati su 'closed' farebbe premiare gli attacchi, e il test che la sorveglia diventa rosso subito.
   */
   function isResolvedForUser(feedback) {
     const f = feedback && typeof feedback === 'object' ? feedback : {};
