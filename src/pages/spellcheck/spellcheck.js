@@ -1,6 +1,5 @@
-// Pagina "Gestisci correttore": gestione autocorrect e dizionario personale.
-// Lettura/scrittura diretta su chrome.storage.local; il content script reagisce
-// in tempo reale via chrome.storage.onChanged.
+// «Gestisci correttore»: autocorrect e dizionario personale, letti e scritti su
+// chrome.storage.local; il content script reagisce via chrome.storage.onChanged.
 
 (function () {
   'use strict';
@@ -42,11 +41,8 @@
     $('addDict').textContent = I18n.t('spell_page_add');
   }
 
-  // ----------------------------------------------------------------------
-  // Avvisi inline (conflitto autocorrect, duplicato dizionario, ecc.)
-  // ----------------------------------------------------------------------
   const inlineTimers = Object.create(null);
-  // Mostra un avviso inline (rosso) sopra una lista, auto-nascosto dopo 3.5s.
+  // Avviso inline rosso sopra una lista, auto-nascosto dopo 3.5s.
   function showInlineMessage(id, anchorId, text) {
     let el = $(id);
     if (!el) {
@@ -54,7 +50,6 @@
       el.id = id;
       el.className = 'sn-muted';
       el.style.cssText = 'color:var(--sn-danger,#c0392b);margin:4px 0 0';
-      // Inserisce dopo l'header h2 e la descrizione, prima della tabella/lista.
       const anchor = $(anchorId);
       anchor.parentElement.insertBefore(el, anchor);
     }
@@ -68,8 +63,8 @@
     showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_conflict', conflictKey));
   }
 
-  // Svuotare il campo parola o correzione non è un salvataggio valido: riusa lo
-  // stesso slot d'avviso del conflitto e indirizza l'utente al bottone «Rimuovi».
+  // Svuotare parola o correzione non è un salvataggio valido: stesso slot d'avviso del
+  // conflitto, e si indirizza l'utente al bottone «Rimuovi».
   function showEmptyFieldMessage() {
     showInlineMessage('autocorrectConflict', 'autocorrectList', I18n.t('spell_page_empty'));
   }
@@ -78,9 +73,6 @@
     showInlineMessage('dictConflict', 'dictList', I18n.t('spell_page_dict_conflict', word));
   }
 
-  // ----------------------------------------------------------------------
-  // Autocorrect
-  // ----------------------------------------------------------------------
   function renderAutocorrect(map) {
     const list = $('autocorrectList');
     list.innerHTML = '';
@@ -91,7 +83,6 @@
     }
     $('autocorrectEmpty').hidden = true;
 
-    // Header
     const header = document.createElement('div');
     header.className = 'sn-spell-row sn-spell-row-head';
     header.innerHTML =
@@ -138,11 +129,9 @@
       const newKey = wIn.value.trim().toLowerCase();
       const newVal = cIn.value.trim();
       if (!newKey || !newVal) {
-        // Campo svuotato: NON è né un salvataggio valido né una rimozione
-        // implicita. In simmetria col ramo conflitto, ripristina i valori reali
-        // (così la UI torna coerente con ciò che è salvato e continua ad agire)
-        // e spiega come rimuovere davvero la regola. Senza questo, il campo
-        // restava vuoto a video mentre la regola era ancora attiva.
+        // Campo svuotato: non è né un salvataggio valido né una rimozione implicita. Si ripristinano
+        // i valori reali — la UI torna coerente con ciò che è salvato — e si spiega come rimuovere
+        // davvero. Senza, il campo restava vuoto a video mentre la regola era ancora attiva.
         wIn.value = wIn.dataset.original || oldKey;
         cIn.value = correction;
         showEmptyFieldMessage();
@@ -151,13 +140,11 @@
       if (oldKey === newKey && correction === newVal) return;
       const ok = await updateAutocorrect(oldKey, newKey, newVal, {
         onConflict: (conflictKey) => {
-          // Ripristina il valore precedente nel campo e avvisa l'utente.
           wIn.value = wIn.dataset.original || oldKey;
           showConflictMessage(conflictKey);
         },
       });
       if (ok) {
-        // Aggiorna il dataset.original per le prossime modifiche.
         wIn.dataset.original = newKey;
       }
     };
@@ -170,8 +157,7 @@
   async function updateAutocorrect(oldKey, newKey, newVal, opts = {}) {
     const data = await chrome.storage.local.get(STORAGE_KEYS.AUTOCORRECT);
     const map = { ...(data[STORAGE_KEYS.AUTOCORRECT] || {}) };
-    // Controllo conflitto: se stiamo rinominando (oldKey diverso da newKey) e
-    // newKey esiste già in un'altra riga, blocca la modifica e avvisa l'utente.
+    // Rinomina su una chiave già presente in un'altra riga: blocca e avvisa.
     if (newKey && oldKey !== newKey && Object.prototype.hasOwnProperty.call(map, newKey)) {
       if (opts.onConflict) opts.onConflict(newKey);
       return false;
@@ -206,9 +192,6 @@
     }
   }
 
-  // ----------------------------------------------------------------------
-  // Dizionario personale
-  // ----------------------------------------------------------------------
   function renderDict(words) {
     const list = $('dictList');
     list.innerHTML = '';
@@ -264,11 +247,9 @@
   async function addDictFromInput() {
     const raw = $('newDictWord').value.trim();
     if (!raw) return;
-    // Il dizionario è confrontato PAROLA PER PAROLA con il testo: una voce con
-    // spazi dentro ("New York") non verrebbe mai confrontata con un singolo token
-    // e resterebbe inerte. Se l'utente scrive più parole le aggiungiamo come voci
-    // separate — così l'input fa davvero qualcosa — invece di salvare una stringa
-    // multi-parola che non scatterebbe mai.
+    // Il dizionario si confronta PAROLA PER PAROLA: una voce con spazi («New York») non
+    // incontrerebbe mai un singolo token e resterebbe inerte. Più parole diventano voci separate,
+    // così l'input fa davvero qualcosa.
     const words = raw.split(/\s+/).filter(Boolean);
     if (!words.length) return;
     const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
@@ -284,9 +265,8 @@
       added.push(w);
     }
     if (!added.length) {
-      // Tutte già presenti: avvisa invece di ingoiare l'input in silenzio
-      // (simmetria con la sezione autocorrect). Non svuotiamo il campo così
-      // l'utente vede cosa aveva digitato.
+      // Tutte già presenti: avvisa invece di ingoiare l'input in silenzio. Il campo non si svuota,
+      // così l'utente vede cosa aveva digitato.
       showDictConflictMessage(raw);
       $('newDictWord').select();
       return;
@@ -297,9 +277,6 @@
     $('newDictWord').focus();
   }
 
-  // ----------------------------------------------------------------------
-  // Boot
-  // ----------------------------------------------------------------------
   document.addEventListener('DOMContentLoaded', () => {
     loadAll();
     $('addAutocorrect').addEventListener('click', addAutocorrectFromInputs);
