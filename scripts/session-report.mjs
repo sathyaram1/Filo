@@ -365,7 +365,6 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '' 
     if (rep.turns > 1 && cr === 0 && cw >= 20000) rep.coldTurns += 1;
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
-    rep.tokens.cacheWrite1h += cw1h;
     rep.tokens.cacheRead += cr;
     rep.tokens.output += out;
     if (typeof model === 'string' && model) modelli.add(model);
