@@ -489,6 +489,32 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
   return { ok: true, skipped: false, committed: st.lines, reason: '' };
 }
 
+/**
+ * Un'operazione di git ferma a metà in `root` — «un rebase», «una fusione»,
+ * «un cherry-pick», «un revert», o «la risoluzione di un conflitto» (file
+ * non ancora fusi nell'indice) — oppure '' se non ce n'è nessuna. Stessa
+ * regola dell'hook di salvataggio: in quel momento `git add -A` metterebbe in
+ * commit i segni di conflitto (giro del 14/09, terza verifica).
+ */
+export function operazioneGitInCorso(root, { exec = execFileSync } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (_) {
+      return { ok: false, out: '' };
+    }
+  };
+  const gitDir = run(['rev-parse', '--absolute-git-dir']);
+  if (gitDir.ok && gitDir.out) {
+    for (const [nome, cosa] of [['rebase-merge', 'un rebase'], ['rebase-apply', 'un rebase'], ['MERGE_HEAD', 'una fusione'], ['CHERRY_PICK_HEAD', 'un cherry-pick'], ['REVERT_HEAD', 'un revert']]) {
+      if (existsSync(join(gitDir.out, nome))) return cosa;
+    }
+  }
+  const nonFusi = run(['ls-files', '-u']);
+  if (nonFusi.ok && nonFusi.out) return 'la risoluzione di un conflitto';
+  return '';
+}
+
 /** Le righe di git che dicono qualcosa (via i `hint:` e le vuote), in una riga. */
 function pulisciGit(testo) {
   return String(testo || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^hint:|^To /.test(l)).slice(0, 3).join(' ');
