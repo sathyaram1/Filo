@@ -334,8 +334,9 @@ una guardia messa lì nasce già spenta — verde il
 giorno in cui la scrivi e mai più rilanciata. Le tue prove del giro restano
 dove sono: sono un'altra cosa.
 
-Alla fine, in ogni caso, **rilascia il claim**:
+Alla fine, in ogni caso, **rilascia il claim** (`--role` firma il rapporto di
+fine sessione che il rilascio allega da solo):
 
 ```bash
-node scripts/routine-channel.mjs release <biglietto>
+node scripts/routine-channel.mjs release <biglietto> --role verifier
 ```
