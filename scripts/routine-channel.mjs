@@ -783,6 +783,17 @@ if (isMain) {
     // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
     // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
     if (data['senza-push'] !== true) {
+      // Prima quello che è rimasto fuori dai commit (un file nato da una
+      // shell non passa dall'hook): si committa qui, e si dice.
+      const c = commitRestante(ROOT);
+      if (!c.ok) {
+        console.error(`Modifiche fuori dai commit che non riesco a committare: ${c.reason}`);
+        console.error('Non ho rilasciato niente: porta la directory a un commit e rilancia lo stesso comando.');
+        process.exit(1);
+      }
+      if (c.committed.length) {
+        console.error(`committate ${c.committed.length} modifiche rimaste fuori dai commit: ${c.committed.slice(0, 3).join(', ')}${c.committed.length > 3 ? ` (+${c.committed.length - 3} file)` : ''}`);
+      }
       const p = pushRamoCorrente(ROOT);
       if (!p.ok) {
         console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
