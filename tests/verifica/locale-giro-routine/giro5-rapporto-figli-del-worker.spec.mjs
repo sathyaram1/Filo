@@ -69,7 +69,6 @@ function cartellaDeiTranscript() {
 
 test.describe('rapporto di fine sessione — i sotto-agenti del worker', () => {
   test('il rapporto che il rilascio del worker allega comprende i sotto-agenti lanciati dal worker', async () => {
-    test.fail(true, 'giro 5: i figli di un sotto-agente stanno accanto a lui, non sotto; il rapporto cerca <worker>/subagents/ e non li trova');
     const c = cartellaDeiTranscript();
     // Come al rilascio: nessun transcript esplicito, si prende il più recente (il worker).
     const rep = await generaRapporto({ cwd: c.progetto, configDir: c.configDir, env: {}, role: 'resolver' });

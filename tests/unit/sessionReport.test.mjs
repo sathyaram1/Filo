@@ -343,3 +343,47 @@ test('una scrittura in cache a un\'ora è prezzata a 2× l\'input, quella a cinq
     assert.equal(PREZZI[k].cacheWrite1h, PREZZI[k].input * 2, `${k}: la scrittura a un'ora è 2× l'input`);
   }
 });
+
+// Un sotto-agente che lancia sotto-agenti suoi: Claude Code li scrive ACCANTO
+// a lui, nella stessa cartella subagents/ della sessione madre, senza un
+// puntatore al lanciatore (verificato dal vivo il 16/09/2026). Nelle routine il
+// worker è un sotto-agente e delega le letture grosse: il suo rapporto deve
+// comprenderli, e li riconosce dal tempo (cominciano fra la sua chiamata
+// Agent e il risultato). Un fratello di un altro giro resta fuori.
+test('i sotto-agenti di un sotto-agente stanno accanto a lui: nel suo rapporto entrano quelli cominciati dentro le sue chiamate Agent', async () => {
+  const base = cartellaTemporanea('filo-rapporto-nipoti-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(dir, 'orch.jsonl'), turnoDi('o1', T('00:00'), 30000, 50, 'orch') + '\n');
+    // Un worker di un giro PRIMA: fuori da ogni finestra del worker che rilascia.
+    writeFileSync(join(sub, 'agent-prima.jsonl'), turnoDi('p1', T('01:00'), 100000, 500, 'orch') + '\n');
+    // Il worker che rilascia: chiama Agent alle 10:00, riceve il risultato alle 12:00, chiude alle 13:00.
+    writeFileSync(join(sub, 'agent-worker.jsonl'), [
+      assistant('w1', 'claude-opus-5', { input_tokens: 1000, output_tokens: 100 }, [{ type: 'tool_use', id: 'tA', name: 'Agent', input: {} }], T('10:00')),
+      result('tA', 'fatto', T('12:00')),
+      turnoDi('w2', T('13:00'), 1000, 100, 'orch'),
+    ].join('\n') + '\n');
+    // Il figlio: comincia alle 10:01, un milione di token (5 $ a tariffa opus).
+    writeFileSync(join(sub, 'agent-figlio.jsonl'), [
+      JSON.stringify({ type: 'user', timestamp: T('10:01'), sessionId: 'orch', message: { role: 'user', content: 'leggi tutto' } }),
+      assistant('f1', 'claude-opus-5', { input_tokens: 1000000, output_tokens: 10 }, [], T('11:00')),
+    ].join('\n') + '\n');
+    // Un fratello di DOPO (un worker successivo): fuori dalla finestra.
+    writeFileSync(join(sub, 'agent-dopo.jsonl'), turnoDi('d1', T('20:00'), 100000, 500, 'orch') + '\n');
+
+    const rep = await generaRapporto({ transcript: join(sub, 'agent-worker.jsonl'), cwd: progetto, configDir: config, role: 'resolver' });
+    assert.equal(rep.subagents, 1, 'la chiamata Agent del worker');
+    assert.equal(rep.subagentRuns, 1, 'solo il figlio, non i fratelli degli altri giri');
+    assert.equal(rep.turns, 3);
+    assert.ok(rep.subagentCostUsd > 5 && rep.subagentCostUsd < 5.01, String(rep.subagentCostUsd));
+    assert.ok(rep.costUsd > 5, String(rep.costUsd));
+    // Senza una chiamata Agent nel transcript nessun fratello entra (era il caso del giro 2).
+    const prima = await generaRapporto({ transcript: join(sub, 'agent-prima.jsonl'), cwd: progetto, configDir: config });
+    assert.equal(prima.subagentRuns, 0);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
