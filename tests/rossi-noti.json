@@ -50,7 +50,7 @@
         "spec": "tests/net-error-page",
         "caso": "renderer crashato: pagina d'errore \"scheda bloccata\" invece del bianco",
         "perche": "la prova ammazza il renderer della scheda e aspetta la pagina d'errore interna, che nel contenitore non compare entro 20 secondi. Solo Linux senza sandbox (ELECTRON_DISABLE_SANDBOX=1, xvfb): identico in due corse della suite in GitHub (35088361658 e 35101566321, tre tentativi ciascuna, 1,4 minuti l'uno), mentre le due sorelle dello stesso spec (dominio inesistente, server giù poi su) sono verdi e su Windows la prova è verde. Dopo ognuno dei tre tentativi il worker non riesce a chiudere l'app entro 60 secondi («Worker teardown timeout», tre volte, sempre con questo caso come ultimo): l'app resta appesa dopo il crash forzato. Ipotesi: senza sandbox la view ricreata dopo il crash (src/main/tabs.js, render-process-gone → _recreateView) muore di nuovo e l'anti-loop a 2 secondi ferma i tentativi, lasciando la scheda bianca. Non confermato: il trace del secondo tentativo porta solo i passi del runner, non lo stderr dell'app dove il main scrive render-process-gone. Da riprodurre nel contenitore leggendo lo stderr dell'app, poi correggere e togliere la voce.",
-        "feedback": "da aprire: rossi del contenitore GitHub Actions"
+        "feedback": "da aprire: rossi del contenitore GitHub Actions (corse della suite #35088361658 e #35101566321)"
       }
     ]
   },
