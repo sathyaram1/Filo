@@ -480,7 +480,12 @@ test('i rossi del contenitore hanno nome, caso, motivo e un feedback', () => {
   const bloccanti = new Set(j.specs.map(String));
   for (const v of c.specs) {
     assert.ok(existsSync(resolve(ROOT, `${v.spec}.spec.mjs`)), `${v.spec} non esiste più: toglilo dall'elenco`);
-    assert.ok(v.caso && v.caso.length > 3, `${v.spec}: manca il caso preciso che è rosso`);
+    // `caso` è il titolo del test (o un elenco di titoli, quando la voce copre
+    // due test sorelle): è quello che scripts/suite-verdict.mjs confronta con
+    // l'esito della suite in GitHub prima di pubblicare.
+    const casi = Array.isArray(v.caso) ? v.caso : [v.caso];
+    assert.ok(casi.length && casi.every((c) => typeof c === 'string' && c.length > 3),
+      `${v.spec}: manca il caso preciso che è rosso (una stringa o un elenco di titoli)`);
     assert.ok(v.perche && v.perche.length > 20, `${v.spec}: manca il motivo, e senza motivo non si toglierà mai`);
     assert.match(String(v.feedback || ''), /#\d+/, `${v.spec}: manca il feedback che lo farà togliere`);
     // Di norma un rosso appartiene a UN ambiente, e trovarlo in tutti e due gli
