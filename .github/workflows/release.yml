@@ -171,10 +171,16 @@ jobs:
       # per seguire l'esecuzione. `continue-on-error`: il verdetto lo da' lo
       # script dopo, non l'uscita di Playwright, che e' rossa anche per i soli
       # rossi noti.
+      # Un tetto SUO, sotto quello del job: con il solo tetto del job un
+      # Electron rimasto appeso faceva annullare il job PRIMA del verdetto,
+      # cioe' senza feedback e senza una riga che lo dicesse (verifica del
+      # giro 2). Scaduto questo, il passo e' rosso, il verdetto trova il JSON
+      # mancante (uscita 2, non un verde) e l'allarme parte come per un rosso.
       - name: Suite Playwright completa
         if: steps.check.outputs.run == 'true'
         id: suite
         continue-on-error: true
+        timeout-minutes: 200
         shell: bash
         run: ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_JSON_OUTPUT_NAME=suite-risultati.json xvfb-run -a npx playwright test --reporter=list,json
 
