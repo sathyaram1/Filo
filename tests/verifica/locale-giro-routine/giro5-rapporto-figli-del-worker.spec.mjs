@@ -81,7 +81,6 @@ test.describe('rapporto di fine sessione — i sotto-agenti del worker', () => {
   });
 
   test('lo stesso col transcript indicato a mano (--transcript, FILO_TRANSCRIPT)', async () => {
-    test.fail(true, 'giro 5: stessa porta, altra strada');
     const c = cartellaDeiTranscript();
     const rep = await generaRapporto({ transcript: c.worker, cwd: c.progetto, configDir: c.configDir, env: {}, role: 'resolver' });
     expect(rep.subagents).toBe(1);
