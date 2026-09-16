@@ -81,10 +81,12 @@ test.describe('hook di salvataggio — il problema di un\'altra cartella di lavo
     // E su stdout, per la sessione di A, c'è l'avviso sulla cartella di B.
     expect(r.stdout).toContain('additionalContext');
     const ctx = JSON.parse(r.stdout).hookSpecificOutput.additionalContext;
-    expect(ctx).toContain('worktrees/B');
-    expect(ctx).toMatch(/finiscilo/i);
-    // Oggi niente dice che quella cartella non è di questa sessione (è il
-    // rilievo del giro: se cambia, cambia anche questa riga).
-    expect(ctx).not.toMatch(/altra sessione|non (è|e') (la tua|di questa sessione)/i);
+    const righeB = ctx.split('\n').filter((l) => l.includes('worktrees/B'));
+    expect(righeB.length).toBe(1);
+    expect(righeB[0]).toMatch(/un'altra cartella di lavoro, non la tua/);
+    expect(righeB[0]).toMatch(/a meta'/);
+    // Mai come ordini, mai come un problema di questa sessione.
+    expect(ctx).not.toMatch(/finiscilo|NON committo/i);
+    expect(ctx).not.toMatch(/committato in locale ma NON e' su origin/);
   });
 });
