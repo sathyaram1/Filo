@@ -129,7 +129,8 @@ test.describe('verdetto della suite — rossi noti e rossi nuovi', () => {
     for (const voce of noti.contenitore.specs) {
       const file = join(ROOT, `${voce.spec}.spec.mjs`);
       expect(existsSync(file), `${voce.spec}: lo spec non c'è`).toBe(true);
-      const src = readFileSync(file, 'utf8');
+      // Nel sorgente un apice dentro una stringa è scritto \' : si legge come lo legge JS.
+      const src = readFileSync(file, 'utf8').replace(/\\(['"])/g, '$1');
       const titoli = Array.isArray(voce.caso) ? voce.caso : (voce.caso ? [voce.caso] : []);
       for (const t of titoli) {
         expect(src.includes(t.replace(/\s+/g, ' ')) || src.includes(t), `${voce.spec}: titolo «${t}» non trovato`).toBe(true);
