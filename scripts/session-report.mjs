@@ -417,6 +417,62 @@ export function transcriptSottoAgenti(file) {
   }
 }
 
+/** La data della prima riga con un timestamp nei primi 64 KB del file, o NaN. */
+export function primoTimestampMs(file) {
+  let fd = null;
+  try {
+    const size = statSync(file).size;
+    if (!size) return NaN;
+    const buf = Buffer.alloc(Math.min(size, 64 * 1024));
+    fd = openSync(file, 'r');
+    readSync(fd, buf, 0, buf.length, 0);
+    for (const r of buf.toString('utf8').split('\n')) {
+      const m = r.match(/"timestamp":"([^"]+)"/);
+      const ms = m ? Date.parse(m[1]) : NaN;
+      if (Number.isFinite(ms)) return ms;
+    }
+    return NaN;
+  } catch (_) {
+    return NaN;
+  } finally {
+    if (fd !== null) { try { closeSync(fd); } catch (_) { /* già chiuso */ } }
+  }
+}
+
+/**
+ * I transcript dei sotto-agenti lanciati da un SOTTO-AGENTE. Claude Code non
+ * li annida sotto di lui: li scrive accanto, nella stessa cartella
+ * `subagents/` della sessione madre, con lo stesso sessionId e un agentId
+ * loro, senza un puntatore a chi li ha lanciati (verificato dal vivo il
+ * 16/09/2026, verifica del giro 5). Nelle routine il worker E' un sotto-agente
+ * e il suo ruolo gli chiede di delegare le letture grosse: fino al giro 5 il
+ * rapporto cercava i figli in <worker>/subagents/, che non esiste, e il
+ * rilascio allegava un rapporto senza le esplorazioni delegate.
+ * Il legame che c'e' e' il tempo: un figlio comincia dentro la finestra fra la
+ * chiamata Agent del lanciatore e il suo risultato (`finestre`, raccolte da
+ * analizzaRighe). Un fratello di un altro giro (un worker precedente) sta
+ * fuori da ogni finestra. I nipoti cominciano dentro la finestra anche loro,
+ * e sono costo del worker come i figli. PURA a meno della lettura dei file.
+ */
+export function figliDelSottoAgente(file, finestre) {
+  if (!Array.isArray(finestre) || !finestre.length) return [];
+  const dir = dirname(file);
+  let nomi = [];
+  try { nomi = readdirSync(dir); } catch (_) { return []; }
+  const out = [];
+  for (const n of nomi.sort()) {
+    if (!n.endsWith('.jsonl')) continue;
+    const p = join(dir, n);
+    if (resolve(p) === resolve(file)) continue;
+    const t = primoTimestampMs(p);
+    if (!Number.isFinite(t)) continue;
+    // Due secondi di margine prima: la riga della chiamata e la prima riga
+    // del figlio si scrivono a orologi diversi.
+    if (finestre.some((f) => t >= f.inizio - 2000 && t <= f.fine)) out.push(p);
+  }
+  return out;
+}
+
 const arrotonda = (x) => Math.round(x * 10000) / 10000;
 
 /**
