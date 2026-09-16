@@ -147,8 +147,8 @@ automatici sono l'ultimo passo, non il primo.
 - Se trovi un rosso d'ambiente che nel file non c'è, **non aggiungerlo tu**:
   scrivilo nella critica come rilievo, con il caso e il motivo. Un elenco che
   cresce da solo torna a essere folklore.
-- Se hai già trovato rilievi di livello 3 o 2, la suite completa non serve
-  adesso: la farà il giro in cui il lavoro passa.
+- Se hai già trovato rilievi di livello 3 o 2, questi controlli non servono
+  adesso: li farà il giro in cui il lavoro passa.
 
 ## Trovato un difetto, conta le porte — tutte nella stessa critica
 
