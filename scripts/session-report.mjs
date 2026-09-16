@@ -303,7 +303,15 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
   if (!guardate.length) return { file: '', note: `nessuna cartella di transcript per questa sessione (${cartelle.join(' né ')})` };
   if (!candidati.length) return { file: '', note: `nessun transcript in ${guardate.join(' né ')}` };
   candidati.sort((a, b) => b.m - a.m);
-  return { file: candidati[0].p, note: '' };
+  let scelto = candidati[0].p;
+  const visti = new Set([resolve(scelto)]);
+  while (eSottoAgente(scelto)) {
+    const su = lanciatoreDi(scelto);
+    if (!su || visti.has(resolve(su))) break;
+    visti.add(resolve(su));
+    scelto = su;
+  }
+  return { file: scelto, note: '' };
 }
 
 /**
