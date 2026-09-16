@@ -20,6 +20,28 @@ cd "$PROJECT_DIR" || exit 0
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
+# ─── QUELLO CHE CLAUDE CODE PASSA ALL'HOOK ──────────────────────────────────
+#
+# Un JSON su stdin, con il nome dell'evento: serve solo quello, per rispondere
+# nella forma che Claude Code ascolta (piu' sotto). Da un terminale, senza un
+# tubo, non si legge niente: resterebbe in attesa di una riga che non arriva.
+HOOK_INPUT=""
+[ -t 0 ] || HOOK_INPUT=$(cat 2>/dev/null)
+HOOK_EVENT=$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+[ -z "$HOOK_EVENT" ] && HOOK_EVENT="PostToolUse"
+
+# I fallimenti della spedizione, raccolti qui: il ciclo dei worktree gira in
+# un sotto-processo (un tubo) e una variabile non ne uscirebbe.
+FALLIMENTI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-fallimenti.$$")
+: > "$FALLIMENTI_FILE" 2>/dev/null
+
+# Un fallimento si dice DUE volte: su stderr (il registro di debug) e nel
+# file, da cui alla fine diventa il contesto che la sessione vede davvero.
+segnala_fallimento() {
+  echo "$1" >&2
+  [ -n "$FALLIMENTI_FILE" ] && printf '%s\n' "$1" >> "$FALLIMENTI_FILE" 2>/dev/null
+}
+
 # ─── I RAMI CHE QUESTO AUTOMATISMO NON TOCCA MAI ─────────────────────────────
 #
 # Fino al 2026-08-21 qui c'era `TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"`: il
