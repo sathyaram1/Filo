@@ -9,9 +9,9 @@
 // nel contesto di QUESTA sessione, con le stesse parole di un problema suo
 // («finiscilo», «sistemalo prima di consegnare»). Claude Code passa la
 // cartella della sessione nello stdin dell'hook (`cwd`), quindi distinguere
-// si può. Questa prova DOCUMENTA il comportamento di oggi (è verde così): la
-// scelta — tacere le cartelle altrui o dire che sono altrui — è dell'owner,
-// e sta nella critica del giro come rilievo con la domanda.
+// si può. Fino al 16/09/2026 questa prova DOCUMENTAVA il comportamento di
+// allora; poi l'owner ha deciso: i guai delle altre cartelle si dicono come
+// altrui, in una riga, mai come ordini. Da allora la prova asserisce quello.
 
 import { test, expect } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';

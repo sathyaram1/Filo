@@ -57,7 +57,6 @@ function scenario(nome) {
 
 test.describe('hook di salvataggio — quando è il commit a non riuscire', () => {
   test('con un index.lock rimasto a terra il salvataggio non avviene, e la sessione lo viene a sapere', async () => {
-    test.fail(true, 'giro 5: il fallimento di git add/commit finisce in 2>/dev/null; uscita 0 e stdout vuoto, la sessione crede di essere salvata');
     const s = scenario('lock');
     const gitDir = git(s.lavoro, 'rev-parse', '--absolute-git-dir');
     writeFileSync(join(gitDir, 'index.lock'), '');
@@ -74,7 +73,6 @@ test.describe('hook di salvataggio — quando è il commit a non riuscire', () =
   });
 
   test('con un pre-commit che rifiuta il commit non nasce, e la sessione lo viene a sapere', async () => {
-    test.fail(true, 'giro 5: il commit rifiutato finisce in 2>/dev/null; uscita 0 e stdout vuoto');
     const s = scenario('precommit');
     const hooks = join(s.base, 'hooks');
     mkdirSync(hooks, { recursive: true });
