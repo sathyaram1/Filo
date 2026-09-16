@@ -1,12 +1,5 @@
-// Azioni del content script: clipboard (copia/taglia/incolla + cronologia),
-// screenshot (pieno e ritaglio), trascrizione OCR, salva/condividi/cerca,
-// color picker, QR code, spiegazioni inline (testo/immagine/link) e analisi
-// euristica dei link sospetti.
-//
-// Estratto da content.js — viene caricato prima di lui dai preload. content.js
-// chiama init() passando le dipendenze che restano sue: il pasteContext
-// (catturato all'apertura del menu), isBlocked (settings correnti) e l'ultimo
-// evento mouse (per ancorare i popup).
+// Azioni del content script: appunti (copia, taglia, incolla e cronologia), screenshot e ritagli, OCR, salva/condividi/cerca, color picker, QR, spiegazioni inline e analisi dei link sospetti.
+// I preload lo caricano prima di content.js, che poi chiama init() passandogli le dipendenze che restano sue: il pasteContext catturato all'apertura del menu, isBlocked e l'ultimo evento del mouse per ancorare i popup.
 
 (function (global) {
   'use strict';
@@ -28,9 +21,6 @@
     getLastMouseEvent: () => ({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 }),
   };
 
-  // ------------------------------------------------------------
-  // Clipboard: copia / taglia
-  // ------------------------------------------------------------
   function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(
       () => {
@@ -41,12 +31,7 @@
     );
   }
 
-  // #437 — "Copia URL" (del link, dell'immagine, del filmato) copia un
-  // INDIRIZZO: se quello che il sito ha messo lì non lo è — un frammento di
-  // codice `javascript:`, un `data:` lungo un chilometro, un `blob:` che muore
-  // con la pagina, o niente affatto — negli appunti finirebbe una stringa che
-  // non apre nulla da nessuna parte, senza che niente lo dica. Meglio dirlo,
-  // come già succede per i filmati trasmessi a pezzi.
+  // #437 — «Copia URL» copia un INDIRIZZO: se quello che il sito ha messo lì non lo è (un `javascript:`, un `data:` lunghissimo, un `blob:` che muore con la pagina, o niente affatto) negli appunti finirebbe una stringa che non apre nulla da nessuna parte, senza che niente lo dica.
   function isAddress(url) {
     const raw = String(url || '').trim();
     // Senza il modulo condiviso non peggioriamo il comportamento storico.
@@ -106,18 +91,13 @@
     return imagePlaceholderLabel();
   }
 
-  // ------------------------------------------------------------
-  // Incolla (da clipboard e da cronologia)
-  // ------------------------------------------------------------
-  // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
+  // Incolla dagli appunti: prima si cercano le immagini, poi il testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
-    // Tenta lettura strutturata (testo + immagini)
     try {
       if (navigator.clipboard.read) {
         const items = await navigator.clipboard.read();
         for (const it of items) {
-          // Cerca un'immagine
           const imgType = it.types.find((t) => t.startsWith('image/'));
           if (imgType) {
             const blob = await it.getType(imgType);
@@ -134,7 +114,6 @@
               if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
                 return;
               }
-              // Nessun handler ha accettato: ricadi sul testo se presente
               const textType = it.types.find((t) => t === 'text/plain');
               if (textType) {
                 const text = await (await it.getType(textType)).text();
@@ -146,7 +125,6 @@
               return;
             }
             if (targetKind !== 'ce') {
-              // Nessun target editabile valido per un'immagine.
               Popup.showToast(I18n.t('toast_cannot_paste_image'));
               return;
             }
@@ -163,9 +141,7 @@
         }
       }
     } catch (_) {
-      // Permessi negati o API non disponibile: ricadi sul testo
     }
-    // Fallback: solo testo
     try {
       const text = await navigator.clipboard.readText();
       if (!text) return;
@@ -177,22 +153,17 @@
 
   async function pasteHistoryEntry(entry) {
     if (!entry) return;
-    // Riporta in cima alla cronologia: il background fa dedup e promuove.
-    // Non passiamo per pushClipboardEntry() per evitare di ri-richiedere
-    // all'AI la descrizione di un'immagine già descritta.
+    // Il background fa dedup e promuove. Non passiamo da pushClipboardEntry() per non ri-chiedere all'AI la descrizione di un'immagine già descritta.
     chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
     deps.restorePasteContext();
     const ctx = deps.getPasteContext();
     if (entry.type === 'image') {
-      // Ricostruisci un Blob a partire dal data URL: serve a tutti i rami sotto.
       // Le immagini in cronologia sono offline (dataUrl in storage): niente provider.
       let blob = null;
       try { blob = await (await fetch(entry.dataUrl)).blob(); } catch (_) {}
 
-      // input/textarea non accettano <img> nativamente: come fa pasteFromClipboard
-      // delega via evento custom 'filo:paste-image' così handler dedicati (modal
-      // feedback, barra input dashboard, ecc.) possono allegarla. Senza questa
-      // delega l'Incolla→cronologia falliva ovunque Ctrl+V su immagine funziona.
+      // input e textarea non accettano <img>: come in pasteFromClipboard si delega con l'evento 'filo:paste-image', così chi ha un handler dedicato (modale feedback, barra della dashboard) può allegarla.
+      // Senza la delega, l'incolla dalla cronologia falliva ovunque Ctrl+V su immagine funziona.
       if (ctx?.kind === 'input' && blob) {
         const pasteEvt = new CustomEvent('filo:paste-image', {
           bubbles: true, cancelable: true, detail: { blob },
@@ -213,15 +184,11 @@
       else Popup.showToast(I18n.t('toast_paste_failed'));
       return;
     }
-    // testo: incolla in input/textarea/contenteditable
     insertTextAtSelection(entry.text || '');
   }
 
-  // Inserisce un'immagine in un contenteditable provando tre strategie in
-  // sequenza: (1) paste event sintetico — necessario per editor moderni
-  // (Gmail, Slate, Lexical, ProseMirror) che hanno un handler paste e
-  // ignorerebbero execCommand o modifiche dirette al DOM; (2) execCommand
-  // 'insertImage'; (3) inserimento manuale via Range API.
+  // Tre strategie in sequenza: (1) evento paste sintetico, necessario agli editor moderni (Gmail, Slate, Lexical, ProseMirror) che hanno un handler paste e ignorerebbero execCommand o le modifiche dirette al DOM;
+  // (2) execCommand 'insertImage'; (3) inserimento manuale via Range.
   function insertImageInEditable(blob, dataUrl, fileName) {
     const ctx = deps.getPasteContext();
     if (!ctx || ctx.kind !== 'ce') return false;
@@ -236,7 +203,6 @@
       } catch (_) {}
     }
 
-    // (1) Paste event sintetico con DataTransfer
     if (blob) {
       try {
         const dt = new DataTransfer();
@@ -253,12 +219,10 @@
       } catch (_) {}
     }
 
-    // (2) execCommand classico
     try {
       if (document.execCommand('insertImage', false, dataUrl)) return true;
     } catch (_) {}
 
-    // (3) Inserimento manuale via Range
     try {
       let range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
       if (!range || !el.contains(range.startContainer)) {
@@ -298,10 +262,7 @@
       el.dispatchEvent(new Event('input', { bubbles: true }));
     } else if (kind === 'ce') {
       el.focus();
-      // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:
-      // il click sul bottone del menu sposta il focus, e su editor moderni
-      // (ProseMirror di claude.ai, Lexical, Slate) execCommand inseriva a fine
-      // testo invece che dove era il caret (feedback alpha).
+      // La selezione salvata all'apertura del menu va ripristinata PRIMA di inserire: il click sul bottone sposta il focus, e sugli editor moderni (ProseMirror di claude.ai, Lexical, Slate) execCommand inseriva a fine testo invece che al caret.
       const sel = window.getSelection();
       if (ctx.range && el.contains(ctx.range.startContainer)) {
         try {
@@ -309,9 +270,7 @@
           sel.addRange(ctx.range);
         } catch (_) {}
       }
-      // (1) paste event sintetico: gli editor "controllati" leggono la loro
-      // selezione interna (mantenuta anche dopo il blur) e inseriscono nel
-      // punto giusto. execCommand su quegli editor finiva in coda.
+      // Gli editor «controllati» leggono la loro selezione interna, mantenuta anche dopo il blur, e inseriscono nel punto giusto; execCommand su quegli editor finiva in coda.
       let handled = false;
       try {
         const dt = new DataTransfer();
@@ -330,12 +289,8 @@
     }
   }
 
-  // Riallinea il contesto di incolla salvato all'apertura del menu alla
-  // posizione CORRENTE del cursore nello stesso campo. Serve alla dettatura:
-  // la registrazione può durare a lungo (fino a ~60s + trascrizione) e nel
-  // frattempo l'utente continua a scrivere o sposta il cursore nello stesso
-  // campo. Senza questo, il testo trascritto atterrerebbe dove il menu era
-  // stato aperto, spaccando in due ciò che l'utente ha digitato nel frattempo.
+  // Riallinea il contesto di incolla alla posizione CORRENTE del cursore nello stesso campo. Serve alla dettatura, che dura a lungo: nel frattempo l'utente continua a scrivere o sposta il cursore,
+  // e senza questo il testo trascritto atterrerebbe dove il menu era stato aperto, spaccando in due quello che ha digitato.
   function refreshPasteContextLive() {
     const ctx = deps.getPasteContext();
     if (!ctx) return;
@@ -358,17 +313,13 @@
     }
   }
 
-  // Inserimento del testo dettato: a differenza di "Incolla" (che avviene
-  // subito dopo il click, quando la posizione catturata è ancora attuale), la
-  // dettatura arriva molto dopo. Prima di inserire riallineiamo la posizione
-  // a dove il cursore si trova ADESSO, poi inseriamo.
+  // La dettatura arriva molto dopo il click, a differenza di «Incolla»: prima di inserire si riallinea la posizione a dov'è il cursore ADESSO.
   function insertDictatedText(text) {
     refreshPasteContextLive();
     deps.restorePasteContext();
     insertTextAtSelection(text);
   }
 
-  // Costruisce l'item del menu "Incolla" con freccetta cronologia.
   function buildPasteItem(clipboardHistory) {
     return {
       type: 'paste',
@@ -390,9 +341,6 @@
     chrome.runtime.sendMessage({ type: MSG.CLEAR_CLIPBOARD_HISTORY }).catch(() => {});
   }
 
-  // ------------------------------------------------------------
-  // Cronologia clipboard + stato navigazione (dati per il menu)
-  // ------------------------------------------------------------
   async function getClipboardHistory() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
@@ -400,9 +348,7 @@
     } catch (_) { return []; }
   }
 
-  // Stato di navigazione (canBack/canFwd) del tab corrente: serve per
-  // mostrare le icone avanti/indietro del menu in grigio quando la cronologia
-  // non lo consente, come già accade per i tasti analoghi nella barra in alto.
+  // Stato di navigazione del tab: serve a mostrare in grigio avanti e indietro nel menu quando la cronologia non lo consente, come già fanno i tasti nella barra in alto.
   async function getNavState() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.NAV_STATE });
@@ -412,16 +358,12 @@
 
   function pushClipboardEntry(entry) {
     chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
-    // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
     if (entry?.type === 'image' && entry.dataUrl) {
       requestImageDescription(entry.dataUrl).catch(() => {});
     }
   }
 
-  // Avviso "questa funzione non ha un modello": lo mostriamo una volta sola per
-  // messaggio finché la pagina resta aperta. La descrizione dell'immagine parte
-  // da sola (incolla, copia, screenshot): ripetere lo stesso toast a ogni
-  // immagine sarebbe rumore, tacere del tutto sarebbe il ripiego muto di prima.
+  // L'avviso «questa funzione non ha un modello» si mostra una volta sola finché la pagina resta aperta: la descrizione parte da sola a ogni immagine, ripetere il toast sarebbe rumore e tacere sarebbe il ripiego muto di prima.
   const modelConfigWarned = new Set();
   function warnModelConfigOnce(message) {
     if (!message || modelConfigWarned.has(message)) return;
@@ -429,21 +371,15 @@
     try { Popup.showToast(message, { duration: 7000 }); } catch (_) {}
   }
 
-  // Etichetta provvisoria delle immagini in cronologia incolla: «Descrizione…»
-  // finché una descrizione può davvero arrivare, altrimenti dice che manca il
-  // modello (un'attesa che non finirà mai è una bugia).
+  // «Descrizione…» solo finché una descrizione può davvero arrivare, altrimenti si dice che manca il modello: un'attesa che non finirà mai è una bugia.
   let imageDescNoModel = false;
   function imagePlaceholderLabel() {
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
   async function requestImageDescription(dataUrl) {
-    // NIENTE modello di ripiego scritto qui: gli unici modelli ammessi sono
-    // quelli configurati per questa funzione (il ripiego VOLUTO fra i modelli
-    // della catena vive nel main, dentro la catena). Se la funzione non ha un
-    // modello — o cita una scorciatoia che non esiste — la descrizione non si
-    // fa e l'utente lo viene a sapere, invece di riceverla da un modello che
-    // nessuno ha mai scelto.
+    // NIENTE modello di ripiego scritto qui: gli unici ammessi sono quelli configurati per questa funzione, e il ripiego VOLUTO vive nel main, dentro la catena.
+    // Senza modello — o con una scorciatoia che non esiste — la descrizione non si fa e l'utente lo viene a sapere, invece di riceverla da un modello che nessuno ha scelto.
     let res;
     try {
       res = await chrome.runtime.sendMessage({
@@ -495,17 +431,8 @@
     return `${name}.${ext}`;
   }
 
-  // ------------------------------------------------------------
-  // Spiega / Traduci (popup streaming)
-  // ------------------------------------------------------------
-  // Il riquadro si stacca dalla PAROLA, non da un punto. Una parola ha
-  // un'altezza, e il riquadro posato sopra deve appoggiarsi sopra la sua cima:
-  // ancorato al solo punto di partenza copriva la metà bassa delle lettere, e
-  // la parola diventava illeggibile proprio mentre l'utente leggeva cosa vuol
-  // dire. Il rettangolo lo prendiamo dalla selezione — è la stessa parola per
-  // tutte e due le strade, la scorciatoia e la freccetta del tasto destro, che
-  // così si comportano uguale. Senza selezione misurabile restano il punto del
-  // puntatore e il vecchio comportamento.
+  // Il riquadro si stacca dalla PAROLA, non da un punto: una parola ha un'altezza, e ancorato al solo punto di partenza copriva la metà bassa delle lettere, rendendo illeggibile proprio la parola che si stava spiegando.
+  // Il rettangolo viene dalla selezione, la stessa per la scorciatoia e per la freccetta del tasto destro, che così si comportano uguale; senza una selezione misurabile restano il punto del puntatore e il vecchio comportamento.
   function ancoraSelezione(anchorEvent) {
     const x = Number.isFinite(anchorEvent?.clientX) ? anchorEvent.clientX : 0;
     const y = Number.isFinite(anchorEvent?.clientY) ? anchorEvent.clientY : 0;
@@ -545,18 +472,9 @@
     triggerExplainOrTranslate(ACTIONS.EXPLAIN_DEEP, selInfo, anchorEvent);
   }
 
-  // Sezione inline: avvia subito una richiesta EXPLAIN e mostra il risultato nel menu.
-  // Se la risposta è "NESSUNA SPIEGAZIONE" la sezione viene nascosta.
-  // ------------------------------------------------------------
-  // Prefetch "Spiega" su selezione di testo (riduce latenza del menu)
-  // ------------------------------------------------------------
-  // Quando l'utente seleziona del testo, lanciamo subito la richiesta EXPLAIN in
-  // background. Quando poi apre il menu (clic destro), il risultato è in cache:
-  // il box inline lo mostra istantaneamente invece di aspettare il provider.
-  // - Debounce 400ms (selectionchange spara molto durante il drag).
-  // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
-  // - No prefetch se tab nascosto, dominio bloccato, selezione troppo corta.
-  // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
+  // Sezione inline: parte subito una EXPLAIN e il risultato compare nel menu; «NESSUNA SPIEGAZIONE» nasconde la sezione.
+  // Prefetch alla selezione del testo: quando poi si apre il menu il risultato è già in cache e il box lo mostra subito invece di aspettare il provider.
+  // Debounce 400ms (selectionchange spara molto durante il trascinamento), dedup per chiave selezione, niente prefetch a tab nascosto, dominio bloccato o selezione troppo corta, una sola entry attiva: la selezione cambia in fretta e una cache larga non serve.
   let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
   let prefetchTimer = null;
 
@@ -729,7 +647,6 @@
           }
           if (cancelled) return;
 
-          // Streaming spiegazione via AI
           let port;
           try {
             port = chrome.runtime.connect({ name: global.SN_MSG.PORTS.AI_STREAM });
@@ -832,20 +749,8 @@
     return d >= 1 && d <= max;
   }
 
-  // ------------------------------------------------------------
-  // Salva / condividi / cerca / immagini
-  // ------------------------------------------------------------
-
-  // Cattura del tab visibile SOLO dopo che il compositor ha ripresentato la
-  // pagina. Le azioni di cattura partono quasi sempre da un click nel menu del
-  // tasto destro: il menu viene rimosso dal DOM in modo sincrono, ma
-  // capturePage nel main fotografa il frame del compositor, che in quel
-  // momento non è ancora stato ridisegnato — e il menu finiva "stampato"
-  // dentro l'immagine (miniatura di "Salva per dopo", screenshot, ritagli).
-  // Doppio requestAnimationFrame: il primo callback apre il frame che
-  // incorpora la rimozione, il secondo gira quando quel frame è stato
-  // committato; il piccolo timeout copre la presentazione fuori processo del
-  // compositor prima che il main scatti la foto.
+  // Si cattura solo dopo che il compositor ha ripresentato la pagina: il menu viene rimosso dal DOM in modo sincrono, ma capturePage fotografa il frame del compositor, non ancora ridisegnato, e il menu finiva stampato dentro l'immagine (miniature, screenshot, ritagli).
+  // Doppio requestAnimationFrame: il primo apre il frame che incorpora la rimozione, il secondo gira quando quel frame è committato; il piccolo timeout copre la presentazione fuori processo prima dello scatto.
   async function captureVisibleTab() {
     await new Promise((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 50)));
@@ -865,14 +770,8 @@
   }
 
   async function savePage() {
-    // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
-    // della miniatura (captureVisibleTab) attende ~120ms che il menu sparisca
-    // dal compositor: se in quella finestra la pagina fa un redirect o si
-    // ricarica, il contesto del content script viene distrutto e il messaggio
-    // di salvataggio non partirebbe mai — l'utente crederebbe di aver salvato
-    // ma non ci sarebbe nulla, senza alcun avviso (#334). Raccogliamo i dati e
-    // inviamo SAVE_PAGE in modo sincrono al click (l'IPC parte prima di ogni
-    // await): la miniatura arriva dopo, ed è best-effort.
+    // Il salvataggio si committa SUBITO, prima di qualsiasi attesa: la cattura della miniatura aspetta ~120ms che il menu sparisca, e se in quella finestra la pagina fa un redirect il contesto del content script muore e il messaggio non parte più — l'utente crederebbe di aver salvato, senza alcun avviso (#334).
+    // Quindi SAVE_PAGE parte sincrono al click, prima di ogni await; la miniatura arriva dopo ed è best-effort.
     const base = buildSavePayload();
     let entry = null;
     try {
@@ -890,11 +789,7 @@
       return;
     }
 
-    // Miniatura best-effort: catturala dopo che il menu è sparito dal
-    // compositor. La cattura DEVE precedere il toast di conferma, altrimenti il
-    // toast finisce dentro la miniatura (#325). Se la pagina è già cambiata la
-    // cattura può fallire: il salvataggio resta comunque valido, solo senza
-    // anteprima.
+    // La cattura DEVE precedere il toast di conferma, o il toast finisce dentro la miniatura (#325). Se la pagina è già cambiata la cattura può fallire: il salvataggio resta valido, solo senza anteprima.
     let thumbnail = '';
     try {
       const cap = await captureVisibleTab();
@@ -909,17 +804,12 @@
       }).catch(() => {});
     }
 
-    // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
-    // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
+    // Conferma CLICCABILE che porta alla lista (#252): il vecchio toast muto si chiudeva in 600ms, troppo rapido per farci qualcosa.
     showSaveConfirm(entry);
   }
 
-  // Riquadro di conferma di "Salva per dopo" (#252). La scheda salvata sta per
-  // chiudersi: prima di farlo diamo qualche secondo per raggiungere la lista
-  // dove la pagina è finita. Cliccandolo apre "Aperti per dopo" con la scheda
-  // appena messa da parte evidenziata; ignorandolo, la scheda si chiude da sola
-  // come prima. È l'unico modo per far scoprire la lista proprio nel momento in
-  // cui serve, senza aggiungere voci di menu.
+  // Riquadro di conferma di «Salva per dopo» (#252): la scheda salvata sta per chiudersi, e prima di farlo si danno qualche secondo per raggiungere la lista dove la pagina è finita.
+  // Cliccandolo si apre «Aperti per dopo» con la scheda evidenziata; ignorandolo si chiude da sola. È l'unico modo di far scoprire la lista proprio quando serve, senza aggiungere voci di menu.
   function showSaveConfirm(entry) {
     const AUTO_CLOSE_MS = 4000;
     let done = false;
@@ -999,9 +889,7 @@
   async function downloadImage(imgEl) {
     const src = imgEl.currentSrc || imgEl.src;
     if (!src) return;
-    // data:/blob: nascono nella pagina stessa (canvas, object URL): lì
-    // l'attributo download di un <a> è onorato da Chromium e il main non
-    // saprebbe risolverli — restano sul cammino anchor.
+    // data: e blob: nascono nella pagina stessa: lì Chromium onora l'attributo download di un <a>, e il main non saprebbe risolverli — restano sul cammino anchor.
     if (/^(data:|blob:)/i.test(src)) {
       const a = document.createElement('a');
       a.href = src;
@@ -1010,12 +898,8 @@
       document.body.appendChild(a); a.click(); a.remove();
       return;
     }
-    // Immagini http(s) — quasi sempre su un ALTRO dominio rispetto alla pagina:
-    // Chromium ignora l'attributo download cross-origin e la scheda NAVIGAVA
-    // sull'URL dell'immagine senza scaricare nulla (#274). Il salvataggio passa
-    // dal main process, che scarica a prescindere dall'origine. La risposta
-    // arriva a download concluso: toast di conferma (o di errore; nessun toast
-    // se l'utente annulla il dialogo di salvataggio).
+    // Le immagini http(s) sono quasi sempre di un altro dominio, dove Chromium ignora l'attributo download e la scheda NAVIGAVA sull'immagine senza scaricare niente (#274).
+    // Il salvataggio passa dal main, che scarica a prescindere dall'origine e risponde a download concluso (nessun toast se l'utente annulla il dialogo).
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src });
       if (res?.ok) Popup.showToast(I18n.t('toast_image_saved'));
@@ -1025,16 +909,8 @@
     }
   }
 
-  // Un link "a un file" (PDF, ZIP, allegato) merita "Salva file"; un link a
-  // un'altra pagina no (scaricherebbe l'HTML). Non possiamo interrogare il
-  // server — una HEAD a ogni apertura del menu sarebbe attrito e latenza —
-  // quindi decidiamo dagli indizi locali:
-  //  - l'attributo `download` sull'<a> dichiara esplicitamente un file da salvare;
-  //  - altrimenti l'ultimo segmento del percorso ha un'estensione che NON è
-  //    quella di una pagina navigabile (html, php, asp…). Le pagine di solito non
-  //    hanno estensione o ne hanno una "web"; un file scaricabile sì
-  //    (.pdf, .zip, .csv, .docx…).
-  // Solo http/https: data:/blob:/mailto: e altri schemi non offrono la voce.
+  // Un link a un file (PDF, ZIP, allegato) merita «Salva file»; un link a un'altra pagina no, scaricherebbe l'HTML. Una HEAD a ogni apertura del menu sarebbe attrito, quindi si decide dagli indizi locali:
+  // l'attributo `download` sull'<a>, oppure un'estensione nell'ultimo segmento del percorso che non sia di una pagina navigabile (html, php, asp…). Solo http e https: data:, blob: e mailto: non offrono la voce.
   const PAGE_EXTS = new Set([
     'html', 'htm', 'xhtml', 'shtml', 'php', 'php3', 'php4', 'php5', 'phtml',
     'asp', 'aspx', 'jsp', 'jspx', 'cgi', 'pl', 'do', 'action', 'cfm',
@@ -1053,21 +929,13 @@
     return !PAGE_EXTS.has(m[1].toLowerCase());
   }
 
-  // "Salva file" (#410.2). A differenza di downloadImage (byte scaricati a mano
-  // nel main con un dialogo "Salva come…"), instradiamo il download NATIVO della
-  // scheda: il main chiama webContents.downloadURL, che passa per
-  // l'intercettazione will-download di #410.1. Così scaricare dal menu e cliccare
-  // il link producono lo STESSO risultato visibile — avanzamento nella barra,
-  // salvataggio in cartella Download, avviso finale, cronologia (parità dei
-  // cammini). Nessun toast qui: la conferma è quella condivisa col clic (barra +
-  // toast finale dalla shell); avvisiamo solo se il download non parte proprio.
+  // «Salva file» (#410.2) instrada il download NATIVO della scheda (webContents.downloadURL, che passa dall'intercettazione will-download di #410.1) invece di scaricare i byte a mano come downloadImage:
+  // così scaricare dal menu e cliccare il link danno lo STESSO risultato visibile — barra di avanzamento, cartella Download, avviso finale, cronologia. Nessun toast qui: la conferma è quella condivisa col clic, e si avvisa solo se il download non parte proprio.
   async function downloadLink(linkEl) {
     let href = '';
     try { href = linkEl.href || ''; } catch (_) {}
     if (!href) return;
-    // data:/blob: nascono nella pagina stessa: lì Chromium onora l'attributo
-    // `download` di un <a> e il main non saprebbe risolverli — restano sul
-    // cammino anchor (stessa scelta di downloadImage).
+    // data: e blob: nascono nella pagina: stessa scelta di downloadImage, restano sul cammino anchor.
     if (/^(data:|blob:)/i.test(href)) {
       const a = document.createElement('a');
       a.href = href;
@@ -1097,9 +965,7 @@
     copyToClipboard(location.href);
   }
 
-  // Condividere un link finisce, senza sistema di condivisione nativo, in una
-  // copia negli appunti: vale lo stesso discorso di "Copia URL" (#437) — un
-  // href che non è un indirizzo non si può né mandare a qualcuno né copiare.
+  // Senza sistema di condivisione nativo, condividere un link finisce in una copia negli appunti: vale lo stesso discorso di «Copia URL» (#437).
   async function shareLink(linkEl) {
     const href = linkEl?.href || '';
     if (!isAddress(href)) {
@@ -1118,14 +984,7 @@
     window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener');
   }
 
-  // ------------------------------------------------------------
-  // Video e audio (#400)
-  // ------------------------------------------------------------
-  // Il menu di Filo prende il posto di quello di Chromium su TUTTE le pagine:
-  // finché qui non c'era nulla, il tasto destro su un filmato toglieva all'utente
-  // ogni azione (salva, copia indirizzo, finestra mobile, ripeti, velocità) senza
-  // rimpiazzarla. Queste sono le azioni sull'elemento media, usate dalla zona
-  // contestuale del menu.
+  // Video e audio (#400). Il menu di Filo prende il posto di quello di Chromium su TUTTE le pagine: finché qui non c'era niente, il tasto destro su un filmato toglieva all'utente ogni azione (salva, copia indirizzo, finestra mobile, ripeti, velocità) senza rimpiazzarla.
 
   const MEDIA_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -1217,12 +1076,8 @@
     }
   }
 
-  // "Copia URL video/audio": un blob: (stream MSE, o Blob creata dalla pagina)
-  // non è un indirizzo utilizzabile fuori dalla scheda — dirlo è meglio che
-  // copiare una stringa che altrove non apre nulla. Un blob: assente o vuoto
-  // resta il caso "streaming a pezzi", che ha il suo messaggio; ogni altra
-  // sorgente che non è un indirizzo (data:, javascript:, testo qualsiasi)
-  // passa dal messaggio generico (#437).
+  // Un blob: (stream MSE, o una Blob creata dalla pagina) non è un indirizzo utilizzabile fuori dalla scheda: dirlo è meglio che copiare una stringa che altrove non apre nulla.
+  // Un blob: assente o vuoto è il caso «streaming a pezzi», che ha il suo messaggio; ogni altra sorgente che non è un indirizzo passa dal messaggio generico (#437).
   function copyMediaUrl(el) {
     const src = mediaSrc(el);
     if (!src || /^blob:/i.test(src)) {
@@ -1238,10 +1093,7 @@
     const src = mediaSrc(el);
     if (!src) { Popup.showToast(I18n.t(failToast)); return; }
 
-    // blob:/data: nascono nella pagina stessa: l'attributo download di un <a> è
-    // onorato da Chromium e il main non saprebbe risolverli. Attenzione: un
-    // blob: di MediaSource (lo streaming adattivo dei player) NON è leggibile —
-    // fetch fallisce, e in quel caso non esiste alcun file da salvare.
+    // blob: e data: nascono nella pagina e restano sul cammino anchor. Attenzione: un blob: di MediaSource (lo streaming adattivo dei player) NON è leggibile — fetch fallisce, e in quel caso non esiste alcun file da salvare.
     if (/^(blob:|data:)/i.test(src)) {
       try {
         const r = await fetch(src);
@@ -1261,9 +1113,7 @@
       return;
     }
 
-    // http(s): stesso cammino del salvataggio immagini (#274) — scarica il main
-    // presentando Referer e cookie della scheda, così funziona anche cross-origin
-    // e sui server con protezione hotlink.
+    // http(s): stesso cammino del salvataggio immagini (#274) — scarica il main presentando Referer e cookie della scheda, così funziona anche cross-origin e sui server con protezione hotlink.
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.DOWNLOAD_MEDIA,
@@ -1277,9 +1127,7 @@
     }
   }
 
-  // Voce "Velocità": il corpo accelera di uno scatto (e dopo 2× torna a 1×),
-  // la freccetta apre l'elenco completo, rallentamenti compresi. L'etichetta
-  // porta con sé la velocità corrente, così il menu dice anche in che stato è.
+  // Voce «Velocità»: il corpo accelera di uno scatto (dopo 2× torna a 1×), la freccetta apre l'elenco completo coi rallentamenti. L'etichetta porta la velocità corrente, così il menu dice anche in che stato è.
   function buildMediaSpeedItem(el) {
     const rate = Number(el.playbackRate) || 1;
     return {
@@ -1294,7 +1142,6 @@
     };
   }
 
-  // Zona contestuale del menu per un <video>/<audio>.
   function buildMediaItems(el) {
     const audio = isAudioEl(el);
     const items = [];
@@ -1348,9 +1195,6 @@
     window.open(`https://lens.google.com/uploadbyurl?url=${q}`, '_blank', 'noopener');
   }
 
-  // ------------------------------------------------------------
-  // Screenshot (pieno e a regione) + trascrizione OCR
-  // ------------------------------------------------------------
   async function takeScreenshot() {
     try {
       const cap = await captureVisibleTab();
@@ -1383,18 +1227,13 @@
     } catch (_) {}
   }
 
-  // Mostra un overlay fullscreen sopra la pagina e fa selezionare all'utente
-  // un rettangolo trascinando. Risolve con { dataUrl, rect } dove dataUrl è
-  // il ritaglio PNG della porzione di tab catturata, rect è in CSS pixel.
-  // Risolve con null se l'utente annulla (Esc / clic senza drag / rettangolo
-  // troppo piccolo). Non logga eccezioni: gli errori bubble-up come reject.
+  // Risolve con { dataUrl, rect }: il ritaglio PNG della porzione catturata e il rettangolo in pixel CSS. Risolve con null se l'utente annulla (Esc, clic senza trascinamento, rettangolo troppo piccolo).
+  // Non logga eccezioni: gli errori escono come reject.
   async function selectScreenRegion() {
     const cap = await captureVisibleTab();
     if (!cap?.dataUrl) throw new Error('capture failed');
 
-    // L'immagine catturata è in pixel del device; l'overlay è in pixel CSS.
-    // Conserviamo la dimensione del viewport CSS qui per calcolare la scala
-    // dopo aver caricato l'immagine sorgente.
+    // L'immagine catturata è in pixel del device, l'overlay in pixel CSS: la dimensione del viewport CSS si conserva qui per calcolare la scala dopo aver caricato l'immagine.
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
@@ -1406,10 +1245,7 @@
     });
 
     return new Promise((resolve) => {
-      // Cursore custom: il crosshair OS può risultare invisibile su sfondo
-      // scuro/chiaro variabile (feedback alpha). Disegnamo un crosshair SVG
-      // bianco con outline nero, abbastanza grande da essere sempre visibile
-      // sopra la maschera semitrasparente. Hotspot al centro (16,16).
+      // Crosshair SVG bianco con outline nero invece di quello del sistema, che su sfondo variabile può risultare invisibile sopra la maschera semitrasparente. Hotspot al centro (16,16).
       const crosshairSvg =
         `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">` +
         `<line x1="16" y1="2" x2="16" y2="30" stroke="black" stroke-width="3"/>` +
@@ -1422,20 +1258,15 @@
       const overlay = document.createElement('div');
       overlay.className = 'sn-region-overlay';
       global.SN_FILO_UI?.mark(overlay);
-      // Stili inline per evitare di dipendere da CSS esterni: l'overlay deve
-      // funzionare in qualsiasi pagina, anche con CSP/style restrittivo.
+      // Stili inline per non dipendere da CSS esterni: l'overlay deve funzionare in qualsiasi pagina, anche con CSP o stili restrittivi.
       Object.assign(overlay.style, {
         position: 'fixed', inset: '0', zIndex: '2147483647',
         cursor: cursorRule, userSelect: 'none', pointerEvents: 'auto',
       });
       overlay.setAttribute('data-sn-theme', document.documentElement.dataset.snTheme || '');
 
-      // 4 quadranti scuri intorno alla selezione (top/left/right/bottom).
-      // Si aggiornano via .style.top/left/width/height durante il drag.
-      // Il cursore va impostato esplicitamente sui figli: la regola CSS
-      // `cursor` è ereditata, ma alcuni runtime Electron non la propagano in
-      // modo affidabile durante il drag, lasciando l'utente senza riferimento
-      // visivo (feedback alpha).
+      // Quattro quadranti scuri intorno alla selezione, aggiornati via style durante il trascinamento.
+      // Il cursore va impostato esplicitamente sui figli: la regola `cursor` è ereditata, ma alcuni runtime Electron non la propagano durante il drag e l'utente resta senza riferimento visivo.
       const mask = ['t', 'r', 'b', 'l'].map(() => {
         const d = document.createElement('div');
         Object.assign(d.style, { position: 'absolute', background: 'rgba(0,0,0,0.45)', cursor: cursorRule });
@@ -1472,13 +1303,9 @@
         rectBox.style.top = minY + 'px';
         rectBox.style.width = (maxX - minX) + 'px';
         rectBox.style.height = (maxY - minY) + 'px';
-        // top
         Object.assign(mask[0].style, { left: '0', top: '0', width: '100%', height: minY + 'px', right: 'auto', bottom: 'auto' });
-        // bottom
         Object.assign(mask[2].style, { left: '0', top: maxY + 'px', width: '100%', bottom: '0', height: 'auto', right: 'auto' });
-        // left
         Object.assign(mask[3].style, { left: '0', top: minY + 'px', width: minX + 'px', height: (maxY - minY) + 'px', right: 'auto', bottom: 'auto' });
-        // right
         Object.assign(mask[1].style, { left: maxX + 'px', top: minY + 'px', right: '0', height: (maxY - minY) + 'px', width: 'auto', bottom: 'auto' });
       }
 
@@ -1543,8 +1370,7 @@
     });
   }
 
-  // Screenshot di una regione selezionata dall'utente. Stessi side-effect del
-  // takeScreenshot pieno (download + clipboard + history clipboard).
+  // Screenshot di una regione scelta dall'utente. Stessi effetti del takeScreenshot pieno: download, appunti, cronologia degli appunti.
   async function takePartialScreenshot() {
     try {
       const region = await selectScreenRegion();
@@ -1557,7 +1383,6 @@
           copied = true;
         }
       } catch (_) {}
-      // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
       const desc = await requestImageDescription(dataUrl).catch(() => null);
       try {
@@ -1628,13 +1453,7 @@
     });
   }
 
-  // ------------------------------------------------------------
-  // Color picker + QR code
-  // ------------------------------------------------------------
-  // Color picker stile PowerToys: usa la EyeDropper API nativa di Chrome. Al
-  // click sull'icona il cursore cambia (gestito dal browser/SO) e la prossima
-  // pressione del tasto sinistro su un pixel qualsiasi della pagina copia il
-  // colore in formato hex nella clipboard. Esc annulla.
+  // Color picker con la EyeDropper API nativa: al click il cursore cambia (lo gestisce il browser) e la pressione successiva su un pixel qualsiasi copia il colore in hex negli appunti. Esc annulla.
   async function pickColor() {
     if (typeof window.EyeDropper !== 'function') {
       Popup.showToast(I18n.t('err_color_picker_unsupported'), { duration: 3000 });
@@ -1662,10 +1481,8 @@
     }
   }
 
-  // Genera e mostra il QR code della pagina corrente in un overlay. La codifica
-  // è 100% locale (src/shared/qr.js): l'URL non viene mai inviato a servizi
-  // esterni. Il QR è sempre nero su bianco (a prescindere dal tema) per
-  // garantire il contrasto richiesto dagli scanner.
+  // La codifica del QR è tutta locale (src/shared/qr.js): l'URL non viene mai mandato a servizi esterni.
+  // Il QR resta nero su bianco a prescindere dal tema, per il contrasto che gli scanner pretendono.
   function showPageQrCode() {
     const QR = global.SN_QR;
     const url = String(location.href || '');
@@ -1705,13 +1522,7 @@
       `</svg>`;
     const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 
-    // --- Overlay ---
-    // L'overlay è figlio di documentElement, che porta data-sn-theme + le
-    // variabili della palette Filo (theme.css è iniettato anche sulle pagine
-    // esterne). Usiamo quindi le stesse variabili del resto della UI (sfondo,
-    // bordo, accento) con dei fallback hard-coded per i rari casi in cui il
-    // tema non fosse ancora applicato. Il QR in sé resta nero su bianco (vedi
-    // sotto): è l'unica parte che NON segue il tema, per restare scansionabile.
+    // L'overlay è figlio di documentElement, che porta data-sn-theme e le variabili della palette (theme.css è iniettato anche sulle pagine esterne): si usano quelle, coi fallback per i rari casi in cui il tema non sia ancora applicato.
     const overlay = document.createElement('div');
     overlay.className = 'sn-qr-overlay';
     global.SN_FILO_UI?.mark(overlay);
@@ -1740,9 +1551,7 @@
     subtitle.textContent = I18n.t('qr_subtitle');
     subtitle.style.cssText = 'font-size:12px;color:var(--sn-muted,#6e6b63);margin-bottom:14px;';
 
-    // Tile bianca attorno al QR: in tema scuro lo stacca dallo sfondo e — cosa
-    // più importante — garantisce la quiet zone bianca che gli scanner si
-    // aspettano, a prescindere dal colore della card.
+    // Tile bianca attorno al QR: lo stacca dallo sfondo in tema scuro e, soprattutto, garantisce la quiet zone che gli scanner si aspettano, qualunque sia il colore della card.
     const qrTile = document.createElement('div');
     qrTile.style.cssText = 'background:#fff;border-radius:10px;padding:10px;display:inline-block;margin:0 auto;box-shadow:0 1px 4px rgba(0,0,0,.12);';
 
@@ -1871,7 +1680,6 @@
 
   global.SN_ACTIONS = {
     init,
-    // clipboard
     copyToClipboard,
     copyUrlToClipboard,
     isAddress,
@@ -1887,7 +1695,6 @@
     pushClipboardEntry,
     requestImageDescription,
     descriptionToFilename,
-    // spiega / traduci
     triggerExplainOrTranslate,
     triggerExplainDeep,
     schedulePrefetchExplain,
@@ -1895,7 +1702,6 @@
     buildInlineExplainImage,
     buildInlineExplainLink,
     analyzeLinkSuspicious,
-    // salva / condividi / cerca / immagini
     buildSavePayload,
     savePage,
     showSaveConfirm,
@@ -1909,7 +1715,6 @@
     shareLink,
     searchTextOnWeb,
     searchImageOnWeb,
-    // video / audio
     buildMediaItems,
     buildMediaSpeedItem,
     downloadMedia,
@@ -1921,11 +1726,9 @@
     toggleMediaControls,
     toggleMediaPip,
     setMediaSpeed,
-    // screenshot / OCR
     takeScreenshot,
     takePartialScreenshot,
     transcribeRegion,
-    // color picker + QR
     pickColor,
     showPageQrCode,
   };
