@@ -1,7 +1,5 @@
-// Tassi di cambio EUR -> altre valute. Fetch lazy da frankfurter.dev (BCE,
-// gratuito, niente API key). Cache in chrome.storage.local con TTL 24h.
-// Usato dai prompt explain/explainDeep per far convertire valute al modello
-// tramite il marker [[calc: ...]] (vedi popup.js).
+// Tassi di cambio EUR → altre valute da frankfurter.dev (BCE, gratuito, senza API key). Cache in chrome.storage.local con TTL 24h.
+// Usato dai prompt explain/explainDeep per far convertire le valute al modello col marker [[calc: ...]] (vedi popup.js).
 
 (function (global) {
   'use strict';
@@ -12,8 +10,7 @@
   const SYMBOLS = ['USD', 'GBP', 'CHF', 'JPY', 'CNY', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK'];
   const URL = `https://api.frankfurter.dev/v1/latest?base=EUR&symbols=${SYMBOLS.join(',')}`;
 
-  // Fallback statico se la fetch fallisce al primo uso e non c'è cache.
-  // Valori indicativi ~2026, usati solo come ultima spiaggia.
+  // Ultima spiaggia se la prima fetch fallisce e non c'è cache: valori indicativi ~2026.
   const FALLBACK = {
     base: 'EUR',
     date: '2026-01-01',
@@ -57,8 +54,7 @@
     }
   }
 
-  // Ritorna sempre qualcosa (cache fresca, cache stale, o fallback).
-  // Aggiorna in background se la cache è scaduta ma utilizzabile.
+  // Ritorna sempre qualcosa (cache fresca, cache stale o fallback) e aggiorna in background se la cache è scaduta ma ancora utilizzabile.
   async function get() {
     const cached = await readCache();
     const now = Date.now();
@@ -82,8 +78,7 @@
     return inflight;
   }
 
-  // Formatta i tassi come riga compatta per il prompt.
-  // Esempio: "1 EUR = 1.08 USD, 0.85 GBP, ..."
+  // Riga compatta per il prompt: "1 EUR = 1.08 USD, 0.85 GBP, …"
   function formatForPrompt(data) {
     if (!data || !data.rates) return '';
     const parts = SYMBOLS

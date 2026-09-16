@@ -1,21 +1,10 @@
-// Esportazione dati Filo come archivio ZIP.
-//
-// Produce un .zip con:
-//   - data.json   → tutto lo storage di Filo (memorie agenti, pagine salvate,
-//                   cronologia incolla, costi, ecc.)
-//   - images/…    → le immagini copiate/salvate, estratte dai data-URL base64
-//                   incorporati nello storage. Nel JSON il data-URL viene
-//                   sostituito col percorso relativo del file (es.
-//                   "images/img-1.png"), così il JSON resta leggero e l'utente
-//                   può sfogliare le immagini come file veri.
-//
-// Modulo puro (niente Electron): riceve i dati e ritorna un Buffer ZIP, così è
-// testabile in isolamento. Lo ZIP usa il metodo STORE (nessuna compressione):
-// non servono dipendenze esterne ed è perfettamente standard.
+// Esportazione dei dati di Filo come archivio ZIP: data.json con tutto lo storage, più images/… con le immagini estratte dai data-URL base64 (nel JSON resta il percorso relativo, così il JSON è leggero e le immagini si sfogliano come file veri).
+// Modulo puro (niente Electron): riceve i dati e ritorna un Buffer ZIP.
+// Lo ZIP usa il metodo STORE (nessuna compressione): niente dipendenze esterne ed è comunque standard.
 
 'use strict';
 
-// --- CRC32 (tabella standard, polinomio 0xEDB88320) -------------------------
+// CRC32, tabella standard (polinomio 0xEDB88320).
 let CRC_TABLE = null;
 function crcTable() {
   if (CRC_TABLE) return CRC_TABLE;
@@ -35,8 +24,7 @@ function crc32(buf) {
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 
-// --- ZIP writer (STORE) -----------------------------------------------------
-// entries: [{ name: string, buffer: Buffer }]
+// entries: [{ name: string, buffer: Buffer }].
 function zipStore(entries) {
   const chunks = [];
   const central = [];
@@ -99,11 +87,8 @@ function zipStore(entries) {
   return Buffer.concat([...chunks, centralBuf, end]);
 }
 
-// --- estrazione immagini dai data-URL ---------------------------------------
 const DATA_URL_RE = /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i;
 
-// Cammina ricorsivamente l'oggetto e sostituisce ogni stringa data-URL immagine
-// con un percorso relativo, raccogliendo i buffer delle immagini.
 function extractImages(node, images) {
   const replaceStr = (s) => {
     const m = DATA_URL_RE.exec(s);
@@ -132,7 +117,6 @@ function extractImages(node, images) {
   }
 }
 
-// Costruisce il Buffer ZIP a partire dallo storage Filo.
 function buildExportZip(storageData) {
   const clone = JSON.parse(JSON.stringify(storageData ?? {}));
   const images = [];
@@ -154,27 +138,16 @@ function buildExportZip(storageData) {
   return zipStore(entries);
 }
 
-// ============================================================================
-// IMPORTAZIONE — l'inverso esatto di buildExportZip.
-//
-// Un backup che non si può ripristinare non è un backup: qui viviamo la metà
-// mancante. Leggiamo lo zip prodotto da buildExportZip (o una sua versione
-// ri-compressa da un qualsiasi gestore di archivi: accettiamo anche DEFLATE, e
-// il file dentro una cartella, perché l'utente ha tutto il diritto di
-// scompattare, guardare e ri-comprimere), rimettiamo le immagini al loro posto
-// come data-URL e fondiamo il risultato con i dati già presenti.
-// ============================================================================
+// IMPORTAZIONE — l'inverso esatto di buildExportZip: un backup che non si può ripristinare non è un backup.
+// Accettiamo anche DEFLATE e data.json dentro una cartella: l'utente ha tutto il diritto di scompattare, guardare e ri-comprimere.
 
 const zlib = require('node:zlib');
 
-// --- ZIP reader (STORE + DEFLATE) -------------------------------------------
-// Ritorna una Map nome → Buffer. Legge la central directory (la sola struttura
-// autorevole di uno zip: i local header possono avere size a 0 con data
-// descriptor).
+// Ritorna una Map nome → Buffer leggendo la central directory, la sola struttura autorevole di uno zip: i local header possono avere size a 0 con data descriptor.
 function unzip(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 22) throw new Error('not_a_zip');
 
-  // EOCD: cerca la firma dalla fine (il commento finale può essere fino a 64KB).
+  // EOCD: si cerca la firma dalla fine, il commento finale può essere fino a 64KB.
   let eocd = -1;
   const minStart = Math.max(0, buf.length - 22 - 0xFFFF);
   for (let i = buf.length - 22; i >= minStart; i--) {
@@ -218,9 +191,7 @@ function unzip(buf) {
   return out;
 }
 
-// Estensione file → mime. buildExportZip deriva l'estensione dal mime
-// togliendo i caratteri non alfanumerici (image/svg+xml → "svgxml"), quindi qui
-// facciamo il cammino inverso sui casi reali e ricadiamo su image/<ext>.
+// buildExportZip deriva l'estensione dal mime togliendo i caratteri non alfanumerici (image/svg+xml → "svgxml"): qui il cammino inverso sui casi reali, con ripiego su image/<ext>.
 const EXT_TO_MIME = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
   webp: 'image/webp', bmp: 'image/bmp', avif: 'image/avif', tiff: 'image/tiff',
@@ -231,9 +202,7 @@ function mimeOf(name) {
   return EXT_TO_MIME[ext] || `image/${ext || 'png'}`;
 }
 
-// Cammina l'oggetto e rimette i data-URL al posto dei percorsi "images/…":
-// l'inverso di extractImages. `files` è la Map nome→Buffer dello zip, `prefix`
-// l'eventuale cartella che contiene data.json.
+// L'inverso di extractImages; `prefix` è l'eventuale cartella che contiene data.json.
 function inlineImages(node, files, prefix, stats) {
   const restore = (s) => {
     if (typeof s !== 'string' || !/^images\/[^/]+$/.test(s)) return null;
@@ -258,13 +227,11 @@ function inlineImages(node, files, prefix, stats) {
   }
 }
 
-// Legge un archivio esportato e ritorna { data, imageCount, exportedAt }.
 // Lancia con un codice parlante se il file non è un export di Filo.
 function readExportZip(zipBuffer) {
   const files = unzip(zipBuffer);
 
-  // data.json può stare in radice o dentro una cartella (utente che ha
-  // scompattato e ri-compresso): prendiamo quello meno profondo.
+  // data.json può stare in radice o dentro una cartella (utente che ha scompattato e ri-compresso): si prende quello meno profondo.
   let dataName = null;
   for (const name of files.keys()) {
     if (!/(^|\/)data\.json$/.test(name)) continue;
@@ -291,11 +258,7 @@ function readExportZip(zipBuffer) {
   return { data, imageCount: stats.images, exportedAt, sectionCount: Object.keys(data).length };
 }
 
-// --- fusione con i dati già presenti ----------------------------------------
-// Identità di un elemento di lista: l'id quando c'è (le liste di Filo — pagine
-// salvate, cronologia, schede archiviate — sono tutte oggetti con id), altrimenti
-// il contenuto serializzato. Serve a non duplicare le voci già presenti quando si
-// ripristina un backup sopra dati vivi.
+// Identità di un elemento di lista: l'id quando c'è (le liste di Filo sono tutte oggetti con id), altrimenti il contenuto serializzato. Serve a non duplicare le voci già presenti quando si ripristina un backup sopra dati vivi.
 function itemKey(item) {
   if (item && typeof item === 'object' && !Array.isArray(item)) {
     for (const k of ['id', 'uuid', 'key']) {
@@ -309,8 +272,7 @@ function isPlainObject(v) {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 
-// Unione di due liste: si tengono TUTTE le voci locali (non si perde nulla di
-// ciò che c'è ora) e si accodano quelle del backup non ancora presenti.
+// Si tengono TUTTE le voci locali — nulla di ciò che c'è ora va perso — e si accodano quelle del backup non ancora presenti.
 function mergeLists(local, imported) {
   const seen = new Set(local.map(itemKey));
   const out = local.slice();
@@ -332,18 +294,12 @@ function mergeValue(local, imported) {
     }
     return out;
   }
-  // Tipi diversi o valori semplici: vince il backup — è ciò che l'utente ha
-  // chiesto di ripristinare.
+  // Tipi diversi o valori semplici: vince il backup, è ciò che l'utente ha chiesto di ripristinare.
   return imported;
 }
 
-// Fonde i dati importati con lo storage corrente.
-// Regole (una sola modalità, spiegata all'utente nella conferma):
-//   - una sezione che qui non esiste viene presa dal backup;
-//   - le liste si UNISCONO senza duplicati: nulla di ciò che c'è ora va perso;
-//   - sui valori in conflitto vince il backup (è un ripristino).
-// Ritorna { merged, stats: { added, updated, unchanged } } dove le statistiche
-// contano le sezioni di primo livello.
+// Regole della fusione (una sola modalità, spiegata all'utente nella conferma): una sezione che qui non esiste si prende dal backup; le liste si UNISCONO senza duplicati; sui valori in conflitto vince il backup, perché è un ripristino.
+// Le statistiche contano le sezioni di primo livello.
 function mergeImportedData(current, imported) {
   const cur = current && typeof current === 'object' ? current : {};
   const imp = imported && typeof imported === 'object' ? imported : {};

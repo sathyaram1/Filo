@@ -1,31 +1,6 @@
-// Outbox del feedback: invio "fire-and-forget" con ritentativo in background.
-//
-// PERCHÉ ESISTE (feedback #341)
-//   Quando l'utente invia un feedback senza rete, il vecchio flusso restava
-//   bloccato sul box con un errore ("Errore invio: timeout — controlla la rete")
-//   e costringeva a ritentare a mano. L'attrito è negativo: alla pressione di
-//   "Invia" il box deve sparire SUBITO e Filo deve farsi carico dell'invio,
-//   ritentando da solo appena la connessione torna. L'utente non deve gestire
-//   nulla — coerente con "il software deve poter essere usato male".
-//
-// COME
-//   Il main tiene una piccola coda persistita (sopravvive al riavvio: un
-//   feedback accodato offline e l'app chiusa parte al prossimo avvio). Ogni
-//   voce viene ritentata con backoff crescente (max ~30s) finché l'invio riesce:
-//   così "quando c'è connessione" significa "entro ~30s dal ritorno della rete".
-//   L'invio è idempotente lato server (submissionId → dedup), quindi ritentare
-//   la stessa voce non crea mai duplicati.
-//
-// DIPENDENZE (da globalThis, caricate prima dal loader)
-//   SN_STORAGE   getRaw/setRaw per persistere la coda
-//   SN_FEEDBACK  submit(payload) + fallbackName(text)
-//   SN_CONST     STORAGE_KEYS.FEEDBACK_OUTBOX
-//
-// API
-//   init({ prepare, onDone, log, backoffMin, backoffMax })  — una volta all'avvio
-//   enqueue(payload) -> { id, queued:true }                 — accoda + prova subito
-//   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
-//   size()                                                  — voci in coda
+// Outbox del feedback (#341): alla pressione di "Invia" il box sparisce SUBITO e il main si fa carico dell'invio, ritentando da solo appena la connessione torna — l'utente non deve gestire nulla.
+// Coda persistita (un feedback accodato offline riparte al prossimo avvio) con backoff crescente fino a ~30s; l'invio è idempotente lato server (submissionId → dedup), quindi ritentare non crea mai duplicati.
+// Dipende da SN_STORAGE, SN_FEEDBACK e SN_CONST su globalThis, caricati prima dal loader.
 
 (function (global) {
   'use strict';
@@ -88,8 +63,7 @@
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
-    // Recupera i feedback accodati e non ancora inviati (es. app riavviata mentre
-    // era offline) e prova subito a smaltirli.
+    // Riprende i feedback accodati e non ancora inviati (app riavviata mentre era offline) e prova subito a smaltirli.
     load().then(() => { if (queue.length) scheduleFlush(0); }).catch(() => {});
   }
 
@@ -116,9 +90,7 @@
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
 
-  // Tenta di inviare TUTTA la coda una volta. Ritorna true se la coda è vuota
-  // dopo il tentativo. Su fallimento (offline) le voci restano in coda e, se
-  // `auto`, viene pianificato un nuovo tentativo con backoff crescente.
+  // Su fallimento (offline) le voci restano in coda e, se `auto`, si pianifica un nuovo tentativo con backoff crescente.
   async function flush() {
     if (flushing) return queue.length === 0;
     flushing = true;
@@ -134,8 +106,7 @@
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
-          // Titolo breve generato al momento dell'invio (offline ripiega sul
-          // fallback), calcolato UNA volta e riusato dai ritentativi.
+          // Titolo breve calcolato UNA volta all'invio (offline ripiega sul fallback) e riusato dai ritentativi.
           if (!it.prepared) {
             let name = '';
             if (prepareFn) {
@@ -174,7 +145,7 @@
     enqueue,
     flush,
     size: () => queue.length,
-    // ---- helper per i test (logica pura, nessun effetto in produzione) ----
+    // helper per i test (logica pura, nessun effetto in produzione)
     _peek: () => queue.map(serialize),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {

@@ -1,23 +1,6 @@
-// Protezione anti-fingerprinting.
-//
-// Il fingerprinting è il secondo vettore di tracking dopo i cookie: i siti
-// combinano segnali ad alta entropia del browser (canvas, WebGL, audio) per
-// generare un identificativo unico senza bisogno di cookie. Filo aggiunge a
-// quei segnali un rumore DETERMINISTICO per-sito, impercettibile all'utente ma
-// sufficiente a rompere la correlazione cross-site.
-//
-// Questo modulo (main process) custodisce il "master secret" persistente e
-// calcola, per ogni origine, il seed del rumore. Il seed — NON il secret —
-// viene passato al preload via IPC sincrono (vedi ipc.js `filo:fp-config`) e di
-// lì iniettato nel main world della pagina (vedi preload/fingerprint-guard.js).
-// Così il secret non tocca mai il mondo non fidato della pagina.
-//
-// Tre livelli, come per i cookie:
-//   off     (0) — nessun rumore.
-//   default (1) — seed = HMAC(secret, eTLD+1 + settimana ISO). Ruota ogni
-//                 settimana. Nessun impatto su banche/CAPTCHA.
-//   privacy (2) — seed = HMAC(secret, eTLD+1 + session_id). Ruota a ogni
-//                 avvio dell'app.
+// Anti-fingerprinting: ai segnali ad alta entropia (canvas, WebGL, audio) si aggiunge un rumore DETERMINISTICO per-sito, impercettibile all'utente ma sufficiente a rompere la correlazione cross-site.
+// Qui vive il master secret persistente; alla pagina arriva SOLO il seed, via IPC sincrono (ipc.js `filo:fp-config`) e poi preload/fingerprint-guard.js, così il secret non tocca mai il mondo non fidato.
+// Tre livelli: off; default = HMAC(secret, eTLD+1 + settimana ISO), ruota ogni settimana; privacy = HMAC(secret, eTLD+1 + session_id), ruota a ogni avvio.
 
 const crypto = require('node:crypto');
 
@@ -43,10 +26,7 @@ function levelNum(mode) {
   return mode === MODES.PRIVACY ? 2 : mode === MODES.DEFAULT ? 1 : 0;
 }
 
-// Carica (o genera) il master secret persistente e fissa la modalità corrente.
-// Chiamato una volta all'avvio. Best-effort: in caso di errore di storage usa
-// un secret effimero (il rumore funziona comunque, solo non sopravvive al
-// riavvio — accettabile).
+// Best-effort: se lo storage non risponde si usa un secret effimero — il rumore funziona comunque, solo non sopravvive al riavvio.
 async function init(settings) {
   _mode = getMode(settings);
   try {
@@ -68,10 +48,7 @@ function setMode(settings) {
   _mode = getMode(settings);
 }
 
-// eTLD+1 con una piccola lista di suffissi multi-parte comuni. Non è un Public
-// Suffix List completo (sarebbe pesante da bundlare nel preload e qui non
-// serve: l'obiettivo è solo rendere coerente il seed tra sottodomini dello
-// stesso servizio). "accounts.google.com" → "google.com"; "bbc.co.uk" → "bbc.co.uk".
+// Non è la Public Suffix List completa: sarebbe pesante da bundlare nel preload e qui basta rendere coerente il seed fra i sottodomini dello stesso servizio ("accounts.google.com" → "google.com", "bbc.co.uk" → "bbc.co.uk").
 const MULTI_SUFFIX = new Set([
   'co.uk', 'org.uk', 'gov.uk', 'ac.uk', 'me.uk', 'ltd.uk',
   'co.jp', 'or.jp', 'ne.jp', 'com.au', 'net.au', 'org.au', 'co.nz',
@@ -98,44 +75,18 @@ function isoWeekId(d = new Date()) {
   return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
-// Seed uint32 per un'origine (già ridotta a eTLD+1).
+// L'origine arriva già ridotta a eTLD+1.
 function seedForOrigin(origin) {
-  // Garantisce un master secret anche se init() non ha ancora caricato/generato
-  // quello persistente. Senza questo, una pagina che chiede la config nella
-  // finestra di avvio (IPC sincrono filo:fp-config, prima che whenReady completi
-  // init) otterrebbe seed 0 = protezione anti-fingerprint silenziosamente spenta.
-  // Il fallback effimero la tiene attiva; init() poi sovrascrive _secret con
-  // quello persistente (coerente fra riavvii).
+  // Un master secret ci deve essere anche prima che init() carichi quello persistente: una pagina che chiede la config nella finestra di avvio otterrebbe seed 0, cioè protezione silenziosamente spenta. Il fallback effimero la tiene accesa, init() poi sovrascrive.
   if (!_secret) _secret = crypto.randomBytes(32);
   const temporal = _mode === MODES.PRIVACY ? _sessionId : isoWeekId();
   const h = crypto.createHmac('sha256', _secret).update(`${origin}|${temporal}`).digest();
   return h.readUInt32BE(0) >>> 0;
 }
 
-// Pagine di provider di identità (Google, Microsoft, GitHub, …): il rumore
-// anti-fingerprint su canvas/WebGL/audio, per quanto impercettibile per un
-// umano, altera esattamente i segnali che questi provider usano nei loro
-// motori antifrode per riconoscere un browser genuino da uno automatizzato/
-// manomesso. Su un sito normale è innocuo; su un login Google può far scattare
-// il blocco "Si è verificato un errore durante l'accesso" — riproducibile
-// solo con un vero tentativo di accesso, quindi difficile da diagnosticare
-// dai soli log. Riusiamo la stessa lista host di src/shared/authPopup.js (già
-// usata per non bloccare i popup OAuth come popup pubblicitari, #209): stessi
-// host, stesso motivo — sono endpoint di autenticazione, non vanno alterati.
-//
-// Ambito dell'esenzione (#209, rifinitura): NON esentiamo l'intero sito di ogni
-// provider. Per gli host DEDICATI all'autenticazione (accounts.google.com,
-// login.microsoftonline.com, appleid.apple.com, auth.openai.com, Auth0/Okta…)
-// l'intero host È la superficie di accesso, quindi resta esente per intero. Per
-// gli host PRODOTTO che sono anche provider (github.com, x.com, discord.com,
-// facebook.com, linkedin.com, slack.com, dropbox.com…) esentiamo SOLO la
-// superficie di accesso (path/query di login/OAuth): la navigazione pubblica di
-// quei siti — dove l'utente può non essere loggato e il rumore protegge davvero
-// — torna coperta. La distinzione vive in authPopup.js (isIdentityAuthSurface).
-//
-// L'euristica su path/query è sicura perché applicata SOLO a host già nella
-// lista fidata dei provider: un tracker arbitrario non può auto-esentarsi
-// scegliendo un path "/login" (il suo host non è noto e resta protetto).
+// Pagine di autenticazione: il rumore altera esattamente i segnali che i motori antifrode dei provider usano per riconoscere un browser genuino, e su un login Google fa scattare "Si è verificato un errore durante l'accesso" — riproducibile solo con un accesso vero, quindi difficile da diagnosticare dai log. Stessa lista host di src/shared/authPopup.js (#209).
+// NON si esenta l'intero sito di ogni provider: per gli host DEDICATI all'autenticazione l'host intero è superficie di accesso; per gli host PRODOTTO (github.com, x.com, facebook.com…) solo la superficie di login/OAuth, così la navigazione pubblica resta protetta (isIdentityAuthSurface in authPopup.js).
+// L'euristica su path/query è sicura perché si applica SOLO a host già nella lista fidata: un tracker arbitrario non può auto-esentarsi scegliendo un path "/login".
 function isIdentityProviderHref(href) {
   try {
     require('../../shared/authPopup');
@@ -146,22 +97,8 @@ function isIdentityProviderHref(href) {
   }
 }
 
-// Superfici "prodotto" di Google in cui l'utente è AUTENTICATO col proprio
-// account (Documenti/Fogli/Presentazioni, Drive, Gmail, Calendar, Meet…). Qui
-// il rumore anti-fingerprint non offre ALCUNA protezione privacy — sei comunque
-// identificato dal cookie del tuo account Google, che ti segue su tutte le sue
-// app — ma altera gli stessi segnali canvas/WebGL/audio che i controlli di
-// sicurezza antifrode di Google campionano lungo il flusso di accesso, facendo
-// scattare il blocco "questo browser o questa app potrebbero non essere sicuri"
-// (feedback #299: accesso a Google Documenti). È lo stesso ragionamento
-// dell'esenzione del login (accounts.google.com, via isIdentityProviderHref),
-// esteso alle app in cui quel login sfocia: costo privacy nullo, elimina un
-// possibile attrito reale.
-//
-// Lista CURATA (come AUTH_HOSTS), NON l'eTLD+1 google.com: esentare tutto
-// "google.com" spegnerebbe la protezione anche sulla ricerca (www.google.com),
-// dove l'utente può NON essere loggato e il rumore ha un valore reale. Match su
-// host esatto o suo sottodominio.
+// App Google in cui l'utente è già AUTENTICATO (#299): lì il rumore non offre alcuna protezione — il cookie dell'account identifica comunque — ma altera i segnali antifrode e fa scattare "questo browser o questa app potrebbero non essere sicuri". Costo privacy nullo, attrito reale eliminato.
+// Lista CURATA, NON l'eTLD+1 google.com: esentare tutto google.com spegnerebbe la protezione anche sulla ricerca, dove l'utente può non essere loggato. Match su host esatto o suo sottodominio.
 const GOOGLE_APP_HOSTS = [
   'docs.google.com',        // Documenti, Fogli, Presentazioni, Moduli
   'drive.google.com',
@@ -192,8 +129,7 @@ function isGoogleAppSurface(href) {
   return GOOGLE_APP_HOSTS.some((h) => host === h || host.endsWith('.' + h));
 }
 
-// Config { level, seed } per la pagina identificata da href. Solo http/https
-// vengono protette (filo://, file://, about: → off).
+// Solo http/https vengono protette (filo://, file://, about: → off).
 function configForHref(href) {
   const level = levelNum(_mode);
   if (!level) return { level: 0, seed: 0 };

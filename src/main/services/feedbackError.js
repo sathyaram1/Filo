@@ -1,23 +1,6 @@
-// Traduzione di un errore Firestore sul triage feedback in un messaggio
-// AZIONABILE per l'utente. Modulo puro (niente electron) così è testabile in
-// isolamento.
-//
-// Un 403/PERMISSION_DENIED ha DUE cause possibili, e confonderle costa caro:
-//
-//   1) l'account loggato non è admin LATO SERVER (manca il documento
-//      admins/<email> nelle Firestore rules, o l'email non è verificata, o le
-//      regole non sono deployate). Il gate client (cfg.adminEmails) può dire
-//      "sei admin" mentre il server dissente: le due allowlist sono distinte.
-//
-//   2) l'account È admin, ma il CONTENUTO del feedback viola un vincolo di
-//      forma delle regole — tipicamente la conversazione (`notes`) più lunga
-//      del tetto consentito. Le regole validano il documento RISULTANTE: un
-//      feedback già oltre il limite respinge QUALUNQUE scrittura, anche il solo
-//      cambio di stato, e sembra "bloccato" senza motivo.
-//
-// Se il chiamante sa quale delle due è (opts.serverAdmin: true = admin
-// confermato dal server), il messaggio punta dritto alla causa giusta invece di
-// mandare l'owner a creare un documento admins che esiste già.
+// Traduce un errore Firestore del triage feedback in un messaggio AZIONABILE. Modulo puro (niente electron), testabile in isolamento.
+// Un 403 ha DUE cause e confonderle costa caro: l'account non è admin LATO SERVER (il gate client cfg.adminEmails è un'allowlist distinta da quella delle regole), oppure È admin ma il CONTENUTO viola un vincolo di forma — tipicamente `notes` oltre il tetto, e allora le regole respingono QUALUNQUE scrittura, anche il solo cambio di stato.
+// opts.serverAdmin dice quale delle due è, così il messaggio non manda l'owner a creare un documento admins che esiste già.
 
 function permissionDeniedHelp(rawError, claims, opts) {
   const raw = String(rawError || '');
@@ -65,60 +48,14 @@ function permissionDeniedHelp(rawError, claims, opts) {
   return lines.join('\n');
 }
 
-// #582 — un 403 su un ALLEGATO è un'altra storia, e va detta in una riga sola:
-// questo testo finisce nell'hover del segnaposto dell'immagine in dashboard,
-// dove un messaggio su più righe non si legge.
-//
-// La causa è UNA SOLA, e va detta com'è. Per un po' ne sono state due: il
-// download token nel link, oppure le credenziali di un amministratore. Poi
-// (#583) le regole hanno chiuso la lettura del deposito a chiunque, owner
-// compreso — ed è quella chiusura che rende di nuovo utile ritirare il token di
-// un link finito in giro. Da allora l'unica chiave è il token, e il messaggio
-// che mandava a «farsi mettere fra gli amministratori» mandava a fare una cosa
-// che non apre più niente: la cura sbagliata è peggio di nessuna cura, perché
-// ci si perde tempo prima di scoprirlo.
-//
-// Quello che resta vero: quel link non ha un token valido — non l'ha mai avuto
-// (allegato caricato quando il deposito non ne rilasciava) o è stato ritirato.
-// In quel caso il file c'è ancora, ma si raggiunge solo dalla console del
-// progetto.
-//
-// @returns {string} una riga, senza a capo (finisce in un hover).
+// #582 — una riga sola, senza a capo: questo testo finisce nell'hover del segnaposto dell'immagine in dashboard.
+// La causa è una sola: il link non ha un token di download valido (mai avuto o ritirato). Le regole chiudono la lettura del deposito a chiunque, owner compreso, quindi mandare a «farsi mettere fra gli amministratori» manda a fare una cosa che non apre più niente.
 function attachmentForbiddenHelp() {
   return 'allegato non leggibile: il link non porta un token di download valido (mancante o ritirato), e il deposito non lo apre a nessuno — resta raggiungibile solo dalla console del progetto';
 }
 
-// #582 — e poi c'è chi NON è l'owner: un utente qualunque che riapre le proprie
-// segnalazioni e ritrova lo screenshot che ha mandato. Quell'immagine non la
-// rivedrà: viaggia cifrata con la chiave di chi riceve le segnalazioni, ed è
-// voluto. Quello che non va è mandargli un messaggio sui permessi di
-// amministratore, che lo spedisce a cercare un problema suo dove non c'è niente
-// da risolvere. Qui si dice invece l'unica cosa che gli serve sapere: l'allegato
-// è arrivato dov'era diretto.
-//
-// La frase vale anche davanti all'allegato di UN ALTRO, e serve che valga:
-// l'elenco dei feedback mostra a ogni tester le segnalazioni di tutti, quindi lo
-// stesso segnaposto compare su roba che chi guarda non ha mandato. «Inviato»
-// lì si leggeva come «l'hai mandato tu» (#582, giro 3).
-//
-// ⚠️ E NON dice che l'allegato è arrivato, né che viaggia cifrato (#582, giro
-// 5). Le diceva, e non le aveva guardate. L'indirizzo di un allegato non lo
-// sceglie Filo: sta dentro la segnalazione, e una segnalazione la manda
-// chiunque, anche senza account. Il giro 4 ha tolto la parola agli indirizzi
-// FUORI dal deposito di Filo; restava che bastasse scriverne uno nella FORMA
-// del deposito — senza caricare niente — perché Filo dichiarasse consegnato, e
-// cifrato con la chiave di chi riceve le segnalazioni, un file che non era mai
-// entrato. Un allegato inventato diventava indistinguibile da uno vero, con la
-// firma di Filo sopra.
-//
-// Da questo lato l'esistenza non si può controllare, e va bene così: senza il
-// download token il deposito risponde 403 sia per un oggetto che c'è sia per uno
-// che non c'è (verificato col motore vero delle regole). Quindi la cura non è
-// indovinare: è dire soltanto ciò che è vero in ogni caso — chi apre quel file.
-// Questo resta vero davanti a un allegato vero, a uno inventato e a quello di un
-// altro, e non rimanda a nessun permesso da chiedere.
-//
-// @returns {string} una riga, senza a capo (finisce in un hover).
+// #582 — una riga sola (finisce in un hover), e NON dice che l'allegato è arrivato né che viaggia cifrato: l'indirizzo di un allegato sta dentro la segnalazione, che può mandare chiunque anche senza account, quindi basterebbe scriverne uno nella forma del deposito perché Filo dichiari consegnato e cifrato un file mai caricato.
+// Senza token il deposito risponde 403 sia per un oggetto che c'è sia per uno che non c'è: da qui l'esistenza non si può controllare, quindi si dice solo ciò che è vero in ogni caso — chi apre quel file. Vale anche davanti all'allegato di un altro, che l'elenco mostra a ogni tester.
 function attachmentNotForYouHelp() {
   return 'questo allegato lo apre solo chi riceve le segnalazioni';
 }
