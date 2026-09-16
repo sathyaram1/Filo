@@ -436,3 +436,67 @@ describe('il rinvio dopo un rebase non calpesta il lavoro degli altri nemmeno do
     assert.match(stderr, /claude\/fetch.*NON e' arrivato su origin/);
   });
 });
+
+// ─── Nel mezzo di un conflitto l'hook si astiene ─────────────────────────────
+//
+// Giro del 14/09/2026, terza verifica: un rebase (o una fusione) fermo su un
+// conflitto, l'agente risolve UN file con un Edit, l'hook riparte e `git add
+// -A` mette in commit anche i file ancora in conflitto, coi segni <<<<<<<
+// dentro. Nel rebase spariva il commit che si stava riportando; nella fusione
+// il commit rotto arrivava su origin. Ora l'hook non tocca niente finché
+// l'operazione è a metà.
+
+const SEGNI = /^<{7}|^={7}$|^>{7}/m;
+
+/** Un ramo di lavoro spedito su origin e main che diverge sugli stessi due file. */
+function sceneConflitto() {
+  const { work, origin } = scene();
+  git(work, ['config', 'core.autocrlf', 'false']);
+  git(work, ['checkout', '-q', '-b', 'claude/prova']);
+  writeFileSync(resolve(work, 'a.txt'), 'mio\n', 'utf8');
+  writeFileSync(resolve(work, 'b.txt'), 'mio\n', 'utf8');
+  git(work, ['add', '-A']);
+  git(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'mio']);
+  git(work, ['push', '-q', '-u', 'origin', 'claude/prova']);
+  git(work, ['checkout', '-q', 'main']);
+  writeFileSync(resolve(work, 'a.txt'), 'loro\n', 'utf8');
+  writeFileSync(resolve(work, 'b.txt'), 'loro\n', 'utf8');
+  git(work, ['add', '-A']);
+  git(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'loro']);
+  git(work, ['checkout', '-q', 'claude/prova']);
+  return { work, origin };
+}
+
+describe('nel mezzo di un conflitto l\'hook si astiene', () => {
+  test('rebase fermo su un conflitto: niente commit coi segni, il rebase resta a metà e il commit riportato conserva il suo nome', () => {
+    const { work } = sceneConflitto();
+    const reb = spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', 'main'], { cwd: work, encoding: 'utf8' });
+    assert.notEqual(reb.status, 0, 'il rebase deve fermarsi sul conflitto');
+    const prima = shaOf(work, 'HEAD');
+    writeFileSync(resolve(work, 'a.txt'), 'risolto\n', 'utf8');
+    runHook(work);
+    assert.equal(shaOf(work, 'HEAD'), prima, 'durante il rebase l\'hook non deve committare');
+    assert.ok(git(work, ['ls-files', '-u']).includes('b.txt'), 'b.txt è ancora in conflitto, come deve');
+    // Chi ha iniziato il rebase lo finisce, e il commit arriva col suo nome.
+    writeFileSync(resolve(work, 'b.txt'), 'risolto\n', 'utf8');
+    git(work, ['add', '-A']);
+    const cont = spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '--continue'], { cwd: work, encoding: 'utf8', env: { ...process.env, GIT_EDITOR: 'true' } });
+    assert.equal(cont.status, 0, cont.stderr);
+    assert.equal(git(work, ['log', '--format=%s', '-1']), 'mio');
+    assert.doesNotMatch(git(work, ['show', 'HEAD:b.txt']), SEGNI);
+  });
+
+  test('fusione ferma su due conflitti: dopo l\'Edit sul primo file la fusione resta aperta e su origin non arriva niente', () => {
+    const { work, origin } = sceneConflitto();
+    const m = spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', 'main'], { cwd: work, encoding: 'utf8' });
+    assert.notEqual(m.status, 0, 'la fusione deve fermarsi sul conflitto');
+    const prima = shaOf(work, 'HEAD');
+    const suOriginPrima = git(origin, ['rev-parse', 'claude/prova']);
+    writeFileSync(resolve(work, 'a.txt'), 'risolto\n', 'utf8');
+    runHook(work);
+    assert.equal(shaOf(work, 'HEAD'), prima, 'durante la fusione l\'hook non deve committare');
+    assert.ok(git(work, ['rev-parse', '--verify', '-q', 'MERGE_HEAD']), 'la fusione deve restare aperta');
+    assert.equal(git(origin, ['rev-parse', 'claude/prova']), suOriginPrima, 'su origin non deve arrivare niente');
+    assert.doesNotMatch(git(origin, ['show', 'claude/prova:b.txt']), SEGNI);
+  });
+});

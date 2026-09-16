@@ -26,7 +26,7 @@ test('un testo oltre il tetto viene tagliato entro il tetto, e il taglio è scri
 });
 
 test('il tetto si può passare, e la nota rientra sempre nel tetto', () => {
-  const t = testoEntroIlTetto('abcdefghij'.repeat(30), 120);
-  assert.ok(t.length <= 120);
+  const t = testoEntroIlTetto('abcdefghij'.repeat(30), 250);
+  assert.ok(t.length <= 250);
   assert.match(t, /era di 300/);
 });

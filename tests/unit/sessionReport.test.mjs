@@ -276,3 +276,33 @@ test('da una cartella di lavoro separata (worktree) si trova la cartella dei tra
     assert.equal((await generaRapporto({ cwd: repo, configDir: config })).sessionId, 'sess');
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
+
+// ─── Giro del 14/09, terza verifica: due forme vere dei transcript ───────────
+
+test('le parole «timed out» nel testo di un file letto non sono un timeout: conta il risultato in errore che comincia così', async () => {
+  const uso = { input_tokens: 10, cache_creation_input_tokens: 30000, cache_read_input_tokens: 0, output_tokens: 40 };
+  const righe = [
+    assistant('m1', 'claude-opus-5', uso, [{ type: 'tool_use', id: 'tu1', name: 'Read', input: {} }], T('00:00')),
+    result('tu1', "12\tif (/timed out/i.test(testo)) n += 1; // 'Command timed out after 2m 0s'", T('00:01')),
+    assistant('m2', 'claude-opus-5', uso, [{ type: 'tool_use', id: 'tu2', name: 'Bash', input: {} }], T('00:02')),
+    result('tu2', 'Command timed out after 2m 0s\nnpm run finish:check', T('02:02'), true),
+  ];
+  const rep = await analizzaRighe(righe, {});
+  assert.equal(rep.tools.total, 2);
+  assert.equal(rep.tools.timeouts, 1);
+  assert.equal(rep.tools.errors, 1);
+});
+
+test('una riga col modello «<synthetic>» (zero token) non è un turno e non lascia la nota del modello sconosciuto', async () => {
+  const zero = { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 };
+  const uso = { input_tokens: 10, cache_creation_input_tokens: 30000, cache_read_input_tokens: 0, output_tokens: 40 };
+  const righe = [
+    assistant('m1', 'claude-opus-5', uso, [{ type: 'text', text: 'ciao' }], T('00:00')),
+    assistant('sint-1', '<synthetic>', zero, [{ type: 'text', text: 'Request interrupted' }], T('00:05')),
+    assistant('m2', 'claude-opus-5', uso, [{ type: 'text', text: 'fine' }], T('01:00')),
+  ];
+  const rep = await analizzaRighe(righe, {});
+  assert.equal(rep.turns, 2);
+  assert.deepEqual(rep.models, ['claude-opus-5']);
+  assert.deepEqual(rep.notes, []);
+});

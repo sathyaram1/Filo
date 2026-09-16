@@ -417,3 +417,56 @@ test('qualcun altro ha spinto E questa copia lo ha già scaricato con un fetch: 
   assert.equal(r.ok, false, `il push doveva essere rifiutato: ${JSON.stringify(r)}`);
   assert.equal(remoteSha(origin, 'worker/9'), b, 'il commit dell\'altro resta su origin');
 });
+
+// ─── commitRestante nel mezzo di un conflitto ────────────────────────────────
+//
+// Stessa regola dell'hook (giro del 14/09, terza verifica): con un rebase o
+// una fusione a metà, `git add -A` metterebbe in commit i segni di conflitto.
+// Il rilascio si ferma e lo dice: chi lavora finisce l'operazione e rilancia.
+
+describe('commitRestante: con un rebase o una fusione a metà non committa', () => {
+  function repoInConflitto(nome) {
+    const base = cartellaTemporanea(`filo-rilascio-conflitto-${nome}-`);
+    const work = resolve(base, 'work');
+    mkdirSync(work, { recursive: true });
+    const g = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: work, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    g('init', '-q', '--initial-branch=main');
+    writeFileSync(resolve(work, 'a.txt'), 'base\n');
+    g('add', '-A'); g('commit', '-q', '-m', 'base');
+    g('checkout', '-q', '-b', 'claude/prova');
+    writeFileSync(resolve(work, 'a.txt'), 'mio\n');
+    g('commit', '-q', '-am', 'mio');
+    g('checkout', '-q', 'main');
+    writeFileSync(resolve(work, 'a.txt'), 'loro\n');
+    g('commit', '-q', '-am', 'loro');
+    g('checkout', '-q', 'claude/prova');
+    return { work, g };
+  }
+
+  test('fusione ferma su un conflitto: ok falso, col motivo, e HEAD non si muove', () => {
+    const { work, g } = repoInConflitto('merge');
+    assert.throws(() => g('merge', 'main'), 'la fusione deve fermarsi sul conflitto');
+    const prima = g('rev-parse', 'HEAD');
+    writeFileSync(resolve(work, 'nato-da-shell.txt'), 'x\n');
+    const c = commitRestante(work);
+    assert.equal(c.ok, false);
+    assert.match(c.reason, /una fusione è a metà/);
+    assert.equal(g('rev-parse', 'HEAD'), prima);
+    assert.equal(mod.operazioneGitInCorso(work), 'una fusione');
+  });
+
+  test('rebase fermo su un conflitto: ok falso; a rebase finito si committa normalmente', () => {
+    const { work, g } = repoInConflitto('rebase');
+    assert.throws(() => g('rebase', 'main'), 'il rebase deve fermarsi sul conflitto');
+    assert.equal(mod.operazioneGitInCorso(work), 'un rebase');
+    const c = commitRestante(work);
+    assert.equal(c.ok, false);
+    assert.match(c.reason, /un rebase è a metà/);
+    g('rebase', '--abort');
+    assert.equal(mod.operazioneGitInCorso(work), '');
+    writeFileSync(resolve(work, 'nato-da-shell.txt'), 'x\n');
+    const dopo = commitRestante(work);
+    assert.equal(dopo.ok, true);
+    assert.deepEqual(dopo.committed, ['nato-da-shell.txt']);
+  });
+});
