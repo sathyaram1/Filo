@@ -319,6 +319,17 @@ jobs:
           if [ "$QUI" != "$PROVATO" ]; then
             echo "main e' a $QUI, la suite ha provato ${PROVATO:-(niente)}: questa corsa NON pubblica; la prossima riprova sul main nuovo."
             echo "should_release=false" >> "$GITHUB_OUTPUT"
+            # Il riassunto del lavoro lo dice a chi guarda Actions: se main
+            # riceve qualcosa durante OGNI corsa, nessuna versione esce e da
+            # nessun'altra parte si vede (giro 6 della verifica, 16/09/2026:
+            # scelta dell'owner non aprire un feedback, ma il caso va visto).
+            {
+              echo "## Pubblicazione ferma: main si e' mosso durante la suite"
+              echo ""
+              echo "La suite ha provato \`${PROVATO:-(niente)}\`; main ora e' a \`$QUI\`."
+              echo "Questa corsa NON pubblica; la prossima, fra sei ore, riprova sul main nuovo."
+              echo "Se succede a ogni corsa, nessuna versione esce: guardare la frequenza delle fusioni su main."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Install dipendenze
