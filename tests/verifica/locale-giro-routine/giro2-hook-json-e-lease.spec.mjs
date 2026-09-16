@@ -95,8 +95,8 @@ test.describe('hook di salvataggio — il rinvio dopo un rebase e il lavoro degl
     // la copia conosce: dopo un `git fetch` quel ref è già quello dell'altro,
     // il lease «combacia» e il rinvio riscrive la storia sopra al suo lavoro.
     // Rilievo del giro 2, situazione rara (due che scrivono sullo stesso ramo
-    // e un fetch in mezzo): livello 0, lasciato all'owner.
-    test.fail(true, 'rilievo del giro 2: dopo un fetch il lease combacia col commit dell’altro e il rinvio lo sovrascrive');
+    // e un fetch in mezzo): livello 0, corretto nello stesso giro con
+    // --force-if-includes accanto al lease.
     const s = scenario('fetch');
     writeFileSync(join(s.altro, 'c.txt'), 'tre\n');
     git(s.altro, 'add', '-A');
