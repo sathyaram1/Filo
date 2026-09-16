@@ -42,13 +42,61 @@ test('il battito porta uptimeS, freeMb, rssMb, loadAvg: numeri, non stringhe', a
   assert.ok(sent.rssMb > 0, 'un processo Node vivo occupa memoria');
 });
 
+// Fuori da un contenitore (niente /proc, niente cgroup: `leggi` risponde null).
+const fuori = { leggi: () => null, elenca: () => [] };
+
 test('stato del contenitore: un valore non numerico non parte (il server lo ignorerebbe comunque)', () => {
   const osImpl = { uptime: () => 12.6, freemem: () => 3 * 1048576, loadavg: () => [NaN, 0, 0] };
   const proc = { memoryUsage: () => ({ rss: 2 * 1048576 }) };
-  assert.deepEqual(statoContenitore({ osImpl, proc }), { uptimeS: 13, freeMb: 3, rssMb: 2, loadAvg: 0 });
-  const senzaCarico = statoContenitore({ osImpl: { ...osImpl, uptime: () => 'boh', loadavg: () => [0.5] }, proc });
+  assert.deepEqual(statoContenitore({ osImpl, proc, ...fuori }), { uptimeS: 13, freeMb: 3, rssMb: 2, loadAvg: 0 });
+  const senzaCarico = statoContenitore({ osImpl: { ...osImpl, uptime: () => 'boh', loadavg: () => [0.5] }, proc, ...fuori });
   assert.equal(senzaCarico.uptimeS, undefined);
   assert.equal(senzaCarico.loadAvg, 0.5);
+});
+
+// Fino al 16/09/2026 rssMb era la memoria del processo che batte (piccola e
+// costante) e uptime e memoria libera erano quelli del kernel, cioè della
+// macchina ospite: un worker ucciso per il tetto del cgroup lasciava un
+// battito con venti giga liberi (giro del 14/09, verifica).
+test('in un contenitore le misure sono del contenitore: cgroup v2, età del processo 1, memoria usata dal cgroup', () => {
+  const file = {
+    '/sys/fs/cgroup/memory.current': '1610612736\n', // 1536 MB
+    '/sys/fs/cgroup/memory.max': '4294967296\n', // 4096 MB
+    // campo 22 (avvio del processo 1) = 5000 tick = 50 s dopo l'avvio del kernel
+    '/proc/1/stat': '1 (init) S 0 1 1 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 1 0 5000 1000 100 18446744073709551615\n',
+  };
+  const leggi = (p) => (p in file ? file[p] : null);
+  assert.deepEqual(memoriaContenitore(leggi), { usedMb: 1536, limitMb: 4096 });
+  assert.equal(uptimeContenitore(3650, leggi), 3600);
+  assert.equal(uptimeContenitore(3650, () => null), null);
+  assert.equal(uptimeContenitore(10, leggi), null, 'un avvio nel futuro non è un uptime');
+  const osImpl = { uptime: () => 3650, freemem: () => 99 * 1048576, loadavg: () => [0.5, 0, 0] };
+  const proc = { memoryUsage: () => ({ rss: 2 * 1048576 }) };
+  assert.deepEqual(statoContenitore({ osImpl, proc, leggi, elenca: () => [] }),
+    { uptimeS: 3600, freeMb: 2560, rssMb: 1536, loadAvg: 0.5 },
+    'uptime del contenitore, memoria che manca al tetto, memoria usata dal contenitore');
+});
+
+test('cgroup v1 senza tetto e, senza cgroup, la memoria è la somma di tutti i processi', () => {
+  const v1 = {
+    '/sys/fs/cgroup/memory/memory.usage_in_bytes': '104857600',
+    '/sys/fs/cgroup/memory/memory.limit_in_bytes': '9223372036854771712',
+  };
+  const leggiV1 = (p) => (p in v1 ? v1[p] : null);
+  assert.deepEqual(memoriaContenitore(leggiV1), { usedMb: 100, limitMb: 0 });
+  assert.equal(memoriaContenitore(() => null), null);
+  assert.equal(memoriaContenitore(() => 'boh'), null, 'un cgroup illeggibile non è un numero');
+  // senza tetto: la memoria libera resta quella del kernel, l'usata è del cgroup
+  const osImpl = { uptime: () => 10, freemem: () => 7 * 1048576, loadavg: () => [0] };
+  const proc = { memoryUsage: () => ({ rss: 1048576 }) };
+  assert.deepEqual(statoContenitore({ osImpl, proc, leggi: leggiV1, elenca: () => [] }), { uptimeS: 10, freeMb: 7, rssMb: 100, loadAvg: 0 });
+  // Linux senza cgroup: la somma delle pagine residenti di tutti i processi (4 KB l'una)
+  const statm = { '/proc/12/statm': '1000 256 10 1 0 100 0', '/proc/34/statm': '2000 768 10 1 0 100 0' };
+  const leggiStatm = (p) => (p in statm ? statm[p] : null);
+  const elenca = () => ['12', '34', 'self', 'meminfo'];
+  assert.equal(rssProcessi(leggiStatm, elenca), 4);
+  assert.equal(rssProcessi(() => null, () => []), null);
+  assert.deepEqual(statoContenitore({ osImpl, proc, leggi: leggiStatm, elenca }), { uptimeS: 10, freeMb: 7, rssMb: 4, loadAvg: 0 });
 });
 
 // ─── D. il rapporto nel rilascio ─────────────────────────────────────────────
