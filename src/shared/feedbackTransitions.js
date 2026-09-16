@@ -178,10 +178,10 @@
   // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
   // I vecchi nomi (`failCap`/`improvableCap`, i tre esiti pass/migliorabile/
   // fail) sono aboliti: l'esito lo calcola il server dai livelli e dai bilanci.
-  const VERIFIER_CAPS = { cap2: 5, cap1: 2, cap0: 0 };
+  const VERIFIER_CAP_KEYS = ['cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {
-    STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAPS,
+    STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAP_KEYS,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
