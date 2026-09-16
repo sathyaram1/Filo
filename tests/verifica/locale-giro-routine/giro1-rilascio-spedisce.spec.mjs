@@ -89,12 +89,15 @@ test.describe('rilascio del biglietto — il ramo va su origin prima di parlare 
     // Rilievo del giro 1, corretto nello stesso giro: il rilascio committa
     // quello che è rimasto fuori (commitRestante) e poi spedisce.
     const s = scenario('sporco');
-    expect(commitRestante(s.lavoro).committed).toEqual(['nato-da-shell.txt']);
     writeFileSync(join(s.lavoro, 'nato-da-shell.txt'), 'quattro\n');
+    const c = commitRestante(s.lavoro);
+    expect(c.ok).toBe(true);
+    expect(c.committed).toEqual(['nato-da-shell.txt']);
     const p = pushRamoCorrente(s.lavoro);
+    expect(p.ok).toBe(true);
     const arrivato = git(s.origin, 'ls-tree', '--name-only', 'claude/prova').split('\n');
-    const segnalato = Boolean(p.avviso || p.dirty || p.reason);
-    expect(arrivato.includes('nato-da-shell.txt') || segnalato, JSON.stringify(p)).toBe(true);
+    expect(arrivato).toContain('nato-da-shell.txt');
+    expect(git(s.lavoro, 'status', '--porcelain')).toBe('');
   });
 });
 
