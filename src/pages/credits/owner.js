@@ -1,8 +1,6 @@
-// Pagina «Inviti e utenti», solo owner (#598): codici d'invito da dare,
-// regali di crediti per pseudonimo, tabella degli utenti con saldo, consumo,
-// registro e dettaglio d'uso, esiti di giornaliera e riconciliazione. È una
-// pagina a parte dalla pagina Crediti dell'utente: due lavori diversi, due
-// pagine. Chi non è owner vede solo una riga che lo dice.
+// Pagina «Inviti e utenti», solo owner (#598): codici d'invito, regali di crediti per
+// pseudonimo, tabella utenti con saldo, consumo e dettaglio d'uso. Sta a parte dalla pagina
+// Crediti dell'utente: due lavori diversi, due pagine. Chi non è owner vede una riga sola.
 
 (function () {
   'use strict';
@@ -12,7 +10,6 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // ── Owner: codici, regali, chi ha cosa ─────────────────────────────────────
   let overviewLoaded = false;
   function renderOwner(w) {
     const owner = Boolean(w && w.ok && w.isOwner);
@@ -45,9 +42,8 @@
       `${formatInt(nUsers)} ${nUsers === 1 ? 'utente' : 'utenti'} · tetti ${fmtUsd(tot.totalLimitUsd)} su ${fmtUsd(tot.maxGrantUsd)} elargibili · `
       + `inviti riscattabili rimasti ${formatInt(cfg.invitesRemaining || 0)} · ingresso ${formatInt(cfg.entryCredits || 0)}, +${formatInt(cfg.dailyCredits || 0)}/giorno`
       + (cfg.eurUsd ? ` · cambio ${cfg.eurUsd} (${cfg.eurUsdAt || ''})` : ' · cambio mancante');
-    // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
-    // con quelli usati barrati, così chi ne genera cinque e chiude la pagina sa
-    // ancora quali ha già dato.
+    // I codici li conserva il server e si rileggono a ogni apertura, con gli usati barrati: chi
+    // ne genera cinque e chiude la pagina sa ancora quali ha già dato.
     renderOwnerCodes(o.ownerInvites || []);
 
     const table = $('ownerUsers');
@@ -76,8 +72,7 @@
       tr.title = 'Dettaglio per azione e per giorno';
       tbody.appendChild(tr);
 
-      // Il dettaglio d'uso (per azione, per giorno) sta in una riga sotto, che
-      // si apre al clic sulla riga dell'utente.
+      // Il dettaglio d'uso sta in una riga sotto, che si apre al clic sulla riga dell'utente.
       const detail = document.createElement('tr');
       detail.className = 'sn-wallet-user-detail';
       detail.hidden = true;
@@ -168,8 +163,8 @@
     ev.preventDefault();
     const btn = $('ownerInvitesBtn');
     const msg = $('ownerMsg');
-    // Il controllo lo fa Filo, con una frase sua: la bolla del browser (min/max
-    // del campo) parlava al posto della pagina (verifica del ramo -b, secondo giro).
+    // Il controllo lo fa Filo, con una frase sua: la bolla del browser (min/max del campo)
+    // parlava al posto della pagina.
     const count = numeroIntero($('ownerInviteCount'));
     if (count == null || count < 1 || count > 200) {
       return rifiuta(msg, $('ownerInviteCount'), 'Quanti codici? Un numero da 1 a 200.');
@@ -207,8 +202,7 @@
       msg.textContent = `+${formatInt(res.credits)} crediti a ${pseudonym}.`;
       msg.classList.add('is-ok');
       $('ownerGrantCredits').value = '';
-      // La pagina Crediti, se aperta, si aggiorna da sola (il main avvisa
-      // le pagine al regalo); qui si rilegge la vista.
+      // La pagina Crediti, se aperta, si aggiorna da sola al regalo: qui si rilegge la vista.
       loadOverview().catch(() => {});
       return;
     }
@@ -223,8 +217,7 @@
     msg.classList.add('is-error');
   }
 
-  // Il numero intero scritto in un campo numerico, o null se non è un intero
-  // (vuoto, testo che il browser non traduce in numero, decimali: «10,7» non
+  // Intero da un campo numerico, o null se intero non è (vuoto, testo, decimali: «10,7» non
   // sono crediti). Niente arrotondamenti muti.
   function numeroIntero(input) {
     if (!input || (input.validity && input.validity.badInput)) return null;
@@ -255,9 +248,8 @@
   function formatInt(n) {
     return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
   }
-  // Crediti con al più un decimale: mostra "137" per un valore intero e "0,3"
-  // per una frazione, così un consumo sotto il credito resta visibile invece di
-  // sparire arrotondato a zero. Il decimale sparisce se il valore è intero.
+  // Al più un decimale: «137» per un intero e «0,3» per una frazione, così un consumo sotto il
+  // credito resta visibile invece di sparire arrotondato a zero.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
     return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
