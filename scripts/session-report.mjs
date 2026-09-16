@@ -357,20 +357,22 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '' 
   let costo = 0;
   for (const { u, model } of usi.values()) {
     const input = Number(u.input_tokens) || 0;
-    const cw = Number(u.cache_creation_input_tokens) || 0;
+    const { cw5m, cw1h } = scrittureCache(u);
+    const cw = cw5m + cw1h;
     const cr = Number(u.cache_read_input_tokens) || 0;
     const out = Number(u.output_tokens) || 0;
     rep.turns += 1;
     if (rep.turns > 1 && cr === 0 && cw >= 20000) rep.coldTurns += 1;
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
+    rep.tokens.cacheWrite1h += cw1h;
     rep.tokens.cacheRead += cr;
     rep.tokens.output += out;
     if (typeof model === 'string' && model) modelli.add(model);
     const fam = famigliaPrezzo(model);
     if (!fam.known && model) sconosciuti.add(String(model));
     const p = PREZZI[fam.key];
-    costo += (input * p.input + cw * p.cacheWrite + cr * p.cacheRead + out * p.output) / 1e6;
+    costo += (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cr * p.cacheRead + out * p.output) / 1e6;
   }
 
   rep.models = [...modelli];
