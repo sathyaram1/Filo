@@ -431,17 +431,25 @@
     const blocking = [];
     const fixable = [];
     const derived = [];
+    const ones = [];
     const zeros = [];
     for (const f of findings) {
       if (f.level >= 2) {
         if (f.decision || left('cap2') <= 0) blocking.push(f);
         else fixable.push(f);
       } else if (f.level === 1) {
-        if (f.decision || left('cap1') <= 0) derived.push(f);
-        else fixable.push(f);
+        ones.push(f);
       } else {
         zeros.push(f);
       }
+    }
+    // Gli 1: con un 3/2 da correggere nello stesso giro si correggono pure
+    // loro (il giro lo paga il 3/2); da soli seguono il loro bilancio.
+    const withHigher = fixable.length > 0;
+    for (const f of ones) {
+      if (f.decision) derived.push(f);
+      else if (withHigher || left('cap1') > 0) fixable.push(f);
+      else derived.push(f);
     }
     // Gli 0: con qualcos'altro da correggere si correggono pure loro; da soli
     // solo se il loro bilancio lo permette (z = 0 per default).
