@@ -145,12 +145,11 @@
   function onMenuKeydown(e) { if (e.key === 'Escape') closeCtxMenu(); }
 
   function menuActionsFor(r) {
-    // La lista dipende dallo stato, così ogni azione compare solo quando ha senso (niente «Apri
-    // file» su un download mai completato). Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
+    // Ogni azione compare solo quando ha senso (niente «Apri file» su un download mai completato).
+    // Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
     const acts = [];
     if (isActive(r)) {
-      // canPause === false: scaricamento «a mano» (Salva immagine come…), che non si può
-      // sospendere. Meglio non offrire l'azione che offrirne una muta.
+      // canPause === false: scaricamento «a mano», non sospendibile. Meglio nessuna azione che una muta.
       if (r.canPause !== false) {
         if (r.state === 'paused') acts.push(['Riprendi', () => resume(r)]);
         else acts.push(['Pausa', () => pause(r)]);
@@ -236,7 +235,6 @@
     }
     row.appendChild(meta);
 
-    // Riga 3: barra viva per gli attivi, altrimenti il percorso su disco.
     if (isActive(r)) {
       const bar = document.createElement('div');
       bar.className = 'dl-bar';
@@ -283,8 +281,8 @@
     addBtn('Rimuovi', () => removeItem(r));
     row.appendChild(actions);
 
-    // Clic sinistro = azione primaria: apri il file se completato e se il file c'è ancora (su
-    // una voce svuotata il clic non prometterebbe nulla).
+    // Clic sinistro = azione primaria: apre solo se completato e il file c'è ancora, altrimenti
+    // non prometterebbe nulla.
     if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
