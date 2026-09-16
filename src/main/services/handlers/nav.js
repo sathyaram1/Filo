@@ -1,36 +1,23 @@
-// Handler di dominio: navigazione, apertura/chiusura tab, fullscreen e
-// comandi shell. Ogni handler è registrato nel registro centrale di
-// handlers.js e riceve (msg, sender, origin), ritornando l'oggetto risposta.
+// Handler di dominio: navigazione, apertura/chiusura tab, fullscreen e comandi shell.
 
 const { app } = require('electron');
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
 
-  // SICUREZZA (#250): confine d'origine sui comandi distruttivi. Il canale
-  // 'filo:message' è raggiungibile sia dalle pagine interne filo:// sia dai
-  // content script delle pagine web esterne. Oggi contextIsolation impedisce
-  // alla pagina esterna di chiamarli, ma far poggiare TUTTA la barriera sul
-  // solo isolamento è fragile: chiudere tutte le schede o l'intera app non è
-  // mai un'operazione legittima per una pagina web. Difesa in profondità come
-  // già fatto su _storage:clear / RESET_SETTINGS / EXPORT_DATA.
+  // SICUREZZA (#250): confine d'origine sui comandi distruttivi. Il canale 'filo:message' è raggiungibile sia dalle pagine filo:// sia dai content script dei siti esterni; oggi contextIsolation basterebbe, ma far poggiare TUTTA la barriera sull'isolamento è fragile — chiudere tutte le schede o l'intera app non è mai un'operazione legittima per una pagina web.
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
   on(MSG.OPEN_HOME, async (msg, sender) => {
     const win = winOf(sender);
-    // #252: la conferma cliccabile di "Salva per dopo" apre la lista chiedendo
-    // di evidenziare la scheda appena salvata (?highlight=<id>), così chi la
-    // apre la prima volta vede subito dove è finita.
+    // #252: la conferma cliccabile di "Salva per dopo" apre la lista evidenziando la scheda appena salvata, così chi la apre la prima volta vede subito dove è finita.
     let url = 'filo://home/home.html';
     if (msg && msg.highlight) url += `?highlight=${encodeURIComponent(String(msg.highlight))}`;
     if (win?._filoTabs) win._filoTabs.openTab(url);
     return { ok: true };
   });
 
-  // Home vera di Filo (la newtab/dashboard): naviga la scheda CORRENTE, come il
-  // tasto home della barra. Distinto da OPEN_NEW_TAB (che apre una scheda nuova)
-  // e da OPEN_HOME (che apre la pagina "Aperti per dopo"). Se manca l'id della
-  // scheda mittente (flussi senza tab) ripieghiamo sull'apertura di una nuova.
+  // Home vera di Filo: naviga la scheda CORRENTE, come il tasto home della barra. Distinta da OPEN_NEW_TAB e da OPEN_HOME (la pagina "Aperti per dopo"); senza l'id della scheda mittente si ripiega sull'apertura di una nuova.
   on(MSG.GO_HOME, async (msg, sender) => {
     const win = winOf(sender);
     if (!win?._filoTabs) return { ok: true };
@@ -120,15 +107,10 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.TOGGLE_FULLSCREEN, async (msg, sender) => {
-    // Il `document.requestFullscreen()` dal renderer di una WebContentsView
-    // non porta la BrowserWindow a tutto schermo: la WebContentsView resta
-    // confinata al suo bounds attuale. Per andare davvero in fullscreen OS
-    // dobbiamo agire sulla BrowserWindow (feedback alpha).
+    // `document.requestFullscreen()` dal renderer di una WebContentsView non porta a tutto schermo la BrowserWindow: la view resta confinata al suo bounds, quindi si agisce sulla finestra.
     const win = winOf(sender);
     if (win?._filoTabs) {
-      // Non basta il fullscreen OS: la view resta confinata sotto la barra
-      // (tab + indirizzo). Per nascondere davvero la barra la view attiva deve
-      // coprire l'intera finestra. Esc esce (gestito in tabs.js).
+      // Non basta il fullscreen OS: per nascondere davvero la barra la view attiva deve coprire l'intera finestra. Esc esce (gestito in tabs.js).
       win._filoTabs.toggleContentFullscreen();
     } else if (win) {
       win.setFullScreen(!win.isFullScreen());
@@ -137,43 +119,29 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.EXIT_FULLSCREEN, async (msg, sender) => {
-    // Uscita idempotente dalla modalità contenuto a tutto schermo (Esc dalla
-    // pagina). Idempotente così convive col fallback before-input-event.
+    // Idempotente, così convive col fallback before-input-event.
     const win = winOf(sender);
     if (win?._filoTabs) win._filoTabs.setContentFullscreen(false);
     return { ok: true };
   });
 
   on(MSG.FULLSCREEN_STATE, async (msg, sender) => {
-    // La pagina lo chiede appena si monta. Serve perché l'annuncio
-    // (FULLSCREEN_CHANGED) parte quando la modalità CAMBIA: una pagina nata
-    // dopo non l'ha mai sentito e mostrerebbe "Schermo intero" nel menu del
-    // tasto destro mentre ci si è già dentro. Nessun gate d'origine: la
-    // risposta è un solo booleano sulla finestra che ospita chi chiede, la
-    // stessa cosa che l'annuncio dice già a ogni pagina aperta.
+    // La pagina lo chiede appena si monta: l'annuncio parte quando la modalità CAMBIA, e una pagina nata dopo mostrerebbe "Schermo intero" nel menu mentre ci si è già dentro. Nessun gate d'origine: è un booleano sulla finestra che ospita chi chiede, lo stesso che l'annuncio dice già a tutti.
     const win = winOf(sender);
-    // È anche il modo in cui la pagina si presenta: da qui in poi il main sa
-    // che a un Esc questa scheda risponde, e la aspetta invece di uscire dallo
-    // schermo intero a tempo scaduto. Una pagina impegnata mezzo secondo
-    // rispondeva fuori tempo massimo e ci perdeva la modalità (#514).
+    // È anche il modo in cui la pagina si presenta: da qui il main sa che a un Esc questa scheda risponde e la aspetta, invece di uscire dallo schermo intero a tempo scaduto (#514).
     win?._filoTabs?.paginaRispondeAllEsc(sender?.tab?.id ?? null);
     return { ok: true, fullscreen: !!win?._filoTabs?.contentFullscreen };
   });
 
   on(MSG.ESC_CHIEDI_TASTO, async (msg, sender) => {
-    // Da un riquadro incorporato: lì il tasto non si può chiedere al browser,
-    // lo può fare solo il frame principale della scheda. Nessun gate d'origine:
-    // dice solo «ho qualcosa di aperto», e vale sulla scheda che parla (#514).
+    // Da un riquadro incorporato il tasto lo può chiedere solo il frame principale. Nessun gate d'origine: dice soltanto «ho qualcosa di aperto» e vale sulla scheda che parla (#514).
     const win = winOf(sender);
     win?._filoTabs?.chiediEscAlFramePrincipale(sender?.tab?.id ?? null);
     return { ok: true };
   });
 
   on(MSG.ESC_CONSUMATO, async (msg, sender) => {
-    // A tutto schermo l'Esc l'ha usato un riquadro di Filo aperto sopra la
-    // pagina: quel tasto era suo, e l'uscita che il main aveva messo in attesa
-    // si annulla (#514). Nessun gate d'origine: dice solo "quel tasto l'ho
-    // usato io", e vale sulla scheda che parla, mai su un'altra.
+    // A tutto schermo l'Esc l'ha usato un riquadro di Filo aperto sopra la pagina: quel tasto era suo e l'uscita messa in attesa si annulla (#514). Vale sulla scheda che parla, mai su un'altra.
     const win = winOf(sender);
     win?._filoTabs?.escConsumato(sender?.tab?.id ?? null);
     return { ok: true };
@@ -186,10 +154,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.SHELL_ACTION, async (msg, sender) => {
-    // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone
-    // in alto). "close" è ESCLUSO di proposito: l'AI non chiude finestra né
-    // schede. Inoltriamo alla shell, che clicca il bottone reale, così si
-    // riusa tutto il comportamento esistente (menu ancorati, toggle finestra…).
+    // L'agente "Aiuto" aziona i comandi rapidi della barra. "close" è ESCLUSO di proposito: l'AI non chiude finestra né schede. Si inoltra alla shell, che clicca il bottone reale e riusa tutto il comportamento esistente.
     const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize'];
     const command = String(msg.command || '').trim().toLowerCase();
     if (!allowed.includes(command)) {
@@ -203,10 +168,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.OPEN_INCOGNITO, async () => {
-    // Apre una NUOVA finestra incognito: sessione web effimera (cookie/cache
-    // in RAM) + storage filo:// instradato sull'overlay in memoria. Come in
-    // Chrome, apriamo sempre una finestra nuova anche se il mittente è già
-    // incognito. Lazy require di window.js per evitare cicli al boot.
+    // Come in Chrome si apre sempre una finestra nuova, anche se il mittente è già incognito. Lazy require di window.js per evitare cicli al boot.
     try {
       const { createIncognitoWindow } = require('../../window');
       createIncognitoWindow();
@@ -217,18 +179,8 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // #405 — ponte fra un riquadro incorporato e la pagina che lo ospite.
-  // Un iframe non può parlare con il frame che lo contiene (origini diverse,
-  // e gli eventi non attraversano il confine): passa da qui. Due usi:
-  //   - RUN_IN_TOP_FRAME: azione di pagina (traduci, condividi, salva, QR,
-  //     screenshot…) scelta dal menu aperto dentro il riquadro → va eseguita
-  //     dal frame principale, che è l'unico a conoscere la pagina intera;
-  //   - FRAME_TRANSLATE_DONE (#407): il riquadro riferisce com'è andata la sua
-  //     traduzione → va al solo frame principale, che tiene il conto del giro;
-  //   - CLOSE_OTHER_MENUS: il riquadro ha appena aperto il suo menu → gli
-  //     altri frami della stessa scheda chiudono il loro.
-  // Il messaggio non porta dati arbitrari: solo l'id di un'icona del registro
-  // del menu, che il frame principale risolve nel proprio registro.
+  // #405 — un iframe non può parlare col frame che lo ospita (origini diverse, e gli eventi non attraversano il confine): passa da qui, per far eseguire al frame principale un'azione di pagina, per riferirgli l'esito della traduzione di un riquadro (#407) e per far chiudere agli altri frame il loro menu.
+  // Il messaggio non porta dati arbitrari: solo l'id di un'icona del registro del menu, che il frame principale risolve nel proprio registro.
   const frameBridge = (msg, sender, payload) => {
     const wc = sender && sender.wc;
     if (!wc) return { ok: false, error: 'no-sender' };
@@ -259,18 +211,8 @@ module.exports = function register(on, ctx) {
     type: MSG.CLOSE_OTHER_MENUS,
   }));
 
-  // #407 — «Traduci la pagina» deve arrivare anche dentro i riquadri
-  // incorporati (post incorporati, blocchi commenti, moduli di iscrizione).
-  // Il frame principale non può toccarne il testo — sono altre origini — ma il
-  // content script di Filo gira anche lì: qui gli si passa parola.
-  //
-  // Solo il frame PRINCIPALE può indire il giro. Un riquadro che comandasse i
-  // suoi fratelli non risolverebbe niente e aprirebbe una strada perché un sito
-  // incorporato muova la traduzione dentro riquadri che non sono suoi.
-  //
-  // La risposta dice a quanti riquadri è stata passata parola: è la base del
-  // conto con cui la pagina decide se l'avviso finale può dire "Pagina
-  // tradotta" o deve dire che una parte è rimasta fuori.
+  // #407 — «Traduci la pagina» deve arrivare anche dentro i riquadri incorporati: il frame principale non può toccarne il testo, sono altre origini, ma il content script di Filo gira anche lì.
+  // Solo il frame PRINCIPALE può indire il giro: un riquadro che comandasse i fratelli aprirebbe la strada a un sito incorporato che muove la traduzione dentro riquadri non suoi. La risposta dice a quanti riquadri è stata passata parola, ed è la base del conto con cui la pagina decide se l'avviso finale può dire "Pagina tradotta".
   on(MSG.TRANSLATE_FRAMES, async (msg, sender) => {
     const wc = sender && sender.wc;
     if (!wc) return { ok: false, error: 'no-sender' };
@@ -294,8 +236,7 @@ module.exports = function register(on, ctx) {
     return { ok: true, frames };
   });
 
-  // Il resoconto di un riquadro torna al frame principale, che è l'unico a
-  // tenere il conto del giro e a scrivere l'avviso.
+  // Il resoconto di un riquadro torna al frame principale, l'unico che tiene il conto del giro e scrive l'avviso.
   on(MSG.FRAME_TRANSLATE_DONE, async (msg, sender) => frameBridge(msg, sender, {
     type: MSG.FRAME_TRANSLATE_REPORT,
     runId: String(msg?.runId || ''),
@@ -306,9 +247,7 @@ module.exports = function register(on, ctx) {
   }));
 
   on(MSG.REPLACE_MISSPELLING, async (msg, sender) => {
-    // Usa l'API nativa di Electron per sostituire la parola sotto il cursore
-    // del context-menu nativo (vedi `wc.on('context-menu', ...)` in tabs.js).
-    // Funziona uniformemente su input, textarea e contenteditable.
+    // API nativa di Electron per sostituire la parola sotto il cursore: funziona uniformemente su input, textarea e contenteditable.
     try {
       const win = winOf(sender);
       const tab = sender?.tab?.id ? win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id) : null;

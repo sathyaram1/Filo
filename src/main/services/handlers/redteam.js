@@ -1,28 +1,16 @@
-// Handler di dominio: canale RED-TEAM (filo-redteam-ux-spec).
-//
-// Ponte tra la pagina `filo://redteam/` (e il menu tasto destro) e le Cloud
-// Function del backend di sicurezza (repo privato filo-security). Le funzioni
-// vivono server-side perché il "cervello" (giudici, scoring, verifica) non deve
-// stare nel client pubblico. Qui c'è SOLO il trasporto: invoca le callable
-// `redteam*` col Firebase ID token dell'utente loggato (l'`uid` lo ricava il
-// backend da quel token: il client non può impersonare né auto-verificarsi).
-//
-// NB: finché il backend non è deployato (gate owner) queste chiamate falliscono
-// con un errore di rete: gli handler ritornano una forma d'errore pulita e la UI
-// mostra lo stato adeguato. Nessun credito viene toccato lato client.
+// Canale RED-TEAM: ponte fra la pagina `filo://redteam/` (e il menu del tasto destro) e le Cloud Function di filo-security. Il "cervello" — giudici, scoring, verifica — sta server-side e non nel client pubblico; qui c'è SOLO il trasporto, con l'ID token dell'utente: l'uid lo ricava il backend da quel token, quindi il client non può impersonare né auto-verificarsi.
+// Finché il backend non è deployato le chiamate falliscono con un errore di rete: gli handler ritornano una forma d'errore pulita e nessun credito viene toccato lato client.
 
 const auth = require('../../auth/google-auth');
 
-// Endpoint delle callable gen2. Region/progetto = quelli del deploy di
-// filo-security (europe-west1, filo-8b9cb). Override per i test via env.
+// Region e progetto sono quelli del deploy di filo-security; override per i test via env.
 const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
 
-  // Invoca una Cloud Function callable (protocollo onCall): POST {data} con
-  // Bearer ID token; risposta {result}. Lancia su errore (auth/rete/HTTP).
+  // Protocollo onCall: POST {data} con Bearer ID token, risposta {result}. Lancia su errore di auth, rete o HTTP.
   async function callable(name, data = {}) {
     const idToken = await auth.getIdToken();
     if (!idToken) throw new Error('not_signed_in');
@@ -40,7 +28,6 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
-  // Invio tentativo. { attackText, description } → vedi MSG.REDTEAM_SUBMIT.
   on(MSG.REDTEAM_SUBMIT, async (msg) => {
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };
     try {
@@ -51,8 +38,7 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { status: 'error', error: e?.message || String(e) }; }
   });
 
-  // Stato gamification dell'utente per la tab Statistiche. Include `isOwner`
-  // così la pagina può mostrare il pannello owner di generazione codici.
+  // `isOwner` serve alla pagina per mostrare il pannello owner di generazione codici.
   on(MSG.REDTEAM_STATE, async () => {
     if (!auth.isSignedIn()) return { verified: false, signedIn: false, isOwner: false };
     try {
@@ -61,7 +47,6 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { verified: false, signedIn: true, isOwner: auth.isAdmin(), error: e?.message || String(e) }; }
   });
 
-  // Un tentativo (polling della rivelazione live). { attemptId }.
   on(MSG.REDTEAM_ATTEMPT, async (msg) => {
     if (!auth.isSignedIn()) return { notFound: true };
     try {
@@ -69,7 +54,6 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { error: e?.message || String(e) }; }
   });
 
-  // Leaderboard (tutti i loggati).
   on(MSG.REDTEAM_LEADERBOARD, async () => {
     if (!auth.isSignedIn()) return { entries: [], signedIn: false };
     try {
@@ -78,7 +62,6 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { entries: [], signedIn: true, error: e?.message || String(e) }; }
   });
 
-  // Riscatto codice monouso → verifica + handle. { code, handle }.
   on(MSG.REDTEAM_REDEEM, async (msg) => {
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };
     try {
@@ -89,7 +72,6 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { status: 'error', error: e?.message || String(e) }; }
   });
 
-  // Generazione codici (SOLO owner). { count } → { ok, codes }.
   on(MSG.REDTEAM_GEN_CODES, async (msg) => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     const count = Math.max(1, Math.min(200, Math.floor(Number(msg?.count) || 1)));
@@ -99,8 +81,6 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
 
-  // Elenco codici esistenti (SOLO owner) per il pannello di gestione. { } →
-  // { ok, codes:[{ code, used, usedAt?, createdAt?, handle? }] }.
   on(MSG.REDTEAM_LIST_CODES, async () => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     try {
@@ -109,8 +89,7 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
 
-  // Revoca di un codice ancora libero (SOLO owner). { code } → { ok } |
-  // { ok:false, status } se non esiste o è già stato usato (non revocabile).
+  // Un codice già usato non è revocabile.
   on(MSG.REDTEAM_REVOKE_CODE, async (msg) => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     try {

@@ -1,7 +1,4 @@
-// Handler di dominio: deck builder Commander (DECK-BUILDER-SPEC.md).
-// CRUD dei mazzi su storage locale (deckStore). La logica di modello (versione
-// che incrementa a ogni edit, invarianti) è in SN_DECKS: la pagina applica le
-// funzioni di modello e manda qui il mazzo intero da persistere (DECKS_UPDATE).
+// Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi su storage locale. La logica di modello (versione che incrementa a ogni edit, invarianti) è in SN_DECKS: la pagina applica le funzioni di modello e manda qui il mazzo intero da persistere.
 
 module.exports = function register(on, ctx) {
   const { MSG, handleAIRequest } = ctx;
@@ -32,8 +29,7 @@ module.exports = function register(on, ctx) {
   on(MSG.DECKS_DELETE, async (msg) => {
     const id = String(msg?.id || '');
     const removed = await Store.remove(id);
-    // Mazzo eliminato → via anche i suoi pareri cacheati (la cache tag resta:
-    // è per carta, cross-mazzo). Best-effort: il delete non deve fallire per questo.
+    // Mazzo eliminato: via anche i suoi pareri cacheati (la cache tag resta, è per carta e cross-mazzo). Best-effort: il delete non deve fallire per questo.
     if (removed) await Opinions.dropDeck(id).catch(() => {});
     return { ok: removed, ...(removed ? {} : { error: 'not_found' }) };
   });
@@ -43,14 +39,8 @@ module.exports = function register(on, ctx) {
     return copy ? { ok: true, deck: copy } : { ok: false, error: 'not_found' };
   });
 
-  // ── Parere LLM carta-vs-mazzo (§6) ─────────────────────────────────────────
-  // { deckId, cardIds, compute?, refresh? } →
-  // { ok, opinions: { cardId → { text, versione, stale } } }.
-  // compute=false: solo cache, MAI una chiamata LLM (per mostrare lo stato).
-  // compute=true: calcola i mancanti/stantii in UN batch; refresh=true ricalcola
-  // anche i freschi (il refresh on-demand di §6.2). Le carte possono anche NON
-  // essere nel mazzo (candidati dai risultati di ricerca: il parere è proprio
-  // "questa carta serve a questo mazzo?").
+  // Parere LLM carta-vs-mazzo (§6). compute=false: solo cache, MAI una chiamata LLM (serve a mostrare lo stato); compute=true calcola mancanti e stantii in UN batch; refresh=true ricalcola anche i freschi (§6.2).
+  // Le carte possono NON essere nel mazzo (candidati da una ricerca): il parere è proprio "questa carta serve a questo mazzo?".
   on(MSG.DECKS_OPINION, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.deckId || ''));

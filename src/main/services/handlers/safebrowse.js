@@ -1,6 +1,4 @@
-// Handler di dominio: rilevamento siti pericolosi e config cookie.
-// Il verdetto safebrowse vive nel TabManager (per tab: bypass/dismiss); qui
-// inoltriamo alla finestra MITTENTE così l'overlay/banner agisce sul tab giusto.
+// Rilevamento siti pericolosi e config cookie. Il verdetto safebrowse vive nel TabManager (per tab: bypass/dismiss): qui si inoltra alla finestra MITTENTE, così l'overlay agisce sul tab giusto.
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
@@ -28,8 +26,7 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.safebrowseDismiss(tabId, msg.url || origin);
   });
 
-  // Geo-block: l'utente ha accettato la proposta inline (#151) → instrada la tab
-  // dal paese indicato. Il tabId arriva dal sender (content script).
+  // Geo-block: proposta accettata (#151) → instrada la tab dal paese indicato. Il tabId arriva dal sender.
   on(MSG.GEO_PROPOSE_ACCEPT, async (msg, sender) => {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
@@ -37,8 +34,7 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.geoProposeAccept(tabId, msg.country);
   });
 
-  // Geo-block: l'utente ha rifiutato/chiuso la proposta → non riproporla per
-  // questo dominio nel tab.
+  // Geo-block: proposta rifiutata o chiusa → non riproporla per questo dominio nel tab.
   on(MSG.GEO_PROPOSE_DISMISS, async (msg, sender, origin) => {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
@@ -47,9 +43,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.COOKIES_CONFIG, async () => {
-    // Il content script chiede la modalità corrente per decidere se rifiutare
-    // i banner CMP e riscrivere gli embed YouTube. È una config globale, non
-    // per-tab (settings.security.cookies.mode).
+    // Il content script chiede la modalità corrente per decidere se rifiutare i banner CMP e riscrivere gli embed YouTube. È una config globale, non per-tab.
     const settings = await Storage.getSettings();
     return { ok: true, mode: require('../cookies').getMode(settings) };
   });

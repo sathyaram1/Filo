@@ -1,15 +1,9 @@
-// Handler di dominio: crediti (gamification). Espone il saldo + il consumo per
-// tipo d'uso alla pagina Crediti, accredita le ricompense feedback, e sincronizza
-// lo stato sul doc Firestore `credits/<uid>` per-account.
-//
-// Separazione: la LOGICA (saldo, refill, aggregazione) vive nel motore puro
-// SN_CREDITS (creditStore.js, testabile headless). Qui sopra c'è solo il
-// trasporto: IPC verso la UI + REST Firestore autenticato con l'ID token utente.
+// Crediti (gamification): saldo e consumo per tipo d'uso per la pagina Crediti, ricompense feedback, sincronizzazione sul doc Firestore `credits/<uid>` per-account.
+// La LOGICA (saldo, refill, aggregazione) vive nel motore puro SN_CREDITS (creditStore.js, testabile headless); qui c'è solo il trasporto: IPC verso la UI e REST Firestore con l'ID token utente.
 
 const auth = require('../../auth/google-auth');
 const { soloFilo } = require('./origine');
-// SN_FEEDBACK_THREAD: ci serve splitNotes() per estrarre la spiegazione non
-// tecnica dalle note del feedback risolto (C5). Idempotente se già caricato.
+// Di SN_FEEDBACK_THREAD serve splitNotes(), per estrarre la spiegazione non tecnica dalle note del feedback risolto (C5).
 require('../../../shared/feedbackThread.js');
 
 module.exports = function register(on, ctx) {
@@ -17,15 +11,10 @@ module.exports = function register(on, ctx) {
   const Credits = globalThis.SN_CREDITS;
   const FB = globalThis.SN_FEEDBACK;
 
-  // ── uid dell'utente loggato (claim dell'ID token Firebase) ──────────────────
-  // Centralizzato in google-auth.js (getUid): lo riusa anche l'handler board.js
-  // (DC2) per lo stesso scopo (votes.<uid> richiede l'uid Firebase, non l'email).
+  // uid Firebase (claim dell'ID token), centralizzato in google-auth: lo riusa board.js, perché votes.<uid> vuole l'uid e non l'email.
   const currentUid = auth.getUid;
 
-  // ── REST Firestore sul doc credits/<uid> ────────────────────────────────────
-  // Campi sincronizzati: tutto lo stato del motore (saldo, refill, aggregati,
-  // ricompense). Il costo € resta nel doc privato dell'utente ma non lascia mai
-  // il main verso la UI (la vista pubblica lo elimina).
+  // Si sincronizza tutto lo stato del motore. Il costo € resta nel doc privato dell'utente ma non lascia mai il main verso la UI: la vista pubblica lo elimina.
   const SYNC_FIELDS = ['balance', 'lastRefillDate', 'byUsage', 'byAction',
     'totalSpentCredits', 'totalCostEur', 'rewards', 'rewardedFeedback'];
 
@@ -47,15 +36,11 @@ module.exports = function register(on, ctx) {
     if (!idToken) return;
     const fields = {};
     for (const k of SYNC_FIELDS) fields[k] = FB.toFsValue(state[k]);
-    // Registro utenti (#210.1): scriviamo anche email/name dell'account loggato
-    // sul proprio doc, così l'owner può risolvere email→uid (/gift) ed elencare
-    // gli iscritti (/users). Solo se il profilo è disponibile, e con la stessa
-    // updateMask così non azzeriamo nulla quando il profilo manca.
+    // Registro utenti (#210.1): email e nome dell'account vanno sul proprio doc, così l'owner può risolvere email→uid (/gift) ed elencare gli iscritti (/users). Solo se il profilo c'è, e con la stessa updateMask, così non si azzera nulla quando manca.
     const maskPaths = [...SYNC_FIELDS];
     const profile = auth.getProfile?.();
     if (profile?.email) { fields.email = FB.toFsValue(String(profile.email).toLowerCase()); maskPaths.push('email'); }
     if (profile?.name) { fields.name = FB.toFsValue(String(profile.name)); maskPaths.push('name'); }
-    // updateMask così non azzeriamo campi non inviati.
     const mask = maskPaths.map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
     const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?${mask}&key=${FB.rest.API_KEY}`;
     const res = await fetch(url, {
@@ -66,13 +51,8 @@ module.exports = function register(on, ctx) {
     if (!res.ok) throw new Error(`credits push ${res.status}`);
   }
 
-  // ── Comandi proprietario (#210): registro utenti + regalo crediti ───────────
-  // Tutte le operazioni qui sotto sono riservate all'owner (auth.isAdmin()): il
-  // gate applicativo è negli handler IPC, la garanzia forte è nelle Firestore
-  // rules (match /credits/{uid} … allow read,write: if isAdmin()). Le scritture
-  // cross-account usano l'ID token dell'owner come Bearer.
+  // Comandi riservati all'owner: il gate applicativo è negli handler IPC, la garanzia forte è nelle Firestore rules. Le scritture cross-account usano l'ID token dell'owner.
 
-  // Elenco di tutti gli utenti registrati (doc credits con campo `email`).
   async function adminListUsers() {
     if (!FB?.rest) return [];
     const idToken = await auth.getIdToken();
@@ -96,8 +76,7 @@ module.exports = function register(on, ctx) {
     return users;
   }
 
-  // Trova il doc credits il cui campo `email` corrisponde (esatto). Ritorna
-  // l'oggetto completo (incluso uid in _id e l'eventuale giftNotice) o null.
+  // Corrispondenza esatta sull'email; ritorna l'oggetto completo (uid in _id, eventuale giftNotice) o null.
   async function adminFindByEmail(email) {
     if (!FB?.rest) return null;
     const idToken = await auth.getIdToken();
@@ -121,8 +100,7 @@ module.exports = function register(on, ctx) {
     return null;
   }
 
-  // Regala `amount` crediti all'utente con `email`: somma al suo saldo remoto e
-  // lascia un avviso `giftNotice` (cumulativo finché non lo vede) sul suo doc.
+  // Somma al saldo remoto e lascia un avviso `giftNotice` sul doc, cumulativo finché l'utente non lo vede.
   async function adminGift(email, amount) {
     const target = await adminFindByEmail(email);
     if (!target || !target._id) throw new Error('Nessun utente registrato con questa email.');
@@ -146,9 +124,7 @@ module.exports = function register(on, ctx) {
     return { balance: newBalance };
   }
 
-  // Avviso "crediti regalati" (#210.4): se il doc dell'utente corrente porta un
-  // `giftNotice`, mostra il popup una volta sola e azzera il campo così non si
-  // ripresenta. `remote` è il doc appena letto in ensureAccountSync.
+  // Avviso "crediti regalati" (#210.4): se il doc porta un `giftNotice`, il popup si mostra una volta sola e il campo si azzera.
   async function maybeNotifyGift(uid, remote) {
     const amount = remote?.giftNotice && Math.round(Number(remote.giftNotice.amount) || 0);
     if (!amount || amount <= 0) return;
@@ -163,23 +139,18 @@ module.exports = function register(on, ctx) {
     }).catch(() => {});
   }
 
-  // Legge il flag "feedback autonomo attivo" dalle impostazioni correnti.
-  // Default ON (true) quando il setting non è ancora stato scritto dall'utente
-  // (=== undefined): corrisponde alla politica "ON di default" di F4.
-  // Fallback false (safe) solo in caso di errore di lettura.
+  // Default ON quando il setting non è mai stato scritto (=== undefined): è la politica di F4. False solo in caso di errore di lettura.
   async function getAutoFeedbackEnabled() {
     try {
       const Storage = globalThis.SN_STORAGE;
       if (!Storage || typeof Storage.getSettings !== 'function') return false;
       const s = await Storage.getSettings();
       const v = s && s.security && s.security.autoFeedback;
-      // undefined → mai impostato → default ON
       return v === undefined ? true : !!v;
     } catch (_) { return false; }
   }
 
-  // Adotta lo stato remoto al (primo) accesso o cambio account; se il doc non
-  // esiste ancora, ci pusha lo stato locale corrente. Idempotente per uid.
+  // Adotta lo stato remoto al primo accesso o al cambio account; se il doc non esiste ancora, ci pusha lo stato locale. Idempotente per uid.
   let lastSyncedOwner; // undefined = mai sincronizzato in questa sessione
   let syncing = null;
   async function ensureAccountSync() {
@@ -195,20 +166,15 @@ module.exports = function register(on, ctx) {
         const remote = await loadRemote(uid);
         if (remote) {
           await Credits.adopt(remote, uid);
-          // Registro utenti (#210.1): se il doc remoto non ha ancora email/name
-          // (o sono cambiati), aggiorniamoli subito senza aspettare la prossima
-          // mutazione del saldo, così l'owner trova l'account in /users e /gift.
+          // Registro utenti: email e nome si aggiornano subito, senza aspettare la prossima mutazione del saldo, così l'owner trova l'account in /users e /gift.
           const profile = auth.getProfile?.();
           const wantEmail = profile?.email ? String(profile.email).toLowerCase() : null;
           if (wantEmail && (remote.email !== wantEmail || (profile?.name && remote.name !== profile.name))) {
             await pushRemote(uid, await Credits.readState()).catch(() => {});
           }
-          // Avviso crediti regalati (#210.4): se l'owner ha lasciato un avviso
-          // sul doc, mostralo una volta sola e azzeralo.
           await maybeNotifyGift(uid, remote).catch(() => {});
         } else {
-          // Primo accesso di questo account: lo stato locale (eventualmente già
-          // 1000 di benvenuto) diventa il suo, e lo materializziamo su Firestore.
+          // Primo accesso di questo account: lo stato locale (magari già coi 1000 di benvenuto) diventa il suo e si materializza su Firestore.
           await Credits.setOwner(uid);
           await pushRemote(uid, await Credits.readState());
         }
@@ -221,8 +187,7 @@ module.exports = function register(on, ctx) {
     return syncing;
   }
 
-  // Push debounced su ogni mutazione del saldo (consumo in background, refill,
-  // ricompensa). Non blocca mai il flusso chiamante.
+  // Push debounced a ogni mutazione del saldo: non blocca mai il flusso chiamante.
   let pushTimer = null;
   Credits.onChange(() => {
     broadcastToTabs({ type: MSG.CREDITS_CHANGED });
@@ -236,19 +201,12 @@ module.exports = function register(on, ctx) {
     }, 4000);
   });
 
-  // ── IPC ─────────────────────────────────────────────────────────────────────
   on(MSG.GET_CREDITS, async () => {
     await ensureAccountSync().catch(() => {});
     return { ok: true, credits: await Credits.getPublic(), signedIn: auth.isSignedIn() };
   });
 
-  // ── Comandi proprietario (#210): /users e /gift ─────────────────────────────
-  //
-  // #583 — «sei il proprietario?» da solo non basta: sul suo computer la
-  // risposta è sempre sì, ed è l'unico dove c'è qualcosa da prendere. Questi
-  // due comandi si scrivono nella chat della dashboard, che è una pagina di
-  // Filo; un sito visitato non deve poter chiedere l'elenco di chi usa Filo né
-  // regalare crediti a un indirizzo che sceglie lui.
+  // #583 — «sei il proprietario?» da solo non basta: sul suo computer la risposta è sempre sì, ed è l'unico dove c'è qualcosa da prendere. Questi due comandi si scrivono nella chat della dashboard: un sito visitato non deve poter chiedere l'elenco di chi usa Filo né regalare crediti a un indirizzo che sceglie lui.
   on(MSG.OWNER_LIST_USERS, soloFilo(async () => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     try { return { ok: true, users: await adminListUsers() }; }
@@ -271,8 +229,7 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 
-  // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
-  // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
+  // +5 crediti subito all'invio di un feedback (C3): ogni invio è un evento distinto, quindi si premia ogni volta.
   on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
     const { SN_CONST } = globalThis;
     const amount = (msg && Number(msg.credits)) || SN_CONST.CREDIT.FEEDBACK_SEND;
@@ -280,16 +237,11 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
-  // ── Ricompensa alla risoluzione di un feedback (C5) ─────────────────────────
-
-  // Cosa legge chi ha mandato il feedback, quando gli viene detto che è risolto.
-  // La scelta (la frase in chiaro sì, il report cifrato mai) sta nella logica
-  // pura accanto al resto del parsing della conversazione, dove si può provare.
+  // Cosa legge chi ha mandato il feedback quando gli viene detto che è risolto. La scelta — la frase in chiaro sì, il report cifrato mai — sta nella logica pura, accanto al parsing della conversazione, dove si può provare.
   function resolutionExplanation(f) {
     const FBT = globalThis.SN_FEEDBACK_THREAD;
     if (FBT?.explanationForReporter) return FBT.explanationForReporter(f);
-    // Senza il modulo condiviso: la frase se c'è, altrimenti niente. Mai il
-    // ciphertext.
+    // Senza il modulo condiviso: la frase se c'è, altrimenti niente. Mai il ciphertext.
     const frase = String((f && f.userNote) || '').trim();
     if (frase) return frase;
     const raw = String((f && f.notes) || '').trim();
@@ -299,26 +251,13 @@ module.exports = function register(on, ctx) {
   on(MSG.GET_FEEDBACK_REWARDS, async () => {
     const empty = { ok: true, rewards: [], totalCredits: 0 };
     try {
-      // Allinea la cache crediti al doc dell'account (così rewardedFeedback è
-      // quello vero anche dopo un cambio dispositivo) prima di premiare.
+      // Allinea la cache al doc dell'account prima di premiare, così rewardedFeedback è quello vero anche dopo un cambio dispositivo.
       await ensureAccountSync().catch(() => {});
       const id = await globalThis.SN_STORAGE?.getRaw?.('sn_feedback_client_id', null);
       if (!id || !(FB?.listAllPublic || FB?.listPublic)) return empty;
 
-      // #583: si leggono le SCHEDE pubbliche, non i feedback. La collezione
-      // vera non si apre senza credenziali (e questa macchina non ne ha: il
-      // popup gira da chiunque abbia Filo). Nella scheda c'è tutto quello che
-      // serve qui — l'impronta per riconoscere i propri, il titolo, il numero,
-      // la frase per chi ha segnalato e la cifra che gli spetta — e niente dei
-      // feedback altrui.
-      //
-      // TUTTE le schede, non una pagina. La pagina era dei 200 più recenti PER
-      // DATA D'INVIO: una segnalazione vecchia chiusa oggi ha una data d'invio
-      // vecchia, quindi la sua scheda nasceva già fuori e chi l'aveva mandata
-      // non riceveva né l'annuncio né i crediti — mentre il suo fix compariva
-      // in bacheca sotto i suoi occhi. Chiedere una finestra sull'asse
-      // sbagliato è la stessa causa che la verifica del #583 ha visto rientrare
-      // da tre porte.
+      // #583: si leggono le SCHEDE pubbliche, non i feedback — la collezione vera non si apre senza credenziali (e questa macchina non ne ha). Nella scheda c'è tutto quello che serve qui e niente dei feedback altrui.
+      // TUTTE le schede, non una pagina: la pagina era dei più recenti PER DATA D'INVIO, quindi una segnalazione vecchia chiusa oggi nasceva già fuori, e chi l'aveva mandata non riceveva né annuncio né crediti mentre il suo fix compariva in bacheca sotto i suoi occhi.
       let lette;
       try {
         lette = FB.listAllPublic
@@ -327,13 +266,7 @@ module.exports = function register(on, ctx) {
       }
       catch (e) { console.warn('[credits] schede dei feedback non disponibili:', e?.message || e); return empty; }
 
-      // Dal più recente, come le vedeva chi chiedeva una pagina ordinata per
-      // data d'invio. La lettura completa arriva nell'ordine interno del
-      // database, che è l'ordine degli identificativi, cioè casuale: senza
-      // questa riga chi si vede risolvere due segnalazioni insieme le trova
-      // annunciate a caso. Si ordina una COPIA: quelle righe arrivano dalla
-      // memoria breve delle schede ed è la stessa lista che legge anche chi
-      // gestisce i feedback.
+      // Dal più recente: la lettura completa arriva nell'ordine interno del database, cioè quello degli identificativi, casuale — senza questo, chi si vede risolvere due segnalazioni insieme le trova annunciate a caso. Si ordina una COPIA: sono le stesse righe che legge chi gestisce i feedback.
       const all = (Array.isArray(lette) ? lette.slice() : []).sort((a, b) => {
         const ta = Date.parse(a?.createdAt || '');
         const tb = Date.parse(b?.createdAt || '');
@@ -344,8 +277,7 @@ module.exports = function register(on, ctx) {
         return String(b?._id || '').localeCompare(String(a?._id || ''));
       });
 
-      // S1.F2.2: pre-calcola l'hash del clientId locale UNA VOLTA per tutti i confronti.
-      // Stesso algoritmo di feedbackClientIdHash.js (SHA-256 troncato 32 hex).
+      // Hash del clientId locale calcolato UNA volta per tutti i confronti (SHA-256 troncato a 32 hex, come feedbackClientIdHash.js).
       let localIdHash = '';
       try {
         const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
@@ -356,22 +288,13 @@ module.exports = function register(on, ctx) {
       const rewarded = state.rewardedFeedback || {};
       const rewards = [];
       for (const f of all) {
-        // S1.F2.1: la macchina UTENTE non ha la chiave privata → non può leggere
-        // `status` cifrato e guarda solo l'enum grossolano in chiaro. La regola
-        // sta in SN_FB_STATUS accanto alla mappa che la determina (#476): è la
-        // stessa decisione, e separarle è ciò che aveva fatto premiare gli
-        // attacchi confermati.
+        // La macchina UTENTE non ha la chiave privata: non può leggere `status` cifrato e guarda solo l'enum grossolano in chiaro. La regola sta in SN_FB_STATUS accanto alla mappa che la determina (#476) — separarle è ciò che aveva fatto premiare gli attacchi confermati.
         const FBS = globalThis.SN_FB_STATUS;
         const isResolved = FBS && FBS.isResolvedForUser
           ? FBS.isResolvedForUser(f)
           : f.statusPublic === 'closed';
         if (!f || !isResolved) continue;
-        // #583: l'impronta sulla scheda è di QUELLA scheda, non
-        // dell'installazione, così chi legge la bacheca non può raggruppare i
-        // fix per segnalatore. Qui la si ricalcola scheda per scheda: sappiamo
-        // l'id e sappiamo l'impronta del nostro clientId, che è tutto quello
-        // che serve. I feedback anteriori a giugno 2026 non hanno nemmeno
-        // quella, e non producono più una ricompensa.
+        // #583: l'impronta sulla scheda è di QUELLA scheda, non dell'installazione, così chi legge la bacheca non può raggruppare i fix per segnalatore. Qui si ricalcola scheda per scheda; i feedback anteriori a giugno 2026 non ce l'hanno e non producono più ricompensa.
         const matched = await (async () => {
           if (!f.clientIdTag || !localIdHash) return false;
           try {
@@ -383,17 +306,11 @@ module.exports = function register(on, ctx) {
         if (!matched) continue; // solo i feedback DI questo install
         const fid = f._id;
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
-        // #583 — quanto vale la segnalazione lo dice la SCHEDA (`reward`), non
-        // il feedback: la priorità è un giudizio interno e sulla scheda non
-        // c'è. Letta dal feedback, qui sarebbe sempre assente e ogni
-        // ricompensa scenderebbe in silenzio alla fascia più bassa. Le schede
-        // pubblicate prima che il campo esistesse non ce l'hanno: per quelle
-        // resta la fascia minima, che è quello che davano comunque.
+        // #583 — quanto vale la segnalazione lo dice la SCHEDA (`reward`), non il feedback: la priorità è un giudizio interno e sulla scheda non c'è, quindi letta dal feedback ogni ricompensa scenderebbe in silenzio alla fascia più bassa. Le schede pubblicate prima del campo restano alla fascia minima, che è quanto davano comunque.
         const credits = Number.isFinite(Number(f.reward)) && Number(f.reward) > 0
           ? Math.round(Number(f.reward))
           : Credits.rewardForPriority(0);
-        // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
-        // così alla prossima apertura non ricompare.
+        // Marcare il feedback come premiato evita che ricompaia alla prossima apertura.
         await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
         rewards.push({
           id: fid,

@@ -38,8 +38,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.RUN_TAB_TRIAGE, async (msg, sender) => {
-    // Pulizia/riordino su richiesta esplicita (l'utente ha confermato nel
-    // bottone dell'agente). Gira sul TabManager della finestra del mittente.
+    // Pulizia/riordino su richiesta esplicita dell'utente. Gira sul TabManager della finestra del mittente.
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
@@ -49,8 +48,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.REORDER_TABS, async (msg, sender) => {
-    // "/riordina": riordino cromatico esplicito della striscia, senza archiviare
-    // nulla (a differenza di RUN_TAB_TRIAGE). Gira sul TabManager della finestra.
+    // "/riordina": riordino cromatico esplicito della striscia, senza archiviare nulla (a differenza di RUN_TAB_TRIAGE).
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = win._filoTabs.reorderTabs();
@@ -59,11 +57,8 @@ module.exports = function register(on, ctx) {
     return { ok: false, reordered: false };
   });
 
-  // #376 — porta in primo piano una scheda già aperta. La usa il riferimento in
-  // chat quando Filo ha aperto qualcosa in secondo piano (un brano da
-  // ascoltare): cliccarlo deve PORTARCI, non aprire un doppione.
-  // Confine d'origine come su nav.js: solo le pagine interne filo:// possono
-  // spostare il primo piano — per un sito esterno non è mai legittimo.
+  // #376 — porta in primo piano una scheda già aperta: il riferimento in chat a qualcosa che Filo ha aperto in secondo piano deve PORTARCI, non aprire un doppione.
+  // Confine d'origine come in nav.js: solo le pagine filo:// possono spostare il primo piano, per un sito esterno non è mai legittimo.
   on(MSG.FOCUS_TAB, async (msg, sender, origin) => {
     if (!String(origin || '').startsWith('filo://')) return { ok: false };
     const win = winOf(sender);
@@ -106,14 +101,11 @@ module.exports = function register(on, ctx) {
   on(MSG.CLEAR_ARCHIVED_TABS, async () => ({ ok: true, tabs: await ArchivedTabs.clear() }));
 
   on(MSG.REOPEN_ARCHIVED_TAB, async (msg, sender) => {
-    // Riapre la scheda archiviata, ripristinando lo scroll registrato.
     const win = winOf(sender);
     if (win && win._filoTabs && msg.url) {
       const pct = typeof msg.scrollPct === 'number' ? msg.scrollPct : null;
       const id = win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct });
-      // Se la tab archiviata era instradata "da un altro paese", riaprila
-      // proxata sulla stessa location: setTabProxy ricrea la view nella
-      // partition proxata e ricarica l'URL attraverso l'endpoint del paese.
+      // Se la scheda archiviata era instradata "da un altro paese", si riapre proxata sulla stessa location: setTabProxy ricrea la view nella partition proxata e ricarica l'URL attraverso l'endpoint del paese.
       const px = msg.proxy;
       if (id && px && px.country) {
         try { await win._filoTabs.setTabProxy(id, px.country, { tier: px.tier || undefined }); } catch (_) {}
