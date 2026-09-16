@@ -83,7 +83,7 @@ test.describe('rilascio del biglietto, dalla riga di comando vera', () => {
     writeFileSync(join(s.lavoro, 'nato-da-shell.txt'), 'quattro\n');
     const c = await canaleFinto([{ status: 200, body: { ok: true } }]);
     try {
-      const r = rilascia(s, c.url);
+      const r = await rilascia(s, c.url);
       expect(r.status, r.stderr).toBe(0);
       expect(r.stdout).toMatch(/OK: biglietto rilasciato/);
       expect(r.stderr).toMatch(/committate 1 modifiche rimaste fuori dai commit: nato-da-shell\.txt/);
@@ -110,7 +110,7 @@ test.describe('rilascio del biglietto, dalla riga di comando vera', () => {
     const s = scenario('guasto');
     const c = await canaleFinto([{ status: 200, body: { ok: true } }]);
     try {
-      const r = rilascia(s, c.url, ['--guasto', 'npm install non riesce']);
+      const r = await rilascia(s, c.url, ['--guasto', 'npm install non riesce']);
       expect(r.status, r.stderr).toBe(0);
       expect(r.stdout).toMatch(/guasto dichiarato/);
       expect(c.chiamate[0].payload.fault).toBe('npm install non riesce');
@@ -125,7 +125,7 @@ test.describe('rilascio del biglietto, dalla riga di comando vera', () => {
       { status: 200, body: { ok: true } },
     ]);
     try {
-      const r = rilascia(s, c.url);
+      const r = await rilascia(s, c.url);
       expect(r.status, r.stderr).toBe(0);
       expect(r.stdout).toMatch(/OK: biglietto rilasciato/);
       expect(r.stderr).toMatch(/rapporto troppo grande \(99999 byte, massimo 8192\)/);
@@ -144,7 +144,7 @@ test.describe('rilascio del biglietto, dalla riga di comando vera', () => {
       { status: 200, body: { ok: true } },
     ]);
     try {
-      const r = rilascia(s, c.url);
+      const r = await rilascia(s, c.url);
       expect(r.status, r.stderr).toBe(0);
       expect(r.stderr).toMatch(/report_malformed: campo x/);
       expect(c.chiamate).toHaveLength(2);
@@ -162,7 +162,7 @@ test.describe('rilascio del biglietto, dalla riga di comando vera', () => {
     git(s.lavoro, 'commit', '-q', '--amend', '-m', 'primo, riscritto');
     const c = await canaleFinto([{ status: 200, body: { ok: true } }]);
     try {
-      const r = rilascia(s, c.url);
+      const r = await rilascia(s, c.url);
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/NON è arrivato su origin/);
       expect(r.stderr).toMatch(/Non ho rilasciato niente/);
@@ -176,7 +176,7 @@ test.describe('rilascio del biglietto, dalla riga di comando vera', () => {
     s.transcript = join(s.base, 'non-esiste.jsonl');
     const c = await canaleFinto([{ status: 200, body: { ok: true } }]);
     try {
-      const r = rilascia(s, c.url);
+      const r = await rilascia(s, c.url);
       expect(r.status, r.stderr).toBe(0);
       const rep = c.chiamate[0].payload.report;
       expect(rep.turns).toBe(0);
