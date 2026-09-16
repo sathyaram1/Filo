@@ -10,7 +10,6 @@
   const Storage = window.SN_STORAGE;
   const ModelChain = window.SN_MODEL_CHAIN;
 
-  // Mappa azione → editor a segmenti della catena di modelli (popolata in applyConfig()).
   let modelChains = {};
 
   // Cache dei cataloghi per provider, recuperati dal MAIN con le chiavi predefinite: questa
@@ -23,8 +22,7 @@
     return `models-list-${provider}`;
   }
 
-  // Le <datalist> per-provider restano l'unica sorgente di verità: il combobox le legge
-  // senza duplicarle.
+  // Le <datalist> per-provider sono l'unica sorgente di verità: il combobox non le duplica.
   function readProviderOptions(provider) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return [];
@@ -34,7 +32,6 @@
     }));
   }
 
-  // Le voci arrivano già ordinate dal più recente ed etichettate per categoria dal main.
   function populateDatalist(provider, items) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return;
@@ -63,8 +60,7 @@
     } catch (_) { /* lista non disponibile: il campo resta libero */ }
   }
 
-  // Semina cogli id già nel registry, così il valore corrente compare subito; il catalogo
-  // completo poi li rimpiazza.
+  // Il valore corrente compare subito; il catalogo completo poi lo rimpiazza.
   function seedDatalistsFromRegistry(registry) {
     const byProv = { openrouter: [] };
     for (const nick of Object.keys(registry || {})) {
@@ -150,7 +146,6 @@
     idIn.value = single.model;
     idIn.className = 'sn-model-id';
     idWrap.appendChild(idIn);
-    // Carica il catalogo la prima volta che l'utente apre il campo.
     idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(idWrap, idIn, {
@@ -158,13 +153,11 @@
       });
     }
 
-    // Cambiando provider, il combobox legge l'altra lista (e la carica).
     provSel.addEventListener('change', () => {
       ensureProviderModels(provSel.value);
     });
 
-    // Livello di reasoning per QUESTO modello (#369), quando il modello lo supporta. Select
-    // nativa come il provider accanto, per coerenza coi controlli fratelli della riga.
+    // Livello di reasoning per QUESTO modello (#369). Select nativa, per coerenza coi controlli fratelli.
     const reasonSel = document.createElement('select');
     reasonSel.className = 'sn-model-reason';
     reasonSel.title = I18n.t('admin_defaults_reasoning_desc');
@@ -213,8 +206,7 @@
     statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     try {
-      // Testa la riga così com'è scritta, anche prima del salvataggio: il main usa le chiavi
-      // predefinite (mai visibili qui). Il nickname viaggia solo come informazione di contorno.
+      // Testa la riga com'è scritta, anche prima del salvataggio: il main usa le chiavi predefinite.
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
         nickname,
@@ -296,9 +288,8 @@
     }
   }
 
-  // Fornitori esclusi (politica sui modelli, #421/#518): la lista salvata qui SOSTITUISCE per
-  // intero quella del codice — l'owner deve poterla svuotare — ma così un'esclusione aggiunta
-  // al codice non arriva dove questa lista esiste già. Perciò la pagina confronta le due e lo dice.
+  // Fornitori esclusi (#421/#518): la lista salvata qui SOSTITUISCE quella del codice — l'owner
+  // deve poterla svuotare — quindi la pagina confronta le due e dice cosa manca.
   function makeExcludedRow(name) {
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-excluded-row';
@@ -350,8 +341,7 @@
     return out;
   }
 
-  // Voci escluse dal codice che la lista in pagina non copre: l'avviso le nomina e offre di
-  // rimetterle — un elenco senza il modo di rimediare sarebbe solo una brutta notizia.
+  // L'avviso le nomina e offre di rimetterle: un elenco senza rimedio è solo una brutta notizia.
   function excludedMissingFromBuild() {
     const C = window.SN_CONST;
     if (!C || typeof C.missingExcludedProviders !== 'function') return [];
@@ -394,11 +384,9 @@
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
-    // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed è quella che il
-    // salvataggio riscrive per intero.
+    // Lista EFFETTIVA (codice ⊕ override remoto): quella che l'app applica e che il salvataggio riscrive.
     renderExcluded(cfg.excludedProviders || []);
-    // Semina col registry (il valore corrente compare subito), poi i cataloghi completi in
-    // background, senza bloccare il render.
+    // Poi i cataloghi completi in background, senza bloccare il render.
     seedDatalistsFromRegistry(cfg.modelRegistry || {});
     ensureProviderModels('openrouter');
   }
@@ -458,8 +446,7 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DEFAULTS_UPDATE, config });
       if (!res || !res.ok) throw new Error(res?.error || 'errore sconosciuto');
-      // I campi chiave si svuotano dopo il salvataggio (non si ritengono in pagina) e lo stato
-      // «configurata» si rilegge dalla config tornata dal main.
+      // I campi chiave si svuotano dopo il salvataggio; lo stato «configurata» torna dal main.
       $('apiKey').value = '';
       $('apiKeyTavily').value = '';
       $('apiKeySafebrowse').value = '';
