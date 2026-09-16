@@ -296,7 +296,11 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   SUMMARY=$(printf '%s\n' "$CHANGED" | head -3 | awk 'NR>1{printf ", "}{printf "%s",$0}')
   [ "${N:-0}" -gt 3 ] && SUMMARY="$SUMMARY (+$((N-3)) file)"
   [ -z "$SUMMARY" ] && SUMMARY=$(date +%Y-%m-%dT%H:%M:%S)
-  git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" commit -q -m "auto: $SUMMARY" 2>/dev/null
+  ESITO_COMMIT=$(git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" commit -q -m "auto: $SUMMARY" 2>&1) || {
+    segnala_avviso "$wt" "le modifiche NON sono state committate (git commit e' fallito): $(motivo_git "$ESITO_COMMIT"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella, in scena: un pre-commit che rifiuta dice il perche' qui sopra; al primo salvataggio dopo si riprova." \
+      "il salvataggio li' non e' riuscito (git commit): $(motivo_git "$ESITO_COMMIT")"
+    continue
+  }
 
   # NESSUNA fusione automatica sul ramo principale (cambiato il 2026-08-07).
   # Il salvataggio continuo resta — e' cio' che salva il lavoro quando una
