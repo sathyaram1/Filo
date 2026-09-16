@@ -437,6 +437,13 @@ export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
   // come nell'hook: una sentinella negli unit test la cerca lì.
   const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
   if (push.ok) return { ok: true, skipped: false, branch: ramo };
+  // «! [remote rejected]» è il SERVER che dice di no (un pre-receive, una
+  // regola del repo, il push protection): non è storia divergente, un rebase
+  // non lo cura e il lease non si tenta (verifica del giro 4, stessa regola
+  // dell'hook di salvataggio).
+  if (/\[remote rejected\]/i.test(push.out)) {
+    return { ok: false, skipped: false, branch: ramo, reason: `il server remoto ha rifiutato il push (una regola del repo, un pre-receive, il push protection?): ${pulisciGit(push.out)}` };
+  }
   if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
     // --force-if-includes: il lease da solo si fida del ref remoto che questa
     // copia conosce, e dopo un `git fetch` quel ref è già il commit dell'altro

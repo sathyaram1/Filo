@@ -76,7 +76,6 @@ test.describe('hook di salvataggio — il rifiuto viene dal server remoto', () =
   });
 
   test('quel contesto è un JSON valido anche se il messaggio del remoto porta un ritorno carrello', async () => {
-    test.fail(true, 'giro 4: un ritorno carrello nel messaggio di git resta nel JSON (solo il tab viene sostituito) e Claude Code non riesce più a leggerlo: il fallimento torna muto');
     const s = scenario('json');
     originRifiuta(s);
     writeFileSync(join(s.lavoro, 'a.txt'), 'modifica\n');
@@ -88,7 +87,6 @@ test.describe('hook di salvataggio — il rifiuto viene dal server remoto', () =
   });
 
   test('un rifiuto del remoto (regola del repo) non viene raccontato come «storia divergente, qualcun altro ha spinto»', async () => {
-    test.fail(true, 'giro 4: la parola «rejected» nel messaggio di git fa scattare la diagnosi di storia divergente anche quando è il remoto a rifiutare per una regola');
     const s = scenario('diagnosi');
     originRifiuta(s);
     writeFileSync(join(s.lavoro, 'a.txt'), 'modifica\n');
@@ -101,7 +99,6 @@ test.describe('hook di salvataggio — il rifiuto viene dal server remoto', () =
 
 test.describe('hook di salvataggio — a metà di una fusione la sessione lo viene a sapere', () => {
   test('quando si astiene per un conflitto in corso lo dice ANCHE alla sessione, non solo al registro di debug', async () => {
-    test.fail(true, 'giro 4: l\'astensione durante un rebase o una fusione va solo su stderr con uscita 0, che Claude Code non mostra alla sessione');
     const s = scenario('astensione');
     git(s.lavoro, 'checkout', '-q', 'main');
     writeFileSync(join(s.lavoro, 'a.txt'), 'loro\n');

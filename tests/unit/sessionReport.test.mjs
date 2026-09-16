@@ -65,7 +65,7 @@ test('dieci righe: turni, freddi, token, strumenti, timeout, sotto-agenti, durat
   assert.deepEqual(rep.models, ['claude-opus-5', 'claude-fable-5-1']);
   assert.equal(rep.turns, 4, 'm3 sta su due righe e conta una volta');
   assert.equal(rep.coldTurns, 1, 'solo m3: m1 è il primo turno ed è escluso');
-  assert.deepEqual(rep.tokens, { input: 116, cacheRead: 70000, cacheWrite: 55500, output: 110 });
+  assert.deepEqual(rep.tokens, { input: 116, cacheRead: 70000, cacheWrite: 55500, cacheWrite1h: 0, output: 110 });
   assert.equal(rep.tools.total, 3);
   assert.deepEqual(rep.tools.byName, { Bash: 1, Agent: 1, mcp__x__read_me: 1 });
   assert.equal(rep.tools.timeouts, 1);

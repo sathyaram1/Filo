@@ -22,7 +22,6 @@ function turno(id, usage) {
 
 test.describe('rapporto di fine sessione — la cache a un\'ora costa il doppio, non 1,25', () => {
   test('una scrittura in cache a un\'ora è prezzata a 2× l\'input (come dice Anthropic), non a 1,25×', async () => {
-    test.fail(true, 'giro 4: il rapporto prezza ogni scrittura in cache a 1,25× e ignora cache_creation.ephemeral_1h_input_tokens');
     const righe = [turno('m1', {
       input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0,
       cache_creation_input_tokens: 100000,
@@ -35,7 +34,6 @@ test.describe('rapporto di fine sessione — la cache a un\'ora costa il doppio,
   });
 
   test('con cinque minuti e un\'ora insieme il costo è la somma delle due tariffe', async () => {
-    test.fail(true, 'giro 4: il rapporto prezza ogni scrittura in cache a 1,25× e ignora cache_creation.ephemeral_1h_input_tokens');
     const righe = [turno('m1', {
       input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0,
       cache_creation_input_tokens: 200000,

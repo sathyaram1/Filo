@@ -30,16 +30,28 @@ HOOK_INPUT=""
 HOOK_EVENT=$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
 [ -z "$HOOK_EVENT" ] && HOOK_EVENT="PostToolUse"
 
-# I fallimenti della spedizione, raccolti qui: il ciclo dei worktree gira in
-# un sotto-processo (un tubo) e una variabile non ne uscirebbe.
+# I fallimenti della spedizione e le astensioni, raccolti qui: il ciclo dei
+# worktree gira in un sotto-processo (un tubo) e una variabile non ne
+# uscirebbe. Due file perche' alla fine si dicono in modo diverso: a un push
+# fallito segue cosa fare per spedire, a un'astensione no.
 FALLIMENTI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-fallimenti.$$")
 : > "$FALLIMENTI_FILE" 2>/dev/null
+AVVISI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-avvisi.$$")
+: > "$AVVISI_FILE" 2>/dev/null
 
 # Un fallimento si dice DUE volte: su stderr (il registro di debug) e nel
 # file, da cui alla fine diventa il contesto che la sessione vede davvero.
 segnala_fallimento() {
   echo "$1" >&2
   [ -n "$FALLIMENTI_FILE" ] && printf '%s\n' "$1" >> "$FALLIMENTI_FILE" 2>/dev/null
+}
+# Un'astensione (un rebase o una fusione a meta') vale lo stesso: fino al
+# giro 4 della verifica (16/09/2026) stava solo su stderr, e la sessione che
+# risolveva i conflitti con Edit non sapeva che quel salvataggio non era
+# avvenuto finche' non provava a consegnare.
+segnala_avviso() {
+  echo "$1" >&2
+  [ -n "$AVVISI_FILE" ] && printf '%s\n' "$1" >> "$AVVISI_FILE" 2>/dev/null
 }
 
 # ─── I RAMI CHE QUESTO AUTOMATISMO NON TOCCA MAI ─────────────────────────────
@@ -131,6 +143,13 @@ spedisci_ramo() {
   local ramo="$1" dove="$2" esito esito2
   esito=$(git push origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
   case "$esito" in
+    # E' il SERVER a dire di no (un pre-receive, una regola del repo, il push
+    # protection sui segreti): «! [remote rejected]». Non e' storia divergente
+    # e un rebase non lo cura: si dice per quello che e', col motivo del
+    # remoto, e non si ritenta col lease (verifica del giro 4).
+    *"[remote rejected]"*)
+      segnala_fallimento "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"
+      return 1 ;;
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
       # --force-if-includes: il lease da solo si fida del ref remoto che questa
       # copia conosce, e dopo un `git fetch` quel ref e' gia' il commit
@@ -200,7 +219,7 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   if [ -d "$GIT_DIR_QUI/rebase-merge" ] || [ -d "$GIT_DIR_QUI/rebase-apply" ] \
      || [ -f "$GIT_DIR_QUI/MERGE_HEAD" ] || [ -f "$GIT_DIR_QUI/CHERRY_PICK_HEAD" ] || [ -f "$GIT_DIR_QUI/REVERT_HEAD" ] \
      || [ -n "$(git ls-files -u 2>/dev/null | head -1)" ]; then
-    echo "[auto-commit] '$wt': un rebase o una fusione e' a meta' (o ci sono file ancora in conflitto): NON committo e NON spedisco, o metterei in commit i segni di conflitto. Finiscilo (risolvi i file, git add, poi git rebase --continue o git commit): al primo salvataggio dopo il ramo parte." >&2
+    segnala_avviso "[auto-commit] '$wt': un rebase o una fusione e' a meta' (o ci sono file ancora in conflitto): NON committo e NON spedisco, o metterei in commit i segni di conflitto. Finiscilo (risolvi i file, git add, poi git rebase --continue o git commit): al primo salvataggio dopo il ramo parte."
     continue
   fi
 
@@ -304,10 +323,24 @@ fi
 # `additionalContext` (l'uscita 2 non vale per questo evento; un'uscita
 # diversa da zero mostra la prima riga di stderr a chi guarda, e basta).
 # Quando tutto e' arrivato, stdout resta vuoto: niente contesto a ogni Edit.
-if [ -s "$FALLIMENTI_FILE" ]; then
-  TESTO=$(sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/ /g' "$FALLIMENTI_FILE" | awk 'NR>1{printf "\\n"}{printf "%s",$0}')
-  printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"SALVATAGGIO: %s\\nIl lavoro e'"'"' committato in locale ma NON e'"'"' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."}}\n' "$HOOK_EVENT" "$TESTO"
+# Le astensioni (rebase o fusione a meta') passano dallo stesso canale, senza
+# la coda che dice di spedire: li' non c'e' niente da spedire.
+#
+# Il testo diventa una stringa JSON: backslash e virgolette si scappano, e
+# OGNI carattere di controllo se ne va (ritorno carrello e tab in spazi, gli
+# altri via). Fino al giro 4 della verifica si sostituiva il solo tab: un
+# ritorno carrello nel messaggio del remoto — git lo lascia passare com'e',
+# a seconda di come spezza i pacchetti — rendeva il JSON illeggibile e il
+# fallimento tornava muto.
+stringa_json() {
+  tr '\r\t' '  ' | tr -d '\000-\010\013\014\016-\037' | sed 's/\\/\\\\/g; s/"/\\"/g' | awk 'NR>1{printf "\\n"}{printf "%s",$0}'
+}
+if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
+  TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null | stringa_json)
+  CODA=""
+  [ -s "$FALLIMENTI_FILE" ] && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."
+  printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"SALVATAGGIO: %s%s"}}\n' "$HOOK_EVENT" "$TESTO" "$CODA"
 fi
-rm -f "$FALLIMENTI_FILE" 2>/dev/null
+rm -f "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null
 
 exit 0
