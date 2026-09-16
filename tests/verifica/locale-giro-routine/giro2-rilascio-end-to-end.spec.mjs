@@ -62,13 +62,19 @@ function canaleFinto(risposte) {
   return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok({ server, chiamate, url: `http://127.0.0.1:${server.address().port}` })));
 }
 
+/** Il rilascio, in un processo figlio ASINCRONO: il server finto vive in questo processo e deve poter rispondere. */
 function rilascia(s, url, extra = []) {
-  const r = spawnSync(process.execPath, [CANALE, 'release', 'biglietto-di-prova-1234567890', '--role', 'verifier', ...extra], {
-    cwd: s.lavoro, encoding: 'utf8',
-    env: { ...process.env, FILO_ROUTINE_API: url, FILO_REPO_ROOT: s.lavoro, FILO_TRANSCRIPT: s.transcript, FILO_ROUTINE: '1' },
-    timeout: 60000,
+  return new Promise((ok) => {
+    const p = spawn(process.execPath, [CANALE, 'release', 'biglietto-di-prova-1234567890', '--role', 'verifier', ...extra], {
+      cwd: s.lavoro, stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, FILO_ROUTINE_API: url, FILO_REPO_ROOT: s.lavoro, FILO_TRANSCRIPT: s.transcript, FILO_ROUTINE: '1' },
+    });
+    let stdout = ''; let stderr = '';
+    p.stdout.on('data', (d) => { stdout += d; });
+    p.stderr.on('data', (d) => { stderr += d; });
+    const t = setTimeout(() => { p.kill(); }, 45000);
+    p.on('close', (status) => { clearTimeout(t); ok({ status, stdout, stderr }); });
   });
-  return { status: r.status, stdout: String(r.stdout || ''), stderr: String(r.stderr || '') };
 }
 
 test.describe('rilascio del biglietto, dalla riga di comando vera', () => {
