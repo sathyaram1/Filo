@@ -294,27 +294,16 @@ async function main() {
   }
 
   const v = verdetto(json, noti);
-  const erroriGlobali = Array.isArray(json.errors) ? json.errors : [];
   if (v.totale === 0) {
     console.error('La suite NON ha eseguito nessun caso: non è un verde.');
-    for (const e of erroriGlobali) console.error(`  errore: ${String(e?.message || JSON.stringify(e)).split('\n')[0]}`);
+    for (const e of Array.isArray(json.errors) ? json.errors : []) console.error(`  errore: ${primaRiga(e)}`);
     process.exit(2);
   }
+  // Gli errori fuori dai casi stanno già dentro `v`: fra i nuovi (rossi) o fra
+  // gli avvisi (i soli teardown scaduti in una corsa senza rossi nuovi).
   console.log(testoRiassunto(v));
-  if (erroriGlobali.length) {
-    // Errori fuori dai casi (un file che non si carica, un fixture rotto):
-    // Playwright li mette qui e i casi di quel file non compaiono. Si dicono,
-    // e si contano come rossi nuovi: tacerli farebbe passare un file intero
-    // sparito dalla suite.
-    console.log(`Errori fuori dai casi: ${erroriGlobali.length}`);
-    for (const e of erroriGlobali) {
-      const riga = String(e?.message || JSON.stringify(e)).split('\n')[0];
-      console.log(`  ✗ ${riga}`);
-      v.nuovi.push({ spec: '(fuori dai casi)', titolo: riga, titoloCompleto: riga });
-    }
-  }
   if (opt.out) {
-    const righe = v.nuovi.map((c) => (c.spec === '(fuori dai casi)' ? `errore fuori dai casi: ${c.titolo}` : rigaRosso(c)));
+    const righe = v.nuovi.map(rigaRosso);
     writeFileSync(resolve(opt.out), righe.length ? `${righe.join('\n')}\n` : '', 'utf8');
   }
   process.exit(v.nuovi.length ? 1 : 0);
