@@ -1,9 +1,8 @@
 // Voci della lettura ad alta voce. Ogni modello di sintesi ha il SUO catalogo con i SUOI
-// nomi (Kokoro `if_sara`, MAI-Voice `it-IT-ElsaNeural`, Aura-2 `aura-2-cinzia-it`): mandare
-// a un modello il nome di una voce di un altro è un 400 secco, e la lettura ripiega sulla
-// voce del browser senza che nessuno capisca perché. Un modello fuori catalogo non è un
-// errore: gli si manda la voce scritta a mano (se c'è) o nessuna, e se il router elenca le
-// voci ammesse si può riprovare (voicesFromError + pickFromList). Tutto PURO.
+// nomi (Kokoro `if_sara`, MAI-Voice `it-IT-ElsaNeural`, Aura-2 `aura-2-cinzia-it`): mandargli
+// la voce di un altro è un 400 secco, e la lettura ripiega sulla voce del browser senza che
+// si capisca perché. Un modello fuori catalogo non è un errore: gli si manda la voce scritta
+// a mano o nessuna, e se il router elenca le voci ammesse si può riprovare. Tutto PURO.
 (function (global) {
   'use strict';
 
@@ -88,7 +87,7 @@
     id: `aura-2-${name}-${lang}`, lang, gender, label: cap(name),
   }));
 
-  // ── Deepgram Flux (deepgram/flux-tts) — solo inglese ────────────────────
+  // Deepgram Flux (deepgram/flux-tts): solo inglese.
   const FLUX_LIST = [
     ['alexis', 'f'], ['bree', 'f'], ['brittany', 'f'], ['brooke', 'f'], ['bruce', 'm'],
     ['cliff', 'm'], ['cole', 'm'], ['colin', 'm'], ['conor', 'm'], ['donovan', 'm'],
@@ -102,13 +101,13 @@
     id: `flux-${name}-en`, lang: 'en', gender, label: cap(name),
   }));
 
-  // ── Orpheus (canopylabs/orpheus-*) — solo inglese ───────────────────────
+  // Orpheus (canopylabs/orpheus-*): solo inglese.
   const ORPHEUS_VOICES = [
     ['tara', 'f'], ['leah', 'f'], ['jess', 'f'], ['leo', 'm'], ['dan', 'm'],
     ['mia', 'f'], ['zac', 'm'], ['zoe', 'f'],
   ].map(([id, gender]) => ({ id, lang: 'en', gender, label: cap(id) }));
 
-  // ── Sesame CSM (sesame/csm-1b) — solo inglese ───────────────────────────
+  // Sesame CSM (sesame/csm-1b): solo inglese.
   const SESAME_VOICES = [
     { id: 'conversational_a', lang: 'en', gender: 'f', label: 'Voce A' },
     { id: 'conversational_b', lang: 'en', gender: 'm', label: 'Voce B' },
@@ -139,7 +138,6 @@
     return String(tag == null ? '' : tag).trim().toLowerCase().split(/[-_]/)[0];
   }
 
-  // Catalogo di un modello (dal suo id sul router), o null se non lo conosciamo.
   function catalogFor(modelId) {
     const id = String(modelId == null ? '' : modelId).trim();
     if (!id) return null;
@@ -182,8 +180,7 @@
 
   // Voce di partenza per una lingua: la prima di quella lingua; se la lingua non c'è la prima
   // inglese (quella che ogni modello conosce meglio); se nemmeno quella, la prima del
-  // catalogo. Senza modello vale Kokoro, per chi chiamava prima che le voci fossero per
-  // modello. '' se il modello non ha catalogo o non pretende una voce.
+  // catalogo. Senza modello vale Kokoro. '' se il modello non pretende una voce.
   function defaultVoiceFor(lang, modelId) {
     const c = modelId === undefined ? CATALOGS[0] : catalogFor(modelId);
     if (!c || !c.required || !c.voices.length) return '';
@@ -197,12 +194,11 @@
   // LA regola, quale voce mandare a un modello:
   // - scelta a mano e il modello la conosce → quella;
   // - scelta a mano ma di un ALTRO catalogo → ignorata (è rimasta da un modello precedente,
-  // mandarla è un 400 sicuro) e si va alla voce di partenza per la lingua;
-  // - un nome che nessun catalogo conosce → passa tale e quale: è l'unico modo di usare un
+  // mandarla è un 400 sicuro): si va alla voce di partenza per la lingua;
+  // - un nome che nessun catalogo conosce → passa tale e quale, è l'unico modo di usare un
   // modello che non conosciamo;
   // - niente scelto → la voce di partenza ('' se il modello sceglie da sé).
-  // `learned` è l'elenco che il router ha dichiarato in una risposta precedente, e vale
-  // come catalogo.
+  // `learned` è l'elenco dichiarato dal router in una risposta precedente: vale come catalogo.
   function resolveVoice({ chosen, lang, modelId, learned } = {}) {
     const want = String(chosen == null ? '' : chosen).trim();
     const c = catalogFor(modelId);

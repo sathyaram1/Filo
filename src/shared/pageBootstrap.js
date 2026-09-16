@@ -79,10 +79,10 @@
   // Dropdown custom per i <select>: il popup nativo usa l'highlight blu di sistema e in
   // Chromium non rispetta `option:hover`, quindi non si può rendere coerente con la palette.
   // Il <select> nativo resta nel DOM (nascosto) come sorgente di verità, così `.value`,
-  // l'evento `change` e `selectOption` di Playwright continuano a funzionare.
-  // Selezionata e hover usano lo stesso arancione a due opacità che si SOMMANO, così l'hover
-  // sull'opzione già selezionata dà comunque una risposta visiva. L'editor è escluso: il suo
-  // <select> del font ha una gestione speciale del focus e si resetta a un placeholder.
+  // `change` e `selectOption` di Playwright continuano a funzionare. Selezionata e hover
+  // usano lo stesso arancione a due opacità che si SOMMANO, così l'hover sull'opzione già
+  // selezionata risponde comunque. L'editor è escluso: il suo <select> del font ha una
+  // gestione speciale del focus.
   function enhanceSelect(select) {
     if (!select || select.dataset.snEnhanced) return;
     if (select.multiple || select.size > 1) return;
@@ -162,8 +162,7 @@
     }
 
     function pick(value) {
-      // Dal setter nativo (l'override più sotto risincronizza la UI), e si notificano i listener
-      // già attaccati al <select>.
+      // Dal setter nativo (l'override più sotto risincronizza la UI), e si notificano i listener.
       select.value = value;
       select.dispatchEvent(new Event('input', { bubbles: true }));
       select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -271,7 +270,6 @@
   if (!IS_EDITOR) {
     const start = () => {
       enhanceSelects(document);
-      // Osserva i <select> aggiunti dinamicamente dopo il primo render.
       const obs = new MutationObserver((records) => {
         for (const rec of records) {
           for (const node of rec.addedNodes) {

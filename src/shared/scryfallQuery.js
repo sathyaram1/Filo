@@ -25,10 +25,9 @@
   }
 
   // Dentro l'identità se OGNI colore della carta è fra quelli del commander (regola Commander
-  // §8.4); le incolori sempre ammesse; nessun commander = nessun vincolo. È il filtro DURO sui
-  // DATI: a differenza di buildSearchQuery, che agisce sulla stringa e cede a un `id`
-  // esplicito, qui nessuna sintassi fa passare una carta fuori identità — è la rete di
-  // sicurezza sui risultati proposti dall'agente.
+  // §8.4); incolori sempre ammesse, nessun commander = nessun vincolo. È il filtro DURO sui
+  // DATI: buildSearchQuery agisce sulla stringa e cede a un `id` esplicito, qui invece nessuna
+  // sintassi fa passare una carta fuori identità — è la rete sui risultati dell'agente.
   function withinIdentity(cardColorIdentity, commanderColors) {
     if (!Array.isArray(commanderColors)) return true;
     const allowed = new Set(commanderColors.map((c) => String(c).toUpperCase()));
@@ -36,7 +35,6 @@
     return ci.every((c) => allowed.has(String(c).toUpperCase()));
   }
 
-  // '{2}{U}{R}' → ['2','U','R']; stringa vuota/null → [].
   function parseManaCost(cost) {
     if (!cost) return [];
     const out = [];
@@ -46,8 +44,7 @@
     return out;
   }
 
-  // Riduce una carta dell'API ai campi che l'app usa. Gestisce le carte a due facce
-  // (image_uris/mana_cost sulle card_faces, non sulla radice).
+  // Gestisce le carte a due facce: image_uris/mana_cost stanno sulle card_faces, non sulla radice.
   function simplifyCard(api) {
     if (!api || typeof api !== 'object' || !api.id) return null;
     const faces = Array.isArray(api.card_faces) ? api.card_faces : [];
@@ -74,7 +71,6 @@
       colors: Array.isArray(api.colors) ? api.colors : (Array.isArray(front.colors) ? front.colors : []),
       colorIdentity: Array.isArray(api.color_identity) ? api.color_identity : [],
       image: String(img.normal || img.large || ''),
-      // Alimenta il tasto «gira la carta» del pannello di dettaglio; vuota = carta a faccia unica.
       backImage: backImg ? String(backImg.normal || backImg.large || '') : '',
       backName: backFace ? String(backFace.name || '') : '',
       artCrop: String(img.art_crop || ''),
@@ -90,7 +86,7 @@
     };
   }
 
-  // Freschezza di un'entry di cache con TTL. `fetchedAt` ISO o epoch ms.
+  // `fetchedAt` ISO o epoch ms.
   function isFresh(fetchedAt, ttlMs, now = Date.now()) {
     const t = typeof fetchedAt === 'string' ? Date.parse(fetchedAt) : Number(fetchedAt);
     if (!Number.isFinite(t)) return false;
@@ -99,9 +95,9 @@
 
   // Chat unificata (§3): l'agente risponde con un JSON { reply?, query?, cards?, budget?,
   // prob? } che i modelli a volte avvolgono in ```json o circondano di testo, quindi si
-  // estrae il primo oggetto valido in modo tollerante. Uscita sempre normalizzata: reply,
-  // query e cards presenti; hasBudget/budget = tetto da impostare (numero ≥ 0) o togliere
-  // (null) (§9.2); prob = { turn, needs:[{ tag, n }] } per il calcolatore (§9.3).
+  // estrae il primo oggetto valido in modo tollerante. Uscita normalizzata: reply, query e
+  // cards sempre presenti; hasBudget/budget = tetto da impostare o togliere (§9.2); prob =
+  // { turn, needs } per il calcolatore (§9.3).
   function normalizeProb(p) {
     if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
     const turn = Math.floor(Number(p.turn));
@@ -131,7 +127,6 @@
     };
     const raw = String(text || '').trim();
     if (!raw) return none;
-    // Candidati: contenuto dei fence ```…```, testo intero, primo blocco {...}.
     const candidates = [];
     const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
     if (fence) candidates.push(fence[1].trim());
@@ -155,8 +150,7 @@
         return {
           reply: typeof o.reply === 'string' ? o.reply.trim() : '',
           query: typeof o.query === 'string' ? o.query.trim() : '',
-          // Criterio del filtro semantico (§4.1): quando presente, il sistema
-          // usa un LLM economico per tenere solo le carte che lo rispettano.
+          // Filtro semantico (§4.1): un LLM economico tiene solo le carte che rispettano il criterio.
           filter: typeof o.filter === 'string' ? o.filter.trim() : '',
           cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
           hasBudget,
@@ -165,7 +159,6 @@
           // Valutazione batch (§6.1): 'deck' | 'results'. true legacy dei modelli → 'deck', il resto → ''.
           evaluate: o.evaluate === 'deck' || o.evaluate === 'results' ? o.evaluate
             : (o.evaluate === true ? 'deck' : ''),
-          // Auto-tag (§7): tag richiesti, normalizzati minuscoli.
           tagWith: Array.isArray(o.tagWith)
             ? o.tagWith.map((t) => String(t).trim().toLowerCase()).filter(Boolean) : [],
           // Import via chat (§11.2): nomi indovinati dal modello (typo, italiano, formati strani),
@@ -181,7 +174,7 @@
         };
       } catch (_) { /* prova il prossimo candidato */ }
     }
-    // Nessun JSON: il testo grezzo diventa la reply (degradazione garbata).
+    // Nessun JSON: il testo grezzo diventa la reply.
     return { ...none, reply: raw };
   }
 
