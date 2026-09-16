@@ -1,12 +1,6 @@
-// Dashboard Filo (new tab). Controller UI.
-//
-// Stati visibili:
-//   - "home"   → messaggio centrale proattivo + suggerimenti pieni
-//   - "thread" → conversazione in corso (bolle). Colonna sx collassa a icone.
-//
-// Ogni nuova query dalla home apre un nuovo thread (vedi spec sezione 2.1).
-// Niente persistenza cross-tab del thread: ad ogni nuovo new-tab si riparte
-// dalla home. Il "raw log" tiene memoria delle interazioni lato background.
+// Dashboard Filo (new tab). Controller UI: stato «home» (messaggio proattivo + suggerimenti) o
+// «thread» (conversazione). Ogni query dalla home apre un nuovo thread (spec §2.1); niente
+// persistenza cross-tab: a ogni new-tab si riparte dalla home.
 
 (function () {
   'use strict';
@@ -14,13 +8,11 @@
   const { MSG } = self.SN_MSG;
   const { STORAGE_KEYS } = self.SN_CONST;
 
-  // #524 — il benvenuto non è più un cartello: è l'inizio di una conversazione
-  // vera (la micro-intervista). Il testo del primo messaggio, l'elenco delle
-  // cose da scoprire e da dire e lo stato della ripresa vivono in
-  // src/shared/onboarding.js; qui c'è solo la chat che l'utente vede.
+  // #524 — il benvenuto è l'inizio di una conversazione vera (la micro-intervista): testi, cose
+  // da scoprire e stato della ripresa stanno in src/shared/onboarding.js, qui solo la chat.
   const Onb = self.SN_ONBOARDING;
 
-  // ===== DOM =====
+  // DOM
   const $ = (id) => document.getElementById(id);
   const body = document.body;
   const homeMessageEl = $('homeMessage');
@@ -35,7 +27,7 @@
   const sendBtn = $('sendBtn');
   const dashDir = $('dashDir');
 
-  // ===== Stato locale =====
+  // Stato locale
   let suggestions = [];
   let showHomeMessage = true; // commento centrale (disattivabile da Preferenze)
   let expanded = false;
@@ -44,23 +36,19 @@
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
 
-  // ===== Modalità terminale =====
+  // Modalità terminale
   let terminalMode = false;          // attivabile da Preferenze
   let terminalShell = 'powershell';  // 'powershell' | 'cmd' | 'bash'
   let currentCwd = '';               // directory mostrata nella riga grigia
 
-  // ===== Suoneria timer =====
-  // Singleton AudioContext + oscillatori per la suoneria del timer.
-  // Non usiamo file audio per non dover committare binari; generiamo
-  // sequenze di beep via WebAudio. La suoneria parte quando il primo
-  // timer passa in stato `ringing` e si ferma quando non ce ne sono più.
+  // Suoneria timer: AudioContext + oscillatori, niente file audio per non committare binari.
+  // Parte quando il primo timer passa a `ringing` e si ferma quando non ce ne sono più.
   let _alarmCtx = null;
   let _alarmPlaying = false;
   let _alarmLoopTimeout = null;
   let _timerRingTone = 'default'; // suoneria attiva (ID stringa)
 
-  // Catalogo suonerie: ogni voce è un array di note [ [freq, durMs], … ]
-  // seguite da un gap prima del loop successivo.
+  // Catalogo suonerie: ogni voce è [ [freq, durMs], … ] più un gap prima del loop successivo.
   const RINGTONES = {
     default: {
       label: 'Standard',
@@ -87,9 +75,8 @@
     return _alarmCtx;
   }
 
-  // Suona UNA sequenza di note (non in loop). Ritorna una Promise che si
-  // risolve quando la sequenza è finita. Usata sia per la suoneria in loop
-  // sia per l'anteprima nelle opzioni (ma lì non in loop).
+  // Suona UNA sequenza (non in loop); la Promise si risolve a sequenza finita. Serve sia alla
+  // suoneria in loop sia all'anteprima nelle opzioni.
   function _playSequence(toneId) {
     const tone = RINGTONES[toneId] || RINGTONES.default;
     const ctx = _getAlarmCtx();
@@ -113,13 +100,12 @@
           }
           t += durMs / 1000;
         }
-        // Risolvi al termine dell'ultima nota + gap.
         setTimeout(resolve, Math.max(0, (t - ctx.currentTime) * 1000));
       });
     });
   }
 
-  // Avvia la suoneria in loop continuo. Idempotente: se già suona, non fa nulla.
+  // Avvia la suoneria in loop. Idempotente.
   function startAlarm() {
     if (_alarmPlaying) return;
     _alarmPlaying = true;
@@ -138,7 +124,7 @@
     _alarmLoopTimeout = null;
   }
 
-  // ===== Helpers messaggi =====
+  // Helpers messaggi
   function send(msg) {
     return new Promise((resolve) => {
       try {
@@ -163,7 +149,7 @@
     } catch (_) {}
   }
 
-  // ===== Stato UI =====
+  // Stato UI
   function goHome() {
     body.dataset.state = 'home';
     homeView.hidden = false;
@@ -181,19 +167,16 @@
     threadView.hidden = false;
   }
 
-  // ===== Micro-intervista di benvenuto (#524) =====
-  //
-  // Lo stato lo tiene il main (una chiave sola): all'apertura chiediamo se
-  // l'intervista è aperta e, se sì, ricomponiamo la conversazione com'era.
-  // Niente flag scritto qui: il segno "già accolto" lo scrive la CHIUSURA.
+  // Micro-intervista di benvenuto (#524). Lo stato lo tiene il main (una chiave sola):
+  // all'apertura si chiede se è aperta e, se sì, si ricompone la conversazione. Il segno «già
+  // accolto» lo scrive la CHIUSURA, non questo punto.
   let onboardingActive = false;
 
   async function fetchOnboarding() {
     try {
       const r = await send({ type: MSG.FILO_GET_ONBOARDING });
-      // `ready: false` = nessun modello disponibile ancora (niente accesso,
-      // niente chiave): l'intervista aspetta e la home spiega come attivare
-      // Filo, invece di accoglierlo con una chat che non può rispondere.
+      // `ready: false` = nessun modello disponibile: l'intervista aspetta e la home spiega come
+      // attivare Filo, invece di accogliere con una chat che non può rispondere.
       if (!r?.ok || !r.onboarding || !r.ready) return null;
       if (r.onboarding.done) return null;
       // `resume` lo decide il main: di schede nuove se ne aprono due insieme, e
@@ -202,9 +185,8 @@
     } catch (_) { return null; }
   }
 
-  // La conversazione salvata torna a schermo come bolle normali — per l'utente
-  // è una chat, non una procedura guidata. Usata sia all'apertura sia quando
-  // un'altra scheda fa avanzare la stessa intervista.
+  // La conversazione salvata torna a schermo come bolle normali: per l'utente è una chat, non
+  // una procedura guidata.
   function renderOnboardingThread(state) {
     const thread = Array.isArray(state?.thread) ? state.thread : [];
     bubblesEl.innerHTML = '';
@@ -218,9 +200,8 @@
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
-  // Apre (o riprende) l'intervista. Se l'ultimo messaggio è dell'utente (ha
-  // risposto e ha chiuso la finestra prima della risposta), il turno riparte da
-  // solo: non deve riscrivere niente.
+  // Se l'ultimo messaggio è dell'utente (ha risposto e ha chiuso la finestra prima della
+  // risposta), il turno riparte da solo.
   async function openOnboarding(state) {
     onboardingActive = true;
     hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
@@ -236,25 +217,20 @@
     }
   }
 
-  // Un'altra scheda ha fatto avanzare l'intervista: questa si riallinea, invece
-  // di restare ferma alla conversazione com'era quando l'ha letta. Mai mentre
-  // stiamo scrivendo noi — le bolle in corso sono già la verità.
+  // Un'altra scheda ha fatto avanzare l'intervista: questa si riallinea. Mai mentre stiamo
+  // scrivendo noi — le bolle in corso sono già la verità.
   function onboardingUpdated(state) {
     if (!state || state.done) return;
-    // Qui l'intervista non è a schermo, ma da qualche parte è di nuovo aperta:
-    // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
+    // Qui l'intervista non è a schermo ma altrove è di nuovo aperta: se questa home mostrava la
+    // riga «abbiamo chiuso a metà», adesso mente.
     if (!onboardingActive) { hideOnboardingNotice(); return; }
     if (sending) return;
     renderOnboardingThread(state);
   }
 
-  // ── La via d'uscita che non passa dal modello ─────────────────────────────
-  //
-  // Il benvenuto promette «scrivi "basta così" e chiudiamo»: la parola la
-  // riconosce il main da sé, senza chiamare nessuno. Questo pulsante è il suo
-  // gemello visibile, per chi la frase non la ricorda o si trova davanti a una
-  // bolla d'errore. Senza, chi apre Filo la prima volta senza rete resta chiuso
-  // dentro l'accoglienza con il solo "Riprova" davanti.
+  // La via d'uscita che non passa dal modello. Il benvenuto promette «scrivi basta così»: la
+  // parola la riconosce il main da sé. Questo pulsante è il suo gemello visibile — senza, chi
+  // apre Filo la prima volta senza rete resta chiuso dentro l'accoglienza col solo «Riprova».
   function makeSkipOnboardingBtn(label) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -301,10 +277,8 @@
     }
   }
 
-  // L'intervista era in attesa di un modello (nessun accesso, nessuna chiave) e
-  // adesso c'è: la apriamo, ma solo se l'utente è ancora sulla home e non sta
-  // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
-  // che aspettare la prossima scheda.
+  // L'intervista aspettava un modello e adesso c'è: la si apre, ma solo se l'utente è ancora
+  // sulla home — irrompere in una conversazione in corso sarebbe peggio che aspettare.
   async function maybeOpenOnboardingLater() {
     if (onboardingActive || sending) return;
     if (body.dataset.state !== 'home') return;
@@ -313,9 +287,8 @@
     await openOnboarding(state);
   }
 
-  // Chiusura: l'ultimo atto non è un "fatto", è il risultato — la prima home
-  // costruita sul profilo appena imparato. Finché non arriva, la chat dice cosa
-  // sta succedendo invece di restare muta.
+  // L'ultimo atto non è un «fatto», è il risultato: la prima home costruita sul profilo appena
+  // imparato. Finché non arriva, la chat dice cosa sta succedendo invece di restare muta.
   function onboardingClosing() {
     if (!onboardingActive) return;
     onboardingActive = false;
@@ -323,20 +296,17 @@
     hideSkipOnboarding();
     bubblesEl.appendChild(stepTrace('Preparo la tua home…'));
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
-    // La home personale è l'ultimo atto dell'accoglienza, ma non può esserne la
-    // condizione: se non arriva (nessun modello, provider giù) l'utente va alla
-    // home lo stesso invece di restare davanti a una chat chiusa.
+    // La home personale è l'ultimo atto dell'accoglienza ma non può esserne la condizione: se non
+    // arriva (nessun modello, provider giù) l'utente ci va lo stesso.
     clearTimeout(onboardingHomeFallback);
     onboardingHomeFallback = setTimeout(() => {
       if (body.dataset.state === 'thread' && !sending) onboardingDone(null);
     }, 8000);
   }
 
-  // Il congedo («chiudo qui, la rifacciamo quando vuoi») è l'ultima cosa che
-  // l'utente legge dell'accoglienza, e la home lo cancella: quando la home
-  // arriva nello stesso istante — col modello giù è così — non lo legge
-  // nessuno. Gli lasciamo il tempo di essere letto; se la home ci mette di suo
-  // più di così, non si aspetta niente.
+  // Il congedo è l'ultima cosa che l'utente legge, e la home lo cancella: quando arriva nello
+  // stesso istante non lo legge nessuno. Gli si lascia il tempo di essere letto; se la home ci
+  // mette di suo più di così, non si aspetta niente.
   const CLOSING_DWELL_MS = 2600;
   let closingShownAt = 0;
   let closingDwellTimer = null;
@@ -376,13 +346,10 @@
     refreshOnboardingNotice().catch(() => {});
   }
 
-  // ── Dopo un'accoglienza chiusa a metà ─────────────────────────────────────
-  //
-  // Il congedo spiega che l'intervista si rifà da Preferenze, ma vive in chat e
-  // la chat sparisce appena la home è pronta — a volte in un istante. E il segno
-  // «già accolto» è definitivo: chi non fa in tempo a leggerlo non ha modo di
-  // capire perché Filo ha smesso di presentarsi. Questa riga resta sulla home
-  // finché non la si toglie, e porta con sé la strada per tornarci.
+  // Dopo un'accoglienza chiusa a metà. Il congedo spiega che l'intervista si rifà da Preferenze,
+  // ma vive in chat e la chat sparisce appena la home è pronta; e il segno «già accolto» è
+  // definitivo. Questa riga resta sulla home finché non la si toglie, e porta con sé la strada
+  // per tornarci.
   async function refreshOnboardingNotice() {
     let st = null;
     try {
@@ -430,8 +397,7 @@
     try { await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN }); } catch (_) {}
   }
 
-  // Rifarla da qui: la stessa cosa del pulsante in Preferenze, ma senza mandare
-  // l'utente a cercarlo — l'intervista riparte nella scheda che ha davanti.
+  // Rifarla da qui, senza mandare l'utente a cercare il pulsante in Preferenze.
   async function restartOnboardingHere() {
     hideOnboardingNotice();
     try {
@@ -441,7 +407,7 @@
   }
 
 
-  // ===== Suggerimenti (colonna sinistra) =====
+  // Suggerimenti (colonna sinistra)
   function iconLabel(icon) {
     const map = {
       gmail: 'M', calendar: 'C', editor: 'E', file: 'F',
@@ -450,9 +416,8 @@
     return map[icon] || (icon ? icon[0].toUpperCase() : '·');
   }
 
-  // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
-  // gratis, niente API key, regge i casi mancanti restituendo un'icona
-  // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
+  // Favicon via il servizio Google s2 — gratis, niente API key, e per i casi mancanti torna
+  // un'icona grigia. '' per URL non http(s).
   function faviconUrl(rawUrl) {
     if (!rawUrl) return '';
     try {
@@ -478,9 +443,8 @@
       const icon = document.createElement('span');
       icon.className = 'dash-sug-icon';
       icon.dataset.icon = s.icon || '';
-      // Per le azioni NAVIGA mostriamo la favicon del sito al posto della
-      // letterina generica: più riconoscibile a colpo d'occhio. Se la favicon
-      // non carica (404/rete) torniamo all'iniziale.
+      // Per le azioni NAVIGA la favicon del sito al posto della letterina: più riconoscibile a colpo
+      // d'occhio. Se non carica si torna all'iniziale.
       const navUrl = (String(s.action?.type || '').toUpperCase() === 'NAVIGA') ? s.action?.url : '';
       const favUrl = faviconUrl(navUrl);
       if (favUrl) {
@@ -518,10 +482,8 @@
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
     if (type === 'PULISCI_TAB') {
-      // §6 — suggerimento di pulizia dalla home: STESSA conferma del bottone chat.
-      // Popup Filo (SN_CONFIRM_UI), non il window.confirm nativo del browser
-      // (PATTERNS.md: niente default del browser). Fallback al nativo solo se il
-      // modulo non è caricato.
+      // §6 — STESSA conferma del bottone chat: popup Filo (SN_CONFIRM_UI), non il window.confirm
+      // nativo (PATTERNS.md). Fallback al nativo solo se il modulo non è caricato.
       const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
         + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
       const ok = window.SN_CONFIRM_UI
@@ -547,7 +509,7 @@
     }
   }
 
-  // ===== Colonna destra (live) =====
+  // Colonna destra (live)
   async function refreshLive() {
     const [timersR, notiR] = await Promise.all([
       send({ type: MSG.FILO_GET_TIMERS }),
@@ -568,23 +530,21 @@
       if (t.ringing) {
         liveEl.appendChild(renderRingingCard(t));
       } else if (t.kind === 'alarm') {
-        // #322 — la sveglia mostra l'ORARIO programmato, non un countdown
-        // mm:ss (un conto alla rovescia di ore sarebbe illeggibile). La × la
-        // rimuove, come per i timer.
+        // #322 — la sveglia mostra l'ORARIO programmato, non un countdown (un conto alla rovescia di
+        // ore sarebbe illeggibile).
         liveEl.appendChild(renderLiveCard({
           kind: 'process',
           text: `⏰ Sveglia ${fmtAlarmWhen(t)}${t.label ? `\n${t.label}` : ''}`,
           onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
         }));
       } else {
-        // Timer in pausa: il countdown è congelato, `endsAt` non è più
-        // affidabile (il "now" avanza mentre il timer è fermo) → usa il tempo
-        // rimanente salvato al momento della pausa.
+        // Timer in pausa: `endsAt` non è più affidabile (il «now» avanza mentre il timer è fermo) →
+        // si usa il tempo rimanente salvato alla pausa.
         const remaining = (t.paused && Number.isFinite(t.remainingMs))
           ? Math.max(0, Math.round(t.remainingMs / 1000))
           : Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
-        // #323 — countdown "da orologio": M:SS sotto l'ora, H:MM:SS oltre, così
-        // un timer di 2 ore mostra "2:00:00" e non "120:00".
+        // #323 — countdown da orologio: M:SS sotto l'ora, H:MM:SS oltre, così due ore fanno «2:00:00»
+        // e non «120:00».
         const clock = (self.SN_TIME ? self.SN_TIME.fmtCountdown(remaining)
           : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`);
         const txt = `${t.label}\n${clock}${t.paused ? ' (in pausa)' : ''}`;
@@ -601,7 +561,6 @@
       }
     }
 
-    // Gestione suoneria: parte se c'è almeno un timer ringing, si ferma altrimenti.
     const hasRinging = timers.some((t) => t.ringing);
     if (hasRinging) {
       startAlarm();
@@ -609,14 +568,12 @@
       stopAlarm();
     }
 
-    // Stato osservabile per i test Playwright (non dipende dall'audio che in
-    // headless non suona): data-ringing="1" sul contenitore live.
+    // Stato osservabile per i test Playwright (in headless l'audio non suona): data-ringing sul
+    // contenitore live.
     liveEl.dataset.ringing = hasRinging ? '1' : '0';
 
-    // Ticker per i timer: aggiorna il rendering ogni secondo SOLO se ci sono
-    // timer attivi (compresi i ringing — un timer ringing non è in pausa
-    // quindi !t.paused è già true, ma includiamo t.ringing esplicitamente
-    // per robustezza nel caso futura variazione della logica di pausa).
+    // Ticker: aggiorna il rendering ogni secondo SOLO se ci sono timer attivi (i ringing inclusi
+    // esplicitamente, per non dipendere dalla logica di pausa).
     const hasActiveTimer = timers.some((t) => !t.paused || t.ringing);
     if (hasActiveTimer && !liveTickHandle) {
       liveTickHandle = setInterval(refreshLive, 1000);
@@ -626,10 +583,9 @@
     }
   }
 
-  // Quando suona una sveglia. Se si RIPETE, il giorno della prossima occorrenza
-  // non è l'informazione utile ("07:55 di domani" per una sveglia del lunedì e
-  // del mercoledì dice meno del vero): si mostrano l'orario e i giorni, con la
-  // stessa dicitura che legge l'assistente ("feriali", "lun+mer").
+  // Se la sveglia si RIPETE, il giorno della prossima occorrenza non è l'informazione utile
+  // («07:55 di domani» per una sveglia di lunedì e mercoledì dice meno del vero): si mostrano
+  // orario e giorni, con la dicitura che legge l'assistente («feriali», «lun+mer»).
   function fmtAlarmWhen(t) {
     const M = self.SN_FILO_MEMORY;
     const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
@@ -660,8 +616,8 @@
 
     const textEl = document.createElement('div');
     textEl.className = 'dash-live-text';
-    // Su una sveglia ricorrente diciamo anche i giorni: "Ferma" la zittisce ora
-    // e la lascia in lista per la prossima volta, quindi va detto.
+    // Su una sveglia ricorrente «Ferma» la zittisce ora e la lascia in lista per la prossima
+    // volta, quindi va detto.
     const M = self.SN_FILO_MEMORY;
     const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
     textEl.textContent = t.kind === 'alarm'
@@ -678,12 +634,9 @@
     });
     div.appendChild(stopBtn);
 
-    // Pulsante × per dismissione rapida (stessa azione di "Ferma"). Sulle
-    // sveglie RICORRENTI i due pulsanti non fanno più la stessa cosa: "Ferma"
-    // zittisce quella di adesso e la lascia per la prossima volta, la × la
-    // toglie del tutto — che è quello che la × fa su ogni altra card della
-    // colonna, e senza questo ramo una sveglia ricorrente non si potrebbe
-    // togliere proprio mentre suona.
+    // Sulle sveglie RICORRENTI × e «Ferma» non fanno la stessa cosa: «Ferma» zittisce quella di
+    // adesso, la × la toglie del tutto — come su ogni altra card. Senza questo ramo una sveglia
+    // ricorrente non si potrebbe togliere proprio mentre suona.
     const dismissBtn = document.createElement('button');
     dismissBtn.className = 'dash-live-dismiss';
     dismissBtn.type = 'button';
@@ -706,8 +659,7 @@
     t.className = 'dash-live-text';
     t.textContent = text;
     div.appendChild(t);
-    // Pausa/ripresa: solo per i countdown (chi passa onToggle). Il pulsante sta
-    // accanto alla × e cambia icona/etichetta in base allo stato.
+    // Pausa/ripresa: solo per i countdown (chi passa onToggle).
     if (onToggle) {
       const pb = document.createElement('button');
       pb.className = 'dash-live-pause';
@@ -730,13 +682,12 @@
     return div;
   }
 
-  // Mostra/nasconde il commento centrale di Filo (Preferenze → "Commento nella
-  // home"). I suggerimenti nella colonna sinistra restano comunque visibili.
+  // Preferenze → «Commento nella home». I suggerimenti a sinistra restano comunque visibili.
   function applyHomeMessageVisibility() {
     homeMessageEl.hidden = !showHomeMessage;
   }
 
-  // ===== Generazione dashboard (messaggio centro + suggerimenti) =====
+  // Generazione dashboard (messaggio centro + suggerimenti)
   async function loadDashboard({ force = false } = {}) {
     if (showHomeMessage) {
       homeMessageEl.classList.add('dash-home-msg-loading');
@@ -756,24 +707,21 @@
     renderSuggestions();
   }
 
-  // ===== Bolle conversazione =====
+  // Bolle conversazione
   function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
     if (pending) div.classList.add('dash-bubble-pending');
-    // #162 — testo vuoto (Filo ha solo eseguito un'azione, es. aperto un link):
-    // niente nodo di testo, la bolla conterrà solo i chip d'azione. Marchiamo
-    // la bolla così il CSS può stringere i margini quando è "solo azioni".
+    // #162 — testo vuoto (Filo ha solo eseguito un'azione): niente nodo di testo, solo i chip. La
+    // bolla è marcata così il CSS può stringere i margini.
     if (text) setBubbleText(div, text, markdown);
     else div.classList.add('dash-bubble-actions-only');
     return div;
   }
 
-  // #418 — scrive il testo in una bolla. Per le risposte di Filo (markdown=true)
-  // rende la formattazione leggera condivisa (grassetto, corsivo, codice,
-  // elenchi, LINK). Per tutto il resto (testo utente, righe di sistema) resta
-  // testo letterale. I link aperti sono già filtrati da SN_MARKDOWN: nessuno
-  // punta alle pagine interne dell'app.
+  // #418 — per le risposte di Filo (markdown=true) rende la formattazione leggera condivisa
+  // (grassetto, corsivo, codice, elenchi, link); per tutto il resto resta testo letterale. I link
+  // sono già filtrati da SN_MARKDOWN: nessuno punta alle pagine interne.
   function setBubbleText(el, text, markdown) {
     if (markdown && text && self.SN_MARKDOWN) {
       el.innerHTML = self.SN_MARKDOWN.render(text);
@@ -783,8 +731,8 @@
     }
   }
 
-  // Un solo listener delegato: i link renderizzati da Filo aprono una NUOVA
-  // SCHEDA (come qualsiasi altro link) invece di navigare via la pagina interna.
+  // Un solo listener delegato: i link di Filo aprono una NUOVA SCHEDA invece di navigare via la
+  // pagina interna.
   bubblesEl.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a || !bubblesEl.contains(a)) return;
@@ -795,21 +743,13 @@
     send({ type: MSG.OPEN_URL, url });
   });
 
-  // ===== Blocco di attività della domanda (#521) =====
-  // UNO per messaggio dell'utente, sopra la risposta finale. Raccoglie tutto
-  // ciò che Filo fa prima di rispondere, anche su più turni automatici
-  // (ragiona, cerca, legge, ragiona ancora, risponde). Filo non «ragiona e
-  // basta»: agisce, e il blocco è «Filo sta facendo qualcosa».
-  //
-  // Chiuso di default, sempre: il 90 % delle volte l'utente vuole che il lavoro
-  // sia invisibile. La riga in testa dice cosa succede ADESSO — rotella e
-  // «Aspetto la risposta…», poi «Sta ragionando · …ultima frase», poi «Cerco
-  // sul web: …» — e a lavoro finito diventa il riassunto («Ha cercato sul web e
-  // letto un documento · 1 min 20 s»). Un click apre la cronologia completa:
-  // ragionamento, azioni, note intermedie, esiti dei comandi, nell'ordine in
-  // cui sono avvenuti. Niente frasi inventate: le vecchie righe «Consulto la
-  // memoria…» erano teatro, non stato.
-  //
+  // Blocco di attività della domanda (#521). UNO per messaggio dell'utente, sopra la risposta
+  // finale: raccoglie tutto ciò che Filo fa prima di rispondere, anche su più turni automatici.
+  // Filo non «ragiona e basta»: agisce.
+  // Chiuso di default, sempre: il 90% delle volte l'utente vuole che il lavoro sia invisibile.
+  // La riga in testa dice cosa succede ADESSO e a lavoro finito diventa il riassunto; un click
+  // apre la cronologia completa, nell'ordine in cui le cose sono avvenute. Niente frasi inventate:
+  // le vecchie righe «Consulto la memoria…» erano teatro, non stato.
   // Se alla fine non c'è niente da raccontare, il blocco si toglie da solo.
   function createActivity() {
     const wrap = document.createElement('div');
@@ -885,8 +825,7 @@
       followBody();
       followThread();
     };
-    // Chiude il blocco di ragionamento del turno (se c'era) e lo mette da parte
-    // per lo storico del thread.
+    // Chiude il blocco di ragionamento del turno e lo mette da parte per lo storico.
     const closeTurnReasoning = () => {
       if (!turnReasoning) return;
       lastTurn = { text: turnReasoning, ms: Date.now() - turnStartedAt };
@@ -912,9 +851,8 @@
         followBody();
         followThread();
       },
-      // È partito il testo di una risposta (finale o intermedia). Da qui in poi
-      // le righe del turno (azioni, comandi) vengono DOPO il testo: se poi
-      // quel testo entra in cronologia come nota, va messo qui, non in coda.
+      // È partito il testo di una risposta: da qui le righe del turno vengono DOPO il testo, quindi
+      // se quel testo entra in cronologia come nota va messo qui, non in coda.
       answerStarted() {
         closeTurnReasoning();
         turnMark = body.childElementCount;
@@ -927,17 +865,15 @@
         closeTurnReasoning();
         setPhase('act', text);
       },
-      // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
-      // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
-      // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
+      // Una riga di azione: icona e due parole. `failed`: la riga resta (è successo qualcosa) ma il
+      // riassunto non la conta — «Ha avviato un timer» su un timer non avviato è una bugia.
       addRow(type, rowIcon, text, failed = false) {
         closeTurnReasoning();
         if (!failed) doneTypes.push(String(type || '').toUpperCase());
         append(makeActivityRow(rowIcon, text));
         if (phase !== 'done') setPhase('act', text);
       },
-      // Esito di un comando eseguito subito (livello 1): riga di comando e
-      // output, nella cronologia — non nella bolla della risposta.
+      // Esito di un comando eseguito subito (livello 1): nella cronologia, non nella bolla.
       addCommand(out) {
         closeTurnReasoning();
         doneTypes.push('ESEGUI_COMANDO');
@@ -946,9 +882,8 @@
         append(el);
         if (phase !== 'done') setPhase('act', `Eseguito · ${(out && out.command) || 'comando'}`);
       },
-      // La bolla di un turno che NON era l'ultimo («Provo subito tutti e tre…»)
-      // entra nella cronologia come nota e sparisce dalla conversazione: per
-      // l'utente conta la risposta, non il commento a metà lavoro.
+      // La bolla di un turno che NON era l'ultimo entra nella cronologia come nota e sparisce dalla
+      // conversazione: per l'utente conta la risposta, non il commento a metà lavoro.
       absorbBubble(bubble) {
         if (!bubble || !bubble.isConnected) return;
         const text = (bubble.textContent || '').trim();
@@ -965,9 +900,8 @@
         followBody();
         followThread();
       },
-      // La nota che il main ha promosso a risposta (ultimo giro muto: la frase
-      // scritta insieme alle azioni era la risposta) non resta anche qui: una
-      // frase sola, nella bolla, non due.
+      // La nota che il main ha promosso a risposta non resta anche qui: una frase sola, nella bolla,
+      // non due.
       dropNote(text) {
         const t = String(text || '').trim();
         if (!t) return;
@@ -983,12 +917,9 @@
         lastTurn = { text: '', ms: 0 };
         return t;
       },
-      // Fine di tutto il lavoro: la riga diventa il riassunto; senza niente
-      // dentro, il blocco non ha ragione di restare.
-      // `failed`: il lavoro si è interrotto per un errore. Il blocco resta (il
-      // ragionamento aiuta a capire cosa stava tentando) ma lo dice in riga,
-      // così dopo un «Riprova» non sembra un lavoro riuscito impilato sopra
-      // l'altro.
+      // Fine del lavoro: la riga diventa il riassunto, e senza niente dentro il blocco non ha ragione
+      // di restare. `failed`: il blocco resta (il ragionamento aiuta a capire cosa stava tentando) ma
+      // lo dice in riga, così dopo un «Riprova» non sembra un lavoro riuscito.
       finish({ failed = false } = {}) {
         closeTurnReasoning();
         if (!items) { wrap.remove(); setPhase('done', ''); return; }
@@ -1001,9 +932,8 @@
     };
   }
 
-  // «Ha cercato sul web, impostato una sveglia e letto un documento»: il
-  // riassunto delle azioni, nell'ordine in cui sono avvenute, con i doppioni
-  // contati. Senza azioni resta il solo ragionamento.
+  // Il riassunto delle azioni nell'ordine in cui sono avvenute, coi doppioni contati. Senza
+  // azioni resta il solo ragionamento.
   const ACTIVITY_VERBS = {
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
@@ -1032,8 +962,8 @@
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
   };
-  // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
-  // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
+  // `hasReasoning`: senza, un blocco che contiene solo una frase intermedia non può intitolarsi
+  // «Ragionamento».
   function summarizeActivity(types, hasReasoning = true) {
     const counts = new Map();
     for (const t of types) counts.set(t, (counts.get(t) || 0) + 1);
@@ -1053,10 +983,9 @@
     return s % 60 ? `${m} min ${s % 60} s` : `${m} min`;
   }
 
-  // Riga di attività: la stessa forma sia dentro il blocco del turno sia — per
-  // chi disegna una risposta senza blocco (replay, altre superfici) — fra le
-  // azioni della bolla. Tiene la classe della traccia (#376): non è un bottone
-  // e non deve sembrarlo.
+  // La stessa forma sia dentro il blocco del turno sia fra le azioni della bolla, per chi disegna
+  // una risposta senza blocco. Tiene la classe della traccia (#376): non è un bottone e non deve
+  // sembrarlo.
   function makeActivityRow(rowIcon, text) {
     const el = document.createElement('div');
     el.className = 'dash-action-step dash-activity-row';
@@ -1070,14 +999,12 @@
     return el;
   }
 
-  // Le azioni che si raccontano con una riga (icona + due parole) invece che
-  // con un bottone: sono già eseguite dal main o sono passi intermedi, e
-  // cliccarle non farebbe niente (#376). Una sola tabella, così l'icona di
-  // un'azione sta in un posto solo. Ciò che è cliccabile — un link da aprire,
-  // una conferma da dare, l'esito di un comando — resta un bottone sotto la
-  // risposta e NON passa di qui.
-  // Il testo scritto dal modello prima di finire in una riga: senza caratteri
-  // di controllo (un byte nullo nell'etichetta finiva tale e quale nel diario).
+  // Le azioni che si raccontano con una riga invece che con un bottone: già eseguite dal main o
+  // passi intermedi, cliccarle non farebbe niente (#376). Una sola tabella, così l'icona di
+  // un'azione sta in un posto solo. Ciò che è cliccabile resta un bottone sotto la risposta e NON
+  // passa di qui.
+  // Il testo del modello va ripulito dai caratteri di controllo: un byte nullo nell'etichetta
+  // finiva tale e quale nel diario.
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
@@ -1094,9 +1021,7 @@
       const name = pulito(a.label || a.etichetta);
       return { icon: '⏰', text: `Sveglia impostata${when ? ` · ${when}` : ''}${name ? ` · ${name}` : ''}` };
     },
-    // Il main descrive cosa ha tolto o spostato («Sveglia “lezione” 07:55»):
-    // se si può aggiungere una sveglia dalla chat, si deve vedere anche
-    // quando la si toglie.
+    // Se si può aggiungere una sveglia dalla chat, si deve vedere anche quando la si toglie.
     CANCELLA_SVEGLIA: (a) => {
       const list = (a._output && Array.isArray(a._output.removed)) ? a._output.removed : [];
       return { icon: '⏰', text: `Cancellata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
@@ -1106,8 +1031,8 @@
       return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
     },
     EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
-    // Impostazione applicata subito (livello 1, es. il tema): prima non
-    // lasciava traccia in chat, come se non fosse successo niente.
+    // Impostazione applicata subito (livello 1, es. il tema): prima non lasciava traccia in chat,
+    // come se non fosse successo niente.
     IMPOSTA_PREFERENZA: (a) => {
       const k = a.chiave || a.key || '';
       const v = a.valore ?? a.value;
@@ -1126,8 +1051,8 @@
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
-    // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
-    // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
+    // Le azioni che non lasciano niente da cliccare: prima sparivano del tutto, e l'utente non
+    // sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
       const dove = String(a.contesto || a.context || a.argomento || '').trim();
       return { icon: '📝', text: `Appunto salvato${dove ? ` · ${dove}` : ''}` };
@@ -1165,8 +1090,8 @@
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
   };
-  // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
-  // del diario resta (è successo qualcosa), ma non promette il contrario.
+  // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga resta, ma non
+  // promette il contrario.
   const FAILED_LABELS = {
     TIMER: 'Timer non avviato', SVEGLIA: 'Sveglia non impostata',
     CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
@@ -1183,28 +1108,26 @@
   };
   function activityRowFor(a) {
     if (!a) return null;
-    // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
-    // la traccia che Filo l'ha CHIESTO — se no un turno fatto di sola richiesta
-    // di conferma non lascia nessun blocco, e alla conferma non c'è più dove
-    // scrivere che è stata data.
+    // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta la traccia che Filo
+    // l'ha CHIESTO — o un turno di sola richiesta non lascerebbe nessun blocco, e alla conferma non
+    // ci sarebbe dove scrivere che è stata data.
     if (a._confirm) {
-      // Due parole, non l'intera spiegazione: quella sta nel popup, che è
-      // aperto davanti all'utente proprio in quel momento.
+      // Due parole, non l'intera spiegazione: quella è nel popup, aperto davanti all'utente.
       let prima = String(a._confirm.text || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
       if (prima.length > 60) prima = `${prima.slice(0, 57)}…`;
       return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
     }
     const type = String(a.type || '').toUpperCase();
-    // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
-    // c'è stato (un documento inesistente diceva «Leggo il documento…»).
+    // Non riuscita: la riga lo DICE, invece di raccontare un successo che non c'è stato (un
+    // documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
       const perche = motivoFallimento(a);
       return { icon: '⚠', text: `${FAILED_LABELS[type] || 'Azione non riuscita'}${perche ? ` · ${perche}` : ''}`, failed: true };
     }
     const fn = ACTIVITY_ROWS[type];
     if (fn) return fn(a);
-    // Azione eseguita di cui la tabella non sa niente: meglio una riga generica
-    // che il silenzio — il diario deve dire tutto quello che Filo ha fatto.
+    // Azione eseguita che la tabella non conosce: meglio una riga generica che il silenzio — il
+    // diario deve dire tutto quello che Filo ha fatto.
     if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
     return null;
   }
@@ -1220,15 +1143,13 @@
     return '';
   }
 
-  // Una riga o un esito di comando nel blocco di attività, per un'azione già
-  // eseguita dal main. Ritorna true se l'azione è stata raccontata così (e
-  // quindi non è un bottone). Serve sia in diretta (evento 'done' mentre il
-  // turno lavora) sia a fine turno per le azioni arrivate senza evento.
+  // Ritorna true se l'azione è stata raccontata così (e quindi non è un bottone). Serve sia in
+  // diretta sia a fine turno per le azioni arrivate senza evento.
   function tellActionInActivity(activity, a) {
     if (!activity || !a) return false;
-    // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e
-    // va nella cronologia del blocco, non sotto la risposta. Se è stato
-    // bloccato (terminale spento) resta in vista: è un problema da leggere.
+    // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e va nella cronologia,
+    // non sotto la risposta. Se è stato bloccato (terminale spento) resta in vista: è un problema
+    // da leggere.
     if (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
       activity.addCommand(a._output);
       return true;
@@ -1238,18 +1159,13 @@
     return false;
   }
 
-  // Le azioni che hanno SIA una riga nel diario SIA un bottone che porta
-  // altrove: l'appunto salvato dice cosa ha scritto Filo (riga) e apre il
-  // posto dove l'ha scritto (bottone). Per tutte le altre vale l'aut-aut: o si
-  // racconta o si clicca.
-  // Sono le sole due che hanno un bottone che PORTA DA QUALCHE PARTE: l'editor
-  // dove l'appunto è finito, e il controllo per scegliere la tinta esatta.
-  // Aggiungerne una qui è obbligatorio quando le si dà una riga: senza, la riga
-  // si mangia il bottone e la funzione sparisce dalla chat.
+  // Le azioni che hanno SIA una riga nel diario SIA un bottone che porta altrove: l'appunto
+  // salvato (riga che dice cosa ha scritto, bottone che apre l'editor) e la tinta esatta. Per
+  // tutte le altre vale l'aut-aut: o si racconta o si clicca. Aggiungerne una qui è obbligatorio
+  // quando le si dà una riga: senza, la riga si mangia il bottone e la funzione sparisce.
   const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
 
-  // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
-  // attività (evento 'done'): a fine turno non si ripetono.
+  // `shown`: gli id delle chiamate già raccontate in diretta; a fine turno non si ripetono.
   function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
     if (!actions || !actions.length) return;
     const wrap = document.createElement('div');
@@ -1257,10 +1173,8 @@
     let hasAck = false;
     for (const a of actions) {
       const told = a && a._callId && shown && shown.has(a._callId);
-      // `anche` = ha la riga nel diario E il bottone in chat. Oltre all'appunto
-      // (riga che racconta, bottone che porta all'editor) vale per tutto ciò
-      // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
-      // bottone è come si risponde.
+      // `anche` = ha la riga nel diario E il bottone in chat. Oltre all'appunto vale per tutto ciò
+      // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il bottone è come si risponde.
       const anche = a._confirm
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false);
       if (activity) {
@@ -1277,20 +1191,17 @@
           if (!anche) continue;
         }
       }
-      // Un'azione senza niente da cliccare (`_traccia`) o non riuscita non
-      // diventa MAI un bottone: un chip che al click non fa niente è un vicolo
-      // cieco (era il caso di un link con un indirizzo non ammesso). La sua
-      // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
-      // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
+      // Un'azione senza niente da cliccare (`_traccia`) o non riuscita non diventa MAI un bottone: un
+      // chip che al click non fa niente è un vicolo cieco. La sua riga sta già nel diario. Un'azione
+      // IN ATTESA DI CONFERMA non è «fallita»: il suo bottone è tutto il punto.
       if (!a._confirm && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
     }
     if (!wrap.childElementCount && !(hasAck && onAck)) return;
-    // Per l'appunto salvato (già eseguito server-side) aggiungiamo un tasto ✓
-    // che torna alla dashboard (spec). Timer e sveglie non lo hanno più: la
-    // loro riga nel blocco di attività dice già tutto.
+    // Per l'appunto salvato un tasto ✓ che torna alla dashboard (spec). Timer e sveglie non lo
+    // hanno più: la loro riga nel blocco dice già tutto.
     if (hasAck && onAck) {
       const ok = document.createElement('button');
       ok.type = 'button';
@@ -1301,13 +1212,10 @@
       wrap.appendChild(ok);
     }
     container.appendChild(wrap);
-    // #159/#183 — le modifiche alle impostazioni di livello 2 NON sono chip
-    // inerti da cliccare: il popup di conferma (che spiega cosa Filo sta per
-    // fare e i rischi) si apre DA SOLO. Se nella stessa risposta ci sono più
-    // impostazioni sensibili, i popup si aprono UNO ALLA VOLTA — niente
-    // stacking di modali: aspettiamo che l'utente chiuda l'uno prima di aprire
-    // il successivo. Le azioni distruttive (livello 3) o esterne (feedback)
-    // restano a click esplicito (non marcate data-auto-confirm).
+    // #159/#183 — le impostazioni di livello 2 non sono chip inerti: il popup di conferma si apre
+    // DA SOLO, e con più impostazioni sensibili nella stessa risposta i popup si aprono UNO ALLA
+    // VOLTA (niente stacking di modali). Le azioni distruttive (livello 3) o esterne restano a
+    // click esplicito.
     if (autoConfirm) {
       const autos = Array.from(wrap.querySelectorAll('[data-auto-confirm="1"]'));
       if (autos.length) {
@@ -1320,12 +1228,9 @@
     }
   }
 
-  // #146.4 — bottone di raffinamento estetico. Filo ha già applicato un valore
-  // ragionevole al token (IMPOSTA_ESTETICA, livello 1); questo bottone apre il
-  // box (color picker / slider, secondo il tipo del token) per scegliere il
-  // valore esatto, con anteprima live e persistenza. La logica del box vive nel
-  // modulo condiviso SN_AESTHETIC_REFINER; qui colleghiamo solo le dipendenze
-  // (applica live = pageBootstrap; persisti = UPDATE_SETTINGS debounced).
+  // #146.4 — Filo ha già applicato un valore ragionevole al token (livello 1); questo bottone
+  // apre il box per scegliere il valore esatto, con anteprima live e persistenza. La logica sta
+  // in SN_AESTHETIC_REFINER; qui solo le dipendenze.
   function buildAestheticRefiner(a) {
     const R = window.SN_AESTHETIC_REFINER;
     const Tokens = window.SN_THEME_TOKENS;
@@ -1341,8 +1246,8 @@
       try { window.SN_PAGE_BOOTSTRAP.applyThemeTokens(overrides); } catch (_) {}
     };
     const resolveTheme = () => (document.documentElement.dataset.snTheme === 'dark' ? 'dark' : 'light');
-    // Risolve le dipendenze al click, leggendo gli override più freschi dallo
-    // storage (Filo potrebbe averne cambiati altri nel frattempo).
+    // Risolve le dipendenze al click, leggendo gli override più freschi (Filo potrebbe averne
+    // cambiati altri nel frattempo).
     const resolve = async () => {
       let overrides = {};
       try {
@@ -1354,9 +1259,8 @@
     return R.buildButton(a, { Tokens, resolve });
   }
 
-  // Esito di un comando da terminale mostrato in chat (#146.6): la riga di
-  // comando + stdout/stderr in monospazio, con note per uscita/timeout/
-  // troncamento, o l'avviso "modalità terminale disattivata".
+  // Esito di un comando da terminale in chat (#146.6): riga di comando + stdout/stderr in
+  // monospazio, con note per uscita/timeout/troncamento.
   function renderCommandResult(out) {
     const wrap = document.createElement('div');
     wrap.className = 'dash-cmd-result';
@@ -1383,10 +1287,8 @@
       pre.textContent = body;
       wrap.appendChild(pre);
     } else {
-      // Comando senza output (tipicamente un `cd`): non lasciare una scatola
-      // vuota e invisibile — mostra SEMPRE una risposta. Per i cambi di
-      // cartella diciamo dove sei finito ("sei in <percorso>"); per gli altri
-      // comandi muti un neutro "(nessun output)".
+      // Comando senza output (tipicamente un `cd`): non lasciare una scatola vuota e invisibile —
+      // per i cambi di cartella si dice dove si è finiti, per gli altri un neutro «(nessun output)».
       const empty = document.createElement('pre');
       empty.className = 'dash-cmd-output dash-cmd-output-empty';
       const isCd = /^\s*(cd|chdir)\b/i.test(out.command || '');
@@ -1406,11 +1308,9 @@
     return wrap;
   }
 
-  // #376 — traccia di un PASSO INTERMEDIO (cerco sul web, leggo un file,
-  // verifico cosa so fare). Racconta cosa sta facendo Filo, ma non è un bottone:
-  // niente pill né bordo, così l'unica cosa cliccabile nella conversazione resta
-  // il risultato vero (il link aperto). Prima queste tracce avevano la stessa
-  // forma dei bottoni e l'utente ne contava due per una singola azione.
+  // #376 — traccia di un PASSO INTERMEDIO: racconta cosa sta facendo Filo ma non è un bottone,
+  // così l'unica cosa cliccabile resta il risultato vero. Prima avevano la stessa forma dei
+  // bottoni e l'utente ne contava due per una singola azione.
   function stepTrace(text) {
     const el = document.createElement('div');
     el.className = 'dash-action-step';
@@ -1420,45 +1320,36 @@
 
   function renderActionButton(a, { onAck, activity = null } = {}) {
     const type = String(a.type || '').toUpperCase();
-    // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
-    // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
-    // popup OK/Annulla (2) o il box "digita conferma" (3); solo dopo il sì
-    // dell'utente l'azione parte davvero via MSG.FILO_CONFIRM_ACTION.
-    // PULISCI_TAB e CANCELLA_ARCHIVIO non passano di qui: hanno la loro UI.
+    // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita e ha allegato
+    // spiegazione + livello. Il bottone apre il popup OK/Annulla (2) o il box «digita conferma»
+    // (3); solo dopo il sì parte via MSG.FILO_CONFIRM_ACTION. PULISCI_TAB e CANCELLA_ARCHIVIO
+    // hanno la loro UI.
     if (a._confirm && a._confirm.level >= 2) {
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.type = 'button';
-      // Per i comandi (#146.6) l'etichetta è il comando stesso, conciso; la
-      // spiegazione completa resta nel popup di conferma (a._confirm.text).
+      // Per i comandi l'etichetta è il comando stesso; la spiegazione completa resta nel popup.
       const cmdText = String(a.comando || a.command || a.cmd || '').trim();
       const isCmd = type === 'ESEGUI_COMANDO';
       const short = cmdText.length > 60 ? `${cmdText.slice(0, 57)}…` : cmdText;
-      // Il testo completo (cosa fa + rischi, #183) vive nel popup. Sul bottone —
-      // che resta solo come ripiego se l'utente annulla — basta la prima riga.
+      // Il testo completo (cosa fa + rischi, #183) vive nel popup: sul bottone, che resta solo come
+      // ripiego se l'utente annulla, basta la prima riga.
       const fullText = String(a._confirm.text || '');
-      // I due punti finali annunciano il testo che segue nel popup ("…a tuo
-      // nome:"): sul bottone, dove quel testo non c'è, restano appesi nel vuoto.
+      // I due punti finali annunciano il testo che segue nel popup: sul bottone, dove quel testo non
+      // c'è, restano appesi nel vuoto.
       const shortLabel = (fullText.split('\n')[0] || 'Esegui').replace(/\s*:\s*$/, '');
       btn.textContent = isCmd ? `▶ ${short}` : shortLabel;
-      // #159/#414 — le azioni di livello 2 che Filo PROPONE da sé aprono il
-      // popup di conferma da sole: marchiamo il bottone perché renderActions lo
-      // possa aprire automaticamente. Oltre alle impostazioni (preferenza/
-      // estetica) c'è la segnalazione agli sviluppatori: è Filo a proporla dopo
-      // aver ammesso una mancanza, quindi lasciarla come chip da cliccare
-      // aggiungeva un passaggio in più prima ancora di poter leggere cosa
-      // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
-      // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
-      // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
+      // #159/#414 — le azioni di livello 2 che Filo PROPONE da sé aprono il popup da sole. Oltre alle
+      // impostazioni c'è la segnalazione agli sviluppatori: lasciarla come chip aggiungeva un
+      // passaggio prima ancora di poter leggere cosa partirebbe a nome dell'utente. Il popup non
+      // invia nulla: mostra il testo e aspetta l'OK. Livello 3 e comandi restano a click esplicito.
       const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK'];
       if (AUTO_CONFIRM_TYPES.includes(type) && a._confirm.level === 2) {
         btn.dataset.autoConfirm = '1';
       }
-      // La conferma (popup + esecuzione) è una funzione a sé, così renderActions
-      // può aprirla DA SOLA — anche in sequenza quando ci sono più azioni di
-      // livello 2 nella stessa risposta (#183) — oltre che al click manuale.
-      // Ritorna una Promise che si risolve quando il popup è chiuso, perché
-      // l'auto-apertura sequenziale possa attendere l'una prima della successiva.
+      // La conferma (popup + esecuzione) è una funzione a sé, così renderActions può aprirla DA SOLA,
+      // anche in sequenza con più azioni di livello 2 (#183). Ritorna una Promise che si risolve alla
+      // chiusura del popup, perché l'auto-apertura possa attendere l'una prima dell'altra.
       async function runConfirm() {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
@@ -1469,11 +1360,9 @@
         if (!ok) return;
         btn.disabled = true;
         const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a });
-        // L'utente ha detto sì: da qui in poi l'azione è FATTA. Lo deve sapere
-        // il diario (una riga come per le azioni di livello 1) e lo deve sapere
-        // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
-        // storico della conversazione, quindi basta segnarlo qui. Senza,
-        // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
+        // L'utente ha detto sì: da qui l'azione è FATTA. Lo deve sapere il diario e lo deve sapere il
+        // MODELLO al turno dopo — l'oggetto è lo stesso che sta nello storico, quindi basta segnarlo
+        // qui. Senza, a «l'hai attivato?» il modello poteva solo tirare a indovinare.
         if (r && r.executed) {
           a._confirmed = true;
           a._executed = true;
@@ -1490,8 +1379,7 @@
           return;
         }
         btn.textContent = (r && r.executed) ? `✓ ${shortLabel}` : '✗ Non eseguita';
-        // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
-        // applicata, offriamo subito il box per correggere il valore.
+        // #146.4 — modifica estetica illeggibile confermata: si offre subito il box per correggere.
         if (r && r.executed && type === 'IMPOSTA_ESTETICA') {
           const refiner = buildAestheticRefiner(a);
           if (refiner) btn.after(refiner);
@@ -1512,17 +1400,14 @@
       return buildAestheticRefiner(a);
     }
     if (type === 'NAVIGA') {
-      // #162 — il link è già stato aperto direttamente dal main (executeFiloAction
-      // apre la scheda). Questo chip resta come riferimento per RIAPRIRLO, ma deve
-      // SEMPRE avere un'etichetta leggibile: il favicon da solo, senza testo, era
-      // il bottone "misterioso" del feedback. Mostriamo favicon + nome del sito.
+      // #162 — il link l'ha già aperto il main. Il chip resta come riferimento per RIAPRIRLO, ma deve
+      // SEMPRE avere un'etichetta leggibile: il favicon da solo era il bottone «misterioso».
       let label = String(a.label || a.etichetta || '').trim();
       if (!label) {
         try { label = new URL(a.url).hostname.replace(/^www\./, ''); } catch (_) { label = a.url || 'Apri'; }
       }
-      // #376 — aperto in SECONDO PIANO: la scheda esiste già e sta suonando
-      // dietro. Il chip allora non è più "riapri" ma "portami lì": attiva
-      // QUELLA scheda invece di aprirne un doppione sullo stesso indirizzo.
+      // #376 — aperto in SECONDO PIANO: la scheda esiste già. Il chip non è «riapri» ma «portami lì»:
+      // attiva QUELLA scheda invece di aprire un doppione.
       const bgTabId = (a._output && a._output.background && a._output.tabId) || '';
       const btn = document.createElement(bgTabId ? 'button' : 'a');
       if (bgTabId) {
@@ -1579,11 +1464,9 @@
       return btn;
     }
     if (type === 'SALVA_APPUNTO') {
-      // Ora che gli appunti vivono SOLO nei file dell'editor, la conferma non
-      // può restare un chip inerte: sarebbe un vicolo cieco (l'utente sa che
-      // Filo ha scritto, ma non ha da dove andare a leggere). Il chip resta la
-      // ricevuta dell'azione — già eseguita — e in più apre l'editor, cioè il
-      // posto dove l'appunto è finito.
+      // Gli appunti vivono SOLO nei file dell'editor, quindi la conferma non può restare un chip
+      // inerte: sarebbe un vicolo cieco. Resta la ricevuta dell'azione e in più apre l'editor, dove
+      // l'appunto è finito.
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
       btn.type = 'button';
@@ -1602,11 +1485,9 @@
       return btn;
     }
     if (type === 'CERCA_WEB') {
-      // Traccia del passo intermedio: rende trasparente che Filo sta cercando sul
-      // web (#368). La ricerca è già partita nel main e i risultati rientrano nel
-      // turno successivo (auto-continue), dove compare la risposta con i link
-      // REALI. NON è un bottone: prima aveva la forma di una pill e l'utente si
-      // ritrovava "due bottoni" per una cosa sola (#376).
+      // Traccia del passo intermedio (#368): la ricerca è già partita nel main e i risultati rientrano
+      // nel turno successivo, coi link REALI. NON è un bottone: prima aveva la forma di una pill e
+      // l'utente si ritrovava «due bottoni» per una cosa sola (#376).
       return stepTrace(`🔎 Cerco sul web: ${a.query || ''}`.trim());
     }
     if (type === 'CAPACITA_DETTAGLIO') {
@@ -1615,16 +1496,14 @@
       return stepTrace('📖 Verifico cosa so fare');
     }
     if (type === 'LEGGI_FILE') {
-      // Traccia del passo intermedio: Filo apre un file dell'editor per leggerlo
-      // per intero (#379.5). Il contenuto rientra nel turno successivo
-      // (auto-continue), dove compare la risposta.
+      // Traccia del passo intermedio: Filo legge un file dell'editor (#379.5); il contenuto rientra
+      // nel turno successivo.
       const title = (a._output && a._output.title) || '';
       return stepTrace(title ? `📄 Leggo: ${title}` : '📄 Leggo un file');
     }
     if (type === 'LEGGI_DOCUMENTO') {
-      // Traccia del passo intermedio: Filo apre un documento dal disco (un PDF,
-      // un file di testo). Il contenuto rientra nel turno successivo
-      // (auto-continue), dove compare la risposta.
+      // Traccia del passo intermedio: Filo apre un documento dal disco; il contenuto rientra nel
+      // turno successivo.
       const nome = (a._output && a._output.name) || '';
       return stepTrace(nome ? `📄 Leggo il documento: ${nome}` : '📄 Leggo il documento');
     }
@@ -1731,17 +1610,15 @@
     return panel;
   }
 
-  // ===== Invio messaggio =====
-  // Il ciclo «azione → esito → modello» vive nel main (tool calling nativo):
-  // cerca, legge, imposta e risponde in un turno solo, e la scheda riceve
-  // ragionamento, azioni e note mano a mano. Qui non ci sono più rilanci
-  // automatici con messaggi di spinta: la scheda mostra quello che arriva.
+  // Invio messaggio. Il ciclo «azione → esito → modello» vive nel main (tool calling nativo):
+  // cerca, legge, imposta e risponde in un turno solo, e la scheda riceve ragionamento, azioni e
+  // note mano a mano. Niente più rilanci automatici: la scheda mostra quello che arriva.
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
   }
-  // Cosa dire in riga appena il modello NOMINA un'azione, prima ancora che
-  // gli argomenti siano arrivati: l'attesa è attrito, e «Cerco sul web…» un
-  // secondo prima vale più di un'etichetta precisa un secondo dopo.
+  // Cosa dire in riga appena il modello NOMINA un'azione, prima che arrivino gli argomenti:
+  // l'attesa è attrito, e «Cerco sul web…» un secondo prima vale più di un'etichetta precisa un
+  // secondo dopo.
   const START_LABELS = {
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
@@ -1763,17 +1640,13 @@
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
   }
 
-  // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
-  // FILO_CHAT, render della bolla di Filo con le sue azioni e registrazione del
-  // turno nello storico. Ritorna la risposta grezza per decidere se proseguire.
-  // `internal: true` per i turni di prosecuzione automatica: il "messaggio
-  // utente" è un nudge scritto da noi, non una richiesta reale. Il main lo usa
-  // per non trattarlo come parole dell'utente (#360: una segnalazione proposta
-  // da Filo non deve citare un nudge interno).
-  // La conversazione da mandare al modello, senza il messaggio che parte ora.
-  // Toglie l'ultima voce SOLO se è davvero quel messaggio: dopo un tentativo
-  // interrotto in fondo c'è la traccia di cosa Filo aveva già fatto, e quella
-  // deve arrivare al modello.
+  // Un singolo turno del modello: bolla «sta pensando» + reasoning live, FILO_CHAT, render della
+  // bolla di Filo e registrazione nello storico. Ritorna la risposta grezza.
+  // `internal: true` per i turni di prosecuzione automatica: il «messaggio utente» è un nudge
+  // scritto da noi, e il main non deve trattarlo come parole dell'utente (#360).
+  // La conversazione mandata al modello toglie l'ultima voce SOLO se è davvero il messaggio che
+  // parte ora: dopo un tentativo interrotto in fondo c'è la traccia di cosa Filo aveva già fatto,
+  // e quella deve arrivare al modello.
   function historyWithout(userMessage) {
     const h = threadHistory.slice();
     const last = h[h.length - 1];
@@ -1782,14 +1655,11 @@
   }
 
   async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
-    // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
-    // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
+    // Il blocco di attività (#521) lo crea e lo chiude runTurnAndContinue; qui ci si scrive dentro.
     const pending = activity || createActivity();
     const ownsActivity = !activity;
-    // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
-    // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
-    // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
-    // il blocco resta in attesa finché non parte il testo.
+    // Canale per il reasoning VERO in diretta: sottoscrizione filtrata per reqId che il main usa per
+    // pushare i thought summary mentre genera. Se il modello non ragiona non arriva nulla.
     const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let offReasoning = null;
     if (window.filo?.onReasoning) {
@@ -1797,13 +1667,10 @@
         if (data && data.reqId === reasoningReqId && data.text) pending.pushReasoning(data.text);
       });
     }
-    // #420 — RISPOSTA in diretta: la bolla di Filo si riempie mentre il modello
-    // scrive, invece di comparire tutta insieme a fine turno. Il main estrae il
-    // campo "text" dal JSON di risposta e ci pusha i delta (o un reset dopo un
-    // fallback provider). La bolla NON si crea finché non arriva il PRIMO
-    // carattere: una risposta di sola azione (apri un link, testo vuoto) non
-    // lascia una bolla vuota che poi si riempie. Quando il testo inizia, il
-    // ragionamento si richiude da solo (resta apribile): i due non si accavallano.
+    // #420 — RISPOSTA in diretta: la bolla si riempie mentre il modello scrive. La bolla NON si
+    // crea finché non arriva il PRIMO carattere: una risposta di sola azione non lascia una bolla
+    // vuota che poi si riempie. Quando il testo inizia il ragionamento si richiude da solo (resta
+    // apribile): i due non si accavallano.
     let streamBubble = null;
     let streamedText = '';
     const followBottomIfNear = () => {
@@ -1832,12 +1699,10 @@
         followBottomIfNear();
       });
     }
-    // Le AZIONI in diretta (tool calling nativo): il modello ne nomina una →
-    // la riga in testa lo dice subito; il main la esegue → la riga vera entra
-    // nel blocco con l'esito; un giro con azioni si chiude → il testo scritto
-    // in quel giro era una nota di lavoro, non la risposta: finisce nel blocco
-    // e la bolla riparte vuota per il giro dopo. Gli id delle chiamate già
-    // raccontate qui non si ripetono a fine turno (renderActions).
+    // Le AZIONI in diretta (tool calling nativo): il modello ne nomina una → la riga in testa lo
+    // dice subito; il main la esegue → la riga vera entra nel blocco con l'esito; un giro con azioni
+    // si chiude → il testo di quel giro era una nota di lavoro, non la risposta, e la bolla riparte
+    // vuota. Gli id già raccontati qui non si ripetono a fine turno.
     const shown = new Set();
     let offAction = null;
     if (window.filo?.onAction) {
@@ -1860,10 +1725,9 @@
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage,
-      // Tutta la conversazione TRANNE il messaggio che stiamo mandando adesso
-      // (viaggia a parte, in `userMessage`). Non «l'ultima voce e basta»: dopo
-      // un turno interrotto in fondo c'è quello che Filo aveva già fatto, e
-      // buttarlo via faceva ripartire il «Riprova» senza saperlo.
+      // Tutta la conversazione TRANNE il messaggio che parte adesso. Non «l'ultima voce e basta»:
+      // dopo un turno interrotto in fondo c'è quello che Filo aveva già fatto, e buttarlo faceva
+      // ripartire il «Riprova» senza saperlo.
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
@@ -1878,13 +1742,12 @@
     if (offAnswer) { try { offAnswer(); } catch (_) {} }
     if (offAction) { try { offAction(); } catch (_) {} }
     if (!r?.ok) {
-      // Il ragionamento già arrivato resta leggibile anche sotto un errore:
-      // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
+      // Il ragionamento già arrivato resta leggibile anche sotto un errore: aiuta a capire cosa stava
+      // tentando. Senza niente dentro, il blocco sparisce.
       pending.endTurn();
       if (ownsActivity) pending.finish();
-      // Le azioni fatte PRIMA del guasto sono successe davvero: restano nello
-      // storico, così un «Riprova» riparte sapendo che quel timer c'è già
-      // invece di avviarne un secondo.
+      // Le azioni fatte PRIMA del guasto sono successe davvero: restano nello storico, così un
+      // «Riprova» riparte sapendo che quel timer c'è già invece di avviarne un secondo.
       if (Array.isArray(r?.actions) && r.actions.length) {
         threadHistory.push({ role: 'filo', text: '', actions: r.actions, interrotto: true });
       }
@@ -1892,9 +1755,8 @@
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
       const err = makeBubble({ role: 'filo', text: r?.error || 'Errore.' });
-      // #360 — la bolla d'errore dice "riprova": darglielo da fare a mano
-      // (riscrivere la domanda) è attrito inutile. Il tasto rimanda LO STESSO
-      // messaggio, come il "Riprova" della pagina d'errore di una scheda.
+      // #360 — la bolla d'errore dice «riprova»: farlo riscrivere a mano è attrito inutile. Il tasto
+      // rimanda LO STESSO messaggio.
       const row = document.createElement('div');
       row.className = 'dash-bubble-actions';
       const retry = document.createElement('button');
@@ -1915,18 +1777,15 @@
         credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
         row.appendChild(credits);
       }
-      // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
-      // modello non risponde (rete assente, provider giù, crediti finiti) alla
-      // home non ci si arriva più. L'uscita sta qui, accanto, dove l'utente
-      // guarda.
+      // #524 — durante l'accoglienza il solo «Riprova» è un vicolo cieco: se il modello non risponde,
+      // alla home non ci si arriva più. L'uscita sta qui accanto, dove l'utente guarda.
       if (onboardingActive) row.appendChild(makeSkipOnboardingBtn('Salta e vai alla home'));
       err.appendChild(row);
       bubblesEl.appendChild(err);
     } else {
-      // La risposta finale (r.text) è autorevole: riconcilia la bolla in
-      // streaming con essa (recupera l'eventuale coda non ancora emessa). Se non
-      // c'è testo ma ci sono azioni, la bolla in streaming non esiste (non è mai
-      // arrivato un delta) e cadiamo nel ramo "solo azioni" come prima.
+      // La risposta finale (r.text) è autorevole: riconcilia la bolla in streaming (recupera la coda
+      // non ancora emessa). Senza testo ma con azioni la bolla non esiste e si cade nel ramo «solo
+      // azioni».
       let filoBubble;
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
@@ -1948,19 +1807,17 @@
         filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true });
         bubblesEl.appendChild(filoBubble);
       }
-      // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
-      // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
-      // replay storico.
+      // #159 — risposta fresca: le impostazioni di livello 2 aprono il popup da sole. Solo qui, mai
+      // in replay storico.
       renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending, shown });
       // Un turno di sole azioni raccontate nel blocco (un timer avviato, e
       // niente da dire) non lascia una bolla vuota sotto.
       if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
         filoBubble.remove();
       }
-      // Il ragionamento del turno entra nello storico del thread insieme al
-      // messaggio. Il testo resta con la conversazione; i blocchi strutturati
-      // del fornitore (reasoningDetails) tornano al modello al turno dopo,
-      // così riprende da dove aveva lasciato.
+      // Il ragionamento del turno entra nello storico col messaggio. Il testo resta con la
+      // conversazione; i blocchi strutturati del fornitore tornano al modello al turno dopo, così
+      // riprende da dove aveva lasciato.
       const turn = pending.endTurn();
       if (ownsActivity) pending.finish();
       const entry = { role: 'filo', text: r.text || '', actions: r.actions || [] };
@@ -1989,7 +1846,6 @@
     // Prima query dalla home → entra in stato thread.
     if (body.dataset.state !== 'thread') goThread();
 
-    // Bolla utente
     threadHistory.push({ role: 'user', text: text || '(immagine)' });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
@@ -2005,15 +1861,14 @@
     await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend });
   }
 
-  // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
-  // di invio. Condiviso tra il primo invio e il "Riprova" della bolla d'errore:
-  // riprovare deve comportarsi ESATTAMENTE come inviare.
+  // Condiviso tra il primo invio e il «Riprova»: riprovare deve comportarsi ESATTAMENTE come
+  // inviare.
   async function runTurnAndContinue(args) {
-    // Un blocco di attività per tutta la sequenza (#521): i turni automatici
-    // sono passi dello stesso lavoro, non risposte diverse.
+    // Un blocco di attività per tutta la sequenza (#521): i turni automatici sono passi dello stesso
+    // lavoro, non risposte diverse.
     const activity = createActivity();
-    // Un turno solo: la sequenza «azione → esito → modello» la guida il main,
-    // e la scheda la racconta in diretta dentro il blocco (runFiloTurn).
+    // Un turno solo: la sequenza «azione → esito → modello» la guida il main, e la scheda la
+    // racconta in diretta dentro il blocco.
     const r = await runFiloTurn({ ...args, activity });
     activity.finish({ failed: !r?.ok });
 
@@ -2021,9 +1876,8 @@
     sendBtn.disabled = false;
     inputEl.focus();
 
-    // #524 — l'intervista di benvenuto si è appena chiusa: il main sta
-    // compattando quello che ha imparato e generando la prima home. Lo diciamo
-    // subito, la home arriva con FILO_ONBOARDING_DONE.
+    // #524 — l'intervista si è chiusa: il main sta compattando quello che ha imparato e generando
+    // la prima home. Lo si dice subito; la home arriva con FILO_ONBOARDING_DONE.
     if (r?.ok && r.onboardingClosed) onboardingClosing();
 
     // Aggiorna live (potrebbe esserci un timer/sveglia appena creato).
@@ -2031,9 +1885,8 @@
     return r;
   }
 
-  // #360 — "Riprova" dalla bolla d'errore: rimanda lo stesso messaggio senza
-  // farlo riscrivere. La bolla d'errore sparisce (il tentativo è ricominciato) e
-  // lo storico è già a posto: un turno fallito non ci ha lasciato niente dentro.
+  // #360 — «Riprova»: rimanda lo stesso messaggio senza farlo riscrivere. La bolla d'errore
+  // sparisce e lo storico è già a posto: un turno fallito non ci ha lasciato niente dentro.
   async function retryTurn(errBubble, args) {
     if (sending) return;
     sending = true;
@@ -2042,7 +1895,7 @@
     await runTurnAndContinue(args);
   }
 
-  // ===== Image paste / drop (multi-immagine) =====
+  // Image paste / drop (multi-immagine)
   const imgPreviewsEl = $('imgPreviews');
 
   function renderImagePreviews() {
@@ -2051,8 +1904,7 @@
     pendingImages.forEach((dataUrl, idx) => {
       const wrap = document.createElement('div');
       wrap.className = 'dash-img-preview';
-      // Retrocompatibilità: la prima anteprima conserva l'id storico #imgPreview
-      // (usato dall'implementazione mono-immagine precedente e dai test esistenti).
+      // Retrocompatibilità: la prima anteprima conserva l'id storico #imgPreview (usato dai test).
       if (idx === 0) wrap.id = 'imgPreview';
       const img = document.createElement('img');
       img.src = dataUrl;
@@ -2100,9 +1952,8 @@
     }
     if (found) e.preventDefault();
   });
-  // Accetta immagini incollate da "Incolla → cronologia" del menu Filo
-  // (Ctrl+V passa dal listener 'paste' qui sopra; il menu invece dispatcha
-  // questo evento custom — vedi pasteHistoryEntry in content.js).
+  // Accetta immagini incollate da «Incolla → cronologia» del menu Filo: Ctrl+V passa dal listener
+  // 'paste' qui sopra, il menu dispatcha invece questo evento custom.
   inputForm.addEventListener('filo:paste-image', (e) => {
     if (e.detail?.blob) {
       e.preventDefault();
@@ -2116,7 +1967,7 @@
     if (files) for (const f of files) handleImageFile(f);
   });
 
-  // ===== Lightbox: click su un'immagine per ingrandirla =====
+  // Lightbox: click su un'immagine per ingrandirla
   let lightboxEl = null;
   function ensureLightbox() {
     if (lightboxEl) return lightboxEl;
@@ -2155,8 +2006,7 @@
     }
   });
 
-  // Vero se l'account loggato è l'owner (admin): abilita i comandi /users e
-  // /gift in /help. Il gate forte resta nel main (auth.isAdmin) + Firestore rules.
+  // Owner (admin): abilita /users e /gift in /help. Il gate forte resta nel main e nelle rules.
   let isOwner = false;
 
   const SLASH_COMMANDS = {
@@ -2170,10 +2020,9 @@
     '/sicurezza': () => { send({ type: MSG.OPEN_URL, url: 'filo://security/security.html' }); },
     '/preferenze': () => { send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html' }); },
     '/editor': () => { send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }); },
-    // #583 — apre la POSTA delle segnalazioni, che legge solo chi le gestisce:
-    // a chiunque altro darebbe una pagina vuota. Chi vuole MANDARE un feedback
-    // lo fa dal menu del tasto destro → "Invia feedback", oppure chiedendolo a
-    // Filo in chat, e quella strada non cambia.
+    // #583 — apre la POSTA delle segnalazioni, che legge solo chi le gestisce: a chiunque altro
+    // darebbe una pagina vuota. Chi vuole MANDARE un feedback lo fa dal tasto destro o chiedendolo
+    // a Filo, e quella strada non cambia.
     '/feedback': () => {
       if (!isOwner) {
         showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.');
@@ -2219,8 +2068,8 @@
     },
   };
 
-  // "/users": elenca le email degli utenti registrati. Riservato al proprietario
-  // (il main rifiuta i non-admin con un messaggio chiaro).
+  // «/users»: elenca le email degli utenti. Riservato al proprietario (il main rifiuta gli altri
+  // con un messaggio chiaro).
   async function handleUsersCommand() {
     showFiloLine('Recupero gli utenti registrati…');
     const r = await send({ type: MSG.OWNER_LIST_USERS });
@@ -2247,8 +2096,7 @@
     showFiloLine(`✓ Regalati ${r.amount} crediti a ${r.email}. Nuovo saldo del destinatario: ${r.balance}.`);
   }
 
-  // Mostra una riga di risposta da Filo nel thread (usata dai comandi che
-  // hanno bisogno di dire qualcosa: es. l'uso corretto di /set timer).
+  // Una riga di risposta da Filo nel thread, per i comandi che hanno bisogno di dire qualcosa.
   function showFiloLine(text) {
     if (body.dataset.state !== 'thread') goThread();
     const bubble = makeBubble({ role: 'filo', text });
@@ -2256,9 +2104,8 @@
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
-  // "/pulisci" (o "/pulizia"): avvia il riordino/archiviazione delle schede non
-  // più utili, con la STESSA conferma del bottone "🧹 Riordina e archivia le
-  // schede" (mai automatico, spec §2.1). Riusa il popup Filo SN_CONFIRM_UI.
+  // «/pulisci»: la STESSA conferma del bottone «Riordina e archivia le schede» (mai automatico,
+  // spec §2.1), col popup Filo SN_CONFIRM_UI.
   async function runTabCleanup() {
     const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
       + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
@@ -2274,11 +2121,9 @@
       : '✓ Nessuna scheda da archiviare.');
   }
 
-  // "/riordina": riordina la striscia delle schede per colore, esattamente come
-  // succede alla riapertura di Filo, ma SENZA chiudere/archiviare nulla (a
-  // differenza di /pulisci). Immediato: è deterministico e non tocca i contenuti,
-  // quindi niente popup di conferma — l'utente può sempre rifarlo o riaprire una
-  // scheda. Diamo comunque un feedback esplicito (spec: ogni azione ha un esito).
+  // «/riordina»: riordina la striscia delle schede per colore, come alla riapertura di Filo, ma
+  // SENZA chiudere o archiviare nulla. Immediato: è deterministico e non tocca i contenuti, quindi
+  // niente popup — ma un feedback esplicito sì (spec: ogni azione ha un esito).
   async function runTabReorder() {
     const r = await send({ type: MSG.REORDER_TABS });
     showFiloLine(r && r.reordered
@@ -2286,17 +2131,15 @@
       : '✓ Le schede erano già in ordine.');
   }
 
-  // Converte l'argomento di "/set timer" in secondi.
-  //   "5:00" → 5 minuti 0 secondi → 300 ; "8" → 8 minuti → 480.
-  // Ritorna null se non è una durata valida.
+  // «5:00» → 300 ; «8» → 8 minuti → 480. Null se non è una durata valida.
   function parseTimerArg(raw) {
     const s = String(raw || '').trim();
     if (!s) return null;
     if (s.includes(':')) {
       const parts = s.split(':');
       if (parts.length !== 2) return null;
-      // Ogni parte deve essere un intero esplicito: "5:", ":30" o "5: 30" non
-      // sono durate valide (Number('') === 0 le farebbe passare in silenzio).
+      // Ogni parte dev'essere un intero esplicito: «5:», «:30» o «5: 30» non sono durate valide
+      // (Number('') === 0 le farebbe passare in silenzio).
       if (!/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) return null;
       const mm = Number(parts[0]);
       const ss = Number(parts[1]);
@@ -2331,42 +2174,35 @@
     });
   }
 
-  // Riconosce un singolo token "tipo sito" (es. google.com, github.com/x,
-  // http://localhost:3000, localhost:3000, 127.0.0.1:8080, 192.168.1.1). DEVE
-  // essere preciso: un comando di shell come `/git log v1.2` o `/cat file.txt`
-  // NON è un sito. La logica (e la simmetria con la vecchia barra indirizzi della
-  // shell) vive in src/shared/urlNav.js (#398): qui togliamo la "/" e chiediamo
-  // a SN_URL_NAV.looksLikeAddress — così indirizzi locali e IP sono riconosciuti
-  // come lo erano dalla barra, invece di finire all'LLM.
+  // Riconosce un singolo token «tipo sito». DEVE essere preciso: un comando di shell come
+  // `/git log v1.2` NON è un sito. La logica (e la simmetria con la vecchia barra indirizzi) sta
+  // in src/shared/urlNav.js (#398), così indirizzi locali e IP sono riconosciuti come lo erano
+  // dalla barra invece di finire all'LLM.
   function isSiteToken(text) {
     return !!(self.SN_URL_NAV && self.SN_URL_NAV.looksLikeAddress(text.slice(1)));
   }
 
-  // Estrae l'host da un token "/sito" (toglie "/", lo schema e l'eventuale
-  // path/porta), per la verifica DNS.
+  // Estrae l'host da un token «/sito» per la verifica DNS.
   function siteHostOf(text) {
     const raw = text.slice(1).replace(/^https?:\/\//i, '');
     return (raw.split(/[/:?#]/)[0] || '').toLowerCase();
   }
 
-  // URL navigabile di un token "/sito". Lo schema (http per i server locali, i
-  // dispositivi della rete di casa e gli IP privati; https per i domini
-  // pubblici) lo sceglie la stessa logica della barra indirizzi — #398.
+  // Lo schema (http per server locali, rete di casa e IP privati; https per i domini pubblici) lo
+  // sceglie la stessa logica della barra indirizzi — #398.
   function siteUrlOf(text) {
     const raw = text.slice(1);
     return (self.SN_URL_NAV && self.SN_URL_NAV.normalizeUrl(raw))
       || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
   }
 
-  // Cache "il comando shell esiste?" (token → bool), per non rifare lo spawn
-  // di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
-  // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
+  // Cache «il comando shell esiste?», per non rifare lo spawn di controllo a ogni tasto. Non
+  // dipende dalla cwd per i comandi su PATH; per gli script relativi la piccola imprecisione è ok.
   const shellCmdCache = new Map();
   let whichTimer = null;
 
-  // Cache "il dominio /sito.tld esiste?" (host → bool). Evita di rifare il
-  // lookup DNS a ogni tasto; popolata sia dalla verifica live sia da quella
-  // sull'invio. Un host non in cache = ancora da verificare (resta arancione).
+  // Cache «il dominio esiste?», per non rifare il lookup DNS a ogni tasto. Un host non in cache =
+  // ancora da verificare (resta arancione).
   const siteResolveCache = new Map();
   let siteResolveTimer = null;
 
@@ -2395,11 +2231,9 @@
       if (shellCmdCache.has(cmd)) return shellCmdCache.get(cmd) ? 'shell' : 'unknown';
       return 'pending'; // verifica in corso (vedi scheduleShellWhich)
     }
-    // Modalità normale: un "/comando" che non è interno né un sito non verrà
-    // riconosciuto (finirebbe all'LLM come testo). Lo segnaliamo in rosso —
-    // MA non mentre l'utente sta ancora digitando un prefisso che potrebbe
-    // diventare un comando valido (es. "/he" → "/help"): in quel caso restiamo
-    // neutri così il rosso non lampeggia a ogni tasto.
+    // Modalità normale: un «/comando» che non è interno né un sito finirebbe all'LLM come testo, e
+    // lo si segnala in rosso — ma non mentre si sta ancora digitando un prefisso che potrebbe
+    // diventare valido («/he» → «/help»), o il rosso lampeggerebbe a ogni tasto.
     const hasSpace = /\s/.test(t);
     if (!hasSpace && isCommandPrefix(firstToken)) return 'none';
     return 'unknown';
@@ -2414,10 +2248,8 @@
     );
   }
 
-  // Verifica (con debounce) se il primo token è un comando shell esistente e
-  // poi ricolora. Debounce così il controllo parte solo quando l'utente si
-  // ferma: digitando di getto "/git" i prefissi non vengono mai controllati e
-  // il rosso non lampeggia.
+  // Debounce così il controllo parte solo quando l'utente si ferma: digitando di getto «/git» i
+  // prefissi non vengono mai controllati e il rosso non lampeggia.
   function scheduleShellWhich(value) {
     clearTimeout(whichTimer);
     whichTimer = setTimeout(async () => {
@@ -2434,9 +2266,8 @@
     }, 250);
   }
 
-  // Verifica (immediata) se l'host di un "/sito.tld" risolve, e popola la cache.
-  // Usata sull'invio: in caso di dubbio (rete giù, errore) torna true così non
-  // blocca mai una navigazione legittima.
+  // Usata sull'invio: in caso di dubbio (rete giù, errore) torna true, così non blocca mai una
+  // navigazione legittima.
   async function ensureSiteResolved(host) {
     if (!host) return true;
     if (siteResolveCache.has(host)) return siteResolveCache.get(host);
@@ -2449,18 +2280,14 @@
     return resolves;
   }
 
-  // #433 — Enter su "/sito" il cui host il DNS non conosce. Prima non succedeva
-  // ASSOLUTAMENTE NULLA: nessuna scheda, nessun messaggio, solo l'input rosso —
-  // indistinguibile da un tasto Invio rotto. Il controllo esistenza serve a non
-  // finire su una pagina bianca dopo un errore di battitura, ma può sbagliarsi
-  // (VPN, rete aziendale, DNS che non conosce quel nome): quindi Filo lo dice e
-  // lascia comunque aprire con un clic, invece di rifiutare in silenzio.
-  // Il testo resta nel campo: se era un typo, si corregge senza riscriverlo.
+  // #433 — Enter su «/sito» il cui host il DNS non conosce. Prima non succedeva NULLA: nessuna
+  // scheda, nessun messaggio, indistinguibile da un tasto Invio rotto. Il controllo può sbagliarsi
+  // (VPN, rete aziendale, DNS che non conosce quel nome): quindi Filo lo dice e lascia comunque
+  // aprire con un clic. Il testo resta nel campo: se era un typo si corregge senza riscriverlo.
   let unresolvedLine = null; // { el, host } dell'ultimo avviso ancora non agito
   function showUnresolvedSite(text, host) {
-    // Un secondo invio dello STESSO indirizzo non impila avvisi identici. Uno su
-    // un indirizzo diverso, o uno già agito ("Apri comunque"), resta in chat: è
-    // roba successa, non rumore da sostituire.
+    // Un secondo invio dello STESSO indirizzo non impila avvisi identici. Uno su un indirizzo
+    // diverso, o uno già agito, resta in chat: è roba successa, non rumore.
     if (unresolvedLine && unresolvedLine.host === host) {
       unresolvedLine.el.remove();
       unresolvedLine = null;
@@ -2468,8 +2295,8 @@
     if (body.dataset.state !== 'thread') goThread();
     const bubble = makeBubble({
       role: 'filo',
-      // Una riga sola: il bottone qui sotto dice già l'altra metà. Spiegare a
-      // parole cosa fa un bottone è la spiegazione della UI dentro la UI.
+      // Una riga sola: il bottone qui sotto dice già l'altra metà. Spiegare a parole cosa fa un
+      // bottone è la spiegazione della UI dentro la UI.
       text: `Non trovo “${host}” — controlla se c’è un errore di battitura.`,
     });
     const row = document.createElement('div');
@@ -2509,11 +2336,8 @@
 
   function updateInputClass() {
     const kind = classifyInput(inputEl.value);
-    // 'pending' (terminale, esistenza del comando ancora da verificare) viene
-    // mostrato GIÀ in rosso: aggiungere caratteri a un "/comando" non deve far
-    // lampeggiare il colore tornando a neutro a ogni tasto mentre il controllo
-    // è in corso. Quando il check risolve, il comando diventa azzurro (esiste)
-    // o resta rosso (non esiste), senza flicker intermedi.
+    // 'pending' si mostra GIÀ in rosso: aggiungere caratteri a un «/comando» non deve far
+    // lampeggiare il colore tornando a neutro a ogni tasto mentre il controllo è in corso.
     const showUnknown = kind === 'unknown' || kind === 'pending';
     inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
     inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
@@ -2535,11 +2359,9 @@
     // 1) Comandi interni di Filo: vincono SEMPRE, anche in modalità terminale.
     const handler = SLASH_COMMANDS[text] || SLASH_COMMANDS[firstToken];
     if (handler) { handler(text); inputEl.value = ''; autoGrowInput(); updateInputClass(); return true; }
-    // 2) Navigazione diretta a un sito: solo se è un singolo token "tipo sito".
-    //    L'URL (e lo schema: http per i server locali/IP privati, https per i
-    //    domini pubblici) lo compone la stessa logica della vecchia barra
-    //    indirizzi — SN_URL_NAV.normalizeUrl (#398) — così "/localhost:3000" o
-    //    "/192.168.1.1" si aprono davvero invece di partire su un https vuoto.
+    // 2) Navigazione diretta a un sito: solo se è un singolo token «tipo sito». L'URL e lo schema
+    // li compone SN_URL_NAV.normalizeUrl (#398), così «/localhost:3000» o «/192.168.1.1» si
+    // aprono davvero invece di partire su un https vuoto.
     if (isSiteToken(text)) {
       send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
       inputEl.value = '';
@@ -2560,14 +2382,13 @@
     return false;
   }
 
-  // ===== Esecuzione comandi shell (modalità terminale) =====
+  // Esecuzione comandi shell (modalità terminale)
   function updateDirLine() {
     dashDir.textContent = currentCwd || '';
   }
 
-  // Aggiorna la cartella corrente e la RENDE PERSISTENTE tra le sessioni (#259):
-  // riaprendo Filo si riparte da qui, non dalla home. Un solo punto di verità per
-  // ogni cambio di `cwd`, così barra mostrata, cartella reale e valore salvato
+  // Aggiorna la cartella corrente e la RENDE PERSISTENTE (#259): riaprendo Filo si riparte da qui.
+  // Un solo punto di verità per ogni cambio di `cwd`, così barra, cartella reale e valore salvato
   // restano allineati.
   function setCwd(cwd) {
     if (!cwd || cwd === currentCwd) return;
@@ -2577,9 +2398,8 @@
     try { self.SN_STORAGE?.setRaw?.(STORAGE_KEYS.FILO_TERMINAL_CWD, cwd); } catch (_) {}
   }
 
-  // L'assistente ha eseguito uno o più comandi: se l'ultimo ha cambiato cartella
-  // (un `cd`, ora persistente), il main ce la riporta in _output.cwd. Aggiorniamo
-  // la barra del percorso così "percorso mostrato" e cartella reale coincidono.
+  // Se l'ultimo comando ha cambiato cartella, il main la riporta in _output.cwd: si aggiorna la
+  // barra così percorso mostrato e cartella reale coincidono.
   function applyCommandCwd(actions) {
     if (!Array.isArray(actions)) return;
     let cwd = '';
@@ -2600,11 +2420,9 @@
 
   async function initCwd() {
     if (currentCwd) return;
-    // Ripristina l'ultima cartella in cui era il terminale (#259): riaprendo Filo
-    // non si torna alla home. Se non c'è nulla di salvato (primo avvio) si parte
-    // dalla home come prima. Se la cartella salvata non esiste più, il main la
-    // riporta alla home al primo comando (shell.js valida la cwd) e il valore si
-    // auto-corregge.
+    // Ripristina l'ultima cartella del terminale (#259). Senza nulla di salvato si parte dalla home;
+    // se la cartella salvata non esiste più il main la riporta alla home al primo comando e il
+    // valore si auto-corregge.
     try {
       const saved = await self.SN_STORAGE?.getRaw?.(STORAGE_KEYS.FILO_TERMINAL_CWD, '');
       if (saved && typeof saved === 'string') currentCwd = saved;
@@ -2618,11 +2436,9 @@
     updateDirLine();
   }
 
-  // ===== Rendering colori ANSI (SGR) per l'output del terminale =====
-  // Niente emulazione TUI: interpretiamo solo le sequenze di colore/stile
-  // (ESC[…m) e SCARTIAMO il resto (movimenti cursore, OSC…), così i tool che
-  // colorano (git, ls --color, eslint…) si vedono giusti senza che i codici
-  // grezzi sporchino l'output. Le altre sequenze a schermo intero non servono.
+  // Colori ANSI (SGR) per l'output del terminale. Niente emulazione TUI: si interpretano solo le
+  // sequenze di colore/stile (ESC[…m) e si SCARTA il resto, così i tool che colorano si vedono
+  // giusti senza che i codici grezzi sporchino l'output.
   const ANSI_BASE = ['#1e1e1e', '#cc4136', '#4e9a06', '#c4a000', '#3465a4',
     '#a347ba', '#0e9aa7', '#d3d7cf', '#6e7170', '#ef5350', '#8ae234',
     '#e6d44e', '#5a9ee6', '#c77fd6', '#34e2e2', '#fafafa'];
@@ -2632,9 +2448,7 @@
     const k = n - 16, L = [0, 95, 135, 175, 215, 255];
     return `rgb(${L[Math.floor(k / 36) % 6]},${L[Math.floor(k / 6) % 6]},${L[k % 6]})`;
   }
-  // Trova una sequenza ESC a partire da `pos` (dove s[pos] === ESC). Ritorna
-  // { end, sgr } oppure null se la sequenza è troncata a fine chunk (da
-  // ricomporre col chunk successivo).
+  // Null se la sequenza è troncata a fine chunk (da ricomporre col chunk successivo).
   function parseEscape(s, pos) {
     if (pos + 1 >= s.length) return null;
     const c = s[pos + 1];
@@ -2660,7 +2474,6 @@
     if (!command) return;
     if (body.dataset.state !== 'thread') goThread();
 
-    // Bolla "comando" (stile utente) con il prompt digitato.
     const cmdBubble = makeBubble({ role: 'user', text: '' });
     cmdBubble.classList.add('dash-term-cmd');
     const promptLine = document.createElement('span');
@@ -2670,7 +2483,6 @@
     cmdBubble.appendChild(document.createTextNode(command));
     bubblesEl.appendChild(cmdBubble);
 
-    // Bolla output (monospace) con controlli.
     const out = document.createElement('div');
     out.className = 'dash-bubble dash-bubble-filo dash-term';
     const pre = document.createElement('pre');
@@ -2693,8 +2505,8 @@
     bubblesEl.appendChild(out);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    // Stato di stile ANSI per QUESTA bolla (attraversa i chunk: un colore
-    // aperto in un chunk resta valido nei successivi finché non c'è un reset).
+    // Stato di stile ANSI per QUESTA bolla: attraversa i chunk, un colore aperto resta valido nei
+    // successivi finché non c'è un reset.
     const ansi = { tail: '', fg: null, bg: null, bold: false, dim: false, underline: false };
     const applySgr = (params) => {
       const codes = (params === '' ? '0' : params).split(';').map((x) => parseInt(x || '0', 10) || 0);
@@ -2754,8 +2566,8 @@
     const finish = (label) => {
       if (finished) return;
       finished = true;
-      // Se il focus era sui controlli che sto per rimuovere (es. campo stdin),
-      // riportalo nella barra principale invece di perderlo nel vuoto.
+      // Se il focus era sui controlli che sto per rimuovere (es. campo stdin), riportalo nella barra
+      // principale invece di perderlo nel vuoto.
       const focusWasInControls = controls.contains(document.activeElement);
       controls.remove();
       if (focusWasInControls) inputEl.focus();
@@ -2795,9 +2607,8 @@
         stdinInput.value = '';
       }
     });
-    // Il cursore resta nella barra principale così l'utente può digitare subito
-    // il comando successivo senza ricliccare. Il campo "Invio testo al comando…"
-    // qui sopra resta cliccabile per i comandi interattivi che chiedono stdin.
+    // Il cursore resta nella barra principale così si può digitare subito il comando successivo. Il
+    // campo stdin qui sopra resta cliccabile per i comandi interattivi.
     inputEl.focus();
   }
 
@@ -2805,10 +2616,8 @@
     e.preventDefault();
     const text = inputEl.value.trim();
     if (!text && pendingImages.length === 0) return;
-    // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
-    // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
-    // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
-    // mai restare in silenzio (#433).
+    // «/dominio.tld»: non navigare di slancio verso un sito inesistente. Si verifica il DNS e, se
+    // non esiste, lo si dice offrendo di aprire lo stesso — mai restare in silenzio (#433).
     if (text.startsWith('/') && isSiteToken(text)) {
       const host = siteHostOf(text);
       const resolves = host ? await ensureSiteResolved(host) : true;
@@ -2818,9 +2627,8 @@
     submitMessage(text);
   });
 
-  // Invio = manda il messaggio; Shift+Invio = a capo. Il campo è una textarea
-  // (non più un <input>), quindi Invio di suo andrebbe a capo: lo intercettiamo.
-  // `isComposing` evita di mandare a metà di una composizione IME.
+  // Invio manda, Shift+Invio va a capo: il campo è una textarea, quindi Invio di suo andrebbe a
+  // capo e lo si intercetta. `isComposing` evita di mandare a metà di una composizione IME.
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
@@ -2828,8 +2636,8 @@
     }
   });
 
-  // La textarea parte a una riga e cresce mentre si va a capo (fino al max-height
-  // del CSS, poi scrolla). Va richiamata anche quando svuotiamo il campo da codice.
+  // La textarea parte a una riga e cresce (fino al max-height del CSS, poi scrolla). Va richiamata
+  // anche quando si svuota il campo da codice.
   function autoGrowInput() {
     inputEl.style.height = 'auto';
     inputEl.style.height = `${inputEl.scrollHeight}px`;
@@ -2839,7 +2647,7 @@
   // azzurro = comando shell (solo in modalità terminale).
   inputEl.addEventListener('input', () => { updateInputClass(); autoGrowInput(); });
 
-  // ===== Bridge cambio stato live dal background =====
+  // Bridge cambio stato live dal background
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
@@ -2885,9 +2693,8 @@
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       isOwner = !!(msg.signedIn && msg.isAdmin);
       applyAccountProfile(msg.signedIn ? msg.profile : null);
-      // #524 — l'accoglienza aspettava un modello: appena l'accesso lo rende
-      // disponibile, Filo si presenta subito invece di rimandare alla prossima
-      // scheda nuova.
+      // #524 — l'accoglienza aspettava un modello: appena l'accesso lo rende disponibile Filo si
+      // presenta subito, invece di rimandare alla prossima scheda.
       if (msg.signedIn) maybeOpenOnboardingLater();
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
@@ -2903,13 +2710,9 @@
   });
 
 
-  // ===== Bootstrap =====
-  // ===== Controlli del browser dentro la home (in alto a destra) =====
-  // Le icone home/impostazioni/app/profilo (un tempo nella barra in alto, ora
-  // rimossa) vivono qui. Ogni click aziona il comando REALE della shell via
-  // MSG.SHELL_ACTION: il main lo inoltra alla shell, che clicca il bottone
-  // corrispondente e apre il suo menu nativo (Impostazioni, App, Account) in
-  // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
+  // Bootstrap — controlli del browser dentro la home (in alto a destra). Ogni click aziona il
+  // comando REALE della shell via MSG.SHELL_ACTION: il main lo inoltra, la shell clicca il bottone
+  // corrispondente e apre il suo menu nativo. Nessuna logica di menu duplicata qui.
   let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
 
   function renderControls() {
@@ -2917,17 +2720,12 @@
     if (!host) return;
     const ICONS = self.SN_ICONS || {};
     const items = [
-      // Red-team: apre direttamente la pagina interna (è solo una navigazione,
-      // non un menu nativo). Tenuto per primo (più a sinistra) e in rosso (vedi
-      // dashboard.css) perché è il canale sicurezza, distinto dai controlli del
-      // browser. Spec §2: punto d'accesso in alto a destra nella home.
+      // Red-team: apre direttamente la pagina interna. Per primo e in rosso perché è il canale
+      // sicurezza, distinto dai controlli del browser (spec §2).
       { command: 'redteam', icon: 'redteam', label: 'Red-team', url: 'filo://redteam/redteam.html' },
       { command: 'home', icon: 'home', label: 'Home' },
-      // Cronologia: la pagina principale è quella delle schede visitate/chiuse
-      // (raggruppate per giorno), non il log delle azioni AI (raggiungibile da lì
-      // come "Cronologia AI"). Apre direttamente la pagina interna (non passa
-      // dalla shell come gli altri, che ancorano un menu nativo) — è solo una
-      // navigazione. Risponde al feedback "metti la cronologia in alto a destra".
+      // Cronologia: la pagina principale è quella delle schede visitate/chiuse, non il log delle
+      // azioni AI (raggiungibile da lì). Apre direttamente la pagina interna: è solo una navigazione.
       { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://archive/archive.html' },
       // Gli appunti non hanno più un pannello separato: Filo li scrive nei file
       // dell'editor (icona Editor, che ora usa proprio l'SVG degli appunti).
@@ -2957,10 +2755,9 @@
     refreshAccountControl();
   }
 
-  // L'icona profilo mostra la foto Google quando sei loggato (come faceva la
-  // vecchia barra in alto), con fallback all'icona utente se la foto non carica
-  // o se sei sloggato. Lo stato auth vive nel main: lo interroghiamo e ci
-  // iscriviamo a `auth_changed` per aggiornarla dal vivo a login/logout.
+  // L'icona profilo mostra la foto Google quando sei loggato, con fallback all'icona utente. Lo
+  // stato auth vive nel main: lo si interroga e ci si iscrive a `auth_changed` per aggiornarla
+  // dal vivo.
   function applyAccountProfile(profile) {
     if (!accountCtrlBtn) return;
     const ICONS = self.SN_ICONS || {};
@@ -2997,18 +2794,13 @@
     }
   }
 
-  // Le fusioni in attesa del via libera dell'owner NON compaiono più qui: la
-  // decisione vive in cima ai Ricevuti della dashboard di gestione, insieme
-  // alle altre cose che aspettano lui (scelta owner 2026-08-26).
+  // Le fusioni in attesa dell'owner NON compaiono più qui: la decisione vive in cima ai Ricevuti
+  // della dashboard di gestione, con le altre cose che aspettano lui (scelta owner).
 
-  // ===== Recap aggiornamento (C4) =====
-  // Popup all'avvio dopo un update: il main (che ha sia app.getVersion() sia le
-  // note curate in src/shared/patchNotes.js) calcola quali versioni l'utente ha
-  // saltato dall'ultima volta. Se ce ne sono, mostriamo un recap con le novità
-  // in alto, le correzioni in basso e un pulsante per condividerlo/copiarlo.
-  // Ritorna true se ha mostrato il popup (e chiamerà onClose alla chiusura),
-  // false altrimenti — così l'avvio può incatenare il ringraziamento feedback
-  // (C5) DOPO il recap, senza sovrapporre due popup.
+  // Recap aggiornamento (C4). Popup all'avvio dopo un update: il main calcola quali versioni
+  // l'utente ha saltato e qui si mostrano novità in alto, correzioni in basso e un pulsante per
+  // condividere. Ritorna true se ha mostrato il popup (e chiamerà onClose), così l'avvio può
+  // incatenare il ringraziamento feedback DOPO, senza sovrapporre due popup.
   async function maybeShowUpdateRecap(onClose) {
     let recap;
     try { recap = await send({ type: MSG.GET_UPDATE_RECAP }); } catch (_) { return false; }
@@ -3020,7 +2812,6 @@
     return true;
   }
 
-  // Testo del recap per la condivisione/copia.
   function buildRecapText({ lastSeen, current, features, fixes }) {
     const lines = [`Filo ${lastSeen} → ${current}`];
     if (features.length) { lines.push('', 'Novità:'); for (const f of features) lines.push(`• ${f}`); }
@@ -3063,8 +2854,7 @@
   }
 
   function renderUpdateRecap({ lastSeen, current, notes }, onClose) {
-    // Aggrega le voci di tutte le versioni saltate (notes è già ordinato dalla
-    // più recente): tutte le novità in un blocco, tutte le correzioni nell'altro.
+    // notes è già ordinato dalla più recente: tutte le novità in un blocco, le correzioni nell'altro.
     const features = [];
     const fixes = [];
     for (const n of notes) {
@@ -3171,12 +2961,10 @@
     doneBtn.focus();
   }
 
-  // ===== Ringraziamento feedback risolto (C5) =====
-  // All'avvio chiediamo al main se qualche feedback INVIATO DA QUESTO UTENTE è
-  // passato a "risolto" da quando non guardava. Per ognuno il main ha già
-  // accreditato la ricompensa per priorità (50/100/200/300, una volta sola) e
-  // ci ritorna il testo da mostrare. Qui ringraziamo, spieghiamo cosa è cambiato
-  // (testo non tecnico preso dalle note) e animiamo i crediti verso il profilo.
+  // Ringraziamento feedback risolto (C5). All'avvio si chiede al main se un feedback di questo
+  // utente è passato a «risolto»; per ognuno la ricompensa per priorità è già accreditata (una
+  // volta sola). Qui si ringrazia, si spiega cosa è cambiato con le note non tecniche e si animano
+  // i crediti verso il profilo.
   async function maybeShowFeedbackRewards() {
     let res;
     try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
@@ -3184,10 +2972,8 @@
     renderFeedbackRewards(res.rewards, res.totalCredits || 0);
   }
 
-  // Anima alcune "monete credito" dorate dal centro dello schermo verso l'icona
-  // profilo (accountCtrlBtn). Riusa lo spirito di C3 ma vive nella home, dove
-  // l'icona account è un elemento DOM reale: puntiamo al suo centro. Decorativa,
-  // best-effort, rispetta prefers-reduced-motion.
+  // Anima alcune monete dorate dal centro verso l'icona profilo, che nella home è un elemento DOM
+  // reale. Decorativa, best-effort, rispetta prefers-reduced-motion.
   function flyCreditsToAccount(amount) {
     try {
       const reduce = !!(window.matchMedia &&
@@ -3355,11 +3141,9 @@
     applyHomeMessageVisibility();
     if (terminalMode) await initCwd();
     applyTerminalMode();
-    // #524 — intervista di benvenuto aperta (primo avvio, o ripresa a metà, o
-    // rilanciata dalle Preferenze)? Allora la home non serve: quello che
-    // l'utente deve vedere è la conversazione, dal punto in cui era rimasta. Il
-    // segno "già accolto" NON si scrive qui — si scrive quando l'intervista
-    // finisce, altrimenti chi chiude la finestra adesso non la rivede più.
+    // #524 — intervista aperta (primo avvio, ripresa a metà, o rilanciata dalle Preferenze)? Allora
+    // la home non serve: si mostra la conversazione dal punto in cui era rimasta. Il segno «già
+    // accolto» NON si scrive qui, o chi chiude la finestra adesso non la rivede più.
     const onbState = await fetchOnboarding();
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
@@ -3370,12 +3154,9 @@
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
     else refreshOnboardingNotice().catch(() => {});
-    // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
-    // aggiornamento (solo se c'è una versione precedente vista e note nuove),
-    // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
-    // il ringraziamento parte subito. Con l'intervista di benvenuto a schermo
-    // (#524) non parte niente: un popup sopra l'accoglienza è la prima cosa che
-    // l'utente vedrebbe di Filo.
+    // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap aggiornamento, poi il
+    // ringraziamento per i feedback risolti. Con l'intervista di benvenuto a schermo non parte
+    // niente: un popup sopra l'accoglienza è la prima cosa che l'utente vedrebbe di Filo.
     if (onbState) return;
     (async () => {
       try {
@@ -3385,9 +3166,7 @@
     })();
   })();
 
-  // Hook per i test Playwright (stesso pattern di __filoEditorFormat
-  // nell'editor): permette di renderizzare azioni come farebbe una bolla di
-  // chat senza dover pilotare l'LLM.
+  // Hook per i test Playwright: rende azioni come farebbe una bolla di chat senza pilotare l'LLM.
   window.__filoDashActions = {
     renderActions,
     applyCommandCwd,
