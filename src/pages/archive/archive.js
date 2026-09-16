@@ -1,7 +1,5 @@
-// Pagina archivio tab (§3.3): le schede chiuse, raggruppate per giorno e
-// ordinate per colore (ordine cromatico), mostrate come chip orizzontali.
-// Riapri / elimina via menu contestuale (tasto destro) su ogni chip; svuota
-// l'intero archivio dalla toolbar.
+// Archivio tab (§3.3): le schede chiuse in chip orizzontali, per giorno e in ordine
+// cromatico. Riapri ed elimina dal tasto destro; svuota tutto dalla toolbar.
 
 (function () {
   'use strict';
@@ -12,8 +10,8 @@
   function $(id) { return document.getElementById(id); }
 
   let tabs = [];
-  // Quando valorizzato, mostriamo i risultati della ricerca semantica (lista
-  // piatta ordinata per pertinenza) invece dell'archivio raggruppato per giorno.
+  // Se valorizzato, si mostrano i risultati della ricerca semantica (lista piatta per
+  // pertinenza) invece dell'archivio raggruppato per giorno.
   let semanticResults = null;
 
   async function load() {
@@ -26,8 +24,8 @@
     render();
   }
 
-  // Hue (0..360) del colore identità, per l'ordine cromatico. Le tab senza
-  // colore vanno in fondo (hue = Infinity), così i siti colorati guidano l'occhio.
+  // Hue del colore identità per l'ordine cromatico. Le tab senza colore vanno in fondo
+  // (hue = Infinity), così i siti colorati guidano l'occhio.
   function hueOf(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return Infinity;
@@ -44,12 +42,9 @@
     return (h / 6) * 360;
   }
 
-  // Tinta identità ATTENUATA per lo sfondo della chip: stessa logica delle tab
-  // in alto (§1.2, shell.js) — riduciamo la saturazione al ~18% dell'originale
-  // e lasciamo che il CSS (color-mix col neutro di superficie) sposti la
-  // luminosità verso il tema. Così una scheda molto satura (es. YouTube rosso)
-  // non diventa un blocco acceso ma una tinta sobria e riconoscibile. Ritorna
-  // null per grigi/valori non parsabili → la chip usa il neutro.
+  // Tinta identità ATTENUATA per lo sfondo della chip, stessa logica delle tab in alto (§1.2):
+  // saturazione al ~18% e luminosità lasciata al CSS, così una scheda molto satura non diventa
+  // un blocco acceso. null per grigi o valori non parsabili → la chip usa il neutro.
   function tintOf(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return null;
@@ -91,7 +86,7 @@
 
   function dayKey(iso) {
     const d = iso ? new Date(iso) : new Date();
-    // Chiave locale YYYY-MM-DD per raggruppare per giorno nel fuso dell'utente.
+    // Chiave locale YYYY-MM-DD: il raggruppamento per giorno è nel fuso dell'utente.
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
@@ -109,9 +104,8 @@
     return new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // Stato vuoto: il testo di default vale solo per "archivio realmente vuoto".
-  // Quando c'è una ricerca attiva senza risultati mostriamo un messaggio
-  // dedicato, altrimenti l'elenco svuotato sembra un archivio cancellato.
+  // Il testo di default vale solo per «archivio realmente vuoto»: con una ricerca attiva senza
+  // risultati serve un messaggio dedicato, o l'elenco svuotato sembra un archivio cancellato.
   const EMPTY_DEFAULT = 'Nessuna tab archiviata, per ora.';
   function showEmpty() {
     const rawQ = ($('search').value || '').trim();
@@ -120,7 +114,7 @@
     el.hidden = false;
   }
 
-  // Ricerca semantica: embeddizza la query e ordina per pertinenza (lato main).
+  // Ricerca semantica: embedding della query e ordine per pertinenza, lato main.
   async function runSemanticSearch() {
     const q = ($('search').value || '').trim();
     const note = $('searchNote');
@@ -130,8 +124,7 @@
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.SEARCH_ARCHIVED_TABS, query: q }); } catch (_) {}
     if (!r || !Array.isArray(r.results)) {
-      // Niente embedding disponibile (manca la chiave o nessuna tab indicizzata):
-      // ripiego sul filtro per sottostringa.
+      // Niente embedding (manca la chiave o nessuna tab indicizzata): ripiego sul filtro per sottostringa.
       semanticResults = null;
       note.textContent = 'Ricerca nei contenuti non disponibile: mostro i risultati per testo.';
       render();
@@ -150,8 +143,7 @@
     if (!semanticResults.length) { showEmpty(); return; }
     $('empty').hidden = true;
     const wrap = document.createElement('div');
-    // Risultati per pertinenza: chip compatte che vanno a capo (classe dedicata),
-    // non la riga singola scorrevole usata per il raggruppamento per giorno.
+    // Risultati per pertinenza: chip compatte che vanno a capo, non la riga scorrevole dei giorni.
     wrap.className = 'arc-results';
     for (const t of semanticResults) wrap.appendChild(renderTab(t, { showScore: true }));
     list.appendChild(wrap);
@@ -175,8 +167,7 @@
     }
     $('empty').hidden = true;
 
-    // Raggruppa per giorno (chiave locale), mantenendo i giorni in ordine
-    // cronologico decrescente (più recenti in alto).
+    // Giorni in ordine cronologico decrescente, i più recenti in alto.
     const groups = new Map();
     for (const t of filtered) {
       const k = dayKey(t.closedAt);
@@ -205,15 +196,14 @@
     }
   }
 
-  // Riapre una tab archiviata ripristinando lo scroll registrato (§3.1).
+  // Riapre ripristinando lo scroll registrato (§3.1).
   function reopenTab(t) {
     try {
       chrome.runtime.sendMessage({
         type: MSG.REOPEN_ARCHIVED_TAB,
         url: t.url,
         scrollPct: typeof t.scrollPosition === 'number' ? t.scrollPosition : null,
-        // Se la tab era stata aperta "da un altro paese", riaprila proxata
-        // sulla stessa location.
+        // Se la tab era stata aperta «da un altro paese», riaprila proxata sulla stessa location.
         proxy: t.proxy && t.proxy.country ? t.proxy : null,
       });
     } catch (_) {
@@ -228,11 +218,9 @@
     render();
   }
 
-  // Menu contestuale (tasto destro) con "Riapri"/"Elimina": sostituisce i
-  // bottoni sempre visibili, coerente con le chip orizzontali compatte.
-  // Riusa le classi .sn-select-pop/.sn-select-option (stesso look degli altri
-  // menu di Filo, vedi
-  // patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md).
+  // Menu contestuale con «Riapri» ed «Elimina» invece di bottoni sempre visibili, coerente con
+  // le chip compatte. Riusa .sn-select-pop/.sn-select-option, come gli altri menu di Filo
+  // (patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md).
   let openMenu = null;
   function closeCtxMenu() {
     if (!openMenu) return;
@@ -271,15 +259,14 @@
 
     document.body.appendChild(menu);
 
-    // Clamp alla viewport (il menu non deve uscire dal bordo destro/basso).
+    // Clamp alla viewport: il menu non deve uscire dal bordo.
     const vw = window.innerWidth, vh = window.innerHeight;
     const w = menu.offsetWidth, h = menu.offsetHeight;
     menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
 
     openMenu = menu;
-    // setTimeout: evita che il mousedown/click che ha aperto il menu lo chiuda
-    // subito tramite il listener "outside click".
+    // setTimeout: evita che il click che ha aperto il menu lo chiuda subito col listener «outside click».
     setTimeout(() => {
       document.addEventListener('mousedown', onOutsideClick, true);
       document.addEventListener('keydown', onMenuKeydown, true);
@@ -295,14 +282,12 @@
     row.setAttribute('role', 'button');
     if (t.identityColor) {
       row.style.setProperty('--arc-color', t.identityColor);
-      // Sfondo della chip = tinta identità attenuata, come le tab in alto.
       const tint = tintOf(t.identityColor);
       if (tint) row.style.setProperty('--arc-tint', tint);
     }
 
     const titleText = t.title || t.url || '';
-    // Tooltip: conserva URL/orario/snippet, non più sempre visibili nella
-    // chip compatta ma comunque consultabili al passaggio del mouse.
+    // Tooltip: URL, orario e snippet non stanno nella chip compatta ma restano consultabili.
     const tipParts = [titleText, t.url, timeLabel(t.closedAt)];
     if (t.snippet) tipParts.push(t.snippet);
     row.title = tipParts.filter(Boolean).join('\n');
@@ -324,18 +309,16 @@
       row.appendChild(sc);
     }
 
-    // Click sinistro = azione primaria "Riapri" (la chip ha role=button e ne
-    // ha l'aspetto: deve rispondere al click come le card di "Aperti per dopo").
+    // Click sinistro = «Riapri»: la chip ha role=button e ne ha l'aspetto, deve rispondere al
+    // click come le card di «Aperti per dopo».
     row.addEventListener('click', () => { reopenTab(t); });
-    // Tasto destro = menu contestuale (Riapri/Elimina), coerente con la
-    // centralità del tasto destro in Filo.
+    // Tasto destro = menu contestuale, centrale in Filo.
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       openCtxMenu(e.clientX, e.clientY, t);
     });
-    // Tastiera, parità piena con il mouse:
-    //  - Invio/Spazio = azione primaria "Riapri" (come il click sinistro);
-    //  - Shift+F10 o il tasto Menu = menu contestuale (come il tasto destro).
+    // Tastiera, parità piena col mouse: Invio o Spazio riaprono, Shift+F10 o il tasto Menu
+    // aprono il menu contestuale.
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -350,13 +333,10 @@
     return row;
   }
 
-  // La rotellina verticale del mouse scrolla in orizzontale la riga di un
-  // giorno (le righe .arc-tabs non hanno scroll verticale) — stessa logica
-  // della barra delle tab in alto (shell.js §6). Senza questo, con molte schede
-  // in un giorno le eccedenti restavano irraggiungibili col solo mouse. Handler
-  // delegato su #list: trova la riga sotto il puntatore e scrolla solo se c'è
-  // davvero overflow. I risultati della ricerca (.arc-results) vanno a capo e
-  // non hanno .arc-tabs, quindi non vengono intercettati.
+  // La rotellina verticale scrolla in orizzontale la riga di un giorno (come la barra delle tab
+  // in alto): senza, con molte schede le eccedenti restavano irraggiungibili col solo mouse.
+  // Delegato su #list, scrolla solo con overflow vero; i risultati della ricerca vanno a capo
+  // e non hanno .arc-tabs, quindi non vengono intercettati.
   function onListWheel(e) {
     const row = e.target.closest && e.target.closest('.arc-tabs');
     if (!row) return;
@@ -398,9 +378,7 @@
     $('openHistory').addEventListener('click', () => {
       try { chrome.tabs.create({ url: 'filo://history/history.html' }); } catch (_) {}
     });
-    // Simmetria fra le tre liste sorelle: "Aperti per dopo" e "Cronologia AI"
-    // rimandano già l'una all'altra e a qui; mancava solo la strada di ritorno
-    // da qui verso "Aperti per dopo".
+    // Simmetria fra le tre liste sorelle: mancava la strada di ritorno da qui verso «Aperti per dopo».
     $('openHome').addEventListener('click', () => {
       try { chrome.tabs.create({ url: 'filo://home/home.html' }); } catch (_) {}
     });
