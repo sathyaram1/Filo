@@ -64,7 +64,7 @@ test.describe('hook di salvataggio — il fallimento arriva in una forma che la 
     const ctx = json.hookSpecificOutput.additionalContext;
     expect(ctx).toMatch(/SALVATAGGIO/);
     expect(ctx).toMatch(/NON e' arrivato su origin/);
-    expect(ctx).toMatch(/non\\esiste|non.esiste/);
+    expect(ctx).toMatch(/"virgolette"/);
     expect(ctx).toMatch(/NON e' su origin/);
     // Il commit locale c'è comunque: il paracadute non dipende dal push.
     expect(git(s.lavoro, 'status', '--porcelain')).toBe('');
