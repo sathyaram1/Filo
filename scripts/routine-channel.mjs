@@ -48,7 +48,7 @@
 //         deve succedere sempre non si chiede a chi lavora. Senza biglietto fra
 //         gli argomenti lo ritrova da solo, come le consegne.
 //
-//   node scripts/routine-channel.mjs release <biglietto> [--guasto "motivo"]
+//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"]
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
 //         `--guasto` DICHIARI un guasto al server (SPEC-RIDISEGNO-MAX.md §12):
 //         è così che il server smette di dare lavoro per il giro — le
