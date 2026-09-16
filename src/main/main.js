@@ -45,6 +45,11 @@ require('./services/loader');
 // fatto in modo SINCRONO qui (non dentro whenReady) perché i test che dipendono
 // solo dal fixture `app` possono valutare prima che il callback async finisca.
 if (process.env.NODE_ENV === 'test') {
+  // Niente browser né gestore file aperti dal sistema durante i test: su un
+  // contenitore senza desktop l'apertura non torna mai e l'app non si chiude
+  // più (vedi test-window-mode.js). Le prove che vogliono lo stub lo mettono
+  // dopo, per conto loro, sopra a questo.
+  try { require('./test-window-mode').silenziaApertureDiSistema(require('electron').shell); } catch (_) {}
   try {
     globalThis.__filoHandlers = require('./services/handlers');
     globalThis.__filoDefaults = require('./services/defaultsStore');
