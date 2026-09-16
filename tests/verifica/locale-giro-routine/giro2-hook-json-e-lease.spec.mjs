@@ -46,7 +46,7 @@ function hook(cwd, stdin = '') {
 }
 
 test.describe('hook di salvataggio — il fallimento arriva in una forma che la sessione legge', () => {
-  test('con origin irraggiungibile (percorso di Windows, con barre rovesciate) il contesto è un JSON valido con dentro il motivo', () => {
+  test('con origin irraggiungibile (e virgolette nel motivo di git) il contesto è un JSON valido con dentro il motivo', () => {
     const s = scenario('json');
     // Un remoto che non esiste, con le virgolette nel nome: il messaggio di
     // git lo ripete tale e quale, e dentro un JSON una virgolette non
