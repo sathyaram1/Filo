@@ -81,7 +81,7 @@ test.describe('hook di salvataggio — la spedizione dopo un rebase e nei fallim
     // detto lì è ancora un fallimento in silenzio. Le strade che la sessione
     // vede: un'uscita diversa da zero (la prima riga di stderr compare come
     // errore dell'hook) oppure un JSON su stdout con additionalContext.
-    test.fail(true, 'rilievo aperto del giro 1: il push fallito finisce su stderr con uscita 0, che Claude Code scarta');
+    // Rilievo del giro 1, corretto nello stesso giro: adesso arriva il JSON.
     const s = scenario('silenzio');
     writeFileSync(join(s.altro, 'c.txt'), 'tre\n');
     git(s.altro, 'add', '-A');
