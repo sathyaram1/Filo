@@ -50,9 +50,9 @@ test.describe('hook di salvataggio — il fallimento arriva in una forma che la 
     const s = scenario('json');
     // Un remoto che non esiste, con le virgolette nel nome: il messaggio di
     // git lo ripete tale e quale, e dentro un JSON una virgolette non
-    // scappata lo rompe (con le barre rovesciate git legge «C:» come un host
-    // ssh e non ripete il percorso: provato).
-    const rotto = 'C:/non/esiste/origin "virgolette".git';
+    // scappata lo rompe (con «C:» davanti git legge un host ssh e non ripete
+    // il percorso: provato, quindi un percorso relativo).
+    const rotto = './non-esiste/origin "virgolette".git';
     git(s.lavoro, 'remote', 'set-url', 'origin', rotto);
     writeFileSync(join(s.lavoro, 'b.txt'), 'due\n');
     const r = hook(s.lavoro, JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Edit' }));
