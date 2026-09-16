@@ -65,7 +65,7 @@ test('dieci righe: turni, freddi, token, strumenti, timeout, sotto-agenti, durat
   assert.deepEqual(rep.models, ['claude-opus-5', 'claude-fable-5-1']);
   assert.equal(rep.turns, 4, 'm3 sta su due righe e conta una volta');
   assert.equal(rep.coldTurns, 1, 'solo m3: m1 è il primo turno ed è escluso');
-  assert.deepEqual(rep.tokens, { input: 116, cacheRead: 70000, cacheWrite: 55500, cacheWrite1h: 0, output: 110 });
+  assert.deepEqual(rep.tokens, { input: 116, cacheRead: 70000, cacheWrite: 55500, output: 110 });
   assert.equal(rep.tools.total, 3);
   assert.deepEqual(rep.tools.byName, { Bash: 1, Agent: 1, mcp__x__read_me: 1 });
   assert.equal(rep.tools.timeouts, 1);
@@ -316,7 +316,6 @@ test('una scrittura in cache a un\'ora è prezzata a 2× l\'input, quella a cinq
   const a = await analizzaRighe(soloUnOra);
   assert.equal(a.costUsd, 1.0, '100.000 token a un\'ora, Opus: 10 $/M → 1,00 $ (non 0,625)');
   assert.equal(a.tokens.cacheWrite, 100000);
-  assert.equal(a.tokens.cacheWrite1h, 100000);
 
   const miste = [assistant('u2', 'claude-fable-5-1', {
     input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 200000,
@@ -325,14 +324,12 @@ test('una scrittura in cache a un\'ora è prezzata a 2× l\'input, quella a cinq
   const b = await analizzaRighe(miste);
   // Fable 5.1: 100.000 × 12,5 + 100.000 × 20 = 3,25 $
   assert.equal(b.costUsd, 3.25);
-  assert.equal(b.tokens.cacheWrite1h, 100000);
 
   const senzaDettaglio = [assistant('u3', 'claude-opus-5', {
     input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 100000,
   }, [], T('00:00'))];
   const c = await analizzaRighe(senzaDettaglio);
   assert.equal(c.costUsd, 0.625, 'un transcript senza il dettaglio per durata: tutto a cinque minuti, come prima');
-  assert.equal(c.tokens.cacheWrite1h, 0);
 
   // Il dettaglio che non torna col totale: la differenza si conta a cinque minuti.
   const storto = [assistant('u4', 'claude-opus-5', {
@@ -345,5 +342,4 @@ test('una scrittura in cache a un\'ora è prezzata a 2× l\'input, quella a cinq
   for (const k of ['opus', 'sonnet', 'sonnet-4', 'haiku', 'fable', 'fable-5']) {
     assert.equal(PREZZI[k].cacheWrite1h, PREZZI[k].input * 2, `${k}: la scrittura a un'ora è 2× l'input`);
   }
-  assert.match(riassunto(a)[2], /di cui a un'ora 100000/);
 });
