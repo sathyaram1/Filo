@@ -19,7 +19,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 /** I passi del job `suite`, nell'ordine: { name, righe } (righe = il blocco YAML del passo, grezzo). */
 function passiDellaSuite() {
-  const yml = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+  // Sulla macchina di chi sviluppa il file può stare con i ritorni a capo di Windows.
+  const yml = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8').replace(/\r\n/g, '\n');
   const daSuite = yml.slice(yml.indexOf('\n  suite:\n'));
   const soloSuite = daSuite.slice(0, daSuite.indexOf('\n  release:\n'));
   const blocchi = soloSuite.split(/\n(?=      - name: )/).slice(1);
