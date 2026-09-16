@@ -105,9 +105,8 @@
     return MR.sectionsReliable(all);
   }
 
-  // Ritrovamenti automatici, due fonti: agente esploratore LLM (clientId «agent:<model>») e
-  // audit di una routine cloud («routine:<slug>») ancora da triagiare. I sub-feedback di una
-  // routine hanno lo stesso prefisso ma nascono todo/design: esclusi col vincolo sullo stato.
+  // Ritrovamenti automatici: agente esploratore LLM («agent:<model>») e audit di routine
+  // («routine:<slug>») da triagiare; i sub-feedback nascono todo/design e vanno esclusi.
   function isAgent(f) {
     const c = String(f.clientId || '');
     if (c.startsWith('agent:')) return true;
@@ -179,9 +178,8 @@
   // Dentro «Ricevuti» e «In coda» vivono stati diversi: senza questa riga la card non direbbe
   // più a che punto è. Colore, testo e motivo vengono dal vocabolario unico.
   function stateBadgeHtml(f) {
-    // Stato cifrato: non c'è uno stato da leggere, e la macchina lo ridurrebbe a «Non filtrato»
-    // anche su un feedback già chiuso. L'unica cosa vera in mano è l'enum grossolano in chiaro
-    // (`statusPublic`): aperta o chiusa. Le PAROLE vengono dal modulo condiviso, mai copiate.
+    // Stato cifrato: la macchina lo ridurrebbe a «Non filtrato» anche su un feedback già chiuso.
+    // L'unica cosa vera è l'enum in chiaro `statusPublic`; le PAROLE dal modulo condiviso.
     const b = MR.stateBadge(f);
     if (!b) return '';
     const dot = b.color
@@ -216,9 +214,8 @@
     return '';
   }
 
-  // Allegati nei commenti (#190.3): sono ANCORATI al singolo turno, come righe-marcatore
-  // dentro `notes` (SN_FEEDBACK_THREAD), così non cambiano schema Firestore né regole.
-  // L'allowlist dei tipi è UNA, condivisa col riquadro dentro i siti: stesse parole (#582).
+  // Allegati ANCORATI al turno (#190.3): righe-marcatore dentro `notes`, così non cambiano
+  // schema né regole. Allowlist dei tipi UNA, condivisa col riquadro dentro i siti (#582).
   const AttachTypes = window.SN_FEEDBACK_ATTACH;
   const ATTACH_REJECT_MSG =
     'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
@@ -252,9 +249,8 @@
     return `<div class="fb-imgs">${imgs.map((u) => `<img class="fb-img-loading" data-url="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`;
   }
 
-  // Decifratura lazy degli allegati immagine (S1.2), cache url → { dataUrl, error }. Su
-  // fallimento `error` porta il MOTIVO preciso, così il segnaposto lo spiega invece di restare
-  // muto. `soloDestinatario` non è un guasto: l'allegato lo apre solo chi riceve (#582).
+  // Decifratura lazy (S1.2), cache url → { dataUrl, error }: `error` porta il MOTIVO preciso
+  // così il segnaposto lo spiega. `soloDestinatario` non è un guasto: apre solo chi riceve (#582).
   const fbImgCache = new Map();
   async function resolveImageSrc(url) {
     if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
@@ -273,10 +269,9 @@
     return res;
   }
 
-  // L'indirizzo di un allegato NON diventa mai un href: non lo sceglie Filo, sta dentro la
-  // segnalazione, e una segnalazione la manda chiunque. Un finto allegato «schermata.png» che
-  // punta al proprio sito era un'esca dentro una pagina di Filo. Il clic passa dal main, che
-  // confronta l'indirizzo col deposito e decifra i byte — la stessa strada della dashboard (#582).
+  // L'indirizzo di un allegato NON diventa mai un href: lo scrive chi manda la segnalazione, e
+  // una segnalazione la manda chiunque — un finto «schermata.png» che punta al proprio sito era
+  // un'esca dentro Filo. Il clic passa dal main, che confronta col deposito e decifra (#582).
   function filesListHtml(files) {
     const fs = (files || []).filter((x) => x && typeof x.url === 'string' && x.url);
     if (!fs.length) return '';
@@ -360,9 +355,8 @@
     return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  // Compositore di allegati legato a una textarea: intercetta incolla e trascina. Ogni file
-  // va SUBITO su Storage, così le note salvano solo l'URL. onChange() dopo ogni aggiunta o
-  // rimozione, per chi vuole persistenza immediata. Ritorna { getAttachments }.
+  // Compositore legato a una textarea (incolla e trascina). Ogni file va SUBITO su Storage,
+  // così le note salvano solo l'URL; onChange() per chi vuole persistenza immediata.
   function makeAttachComposer({ textarea, mount, initial, onChange }) {
     if (!textarea || !mount) return { getAttachments: () => [] };
     const attachments = Array.isArray(initial) ? initial.slice() : [];
@@ -435,9 +429,8 @@
 
     async function addFile(file) {
       if (!file) return;
-      // Il TIPO si guarda PRIMA di caricare, come nel riquadro dentro i siti (#582). Il selettore
-      // offre anche image/* e text/*, che comprendono una pagina web e un disegno vettoriale: tipi
-      // che il deposito rifiuta. Senza, si leggeva il numero d'errore invece della frase giusta.
+      // Il TIPO si guarda PRIMA di caricare (#582): il selettore offre anche image/* e text/*, che
+      // il deposito rifiuta, e si leggeva il suo numero d'errore invece della frase giusta.
       const kind = classificaAllegato(file);
       if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
       const isImg = kind === 'image';
@@ -522,9 +515,8 @@
     return { head: s, tail: '' };
   }
 
-  // `silenzioso`: salva senza ridisegnare la lista, per le caselle che si salvano mentre ci
-  // si scrive dentro (un ridisegno rimpiazza la casella sotto le dita e perde il primo clic).
-  // `inPlace`: non ridisegnare MAI, né al successo né all'errore (vedi «Un clic, una scheda»).
+  // `silenzioso`: salva senza ridisegnare, per le caselle che si salvano mentre ci si scrive
+  // dentro. `inPlace`: non ridisegnare MAI (vedi «Un clic, una scheda»).
   async function patch(id, payload, optimistic, { silenzioso = false, inPlace = false } = {}) {
     if (!isAdmin) {
       alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
@@ -532,9 +524,8 @@
     }
     const item = all.find((f) => f._id === id);
     if (!item) return false;
-    // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano sta qui e non
-    // sui pulsanti perché i cammini che scrivono le note sono più d'uno: uno scoperto basta a
-    // sostituire il report vero con quello rimasto sullo schermo. Stato e priorità restano liberi.
+    // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano sta qui perché
+    // i cammini che scrivono le note sono più d'uno: uno scoperto basta. Stato e priorità liberi.
     if (item.reportIllegibile && payload && typeof payload.notes === 'string') {
       alert('Il report di questo feedback non è leggibile su questo computer: manca la chiave privata. '
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
@@ -570,9 +561,8 @@
     }
   }
 
-  // I pulsanti scrivono STATI CANONICI, gli stessi della dashboard di gestione: col vocabolario
-  // vecchio ogni clic spingeva il feedback FUORI dalla macchina a stati. QUALI azioni esistono
-  // lo decide MR.ownerActions, letto da entrambe le pagine; qui resta solo il modo di disegnarle.
+  // I pulsanti scrivono STATI CANONICI, o il feedback esce dalla macchina a stati. QUALI azioni
+  // esistono lo decide MR.ownerActions, la stessa tabella della gemella; qui solo il disegno.
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
@@ -593,12 +583,10 @@
   }
 
   // UN CLIC, UNA SCHEDA. I pulsanti vivono DENTRO la scheda, in una lista che si riordina da
-  // sé: finché ogni azione ridisegnava la lista, sotto il puntatore FERMO arrivava il pulsante
-  // della scheda successiva e il secondo clic cadeva su un ALTRO feedback (due «→ In coda»
-  // mettevano in coda il primo e confermavano il secondo come attacco).
-  // La regola: NESSUNA AZIONE PRESA DENTRO UNA SCHEDA RICOMPONE LA LISTA. La scheda si aggiorna
-  // al proprio posto e la lista si ricompone solo su richiesta esplicita (sezione, ricerca,
-  // filtro, Aggiorna). Vale per i pulsanti di stato, la riapertura, la risposta e la priorità.
+  // sé: finché ogni azione la ridisegnava, sotto il puntatore FERMO arrivava il pulsante della
+  // scheda successiva e il secondo clic cadeva su un ALTRO feedback. La regola: NESSUNA AZIONE
+  // PRESA DENTRO UNA SCHEDA RICOMPONE LA LISTA — la scheda si aggiorna al proprio posto e la
+  // lista si ricompone solo su richiesta esplicita (sezione, ricerca, filtro, Aggiorna).
 
   // Schede con una scrittura in volo: il loro secondo clic non deve partire.
   const inScrittura = new Set();
@@ -810,8 +798,7 @@
       const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(f.clientId) ? 'model' : 'user';
       const reportWho = reportRole === 'model' ? 'Agente' : 'Segnalazione';
       // «Ricevuti» è incluso così si può COMMENTARE un feedback appena arrivato e poi metterlo in
-      // coda: il commento viaggia col cambio di stato. Le domande della routine (`design`/`clarify`)
-      // vivono nei Ricevuti, perché sono una decisione che aspetta l'owner.
+      // coda: il commento viaggia col cambio di stato. Le domande della routine stanno qui.
       const clarifyReply = isAdmin && statusOf(f) === 'design' && statusReasonOf(f) === 'clarify';
       const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply
         && (currentTab === 'inbox' || currentTab === 'queue');
@@ -931,9 +918,8 @@
           const ph = document.createElement('div');
           ph.className = 'fb-img-broken';
           // Chi ha mandato la segnalazione non rivedrà il proprio screenshot: l'allegato lo apre solo
-          // chi riceve. Non è un guasto, non è «inviato» (l'elenco mostra a ogni tester le segnalazioni
-          // di tutti) e non è «consegnato»: che sia arrivato Filo non l'ha guardato (#582). Il motivo
-          // per esteso lo dà il main, una fonte sola per quella frase.
+          // chi riceve. Non è un guasto, non è «inviato» (l'elenco mostra le segnalazioni di tutti) né
+          // «consegnato»: che sia arrivato Filo non l'ha guardato (#582). Il motivo lo dà il main.
           ph.textContent = soloDestinatario ? '(allegato riservato)' : '(immagine non disponibile)';
           // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
           ph.title = error || img.dataset.url || '';
@@ -1078,9 +1064,8 @@
       });
     });
 
-    // Clic sul pallino N imposta priorità N; ri-clic su quello attivo la azzera. In «In coda» la
-    // priorità è un criterio di ORDINAMENTO, quindi i pallini si ridipingono nella scheda e la
-    // lista resta ferma (vedi «Un clic, una scheda»).
+    // Clic sul pallino N imposta priorità N, ri-clic su quello attivo la azzera. In «In coda» la
+    // priorità ordina: i pallini si ridipingono nella scheda, la lista resta ferma.
     root.querySelectorAll('.fb-dot').forEach((dot) => {
       dot.addEventListener('click', async () => {
         const id = dot.dataset.id;
@@ -1262,9 +1247,8 @@
     const counts = agentOnly
       ? TABS.reduce((acc, t) => { acc[t] = sectionItems(t).length; return acc; }, {})
       : MR.manageTabCounts(all, { releasedVersion });
-    // Il caricamento si ferma ai più recenti: presi tutti fino al tetto, questi numeri sono
-    // minimi e lo dicono con un «+» — «(312)» su 400 sembra una risposta e non lo è. E finché i
-    // feedback non sono arrivati non si scrive nessun numero: «(0)» direbbe che non c'è niente.
+    // Presi tutti i feedback fino al tetto, questi numeri sono minimi e lo dicono con un «+»:
+    // «(312)» su 400 sembra una risposta e non lo è. Prima dell'arrivo, nessun numero.
     const capped = dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
     for (const tab of TABS) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
@@ -1279,8 +1263,7 @@
   }
 
   /** Il feedback come lo può leggere CHI STA GUARDANDO: se il report è ancora cifrato, al
-  * suo posto va la frase in chiaro scritta per chi ha segnalato. Non tocca niente quando il
-  * report è leggibile, così i feedback storici restano com'erano. */
+  * suo posto va la frase in chiaro per chi ha segnalato; se è leggibile, non tocca niente. */
   function sanitizeReportForReader(f) {
     const raw = String((f && f.notes) || '');
     const T = window.SN_FEEDBACK_THREAD;
