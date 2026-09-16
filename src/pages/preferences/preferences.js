@@ -1,6 +1,5 @@
-// Logica pagina Preferenze: tema, dimensione del testo, commento home e stile
-// dell'agente. Niente pulsante "Salva": ogni modifica viene applicata e
-// persistita subito (con un breve "Salvato" come conferma).
+// Preferenze: tema, dimensione del testo, commento home, stile dell'agente. Niente pulsante
+// «Salva»: ogni modifica si applica e si persiste subito, con un breve «Salvato».
 
 (function () {
   'use strict';
@@ -18,9 +17,7 @@
 
   let saveTimer = null;
 
-  // Indicatore "Salvato": può lampeggiare su più ancore (quella globale a fondo
-  // pagina e quella locale della sezione token), così la conferma è visibile
-  // vicino al controllo toccato.
+  // L'indicatore «Salvato» lampeggia sull'ancora più vicina al controllo toccato.
   const _savedTimers = {};
   function flashSaved(id = 'savedHint') {
     const hint = $(id);
@@ -30,24 +27,14 @@
     _savedTimers[id] = setTimeout(() => hint.classList.remove('sn-show'), 1200);
   }
 
-  // ── Sezione "token estetici" (#146.3) ────────────────────────────────────
-  // Mostra TUTTI i token del registro (themeTokens.js) coi valori predefiniti,
-  // in forma di config testuale "a codice". Modificare un valore applica
-  // l'override live e lo persiste; i valori personalizzati sono evidenziati e
-  // hanno un ↺ per tornare al predefinito; in fondo un reset globale. Un valore
-  // non valido viene rifiutato con un errore puntuale, senza toccare gli altri.
-  //
-  // Modello: gli override vivono in una mappa piatta { token: valore }
-  // (settings.themeTokens, REPLACE in storage). Un token è "personalizzato"
-  // SOLO se ha un override diretto valido; i token che ereditano da una
-  // categoria sovrascritta mostrano il valore ereditato (effectiveValue) ma non
-  // risultano personalizzati finché non li si tocca direttamente.
+  // Sezione «token estetici» (#146.3): tutti i token del registro in forma di config testuale.
+  // Gli override vivono in una mappa piatta (settings.themeTokens, REPLACE in storage): un token
+  // è «personalizzato» SOLO con un override diretto, non se eredita da una categoria sovrascritta.
 
   let currentOverrides = {};
   let tokensSaveTimer = null;
 
-  // Tema risolto (light/dark) com'è applicato ora su <html>: i default di alcuni
-  // token differiscono fra chiaro e scuro.
+  // Tema risolto com'è applicato su <html>: i default di alcuni token cambiano fra chiaro e scuro.
   function resolvedTheme() {
     return document.documentElement.dataset.snTheme === 'dark' ? 'dark' : 'light';
   }
@@ -57,7 +44,6 @@
     return !!t && t.type === 'color';
   }
 
-  // Messaggio d'errore puntuale per tipo di token.
   function tokenErrorMsg(name) {
     const t = Tokens && Tokens.get(name);
     switch (t && t.type) {
@@ -69,8 +55,6 @@
     }
   }
 
-  // (Ri)disegna una singola riga dal modello: valore effettivo, stato
-  // "personalizzato", anteprima colore. Cancella eventuali errori.
   function renderTokenRow(name) {
     const input = $(`tok-${name}`);
     if (!input || !Tokens) return;
@@ -122,8 +106,7 @@
       input.addEventListener('blur', () => {
         const v = input.value.trim();
         if (v !== '' && !Tokens.validate(name, v)) {
-          // Lasciato un valore non valido: errore puntuale, gli altri token
-          // restano intatti. Teniamo il testo così l'utente può correggerlo.
+          // Valore non valido: errore puntuale, gli altri token intatti, il testo resta correggibile.
           const errEl = row.querySelector('.sn-token-error');
           errEl.hidden = false;
           errEl.textContent = tokenErrorMsg(name);
@@ -171,9 +154,8 @@
     tokensSaveTimer = setTimeout(persistTokens, 400);
   }
 
-  // Ridisegna tutte le righe TRANNE quella in `exceptName` (che l'utente sta
-  // editando): serve quando si cambia un token-categoria, così i token che ne
-  // ereditano (es. link.color da accent) mostrano subito il valore ereditato.
+  // Ridisegna tutte le righe TRANNE quella in `exceptName`, che l'utente sta editando: serve
+  // quando cambia un token-categoria e chi eredita da lui deve mostrare subito il nuovo valore.
   function renderOtherTokenRows(exceptName) {
     if (!Tokens) return;
     for (const name of Tokens.names()) if (name !== exceptName) renderTokenRow(name);
@@ -185,9 +167,8 @@
     const err = row.querySelector('.sn-token-error');
     const v = input.value.trim();
 
-    // Mentre si digita NON mostriamo l'errore (eviterebbe di lampeggiare "non
-    // valido" a ogni carattere di un colore scritto a mano): l'errore puntuale
-    // compare al blur. Finché il valore non è valido, non applichiamo nulla.
+    // L'errore compare al blur, non mentre si digita: altrimenti lampeggerebbe «non valido» a
+    // ogni carattere di un colore scritto a mano. Finché non è valido non si applica nulla.
     err.hidden = true;
     err.textContent = '';
     row.classList.remove('sn-token-invalid');
@@ -224,13 +205,9 @@
     persistTokens();
   }
 
-  // ── Ripristino completo (#184) ───────────────────────────────────────────
-  // Un solo bottone riporta TUTTE le impostazioni ai predefiniti: non solo i
-  // token estetici o il colore delle tab (che hanno il loro reset locale), ma
-  // anche tema, dimensione del testo, gestione schede, notifiche, ecc. Risolve
-  // il caso in cui una personalizzazione fatta a voce ("colore della barra")
-  // resta appiccicata e i reset parziali non bastano a toglierla. Le chiavi API
-  // si preservano (lo fa il main): un reset estetico non deve sloggare l'utente.
+  // Ripristino completo (#184): un solo bottone riporta TUTTE le impostazioni ai predefiniti,
+  // perché una personalizzazione fatta a voce resta appiccicata e i reset parziali non bastano.
+  // Le chiavi API si preservano (lo fa il main): un reset estetico non deve sloggare l'utente.
   async function resetAllSettings() {
     const Ui = window.SN_CONFIRM_UI;
     const text = 'Riporta TUTTE le impostazioni di Filo ai valori predefiniti: '
@@ -242,17 +219,13 @@
       : window.confirm(`${text} Procedo?`);
     if (!ok) return;
     await chrome.runtime.sendMessage({ type: MSG.RESET_SETTINGS });
-    // Ricarica la pagina: si ri-bootstrappa dai valori ora predefiniti (tema,
-    // token, colore tab applicati da zero), evitando qualunque stato residuo.
+    // Ricarica la pagina: si ri-bootstrappa dai predefiniti, senza stato residuo.
     flashSaved('resetAllSavedHint');
     setTimeout(() => { try { location.reload(); } catch (_) {} }, 350);
   }
 
-  // ── Rilancio dell'intervista di benvenuto (#524) ─────────────────────────
-  // Azzera spunte e conversazione e riporta l'utente dove l'intervista vive:
-  // una scheda nuova. Non tocca né la memoria né le impostazioni già applicate
-  // — rifarla non è disfare quello che Filo ha imparato — e nemmeno la
-  // conversazione di prima: quella finisce nell'archivio qui sotto.
+  // Rilancio dell'intervista (#524): azzera spunte e conversazione, ma non tocca memoria né
+  // impostazioni già applicate — rifarla non è disfare quello che Filo ha imparato.
   async function restartOnboarding() {
     const r = await chrome.runtime.sendMessage({ type: MSG.FILO_RESTART_ONBOARDING });
     if (!r || !r.ok) return;
@@ -271,10 +244,8 @@
     } catch (_) { return 'Intervista di benvenuto'; }
   }
 
-  // Le interviste conservate, rileggibili. La prima conversazione con Filo è la
-  // prima cosa che l'utente gli ha raccontato di sé: rifarne una non la deve
-  // cancellare, e senza un posto dove rileggerla "conservata" non vuol dire
-  // niente. (Portarle anche nella cronologia delle chat è un feedback a parte.)
+  // Le interviste conservate, rileggibili: la prima conversazione è la prima cosa che l'utente
+  // ha raccontato di sé, e «conservata» senza un posto dove rileggerla non vuol dire niente.
   function renderOnboardingArchive(state) {
     const box = $('onboardingArchive');
     if (!box) return;
@@ -327,12 +298,9 @@
     } catch (_) {}
   }
 
-  // ── Sezione "colore identità delle tab" (Preferenze avanzate) ────────────
-  // Stessa estetica "a codice" dei token: una riga per ognuno dei sei parametri
-  // di src/shared/tabColor.js, con nome, valore numerico editabile, intervallo
-  // ammesso e commento. Modificare un valore lo clampa al range, lo persiste e
-  // (via SETTINGS_UPDATED) aggiorna live il colore delle tab. ↺ riporta il
-  // singolo parametro al predefinito; il bottone in fondo li azzera tutti.
+  // Colore identità delle tab: stessa estetica «a codice» dei token, una riga per ognuno dei
+  // sei parametri di src/shared/tabColor.js. Un valore si clampa al range, si persiste e
+  // aggiorna live il colore delle tab; ↺ per uno, il bottone in fondo per tutti.
   let currentTabColor = {};
   let tabColorSaveTimer = null;
 
@@ -381,7 +349,6 @@
       reset.addEventListener('click', () => resetTabColorParam(m.key));
       row.appendChild(reset);
 
-      // Intervallo + commento, su una riga dedicata sotto al controllo.
       const help = document.createElement('span');
       help.className = 'sn-token-error';
       help.hidden = false;
@@ -455,28 +422,24 @@
     tabColorSaveTimer = setTimeout(persistTabColor, 400);
   }
 
-  // Restituisce lo stile testuale corrente dal textarea.
   function currentStyleText() {
     return $('agentStyleText').value;
   }
 
-  // Allinea la select dei preset al testo corrente: se combacia con un preset
-  // noto seleziona quello, altrimenti "Personalizzato".
+  // Se il testo combacia con un preset noto seleziona quello, altrimenti «Personalizzato».
   function syncPresetSelect() {
     const text = currentStyleText().trim();
     const match = AGENT_STYLE_PRESETS.find((p) => p.text.trim() === text);
     $('agentStylePreset').value = match ? match.key : CUSTOM_KEY;
   }
 
-  // ── Lettura ad alta voce (text-to-speech) ────────────────────────────────
   function ttsSupported() {
     return typeof window.speechSynthesis !== 'undefined'
       && typeof window.SpeechSynthesisUtterance === 'function';
   }
 
-  // Popola la select delle voci dalle voci del sistema. getVoices() può tornare
-  // [] al primo giro e popolarsi più tardi (evento voiceschanged), quindi la
-  // richiamiamo anche da lì. Mantiene la scelta corrente se ancora disponibile.
+  // getVoices() può tornare [] al primo giro e popolarsi più tardi (voiceschanged), quindi si
+  // richiama anche da lì. La scelta corrente si mantiene se ancora disponibile.
   function populateVoices(selected) {
     const sel = $('ttsVoice');
     if (!sel || !ttsSupported()) return;
@@ -492,13 +455,9 @@
     if (want && [...sel.options].some((o) => o.value === want)) sel.value = want;
   }
 
-  // Tendina della voce NATURALE (del modello): una voce per riga, raggruppate
-  // per lingua; la prima scelta è "automatica" (segue la lingua del testo).
-  // Le voci sono quelle del MODELLO di lettura in uso (le dice il main: ogni
-  // modello ha i suoi nomi). L'ultima riga, «Altra voce», apre un campo di
-  // testo: è la strada per un modello che Filo non conosce, o per una voce
-  // che non è nell'elenco. Una voce salvata che non è fra le opzioni finisce
-  // lì dentro, così non sparisce.
+  // Voce NATURALE (del modello): le voci sono quelle del MODELLO di lettura in uso, le dice il
+  // main. «Altra voce» apre un campo di testo per un modello che Filo non conosce o una voce
+  // fuori elenco; una voce salvata che non è fra le opzioni finisce lì, così non sparisce.
   const CUSTOM_VOICE = '__custom__';
   function currentModelVoice() {
     const sel = $('ttsModelVoice');
@@ -554,9 +513,8 @@
       sel.value = want;
       if (input) input.value = '';
     } else if (want && V && V.catalogOfVoice(want)) {
-      // Voce di un ALTRO modello, rimasta da prima che il modello cambiasse:
-      // la lettura la ignora e va con la lingua del testo, quindi la pagina
-      // dice la stessa cosa (mostrarla come «altra voce» sarebbe una bugia).
+      // Voce di un ALTRO modello, rimasta da prima: la lettura la ignora e va con la lingua del
+      // testo, quindi la pagina dice lo stesso (mostrarla come «altra voce» sarebbe una bugia).
       sel.value = '';
       if (input) input.value = '';
     } else if (want) {
@@ -596,8 +554,7 @@
   }
 
   let modelPreviewAudio = null;
-  // Ascolta la voce naturale scelta: una frase nella sua lingua, sintetizzata
-  // dal modello (passa dal main come una lettura vera).
+  // Ascolta la voce scelta: una frase nella sua lingua, sintetizzata dal modello via main.
   async function previewModelVoice() {
     const btn = $('ttsModelPreview');
     const status = $('ttsModelPreviewStatus');
@@ -643,11 +600,8 @@
     synth.speak(u);
   }
 
-  // ── Suoneria timer (anteprima tramite WebAudio API) ─────────────────────
-  // Stesso catalogo della dashboard (RINGTONES): riproduce una sequenza di
-  // beep senza file audio. Usato dal pulsante "Prova" in questa pagina.
-  // I toni (sequenze di note + player AudioContext) vivono nel modulo condiviso
-  // SN_SOUNDS, riusato anche dalla shell per il suono delle notifiche (#170.1).
+  // Suoneria timer: stesso catalogo della dashboard, beep sintetizzati senza file audio. I
+  // toni vivono in SN_SOUNDS, riusato anche dalla shell per le notifiche (#170.1).
   const Sounds = window.SN_SOUNDS;
 
   // Riempie il <select> dei suoni notifica con le stesse voci della suoneria.
@@ -671,22 +625,18 @@
     if (Sounds) Sounds.play($('notifSound').value);
   }
 
-  // Clamp dei due campi numerici "liberi" (li usano sia il salvataggio sia il
-  // riallineamento visivo al blur, così ciò che si vede è sempre ciò che è
-  // salvato). idleHours: 1..168 (0/negativo/vuoto → 6 predefinito).
+  // Clamp dei due campi numerici liberi, usato sia dal salvataggio sia dal riallineamento al
+  // blur, così ciò che si vede è sempre ciò che è salvato. idleHours: 1..168 (default 6).
   function clampIdleHours(raw) {
     return Number.isFinite(raw) && raw > 0 ? Math.min(168, raw) : 6;
   }
-  // durata notifica in secondi: 0..120 (0 = resta finché non la chiudi;
-  // negativo/vuoto → 5 predefinito).
+  // durata notifica 0..120 s (0 = resta finché non la chiudi; vuoto o negativo → 5).
   function clampNotifDurationSec(raw) {
     return Number.isFinite(raw) && raw >= 0 ? Math.min(120, raw) : 5;
   }
 
-  // Riallinea un campo numerico al valore realmente salvato (clampato al
-  // range), come fa renderTabColorRow per i parametri del colore delle tab:
-  // appena si lascia il campo, sparisce il numero fuori scala digitato e
-  // compare il valore in uso.
+  // Riallinea il campo al valore realmente salvato e clampato: appena si lascia il campo
+  // sparisce il numero fuori scala digitato e compare quello in uso.
   function canonAutoArchiveIdle() {
     const input = $('autoArchiveIdleHours');
     if (!input) return;
@@ -776,11 +726,9 @@
 
     const terminal = settings.terminal || {};
     $('terminalEnabled').checked = terminal.enabled === true;
-    // PowerShell e cmd esistono solo su Windows. Fuori da lì il comando parte
-    // comunque (il main ricade su /bin/sh — vedi src/main/services/terminal.js),
-    // ma offrire tre shell di Windows a chi sta su un Mac è un menu che mente:
-    // qui si mostrano quelle vere. Il valore salvato di una macchina Windows
-    // (es. "powershell") si legge come "la shell di sistema".
+    // PowerShell e cmd esistono solo su Windows: fuori da lì il comando parte lo stesso (il main
+    // ricade su /bin/sh) ma offrire tre shell di Windows a chi sta su un Mac è un menu che mente.
+    // Il valore salvato da una macchina Windows si legge come «la shell di sistema».
     const suWindows = (() => { try { return (window.filo?.sistema || 'win32') === 'win32'; } catch (_) { return true; } })();
     const sel = $('terminalShell');
     if (!suWindows) {
@@ -796,7 +744,6 @@
     const shellOpt = [...sel.options].find((o) => o.value === salvata);
     sel.value = shellOpt ? salvata : predefinita;
 
-    // Notifiche (durata + suono)
     populateNotifSounds();
     const notif = settings.notifications || {};
     const dur = Number(notif.durationSec);
@@ -806,7 +753,6 @@
     const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
     $('notifSound').value = nsOpt ? notifSound : 'default';
 
-    // Suoneria timer
     const ringtone = settings.timerRingtone || 'default';
     const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
     $('timerRingtone').value = ringOpt ? ringtone : 'default';
@@ -833,13 +779,10 @@
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
 
-    // Token estetici: il tema è già applicato su <html>, quindi i default
-    // mostrati riflettono il tema risolto corrente.
     currentOverrides = { ...(settings.themeTokens || {}) };
     buildTokenSection();
 
-    // Colore identità delle tab: parti dai valori salvati (clampati ai range),
-    // o dai default se mancano.
+    // Colore delle tab: valori salvati clampati ai range, o i default se mancano.
     currentTabColor = TabColor
       ? TabColor.clampParams(settings.tabColor || {})
       : { ...(settings.tabColor || {}) };
@@ -849,12 +792,10 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
 
-    // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
       Bootstrap.applyTheme($('theme').value);
-      // I default di alcuni token cambiano fra chiaro e scuro: ridisegna le
-      // righe così i valori predefiniti mostrati seguono il nuovo tema (gli
-      // override diretti sono indipendenti dal tema e restano).
+      // I default di alcuni token cambiano col tema: ridisegna le righe. Gli override diretti sono
+      // indipendenti dal tema e restano.
       if (Tokens) for (const name of Tokens.names()) renderTokenRow(name);
       persist();
     });
@@ -866,8 +807,7 @@
     $('autoArchiveEnabled').addEventListener('change', persist);
     $('autoArchiveOnClose').addEventListener('change', persist);
     $('autoArchiveIdleHours').addEventListener('change', persist);
-    // Al blur riallinea il campo al valore realmente salvato (clampato), così
-    // un numero fuori scala non resta a schermo a mentire sul valore in uso.
+    // Al blur il campo torna al valore salvato: un numero fuori scala non deve restare a mentire.
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
     $('terminalEnabled').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
@@ -894,19 +834,16 @@
     });
     $('ttsModelVoiceCustom').addEventListener('input', persistDebounced);
 
-    // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
     $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
     $('notifSoundPreview').addEventListener('click', previewNotifSound);
 
-    // Suoneria timer: salva al cambio + anteprima.
     $('timerRingtone').addEventListener('change', persist);
     $('timerRingtonePreview').addEventListener('click', previewRingtone);
 
-    // Stile agente: scegliere un preset riempie il textarea; scrivere a mano
-    // riallinea la select su "Personalizzato".
+    // Scrivere a mano riallinea la select su «Personalizzato».
     $('agentStylePreset').addEventListener('change', () => {
       const key = $('agentStylePreset').value;
       if (key !== CUSTOM_KEY) {
@@ -919,14 +856,11 @@
     });
     $('agentStyleText').addEventListener('input', () => { syncPresetSelect(); persistDebounced(); });
 
-    // Token estetici: reset globale ai predefiniti.
     $('resetAllTokens').addEventListener('click', resetAllTokens);
 
-    // Colore identità delle tab: reset globale ai predefiniti.
     const resetTabColorBtn = $('resetAllTabColor');
     if (resetTabColorBtn) resetTabColorBtn.addEventListener('click', resetAllTabColor);
 
-    // Ripristino completo di TUTTE le impostazioni ai predefiniti (#184).
     const resetAllBtn = $('resetAllSettings');
     if (resetAllBtn) resetAllBtn.addEventListener('click', resetAllSettings);
 
@@ -934,8 +868,8 @@
     if (onbBtn) onbBtn.addEventListener('click', restartOnboarding);
     loadOnboardingArchive();
 
-    // Con tema "Come il sistema", il tema risolto può cambiare quando l'OS passa
-    // chiaro↔scuro: ridisegna le righe così i default mostrati restano corretti.
+    // Con tema «Come il sistema» il tema risolto cambia quando l'OS passa chiaro↔scuro:
+    // ridisegna le righe, o i default mostrati mentirebbero.
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
         if ((window.SN_PAGE_THEME || 'system') !== 'system' || !Tokens) return;
