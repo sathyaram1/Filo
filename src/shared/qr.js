@@ -1,16 +1,8 @@
-// Generatore di QR code puro, senza dipendenze né rete.
-// Port fedele dell'algoritmo "qrcode-generator" di Kazuhiko Arase (MIT /
-// pubblico dominio): byte mode (UTF-8), versioni 1-40, scelta automatica
-// della versione minima, mask pattern con penalty scoring.
-//
-// Genera tutto in locale: l'URL della pagina NON viene mai inviato a servizi
-// esterni (privacy — è il QR della pagina che stai visitando).
-//
-// API:
-//   SN_QR.toMatrix(text, { ecc })  -> boolean[][]  (true = modulo nero)
-//   SN_QR.create(text, ecc)        -> { moduleCount, isDark(r,c) }
-//
-// `ecc` ∈ 'L' | 'M' | 'Q' | 'H' (default 'M').
+// Generatore di QR puro, senza dipendenze né rete: port fedele di «qrcode-generator» di
+// Kazuhiko Arase (MIT), byte mode UTF-8, versioni 1-40, versione minima automatica, mask
+// con penalty scoring. Tutto in locale: l'URL della pagina non esce verso nessun servizio.
+// SN_QR.toMatrix(text, { ecc }) -> boolean[][]; SN_QR.create(text, ecc) -> { moduleCount,
+// isDark(r,c) }. `ecc` ∈ 'L' | 'M' | 'Q' | 'H' (default 'M').
 
 (function (global) {
   'use strict';
@@ -225,8 +217,8 @@
     },
   };
 
-  // ---- RS block table (versioni 1-40, livelli L/M/Q/H) ----
-  // Indici per livello: M=0, L=1, H=2, Q=3 — l'ordine delle colonne DEVE combaciare con la mappa ECC qui sopra.
+  // Tabella dei blocchi RS (versioni 1-40, livelli L/M/Q/H). Indici per livello: M=0, L=1,
+  // H=2, Q=3 — l'ordine delle colonne DEVE combaciare con la mappa ECC qui sopra.
   const RS_BLOCK_TABLE = [
     [1, 26, 16], [1, 26, 19], [1, 26, 9], [1, 26, 13],
     [1, 44, 28], [1, 44, 34], [1, 44, 16], [1, 44, 22],
@@ -484,8 +476,8 @@
     return data;
   };
 
-  // Capienza in byte (byte mode) per ogni versione/livello. Calcolata dai
-  // dataCount dei blocchi RS meno l'overhead di header (4 bit mode + length).
+  // Capienza in byte (byte mode) per versione/livello: dai dataCount dei blocchi RS meno
+  // l'header (4 bit mode + length).
   function byteCapacity(typeNumber, eccLevel) {
     const rsBlocks = QRRSBlock.getRSBlocks(typeNumber, eccLevel);
     let totalDataCount = 0;
