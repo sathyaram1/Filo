@@ -238,6 +238,13 @@ jobs:
           … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno in rossi-nuovi.txt, nell'artifact di questa esecuzione (Actions)"
           fi
           VERDETTO=$(tail -c 2500 verdetto.log 2>/dev/null || echo "(nessun verdetto: la suite non e partita)")
+          # Senza il JSON la suite o non e partita o e stata interrotta dal
+          # tetto del passo (un Electron rimasto appeso): lo si dice, perche
+          # chi prende il feedback sappia cosa cercare nel registro.
+          if [ ! -f suite-risultati.json ]; then
+            VERDETTO="La suite non ha lasciato il JSON dei risultati: o non e partita, oppure ha superato il tetto del passo (200 minuti, di norma un Electron rimasto appeso) ed e stata interrotta prima della fine. Guarda il registro del passo Suite Playwright completa in questa esecuzione (Actions).
+          ${VERDETTO}"
+          fi
           TESTO="${PREMESSA}
 
           Rossi nuovi (${N_TUTTE:-0}):
