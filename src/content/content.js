@@ -21,7 +21,7 @@
   // Ctrl+Alt): mai scriverla a mano in un'etichetta.
   const Tasti = self.SN_TASTI;
 
-  // I moduli estratti (actions.js, menuIcons.js, tts.js, editBox.js) hanno bisogno di pezzi che restano qui: settings correnti, pasteContext, blocklist, ultimo evento mouse. Le funzioni sono dichiarazioni hoisted, quindi i riferimenti sono già validi.
+  // I moduli estratti (actions.js, menuIcons.js, tts.js, editBox.js) hanno bisogno di pezzi che restano qui: settings, pasteContext, blocklist, ultimo evento mouse. Sono dichiarazioni hoisted, quindi i riferimenti sono già validi.
   Actions.init({
     getPasteContext: () => pasteContext,
     restorePasteContext: () => restorePasteContext(),
@@ -44,8 +44,7 @@
   });
 
   let settings = null;
-  // Rispecchia la modalità "contenuto a tutto schermo" del main (vedi tabs.js).
-  // Serve a mostrare l'icona/etichetta giusta nella voce di menu "Schermo intero".
+  // Rispecchia la modalità «contenuto a tutto schermo» del main (tabs.js): serve a dare icona ed etichetta giuste alla voce «Schermo intero».
   let contentFullscreen = false;
   // Vero appena il main ci ha annunciato un cambio: da quel momento l'annuncio
   // è più fresco della risposta alla domanda che facciamo al montaggio, e vince.
@@ -58,11 +57,10 @@
   let consegnaChiediEsc = null;
 
   // Chi si è preso l'Esc, a schermo intero. Sopra la pagina Filo apre roba che si chiude con Esc (il menu, la risposta, il QR, il ritaglio, una conferma, un'immagine ingrandita), e a schermo intero quel tasto serve anche a uscire: chi arriva prima vince, e se esce la modalità il riquadro resta aperto su una pagina che nessuno voleva lasciare (#514).
-  // La domanda giusta non è «quali riquadri esistono» — quella è una lista che invecchia — ma «questo Esc l'ha usato qualcuno?». Si risponde dopo che il tasto ha finito il suo giro nel documento, guardando tre cose.
-  // · I pezzi di UI DISEGNATI DA NOI presenti un istante prima: l'elenco lo tiene SN_FILO_UI nel mondo isolato dei content script, e ci finisce solo chi passa da `mark()`, quindi un riquadro nuovo è coperto il giorno che nasce. Non basta la RADICE: Filo apre roba anche DENTRO un suo riquadro (l'immagine ingrandita nel box «Invia feedback»), quindi di ogni radice si guarda anche il SOTTOALBERO — roba nostra anche sui siti.
-  // · Su una pagina DI FILO, in più, che il documento si sia ALLEGGERITO nel giro del tasto: i riquadri delle pagine interne non passano da `mark()` e non dichiarano niente, e sparire è l'unica cosa che fanno tutti. Conta solo quella direzione: una pagina che sta AGGIUNGENDO roba (una risposta che arriva a pezzi) non deve poter rivendicare il tasto.
-  // · Su una pagina DI FILO, sempre in più, che qualcuno l'abbia consumato: lì tutto quello che si vede è roba nostra. Sui siti no — un sito che si mangia i tasti non deve poterci chiudere dentro allo schermo intero. Se nessuno l'ha usato chiediamo noi di uscire, e se non chiediamo niente il main esce da solo: l'errore possibile è un'uscita in ritardo, mai restare chiusi dentro.
-  // Tutto questo presuppone che il tasto arrivi. Quando lo schermo pieno è del SITO (il pulsante del suo lettore video) se lo prende il browser e non lo vede né il documento né il main: lì va CHIESTO (`chiediEsc` più sotto), e poi il giro è questo, identico.
+  // La domanda giusta non è «quali riquadri esistono» — quella è una lista che invecchia — ma «questo Esc l'ha usato qualcuno?», e si risponde a giro finito guardando tre cose.
+  // · I pezzi di UI DISEGNATI DA NOI presenti un istante prima: l'elenco lo tiene SN_FILO_UI nel mondo isolato, e ci finisce solo chi passa da `mark()`, quindi un riquadro nuovo è coperto dal giorno che nasce. Non basta la RADICE — Filo apre roba anche DENTRO un suo riquadro (l'immagine ingrandita nel box «Invia feedback») — quindi si guarda anche il SOTTOALBERO, che è roba nostra anche sui siti.
+  // · Su una pagina DI FILO, in più, che il documento si sia ALLEGGERITO nel giro del tasto (i riquadri delle pagine interne non passano da `mark()`, e sparire è l'unica cosa che fanno tutti); e che qualcuno l'abbia consumato, perché lì tutto quello che si vede è roba nostra. Sui siti no: un sito che si mangia i tasti non deve poterci chiudere dentro allo schermo intero.
+  // Se nessuno l'ha usato chiediamo noi di uscire, e se non chiediamo niente il main esce da solo: l'errore ammesso è un'uscita in ritardo, mai restare chiusi dentro. Tutto questo però presuppone che il tasto arrivi: quando lo schermo pieno è del SITO se lo prende il browser, e lì va CHIESTO (`chiediEsc` più sotto).
   const PAGINA_DI_FILO = (() => {
     try { return location.protocol === 'filo:'; } catch (_) { return false; }
   })();
@@ -85,7 +83,6 @@
     return dopo.elementi < prima.elementi || dopo.nascosti > prima.nascosti;
   }
 
-  // Le nostre radici aperte adesso, ciascuna col peso del suo sottoalbero.
   function pezziDiFiloSullaPagina() {
     const out = [];
     try {
@@ -126,14 +123,10 @@
 
     // Le tre cose qui sotto descrivono la SCHEDA: un riquadro incorporato campionerebbe il colore di una pubblicità e conterebbe lo scroll di un rettangolo, quindi restano alla pagina che lo ospita (#405).
     if (!IS_SUBFRAME) {
-      // "Vetro smerigliato" della tab attiva (§1.1): campiona il colore della cima
-      // della pagina e mandalo al main, che tinge la tab. Attivo su tutte le pagine
-      // (anche quelle senza menu), perché il colore non c'entra col menu.
+      // «Vetro smerigliato» della tab attiva (§1.1): il colore della cima pagina va al main, che tinge la tab. Attivo su tutte le pagine, anche quelle senza menu: il colore non c'entra col menu.
       try { PageColor.startTabColorSampler(); } catch (_) {}
 
-      // Colore identità del sito (§1.2): calcolato una volta (theme-color →
-      // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-      // e lo applica attenuato alle tab inattive.
+      // Colore identità del sito (§1.2): calcolato una volta (theme-color → manifest → favicon) e mandato al main, che lo cacha per dominio e lo applica attenuato alle tab inattive.
       try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
       // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
@@ -152,9 +145,8 @@
 
     // Esc esce dalla modalità «contenuto a tutto schermo» (vedi tabs.js), ma solo se non se l'è preso nessun altro: due ascoltatori sullo stesso tasto, il primo in capture fotografa la pagina prima di chiunque, l'ultimo in bolla su window vede se il tasto è arrivato in fondo intatto. La decisione arriva a giro finito.
     let escInCorso = null;
-    // Quante volte di fila un Esc può essere rivendicato. Nessuna prova vale all'infinito, perché nessuna è a prova di pagina ostile: chi si prendesse ogni Esc ci chiuderebbe dentro allo schermo intero. Due tetti, perché le prove non valgono uguale, e il taglio è COSA si è visto succedere, non su quale pagina siamo.
-    // PROVA FORTE (qualcosa è sparito davvero): tetto tre, come i riquadri che si possono impilare. PROVA DEBOLE (solo «qualcuno ha consumato il tasto», senza che sia sparito niente): tetto uno, così chi se li prende tutti senza chiudere niente si ferma al secondo. Contarli INSIEME era il difetto: con due riquadri aperti sopra una pagina di Filo il secondo Esc chiudeva quello di sotto e portava via anche lo schermo intero.
-    // Una prova forte riazzera il conto delle deboli: la pagina sta dimostrando di fare qualcosa, non di mangiare tasti. Il tetto che GARANTISCE resta quello del main (ESC_RIVENDICAZIONI_MAX in src/main/tabs.js); questo è il primo filtro e vive nella pagina. Entrambi i conteggi tornano a zero appena l'utente fa qualcos'altro.
+    // Quante volte di fila un Esc può essere rivendicato. Nessuna prova vale all'infinito, perché nessuna è a prova di pagina ostile: chi si prendesse ogni Esc ci chiuderebbe dentro allo schermo intero. Due tetti, e il taglio è COSA si è visto succedere, non su quale pagina siamo.
+    // PROVA FORTE (qualcosa è sparito davvero): tetto tre, come i riquadri impilabili. PROVA DEBOLE (solo «qualcuno ha consumato il tasto»): tetto uno. Contarli insieme era il difetto — con due riquadri aperti il secondo Esc portava via anche lo schermo intero. Una prova forte riazzera le deboli; il tetto che GARANTISCE resta quello del main (ESC_RIVENDICAZIONI_MAX in src/main/tabs.js), e i conteggi si azzerano appena l'utente fa altro.
     const TETTO_PROVE_FORTI = 3;
     const TETTO_PROVE_DEBOLI = 1;
     let escFortiDiFila = 0;
@@ -164,9 +156,8 @@
 
     // L'Esc ce l'ha consegnato il main invece di arrivare da sé? Succede quando lo schermo pieno è del SITO, dove il browser se lo mangia per uscire e nessun riquadro di Filo lo vedrebbe (#514). Quando è consegnato la deroga qui sotto non vale: il main ha già deciso che quel tasto passa di qui.
     let escInoltrato = false;
-    // Chiedere l'Esc al browser, sopra lo schermo pieno di un SITO. Lì il tasto se lo mangia il browser per uscire: il documento non lo vede mai, e ogni riquadro che Filo aveva aperto veniva scavalcato, restava aperto, e la modalità se ne andava lo stesso (#514).
-    // Col Keyboard Lock il tasto si può CHIEDERE: da quel momento arriva a Filo, che lo consegna alla pagina e decide con la regola di sempre. Lo chiediamo solo mentre c'è qualcosa di nostro aperto, e solo l'Esc: un sito che si è preso dei tasti suoi (un gioco, un desktop remoto) non deve perderli.
-    // Appena non abbiamo più niente aperto lo restituiamo. Dove il browser non lo presta (pagina non sicura, API assente) resta il comportamento di prima: si esce, e il riquadro va chiuso a mano.
+    // Chiedere l'Esc al browser, sopra lo schermo pieno di un SITO. Lì se lo mangia il browser per uscire: il documento non lo vede mai, e ogni riquadro di Filo veniva scavalcato mentre la modalità se ne andava lo stesso (#514).
+    // Col Keyboard Lock il tasto si può CHIEDERE, e da lì Filo lo consegna alla pagina e decide con la regola di sempre. Lo chiediamo solo mentre c'è qualcosa di nostro aperto e solo l'Esc — un sito che si è preso dei tasti suoi non deve perderli — e lo restituiamo appena non serve. Dove il browser non lo presta resta il comportamento di prima: si esce, e il riquadro va chiuso a mano.
     let tastoChiesto = false;
     // Dentro un riquadro incorporato il tasto serve uguale, ma il browser lo presta solo al frame principale: la richiesta si gira a lui passando dal main, e chi la riceve la esegue con questa stessa funzione.
     function chiediEsc() {
@@ -189,7 +180,7 @@
       if (IS_SUBFRAME) return; // il tasto ce l'ha il frame principale, non noi
       try { navigator.keyboard?.unlock?.(); } catch (_) {}
     }
-    // Il frame principale lo restituisce a fine schermo pieno, l'unico momento in cui quel tasto smette di essere in ballo: un riquadro aperto dentro un riquadro incorporato non dice quando si chiude, e tenerlo un attimo in più non toglie niente a nessuno.
+    // Il frame principale lo restituisce a fine schermo pieno, l'unico momento in cui quel tasto smette di essere in ballo: un riquadro dentro un riquadro non dice quando si chiude, e tenerlo un attimo in più non toglie niente.
     consegnaChiediEsc = () => { if (document.fullscreenElement) chiediEsc(); };
     try {
       self.SN_FILO_UI?.onMark?.(() => {
@@ -259,7 +250,6 @@
       const rivendica = (forte && escFortiDiFila < TETTO_PROVE_FORTI)
         || (debole && escDeboliDiFila < TETTO_PROVE_DEBOLI);
       if (rivendica) {
-        // Era il tasto del riquadro: il main annulla l'uscita che aspettava.
         if (forte) { escFortiDiFila++; escDeboliDiFila = 0; } else { escDeboliDiFila++; }
         try { chrome.runtime.sendMessage({ type: MSG.ESC_CONSUMATO }).catch(() => {}); } catch (_) {}
         return;
@@ -287,9 +277,8 @@
 
     SpellCheck.init(settings);
 
-    // window + capture, la fase più precoce possibile: alcune pagine gestiscono il tasto destro su certi SVG e lasciavano comparire il menu nativo del browser.
-    // Sulle pagine web il page-preload ha già un listener window+capture registrato a document_start, prima di ogni script di pagina: gli passiamo il nostro handler, così siamo i primi anche sui siti che bloccano il contextmenu con stopImmediatePropagation (YouTube, Reddit).
-    // Sulle pagine filo:// si registra in BUBBLE: sono pagine NOSTRE, e alcune hanno un menu contestuale proprio (chip dell'archivio, card dei mazzi) che in capture + stopPropagation veniva soffocato. In bubble l'handler della pagina scatta per primo, e se ha già gestito il click il menu di Filo si fa da parte.
+    // window + capture, la fase più precoce possibile: alcune pagine gestiscono il tasto destro su certi SVG e lasciavano comparire il menu nativo. Sulle pagine web il page-preload ha già un listener window+capture a document_start, prima di ogni script di pagina: gli passiamo il nostro handler, così siamo i primi anche sui siti che bloccano il contextmenu (YouTube, Reddit).
+    // Sulle pagine filo:// si registra in BUBBLE: sono pagine NOSTRE e alcune hanno un menu contestuale proprio (chip dell'archivio, card dei mazzi) che in capture + stopPropagation veniva soffocato. In bubble l'handler della pagina scatta per primo, e se ha già gestito il click il menu di Filo si fa da parte.
     if (typeof self.__snSetContextMenuHandler === 'function') {
       self.__snSetContextMenuHandler(onContextMenu);
     } else {
@@ -314,7 +303,6 @@
   // Il campionatore colore tab + colore identità sito vivono in
   // src/content/pageColor.js (SN_PAGE_COLOR), caricato prima di questo file.
 
-  // Segnali di attività della tab (§2.1): quando l'utente ha interagito l'ultima volta, quanto ha scorso (0-100%) e se ha sporcato un form. Throttled per non inondare l'IPC.
   function startTabActivityReporter() {
     let formDirty = false;
     let lastSentScroll = -1;
@@ -337,14 +325,12 @@
       lastSend = performance.now();
     }
 
-    // Interazione "vera": pointer/keyboard → aggiorna lastInteractionAt (throttle 2s).
     function onInteract() {
       const since = performance.now() - lastSend;
       if (since < 2000) return;
       send({});
     }
 
-    // Scroll: aggiorna % (throttle ~500ms) e conta come interazione.
     function onScroll() {
       if (pending) return;
       pending = true;
@@ -358,7 +344,6 @@
       }, 500);
     }
 
-    // Form "sporco": primo input/change su un campo editabile. Si manda una volta.
     function onFormInput(e) {
       if (formDirty) return;
       const t = e.target;
@@ -376,7 +361,6 @@
     window.addEventListener('input', onFormInput, { passive: true, capture: true });
     window.addEventListener('change', onFormInput, { passive: true, capture: true });
 
-    // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
   }
 
@@ -421,11 +405,7 @@
     document.documentElement.dataset.snTheme = resolved;
   }
 
-  // Override dei token estetici (#146.1): le superfici Filo iniettate nella
-  // pagina (menu, popup, sidebar) usano le variabili --sn-* di theme.css; qui
-  // emettiamo le variabili sovrascritte dall'utente. Idempotente (upsert per
-  // id), quindi innocuo anche sulle pagine filo:// dove pageBootstrap fa già
-  // lo stesso lavoro.
+  // Override dei token estetici (#146.1): le superfici Filo nella pagina usano le variabili --sn-* di theme.css, e qui emettiamo quelle sovrascritte dall'utente. Idempotente (upsert per id), quindi innocuo anche sulle pagine filo://, dove ci pensa già pageBootstrap.
   function applyThemeTokens(tokens) {
     const reg = self.SN_THEME_TOKENS;
     if (reg) reg.applyToDocument(document, tokens || {});
@@ -472,9 +452,8 @@
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
     if (e.shiftKey) return;
 
-    // stopPropagation impedisce alla pagina ospite (YouTube, Reddit) di mostrare il SUO menu: il nostro listener è registrato per primo, quindi interrompe la discesa in cattura prima degli handler che i siti mettono su document e sugli elementi.
-    // NON stopImmediatePropagation: a quel timing (document_start, nel bridge del page-preload) sopprimerebbe anche l'evento `context-menu` del webContents che Chromium emette nel main, quello che porta `misspelledWord` e `dictionarySuggestions` del correttore nativo. Con stopPropagation quel canale resta aperto.
-    // E nemmeno e.preventDefault(): in Electron il menu nativo non appare da solo — lo costruisce l'app — e preventDefault chiuderebbe lo stesso canale.
+    // stopPropagation impedisce alla pagina ospite (YouTube, Reddit) di mostrare il SUO menu: il nostro listener è registrato per primo e interrompe la discesa in cattura prima degli handler che i siti mettono su document e sugli elementi.
+    // NON stopImmediatePropagation: a quel timing sopprimerebbe anche l'evento `context-menu` del webContents, quello che porta `misspelledWord` e `dictionarySuggestions` del correttore nativo. E nemmeno e.preventDefault(): in Electron il menu nativo non appare da solo, e chiuderebbe lo stesso canale.
     e.stopPropagation();
 
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
@@ -504,8 +483,6 @@
             await openSpellWordMenu(inputEl, wordCtx, e);
             return;
           }
-          // Nessuna parola sotto il cursore (es. click su area vuota): menu
-          // normale, che riserva comunque lo slot per il nativo se arriva.
           await openNormalMenuAt(e);
           return;
         }
@@ -525,7 +502,6 @@
     if (el.disabled || el.readOnly) return false;
     const t = (el.getAttribute('type') || 'text').toLowerCase();
     if (!['text', 'search', ''].includes(t)) return false;
-    // Rispetta la disabilitazione esplicita.
     const sc = el.getAttribute('spellcheck');
     if (sc === 'false') return false;
     return true;
@@ -693,9 +669,8 @@
   }
 
   // Il freno di TUTTO ciò che si adotta da sotto. Guardare sotto al punto cliccato serve — le schede sono strati: copertina, anteprima, velo col titolo, e il collegamento sotto a tutto — ma si adotta solo ciò che l'utente sta GUARDANDO.
-  // Altrimenti basta un elemento opaco davanti (la barra fissa di un sito di notizie, il riquadro dei cookie, un manto steso sulla pagina) perché il menu parli di un collegamento invisibile scelto dalla pagina: «Copia URL», «Apri in nuova tab» e «Condividi» finirebbero lì sopra, con in più l'analisi del link che parte da sola e va a scaricarlo.
-  // Due condizioni, entrambe misurate sui rettangoli. 1) Si sovrappongono davvero: l'intersezione copre almeno metà del più piccolo dei due — un incrocio d'angolo fra una barra laterale e una riga di testo non è una sovrapposizione.
-  // 2) Nessuno dei due INGHIOTTE l'altro: non basta circondarlo, deve stare su un'altra scala. Una scheda col bordo circonda la copertina da tutti e quattro i lati ed è la forma più comune degli elenchi — fermarsi al «circonda» faceva sparire le voci del collegamento su mezzo web (#444). Un contenitore ABBRACCIA quello che tiene, mentre una barra o un manto sono grandi come la finestra e nascondono una frazione minima di sé.
+  // Altrimenti basta un elemento opaco davanti (la barra fissa di un sito di notizie, il riquadro dei cookie, un manto steso sulla pagina) perché il menu parli di un collegamento invisibile scelto dalla pagina: «Copia URL», «Apri in nuova tab» e «Condividi» finirebbero lì sopra, con l'analisi del link che parte da sola e va a scaricarlo.
+  // Due condizioni sui rettangoli: 1) l'intersezione copre almeno metà del più piccolo dei due; 2) nessuno dei due INGHIOTTE l'altro — non basta circondarlo, deve stare su un'altra scala. Una scheda col bordo circonda la copertina da tutti i lati ed è la forma più comune degli elenchi: fermarsi al «circonda» faceva sparire le voci del collegamento su mezzo web (#444). Un contenitore ABBRACCIA, mentre una barra o un manto sono grandi come la finestra e nascondono una frazione minima di sé.
   const SURFACE_SLACK_PX = 4;
   // Quanta parte del più grande deve occupare il più piccolo perché il primo lo contenga invece di coprirlo. Le misure vere stanno lontane dalla soglia da tutte e due le parti: una copertina rientrata di dodici pixel occupa l'85% della scheda, una barra fissa sopra una riga di titoli sta sotto al 5%.
   const CONTAINER_MIN_RATIO = 0.35;
@@ -729,11 +704,9 @@
     return false;
   }
 
-  // La seconda prova: quello che sta sotto lo si VEDE. Il conto sui rettangoli sa dire «stessa scala, stessa scheda», ma sulla FORMA non dice niente, e due cose opposte hanno la stessa forma.
-  // La riga di un elenco di risultati — miniatura piccola a sinistra, testo a destra, il collegamento steso sopra a tutto — ha lo stesso ingombro di una barra fissa sopra un titolo scivolato sotto. Nessuna soglia di area separa i due casi, e il freno geometrico buttava via i comandi del filmato proprio sulle miniature vere (#444).
-  // A separarli è se l'utente li vede: sopra la miniatura c'è un collegamento invisibile, sopra il titolo sepolto una barra opaca. Quindi, se fra il punto cliccato e il candidato non c'è niente di DIPINTO, il candidato è quello che l'utente sta guardando, e la geometria non ha più niente da aggiungere.
+  // La seconda prova: quello che sta sotto lo si VEDE. Il conto sui rettangoli sa dire «stessa scala, stessa scheda», ma sulla FORMA non dice niente, e due cose opposte hanno la stessa forma: la riga di un elenco di risultati (miniatura piccola, testo a destra, collegamento steso sopra a tutto) ha lo stesso ingombro di una barra fissa sopra un titolo scivolato sotto.
+  // Nessuna soglia di area separa i due casi, e il freno geometrico buttava via i comandi del filmato proprio sulle miniature vere (#444). A separarli è se l'utente li vede: se fra il punto cliccato e il candidato non c'è niente di DIPINTO, il candidato è quello che sta guardando, e la geometria non ha più niente da aggiungere.
 
-  // Elementi che si disegnano da soli, senza bisogno di sfondo o di testo.
   const SELF_PAINTING_TAGS = new Set([
     'IMG', 'VIDEO', 'AUDIO', 'CANVAS', 'SVG', 'IFRAME', 'EMBED', 'OBJECT',
     'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'HR', 'PROGRESS', 'METER',
@@ -809,10 +782,7 @@
       && view.y >= rect.top && view.y <= rect.bottom;
   }
 
-  // C'è qualcosa di DIPINTO davanti a `el`, nel punto cliccato? La pila arriva
-  // da `deepElementsFromPoint`, cioè nell'ordine in cui si vedono: chi sta
-  // prima sta sopra. Antenati e discendenti di `el` non contano — un antenato
-  // disegna dietro al figlio, e un figlio per chi guarda È `el`.
+  // C'è qualcosa di DIPINTO davanti a `el` nel punto cliccato? La pila arriva da `deepElementsFromPoint`, nell'ordine in cui si vede: chi sta prima sta sopra. Antenati e discendenti di `el` non contano — un antenato disegna dietro al figlio, e un figlio per chi guarda È `el`.
   function coveredAt(el, view) {
     // Senza la pila non possiamo dimostrare niente: in dubbio resta il freno
     // geometrico, cioè il comportamento di prima.
@@ -823,22 +793,13 @@
       if (!coversPoint(other.getBoundingClientRect?.(), view)) continue;
       if (paintsSomething(other)) return true;
     }
-    // `el` non è nella pila sotto il cursore: non possiamo dire che si veda.
     return true;
   }
 
-  // Quanto del candidato può essere nascosto da uno strato dipinto ESTRANEO
-  // prima che smetta di essere "quello che l'utente sta guardando". La striscia
-  // del titolo copre il 31% della sua scheda e deve passare; un titolo
-  // scivolato per metà sotto una barra, un pannello su mezza scheda o su tutta
-  // devono fermarsi. Le misure vere stanno da una parte e dall'altra del 45%.
+  // Quanto del candidato può essere nascosto da uno strato dipinto ESTRANEO prima che smetta di essere quello che l'utente sta guardando. La striscia del titolo copre il 31% della sua scheda e deve passare; un titolo per metà sotto una barra, o un pannello su mezza scheda, devono fermarsi.
   const HIDDEN_FRACTION = 0.45;
 
-  // L'alfa più basso fra i colori di un'immagine CSS (i gradienti, nel
-  // computed style, serializzano i colori come rgb()/rgba()). Se non si trova
-  // nessun colore leggibile si risponde 1: nel dubbio la sfumatura copre —
-  // l'errore prudente spegne una voce di menu, quello imprudente regala al
-  // menu un collegamento scelto dalla pagina.
+  // L'alfa più basso fra i colori di un'immagine CSS (nel computed style i gradienti serializzano i colori come rgb()/rgba()). Senza nessun colore leggibile si risponde 1: nel dubbio la sfumatura copre — l'errore prudente spegne una voce di menu, quello imprudente regala al menu un collegamento scelto dalla pagina.
   function minAlphaInCssImage(bg) {
     let min = Infinity;
     const re = /rgba?\([^)]+\)/g;
@@ -884,12 +845,8 @@
     return false;
   }
 
-  // Un contenuto "appartiene" a un collegamento quando ci sta dentro (nel DOM) o
-  // quando ne occupa la superficie (i player veri coprono il filmato col proprio
-  // overlay, e le schede impilano copertina e link invece di annidarli). Il DOM
-  // viene prima: se la pagina dice già che copertina e collegamento sono la
-  // stessa scheda, rifare il conto sui rettangoli può solo buttare via
-  // un'informazione certa (#444).
+  // Un contenuto «appartiene» a un collegamento quando ci sta dentro nel DOM o quando ne occupa la superficie (i player coprono il filmato col proprio overlay, e le schede impilano copertina e link invece di annidarli).
+  // Il DOM viene prima: se la pagina dice già che copertina e collegamento sono la stessa scheda, rifare il conto sui rettangoli può solo buttare via un'informazione certa (#444).
   function belongsTo(el, linkEl, view) {
     if (!el || !linkEl) return false;
     return containsAcrossShadow(linkEl, el) || sameSurface(el, linkEl, view);
@@ -916,39 +873,23 @@
         && !hiddenBehindForeignPaint(b, view)
         && !swallows(ra, rb) && !swallows(rb, ra)) return true;
     }
-    // Il conto sui rettangoli non decide. Resta la prova diretta, e vale da
-    // sola: se né l'uno né l'altro hanno qualcosa di dipinto davanti, in questo
-    // punto sono tutti e due sotto gli occhi dell'utente — che è l'unica cosa
-    // che il freno voleva sapere (#444). È il caso della riga di risultati con
-    // la miniatura piccola, dove la geometria da sola sbagliava.
+    // Il conto sui rettangoli non decide. Resta la prova diretta, e vale da sola: se né l'uno né l'altro hanno qualcosa di dipinto davanti, in questo punto sono entrambi sotto gli occhi dell'utente — l'unica cosa che il freno voleva sapere (#444).
     return !coveredAt(a, view) && !coveredAt(b, view);
   }
 
-  // Cosa c'è sotto il tasto destro. Sta in un posto solo perché il menu si apre
-  // da due strade (menu normale e menu di correzione): quando il riconoscimento
-  // era copiato in tutt'e due, lo stesso clic rischiava di dare due menu diversi
-  // a seconda che sotto ci fosse o no una parola da correggere.
+  // Cosa c'è sotto il tasto destro. Sta in un posto solo perché il menu si apre da due strade (normale e correzione): col riconoscimento copiato in tutte e due, lo stesso clic rischiava di dare due menu diversi a seconda che sotto ci fosse o no una parola da correggere.
   function detectContext(target, x, y) {
     const linkEl = closestAcrossShadow(target, 'a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : closestAcrossShadow(target, 'img');
-    // Un solo colpo di hit-test per tutte e tre le famiglie: è la stessa pila di
-    // strati, e ripeterlo tre volte costerebbe tre risalite dell'albero a ogni
-    // apertura del menu.
-    // `view` = la pila PIÙ il punto: i due dati vanno sempre insieme, perché
-    // il rettangolo di un elemento vale come misura solo se copre quel punto.
+    // Un solo colpo di hit-test per tutte e tre le famiglie: è la stessa pila di strati, e ripeterlo tre volte costerebbe tre risalite dell'albero a ogni apertura. `view` = la pila PIÙ il punto: vanno sempre insieme, perché il rettangolo di un elemento vale come misura solo se copre quel punto.
     const view = { stack: deepElementsFromPoint(x, y), x, y };
     const { mediaEl, mediaUnder } = findMedia(target, view);
-    // Cercati solo se non sono già fra gli antenati.
     const imgUnder = imgEl ? null : findUnder(view, 'img', target);
     return {
       linkEl,
       imgEl,
       mediaEl,
-      // I tre `*Under` escono da qui GIÀ VAGLIATI: o `sameSurface` li ha
-      // confrontati con l'elemento davvero cliccato, o è il DOM a legarli alla
-      // copertina adottata. Chi legge questi campi più a valle non deve rifare
-      // il controllo (né può dimenticarselo — è così che la barra fissa e il
-      // manto invisibile erano finiti nel menu).
+      // I tre `*Under` escono da qui GIÀ VAGLIATI: o `sameSurface` li ha confrontati con l'elemento davvero cliccato, o è il DOM a legarli alla copertina adottata. Chi li legge più a valle non deve rifare il controllo, né può dimenticarselo — è così che la barra fissa e il manto invisibile erano finiti nel menu.
       mediaUnder,
       imgUnder,
       // Il collegamento lo può dire il DOM (la copertina adottata sta dentro un
@@ -960,9 +901,8 @@
     };
   }
 
-  // Il collegamento della scheda, quando non è fra gli antenati del punto cliccato. Due strade, e la prima è il DOM (#444): se abbiamo già adottato la copertina e quella sta DENTRO un <a>, la pagina ha già detto che sono la stessa scheda — rifare il conto sui rettangoli lì toglie e non aggiunge, perché fra collegamento e copertina ci sono bordo, imbottitura e spesso il titolo.
-  // Solo quando il DOM non lega niente si guarda la pila di strati, e lì il freno geometrico è l'unica cosa che regge: il collegamento sepolto è coperto da una COPERTINA nel punto cliccato? Una copertina è la faccia visibile di una scheda, e un link invisibile lì sotto è la scheda stessa.
-  // Del TESTO o uno sfondo dipinto non sono la faccia di nessun link: un collegamento invisibile sotto un paragrafo è l'esca del #499, non una scheda — l'utente sta guardando il paragrafo, e il paragrafo non è la sua rappresentazione.
+  // Il collegamento della scheda quando non è fra gli antenati. Due strade, e la prima è il DOM (#444): se la copertina adottata sta DENTRO un <a>, la pagina ha già detto che sono la stessa scheda, e rifare il conto sui rettangoli lì toglie e non aggiunge — fra collegamento e copertina ci sono bordo, imbottitura e spesso il titolo.
+  // Solo quando il DOM non lega niente si guarda la pila: il collegamento sepolto è coperto da una COPERTINA nel punto cliccato? Quella è la faccia visibile di una scheda, e un link invisibile lì sotto è la scheda stessa. Testo e sfondi dipinti no: un collegamento sotto un paragrafo è l'esca del #499, non una scheda.
   const COVER_TAGS = new Set(['IMG', 'VIDEO', 'CANVAS', 'SVG', 'PICTURE', 'OBJECT', 'EMBED']);
   function coverInFront(hit, view) {
     if (!Array.isArray(view?.stack)) return false;
@@ -995,10 +935,7 @@
     return hit;
   }
 
-  // La regola sta in un posto solo, src/shared/campoTesto.js: la stessa
-  // domanda ("si sta scrivendo qui?") arriva anche dal processo principale,
-  // perché su Mac è la barra dei menu a prendersi Ctrl/Cmd+Z prima di noi
-  // (#527). Due copie avrebbero cominciato a divergere subito.
+  // La regola sta in un posto solo, src/shared/campoTesto.js: la stessa domanda («si sta scrivendo qui?») arriva anche dal processo principale, perché su Mac è la barra dei menu a prendersi Ctrl/Cmd+Z prima di noi (#527). Due copie avrebbero cominciato a divergere subito.
   function isEditable(el) {
     return !!(self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.campoDiTesto(el));
   }
@@ -1042,12 +979,8 @@
     });
   }
 
-  // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
-  // correggi automaticamente, gestisci correttore.
   function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = []) {
     const items = [];
-    // Suggerimenti alternativi (dal correttore nativo): righe "applica" sopra le
-    // azioni di gestione. Saltiamo quello già mostrato come correzione primaria.
     const seen = new Set([String(correction || '').toLowerCase()]);
     for (const s of altSuggestions) {
       const v = String(s || '').trim();
@@ -1087,8 +1020,6 @@
     return items;
   }
 
-  // Sub-menu per una correzione "blu" (errore contestuale): mostra la spiegazione
-  // dell'errore come riga informativa, poi link a "Gestisci correttore".
   function buildBlueSubItems(issue) {
     return [
       {
@@ -1105,9 +1036,8 @@
     ];
   }
 
-  // Click destro su parola in editabile (errore «rosso», non coperta da un issue blu). Le regole:
-  // mai il flash «Cerco una correzione…» — la riga compare solo se sappiamo che la parola è davvero sbagliata; se la cache locale l'ha già marcata errata mostriamo subito la correzione, e se il contesto è cambiato rilanciamo in background aggiornando la riga quando arriva.
-  // Senza cache si riserva uno slot nascosto e si spara la richiesta: lo slot si rivela SOLO a misspelled=true. Il prefetch proattivo sta in spellcheck.js: qui si consuma la cache e si coprono i casi non prefetchati (testo pre-esistente, editor che non emettono gli input event attesi).
+  // Click destro su parola in editabile (errore «rosso», non coperta da un issue blu). Mai il flash «Cerco una correzione…»: la riga compare solo se sappiamo che la parola è davvero sbagliata. Se la cache l'ha già marcata errata si mostra subito, e se il contesto è cambiato si rilancia in background aggiornando la riga.
+  // Senza cache si riserva uno slot nascosto e si spara la richiesta: lo slot si rivela SOLO a misspelled=true. Il prefetch proattivo sta in spellcheck.js; qui si consuma la cache e si coprono i casi non prefetchati.
   async function openSpellWordMenu(editableEl, wordCtx, mouseEvent) {
     const items = await buildBaseItemsAt(mouseEvent);
 
@@ -1121,7 +1051,7 @@
 
     let updateCorrection = null;
 
-    // Suggerimenti del correttore NATIVO per questa parola: immediati e affidabili, sono quelli dietro lo zigzag rosso. Di solito sono già in cache quando il menu si compone (c'è il round-trip della cronologia appunti prima), altrimenti si rivelano appena arrivano. Sono la base che garantisce «qualcosa appare» anche senza LLM.
+    // Suggerimenti del correttore NATIVO: immediati e affidabili, sono quelli dietro lo zigzag rosso. Di solito sono già in cache quando il menu si compone, altrimenti si rivelano appena arrivano. Sono la base che garantisce «qualcosa appare» anche senza LLM.
     const nativeSugg = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
     const nativeTop = nativeSugg[0] || '';
 
@@ -1129,8 +1059,6 @@
       editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word },
     );
 
-    // Correzione mostrata inizialmente: la cache LLM se usabile, altrimenti il
-    // primo suggerimento nativo. `shown` traccia se una riga è visibile.
     let visibleCorrection = cachedUsable ? cached.correction : nativeTop;
     let shown = !!visibleCorrection;
 
@@ -1178,8 +1106,6 @@
       });
     };
 
-    // Se i suggerimenti nativi non erano ancora arrivati al momento dell'apertura,
-    // rivela appena arrivano (a meno che non si stia già mostrando qualcosa).
     if (!shown) {
       SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => {
         if (shown || !sugg?.length) return;
@@ -1187,8 +1113,7 @@
       });
     }
 
-    // Helper: applica la risposta dell'LLM. Quando l'LLM declina ma esiste un
-    // suggerimento nativo, manteniamo comunque quest'ultimo visibile.
+    // Se l'LLM declina ma c'è un suggerimento nativo, quest'ultimo resta visibile.
     const applyResponse = (res) => {
       // Si cache SOLO un verdetto definitivo dell'LLM. Se `res` è null la chiamata è FALLITA (nessuna chiave, errore del provider, parse fallito): cacharla come «non errata» impedirebbe al prossimo click destro di rilanciare e — peggio — soffocherebbe il suggerimento nativo, lasciando la parola segnata in rosso senza correzione nel menu.
       if (res) {
@@ -1203,7 +1128,6 @@
         const freshNative = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
         const freshTop = freshNative[0] || '';
         if (freshTop) {
-          // Il correttore nativo ha comunque marcato la parola: mostra il nativo.
           if (!shown || visibleCorrection !== freshTop) revealCorrection(freshTop, freshNative);
         } else if (shown) {
           updateCorrection({ remove: true });
@@ -1212,7 +1136,6 @@
         }
         return;
       }
-      // Correzione LLM (contestuale): preferiscila, mantenendo i nativi come alternative.
       revealCorrection(res.correction, (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || nativeSugg);
     };
 
@@ -1227,8 +1150,6 @@
   async function openSpellBlueMenu(editableEl, issue, mouseEvent) {
     const items = await buildBaseItemsAt(mouseEvent);
 
-    // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
-    // Per le ripetizioni (correction === '') etichettiamo con un'azione esplicita.
     let label;
     if (issue.correction) {
       label = issue.correction;
@@ -1353,7 +1274,6 @@
     ];
   }
 
-  // Azioni sul collegamento (senza la sezione "Spiega", come sopra).
   function buildLinkActionItems(linkEl) {
     const out = [
       {
@@ -1532,9 +1452,6 @@
 
   // Le azioni del tasto destro (appunti, screenshot, OCR, salva/condividi/cerca, color picker, QR, spiegazioni inline) vivono in src/content/actions.js, caricato prima di questo file; le dipendenze gliele passa Actions.init() in testa.
 
-  // La traduzione di pagina (e il suo stato) vive in
-  // src/content/translatePage.js (SN_TRANSLATE_PAGE), caricato prima di questo file.
-
   function openHelpSidebar(context) {
     Sidebar.open(context);
   }
@@ -1608,7 +1525,6 @@
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
-      // Shortcut save-for-later: il SW chiede al content il payload.
       if (msg.command === 'save-for-later') {
         if (isBlocked()) { sendResponse({ savePayload: null }); return; }
         sendResponse({ savePayload: Actions.buildSavePayload() });
@@ -1646,13 +1562,9 @@
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     }
-    // save-for-later è gestito direttamente nel background
   }
 
   // Lettura ad alta voce e dettatura vivono in src/content/tts.js, caricato prima di questo file; le dipendenze gliele passa TTS.init() in testa.
-
-  // Il box "Modifica" (preview + diff + conferma) vive in
-  // src/content/editBox.js (SN_EDITBOX), caricato prima di questo file.
 
   init();
 })();

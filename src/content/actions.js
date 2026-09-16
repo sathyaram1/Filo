@@ -39,7 +39,6 @@
     return global.SN_URL_NAV.isShareableAddress(raw);
   }
 
-  // Ritorna true se ha davvero copiato.
   function copyUrlToClipboard(url) {
     if (!isAddress(url)) {
       Popup.showToast(I18n.t('toast_not_an_address'));
@@ -91,7 +90,6 @@
     return imagePlaceholderLabel();
   }
 
-  // Incolla dagli appunti: prima si cercano le immagini, poi il testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
     try {
@@ -214,7 +212,6 @@
           cancelable: true,
         });
         const notCancelled = el.dispatchEvent(evt);
-        // Se l'evento è stato cancellato (preventDefault), la pagina lo ha gestito.
         if (!notCancelled) return true;
       } catch (_) {}
     }
@@ -282,7 +279,6 @@
         });
         handled = !el.dispatchEvent(evt);
       } catch (_) {}
-      // (2) fallback: execCommand insertText (editor "non controllati").
       if (!handled) {
         try { document.execCommand('insertText', false, text); } catch (_) {}
       }
@@ -576,7 +572,6 @@
     };
   }
 
-  // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
   function buildInlineExplainImage(imgEl) {
     return {
       type: 'inline',
@@ -623,7 +618,6 @@
     };
   }
 
-  // Sezione inline "Spiega link": niente apertura del link, solo metadati OG e dominio.
   function buildInlineExplainLink(linkEl) {
     return {
       type: 'inline',
@@ -719,7 +713,6 @@
     for (const p of POPULAR) {
       if (host === p) break;
       if (host.endsWith('.' + p)) break;
-      // typosquatting: distanza Levenshtein ≤ 2 sul dominio principale
       if (levenshteinSmall(host, p, 2)) { flags.push('typosquatting:' + p); break; }
     }
     return flags;
@@ -866,7 +859,6 @@
       const r = await fetch(imgEl.currentSrc || imgEl.src);
       const blob = await r.blob();
       let pngBlob = blob;
-      // Clipboard API supporta image/png; converte se serve
       if (blob.type !== 'image/png') {
         const url = URL.createObjectURL(blob);
         const img = new Image();
@@ -1272,7 +1264,6 @@
         Object.assign(d.style, { position: 'absolute', background: 'rgba(0,0,0,0.45)', cursor: cursorRule });
         return d;
       });
-      // All'inizio (nessun drag) tutto il viewport è coperto.
       Object.assign(mask[0].style, { left: '0', top: '0', right: '0', bottom: '0' });
       mask.forEach((d) => overlay.appendChild(d));
 
@@ -1323,7 +1314,6 @@
         const w = maxX - minX, h = maxY - minY;
         cleanup();
         if (w < 4 || h < 4) { resolve(null); return; }
-        // Scala da CSS px a pixel della cattura.
         const sx = img.naturalWidth / vw;
         const sy = img.naturalHeight / vh;
         const cx = Math.round(minX * sx), cy = Math.round(minY * sy);
@@ -1417,7 +1407,6 @@
       const text = (res.text || '').trim();
       if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
-        // Fallback DOM se la Clipboard API è bloccata.
         const ta = document.createElement('textarea');
         ta.value = text;
         ta.style.position = 'fixed'; ta.style.left = '-9999px';
@@ -1467,7 +1456,6 @@
       try {
         await navigator.clipboard.writeText(hex);
       } catch (_) {
-        // Fallback: textarea + execCommand se la clipboard API è bloccata.
         const ta = document.createElement('textarea');
         ta.value = hex;
         ta.style.position = 'fixed'; ta.style.left = '-9999px';
@@ -1477,7 +1465,6 @@
       }
       Popup.showToast(I18n.t('toast_color_copied') + hex, { duration: 2500 });
     } catch (_) {
-      // L'utente ha annullato (Esc) — nessun toast.
     }
   }
 
@@ -1504,7 +1491,6 @@
     const cell = 8;             // px per modulo nel PNG/SVG sorgente
     const dim = total * cell;
 
-    // Costruisce l'SVG del QR (nero su bianco) con quiet zone.
     const rects = [];
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) {
@@ -1582,8 +1568,6 @@
         base.push('border:1px solid var(--sn-border,#e0dcd4)', 'background:transparent', 'color:var(--sn-fg,#1a1918)');
       }
       b.style.cssText = base.join(';');
-      // Hover coerente con il resto della UI Filo (l'accento sul bordo dei
-      // secondari, leggero scurimento sui primari).
       b.addEventListener('mouseenter', () => {
         if (primary) b.style.filter = 'brightness(1.08)';
         else b.style.borderColor = 'var(--sn-accent,#c45a3b)';
@@ -1632,8 +1616,6 @@
     document.documentElement.appendChild(overlay);
   }
 
-  // Converte la matrice QR in un PNG e lo scarica. Usa un canvas off-DOM:
-  // disegna i moduli neri su sfondo bianco con quiet zone.
   function downloadQrPng(matrix, quiet, url) {
     try {
       const n = matrix.length;
