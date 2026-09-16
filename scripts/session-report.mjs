@@ -349,6 +349,10 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         // nessun comando fosse scaduto.
         if (b.is_error === true && /timed out/i.test(testoDi(b.content).split('\n')[0])) rep.tools.timeouts += 1;
         if (b.is_error === true) rep.tools.errors += 1;
+        if (Array.isArray(finestreAgent) && Number.isFinite(ms)) {
+          const f = finestreAgent.find((x) => x.id === b.tool_use_id);
+          if (f) f.fine = ms;
+        }
         const inizio = inCorso.get(b.tool_use_id);
         if (inizio !== undefined) {
           inCorso.delete(b.tool_use_id);
