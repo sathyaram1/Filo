@@ -469,12 +469,15 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
   };
   const head = run(['rev-parse', '--abbrev-ref', 'HEAD']);
   if (!head.ok) return { ok: false, skipped: false, committed: [], reason: `stato di git illeggibile: ${head.out}` };
+  // Prima della HEAD staccata: durante un rebase la HEAD È staccata, e un
+  // rilascio che «salta» in silenzio lascerebbe il ramo a metà e mai su
+  // origin. Qui si dice cosa finire, e il rilascio si ferma.
+  const aMeta = operazioneGitInCorso(root, { exec });
+  if (aMeta) return { ok: false, skipped: false, committed: [], reason: `${aMeta} è a metà: finiscila prima (risolvi i file, git add, poi git rebase --continue o git commit), o metterei in commit i segni di conflitto` };
   if (head.out === 'HEAD') return { ok: true, skipped: true, committed: [], reason: 'HEAD staccata: non committo' };
   const def = run(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
   const principale = def.ok ? def.out.replace(/^origin\//, '') : '';
   if (isProtectedBranch(head.out, principale)) return { ok: true, skipped: true, committed: [], reason: `'${head.out}' è un ramo protetto: non committo` };
-  const aMeta = operazioneGitInCorso(root, { exec });
-  if (aMeta) return { ok: false, skipped: false, committed: [], reason: `${aMeta} è a metà: finiscila prima (risolvi i file, git add, poi git rebase --continue o git commit), o metterei in commit i segni di conflitto` };
   const st = statoDirectory(root);
   if (!st.ok) return { ok: false, skipped: false, committed: [], reason: `non so cosa c'è fuori dai commit: ${st.motivo}` };
   if (!st.lines.length) return { ok: true, skipped: false, committed: [], reason: '' };
