@@ -254,7 +254,11 @@ export function withRequest(state, branch, { request, sha, at }) {
  *   outcome 'fix'  → verdict 'fix-pending' (con `pending`: i rilievi da correggere)
  *   outcome 'stop' → verdict 'fail'
  */
-export function withCritique(state, branch, { critique, sha, at, caps = CAPS, dirtyFiles = [] }) {
+export function withCritique(state, branch, { critique, sha, at, caps, dirtyFiles = [] }) {
+  // I bilanci arrivano dal server (leggiBilanciDalServer): qui non c'è un
+  // default con cui rimpiazzarli, e mancarne uno è un errore di chi chiama.
+  const mancanti = ROUND.missingCaps(caps);
+  if (mancanti.length) throw new Error(`withCritique senza i bilanci ${mancanti.join(', ')}: si leggono dal server prima di calcolare l'esito`);
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   // Una critica vuota non è un pass: un pass senza una riga di riassunto non
