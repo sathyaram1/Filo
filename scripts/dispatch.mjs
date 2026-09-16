@@ -1945,7 +1945,9 @@ if (isMainModule) {
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
-      // la suite completa in cloud dura più di mezz'ora,
+      // una lavorazione lunga (finish:check più le prove del giro) lo supera
+      // — la suite completa, che lo superava sempre, dal 2026-09-15 gira solo
+      // in GitHub Actions nel lavoro di release, mai nelle routine —
       // quindi senza battito ogni lavorazione lunga arriva alla consegna con un
       // biglietto morto (è già costato un giro intero: venti commit spinti e
       // nessun esito registrato). Chiederlo al prompt del lavoratore è la
