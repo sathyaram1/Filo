@@ -439,6 +439,10 @@
    */
   function decideRound(p) {
     const findings = normalizeFindings(p && p.findings);
+    const mancanti = missingCaps(p && p.caps, p && p.defaults);
+    if (mancanti.length) {
+      throw new Error(`bilanci del verificatore mancanti: ${mancanti.join(', ')} — li imposta l'owner in Gestione → Automazioni (config/routines); nel codice non c'è un default`);
+    }
     const caps = normalizeCaps(p && p.caps, p && p.defaults);
     const counts = normalizeCounts(p && p.counts);
     const left = (k) => caps[k] - counts[k.replace('cap', 'count')];
