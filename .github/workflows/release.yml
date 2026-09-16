@@ -284,6 +284,18 @@ jobs:
               echo "should_release=false" >> "$GITHUB_OUTPUT"
             fi
           fi
+          # ─── SI PUBBLICA SOLO IL COMMIT CHE LA SUITE HA PROVATO ────────
+          # La suite ha provato main com'era un'ora e un quarto fa; se nel
+          # frattempo su main e' entrato altro, questa corsa NON pubblica
+          # (l'ultima riga vince) e non apre feedback: la prossima, sei ore
+          # dopo, riprova sul main nuovo. Senza un commit provato non si
+          # pubblica alla cieca.
+          PROVATO="${{ needs.suite.outputs.sha }}"
+          QUI=$(git rev-parse HEAD)
+          if [ "$QUI" != "$PROVATO" ]; then
+            echo "main e' a $QUI, la suite ha provato ${PROVATO:-(niente)}: questa corsa NON pubblica; la prossima riprova sul main nuovo."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install dipendenze
         if: steps.check.outputs.should_release == 'true'
