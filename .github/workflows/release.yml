@@ -248,7 +248,11 @@ jobs:
           # Senza il JSON la suite o non e partita o e stata interrotta dal
           # tetto del passo (un Electron rimasto appeso): lo si dice, perche
           # chi prende il feedback sappia cosa cercare nel registro.
-          if [ ! -f suite-risultati.json ]; then
+          if [ "$SUITE_OUTCOME" != "success" ] && [ "$SUITE_OUTCOME" != "failure" ]; then
+            # La suite non e' nemmeno partita: e' rosso un passo prima di lei.
+            VERDETTO="La suite NON e partita: e rosso uno dei passi che la preparano (l installazione delle dipendenze con npm ci, il binario di Electron, lo schermo virtuale xvfb). Non e un rosso del codice di Filo: guarda il registro di questa esecuzione (Actions), sistema quel passo (un lockfile fuori sincrono, un download che non arriva) e la prossima corsa riprova.
+          ${VERDETTO}"
+          elif [ ! -f suite-risultati.json ]; then
             VERDETTO="La suite non ha lasciato il JSON dei risultati: o non e partita, oppure ha superato il tetto del passo (200 minuti, di norma un Electron rimasto appeso) ed e stata interrotta prima della fine. Guarda il registro del passo Suite Playwright completa in questa esecuzione (Actions).
           ${VERDETTO}"
           fi
