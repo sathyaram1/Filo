@@ -17,7 +17,9 @@ Questo è il **livello base della piramide dei test** di Filo: test veloci sulla
   logica di categorizzazione URL.
 - **e2e Playwright (`tests/*.spec.mjs`)**: tutto ciò che è **composito**
   (shell + WebContentsView native), interazione UI, wiring IPC. Gli unit test
-  non vedono questi bug — restano dominio degli e2e (regressione completa: cloud).
+  non vedono questi bug — restano dominio degli e2e (la regressione completa
+  gira in GitHub, nel lavoro di release, prima di ogni pubblicazione: a mano
+  non la lancia nessuno).
 
 ## Come caricare un modulo IIFE
 
