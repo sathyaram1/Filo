@@ -6,34 +6,12 @@ const auth = require('../../auth/google-auth');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
 const identitaInvio = require('../../auth/identita-invio');
-// Registra SN_FEEDBACK_THREAD su globalThis (IIFE): ci serve ownerize() per
-// marcare gli invii dell'owner. Idempotente se già caricato dal loader.
+// Di SN_FEEDBACK_THREAD serve ownerize(), per marcare gli invii dell'owner. Idempotente se già caricato dal loader.
 require('../../../shared/feedbackThread.js');
 
-// ── "Salva immagine/video/audio come…" (#274, #400): byte scaricati nel main ─
-
-// Scarica i byte di un'immagine/media presentando il Referer della pagina e i
-// cookie della session — l'unico modo, in Electron 33, di far arrivare il
-// Referer a valle (i download via webContents.downloadURL lo perdono SEMPRE,
-// sia con l'opzione { headers } sia riscrivendolo in onBeforeSendHeaders:
-// verificato). Usiamo http/https di Node invece di net.request perché la
-// richiesta di un download partita dal main viene bloccata
-// (ERR_BLOCKED_BY_CLIENT) dal webRequest della session; il salvataggio
-// esplicito di un'immagine che l'utente già vede non deve passare per
-// l'ad/tracker-blocking.
-//
-// #436 — I byte vanno DIRETTAMENTE SU DISCO man mano che arrivano, non in un
-// Buffer in memoria. Prima il file intero veniva accumulato in RAM prima di
-// scriverlo: serviva un tetto (64MB per le immagini, 512MB per i media) oltre il
-// quale il salvataggio si rifiutava, e anche sotto il tetto un filmato da
-// qualche centinaio di MB appesantiva tutta l'app. Scrivendo di continuo il
-// tetto non serve più — si salva quello che ci sta sul disco — e i byte
-// ricevuti diventano un dato di avanzamento da mostrare.
-//
-// Segue i redirect (max 5) ricalcolando i cookie per l'host di destinazione,
-// come farebbe un browser. Risolve { partPath, filename, totalBytes,
-// receivedBytes } o rigetta con un errore leggibile (HTTP 4xx/5xx, connessione
-// troncata, file vuoto).
+// Scarica i byte di un'immagine o di un media presentando il Referer della pagina e i cookie della session: in Electron 33 è l'unico modo di far arrivare il Referer a valle, perché i download via webContents.downloadURL lo perdono SEMPRE (verificato, sia con l'opzione { headers } sia riscrivendolo in onBeforeSendHeaders).
+// Si usano http/https di Node invece di net.request perché la richiesta di un download partita dal main viene bloccata (ERR_BLOCKED_BY_CLIENT) dal webRequest della session: il salvataggio esplicito di un'immagine che l'utente già vede non deve passare per l'ad/tracker-blocking.
+// #436 — i byte vanno DIRETTAMENTE su disco mentre arrivano: prima il file si accumulava in RAM, serviva un tetto oltre il quale il salvataggio si rifiutava, e anche sotto il tetto un filmato appesantiva tutta l'app. Segue i redirect (max 5) ricalcolando i cookie per l'host di destinazione.
 async function fetchToFile({ url, referrer, session, kind = 'image', onHeaders, onProgress, shouldStop }) {
   const MAX_REDIRECTS = 5;
   let target = url;
@@ -50,9 +28,7 @@ async function fetchToFile({ url, referrer, session, kind = 'image', onHeaders, 
   throw new Error('troppi redirect');
 }
 
-// Una singola richiesta GET. Risolve { redirect:true, location } su 3xx; oppure
-// scrive il body nel file indicato da onHeaders() e risolve a scrittura
-// conclusa. Rigetta su errore/troncamento.
+// Una singola GET: risolve { redirect:true, location } su 3xx, oppure scrive il body nel file indicato da onHeaders() e risolve a scrittura conclusa.
 async function httpGetToFile(target, referrer, session, kind, hooks) {
   const isMedia = kind === 'video' || kind === 'audio';
   let u;
@@ -70,8 +46,7 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
 
   const headers = {
     'User-Agent': 'Mozilla/5.0',
-    // Un Accept che dichiara solo immagini fa rispondere 406 ad alcuni server
-    // quando l'URL è un filmato: per i media chiediamo il tipo giusto.
+    // Un Accept che dichiara solo immagini fa rispondere 406 ad alcuni server quando l'URL è un filmato: per i media si chiede il tipo giusto.
     Accept: isMedia ? `${kind}/*,*/*;q=0.8` : 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
   };
   if (/^https?:/i.test(referrer)) headers.Referer = referrer;
@@ -90,15 +65,12 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
       }
       if (status >= 400) { res.resume(); finish(reject, new Error('HTTP ' + status)); return; }
 
-      // Content-Length: è il dato che rende l'avanzamento una PERCENTUALE
-      // invece di un contatore di byte. Manca sui trasferimenti chunked, e lì
-      // la barra resta indeterminata — come per i download nativi.
+      // Il Content-Length è ciò che rende l'avanzamento una PERCENTUALE invece di un contatore di byte: manca sui trasferimenti chunked, e lì la barra resta indeterminata come per i download nativi.
       const expected = parseInt(res.headers['content-length'], 10);
       const total = Number.isFinite(expected) && expected > 0 ? expected : 0;
       const filename = filenameFromHeaders(res.headers, target);
 
-      // Solo ORA sappiamo nome e dimensione: il chiamante li usa per aprire la
-      // voce nella barra e per decidere dove far crescere il file parziale.
+      // Solo ORA si sanno nome e dimensione: il chiamante li usa per aprire la voce nella barra e per decidere dove far crescere il file parziale.
       let partPath;
       try {
         partPath = hooks.onHeaders({ filename, totalBytes: total });
@@ -113,8 +85,7 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
       res.on('data', (chunk) => {
         received += chunk.length;
         try { hooks.onProgress && hooks.onProgress(received, total); } catch (_) {}
-        // L'utente ha premuto "Annulla" nella barra: chiudi la connessione
-        // invece di continuare a consumare rete e disco.
+        // L'utente ha premuto "Annulla" nella barra: si chiude la connessione invece di continuare a consumare rete e disco.
         if (hooks.shouldStop && hooks.shouldStop()) {
           try { req.destroy(new Error('annullato')); } catch (_) {}
         }
@@ -123,9 +94,7 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
       const out = fs.createWriteStream(partPath);
       pipeline(res, out, (err) => {
         if (err) { finish(reject, err instanceof Error ? err : new Error('download interrotto')); return; }
-        // Connessione chiusa prima della fine del body (res.complete=false) o
-        // Content-Length dichiarato ma non raggiunto ⇒ risposta troncata: è un
-        // errore, non un file valido (niente più silenzio sul download a metà).
+        // Connessione chiusa prima della fine del body, o Content-Length dichiarato e non raggiunto: risposta troncata, quindi un errore e non un file valido.
         if (!res.complete || (total && received < total)) {
           finish(reject, new Error('download interrotto'));
           return;
@@ -135,16 +104,12 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
       });
     });
     req.on('error', (e) => finish(reject, e || new Error('richiesta fallita')));
-    // Timeout di INATTIVITÀ (si riarma a ogni byte): un file da un'ora è
-    // legittimo, mezzo minuto di silenzio assoluto no.
+    // Timeout di INATTIVITÀ, si riarma a ogni byte: un file da un'ora è legittimo, mezzo minuto di silenzio assoluto no.
     req.setTimeout(30000, () => { try { req.destroy(new Error('timeout')); } catch (_) {} });
   });
 }
 
-// Sposta il file finito dalla sua posizione di lavoro alla destinazione scelta.
-// Quasi sempre è una rinomina istantanea (stesso volume); se l'utente ha scelto
-// un altro disco/chiavetta la rinomina non è possibile e si copia — comunque a
-// blocchi, mai passando dalla memoria.
+// Quasi sempre una rinomina istantanea (stesso volume); se l'utente ha scelto un altro disco si copia, comunque a blocchi e mai passando dalla memoria.
 async function moveInto(from, to) {
   const fs = require('node:fs');
   try {
@@ -157,7 +122,7 @@ async function moveInto(from, to) {
   try { await fs.promises.unlink(from); } catch (_) {}
 }
 
-// Nome file dal Content-Disposition (se presente), altrimenti dal path dell'URL.
+// Nome file dal Content-Disposition se c'è, altrimenti dal path dell'URL.
 function filenameFromHeaders(hdrs, url) {
   try {
     const cd = hdrs && hdrs['content-disposition'];
@@ -180,8 +145,7 @@ function filenameFromUrl(url) {
   } catch (_) { return ''; }
 }
 
-// Neutralizza separatori di percorso, caratteri di controllo e traversal: il
-// nome del server è dato ostile e non deve poter uscire dalla cartella scelta.
+// Il nome che arriva dal server è dato ostile: separatori di percorso, caratteri di controllo e traversal vanno neutralizzati, o può uscire dalla cartella scelta.
 function safeImageFilename(name) {
   let n = require('node:path').basename(String(name || ''));
   n = n.replace(/[\x00-\x1f<>:"/\\|?*]/g, '').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
@@ -193,10 +157,7 @@ module.exports = function register(on, ctx) {
   const { MSG, winOf, getEffectiveSettings, modelForAction, buildAttemptChain, broadcastToTabs } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
-  // Titolo breve del feedback, generato da un LLM economico al momento
-  // dell'invio (es. "gestione segreti"). Best-effort: se la catena modelli non
-  // è configurata o tarda, si ripiega sulle prime parole del testo — l'invio
-  // del feedback non deve MAI fallire per colpa del titolo.
+  // Titolo breve del feedback, generato da un LLM economico al momento dell'invio. Best-effort: se la catena non è configurata o tarda si ripiega sulle prime parole del testo — l'invio non deve MAI fallire per colpa del titolo.
   async function generateFeedbackName(text) {
     const fallback = globalThis.SN_FEEDBACK?.fallbackName?.(text) || '';
     const t = String(text || '').trim();
@@ -234,34 +195,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, dataUrl: img.toDataURL() };
   });
 
-  // "Salva immagine come…" (#274). Il vecchio cammino era un <a download>
-  // creato dal content script: Chromium onora l'attributo `download` SOLO per
-  // URL same-origin/blob:/data: — per un'immagine su un ALTRO dominio (la
-  // stragrande maggioranza) lo ignorava e la scheda navigava sull'immagine
-  // senza scaricare nulla.
-  //
-  // Scarichiamo i byte QUI nel main con net.request, poi li scriviamo su disco.
-  // Perché non webContents.downloadURL: molti CDN con protezione hotlink
-  // rispondono 403 alle richieste "anonime" (senza Referer) anche per immagini
-  // che nella pagina si vedono benissimo — e NON c'è modo di presentare il
-  // Referer a un download di Electron 33: né l'opzione { headers } di
-  // downloadURL né una riscrittura in onBeforeSendHeaders vengono onorate per
-  // la richiesta di download (verificato: la richiesta arriva sempre senza
-  // Referer). net.request invece lascia impostare qualsiasi header e usa i
-  // cookie/auth della session del tab, così il salvataggio riesce a prescindere
-  // dall'origine E sui siti con hotlink protection. Un fetch che si interrompe
-  // a metà diventa naturalmente un errore (niente più silenzio), e l'utente
-  // sceglie dove salvare col dialogo nativo "Salva come…".
-  // Un solo cammino per immagini, video e audio: cambia solo `kind` (nome di
-  // ripiego e header Accept). Registrato su DUE messaggi perché il chiamante
-  // dichiara cosa sta salvando (#400: prima del fix il menu su un <video> non
-  // offriva alcun salvataggio).
-  //
-  // #436 — I byte scendono su disco mentre arrivano, e il trasferimento si
-  // iscrive alla barra degli scaricamenti come un download qualsiasi. Prima il
-  // file veniva accumulato in memoria e consegnato tutto in fondo: salvare un
-  // filmato voleva dire fissare uno schermo immobile per minuti, e oltre mezzo
-  // giga il salvataggio si rifiutava proprio.
+  // "Salva immagine come…" (#274): il vecchio cammino era un <a download> del content script, che Chromium onora SOLO per URL same-origin/blob:/data: — per un'immagine su un altro dominio la scheda ci navigava sopra senza scaricare niente.
+  // I byte si scaricano qui nel main perché molti CDN con protezione hotlink rispondono 403 alle richieste senza Referer, e a un download di Electron il Referer non si può dare (vedi fetchToFile). Un fetch che si interrompe a metà diventa naturalmente un errore, e l'utente sceglie dove salvare col dialogo nativo.
+  // Un solo cammino per immagini, video e audio: cambia solo `kind` (nome di ripiego e header Accept), registrato su DUE messaggi perché il chiamante dichiara cosa sta salvando (#400). Dal #436 il trasferimento si iscrive alla barra degli scaricamenti come un download qualsiasi.
   const handleDownload = async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
@@ -276,9 +212,7 @@ module.exports = function register(on, ctx) {
     const referrer = String(sender?.tab?.url || sender?.url || '');
     const fallbackName = kind === 'video' ? 'video' : (kind === 'audio' ? 'audio' : 'immagine');
 
-    // Dove mettere il file: in test si salva diretto (il dialogo nativo non è
-    // automatizzabile), altrimenti "Salva come…" pre-compilato con la cartella
-    // Download e il nome dedotto. Non rigetta MAI: l'esito è nel valore.
+    // In test si salva diretto (il dialogo nativo non è automatizzabile), altrimenti "Salva come…" pre-compilato con cartella Download e nome dedotto. Non rigetta MAI: l'esito è nel valore.
     const pickDestination = async (filename) => {
       const testDir = process.env.FILO_DOWNLOAD_DIR;
       if (testDir) {
@@ -302,11 +236,7 @@ module.exports = function register(on, ctx) {
     let destPromise = null;  // scelta della destinazione (una volta sola)
     let askDest = null;      // come aprirla, quando serve
     let askTimer = null;
-    // Il dialogo si apre alla prima delle due: trasferimento finito, oppure
-    // passato un attimo senza che finisca (⇒ è un file grosso). Così un
-    // salvataggio istantaneo si comporta esattamente come prima — dialogo a
-    // scaricamento concluso, e nessun dialogo se fallisce subito — mentre un
-    // filmato lungo non tiene ferma la connessione aspettando una risposta.
+    // Il dialogo si apre alla prima delle due: trasferimento finito, oppure passato un attimo senza che finisca (è un file grosso). Così un salvataggio istantaneo si comporta come prima, mentre un filmato lungo non tiene ferma la connessione aspettando una risposta.
     const ASK_AFTER_MS = 1200;
     const ensureDest = () => {
       if (!destPromise && askDest) destPromise = askDest();
@@ -325,26 +255,18 @@ module.exports = function register(on, ctx) {
         referrer,
         session: ses,
         kind,
-        // Arrivati gli header sappiamo nome e peso: da qui in poi il
-        // salvataggio non è più cieco.
         onHeaders: ({ filename, totalBytes }) => {
-          // Nome file sicuro: preferisci il Content-Disposition del server, poi
-          // il path dell'URL; neutralizza separatori e tentativi di traversal.
+          // Nome file sicuro: prima il Content-Disposition del server, poi il path dell'URL.
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
-          // La voce nella barra in alto: percentuale, peso e "Annulla", gli
-          // stessi di un download partito da un link.
           entry = downloads.beginManual({ url, filename: name, totalBytes });
-          // Il nome da proporre lo sa solo il server (Content-Disposition):
-          // per questo la destinazione si chiede da qui in poi, mai prima.
+          // Il nome da proporre lo sa solo il server (Content-Disposition): per questo la destinazione si chiede da qui in poi, mai prima.
           askDest = () => pickDestination(name).then((d) => {
             // Chi annulla il dialogo non vuole più il file: ferma anche i byte.
             if (d && (d.cancelled || d.error)) { try { entry.cancel(); } catch (_) {} }
             return d;
           });
           askTimer = setTimeout(ensureDest, ASK_AFTER_MS);
-          // Il file parziale cresce nella cartella dove atterrerebbe un download
-          // nativo: se la destinazione è lì (quasi sempre) la consegna finale è
-          // una rinomina istantanea invece della copia di un filmato intero.
+          // Il file parziale cresce nella cartella dove atterrerebbe un download nativo: se la destinazione è lì (quasi sempre) la consegna finale è una rinomina istantanea invece della copia di un filmato intero.
           partPath = downloads.uniquePath(downloads.downloadsDir(), `${name}.filo-part`);
           return partPath;
         },
@@ -356,13 +278,10 @@ module.exports = function register(on, ctx) {
     }
     if (askTimer) { clearTimeout(askTimer); askTimer = null; }
 
-    // Non siamo mai arrivati agli header (URL morto, 404, host irraggiungibile):
-    // nessuna voce aperta, nessun file da ripulire.
+    // Mai arrivati agli header (URL morto, 404, host irraggiungibile): nessuna voce aperta, nessun file da ripulire.
     if (!entry) return { ok: false, error: downloadError?.message || 'download fallito' };
 
-    // Se il trasferimento è fallito NON chiediamo dove salvare: sarebbe un
-    // dialogo per un file che non c'è. Se invece era già aperto lo si aspetta
-    // (non c'è modo di richiuderlo da qui).
+    // Se il trasferimento è fallito NON si chiede dove salvare: sarebbe un dialogo per un file che non c'è. Se era già aperto lo si aspetta, perché da qui non si può richiudere.
     if (!downloadError && !entry.cancelled()) ensureDest();
     const dest = destPromise ? await destPromise : null;
     const cancelled = entry.cancelled() || !!(dest && dest.cancelled);
@@ -387,17 +306,8 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
 
-  // "Salva file" su un link a un file (#410.2). A differenza di
-  // DOWNLOAD_IMAGE/MEDIA (byte scaricati a mano nel main), qui facciamo partire
-  // il download NATIVO della scheda: webContents.downloadURL emette
-  // will-download sulla sessione della scheda, che services/downloads.js (#410.1)
-  // già intercetta e segue. Risultato IDENTICO al clic sul link — avanzamento in
-  // barra, salvataggio in cartella Download, toast finale, cronologia — così i
-  // due cammini (menu e clic) producono lo stesso effetto visibile. Il nome-file
-  // ostile del server è neutralizzato a valle da downloads.js (safeName), come
-  // per il salvataggio immagini. Non serve il gate "solo superfici interne": far
-  // partire uno scaricamento di un URL è esattamente ciò che il clic sul link fa
-  // già, e non espone cronologia né percorsi su disco (quelli restano riservati).
+  // "Salva file" su un link (#410.2): qui parte il download NATIVO della scheda, che services/downloads.js già intercetta e segue. Risultato IDENTICO al clic sul link — avanzamento in barra, cartella Download, toast finale, cronologia — così menu e clic producono lo stesso effetto visibile.
+  // Niente gate "solo superfici interne": far partire uno scaricamento di un URL è esattamente ciò che il clic sul link fa già, e non espone cronologia né percorsi su disco.
   on(MSG.DOWNLOAD_LINK, async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
@@ -411,27 +321,11 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Download "nativi" della navigazione (#410.1): la shell legge la
-  //    cronologia e comanda i singoli scaricamenti. Il tracking vero vive in
-  //    services/downloads.js (ascolta will-download della sessione). ──────────
-  //
-  // SICUREZZA — confine d'origine (stesso pattern di handlers/storage.js e
-  // handlers/nav.js). Questi handler sono registrati sul canale generico
-  // `filo:message`, raggiungibile ANCHE dai content script delle pagine web
-  // esterne. Senza gate, un sito qualsiasi potrebbe:
-  //   - leggere l'intera cronologia degli scaricamenti (nomi dei file, URL di
-  //     provenienza e percorso ASSOLUTO su disco, che contiene lo username);
-  //   - far APRIRE al sistema operativo un file appena scaricato (su Windows
-  //     equivale a farlo eseguire) o rivelarne la cartella;
-  //   - annullare un download in corso o svuotare la cronologia.
-  // Nessuna pagina web ha motivo di toccare gli scaricamenti: la cronologia e i
-  // comandi sono UI di Filo. Ammessi solo dalle superfici interne (shell e
-  // pagine filo://), come gli altri canali privilegiati.
+  // SICUREZZA — confine d'origine (stesso pattern di handlers/storage.js e nav.js): questi handler stanno sul canale generico `filo:message`, raggiungibile ANCHE dai content script dei siti esterni. Senza gate, un sito qualsiasi potrebbe leggere l'intera cronologia degli scaricamenti (nomi, URL di provenienza e percorso ASSOLUTO su disco, che contiene lo username), far APRIRE al sistema operativo un file appena scaricato (su Windows equivale a farlo eseguire), o annullare un download e svuotare la cronologia.
+  // Nessuna pagina web ha motivo di toccare gli scaricamenti: cronologia e comandi sono UI di Filo.
   const DL = () => require('../downloads');
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
-  // La shell (barra in alto) è la finestra stessa: `filo://shell/shell.html`,
-  // quindi isFilo la copre già; `sender.isShell` è la conferma strutturale per
-  // eventuali finestre interne senza URL filo://.
+  // La shell è `filo://shell/shell.html`, quindi isFilo la copre già; `sender.isShell` è la conferma strutturale per eventuali finestre interne senza URL filo://.
   const internalOnly = (fn) => async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     return fn(msg, sender, origin);
@@ -446,27 +340,21 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg) => DL().resume(msg.id)));
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
-    // Il box feedback è appena entrato/uscito dalla modalità annotazione.
-    // Inoltriamo alla shell (barra in alto) così l'ombra copre TUTTO Filo,
-    // non solo l'area pagina dove vive il content script.
+    // Si inoltra alla shell così l'ombra dell'annotazione copre TUTTO Filo, non solo l'area pagina dove vive il content script.
     const win = winOf(sender);
     try { win?.webContents?.send('shell:feedback-dim', { on: !!msg.on }); } catch (_) {}
     return { ok: true };
   });
 
   on(MSG.FEEDBACK_CLEAR_DRAW, async (msg, sender) => {
-    // "Cancella disegno" dal box (pagina): cancella anche i tratti sulla barra
-    // in alto, che vivono nella shell.
+    // "Cancella disegno" dal box cancella anche i tratti sulla barra in alto, che vivono nella shell.
     const win = winOf(sender);
     try { win?.webContents?.send('shell:feedback-clear-draw'); } catch (_) {}
     return { ok: true };
   });
 
   on(MSG.CAPTURE_FEEDBACK_TOPBAR, async (msg, sender) => {
-    // Scatto annotato della SOLA barra in alto di Filo (shell): il box lo
-    // impila sopra lo screenshot della pagina per ottenere un'immagine di
-    // tutta l'app col disegno. I tratti sono già parte del DOM della shell
-    // (canvas di disegno), quindi vengono catturati direttamente.
+    // Scatto annotato della SOLA barra in alto: il box lo impila sopra lo screenshot della pagina per ottenere un'immagine di tutta l'app col disegno.
     const win = winOf(sender);
     if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
     try {
@@ -480,20 +368,13 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Coda d'invio del feedback (#341): "Invia" NON aspetta più la rete. Il box
-  // sparisce subito e il main si fa carico di consegnare il feedback in
-  // background, ritentando da solo finché la connessione torna. L'invio è
-  // idempotente (submissionId → dedup lato server), quindi i ritentativi non
-  // creano duplicati. La coda è persistita: un feedback accodato offline
-  // sopravvive anche alla chiusura dell'app e riparte al riavvio.
+  // Coda d'invio del feedback (#341): "Invia" NON aspetta la rete — il box sparisce subito e il main consegna in background, ritentando finché la connessione torna. L'invio è idempotente lato server, quindi i ritentativi non creano duplicati, e la coda è persistita: un feedback accodato offline riparte al riavvio.
   const Outbox = globalThis.SN_FEEDBACK_OUTBOX;
   if (Outbox?.init) {
     Outbox.init({
       // Titolo breve generato al momento reale dell'invio (offline → fallback).
       prepare: (payload) => generateFeedbackName(payload?.text),
-      // A invio riuscito: se qualche allegato non è stato caricato, avvisa
-      // l'utente (l'unico canale disponibile dal main verso le pagine è il
-      // broadcast di un toast). Il feedback è comunque partito col resto.
+      // A invio riuscito, se qualche allegato non è stato caricato si avvisa l'utente con un toast: il feedback è comunque partito col resto.
       onDone: (_item, result) => {
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
@@ -510,15 +391,8 @@ module.exports = function register(on, ctx) {
     });
   }
 
-  // Coda dei percorsi condivisi dell'Aiuto (#584). Ritarda apposta l'invio
-  // perché l'ora in cui Firestore riceve un percorso è pubblica e, se fosse
-  // quella della sessione, ricucirebbe i percorsi di una persona su domini
-  // diversi. Qui si riprende quello che era rimasto in coda alla chiusura.
-  //
-  // L'identità va chiesta AL MOMENTO DELL'INVIO, non quando il percorso viene
-  // raccolto: in mezzo passano ore e un token di allora sarebbe scaduto. Chi
-  // sia, e perché il mittente resti anonimo lo stesso, sta in
-  // src/main/auth/identita-invio.js.
+  // Coda dei percorsi condivisi dell'Aiuto (#584): l'invio è ritardato apposta perché l'ora in cui Firestore riceve un percorso è pubblica e, se fosse quella della sessione, ricucirebbe i percorsi di una persona su domini diversi. Qui si riprende quello rimasto in coda alla chiusura.
+  // L'identità si chiede AL MOMENTO DELL'INVIO, non quando il percorso viene raccolto: in mezzo passano ore e un token di allora sarebbe scaduto (vedi src/main/auth/identita-invio.js).
   try {
     globalThis.SN_PATHS_COLLECTOR?.init?.({
       ottieniIdToken: identitaInvio.ottieniIdToken,
@@ -534,10 +408,7 @@ module.exports = function register(on, ctx) {
         throw new Error('SN_FEEDBACK_OUTBOX non caricato nel main process');
       }
       const payload = msg.payload || {};
-      // Se l'utente è loggato come admin (l'owner), marca il suo invio come
-      // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
-      // esterni (arancione). L'identità owner è nota solo qui nel main (auth
-      // singleton): il content script che genera il clientId non sa di esserlo.
+      // Se l'utente è loggato come admin il suo invio si marca "owner:", così la dashboard lo distingue dai feedback dei tester esterni: l'identità owner è nota solo qui nel main, e il content script che genera il clientId non sa di esserlo.
       try {
         if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
           payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
@@ -548,9 +419,7 @@ module.exports = function register(on, ctx) {
         images: (payload.images || []).length,
         url: payload.url,
       });
-      // Accoda e prova a inviare subito, ma NON aspettare la rete: l'ack torna
-      // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
-      // la coda al momento dell'invio (anche offline, col fallback).
+      // Accoda e prova a inviare subito, ma NON aspetta la rete: l'ack torna appena il feedback è al sicuro in coda (persistito).
       const r = await Outbox.enqueue(payload);
       return { ok: true, queued: true, id: r?.id };
     } catch (e) {
@@ -559,10 +428,7 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Recap aggiornamento (C4) ────────────────────────────────────────────────
-  // Calcola, lato main (qui c'è sia app.getVersion() sia le note caricate), il
-  // recap delle versioni saltate dall'ultima vista dall'utente. La pagina home
-  // (dashboard) lo mostra come popup all'avvio.
+  // Recap delle versioni saltate dall'ultima vista dall'utente: si calcola qui, dove ci sono sia la versione dell'app sia le note. La home lo mostra come popup all'avvio.
   function appVersion() {
     try { return require('electron').app.getVersion(); } catch (_) { return '0.0.0'; }
   }
@@ -573,9 +439,7 @@ module.exports = function register(on, ctx) {
     const current = appVersion();
     if (!PN || !globalThis.SN_STORAGE) return { ok: true, current, lastSeen: current, notes: [] };
     const lastSeen = await globalThis.SN_STORAGE.getRaw(KEYS.LAST_SEEN_VERSION, null);
-    // Primissimo avvio (nessuna versione vista): non mostrare nulla a sorpresa,
-    // ma marca la versione corrente come "vista" così il prossimo update parte
-    // pulito. Niente note ritornate → niente popup.
+    // Primissimo avvio (nessuna versione vista): non si mostra nulla a sorpresa, ma si marca la versione corrente come vista, così il prossimo aggiornamento parte pulito.
     if (!lastSeen) {
       try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, current); } catch (_) {}
       return { ok: true, current, lastSeen: null, notes: [] };
@@ -596,9 +460,7 @@ module.exports = function register(on, ctx) {
       if (!url) return { ok: false, error: 'url mancante' };
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);
-      // safeFetch: solo http/https + blocco di loopback/IP privati, rivalidando
-      // ogni redirect. Evita che una pagina usi questa fetch del main per
-      // sondare/leggere servizi locali o interni (SSRF).
+      // safeFetch: solo http/https e blocco di loopback/IP privati, rivalidando ogni redirect — evita che una pagina usi questa fetch del main per sondare o leggere servizi locali e interni (SSRF).
       const r = await safeFetch(url, { signal: controller.signal });
       clearTimeout(t);
       let html = '';

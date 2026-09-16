@@ -1,6 +1,4 @@
-// Handler di dominio: client Scryfall per il deck builder (§13.2) + commander.
-// La pagina non parla mai con Scryfall direttamente: passa da qui, così rate
-// limit e cache sono condivisi fra tutte le superfici.
+// Client Scryfall per il deck builder (§13.2) e il commander: la pagina non parla mai con Scryfall direttamente, così rate limit e cache restano condivisi fra tutte le superfici.
 
 module.exports = function register(on, ctx) {
   const { MSG, handleAIRequest } = ctx;
@@ -11,8 +9,7 @@ module.exports = function register(on, ctx) {
   const IE = globalThis.SN_DECK_IMPORT_EXPORT;
   const { ACTIONS, PROMPTS } = globalThis.SN_CONST;
 
-  // Identity del mazzo per il filtro automatico (§4): dai colori del
-  // commander. Senza commander nessun vincolo (si cerca in tutto Scryfall).
+  // Identity del mazzo dai colori del commander (§4): senza commander nessun vincolo, si cerca in tutto Scryfall.
   async function identityOf(deckId) {
     if (!deckId) return null;
     const deck = await Store.get(String(deckId));
@@ -57,7 +54,7 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Conteggio ristampe per nome (modulo "Prezzo e dati" del detail, §5.2).
+  // Conteggio ristampe per nome (modulo "Prezzo e dati", §5.2).
   on(MSG.SCRYFALL_PRINTS, async (msg) => {
     try {
       const prints = await Scry.prints(msg?.name);
@@ -67,26 +64,16 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Chat unificata del Builder (§3-§4) ─────────────────────────────────────
-  // Ricerca e chat sono lo stesso pannello: il messaggio dell'utente passa
-  // dall'LLM che decide se è una ricerca (→ query Scryfall, eseguita QUI col
-  // filtro identity automatico), una selezione cross-mazzo (→ scryfall_id presi
-  // dal contesto degli altri mazzi) o solo conversazione (→ reply).
+  // Chat unificata del Builder (§3-§4): ricerca e chat sono lo stesso pannello, e l'LLM decide se il messaggio è una ricerca (query Scryfall eseguita QUI col filtro identity automatico), una selezione cross-mazzo o solo conversazione.
 
-  // Riga compatta di contesto per il prompt: nome + tag (+ id dove serve
-  // all'LLM per rispondere con scryfall_id reali, cioè negli ALTRI mazzi).
+  // Riga compatta di contesto per il prompt: nome + tag, con l'id solo dove serve all'LLM per rispondere con scryfall_id reali, cioè negli ALTRI mazzi.
   function cardLine(entry, card, withId) {
     const name = (card && card.name) || entry.scryfall_id;
     const tags = (entry.tags && entry.tags.length) ? ` — tag: ${entry.tags.join(', ')}` : '';
     return withId ? `  - ${name} [id: ${entry.scryfall_id}]${tags}` : `  - ${name}${tags}`;
   }
 
-  // Errore → frase per l'utente (#331): mai un codice HTTP nudo in chat.
-  // La traduzione vive in `shared/chatErrors.js` (#360): è la STESSA per tutte
-  // le chat di Filo — prima era solo qui e la chat della home mostrava ancora
-  // "fetch failed" nudo. Qui passiamo solo l'archivio esterno che questa chat
-  // interroga oltre al servizio AI, così un errore HTTP senza marcatore di
-  // provider viene attribuito a lui.
+  // Errore → frase per l'utente (#331): mai un codice HTTP nudo in chat. La traduzione vive in shared/chatErrors.js ed è la STESSA per tutte le chat di Filo; qui si passa solo l'archivio esterno che questa chat interroga, così un errore HTTP senza marcatore di provider viene attribuito a lui.
   const SCRYFALL_SOURCE = 'Scryfall (l\'archivio delle carte)';
   function friendlyChatError(e) {
     const CE = globalThis.SN_CHAT_ERRORS;
@@ -95,11 +82,7 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.DECKS_CHAT, async (msg, sender) => {
-    // Ragionamento del modello (CoT, #331): accumulato qui e ritornato alla
-    // pagina (che lo mostra in un blocco collassabile); se la pagina ha aperto
-    // un canale live (reasoningReqId) ogni chunk viene anche inoltrato subito,
-    // così si vede "pensare" in diretta. Dichiarato fuori dal try: anche un
-    // turno fallito ritorna il ragionamento raccolto fin lì.
+    // Il ragionamento del modello si accumula qui e torna alla pagina, che lo mostra in un blocco collassabile; con un canale live aperto ogni chunk viene anche inoltrato subito. Dichiarato fuori dal try: anche un turno fallito ritorna il ragionamento raccolto fin lì.
     let reasoning = '';
     try {
       const text = String(msg?.text || '').trim();
@@ -108,18 +91,14 @@ module.exports = function register(on, ctx) {
       const deck = deckId ? await Store.get(deckId) : null;
       if (!deck) return { ok: false, error: 'not_found' };
 
-      // Contesto: nomi/tag del mazzo corrente + degli altri mazzi (per le
-      // query cross-mazzo, §4). I nomi arrivano dalla cache carte (le carte di
-      // un mazzo sono già state risolte quando sono entrate).
+      // Contesto: nomi e tag del mazzo corrente e degli altri (per le query cross-mazzo, §4). I nomi vengono dalla cache carte, già risolti quando sono entrati nel mazzo.
       const all = await Store.list();
       const others = all.filter((d) => d.id !== deck.id);
       const allIds = [];
       for (const d of [deck, ...others]) for (const c of d.carte) allIds.push(c.scryfall_id);
       const known = await Scry.cards(allIds).catch(() => ({}));
 
-      // `let`, non `const`: se in questo stesso turno l'utente stabilisce il
-      // commander (build-around, sotto), va ricalcolato PRIMA della ricerca, così
-      // la query e il filtro duro restano nei colori del commander appena scelto.
+      // `let`, non `const`: se in questo stesso turno l'utente stabilisce il commander va ricalcolato PRIMA della ricerca, così query e filtro duro restano nei colori appena scelti.
       let identityColors = (deck.commanderMeta && Array.isArray(deck.commanderMeta.colors))
         ? deck.commanderMeta.colors : null;
       const sys = PROMPTS.decksChat({
@@ -139,8 +118,6 @@ module.exports = function register(on, ctx) {
         : [];
       const messages = [{ role: 'system', content: sys }, ...history, { role: 'user', content: text }];
 
-      // Canale del ragionamento: accumulo sempre (torna nella risposta) +
-      // inoltro live alla scheda che ha chiesto il turno, se c'è un reqId.
       const wc = sender && sender.wc;
       const reasoningReqId = msg?.reasoningReqId ? String(msg.reasoningReqId) : '';
       const onReasoning = (t) => {
@@ -161,23 +138,12 @@ module.exports = function register(on, ctx) {
       let cardIds = [];
       let cards = {};
       let query = '';
-      // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
-      // perché sia la ricerca sia l'import possono accodare testo alla reply.
+      // Dichiarati qui perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
       let deckOut = null;
 
-      // Imposta il commander AUTOMATICAMENTE (feedback #337). Quando l'utente
-      // vuole costruire attorno a un commander preciso, o dichiara qual è il
-      // commander di QUESTO mazzo (es. "facciamo un mazzo con Krenko", "il mio
-      // commander è Atraxa"), l'agente torna "commander" SENZA una lista da
-      // importare. Filo lo imposta subito e — se nello stesso turno c'è anche una
-      // ricerca — la filtra sui colori del commander appena scelto: senza questo,
-      // la ricerca partirebbe con "(nessun vincolo)" e proporrebbe carte fuori
-      // colore, cioè l'esatto attrito segnalato. NON tocca un commander già
-      // impostato (serve un'azione esplicita/dedicata, §8.4) e resta reversibile
-      // ("Rimuovi commander", feedback #302). L'import di una lista incollata
-      // (parsed.import) è il ramo SEPARATO più sotto, dove il commander è invece
-      // un CANDIDATO da confermare insieme alle carte, mai scritto in automatico.
+      // Commander impostato AUTOMATICAMENTE quando l'utente dichiara attorno a chi costruire (#337): se nello stesso turno c'è anche una ricerca viene filtrata sui colori del commander appena scelto — senza, partirebbe "senza vincolo" e proporrebbe carte fuori colore.
+      // NON tocca un commander già impostato (serve un'azione dedicata, §8.4) e resta reversibile. L'import di una lista incollata è il ramo SEPARATO più sotto, dove il commander è un CANDIDATO da confermare, mai scritto in automatico.
       let commanderJustSet = false;
       if (parsed.commanderName && !parsed.import.length && !deck.commander) {
         const found = await Scry.named(parsed.commanderName).catch(() => null);
@@ -199,12 +165,8 @@ module.exports = function register(on, ctx) {
         }
       }
       if (parsed.query) {
-        // Filtro identity AUTOMATICO (§4): lo aggiunge search/buildSearchQuery;
-        // se l'utente/LLM ha già un vincolo id esplicito, quello vince.
-        // La query la scrive il MODELLO e può essere sintatticamente invalida
-        // (Scryfall risponde 400): non buttare l'intero turno (#331) — si
-        // riprova UNA volta facendo correggere la query al modello stesso, e
-        // se non ne esce si spiega il problema in chiaro nella reply.
+        // La query la scrive il MODELLO e può essere sintatticamente invalida (Scryfall risponde 400): invece di buttare l'intero turno (#331) si riprova UNA volta facendo correggere la query al modello stesso, e se non ne esce si spiega il problema in chiaro nella reply.
+        // Il filtro identity lo aggiunge buildSearchQuery; un vincolo `id:` esplicito dell'utente vince.
         let sr = null;
         try {
           sr = await Scry.search(parsed.query, { identity: identityColors });
@@ -213,7 +175,6 @@ module.exports = function register(on, ctx) {
           const detail = String((e1 && e1.details) || '');
           let explained = false;
           if (Number.isFinite(status) && status >= 400 && status < 500 && status !== 429) {
-            // Query rifiutata (sintassi): il modello la corregge o spiega.
             try {
               const retryMessages = [...messages,
                 { role: 'assistant', content: r.text },
@@ -230,18 +191,14 @@ module.exports = function register(on, ctx) {
                 onReasoning,
               });
               const p2 = Q.parseAgentReply(r2.text);
-              // La reply del retry si accoda solo se aggiunge qualcosa (il
-              // modello a volte ripete la stessa frase del primo tentativo).
+              // La reply del retry si accoda solo se aggiunge qualcosa: il modello a volte ripete la stessa frase del primo tentativo.
               if (p2.reply && p2.reply !== parsed.reply) {
                 reply = [reply, p2.reply].filter(Boolean).join('\n');
               }
               if (p2.query) {
-                // Il modello ha riprovato: se anche questa fallisce si passa
-                // alla spiegazione generica qui sotto.
                 sr = await Scry.search(p2.query, { identity: identityColors });
               } else if (p2.reply) {
-                // Niente query: il modello ha SPIEGATO il problema — è la
-                // risposta per l'utente, il messaggio generico non serve.
+                // Niente query: il modello ha SPIEGATO il problema, ed è la risposta per l'utente — il messaggio generico non serve.
                 explained = true;
               }
             } catch (_) { sr = null; }
@@ -256,12 +213,7 @@ module.exports = function register(on, ctx) {
           cardIds = sr.cards.map((c) => c.id);
           for (const c of sr.cards) cards[c.id] = c;
           query = sr.query;
-          // Filtro semantico (§4.1): la query era LARGA apposta (sinonimi, per
-          // non perdere carte). Se il modello ha dato un "filter", un LLM
-          // economico giudica carta-per-carta se rispetta l'intento, in batch,
-          // con cache (carta, criterio). Best-effort: un errore o un filtro che
-          // svuota TUTTO non deve lasciare l'utente a mani vuote → si ricade
-          // sui risultati larghi.
+          // Filtro semantico (§4.1): la query era LARGA apposta, per non perdere carte, quindi un LLM economico giudica carta-per-carta se rispettano l'intento, in batch e con cache (carta, criterio). Best-effort: un errore o un filtro che svuota TUTTO ricade sui risultati larghi, l'utente non resta a mani vuote.
           if (parsed.filter && cardIds.length) {
             try {
               const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
@@ -275,27 +227,18 @@ module.exports = function register(on, ctx) {
           }
         }
       } else if (parsed.cards.length) {
-        // Cross-mazzo: gli id vengono dal contesto (mai inventati) → risolti
-        // dalla cache; quelli ignoti si scartano.
+        // Cross-mazzo: gli id vengono dal contesto, mai inventati, e si risolvono dalla cache; quelli ignoti si scartano.
         cards = await Scry.cards(parsed.cards).catch(() => ({}));
         cardIds = parsed.cards.filter((id) => cards[id]);
       }
 
-      // Invariante DURA di color identity (§4/§8.4): l'agente non deve MAI
-      // proporre carte fuori dai colori del commander. Il filtro sulla QUERY
-      // (buildSearchQuery, `id<=`) copre il caso normale, ma il modello può
-      // scriversi un vincolo `id:` esplicito sbagliato (che quel filtro lascia
-      // passare, per rispettare l'override manuale dell'utente) o pescare da un
-      // altro mazzo carte fuori identità: qui si applica il filtro sui DATI
-      // reali della carta (colorIdentity ⊆ colori commander), che nessuna
-      // sintassi di query può aggirare. L'import via chat (lista incollata
-      // dall'utente, più sotto) resta fuori: è una scelta esplicita dell'utente,
-      // non una proposta dell'agente, e la riga di legalità la segnala comunque.
+      // Invariante DURA di color identity (§4/§8.4): l'agente non deve MAI proporre carte fuori dai colori del commander. Il filtro sulla QUERY copre il caso normale, ma il modello può scriversi un vincolo `id:` sbagliato o pescare da un altro mazzo: qui si filtra sui DATI reali della carta, che nessuna sintassi di query può aggirare.
+      // L'import di una lista incollata resta fuori: è una scelta esplicita dell'utente, non una proposta dell'agente, e la riga di legalità la segnala comunque.
       let identityDropped = 0;
       if (identityColors && cardIds.length) {
         const kept = cardIds.filter((id) => {
           const c = cards[id];
-          // Dato carta mancante: non scartare per un dubbio (meglio mostrarla).
+          // Dato carta mancante: non si scarta per un dubbio, meglio mostrarla.
           if (!c) return true;
           if (Q.withinIdentity(c.colorIdentity, identityColors)) return true;
           identityDropped += 1;
@@ -309,15 +252,9 @@ module.exports = function register(on, ctx) {
           .filter(Boolean).join('\n');
       }
 
-      // Import via chat (§11.2): l'utente incolla una lista grezza, l'LLM la
-      // interpreta (typo/italiano/formati strani) in nomi+quantità sopra —
-      // qui il SISTEMA risolve ogni nome su Scryfall (fuzzy match, MAI si
-      // fida di un id inventato dal modello) e propone la stessa CardList di
-      // conferma della ricerca: l'aggiunta al mazzo resta un'azione esplicita
-      // dell'utente (toggle riga o "Aggiungi tutte"), mai automatica.
+      // Import via chat (§11.2): l'LLM interpreta la lista incollata (typo, italiano, formati strani) in nomi e quantità, ma è il SISTEMA a risolvere ogni nome su Scryfall — mai un id inventato dal modello. L'aggiunta al mazzo resta un'azione esplicita dell'utente, mai automatica.
       let importPending = null;
-      // `commanderJustSet` esclude il commander già consumato sopra (build-around):
-      // qui resta solo il commander-CANDIDATO dell'import di una lista incollata.
+      // `commanderJustSet` esclude il commander già consumato sopra (build-around): qui resta solo il commander-CANDIDATO dell'import.
       const importCommanderName = commanderJustSet ? '' : parsed.commanderName;
       if (parsed.import.length || importCommanderName) {
         const qtyById = {};
@@ -344,9 +281,7 @@ module.exports = function register(on, ctx) {
           .filter(Boolean).join('\n');
       }
 
-      // Budget via chat (§9.2): l'LLM estrae il numero, il tetto lo applica IL
-      // SISTEMA (mai fidarsi che il modello "abbia già fatto"). Il mazzo
-      // aggiornato torna alla pagina, che rinfresca header e statistiche.
+      // Budget via chat (§9.2): l'LLM estrae il numero, il tetto lo applica IL SISTEMA — mai fidarsi che il modello "abbia già fatto".
       if (parsed.hasBudget) {
         const saved = await Store.put(Decks.setBudget(deck, parsed.budget));
         if (saved) {
@@ -358,8 +293,7 @@ module.exports = function register(on, ctx) {
         }
       }
 
-      // Calcolatore di probabilità via chat (§9.3): la simulazione Monte Carlo
-      // gira QUI, locale e gratis; il risultato si accoda alla reply.
+      // Calcolatore di probabilità via chat (§9.3): la simulazione Monte Carlo gira QUI, locale e gratis.
       if (parsed.prob) {
         const Stats = globalThis.SN_DECK_STATS;
         const library = Stats.buildLibrary(deckOut || deck, known);
@@ -370,10 +304,7 @@ module.exports = function register(on, ctx) {
           .filter(Boolean).join('\n');
       }
 
-      // Auto-tag via chat (§7): "tagga il mazzo con ramp, draw, removal…".
-      // I giudizi li fa IL SISTEMA (LLM economico in batch + cache carta/tag),
-      // mai il modello della chat "a parole". Il mazzo aggiornato torna alla
-      // pagina, che rinfresca elenco (gruppi per tag) e statistiche.
+      // Auto-tag via chat (§7): i giudizi li fa IL SISTEMA (LLM economico in batch + cache carta/tag), mai il modello della chat "a parole".
       if (parsed.tagWith.length) {
         const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
         const base = deckOut || deck;
@@ -390,10 +321,7 @@ module.exports = function register(on, ctx) {
           .filter(Boolean).join('\n');
       }
 
-      // Valutazione batch esplicita (§6.1): "valuta il mazzo" / "valuta questi
-      // risultati". MAI in automatico: solo su richiesta. Calcola i pareri
-      // mancanti/stantii in un colpo e li mette in cache (§6.2); la sintesi
-      // complessiva va nella reply della chat.
+      // Valutazione batch esplicita (§6.1): MAI in automatico, solo su richiesta. Calcola i pareri mancanti o stantii in un colpo e li mette in cache (§6.2).
       if (parsed.evaluate) {
         const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
         const base = deckOut || deck;
@@ -425,9 +353,7 @@ module.exports = function register(on, ctx) {
         ...(importPending ? { importPending } : {}),
       };
     } catch (e) {
-      // Mai il codice grezzo in chat (#331): l'errore diventa una frase per
-      // l'utente, e il ragionamento raccolto fin lì resta comunque visibile.
-      // Il dettaglio tecnico resta nei log per la diagnosi.
+      // Mai il codice grezzo in chat (#331): l'errore diventa una frase per l'utente, il ragionamento raccolto resta visibile e il dettaglio tecnico va nei log.
       console.warn('[SN] decks chat fallita:', (e && e.message) || e);
       return {
         ok: false,
@@ -437,17 +363,12 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Imposta il commander (§8.4): risolve la carta, scrive id + meta di
-  // presentazione (nome, color identity, art crop) e incrementa la versione.
-  // La legalità (banned/non leggendaria) NON blocca qui: è una riga delle
-  // statistiche (§9.1), non un divieto d'inserimento.
+  // Imposta il commander (§8.4): risolve la carta, scrive id e meta di presentazione, incrementa la versione. La legalità (banned, non leggendaria) NON blocca qui: è una riga delle statistiche (§9.1), non un divieto d'inserimento.
   on(MSG.DECKS_SET_COMMANDER, async (msg) => {
     const deck = await Store.get(String(msg?.id || ''));
     if (!deck) return { ok: false, error: 'not_found' };
     try {
-      // scryfallId vuoto = RIMUOVI il commander (torna a "nessun commander").
-      // È l'inverso di "imposta come commander": senza questo ramo un mazzo
-      // resterebbe bloccato col commander impostato per sbaglio (feedback #302).
+      // scryfallId vuoto = RIMUOVI il commander: senza questo ramo un mazzo resterebbe bloccato col commander impostato per sbaglio (#302).
       const wantId = String(msg?.scryfallId || '').trim();
       if (!wantId) {
         const cleared = Decks.setCommander(deck, '', null);
@@ -468,11 +389,7 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Import/Export testuale (§11), via switcher ─────────────────────────────
-  // Parser RIGIDO e deterministico (IE = SN_DECK_IMPORT_EXPORT, logica pura,
-  // MAI l'LLM — quello è il cammino della chat sopra). PREVIEW risolve ogni
-  // nome via Scryfall fuzzy PRIMA di scrivere qualunque cosa: l'utente vede
-  // cosa entrerà nel mazzo (e cosa non si è capito) e conferma con APPLY.
+  // Import/export testuale (§11): parser RIGIDO e deterministico (logica pura), MAI l'LLM — quello è il cammino della chat sopra. PREVIEW risolve ogni nome via fuzzy PRIMA di scrivere qualunque cosa: l'utente vede cosa entrerà e cosa non si è capito, e conferma con APPLY.
   on(MSG.DECKS_IMPORT_PREVIEW, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.id || ''));
@@ -495,18 +412,13 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Applica un import già confermato dall'utente (§11.1): merge delle carte
-  // già risolte (mai un nome libero qui — solo scryfall_id già verificati
-  // dalla preview) + commander opzionale, SOLO se il mazzo non ne ha già uno
-  // (non sovrascrive mai una scelta esistente senza un'azione dedicata).
+  // Applica un import già confermato (§11.1): solo scryfall_id già verificati dalla preview, mai un nome libero, e il commander si scrive SOLO se il mazzo non ne ha già uno.
   on(MSG.DECKS_IMPORT_APPLY, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.id || ''));
       if (!deck) return { ok: false, error: 'not_found' };
       const rawEntries = Array.isArray(msg?.entries) ? msg.entries : [];
-      // Una qty <= 0 (o non numerica) significa "non includere": si scarta,
-      // NON si forza a 1 (0 è falsy — il vecchio `Number(...) || 1` la
-      // trasformava in una copia fantasma).
+      // Una qty <= 0 o non numerica significa "non includere": si scarta, NON si forza a 1 — 0 è falsy, e il vecchio `Number(...) || 1` la trasformava in una copia fantasma.
       const entries = rawEntries
         .map((e) => ({ scryfall_id: String((e && e.scryfallId) || ''), qty: Math.floor(Number(e && e.qty)) }))
         .filter((e) => e.scryfall_id && Number.isFinite(e.qty) && e.qty > 0);
@@ -529,7 +441,7 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Esporta il mazzo nello STESSO formato testuale dell'import (§11.1).
+  // Esporta nello STESSO formato testuale dell'import (§11.1).
   on(MSG.DECKS_EXPORT, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.id || ''));
