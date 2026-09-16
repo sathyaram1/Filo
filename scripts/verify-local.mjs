@@ -930,6 +930,9 @@ if (isMain) {
   }
 
   if (cmd === 'status' || !cmd) {
+    // I bilanci veri, dal server: `status` è il modo di vederli senza aprire
+    // un giro, e di scoprire subito se il token manca.
+    console.log(bilanciText(await bilanciOStop()));
     const r = verdictForCurrentBranch();
     console.log(`${r.branch}: ${r.reason}`);
     // A correzione in sospeso si dice anche COSA c'è da correggere, e come
