@@ -1,21 +1,6 @@
-// Icona di ogni AZIONE dell'agente Filo: la tabella azione → nome in SN_ICONS.
-//
-// Il blocco di attività della chat (#521) racconta ogni passo con «icona +
-// due parole». L'icona di un'azione sta in UN posto solo: qui. Chi disegna
-// una riga chiede `SN_ACTION_ICONS.svg(type, size)` e non tiene emoji né
-// glifi in tabelle sue.
-//
-// Tre tabelle:
-//   - AZIONI:   le azioni registrate oggi in actionLevels.js (una sentinella
-//               negli unit test diventa rossa se un'azione resta senza icona);
-//   - PREVISTE: poteri che l'agente non ha ancora ma avrà a breve (posta,
-//               pagina, voce, memoria…). I nomi sono indicativi: quando
-//               l'azione nasce davvero, la si sposta in AZIONI col nome vero;
-//   - STATI:    non azioni ma momenti del lavoro (ragiona, fatto, avviso,
-//               bloccato) che il blocco mostra in testa.
-//
-// Un'azione senza icona (tipo sconosciuto) riceve il logo di Filo: meglio
-// una riga con il marchio che una riga con un buco.
+// Icona di ogni azione dell'agente Filo: la tabella azione → nome in SN_ICONS, in un posto solo. Chi disegna una riga chiede `SN_ACTION_ICONS.svg(type, size)`, senza tabelle di emoji proprie.
+// Tre tabelle: AZIONI (quelle di actionLevels.js: una sentinella negli unit test diventa rossa se una resta senza icona), PREVISTE (poteri non ancora nati, nomi indicativi, da spostare in AZIONI quando arrivano), STATI (momenti del lavoro, non azioni).
+// Tipo sconosciuto → logo di Filo: meglio una riga col marchio che una riga con un buco.
 
 (function (global) {
   'use strict';
@@ -92,10 +77,8 @@
     BLOCCATO: 'blocked',
   };
 
-  // Aprire un'app di Filo mostra l'icona di QUELL'app (parere dell'owner):
-  // la griglia del menu App resta solo per un'app che qui non è censita.
+  // Aprire un'app mostra l'icona di QUELL'app (parere dell'owner): la griglia del menu App resta solo per un'app non censita qui.
   // Chiavi: come l'azione nomina l'app (`app`, `id` o `nome`), in minuscolo.
-  // Un'app nuova aggiunge una riga.
   const APP = {
     mazzi: 'decks', deck: 'decks', decks: 'decks', board: 'decks',
     editor: 'editor', appunti: 'note', note: 'note',
@@ -110,8 +93,7 @@
 
   const RIPIEGO = 'filoLogo';
 
-  // `azione` è facoltativo: serve alle azioni la cui icona dipende dai
-  // parametri (oggi solo APRI_APP).
+  // `azione` è facoltativo: serve alle azioni la cui icona dipende dai parametri (oggi solo APRI_APP).
   function nome(type, azione) {
     const k = String(type || '').toUpperCase();
     if (k === 'APRI_APP' && azione && typeof azione === 'object') {
@@ -121,8 +103,7 @@
     return AZIONI[k] || PREVISTE[k] || STATI[k] || RIPIEGO;
   }
 
-  // La stringa SVG pronta per innerHTML (mai input utente: sicuro), oppure ''
-  // se la libreria delle icone non è caricata su questa pagina.
+  // Stringa SVG pronta per innerHTML (mai input utente: sicuro), oppure '' se la libreria delle icone non è caricata su questa pagina.
   function svg(type, size, azione) {
     const I = global.SN_ICONS;
     const fn = I && I[nome(type, azione)];

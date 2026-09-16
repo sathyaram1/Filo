@@ -1,15 +1,6 @@
-// Chiave PUBBLICA di Filo per cifrare i feedback (sealed box, vedi
-// feedbackCrypto.js e CLAUDE.md → S1). È sicuro committarla: serve solo a
-// CIFRARE. La chiave PRIVATA corrispondente NON sta nel repo — la tiene
-// l'owner (dashboard), il backend di sicurezza (Functions secrets) e le
-// routine (passata via env). Vedi S1.5.
-//
-// Per (ri)generare la coppia:  node scripts/gen-feedback-keys.mjs
-// Lo script sovrascrive la riga `SN_FEEDBACK_PUBKEY` qui sotto con la nuova
-// chiave pubblica e stampa la privata (da salvare fuori dal repo).
-//
-// Finché è `null`, encryptForOwner() lancia un errore esplicito: la cifratura
-// dei feedback è inattiva finché l'owner non genera la coppia.
+// Chiave PUBBLICA per cifrare i feedback (sealed box: feedbackCrypto.js, CLAUDE.md → S1). Committarla è sicuro, serve solo a CIFRARE; la privata sta fuori dal repo (owner, Functions secrets, env delle routine — S1.5).
+// Per rigenerare la coppia: node scripts/gen-feedback-keys.mjs (riscrive la riga qui sotto e stampa la privata).
+// Finché è `null`, encryptForOwner() lancia un errore esplicito: la cifratura è inattiva.
 
 (function (global) {
   'use strict';
@@ -17,15 +8,8 @@
   global.SN_FEEDBACK_PUBKEY = "BM44td2o-xZx_7Wvnx9LMeJLvdpgQU_DwidPKFFkIrHJ2abUMtBKVonlXdTRt3G3wWmtbZago2UCJfB9vnrqso8";
   // === /FILO_FEEDBACK_PUBKEY ===
 
-  // INTERRUTTORE DI ATTIVAZIONE (S1, cutover). La presenza della chiave pubblica
-  // NON basta ad accendere la cifratura: serve anche questo flag = true. Così il
-  // codice di cifratura vive su main in modo DORMIENTE senza rompere i lettori
-  // che non hanno ancora la chiave privata (dashboard owner, routine cloud,
-  // backend filo-security) né le feature utente che leggono i campi (ricompense
-  // C5). L'owner lo mette a `true` SOLO al cutover, dopo aver: (1) distribuito la
-  // privata a dashboard/routine/backend, (2) verificato che dashboard e routine
-  // decifrano, (3) confermato che nessun campo cifrato è mostrato a un utente
-  // senza chiave. (Cutover S1 fatto 2026-06-25; storia in git.)
+  // INTERRUTTORE DI ATTIVAZIONE (S1): la chiave pubblica da sola non accende la cifratura, serve anche questo flag a true.
+  // Serviva a tenere il codice di cifratura dormiente su main finché dashboard, routine e backend non decifravano e nessun campo cifrato finiva sotto gli occhi di un utente senza chiave.
   if (global.SN_FEEDBACK_ENC_ENABLED === undefined) {
     global.SN_FEEDBACK_ENC_ENABLED = true; // CUTOVER 2026-06-25: cifratura S1 ATTIVA.
   }
