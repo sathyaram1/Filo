@@ -313,7 +313,12 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '' 
       const blocchi = Array.isArray(msg.content) ? msg.content : [];
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_result') continue;
-        if (/timed out/i.test(testoDi(b.content))) rep.tools.timeouts += 1;
+        // Un timeout è un risultato IN ERRORE che comincia con «Command timed
+        // out after …»: il testo di un file letto che contiene quelle parole
+        // (uno spec, questo script) non lo è. Fino al giro 3 contava anche
+        // quello, e il rapporto di una verifica diceva «timeout 2» senza che
+        // nessun comando fosse scaduto.
+        if (b.is_error === true && /timed out/i.test(testoDi(b.content).split('\n')[0])) rep.tools.timeouts += 1;
         if (b.is_error === true) rep.tools.errors += 1;
         const inizio = inCorso.get(b.tool_use_id);
         if (inizio !== undefined) {
