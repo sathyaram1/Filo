@@ -267,7 +267,9 @@ test('ogni caso dei rossi noti del contenitore è il titolo di un test che esist
   const ROOT = resolve(__dirname, '..', '..');
   const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
   for (const voce of j.contenitore.specs) {
-    const src = readFileSync(resolve(ROOT, `${voce.spec}.spec.mjs`), 'utf8').replace(/\s+/g, ' ');
+    // Il titolo va confrontato come lo vede Playwright: nel sorgente un
+    // apostrofo dentro una stringa a virgolette singole è scritto `\'`.
+    const src = readFileSync(resolve(ROOT, `${voce.spec}.spec.mjs`), 'utf8').replace(/\s+/g, ' ').replace(/\\'/g, "'");
     for (const titolo of casiDellaVoce(voce)) {
       assert.ok(src.includes(titolo),
         `${voce.spec}: il caso «${titolo}» non è il titolo di un test di quello spec: la voce non coprirebbe niente`);
