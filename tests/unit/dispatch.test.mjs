@@ -221,9 +221,10 @@ test('readState: id inesistente → null', () => {
 // toccare git col repo reale mentre gira la suite.
 
 // ─── resolveLoopCap: precedenza env > remoto > default, con clamp ─────────────
-// Il default è il failCap della fonte unica (feedbackTransitions.js,
-// VERIFIER_CAPS.failCap = 10 — SPEC-RIDISEGNO-MAX.md §13): i documenti che
-// dicevano "3" erano già stantii, e il numero non vive più nei prompt.
+// Il default è il LEGACY_FAIL_CAP del giro vecchio (10, SPEC-RIDISEGNO-MAX.md
+// §13): i documenti che dicevano "3" erano già stantii, e il numero non vive
+// più nei prompt. (I tre bilanci nuovi cap2/cap1/cap0 non hanno default nel
+// codice, dal 2026-09-16: li scrive l'owner in config/routines.)
 
 test('resolveLoopCap: niente env né remoto → default failCap (10)', () => {
   assert.equal(resolveLoopCap({}), 10);

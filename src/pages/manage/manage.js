@@ -299,9 +299,9 @@
   const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
   const CAP0_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP0) || 'filo_automation_cap0';
   const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10 };
-  // Default dei bilanci dalla fonte unica (feedbackTransitions.js): la stessa
-  // che il server incorpora al deploy. Mai due copie a mano.
-  const VERIFIER_CAPS = window.SN_FB_TRANSITIONS?.VERIFIER_CAPS || { cap2: 5, cap1: 2, cap0: 0 };
+  // Nessun default dei bilanci nel codice (decisione dell'owner del
+  // 2026-09-16): i numeri stanno solo nel documento del server. Un campo che
+  // lì non c'è si mostra vuoto, e lo si dice.
 
   // ── Canale main process ───────────────────────────────────────────────────
   function sendToMain(msg) {
@@ -558,9 +558,11 @@
   //         a una critica (vuoto = il testo del server).
   // Li applica il SERVER quando registra la critica; chrome.storage.local è
   // solo una CACHE per mostrare subito un valore (e un ripiego offline).
-  function clampCap(n, def, min = AUTOMATION.CAP_MIN) {
+  // Nel range, o null se non è un numero (un campo vuoto non è uno zero).
+  function clampCap(n, min = AUTOMATION.CAP_MIN) {
+    if (n === '' || n === null || n === undefined) return null;
     n = Math.round(Number(n));
-    if (!Number.isFinite(n)) return def;
+    if (!Number.isFinite(n)) return null;
     return Math.min(AUTOMATION.CAP_MAX, Math.max(min, n));
   }
 
@@ -569,9 +571,9 @@
 
   // I tre bilanci condividono il meccanismo: descrizione una volta sola.
   const CAP_FIELDS = {
-    cap2: { input: mgCap2, save: mgCap2Save, msg: mgCap2Msg, def: VERIFIER_CAPS.cap2, cacheKey: CAP2_KEY, min: AUTOMATION.CAP_MIN },
-    cap1: { input: mgCap1, save: mgCap1Save, msg: mgCap1Msg, def: VERIFIER_CAPS.cap1, cacheKey: CAP1_KEY, min: AUTOMATION.CAP_MIN },
-    cap0: { input: mgCap0, save: mgCap0Save, msg: mgCap0Msg, def: VERIFIER_CAPS.cap0, cacheKey: CAP0_KEY, min: AUTOMATION.CAP_MIN },
+    cap2: { input: mgCap2, save: mgCap2Save, msg: mgCap2Msg, cacheKey: CAP2_KEY, min: AUTOMATION.CAP_MIN },
+    cap1: { input: mgCap1, save: mgCap1Save, msg: mgCap1Msg, cacheKey: CAP1_KEY, min: AUTOMATION.CAP_MIN },
+    cap0: { input: mgCap0, save: mgCap0Save, msg: mgCap0Msg, cacheKey: CAP0_KEY, min: AUTOMATION.CAP_MIN },
   };
 
   function setCapMsg(field, text, kind) {
@@ -594,18 +596,21 @@
     } catch (_) {}
     for (const [field, f] of Object.entries(CAP_FIELDS)) {
       if (!f.input) continue;
-      let val = f.def;
+      let val = null;
       if (remote[field] != null) {
-        val = clampCap(remote[field], f.def, f.min);
-        chrome.storage.local.set({ [f.cacheKey]: val }).catch(() => {});
+        val = clampCap(remote[field], f.min);
+        if (val !== null) chrome.storage.local.set({ [f.cacheKey]: val }).catch(() => {});
       } else {
         // Ripiego sulla cache locale (non admin / offline).
         try {
           const data = await chrome.storage.local.get(f.cacheKey);
-          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.def, f.min);
+          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.min);
         } catch (_) {}
       }
-      f.input.value = String(val);
+      // Sul server manca: si mostra vuoto e si dice. Senza questo numero la
+      // verifica (server e locale) si ferma con un errore, non usa un default.
+      f.input.value = val === null ? '' : String(val);
+      if (val === null) setCapMsg(field, 'Non impostato sul server: scrivi un numero (0 compreso) e salva.', 'err');
     }
     if (mgFixInstructions && typeof remote.fixInstructions === 'string') mgFixInstructions.value = remote.fixInstructions;
   }
@@ -613,11 +618,14 @@
   async function saveCap(field) {
     const f = CAP_FIELDS[field];
     if (!f.input) return;
-    // Un campo vuoto non è uno zero: per i difetti gravi lo 0 ferma il lavoro
-    // al primo rilievo, il contrario di «torno al default» che chi svuota il
-    // campo intende. Vuoto = il default, e la scritta lo dice.
-    const vuoto = String(f.input.value == null ? '' : f.input.value).trim() === '';
-    const val = vuoto ? f.def : clampCap(f.input.value, f.def, f.min);
+    // Un campo vuoto non è uno zero (per i difetti gravi lo 0 ferma il lavoro
+    // al primo rilievo) e non è nemmeno «torno al default»: un default non
+    // c'è più (2026-09-16). Vuoto = non si salva, e la scritta lo dice.
+    const val = clampCap(f.input.value, f.min);
+    if (val === null) {
+      setCapMsg(field, 'Vuoto o non numerico: non salvato. Scrivi un numero, 0 compreso.', 'err');
+      return;
+    }
     f.input.value = String(val); // normalizza eventuali fuori-range
     try {
       // Scrive su Firestore (la config che il server della critica legge); il
@@ -628,10 +636,11 @@
         if (r?.error) console.error(`[manage] salvataggio ${field}:`, r.error);
         return;
       }
-      const saved = clampCap(r[field] != null ? r[field] : val, f.def, f.min);
+      const confermato = clampCap(r[field] != null ? r[field] : val, f.min);
+      const saved = confermato === null ? val : confermato;
       f.input.value = String(saved);
       chrome.storage.local.set({ [f.cacheKey]: saved }).catch(() => {});
-      setCapMsg(field, vuoto ? `Salvato: vale il default (${saved}).` : 'Salvato.', 'ok');
+      setCapMsg(field, 'Salvato.', 'ok');
     } catch (err) {
       setCapMsg(field, 'Salvataggio fallito.', 'err');
       console.error(`[manage] salvataggio ${field} fallito:`, err);

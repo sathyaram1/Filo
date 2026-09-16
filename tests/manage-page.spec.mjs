@@ -2181,7 +2181,7 @@ test('il testo delle istruzioni di correzione oltre il tetto non viene salvato m
   await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato.');
 });
 
-test('un bilancio salvato col campo vuoto torna al default (non a 0) e lo dice; Invio salva come il pulsante', async ({ openTab }) => {
+test('un bilancio salvato col campo vuoto NON si salva (non c\'è un default, e non è 0) e lo dice; Invio salva come il pulsante', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
@@ -2192,12 +2192,19 @@ test('un bilancio salvato col campo vuoto torna al default (non a 0) e lo dice; 
   const cap2 = page.locator('#mgCap2');
   await expect(cap2).toHaveValue('3');
 
-  // Campo vuoto → il default della fonte unica (5), non 0.
+  // Campo vuoto → niente salvato (dal 2026-09-16 un default nel codice non
+  // c'è: i numeri stanno solo sul server), e non diventa 0.
   await cap2.fill('');
   await page.locator('#mgCap2Save').click();
-  await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato: vale il default (5).');
-  await expect(cap2).toHaveValue('5');
-  expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(5);
+  await expect(page.locator('#mgCap2Msg')).toHaveText('Vuoto o non numerico: non salvato. Scrivi un numero, 0 compreso.');
+  expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(3);
+  expect(await page.evaluate(() => window.__capsSets.length)).toBe(0);
+
+  // Sul server il campo manca: la casella resta vuota e la scritta lo dice.
+  await page.evaluate(() => { delete window.__capsValue.cap1; });
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(page.locator('#mgCap1')).toHaveValue('');
+  await expect(page.locator('#mgCap1Msg')).toContainText('Non impostato sul server');
 
   // Invio nel campo salva quanto il pulsante.
   await cap2.fill('4');

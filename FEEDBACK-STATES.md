@@ -323,9 +323,11 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   `filo-security/functions/src/routine/select.js`.)*
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
   loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: la
-  critica si registra coi livelli e l'esito lo calcola il server; i tre
-  bilanci `cap2/cap1/cap0` e le regole stanno in `src/shared/feedbackTransitions.js`
-  e `src/shared/verifierRound.js`, incorporati dal server.)*
+  critica si registra coi livelli e l'esito lo calcola il server; le regole
+  stanno in `src/shared/verifierRound.js`, incorporato dal server; i tre
+  bilanci `cap2/cap1/cap0` li scrive SOLO l'owner in `config/routines`
+  (Gestione → Automazioni) — dal 2026-09-16 nel codice non c'è un default: la
+  verifica locale li legge dal server e senza si ferma.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
   `workingSince`. Deploy manuale (`firebase deploy --only firestore:rules`).

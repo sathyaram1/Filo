@@ -341,14 +341,15 @@ collegate:
 > esiti non esistono più: il verificatore registra
 > la critica coi livelli (3/2/1/0, più `?` = chiede una decisione dell'owner),
 > l'esito lo calcola il server da tre bilanci per feedback — `cap2` (giri di
-> correzione per i livelli 3/2, default 5), `cap1` (livello 1, default 2),
-> `cap0` (livello 0, default 0) — e poi si corregge ciò che il server dice di
-> correggere. Ogni correzione porta a un altro verificatore. I rilievi non
+> correzione per i livelli 3/2), `cap1` (livello 1), `cap0` (livello 0), che
+> l'owner scrive in Gestione → Automazioni e che dal 2026-09-16 non hanno un
+> default nel codice — e poi si corregge ciò che il server dice di correggere. Ogni correzione porta a un altro verificatore. I rilievi non
 > corretti finiscono in UN feedback derivato per lavoro, figlio `#N.k`, aperto
 > dal server (categoria `routine:residuo`); il verificatore non apre più
 > feedback. Regole in
-> `src/shared/verifierRound.js` (incorporato dal server al deploy), bilanci in
-> `src/shared/feedbackTransitions.js`, dashboard in Gestione → Automazioni.
+> `src/shared/verifierRound.js` (incorporato dal server al deploy), i nomi dei
+> bilanci in `src/shared/feedbackTransitions.js`, i numeri solo in
+> `config/routines` (dashboard, Gestione → Automazioni).
 > Quello che segue resta come storia della decisione precedente.
 
 Deciso con l'owner il 18/08, dopo la seconda tornata del laboratorio (§9): il
