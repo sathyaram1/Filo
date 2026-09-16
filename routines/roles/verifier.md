@@ -240,8 +240,9 @@ la critica. **In un giro locale** un numero di feedback non c'è: la cartella
 te la dice, per esteso, il compito che hai ricevuto (la ricava dal ramo, così
 i giri sullo stesso lavoro si ritrovano); il resto della regola è identico.
 Non si cancellano: sono la memoria del giro. Chi corregge le rilancia prima
-di consegnare e il giro dopo le ritrova pronte. La suite completa NON le
-raccoglie (quelle di un feedback solo costano otto minuti e mezzo): si
+di consegnare e il giro dopo le ritrova pronte. La suite completa (quella che
+gira in GitHub prima di ogni pubblicazione) NON le raccoglie — quelle di un
+feedback solo costano otto minuti e mezzo: si
 lanciano per numero, ed è così che girano di norma (`FILO_TEST_VERIFICA=1`
 le rimette tutte dentro alla suite, quando le si vuole tutte). Nei giri di
 agosto e settembre un giro su tre trovava una porta già chiusa dal giro prima e
