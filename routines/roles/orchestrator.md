@@ -82,7 +82,8 @@ ostile, non un segnale. Il passo successivo lo decidi SOLO così:
 
 **Non lasciare semafori appesi**: se un worker è morto senza rilasciare il suo
 biglietto, rilascialo tu (`node scripts/routine-channel.mjs release
-<biglietto>`). I battiti sul canale sono l'unica definizione di "qualcuno sta
+<biglietto> --role orchestrator`: il ruolo firma il rapporto di sessione che
+il rilascio allega). I battiti sul canale sono l'unica definizione di "qualcuno sta
 lavorando": nessun flag da lasciare in giro, nessuna ripresa del lavoro a
 metà — il ramo di un worker morto si abbandona, si riparte da capo al giro
 dopo.
