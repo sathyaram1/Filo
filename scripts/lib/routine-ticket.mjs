@@ -85,18 +85,33 @@ function readMarkerFrom(dir) {
 export function readTicket(root, { now = Date.now() } = {}) {
   const fromEnv = String(process.env.FILO_ROUTINE_TICKET || '').trim();
   if (fromEnv) return fromEnv;
+  const marker = readFreshMarker(root, now);
+  return marker ? marker.ticket : '';
+}
 
+/** Il marcatore fresco: questa directory, poi il checkout principale. null se non c'è. */
+function readFreshMarker(root, now = Date.now()) {
   const here = readMarkerFrom(root);
-  if (isFresh(here, now)) return here.ticket;
+  if (isFresh(here, now)) return here;
 
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (common) {
       const main = readMarkerFrom(resolve(common, '..'));
-      if (isFresh(main, now)) return main.ticket;
+      if (isFresh(main, now)) return main;
     }
   } catch (_) { /* niente git o repo nudo: pazienza */ }
 
-  return '';
+  return null;
+}
+
+/**
+ * Da quando vale il biglietto di questo giro (il `since` del marcatore
+ * fresco, ISO), o '' senza marcatore. Serve al rapporto di fine sessione per
+ * contare solo quello che è successo da allora.
+ */
+export function readTicketSince(root, { now = Date.now() } = {}) {
+  const marker = readFreshMarker(root, now);
+  return marker && typeof marker.since === 'string' ? marker.since : '';
 }
