@@ -239,18 +239,104 @@ export async function work(t, opts) {
 // vorrebbe dire far cadere il semaforo di un lavoro ancora vivo.
 const BATTITO_FINITO = new Set(['bad_ticket', 'dead_ticket']);
 
+/** Un file di sistema, o null se non c'è (Windows, un contenitore senza cgroup). */
+function leggiFileDiSistema(p) {
+  try { return readFileSync(p, 'utf8'); } catch (_) { return null; }
+}
+function elencaCartella(p) {
+  try { return readdirSync(p); } catch (_) { return []; }
+}
+
+/**
+ * La memoria del CONTENITORE, dal suo cgroup (prima v2, poi v1):
+ * { usedMb, limitMb }, con limitMb 0 se non c'è un tetto; null fuori da un
+ * cgroup. In un contenitore la memoria «libera» del kernel è quella della
+ * macchina che lo ospita, non la sua: un worker ucciso per aver superato il
+ * tetto del cgroup lasciava un battito con venti giga liberi. PURA (legge con
+ * `leggi`).
+ */
+export function memoriaContenitore(leggi = leggiFileDiSistema) {
+  const mb = (s) => { const n = Number(String(s == null ? '' : s).trim()); return Number.isFinite(n) ? n / 1048576 : NaN; };
+  const v2 = leggi('/sys/fs/cgroup/memory.current');
+  if (v2 !== null) {
+    const used = mb(v2);
+    if (!Number.isFinite(used)) return null;
+    const max = String(leggi('/sys/fs/cgroup/memory.max') || '').trim();
+    const limit = max && max !== 'max' ? mb(max) : 0;
+    return { usedMb: used, limitMb: Number.isFinite(limit) ? limit : 0 };
+  }
+  const v1 = leggi('/sys/fs/cgroup/memory/memory.usage_in_bytes');
+  if (v1 !== null) {
+    const used = mb(v1);
+    if (!Number.isFinite(used)) return null;
+    const limit = mb(leggi('/sys/fs/cgroup/memory/memory.limit_in_bytes'));
+    // In v1 «senza tetto» è un numero enorme (circa 2^63): non è un limite.
+    return { usedMb: used, limitMb: Number.isFinite(limit) && limit < 1024 * 1024 * 1024 ? limit : 0 };
+  }
+  return null;
+}
+
+/**
+ * Da quanto vive il CONTENITORE: l'età del suo processo 1, da /proc/1/stat
+ * (campo 22: l'avvio in tick dall'avvio del kernel, 100 tick al secondo su
+ * Linux). L'uptime del kernel, in un contenitore, è quello della macchina che
+ * lo ospita. null dove /proc non c'è. PURA (legge con `leggi`).
+ */
+export function uptimeContenitore(uptimeKernelS, leggi = leggiFileDiSistema) {
+  const stat = leggi('/proc/1/stat');
+  if (!stat) return null;
+  const dopoNome = String(stat).slice(String(stat).lastIndexOf(')') + 2).trim().split(/\s+/);
+  const avvioTick = Number(dopoNome[19]);
+  if (!Number.isFinite(avvioTick) || !Number.isFinite(uptimeKernelS)) return null;
+  const s = uptimeKernelS - avvioTick / 100;
+  return s >= 0 ? s : null;
+}
+
+/**
+ * La memoria residente di TUTTI i processi visibili (somma di
+ * /proc/<pid>/statm, pagine da 4 KB): la memoria del lavoro, non del solo
+ * processo che batte. null senza /proc. PURA (legge con `leggi`/`elenca`).
+ */
+export function rssProcessi(leggi = leggiFileDiSistema, elenca = elencaCartella) {
+  const pid = elenca('/proc').filter((n) => /^\d+$/.test(n));
+  if (!pid.length) return null;
+  let pagine = 0;
+  for (const p of pid) {
+    const statm = leggi(`/proc/${p}/statm`);
+    if (!statm) continue;
+    const n = Number(String(statm).trim().split(/\s+/)[1]);
+    if (Number.isFinite(n)) pagine += n;
+  }
+  return (pagine * 4096) / 1048576;
+}
+
 /**
  * Lo stato del contenitore, da allegare a ogni battito (giro del 14/09: un
  * worker morto di memoria non lasciava nessuna traccia, il semaforo cadeva e
- * basta). Solo numeri: il server salva quelli e ignora il resto.
+ * basta). Quattro numeri, gli stessi che il server salva:
+ *   uptimeS  da quanto vive il contenitore (l'età del suo processo 1; fuori
+ *            da un contenitore, l'uptime del sistema);
+ *   freeMb   quanto manca al tetto di memoria del cgroup; senza tetto, la
+ *            memoria libera del sistema;
+ *   rssMb    la memoria usata dal contenitore (cgroup), o la somma di tutti i
+ *            processi (Linux senza cgroup), o quella di questo processo (dove
+ *            /proc non c'è);
+ *   loadAvg  il carico dell'ultimo minuto.
+ * Solo numeri: il server salva quelli e ignora il resto. Fino al 16/09/2026
+ * rssMb era la memoria del processo che batte (piccola e costante) e uptime
+ * e memoria libera erano quelli del kernel, cioè della macchina ospite.
  */
-export function statoContenitore({ osImpl = os, proc = process } = {}) {
+export function statoContenitore({ osImpl = os, proc = process, leggi = leggiFileDiSistema, elenca = elencaCartella } = {}) {
   const num = (v) => (Number.isFinite(v) ? v : undefined);
   const carico = osImpl.loadavg();
+  const cg = memoriaContenitore(leggi);
+  const upC = uptimeContenitore(Number(osImpl.uptime()), leggi);
+  const usata = cg ? cg.usedMb : rssProcessi(leggi, elenca);
+  const libera = cg && cg.limitMb > 0 ? Math.max(0, cg.limitMb - cg.usedMb) : osImpl.freemem() / 1048576;
   return {
-    uptimeS: num(Math.round(osImpl.uptime())),
-    freeMb: num(Math.round(osImpl.freemem() / 1048576)),
-    rssMb: num(Math.round(proc.memoryUsage().rss / 1048576)),
+    uptimeS: num(Math.round(upC !== null ? upC : osImpl.uptime())),
+    freeMb: num(Math.round(libera)),
+    rssMb: num(Math.round(usata !== null ? usata : proc.memoryUsage().rss / 1048576)),
     loadAvg: num(Math.round(((Array.isArray(carico) && carico[0]) || 0) * 100) / 100),
   };
 }
