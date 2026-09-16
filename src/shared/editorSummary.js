@@ -1,44 +1,21 @@
-// Riassunto per file dell'editor (#379.5): logica pura per (a) estrarre il testo
-// di un file serializzato, (b) decidere QUANDO (ri)generare il suo riassunto, e
-// (c) costruire l'elenco {titolo, riassunto} di tutti i file che entra nel
-// contesto di Filo al posto del testo integrale.
-//
-// PERCHÉ ESISTE
-//   Filo deve poter "vedere" i file dell'editor senza pagarne il testo intero a
-//   ogni risposta. Ogni file porta un riassunto di un paio di righe (generato
-//   dall'AV, mantenuto aggiornato quando il file cambia in modo significativo);
-//   nel contesto entra SOLO il riassunto di ogni file, e Filo — se serve — chiede
-//   il contenuto completo di un singolo file on-demand (azione LEGGI_FILE).
-//
-// LOGICA PURA
-//   Nessun DOM, nessuno storage: opera sugli oggetti-file serializzati
-//   (meta/content, lo stesso schema di editorStore.js) e ritorna valori. Così è
-//   unit-testabile senza aprire Electron (vedi tests/unit/editorSummary.test.mjs).
-//   La generazione vera (chiamata AI) vive nel renderer dell'editor; la lettura
-//   della collezione dal main vive in services/editorFiles.js.
+// Riassunto per file dell'editor (#379.5): estrarre il testo di un file serializzato, decidere quando rigenerarne il riassunto, e costruire l'elenco {titolo, riassunto} che entra nel contesto di Filo al posto del testo integrale.
+// Filo deve poter «vedere» i file senza pagarne il testo intero a ogni risposta: nel contesto va solo il riassunto, e il contenuto completo di un singolo file si chiede on-demand (azione LEGGI_FILE).
+// LOGICA PURA sugli oggetti-file serializzati (stesso schema di editorStore.js): la generazione vera vive nel renderer dell'editor, la lettura della collezione in services/editorFiles.js.
 
 (function (global) {
   'use strict';
 
-  // Soglia minima di parole prima di generare un riassunto AI: sotto questa il
-  // testo È già la sua sintesi, quindi buildContextFiles usa un estratto grezzo
-  // (nessuna chiamata sprecata su file cortissimi).
+  // Sotto questa soglia il testo È già la sua sintesi: si usa un estratto grezzo invece di sprecare una chiamata.
   const MIN_WORDS = 60;
-  // "Cambiamento significativo": rigenera quando le parole differiscono dallo
-  // stato di quando fu generato il riassunto di almeno ABS parole OPPURE almeno
-  // RATIO in proporzione (il più permissivo dei due), così un file corto che
-  // cambia molto e uno lungo che cambia poco sono entrambi coperti senza
-  // rigenerare a ogni battitura.
+  // «Cambiamento significativo»: si rigenera quando le parole differiscono da quelle di allora di almeno ABS parole OPPURE di almeno RATIO in proporzione — il più permissivo dei due, così un file corto che cambia molto e uno lungo che cambia poco sono coperti entrambi senza rigenerare a ogni battitura.
   const CHANGE_ABS = 40;
   const CHANGE_RATIO = 0.4;
-  // Lunghezza massima del riassunto che iniettiamo per file (taglio difensivo).
+  // Taglio difensivo sul riassunto iniettato.
   const MAX_SUMMARY = 400;
-  // Lunghezza dell'estratto grezzo usato come ripiego finché non c'è un riassunto.
+  // Ripiego finché non c'è un riassunto.
   const EXCERPT_LEN = 200;
 
-  // Estrae il testo semplice da un content serializzato dell'editor (albero
-  // PM-like: doc → paragraph/heading/blockquote/list… → text). I blocchi sono
-  // separati da newline. Robusto a nodi mancanti o forme inattese.
+  // Albero PM-like (doc → paragraph/heading/blockquote/list… → text), blocchi separati da newline. Robusto a nodi mancanti o forme inattese.
   function plainText(content) {
     const root = content && content.content ? content : (content && content.meta ? content.content : content);
     if (!root || !Array.isArray(root.content)) return '';
@@ -56,7 +33,6 @@
     return out.replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  // Testo semplice di un FILE serializzato (comodo per il main).
   function fileText(file) {
     if (!file) return '';
     return plainText(file.content);
@@ -72,11 +48,7 @@
     return countWords(fileText(file));
   }
 
-  // Il riassunto memorizzato è "fresco" rispetto al contenuto attuale?
-  //  - nessun riassunto → non fresco.
-  //  - c'è un riassunto ma manca la firma → consideralo fresco (non rigenerare a
-  //    vuoto un riassunto scritto/mantenuto altrove).
-  //  - c'è firma → confronta le parole di allora con quelle di adesso.
+  // Nessun riassunto → non fresco. Riassunto senza firma → fresco: non si rigenera a vuoto qualcosa scritto o mantenuto altrove. Con firma, si confrontano le parole di allora con quelle di adesso.
   function isSummaryFresh(file, currentWords) {
     const meta = (file && file.meta) || {};
     if (!meta.summary) return false;
@@ -88,9 +60,7 @@
     return delta < threshold;
   }
 
-  // Va (ri)generato ORA il riassunto AI del file?
-  //   true se il file ha abbastanza testo (≥ MIN_WORDS) e il riassunto manca o
-  //   è stantìo. Sotto MIN_WORDS non vale la chiamata (ci pensa l'estratto).
+  // Sotto MIN_WORDS non vale la chiamata: ci pensa l'estratto.
   function needsSummary(file, opts) {
     const o = opts || {};
     const minWords = Number.isFinite(o.minWords) ? o.minWords : MIN_WORDS;
@@ -99,7 +69,7 @@
     return !isSummaryFresh(file, words);
   }
 
-  // Firma da salvare quando si genera un riassunto (per il confronto futuro).
+  // Firma da salvare insieme al riassunto, per il confronto futuro.
   function makeSig(file) {
     return { words: fileWords(file), at: Date.now() };
   }
@@ -109,8 +79,7 @@
     return t.length > n ? t.slice(0, n).trim() + '…' : t;
   }
 
-  // Un "riassunto per il contesto" per un singolo file: il riassunto AI se c'è,
-  // altrimenti un estratto grezzo del testo (ripiego), altrimenti "(vuoto)".
+  // Il riassunto AI se c'è, altrimenti un estratto grezzo, altrimenti «(vuoto)».
   function summaryFor(file) {
     const meta = (file && file.meta) || {};
     if (meta.summary && String(meta.summary).trim()) {
@@ -121,8 +90,7 @@
     return { text: '(vuoto)', source: 'empty' };
   }
 
-  // Elenco {id, title, summary, source} di TUTTI i file di una collezione: è ciò
-  // che entra nel contesto di Filo (riassunti, non testo integrale).
+  // È questo che entra nel contesto di Filo: riassunti, non testo integrale.
   function buildContextFiles(collection) {
     const files = (collection && Array.isArray(collection.files)) ? collection.files : [];
     return files.map((f) => {
@@ -137,8 +105,7 @@
     });
   }
 
-  // Rende i riassunti in un blocco di testo per il prompt. Ogni riga porta l'id
-  // del file (serve a Filo per chiederne il contenuto con LEGGI_FILE).
+  // Ogni riga porta l'id del file: serve a Filo per chiederne il contenuto con LEGGI_FILE.
   function renderForPrompt(contextFiles) {
     const list = Array.isArray(contextFiles) ? contextFiles : [];
     if (!list.length) return '';
