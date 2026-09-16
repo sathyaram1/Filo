@@ -1,25 +1,22 @@
-// Logica PURA del client Scryfall (DECK-BUILDER-SPEC.md §13.2): costruzione
-// query, semplificazione delle carte, parsing dei costi di mana, freschezza
-// cache. Niente rete, niente storage — la parte I/O vive in
-// src/main/services/scryfall.js. Unit test: tests/unit/scryfallQuery.test.mjs.
+// Logica PURA del client Scryfall (DECK-BUILDER-SPEC.md §13.2): query, semplificazione
+// delle carte, costi di mana, freschezza cache. La parte I/O vive in
+// src/main/services/scryfall.js.
 
 (function (global) {
   'use strict';
 
   const WUBRG = ['W', 'U', 'B', 'R', 'G'];
 
-  // Codice identity per la sintassi Scryfall: ['U','R'] → 'UR' (ordine WUBRG),
-  // [] → 'C' (incolore). Colori ignoti vengono scartati.
+  // Identity per la sintassi Scryfall: ['U','R'] → 'UR' (ordine WUBRG), [] → 'C' (incolore).
+  // Colori ignoti scartati.
   function identityCode(colors) {
     const set = new Set((Array.isArray(colors) ? colors : []).map((c) => String(c).toUpperCase()));
     const code = WUBRG.filter((c) => set.has(c)).join('');
     return code || 'C';
   }
 
-  // Vincola una query di ricerca alla color identity del commander (§4): ogni
-  // ricerca dentro un mazzo è filtrata con `id<=…` AUTOMATICAMENTE. Se l'utente
-  // ha già scritto un vincolo di identity a mano (sintassi ibrida §4: `id:`,
-  // `id<=`, `identity…`), la sua query passa invariata — l'esplicito vince.
+  // Ogni ricerca dentro un mazzo è filtrata con `id<=…` (§4), ma se l'utente ha già scritto un
+  // vincolo di identity a mano la sua query passa invariata: l'esplicito vince.
   function buildSearchQuery(userQuery, identity) {
     const q = String(userQuery || '').trim();
     if (!Array.isArray(identity)) return q;
@@ -27,14 +24,11 @@
     return `${q} id<=${identityCode(identity)}`.trim();
   }
 
-  // Una carta è DENTRO l'identità di colore del commander se OGNI colore della
-  // sua color identity è tra i colori del commander (regola Commander §8.4, la
-  // stessa del check di legalità). Le incolori (identity vuota) sono sempre
-  // ammesse. `commanderColors` null/non-array = nessun commander → nessun
-  // vincolo, tutto ammesso. È il filtro DURO sui DATI reali della carta: a
-  // differenza di `buildSearchQuery` (che agisce sulla stringa di query e cede
-  // a un vincolo `id` esplicito) qui nessuna sintassi può far passare una carta
-  // fuori identità — è la rete di sicurezza sui risultati proposti dall'agente.
+  // Dentro l'identità se OGNI colore della carta è fra quelli del commander (regola Commander
+  // §8.4); le incolori sempre ammesse; nessun commander = nessun vincolo. È il filtro DURO sui
+  // DATI: a differenza di buildSearchQuery, che agisce sulla stringa e cede a un `id`
+  // esplicito, qui nessuna sintassi fa passare una carta fuori identità — è la rete di
+  // sicurezza sui risultati proposti dall'agente.
   function withinIdentity(cardColorIdentity, commanderColors) {
     if (!Array.isArray(commanderColors)) return true;
     const allowed = new Set(commanderColors.map((c) => String(c).toUpperCase()));
@@ -52,16 +46,15 @@
     return out;
   }
 
-  // Riduce una carta dell'API Scryfall ai soli campi che l'app usa. Gestisce le
-  // carte a due facce (image_uris/mana_cost sulle card_faces, non sulla radice).
+  // Riduce una carta dell'API ai campi che l'app usa. Gestisce le carte a due facce
+  // (image_uris/mana_cost sulle card_faces, non sulla radice).
   function simplifyCard(api) {
     if (!api || typeof api !== 'object' || !api.id) return null;
     const faces = Array.isArray(api.card_faces) ? api.card_faces : [];
     const front = faces[0] || {};
     const img = api.image_uris || front.image_uris || {};
-    // Retro delle carte bifronte (transform / modal DFC): la faccia 2 ha una sua
-    // immagine SOLO quando la radice non ha `image_uris` (le split/adventure hanno
-    // un'immagine unica e non vanno "girate"). Vuoto per le carte a faccia singola.
+    // La faccia 2 ha una sua immagine SOLO quando la radice non ha `image_uris`: le
+    // split/adventure hanno un'immagine unica e non vanno «girate».
     const backFace = faces[1] || null;
     const backImg = (!api.image_uris && backFace && backFace.image_uris) ? backFace.image_uris : null;
     const manaCost = api.mana_cost != null && api.mana_cost !== ''
@@ -81,19 +74,16 @@
       colors: Array.isArray(api.colors) ? api.colors : (Array.isArray(front.colors) ? front.colors : []),
       colorIdentity: Array.isArray(api.color_identity) ? api.color_identity : [],
       image: String(img.normal || img.large || ''),
-      // Immagine del retro per le bifronte: alimenta il tasto "gira la carta" nel
-      // pannello di dettaglio (preview e carosello). Vuota = carta a faccia unica.
+      // Alimenta il tasto «gira la carta» del pannello di dettaglio; vuota = carta a faccia unica.
       backImage: backImg ? String(backImg.normal || backImg.large || '') : '',
       backName: backFace ? String(backFace.name || '') : '',
       artCrop: String(img.art_crop || ''),
       priceEur: Number.isFinite(price) ? price : null,
-      // Mana prodotto dalla carta (terre/rock/dork): alimenta "mana prodotto
-      // per colore" nelle statistiche (§9.1). Sempre array (vuoto = non
+      // Mana prodotto (terre, rock, dork) per le statistiche §9.1. Sempre array (vuoto = non
       // produce): `undefined` marca le entry di cache vecchio schema da rifare.
       producedMana: Array.isArray(api.produced_mana) ? api.produced_mana.map(String) : [],
-      // Testo Oracle: serve ai giudizi LLM (auto-tag §7, parere §6). Sempre
-      // stringa (vuota = carta senza testo): `undefined` marca le entry di
-      // cache vecchio schema da rifetchare.
+      // Testo Oracle per i giudizi LLM (§7, §6). Sempre stringa (vuota = carta senza testo):
+      // `undefined` marca le entry di cache vecchio schema da rifetchare.
       oracleText: String(oracleText || ''),
       legalCommander: !!(api.legalities && api.legalities.commander === 'legal'),
       scryfallUri: String(api.scryfall_uri || ''),
@@ -107,15 +97,11 @@
     return now - t < ttlMs;
   }
 
-  // ── Chat unificata (§3): parsing della risposta dell'agente ───────────────
-  // L'agente risponde con un JSON { reply?, query?, cards?, budget?, prob? }.
-  // I modelli a volte lo avvolgono in ```json … ``` o aggiungono testo attorno:
-  // qui si estrae il primo oggetto JSON valido in modo tollerante. Output
-  // sempre normalizzato: { reply, query, cards } sempre presenti; in più
-  //   hasBudget/budget  → l'utente ha chiesto di impostare (numero ≥ 0) o
-  //                       rimuovere (null) il tetto di budget (§9.2)
-  //   prob              → richiesta al calcolatore di probabilità (§9.3):
-  //                       { turn: int ≥ 1, needs: [{ tag, n }] } oppure null
+  // Chat unificata (§3): l'agente risponde con un JSON { reply?, query?, cards?, budget?,
+  // prob? } che i modelli a volte avvolgono in ```json o circondano di testo, quindi si
+  // estrae il primo oggetto valido in modo tollerante. Uscita sempre normalizzata: reply,
+  // query e cards presenti; hasBudget/budget = tetto da impostare (numero ≥ 0) o togliere
+  // (null) (§9.2); prob = { turn, needs:[{ tag, n }] } per il calcolatore (§9.3).
   function normalizeProb(p) {
     if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
     const turn = Math.floor(Number(p.turn));
@@ -156,10 +142,8 @@
       try {
         const o = JSON.parse(c);
         if (!o || typeof o !== 'object' || Array.isArray(o)) continue;
-        // Budget: presente = intenzione esplicita. null lo rimuove; un numero
-        // valido lo imposta; qualsiasi altro valore si ignora. Se il modello
-        // riporta il numero come lo scrive l'utente italiano («40,50»), la
-        // virgola decimale è valida (stessa tolleranza del campo Budget…).
+        // Budget presente = intenzione esplicita: null lo rimuove, un numero valido lo imposta, il
+        // resto si ignora. La virgola decimale è valida («40,50»), come nel campo Budget.
         let hasBudget = false; let budget = null;
         if ('budget' in o) {
           const rawB = typeof o.budget === 'string' ? o.budget.trim().replace(',', '.') : o.budget;
@@ -178,17 +162,15 @@
           hasBudget,
           budget,
           prob: normalizeProb(o.prob),
-          // Valutazione batch esplicita (§6.1): 'deck' | 'results'. true
-          // legacy/sbrigativo dei modelli → 'deck'. Tutto il resto → ''.
+          // Valutazione batch (§6.1): 'deck' | 'results'. true legacy dei modelli → 'deck', il resto → ''.
           evaluate: o.evaluate === 'deck' || o.evaluate === 'results' ? o.evaluate
             : (o.evaluate === true ? 'deck' : ''),
           // Auto-tag (§7): tag richiesti, normalizzati minuscoli.
           tagWith: Array.isArray(o.tagWith)
             ? o.tagWith.map((t) => String(t).trim().toLowerCase()).filter(Boolean) : [],
-          // Import via chat (§11.2): lista grezza incollata → nomi indovinati
-          // dal modello (typo/italiano/formati strani tollerati) + quantità.
-          // MAI scryfall_id qui: la risoluzione la fa il sistema via fuzzy
-          // match (mai fidarsi di un id inventato dal modello, §11.2).
+          // Import via chat (§11.2): nomi indovinati dal modello (typo, italiano, formati strani),
+          // MAI scryfall_id — la risoluzione la fa il sistema via fuzzy match, e di un id inventato
+          // dal modello non ci si fida.
           import: Array.isArray(o.import)
             ? o.import.map((it) => ({
                 name: typeof (it && it.name) === 'string' ? it.name.trim() : '',
@@ -203,10 +185,8 @@
     return { ...none, reply: raw };
   }
 
-  // Prosa con nomi carta marcati [[Nome Carta]] (§3.5) → segmenti tipizzati:
-  // [{ type:'text', text }, { type:'card', name }, …]. Il renderer trasforma i
-  // segmenti 'card' in span hoverable risolti via fuzzy. Marcatori vuoti
-  // restano testo normale.
+  // Prosa coi nomi marcati [[Nome Carta]] (§3.5) → segmenti tipizzati; il renderer rende i
+  // segmenti 'card' span hoverable risolti via fuzzy. Marcatori vuoti restano testo.
   function proseSegments(text) {
     const s = String(text || '');
     const out = [];

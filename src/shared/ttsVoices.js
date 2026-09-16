@@ -1,23 +1,13 @@
-// Voci del modello di lettura ad alta voce.
-//
-// Ogni modello di sintesi vocale ha il SUO catalogo di voci, con i SUOI nomi:
-// Kokoro vuole `if_sara`, MAI-Voice (Azure) vuole `it-IT-ElsaNeural`, Aura-2
-// vuole `aura-2-cinzia-it`. Mandare a un modello il nome di una voce di un
-// altro è un 400 secco, e la lettura ripiega sulla voce del browser senza che
-// nessuno capisca perché (è successo: il modello predefinito era cambiato, le
-// voci no). Qui stanno i cataloghi noti, chi li riconosce dall'id del modello,
-// e la regola che sceglie la voce da mandare. Tutto PURO, senza I/O: gira nel
-// main e nelle pagine.
-//
-// Un modello che non è in nessun catalogo non è un errore: gli si manda la
-// voce scritta a mano dall'utente (se c'è) o nessuna, e se il router risponde
-// elencando le voci ammesse ("Supported voices: …") chi chiama può riprovare
-// con una di quelle (voicesFromError + pickFromList).
+// Voci della lettura ad alta voce. Ogni modello di sintesi ha il SUO catalogo con i SUOI
+// nomi (Kokoro `if_sara`, MAI-Voice `it-IT-ElsaNeural`, Aura-2 `aura-2-cinzia-it`): mandare
+// a un modello il nome di una voce di un altro è un 400 secco, e la lettura ripiega sulla
+// voce del browser senza che nessuno capisca perché. Un modello fuori catalogo non è un
+// errore: gli si manda la voce scritta a mano (se c'è) o nessuna, e se il router elenca le
+// voci ammesse si può riprovare (voicesFromError + pickFromList). Tutto PURO.
 (function (global) {
   'use strict';
 
-  // ── Kokoro (hexgrad/kokoro-82m) ─────────────────────────────────────────
-  // Id = prefisso di due lettere (lingua/varietà + genere) + nome.
+  // Kokoro: id = prefisso di due lettere (lingua/varietà + genere) + nome.
   const KOKORO_LANG_OF_PREFIX = {
     a: 'en', b: 'en', e: 'es', f: 'fr', h: 'hi', i: 'it', j: 'ja', p: 'pt', z: 'zh',
   };
@@ -49,9 +39,8 @@
     label: kokoroLabel(id),
   }));
 
-  // ── MAI-Voice (microsoft/mai-voice-2, -flash), servito da Azure ─────────
-  // Nomi delle voci neurali di Azure: `<lingua>-<Regione>-<Nome>Neural`. La
-  // prima voce di ogni lingua è quella di partenza.
+  // MAI-Voice, servito da Azure: `<lingua>-<Regione>-<Nome>Neural`. La prima voce di ogni
+  // lingua è quella di partenza.
   const REGION_LABELS = {
     'en-US': 'US', 'en-GB': 'UK', 'es-MX': 'Messico', 'pt-PT': 'Portogallo',
   };
@@ -80,9 +69,8 @@
     return { id, lang, gender, label: name + suffix };
   });
 
-  // ── Deepgram Aura-2 (deepgram/aura-2) ───────────────────────────────────
-  // Id = `aura-2-<nome>-<lingua>`. Sottoinsieme del catalogo: il router
-  // elenca il resto quando gli si manda una voce che non conosce.
+  // Aura-2: id = `aura-2-<nome>-<lingua>`. Sottoinsieme del catalogo: il router elenca il
+  // resto quando gli si manda una voce che non conosce.
   const AURA2_LIST = [
     ['cinzia', 'it', 'f'], ['cesare', 'it', 'm'], ['demetra', 'it', 'f'], ['dionisio', 'it', 'm'],
     ['thalia', 'en', 'f'], ['andromeda', 'en', 'f'], ['helena', 'en', 'f'], ['apollo', 'en', 'm'],
@@ -126,9 +114,8 @@
     { id: 'conversational_b', lang: 'en', gender: 'm', label: 'Voce B' },
   ];
 
-  // Cataloghi: `match` riconosce il modello dal suo id sul router; `required`
-  // dice se il modello PRETENDE una voce (Fish Audio la sceglie da sé, e non
-  // ha nomi da elencare).
+  // `match` riconosce il modello dal suo id sul router; `required` dice se PRETENDE una voce
+  // (Fish Audio la sceglie da sé e non ha nomi da elencare).
   const CATALOGS = [
     { id: 'kokoro', name: 'Kokoro', match: /^hexgrad\/kokoro/i, voices: KOKORO_VOICES, required: true },
     { id: 'azure', name: 'MAI-Voice', match: /^microsoft\/mai-voice/i, voices: AZURE_VOICES, required: true },
@@ -144,11 +131,10 @@
     pt: 'portoghese', hi: 'hindi', ja: 'giapponese', zh: 'cinese', nl: 'olandese',
     pl: 'polacco', ru: 'russo', ko: 'coreano', ar: 'arabo', tr: 'turco',
   };
-  // Ordine delle lingue nelle tendine: l'italiano prima, poi l'inglese, poi
-  // le altre nell'ordine in cui compaiono nel catalogo.
+  // Ordine nelle tendine: prima l'italiano, poi l'inglese, poi le altre come nel catalogo.
   const LANG_ORDER_HEAD = ['it', 'en'];
 
-  // 'it-IT' → 'it'. PURA.
+  // 'it-IT' → 'it'.
   function langOf(tag) {
     return String(tag == null ? '' : tag).trim().toLowerCase().split(/[-_]/)[0];
   }
@@ -169,8 +155,7 @@
     return CATALOGS.flatMap((c) => c.voices);
   }
 
-  // Catalogo a cui appartiene un id di voce ('' se non è in nessuno: o è un
-  // nome scritto a mano, o non è una voce).
+  // '' se non è in nessun catalogo: o è un nome scritto a mano, o non è una voce.
   function catalogOfVoice(id) {
     const v = String(id == null ? '' : id).trim();
     if (!v) return '';
@@ -184,7 +169,7 @@
     return catalogOfVoice(v) !== '';
   }
 
-  // Lingua di una voce ('if_sara' → 'it', 'it-IT-ElsaNeural' → 'it'). PURA.
+  // Lingua di una voce: 'if_sara' → 'it', 'it-IT-ElsaNeural' → 'it'.
   function langOfVoice(id) {
     const v = allVoices().find((x) => x.id === id);
     return v ? v.lang : '';
@@ -195,12 +180,10 @@
     return v ? v.label : String(id == null ? '' : id);
   }
 
-  // Voce di partenza per una lingua nel catalogo di un modello: la prima voce
-  // di quella lingua; se la lingua non c'è, la prima inglese (la lingua che
-  // ogni modello conosce meglio); se nemmeno quella, la prima del catalogo.
-  // Senza modello vale il catalogo Kokoro (compatibilità con chi chiamava
-  // prima che le voci fossero per modello). '' se il modello non ha catalogo
-  // o non pretende una voce. PURA.
+  // Voce di partenza per una lingua: la prima di quella lingua; se la lingua non c'è la prima
+  // inglese (quella che ogni modello conosce meglio); se nemmeno quella, la prima del
+  // catalogo. Senza modello vale Kokoro, per chi chiamava prima che le voci fossero per
+  // modello. '' se il modello non ha catalogo o non pretende una voce.
   function defaultVoiceFor(lang, modelId) {
     const c = modelId === undefined ? CATALOGS[0] : catalogFor(modelId);
     if (!c || !c.required || !c.voices.length) return '';
@@ -211,17 +194,15 @@
     return hit.id;
   }
 
-  // LA regola: quale voce mandare a un modello.
-  //  - una voce scelta a mano che il modello conosce → quella;
-  //  - una voce scelta a mano che appartiene a un ALTRO catalogo → ignorata
-  //    (è rimasta da un modello precedente: mandarla è un 400 sicuro) e si va
-  //    alla voce di partenza per la lingua;
-  //  - un nome scritto a mano che nessun catalogo conosce → passa tale e quale
-  //    (è l'unico modo di usare un modello che non conosciamo);
-  //  - niente scelto → la voce di partenza per la lingua ('' se il modello
-  //    sceglie da sé o non lo conosciamo).
-  // `learned` (facoltativo) è l'elenco di voci che il router ha dichiarato per
-  // quel modello in una risposta precedente: vale come catalogo.
+  // LA regola, quale voce mandare a un modello:
+  // - scelta a mano e il modello la conosce → quella;
+  // - scelta a mano ma di un ALTRO catalogo → ignorata (è rimasta da un modello precedente,
+  // mandarla è un 400 sicuro) e si va alla voce di partenza per la lingua;
+  // - un nome che nessun catalogo conosce → passa tale e quale: è l'unico modo di usare un
+  // modello che non conosciamo;
+  // - niente scelto → la voce di partenza ('' se il modello sceglie da sé).
+  // `learned` è l'elenco che il router ha dichiarato in una risposta precedente, e vale
+  // come catalogo.
   function resolveVoice({ chosen, lang, modelId, learned } = {}) {
     const want = String(chosen == null ? '' : chosen).trim();
     const c = catalogFor(modelId);
@@ -237,24 +218,23 @@
     return '';
   }
 
-  // Voci ammesse elencate dal router in un errore ("Unknown voice "x".
-  // Supported voices: a, b, c."). [] se il messaggio non le elenca. PURA.
+  // Voci ammesse elencate dal router in un errore («Supported voices: a, b, c»); [] se il
+  // messaggio non le elenca.
   function voicesFromError(message) {
-    // L'elenco finisce alla prima virgoletta (il messaggio arriva dentro un
-    // JSON) o a capo; un punto in coda non è parte dell'ultimo nome.
+    // L'elenco finisce alla prima virgoletta (arriva dentro un JSON) o a capo; un punto in coda
+    // non è parte dell'ultimo nome.
     const m = /supported voices?\s*:\s*([^"\n]+)/i.exec(String(message == null ? '' : message));
     if (!m) return [];
     return m[1].split(',').map((s) => s.trim().replace(/[.\s'\\]+$/g, '')).filter(Boolean);
   }
 
-  // Il modello pretende una voce e non gliene abbiamo mandata nessuna. PURA.
+  // Il modello pretende una voce e non gliene abbiamo mandata nessuna.
   function isVoiceRequiredError(message) {
     return /explicit voice is required|voice is required/i.test(String(message == null ? '' : message));
   }
 
-  // Da un elenco di nomi di voci, quella della lingua chiesta (riconosciuta
-  // dal suffisso `-it` o dal prefisso `it-`), altrimenti l'inglese, altrimenti
-  // la prima. PURA.
+  // Da un elenco di nomi, quella della lingua chiesta (suffisso `-it` o prefisso `it-`),
+  // altrimenti l'inglese, altrimenti la prima.
   function pickFromList(list, lang) {
     const arr = (list || []).filter(Boolean);
     if (!arr.length) return '';
@@ -263,8 +243,7 @@
     return (want && byLang(want)) || byLang('en') || arr[0];
   }
 
-  // Voci di un modello raggruppate per lingua, per una tendina:
-  // [{ lang, label, voices }]. Senza modello, Kokoro.
+  // Voci raggruppate per lingua, per una tendina: [{ lang, label, voices }]. Senza modello, Kokoro.
   function groupedByLang(modelId) {
     const voices = modelId === undefined ? KOKORO_VOICES : voicesFor(modelId);
     const langs = [];
