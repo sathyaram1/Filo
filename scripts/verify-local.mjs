@@ -108,11 +108,11 @@ export function numeroFirestore(campo) {
  * che dice cosa manca; mai un numero al posto di quello dell'owner.
  * @returns {Promise<{cap2:number, cap1:number, cap0:number, fixInstructions:string}>}
  */
-export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.env } = {}) {
+export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.env, trovaRefresh = null } = {}) {
   const fa = await import('./lib/firestore-auth.mjs');
   let idToken = String(env.FILO_ADMIN_ID_TOKEN || '').trim();
   if (!idToken) {
-    const refresh = env.FILO_ADMIN_REFRESH_TOKEN || fa.findAdminRefreshToken();
+    const refresh = env.FILO_ADMIN_REFRESH_TOKEN || (trovaRefresh || fa.findAdminRefreshToken)();
     if (!refresh) throw new Error(SENZA_TOKEN_MSG);
     idToken = await fa.mintIdToken(refresh);
   }
