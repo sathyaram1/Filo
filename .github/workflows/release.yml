@@ -436,6 +436,18 @@ jobs:
             echo "::error::il manifesto qui dice v${LOCALE}, il server ha scritto ${ATTESA}: non costruisco alla cieca."
             exit 1
           fi
+          # Sotto il commit di release del server deve esserci ESATTAMENTE il
+          # commit che la suite ha provato: fra il controllo di prima e il
+          # numero di versione passano minuti, e una fusione in quei minuti
+          # farebbe costruire codice mai provato. Qui un numero di versione
+          # e' gia' stato consumato: resta un buco nella numerazione, che
+          # non fa male; pubblicare codice mai provato si'.
+          PROVATO="${{ needs.suite.outputs.sha }}"
+          SOTTO=$(git rev-parse HEAD~1)
+          if [ "$SOTTO" != "$PROVATO" ]; then
+            echo "::error::su main e' entrato altro fra la suite e il numero di versione (provato ${PROVATO:-(niente)}, sotto la release c'e' ${SOTTO}): non costruisco codice mai provato. La prossima corsa riprova."
+            exit 1
+          fi
           # Il commit ESATTO che si sta costruendo. Serve alla meta' Mac, che
           # deve partire dallo stesso codice: il tag della release nasce solo
           # alla pubblicazione e punta a dove sta `main` in QUEL momento, che
