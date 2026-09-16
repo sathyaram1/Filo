@@ -1,15 +1,6 @@
-// Proposta inline "Apri da un altro paese" — interfaccia (content script).
-// Livello decisionale del geo-block (proxy-per-tab-spec.md §5, feedback #151).
-//
-// Vive sulle pagine web esterne (page-preload.js). Quando il main rileva un
-// contenuto bloccato in Italia su un tab con sessione di login attiva (o dopo che
-// i retry automatici sono falliti), NON riprova in silenzio: manda un broadcast
-// GEO_PROPOSE e qui disegniamo una striscia discreta che PROPONE di aprire la tab
-// da un altro paese, avvertendo che lì l'utente non sarà loggato.
-//
-// Estetica calda e non allarmistica (spec §3: "non un lucchetto da security
-// tool"). Stili inline via CSSOM dentro uno Shadow DOM isolato, così appare anche
-// sotto le CSP più rigide e non è influenzato dal CSS della pagina.
+// Proposta inline "Apri da un altro paese" per il geo-block (proxy-per-tab-spec.md §5).
+// Filo non riprova in silenzio: propone, avvertendo che nell'altro paese l'utente non sarà loggato.
+// Stili via CSSOM dentro uno Shadow DOM: passa anche sotto le CSP più rigide, e il CSS della pagina non lo tocca.
 
 (function (global) {
   'use strict';
@@ -106,7 +97,6 @@
     try { return new URL(a).host === new URL(b).host; } catch (_) { return true; }
   }
 
-  // Broadcast dal main: c'è una proposta geo-block per questa pagina.
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== T_PROPOSE) return;

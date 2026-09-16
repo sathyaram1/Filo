@@ -1,10 +1,5 @@
-// Box "Modifica" (preview + conferma, mai sovrascrittura cieca).
-// Apre un overlay modale (HTML), mostra originale + proposta con diff, e
-// azioni esplicite [Sostituisci] / [Copia la nuova] / [Annulla]. Scorciatoie
-// pronte (più formale / informale / riassumi / traduci / correggi) + campo
-// libero per istruzioni arbitrarie.
-// Estratto da content.js — viene caricato prima di lui dai preload. content.js
-// chiama init() passando l'accesso al pasteContext (che resta suo).
+// Box "Modifica": preview con diff e conferma esplicita, mai sovrascrittura cieca.
+// I preload lo caricano prima di content.js, che poi chiama init() passandogli il pasteContext (che resta suo).
 
 (function (global) {
   'use strict';
@@ -142,8 +137,7 @@
     $replace.addEventListener('click', () => {
       deps.setPasteContext(savedCtx);
       deps.restorePasteContext();
-      // In input/textarea sostituisco il range salvato; in contenteditable uso execCommand insertText
-      // dopo aver ripristinato la selezione originale, così Ctrl+Z funziona.
+      // In contenteditable l'inserimento passa da execCommand dopo aver ripristinato la selezione, così Ctrl+Z funziona.
       if (savedCtx.kind === 'input') {
         const el = savedCtx.el;
         const start = savedCtx.start, end = savedCtx.end;
@@ -173,14 +167,11 @@
       if (e.target === root) close(); // click fuori dal box
     });
 
-    // Avvia subito una proposta neutra (rifrasi), così l'utente vede già qualcosa.
     $instr.value = '';
     // No autorun — l'utente deve dare istruzione esplicita.
     $prop.textContent = '—';
   }
 
-  // Diff parola-per-parola: ricostruisce il testo proposto evidenziando aggiunte
-  // (verde) e rimozioni (rosso barrato). Algoritmo LCS semplice sulle parole.
   function renderDiff(container, original, proposed) {
     container.innerHTML = '';
     const a = original.split(/(\s+)/);

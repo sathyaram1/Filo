@@ -1,20 +1,6 @@
-// Rilevamento siti pericolosi — interfaccia (content script).
-//
-// Vive sulle pagine web esterne (page-preload.js). Riceve il verdetto dal main
-// process (services/safebrowse) e disegna:
-//   - "pericoloso" → interstitial a pagina piena che BLOCCA l'interazione.
-//     Per proseguire l'utente deve scrivere "confermo" e premere "Procedi".
-//   - "sospetto"   → popup di conferma centrato che blocca l'interazione: per
-//     restare l'utente sceglie "Continua" (conferma), altrimenti "Torna indietro".
-//   - "safe"       → rimuove qualsiasi avviso.
-//
-// NON blocca mai la navigazione: la pagina carica normalmente, l'avviso la
-// copre. Il verdetto può cambiare in corsa (segnali di rete asincroni): il main
-// fa broadcast SAFEBROWSE_UPDATE e qui ridisegniamo.
-//
-// Tutti gli stili sono applicati via proprietà inline (CSSOM), non via <style>
-// o <link>: così l'avviso appare anche sotto le CSP più rigide e non è
-// influenzato dal CSS della pagina (vive in uno Shadow DOM isolato).
+// Siti pericolosi, lato pagina: disegna il verdetto del main (interstitial per "pericoloso", popup di conferma per "sospetto").
+// Non blocca mai la navigazione: la pagina carica e l'avviso la copre; il verdetto può cambiare in corsa (SAFEBROWSE_UPDATE) e qui si ridisegna.
+// Stili via CSSOM dentro uno Shadow DOM: passa anche sotto le CSP più rigide, e il CSS della pagina non lo tocca.
 
 (function (global) {
   'use strict';
@@ -91,7 +77,6 @@
     return b;
   }
 
-  // ── Interstitial "pericoloso" (blocca l'interazione) ──────────────────────
   function renderDanger(url, message) {
     ensureHost();
     shadow.replaceChildren();
@@ -165,10 +150,8 @@
     const doProceed = () => { send({ type: T_PROCEED, url }); clear(); };
     proceed.addEventListener('click', doProceed);
     back.addEventListener('click', () => {
-      // "Torna indietro" NON deve MAI confermare il sito pericoloso. Se c'è una
-      // pagina precedente ci torniamo; se la scheda è nuova (nessuna cronologia)
-      // usciamo e basta, SENZA inviare T_PROCEED (che registrerebbe il bypass,
-      // trattando l'uscita come "confermo" → "Procedi comunque").
+      // "Torna indietro" non deve MAI confermare il sito: senza cronologia si esce e basta, senza mandare T_PROCEED,
+      // che registrerebbe il bypass come se l'utente avesse scelto "Procedi comunque".
       try { if (history.length > 1) history.back(); else location.replace('about:blank'); }
       catch (_) {}
     });
@@ -181,13 +164,8 @@
     try { input.focus(); } catch (_) {}
   }
 
-  // ── Popup "sospetto" (richiede conferma) ──────────────────────────────────
-  // #176 — l'utente vuole che il sito sospetto compaia con un popup di conferma
-  // (come gli altri popup di Filo), non con una striscia passiva chiudibile con
-  // "Ho capito" che si può ignorare. Il popup BLOCCA l'interazione finché non si
-  // sceglie: "Torna indietro" (lascia il sito) o "Continua" (conferma esplicita
-  // di voler restare). Meno severo dell'interstitial "pericoloso" (niente parola
-  // da digitare), ma comunque una scelta attiva, non un avviso ignorabile.
+  // Il "sospetto" pretende una scelta attiva e blocca l'interazione (#176): una striscia chiudibile si ignora e non protegge nessuno.
+  // Resta meno severo del "pericoloso": qui non c'è nessuna parola da digitare.
   function renderSuspect(url, message) {
     ensureHost();
     shadow.replaceChildren();
@@ -260,7 +238,6 @@
     });
   }
 
-  // Broadcast dal main: il verdetto per la URL è cambiato.
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== T_UPDATE) return;
