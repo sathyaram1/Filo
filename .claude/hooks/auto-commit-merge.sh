@@ -183,6 +183,27 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
     continue
   fi
 
+  # ─── NEL MEZZO DI UN CONFLITTO NON SI COMMITTA ─────────────────────────────
+  #
+  # Un rebase o una fusione fermi su un conflitto: l'agente risolve un file con
+  # un Edit, e questo hook riparte. Fino al 2026-09-16 (giro del 14/09, terza
+  # verifica) `git add -A` metteva in scena anche i file ANCORA in conflitto,
+  # coi segni <<<<<<< dentro, e il commit li portava nella storia: durante un
+  # rebase inghiottiva il commit che il rebase stava riportando (il suo
+  # messaggio sparito, «auto: a.txt, b.txt» al suo posto, e --continue diceva
+  # «Successfully rebased»); durante una fusione la chiudeva col file rotto e la
+  # spediva su origin, dove la leggono il server e chi verifica. Qui ci si
+  # ferma: le modifiche restano nella cartella, il rebase resta a meta', e chi
+  # lo ha iniziato lo finisce (git add, git rebase --continue o git commit).
+  # Il salvataggio riparte al primo Edit dopo.
+  GIT_DIR_QUI=$(git rev-parse --git-dir 2>/dev/null)
+  if [ -d "$GIT_DIR_QUI/rebase-merge" ] || [ -d "$GIT_DIR_QUI/rebase-apply" ] \
+     || [ -f "$GIT_DIR_QUI/MERGE_HEAD" ] || [ -f "$GIT_DIR_QUI/CHERRY_PICK_HEAD" ] || [ -f "$GIT_DIR_QUI/REVERT_HEAD" ] \
+     || [ -n "$(git ls-files -u 2>/dev/null | head -1)" ]; then
+    echo "[auto-commit] '$wt': un rebase o una fusione e' a meta' (o ci sono file ancora in conflitto): NON committo e NON spedisco, o metterei in commit i segni di conflitto. Finiscilo (risolvi i file, git add, poi git rebase --continue o git commit): al primo salvataggio dopo il ramo parte." >&2
+    continue
+  fi
+
   git add -A 2>/dev/null
   if git diff --cached --quiet 2>/dev/null; then
     continue
