@@ -465,21 +465,39 @@ export function transcriptSottoAgenti(file) {
   }
 }
 
-/** La data della prima riga con un timestamp nei primi 64 KB del file, o NaN. */
+/**
+ * La data della prima riga con un timestamp, o NaN. Si leggono righe INTERE,
+ * a blocchi: la prima riga di un sotto-agente è il suo compito, e il
+ * timestamp sta in coda al testo — con un compito da 100.000 caratteri un
+ * prefisso di 64 KB non ci arrivava e il figlio spariva dal conto (giro 6).
+ */
 export function primoTimestampMs(file) {
   let fd = null;
   try {
     const size = statSync(file).size;
     if (!size) return NaN;
-    const buf = Buffer.alloc(Math.min(size, 64 * 1024));
     fd = openSync(file, 'r');
-    readSync(fd, buf, 0, buf.length, 0);
-    for (const r of buf.toString('utf8').split('\n')) {
+    const BLOCCO = 64 * 1024;
+    const buf = Buffer.alloc(BLOCCO);
+    let resto = '';
+    let pos = 0;
+    const dataIn = (r) => {
       const m = r.match(/"timestamp":"([^"]+)"/);
-      const ms = m ? Date.parse(m[1]) : NaN;
-      if (Number.isFinite(ms)) return ms;
+      return m ? Date.parse(m[1]) : NaN;
+    };
+    while (pos < size) {
+      const n = readSync(fd, buf, 0, BLOCCO, pos);
+      if (!n) break;
+      pos += n;
+      resto += buf.toString('utf8', 0, n);
+      const righe = resto.split('\n');
+      resto = righe.pop();
+      for (const r of righe) {
+        const ms = dataIn(r);
+        if (Number.isFinite(ms)) return ms;
+      }
     }
-    return NaN;
+    return dataIn(resto);
   } catch (_) {
     return NaN;
   } finally {
