@@ -6,7 +6,7 @@
 // ruolo, e le ritentate quando il server rifiuta il rapporto.
 
 import { test, expect } from '@playwright/test';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
