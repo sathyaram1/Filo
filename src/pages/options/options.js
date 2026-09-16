@@ -7,7 +7,6 @@
   const ModelChain = window.SN_MODEL_CHAIN;
   const Caps = window.SN_MODEL_CAPS;
 
-  // Mappa azione → editor a segmenti della sua catena di modelli (popolata in load()).
   let modelChains = {};
 
   // Cache delle liste modelli per provider, riempita on-demand (focus, cambio provider,
@@ -20,8 +19,7 @@
     return `models-list-${provider}`;
   }
 
-  // Le <datalist> per-provider restano l'unica sorgente di verità: il combobox le legge senza
-  // duplicarle. value = id del modello, label = categoria.
+  // Le <datalist> per-provider sono l'unica sorgente di verità: value = id, label = categoria.
   function readProviderOptions(provider) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return [];
@@ -59,8 +57,8 @@
     renderModelUsage();
   }
 
-  // Gli ALTRI punti in cui Filo usa un modello (sui suoi server, o nessun modello), in sola
-  // lettura: le funzioni impostabili da qui sono già la griglia sopra. Fonte: il censimento condiviso.
+  // Gli ALTRI punti in cui Filo usa un modello, in sola lettura: le funzioni impostabili da qui
+  // sono già la griglia sopra. Fonte: il censimento condiviso.
   function renderModelUsage() {
     const host = $('modelUsageList');
     const Usage = window.SN_MODEL_USAGE;
@@ -103,8 +101,8 @@
     }
   }
 
-  // «Usa modelli predefiniti» ON nasconde la config avanzata (provider, chiavi, registry,
-  // modelli per azione) e mostra la lista read-only dei predefiniti; OFF mostra tutto.
+  // «Usa modelli predefiniti» ON nasconde la config avanzata e mostra la lista read-only dei
+  // predefiniti; OFF mostra tutto.
   function applyDefaultModelsVisibility() {
     const useDefault = $('useDefaultModels').checked;
     for (const el of document.querySelectorAll('.sn-advanced-models')) {
@@ -198,8 +196,8 @@
     const impact = C.openWeightsImpact(models, modelRegistry);
     const lines = [];
     if (impact.substituted.length) {
-      // Le funzioni che cambiano modello sono decine: serve sapere quante sono e su quali
-      // finiscono, l'elenco per funzione è già la griglia dei modelli qui sotto.
+      // Le funzioni sono decine: serve quante sono e su quali finiscono, l'elenco per funzione è
+      // già la griglia qui sotto.
       const modelli = [...new Set(impact.substituted.map((s) => s.to))];
       lines.push(I18n.t('options_open_weights_switched', String(impact.substituted.length), modelli.join(', ')));
     }
@@ -230,8 +228,7 @@
       }
     } catch (_) {}
     renderDefaultModels(registry);
-    // L'effetto dell'interruttore si calcola sulla config VERA: ora che è
-    // arrivata, ricalcolalo.
+    // L'effetto si calcola sulla config VERA: ora che è arrivata, ricalcolalo.
     renderOpenWeightsImpact();
   }
 
@@ -313,8 +310,7 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
-      // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
-      // rimetterebbe premibile un "Prova" che la politica tiene spento.
+      // Il cancello dei pesi aperti ha l'ultima parola (applyOpenWeightsTestGates).
       applyOpenWeightsTestGates();
     }
   }
@@ -353,13 +349,11 @@
       $('spentBox').textContent = `€${eur.toFixed(4)}`;
     } catch (_) {}
 
-    // Prima semina coi soli id già nel registry (il valore corrente compare subito), poi il
-    // catalogo completo di ogni provider arriva in background, senza bloccare il render.
+    // Il valore corrente compare subito; i cataloghi completi arrivano in background.
     seedDatalistsFromRegistry(settings.modelRegistry || {});
     ensureProviderModels('openrouter');
 
-    // Con la config personale l'effetto è calcolabile subito; con quella condivisa lo ricalcola
-    // loadDefaultModels appena il main risponde.
+    // Con la config condivisa l'effetto lo ricalcola loadDefaultModels quando il main risponde.
     renderOpenWeightsImpact();
   }
 
@@ -372,8 +366,7 @@
     return { provider: 'openrouter', model: '' };
   }
 
-  // Normalizza i risultati di test (schema flat o vecchio per-provider) in flat, prendendo dal
-  // vecchio il sotto-oggetto del provider attivo.
+  // Normalizza i risultati di test (flat o vecchio per-provider) in flat, col provider attivo.
   function normalizeTest(entry, single) {
     const t = entry && entry.test;
     if (!t || typeof t !== 'object') return null;
@@ -449,7 +442,6 @@
     idIn.value = single.model;
     idIn.className = 'sn-model-id';
     idWrap.appendChild(idIn);
-    // Carica la lista del provider la prima volta che l'utente apre il campo.
     idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(idWrap, idIn, {
@@ -458,7 +450,6 @@
       });
     }
 
-    // Cambiando provider, il combobox legge l'altra lista (e la carica).
     provSel.addEventListener('change', () => {
       ensureProviderModels(provSel.value);
     });
@@ -466,8 +457,8 @@
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
-    // Messaggio non bloccante per le righe scartate dal salvataggio (nickname mancante o
-    // duplicato, #216), popolato e svuotato da markRegistryRowIssues() dopo ogni save().
+    // Righe scartate dal salvataggio (nickname mancante o duplicato, #216): messaggio non
+    // bloccante, popolato da markRegistryRowIssues() dopo ogni save().
     const msg = document.createElement('div');
     msg.className = 'sn-model-row-msg';
 
@@ -615,8 +606,8 @@
     }
   }
 
-  // `items` può essere una lista di id o di { id, meta } (meta = oggetto grezzo dell'API).
-  // Ordinati col più recente in cima ed etichettati per categoria via option.label.
+  // `items`: lista di id o di { id, meta } (meta = oggetto grezzo dell'API), già ordinati col
+  // più recente in cima ed etichettati per categoria.
   function populateDatalist(provider, items) {
     const dl = $(datalistIdFor(provider));
     if (!dl) return;
@@ -637,8 +628,7 @@
     }
   }
 
-  // Semina i combobox con gli id già nel registry, così il valore corrente compare anche prima
-  // di interrogare l'API; il fetch successivo lo rimpiazza col catalogo completo.
+  // Il valore corrente compare anche prima di interrogare l'API; il fetch lo rimpiazza.
   function seedDatalistsFromRegistry(registry) {
     const byProv = { openrouter: [] };
     for (const nick of Object.keys(registry || {})) {
@@ -648,9 +638,8 @@
     populateDatalist('openrouter', byProv.openrouter);
   }
 
-  // Il catalogo OpenRouter è PUBBLICO: la chiave non serve (sono metadati, niente inferenza).
-  // Si passa se c'è, ma funziona anche senza. Il catalogo «semplice» elenca i soli modelli di
-  // testo: voce, dettatura e indicizzazione stanno in liste a parte, e si chiedono tutte.
+  // Il catalogo OpenRouter è PUBBLICO: la chiave non serve (metadati, niente inferenza). Il
+  // catalogo «semplice» elenca i soli modelli di testo: le altre modalità si chiedono a parte.
   const OR_CATALOG_QUERIES = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
   async function fetchOpenRouterModels(key) {
     const headers = key ? { Authorization: `Bearer ${key}` } : {};
@@ -663,8 +652,7 @@
     return lists.flat();
   }
 
-  // Gli id del registro che il catalogo non conosce (nuovi, o scritti a mano) restano nella
-  // tendina: toglierli farebbe sparire proprio il modello che la riga usa.
+  // Gli id che il catalogo non conosce restano in tendina: toglierli farebbe sparire quello in uso.
   function withRegistryIds(provider, catalog) {
     const known = new Set(catalog.map((it) => it.id));
     const extra = [];
@@ -685,9 +673,8 @@
     return provider === 'openrouter' ? $('apiKey').value.trim() : '';
   }
 
-  // Il catalogo è «solo metadati», ma resta una richiesta MANDATA al fornitore con la tua
-  // chiave, e questa pagina la faceva da sola al caricamento. Con «Solo modelli a pesi aperti»
-  // acceso sta spenta come il suo «Prova», o sarebbe l'unica pagina che parla a un escluso.
+  // Il catalogo è «solo metadati», ma resta una richiesta mandata al fornitore con la tua
+  // chiave: con «Solo modelli a pesi aperti» acceso sta spenta come il suo «Prova».
   function catalogBlocked(provider) {
     if (!$('openWeightsOnly').checked) return false;
     const C = window.SN_CONST;
@@ -695,8 +682,7 @@
     return diretti.includes(provider);
   }
 
-  // Carica una sola volta il catalogo di un provider (solo metadati, gratis). OpenRouter è
-  // pubblico, quindi si carica anche senza chiave; in errore il campo resta un input libero.
+  // Una volta sola, e senza chiave per OpenRouter; in errore il campo resta un input libero.
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
     if (catalogBlocked(provider)) return;
@@ -730,9 +716,8 @@
     const apiKey = $('apiKey').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
 
-    // Auto-save: si persistono le sole righe valide. Le incomplete o duplicate restano ignorate
-    // finché non sono complete — niente alert che interrompono la digitazione — ma vengono
-    // evidenziate, e la conferma non dice più «Salvato» secco: l'utente ci credeva (#216).
+    // Auto-save delle sole righe valide: le incomplete restano ignorate finché non sono complete
+    // — niente alert mentre si digita — ma evidenziate, e la conferma non dice «Salvato» secco (#216).
     const { registry, missingNickRows, dupRows } = collectModelRegistry();
 
     const partial = {
@@ -791,8 +776,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    // Niente pulsante «Salva»: ogni modifica si applica e si persiste subito. I controlli
-    // testuali salvano allo `change` (al blur), select e checkbox immediatamente.
+    // Niente «Salva»: i controlli testuali si persistono allo `change` (al blur), gli altri subito.
     $('page').addEventListener('change', () => saveDebounced());
     // Qualunque cosa cambi può cambiare l'effetto di «solo pesi aperti»: si ricalcola sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);
