@@ -164,6 +164,40 @@ export function eSottoAgente(file) {
   return basename(dirname(file)) === 'subagents';
 }
 
+/** L'id di un sotto-agente dal nome del suo transcript (`agent-<id>.jsonl`). PURA. */
+export function agentIdDi(file) {
+  return basename(file, '.jsonl').replace(/^agent-/, '');
+}
+
+/**
+ * Il meta di un sotto-agente: Claude Code scrive accanto a ogni transcript
+ * `agent-<id>.meta.json` con `parentAgentId` (chi lo ha lanciato) e
+ * `toolUseId` (la chiamata Agent che lo ha lanciato). È il legame vero
+ * figlio → lanciatore; il tempo è solo un ripiego (giro 6 della verifica del
+ * 16/09/2026). Torna null se il file manca o non è JSON.
+ */
+export function leggiMeta(file) {
+  const p = file.replace(/\.jsonl$/, '.meta.json');
+  try {
+    const m = JSON.parse(readFileSync(p, 'utf8'));
+    return m && typeof m === 'object' ? m : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Il transcript del lanciatore dichiarato dal meta, se sta nella stessa cartella; altrimenti ''. */
+function lanciatoreDi(file) {
+  const meta = leggiMeta(file);
+  const pid = meta && typeof meta.parentAgentId === 'string' ? meta.parentAgentId.trim() : '';
+  if (!pid) return '';
+  for (const nome of [`agent-${pid}.jsonl`, `${pid}.jsonl`]) {
+    const p = join(dirname(file), nome);
+    if (existsSync(p) && resolve(p) !== resolve(file)) return p;
+  }
+  return '';
+}
+
 /**
  * I transcript di una cartella del progetto, con la data dell'ultima
  * scrittura: i `.jsonl` delle sessioni E quelli dei loro sotto-agenti
