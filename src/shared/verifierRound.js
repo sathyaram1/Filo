@@ -425,7 +425,10 @@
    *     (un altro verificatore arriva comunque) oppure se l'owner ha dato
    *     giri al loro bilancio; altrimenti vanno nel feedback derivato;
    *   - un giro consuma UN giro dal bilancio del livello più alto corretto;
-   *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto.
+   *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto;
+   *   - senza uno dei tre bilanci LANCIA (`bilanci del verificatore
+   *     mancanti: …`): un numero inventato al posto di quello dell'owner è
+   *     peggio di un errore (decisione del 2026-09-16).
    *
    * @param {object} p { findings, caps:{cap2,cap1,cap0}, counts:{count2,count1,count0} }
    * @returns {{
