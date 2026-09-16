@@ -120,6 +120,28 @@ test('bilancio esaurito su quel livello: un 1 con cap1 a zero → derivato', () 
   assert.equal(d.stop, false, 'un 1 non ferma mai il lavoro');
 });
 
+test('decisione owner 2026-09-16: un 1 si corregge nel giro in cui si corregge un 2, anche a cap1 finito', () => {
+  const d = decide([f(2, 'rotto'), f(1, 'bordo'), f(1, 'ombra')], { count1: 2 });
+  assert.equal(d.stop, false);
+  assert.deepEqual(d.fix.map((x) => x.level), [2, 1, 1], 'gli 1 entrano nel giro del 2');
+  assert.deepEqual(d.derived, []);
+  assert.equal(d.consume, 'cap2', 'il giro lo paga il livello più alto');
+  assert.equal(d.counts.count1, 2, 'cap1 non si tocca');
+  // Con cap1 a zero dall'owner vale lo stesso.
+  const zero = decide([f(1, 'bordo'), f(2, 'rotto')], {}, { cap2: 10, cap1: 0, cap0: 0 });
+  assert.deepEqual(zero.fix.map((x) => x.level), [1, 2], 'ordine della critica conservato');
+  assert.equal(zero.consume, 'cap2');
+});
+
+test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se il 2 ferma il lavoro, si ferma tutto', () => {
+  const d = decide([f(2, 'rotto'), f(1, 'gusto?', true)], { count1: 2 });
+  assert.deepEqual(d.fix.map((x) => x.level), [2]);
+  assert.equal(d.derived.length, 1, 'la domanda non si corregge da soli');
+  const stop = decide([f(2, 'rotto'), f(1, 'bordo')], { count2: 5, count1: 2 });
+  assert.equal(stop.stop, true);
+  assert.deepEqual(stop.fix, [], 'fermandosi non si corregge nemmeno l\'1');
+});
+
 test('livello 2 o 3 con cap2 esaurito → stop, decide l\'owner', () => {
   const d = decide([f(2, 'rotto'), f(1, 'bordo'), f(0, 'raro')], { count2: 5 });
   assert.equal(d.stop, true);
