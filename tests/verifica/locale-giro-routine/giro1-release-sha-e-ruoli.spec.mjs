@@ -30,7 +30,7 @@ test.describe('lavoro di release — la suite prima della patch', () => {
     // è entrato su main nel frattempo esce senza essere mai passato dalla
     // suite. Il lavoro di release deve confrontare il commit che costruisce
     // con quello che la suite ha provato, e fermarsi se non coincidono.
-    test.fail(true, 'rilievo aperto del giro 1: il release non confronta il commit costruito con quello provato dalla suite');
+    // Rilievo del giro 1, corretto nello stesso giro: il confronto c'è.
     const y = leggi('.github/workflows/release.yml');
     const release = y.slice(y.indexOf('\n  release:'), y.indexOf('\n  release-mac:'));
     expect(release).toMatch(/needs\.suite\.outputs\./);
