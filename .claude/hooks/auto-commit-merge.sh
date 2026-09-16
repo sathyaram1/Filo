@@ -132,7 +132,12 @@ spedisci_ramo() {
   esito=$(git push origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
   case "$esito" in
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
-      esito2=$(git push --force-with-lease="refs/heads/$ramo" origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      # --force-if-includes: il lease da solo si fida del ref remoto che questa
+      # copia conosce, e dopo un `git fetch` quel ref e' gia' il commit
+      # dell'altro: il lease combacia e il rinvio lo sovrascrive (verifica del
+      # giro 2). Con --force-if-includes git rifiuta se quel commit non e' mai
+      # passato dalla storia locale di questo ramo.
+      esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
       segnala_fallimento "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")"
       return 1 ;;
   esac
