@@ -109,22 +109,24 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
       motivo: il server non te lo permette più, e i rilievi che restano
       aperti li raccoglie lui da ciò che hai scritto.
 
-## La suite completa: una volta, prima di lasciar passare
+## I controlli automatici, una volta, prima di lasciar passare
 
-Chi risolve non lancia più `npm test` (dal 2026-09-03). Lo lanci tu, **quando
-non hai trovato rilievi di livello 3 o 2** (cioè quando il lavoro sta per
-passare): una corsa per feedback invece di una per consegna. Prima confronta
-gli spec toccati e gli unit test; la suite intera è l'ultimo passo, non il
-primo.
+**La suite intera (`npm test`) non la lanci più** (decisione owner
+2026-09-15): non la lancia nessuno, né qui né in locale. Gira in GitHub, nel
+lavoro di release, che parte ogni sei ore: se è verde la patch si pubblica, se
+ha un rosso nuovo — fuori dai rossi noti del contenitore — la patch non esce,
+il rosso diventa un feedback e si corregge con calma, saltando un giro. Una
+regressione è rara: non vale un'ora d'attesa a ogni consegna.
 
-**In locale, sulla macchina di chi sviluppa Filo, la suite intera NON si
-lancia** (decisione owner 2026-09-10: lì dura quasi sette ore con un solo
-worker e occupa la macchina; i rossi che trova sono quelli già scritti nei
-rossi noti). Al suo posto: `npm run finish:check`, che lancia gli unit test e
-gli spec delle aree toccate dal ramo, più le prove dei giri in
-`tests/verifica/<numero>/`. La suite intera gira nel cancello del server
-prima della pubblicazione. Come sai di essere in locale: il compito che hai
-ricevuto viene da `verify-local.mjs`, non dal canale delle routine.
+Quello che lanci tu, **quando non hai trovato rilievi di livello 3 o 2** (cioè
+quando il lavoro sta per passare), è:
+
+- `npm run finish:check` — unit test più gli spec delle aree toccate dal ramo;
+- le prove dei giri, `npx playwright test tests/verifica/<numero>` (il percorso
+  va scritto relativo alla radice del repo e con le barre normali, vedi sotto).
+
+Prima di tutto questo confronta gli spec toccati e gli unit test: i controlli
+automatici sono l'ultimo passo, non il primo.
 
 - Rossi **fuori dalla lista dei rossi noti** → rilievo di livello **2**, con
   l'elenco esatto degli spec rotti nella critica.
