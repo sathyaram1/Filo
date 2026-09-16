@@ -266,11 +266,24 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   if [ -d "$GIT_DIR_QUI/rebase-merge" ] || [ -d "$GIT_DIR_QUI/rebase-apply" ] \
      || [ -f "$GIT_DIR_QUI/MERGE_HEAD" ] || [ -f "$GIT_DIR_QUI/CHERRY_PICK_HEAD" ] || [ -f "$GIT_DIR_QUI/REVERT_HEAD" ] \
      || [ -n "$(git ls-files -u 2>/dev/null | head -1)" ]; then
-    segnala_avviso "[auto-commit] '$wt': un rebase o una fusione e' a meta' (o ci sono file ancora in conflitto): NON committo e NON spedisco, o metterei in commit i segni di conflitto. Finiscilo (risolvi i file, git add, poi git rebase --continue o git commit): al primo salvataggio dopo il ramo parte."
+    segnala_avviso "$wt" "un rebase o una fusione e' a meta' (o ci sono file ancora in conflitto): NON committo e NON spedisco, o metterei in commit i segni di conflitto. Finiscilo (risolvi i file, git add, poi git rebase --continue o git commit): al primo salvataggio dopo il ramo parte." \
+      "un rebase o una fusione e' a meta' li' (o ci sono file in conflitto): quel salvataggio non e' avvenuto"
     continue
   fi
 
-  git add -A 2>/dev/null
+  # ─── UN COMMIT CHE NON RIESCE NON TACE ─────────────────────────────────────
+  #
+  # Un index.lock rimasto a terra (un git morto a meta') ferma gia' `git add`;
+  # un pre-commit che rifiuta ferma il commit. Fino al giro 5 della verifica
+  # (16/09/2026) tutti e due finivano in /dev/null e la sessione lavorava
+  # convinta di essere salvata. Ora passano alla sessione dallo stesso canale
+  # del push fallito, col motivo di git. Un fallimento qui non e' un push a
+  # vuoto: non c'e' niente di committato, e la coda dice questo.
+  ESITO_ADD=$(git add -A 2>&1) || {
+    segnala_avviso "$wt" "le modifiche NON sono state committate (git add e' fallito): $(motivo_git "$ESITO_ADD"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella: se e' un index.lock a terra e nessun git e' in corso, si toglie; al primo salvataggio dopo si riprova." \
+      "il salvataggio li' non e' riuscito (git add): $(motivo_git "$ESITO_ADD")"
+    continue
+  }
   if git diff --cached --quiet 2>/dev/null; then
     continue
   fi
