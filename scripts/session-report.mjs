@@ -514,10 +514,15 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     return rep;
   }
   try {
-    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since });
+    const finestre = [];
+    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since, finestreAgent: finestre });
     if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
-    if (eSottoAgente(trovato.file)) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
-    for (const f of transcriptSottoAgenti(trovato.file)) {
+    const sottoAgente = eSottoAgente(trovato.file);
+    if (sottoAgente) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
+    // Una sessione ha i suoi sotto-agenti in <sessione>/subagents/; un
+    // sotto-agente li ha ACCANTO a se', e li si riconosce dal tempo.
+    const figli = sottoAgente ? figliDelSottoAgente(trovato.file, finestre) : transcriptSottoAgenti(trovato.file);
+    for (const f of figli) {
       try {
         sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket, since }));
       } catch (e) {
