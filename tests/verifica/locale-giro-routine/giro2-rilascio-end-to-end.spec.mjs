@@ -141,8 +141,8 @@ test.describe('rilascio del biglietto, dalla riga di comando vera', () => {
     // L'avviso dice «report_malformed» ma perde il dettaglio che il server ha
     // mandato (qui «campo x»): l'avviso legge la risposta della SECONDA
     // chiamata, quella senza rapporto, non della prima. Rilievo del giro 2,
-    // situazione rara (il server che rifiuta un rapporto): livello 0.
-    test.fail(true, 'rilievo del giro 2: il dettaglio del rifiuto del server non compare nell’avviso');
+    // situazione rara (il server che rifiuta un rapporto): livello 0, corretto
+    // nello stesso giro (il dettaglio si legge dalla prima risposta).
     const s = scenario('400');
     const c = await canaleFinto([
       { status: 400, body: { ok: false, reason: 'report_malformed', detail: 'campo x' } },
