@@ -12,8 +12,7 @@
   const MODEL_TURN_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*(.*?)\s*---\s*$/;
 
   // Allegati PER-TURNO (#190.3). Il documento ha `images`/`files` PIATTI, buoni per la segnalazione originale: per legare un allegato a un singolo turno senza aggiungere campi a Firestore né toccare le regole, lo si codifica come riga-marcatore dentro `notes` — `@@filo-attachment {"kind":"img","url":"…"}`, un JSON per riga.
-  // Il parser le toglie dal corpo e le raccoglie in `turn.attachments`, così l'allegato resta ANCORATO al turno in cui è stato incollato invece di finire nel mucchio insieme alla segnalazione.
-  // JSON su riga singola: l'escaping gestisce nomi con spazi e caratteri speciali, e il prefisso è improbabile nella prosa.
+  // Il parser le toglie dal corpo e le raccoglie in `turn.attachments`, così l'allegato resta ANCORATO al turno in cui è stato incollato invece di finire nel mucchio con la segnalazione. JSON su riga singola: l'escaping gestisce nomi con spazi, e il prefisso è improbabile nella prosa.
   const ATTACH_PREFIX = '@@filo-attachment ';
 
   // Serializza un allegato { kind, url, name?, type? } nella sua riga-marcatore.
@@ -79,8 +78,8 @@
     return 'user';
   }
 
-  // Categoria d'AUTORE, user-facing, per l'icona «chi l'ha scritto»: auto:/filo: → 'filo' (Filo per conto di un utente), owner: → 'owner', :prober → 'prober' (esplora l'app), :new-work/:fixer → 'worker' (implementa), :verifier/:secaudit → 'verifier' (parla del lavoro appena fatto), local: → 'local', routine:residuo → 'residuo', altre automazioni → 'claude', tutto il resto → 'user'.
-  // Il MITTENTE dice quanto fidarsi e in che contesto leggere (#443): un rilievo del verificatore riguarda la modifica appena consegnata, uno dell'esploratore riguarda l'app in generale, uno di Filo è la voce di un utente vero filtrata. Per questo 'local' e 'residuo' sono categorie proprie e non collassano su 'prober' o 'verifier': leggendo la coda non si saprebbe più da dove nasce un ritrovamento, che è l'unica cosa che il mittente serve a dire.
+  // Categoria d'AUTORE, user-facing, per l'icona «chi l'ha scritto»: auto:/filo: → 'filo' (Filo per conto di un utente), owner: → 'owner', :prober → 'prober' (esplora l'app), :new-work/:fixer → 'worker' (implementa), :verifier/:secaudit → 'verifier' (parla del lavoro appena fatto), local: → 'local', routine:residuo → 'residuo', altre automazioni → 'claude', il resto → 'user'.
+  // Il MITTENTE dice quanto fidarsi e in che contesto leggere (#443): un rilievo del verificatore riguarda la modifica appena consegnata, uno dell'esploratore l'app in generale, uno di Filo è la voce di un utente filtrata. Per questo 'local' e 'residuo' non collassano su 'prober' o 'verifier': si perderebbe da dove nasce un ritrovamento, l'unica cosa che il mittente serve a dire.
   // `auto:`/`filo:` si controllano PRIMA di `owner:`: gli auto-feedback bypassano ownerize(), e l'ordine regge anche se un domani venissero marcati.
   var ROLE_KIND = {
     prober: 'prober',
@@ -103,9 +102,9 @@
     return 'user';
   }
 
-  // Chi può entrare in coda da solo: la modalità automatica non è un sì/no per tutti, l'owner sceglie DI QUALI MITTENTI si fida.
-  // Un interruttore per ogni autore che la dashboard mostra. Con le cinque istanze di Claude dietro un interruttore solo, la coda le distingueva con cinque icone ma la fiducia era una: per non far entrare l'esploratore bisognava fermare anche la sessione locale. Chi si vede separato si regola separato.
-  // `filo` resta SEPARATO dalle automazioni: è la voce di un utente vero filtrata da un modello, non un processo dell'owner, e metterli insieme farebbe entrare in coda contenuto scritto da un utente sotto l'etichetta «automazioni». L'ordine è quello della dashboard (AUTHOR_RANK in manage.js).
+  // Chi può entrare in coda da solo: l'automatica non è un sì/no per tutti, l'owner sceglie di quali mittenti si fida, un interruttore per ogni autore che la dashboard mostra.
+  // Con le cinque istanze di Claude dietro un interruttore solo, per non far entrare l'esploratore bisognava fermare anche la sessione locale: chi si vede separato si regola separato. `filo` resta SEPARATO dalle automazioni — è la voce di un utente filtrata da un modello, e metterli insieme farebbe entrare contenuto scritto da un utente sotto l'etichetta «automazioni».
+  // L'ordine è quello della dashboard (AUTHOR_RANK in manage.js).
   var AUTO_APPROVE_GROUPS = [
     'owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo',
   ];
@@ -282,9 +281,9 @@
     return appendModelTurn(existing, incoming, opts);
   }
 
-  // Tetto alla lunghezza della conversazione. Le firestore rules limitano `notes`, e il limite non è cosmetico: oltre il tetto ogni scrittura successiva viene respinta, anche una che le note non le tocca (le regole validano il documento RISULTANTE). Il feedback diventa immobile — non si sposta di stato, non si commenta, non si archivia.
-  // Ci si arriva perché la conversazione cresce, e perché uno dei cammini di scrittura (la GitHub Action, con un service account) BYPASSA le regole: può gonfiare le note senza accorgersene, e la dashboard, che dalle regole ci passa, resta fuori. Difesa: TUTTI i cammini passano da qui e tagliano i turni PIÙ VECCHI finché il blob rientra, lasciando una riga che dichiara il taglio.
-  // IL TETTO È IN BYTE E STA SOTTO QUELLO DELLE REGOLE: il taglio si fa sul chiaro, ma su Firestore va il CIFRATO, più lungo di un terzo — 6 + ceil(4*(94+byte)/3). Con il tetto uguale a quello delle regole la conversazione passava il taglio e veniva respinta subito dopo, cioè proprio il guaio che questo tetto esiste per impedire. 44.000 byte diventano 58.798 cifrati: ci stanno.
+  // Tetto alla lunghezza della conversazione. Le firestore rules limitano `notes`, e oltre il tetto ogni scrittura successiva viene respinta, anche una che le note non le tocca (le regole validano il documento RISULTANTE): il feedback diventa immobile — non si sposta di stato, non si commenta, non si archivia.
+  // Ci si arriva perché la conversazione cresce e perché la GitHub Action, con un service account, BYPASSA le regole: gonfia le note senza accorgersene, e la dashboard resta fuori. Difesa: TUTTI i cammini passano da qui e tagliano i turni PIÙ VECCHI finché il blob rientra, lasciando una riga che dichiara il taglio.
+  // IL TETTO È IN BYTE E STA SOTTO QUELLO DELLE REGOLE: il taglio si fa sul chiaro, ma su Firestore va il CIFRATO, più lungo di un terzo. Con i due tetti uguali la conversazione passava il taglio e veniva respinta subito dopo, cioè il guaio che questo tetto esiste per impedire.
   // Se cambi NOTES_MAX, riallinea la copia del server (filo-security, routine/notes.js) e rideploya.
   const NOTES_MAX = 44000;
   const TRIM_MARK = '--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---';
@@ -344,8 +343,8 @@
 
   /**
   * Cosa legge CHI HA MANDATO il feedback quando gli viene detto che è risolto (ROUTINE-AUTH-SPEC.md §8).
-  * I due testi sono cose diverse: `userNote` è la frase scritta per lui, breve e in chiaro, leggibile sulla SUA macchina, che non ha nessuna chiave; `notes` è il report per l'owner, con le scelte della lavorazione, e viaggia cifrato. Mostrargli quello era il motivo per cui il report non poteva essere protetto.
-  * Retrocompatibilità: i feedback già chiusi hanno un testo solo in chiaro dentro `notes`, e per quelli si continuano a estrarre i turni del modello. Se invece `notes` è cifrato e la frase non c'è, si tace: meglio del blob.
+  * `userNote` è la frase scritta per lui, breve e in chiaro, leggibile sulla sua macchina, che non ha nessuna chiave; `notes` è il report per l'owner e viaggia cifrato. Mostrargli quello era il motivo per cui il report non poteva essere protetto.
+  * Retrocompatibilità: i feedback già chiusi hanno un testo solo in chiaro dentro `notes`, e per quelli si estraggono ancora i turni del modello. Se `notes` è cifrato e la frase non c'è, si tace: meglio del blob.
   */
   /**
   * Il report NON è leggibile da chi sta guardando? Due forme, da riconoscere entrambe: il testo cifrato così com'è, e il SEGNAPOSTO che l'app mette al suo posto quando ha provato a decifrare senza riuscirci.
