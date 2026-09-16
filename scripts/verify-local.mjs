@@ -792,6 +792,17 @@ if (isMain) {
   const branch = currentBranch();
   const sha = headSha();
 
+  // I bilanci veri, o ci si ferma qui: un errore evidente, nessun ripiego.
+  const bilanciOStop = async () => {
+    try {
+      return await leggiBilanciDalServer();
+    } catch (e) {
+      console.error(`BILANCI DEL GIRO NON LETTI DAL SERVER — mi fermo, non ho toccato niente. ${String((e && e.message) || e)}`);
+      process.exit(1);
+    }
+    return null;
+  };
+
   if (cmd === 'start') {
     const prev = readState()[branch];
     // Dopo una correzione si riparte senza argomenti: la richiesta è la stessa.
