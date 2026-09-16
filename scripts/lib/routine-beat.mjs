@@ -5,7 +5,9 @@
 //   il problema è lo stesso). La suite completa in cloud ne dura 37. Il primo giro che ci è finito dentro ha perso un lavoro
 //   intero: venti commit spinti sul ramo, consegna rifiutata (`dead_ticket`),
 //   esito e report mai registrati da nessuna parte. Non è un caso isolato:
-//   capita a ogni ruolo che lanci la suite completa.
+//   capita a ogni lavorazione che supera l'ora (dal 2026-09-15 la suite
+//   completa gira solo in GitHub Actions nel lavoro di release, mai nelle
+//   routine; finish:check più le prove del giro possono superarla lo stesso).
 //
 //   Il comando che tiene vivo il semaforo esisteva già (`routine-channel.mjs
 //   heartbeat --loop`), ma nessuno lo lanciava: non stava in nessuna ricetta di
