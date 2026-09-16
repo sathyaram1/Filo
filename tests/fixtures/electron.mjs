@@ -31,6 +31,24 @@ const APP_ROOT = resolve(__dirname, '..', '..');
 // ri-esporta perché quegli spec la importano da questa fixture da sempre.
 export { argomentiScala };
 
+// Chiusura con un tetto. `app.close()` aspetta che il processo di Electron
+// esca, e se non esce (un'apertura di sistema appesa, un renderer morto male)
+// Playwright aspetta il tetto del test — 60 secondi — e poi altri 60 per il
+// worker, e li segna come «Worker teardown timeout»: nella prima corsa della
+// suite in GitHub (2026-09-16) ne sono venuti quindici così, da tre spec.
+// Cinque secondi bastano a una chiusura normale (misurata sotto il secondo);
+// scaduti, il processo si ammazza. Su Windows SIGKILL è un TerminateProcess;
+// a processo già uscito `kill` lancia, e si ignora.
+export async function chiudiApp(app, { tetto = 5000 } = {}) {
+  let pid = null;
+  try { pid = app.process().pid; } catch (_) {}
+  let timer = null;
+  const scaduto = new Promise((r) => { timer = setTimeout(r, tetto); timer.unref?.(); });
+  await Promise.race([app.close(), scaduto]).catch(() => {});
+  clearTimeout(timer);
+  if (pid) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
+}
+
 export const test = base.extend({
   app: async ({}, use) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
