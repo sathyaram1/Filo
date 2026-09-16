@@ -79,7 +79,10 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
+import { isProtectedBranch } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
 
