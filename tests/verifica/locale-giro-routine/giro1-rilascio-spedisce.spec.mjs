@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
-import { pushRamoCorrente, statoContenitore } from '../../../scripts/routine-channel.mjs';
+import { pushRamoCorrente, statoContenitore, commitRestante } from '../../../scripts/routine-channel.mjs';
 
 function git(cwd, ...args) {
   return execFileSync('git', ['-c', 'user.name=prova', '-c', 'user.email=prova@prova', ...args],
