@@ -46,3 +46,61 @@ test('un fattore di scala assurdo o mancante non fa uscire un NaN', () => {
     assert.ok(Number.isFinite(v) && v < 0, `scala ${String(brutto)} → ${v}`);
   }
 });
+
+// Aperture di sistema (browser, gestore file) durante i test. Su un
+// contenitore senza desktop `xdg-open` non esce mai e l'app non si chiude più;
+// altrove si apre davvero il browser di chi lancia i test. In modalità test le
+// due funzioni dello shell non aprono niente, risolvono subito e lo scrivono su
+// stderr; fuori dalla modalità test lo shell resta quello di Electron.
+
+// Uno shell finto che conta le chiamate all'originale.
+function shellFinto() {
+  const chiamate = [];
+  return {
+    chiamate,
+    shell: {
+      openExternal: async (u) => { chiamate.push(['openExternal', u]); },
+      openPath: async (p) => { chiamate.push(['openPath', p]); return ''; },
+    },
+  };
+}
+
+test('la modalità test è NODE_ENV=test, e solo quella', () => {
+  assert.equal(inModalitaTest({ NODE_ENV: 'test' }), true);
+  for (const env of [{}, { NODE_ENV: 'production' }, { NODE_ENV: 'development' }, { FILO_HIDE_WINDOW: '1' }, null, undefined]) {
+    assert.equal(inModalitaTest(env), false, `ambiente ${JSON.stringify(env)} scambiato per test`);
+  }
+});
+
+test('in modalità test openExternal e openPath non aprono niente e lo dicono su stderr', async () => {
+  const { shell, chiamate } = shellFinto();
+  const righe = [];
+  assert.equal(silenziaApertureDiSistema(shell, { inTest: true, avvisa: (r) => righe.push(r) }), true);
+  const a = await shell.openExternal('https://accounts.google.com/o/oauth2/v2/auth?x=1');
+  const b = await shell.openPath('/una/cartella/file.pdf');
+  assert.equal(a, undefined);
+  assert.equal(b, '', 'openPath deve rispondere come Electron quando va bene: stringa vuota');
+  assert.deepEqual(chiamate, [], 'l\'originale non va chiamato');
+  assert.deepEqual(righe, [
+    '[test] openExternal soppresso: https://accounts.google.com/o/oauth2/v2/auth?x=1',
+    '[test] openPath soppresso: /una/cartella/file.pdf',
+  ]);
+});
+
+test('fuori dalla modalità test lo shell resta quello di Electron', async () => {
+  const { shell, chiamate } = shellFinto();
+  const originali = { openExternal: shell.openExternal, openPath: shell.openPath };
+  const righe = [];
+  assert.equal(silenziaApertureDiSistema(shell, { inTest: false, avvisa: (r) => righe.push(r) }), false);
+  assert.equal(shell.openExternal, originali.openExternal);
+  assert.equal(shell.openPath, originali.openPath);
+  await shell.openExternal('https://esempio.test/');
+  await shell.openPath('/tmp/x');
+  assert.deepEqual(chiamate, [['openExternal', 'https://esempio.test/'], ['openPath', '/tmp/x']]);
+  assert.deepEqual(righe, []);
+});
+
+test('uno shell mancante non fa cadere l\'avvio', () => {
+  assert.equal(silenziaApertureDiSistema(null, { inTest: true }), false);
+  assert.equal(silenziaApertureDiSistema(undefined, { inTest: true }), false);
+});
