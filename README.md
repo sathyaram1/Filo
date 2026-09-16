@@ -134,9 +134,9 @@ La suite completa non la lancia più nessuno a mano (decisione owner
 2026-09-15): gira in GitHub, nel lavoro di release, ogni sei ore prima di
 pubblicare — se è verde la patch esce, se ha un rosso nuovo la patch salta un
 giro e il rosso diventa un feedback. È il job `suite` di
-`.github/workflows/release.yml` (Linux senza schermo; i rossi noti del
-contenitore, `tests/rossi-noti.json`, sono tolti dal conto da
-`scripts/suite-verdict.mjs`). Per provare la suite su un ramo senza
+`.github/workflows/release.yml` (Linux senza schermo; `scripts/suite-verdict.mjs`
+toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`). Per
+provare la suite su un ramo senza
 pubblicare: `gh workflow run release.yml --ref <ramo> -f solo_suite=true`.
 Sulla macchina di chi sviluppa Filo
 durerebbe quasi sette ore con un solo worker. Si lancia `npm run finish:check`,
