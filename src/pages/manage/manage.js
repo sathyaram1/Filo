@@ -586,10 +586,14 @@
 
   async function loadCaps() {
     const remote = {};
-    // Sorgente autorevole: Firestore via main (owner-gated).
+    // Sorgente autorevole: Firestore via main (owner-gated). Se la lettura
+    // riesce, quello che dice il server vale anche quando un campo MANCA: la
+    // cache locale serve solo a chi non ha potuto leggere.
+    let lettoDalServer = false;
     try {
       const r = await sendToMain({ type: CAPS_GET });
       if (r && r.ok) {
+        lettoDalServer = true;
         for (const k of Object.keys(CAP_FIELDS)) if (r[k] != null) remote[k] = r[k];
         if (typeof r.fixInstructions === 'string') remote.fixInstructions = r.fixInstructions;
       }
@@ -600,7 +604,7 @@
       if (remote[field] != null) {
         val = clampCap(remote[field], f.min);
         if (val !== null) chrome.storage.local.set({ [f.cacheKey]: val }).catch(() => {});
-      } else {
+      } else if (!lettoDalServer) {
         // Ripiego sulla cache locale (non admin / offline).
         try {
           const data = await chrome.storage.local.get(f.cacheKey);
@@ -610,7 +614,8 @@
       // Sul server manca: si mostra vuoto e si dice. Senza questo numero la
       // verifica (server e locale) si ferma con un errore, non usa un default.
       f.input.value = val === null ? '' : String(val);
-      if (val === null) setCapMsg(field, 'Non impostato sul server: scrivi un numero (0 compreso) e salva.', 'err');
+      if (val === null && lettoDalServer) setCapMsg(field, 'Non impostato sul server: scrivi un numero (0 compreso) e salva.', 'err');
+      else if (val !== null) setCapMsg(field, '', null);
     }
     if (mgFixInstructions && typeof remote.fixInstructions === 'string') mgFixInstructions.value = remote.fixInstructions;
   }

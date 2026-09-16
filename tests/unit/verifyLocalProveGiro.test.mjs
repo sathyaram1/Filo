@@ -43,6 +43,8 @@ test('la coda stampata dopo la critica dice di rilanciare le prove del giro, e c
 test('consegnare una correzione con file non salvati: il rifiuto elenca i file e spiega il salvataggio automatico', () => {
   const dopoCritica = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', {
     critique: 'provato tutto.\n[2] rotto', sha: SHA,
+    // I bilanci li passa chi chiama: nel codice non c'è un default (2026-09-16).
+    caps: { cap2: 5, cap1: 2, cap0: 0 },
   });
   const rifiuto = withFixed(dopoCritica.state, 'r', {
     report: 'corretto', sha: ALTRO, dirtyFiles: ['tests/verifica/locale-r/giro1-prova.spec.mjs', 'avanzo.txt'],
