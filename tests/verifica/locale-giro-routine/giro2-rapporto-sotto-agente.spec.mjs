@@ -62,8 +62,8 @@ test.describe('rapporto di fine sessione — nella forma vera delle routine', ()
     // su 18) la prima riga di un messaggio porta output_tokens parziali (2, 5,
     // 7) e l'ultima quelli veri (163, 273, 309). Contando la prima, su una
     // sessione vera l'output è 317.000 token invece di 1.927.000 e il costo
-    // 235 $ invece di 283 $. Rilievo del giro 2, livello 1.
-    test.fail(true, 'rilievo del giro 2: si conta la prima riga del messaggio, con l’output parziale');
+    // 235 $ invece di 283 $. Rilievo del giro 2, livello 1, corretto nello
+    // stesso giro: vale l'ultima usage vista per ogni id.
     const primo = { input_tokens: 2, cache_creation_input_tokens: 32076, cache_read_input_tokens: 29159, output_tokens: 5 };
     const ultimo = { ...primo, output_tokens: 163, output_tokens_details: { thinking_tokens: 13 } };
     const righe = [
