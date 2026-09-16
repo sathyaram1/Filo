@@ -233,8 +233,8 @@ jobs:
   release:
     needs: suite
     # Con solo_suite non si pubblica niente. Su cron `inputs` e' vuoto e la
-    # condizione resta vera; `success()` va detto: senza, un `if` scritto a
-    # mano lo sostituisce, e il lavoro partirebbe anche a suite rossa.
+    # condizione resta vera. `success()` (suite verde) e' scritto per esteso
+    # invece di affidarsi al default implicito: a suite rossa qui non si parte.
     if: ${{ success() && !inputs.solo_suite }}
     runs-on: windows-latest
     outputs:
