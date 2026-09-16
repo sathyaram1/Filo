@@ -214,11 +214,18 @@ jobs:
       # prende in carico. Non con solo_suite: una prova su un ramo non e' una
       # pubblicazione fermata, e un feedback aperto per un ramo di lavoro
       # sarebbe rumore in coda (l'elenco resta nel registro e nell'artifact).
+      #
+      # Parte anche se e' rosso un passo PRIMA della suite (npm ci, il binario
+      # di Electron, xvfb: `failure()`): fino al giro 5 della verifica quel
+      # rosso fermava il lavoro prima del verdetto, senza feedback, e la
+      # pubblicazione si fermava in silenzio. `always()` serve perche' dopo un
+      # passo rosso i passi senza una funzione di stato vengono saltati.
       - name: Rosso nuovo - apri un feedback e fermati
-        if: steps.check.outputs.run == 'true' && steps.verdetto.outcome == 'failure'
+        if: always() && !cancelled() && steps.check.outputs.run != 'false' && (steps.verdetto.outcome == 'failure' || failure())
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           SOLO_SUITE: ${{ inputs.solo_suite }}
+          SUITE_OUTCOME: ${{ steps.suite.outcome }}
         shell: bash
         run: |
           echo "::error::Suite Playwright con rossi nuovi (o non partita): pubblicazione annullata."
