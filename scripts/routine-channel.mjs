@@ -818,7 +818,12 @@ if (isMain) {
       const ruolo = typeof data.role === 'string' ? data.role : '';
       try {
         const { generaRapporto } = await import('./session-report.mjs');
-        rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT });
+        // Dal momento del biglietto: chi rilascia è quasi sempre un
+        // sotto-agente col suo transcript; quando è l'orchestratore a
+        // rilasciare per un worker morto, la finestra lascia fuori i worker
+        // dei biglietti prima.
+        const { readTicketSince } = await import('./lib/routine-ticket.mjs');
+        rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT, since: readTicketSince(ROOT) });
       } catch (e) {
         rapporto = { v: 1, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
       }
