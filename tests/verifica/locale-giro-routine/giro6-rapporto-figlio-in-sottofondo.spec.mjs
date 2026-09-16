@@ -97,7 +97,6 @@ test.describe('rapporto di fine sessione — il figlio lanciato in sottofondo', 
   });
 
   test('figlio che comincia mezzo secondo DOPO la risposta immediata: sommato lo stesso, o almeno dichiarato', async () => {
-    test.fail(true, 'giro 6: la finestra si chiude alla risposta immediata «avviato», e un figlio che comincia dopo non viene riconosciuto; il meta.json accanto porta parentAgentId e toolUseId e non viene letto');
     const c = cartella({ ritardoFiglioMs: 500 });
     const rep = await generaRapporto({ transcript: c.worker, cwd: c.progetto, configDir: c.configDir, env: {}, role: 'resolver' });
     expect(rep.subagents).toBe(1);
@@ -107,7 +106,6 @@ test.describe('rapporto di fine sessione — il figlio lanciato in sottofondo', 
   });
 
   test('il worker rilascia mentre il figlio in sottofondo lavora ancora: il rapporto senza transcript indicato è quello del worker, non del figlio', async () => {
-    test.fail(true, 'giro 6: senza un transcript indicato si prende il più recente di tutta la cartella, e un figlio ancora vivo è più recente del worker che rilascia');
     const c = cartella({ ritardoFiglioMs: -300, figlioAncoraVivo: true });
     const rep = await generaRapporto({ cwd: c.progetto, configDir: c.configDir, env: {}, role: 'resolver' });
     // Il rapporto del worker: due turni suoi più i due del figlio, con la chiamata Agent contata.

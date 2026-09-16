@@ -387,3 +387,70 @@ test('i sotto-agenti di un sotto-agente stanno accanto a lui: nel suo rapporto e
     assert.equal(prima.subagentRuns, 0);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
+
+test('giro 6: il legame figlio → lanciatore si legge dal meta; il tempo resta un ripiego dichiarato; senza transcript indicato si risale al lanciatore', async () => {
+  const base = cartellaTemporanea('filo-rapporto-meta-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(dir, 'orch.jsonl'), turnoDi('o1', T('00:00'), 30000, 50, 'orch') + '\n');
+    // Il worker: chiama Agent alle 10:00, la risposta immediata «avviato» arriva alle 10:00:02, chiude alle 13:00.
+    writeFileSync(join(sub, 'agent-worker.jsonl'), [
+      assistant('w1', 'claude-opus-5', { input_tokens: 1000, output_tokens: 100 }, [{ type: 'tool_use', id: 'tA', name: 'Agent', input: {} }], T('00:00')),
+      result('tA', 'Async agent launched successfully.', '2026-09-16T10:00:02.000Z'),
+      turnoDi('w2', T('13:00'), 1000, 100, 'orch'),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-worker.meta.json'), JSON.stringify({ agentType: 'routine-worker', toolUseId: 'toolu_w' }));
+    // Il figlio in sottofondo: comincia DOPO la risposta immediata, e resta vivo dopo la chiusura del worker.
+    writeFileSync(join(sub, 'agent-figlio.jsonl'), [
+      JSON.stringify({ type: 'user', timestamp: '2026-09-16T10:00:03.000Z', sessionId: 'orch', message: { role: 'user', content: 'leggi tutto' } }),
+      assistant('f1', 'claude-opus-5', { input_tokens: 1000000, output_tokens: 10 }, [], T('11:00')),
+      turnoDi('f2', T('14:00'), 10, 10, 'orch'),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-figlio.meta.json'), JSON.stringify({ agentType: 'Explore', toolUseId: 'tA', parentAgentId: 'worker' }));
+    // Un nipote: figlio del figlio, fuori da ogni finestra del worker.
+    writeFileSync(join(sub, 'agent-nipote.jsonl'), turnoDi('n1', T('20:00'), 200000, 10, 'orch') + '\n');
+    writeFileSync(join(sub, 'agent-nipote.meta.json'), JSON.stringify({ parentAgentId: 'figlio' }));
+    // Un fratello di un altro giro col meta: punta a un altro lanciatore, dentro la finestra o no non conta.
+    writeFileSync(join(sub, 'agent-altro.jsonl'), [
+      JSON.stringify({ type: 'user', timestamp: '2026-09-16T10:00:01.000Z', sessionId: 'orch', message: { role: 'user', content: 'altro giro' } }),
+      turnoDi('a1', T('10:30'), 100000, 10, 'orch'),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-altro.meta.json'), JSON.stringify({ parentAgentId: 'worker-di-prima' }));
+
+    const rep = await generaRapporto({ transcript: join(sub, 'agent-worker.jsonl'), cwd: progetto, configDir: config, role: 'resolver' });
+    assert.equal(rep.subagentRuns, 2, 'figlio e nipote dal meta; il fratello di un altro giro no');
+    assert.ok(rep.subagentCostUsd > 5, String(rep.subagentCostUsd));
+    assert.ok(!rep.notes.some((n) => /senza meta/.test(n)), 'col meta nessun ripiego dichiarato');
+
+    // Senza transcript indicato: il più recente è il figlio (14:00), ma il rapporto è del lanciatore.
+    const scelto = trovaTranscript({ cwd: progetto, configDir: config, env: {} });
+    assert.equal(resolve(scelto.file), resolve(join(sub, 'agent-worker.jsonl')));
+
+    // Ripiego dal tempo: un figlio SENZA meta dentro la finestra entra, e il rapporto lo dice.
+    writeFileSync(join(sub, 'agent-orfano.jsonl'), [
+      JSON.stringify({ type: 'user', timestamp: '2026-09-16T10:00:01.000Z', sessionId: 'orch', message: { role: 'user', content: 'senza meta' } }),
+      turnoDi('x1', T('10:10'), 1000, 10, 'orch'),
+    ].join('\n') + '\n');
+    const conOrfano = await generaRapporto({ transcript: join(sub, 'agent-worker.jsonl'), cwd: progetto, configDir: config, role: 'resolver' });
+    assert.equal(conOrfano.subagentRuns, 3);
+    assert.ok(conOrfano.notes.some((n) => /agent-orfano\.jsonl senza meta/.test(n) && /tempo/.test(n)), conOrfano.notes.join(' | '));
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('giro 6: la data della prima riga si trova anche oltre i 64 KB di compito', async () => {
+  const base = cartellaTemporanea('filo-rapporto-lungo-');
+  try {
+    const { primoTimestampMs } = await import('../../scripts/session-report.mjs');
+    const p = join(base, 'agent-x.jsonl');
+    writeFileSync(p, JSON.stringify({ type: 'user', message: { role: 'user', content: 'x'.repeat(200_000) }, timestamp: T('05:00') }) + '\n');
+    assert.equal(primoTimestampMs(p), Date.parse(T('05:00')));
+    const senza = join(base, 'agent-y.jsonl');
+    writeFileSync(senza, 'niente\n{"type":"user"}\n');
+    assert.ok(Number.isNaN(primoTimestampMs(senza)));
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});

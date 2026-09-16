@@ -82,7 +82,6 @@ test.describe('rapporto di fine sessione — il figlio del worker con un compito
   });
 
   test('con un compito di 100.000 caratteri il figlio entra lo stesso: il suo costo non sparisce senza una nota', async () => {
-    test.fail(true, 'giro 6: la data della prima riga si cerca nei primi 64 KB, e in un transcript vero sta DOPO il testo del compito; oltre quel tetto il figlio non viene riconosciuto e il rapporto non lo dice');
     const c = cartellaDeiTranscript(100_000);
     const rep = await generaRapporto({ transcript: c.worker, cwd: c.progetto, configDir: c.configDir, env: {}, role: 'resolver' });
     expect(rep.subagents).toBe(1);

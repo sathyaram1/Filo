@@ -30,28 +30,71 @@ HOOK_INPUT=""
 HOOK_EVENT=$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
 [ -z "$HOOK_EVENT" ] && HOOK_EVENT="PostToolUse"
 
+# ─── LA CARTELLA DELLA SESSIONE ──────────────────────────────────────────────
+#
+# Questo hook gira su TUTTE le cartelle di lavoro del repo, ma la sessione che
+# lo ha svegliato sta in una sola: Claude Code la passa nello stdin (campo
+# `cwd`). Un guaio di un'altra cartella — una fusione a meta' altrui, un ramo
+# altrui non su origin — fino al giro 5 della verifica (16/09/2026) arrivava
+# alla sessione con le parole di un problema SUO, e l'agente andava a
+# finire il rebase di qualcun altro. Ora si distingue: i guai della propria
+# cartella si dicono come oggi; quelli delle altre in una riga, come altrui,
+# mai come ordini. Nella JSON di Claude Code le barre di Windows arrivano
+# raddoppiate: si rimettono normali e si chiede a git qual e' la radice.
+HOOK_CWD=$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 | sed 's#\\\\#/#g')
+[ -z "$HOOK_CWD" ] && HOOK_CWD="$PROJECT_DIR"
+MIA_CARTELLA=$(git -C "$HOOK_CWD" rev-parse --show-toplevel 2>/dev/null)
+minuscolo() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's#/*$##'; }
+# La cartella del ciclo e' quella della sessione? Senza una radice nota (stdin
+# senza cwd e PROJECT_DIR fuori da git) ogni cartella e' «mia», com'era prima.
+e_mia() {
+  [ -z "$MIA_CARTELLA" ] && return 0
+  [ "$(minuscolo "$1")" = "$(minuscolo "$MIA_CARTELLA")" ]
+}
+QUI_MIA=1
+
 # I fallimenti della spedizione e le astensioni, raccolti qui: il ciclo dei
 # worktree gira in un sotto-processo (un tubo) e una variabile non ne
-# uscirebbe. Due file perche' alla fine si dicono in modo diverso: a un push
-# fallito segue cosa fare per spedire, a un'astensione no.
+# uscirebbe. Tre file perche' alla fine si dicono in modo diverso: a un push
+# fallito segue cosa fare per spedire, a un'astensione no, e i guai delle
+# altre cartelle si dicono come altrui.
 FALLIMENTI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-fallimenti.$$")
 : > "$FALLIMENTI_FILE" 2>/dev/null
 AVVISI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-avvisi.$$")
 : > "$AVVISI_FILE" 2>/dev/null
+ALTRUI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-altrui.$$")
+: > "$ALTRUI_FILE" 2>/dev/null
 
+# Un guaio di un'altra cartella: una riga, con la cartella, senza ordini.
+# $1 = la cartella, $2 = il fatto, in breve.
+segnala_altrui() {
+  local riga="[auto-commit] un'altra cartella di lavoro, non la tua: '$1' — $2"
+  echo "$riga" >&2
+  [ -n "$ALTRUI_FILE" ] && printf '%s\n' "$riga" >> "$ALTRUI_FILE" 2>/dev/null
+}
 # Un fallimento si dice DUE volte: su stderr (il registro di debug) e nel
 # file, da cui alla fine diventa il contesto che la sessione vede davvero.
+# $1 = la cartella, $2 = il testo (per la propria cartella); $3 = il fatto in
+# breve, per quando la cartella e' di un altro.
 segnala_fallimento() {
-  echo "$1" >&2
-  [ -n "$FALLIMENTI_FILE" ] && printf '%s\n' "$1" >> "$FALLIMENTI_FILE" 2>/dev/null
+  if [ "$QUI_MIA" = 1 ]; then
+    echo "[auto-commit] '$1': $2" >&2
+    [ -n "$FALLIMENTI_FILE" ] && printf '%s\n' "[auto-commit] '$1': $2" >> "$FALLIMENTI_FILE" 2>/dev/null
+  else
+    segnala_altrui "$1" "$3"
+  fi
 }
 # Un'astensione (un rebase o una fusione a meta') vale lo stesso: fino al
 # giro 4 della verifica (16/09/2026) stava solo su stderr, e la sessione che
 # risolveva i conflitti con Edit non sapeva che quel salvataggio non era
-# avvenuto finche' non provava a consegnare.
+# avvenuto finche' non provava a consegnare. Stessi tre argomenti.
 segnala_avviso() {
-  echo "$1" >&2
-  [ -n "$AVVISI_FILE" ] && printf '%s\n' "$1" >> "$AVVISI_FILE" 2>/dev/null
+  if [ "$QUI_MIA" = 1 ]; then
+    echo "[auto-commit] '$1': $2" >&2
+    [ -n "$AVVISI_FILE" ] && printf '%s\n' "[auto-commit] '$1': $2" >> "$AVVISI_FILE" 2>/dev/null
+  else
+    segnala_altrui "$1" "$3"
+  fi
 }
 
 # ─── I RAMI CHE QUESTO AUTOMATISMO NON TOCCA MAI ─────────────────────────────
