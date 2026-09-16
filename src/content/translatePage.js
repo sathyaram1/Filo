@@ -1,6 +1,6 @@
-// Traduzione dell'intera pagina e ritorno all'originale. Lo stato «sta traducendo / ha una traduzione attiva» vive qui; il menu lo legge con hasTranslation() per scegliere icona ed etichetta.
-// Le unità arrivano da Extract.extractTranslatableBlocks(): tutto il testo visibile, più il NOME DELLA SCHEDA (document.title) e il testo dentro i RIQUADRI INCORPORATI, a cui la traduzione passa parola (vedi «Riquadri incorporati»).
-// I figli di un'unità diventano segnaposto [[Lk]] e tornano al loro posto come NODI VIVI, non come HTML ri-parsato, così link, immagini e componenti conservano listener e stato. Il tradotto entra come text node: nessun HTML del modello finisce mai nella pagina.
+// Traduzione dell'intera pagina e ritorno all'originale; lo stato vive qui, e il menu lo legge con hasTranslation() per scegliere icona ed etichetta.
+// Le unità vengono da Extract.extractTranslatableBlocks(), più il nome della scheda (document.title) e i RIQUADRI INCORPORATI, a cui si passa parola.
+// I figli di un'unità diventano segnaposto [[Lk]] e tornano come NODI VIVI, non come HTML ri-parsato: link, immagini e componenti conservano listener e stato. Il tradotto entra come text node, nessun HTML del modello finisce nella pagina.
 
 (function (global) {
   'use strict';
@@ -13,8 +13,7 @@
 
   const CHUNK_SIZE = 3000;      // caratteri per richiesta
   const CONCURRENCY = 3;        // richieste in parallelo (l'attesa è attrito)
-  // Sulle pagine che si allungano mentre si scorre, il testo nuovo arriva PROPRIO mentre traduciamo: fermarsi al primo giro lo lascerebbe in lingua originale sotto un avviso che dichiara finito (#407).
-  // Il tetto c'è perché su un sito che carica all'infinito rincorrerlo non finirebbe mai: dopo, se ne è arrivato dell'altro, lo si dice e il menu offre di prenderlo.
+  // Sulle pagine che si allungano mentre si scorre, il testo nuovo arriva mentre traduciamo: fermarsi al primo giro lo lascerebbe in lingua originale sotto un avviso che dichiara finito (#407). Il tetto c'è perché rincorrere un sito infinito non finirebbe mai.
   const MAX_PASSES = 3;
   const MAX_SPLIT_DEPTH = 4;    // bisezione massima quando il modello sballa i separatori
   const SEPARATOR = '\n@@@SN_SEP@@@\n';
@@ -23,7 +22,7 @@
 
   const HAS_LETTER = /\p{L}/u;
 
-  // Sotto queste misure non c'è un post incorporato né un blocco commenti, ma un pixel di tracciamento o uno spaziatore: non si traduce e non entra nel conto di ciò che è rimasto fuori, o l'avviso manderebbe a cercare testo che non esiste (#407).
+  // Sotto queste misure non c'è un post incorporato ma un pixel di tracciamento o uno spaziatore: non si traduce e non entra nel conto di ciò che è rimasto fuori, o l'avviso manderebbe a cercare testo che non esiste (#407).
   const FRAME_MIN_W = 120;
   const FRAME_MIN_H = 40;
   // Chi non si fa vivo entro questo tempo non ha script (sandbox chiuso): è esattamente il caso in cui l'avviso deve dire che una parte è rimasta fuori.
@@ -31,7 +30,7 @@
   // Tetto all'attesa di chi sta lavorando: non è un timer da consumare, si esce appena hanno finito tutti.
   const FRAME_WORK_CAP = 60000;
 
-  // Il modello ha risposto ma senza testo: non è un guasto, e raccontarlo come tale non dice niente e contraddice la riga che invita a riprendere. La frase giusta parla di blocchi tornati vuoti dal modello.
+  // Il modello ha risposto ma senza testo: non è un guasto. La frase giusta parla di blocchi tornati vuoti, non di «qualcosa è andato storto», che contraddice l'invito a riprendere.
   const EMPTY_ANSWER = { emptyAnswer: true };
 
   let pageTranslating = false;
@@ -50,15 +49,15 @@
   // Testo arrivato DOPO che la traduzione si era dichiarata finita (#407): sui siti a scorrimento infinito è la normalità, e senza accorgersene l'unico modo di averlo in italiano era ripagare tutta la pagina.
   let newContentSeen = false;
   let contentObserver = null;
-  // Sottoalberi nascosti al momento della traduzione (fisarmoniche chiuse, schede in secondo piano, «leggi tutto» ripiegati): non tradotti, ma se l'utente li apre il menu deve offrire di tradurli — scoprire del testo e riceverlo dal sito, per chi guarda lo schermo, sono la stessa cosa (#407).
+  // Sottoalberi nascosti al momento della traduzione (fisarmoniche, schede, «leggi tutto»): non tradotti, ma se l'utente li apre il menu deve offrire di tradurli — scoprire del testo e riceverlo dal sito, per chi guarda, sono la stessa cosa (#407).
   let hiddenSkipped = [];
   // Chi chiede l'originale fa avanzare il numero d'ordine: le richieste rimaste in volo si accorgono di non essere più quelle buone e si buttano via, invece di scaricarsi su una pagina appena riportata indietro (#407).
   let runSeq = 0;
-  // Serve a chi FERMA: le richieste già spedite tornano quando vogliono, e fino ad allora «Traduzione pagina in corso…» resterebbe sullo schermo accanto a «Traduzione annullata». Una cosa che si ferma deve sembrare ferma subito.
+  // Serve a chi FERMA: le richieste già spedite tornano quando vogliono, e fino ad allora «in corso» resterebbe accanto a «annullata». Una cosa che si ferma deve sembrare ferma subito.
   let progressToast = null;
-  // Il nome della scheda è l'ultimo pezzo di lingua originale che resta sotto gli occhi a pagina tradotta, e sta nello stesso giro di lavoro. Solo per il frame principale: il titolo di un riquadro incorporato non compare da nessuna parte.
+  // Il nome della scheda è l'ultimo pezzo di lingua originale sotto gli occhi a pagina tradotta, e sta nello stesso giro. Solo nel frame principale: il titolo di un riquadro non si vede.
   let translatedTitle = null;
-  // Giro in corso, col conto dei riquadri: quanti se ne aspettano, quanti si sono fatti vivi, quanti hanno finito, quanto è rimasto in lingua originale. La chiave del giro tiene fuori i resoconti in ritardo di un giro già chiuso.
+  // Giro in corso, col conto dei riquadri: attesi, fatti vivi, finiti, e quanto è rimasto in lingua originale. La chiave del giro tiene fuori i resoconti di un giro già chiuso.
   const frameRuns = new Map();
 
   // Un riquadro incorporato non è "la pagina": lì gli avvisi non si mostrano
@@ -67,7 +66,6 @@
     try { return window.top === window.self; } catch (_) { return false; }
   }
 
-  // Avviso finto per il lavoro dentro un riquadro: stessa forma, non disegna niente. Evita di infilare «se non sono un riquadro» in mezzo al lavoro.
   function silentToast() {
     return { el: {}, close() {} };
   }
@@ -79,12 +77,8 @@
   }
 
   async function translatePage(opts) {
-    // Dentro un riquadro incorporato: stesso lavoro, ma senza avvisi (li mostra
-    // la pagina che lo ospita) e con un resoconto da mandarle indietro.
     const quiet = !!(opts && opts.quiet);
     const frameRunId = (opts && opts.runId) || '';
-    // Riclic mentre traduce: l'avviso "in corso" è già sullo schermo (dura
-    // quanto il lavoro), un secondo riquadro identico sopra sarebbe solo rumore.
     if (pageTranslating) {
       // Un riquadro già al lavoro non deve restare «mai finito» nel conto di chi lo ospita, o l'avviso direbbe che è rimasto fuori del testo che sta invece arrivando.
       if (quiet) reportToHost(frameRunId, { phase: 'end', applied: 0, left: 0 });
@@ -99,7 +93,7 @@
       ? silentToast()
       : Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
     if (!quiet) progressToast = progress;
-    // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è normale, e il testo che il sito carica in quei secondi resta in lingua originale sotto gli occhi. Le nostre sostituzioni nascono già marcate come tradotte e non la ingannano.
+    // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è normale, e il testo caricato in quei secondi resta in lingua originale sotto gli occhi. Le nostre sostituzioni nascono già marcate e non la ingannano.
     newContentSeen = false;
     startWatchingNewContent();
     // Parola ai riquadri incorporati PRIMA di cominciare: traducono in
@@ -109,12 +103,10 @@
     let result = null;
     try {
       for (let pass = 0; pass < MAX_PASSES; pass++) {
-        // Da qui in poi, quel che compare è arrivato DOPO l'inizio del giro.
         newContentSeen = false;
         result = await runPass(progress, myRun);
         if (aborted()) return;
-        // Il sito ha allungato la pagina mentre lavoravamo: la finiamo adesso, senza far ricliccare e senza rimandare al modello ciò che è già fatto.
-        // Vale anche quando il primo giro non aveva trovato niente: «non ho trovato testo» mentre il testo sta comparendo è la stessa bugia. Se invece il giro si è interrotto, l'avviso lo dice già e sarà la ripresa a prendere il resto.
+        // Il sito ha allungato la pagina mentre lavoravamo: la finiamo adesso, senza far ricliccare e senza rimandare al modello ciò che è già fatto. Vale anche se il primo giro non aveva trovato niente: «non ho trovato testo» mentre il testo compare è la stessa bugia.
         if (!newContentSeen || (result.kind !== 'done' && result.kind !== 'none')) break;
       }
       if (aborted()) return;
@@ -122,7 +114,7 @@
       // I riquadri lavorano in parallelo e l'avviso finale li aspetta, perché è lui a dover dire la verità su tutta la pagina. Fino ad allora resta in vista «sto traducendo».
       const frames = await waitForFrames(framesRunId, aborted);
       if (aborted()) return;
-      // Il testo cambiato sta tutto dentro i riquadri (una pagina che è poco più di una cornice attorno a un modulo incorporato): senza questo il menu offrirebbe di nuovo «Traduci la pagina», e non ci sarebbe modo di tornare indietro.
+      // Il testo cambiato sta tutto dentro i riquadri (una pagina che è poco più di una cornice attorno a un modulo): senza questo il menu offrirebbe di nuovo «Traduci la pagina», e non ci sarebbe modo di tornare indietro.
       if (frames.applied > 0 && !pageHasTranslation) {
         pageHasTranslation = true;
         pageComplete = true;
@@ -132,8 +124,6 @@
     } finally {
       progress.close();
       if (framesRunId) frameRuns.delete(framesRunId);
-      // Un riquadro che si ferma per strada (l'utente ha chiesto l'originale,
-      // un'eccezione) non deve lasciare la pagina ad aspettarlo fino al tetto.
       if (quiet && (result === null || myRun !== runSeq)) reportToHost(frameRunId, { phase: 'end', applied: 0, left: 0 });
       if (progressToast === progress) progressToast = null;
       // Se nel frattempo l'utente ha annullato (o ha già fatto ripartire un
@@ -152,13 +142,12 @@
     }
   }
 
-  // Un giro di lavoro: rilegge la pagina, manda al modello solo ciò che non è già tradotto, applica. L'avviso lo scrive chi chiama, l'unico a sapere se nel frattempo è arrivato dell'altro.
+  // Un giro: rilegge, manda al modello solo ciò che non è già tradotto, applica. L'avviso lo scrive chi chiama, l'unico a sapere se nel frattempo è arrivato dell'altro.
   async function runPass(progress, myRun) {
     const blocks = Extract.extractTranslatableBlocks();
     // I componenti aperti del sito sono alberi a parte: una sentinella sul solo
     // documento non vede il contenuto che cambia lì dentro.
     addWatchRoots(blocks.shadowRoots);
-    // Anche i riquadri riempiti dalla pagina stessa sono alberi a parte (#407).
     addWatchRoots(blocks.frameDocs);
     hiddenSkipped = blocks.hidden || [];
     // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel lavoro, ma cambiano l'avviso finale — «Pagina tradotta» sarebbe falso.
@@ -166,18 +155,16 @@
     // Blocchi oltre il tetto di un giro solo: non sono persi, si prendono alla ripresa. Entrano nei totali perché è l'unico modo perché l'avviso non menta su una pagina enorme.
     const truncated = Number(blocks.truncated || 0);
 
-    // I figli di ogni unità (link, img, span…) diventano segnaposto [[Lk]]: il modello traduce solo il testo e la struttura resta intatta.
-    // I blocchi già tradotti da un giro interrotto non tornano dall'estrazione e non vanno rimandati al modello, sarebbe testo pagato due volte: servono solo a dare i totali giusti a chi legge l'avviso (#408).
+    // I figli di ogni unità diventano segnaposto [[Lk]]: il modello traduce solo il testo, la struttura resta. I blocchi già tradotti da un giro interrotto non tornano dall'estrazione e non si rimandano al modello — servono solo ai totali dell'avviso (#408).
     const doneBefore = Extract.findTranslatedElements();
     const already = doneBefore.length + Number(doneBefore.attrCount || 0);
     const units = [];
-    // Il nome della scheda per primo: è la prima riga di lingua originale che l'utente incontra, ed è l'ultima che restava in inglese su una pagina per il resto tutta tradotta.
+    // Il nome della scheda per primo: è la prima riga di lingua originale che l'utente incontra, e l'ultima che restava in inglese a pagina tradotta.
     const title = titleUnit(myRun);
     if (title) units.push(title);
     for (const b of blocks) {
       if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
       const { templated, refs } = templateizeBlock(b.el);
-      // Se tolti i segnaposto non resta testo, non c'è nulla da tradurre.
       if (!hasTranslatableText(templated)) continue;
       units.push({ el: b.el, templated, refs, run: myRun });
     }
@@ -198,7 +185,6 @@
         return { kind: 'batch', applied: already, total: totalCount };
       }
       if (already) {
-        // Ripresa su una pagina che nel frattempo è già tutta tradotta.
         pageHasTranslation = true;
         pageComplete = true;
         missingCount = 0;
@@ -212,7 +198,6 @@
       return { kind: 'none' };
     }
 
-    // Chunking: aggrega unità fino a ~3000 caratteri per richiesta.
     const chunks = [];
     let cur = [];
     let curLen = 0;
@@ -236,8 +221,6 @@
     };
     tick();
 
-    // Le richieste partono a gruppi e i risultati vengono applicati appena
-    // arrivano: la pagina si traduce progressivamente sotto gli occhi.
     let lastError = null;
     let next = 0;
     const worker = async () => {
@@ -263,14 +246,13 @@
     missingCount = grandTotal - applied;
 
     if (!applied) {
-      // Niente tradotto: né prima né adesso. Nessuno stato da conservare.
       pageHasTranslation = false;
       pageComplete = false;
       return { kind: 'failed', reason: reasonFor(lastError) };
     }
 
     pageHasTranslation = true;
-    // I componenti chiusi non rendono la traduzione riprendibile: riprovare non li aprirà mai. Lo stato resta completo — il menu offre «Mostra originale», non «Riprendi» — ed è l'AVVISO a dire che una parte è rimasta fuori.
+    // I componenti chiusi non rendono la traduzione riprendibile: riprovare non li aprirà mai. Lo stato resta completo — il menu offre «Mostra originale» — ed è l'AVVISO a dire che una parte è rimasta fuori.
     pageComplete = missingCount === 0;
     if (pageComplete) return { kind: 'done', unreachable };
     // Nessun guasto: la pagina è semplicemente più lunga di un giro solo, e «interrotta» suonerebbe come un errore che non c'è stato.
@@ -308,8 +290,6 @@
         return;
       case 'done':
         if (moreArrived) {
-          // "Pagina tradotta" sarebbe di nuovo la bugia della segnalazione: il
-          // testo arrivato per ultimo è lì, in lingua originale, sotto gli occhi.
           Popup.showToast(I18n.t('toast_page_translated_new_arrived'), { duration: 7000 });
           return;
         }
@@ -319,7 +299,7 @@
     }
   }
 
-  // Riquadri incorporati: post, blocchi commenti, moduli di iscrizione, guide — pagine dentro la pagina. Il frame principale non ne tocca il testo (quasi sempre è di un'altra origine), ma il content script di Filo gira anche lì dentro e la traduzione gli passa parola: ognuno traduce sé stesso e riferisce com'è andata.
+  // Riquadri incorporati: pagine dentro la pagina. Il frame principale non ne tocca il testo (quasi sempre è di un'altra origine), ma il content script di Filo gira anche lì e la traduzione gli passa parola: ognuno traduce sé stesso e riferisce com'è andata.
   // Dove nemmeno questo si può — un riquadro senza script, chiuso a chiave dal `sandbox` — lo dice l'avviso finale, invece di dichiarare tradotta una pagina con dentro un rettangolo in inglese (#407).
 
   // Quanti riquadri guardare: serve alla pagina per sapere quante risposte aspettarsi. Chi non risponde è un riquadro che nessuno script può toccare, e va detto.
@@ -330,7 +310,7 @@
         const r = f.getBoundingClientRect();
         if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) continue;
         if (isInsideFiloUi(f)) continue;
-        // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo che possa rispondere, ma il testo lo prende l'estrazione da qui. Aspettarne una risposta direbbe «una parte è rimasta fuori» su un rettangolo che invece è tradotto.
+        // Riquadro riempito dalla pagina stessa: non c'è nessun Filo che risponda, ma il testo lo prende l'estrazione da qui. Aspettarne una risposta direbbe «rimasto fuori» su un rettangolo che invece è tradotto.
         if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) continue;
         n++;
       }
@@ -354,7 +334,6 @@
     } catch (_) {}
   }
 
-  // Blocchi tradotti in questo giro, come li conta chi ospita.
   function appliedOf(result) {
     if (!result) return 0;
     // Questi tre non passano dal conteggio di un giro: i totali sarebbero quelli, vecchi, di una traduzione precedente.
@@ -409,13 +388,11 @@
     return { left: silent + unfinished + st.left, applied: st.applied };
   }
 
-  // Resoconto di un riquadro, arrivato al frame principale.
   function onFrameReport(msg) {
     const st = frameRuns.get(String((msg && msg.runId) || ''));
     if (!st) return;
     if (msg.phase === 'ack') {
       st.acked++;
-      // Un riquadro può ospitarne altri: la pagina aspetta anche quelli.
       st.expected += Number(msg.frames) || 0;
       return;
     }
@@ -443,8 +420,7 @@
     });
   } catch (_) {}
 
-  // Sentinella del testo che il sito aggiunge DOPO (scorrimento infinito, schermate che cambiano senza ricaricare). Non estrae niente, segna solo che c'è del nuovo da guardare, così il menu si apre subito;
-  // il conto vero lo fa la traduzione, che rilegge la pagina e salta ciò che è già tradotto — nessun blocco pagato due volte.
+  // Sentinella del testo che il sito aggiunge DOPO. Non estrae niente, segna solo che c'è del nuovo da guardare, così il menu si apre subito; il conto vero lo fa la traduzione, che rilegge e salta ciò che è già tradotto.
   function startWatchingNewContent(extraRoots) {
     if (contentObserver) { addWatchRoots(extraRoots); return; }
     if (typeof MutationObserver !== 'function') return;
@@ -491,14 +467,14 @@
     } catch (_) { return false; }
   }
 
-  // Il marchio sta sulla RADICE del pezzo di UI, quindi si cerca fra gli antenati con `closest`: guardandone solo otto, bastava un popup più profondo per scambiare il nostro stesso disegno per testo appena arrivato dal sito.
+  // Il marchio sta sulla RADICE del pezzo di UI, quindi si cerca fra gli antenati con `closest`: guardandone solo otto, un popup più profondo faceva scambiare il nostro stesso disegno per testo del sito.
   function isInsideFiloUi(el) {
     const UI = global.SN_FILO_UI;
     return !!(UI && UI.inside(el));
   }
 
-  // «Pagina tradotta» solo se non è rimasto fuori niente: con dei componenti chiusi (#439) sarebbe una bugia, e la versione onesta resta in vista più a lungo perché dice qualcosa di nuovo.
-  // `framesLeft` viene prima: un riquadro rimasto in inglese è un rettangolo intero sullo schermo, un componente chiuso di solito un pezzetto — con tutti e due si manda l'utente a guardare la cosa più grande.
+  // «Pagina tradotta» solo se non è rimasto fuori niente: coi componenti chiusi (#439) sarebbe una bugia, e la versione onesta resta in vista più a lungo perché dice qualcosa di nuovo.
+  // `framesLeft` viene prima: un riquadro in inglese è un rettangolo intero, un componente chiuso di solito un pezzetto — si manda l'utente sulla cosa più grande.
   function doneToast(unreachable, framesLeft) {
     if (framesLeft) return [I18n.t('toast_page_translated_partial_frame'), { duration: 7000 }];
     return unreachable
@@ -509,19 +485,16 @@
   // Errore tecnico → frase per l'utente (stessa traduzione delle chat: mai il
   // messaggio grezzo del provider, sempre cosa non ha funzionato e cosa fare).
   function reasonFor(err) {
-    // Nessun guasto: qualche blocco è semplicemente tornato vuoto dal modello.
-    // Dirlo così è più onesto che inventare un errore che non c'è stato.
     if (!err || err.emptyAnswer) return I18n.t('reason_translate_incomplete');
     const CE = global.SN_CHAT_ERRORS;
     if (CE && typeof CE.sentence === 'function') return CE.sentence(err);
     return I18n.t('err_provider_failed');
   }
 
-  // Un gruppo di unità in UNA richiesta. Se il modello torna un numero di pezzi diverso dalle unità, i testi finirebbero nei blocchi sbagliati: si dimezza il gruppo e si riprova, fino a una unità sola dove il rischio non esiste.
-  // Ritorna null se è andata, altrimenti l'errore come oggetto (message/code/status, non una stringa): serve a SN_CHAT_ERRORS per scegliere la frase giusta.
+  // Un gruppo di unità in UNA richiesta. Se il modello torna un numero di pezzi diverso dalle unità i testi finirebbero nei blocchi sbagliati: si dimezza il gruppo e si riprova, fino a una unità sola.
+  // Ritorna null se è andata, altrimenti l'errore come oggetto (message/code/status): serve a SN_CHAT_ERRORS per scegliere la frase.
   async function translateGroup(units, depth) {
     if (!units.length) return null;
-    // Lavoro di un giro che l'utente ha già annullato: non si spedisce.
     if (units[0].run !== runSeq) return null;
     const joined = units.map((u) => u.templated).join(SEPARATOR);
     const res = await requestTranslation(joined);
@@ -529,7 +502,6 @@
 
     const parts = String(res.text || '').split(SEP_RE);
     if (units.length === 1) {
-      // Separatori spuri nell'output di una singola unità: si ricuce tutto.
       applyTranslation(units[0], parts.join(' ').trim());
       return null;
     }
@@ -538,7 +510,6 @@
       return null;
     }
     if (depth >= MAX_SPLIT_DEPTH) {
-      // Ripiego: applica quel che si può, in ordine, senza sfasare oltre.
       const n = Math.min(parts.length, units.length);
       for (let i = 0; i < n; i++) applyTranslation(units[i], (parts[i] || '').trim());
       return null;
@@ -551,7 +522,7 @@
 
   // Una richiesta con un ritentativo dopo un attimo: un errore singolo (rete, rate limit) non deve lasciare mezza pagina non tradotta.
   async function requestTranslation(chunk) {
-    // Risposta senza testo: la richiesta è partita e la risposta è tornata, quindi non c'è nessun guasto da raccontare. L'avviso deve dire «alcuni blocchi sono tornati vuoti dal modello», non un «qualcosa è andato storto» che contraddice la riga dopo.
+    // Risposta senza testo: richiesta partita, risposta tornata, nessun guasto. L'avviso deve dire «alcuni blocchi sono tornati vuoti dal modello», non un «qualcosa è andato storto» che contraddice la riga dopo.
     let answeredEmpty = false;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt) await new Promise((r) => setTimeout(r, 1200));
@@ -572,7 +543,7 @@
     return { ok: false, error: errFrom(null) };
   }
 
-  // L'errore che arriva dal main è un oggetto piatto ({ error, code }): ricomposto nella forma che SN_CHAT_ERRORS sa leggere, così «chiave rifiutata», «servizio sovraccarico» e «rete caduta» diventano frasi diverse invece di un messaggio generico.
+  // L'errore dal main è un oggetto piatto ({ error, code }): ricomposto per SN_CHAT_ERRORS, così «chiave rifiutata», «servizio sovraccarico» e «rete caduta» diventano frasi diverse.
   function errFrom(res) {
     const e = new Error(String((res && res.error) || 'translate_failed'));
     if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
@@ -582,7 +553,7 @@
 
   // Rimette i figli originali (nodi vivi) al posto dei segnaposto. Niente contenuto perso: i figli che il modello non ha richiamato tornano comunque in fondo.
   function applyTranslation(unit, text) {
-    // Traduzione che arriva quando l'utente ha già chiesto l'originale: si butta via. Se ha detto di tornare indietro ci deve restare — una pagina che si ritraduce da sola qualche secondo dopo non l'ha chiesta nessuno (#407).
+    // Traduzione che arriva quando l'utente ha già chiesto l'originale: si butta. Se ha detto di tornare indietro ci deve restare — una pagina che si ritraduce da sola non l'ha chiesta nessuno (#407).
     if (!unit || unit.run !== runSeq) return;
     if (unit.title) return applyTitleTranslation(unit, text);
     if (unit.attr) return applyAttrTranslation(unit, text);
@@ -621,7 +592,7 @@
     } catch (_) {}
   }
 
-  // Il nome della scheda è testo della pagina come gli altri: un'unità sola, applicata scrivendo `document.title`. Solo dal frame principale — il titolo di un riquadro non si vede da nessuna parte, e tradurlo sarebbe una richiesta pagata per niente.
+  // Il nome della scheda è testo come gli altri: un'unità sola, applicata scrivendo `document.title`. Solo dal frame principale — il titolo di un riquadro non si vede, e tradurlo sarebbe pagato per niente.
   function titleUnit(myRun) {
     if (!isTopFrame() || translatedTitle) return null;
     let text = '';
@@ -643,8 +614,8 @@
     } catch (_) {}
   }
 
-  // Etichette GEMELLE del testo già mostrato (il suggerimento uguale al testo del link, l'etichetta uguale alla scritta sul bottone): sono decine per pagina, e mandarle al modello pagherebbe due volte la stessa riga per lo stesso schermo. Si copiano dal testo appena tradotto.
-  // Il testo dell'elemento si legge ADESSO, non dalla traduzione di una singola unità: l'etichetta può stare su un contenitore (`<a title="…"><span>…`), dove la frase tradotta è quella del figlio.
+  // Etichette GEMELLE del testo già mostrato (il suggerimento uguale al testo del link, l'etichetta uguale alla scritta del bottone): decine per pagina, e mandarle al modello pagherebbe due volte la stessa riga.
+  // Si copiano dal testo appena tradotto, letto ADESSO dall'elemento e non dalla traduzione di una singola unità: l'etichetta può stare su un contenitore, dove la frase tradotta è quella del figlio.
   function applyMirroredAttrs(mirrors, myRun) {
     for (const m of (mirrors || [])) {
       if (myRun !== runSeq) return;
@@ -658,8 +629,8 @@
     }
   }
 
-  // Si scrive l'attributo tenendo da parte com'era, e SE c'era: su una <option> senza etichetta esplicita l'aggiungiamo noi, e il ritorno all'originale deve toglierla invece di lasciarne una vuota.
-  // setAttribute scrive una stringa e basta: il testo del modello non viene mai interpretato come HTML.
+  // Si scrive l'attributo tenendo da parte com'era, e SE c'era: su una <option> senza etichetta la aggiungiamo noi, e il ritorno all'originale deve toglierla, non lasciarne una vuota.
+  // setAttribute scrive una stringa: il testo del modello non è mai interpretato come HTML.
   function applyAttrTranslation(unit, text) {
     const el = unit.el;
     if (!el || unit.applied || !text) return;
@@ -759,7 +730,6 @@
       }
       delete el.dataset.snTranslated;
     });
-    // Rimuovi eventuali note di traduzione (vecchio formato, retrocompatibilità)
     document.querySelectorAll('[data-sn-translation="1"]').forEach((n) => n.remove());
     pageHasTranslation = false;
     pageComplete = false;
@@ -774,8 +744,8 @@
   function hasTranslation() { return pageHasTranslation; }
   // Traduzione presente ma incompleta: il menu deve offrire «Riprendi», non «Mostra originale», che butterebbe via anche la parte già tradotta e pagata.
   function isPartial() { return pageHasTranslation && !pageComplete; }
-  // Traduzione completa, ma sullo schermo c'è testo in lingua originale che il lavoro non ha toccato. Due strade, per l'utente identiche: il sito l'ha AGGIUNTO (scorrimento infinito, schermate che cambiano senza ricaricare), o era già lì e lui l'ha SCOPERTO aprendo una fisarmonica, una scheda, un «leggi tutto».
-  // In entrambi i casi il menu deve offrire di tradurlo: senza, l'unica strada era tornare all'originale e ripagare l'intera pagina per avere in italiano tre righe.
+  // Traduzione completa, ma sullo schermo c'è testo in lingua originale. Due strade, per l'utente identiche: il sito l'ha AGGIUNTO, oppure era già lì e lui l'ha SCOPERTO aprendo una fisarmonica o un «leggi tutto».
+  // In entrambi i casi il menu deve offrire di tradurlo: senza, l'unica strada era tornare all'originale e ripagare l'intera pagina per tre righe.
   function hasNewContent() {
     if (!pageHasTranslation || !pageComplete) return false;
     if (newContentSeen) return true;
@@ -785,13 +755,13 @@
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
   // l'icona del menu serve a CONTINUARE, non a tornare all'originale.
   function canContinue() { return isPartial() || hasNewContent(); }
-  // L'icona torna all'originale a traduzione completa e ferma, e anche MENTRE traduce: una cosa che parte si deve poter fermare, e a metà lavoro fermarsi vuol dire tornare indietro (prima, durante il lavoro, l'unica voce era «Traduci la pagina», che non faceva niente).
-  // Fonte unica: la usano sia l'icona sia la voce etichettata, che compare solo quando l'icona serve ad altro.
+  // L'icona torna all'originale a traduzione completa e ferma, e anche MENTRE traduce: una cosa che parte si deve poter fermare, e a metà lavoro fermarsi vuol dire tornare indietro.
+  // Fonte unica: la usano sia l'icona sia la voce etichettata.
   function showsRestore() { return pageTranslating || (pageHasTranslation && !canContinue()); }
   function missing() { return missingCount; }
   function total() { return totalCount; }
 
-  // «Mostra originale» come voce etichettata SOLO quando c'è ancora lavoro da fare (traduzione a metà, o testo comparso dopo): lì l'icona serve a continuare, ma chi vuole rinunciare deve poter tornare indietro. A traduzione completa e ferma la offre già l'icona.
+  // «Mostra originale» come voce etichettata SOLO quando c'è ancora lavoro da fare: lì l'icona serve a continuare, ma chi vuole rinunciare deve poter tornare indietro. A traduzione completa la offre già l'icona.
   function buildRestoreOriginalItem() {
     const Icons = global.SN_ICONS;
     const icon = (Icons && typeof Icons.showOriginal === 'function') ? Icons.showOriginal(18) : undefined;
