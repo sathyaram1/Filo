@@ -229,6 +229,7 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   cd "$wt" || continue
 
   BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if e_mia "$wt"; then QUI_MIA=1; else QUI_MIA=0; fi
 
   # ─── SUL RAMO PRINCIPALE NON SI COMMITTA ───────────────────────────────────
   #
