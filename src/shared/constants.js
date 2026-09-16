@@ -90,9 +90,8 @@
     LOOP_CAP_MIN: 1,
     IMPROVABLE_CAP_MIN: 0,
     LOOP_CAP_MAX: 10,
-    // Timeout di ogni giudice di sicurezza. I modelli che ragionano ci mettono qualche secondo: troppo basso e quel giudice non risponde mai, lasciando il panel parziale.
-    // Il TETTO non è estetico: è vincolato al tempo massimo della funzione cloud che gira il panel (540s, il massimo per un trigger Firestore). Il panel prova ogni giudice fino a tre volte e salta i tentativi che non ci starebbero: con 300s un giudice lentissimo ne fa uno solo, ma lo fa davvero.
-    // Alzarlo oltre 300 SENZA alzare il budget della funzione (filo-security: PANEL_BUDGET_MS + timeoutSeconds) rimetterebbe l'impostazione com'era: scrivibile ma non rispettata.
+    // Timeout di ogni giudice di sicurezza: i modelli che ragionano ci mettono qualche secondo, e troppo basso vuol dire un panel parziale perché quel giudice non risponde mai.
+    // Il TETTO è vincolato al tempo massimo della funzione cloud che gira il panel (540s, il massimo per un trigger Firestore): il panel prova ogni giudice fino a tre volte e salta i tentativi che non ci starebbero. Alzarlo oltre 300 SENZA alzare il budget della funzione rimetterebbe l'impostazione com'era, scrivibile ma non rispettata.
     JUDGE_TIMEOUT_DEFAULT_S: 60,
     JUDGE_TIMEOUT_MIN_S: 10,
     JUDGE_TIMEOUT_MAX_S: 300,
@@ -183,8 +182,8 @@
     BOARD_REOPEN: 5,
   };
 
-  // Prezzo NOZIONALE per 1M token usato SOLO per i crediti. È separato da `settings.pricing`, che governa il limite di spesa REALE e resta a 0 per i modelli serviti gratis, così una chiamata gratuita non intacca il budget in euro.
-  // I crediti però devono calare anche quando la chiamata è gratis, altrimenti col setup di default il saldo non si muoverebbe mai e la pagina Crediti sembrerebbe rotta: qui ogni modello di default ha un prezzo di listino, così il costo stimato esce > 0 e il motore crediti scala il saldo. Valori indicativi.
+  // Prezzo NOZIONALE per 1M token, usato SOLO per i crediti. È separato da `settings.pricing`, che governa il limite di spesa REALE e resta a 0 per i modelli serviti gratis, così una chiamata gratuita non intacca il budget in euro.
+  // I crediti però devono calare anche quando la chiamata è gratis, o col setup di default il saldo non si muoverebbe mai e la pagina Crediti sembrerebbe rotta: qui ogni modello di default ha un prezzo di listino. Valori indicativi.
   const NOTIONAL_PRICING = {
     // Anthropic, via il router.
     'anthropic/claude-haiku-4.5': { input: 1.00, output: 5.00 },
@@ -283,9 +282,9 @@
     return ACTION_LABELS[action] || action;
   }
 
-  // Registry di modelli logici per nickname: ogni modello ha UN SOLO provider e il nome concreto da usare (`model`). Per un fallback si crea un secondo modello e si indicano entrambi nella lista di un'azione. I nickname sono case-sensitive e devono essere slug semplici, così l'utente li riconosce.
-  // Retro-compatibilità: le vecchie entry «duali» (un nickname per due provider) resolveModel le gestisce ancora, finché l'utente non ri-salva dalle Opzioni.
-  // VUOTO di proposito: i modelli veri stanno nella configurazione condivisa o nelle Opzioni. Una funzione senza modello si ferma e lo dice — meglio un errore rumoroso di una chiamata silenziosa a un modello vecchio scelto da nessuno. (Per i test: tests/fixtures/testModels.js.)
+  // Registry di modelli logici per nickname: ogni modello ha UN SOLO provider e il nome concreto da usare. Per un fallback si crea un secondo modello e si indicano entrambi nella lista di un'azione. I nickname sono case-sensitive e devono essere slug semplici, così l'utente li riconosce.
+  // Le vecchie entry «duali» (un nickname per due provider) resolveModel le gestisce ancora, finché l'utente non ri-salva dalle Opzioni.
+  // VUOTO di proposito: i modelli veri stanno nella configurazione condivisa o nelle Opzioni. Una funzione senza modello si ferma e lo dice — meglio un errore rumoroso di una chiamata silenziosa a un modello vecchio scelto da nessuno.
   const DEFAULT_MODEL_REGISTRY = {};
 
   // Modello di default per ogni azione: liste di NICKNAME separate da virgola, il primo primario e gli altri ripieghi in ordine. I predefiniti seguono la politica sui modelli — pesi aperti da fornitori indipendenti, Anthropic dove serve più testa.
@@ -329,11 +328,11 @@
     [ACTIONS.PROVIDER_TEST]: '',
   };
 
-  // Politica sui fornitori. Filo ammette i modelli di Anthropic e quelli a pesi aperti SOLO se serviti da fornitori INDIPENDENTI, mai dai server di chi il modello lo ha prodotto; e lo smistatore sceglie da sé chi ospita, con criteri di prezzo che cambiano, quindi senza istruzioni può mandarle proprio al produttore.
-  // Criterio dell'owner: si esclude il PRODUTTORE in quanto fornitore, a prescindere da quale modello stia servendo. È quindi una LISTA DI ESCLUSIONE, non di ammessi: regge quando esce un fornitore indipendente nuovo. Il rovescio — un'azienda esclusa che ricompare con un nome nuovo — è coperto registrando chi ha DAVVERO servito ogni risposta: senza quel riscontro la lista è solo una speranza.
-  // Forma BASE: il nome base copre le varianti regionali («Google» copre «Google AI Studio» e «Google Vertex»); la variante singola le lascerebbe sfuggire.
-  // SECONDO motivo di esclusione: un host che serve MALE — risposte troncate, risposte di qualcun altro, contenuti che non c'entrano. Vale a prescindere dal modello: chi sbaglia a instradare sbaglia su tutto quello che ospita.
-  // L'owner può sostituire questa lista PER INTERO dal doc Firestore `config/models`, quindi aggiungere un nome qui non basta dove lui ha già scritto la sua: va aggiunto anche là, e la pagina «Modelli predefiniti» segnala da sola le voci scoperte. Anthropic non è qui: la politica ammette i suoi modelli.
+  // Politica sui fornitori. Filo ammette i modelli di Anthropic e quelli a pesi aperti SOLO da fornitori INDIPENDENTI, mai dai server di chi il modello lo ha prodotto; e lo smistatore sceglie da sé chi ospita, a prezzo, quindi senza istruzioni può mandarle proprio al produttore.
+  // Si esclude il PRODUTTORE in quanto fornitore, a prescindere da quale modello stia servendo: è una LISTA DI ESCLUSIONE, non di ammessi, così regge quando esce un fornitore indipendente nuovo. Il rovescio — un'azienda esclusa che ricompare con un nome nuovo — è coperto registrando chi ha DAVVERO servito ogni risposta: senza quel riscontro la lista è solo una speranza.
+  // Forma BASE: il nome base copre le varianti regionali («Google» copre «Google AI Studio» e «Google Vertex»).
+  // Secondo motivo di esclusione: un host che serve MALE — risposte troncate, risposte di qualcun altro, contenuti che non c'entrano. Vale a prescindere dal modello: chi sbaglia a instradare sbaglia su tutto quello che ospita.
+  // L'owner può sostituire questa lista PER INTERO dal doc Firestore `config/models`, quindi aggiungere un nome qui non basta dove lui ha già scritto la sua. Anthropic non è qui: la politica ammette i suoi modelli.
   const DEFAULT_EXCLUDED_PROVIDERS = [
     'Google',       // produttore di Gemini (copre Google AI Studio / Vertex)
     'OpenAI',
@@ -396,9 +395,9 @@
     return out;
   }
 
-  // Interruttore «solo modelli a pesi aperti»: chi usa Filo può rifiutare TUTTI i modelli proprietari — Anthropic compresa, cioè anche la scelta di chi Filo lo fa. Qui la parte pura; l'applicazione alla catena di tentativi è in handlers.js.
-  // DUE condizioni, entrambe necessarie: i pesi sono aperti (chi li ha addestrati non incassa nulla quando li usi altrove) e a servirlo NON è chi li ha prodotti — Gemma sui server di Google resta Google, i pesi aperti non cambiano dove vanno i soldi. La seconda esclude in blocco i provider diretti e, per lo smistatore, si ottiene con la lista di esclusione.
-  // DIFFIDENTE PER COSTRUZIONE: un modello che non sappiamo classificare vale come proprietario. Ammettere ciò che non riconosciamo trasformerebbe l'interruttore in una promessa a caso, che è peggio che non averlo.
+  // Interruttore «solo modelli a pesi aperti»: chi usa Filo può rifiutare TUTTI i modelli proprietari, Anthropic compresa — cioè anche la scelta di chi Filo lo fa. Qui la parte pura; l'applicazione alla catena è in handlers.js.
+  // DUE condizioni necessarie: i pesi sono aperti (chi li ha addestrati non incassa nulla quando li usi altrove) e a servirlo NON è chi li ha prodotti — Gemma sui server di Google resta Google, i pesi aperti non cambiano dove vanno i soldi.
+  // DIFFIDENTE PER COSTRUZIONE: un modello che non sappiamo classificare vale come proprietario. Ammettere ciò che non riconosciamo trasformerebbe l'interruttore in una promessa a caso, peggio che non averlo.
 
   // Provider che sono l'API del PRODUTTORE: qualunque cosa servano, i soldi vanno a chi i modelli li fa. Lo smistatore non è qui, perché chi ospita davvero si sceglie con la lista di esclusione.
   // Oggi la lista è VUOTA; il meccanismo resta per il giorno in cui si aggiunge un fornitore che sia anche produttore.
@@ -448,8 +447,7 @@
     return false;
   }
 
-  // Sostituti a pesi aperti dei predefiniti proprietari. Servono perché quasi tutte le funzioni nascono con un modello proprietario: senza sostituzione, accendere l'interruttore spegnerebbe mezza app invece di cambiarle modello.
-  // Valgono anche per i nickname non più fra i predefiniti, che possono vivere ancora nei registri personali salvati prima.
+  // Sostituti a pesi aperti dei predefiniti proprietari: quasi tutte le funzioni nascono con un modello proprietario, e senza sostituzione accendere l'interruttore spegnerebbe mezza app invece di cambiarle modello. Valgono anche per i nickname non più predefiniti, che possono vivere nei registri personali salvati prima.
   // Una funzione il cui modello NON ha un sostituto si ferma e lo dice: mai un ripiego silenzioso su un modello proprietario, sarebbe l'interruttore che mente.
   const OPEN_WEIGHTS_SUBSTITUTES = {
     claude: 'deepseek',
@@ -502,8 +500,8 @@
     };
   }
 
-  // Il sostituto sa fare il MESTIERE della funzione? La dettatura deve ascoltare un audio, la lettura ad alta voce produrne uno, l'indicizzazione produrre vettori: infilarci un modello che macina solo testo non è una sostituzione, è la funzione che smette di funzionare con un errore qualunque.
-  // DIFFIDENTE come il resto: si sostituisce solo se il sostituto DICHIARA di saper fare quel mestiere. Capacità ignote, niente sostituzione — la funzione si ferma dicendolo, che è recuperabile; una sostituzione sbagliata no.
+  // Il sostituto sa fare il MESTIERE della funzione? La dettatura deve ascoltare un audio, la lettura ad alta voce produrne uno, l'indicizzazione produrre vettori: infilarci un modello che macina solo testo è la funzione che smette di funzionare con un errore qualunque.
+  // DIFFIDENTE come il resto: si sostituisce solo se il sostituto DICHIARA quel mestiere. Capacità ignote, niente sostituzione — la funzione si ferma dicendolo, che è recuperabile; una sostituzione sbagliata no.
   function substituteFitsAction(entry, action, nickname) {
     const caps = global.SN_MODEL_CAPS;
     const meta = entryModalities(entry, nickname);
@@ -513,7 +511,7 @@
     return Boolean(res && res.ok);
   }
 
-  // Perché una chiamata COSTRUITA A MANO (i pulsanti «Prova»: modello concreto, nessuna catena) non può partire con l'interruttore acceso. Si passa `entry`, la voce intera, così una classificazione corretta a mano dall'owner vale qui come per le richieste vere.
+  // Perché una chiamata COSTRUITA A MANO (i pulsanti «Prova»: modello concreto, nessuna catena) non può partire con l'interruttore acceso. Si passa la voce intera, così una classificazione corretta a mano dall'owner vale qui come per le richieste vere.
   // '' se può partire, 'provider' se il fornitore è l'API di chi produce i modelli, 'model' se il modello non è a pesi aperti. PURA.
   function openWeightsBlockKind(openWeightsOnly, entry) {
     if (openWeightsOnly !== true) return '';
@@ -644,8 +642,8 @@
     return (refs || []).filter((r) => r && !missing.has(r));
   }
 
-  // Catena di tentativi per una richiesta AI: per ogni nickname, nell'ordine scelto dall'utente, si provano i provider di `providerOrder` scartando quelli senza chiave o senza un id concreto. Prima tutti i provider del modello primario, poi quelli del secondo, e i duplicati esatti si saltano.
-  // Livelli di reasoning che l'owner può forzare per un modello (#369): 'auto' o assente lascia il comportamento del provider, gli altri chiedono uno sforzo esplicito quando il modello lo supporta — chi non ragiona ignora il parametro.
+  // Catena di tentativi: per ogni nickname, nell'ordine scelto dall'utente, si provano i provider scartando quelli senza chiave o senza un id concreto — prima tutti quelli del modello primario, poi del secondo; i duplicati esatti si saltano.
+  // Livelli di reasoning forzabili dall'owner (#369): 'auto' o assente lascia il comportamento del provider, gli altri chiedono uno sforzo esplicito quando il modello lo supporta.
   const REASONING_LEVELS = ['auto', 'off', 'low', 'medium', 'high'];
 
   function normalizeReasoning(v) {
@@ -679,8 +677,8 @@
 
   const DEFAULT_PROVIDER = 'openrouter';
 
-  // IL SISTEMA SU CUI GIRA FILO, DETTO AL MODELLO. Filo lancia comandi da terminale e legge file per percorso, due cose che hanno forma DIVERSA su Windows, Mac e Linux: finché il prompt non lo diceva il modello poteva solo indovinare, e l'unico esempio che vedeva era un percorso di Windows — quindi su un Mac proponeva comandi e percorsi che lì non esistono.
-  // Sta nella parte FISSA del prompt, non nel contesto: il sistema di una macchina non cambia fra un messaggio e l'altro, quindi non rompe il riuso della cache. Il valore arriva dal main, perché questo file gira anche nelle pagine, dove `process` non c'è.
+  // IL SISTEMA SU CUI GIRA FILO, DETTO AL MODELLO: Filo lancia comandi da terminale e legge file per percorso, e quelle due cose hanno forma DIVERSA su Windows, Mac e Linux. Finché il prompt non lo diceva il modello indovinava, e l'unico esempio che vedeva era un percorso di Windows.
+  // Sta nella parte FISSA del prompt: il sistema di una macchina non cambia fra un messaggio e l'altro, quindi non rompe il riuso della cache. Il valore arriva dal main, perché questo file gira anche nelle pagine, dove `process` non c'è.
   const SISTEMI = {
     darwin: {
       nome: 'macOS (un Mac)',
@@ -710,9 +708,9 @@
     return SISTEMI[platform] || SISTEMI.win32;
   }
 
-  // Rende inerte come STRUTTURA un testo scritto da un terzo prima che entri in un prompt: una riga sola, niente caratteri di controllo, niente segni invisibili, una lunghezza massima. Non è un filtro sul SENSO delle parole, che a colpi di regex non si fa: è la garanzia che quel testo resti una riga di dati e non possa aprire sezioni, turni o blocchi finti dentro la domanda che lo contiene.
-  // Serve alle due parti dello stesso cammino: in lettura appiattisce un percorso condiviso prima delle istruzioni dell'assistente di pagina; in scrittura appiattisce i nomi degli elementi — cioè le etichette dei pulsanti del sito — e i messaggi dell'utente prima dei due modelli che decidono se un percorso è anonimo. Lì la difesa non c'era, e un sito poteva scrivere in un'etichetta quella che al modello sembrava una riga di istruzioni (#584).
-  // I segni invisibili sono gli stessi che toglie SN_PATHS_SAFETY, che deve restare autonomo perché il backend di sicurezza lo incorpora: una sentinella negli unit test diventa rossa se divergono. Fra questi i caratteri \u{E0000}-\u{E007F}, una copia invisibile dell'alfabeto, che è il modo in cui oggi si nasconde davvero una frase dentro un'altra.
+  // Rende inerte come STRUTTURA un testo scritto da un terzo prima che entri in un prompt: una riga sola, niente caratteri di controllo né segni invisibili, lunghezza massima. Non è un filtro sul SENSO, che a colpi di regex non si fa: è la garanzia che resti una riga di dati e non possa aprire sezioni, turni o blocchi finti dentro la domanda che lo contiene.
+  // Serve alle due parti dello stesso cammino: in lettura appiattisce un percorso condiviso prima delle istruzioni dell'assistente di pagina; in scrittura i nomi degli elementi — le etichette dei pulsanti del sito — e i messaggi dell'utente, prima dei modelli che decidono se un percorso è anonimo. Lì la difesa non c'era, e un sito poteva scrivere in un'etichetta quella che al modello sembrava una riga di istruzioni (#584).
+  // I segni invisibili sono gli stessi che toglie SN_PATHS_SAFETY, che resta autonomo perché il backend di sicurezza lo incorpora: una sentinella diventa rossa se divergono. Fra questi i caratteri \u{E0000}-\u{E007F}, una copia invisibile dell'alfabeto.
   const SEGNI_INVISIBILI_RE = /[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufe00-\ufe0f\ufeff]|[\u{E0000}-\u{E007F}]/gu;
 
   function unaRigaDiDati(testo, max) {
@@ -1031,9 +1029,9 @@
       `- NON includere nomi, indirizzi, email, numeri o altri dati personali — anche se ti sembra di vederli nei selettori, ignorali.\n` +
       `- NON aggiungere preamboli, virgolette, markdown o spiegazioni meta. Solo la frase.`,
 
-    // Il giudice vede CINQUE cose: l'intento proposto dal primo LLM, il nome del sito, la pagina di partenza, i nomi degli elementi (cioè esattamente quello che verrebbe pubblicato) e i messaggi raw dell'utente. Decide se è fedele a ciò che l'utente voleva e se è ANONIMO, e l'output è solo {ok}: nessun dato raw esce da questo turno.
-    // Le due di mezzo mancavano mentre il resto del sistema dava per scontato che le vedesse: riceveva «(nessuna)» e approvava alla cieca (#584). È l'unica cosa che ferma un nome di persona scritto a lettere, perché nessuna regola di forma distingue «Mario Rossi» da una parola qualunque.
-    // E con loro mancava il NOME DEL SITO, la quarta cosa pubblicata e l'unica che non si possa ripulire, perché è anche l'indirizzo sotto cui il documento finisce: su un sito personale è un nome e cognome, su un'intranet è il datore di lavoro. Chi PROPONE la frase ce l'aveva già; chi decide se pubblicare, no.
+    // Il giudice vede CINQUE cose: l'intento proposto dal primo LLM, il nome del sito, la pagina di partenza, i nomi degli elementi — cioè esattamente quello che verrebbe pubblicato — e i messaggi raw dell'utente. Decide se è fedele a ciò che l'utente voleva e se è ANONIMO, e l'output è solo {ok}.
+    // Le due di mezzo mancavano mentre il resto del sistema dava per scontato che le vedesse: riceveva «(nessuna)» e approvava alla cieca (#584). Sono l'unica cosa che ferma un nome di persona scritto a lettere, perché nessuna regola di forma distingue «Mario Rossi» da una parola qualunque.
+    // Mancava anche il NOME DEL SITO, la quarta cosa pubblicata e l'unica che non si possa ripulire, perché è l'indirizzo sotto cui il documento finisce: su un sito personale è un nome e cognome, su un'intranet è il datore di lavoro.
     helpIntentJudge: ({ proposedIntent, userMessages, domain, initialUrl, steps }) =>
       `Sei un giudice di sicurezza. Sta per essere pubblicato, in una raccolta che chiunque può leggere, un percorso di navigazione: serve a insegnare ad altri come si fa una cosa su un sito. Devi decidere se quello che sta per uscire è fedele a ciò che l'utente voleva fare e se è ANONIMO.\n\n` +
       // Sei l'ULTIMA difesa e leggi testo che non hai scritto tu: la frase la propone un altro modello, l'indirizzo e i nomi degli elementi li scrive il sito, i messaggi l'utente. Senza questa cornice un sito poteva mettere in un'etichetta una finta nota di sistema e farsi approvare un percorso col nome di una persona dentro (#584).
@@ -1066,9 +1064,9 @@
       `Rispondi SOLO con un JSON valido (nessun preambolo, nessun markdown):\n` +
       `{"ok": true|false}`,
 
-    // Agente conversazionale principale: riceve memoria, stato e cronologia del thread, risponde con una bolla e opzionalmente azioni strutturate che il client esegue.
-    // ORDINE DEL PROMPT — la parte IMMUTABILE viene PRIMA (#422): istruzioni, capacità, azioni, tono e formato stanno in `filoChatStatic`, che apre; tutto ciò che cambia (modello, profilo, preferenze, lezioni, stato del browser, file, conversazione) sta in `filoChatContext` e viene dopo.
-    // Motivo: i fornitori riconoscono che l'INIZIO di una richiesta è identico a una precedente e non lo rielaborano né lo rifatturano, ma il riuso vale solo sul PREFISSO — prima bastava il nome del modello, che cambia col ripiego, o l'ora dentro STATO, per far ricalcolare tutto il blocco a ogni messaggio. REGOLA: sopra la frontiera non va NULLA che dipenda dall'utente o dalla singola richiesta.
+    // Agente conversazionale principale: riceve memoria, stato e cronologia, risponde con una bolla e opzionalmente azioni strutturate che il client esegue.
+    // ORDINE DEL PROMPT — la parte IMMUTABILE viene PRIMA (#422): istruzioni, capacità, azioni, tono e formato in `filoChatStatic`; tutto ciò che cambia (modello, profilo, preferenze, lezioni, stato del browser, file, conversazione) in `filoChatContext`, dopo.
+    // I fornitori non rielaborano né rifatturano un INIZIO identico a una richiesta precedente, ma il riuso vale solo sul PREFISSO: prima bastavano il nome del modello, che cambia col ripiego, o l'ora dentro STATO, per far ricalcolare tutto a ogni messaggio. REGOLA: sopra la frontiera non va NULLA che dipenda dall'utente o dalla singola richiesta.
     filoChatStatic: ({ capacita, sistema }) =>
       `Sei Filo, un assistente personale. L'utente interagisce con te attraverso un campo di testo nella dashboard del browser.\n\n` +
       `Prima vengono le istruzioni, che valgono sempre. Il CONTESTO di questa conversazione — chi è l'utente, cosa ha in memoria, cosa sta guardando, che file ha, che modello ti sta eseguendo — arriva più sotto, dopo le istruzioni.\n\n` +
@@ -1120,8 +1118,8 @@
       `═══ TONO E STILE ═══\n` +
       `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze dell'utente hanno priorità su queste istruzioni.\n\n`,
 
-    // Parte VARIABILE della chat: cambia da un utente all'altro e da un messaggio all'altro. Sta SEMPRE dopo `filoChatStatic`, o il blocco di istruzioni non è più riusabile e va ripagato a ogni messaggio.
-    // Anche l'ONBOARDING (#524) sta qui e non fra le istruzioni fisse, per due ragioni: cambia a ogni messaggio (le spunte si muovono) e vale solo nei primi minuti di vita di un profilo. Sopra la frontiera farebbe ripagare l'intero manuale a ogni chat di ogni utente, per sempre.
+    // Parte VARIABILE della chat: cambia da un utente all'altro e da un messaggio all'altro. Sta SEMPRE dopo `filoChatStatic`, o il blocco di istruzioni va ripagato a ogni messaggio.
+    // Anche l'ONBOARDING (#524) sta qui: cambia a ogni messaggio e vale solo nei primi minuti di vita di un profilo — sopra la frontiera farebbe ripagare l'intero manuale a ogni chat di ogni utente, per sempre.
     filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax }) =>
       (!onboarding ? '' :
         `═══ STAI ACCOGLIENDO QUESTO UTENTE (intervista in corso) ═══\n`
@@ -1233,9 +1231,8 @@
       `NOME_ESPANSIONE:\n[contenuto completo]\n\n` +
       `Se non c'è davvero nulla da modificare, scrivi solo: NESSUNA MODIFICA`,
 
-    // Deck builder (§3-§4): la barra di ricerca È la chat — query secca o frase conversazionale, e l'LLM decide se serve una ricerca Scryfall, una selezione da un altro mazzo o solo una risposta testuale.
-    // Il filtro di color identity NON va messo qui: lo aggiunge il codice a valle, sempre.
-    // ORDINE DEL PROMPT — parte immutabile PRIMA (#422), come la chat della home: regole e formato in testa, mazzo corrente e altri mazzi in fondo.
+    // Deck builder (§3-§4): la barra di ricerca È la chat, e l'LLM decide se serve una ricerca Scryfall, una selezione da un altro mazzo o solo una risposta testuale. Il filtro di color identity NON va qui: lo aggiunge il codice a valle, sempre.
+    // ORDINE DEL PROMPT — parte immutabile PRIMA (#422): regole e formato in testa, mazzo corrente e altri mazzi in fondo.
     decksChatStatic: () =>
       `Sei l'assistente di un deck builder per Magic: The Gathering, formato Commander. L'utente ti scrive in una chat che è anche la barra di ricerca carte.\n` +
       `Le regole valgono sempre; il mazzo su cui state lavorando è in fondo, dopo le regole.\n\n` +
@@ -1384,14 +1381,13 @@
       soundEnabled: false,
       sound: 'default',
     },
-    // Sicurezza e privacy per le pagine esterne.
-    // protectIpLeak: forza WebRTC sulla sola interfaccia pubblica, così i siti non leggono gli IP di LAN o VPN dai candidati ICE — il vettore tipico del fingerprinting WebRTC. In cambio alcuni servizi P2P locali non trovano più i dispositivi sulla stessa rete.
-    // blockPopups: blocca window.open() senza un gesto dell'utente, cioè i popup pubblicitari; i link target="_blank" cliccati si aprono normalmente, e un popup bloccato lascia una chip con «Apri comunque».
+    // Sicurezza e privacy per le pagine esterne. protectIpLeak forza WebRTC sulla sola interfaccia pubblica, così i siti non leggono gli IP di LAN o VPN dai candidati ICE — il vettore tipico del fingerprinting WebRTC; in cambio alcuni servizi P2P locali non trovano più i dispositivi sulla stessa rete.
+    // blockPopups blocca window.open() senza un gesto dell'utente, cioè i popup pubblicitari; i link target="_blank" cliccati si aprono normalmente, e un popup bloccato lascia una chip con «Apri comunque».
     security: {
       protectIpLeak: true,
       blockPopups: true,
-      // Rilevamento siti pericolosi (services/safebrowse/). I controlli locali — omoglifi, typo, combosquat, trasporto — sono gratuiti e attivi di default; quelli di rete sono best-effort e non bloccano mai la navigazione.
-      // safeBrowsing: blacklist Google, richiede una API key gratuita e senza chiave lo stage si salta. networkSignals: età dominio e del primo certificato, senza chiave, disattivabile da chi non vuole chiamate esterne. llmJudge: giudizio solo-metadati sui casi sospetti non conclusivi. sandbox: detonation dei link sospetti in finestra isolata.
+      // Rilevamento siti pericolosi: i controlli locali (omoglifi, typo, combosquat, trasporto) sono gratuiti e attivi di default, quelli di rete sono best-effort e non bloccano mai la navigazione.
+      // safeBrowsing richiede una API key gratuita e senza chiave si salta; networkSignals (età dominio e primo certificato) è keyless e disattivabile da chi non vuole chiamate esterne; llmJudge giudica solo i metadati dei casi non conclusivi; sandbox fa detonare i link sospetti in finestra isolata.
       safeBrowse: {
         enabled: true,
         safeBrowsingKey: '',
@@ -1399,16 +1395,15 @@
         llmJudge: true,
         sandbox: true,
       },
-      // Gestione cookie e consenso, un solo interruttore a tre stati (services/cookies.js).
-      // 'manual': nessuna gestione automatica, i banner si vedono e decide l'utente, niente GPC e niente blocco tracker.
-      // 'default' (la scelta di quasi tutti): emette GPC, rifiuta i banner CMP, riscrive gli embed YouTube su youtube-nocookie e BLOCCA a monte i tracker noti. I cookie funzionali e di login NON vengono cancellati: le scelte dell'utente restano; all'uscita si ripuliscono solo i cookie di domini-tracker rimasti.
-      // 'privacy': ogni sito naviga in un cookie jar isolato ed effimero — nessuna correlazione cross-site, nulla sopravvive alla sessione, login compresi. I domini in trustedSites fanno eccezione con un jar isolato ma persistente, così resti connesso; negli altri modi non hanno effetto.
+      // Gestione cookie e consenso, un interruttore a tre stati (services/cookies.js).
+      // 'manual': nessuna gestione automatica, decide l'utente sui banner. 'default', la scelta di quasi tutti: GPC, rifiuto automatico dei banner CMP, embed YouTube su youtube-nocookie e blocco a monte dei tracker noti — i cookie funzionali e di login NON si cancellano, all'uscita si ripuliscono solo quelli dei domini-tracker.
+      // 'privacy': ogni sito in un cookie jar isolato ed effimero, nessuna correlazione cross-site e nulla che sopravviva alla sessione, login compresi. I domini in trustedSites fanno eccezione con un jar isolato ma persistente; negli altri modi non hanno effetto.
       cookies: {
         mode: 'default',
         trustedSites: [],
       },
-      // Anti-fingerprinting: rumore deterministico per-sito sui segnali continui ad alta entropia (canvas, WebGL, audio). Stessa struttura a tre stati dei cookie.
-      // 'off': nessun rumore, i siti possono identificare il browser. 'default': seed settimanale per sito, rompe la correlazione cross-site senza toccare banche, Cloudflare o CAPTCHA. 'privacy': seed per-sessione, identità nuova a ogni avvio, con rari CAPTCHA in più.
+      // Anti-fingerprinting: rumore deterministico per-sito sui segnali ad alta entropia (canvas, WebGL, audio), a tre stati come i cookie.
+      // 'off' nessun rumore; 'default' seed settimanale per sito, rompe la correlazione cross-site senza toccare banche, Cloudflare o CAPTCHA; 'privacy' seed per-sessione, identità nuova a ogni avvio, con rari CAPTCHA in più.
       fingerprint: {
         mode: 'default',
       },
@@ -1417,9 +1412,8 @@
       adblock: {
         enabled: true,
       },
-      // Blocco apertura siti in blacklist (#170.3): a differenza dell'ad-block, che annulla le singole richieste, qui si blocca l'apertura della pagina top-level.
-      // Eccezioni: navigazione da un motore di ricerca (l'utente l'ha cercato) o originata da Filo. Quando blocca mostra una notifica con «Apri comunque».
-      // useAdblockLists: usa come blacklist anche i domini delle liste pubbliche, oltre a quelli aggiunti a mano.
+      // Blocco apertura siti in blacklist (#170.3): l'ad-block annulla le singole richieste, qui si blocca la pagina top-level. Eccezioni: navigazione da un motore di ricerca (l'utente l'ha cercato) o originata da Filo; quando blocca mostra una notifica con «Apri comunque».
+      // useAdblockLists usa come blacklist anche i domini delle liste pubbliche, oltre a quelli aggiunti a mano.
       siteBlock: {
         enabled: true,
         useAdblockLists: true,
@@ -1432,8 +1426,8 @@
       enabled: false,
       shell: 'powershell',
     },
-    // Proxy per-tab (proxy-per-tab-spec.md): endpoint del provider come template URL con {country} sostituito dal codice paese. Vuoto = feature non configurata, e le variabili d'ambiente hanno la precedenza.
-    // datacenter: tier economico, primo tentativo. residential: ripiego quando il sito blocca gli IP datacenter. bypass: proxyBypassRules di Chromium. defaultCountry: paese del click diretto. lastCountry: ultima location usata, vince sul default.
+    // Proxy per-tab: endpoint del provider come template URL con {country} sostituito dal codice paese; vuoto = feature non configurata, e le variabili d'ambiente hanno la precedenza.
+    // datacenter è il tier economico e il primo tentativo, residential il ripiego quando il sito blocca gli IP datacenter, bypass sono le proxyBypassRules, defaultCountry il paese del click diretto e lastCountry l'ultima location usata, che vince sul default.
     proxy: {
       datacenter: '',
       residential: '',
@@ -1492,8 +1486,8 @@
     ACTIONS.EDITOR_CHAT,
   ];
 
-  // Inietta lo stile di scrittura nei messaggi di una richiesta AI. Pura: se l'azione è style-aware e lo stile non è vuoto, l'istruzione si aggiunge al primo messaggio di sistema, o ne antepone uno nuovo.
-  // Lo stile viene ACCODATO (#422), quindi finisce dopo la parte immutabile e non ne rompe il riuso. In testa, ogni utente con uno stile personale avrebbe un prefisso diverso e il riuso morirebbe per tutti.
+  // Inietta lo stile di scrittura nei messaggi di una richiesta AI. Pura: se l'azione è style-aware e lo stile non è vuoto, l'istruzione si aggiunge al primo messaggio di sistema o ne antepone uno nuovo.
+  // Lo stile viene ACCODATO (#422), quindi finisce dopo la parte immutabile e non ne rompe il riuso: in testa, ogni utente con uno stile personale avrebbe un prefisso diverso e il riuso morirebbe per tutti.
   function injectAgentStyle(messages, action, styleText) {
     const style = typeof styleText === 'string' ? styleText.trim() : '';
     if (!Array.isArray(messages) || !style) return messages;
