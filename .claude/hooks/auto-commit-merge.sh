@@ -399,12 +399,14 @@ fi
 stringa_json() {
   tr '\r\t' '  ' | tr -d '\000-\010\013\014\016-\037' | sed 's/\\/\\\\/g; s/"/\\"/g' | awk 'NR>1{printf "\\n"}{printf "%s",$0}'
 }
-if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
-  TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null | stringa_json)
+# I guai delle ALTRE cartelle vanno in coda, una riga ciascuno, e la coda che
+# dice di spedire riguarda solo la propria.
+if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ] || [ -s "$ALTRUI_FILE" ]; then
+  TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" "$ALTRUI_FILE" 2>/dev/null | stringa_json)
   CODA=""
   [ -s "$FALLIMENTI_FILE" ] && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"SALVATAGGIO: %s%s"}}\n' "$HOOK_EVENT" "$TESTO" "$CODA"
 fi
-rm -f "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null
+rm -f "$FALLIMENTI_FILE" "$AVVISI_FILE" "$ALTRUI_FILE" 2>/dev/null
 
 exit 0
