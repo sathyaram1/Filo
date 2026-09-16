@@ -48,7 +48,12 @@ name: Release Filo (Windows + Mac)
 on:
   schedule:
     - cron: '0 */6 * * *'   # ogni 6 ore (UTC); modificabile
-  workflow_dispatch: {}      # pulsante "Run workflow" manuale
+  workflow_dispatch:         # pulsante "Run workflow" manuale
+    inputs:
+      solo_suite:
+        description: 'Solo la suite Playwright sul ramo scelto: non pubblica niente'
+        type: boolean
+        default: false
 
 permissions:
   contents: write            # creare e pubblicare la Release (non serve piu' per scrivere su main)
