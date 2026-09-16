@@ -329,7 +329,13 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         rep.tools.total += 1;
         const nome = chiaveSicura(b.name);
         rep.tools.byName[nome] = (rep.tools.byName[nome] || 0) + 1;
-        if (b.name === 'Agent' || b.name === 'Task') rep.subagents += 1;
+        if (b.name === 'Agent' || b.name === 'Task') {
+          rep.subagents += 1;
+          // La finestra in cui quel sotto-agente ha lavorato: da questa
+          // chiamata al suo risultato. Serve a ritrovare il suo transcript
+          // quando chi rilascia e' a sua volta un sotto-agente (figliDelSottoAgente).
+          if (Array.isArray(finestreAgent) && Number.isFinite(ms)) finestreAgent.push({ id: bid, inizio: ms, fine: Infinity });
+        }
         if (Number.isFinite(ms)) inCorso.set(bid, ms);
       }
     } else if (e.type === 'user') {
