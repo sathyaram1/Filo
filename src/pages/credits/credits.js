@@ -11,8 +11,8 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // Palette scelta a mano per restare distinguibile su tema chiaro e scuro. Le fette ciclano
-  // nell'ordine decrescente della legenda, così colore ed etichetta combaciano.
+  // Palette scelta a mano per restare distinguibile su chiaro e scuro; le fette seguono
+  // l'ordine della legenda, così colore ed etichetta combaciano.
   const PALETTE = ['#c45a3b', '#3b82c4', '#3bbf7a', '#c9a13b',
     '#8a4fc4', '#c43b87', '#3bbdc4', '#7d8a3b'];
 
@@ -23,8 +23,7 @@
 
     if (ICONS && ICONS.credits) $('coin').innerHTML = ICONS.credits(48);
 
-    // La ricarica giornaliera è un importo unico (CREDIT.DAILY_REFILL): la frase lo legge dal
-    // valore in vigore invece di scriverlo a mano, così se cambia il testo resta veritiero.
+    // La frase legge CREDIT.DAILY_REFILL dal valore in vigore: se cambia, resta veritiera.
     const refill = window.SN_CONST?.CREDIT?.DAILY_REFILL;
     if (refill != null) {
       $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
@@ -51,9 +50,8 @@
     renderMoves(credits.rewards || []);
   }
 
-  // Una conferma (riscatto riuscito, nuova chiave) deve restare leggibile: nello stesso istante
-  // arriva l'avviso di saldo cambiato e la pagina si ridisegna da sola, cancellando la frase
-  // prima che l'utente la legga. La conferma vince su ogni ridisegno finché non si fa altro.
+  // Una conferma deve restare leggibile: l'avviso di saldo cambiato arriva nello stesso istante
+  // e il ridisegno cancellava la frase. La conferma vince sui ridisegni finché non si fa altro.
   let confirmation = null;
   function showConfirmation(text) {
     confirmation = text || null;
@@ -80,9 +78,8 @@
     const has = Boolean(server && server.hasWallet);
     const note = $('walletNote');
     note.hidden = true;
-    // Senza nessuna chiave (personale, propria o di fabbrica) il conteggio locale non compra
-    // niente: saldo, ricarica a mezzanotte e invito al login sono promesse vuote e si tolgono.
-    // Vale anche con la chiave personale ancora qui ma l'identità annullata sul server.
+    // Senza nessuna chiave il conteggio locale non compra niente: saldo, ricarica a mezzanotte e
+    // invito al login sono promesse vuote e si tolgono. Vale anche con l'identità annullata.
     const noKey = !has && (w.keySource === 'none' || Boolean(w.identity && w.identity.lost));
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
@@ -124,8 +121,8 @@
     const form = $('redeemForm');
     form.hidden = false;
     if (w.identity && !w.identity.ok && w.identity.lost) {
-      // Il server ha annullato l'identità: il portafoglio legato a essa non si raggiunge più. Si
-      // dice, e ricominciare resta una scelta dell'utente.
+      // Identità annullata dal server: quel portafoglio non si raggiunge più, e ricominciare resta
+      // una scelta dell'utente.
       form.hidden = true;
       note.textContent = 'L\'identità di questa installazione è stata annullata sul server, e con lei i crediti che aveva. Puoi ricominciare con un nuovo invito.';
       note.hidden = false;
@@ -240,9 +237,8 @@
   }
 
   function renderUsage(byUsage) {
-    // Solo i gruppi con consumo > 0, in ordine decrescente. NON arrotondare all'intero: il motore
-    // dà già i crediti per gruppo al decimo, apposta per non perdere il consumo sotto il credito.
-    // Arrotondando, un uso leggero sparirebbe dalla torta e la pagina direbbe «non hai consumato».
+    // Solo i gruppi con consumo > 0. NON arrotondare all'intero: il motore dà già i crediti al
+    // decimo, e arrotondando un uso leggero sparirebbe dalla torta come «non hai consumato».
     const groups = Object.entries(byUsage)
       .map(([label, v]) => ({ label, credits: (v && v.credits) || 0, calls: (v && v.calls) || 0 }))
       .filter((g) => g.credits > 0)
@@ -258,8 +254,8 @@
     drawLegend(groups);
   }
 
-  // Un <path> per fetta (data-group) così un test può asserire le fette attese. Con un solo
-  // gruppo si disegna un cerchio pieno: l'arco da 0 a 2π collasserebbe.
+  // Un <path> per fetta (data-group) così un test può asserirle. Con un solo gruppo un cerchio
+  // pieno: l'arco da 0 a 2π collasserebbe.
   function drawChart(groups, total) {
     const chart = $('chart');
     chart.innerHTML = '';
