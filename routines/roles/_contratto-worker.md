@@ -28,10 +28,13 @@ REGISTRATO con gli script, mentre lavori:
   `--segnala` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
   del sistema (per esempio `../segnala-<numero>.md`): la consegna rifiuta una
   directory con file non committati;
-- il claim → il rilascio, quando hai finito;
+- il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
+  release <biglietto> --role <il tuo ruolo>`: il rilascio allega da solo il
+  rapporto di fine sessione, e il ruolo è la firma di quel rapporto — senza,
+  il rapporto esce anonimo);
 - un guasto che ti impedisce di lavorare → dichiaralo AL CANALE nel rilascio,
   col motivo (`node scripts/routine-channel.mjs release <biglietto>
-  --guasto "<motivo>"`): è così che il server smette di dare lavoro per
+  --role <il tuo ruolo> --guasto "<motivo>"`): è così che il server smette di dare lavoro per
   questo giro. Non "riportarlo" a parole: registralo.
 
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
