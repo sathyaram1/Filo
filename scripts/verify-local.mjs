@@ -870,7 +870,9 @@ if (isMain) {
     // critica ristampa la risposta (persa), un'altra è respinta.
     const stato = statoDirectory(ROOT);
     if (!stato.ok) { console.error(statoIllegibileText(stato.motivo)); process.exit(1); }
-    const r = withCritique(readState(), branch, { critique: text, sha, caps: CAPS, dirtyFiles: stato.lines });
+    // I bilanci dal server, PRIMA di calcolare l'esito: nessun default.
+    const caps = await bilanciOStop();
+    const r = withCritique(readState(), branch, { critique: text, sha, caps, dirtyFiles: stato.lines });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
     if (!r.replayed) writeState(r.state);
     const e = r.state[branch];
