@@ -1,19 +1,18 @@
-// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7), SOLO logica pura: chiavi e staleness della cache pareri, parsing tollerante delle risposte batch, classificazione dei tag e applicazione della membership al mazzo. La parte I/O vive in src/main/services/deckOpinions.js.
-// Invarianti (§6.2, §7): un parere è cacheato per (carta, versione mazzo) e quando il mazzo avanza resta visibile ma STANTIO, mai cancellato in automatico.
-// Un giudizio (carta, tag) è cacheabile permanentemente cross-mazzo solo se il tag è context-free, cioè dipende dal solo testo della carta; i tag che citano mazzo o commander sono contestuali e non vanno mai in cache.
+// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7), logica pura: cache pareri, parsing tollerante delle risposte batch, classificazione dei tag e applicazione della membership. L'I/O vive in src/main/services/deckOpinions.js.
+// Invarianti (§6.2, §7): un parere è cacheato per (carta, versione mazzo) e quando il mazzo avanza resta visibile ma STANTIO, mai cancellato in automatico. Un giudizio (carta, tag) si cachea permanentemente cross-mazzo solo se il tag è context-free; quelli che citano mazzo o commander sono contestuali e non vanno mai in cache.
 
 (function (global) {
   'use strict';
 
   function normTag(t) { return String(t || '').trim().toLowerCase(); }
 
-  // Tag CONTESTUALE = il giudizio dipende dal mazzo, non solo dalla carta: cita commander, mazzo, sinergie o possessivi. Tutto il resto è context-free → cache cross-mazzo.
+  // CONTESTUALE = il giudizio dipende dal mazzo: cita commander, mazzo, sinergie o possessivi. Il resto è context-free → cache cross-mazzo.
   const CONTEXTUAL_RE = /\b(commander|comandante|generale|mazzo|deck|sinergi\w*|combo|mio|mia|miei|mie|nostro|nostra)\b/i;
   function isContextFreeTag(tag) {
     return !CONTEXTUAL_RE.test(String(tag || ''));
   }
 
-  // Stantio (§6.2) = il mazzo è avanzato oltre la versione su cui il parere è stato calcolato. Entry assente → non stantio, non esiste.
+  // Stantio (§6.2) = il mazzo è avanzato oltre la versione del parere. Entry assente → non stantio, non esiste.
   function isStale(entry, deck) {
     if (!entry) return false;
     return (Number(deck && deck.versione) || 1) > (Number(entry.versione) || 0);
@@ -44,7 +43,7 @@
     return null;
   }
 
-  // Batch pareri (§6): accetta sia l'oggetto con `sintesi` e `pareri` sia un array nudo di { id, parere }, e ritorna sempre { opinions, sintesi }. Gli id senza parere testuale si scartano: mai salvare pareri vuoti.
+  // Batch pareri (§6): accetta l'oggetto con `sintesi` e `pareri` o un array nudo, e ritorna sempre { opinions, sintesi }. Gli id senza parere testuale si scartano: mai salvare pareri vuoti.
   function parseOpinionBatch(text) {
     const o = firstJson(text);
     const out = { opinions: {}, sintesi: '' };
@@ -59,8 +58,7 @@
     return out;
   }
 
-  // Batch auto-tag (§7): accetta sia la mappa id → tag sia un array di { id, tags }.
-  // Un id presente con lista vuota significa «giudicata: nessun tag», informazione cacheabile come false, diversa da un id ASSENTE, che è «non giudicata» e non tocca né cache né mazzo.
+  // Batch auto-tag (§7): accetta la mappa id → tag o un array di { id, tags }. Un id con lista vuota è «giudicata: nessun tag», cacheabile come false; un id ASSENTE è «non giudicata» e non tocca né cache né mazzo.
   function parseTagBatch(text) {
     const o = firstJson(text);
     const out = {};
@@ -80,8 +78,7 @@
     return out;
   }
 
-  // Piano di tagging con cache (§7). tagCache: { cardId → { tag → bool } }, solo tag context-free.
-  // Una carta va giudicata dall'LLM se ha almeno una coppia (carta, tag) non risolvibile dalla cache: tag contestuale, o context-free mancante. Le carte interamente coperte saltano l'LLM. Ritorna { judgeIds, membershipFromCache }.
+  // tagCache: { cardId → { tag → bool } }, solo tag context-free. Una carta va dall'LLM se ha almeno una coppia (carta, tag) non risolvibile dalla cache; quelle interamente coperte lo saltano.
   function planTagJudgments({ cardIds, tags, tagCache }) {
     const norm = (tags || []).map(normTag).filter(Boolean);
     const cache = tagCache && typeof tagCache === 'object' ? tagCache : {};
@@ -102,7 +99,7 @@
     return { judgeIds, membershipFromCache };
   }
 
-  // Solo tag context-free e solo carte presenti in `judged`: un id omesso dall'LLM non è «false», è «non giudicato», e non va mai scritto in una cache permanente. Ritorna una NUOVA mappa.
+  // Solo tag context-free e solo carte presenti in `judged`: un id omesso dall'LLM non è «false», è «non giudicato», e non va mai in una cache permanente. Ritorna una NUOVA mappa.
   function updateTagCache(tagCache, tags, judged) {
     const norm = (tags || []).map(normTag).filter(Boolean);
     const cacheable = norm.filter(isContextFreeTag);
@@ -117,8 +114,7 @@
     return next;
   }
 
-  // Per ogni carta giudicata i tag RICHIESTI si allineano al giudizio (aggiunti o rimossi); i tag non richiesti restano intatti e le carte non giudicate non si toccano.
-  // Un solo touch (la versione avanza di 1) e solo se qualcosa è cambiato davvero. Richiede SN_DECKS su global; ritorna { deck, changed, taggedCount }.
+  // Per ogni carta giudicata i tag RICHIESTI si allineano al giudizio; i non richiesti restano intatti e le carte non giudicate non si toccano. Un solo touch, e solo se qualcosa è cambiato davvero.
   function applyTagMembership(deck, tags, membership) {
     const norm = (tags || []).map(normTag).filter(Boolean);
     const requested = new Set(norm);
@@ -145,15 +141,15 @@
     return { deck: touched, changed: true, taggedCount };
   }
 
-  // Filtro semantico dei risultati di ricerca (§4.1): la chat produce una query Scryfall LARGA più un criterio in linguaggio naturale, e si tengono solo le carte che un LLM economico giudica conformi.
-  // Il giudizio (carta, criterio) è cacheabile permanentemente cross-ricerca, perché dipende solo dal testo della carta e dal criterio, mai dal mazzo. Cache: { cardId → { critKey → bool } }.
+  // Filtro semantico della ricerca (§4.1): la chat produce una query Scryfall LARGA più un criterio a parole, e si tengono solo le carte che un LLM economico giudica conformi.
+  // Il giudizio (carta, criterio) si cachea permanentemente cross-ricerca: dipende solo dal testo della carta e dal criterio, mai dal mazzo.
 
   // Due ricerche scritte uguale a meno di spazi e maiuscole condividono i giudizi in cache.
   function normCriterion(s) {
     return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
-  // Batch filtro (§4.1): { keep: [id…] } o un array nudo. Il Set torna RISTRETTO agli id davvero giudicati, mai quelli inventati dal modello; i giudicati fuori da «keep» sono scarti (false), informazione cacheabile dal chiamante.
+  // Il Set torna RISTRETTO agli id davvero giudicati, mai quelli inventati dal modello; i giudicati fuori da «keep» sono scarti, informazione cacheabile dal chiamante.
   function parseSearchKeep(text, judgeIds) {
     const allow = new Set((judgeIds || []).map(String));
     const o = firstJson(text);
@@ -167,7 +163,7 @@
     return out;
   }
 
-  // Separa gli id già decisi in cache per QUESTO criterio (keepFromCache: solo i true) da quelli ancora da giudicare, nell'ordine dato, che keepFromCache preserva.
+  // Separa gli id già decisi in cache per QUESTO criterio (solo i true) da quelli da giudicare, nell'ordine dato.
   function planSearchFilter({ cardIds, criterion, searchCache }) {
     const key = normCriterion(criterion);
     const cache = searchCache && typeof searchCache === 'object' ? searchCache : {};
