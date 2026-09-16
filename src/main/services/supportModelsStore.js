@@ -1,38 +1,6 @@
-// Store della config "modelli di supporto" di Filo.
-//
-// Vive nel doc Firestore `config/supportModels`. Contiene un campo per ogni
-// slot di supporto: ogni valore è una stringa catena di nickname
-// ("flash, flash-or"), lo stesso formato che il backend usa per `config/models`.
-// È leggibile dal backend filo-security (Cloud Functions, via Admin SDK) senza
-// passare per queste regole. Dal client è write-only admin.
-//
-// I 3 giudici fissi del panel L2 + il giudice dinamico hanno ciascuno il proprio
-// slot (judge1/judge2/judge3/judgeDynamic) così l'owner può impostare il modello
-// di OGNI giudice separatamente dalla dashboard. Il vecchio slot unico `judgeL2`
-// non era letto da nessuno ed è stato rimosso.
-//
-// Oltre agli slot, il doc contiene il REGISTRO MODELLI DEDICATO AI GIUDICI
-// (`judgeRegistry`): mappa nickname → { provider, model }. È l'analogo del
-// `modelRegistry` di "Modelli predefiniti", ma SEPARATO: l'owner dà ai giudici
-// scorciatoie/modelli propri, indipendenti dal resto di Filo. Il backend
-// filo-security lo unisce (con precedenza) al registro condiviso per risolvere i
-// nickname degli slot. Provider OpenRouter (il backend giudici è OpenRouter-only).
-//
-// La CHIAVE OpenRouter dei giudici è un SEGRETO e vive in un doc SEPARATO
-// (`config/judgeSecrets`, campo `openrouterKey`): regole solo-owner, mai inviata
-// alle pagine. Qui esponiamo solo il booleano "presente/assente".
-//
-// Schema doc config/supportModels:
-//   {
-//     sanitizer:     "flash",
-//     judge1:        "flash, flash-or",
-//     judge2:        "flash",
-//     judge3:        "flash",
-//     judgeDynamic:  "flash",
-//     judgeRedTeam:  "flash",
-//     judgePriority: "flash",
-//     judgeRegistry: { "<nick>": { provider: "openrouter", model: "...", label?: "..." } },
-//   }
+// Store della config "modelli di supporto" (doc Firestore `config/supportModels`): un campo per ogni slot, valore = catena di nickname ("flash, flash-or"), lo stesso formato di `config/models`. Dal client è write-only admin; il backend filo-security lo legge con l'Admin SDK senza passare da queste regole.
+// Ogni giudice del panel L2 ha il suo slot, così l'owner può impostarli separatamente dalla dashboard. Il doc contiene anche `judgeRegistry` (nickname → { provider, model }): il registro dedicato ai giudici, SEPARATO da quello di "Modelli predefiniti" e unito a quello con precedenza dal backend. Provider OpenRouter, l'unico che il backend giudici usa.
+// La CHIAVE OpenRouter dei giudici è un SEGRETO e vive nel doc separato `config/judgeSecrets` (regole solo-owner, mai inviata alle pagine): qui si espone solo il booleano presente/assente.
 
 const auth = require('../auth/google-auth');
 
@@ -44,16 +12,10 @@ const SUPPORT_MODELS_DOC = 'config/supportModels';
 // Doc separato per la chiave (segreta) dei giudici. Regole: solo owner.
 const JUDGE_SECRETS_DOC = 'config/judgeSecrets';
 
-// Slot validi. Stabile: i backend filo-security li leggono per nome.
-// I 3 giudici fissi del panel L2 + il giudice dinamico hanno ciascuno il proprio
-// slot (judge1/judge2/judge3/judgeDynamic). Il vecchio slot unico `judgeL2`,
-// non letto da nessuno, è stato rimosso.
+// Slot validi, stabili: i backend filo-security li leggono per nome.
 const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
 
-// Timeout per giudice, salvato in MILLISECONDI nel campo `judgeTimeoutMs` dello
-// stesso doc (lo legge il backend dei giudici). I bound vivono nelle costanti
-// condivise (in secondi); qui clampiamo in ms. Fallback letterali se le costanti
-// non sono caricate su globalThis (robustezza nel main process).
+// Timeout per giudice, in MILLISECONDI nel campo `judgeTimeoutMs` dello stesso doc (lo legge il backend dei giudici). I bound stanno nelle costanti condivise, in secondi; fallback letterali se non sono caricate su globalThis.
 function timeoutBoundsMs() {
   const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
   const s = (v, d) => (Number.isFinite(v) ? v : d) * 1000;
@@ -66,7 +28,6 @@ function clampTimeoutMs(n) {
   return Math.min(max, Math.max(min, v));
 }
 
-// ── Firestore Value <-> JS ───────────────────────────────────────────────────
 function toFsValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === 'string') return { stringValue: v };
@@ -139,12 +100,7 @@ async function patchDoc(docPath, fields, mask, idToken) {
   }
 }
 
-// ── API ──────────────────────────────────────────────────────────────────────
-
-// Legge il doc config/supportModels. Richiede il Firebase ID token admin (per
-// garantire che solo l'owner legga; la regola Firestore è la garanzia forte).
-// Ritorna un oggetto con i campi degli slot (stringhe). I campi assenti (doc non
-// ancora creato o slot non ancora impostato) hanno valore ''.
+// Richiede il Firebase ID token admin; la garanzia forte resta comunque la regola Firestore. I campi assenti (doc non ancora creato, slot non impostato) valgono ''.
 async function get() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
@@ -159,10 +115,7 @@ async function get() {
   return out;
 }
 
-// Scrive (PATCH per-campo) il doc config/supportModels. Richiede ID token admin.
-// Accetta gli slot in SLOTS + `judgeRegistry` (mappa). La chiave OpenRouter dei
-// giudici (`openrouterKey`, segreta) va su un doc separato; si scrive solo se
-// passata e non vuota (vuoto = "non toccare").
+// PATCH per-campo. La chiave OpenRouter dei giudici va sul doc separato e si scrive solo se passata e non vuota: vuoto = "non toccare".
 async function update(partial, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per modificare i modelli di supporto.');
   partial = partial || {};
@@ -178,7 +131,7 @@ async function update(partial, idToken) {
     fields.judgeRegistry = toFsValue(sanitizeRegistry(partial.judgeRegistry));
     mask.push('judgeRegistry');
   }
-  // Timeout per giudice (ms): si scrive solo se passato un numero valido, clampato.
+  // Timeout per giudice: si scrive solo se è un numero valido, clampato.
   if (partial.judgeTimeoutMs != null && Number.isFinite(Number(partial.judgeTimeoutMs))) {
     const ms = clampTimeoutMs(partial.judgeTimeoutMs);
     if (ms != null) {
@@ -188,7 +141,7 @@ async function update(partial, idToken) {
   }
   if (mask.length) await patchDoc(SUPPORT_MODELS_DOC, fields, mask, idToken);
 
-  // Chiave giudici (doc separato): scrivi solo se digitata.
+  // Chiave giudici (doc separato): si scrive solo se digitata.
   if (typeof partial.openrouterKey === 'string' && partial.openrouterKey.trim()) {
     await patchDoc(
       JUDGE_SECRETS_DOC,
@@ -220,9 +173,7 @@ function sanitize(doc) {
   return out;
 }
 
-// Tiene solo le voci valide del registro giudici: nickname non vuoto →
-// { provider, model } con provider OpenRouter (il backend giudici è OR-only) e
-// model non vuoto. `label` opzionale conservata.
+// Solo le voci valide: provider OpenRouter (il backend giudici è OR-only) e model non vuoto; `label` opzionale conservata.
 function sanitizeRegistry(reg) {
   const out = {};
   if (!reg || typeof reg !== 'object') return out;

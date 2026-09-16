@@ -1,51 +1,20 @@
-// Blocco apertura siti in blacklist (#170.3).
-//
-// PERCHÉ ESISTE
-//   L'ad-blocking (adblock.js) annulla le SINGOLE richieste verso domini di
-//   ad/tracker, ma non impedisce di APRIRE la pagina top-level di un sito che
-//   sta in blacklist. Questo modulo decide, a livello di navigazione top-level,
-//   se l'apertura di un sito va bloccata del tutto.
-//
-//   Sorgenti della blacklist:
-//   - le liste pubbliche già scaricate dall'ad-blocker (#170.2: StevenBlack +
-//     EasyList), opzionali (useAdblockLists);
-//   - una blacklist DEDICATA dell'utente (domini aggiunti a mano nelle
-//     Preferenze).
-//
-//   ECCEZIONI (l'apertura è consentita anche se il sito è in blacklist):
-//   a) la navigazione proviene da un MOTORE DI RICERCA (referrer Google/Bing/…):
-//      l'utente l'ha cercato apposta, non lo intercettiamo;
-//   b) la navigazione è ORIGINATA DA FILO (azione NAVIGA dell'assistente o
-//      navigazione interna filo://): è Filo stesso ad aprire, su richiesta
-//      esplicita dell'utente.
-//
-//   Quando invece blocca, il chiamante (tabs.js) mostra una notifica in basso a
-//   destra (#170.1) col sito bloccato e l'opzione "Apri comunque".
-//
-// API: configureFromSettings, shouldBlockNavigation, isSearchEngineUrl,
-//      isBlacklistedHost, setForTest, status.
+// Blocco dell'apertura di siti in blacklist (#170.3): l'ad-blocking annulla le SINGOLE richieste verso ad/tracker, qui si decide se la navigazione TOP-LEVEL verso un sito va bloccata del tutto.
+// Sorgenti: le liste pubbliche già scaricate dall'ad-blocker (opzionali, useAdblockLists) più una blacklist DEDICATA dell'utente.
+// Due eccezioni consentono l'apertura anche di un sito in blacklist: la navigazione viene da un MOTORE DI RICERCA (l'utente l'ha cercato apposta) oppure è originata DA FILO (azione NAVIGA, pagine filo://). Quando blocca, tabs.js mostra la notifica con "Apri comunque".
 
 let enabled = true;
 let useAdblockLists = true;
 let userBlacklist = new Set(); // domini extra inseriti dall'utente
 
-// Second-level public suffix usati dai motori multi-TLD (co.uk, com.au,
-// co.jp, com.tr, …): la label del motore può stare subito prima di questi.
+// Second-level public suffix dei motori multi-TLD (co.uk, com.au, co.jp…): la label del motore può stare subito prima di questi.
 const PUB_SLD = '(?:co|com|net|org|gov|edu|ac|ne|or|go|nom|nic)';
 
-// Ancora il nome di un motore multi-TLD (google/yahoo/yandex) al DOMINIO
-// REGISTRABILE: lo riconosce solo se <name> è la label subito prima del
-// suffisso pubblico (google.com, google.co.uk, search.yahoo.com, yandex.com.tr),
-// NON se è una label iniziale qualsiasi (google.evil.com, yahoo.phishing.io).
-// Il suffisso è un TLD singolo, eventualmente preceduto da un SLD pubblico;
-// nessuno dei due può contenere una label registrabile arbitraria (#230).
+// Il nome del motore dev'essere la label subito prima del suffisso pubblico (google.co.uk, search.yahoo.com, yandex.com.tr), NON una label iniziale qualsiasi: google.evil.com non è Google (#230).
 function engineOnPublicSuffix(name) {
   return new RegExp(`(^|\\.)${name}\\.(?:${PUB_SLD}\\.)?[a-z]{2,}$`);
 }
 
-// Motori di ricerca il cui referrer rende lecita l'apertura di un sito in
-// blacklist. Riconoscimento per pattern sul dominio registrabile, robusto ai
-// molti TLD di Google/Yandex e ai sottodomini (www., search., ecc.).
+// Motori di ricerca il cui referrer rende lecita l'apertura di un sito in blacklist. Riconoscimento per pattern sul dominio registrabile, robusto ai molti TLD e ai sottodomini.
 const SEARCH_ENGINE_PATTERNS = [
   engineOnPublicSuffix('google'), // google.com, google.it, google.co.uk, …
   /(^|\.)bing\.com$/,
@@ -71,7 +40,7 @@ function hostnameOf(url) {
   }
 }
 
-// Normalizza un dominio inserito dall'utente: toglie schema, path, porta, www.
+// Normalizza un dominio inserito dall'utente: via schema, path, porta, www.
 function normalizeDomain(raw) {
   if (!raw) return '';
   let s = String(raw).trim().toLowerCase();
@@ -85,20 +54,16 @@ function normalizeDomain(raw) {
   return s;
 }
 
-// Un dominio è valido come voce di blacklist solo se ha un'estensione (almeno
-// un punto + TLD alfabetico). Allineato al campo "siti fidati": una voce come
-// "facebook" o un IP non è mai un host reale, quindi non deve entrare nel Set
-// (matcherebbe "facebook.com/com", non "facebook") dando falsa sicurezza.
+// Una voce senza estensione ("facebook") o un IP non è mai un host reale: nel Set matcherebbe cose sbagliate e darebbe falsa sicurezza. Allineato al campo "siti fidati".
 function isValidDomain(host) {
   return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
 }
 
-// Da lista grezza (settings) → Set di domini normalizzati E validi.
 function toBlacklistSet(list) {
   return new Set(list.map(normalizeDomain).filter(isValidDomain));
 }
 
-// Match per suffisso di dominio: "a.b.example.com" matcha "example.com".
+// Match per suffisso: "a.b.example.com" matcha "example.com".
 function matchesSuffix(host, set) {
   if (!host || !set || !set.size) return false;
   let h = host;
@@ -116,13 +81,10 @@ function isSearchEngineHost(host) {
   return SEARCH_ENGINE_PATTERNS.some((re) => re.test(host));
 }
 
-// Il referrer (o la pagina di partenza) è un motore di ricerca?
 function isSearchEngineUrl(url) {
   return isSearchEngineHost(hostnameOf(url));
 }
 
-// L'host è in blacklist? (blacklist dedicata dell'utente, oppure — se
-// abilitato — le liste pubbliche dell'ad-blocker.)
 function isBlacklistedHost(host) {
   if (!host) return false;
   if (matchesSuffix(host, userBlacklist)) return true;
@@ -135,10 +97,7 @@ function isBlacklistedHost(host) {
   return false;
 }
 
-// Decisione centrale. Ritorna { block, host, reason }.
-//   targetUrl: dove si vuole andare.
-//   fromUrl:   pagina di partenza / referrer (per l'eccezione "ricerca").
-//   viaFilo:   true se l'apertura è originata da Filo (eccezione "Filo").
+// Decisione centrale → { block, host, reason }. `fromUrl` è la pagina di partenza o referrer (eccezione ricerca), `viaFilo` dice che l'apertura è originata da Filo.
 function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}) {
   const res = { block: false, host: '', reason: '' };
   if (!enabled) return res;
@@ -149,8 +108,7 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}
   } catch (_) {
     return res; // URL non valido: non interferiamo
   }
-  // Solo navigazioni web top-level. filo://, about:, data:, chrome:, ecc. sono
-  // sempre lecite (le pagine interne di Filo non si bloccano mai).
+  // Solo navigazioni web top-level: gli altri schemi, comprese le pagine interne di Filo, non si bloccano mai.
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return res;
 
   const host = u.hostname.toLowerCase();
@@ -176,7 +134,7 @@ function configureFromSettings(settings) {
   userBlacklist = toBlacklistSet(list);
 }
 
-// Per i test: imposta stato senza passare da settings.
+// Per i test: imposta lo stato senza passare da settings.
 function setForTest({ enabled: en, useAdblockLists: ual, blacklist } = {}) {
   if (en !== undefined) enabled = !!en;
   if (ual !== undefined) useAdblockLists = !!ual;

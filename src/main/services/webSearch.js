@@ -1,12 +1,5 @@
-// Web search per la sidebar Aiuto. Provider primario: Tavily (API pensata
-// per LLM, snippet già "rilevanti"). Fallback: scraping di duckduckgo.com/html
-// (gratis, fragile — può rompersi se DDG cambia il markup).
-//
-// L'API non lancia mai: in caso di errore ritorna { ok:false, results:[],
-// reason }. Il consumer (sidebar via background) inietterà i risultati come
-// system note nel turno successivo dell'AI.
-//
-// Espone SN_WEB_SEARCH = { search({query, tavilyKey, maxResults}) }.
+// Web search per la sidebar Aiuto: Tavily come primario (API pensata per LLM, snippet già rilevanti), fallback sullo scraping di duckduckgo.com/html — gratis ma fragile, si rompe se DDG cambia il markup.
+// Non lancia mai: in caso di errore ritorna { ok:false, results:[], reason }. Espone SN_WEB_SEARCH = { search({query, tavilyKey, maxResults}) }.
 
 (function (global) {
   'use strict';
@@ -61,9 +54,7 @@
     });
   }
 
-  // DuckDuckGo HTML: parsiamo i risultati con regex perché in service worker
-  // non abbiamo DOMParser. Cerca i blocchi <a class="result__a" ...>title</a>
-  // e <a class="result__snippet">snippet</a>. Best-effort.
+  // Parsing con regex perché in service worker non c'è DOMParser: blocchi <a class="result__a">titolo</a> e result__snippet. Best-effort.
   async function searchDuckDuckGo({ query, maxResults }) {
     return withTimeout(async (signal) => {
       const body = `q=${encodeURIComponent(query)}`;
@@ -71,7 +62,7 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          // UA "neutro": senza un User-Agent DDG a volte ritorna 403.
+          // UA "neutro": senza User-Agent DDG a volte risponde 403.
           'User-Agent': 'Mozilla/5.0 (compatible; Filo/0.1)',
         },
         signal,
@@ -87,7 +78,7 @@
         const rawUrl = m[1] || '';
         const title = clip(m[2].replace(/<[^>]+>/g, ''), 200);
         const snippet = clip((m[3] || '').replace(/<[^>]+>/g, ''), SNIPPET_MAX);
-        // DDG redireziona via uddg=...; estraiamo l'URL originale se possibile.
+        // DDG redireziona via uddg=…: si estrae l'URL originale quando si può.
         let url = rawUrl;
         const uddg = /[?&]uddg=([^&]+)/.exec(rawUrl);
         if (uddg) {
