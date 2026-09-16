@@ -16,10 +16,17 @@
 //       una nota.
 //
 // DOVE STA IL TRANSCRIPT
-//   `--transcript`, poi FILO_TRANSCRIPT; altrimenti il `.jsonl` più recente in
-//   `~/.claude/projects/<slug>/` (CLAUDE_CONFIG_DIR al posto di `~/.claude` se
-//   c'è), dove <slug> è il percorso assoluto della cartella di lavoro con ogni
-//   carattere non alfanumerico sostituito da `-`.
+//   `--transcript`, poi FILO_TRANSCRIPT; altrimenti il `.jsonl` scritto più di
+//   recente in `~/.claude/projects/<slug>/` (CLAUDE_CONFIG_DIR al posto di
+//   `~/.claude` se c'è), dove <slug> è il percorso assoluto della cartella di
+//   lavoro con ogni carattere non alfanumerico sostituito da `-`. Contano
+//   anche i transcript dei sotto-agenti (`<sessione>/subagents/*.jsonl`): nelle
+//   routine chi rilascia è un sotto-agente dell'orchestratore, e il suo
+//   transcript è l'ultimo scritto. Da una cartella di lavoro separata (git
+//   worktree) si guarda anche la cartella del checkout principale, dove Claude
+//   Code li scrive davvero.
+//   `since` (il rilascio lo prende dal marcatore del biglietto) limita il conto
+//   a quello che è successo da quel momento.
 //
 // FORMA DEL JSONL (verificata su file veri il 16/09/2026)
 //   righe {"type":"assistant","timestamp":…,"message":{"id","model","usage":{
