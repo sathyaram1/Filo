@@ -18,7 +18,7 @@
     "specs": [
       {
         "spec": "tests/capture-composite",
-        "caso": "screenshot newtab e screenshot dashboard: file esiste e non è vuoto",
+        "caso": ["screenshot newtab: file esiste e non è vuoto", "screenshot dashboard (filo://dashboard): file esiste e non è vuoto"],
         "perche": "cattura la finestra a livello di sistema operativo, ma durante la suite la finestra è parcheggiata fuori dallo schermo di proposito: quello che torna è nero. Serve uno schermo vero con la finestra sopra.",
         "feedback": "#563"
       },
