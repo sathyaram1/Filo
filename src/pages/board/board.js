@@ -1,26 +1,6 @@
-// Bacheca utente di Filo (filo://board/, DC1 + DC2).
-//
-// DA DOVE VENGONO I DATI (#583): dalla vista pubblica `feedback-public`, una
-// scheda per fix chiuso con i soli campi pubblici (titolo, numero, versione,
-// voti). La collezione dei feedback non si legge senza credenziali: qui non ne
-// arriva più niente, nemmeno per essere scartato.
-//
-// Superficie a PERMESSI RIDOTTI, NON owner-gated: gli anonimi leggono, per
-// votare serve il login. Mostra SOLO i miglioramenti già IN PRODUZIONE (fix
-// chiusi e usciti in una versione rilasciata, DB3) in chiave POSITIVA. Il
-// red-team resta invisibile: ZERO info di sicurezza (niente stato, priorità,
-// verdetti dei giudici, pipeline, mittente, orario, testo grezzo). L'unico
-// contenuto mostrato è il TITOLO breve già generato (`name`) — mai il testo
-// libero (che è cifrato e può contenere dettagli tecnici/personali) né nulla
-// che provenga dal pipeline di sicurezza.
-//
-// La struttura dati dei voti (works/broken per uid) è DB4; il filtro "in
-// produzione + niente blocchi" è la pura `SN_MANAGE_REVIEW.listBoardTab`.
-// Il voto (DC2) persiste su Firestore tramite l'handler IPC BOARD_CAST_VOTE/
-// BOARD_CLEAR_VOTE: il main allega l'ID token del votante (mai esposto qui) e
-// premia +10 crediti una sola volta per feedback per utente (anti-doppio-
-// premio nel credit store). Il conteggio mostrato è il tally REALE ritornato
-// dal main dopo la scrittura, non solo l'aggiornamento ottimistico locale.
+// Bacheca utente (filo://board/, DC1+DC2): superficie a PERMESSI RIDOTTI, non owner-gated —
+// gli anonimi leggono, per votare serve il login. Mostra SOLO i fix già usciti in una versione
+// (DB3) col solo titolo breve: zero informazioni di sicurezza, mai il testo grezzo.
 
 (function () {
   'use strict';
@@ -37,20 +17,15 @@
   const bdRetry   = document.getElementById('bdRetry');
   const bdList    = document.getElementById('bdList');
 
-  // Timeout della fetch dei miglioramenti: senza limite, offline la richiesta
-  // resta muta ~13 s prima che il sistema la lasci cadere. Arrendersi prima e
-  // mostrare l'errore è meno attrito che aspettare al buio (filo_design: l'attesa
-  // muta è attrito).
+  // Timeout della fetch: offline la richiesta resta muta ~13 s prima che il sistema la lasci
+  // cadere, e aspettare al buio è più attrito che un errore subito.
   const LOAD_TIMEOUT_MS = 8000;
 
-  // ── Stato ──────────────────────────────────────────────────────────────
   let signedIn = false;
   let uid = null;               // uid Firebase REALE (claim id token), per votes.<uid>
   let allFeedbacks = [];
-  // I miglioramenti sono arrivati davvero, e — se no — perché. Serve a ogni
-  // ridisegno, non solo al primo: un re-render (es. dopo un login) ripartirebbe
-  // da una lista vuota e scriverebbe "Nessun miglioramento…" al posto
-  // dell'errore, portandosi via il tasto "Riprova" (#495).
+  // Serve a OGNI ridisegno, non solo al primo: un re-render (es. dopo un login) ripartirebbe
+  // da una lista vuota e scriverebbe «Nessun miglioramento» al posto dell'errore (#495).
   let dataLoaded = false;
   let lastLoadError = null;
   let releasedVersion = '';
@@ -63,11 +38,8 @@
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // ── Auth (anonimi leggono; per votare serve login) ──────────────────────
-  // `uid` è il claim Firebase REALE (request.auth.uid nelle Firestore rules),
-  // non l'email: è la chiave con cui i voti sono salvati in `votes.<uid>` (DB4).
-  // Senza questo, dopo un reload "il mio voto" non si riconoscerebbe più
-  // (i voti salvati sono sempre per uid reale, mai per email).
+  // `uid` è il claim Firebase REALE (request.auth.uid nelle rules), non l'email: è la chiave
+  // con cui i voti sono salvati (DB4), o dopo un reload «il mio voto» non si riconoscerebbe.
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
@@ -96,9 +68,8 @@
       .catch(() => {});
   });
 
-  // ── Titolo SICURO di un miglioramento ───────────────────────────────────
-  // Solo il titolo breve già generato (`name`). Mai il testo grezzo (cifrato /
-  // potenzialmente tecnico). Se manca, un'etichetta neutra col numero.
+  // Solo il titolo breve già generato (`name`), mai il testo grezzo (cifrato e potenzialmente
+  // tecnico). Se manca, un'etichetta neutra col numero.
   function safeTitle(fb) {
     const name = (fb && typeof fb.name === 'string') ? fb.name.trim() : '';
     if (name) return name;
@@ -106,7 +77,6 @@
     return num ? `Miglioramento #${num}` : 'Miglioramento';
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────
   function renderList() {
     // Caricamento fallito e mai riuscito: la lista è vuota perché non l'abbiamo,
     // non perché non ci sia niente. Resta l'errore, con la via d'uscita.
@@ -160,13 +130,9 @@
     return card;
   }
 
-  // ── Riapertura a pagamento (DC4) ────────────────────────────────────────
-  // Link discreto "Ancora rotto?" sotto i voti: apre un piccolo form inline
-  // (textarea + invia) invece di un prompt nativo, per restare nel tema di
-  // Filo (vedi PATTERNS.md — niente window.prompt). Non mostrato se l'utente
-  // ha già chiesto la riapertura di QUESTO fix (reopenRequests non vuoto):
-  // l'eventuale ❌ è già stata raccolta nei voti, e la riapertura è UNA volta
-  // sola per fix (vedi guard SN_MANAGE_REVIEW.canReopen), non per voto.
+  // Riapertura a pagamento (DC4): «Ancora rotto?» apre un form inline, non un prompt nativo
+  // (PATTERNS.md). Nascosto se l'utente ha già chiesto la riapertura di QUESTO fix: la
+  // riapertura è UNA volta sola per fix (guard SN_MANAGE_REVIEW.canReopen), non per voto.
   function renderReopen(fb) {
     if (MR.hasReopenRequest(fb)) {
       const done = document.createElement('div');
@@ -218,22 +184,17 @@
     form.appendChild(err);
     form.appendChild(actions);
 
-    // Se l'utente non è ancora autenticato, l'intenzione (aprire il form "Ancora
-    // rotto?") non va persa: dopo un login riuscito `renderList()` ricrea il DOM,
-    // quindi segniamo l'id del fix in `openReopenAfterLogin` e lo controlliamo
-    // in `renderReopen` alla ricostruzione, per riaprire il form da solo.
+    // Se non si è ancora autenticati l'intenzione non va persa: l'id resta in
+    // `openReopenAfterLogin` e renderReopen riapre il form da solo dopo il login.
     link.addEventListener('click', () => {
       if (!signedIn || !uid) {
         openReopenAfterLogin = fb._id;
         sendToMain({ type: 'auth_signin' })
           .then((r) => refreshAuth().then(() => r))
           .then((r) => {
-            // `openReopenAfterLogin` resta impostato fino a QUESTO render finale
-            // (i render intermedi innescati da refreshAuth/AUTH_CHANGED non lo
-            // devono consumare prima del tempo, altrimenti il form si richiude
-            // subito dopo essersi aperto): se il login non è riuscito lo si
-            // azzera PRIMA di ridisegnare, altrimenti resta impostato per
-            // questo render (che apre il form) e viene azzerato subito dopo.
+            // `openReopenAfterLogin` resta impostato fino a QUESTO render finale: i render intermedi di
+            // refreshAuth/AUTH_CHANGED non devono consumarlo prima, o il form si richiuderebbe subito
+            // dopo essersi aperto. Se il login non riesce si azzera PRIMA di ridisegnare.
             const ok = !!(r && r.ok && signedIn && uid);
             if (!ok) openReopenAfterLogin = null;
             renderList();
@@ -255,8 +216,7 @@
     wrap.appendChild(link);
     wrap.appendChild(form);
 
-    // Form riaperto da solo dopo il login: sposta il focus sulla textarea
-    // appena il nodo è nel DOM (subito dopo renderList l'ha già inserito).
+    // Form riaperto dopo il login: il focus va sulla textarea appena il nodo è nel DOM.
     if (reopenAfterLogin) {
       requestAnimationFrame(() => { try { textarea.focus(); } catch (_) {} });
     }
@@ -264,11 +224,8 @@
     return wrap;
   }
 
-  // Invio della riapertura: scala crediti + crea il feedback collegato lato
-  // main (BOARD_REOPEN). Bottone disabilitato durante l'invio; errore mostrato
-  // inline (testo vuoto, saldo insufficiente, fix già riaperto, sessione
-  // scaduta…). A successo il link/form scompare e compare la conferma — niente
-  // duplicati possibili senza ricaricare la pagina.
+  // Invio della riapertura: scala crediti e crea il feedback collegato lato main. Errore
+  // inline, e a successo il form scompare — niente duplicati possibili senza ricaricare.
   function onReopen(fb, textarea, sendBtn, errEl) {
     const text = textarea.value.trim();
     errEl.hidden = true;
@@ -329,16 +286,11 @@
     return btn;
   }
 
-  // Voto: anonimo → invito al login; loggato → scrive su Firestore tramite il
-  // main (BOARD_CAST_VOTE/BOARD_CLEAR_VOTE, DC2), che allega l'idToken del
-  // votante e accredita +10 crediti una sola volta per feedback per utente.
-  // Aggiornamento ottimistico locale per reattività immediata, poi sostituito
-  // dal tally REALE che il main rilegge da Firestore dopo la scrittura.
-  //
-  // Se l'utente non è ancora autenticato, il voto scelto NON va perso: dopo un
-  // login riuscito il flusso riprende da solo e il voto viene eseguito subito
-  // (niente secondo click). `renderList()` ricrea il DOM (perde `btn`), quindi
-  // il retry richiama onVote con l'`fb` fresco preso dalla lista ricreata.
+  // Voto: anonimo → invito al login; loggato → scrive via main (DC2), che allega l'idToken e
+  // accredita +10 crediti una volta sola per feedback per utente. Ottimistico per reattività,
+  // poi sostituito dal tally REALE riletto da Firestore.
+  // Dopo un login riuscito il voto scelto riparte da solo (niente secondo click): renderList
+  // ricrea il DOM, quindi il retry richiama onVote con l'`fb` fresco della lista ricreata.
   function onVote(fb, vote, btn) {
     if (!signedIn || !uid) {
       sendToMain({ type: 'auth_signin' })
@@ -378,8 +330,7 @@
     sendToMain(msg)
       .then((r) => {
         if (r && r.ok) {
-          // Tally autorevole dal server: sostituisce l'ottimistico (può
-          // includere voti di altri utenti arrivati nel frattempo).
+          // Tally autorevole dal server: può includere voti di altri arrivati nel frattempo.
           fb.votes = (r.votes && typeof r.votes === 'object') ? r.votes : fb.votes;
           if (r.uid) uid = r.uid;
           if (r.awarded && r.credits) flyCreditsFromButton(originRect, r.credits);
@@ -395,11 +346,8 @@
       });
   }
 
-  // ── Animazione ricompensa crediti ───────────────────────────────────────
-  // Variante locale alla bacheca (pagina senza icona account in vista): vola
-  // dal pulsante di voto verso l'angolo in alto a destra. Stesso spirito di
-  // flyCredits (content/feedback.js) e flyCreditsToAccount (dashboard.js).
-  // Decorativa, best-effort, rispetta prefers-reduced-motion.
+  // Variante locale della ricompensa (questa pagina non ha l'icona account in vista): vola dal
+  // pulsante verso l'angolo. Decorativa, best-effort, rispetta prefers-reduced-motion.
   function flyCreditsFromButton(originRect, amount) {
     try {
       const n = Math.max(1, Math.round(Number(amount) || 0));
@@ -472,12 +420,9 @@
     } catch (_) {}
   }
 
-  // ── Caricamento ─────────────────────────────────────────────────────────
-  // Stato d'errore, DISTINTO dal vuoto: se la fetch fallisce (niente rete, rete
-  // caduta) mostriamo un messaggio comprensibile + "Riprova", invece di ripiegare
-  // su "Nessun miglioramento…" — che direbbe il falso (i miglioramenti ci sono,
-  // solo non scaricati). Riusa SN_CHAT_ERRORS (stesso pattern delle chat): frase
-  // per l'utente, mai il messaggio grezzo dell'eccezione.
+  // Stato d'errore, DISTINTO dal vuoto: «Nessun miglioramento…» direbbe il falso quando i
+  // miglioramenti ci sono e non sono stati scaricati. Riusa SN_CHAT_ERRORS: frase per l'utente,
+  // mai il messaggio grezzo dell'eccezione.
   function showLoadError(err) {
     bdLoading.hidden = true;
     bdList.hidden = true;
@@ -505,44 +450,29 @@
     }
 
     try {
-      // #583: la bacheca legge la VISTA pubblica (`feedback-public`), non i
-      // feedback. Prima scaricava i documenti interi — testo, URL, user agent,
-      // link agli screenshot — e decideva qui cosa disegnare: ma "filtrato in
-      // pagina" vuol dire solo "non disegnato", il resto era già arrivato.
-      // Adesso ogni scheda contiene SOLO i campi pubblici, e le schede
-      // esistono solo per i fix chiusi e mai segnalati dalla sicurezza (la
-      // decisione sta in src/shared/feedbackPublicView.js, dove lo status si
-      // può leggere davvero). I filtri qui sotto restano: sono la seconda
-      // rete, e il gate "uscito in produzione" (DB3) dipende dalla versione
-      // che gira su QUESTA macchina, quindi va applicato qui.
-      //
-      // TUTTE le schede, paginate: un fix vecchio pubblicato in bacheca deve
-      // comparire in bacheca. Il tetto per data d'invio faceva sparire dalla
-      // vetrina le schede oltre la cinquecentesima, che esistevano e che nessun
-      // filtro qui sotto aveva scartato.
+      // #583: la bacheca legge la VISTA pubblica (`feedback-public`), non i feedback: «filtrato in
+      // pagina» vuol dire solo «non disegnato», il resto era già arrivato. Ogni scheda ha i soli
+      // campi pubblici (la decisione sta in src/shared/feedbackPublicView.js); i filtri qui sotto
+      // restano come seconda rete, e il gate «uscito in produzione» (DB3) dipende dalla versione di
+      // QUESTA macchina. TUTTE le schede, paginate: col tetto per data sparivano le più vecchie.
       allFeedbacks = FB.listAllPublic
         ? await FB.listAllPublic({ timeoutMs: LOAD_TIMEOUT_MS })
         : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
       dataLoaded = true;
       lastLoadError = null;
     } catch (err) {
-      // Il caricamento è FALLITO: non fingere "lista vuota". Mostra l'errore con
-      // il tasto Riprova e fermati qui (renderList mostrerebbe #bdEmpty).
-      // Il guasto resta in `lastLoadError`: i ridisegni successivi lo rileggono
-      // invece di ripiegare sul vuoto.
+      // Caricamento FALLITO: non fingere «lista vuota». Il guasto resta in `lastLoadError` così i
+      // ridisegni successivi lo rileggono invece di ripiegare sul vuoto.
       console.error('[board] errore caricamento:', err);
       lastLoadError = err;
       showLoadError(err);
       return;
     }
-    // renderList nasconde sempre il loader (anche a lista vuota), così la pagina
-    // raggiunge uno stato stabile a fine caricamento.
+    // renderList nasconde sempre il loader, anche a lista vuota: la pagina si ferma in uno stato stabile.
     renderList();
   }
 
-  // "Riprova": ritenta il caricamento (il tasto si disabilita mentre è in volo,
-  // così un doppio click non lancia due fetch). loadData rimette a posto loader/
-  // stato a ogni giro.
+  // Il tasto si disabilita mentre la fetch è in volo: un doppio click non lancia due richieste.
   if (bdRetry) {
     bdRetry.addEventListener('click', () => {
       bdRetry.disabled = true;
@@ -561,18 +491,12 @@
     setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; dataLoaded = true; lastLoadError = null; renderList(); },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
-    // Rilancia il caricamento reale (loadData): usato dai test per esercitare il
-    // cammino d'errore (FB.list che rigetta → stato d'errore) e il retry, senza
+    // Rilancia il caricamento reale: i test esercitano il cammino d'errore e il retry senza
     // dover simulare la rete davvero assente.
     reload() { return loadData(); },
-    // Sostituisce la sorgente dati usata da loadData con una funzione di test
-    // (che risolve o rigetta). Va scritta sulla stessa reference `FB` che
-    // loadData usa: su pagine filo:// `window.SN_FEEDBACK` può essere una vista
-    // diversa da quella catturata qui, quindi i test non possono affidarsi a
-    // rimpiazzare `window.SN_FEEDBACK.list`.
-    // `listAllPublic` è la sorgente vera della bacheca: va sostituita anche
-    // lei, o la prova crederebbe di aver messo dei dati finti e la pagina
-    // leggerebbe la rete.
+    // Va scritta sulla stessa reference `FB` che usa loadData: su pagine filo:// la vista
+    // globale SN_FEEDBACK può essere diversa da quella catturata qui. Anche `listAllPublic` va
+    // sostituita, o la prova crederebbe di avere dati finti mentre la pagina legge la rete.
     setList(fn) { if (typeof fn === 'function') { FB.listAllPublic = fn; FB.listPublic = fn; FB.list = fn; } },
   };
 
