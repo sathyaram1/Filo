@@ -481,6 +481,12 @@ jobs:
           SOTTO=$(git rev-parse HEAD~1)
           if [ "$SOTTO" != "$PROVATO" ]; then
             echo "::error::su main e' entrato altro fra la suite e il numero di versione (provato ${PROVATO:-(niente)}, sotto la release c'e' ${SOTTO}): non costruisco codice mai provato. La prossima corsa riprova."
+            {
+              echo "## Pubblicazione ferma: main si e' mosso fra la suite e il numero di versione"
+              echo ""
+              echo "La suite ha provato \`${PROVATO:-(niente)}\`; sotto il commit di release c'e' \`$SOTTO\`."
+              echo "Il numero ${ATTESA} resta consumato (un buco nella numerazione, che non fa male); la prossima corsa riprova."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           # Il commit ESATTO che si sta costruendo. Serve alla meta' Mac, che
