@@ -1,44 +1,30 @@
-// Pagina d'errore di rete (filo://error/) — logica pura condivisa.
-//
-// Quando una navigazione fallisce (dominio inesistente, server giù, offline)
-// o il renderer di una scheda muore, il main carica la pagina interna
-// filo://error/error.html al posto del frame bianco di Chromium. Questo modulo
-// è la SINGOLA fonte di verità per:
-//   - costruire/leggere l'URL della pagina d'errore (roundtrip main ↔ pagina);
-//   - tradurre il codice errore Chromium in un messaggio per l'utente (IT);
-//   - decidere quali fallimenti meritano la pagina (shouldShowErrorPage).
-//
-// Usato dal main (tabs.js, via loader) e dalla pagina stessa
-// (src/pages/error/error.js, via <script src="filo://shared/netError.js">).
-// Pattern IIFE su globalThis come tutti gli shared/*.
+// Pagina d'errore di rete (filo://error/): fonte unica per costruire e leggere il suo URL,
+// tradurre il codice Chromium in un messaggio italiano e decidere quali fallimenti la
+// meritano. La usano il main (tabs.js) e la pagina stessa.
 
 (function (global) {
   'use strict';
 
   const ERROR_PAGE_URL = 'filo://error/error.html';
 
-  // Codice speciale (non-Chromium) usato quando il renderer della scheda muore
-  // (render-process-gone): non è un errore di rete ma la scheda resta bianca
-  // allo stesso modo, quindi passa dalla stessa pagina.
+  // Codice speciale non-Chromium per il renderer morto (render-process-gone): non è un
+  // errore di rete, ma la scheda resta bianca allo stesso modo.
   const CRASH_CODE = 'crash';
 
-  // Schemi che la pagina d'errore può ri-tentare ("Riprova"). Mai altro:
-  // l'URL bersaglio arriva da query string e NON va navigato alla cieca
-  // (filo://error?url=javascript:… non deve poter eseguire nulla).
+  // Schemi che il «Riprova» può ri-tentare. Mai altro: il bersaglio arriva dalla query
+  // string e NON va navigato alla cieca (filo://error?url=javascript:… non deve eseguire nulla).
   function isRetriableTarget(url) {
     let proto = '';
     try { proto = new URL(String(url || '')).protocol.toLowerCase(); } catch (_) { return false; }
     return proto === 'http:' || proto === 'https:' || proto === 'filo:';
   }
 
-  // true se `url` è la pagina d'errore interna (con o senza query).
   function isErrorPageUrl(url) {
     return String(url || '').startsWith(ERROR_PAGE_URL);
   }
 
-  // Costruisce l'URL della pagina d'errore per il fallimento di `targetUrl`.
-  // `code` è il codice errore Chromium (negativo) o CRASH_CODE; `desc` la
-  // descrizione simbolica (es. "ERR_NAME_NOT_RESOLVED") o il motivo del crash.
+  // `code`: codice errore Chromium (negativo) o CRASH_CODE; `desc`: la descrizione
+  // simbolica (es. ERR_NAME_NOT_RESOLVED) o il motivo del crash.
   function buildUrl(targetUrl, code, desc) {
     const params = new URLSearchParams();
     params.set('url', String(targetUrl || ''));
@@ -47,9 +33,8 @@
     return `${ERROR_PAGE_URL}?${params.toString()}`;
   }
 
-  // Estrae { target, code, desc } da un URL di pagina d'errore, o null se
-  // `url` non è la pagina d'errore. `target` è null se assente o non
-  // ri-tentabile (schema non-web): mai restituire bersagli non navigabili.
+  // `target` è null se assente o non ri-tentabile (schema non-web): mai restituire
+  // bersagli non navigabili.
   function parse(url) {
     if (!isErrorPageUrl(url)) return null;
     let params;
@@ -62,19 +47,16 @@
     };
   }
 
-  // L'URL bersaglio (fallito) di una pagina d'errore, o null. Comodo per
-  // "la scheda per l'utente è ancora sull'URL fallito" (barra, sessione,
-  // ricarica) — come fanno gli altri browser.
+  // Serve a tenere la scheda, per l'utente, sull'URL fallito (barra, sessione, ricarica),
+  // come fanno gli altri browser.
   function targetOf(url) {
     const p = parse(url);
     return (p && p.target) || null;
   }
 
-  // Il fallimento di `failedUrl` con `code` merita la pagina d'errore?
-  //   - -3 (ERR_ABORTED) NO: navigazione annullata (stop, redirect, nostra
-  //     _recreateView) — non è un errore da mostrare;
-  //   - la pagina d'errore stessa NO (mai loop);
-  //   - solo main frame (il chiamante passa isMainFrame).
+  // -3 (ERR_ABORTED) no: navigazione annullata (stop, redirect, _recreateView) non è un
+  // errore da mostrare. La pagina d'errore stessa no, per non entrare in loop.
+  // Solo main frame (lo passa il chiamante).
   function shouldShowErrorPage({ code, failedUrl, isMainFrame }) {
     if (isMainFrame === false) return false;
     const n = Number(code);
@@ -85,9 +67,8 @@
     return isRetriableTarget(u);
   }
 
-  // Traduzione codice Chromium → messaggio per l'utente (titolo + suggerimento).
-  // `offline: true` marca gli errori "sei senza rete": la pagina si ri-tenta da
-  // sola quando la connessione torna (evento `online`).
+  // `offline: true` marca gli errori «sei senza rete»: la pagina si ri-tenta da sola
+  // quando la connessione torna (evento `online`).
   const KNOWN = {
     '-105': { title: 'Impossibile trovare questo sito', hint: 'Controlla che l’indirizzo sia scritto correttamente: potrebbe esserci un refuso nel nome del sito.' }, // ERR_NAME_NOT_RESOLVED
     '-137': { title: 'Impossibile trovare questo sito', hint: 'La ricerca del nome del sito è fallita. Controlla l’indirizzo e la connessione.' }, // ERR_NAME_RESOLUTION_FAILED
@@ -117,14 +98,13 @@
     hint: 'Il caricamento non è riuscito. Controlla la connessione e riprova.',
   };
 
-  // { title, hint, offline } per (code, desc). `desc` (es. ERR_…) resta il
-  // dettaglio tecnico che la pagina mostra in piccolo.
+  // `desc` resta il dettaglio tecnico che la pagina mostra in piccolo.
   function describe(code, desc) {
     if (String(code) === CRASH_CODE) return { ...CRASH_INFO, offline: false };
     const known = KNOWN[String(code)];
     if (known) return { title: known.title, hint: known.hint, offline: !!known.offline };
-    // Ripiego sulla descrizione simbolica quando il codice non è mappato ma la
-    // famiglia è riconoscibile dal nome.
+    // Ripiego sulla descrizione simbolica quando il codice non è mappato ma la famiglia
+    // si riconosce dal nome.
     const d = String(desc || '');
     if (/NAME_NOT_RESOLVED|NAME_RESOLUTION/.test(d)) return { ...KNOWN['-105'], offline: false };
     if (/INTERNET_DISCONNECTED/.test(d)) return { ...KNOWN['-106'] };
