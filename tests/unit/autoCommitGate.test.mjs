@@ -363,4 +363,50 @@ describe('la spedizione non tace: storia divergente e push fallito', () => {
     assert.match(stderr, /'claude\/isolato' NON e' arrivato su origin: .+/, 'una riga con il ramo e il motivo di git');
     assert.match(stderr, /non-esiste|does not appear|repository/i, 'il motivo è quello di git, non una frase generica');
   });
+
+  // Claude Code manda stderr di un hook uscito con 0 al solo registro di
+  // debug: la riga qui sopra la sessione non la vede (giro del 14/09,
+  // verifica). L'unico canale da un hook PostToolUse alla sessione è un JSON
+  // su stdout con additionalContext: è lì che il fallimento deve arrivare.
+  function runHookRaw(work, stdin) {
+    const ambiente = { ...process.env };
+    delete ambiente.FILO_ROUTINE;
+    return spawnSync('bash', [resolve(work, '.claude', 'hooks', 'auto-commit-merge.sh')], {
+      cwd: work, encoding: 'utf8', input: stdin, env: { ...ambiente, CLAUDE_PROJECT_DIR: work },
+    });
+  }
+
+  test('un push fallito arriva alla SESSIONE: JSON su stdout con additionalContext, uscita 0', () => {
+    const { work } = scene();
+    git(work, ['checkout', '-q', '-b', 'claude/isolato-2']);
+    git(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+    writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
+
+    const r = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Write' }));
+
+    assert.equal(r.status, 0, 'l\'hook non fallisce mai per contratto');
+    const righe = String(r.stdout || '').split(/\r?\n/).filter((l) => l.trim().startsWith('{'));
+    assert.equal(righe.length, 1, `una riga JSON su stdout, trovato: «${r.stdout}»`);
+    const json = JSON.parse(righe[0]);
+    assert.equal(json.hookSpecificOutput.hookEventName, 'PostToolUse', 'il nome dell\'evento è quello letto da stdin');
+    assert.match(json.hookSpecificOutput.additionalContext, /claude\/isolato-2.*NON e' arrivato su origin/);
+    assert.match(json.hookSpecificOutput.additionalContext, /non-esiste|does not appear|repository/i, 'col motivo di git');
+    assert.match(json.hookSpecificOutput.additionalContext, /committato in locale ma NON e' su origin/, 'e con quello che c\'è da fare');
+    assert.match(String(r.stderr || ''), /NON e' arrivato su origin/, 'la riga su stderr resta, per il registro di debug');
+  });
+
+  test('senza stdin (lanciato a mano) l\'evento è PostToolUse; quando la spedizione riesce stdout resta vuoto', () => {
+    const { work } = scene();
+    git(work, ['checkout', '-q', '-b', 'claude/liscio']);
+    writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
+    const ok = runHookRaw(work, '');
+    assert.equal(ok.status, 0);
+    assert.equal(String(ok.stdout || '').trim(), '', 'niente contesto a ogni salvataggio andato bene');
+
+    git(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+    writeFileSync(resolve(work, 'altro.js'), 'y\n', 'utf8');
+    const ko = runHookRaw(work, '');
+    const json = JSON.parse(String(ko.stdout || '').split(/\r?\n/).find((l) => l.trim().startsWith('{')));
+    assert.equal(json.hookSpecificOutput.hookEventName, 'PostToolUse');
+  });
 });
