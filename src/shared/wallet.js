@@ -1,27 +1,20 @@
-// Crediti sul server e chiave personale — la logica PURA condivisa fra main e
-// pagine (feedback #598). Niente rete, niente Electron: gli unit test la
-// caricano così com'è.
-//
-// - riconoscere «crediti finiti» in un errore del provider (402), che NON si
-//   ritenta: OpenRouter rifiuta finché il tetto non sale;
-// - la riga del registro d'uso, con i soli campi che le regole Firestore
-//   accettano (hasOnly): una riga con un campo in più viene rifiutata, e un
-//   registro che non si scrive è un abuso agli occhi della riconciliazione;
-// - il testo che spiega all'utente cosa fare, in base a come sta usando Filo.
+// Crediti sul server e chiave personale, logica PURA condivisa fra main e pagine (#598).
+// Un 402 del provider è «crediti finiti» e NON si ritenta; la riga del registro d'uso porta
+// SOLO i campi che le regole Firestore accettano (hasOnly): uno in più la fa rifiutare, e un
+// registro che non si scrive è un abuso agli occhi della riconciliazione.
 
 (function (global) {
   'use strict';
 
-  // I campi di una riga del registro, nell'ordine. Sono gli stessi elencati
-  // nelle regole Firestore (wallet-usage): cambiarli qui senza cambiarli lì
-  // fa rifiutare ogni riga.
+  // Gli stessi campi elencati nelle regole Firestore (wallet-usage): cambiarli qui senza
+  // cambiarli lì fa rifiutare ogni riga.
   const USAGE_FIELDS = Object.freeze([
     'pseudonym', 'at', 'action', 'model', 'servedBy',
     'promptTokens', 'completionTokens', 'costUsd', 'credits',
   ]);
 
-  // 402 dal servizio AI = il tetto della chiave è esaurito (o l'account non ha
-  // credito). Con la chiave personale vuol dire «crediti finiti».
+  // 402 dal servizio AI = tetto della chiave esaurito; con la chiave personale vuol dire
+  // «crediti finiti».
   function isOutOfCredits(err) {
     if (!err) return false;
     const st = Number(err.status);
@@ -30,9 +23,8 @@
     return /^OpenRouter(?:\s+\S+)?\s+402\b/.test(raw) || /insufficient credits|key limit exceeded/i.test(raw);
   }
 
-  // Quanti crediti vale una spesa in dollari, coi parametri del server
-  // (euro per credito, cambio). Per eccesso al decimo: ciò che si scala al
-  // saldo mostrato non deve essere meno di ciò che OpenRouter conta.
+  // Per eccesso al decimo: ciò che si scala al saldo mostrato non deve essere meno di ciò
+  // che OpenRouter conta.
   function creditsForUsd(costUsd, { eurPerCredit, eurUsd } = {}) {
     const usd = Number(costUsd);
     if (!Number.isFinite(usd) || usd <= 0) return 0;
@@ -41,8 +33,8 @@
     return Math.ceil((usd / (e * fx)) * 10 - 1e-6) / 10;
   }
 
-  // Costruisce la riga, scartando tutto ciò che non è nel contratto. `at` è
-  // ISO UTC: il server confronta per intervallo di tempo.
+  // Scarta tutto ciò che non è nel contratto. `at` è ISO UTC: il server confronta per
+  // intervallo di tempo.
   function usageRow({ pseudonym, at, action, model, servedBy, usage, costUsd, credits } = {}) {
     if (!pseudonym) return null;
     const u = usage || {};
@@ -60,10 +52,8 @@
     };
   }
 
-  // Il messaggio per l'utente quando la chiamata è stata rifiutata per crediti.
-  //   usingOwnKey: la chiamata è partita con una chiave dell'utente (non quella
-  //                personale di Filo): allora è il SUO conto OpenRouter.
-  //   dailyCredits: quota giornaliera, se nota, per dire quanto arriva domani.
+  // usingOwnKey: la chiamata è partita con una chiave dell'utente, quindi è il SUO conto
+  // OpenRouter. dailyCredits: quota giornaliera, se nota, per dire quanto arriva domani.
   function outOfCreditsMessage({ usingOwnKey = false, dailyCredits = null } = {}) {
     if (usingOwnKey) {
       return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo account OpenRouter, oppure togli la chiave dalle Impostazioni per tornare ai crediti di Filo.';
@@ -92,10 +82,8 @@
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
   }
 
-  // La frase del riscatto riuscito, coi numeri che il server manda: quanti
-  // crediti d'ingresso, quanti del vecchio conteggio locale sono passati e,
-  // se non tutti, perché. Chi aveva 12.000 crediti e ne ritrova 10.000 deve
-  // leggerlo qui, non scoprirlo dal saldo (primo giro di verifica del ramo -b).
+  // Chi aveva 12.000 crediti e ne ritrova 10.000 deve leggere qui quanti ne sono passati e,
+  // se non tutti, perché: non deve scoprirlo dal saldo.
   function fmtInt(n) {
     return String(Math.max(0, Math.floor(Number(n) || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
@@ -112,13 +100,9 @@
     return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più ${passati} (${why}).`;
   }
 
-  // Il codice dentro quello che l'utente incolla. Il codice arriva per
-  // messaggio e si ricopia com'è, spesso con la riga intorno («Codice:
-  // ABCD-EFGH», «il tuo invito è abcd efgh»): se il testo, ripulito, non è un
-  // codice, si cerca dentro un blocco di otto caratteri (anche quattro più
-  // quattro) staccato dal resto. Se non c'è, torna il testo com'era: sarà il
-  // server a dire «non esiste». Un testo che è già un codice passa com'è (il
-  // server tollera trattini, spazi e minuscole).
+  // Il codice si ricopia dal messaggio con la riga intorno («Codice: ABCD-EFGH»): se il testo
+  // ripulito non è un codice si cerca un blocco di otto caratteri (anche quattro più quattro)
+  // staccato dal resto. Se non c'è, torna il testo com'era: sarà il server a dire «non esiste».
   function extractCode(raw) {
     const s = String(raw || '').trim();
     const norm = s.toUpperCase().replace(/[^A-Z0-9]/g, '');

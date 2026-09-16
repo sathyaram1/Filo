@@ -1,21 +1,15 @@
-// Logica PURA della ricerca "a senso" (semantica) della dashboard di gestione
-// (filo://manage/). Vive separata dalla UI per essere unit-testabile senza
-// aprire Electron:
-//   - buildCandidates: riduce i feedback a { id, title, text } per il prompt;
-//   - buildPrompt/buildMessages: costruisce la richiesta per il modello;
-//   - parseRanking: interpreta (in modo tollerante) la classifica del modello;
-//   - keywordSearch: ricerca per parole, il RIPIEGO quando il modello non c'è.
-// IIFE su globalThis, come gli altri moduli condivisi (vedi CLAUDE.md).
+// Logica PURA della ricerca «a senso» della dashboard di gestione (filo://manage/),
+// separata dalla UI per provarla senza aprire Electron. `keywordSearch` è il RIPIEGO
+// per quando il modello non c'è.
 
 (function (global) {
   'use strict';
 
-  // Quanto testo di ogni feedback passiamo al modello: abbastanza per capirne il
-  // senso, senza gonfiare il contesto (e il costo) con testi lunghissimi.
+  // Quanto testo di ogni feedback passa al modello: abbastanza per capirne il senso,
+  // senza gonfiare contesto e costo con testi lunghissimi.
   const MAX_TEXT = 500;
 
-  // Titolo mostrabile di un feedback: il nome esplicito, o il ripiego calcolato
-  // dal testo (stesso criterio del resto della dashboard, via SN_FEEDBACK).
+  // Nome esplicito o ripiego calcolato dal testo, stesso criterio del resto della dashboard.
   function titleOf(fb) {
     const name = fb && fb.name;
     if (name && String(name).trim()) return String(name).trim();
@@ -27,8 +21,7 @@
     return '(senza titolo)';
   }
 
-  // Riduce la lista di feedback ai campi utili alla ricerca. Salta quelli senza
-  // id (non selezionabili) e normalizza/tronca il testo.
+  // Salta i feedback senza id: non sarebbero selezionabili.
   function buildCandidates(feedbacks) {
     const list = Array.isArray(feedbacks) ? feedbacks : [];
     const out = [];
@@ -41,8 +34,7 @@
     return out;
   }
 
-  // Prompt per il modello: descrive il compito (ordinare per SIGNIFICATO, non per
-  // parole) e chiede una risposta SOLO JSON, così parseRanking la può leggere.
+  // Chiede una risposta SOLO JSON, così parseRanking la può leggere.
   function buildPrompt(query, candidates) {
     const q = String(query || '').trim();
     const list = Array.isArray(candidates) ? candidates : [];
@@ -75,8 +67,7 @@
     return s;
   }
 
-  // Estrae il primo valore JSON (array o oggetto) dalla risposta del modello,
-  // tollerando testo prima/dopo e i recinti markdown.
+  // Tollera testo prima e dopo e i recinti markdown.
   function extractJson(text) {
     const s = stripFence(text);
     try { return JSON.parse(s); } catch (_) { /* proviamo a ritagliare */ }
@@ -93,9 +84,8 @@
     return null;
   }
 
-  // Interpreta la classifica del modello → [{ id, reason }] nell'ordine dato,
-  // filtrando agli id realmente esistenti (`validIds`) e senza duplicati. Se la
-  // risposta non è interpretabile torna [] (il chiamante ripiegherà sulle parole).
+  // Filtra agli id realmente esistenti e toglie i duplicati; se la risposta non è
+  // interpretabile torna [] e il chiamante ripiega sulle parole.
   function parseRanking(modelText, validIds) {
     const valid = validIds instanceof Set
       ? validIds
@@ -125,10 +115,8 @@
     return out;
   }
 
-  // Ripiego per PAROLE: tokenizza la query e punteggia titolo (peso 3) e testo
-  // (peso 1) di ogni feedback. Torna solo i feedback con almeno una parola in
-  // comune, dal più pertinente al meno. Usato quando il modello non è
-  // disponibile o la sua risposta non è valida.
+  // Ripiego per PAROLE: titolo peso 3, testo peso 1, e solo i feedback con almeno una
+  // parola in comune. Usato quando il modello non c'è o la sua risposta non è valida.
   function keywordSearch(feedbacks, query) {
     const tokens = String(query || '')
       .toLowerCase()

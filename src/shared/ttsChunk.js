@@ -1,22 +1,13 @@
-// Logica PURA per la lettura ad alta voce a "blocchi" (chunk) e per mappare
-// l'avanzamento della riproduzione alla parola corrente (evidenziazione).
-//
-// Sta in shared/ perché è logica senza DOM né rete: il content script
-// (src/content/tts.js) la usa per spezzare il testo selezionato in frasi e per
-// sapere quale parola evidenziare; i test unitari (tests/unit/ttsChunk.test.mjs)
-// la esercitano senza aprire Electron.
-//
-// Perché spezzare in chunk: il modello di sintesi vocale sintetizza TUTTO l'audio
-// prima di rispondere, quindi su un testo lungo l'attesa iniziale è di parecchi
-// secondi. Sintetizzando prima una frase corta e suonandola mentre si prepara
-// la successiva, il tempo che precede la PRIMA parola crolla.
+// Logica PURA della lettura ad alta voce a blocchi e della parola da evidenziare
+// (niente DOM né rete: la usa src/content/tts.js). Si spezza in chunk perché la sintesi
+// produce TUTTO l'audio prima di rispondere: suonando una frase corta mentre si prepara
+// la successiva, l'attesa prima della PRIMA parola crolla.
 
 (function (global) {
   'use strict';
 
-  // Tokenizza una stringa in "parole" (run di non-spazi), con gli offset di
-  // carattere [start, end) nella stringa originale. Gli offset servono al
-  // content script per ricostruire i Range DOM corrispondenti.
+  // Gli offset di carattere [start, end) servono al content script per ricostruire i
+  // Range DOM corrispondenti.
   function tokenize(text) {
     const tokens = [];
     const s = String(text == null ? '' : text);
@@ -28,22 +19,16 @@
     return tokens;
   }
 
-  // Una parola "chiude una frase" se finisce con punteggiatura forte
-  // (eventualmente seguita da una virgoletta/parentesi di chiusura).
+  // Chiude una frase: punteggiatura forte, eventualmente seguita da una virgoletta o
+  // parentesi di chiusura.
   function endsSentence(word) {
     return /[.!?…।。！？]["'»”’)\]]?$/.test(String(word || ''));
   }
 
-  // Raggruppa i token (parole) in chunk da sintetizzare separatamente.
-  // Ritorna un array di { from, to, start, end }:
-  //   - from/to: indici (inclusivi) nel vettore token
-  //   - start/end: offset di carattere nel testo completo (per fare lo slice)
-  //
-  // Strategia: si accumulano parole finché o (a) si supera il cap "morbido" E
-  // l'ultima parola chiude una frase, oppure (b) si supera il cap "duro"
-  // (taglio forzato anche a metà frase, per non far crescere troppo il primo
-  // pezzo). Il PRIMO chunk usa un cap più piccolo (firstCap) così la prima
-  // parola si sente prima possibile.
+  // Ritorna { from, to (indici token, inclusivi), start, end (offset nel testo) }.
+  // Cap morbido: si taglia solo a fine frase; cap duro: taglio forzato anche a metà,
+  // per non far crescere troppo il primo pezzo. Il primo chunk ha un cap più piccolo
+  // (firstCap), così la prima parola si sente prima possibile.
   function chunkTokens(tokens, opts) {
     const o = opts || {};
     const firstCap = o.firstCap || 140;
@@ -69,12 +54,8 @@
     return chunks;
   }
 
-  // Dato l'avanzamento di un chunk (frazione 0..1 della durata dell'audio),
-  // stima quale token sta venendo letto. Mappa la frazione a un offset di
-  // carattere dentro lo span del chunk e ritorna l'indice globale dell'ultima
-  // parola iniziata prima di quell'offset. È una STIMA: l'API TTS non dà tempi
-  // per-parola, quindi l'evidenziazione approssima distribuendo le parole in
-  // modo proporzionale alla loro lunghezza nel testo.
+  // È una STIMA: l'API TTS non dà tempi per-parola, quindi l'evidenziazione distribuisce
+  // le parole in proporzione alla loro lunghezza nel testo.
   function tokenIndexAtFraction(tokens, from, to, fraction) {
     if (!tokens || !tokens.length) return -1;
     const a = Math.max(0, Math.min(from, tokens.length - 1));
@@ -89,9 +70,7 @@
     return idx;
   }
 
-  // Per il fallback voce-del-browser: l'evento `onboundary` dà l'indice di
-  // carattere nel testo pronunciato. Ritorna l'indice della parola che contiene
-  // (o precede immediatamente) quel carattere.
+  // Ripiego voce-del-browser: `onboundary` dà l'indice di carattere nel testo pronunciato.
   function charIndexToToken(tokens, charIndex) {
     if (!tokens || !tokens.length) return -1;
     const c = Number(charIndex) || 0;
