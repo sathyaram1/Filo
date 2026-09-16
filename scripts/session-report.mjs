@@ -355,7 +355,7 @@ export function sommaSottoAgente(rep, sub) {
  * un transcript assente o illeggibile: torna il rapporto minimo con la nota.
  * (Un errore di programmazione qui dentro sì: lo prende chi chiama.)
  */
-export async function generaRapporto({ transcript = '', role = '', ticket = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
+export async function generaRapporto({ transcript = '', role = '', ticket = '', cwd = process.cwd(), env = process.env, configDir = '', since = '' } = {}) {
   const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
   if (!trovato.file) {
     const rep = rapportoVuoto({ role, ticket });
@@ -363,11 +363,12 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     return rep;
   }
   try {
-    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket });
+    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since });
     if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
+    if (eSottoAgente(trovato.file)) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
     for (const f of transcriptSottoAgenti(trovato.file)) {
       try {
-        sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket }));
+        sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket, since }));
       } catch (e) {
         rep.notes.push(`transcript di un sotto-agente illeggibile (${f}): ${String((e && e.message) || e)}`);
       }
