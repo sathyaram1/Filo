@@ -201,17 +201,26 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
  * tool_use di nome Agent o Task; `longestToolS` = distanza massima fra un
  * tool_use e il suo tool_result.
  */
-export async function analizzaRighe(righe, { role = '', ticket = '' } = {}) {
+export async function analizzaRighe(righe, { role = '', ticket = '', since = '' } = {}) {
   const rep = rapportoVuoto({ role, ticket });
-  const visti = new Set();
+  // L'usage di ogni messaggio, per id: un messaggio su più righe (pensa, poi
+  // chiama uno strumento) porta sulla PRIMA riga un output parziale (2, 5, 7
+  // token) e sull'ultima quello vero (163, 273, 309: verificato sui file di
+  // questa macchina il 16/09/2026). Vale l'ultima usage vista per quell'id;
+  // fino al giro 2 valeva la prima, e l'output usciva sei volte più basso.
+  const usi = new Map();
   const strumentiVisti = new Set();
   const inCorso = new Map();
   const modelli = new Set();
   const sconosciuti = new Set();
+  // `since`: solo quello che è successo da quel momento (il biglietto di
+  // questo giro): quando l'orchestratore rilascia il biglietto di un worker
+  // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
+  // tutti i worker del giro.
+  const sinceMs = since ? Date.parse(String(since)) : NaN;
   let primoMs = Infinity;
   let ultimoMs = -Infinity;
   let illeggibili = 0;
-  let costo = 0;
   let riga = 0;
 
   for await (const linea of righe) {
@@ -223,6 +232,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '' } = {}) {
     if (!e || typeof e !== 'object') continue;
     if (!rep.sessionId && typeof e.sessionId === 'string') rep.sessionId = e.sessionId;
     const ms = e.timestamp ? Date.parse(e.timestamp) : NaN;
+    if (Number.isFinite(sinceMs) && Number.isFinite(ms) && ms < sinceMs) continue;
     if (Number.isFinite(ms)) { if (ms < primoMs) primoMs = ms; if (ms > ultimoMs) ultimoMs = ms; }
     const msg = e.message && typeof e.message === 'object' ? e.message : null;
     if (!msg) continue;
@@ -230,24 +240,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '' } = {}) {
     if (e.type === 'assistant') {
       const u = msg.usage && typeof msg.usage === 'object' ? msg.usage : null;
       const id = typeof msg.id === 'string' && msg.id ? msg.id : `riga-${riga}`;
-      if (u && !visti.has(id)) {
-        visti.add(id);
-        const input = Number(u.input_tokens) || 0;
-        const cw = Number(u.cache_creation_input_tokens) || 0;
-        const cr = Number(u.cache_read_input_tokens) || 0;
-        const out = Number(u.output_tokens) || 0;
-        rep.turns += 1;
-        if (rep.turns > 1 && cr === 0 && cw >= 20000) rep.coldTurns += 1;
-        rep.tokens.input += input;
-        rep.tokens.cacheWrite += cw;
-        rep.tokens.cacheRead += cr;
-        rep.tokens.output += out;
-        if (typeof msg.model === 'string' && msg.model) modelli.add(msg.model);
-        const fam = famigliaPrezzo(msg.model);
-        if (!fam.known && msg.model) sconosciuti.add(String(msg.model));
-        const p = PREZZI[fam.key];
-        costo += (input * p.input + cw * p.cacheWrite + cr * p.cacheRead + out * p.output) / 1e6;
-      }
+      if (u) usi.set(id, { u, model: msg.model });
       const blocchi = Array.isArray(msg.content) ? msg.content : [];
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
