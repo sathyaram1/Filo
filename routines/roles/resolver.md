@@ -168,7 +168,8 @@ Sei tu a scriverli.
 Infine rilascia il claim:
 
 ```bash
-node scripts/routine-channel.mjs release <biglietto>
+node scripts/routine-channel.mjs release <biglietto> --role resolver
 ```
 
+(`--role` firma il rapporto di fine sessione che il rilascio allega da solo.)
 Il prossimo giro instraderà il verifier.
