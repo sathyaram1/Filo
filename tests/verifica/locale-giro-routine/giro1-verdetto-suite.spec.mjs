@@ -39,11 +39,12 @@ function ambientePulito() {
   return env;
 }
 
-function cli() {
+/** Come si lancia Playwright: il suo cli.js se si trova, altrimenti `npx playwright` (con la shell). */
+function lanciaPlaywright(args, opts) {
   for (const p of ['node_modules/@playwright/test/cli.js', 'node_modules/playwright/cli.js']) {
-    if (existsSync(join(ROOT, p))) return join(ROOT, p);
+    if (existsSync(join(ROOT, p))) return spawnSync(process.execPath, [join(ROOT, p), ...args], opts);
   }
-  throw new Error('cli di Playwright non trovata');
+  return spawnSync('npx', ['playwright', ...args], { ...opts, shell: true });
 }
 
 function verdetto(json, noti, out) {
