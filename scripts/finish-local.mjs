@@ -445,8 +445,10 @@ async function main() {
       console.error('\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.');
       process.exit(1);
     }
-    // 2. Spec mirati alle aree toccate. La suite completa gira nel cancello di
-    //    pubblicazione e nelle routine: qui serve il segnale rapido.
+    // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
+    //    Actions, nel lavoro di release, ogni sei ore prima di pubblicare
+    //    (dal 2026-09-15: nessun ruolo e nessuna sessione la lancia): qui
+    //    serve il segnale rapido.
     const changed = git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
     // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
