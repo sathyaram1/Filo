@@ -142,13 +142,55 @@ export function vocePerCaso(caso, noti) {
   return null;
 }
 
+/** Lo spec fittizio dei rossi che non appartengono a nessun caso. */
+export const FUORI_DAI_CASI = '(fuori dai casi)';
+
+/**
+ * La prima riga di un errore fuori dai casi, senza i colori del terminale
+ * (Playwright li scrive nel JSON così come li stampa). PURA.
+ */
+export function primaRiga(e) {
+  return String(e?.message || JSON.stringify(e))
+    .replace(/\[[0-9;]*m/g, '')
+    .split('\n')[0]
+    .trim();
+}
+
+/**
+ * Gli errori fuori dai casi (un file che non si carica, un fixture rotto, un
+ * worker che non chiude) divisi in ROSSI e AVVISI. Playwright li mette in
+ * `json.errors`, e i casi del file colpito possono non comparire affatto: per
+ * questo di regola contano come rossi nuovi, tacerli farebbe passare un file
+ * intero sparito dalla suite. L'eccezione è «Worker teardown timeout»:
+ * un teardown scaduto è lo strascico di un caso appeso, e se quel caso è già un
+ * rosso noto il cancello non deve restare chiuso per il suo strascico. Quindi
+ * i teardown sono rossi solo se nella stessa corsa c'è almeno un rosso nuovo
+ * (un caso, o un altro errore fuori dai casi); altrimenti restano avvisi, col
+ * numero e il testo. PURA.
+ */
+export function classificaErroriGlobali(errori, ciSonoRossiNuovi) {
+  const teardown = [];
+  const altri = [];
+  for (const e of Array.isArray(errori) ? errori : []) {
+    const riga = primaRiga(e);
+    (/^Worker teardown timeout/i.test(riga) ? teardown : altri).push(riga);
+  }
+  const teardownSonoRossi = Boolean(ciSonoRossiNuovi) || altri.length > 0;
+  return {
+    rossi: teardownSonoRossi ? [...altri, ...teardown] : altri,
+    avvisi: teardownSonoRossi ? [] : teardown,
+  };
+}
+
 /**
  * Il verdetto: conta i casi per esito e separa i rossi in coperti (da una voce
- * dei rossi noti) e NUOVI. PURA.
+ * dei rossi noti) e NUOVI. Gli errori fuori dai casi entrano fra i nuovi
+ * (spec FUORI_DAI_CASI) o fra gli avvisi, secondo classificaErroriGlobali.
+ * PURA.
  */
 export function verdetto(json, noti) {
   const casi = raccogliCasi(json);
-  const v = { totale: casi.length, verdi: 0, flaky: 0, saltati: 0, notiCoperti: [], nuovi: [] };
+  const v = { totale: casi.length, verdi: 0, flaky: 0, saltati: 0, notiCoperti: [], nuovi: [], avvisi: [] };
   for (const c of casi) {
     if (c.stato === 'expected') v.verdi += 1;
     else if (c.stato === 'flaky') v.flaky += 1;
@@ -159,22 +201,32 @@ export function verdetto(json, noti) {
       else v.nuovi.push(c);
     }
   }
+  const globali = classificaErroriGlobali(json?.errors, v.nuovi.length > 0);
+  for (const riga of globali.rossi) v.nuovi.push({ spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga });
+  v.avvisi = globali.avvisi;
   return v;
 }
 
-/** Una riga per rosso: «tests/<spec>.spec.mjs › <titolo completo>». PURA. */
+/**
+ * Una riga per rosso: «tests/<spec>.spec.mjs › <titolo completo>», oppure
+ * «errore fuori dai casi: <testo>» per un rosso senza caso. PURA.
+ */
 export function rigaRosso(c) {
+  if (c.spec === FUORI_DAI_CASI) return `errore fuori dai casi: ${c.titolo}`;
   return `tests/${c.spec}.spec.mjs › ${c.titoloCompleto || c.titolo}`;
 }
 
 /** Il riassunto a schermo. Non taglia niente: l'elenco è quello intero. PURA. */
 export function testoRiassunto(v) {
+  const avvisi = Array.isArray(v.avvisi) ? v.avvisi : [];
   const righe = [
     `Casi: ${v.totale} · verdi: ${v.verdi} · flaky (verdi dopo un tentativo): ${v.flaky} · saltati: ${v.saltati}`,
     `Rossi noti del contenitore, coperti: ${v.notiCoperti.length}`,
     ...v.notiCoperti.map((c) => `  (noto ${c.feedback || '?'}) ${rigaRosso(c)}`),
     `Rossi NUOVI: ${v.nuovi.length}`,
     ...v.nuovi.map((c) => `  ✗ ${rigaRosso(c)}`),
+    `AVVISI (teardown scaduti dopo un rosso noto, non fermano): ${avvisi.length}`,
+    ...avvisi.map((a) => `  ! ${a}`),
   ];
   return righe.join('\n');
 }
