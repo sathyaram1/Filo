@@ -143,3 +143,38 @@ test('trova il .jsonl più recente nella cartella del progetto; --transcript e F
     assert.match(assente.note, /assente/);
   } finally { rmSync(casa, { recursive: true, force: true }); }
 });
+
+// I transcript dei sotto-agenti stanno in <sessione>/subagents/*.jsonl coi loro
+// token. Le regole del repo dicono di delegare: un rapporto che li ignorava
+// diceva 29 $ per una sessione in cui un solo sotto-agente su diciassette ne
+// valeva 55 (giro del 14/09, verifica).
+test('i sotto-agenti entrano nel conto: costo, token, turni e strumenti sommati, con la loro parte a vista', async () => {
+  const casa = cartellaTemporanea('filo-rapporto-sotto-');
+  try {
+    const file = join(casa, 'sess-1.jsonl');
+    writeFileSync(file, RIGHE.join('\n'), 'utf8');
+    const sub = join(casa, 'sess-1', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    // 100000·6,25 + 1000·25 = 650.000 / 1e6 = 0,65 $
+    writeFileSync(join(sub, 'agent-a.jsonl'), `${assistant('s1', 'claude-opus-5',
+      { input_tokens: 0, cache_creation_input_tokens: 100000, cache_read_input_tokens: 0, output_tokens: 1000 },
+      [{ type: 'tool_use', id: 'su1', name: 'Read', input: {} }], T('00:20'))}\n`, 'utf8');
+    writeFileSync(join(sub, 'agent-a.meta.json'), '{}', 'utf8');
+    const solo = await analizzaRighe(RIGHE);
+    const rep = await generaRapporto({ transcript: file });
+    assert.equal(rep.subagentRuns, 1);
+    assert.equal(rep.subagentCostUsd, 0.65);
+    assert.equal(rep.costUsd, Math.round((solo.costUsd + 0.65) * 10000) / 10000, 'il costo totale comprende i sotto-agenti');
+    assert.equal(rep.tokens.output, solo.tokens.output + 1000);
+    assert.equal(rep.tokens.cacheWrite, solo.tokens.cacheWrite + 100000);
+    assert.equal(rep.tools.total, solo.tools.total + 1);
+    assert.equal(rep.tools.byName.Read, 1);
+    assert.equal(rep.turns, solo.turns + 1);
+    assert.equal(rep.durationS, solo.durationS, 'la durata resta quella della sessione madre');
+    assert.match(riassunto(rep)[4], /sotto-agenti letti: 1, il loro costo \$0\.6500/);
+    // Senza sotto-agenti il rapporto è quello di prima, con i due contatori a zero.
+    const senza = await generaRapporto({ transcript: join(casa, 'altra.jsonl') });
+    assert.equal(senza.subagentRuns, 0);
+    assert.equal(senza.subagentCostUsd, 0);
+  } finally { rmSync(casa, { recursive: true, force: true }); }
+});
