@@ -1,6 +1,5 @@
-// Logica pagina "Altro" — opzioni secondarie spostate qui da Opzioni:
-// domini esclusi (blocklist) e gestione categorie, più le scorciatoie alle
-// app (Aperti per dopo, Cronologia AI, Correttore). Auto-save come Opzioni.
+// Pagina «Altro»: opzioni secondarie (domini esclusi, categorie) e le scorciatoie alle app.
+// Auto-save come Opzioni.
 
 (function () {
   'use strict';
@@ -23,10 +22,8 @@
     $('openHistory').textContent = 'Cronologia AI';
     $('openSpellcheck').textContent = 'Gestisci correttore';
 
-    // Lista scorciatoie da tastiera. Su Mac le stesse si premono con altri
-    // tasti (vedi src/shared/tasti.js): l'elenco deve dire quello che funziona
-    // DAVVERO sulla macchina di chi lo sta leggendo, quindi i nomi si chiedono
-    // alla regola invece di scriverli.
+    // Su Mac le stesse scorciatoie si premono con altri tasti: i nomi si chiedono a
+    // src/shared/tasti.js, o l'elenco direbbe cose che su quella macchina non funzionano.
     const sc = $('shortcutsList');
     sc.innerHTML = '';
     const T = window.SN_TASTI;
@@ -142,9 +139,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
     $('blocklist').addEventListener('change', saveDebounced);
-    // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
-    // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
-    // riportata a fuoco invece di duplicarla.
+    // #252 — indirizzo canonico filo://<page>/<file>, non la forma legacy: un solo URL per
+    // pagina, e la scheda già aperta torna a fuoco invece di duplicarsi.
     $('openHome').addEventListener('click', () => {
       chrome.tabs.create({ url: 'filo://home/home.html' });
     });
