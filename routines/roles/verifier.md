@@ -328,8 +328,9 @@ Correggendo vali chi risolve, minimi di verifica compresi (CLAUDE.md
 § Verifica): la prova che tiene chiuso il difetto per il futuro va **dove la
 suite la rilancerà per sempre** — accanto alle altre (`tests/<feature>.spec.mjs`,
 o `tests/unit/` per la logica pura). **Non va in `tests/verifica/<numero>/`**:
-lì dentro c'è la memoria di un giro, che la suite completa non raccoglie
-nemmeno dopo la fusione, e una guardia messa lì nasce già spenta — verde il
+lì dentro c'è la memoria di un giro, che la suite completa (quella che gira in
+GitHub prima di ogni pubblicazione) non raccoglie nemmeno dopo la fusione, e
+una guardia messa lì nasce già spenta — verde il
 giorno in cui la scrivi e mai più rilanciata. Le tue prove del giro restano
 dove sono: sono un'altra cosa.
 
