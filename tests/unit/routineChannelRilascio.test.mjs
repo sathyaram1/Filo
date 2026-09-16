@@ -376,4 +376,19 @@ describe('release da riga di comando', () => {
       assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' });
     } finally { srv.close(); }
   });
+
+  test('un file rimasto fuori dai commit viene committato e spedito prima del rilascio, e lo si dice', async () => {
+    const { srv, port } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { origin, work } = scena();
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/13']);
+      writeFileSync(resolve(work, 'nato-da-shell.txt'), 'x\n', 'utf8');
+      const r = await cli(['release', 'tkt-cli', '--senza-rapporto'], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1' });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.match(r.se, /committate 1 modifiche rimaste fuori dai commit: nato-da-shell\.txt/);
+      assert.match(r.se, /spedito su origin/);
+      assert.equal(g(work, ['status', '--porcelain']), '');
+      assert.ok(g(origin, ['ls-tree', '--name-only', 'worker/13']).includes('nato-da-shell.txt'), 'il file è arrivato su origin col rilascio');
+    } finally { srv.close(); }
+  });
 });
