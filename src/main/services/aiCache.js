@@ -1,6 +1,5 @@
-// Cache persistente per le chiamate LLM. Chiave = SHA-256 di {provider, model, messages}.
-// Storage: chrome.storage.local sotto STORAGE_KEYS.AI_CACHE.
-// Eviction: quando supera AI_CACHE_MAX_ENTRIES, rimuove le entry più vecchie per timestamp.
+// Cache persistente delle chiamate LLM in chrome.storage.local (STORAGE_KEYS.AI_CACHE): chiave = SHA-256 di {provider, model, messages}.
+// Eviction delle entry meno usate di recente quando si supera AI_CACHE_MAX_ENTRIES.
 
 (function (global) {
   'use strict';
@@ -34,10 +33,9 @@
       const map = await readAll();
       const entry = map[key];
       if (!entry) return null;
-      // Aggiorna timestamp di ultimo uso (LRU "soft")
       entry.lastUsed = Date.now();
       map[key] = entry;
-      // best-effort: scrittura asincrona, non aspettiamo
+      // best-effort: non aspettiamo la scrittura, la lettura non deve rallentare per un aggiornamento di timestamp.
       writeAll(map).catch(() => {});
       return entry;
     } catch (_) {
@@ -52,7 +50,6 @@
       const now = Date.now();
       map[key] = { text, usage: usage || {}, provider, model, ts: now, lastUsed: now };
 
-      // Eviction se supera la soglia
       const keys = Object.keys(map);
       if (keys.length > AI_CACHE_MAX_ENTRIES) {
         keys.sort((a, b) => (map[a].lastUsed || map[a].ts || 0) - (map[b].lastUsed || map[b].ts || 0));
@@ -61,7 +58,7 @@
       }
       await writeAll(map);
     } catch (_) {
-      // cache best-effort: ignora errori (storage pieno, ecc.)
+      // cache best-effort: un errore (storage pieno, ecc.) non deve far fallire la chiamata.
     }
   }
 

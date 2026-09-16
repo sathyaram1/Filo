@@ -1,54 +1,26 @@
-// Motore di ad-blocking per-dominio basato su liste (processo main).
-//
-// COSA FA
-//   A differenza del blocco tracker "curato" in cookies.js (poche decine di
-//   host scritti a mano) e del popup-blocker in tabs.js (disposition new-window),
-//   questo è il motore di ad-blocking vero: scarica una o più LISTE pubbliche e
-//   gratuite (StevenBlack hosts, EasyList), le tiene in cache locale e le
-//   aggiorna da sole una volta a settimana. Ogni richiesta verso un dominio
-//   presente nelle liste viene annullata a monte (onBeforeRequest), così lo
-//   script pubblicitario/tracker non si carica nemmeno.
-//
-// PERCHÉ UNA CACHE SU DISCO
-//   Le liste sono grandi (StevenBlack supera i 100k domini) e cambiano lentamente.
-//   Scaricarle a ogni avvio sprecherebbe rete e rallenterebbe il boot. Le teniamo
-//   in userData/adblock/lists.json e ci basiamo su `updatedAt`: si rinfresca solo
-//   se la cache manca o ha più di una settimana. Il download è sempre in
-//   background e non blocca mai la navigazione; se la rete non c'è, si continua
-//   con la cache esistente (o senza blocco, ma la navigazione non si rompe).
-//
-// SICUREZZA: niente domini legittimi
-//   Una whitelist di base (BASE_WHITELIST) protegge i domini "buoni" anche se per
-//   errore finissero in una lista: il match in whitelist vince sempre sul blocco.
-//
-// Il toggle vive in settings.security.adblock.enabled (pagina Sicurezza).
+// Ad-blocking a liste pubbliche (hosts di StevenBlack, EasyList), tenute in cache su disco e rinfrescate una volta a settimana.
+// Non registra un proprio onBeforeRequest (vedi shouldBlock) e non blocca mai i domini in BASE_WHITELIST. Toggle in settings.security.adblock.enabled.
 
 'use strict';
 
-// electron è richiesto in modo PIGRO (dentro le funzioni che lo usano) così la
-// logica pura (parseList, isBlockedHost, …) resta caricabile negli unit test
-// node:test, che girano senza Electron.
+// electron si richiede in modo PIGRO dentro le funzioni che lo usano: la logica pura deve restare caricabile negli unit test, che girano senza Electron.
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 
-// Liste pubbliche e gratuite usate di default. Formati misti gestiti dal parser:
-//   - hosts file:  righe "0.0.0.0 dominio" / "127.0.0.1 dominio"
-//   - EasyList:    righe con ancora di dominio "||dominio^"
+// Le sorgenti sono di formato misto: hosts ("0.0.0.0 dominio") ed EasyList ("||dominio^").
 const DEFAULT_SOURCES = [
   'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts',
   'https://easylist.to/easylist/easylist.txt',
 ];
 
-// Aggiornamento automatico: settimanale (le liste cambiano lentamente).
+// Settimanale: le liste cambiano lentamente.
 const REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Dimensione massima per singola lista scaricata (anti-abuso/OOM): 16 MB.
+// Tetto per singola lista scaricata: una sorgente gonfia non deve esaurire la memoria.
 const MAX_LIST_BYTES = 16 * 1024 * 1024;
 
-// Whitelist di base: domini legittimi da non bloccare MAI, anche se una lista li
-// includesse per sbaglio. Sono "domini-ombrello" (registrabili) di servizi che
-// l'utente usa davvero — bloccarli romperebbe siti interi. NON includere qui i
-// puri host pubblicitari (es. doubleclick): quelli devono restare bloccabili.
+// Domini-ombrello di servizi che l'utente usa davvero: bloccarli romperebbe siti interi, e la whitelist vince sempre sul blocco.
+// NON aggiungere qui i puri host pubblicitari (doubleclick e simili): devono restare bloccabili.
 const BASE_WHITELIST = [
   'google.com', 'gstatic.com', 'googleapis.com', 'youtube.com', 'ytimg.com',
   'facebook.com', 'fbcdn.net', 'instagram.com', 'whatsapp.com',
@@ -60,12 +32,6 @@ const BASE_WHITELIST = [
   'paypal.com', 'stripe.com', 'duckduckgo.com',
 ];
 
-// ─── parsing liste (logica pura, esportata e testata) ───────────────────────
-
-// Estrae l'insieme di domini da bloccare dal testo di una lista. Riconosce sia
-// il formato hosts (0.0.0.0/127.0.0.1 dominio) sia le regole EasyList con ancora
-// di dominio (||dominio^). Ignora commenti, regole cosmetiche (##, #@#), regole
-// di eccezione (@@) e tutto ciò che non è un dominio pulito.
 function parseList(text) {
   const out = new Set();
   if (!text) return out;
@@ -73,18 +39,15 @@ function parseList(text) {
   for (let line of lines) {
     line = line.trim();
     if (!line) continue;
-    // Commenti: '#' (hosts) e '!' o '[' (header EasyList).
+    // '#' apre i commenti dei file hosts, '!' e '[' quelli di EasyList.
     if (line[0] === '!' || line[0] === '[') continue;
 
-    // Regole cosmetiche EasyList (element hiding): "dominio##.banner" — non sono
-    // blocchi di rete, saltale per non scambiare il selettore per un dominio.
+    // Regole cosmetiche EasyList ("dominio##.banner"): non sono blocchi di rete, il selettore non va scambiato per un dominio.
     if (line.includes('##') || line.includes('#@#') || line.includes('#?#')) continue;
 
-    // Eccezioni EasyList ("@@||dominio^"): NON bloccare. Le saltiamo (non
-    // implementiamo le allow-rule, ma non devono finire tra i domini bloccati).
+    // Le eccezioni EasyList ("@@") non le implementiamo, ma non devono finire tra i domini bloccati.
     if (line.startsWith('@@')) continue;
 
-    // EasyList: ancora di dominio "||dominio^..." (eventuali opzioni dopo "^").
     if (line.startsWith('||')) {
       const m = line.slice(2).match(/^([a-z0-9_-]+(?:\.[a-z0-9_-]+)+)\^/i);
       if (m) {
@@ -94,7 +57,6 @@ function parseList(text) {
       continue;
     }
 
-    // hosts file: "0.0.0.0 dominio" oppure "127.0.0.1 dominio".
     if (line[0] === '#') continue;
     const parts = line.split(/\s+/);
     if (parts.length >= 2 && (parts[0] === '0.0.0.0' || parts[0] === '127.0.0.1')) {
@@ -106,7 +68,6 @@ function parseList(text) {
   return out;
 }
 
-// Pulisce/valida un dominio: minuscolo, niente www., solo host con almeno un punto.
 function normalizeDomain(raw) {
   let s = String(raw || '').trim().toLowerCase();
   if (!s) return '';
@@ -114,8 +75,6 @@ function normalizeDomain(raw) {
   if (!/^[a-z0-9_.-]+\.[a-z0-9-]{2,}$/i.test(s)) return '';
   return s;
 }
-
-// ─── stato in-memory ────────────────────────────────────────────────────────
 
 let blockedDomains = new Set();   // domini caricati dalle liste
 const whitelistSet = new Set(BASE_WHITELIST.map((d) => d.toLowerCase()));
@@ -128,13 +87,11 @@ function hostnameOf(url) {
   try { return new URL(url).hostname.toLowerCase(); } catch (_) { return ''; }
 }
 
-// True se un host (o un suo dominio padre) è nella whitelist di base.
 function isWhitelistedHost(host) {
   return matchesSuffix(host, whitelistSet);
 }
 
-// True se un host (o un suo dominio padre) è in `set`. "a.b.example.com" matcha
-// se nel set c'è "a.b.example.com", "b.example.com" o "example.com".
+// Il match è per suffisso: "a.b.example.com" matcha anche se nel set c'è solo "example.com".
 function matchesSuffix(host, set) {
   if (!host || !set.size) return false;
   let h = host;
@@ -147,7 +104,6 @@ function matchesSuffix(host, set) {
   return false;
 }
 
-// Decide se un host va bloccato: presente nelle liste E non in whitelist.
 function isBlockedHost(host) {
   if (!host) return false;
   if (isWhitelistedHost(host)) return false;
@@ -158,17 +114,10 @@ function isBlockedUrl(url) {
   return isBlockedHost(hostnameOf(url));
 }
 
-// ─── decisione di blocco ────────────────────────────────────────────────────
-//
-// NON registriamo un nostro onBeforeRequest: Electron consente UN SOLO listener
-// per evento per sessione, e quel choke point è già di cookies.js (blocco
-// tracker). Quel listener consulta `shouldBlock` per coprire anche l'ad-blocking
-// a liste sulla stessa sessione (default + jar per-sito della modalità privacy).
+// Non registriamo un nostro onBeforeRequest: Electron ammette un solo listener per evento per sessione, e quel choke point è di cookies.js, che consulta shouldBlock().
 function shouldBlock(url) {
   return enabled && isBlockedUrl(url);
 }
-
-// ─── cache su disco ─────────────────────────────────────────────────────────
 
 function cacheDir() {
   let base = '';
@@ -202,11 +151,7 @@ async function saveCache() {
   } catch (_) { /* best-effort: la cache è un'ottimizzazione, non un requisito */ }
 }
 
-// ─── download liste ─────────────────────────────────────────────────────────
-
-// Scarica una singola lista. Usa net.request (rispetta proxy/sistema). Ritorna
-// il testo, o null se fallisce (rete assente, 404, troppo grande): il chiamante
-// tiene la cache esistente senza rompere nulla.
+// Ritorna null se il download fallisce (rete assente, 404, troppo grande): il chiamante tiene la cache esistente invece di restare senza blocco.
 function fetchList(url) {
   return new Promise((resolve) => {
     let req;
@@ -234,14 +179,11 @@ function fetchList(url) {
   });
 }
 
-// Scarica tutte le sorgenti, fonde i domini, e se ne ottiene almeno una valida
-// aggiorna lo stato in-memory + la cache. Dedup dei refresh concorrenti.
 function refresh({ force = false, sources = DEFAULT_SOURCES } = {}) {
   if (refreshing) return refreshing;
   refreshing = (async () => {
     try {
-      // Niente refresh inutili: se la cache è fresca (<1 settimana) e non è
-      // forzato, salta. (force=true bypassa, es. pulsante "aggiorna ora".)
+      // force=true salta il controllo di freschezza (pulsante "aggiorna ora").
       if (!force && lastUpdatedAt && (Date.now() - lastUpdatedAt) < REFRESH_INTERVAL_MS) {
         return { ok: true, skipped: true, count: blockedDomains.size };
       }
@@ -254,7 +196,7 @@ function refresh({ force = false, sources = DEFAULT_SOURCES } = {}) {
         for (const d of parseList(text)) merged.add(d);
       }
       if (!any || merged.size === 0) {
-        // Tutti i download falliti (rete assente) → tieni la cache esistente.
+        // Tutti i download falliti (rete assente): tieni la cache esistente.
         return { ok: false, error: 'download_failed', count: blockedDomains.size };
       }
       blockedDomains = merged;
@@ -270,15 +212,12 @@ function refresh({ force = false, sources = DEFAULT_SOURCES } = {}) {
   return refreshing;
 }
 
-// ─── ciclo di vita / configurazione ─────────────────────────────────────────
-
 function isEnabled(settings) {
   const ad = settings && settings.security && settings.security.adblock;
   // Default-on come gli altri controlli di sicurezza: assente/null → attivo.
   return !ad || ad.enabled !== false;
 }
 
-// Avvia un refresh periodico (settimanale) finché il blocco è attivo. Idempotente.
 function ensurePeriodicRefresh() {
   if (refreshTimer) return;
   refreshTimer = setInterval(() => {
@@ -287,9 +226,6 @@ function ensurePeriodicRefresh() {
   if (refreshTimer.unref) refreshTimer.unref(); // non tenere vivo il processo
 }
 
-// Chiamato all'avvio: imposta il toggle, carica la cache, e se serve avvia un
-// refresh in background (mai bloccante). Il choke point onBeforeRequest è già
-// registrato da cookies.js, che consulta shouldBlock().
 async function init(settings) {
   enabled = isEnabled(settings);
   await loadCache();
@@ -297,15 +233,12 @@ async function init(settings) {
   if (process.env.NODE_ENV === 'test' || process.env.FILO_SMOKE) return;
   if (enabled) {
     ensurePeriodicRefresh();
-    // Refresh in background se la cache manca o è stantia. Non attendiamo.
     if (!blockedDomains.size || !lastUpdatedAt || (Date.now() - lastUpdatedAt) >= REFRESH_INTERVAL_MS) {
       refresh().catch(() => {});
     }
   }
 }
 
-// Chiamato a ogni UPDATE_SETTINGS: aggiorna il toggle e, se appena acceso con
-// cache vuota/stantia, avvia un refresh in background.
 function configureFromSettings(settings) {
   const was = enabled;
   enabled = isEnabled(settings);

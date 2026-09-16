@@ -1,5 +1,4 @@
-// Categorizer (Fase 2): assegna automaticamente una categoria a una scheda salvata.
-// Storage categorie persistente in chrome.storage.local sotto STORAGE_KEYS.CATEGORIES.
+// Assegna automaticamente una categoria a una scheda salvata; le categorie stanno in chrome.storage.local sotto STORAGE_KEYS.CATEGORIES.
 
 (function (global) {
   'use strict';
@@ -49,7 +48,6 @@
     const cats = await listCategories();
     const c = cats.find((x) => x.id === id);
     if (!c) return null;
-    // Se il nuovo nome esiste già, fa merge (sposta tutte le pagine)
     const existing = findByName(cats, newName);
     if (existing && existing.id !== id) {
       await mergeCategories(id, existing.id);
@@ -64,7 +62,7 @@
     const cats = await listCategories();
     const filtered = cats.filter((c) => c.id !== id);
     await setCategories(filtered);
-    // Le pagine con quella categoria diventano "non categorizzate" (category=null)
+    // Le pagine di quella categoria diventano non categorizzate (category=null).
     const sp = await chrome.storage.local.get(STORAGE_KEYS.SAVED_PAGES);
     const pages = sp[STORAGE_KEYS.SAVED_PAGES] || [];
     let changed = false;
@@ -122,8 +120,7 @@
     }
   }
 
-  // Chiama l'LLM per categorizzare. invokeAI è una funzione passata da background.js
-  // per evitare dipendenze circolari con il routing dei messaggi.
+  // invokeAI arriva dal chiamante per evitare una dipendenza circolare col routing dei messaggi.
   async function categorize({ invokeAI, page }) {
     const cats = await listCategories();
     const existing = cats.map((c) => c.name);

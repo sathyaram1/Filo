@@ -1,10 +1,5 @@
-// Persistenza tab archiviate (§3.1). "Chiudere una tab non è perdere — è
-// salvare": quando una scheda web viene chiusa, i suoi metadati finiscono qui e
-// restano consultabili (e riapribili) dalla pagina archivio (filo://archive).
-//
-// Per ora salviamo SOLO i metadati (~1-2 KB/tab). Il riassunto LLM e l'embedding
-// per la ricerca semantica (§3.2) sono rimandati: questo store è la base su cui
-// si appoggeranno.
+// Persistenza delle tab archiviate (§3.1): alla chiusura di una scheda i suoi metadati finiscono qui e restano riapribili da filo://archive.
+// Solo metadati: riassunto LLM ed embedding per la ricerca semantica (§3.2) sono rimandati.
 
 (function (global) {
   'use strict';
@@ -22,9 +17,6 @@
     return Array.isArray(arr) ? arr : [];
   }
 
-  // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
-  // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
-  // la tab non è archiviabile (manca l'URL).
   async function archive(meta) {
     if (!meta || !meta.url) return null;
     const items = await list();
@@ -44,9 +36,7 @@
       coOpenUrls: Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : [],
       // Posizione di scroll: rimandata (la consuma §2.1). Campo riservato.
       scrollPosition: typeof meta.scrollPosition === 'number' ? meta.scrollPosition : null,
-      // Location proxy ("Apri da un altro paese"): { country, tier } se la tab
-      // era proxata alla chiusura, null altrimenti. Riaprendo dalla cronologia
-      // la tab rinasce proxata sulla stessa location.
+      // Location proxy alla chiusura: riaprendo dalla cronologia la tab rinasce proxata sulla stessa.
       proxy: meta.proxy && meta.proxy.country
         ? { country: String(meta.proxy.country), tier: meta.proxy.tier || null }
         : null,
@@ -57,16 +47,13 @@
     return entry;
   }
 
-  // Come list() ma SENZA gli embedding: è ciò che mandiamo al renderer (la pagina
-  // archivio), per non spedire MB di vettori via IPP ad ogni apertura.
+  // Senza embedding: al renderer non vanno spediti MB di vettori a ogni apertura dell'archivio.
   async function listMeta() {
     const items = await list();
     return items.map(({ embedding, ...rest }) => rest);
   }
 
-  // Tiene gli embedding solo sulle ultime ARCHIVED_EMBED_LIMIT tab (le più
-  // recenti, che stanno in testa all'array): azzera i più vecchi per non sforare
-  // la quota. Muta l'array in place e ritorna true se ha cambiato qualcosa.
+  // Gli embedding restano solo sulle tab più recenti (in testa all'array) per non sforare la quota; muta l'array in place.
   function capEmbeddings(items) {
     let changed = false;
     for (let i = ARCHIVED_EMBED_LIMIT; i < items.length; i++) {
@@ -75,7 +62,6 @@
     return changed;
   }
 
-  // Aggiorna un'entry (es. aggiunta di embedding/snippet dopo l'arricchimento).
   async function update(id, patch) {
     if (!id || !patch) return null;
     const items = await list();
@@ -94,7 +80,7 @@
     return filtered;
   }
 
-  // Cancellazione multipla (§5 pulizia retroattiva). Ritorna { removed, remaining }.
+  // Cancellazione multipla (§5 pulizia retroattiva).
   async function removeMany(ids) {
     const set = new Set(Array.isArray(ids) ? ids : []);
     if (!set.size) return { removed: 0, remaining: (await list()).length };
