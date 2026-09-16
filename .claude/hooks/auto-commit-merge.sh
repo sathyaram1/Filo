@@ -191,7 +191,8 @@ spedisci_ramo() {
     # e un rebase non lo cura: si dice per quello che e', col motivo del
     # remoto, e non si ritenta col lease (verifica del giro 4).
     *"[remote rejected]"*)
-      segnala_fallimento "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"
+      segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")" \
+        "il suo ramo '$ramo' non e' su origin, il remoto ha rifiutato il push: $(motivo_git "$esito")"
       return 1 ;;
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
       # --force-if-includes: il lease da solo si fida del ref remoto che questa
