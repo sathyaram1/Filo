@@ -514,27 +514,53 @@ export function primoTimestampMs(file) {
  * e il suo ruolo gli chiede di delegare le letture grosse: fino al giro 5 il
  * rapporto cercava i figli in <worker>/subagents/, che non esiste, e il
  * rilascio allegava un rapporto senza le esplorazioni delegate.
- * Il legame che c'e' e' il tempo: un figlio comincia dentro la finestra fra la
- * chiamata Agent del lanciatore e il suo risultato (`finestre`, raccolte da
- * analizzaRighe). Un fratello di un altro giro (un worker precedente) sta
- * fuori da ogni finestra. I nipoti cominciano dentro la finestra anche loro,
- * e sono costo del worker come i figli. PURA a meno della lettura dei file.
+ * Il legame è nel meta accanto a ogni transcript (`agent-<id>.meta.json`,
+ * campo `parentAgentId`): figli, e nipoti per la stessa via, sono costo del
+ * worker. Un fratello di un altro giro (un worker precedente) punta a un
+ * altro lanciatore. Fino al giro 6 il legame era solo il tempo — un figlio
+ * comincia dentro la finestra fra la chiamata Agent e il suo risultato — e
+ * un figlio in sottofondo, che comincia DOPO la risposta immediata «avviato»,
+ * spariva dal conto. Il tempo resta come ripiego per chi non ha un meta, e
+ * il rapporto lo dichiara (`note`). PURA a meno della lettura dei file.
  */
-export function figliDelSottoAgente(file, finestre) {
-  if (!Array.isArray(finestre) || !finestre.length) return [];
+export function figliDelSottoAgente(file, finestre, note = []) {
   const dir = dirname(file);
   let nomi = [];
   try { nomi = readdirSync(dir); } catch (_) { return []; }
-  const out = [];
+  const fratelli = [];
   for (const n of nomi.sort()) {
     if (!n.endsWith('.jsonl')) continue;
     const p = join(dir, n);
     if (resolve(p) === resolve(file)) continue;
-    const t = primoTimestampMs(p);
+    const meta = leggiMeta(p);
+    const parent = meta && typeof meta.parentAgentId === 'string' ? meta.parentAgentId.trim() : '';
+    fratelli.push({ p, id: agentIdDi(p), parent });
+  }
+  const out = [];
+  // Dal meta: figli, poi i figli dei figli, finché non se ne trovano più.
+  const miei = new Set([agentIdDi(file)]);
+  let trovati = true;
+  while (trovati) {
+    trovati = false;
+    for (const f of fratelli) {
+      if (!f.parent || out.includes(f.p) || !miei.has(f.parent)) continue;
+      out.push(f.p);
+      miei.add(f.id);
+      trovati = true;
+    }
+  }
+  // Ripiego dal tempo, solo per chi non dichiara un lanciatore.
+  const finestreValide = Array.isArray(finestre) ? finestre : [];
+  for (const f of fratelli) {
+    if (f.parent || !finestreValide.length) continue;
+    const t = primoTimestampMs(f.p);
     if (!Number.isFinite(t)) continue;
     // Due secondi di margine prima: la riga della chiamata e la prima riga
     // del figlio si scrivono a orologi diversi.
-    if (finestre.some((f) => t >= f.inizio - 2000 && t <= f.fine)) out.push(p);
+    if (finestreValide.some((w) => t >= w.inizio - 2000 && t <= w.fine)) {
+      out.push(f.p);
+      note.push(`sotto-agente ${basename(f.p)} senza meta: legato dal tempo della chiamata Agent, non dal lanciatore dichiarato`);
+    }
   }
   return out;
 }
