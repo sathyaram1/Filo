@@ -55,10 +55,11 @@
 //         richieste di biglietto successive escono con 3 — e il pacemaker
 //         rispetta una pausa prima di riaccendere. Non "riportarlo" a parole:
 //         il tuo testo di ritorno non lo legge nessuna macchina.
-//         Prima di parlare col server spedisce il ramo corrente su origin
-//         (--force-with-lease se la storia è stata riscritta): se il push
-//         fallisce NON rilascia ed esce diverso da zero. `--senza-push` dove
-//         non c'è un repo. Allega da solo il rapporto di fine sessione
+//         Prima di parlare col server committa quello che è rimasto fuori
+//         dai commit (un file nato da una shell non passa dall'hook) e
+//         spedisce il ramo corrente su origin (--force-with-lease se la
+//         storia è stata riscritta): se il push fallisce NON rilascia ed
+//         esce diverso da zero. `--senza-push` dove non c'è un repo. Allega da solo il rapporto di fine sessione
 //         (session-report.mjs; `--role <ruolo>` per firmarlo; `--senza-rapporto`
 //         per saltarlo).
 //
