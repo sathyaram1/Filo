@@ -88,6 +88,36 @@ is_gated_branch() {
 }
 export -f is_gated_branch 2>/dev/null || true
 
+# ─── LA SPEDIZIONE NON TACE ──────────────────────────────────────────────────
+#
+# Fino al 2026-09-16 il push era `… >/dev/null 2>&1 || true`. Dopo un rebase
+# la storia locale diverge da quella su origin, git rifiuta il push, e l'hook
+# non diceva niente: il ramo su origin restava vecchio e il cancello del server
+# rileggeva lo stesso conflitto all'infinito (giro del 14/09).
+#
+# Ora: un push normale; se git lo rifiuta perche' la storia e' divergente, un
+# secondo tentativo con --force-with-lease. Il lease e' contro il ref remoto
+# che questa copia conosce (refs/remotes/origin/<ramo>): se nel frattempo
+# qualcun altro ha spinto sullo stesso ramo, git rifiuta, ed e' giusto cosi'.
+# Qualunque altro esito negativo — o il secondo rifiuto — finisce in UNA riga
+# su stderr, col motivo di git, nello stesso posto dove l'hook dice che si
+# astiene dal ramo principale.
+motivo_git() {
+  printf '%s\n' "$1" | grep -vE '^hint:|^To |^[[:space:]]*$' | head -3 | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+}
+spedisci_ramo() {
+  local ramo="$1" dove="$2" esito esito2
+  esito=$(git push origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+  case "$esito" in
+    *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
+      esito2=$(git push --force-with-lease="refs/heads/$ramo" origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      echo "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")" >&2
+      return 1 ;;
+  esac
+  echo "[auto-commit] '$dove': il ramo '$ramo' NON e' arrivato su origin: $(motivo_git "$esito")" >&2
+  return 1
+}
+
 # Identità di chi committa: distingue nella storia le due provenienze.
 if is_routine_session; then
   COMMIT_AS_NAME="claude-routine"
