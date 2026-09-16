@@ -16,6 +16,9 @@
 //   Un caso il cui esito finale è «unexpected» (fallito in tutti i tentativi,
 //   compresi i retry). Un caso «flaky» (rosso a un tentativo, verde dopo) non è
 //   un rosso: è già il compito dei retry assorbirlo. Gli «skipped» non contano.
+//   Gli errori FUORI dai casi (json.errors) sono rossi anche loro, con una
+//   eccezione: un «Worker teardown timeout» in una corsa senza altri rossi
+//   nuovi è un avviso, non un rosso (vedi classificaErroriGlobali).
 //
 // COME SI COPRE UN ROSSO
 //   Una voce di contenitore.specs con `spec` e `caso` copre QUEL caso (`caso`
