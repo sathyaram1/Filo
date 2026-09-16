@@ -139,6 +139,11 @@ automatici sono l'ultimo passo, non il primo.
   file: quello che non è lì dentro è una regressione. In dubbio, confronta con
   `main` sullo stesso spec prima di bocciare — un rosso d'ambiente spacciato per
   regressione costa un giro intero.
+- **Nel contenitore delle routine** (Linux, senza schermo, da root) gli spec che
+  aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`
+  (lo dice già `scripts/ensure-electron.mjs`). Un rosso all'avvio di Electron
+  senza quei due non è un rosso vero: rilancia con entrambi prima di scrivere
+  qualunque rilievo.
 - Se trovi un rosso d'ambiente che nel file non c'è, **non aggiungerlo tu**:
   scrivilo nella critica come rilievo, con il caso e il motivo. Un elenco che
   cresce da solo torna a essere folklore.
