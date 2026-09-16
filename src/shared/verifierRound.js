@@ -402,9 +402,12 @@
    *
    * Regole:
    *   - un rilievo di livello 3 o 2 che chiede una decisione ferma il lavoro;
-   *   - un rilievo di livello 3/2 (o 1) si corregge se il SUO bilancio ha
-   *     ancora giri; a bilancio finito un 3/2 ferma il lavoro, un 1 va nel
-   *     feedback derivato;
+   *   - un rilievo di livello 3/2 si corregge se il SUO bilancio ha ancora
+   *     giri; a bilancio finito ferma il lavoro;
+   *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
+   *     giro lo paga già il livello più alto, e un altro verificatore arriva
+   *     comunque: decisione dell'owner del 2026-09-16) oppure se il suo
+   *     bilancio ha ancora giri; altrimenti va nel feedback derivato;
    *   - un 1 che chiede una decisione va nel feedback derivato;
    *   - gli 0 si correggono solo se nello stesso giro si corregge anche altro
    *     (un altro verificatore arriva comunque) oppure se l'owner ha dato
