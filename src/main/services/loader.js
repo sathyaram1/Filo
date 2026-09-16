@@ -1,9 +1,5 @@
-// Loader: importa i moduli "background" (portati 1:1 dall'estensione) e
-// "shared" nell'ordine corretto. Tutti i file usano il pattern IIFE che
-// si registra su globalThis, quindi require() basta a renderli disponibili.
-//
-// Lo shim chrome.* deve essere già stato caricato prima di questo file
-// (main.js lo fa nell'ordine giusto).
+// Importa i moduli "background" e "shared" nell'ordine corretto: tutti usano il pattern IIFE che si registra su globalThis, quindi require() basta a renderli disponibili.
+// Lo shim chrome.* dev'essere già stato caricato prima di questo file (lo fa main.js).
 
 const path = require('node:path');
 
@@ -12,40 +8,29 @@ const SVC = __dirname;
 
 // Ordine identico al vecchio background.js importScripts(...).
 require(path.join(SHARED, 'constants.js'));
-// Il marchio della UI di Filo dentro le pagine web: serve ai content script,
-// ma sta fra i moduli condivisi e segue l'ordine di tutti gli altri.
+// Il marchio della UI di Filo dentro le pagine web: serve ai content script, ma è un modulo condiviso e segue l'ordine degli altri.
 require(path.join(SHARED, 'filoUi.js'));
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
-// Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd):
-// serve a chiunque disegni un'etichetta, quindi sta in alto.
+// Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd): serve a chiunque disegni un'etichetta, quindi sta in alto.
 require(path.join(SHARED, 'tasti.js'));
-// "Il cursore è in un campo di testo?": la regola che decide se Ctrl/Cmd+Z
-// annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine
-// (src/main/menu.js), i content script la chiamano direttamente.
+// "Il cursore è in un campo di testo?": la regola che decide se Ctrl/Cmd+Z annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine (src/main/menu.js), i content script la chiamano direttamente.
 require(path.join(SHARED, 'campoTesto.js'));
 require(path.join(SHARED, 'timeFormat.js')); // formattazione durate/countdown (#323)
 require(path.join(SHARED, 'modelCaps.js'));
-// Censimento dei punti in cui Filo usa un modello: è la sorgente di verità
-// dell'elenco di funzioni impostabili, quindi va caricato PRIMA dell'editor
-// delle catene (che da lì prende l'elenco).
+// Sorgente di verità dell'elenco delle funzioni impostabili: va caricato PRIMA dell'editor delle catene, che da lì prende l'elenco.
 require(path.join(SHARED, 'modelUsage.js'));
-// Elenco delle funzioni impostabili + le loro etichette: serve al main per
-// chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
-// Opzioni (il messaggio d'errore gli dice di andare lì). Il modulo tocca il DOM
-// solo dentro le funzioni di rendering, mai al caricamento.
+// Etichette delle funzioni impostabili: il main deve poter chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle Opzioni. Tocca il DOM solo dentro le funzioni di rendering, mai al caricamento.
 require(path.join(SHARED, 'modelChainEditor.js'));
 require(path.join(SHARED, 'storage.js'));
 require(path.join(SHARED, 'themeTokens.js'));
 require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
-// #585 — pulizia e incapsulamento dei percorsi condivisi. Va PRIMA di paths.js
-// (che la usa in scrittura) e di handlers.js (che la usa in lettura).
+// #585 — va PRIMA di paths.js (che la usa in scrittura) e di handlers.js (che la usa in lettura).
 require(path.join(SHARED, 'pathsSafety.js'));
 require(path.join(SHARED, 'paths.js'));
-// Elenco e stato della micro-intervista di benvenuto (#524): logica pura, va
-// PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
+// Micro-intervista di benvenuto (#524): logica pura, va PRIMA di filoMemory, che ci passa lo stato letto dallo storage.
 require(path.join(SHARED, 'onboarding.js'));
 require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'filoState.js'));
@@ -73,16 +58,13 @@ require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'ttsVoices.js'));          // voci del modello di lettura (Kokoro)
 require(path.join(SHARED, 'dictationSegmenter.js')); // dettatura in diretta: spezzoni di parlato (logica pura)
-// Solo nei test: registro e catene di modelli di prova (l'app non ha modelli
-// scritti nel codice; vedi tests/fixtures/testModels.js).
+// Solo nei test: l'app non ha modelli scritti nel codice (vedi tests/fixtures/testModels.js).
 if (process.env.NODE_ENV === 'test') {
   try { require(path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'testModels.js')); } catch (e) { console.warn('[loader] testModels non caricato:', e.message); }
 }
 require(path.join(SHARED, 'patchNotes.js'));
 require(path.join(SHARED, 'capabilities.js'));
-// Documenti di trasparenza (generati da transparency/*.md): servono all'agente
-// per rispondere quando l'utente chiede conto di una scelta. Il gemello
-// transparencyUi.js NON si carica qui: è codice di pagina, tocca il DOM.
+// Documenti di trasparenza: servono all'agente per rispondere quando l'utente chiede conto di una scelta. Il gemello transparencyUi.js NON si carica qui: è codice di pagina, tocca il DOM.
 require(path.join(SHARED, 'transparency.js'));
 require(path.join(SHARED, 'autoFeedback.js'));  // F4 — dipende da capabilities
 require(path.join(SHARED, 'feedbackPublicKey.js'));
@@ -122,8 +104,7 @@ require(path.join(SVC, 'geoBlockClassifier.js'));
 require(path.join(SVC, 'geoBlockRules.js'));
 
 module.exports = {
-  // Esponiamo gli oggetti popolati su globalThis per chi vuole un riferimento
-  // diretto invece di pescare da globalThis.
+  // Per chi vuole un riferimento diretto invece di pescare da globalThis.
   get SN_CONST() { return globalThis.SN_CONST; },
   get SN_MSG() { return globalThis.SN_MSG; },
   get SN_STORAGE() { return globalThis.SN_STORAGE; },

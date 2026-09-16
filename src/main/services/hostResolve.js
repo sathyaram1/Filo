@@ -1,30 +1,12 @@
-// "Questo host esiste davvero?" — risoluzione DNS leggera per la barra comando
-// della dashboard. Quando l'utente digita "/dominio.tld", prima di navigare (e
-// per colorare di rosso l'input mentre scrive) verifichiamo che l'host risolva:
-// un dominio inventato come "nonesistedavvero.io" porterebbe altrimenti a una
-// pagina bianca di errore.
-//
-// POLITICA (volutamente conservativa: meglio lasciar navigare che bloccare per
-// sbaglio un sito buono):
-//   • IP letterale (1.2.3.4, ::1), localhost / *.localhost, oppure un nome della
-//     rete locale (nas.lan, raspberrypi.local, fritz.box — vedi
-//     SN_URL_NAV.isLocalNetworkName) → consideralo valido SENZA interrogare il
-//     DNS. Il resolver pubblico non li conosce per definizione: chiederglielo
-//     restituisce ENOTFOUND anche quando il dispositivo è lì e risponde (#433).
-//   • host normale → `dns.lookup` (lo stesso resolver del sistema operativo che
-//     userebbe il browser per navigare). SOLO un esito ENOTFOUND ("il dominio
-//     non esiste") conta come "non esiste". Qualsiasi altro errore — rete giù,
-//     timeout, EAI_AGAIN transitorio — è un DUBBIO: torniamo "esiste" per non
-//     bloccare una navigazione legittima.
+// "Questo host esiste davvero?" — risoluzione DNS leggera per la barra comando della dashboard: senza, un dominio inventato porterebbe a una pagina bianca di errore.
+// IP letterali, localhost e i nomi della rete locale (nas.lan, raspberrypi.local — SN_URL_NAV.isLocalNetworkName) sono validi SENZA interrogare il DNS: il resolver pubblico non li conosce e risponde ENOTFOUND anche quando il dispositivo è lì e risponde (#433).
+// Per gli altri si usa il resolver del sistema. Politica volutamente conservativa: meglio lasciar navigare che bloccare per sbaglio un sito buono.
 
 const dns = require('node:dns').promises;
 const net = require('node:net');
-// Registra globalThis.SN_URL_NAV (IIFE). Una sola definizione di "host locale"
-// per tutta l'app: la stessa che sceglie http:// invece di https://.
+// Una sola definizione di "host locale" per tutta l'app: la stessa che sceglie http:// invece di https://.
 require('../../shared/urlNav.js');
 
-// Vero se ha senso interrogare il DNS per questo host. IP letterali, localhost e
-// i nomi della rete locale non vanno risolti: sono validi per definizione.
 function isCheckableHost(host) {
   const h = String(host == null ? '' : host).trim().toLowerCase();
   if (!h) return false;
@@ -37,7 +19,7 @@ function isCheckableHost(host) {
   return true;
 }
 
-// Esistenza dell'host. `lookup` iniettabile per i test (default: dns.lookup).
+// `lookup` iniettabile per i test (default: dns.lookup).
 async function hostResolves(host, { lookup = dns.lookup } = {}) {
   const h = String(host == null ? '' : host).trim().toLowerCase();
   if (!h) return false;
@@ -46,7 +28,7 @@ async function hostResolves(host, { lookup = dns.lookup } = {}) {
     await lookup(h);
     return true;
   } catch (err) {
-    // SOLO "il dominio non esiste" blocca. Errori di rete/transitori → dubbio.
+    // SOLO "il dominio non esiste" blocca. Errori di rete o transitori (timeout, EAI_AGAIN) sono un dubbio: si torna "esiste".
     if (err && err.code === 'ENOTFOUND') return false;
     return true;
   }

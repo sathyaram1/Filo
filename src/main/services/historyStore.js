@@ -16,14 +16,11 @@
   }
 
   function approximateBytes(items) {
-    // Approssimazione conservativa: lunghezza JSON
+    // Approssimazione conservativa: lunghezza del JSON.
     try { return JSON.stringify(items).length; } catch (_) { return 0; }
   }
 
-  // Rimuove dall'input campi voluminosi che non hanno valore storico ma
-  // farebbero esplodere la quota di chrome.storage.local (≈10 MB senza
-  // "unlimitedStorage"). Lo screenshot del flusso Aiuto è un data URL
-  // tipicamente da centinaia di KB per turno: non lo salviamo.
+  // Via i campi voluminosi che non hanno valore storico: la quota di chrome.storage.local è ~10 MB e lo screenshot del flusso Aiuto è un data URL da centinaia di KB per turno.
   function sanitizeInput(input) {
     if (!input || typeof input !== 'object') return input || {};
     const out = { ...input };
@@ -39,28 +36,21 @@
       action: entry.action,
       provider: entry.provider,
       model: entry.model,
-      // Chi ha DAVVERO servito la risposta upstream (#421), quando il provider lo
-      // riporta (OpenRouter). È la controprova della politica sui fornitori: null
-      // se il dato non è arrivato (per voce e dettatura arriva dopo, via patch).
+      // Chi ha DAVVERO servito la risposta upstream (#421), quando il provider lo riporta: è la controprova della politica sui fornitori. null se il dato non è arrivato (per voce e dettatura arriva dopo, via patch).
       servedBy: entry.servedBy || null,
-      // Chi ha servito risultava fra i fornitori esclusi dalla politica: la voce
-      // resta marchiata, così la prova di cosa è successo non vive solo in un
-      // log che nessuno riapre.
+      // Chi ha servito era fra i fornitori esclusi dalla politica: la voce resta marchiata, così la prova di cosa è successo non vive solo in un log che nessuno riapre.
       policyViolation: entry.policyViolation === true,
       input: sanitizeInput(entry.input),
       output: entry.output || '',
       origin: entry.origin || '',
       costEur: entry.costEur || 0,
       usage: entry.usage || null,
-      // Tempi del turno (ms dalla partenza della richiesta): primo pezzo di
-      // ragionamento, prima parola, prima azione, fine. Senza questi numeri
-      // ogni scelta sui modelli è a occhio.
+      // Tempi del turno (ms dalla partenza): primo pezzo di ragionamento, prima parola, prima azione, fine. Senza questi numeri ogni scelta sui modelli è a occhio.
       timing: (entry.timing && typeof entry.timing === 'object') ? entry.timing : null,
     };
     items.unshift(full);
-    // Hard cap items
     if (items.length > HISTORY_ITEMS_HARD_CAP) items.length = HISTORY_ITEMS_HARD_CAP;
-    // Hard cap byte: ruota cancellando i più vecchi
+    // Oltre il limite di byte si ruota cancellando i più vecchi.
     while (approximateBytes(items) > HISTORY_LIMIT_BYTES && items.length > 10) {
       items.pop();
     }
@@ -68,11 +58,7 @@
     return full;
   }
 
-  // Rimuove UNA sola voce dalla cronologia AI per id. Simmetrica a append:
-  // se l'utente può aggiungere una voce (di fatto ogni richiesta AI) deve poter
-  // togliere quella singola voce senza svuotare tutto lo storico (es. contiene
-  // testo privato o un risultato sbagliato). Restituisce la lista aggiornata,
-  // così il chiamante riallinea la vista senza una seconda lettura.
+  // Simmetrica ad append: se l'utente può aggiungere una voce deve poter togliere quella singola (testo privato, risultato sbagliato) senza svuotare tutto lo storico. Ritorna la lista aggiornata, così il chiamante riallinea la vista senza rileggere.
   async function remove(id) {
     const items = await list();
     const next = items.filter((it) => it && it.id !== id);
@@ -82,9 +68,7 @@
     return next;
   }
 
-  // Aggiorna pochi campi di una voce già scritta. Serve al riscontro "chi ha
-  // servito" delle chiamate audio, che arriva qualche secondo DOPO la risposta:
-  // la voce nasce senza, e viene marchiata quando il dato c'è.
+  // Serve al riscontro "chi ha servito" delle chiamate audio, che arriva qualche secondo DOPO la risposta: la voce nasce senza e viene marchiata quando il dato c'è.
   async function patch(id, fields) {
     if (!id || !fields || typeof fields !== 'object') return null;
     const items = await list();
@@ -99,11 +83,7 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: [] });
   }
 
-  // Migrazione one-shot: ripulisce le entry esistenti dagli screenshot
-  // (data URL pesanti salvati in input prima del fix). Idempotente: se non
-  // trova nulla da ripulire e la dimensione è entro soglia, non scrive.
-  // Se la scrittura iniziale fallisce per quota, dimezza progressivamente
-  // gli item finché non passa o restano solo gli ultimi 10.
+  // Migrazione one-shot: ripulisce le voci dagli screenshot salvati prima del fix. Idempotente: se non c'è nulla da ripulire e la dimensione è entro soglia, non scrive.
   async function cleanupScreenshots() {
     let items;
     try { items = await list(); } catch (_) { return { changed: false }; }
@@ -122,15 +102,13 @@
     const overLimit = approximateBytes(cleaned) > HISTORY_LIMIT_BYTES;
     if (stripped === 0 && !overLimit) return { changed: false };
 
-    // Applica anche la rotazione per rientrare nel limite.
     let trimmed = cleaned;
     if (trimmed.length > HISTORY_ITEMS_HARD_CAP) trimmed.length = HISTORY_ITEMS_HARD_CAP;
     while (approximateBytes(trimmed) > HISTORY_LIMIT_BYTES && trimmed.length > 10) {
       trimmed.pop();
     }
 
-    // Se la scrittura fallisce per quota (lo storage può essere già pieno
-    // a causa di altri consumer), dimezziamo progressivamente.
+    // Lo storage può essere già pieno per colpa di altri consumer: se la scrittura fallisce per quota si dimezza progressivamente.
     while (trimmed.length > 0) {
       try {
         await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: trimmed });
