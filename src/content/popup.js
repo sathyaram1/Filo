@@ -1,5 +1,4 @@
-// Popup risposta AI: streaming, posizionamento smart, drag, conversazione (follow-up).
-// Supporta più popup contemporanei: aprire un nuovo popup non chiude quelli precedenti.
+// Popup risposta AI: streaming, posa, trascinamento, conversazione. Più popup insieme: aprirne uno nuovo non chiude i precedenti.
 
 (function (global) {
   'use strict';
@@ -11,7 +10,6 @@
   // Stack di popup aperti. L'ultimo è il topmost.
   const popups = [];
 
-  // z-index iniziale e step per stacking deterministico
   const Z_BASE = 2147483600;
   const Z_STEP = 1;
 
@@ -248,7 +246,6 @@
     let dragging = false;
     handle.addEventListener('mousedown', (e) => {
       if (e.target.closest('.sn-popup-close')) return;
-      // Porta in primo piano il popup trascinato
       bringToFront(rootToPopup(root));
       const rect = root.getBoundingClientRect();
       dx = e.clientX - rect.left;
@@ -261,7 +258,7 @@
     });
     function onMove(e) {
       if (!dragging) return;
-      // Il riquadro si è MOSSO davvero (un clic sull'intestazione per portarlo davanti non conta): da qui in poi la posa è dell'utente, e chi rimisura smette di riportarlo sul punto ancorato, limitandosi a tenerlo dentro lo schermo.
+      // Il riquadro si è MOSSO davvero (un clic sull'intestazione per portarlo davanti non conta): da qui la posa è dell'utente, e chi rimisura si limita a tenerlo dentro lo schermo invece di riportarlo sul punto ancorato.
       try { onDragStart && onDragStart(); } catch (_) {}
       let left = e.clientX - dx;
       let top = e.clientY - dy;
@@ -303,7 +300,7 @@
     popups.forEach((p, i) => { p.root.style.zIndex = String(Z_BASE + i * Z_STEP); });
   }
 
-  // Registra un elemento esterno (la modale feedback) nello stack, così partecipa allo z-ordering condiviso: sopra i box aperti prima, sotto quelli aperti dopo. La chiusura resta del chiamante.
+  // Registra un elemento esterno (la modale feedback) nello stack, così partecipa allo z-ordering condiviso. La chiusura resta del chiamante.
   function registerStack(root) {
     if (!root) return null;
     const entry = { root, isExternal: true };
@@ -364,7 +361,6 @@
     const rawYSotto = Number.isFinite(anchor?.bottom) ? anchor.bottom : rawY;
     const dentro = (v, max) => Math.max(POSE_MARGIN, Math.min(max - POSE_MARGIN, v));
     const ax = () => dentro(rawX, window.innerWidth);
-    // Il bordo della parola da cui si stacca il riquadro, a seconda del lato.
     const ayCima = () => dentro(rawYSopra, window.innerHeight);
     const ayFondo = () => dentro(rawYSotto, window.innerHeight);
     // Letto PRIMA di scrivere il tetto inline: dopo rileggeremmo il nostro
@@ -436,7 +432,6 @@
       messe.forEach((c) => root.classList.remove(c));
       return v;
     };
-    // Da comodo: il minimo dichiarato più il suo contorno.
     const bodyComfort = (() => {
       if (!bodyEl) return 0;
       let mh = 0, bordo = residuoCorpo([]);
@@ -446,19 +441,16 @@
         return cs.boxSizing === 'border-box' ? Math.max(mh, bordo) : mh + bordo;
       } catch (_) { return bordo; }
     })();
-    // Da stretto (il corpo scorre) e da nudo (il corpo è sparito del tutto).
     const bodyStretto = residuoCorpo([POSE_TIGHT]);
     const bodyNudo = residuoCorpo([POSE_TIGHT, POSE_BARE]);
-    // Idem per la riga del costo: da nascosta misurerebbe zero e non tornerebbe
-    // più. (Nasce vuota ma il foglio di stile le dà già l'altezza che avrà
-    // piena, così questa misura vale anche dopo.)
+    // Idem per la riga del costo: da nascosta misurerebbe zero e non tornerebbe più. Nasce vuota, ma il foglio di stile le dà già l'altezza che avrà piena.
     const footerH = altezza(footerEl);
 
     // Quello che non cede mai. Misurato ogni volta: la riga per scrivere si
     // allarga quando la domanda è lunga.
     const incomprimibile = () => altezza(headerEl) + altezza(composeEl);
 
-    // Il minimo e il tetto naturale della casella, letti dal foglio di stile UNA VOLTA e prima di scriverci sopra il tetto ristretto: dopo rileggeremmo il nostro stesso valore e lo stringeremmo a ogni giro.
+    // Minimo e tetto naturale della casella, letti UNA VOLTA e prima di scriverci sopra il tetto ristretto: dopo rileggeremmo il nostro stesso valore, stringendolo a ogni giro.
     const inputEl = root.querySelector('.sn-popup-input');
     const misuraStile = (el, prop, ripiego) => {
       let v = NaN;
@@ -563,9 +555,7 @@
       if (left < POSE_MARGIN) left = POSE_MARGIN;
       root.style.left = `${Math.round(left)}px`;
       if (side === 'dentro') {
-        // Il punto ancorato non era onorabile: il riquadro si appoggia in cima
-        // alla finestra e il tetto lo tiene dentro. Anche questa coordinata non
-        // dipende dall'altezza corrente, quindi resta costante come le altre.
+        // Il punto ancorato non era onorabile: il riquadro si appoggia in cima alla finestra e il tetto lo tiene dentro. Anche questa coordinata resta costante come le altre.
         root.style.bottom = 'auto';
         root.style.top = `${POSE_MARGIN}px`;
       } else if (side === 'above') {
@@ -626,7 +616,6 @@
         if (next < cur) { root.style.maxHeight = `${Math.floor(next)}px`; }
         r = root.getBoundingClientRect();
       }
-      // Dentro tutti e due i bordi: finito.
       if (POSE_MARGIN - r.top <= 1 && r.bottom - (vh - POSE_MARGIN) <= 1) return;
       // Sborda ancora: o il tetto è già al minimo (finestra più bassa del riquadro), o a sbordare è il bordo ancorato. Meglio coprire il punto ancorato che restare fuori dal bordo, dove non si clicca. Si passa all'aggancio dall'alto per non litigare con `bottom`.
       const top = Math.max(0, Math.min(vh - r.height, r.top));
@@ -781,7 +770,6 @@
 
     root.addEventListener('mousedown', () => bringToFront(popup), true);
 
-    // Send su Enter (senza Shift); Shift+Enter inserisce nuova riga
     popup.inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -838,7 +826,6 @@
     el.scrollTop = segui ? el.scrollHeight : prevTop;
   }
 
-  // Il riquadro è appena diventato più alto: rimettilo in posa.
   function reflow(popup) {
     try { popup?.pose?.reflow(); } catch (_) {}
   }
