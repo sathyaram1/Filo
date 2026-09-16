@@ -277,3 +277,88 @@ describe('…ma su un ramo di lavoro continuano a fare il loro mestiere', () => 
       'l\'osservazione deve essere finita nel commit, non solo nella cartella');
   });
 });
+
+// ─── La spedizione non tace (giro del 14/09/2026) ────────────────────────────
+//
+// Il push era `>/dev/null 2>&1 || true`: dopo un rebase git lo rifiutava e
+// l'hook non diceva niente. Il ramo su origin restava vecchio e il cancello del
+// server rileggeva lo stesso conflitto all'infinito.
+
+/** Come runHook, ma restituisce lo stderr: è lì che l'hook deve parlare. */
+function runHookStderr(work, env = {}) {
+  const ambiente = { ...process.env };
+  delete ambiente.FILO_ROUTINE;
+  const r = spawnSync('bash', [resolve(work, '.claude', 'hooks', 'auto-commit-merge.sh')], {
+    cwd: work, encoding: 'utf8', input: '',
+    env: { ...ambiente, CLAUDE_PROJECT_DIR: work, ...env },
+  });
+  return String(r.stderr || '');
+}
+
+/** Commit di un file col nome dato, sul ramo corrente. */
+function commitFile(work, name, content = 'x\n') {
+  writeFileSync(resolve(work, name), content, 'utf8');
+  git(work, ['add', '-A']);
+  git(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', name]);
+}
+
+describe('la spedizione non tace: storia divergente e push fallito', () => {
+  test('storia riscritta da un rebase: il ramo arriva comunque su origin (--force-with-lease)', () => {
+    const { work } = scene();
+    git(work, ['checkout', '-q', '-b', 'claude/rebase']);
+    // Il ramo era già su origin con un commit A…
+    commitFile(work, 'a.js');
+    git(work, ['push', '-q', 'origin', 'claude/rebase']);
+    const a = shaOf(work, 'claude/rebase');
+    // …poi la storia locale viene riscritta: A sparisce, al suo posto un
+    // commit nuovo (è la forma di un rebase). Origin ha A, la copia locale no.
+    git(work, ['reset', '-q', '--hard', 'HEAD~1']);
+    writeFileSync(resolve(work, 'b.js'), 'dopo il rebase\n', 'utf8');
+
+    const stderr = runHookStderr(work);
+
+    git(work, ['fetch', '-q', 'origin', 'claude/rebase']);
+    assert.notEqual(shaOf(work, 'claude/rebase'), a);
+    assert.equal(shaOf(work, 'origin/claude/rebase'), shaOf(work, 'claude/rebase'),
+      'dopo un rebase il ramo su origin deve essere quello riscritto, non quello vecchio: altrimenti il cancello rilegge lo stesso conflitto per sempre');
+    assert.ok(git(work, ['ls-tree', '-r', '--name-only', 'origin/claude/rebase']).includes('b.js'));
+    assert.doesNotMatch(stderr, /NON e' arrivato/, 'nessun allarme quando la spedizione riesce');
+  });
+
+  test('qualcun altro ha spinto nel frattempo: il lease rifiuta, e l\'hook lo dice', () => {
+    const { base, origin, work } = scene();
+    git(work, ['checkout', '-q', '-b', 'claude/conteso']);
+    commitFile(work, 'a.js');
+    git(work, ['push', '-q', 'origin', 'claude/conteso']);
+    // Un'altra copia spinge B sopra A: la copia locale non lo sa (origin/… è fermo ad A).
+    const altro = resolve(base, 'altro');
+    git(base, ['clone', '-q', origin, altro]);
+    git(altro, ['checkout', '-q', 'claude/conteso']);
+    commitFile(altro, 'di-un-altro.js');
+    git(altro, ['push', '-q', 'origin', 'claude/conteso']);
+    const b = git(altro, ['rev-parse', 'HEAD']);
+    // Intanto qui la storia viene riscritta.
+    git(work, ['reset', '-q', '--hard', 'HEAD~1']);
+    writeFileSync(resolve(work, 'c.js'), 'riscritto\n', 'utf8');
+
+    const stderr = runHookStderr(work);
+
+    assert.equal(git(work, ['ls-remote', origin, 'refs/heads/claude/conteso']).split(/\s/)[0], b,
+      'il lavoro di un altro non deve essere sovrascritto: il lease è contro il ref conosciuto, e qui non combacia');
+    assert.match(stderr, /claude\/conteso.*NON e' arrivato su origin/, 'un push che non arriva si dice, non si tace');
+    assert.match(stderr, /force-with-lease/);
+  });
+
+  test('origin irraggiungibile: il commit resta come paracadute e la riga di log c\'è, col motivo di git', () => {
+    const { work } = scene();
+    git(work, ['checkout', '-q', '-b', 'claude/isolato']);
+    git(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+    writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
+
+    const stderr = runHookStderr(work);
+
+    assert.equal(git(work, ['status', '--porcelain']), '', 'il salvataggio locale resta');
+    assert.match(stderr, /'claude\/isolato' NON e' arrivato su origin: .+/, 'una riga con il ramo e il motivo di git');
+    assert.match(stderr, /non-esiste|does not appear|repository/i, 'il motivo è quello di git, non una frase generica');
+  });
+});
