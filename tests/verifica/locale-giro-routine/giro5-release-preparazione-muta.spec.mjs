@@ -29,7 +29,6 @@ function passiDellaSuite() {
 
 test.describe('lavoro di release — la preparazione della suite (letto, non eseguito)', () => {
   test('un rosso nei passi prima della suite (npm ci, Electron, xvfb) arriva all\'allarme come un rosso della suite', async () => {
-    test.fail(true, 'giro 5: i passi di preparazione non hanno continue-on-error e l\'allarme guarda solo l\'esito del verdetto');
     const passi = passiDellaSuite();
     const nomi = passi.map((p) => p.name);
     const preparazione = passi.filter((p) => /Install dipendenze|Binario di Electron|Schermo virtuale/.test(p.name));
