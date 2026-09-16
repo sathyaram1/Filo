@@ -86,8 +86,10 @@ test.describe('rilascio del biglietto — il ramo va su origin prima di parlare 
     // un generatore) al rilascio non è in nessun commit. Il rilascio spedisce
     // HEAD e non dice niente di quello che lascia a terra — che muore col
     // contenitore, cioè il guasto che questo punto voleva chiudere.
-    test.fail(true, 'rilievo aperto del giro 1: modifiche non committate non vengono né spedite né segnalate');
+    // Rilievo del giro 1, corretto nello stesso giro: il rilascio committa
+    // quello che è rimasto fuori (commitRestante) e poi spedisce.
     const s = scenario('sporco');
+    expect(commitRestante(s.lavoro).committed).toEqual(['nato-da-shell.txt']);
     writeFileSync(join(s.lavoro, 'nato-da-shell.txt'), 'quattro\n');
     const p = pushRamoCorrente(s.lavoro);
     const arrivato = git(s.origin, 'ls-tree', '--name-only', 'claude/prova').split('\n');
