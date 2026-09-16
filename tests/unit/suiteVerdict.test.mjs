@@ -197,7 +197,52 @@ describe('lo script da riga di comando', () => {
     writeFileSync(jsonFile, JSON.stringify(j), 'utf8');
     const r = lancia(jsonFile, out);
     assert.equal(r.status, 1);
+    assert.match(r.stdout, /Rossi NUOVI: 1/);
     assert.match(readFileSync(out, 'utf8'), /errore fuori dai casi: Error: Cannot find module/);
+  });
+
+  // Il teardown scaduto come lo scrive Playwright: coi colori del terminale e
+  // l'elenco degli ultimi test del worker sotto (corsa 35101566321, tre volte).
+  const TEARDOWN = { message: '[31mWorker teardown timeout of 60000ms exceeded.[39m\n\n[31mFailed worker ran 171 tests, last 10 tests were:[39m\ntests/beta.spec.mjs:1:1 › caso rosso noto' };
+
+  test('teardown scaduti con soli rossi noti → uscita 0, e restano nel riassunto come avvisi col numero e il testo', () => {
+    const jsonFile = join(dir, 'teardown-noti.json');
+    const out = join(dir, 'nuovi-4.txt');
+    const j = jsonSintetico({ conNuovo: false });
+    j.errors = [TEARDOWN, TEARDOWN, TEARDOWN];
+    writeFileSync(jsonFile, JSON.stringify(j), 'utf8');
+    const r = lancia(jsonFile, out);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /Rossi NUOVI: 0/);
+    assert.match(r.stdout, /AVVISI[^\n]*: 3/);
+    assert.equal((r.stdout.match(/! Worker teardown timeout of 60000ms exceeded\./g) || []).length, 3, 'ogni avviso sta nel riassunto, senza colori');
+    assert.equal(readFileSync(out, 'utf8'), '', 'un avviso non è un rosso nuovo');
+  });
+
+  test('teardown scaduto insieme a un rosso nuovo → uscita 1, e il teardown conta fra i rossi', () => {
+    const jsonFile = join(dir, 'teardown-nuovo.json');
+    const out = join(dir, 'nuovi-5.txt');
+    const j = jsonSintetico();
+    j.errors = [TEARDOWN];
+    writeFileSync(jsonFile, JSON.stringify(j), 'utf8');
+    const r = lancia(jsonFile, out);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /Rossi NUOVI: 2/);
+    assert.match(r.stdout, /AVVISI[^\n]*: 0/);
+    const nuovi = readFileSync(out, 'utf8');
+    assert.match(nuovi, /tests\/delta\.spec\.mjs › questo è nuovo/);
+    assert.match(nuovi, /errore fuori dai casi: Worker teardown timeout of 60000ms exceeded\./);
+  });
+
+  test('teardown scaduto insieme a un altro errore fuori dai casi → uscita 1, tutti e due rossi', () => {
+    const jsonFile = join(dir, 'teardown-altro.json');
+    const out = join(dir, 'nuovi-6.txt');
+    const j = jsonSintetico({ conNuovo: false });
+    j.errors = [TEARDOWN, { message: 'Error: Cannot find module ../helpers/sparito.mjs' }];
+    writeFileSync(jsonFile, JSON.stringify(j), 'utf8');
+    const r = lancia(jsonFile, out);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /Rossi NUOVI: 2/);
   });
 
   test.after(() => { try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* best effort */ } });
