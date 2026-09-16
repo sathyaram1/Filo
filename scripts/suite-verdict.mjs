@@ -89,13 +89,12 @@ export function statoFinale(test) {
  */
 export function raccogliCasi(json) {
   const out = [];
-  const visita = (suite, file, cornice) => {
+  const visita = (suite, file, cornice, radice) => {
     if (!suite || typeof suite !== 'object') return;
     const fileQui = suite.file || file || '';
     // Il titolo della suite radice è il nome del file: non è una cornice.
-    const corniceQui = suite.title && suite.title !== suite.file && cornice !== null
-      ? [...cornice, normalizzaTitolo(suite.title)]
-      : (cornice === null ? [] : cornice);
+    // Sotto, ogni suite è un describe e il suo titolo entra nella cornice.
+    const corniceQui = radice ? [] : [...cornice, normalizzaTitolo(suite.title)];
     for (const spec of Array.isArray(suite.specs) ? suite.specs : []) {
       const titolo = normalizzaTitolo(spec?.title);
       const specFile = spec?.file || fileQui;
