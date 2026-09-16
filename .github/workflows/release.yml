@@ -8,6 +8,14 @@
 #   aggiorna i tester. Se NON ci sono commit nuovi, non fa nulla (niente release
 #   inutili).
 #
+#   PRIMA della costruzione gira la suite Playwright completa (job `suite`, su
+#   Linux senza schermo, come nel contenitore delle routine): dal 2026-09-15
+#   nessun agente la lancia più a mano, gira solo qui. Verde (o solo rossi noti
+#   del contenitore, tests/rossi-noti.json) → si pubblica; un rosso NUOVO → non
+#   si pubblica, il rosso diventa un feedback e la patch salta un giro.
+#   `solo_suite` (avvio a mano) fa girare la sola suite sul ramo scelto, senza
+#   pubblicare: serve a provarla su un ramo.
+#
 # QUESTO LAVORO NON SCRIVE SU `main` (SPEC-RIDISEGNO-MAX.md §10)
 #   Fino al 18/08/2026 alzava la patch version da sé e la pushava. Su `main`
 #   adesso scrive UNA SOLA identità, quella del server di sicurezza: la ruleset
