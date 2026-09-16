@@ -68,12 +68,6 @@
       "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
     },
     {
-      "spec": "tests/verifier-stress-410",
-      "caso": "nome file ostile; nome file lunghissimo",
-      "perche": "rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
       "spec": "tests/verify-495-avversariale",
       "caso": "nessun numero finché i feedback non sono arrivati",
       "perche": "presume Firestore irraggiungibile; qui è raggiungibile e le schede dicono «Ricevuti (495+)». Stesso caso di manage-tab-counts già noto. rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
