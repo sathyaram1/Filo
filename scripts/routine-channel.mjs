@@ -395,8 +395,11 @@ export async function releaseConRapporto(t, fault, report, opts) {
     return { ...r, rapporto: 'ridotto', avviso: `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.` };
   }
   if (r.status === 400 && r.reason === 'report_malformed') {
+    // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
+    // rapporto), non nella seconda: letto dopo la ritentata si perdeva.
+    const dettaglio = r.body && r.body.detail ? `: ${r.body.detail}` : '';
     r = await tenta(null);
-    return { ...r, rapporto: 'scartato', avviso: `il server non ha capito il rapporto (report_malformed${r.body && r.body.detail ? `: ${r.body.detail}` : ''}): rilasciato SENZA rapporto.` };
+    return { ...r, rapporto: 'scartato', avviso: `il server non ha capito il rapporto (report_malformed${dettaglio}): rilasciato SENZA rapporto.` };
   }
   return { ...r, rapporto: 'allegato' };
 }
