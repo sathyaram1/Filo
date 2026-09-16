@@ -62,7 +62,7 @@ test.beforeAll(() => {
   writeFileSync(join(SCRATCH, 'playwright.config.mjs'), CONFIG);
   writeFileSync(join(SCRATCH, 'prova.spec.mjs'), SPEC);
   // Come nel lavoro di release: nome RELATIVO nel file, cwd = cartella della config.
-  const r = spawnSync(process.execPath, [cli(), 'test', '--config', 'playwright.config.mjs', '--reporter=list,json'], {
+  const r = lanciaPlaywright(['test', '--config', 'playwright.config.mjs', '--reporter=list,json'], {
     cwd: SCRATCH, encoding: 'utf8', env: { ...ambientePulito(), PLAYWRIGHT_JSON_OUTPUT_NAME: 'suite-risultati.json' }, timeout: 120000,
   });
   esito = { status: r.status, stdout: String(r.stdout || ''), stderr: String(r.stderr || '') };
