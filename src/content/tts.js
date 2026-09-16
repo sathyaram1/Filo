@@ -1,22 +1,6 @@
-// Audio del content script: lettura ad alta voce (text-to-speech) e dettatura
-// (registrazione microfono + trascrizione via modello).
-//
-// TTS — strategia: prima si tenta la sintesi vocale via MODELLO (voce
-// naturale di un modello a pesi aperti, scelta in base alla lingua del testo)
-// tramite il main process; se non c'è un modello/chiave o la chiamata
-// fallisce, si ripiega sulla voce del browser (Web Speech: gratuita, offline,
-// voci del sistema operativo). La voce/velocità/tono del fallback arrivano da
-// settings.tts (Preferenze).
-//
-// Dettatura — il microfono viene ascoltato a blocchi e spezzato in frasi
-// (SN_DICTATION_SEGMENTER): ogni frase chiusa da una pausa va al modello di
-// trascrizione e il testo entra nel campo; nel frattempo la frase in corso si
-// vede, provvisoria, nel riquadro rosso. Nessuna registrazione da fermare e
-// aspettare: si parla, e il testo arriva.
-//
-// Estratto da content.js — viene caricato prima di lui dai preload. content.js
-// chiama init() passando le dipendenze che restano sue (settings correnti,
-// gestione del pasteContext, blobToDataUrl).
+// Audio del content script: lettura ad alta voce e dettatura (microfono + trascrizione). content.js lo carica prima di sé e gli passa le dipendenze con init().
+// TTS: prima la voce di un modello a pesi aperti, scelto sulla lingua del testo, via main; senza modello o chiave, e su errore, si ripiega sulla voce del browser (Web Speech: gratuita, offline) con voce/velocità/tono da settings.tts.
+// Dettatura: il microfono è ascoltato a blocchi e spezzato in frasi (SN_DICTATION_SEGMENTER); ogni frase chiusa da una pausa va al modello e il testo entra nel campo — niente registrazione da fermare e aspettare.
 
 (function (global) {
   'use strict';
@@ -40,12 +24,7 @@
       && typeof window.SpeechSynthesisUtterance === 'function';
   }
 
-  // ─── Evidenziazione della parola letta (CSS Custom Highlight API) ──────────
-  //
-  // Usiamo la Highlight API (CSS.highlights + ::highlight()) invece di avvolgere
-  // le parole in <span>: NON modifica il DOM della pagina (niente layout rotto,
-  // niente reflow, funziona anche su pagine React). Registriamo un Range sulla
-  // parola corrente sotto il nome 'filo-reading' e lo stiliamo via CSS.
+  // Evidenziazione con la CSS Custom Highlight API invece che avvolgendo le parole in <span>: non tocca il DOM della pagina, quindi niente layout rotto, niente reflow, e funziona anche sulle pagine React.
   const HL_NAME = 'filo-reading';
   const hlSupported = typeof CSS !== 'undefined'
     && CSS.highlights && typeof window.Highlight === 'function';
@@ -62,9 +41,7 @@
     const st = document.createElement('style');
     st.id = 'sn-read-style';
     global.SN_FILO_UI?.mark(st);
-    // color-mix con l'accent del tema (con fallback letterale se il token manca,
-    // es. pagine senza theme.css). ::highlight accetta solo poche proprietà:
-    // background-color/color/text-decoration sono tra queste.
+    // color-mix con l'accent del tema, col fallback letterale per le pagine senza theme.css. ::highlight accetta poche proprietà: background-color, color, text-decoration sono fra quelle.
     st.textContent =
       `::highlight(${HL_NAME}){background-color:color-mix(in srgb,var(--sn-accent,#c45a3b) 32%,transparent);border-radius:2px;}`;
     (document.head || document.documentElement).appendChild(st);
@@ -100,10 +77,7 @@
     } catch (_) {}
   }
 
-  // Costruisce il "modello di lettura" dalla selezione corrente: il testo da
-  // leggere + i token-parola con i loro Range DOM (per l'evidenziazione).
-  // Cattura i Range AL MOMENTO della costruzione del menu, quando la selezione
-  // esiste ancora. Ritorna null se non c'è una selezione testuale.
+  // Costruisce testo e token-parola con i loro Range DOM. La cattura avviene QUI, alla costruzione del menu, perché lì la selezione esiste ancora; ritorna null se non c'è selezione testuale.
   function buildReadModel() {
     if (!hlSupported) return null;
     const sel = window.getSelection();
@@ -136,9 +110,7 @@
       if (node === selRange.endContainer) e = selRange.endOffset;
       if (e <= s) continue;
       const piece = node.data.slice(s, e);
-      // Separatore tra nodi adiacenti così parole di blocchi diversi non si
-      // fondono ("Ciao"+"mondo"). Lo spazio non appartiene ad alcuno span:
-      // i token (run di non-spazi) non lo includono mai.
+      // Separatore fra nodi adiacenti perché parole di blocchi diversi non si fondano ("Ciao"+"mondo"). Lo spazio non appartiene a nessuno span: i token, run di non-spazi, non lo includono mai.
       if (text.length && !/\s$/.test(text) && !/^\s/.test(piece)) text += ' ';
       spans.push({ node, nodeStart: s, globalStart: text.length, len: piece.length });
       text += piece;
@@ -161,9 +133,7 @@
     return { text, tokens };
   }
 
-  // Sessione di lettura: ogni readAloud ne apre una nuova; stopReading marca
-  // cancellata quella corrente. Gli step async controllano sessionAlive() per
-  // non continuare una lettura che l'utente ha fermato (o sostituito).
+  // Ogni readAloud apre una sessione nuova, stopReading marca cancellata quella corrente: gli step async controllano sessionAlive() per non proseguire una lettura che l'utente ha fermato o sostituito.
   let session = null;
   function newSession() {
     session = { id: ((session && session.id) || 0) + 1, cancelled: false };
@@ -181,12 +151,8 @@
     return !!(synth && (synth.speaking || synth.pending));
   }
 
-  // ─── Stato lettura condiviso tra le schede ────────────────────────────────
-  // La lettura suona nella scheda dove è partita, ma l'utente vuole poterla
-  // fermare anche stando in un'altra scheda. Per questo segnaliamo al main
-  // l'avvio/arresto (reportReadingState) e riceviamo da lui un flag globale
-  // (globalReading) che dice se QUALCHE scheda sta leggendo. Il menu usa
-  // isAnyReading() = lettura locale OPPURE lettura altrove.
+  // La lettura suona nella scheda dov'è partita, ma si deve poter fermare stando in un'altra: si segnala al main l'avvio e l'arresto, e da lui arriva un flag globale che dice se QUALCHE scheda sta leggendo.
+  // Per il menu conta isAnyReading() = lettura locale oppure altrove.
   let reportedReading = false; // ultimo stato segnalato al main (dedup)
   let globalReading = false;   // qualche scheda (anche un'altra) sta leggendo
   function reportReadingState(active) {
@@ -194,17 +160,14 @@
     reportedReading = active;
     try { chrome.runtime.sendMessage({ type: MSG.TTS_READING_STATE, reading: active }); } catch (_) {}
   }
-  // Lettura attiva dal punto di vista del menu: locale o in un'altra scheda.
   function isAnyReading() {
     return ttsBusy() || globalReading;
   }
-  // Ferma la lettura ovunque sia: quella locale subito, e — se sta leggendo
-  // un'altra scheda — chiede al main di inoltrare lo stop a tutte le schede.
   function requestStopReading() {
     stopReading();
     try { chrome.runtime.sendMessage({ type: MSG.TTS_STOP_READING }); } catch (_) {}
   }
-  // Broadcast in arrivo dal main (instradati da content.js).
+  // Broadcast in arrivo dal main, instradati da content.js.
   function handleBroadcast(msg) {
     if (!msg) return false;
     if (msg.type === MSG.TTS_GLOBAL_READING) { globalReading = !!msg.active; return true; }
@@ -226,9 +189,7 @@
     reportReadingState(false);
   }
 
-  // Incapsula PCM 16-bit little-endian mono (quello che torna il modello di
-  // lettura, audio/pcm;rate=24000) in un WAV riproducibile da <audio>. Ritorna
-  // un blob URL.
+  // Incapsula in un WAV riproducibile da <audio> il PCM 16-bit little-endian mono che torna dal modello di lettura (audio/pcm;rate=24000). Ritorna un blob URL.
   function pcmBase64ToWavUrl(base64, sampleRate) {
     const bin = atob(base64);
     const n = bin.length;
@@ -251,9 +212,7 @@
     return m ? parseInt(m[1], 10) : 24000;
   }
 
-  // Fallback voce-del-browser per una porzione di testo. `utterText` è il testo
-  // pronunciato; `baseChar` è l'offset di quel testo nel testo letto completo
-  // (per mappare l'onboundary ai token globali quando il fallback parte a metà).
+  // `utterText` è il testo pronunciato; `baseChar` è il suo offset nel testo letto completo, e serve a mappare l'onboundary sui token globali quando il fallback parte a metà.
   function playBrowserChunk(s, utterText, baseChar) {
     if (!ttsSupported()) { Popup.showToast(I18n.t('tts_not_supported')); clearHighlight(); reportReadingState(false); return; }
     const synth = window.speechSynthesis;
@@ -280,18 +239,13 @@
       };
     }
     u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
-    // Se la voce del browser fallisce, la lettura finisce comunque: non lasciamo
-    // lo stato "sta leggendo" appeso (le altre schede mostrerebbero uno stop
-    // morto). NON azzeriamo l'evidenziazione qui: in ambienti senza voci di
-    // sistema 'error' scatta subito e cancellerebbe l'evidenziazione della prima
-    // parola appena impostata (che è il segnale visibile che la lettura è
-    // partita) — la pulizia avviene comunque allo stop o alla fine reale.
+    // Se la voce del browser fallisce la lettura finisce comunque, per non lasciare appeso lo stato "sta leggendo" (le altre schede mostrerebbero uno stop morto).
+    // L'evidenziazione NON si azzera qui: senza voci di sistema 'error' scatta subito e cancellerebbe la prima parola, che è il segnale visibile che la lettura è partita; a pulire sono lo stop e la fine vera.
     u.onerror = () => { if (sessionAlive(s)) reportReadingState(false); };
     synth.speak(u);
   }
 
-  // Riproduce un chunk già sintetizzato dal modello. Durante la riproduzione
-  // stima la parola corrente (frazione di durata → token) e la evidenzia.
+  // Con l'audio del modello la parola corrente è solo una stima (frazione di durata → token).
   function playModelChunk(s, res, chunk) {
     return new Promise((resolve) => {
       let url;
@@ -323,20 +277,12 @@
     });
   }
 
-  // Avvisa (una sola volta per sessione dell'app — la deduplica vive nel main,
-  // via `firstFallback`) che la lettura a voce naturale del modello non è
-  // disponibile e sta subentrando la voce del browser. Serve a spiegare
-  // "modello impostato ma lettura automatica": il ripiego resta silenzioso e
-  // grazioso (la lettura parte comunque), ma la PRIMA volta diciamo perché, così
-  // l'utente sa se deve intervenire (es. manca la chiave per la voce a modello).
+  // La prima volta che la voce del modello non è disponibile diciamo perché: il ripiego è silenzioso e grazioso, ma senza una parola "modello impostato e lettura automatica" resta un mistero
+  // e l'utente non sa se deve intervenire (per esempio: manca la chiave). La deduplica per sessione dell'app vive nel main, via `firstFallback`.
   function notifyModelFallback(res) {
     if (!res || !res.firstFallback) return;      // deduplicato dal main
     if (!ttsSupported()) return;                 // playBrowserChunk mostrerà già tts_not_supported
-    // Nessun modello impostato per la lettura (o la scorciatoia citata non
-    // esiste): il messaggio arriva già scritto per l'utente e dice dove si
-    // imposta — mostrarlo com'è vale molto più di una frase generica.
-    // Stesso trattamento quando il modello c'è ma pretende il nome di una voce
-    // che Filo non conosce: il messaggio dice dove scriverlo.
+    // Il messaggio di questi errori arriva già scritto per l'utente e dice dove si mette a posto: mostrarlo com'è vale molto più di una frase generica.
     const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
     if (spiegato.includes(res.errorCode) && res.error) {
       try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error))); } catch (_) {}
@@ -346,20 +292,13 @@
     try { Popup.showToast(I18n.t(key)); } catch (_) {}
   }
 
-  // Lettura ad alta voce. Strategia anti-attesa: il testo viene spezzato in
-  // frasi (chunk); la prima — corta — viene sintetizzata e suonata subito,
-  // mentre le successive si preparano in parallelo. Così il tempo prima della
-  // PRIMA parola crolla rispetto a sintetizzare tutto in un colpo solo. La
-  // parola in corso viene evidenziata sulla pagina (se `tokens` è presente).
+  // Strategia anti-attesa: il testo è spezzato in frasi, la prima — corta — si sintetizza e suona subito mentre le altre si preparano in parallelo. Il tempo prima della PRIMA parola crolla rispetto a sintetizzare tutto in un colpo.
   async function readAloud(text, tokens) {
     const full = String(text == null ? '' : text);
     if (!full.trim()) return;
-    // Ferma un'eventuale lettura in corso: due letture sovrapposte sono
-    // incomprensibili (stopReading apre la strada e azzera lo stato).
+    // Due letture sovrapposte sono incomprensibili: prima si ferma quella in corso.
     stopReading();
     const s = newSession();
-    // Segnala al main che questa scheda sta leggendo: le altre schede mostreranno
-    // "Interrompi lettura" finché non arriva il reading:false (sotto).
     reportReadingState(true);
     readTokens = Array.isArray(tokens) ? tokens.slice() : [];
     ensureReadStyle();
@@ -369,8 +308,7 @@
       document.dispatchEvent(new CustomEvent('filo:read-aloud', { detail: { text: full.trim() } }));
     } catch (_) {}
 
-    // Chunk in base ai token (frasi); senza token, un chunk unico (niente
-    // evidenziazione, from=-1).
+    // Senza token non c'è evidenziazione possibile: un chunk unico, from=-1.
     const chunks = readTokens.length
       ? Chunk.chunkTokens(readTokens, {})
       : [{ from: -1, to: -1, start: 0, end: full.length }];
@@ -382,9 +320,7 @@
       if (ci < 0 || ci >= chunks.length || fetches[ci]) return;
       const c = chunks[ci];
       const ctext = full.slice(c.start, c.end);
-      // Teniamo l'intero esito (non solo null): quando il modello non è
-      // disponibile ci serve `error`/`firstFallback` per spiegare all'utente
-      // perché la lettura passa alla voce del browser (vedi notifyModelFallback).
+      // Si tiene l'intero esito e non solo l'audio: quando il modello non è disponibile servono `error` e `firstFallback` per spiegare all'utente perché si passa alla voce del browser.
       fetches[ci] = chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: ctext, lang: pageLang() })
         .then((res) => res || null)
         .catch(() => null);
@@ -401,10 +337,7 @@
         await playModelChunk(s, res, chunks[ci]);
         if (!sessionAlive(s)) return;
       } else {
-        // Modello non disponibile/fallito da qui in poi → voce del browser per
-        // tutto il testo rimanente (un'unica utterance con onboundary). Se
-        // l'utente aveva un modello di lettura impostato, glielo diciamo: senza
-        // avviso "modello impostato ma lettura automatica" resta un mistero.
+        // Dal chunk fallito in poi, voce del browser per tutto il testo rimanente, in un'unica utterance con onboundary.
         notifyModelFallback(res);
         playBrowserChunk(s, full.slice(chunks[ci].start), chunks[ci].start);
         return;
@@ -413,15 +346,8 @@
     if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); }
   }
 
-  // Voce di menu "Leggi ad alta voce" sul testo selezionato. Mentre una
-  // lettura è in corso non la riproponiamo qui: lo stop è una voce globale
-  // presente in QUALSIASI menu (vedi buildStopReadingItem in buildMenuItems),
-  // così "ferma" è sempre raggiungibile, anche senza selezione.
-  //
-  // Cattura QUI il modello di lettura (testo + Range delle parole) perché la
-  // selezione esiste ancora alla costruzione del menu; al click potrebbe non
-  // esserci più. Se la cattura fallisce, si legge comunque il testo (senza
-  // evidenziazione).
+  // Mentre una lettura è in corso questa voce non si ripropone: lo stop è una voce globale presente in QUALSIASI menu (buildStopReadingItem), così «ferma» è sempre raggiungibile, anche senza selezione.
+  // Il modello di lettura si cattura QUI perché alla costruzione del menu la selezione esiste ancora, al click potrebbe non esserci più; se la cattura fallisce si legge lo stesso, senza evidenziazione.
   function buildReadAloudItem(text) {
     if (ttsBusy()) return null;
     const Icons = global.SN_ICONS;
@@ -437,16 +363,13 @@
     };
   }
 
-  // Voce "Interrompi lettura": compare in ogni menu mentre la sintesi vocale
-  // sta riproducendo, indipendentemente dal contesto cliccato.
+  // Compare in ogni menu mentre la sintesi sta riproducendo, qualunque cosa sia stata cliccata.
   function buildStopReadingItem() {
     const Icons = global.SN_ICONS;
     return { type: 'item', icon: Icons.stopReading(18), label: I18n.t('menu_stop_reading'), onClick: () => requestStopReading() };
   }
 
-  // Lingua del testo che si legge: quella dichiarata dalla pagina, altrimenti
-  // quella dell'app. Sceglie la voce del modello (salvo una voce fissata in
-  // Preferenze).
+  // Lingua del testo letto: quella dichiarata dalla pagina, altrimenti quella dell'app. Sceglie la voce del modello, salvo una voce fissata in Preferenze.
   function pageLang() {
     try {
       const l = document.documentElement && document.documentElement.lang;
@@ -461,9 +384,6 @@
       && Boolean(global.SN_DICTATION_SEGMENTER);
   }
 
-  // Item "Detta": ascolto del microfono + trascrizione in diretta con un
-  // modello di dettatura. La freccetta apre la scelta modello, popolata dai
-  // modelli del registro che dichiarano di ascoltare un audio.
   function buildDictateItem() {
     const supported = dictationSupported();
     return {
@@ -500,10 +420,8 @@
     for (const [nickname, entry] of Object.entries(registry)) {
       if (!entry) continue;
       const checked = nickname === current;
-      // Solo i modelli che dichiarano di ascoltare un audio (la voce del
-      // registro lo dice, o il nome lo lascia capire: whisper, asr…). Un
-      // modello di chat qui non funzionerebbe. Quello scelto resta in lista
-      // comunque, così si vede cos'è impostato.
+      // Solo i modelli che dichiarano di ascoltare un audio (lo dice la voce del registro, o lo lascia capire il nome: whisper, asr…): un modello di chat qui non funzionerebbe.
+      // Quello scelto resta in lista comunque, così si vede cos'è impostato.
       if (!checked) {
         const provider = entry.provider || 'openrouter';
         const model = entry.model || entry.openrouter || '';
@@ -540,17 +458,12 @@
   let _dictateState = null;
   // Sicurezza: il microfono non resta aperto oltre questo tempo.
   const DICTATE_MAX_MS = 5 * 60 * 1000;
-  // Frequenza a cui si manda l'audio al modello: per la voce basta e tiene
-  // gli spezzoni piccoli (~32 KB al secondo).
+  // Per la voce 16 kHz bastano, e tengono gli spezzoni piccoli (~32 KB al secondo).
   const DICTATE_RATE = 16000;
-  // Quanti caratteri della frase provvisoria si vedono nel riquadro (la coda:
-  // è quella che cambia mentre si parla).
+  // Quanti caratteri della frase provvisoria si vedono nel riquadro: la coda, che è la parte che cambia mentre si parla.
   const DICTATE_LIVE_CHARS = 140;
 
-  // Perché la dettatura non è partita, detto all'utente. Un errore di
-  // CONFIGURAZIONE dei modelli (nessun modello per questa funzione, o «solo
-  // pesi aperti» senza un modello che ascolti) arriva già spiegato e va
-  // mostrato com'è: dice cosa fare per rimetterla in piedi.
+  // Perché la dettatura non è partita, detto all'utente. Un errore di CONFIGURAZIONE dei modelli arriva già spiegato e va mostrato com'è: dice cosa fare per rimetterla in piedi.
   function explainDictationFailure(res) {
     const spiegato = (res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_OPEN_WEIGHTS_MODEL')
       && res.error;
@@ -581,9 +494,7 @@
     try {
       ctx = new Ctx();
       source = ctx.createMediaStreamSource(stream);
-      // ScriptProcessor: deprecato ma disponibile ovunque e senza file esterni
-      // (un AudioWorklet vorrebbe un modulo caricato da un URL, che un content
-      // script non ha). 4096 campioni ≈ 85 ms a 48 kHz: latenza trascurabile.
+      // ScriptProcessor: deprecato ma disponibile ovunque e senza file esterni (un AudioWorklet vuole un modulo caricato da un URL, che un content script non ha). 4096 campioni ≈ 85 ms a 48 kHz, latenza trascurabile.
       proc = ctx.createScriptProcessor(4096, 1, 1);
       // Un contesto audio può nascere "sospeso" (politica di autoplay): senza
       // resume non arriverebbe nessun campione.
@@ -596,8 +507,7 @@
     }
     const lang = navigator.language || 'it-IT';
 
-    // Riquadro cliccabile: dice che ascolta, mostra la frase in corso, e al
-    // click ferma (il toast non è cliccabile).
+    // Riquadro cliccabile e non toast: al click ferma, e un toast non si può cliccare.
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'sn-dictate-pill';
@@ -608,14 +518,10 @@
     live.className = 'sn-dictate-pill-live';
     live.hidden = true;
     pill.append(label, live);
-    // Non rubare il focus/caret al campo quando l'utente clicca la pill per
-    // fermare: così il cursore resta dove l'utente stava scrivendo e il testo
-    // dettato ci atterra sopra (vale soprattutto per gli editor contenteditable,
-    // dove la selezione viva va persa se il focus passa a un bottone).
+    // Niente focus rubato al campo quando si clicca la pill per fermare: il cursore resta dove l'utente stava scrivendo e il testo dettato ci atterra sopra.
+    // Vale soprattutto nei contenteditable, dove la selezione viva si perde se il focus passa a un bottone.
     pill.addEventListener('mousedown', (e) => e.preventDefault());
-    // Nello stack degli avvisi in pagina (#409), così non finisce sotto o sopra
-    // un toast che arriva nel frattempo. `sticky`: è l'unico comando per
-    // fermare la dettatura, il tetto dello stack non deve poterlo sfrattare.
+    // Nello stack degli avvisi in pagina (#409) per non finire sotto o sopra un toast che arriva nel frattempo. `sticky` perché è l'unico comando per fermare la dettatura: il tetto dello stack non deve poterlo sfrattare.
     Popup.mountToast(pill, { sticky: true });
 
     const state = {
@@ -642,8 +548,7 @@
 
     const segmenter = Seg.createSegmenter({
       sampleRate: DICTATE_RATE,
-      // Frase in corso: trascrizione provvisoria, solo nel riquadro. Una alla
-      // volta: se la precedente è ancora in volo, si salta questo giro.
+      // Frase in corso, provvisoria e solo nel riquadro. Una alla volta: se la precedente è ancora in volo si salta questo giro.
       onInterim: (seg) => {
         if (state.interimBusy || state.stopped || state.failed) return;
         state.interimBusy = true;
@@ -652,9 +557,7 @@
           .catch(() => {})
           .finally(() => { state.interimBusy = false; });
       },
-      // Frase chiusa da una pausa: trascrizione definitiva, nel campo. In
-      // coda, una alla volta, così il testo entra nell'ordine in cui è stato
-      // detto anche se una risposta è più lenta dell'altra.
+      // Frase chiusa da una pausa: trascrizione definitiva, nel campo. In coda e una alla volta, così il testo entra nell'ordine in cui è stato detto anche se una risposta è più lenta dell'altra.
       onFinal: (seg) => {
         state.queue = state.queue.then(async () => {
           if (state.failed) return;
@@ -670,9 +573,7 @@
           if (!text) return;
           state.finals++;
           showLive('');
-          // Inserisci dove il cursore si trova ADESSO, non dove era all'apertura
-          // del menu: mentre si detta l'utente può aver continuato a scrivere
-          // o spostato il cursore nello stesso campo.
+          // Si inserisce dove il cursore si trova ADESSO, non dov'era all'apertura del menu: mentre detta, l'utente può aver continuato a scrivere o spostato il cursore.
           deps.insertDictatedText(text + ' ');
         });
       },
@@ -686,8 +587,7 @@
       } catch (_) {}
     };
     source.connect(proc);
-    // Lo ScriptProcessor lavora solo se è collegato all'uscita; non scrivendo
-    // nulla nel buffer di uscita, dalle casse non esce niente.
+    // Lo ScriptProcessor lavora solo se collegato all'uscita; non scrivendo nulla nel buffer di uscita, dalle casse non esce niente.
     proc.connect(ctx.destination);
 
     state.stop = async () => {
@@ -716,10 +616,8 @@
 
   function init(d) {
     deps = { ...deps, ...d };
-    // Una scheda appena aperta potrebbe non aver mai ricevuto il broadcast
-    // "sta leggendo" (la lettura era già partita altrove prima che esistesse):
-    // chiediamo lo stato corrente al main così il menu mostra subito "Interrompi
-    // lettura" anche qui.
+    // Una scheda appena aperta può non aver mai ricevuto il broadcast "sta leggendo", perché la lettura era già partita altrove prima che esistesse: si chiede lo stato al main,
+    // così il menu mostra subito «Interrompi lettura» anche qui.
     try {
       const p = chrome.runtime.sendMessage({ type: MSG.TTS_READING_STATUS });
       if (p && typeof p.then === 'function') {
