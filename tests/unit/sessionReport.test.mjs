@@ -231,18 +231,24 @@ test('chi rilascia è un sotto-agente: il rapporto è il suo, non la sessione ma
     assert.equal(rep.tokens.cacheWrite, 41000);
     assert.equal(rep.subagentRuns, 0);
     assert.ok(rep.notes.some((n) => /sotto-agente della sessione orch/.test(n)), rep.notes.join(' | '));
-    // L'orchestratore che rilascia il biglietto di un worker morto: il suo
-    // transcript è l'ultimo scritto, e la finestra del biglietto (`since`)
-    // lascia fuori i suoi turni di prima e il worker 1.
+    // La sessione madre riceve righe di servizio anche mentre aspetta: il suo
+    // file può essere scritto DOPO quello del sotto-agente, ma senza un
+    // messaggio dell'assistente più recente non è lei che sta rilasciando.
+    writeFileSync(join(dir, 'orch.jsonl'), JSON.stringify({ type: 'queue-operation', timestamp: T('26:00'), sessionId: 'orch' }) + '\n', { flag: 'a' });
     utimesSync(join(dir, 'orch.jsonl'), t + 1, t + 1);
+    assert.equal((await generaRapporto({ cwd: progetto, configDir: config })).sessionId, 'w2');
+    // L'orchestratore che rilascia il biglietto di un worker morto: il suo
+    // messaggio dell'assistente è l'ultimo, e la finestra del biglietto
+    // (`since`) lascia fuori i suoi turni di prima e il worker 1.
+    writeFileSync(join(dir, 'orch.jsonl'), turnoDi('o3', T('30:00'), 1000, 50, 'orch') + '\n', { flag: 'a' });
     const orch = await generaRapporto({ role: 'orchestrator', cwd: progetto, configDir: config, since: T('15:00') });
     assert.equal(orch.sessionId, 'orch');
     assert.equal(orch.subagentRuns, 2, 'i due file dei sotto-agenti si leggono…');
-    assert.equal(orch.turns, 2, '…ma nella finestra ci sono solo i turni del worker 2');
-    assert.equal(orch.tokens.cacheWrite, 41000);
+    assert.equal(orch.turns, 3, '…ma nella finestra ci sono solo il rilascio e i turni del worker 2');
+    assert.equal(orch.tokens.cacheWrite, 42000);
     // Senza finestra, la sessione madre resta la somma di tutto (era così prima).
     const tutto = await generaRapporto({ cwd: progetto, configDir: config });
-    assert.equal(tutto.turns, 6);
+    assert.equal(tutto.turns, 7);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
 
