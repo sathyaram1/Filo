@@ -139,6 +139,23 @@ describe('si pubblica SOLO il commit che la suite ha provato', () => {
     assert.match(dopoIlPull, /HEAD~1/);
     assert.match(dopoIlPull, /exit 1/, 'codice mai provato non si costruisce');
   });
+
+  // Giro 6 della verifica (16/09/2026): se main riceve qualcosa durante OGNI
+  // corsa, nessuna versione esce e nessuno lo sa. Non si risolve (scelta
+  // dell'owner), ma il caso si vede: nel riassunto del lavoro, con i due sha.
+  test('quando main si e\' mosso, il riassunto del lavoro lo dice, con lo sha provato e quello attuale', () => {
+    const release = senzaCommenti(job('release'));
+    const primaDelBump = release.slice(0, release.indexOf('release-bump.mjs'));
+    const blocco1 = primaDelBump.slice(primaDelBump.indexOf('if [ "$QUI" != "$PROVATO" ]'));
+    assert.match(blocco1, /GITHUB_STEP_SUMMARY/, 'il primo fermo scrive nel riassunto del lavoro');
+    assert.match(blocco1, /\$\{PROVATO[^}]*\}[\s\S]*\$QUI/, 'con lo sha provato e quello attuale di main');
+    assert.match(blocco1, /main si e' mosso/);
+    const dopoIlPull = release.slice(release.indexOf('git pull --rebase origin main'));
+    const blocco2 = dopoIlPull.slice(dopoIlPull.indexOf('if [ "$SOTTO" != "$PROVATO" ]'));
+    assert.match(blocco2, /GITHUB_STEP_SUMMARY/, 'anche il secondo fermo scrive nel riassunto');
+    assert.match(blocco2, /\$\{PROVATO[^}]*\}[\s\S]*\$SOTTO/, 'con lo sha provato e quello sotto la release');
+    assert.ok(blocco2.indexOf('GITHUB_STEP_SUMMARY') < blocco2.indexOf('exit 1'), 'il riassunto si scrive PRIMA di uscire');
+  });
 });
 
 // Nel contenitore delle routine (Linux, senza schermo, da root) un comando
