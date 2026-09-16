@@ -30,7 +30,7 @@ REGISTRATO con gli script, mentre lavori:
   directory con file non committati;
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`: il rilascio allega da solo il
-  rapporto di fine sessione, e il ruolo è la firma di quel rapporto — senza,
+  rapporto di fine sessione, e il ruolo è la firma di quel rapporto. Senza,
   il rapporto esce anonimo);
 - un guasto che ti impedisce di lavorare → dichiaralo AL CANALE nel rilascio,
   col motivo (`node scripts/routine-channel.mjs release <biglietto>
