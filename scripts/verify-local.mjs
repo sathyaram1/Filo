@@ -818,6 +818,9 @@ if (isMain) {
       console.error('(node scripts/verify-local.mjs corretto "<report>"), poi si riparte.');
       process.exit(1);
     }
+    // I bilanci si leggono già qui, PRIMA del lavoro: se il token manca o il
+    // documento è incompleto, meglio saperlo adesso che dopo la verifica.
+    const capsStart = await bilanciOStop();
     // Prima di consegnare il compito il ramo si riallinea alla linea
     // principale (caso #500): la verifica deve giudicare il contenuto che
     // verrà pubblicato. Sul conflitto ci si ferma qui, col ramo intatto.
