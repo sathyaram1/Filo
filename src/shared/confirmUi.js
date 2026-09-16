@@ -1,26 +1,6 @@
-// Componenti di conferma riusabili per i livelli di sicurezza delle azioni
-// di Filo (#146.2). Stile minimale, costruito sui token del tema (--sn-*).
-//
-//   SN_CONFIRM_UI.confirm({ title, text, okLabel, cancelLabel }) → Promise<bool>
-//     Livello 2: popup che SPIEGA in chiaro la modifica, con OK e Annulla.
-//
-//   SN_CONFIRM_UI.confirmTyped({ title, text, word }) → Promise<bool>
-//     Livello 3: box con attrito maggiore — il bottone resta disabilitato
-//     finché l'utente non digita espressamente la parola ("conferma").
-//
-// Esc o click fuori dal box = annulla. Una sola conferma alla volta.
-//
-// SICUREZZA (#249): il dialogo vive in uno Shadow DOM in modalità CLOSED,
-// agganciato a un host neutro (.sn-confirm-host). Il DOM del documento è
-// condiviso tra il mondo isolato del preload (dove gira questo codice sulle
-// pagine web esterne) e il mondo principale della pagina: senza shadow root
-// chiuso, uno script ostile della pagina poteva trovare il bottone OK via
-// querySelector/MutationObserver e auto-cliccarlo, confermando azioni di
-// livello 2 senza alcun consenso reale. Con lo shadow root chiuso i nodi
-// interni (bottoni, testo, input) NON sono raggiungibili da fuori: la pagina
-// vede solo l'host vuoto. Il riferimento al root resta privato di questo
-// modulo (e degli hook _test, che sulle pagine esterne vivono anch'essi nel
-// mondo isolato, quindi fuori dalla portata della pagina).
+// Conferme riusabili per i livelli di sicurezza delle azioni di Filo (#146.2), sui token del tema. confirm() è il livello 2 (spiega la modifica, OK e Annulla); confirmTyped() è il livello 3, col bottone bloccato finché non si digita la parola. Esc o click fuori annulla, una sola conferma alla volta.
+// SICUREZZA (#249): il dialogo vive in uno Shadow DOM CLOSED su un host neutro. Il DOM del documento è condiviso col mondo principale della pagina, e senza root chiuso uno script ostile trovava il bottone OK e lo auto-cliccava, confermando azioni di livello 2 senza consenso reale.
+// Con il root chiuso la pagina vede solo l'host vuoto, e il riferimento al root resta privato di questo modulo e degli hook _test, che sulle pagine esterne vivono anch'essi nel mondo isolato.
 
 (function (global) {
   'use strict';
@@ -147,21 +127,17 @@
 }
 `;
 
-  // Dialogo attivo (uno alla volta): il root CHIUSO è raggiungibile solo da
-  // questo modulo. `active` serve a done() e agli hook di test qui sotto.
+  // `active` serve a done() e agli hook di test: il root chiuso è raggiungibile solo da qui.
   let active = null; // { host, root }
 
-  // Costruisce host+shadow(closed)+overlay+box e ritorna { overlay, box, done }
-  // dove done(result) smonta tutto e risolve la Promise una sola volta.
+  // Ritorna { overlay, box, done }, dove done(result) smonta tutto e risolve la Promise una volta sola.
   function buildOverlay(resolve) {
     const doc = global.document;
 
-    // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il
-    // posizionamento a tutto viewport (inline, così non serve CSS nel documento).
+    // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il posizionamento a tutto viewport, inline per non dover mettere CSS nel documento.
     const host = doc.createElement('div');
     host.className = 'sn-confirm-host';
-    // Su una pagina web l'host finisce dentro il <body> del sito: marcarlo
-    // tiene fuori il riquadro da chi cammina sulla pagina (la traduzione).
+    // Su una pagina web l'host finisce nel <body> del sito: marcarlo tiene il riquadro fuori da chi cammina sulla pagina (la traduzione).
     global.SN_FILO_UI?.mark(host);
     host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;';
 
@@ -227,7 +203,6 @@
     return btn;
   }
 
-  // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
   function confirm({ title = 'Conferma', text = '', okLabel = 'OK', cancelLabel = 'Annulla' } = {}) {
     return new Promise((resolve) => {
       const { box, done } = buildOverlay(resolve);
@@ -241,8 +216,7 @@
     });
   }
 
-  // Livello 3 — l'utente deve digitare la parola (default "conferma") per
-  // sbloccare il bottone. Per azioni irreversibili.
+  // Livello 3, per azioni irreversibili: il bottone si sblocca solo digitando la parola.
   function confirmTyped({ title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla' } = {}) {
     return new Promise((resolve) => {
       const doc = global.document;
@@ -273,8 +247,7 @@
     });
   }
 
-  // Avviso a un solo bottone — comunica qualcosa senza chiedere una scelta
-  // (es. "Hai ricevuto N crediti in regalo 🎁"). Risolve quando l'utente chiude.
+  // Avviso a un solo bottone: comunica senza chiedere una scelta. Risolve quando l'utente chiude.
   function notify({ title = '', text = '', okLabel = 'OK' } = {}) {
     return new Promise((resolve) => {
       const { box, done } = buildOverlay(resolve);
@@ -286,22 +259,15 @@
     });
   }
 
-  // ── Hook di TEST (tests/helpers/confirm.mjs) ─────────────────────────────
-  // Il root chiuso rende il dialogo invisibile ai locator Playwright: gli spec
-  // sulle pagine filo:// (contextIsolation:false) passano da qui via
-  // page.evaluate. Sulle pagine web esterne SN_CONFIRM_UI vive nel mondo
-  // isolato del preload: la pagina NON può chiamare questi hook, quindi non
-  // riaprono la falla del feedback #249.
+  // Hook di TEST (tests/helpers/confirm.mjs): il root chiuso rende il dialogo invisibile ai locator Playwright, e gli spec sulle pagine filo:// passano da qui via page.evaluate.
+  // Sulle pagine web esterne SN_CONFIRM_UI vive nel mondo isolato del preload: la pagina non può chiamare questi hook, quindi non riaprono la falla del #249.
   const _test = {
-    // Stato del dialogo aperto, o null se non ce n'è uno.
     state() {
       if (!active) return null;
       const q = (s) => active.root.querySelector(s);
       const okBtn = q('.sn-confirm-btn-ok') || q('.sn-confirm-btn-danger');
       const textEl = q('.sn-confirm-text');
-      // Il testo lungo scorre dentro il box invece di essere tagliato, e la sua
-      // selezione usa la palette Filo: entrambe le cose vivono nello shadow root
-      // chiuso, quindi solo da qui sono ispezionabili da uno spec.
+      // Scorrimento del testo lungo e colore della selezione vivono nello shadow root chiuso: solo da qui uno spec può ispezionarli.
       let selectionBg = '';
       try {
         if (textEl) selectionBg = global.getComputedStyle(textEl, '::selection').backgroundColor || '';
@@ -315,8 +281,7 @@
         selectionBg,
       };
     },
-    // Clicca un bottone: which = 'ok' | 'cancel' | 'danger'.
-    // Ritorna false se non c'è dialogo, bottone assente o disabilitato.
+    // which = 'ok' | 'cancel' | 'danger'. False se non c'è dialogo, o il bottone manca o è disabilitato.
     click(which) {
       if (!active) return false;
       const btn = active.root.querySelector('.sn-confirm-btn-' + which);
@@ -324,7 +289,6 @@
       btn.click();
       return true;
     },
-    // Scrive nel campo del dialogo livello 3 (dispatch dell'evento input).
     fill(value) {
       if (!active) return false;
       const input = active.root.querySelector('.sn-confirm-input');

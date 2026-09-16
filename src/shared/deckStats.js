@@ -1,9 +1,5 @@
-// Statistiche del mazzo Commander (DECK-BUILDER-SPEC.md §9) — SOLO logica
-// pura: curva dei costi, pip richiesti/prodotti per colore, CMC medio,
-// composizione per tipo, budget e motore Monte Carlo del calcolatore di
-// probabilità (§9.3). Niente DOM, niente rete: tutto calcolato da
-// (deck, cardsById) — unit test in tests/unit/deckStats.test.mjs, con casi
-// ipergeometrici noti come oracolo per il Monte Carlo.
+// Statistiche del mazzo Commander (DECK-BUILDER-SPEC.md §9), SOLO logica pura: curva dei costi, pip richiesti e prodotti per colore, CMC medio, composizione per tipo, budget e motore Monte Carlo del calcolatore di probabilità (§9.3).
+// Niente DOM né rete: tutto da (deck, cardsById). Gli unit test usano casi ipergeometrici noti come oracolo per il Monte Carlo.
 
 (function (global) {
   'use strict';
@@ -18,8 +14,7 @@
     return /\bLand\b/i.test(t);
   }
 
-  // ── Curva dei costi (§9.1): istogramma per CMC, terre ESCLUSE (la curva
-  //    misura gli incantesimi da lanciare, le terre non si "lanciano"). ──────
+  // Curva (§9.1): istogramma per CMC con le terre ESCLUSE — misura gli incantesimi da lanciare, e le terre non si lanciano.
   function manaCurve(deck, cardsById) {
     const counts = Object.fromEntries(CMC_BUCKETS.map((b) => [b, 0]));
     for (const e of deck.carte) {
@@ -31,7 +26,7 @@
     return CMC_BUCKETS.map((label) => ({ label, n: counts[label] }));
   }
 
-  // CMC medio sulle carte non-terra (pesato per quantità). Null se non ce ne sono.
+  // Sulle carte non-terra, pesato per quantità. Null se non ce ne sono.
   function avgCmc(deck, cardsById) {
     let sum = 0; let n = 0;
     for (const e of deck.carte) {
@@ -43,9 +38,7 @@
     return n ? sum / n : null;
   }
 
-  // ── Mana RICHIESTO per colore (§9.1): conteggio dei pip colorati nei costi.
-  //    Un simbolo ibrido ({W/U}, {2/W}, {G/P}) conta per OGNI colore che
-  //    contiene (è un requisito potenziale di quel colore). Generici/X/C no. ──
+  // Mana RICHIESTO per colore (§9.1): pip colorati nei costi. Un simbolo ibrido conta per OGNI colore che contiene, perché è un requisito potenziale di quel colore; generici, X e incolore no.
   function pipCounts(deck, cardsById) {
     const out = Object.fromEntries(WUBRG.map((c) => [c, 0]));
     const re = /\{([^}]+)\}/g;
@@ -68,10 +61,7 @@
     return out;
   }
 
-  // ── Mana PRODOTTO per colore (§9.1): fonti (terre + rock + dork) che
-  //    producono quel colore, dai dati carta (`producedMana` di Scryfall).
-  //    Conta le FONTI, non i pip: una terra che produce U e R conta 1 in U
-  //    e 1 in R. 'C' = fonti di solo incolore. ─────────────────────────────
+  // Mana PRODOTTO per colore (§9.1) dai dati carta (`producedMana` di Scryfall): conta le FONTI, non i pip, quindi una terra che produce U e R vale 1 in U e 1 in R. 'C' sono le fonti di solo incolore.
   function producedCounts(deck, cardsById) {
     const out = Object.fromEntries([...WUBRG, 'C'].map((c) => [c, 0]));
     for (const e of deck.carte) {
@@ -87,8 +77,7 @@
     return out;
   }
 
-  // Composizione per tipo (§9.1): [{ name, n }] nell'ordine canonico dei tipi.
-  // Delega la classificazione a SN_DECKS.tipoOf (stessa dei gruppi del mazzo).
+  // Composizione per tipo (§9.1): la classificazione la fa SN_DECKS.tipoOf, la stessa dei gruppi del mazzo.
   function typeCounts(deck, cardsById) {
     const D = global.SN_DECKS;
     const counts = new Map();
@@ -108,8 +97,7 @@
       .map(([name, n]) => ({ name, n }));
   }
 
-  // ── Budget (§9.2): totale EUR del mazzo (commander incluso: si compra anche
-  //    lui) + residuo rispetto al tetto. `missing` = carte senza prezzo noto. ─
+  // Budget (§9.2): totale EUR col commander incluso (si compra anche lui) più il residuo sul tetto. `missing` sono le carte senza prezzo noto.
   function budgetInfo(deck, cardsById) {
     let total = 0; let missing = 0;
     const addPrice = (id, qty) => {
@@ -128,20 +116,14 @@
     };
   }
 
-  // ── Calcolatore di probabilità (§9.3): Monte Carlo locale ─────────────────
-  //
-  // La libreria è l'elenco del mazzo espanso per quantità (commander ESCLUSO:
-  // sta in zona di comando), ogni carta = insieme di categorie (i tag utente,
-  // minuscoli, + la categoria implicita "terre" per le terre). Le categorie
-  // sovrapposte sono il motivo per cui si simula invece di usare la formula
-  // ipergeometrica chiusa: una carta taggata sia "ramp" che "draw" può coprire
-  // UNA sola richiesta per pescata — lo decide un matching, non un conteggio.
+  // Calcolatore di probabilità (§9.3), Monte Carlo locale. La libreria è il mazzo espanso per quantità, commander ESCLUSO perché sta in zona di comando, e ogni carta è un insieme di categorie (tag utente più «terre» per le terre).
+  // Si simula invece di usare la formula ipergeometrica chiusa proprio per le categorie sovrapposte: una carta taggata sia «ramp» che «draw» copre UNA sola richiesta per pescata, e lo decide un matching, non un conteggio.
 
   const LAND_TAG = 'terre';
 
   function normTag(t) { return String(t || '').trim().toLowerCase(); }
 
-  // deck + dati carta → array di array di tag (una entry per COPIA di carta).
+  // Una entry per COPIA di carta.
   function buildLibrary(deck, cardsById) {
     const lib = [];
     for (const e of deck.carte) {
@@ -154,8 +136,7 @@
     return lib;
   }
 
-  // Elenco categorie disponibili per la UI: tag del mazzo (in ordine di prima
-  // apparizione) + "terre" se il mazzo ha terre.
+  // Categorie per la UI: i tag del mazzo in ordine di prima apparizione, più «terre» se il mazzo ne ha.
   function categoriesOf(deck, cardsById) {
     const seen = [];
     for (const e of deck.carte) {
@@ -169,8 +150,7 @@
     return seen;
   }
 
-  // RNG deterministico (mulberry32): stesse pescate a parità di seed — i test
-  // confrontano il risultato con l'oracolo ipergeometrico senza flakiness.
+  // RNG deterministico (mulberry32): stesse pescate a parità di seed, così il confronto con l'oracolo ipergeometrico non è flaky.
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function () {
@@ -181,9 +161,7 @@
     };
   }
 
-  // La mano pescata soddisfa le richieste? Matching bipartito carta→richiesta
-  // (algoritmo di Kuhn): ogni carta copre al più UNA unità di richiesta, ogni
-  // unità vuole una carta con quel tag. Gestisce nativamente i tag sovrapposti.
+  // Matching bipartito carta→richiesta (Kuhn): ogni carta copre al più UNA unità di richiesta, ogni unità vuole una carta con quel tag. Gestisce nativamente i tag sovrapposti.
   function handSatisfies(drawn, want) {
     const units = [];
     for (const w of want) for (let k = 0; k < w.n; k++) units.push(w.tag);
@@ -206,24 +184,9 @@
     return true;
   }
 
-  // Simulazione: probabilità di avere la "mano desiderata" al turno N.
-  //
-  //   library    array di array di tag (da buildLibrary)
-  //   want       [{ tag, n }] — le categorie richieste (tag normalizzati)
-  //   turn       turno N (>=1): carte viste = 7 + (N-1) [+1 se si pesca per primi]
-  //   onDraw     true se si pesca al turno 1 (default false: "on the play")
-  //   extraDraws pescate extra oltre quella di turno (tutor/draw, default 0)
-  //   mulligans  quante volte si è disposti a mulligare (default 0). Il mulligan
-  //              rifà la mano iniziale con UNA carta in meno (7→6→5…) finché
-  //              `keep` non è soddisfatto o le carte finiscono.
-  //   keep       [{ tag, n }] — regola di keep della mano iniziale (default:
-  //              si tiene tutto; ha senso solo con mulligans > 0)
-  //   iterations default 10000; seed per run riproducibili.
-  //
-  // Ritorna { probability, hits, iterations, seen }. `hits`/`iterations` sono
-  // ESATTI e sommabili: la UI raffina in continuo lanciando più batch con seed
-  // diversi e accumulando hits/iterations (probabilità = Σhits/Σiterations),
-  // così la stima converge verso il valore vero senza ricalcoli manuali.
+  // Probabilità di avere la mano desiderata al turno N. library da buildLibrary; want [{ tag, n }]; turn >= 1, cioè 7 + (N-1) carte viste, una in più se si pesca per primi (onDraw); extraDraws per tutor e pescate extra.
+  // mulligans: quante volte si è disposti a mulligare, rifacendo la mano con una carta in meno (7→6→5…) finché `keep` non è soddisfatto o le carte finiscono; keep [{ tag, n }] è la regola di keep e ha senso solo con mulligans > 0.
+  // Ritorna { probability, hits, iterations, seen }: `hits` e `iterations` sono ESATTI e sommabili, così la UI raffina in continuo lanciando altri batch con seed diversi e accumulando, senza ricalcoli manuali.
   function simulate({ library, want, turn, onDraw = false, extraDraws = 0, mulligans = 0, keep = null, iterations = 10000, seed } = {}) {
     const lib = Array.isArray(library) ? library : [];
     const reqs = (Array.isArray(want) ? want : [])
@@ -254,9 +217,7 @@
         }
       };
 
-      // Mano iniziale con eventuale mulligan (7 → 6 → 5 … finché keep regge).
-      // La mano TENUTA resta nelle prime `handSize` posizioni: le pescate dei
-      // turni successivi escono dal resto della libreria, senza rimescolarla.
+      // La mano TENUTA resta nelle prime `handSize` posizioni: le pescate dei turni dopo escono dal resto della libreria, senza rimescolarla.
       let handSize = Math.min(7, lib.length);
       shuffleRange(0, handSize);
       if (keepReqs.length && mulligans > 0) {
