@@ -127,7 +127,7 @@ test('bilancio esaurito su quel livello: un 1 con cap1 a zero → derivato', () 
   assert.equal(d.stop, false, 'un 1 non ferma mai il lavoro');
 });
 
-test('decisione owner 2026-09-16: un 1 si corregge nel giro in cui si corregge un 2, anche a cap1 finito', () => {
+test('un 1 entra nel giro di un 2, anche a cap1 finito (decisione owner 2026-09-16)', () => {
   const d = decide([f(2, 'rotto'), f(1, 'bordo'), f(1, 'ombra')], { count1: 2 });
   assert.equal(d.stop, false);
   assert.deepEqual(d.fix.map((x) => x.level), [2, 1, 1], 'gli 1 entrano nel giro del 2');
