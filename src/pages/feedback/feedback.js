@@ -1,23 +1,12 @@
-// Dashboard interna: triage dei feedback alpha.
-// Stato/note salvati su Firestore (via SN_FEEDBACK.updateStatus).
-//
-// LE SEZIONI SONO QUELLE DELLA MACCHINA A STATI (#509). Questa pagina aveva una
-// tassonomia sua — new/draft/todo/review/blocked/clarify/done/verified — che
-// non era più quella di nessuno: gli stati canonici che non riconosceva
-// (archived, working, attack_confirmed…) finivano tutti in "Ricevuti". Con i
-// numeri accanto ai nomi (#495) il difetto è diventato visibile: le stesse
-// segnalazioni si leggevano "Ricevuti (3)" nella dashboard di gestione e
-// "Ricevuti (9)" qui, e chi guardava una pagina sola non aveva modo di
-// accorgersene. Ora sezione, ordinamento e conteggio passano dalle STESSE
-// funzioni pure della gemella (SN_MANAGE_REVIEW): due liste calcolate dallo
-// stesso codice non possono divergere.
+// Dashboard interna: triage dei feedback alpha; stato e note su Firestore.
+// Sezione, ordinamento e conteggio passano dalle STESSE funzioni pure della dashboard di
+// gestione (SN_MANAGE_REVIEW): due liste calcolate dallo stesso codice non divergono (#509).
 
 (function () {
   'use strict';
 
-  // Vocabolario unico della macchina a stati + logica di sezione condivisa.
-  // Se mancano, fermarsi subito con un errore leggibile è meglio di una pagina
-  // che disegna sezioni vuote senza dire perché.
+  // Senza il vocabolario della macchina a stati e la logica di sezione condivisa, fermarsi
+  // con un errore leggibile è meglio di sezioni vuote che non dicono perché.
   const FS = window.SN_FB_STATUS;
   const MR = window.SN_MANAGE_REVIEW;
   if (!FS || !MR) {
@@ -37,30 +26,18 @@
   const adminBanner = document.getElementById('adminBanner');
   const adminBannerText = document.getElementById('adminBannerText');
   const adminSignInBtn = document.getElementById('adminSignIn');
-  // Interruttore master "gestione automatica dei feedback" (owner-only): vedi
-  // filo-security DESIGN §2. Default OFF (autonomia spenta): finché è OFF anche i
-  // feedback sicuri richiedono verifica umana. Il backend (futuro) leggerà lo
-  // stesso flag (doc Firestore config/automation, campo `enabled`).
+  // Interruttore master «gestione automatica» (owner-only, filo-security DESIGN §2). Default
+  // OFF: finché è OFF anche i feedback sicuri richiedono verifica umana (config/automation).
   const automationRow = document.getElementById('automationRow');
   const automationToggle = document.getElementById('automationToggle');
   const automationDesc = document.getElementById('automationDesc');
 
-  // La gestione dei feedback (stato, priorità, note) è riservata agli
-  // amministratori, e dal 2026-09 (#583) anche la LETTURA: senza un account
-  // autorizzato questa pagina non ha niente da mostrare.
-  // La garanzia forte è server-side (Firestore rules): qui è solo il gate UX,
-  // e ogni scrittura passa comunque dal main process che rifiuta i non-admin.
+  // Gestione E lettura dei feedback sono riservate agli admin (#583). La garanzia forte è
+  // server-side (Firestore rules): qui è solo il gate UX, ogni scrittura passa dal main.
   let isAdmin = false;
 
-  // Chi guarda cambia: l'unica porta per dirlo, e l'unico posto dove si buttano
-  // via le risposte tenute da parte.
-  //
-  // Gli allegati si chiedono una volta per indirizzo e la risposta resta in
-  // memoria, anche quando è un no. Quel no però dipende da CHI sta guardando, e
-  // il pulsante per farsi riconoscere sta in questa stessa pagina: senza
-  // svuotare, chi lo premeva continuava a vedere segnaposti al posto degli
-  // allegati finché non riapriva la pagina (#582, giro 3). Vale nei due sensi:
-  // anche uscendo, gli allegati già decifrati non devono restare a schermo.
+  // Gli allegati si chiedono una volta per indirizzo e la risposta resta in memoria, ma un
+  // «no» dipende da CHI guarda: al cambio di identità va svuotata, nei due sensi (#582).
   function setIsAdmin(v) {
     const nuovo = Boolean(v);
     if (nuovo === isAdmin) return;
@@ -69,17 +46,15 @@
     fbFileWhyCache.clear();
   }
 
-  // Invia un messaggio al main process. Su pagine filo:// è sempre presente.
+  // Su pagine filo:// il ponte col main è sempre presente.
   function sendToMain(msg) {
     if (window.filo?.message) return window.filo.message(msg);
     if (window.chrome?.runtime?.sendMessage) return window.chrome.runtime.sendMessage(msg);
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // Le quattro sezioni della macchina a stati, le stesse della dashboard di
-  // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
-  // In coda (l'iter di lavorazione), 'resolved' Risolti (fix usciti davvero in
-  // una versione rilasciata), 'archived' Archiviati.
+  // Le quattro sezioni della macchina a stati, le stesse della dashboard di gestione:
+  // 'inbox' aspettano una decisione, 'queue' in lavorazione, 'resolved' usciti, 'archived'.
   const TABS = ['inbox', 'queue', 'resolved', 'archived'];
   const TAB_LABELS = {
     inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
@@ -93,30 +68,22 @@
 
   let all = [];
   let currentTab = 'inbox';
-  // Solo i ritrovamenti automatici (agente esploratore + audit delle routine).
-  // Era una sezione a sé; adesso è un filtro trasversale alle quattro sezioni.
+  // Ritrovamenti automatici: filtro trasversale alle quattro sezioni, non una sezione a sé.
   let agentOnly = false;
-  // DB3: la versione dell'app in esecuzione è, per definizione, l'ultima
-  // rilasciata. Senza, un `done` non ancora spedito comparirebbe in "Risolti"
-  // qui e in "In coda" nella gemella — la divergenza da capo.
+  // DB3: la versione in esecuzione è, per definizione, l'ultima rilasciata. Senza, un `done`
+  // non ancora spedito starebbe in «Risolti» qui e in «In coda» nella gemella.
   let releasedVersion = '';
-  // I feedback sono arrivati davvero (vs. caricamento in corso o fallito).
-  // Finché è false la pagina non conosce nessun numero: le sezioni restano col
-  // solo nome — stessa cautela della dashboard di gestione (#495).
+  // Finché i feedback non sono arrivati davvero la pagina non conosce nessun numero: le
+  // sezioni restano col solo nome (#495).
   let dataLoaded = false;
-  // Ultimo caricamento fallito: la frase d'errore + "Riprova" da rimettere in
-  // pagina se un re-render (un click su una sezione) svuota il riquadro.
+  // Ultimo caricamento fallito: la frase e «Riprova» da rimettere se un re-render svuota il riquadro.
   let loadError = null;
-  // Numero di generazione dei caricamenti: ogni load() ne prende uno nuovo, e
-  // butta il proprio risultato se nel frattempo ne è partito un altro (o un
-  // test ha iniettato dati con __fbTest.setData). Senza questo, il caricamento
-  // reale partito all'apertura — che sui feedback veri richiede secondi —
-  // atterrerebbe DOPO e sovrascriverebbe quello più recente.
+  // Generazione dei caricamenti: ogni load() butta il proprio risultato se nel frattempo ne
+  // è partito un altro, o quello lento aperto all'avvio sovrascriverebbe il più recente.
   let loadGen = 0;
 
-  // Stato CANONICO di un feedback (spec FEEDBACK-STATES.md §2). Unica porta
-  // d'ingresso: normalizeStatus scioglie anche gli stati legacy dello storico
-  // (new/blocked/draft/review/clarify/verified/ignored).
+  // Stato CANONICO (FEEDBACK-STATES.md §2). Unica porta d'ingresso: normalizeStatus scioglie
+  // anche gli stati legacy dello storico.
   function statusOf(f) {
     return MR.normalizeStatus(f).status;
   }
@@ -129,11 +96,8 @@
     return MR.manageTabFor(f, { releasedVersion });
   }
 
-  // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
-  // La REGOLA (cos'è illeggibile, quando la barra sparisce, che parole si
-  // scrivono al suo posto) vive nel modulo condiviso, insieme alla tassonomia
-  // delle sezioni: tenerne una copia qui è esattamente il modo in cui questa
-  // pagina e la dashboard di gestione hanno divergito (#509).
+  // La regola su cosa è illeggibile e su cosa si scrive al suo posto vive nel modulo
+  // condiviso: tenerne una copia qui è il modo in cui le due pagine hanno divergito (#509).
   function statoCifrato(f) {
     return MR.statusUnreadable(f);
   }
@@ -141,21 +105,16 @@
     return MR.sectionsReliable(all);
   }
 
-  // Ritrovamenti automatici (filtro "Solo automatici"). Due fonti:
-  //   - agente esploratore LLM: clientId "agent:<model>" (vedi tests/agent/feedback.mjs);
-  //   - audit proattivo di una routine cloud: clientId "routine:<slug>" ancora
-  //     da triagiare (status canonico `unlabeled`, o il legacy `new` che ci si
-  //     normalizza). I sub-feedback di una routine portano lo stesso prefisso ma
-  //     nascono `todo`/`design`: NON sono ritrovamenti d'agente, quindi qui si
-  //     escludono col vincolo sullo stato.
+  // Ritrovamenti automatici, due fonti: agente esploratore LLM (clientId «agent:<model>») e
+  // audit di una routine cloud («routine:<slug>») ancora da triagiare. I sub-feedback di una
+  // routine hanno lo stesso prefisso ma nascono todo/design: esclusi col vincolo sullo stato.
   function isAgent(f) {
     const c = String(f.clientId || '');
     if (c.startsWith('agent:')) return true;
     if (c.startsWith('routine:') && statusOf(f) === 'unlabeled') return true;
     return false;
   }
-  // Origine del feedback (per la colorazione di card/bolle). Delega alla logica
-  // condivisa così dashboard e main usano la stessa classificazione.
+  // Origine del feedback: delega alla logica condivisa, così dashboard e main classificano uguale.
   function originOf(f) {
     const c = String(f.clientId || '');
     if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.originOf) return SN_FEEDBACK_THREAD.originOf(c);
@@ -165,9 +124,8 @@
     if (c.startsWith('local:')) return 'local';
     return 'user';
   }
-  // Decodifica i metadati del ritrovamento per il badge. L'agente esploratore
-  // codifica "severità|area|titolo" nel campo `title`; l'audit di una routine no
-  // (il titolo breve sta in `name`), quindi lo trattiamo a parte.
+  // L'agente esploratore codifica «severità|area|titolo» nel campo `title`; l'audit di una
+  // routine no (il titolo breve sta in `name`), quindi va trattato a parte.
   function agentMeta(f) {
     const c = String(f.clientId || '');
     if (c.startsWith('routine:')) {
@@ -182,8 +140,7 @@
     return { source: 'agent', model, severity, area, title };
   }
 
-  // Priorità 1-3 (0 = nessuna). Più pallini pieni = priorità più alta: le
-  // routine di Claude affrontano prima i feedback con priorità maggiore.
+  // Più pallini pieni = priorità più alta: le routine affrontano prima i feedback con priorità maggiore.
   function priorityOf(f) {
     const p = Math.round(Number(f.priority) || 0);
     return p >= 1 && p <= 3 ? p : 0;
@@ -202,9 +159,8 @@
     return `<div class="fb-priority" title="Priorità: ${p || '—'}">${dots}</div>`;
   }
 
-  // Badge "in lavorazione": una routine cloud ha preso in carico il feedback
-  // (il semaforo lo tiene il server, che lo specchia su Firestore).
-  // Mostrato solo finché il claim non è scaduto; '' / scaduto = libero.
+  // Badge «in lavorazione»: il semaforo lo tiene il server e lo specchia su Firestore.
+  // Mostrato solo finché il claim non è scaduto; vuoto o scaduto = libero.
   function claimBadgeHtml(f) {
     const exp = Date.parse(f.claimExpiresAt || '');
     if (!Number.isFinite(exp) || exp <= Date.now()) return '';
@@ -213,28 +169,19 @@
     return `<span class="fb-claim" title="${escapeHtml(title)}">🔧 in lavorazione</span>`;
   }
 
-  // Badge col branch git su cui vive il fix in attesa di verifica (stati
-  // `review`/`blocked` del cancello di merge delle routine). Vuoto se assente.
+  // Branch git del fix in attesa di verifica (stati `review`/`blocked` del cancello di merge).
   function branchBadgeHtml(f) {
     const b = String(f.branch || '').trim();
     if (!b) return '';
     return `<span class="fb-branch" title="Branch del fix: ${escapeHtml(b)}">⎇ ${escapeHtml(b)}</span>`;
   }
 
-  // Etichetta dello stato sulla card. Le sezioni sono quattro, ma dentro
-  // "Ricevuti" e "In coda" vivono stati diversi (allineato vs attacco, in
-  // lavorazione vs audit di sicurezza): senza questa riga la card non direbbe
-  // più a che punto è. Colore e testo vengono dal vocabolario unico, il motivo
-  // (`statusReason`) dalla traduzione condivisa.
+  // Dentro «Ricevuti» e «In coda» vivono stati diversi: senza questa riga la card non direbbe
+  // più a che punto è. Colore, testo e motivo vengono dal vocabolario unico.
   function stateBadgeHtml(f) {
-    // Stato cifrato: qui non c'è uno stato da leggere, e la macchina lo
-    // ridurrebbe a "Non filtrato" anche su un feedback già chiuso — la stessa
-    // bugia delle sezioni, in piccolo. L'unica cosa vera che questa macchina
-    // ha in mano è l'enum grossolano in chiaro (`statusPublic`), lo stesso che
-    // guarda la ricompensa: aperta o chiusa, niente di più.
-    // Le PAROLE (etichetta, motivo, hover) vengono dal modulo condiviso: la
-    // dashboard di gestione mostra la stessa riga, e due copie di questo
-    // calcolo sono esattamente il modo in cui le due pagine hanno divergito.
+    // Stato cifrato: non c'è uno stato da leggere, e la macchina lo ridurrebbe a «Non filtrato»
+    // anche su un feedback già chiuso. L'unica cosa vera in mano è l'enum grossolano in chiaro
+    // (`statusPublic`): aperta o chiusa. Le PAROLE vengono dal modulo condiviso, mai copiate.
     const b = MR.stateBadge(f);
     if (!b) return '';
     const dot = b.color
@@ -258,9 +205,8 @@
     })[c]);
   }
 
-  // Filtra URL non sicuri (javascript:, data:, ecc.) prima di emetterli in href.
-  // I feedback arrivano da utenti reali — se per qualsiasi motivo un URL
-  // malevolo finisce in DB, evitiamo che diventi un vettore XSS al click.
+  // Filtra URL non sicuri (javascript:, data:) prima dell'href: i feedback arrivano da utenti
+  // reali, e un URL malevolo finito in DB non deve diventare un vettore XSS al click.
   function safeHref(rawUrl) {
     if (!rawUrl) return '';
     try {
@@ -270,23 +216,15 @@
     return '';
   }
 
-  // ── Allegati nei commenti (#190.3) ─────────────────────────────────────────
-  // L'admin può incollare/trascinare/allegare immagini e file MENTRE commenta un
-  // feedback (note di triage, risposta nei Chiarimenti, riapertura). Gli allegati
-  // sono ANCORATI al singolo turno: vivono come righe-marcatore dentro `notes`
-  // (vedi SN_FEEDBACK_THREAD), così non serve cambiare lo schema Firestore né le
-  // regole. L'upload va diretto a Storage (path feedback/* è pubblico).
-  // L'allowlist dei tipi allegabili è UNA, condivisa col riquadro di
-  // segnalazione dentro i siti: le due strade devono rifiutare le stesse cose,
-  // e con le stesse parole (#582, giro 7).
+  // Allegati nei commenti (#190.3): sono ANCORATI al singolo turno, come righe-marcatore
+  // dentro `notes` (SN_FEEDBACK_THREAD), così non cambiano schema Firestore né regole.
+  // L'allowlist dei tipi è UNA, condivisa col riquadro dentro i siti: stesse parole (#582).
   const AttachTypes = window.SN_FEEDBACK_ATTACH;
   const ATTACH_REJECT_MSG =
     'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
-  // Stesso ripiego del riquadro di segnalazione dentro i siti, e per lo stesso
-  // motivo: se l'allowlist condivisa non si carica, il ripiego deve CHIUDERE
-  // (solo immagini raster), non aprire. Un gate che sparisce in silenzio quando
-  // manca un pezzo è un gate che non c'è.
+  // Se l'allowlist condivisa non si carica il ripiego deve CHIUDERE (solo immagini raster),
+  // non aprire: un gate che sparisce in silenzio quando manca un pezzo è un gate che non c'è.
   function classificaAllegato(file) {
     if (AttachTypes && typeof AttachTypes.classify === 'function') {
       return AttachTypes.classify(file);
@@ -306,23 +244,17 @@
     return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s);
   }
 
-  // Griglia di immagini (riusata da segnalazione e turni della conversazione).
-  // Nessun src iniziale: gli allegati sono CIFRATI su Storage (byte opachi), un
-  // <img src=URL> diretto mostra un allegato rotto. Il main li decifra (S1.2) e
-  // resolveFbImages riempie src col data URL mostrabile.
+  // Nessun src iniziale: gli allegati sono CIFRATI su Storage (byte opachi) e un <img src=URL>
+  // diretto mostrerebbe un allegato rotto. Il main li decifra, resolveFbImages riempie src.
   function imagesGridHtml(urls) {
     const imgs = (urls || []).filter((u) => typeof u === 'string' && u);
     if (!imgs.length) return '';
     return `<div class="fb-imgs">${imgs.map((u) => `<img class="fb-img-loading" data-url="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`;
   }
 
-  // Decifratura lazy degli allegati immagine (S1.2), con cache
-  // url → { dataUrl, error }. Su fallimento `error` porta il MOTIVO preciso
-  // (dal main) così il segnaposto lo spiega in hover invece di restare muto.
-  // `soloDestinatario`: non è un guasto, è che l'allegato lo apre solo chi
-  // riceve le segnalazioni. Il segnaposto allora lo dice, invece di far
-  // sembrare che manchi qualcosa. Quello che NON dice è che l'allegato sia
-  // arrivato: da qui Filo non l'ha aperto (#582, giro 5).
+  // Decifratura lazy degli allegati immagine (S1.2), cache url → { dataUrl, error }. Su
+  // fallimento `error` porta il MOTIVO preciso, così il segnaposto lo spiega invece di restare
+  // muto. `soloDestinatario` non è un guasto: l'allegato lo apre solo chi riceve (#582).
   const fbImgCache = new Map();
   async function resolveImageSrc(url) {
     if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
@@ -341,32 +273,18 @@
     return res;
   }
 
-  // Lista di allegati non-immagine.
-  //
-  // L'indirizzo di un allegato NON diventa mai un href, e il motivo è che non lo
-  // sceglie Filo (#582): sta scritto dentro la segnalazione, e una segnalazione
-  // la manda chiunque, anche senza account e senza avere Filo installato. Le
-  // regole del database contano gli allegati, non guardano dove puntano. Con un
-  // href diretto bastava mandare una segnalazione con un finto allegato
-  // «schermata.png» che punta al proprio sito per mettere un'esca dentro una
-  // pagina di Filo, davanti a tutti quelli che aprono l'elenco: la pillola è
-  // identica a quella di un allegato vero, il nome lo sceglie chi manda, e il
-  // clic portava fuori.
-  //
-  // Il clic passa dal canale del main, che l'indirizzo lo confronta col deposito
-  // di Filo e i byte li decifra. È la stessa strada della dashboard, che questo
-  // controllo ce l'aveva già: erano due strade per la stessa cosa e una non
-  // guardava niente.
+  // L'indirizzo di un allegato NON diventa mai un href: non lo sceglie Filo, sta dentro la
+  // segnalazione, e una segnalazione la manda chiunque. Un finto allegato «schermata.png» che
+  // punta al proprio sito era un'esca dentro una pagina di Filo. Il clic passa dal main, che
+  // confronta l'indirizzo col deposito e decifra i byte — la stessa strada della dashboard (#582).
   function filesListHtml(files) {
     const fs = (files || []).filter((x) => x && typeof x.url === 'string' && x.url);
     if (!fs.length) return '';
     return `<div class="fb-files">${fs.map((x) => `<a class="fb-file" href="#" data-url="${escapeHtml(x.url)}" data-name="${escapeHtml(x.name || 'allegato')}" data-type="${escapeHtml(x.type || '')}">${FILE_SVG}<span class="fb-file-name">${escapeHtml(x.name || 'allegato')}</span></a>`).join('')}</div>`;
   }
 
-  // Perché un allegato non si apre, con le parole del main (una sola fonte per
-  // quella frase). Lo si chiede solo quando chi guarda NON riceve le
-  // segnalazioni: in quel caso il main risponde subito, senza toccare la rete.
-  // Cache url → { error, soloDestinatario } | null (null = si apre).
+  // Perché un allegato non si apre, con le parole del main (una sola fonte per quella frase).
+  // Lo si chiede solo a chi NON riceve le segnalazioni: lì il main risponde senza toccare la rete.
   const fbFileWhyCache = new Map();
   async function fileClosedReason(url) {
     if (!url) return null;
@@ -384,9 +302,8 @@
     return res;
   }
 
-  // Lo dice sulla pillola, non solo nell'hover: chi ha mandato la segnalazione
-  // deve poter capire a colpo d'occhio che quell'allegato lui non lo apre, come
-  // già succede per lo screenshot lì accanto.
+  // Sulla pillola, non solo nell'hover: chi ha mandato la segnalazione deve capire a colpo
+  // d'occhio che quell'allegato lui non lo apre.
   function markFileClosed(a, motivo, soloDestinatario) {
     a.title = motivo || '';
     a.classList.add('fb-file--closed');
@@ -396,17 +313,13 @@
       nota.className = 'fb-file-note';
       a.appendChild(nota);
     }
-    // Non «inviato»: l'elenco mostra a ogni tester le segnalazioni di tutti,
-    // quindi questa pillola compare anche davanti all'allegato di un altro
-    // (#582, giro 3). E non «consegnato» (#582, giro 5): se sia arrivato Filo
-    // non l'ha guardato. Dice chi lo apre, che è vero in ogni caso.
+    // Non «inviato»: l'elenco mostra a ogni tester le segnalazioni di tutti. Non «consegnato»
+    // (#582): se sia arrivato Filo non l'ha guardato. Dice chi lo apre, che è vero in ogni caso.
     nota.textContent = soloDestinatario ? '(riservato)' : '(non disponibile)';
   }
 
-  // Il clic su un allegato: scarica e decifra dal main, poi salva col nome vero.
-  // Se non si può aprire, lo dice invece di consegnare un file rotto in silenzio
-  // (prima il collegamento portava ai byte cifrati: arrivava un .pdf col nome
-  // giusto che non si apriva, e nessuno spiegava perché).
+  // Il clic scarica e decifra dal main, poi salva col nome vero. Se non si può aprire lo dice:
+  // prima il collegamento portava ai byte cifrati, un .pdf col nome giusto che non si apriva.
   function resolveFileLinks(root) {
     root.querySelectorAll('a.fb-file').forEach((a) => {
       const url = a.dataset.url || '';
@@ -447,12 +360,9 @@
     return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  // Crea un compositore di allegati legato a una textarea. Inserisce in `mount`
-  // un pulsante "Allega" + le thumbnail; intercetta incolla/trascina sulla
-  // textarea. Ogni file viene caricato SUBITO su Storage (così le note salvano
-  // solo l'URL). onChange() è chiamato dopo ogni aggiunta/rimozione — chi vuole
-  // persistenza immediata (note editabili) lo usa per fare patch.
-  // Ritorna { getAttachments } che torna la lista corrente { kind, url, name, type }.
+  // Compositore di allegati legato a una textarea: intercetta incolla e trascina. Ogni file
+  // va SUBITO su Storage, così le note salvano solo l'URL. onChange() dopo ogni aggiunta o
+  // rimozione, per chi vuole persistenza immediata. Ritorna { getAttachments }.
   function makeAttachComposer({ textarea, mount, initial, onChange }) {
     if (!textarea || !mount) return { getAttachments: () => [] };
     const attachments = Array.isArray(initial) ? initial.slice() : [];
@@ -525,13 +435,9 @@
 
     async function addFile(file) {
       if (!file) return;
-      // Il TIPO si guarda PRIMA di caricare, come fa il riquadro di
-      // segnalazione dentro i siti (#582, giro 7). Il selettore offre anche
-      // `image/*` e `text/*`, che comprendono una pagina web e un disegno
-      // vettoriale: tipi che il deposito rifiuta. Senza questo controllo il file
-      // partiva lo stesso e quello che si leggeva era il numero dell'errore del
-      // deposito, invece della frase che dice cosa si può allegare. Il confine
-      // reggeva comunque: a non andare era ciò che si leggeva.
+      // Il TIPO si guarda PRIMA di caricare, come nel riquadro dentro i siti (#582). Il selettore
+      // offre anche image/* e text/*, che comprendono una pagina web e un disegno vettoriale: tipi
+      // che il deposito rifiuta. Senza, si leggeva il numero d'errore invece della frase giusta.
       const kind = classificaAllegato(file);
       if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
       const isImg = kind === 'image';
@@ -561,8 +467,7 @@
       for (const f of picked) await addFile(f);
       fileInput.value = '';
     });
-    // Incolla (Ctrl+V): cattura SOLO i file dagli appunti (le immagini), lascia
-    // passare il testo normale.
+    // Incolla: cattura SOLO i file dagli appunti, lascia passare il testo normale.
     textarea.addEventListener('paste', async (e) => {
       const items = e.clipboardData && e.clipboardData.items;
       if (!items) return;
@@ -585,11 +490,8 @@
     return { getAttachments: () => attachments.slice() };
   }
 
-  // Valore da salvare per la textarea di note editabili. La textarea modifica
-  // SOLO il "capo" delle note (la nota dell'agente, prima di qualsiasi
-  // riapertura/risposta dell'utente): il resto della conversazione (la "coda":
-  // riaperture e turni successivi) vive in bolle a sé e va CONSERVATO intatto.
-  // Quindi ricomponiamo capo modificato + coda originale.
+  // La textarea modifica SOLO il «capo» delle note (la nota dell'agente): la «coda»
+  // (riaperture e turni successivi) vive in bolle a sé e va CONSERVATA intatta.
   function notesValueOf(ta) {
     if (!ta) return '';
     const atts = ta._attachComposer ? ta._attachComposer.getAttachments() : [];
@@ -602,10 +504,8 @@
     return head ? `${head}\n\n${tail}` : tail;
   }
 
-  // Spezza il blob `notes` in { head, tail }: `head` è il testo fino al primo
-  // marcatore di turno utente/agente (la nota editabile dell'agente); `tail` è
-  // tutto il resto verbatim (riaperture/risposte e turni successivi), che viene
-  // mostrato come bolle separate e conservato intatto al salvataggio.
+  // Spezza `notes` in { head, tail }: head fino al primo marcatore di turno (la parte
+  // editabile), tail verbatim — mostrato come bolle e conservato intatto al salvataggio.
   function splitNotesHeadTail(notes) {
     const s = String(notes || '');
     if (!s) return { head: '', tail: '' };
@@ -622,15 +522,9 @@
     return { head: s, tail: '' };
   }
 
-  // `silenzioso`: salva senza ridisegnare la lista. Serve alle caselle di
-  // testo che si salvano da sole mentre ci si scrive dentro: ridisegnare
-  // rimpiazza la casella sotto le dita — mangia gli spazi appena battuti e fa
-  // sparire il pulsante che si stava per premere, così il primo clic va perso.
-  // `inPlace`: non ridisegnare la lista MAI, né al successo né all'errore. Lo
-  // usano le azioni della scheda, che si aggiornano da sole al proprio posto
-  // (vedi "Un clic, una scheda" più sotto): anche un ridisegno al fallimento
-  // rimescolerebbe la lista sotto il puntatore fermo.
-  // Ritorna true se la scrittura è andata a buon fine.
+  // `silenzioso`: salva senza ridisegnare la lista, per le caselle che si salvano mentre ci
+  // si scrive dentro (un ridisegno rimpiazza la casella sotto le dita e perde il primo clic).
+  // `inPlace`: non ridisegnare MAI, né al successo né all'errore (vedi «Un clic, una scheda»).
   async function patch(id, payload, optimistic, { silenzioso = false, inPlace = false } = {}) {
     if (!isAdmin) {
       alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
@@ -638,30 +532,23 @@
     }
     const item = all.find((f) => f._id === id);
     if (!item) return false;
-    // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano
-    // sta QUI e non sui singoli pulsanti perché i cammini che scrivono le note
-    // sono più d'uno (la casella, gli allegati, la risposta ai chiarimenti): uno
-    // solo lasciato scoperto basta a sostituire il report vero con quello che era
-    // rimasto sullo schermo. Gli altri campi (stato, priorità) restano liberi.
+    // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano sta qui e non
+    // sui pulsanti perché i cammini che scrivono le note sono più d'uno: uno scoperto basta a
+    // sostituire il report vero con quello rimasto sullo schermo. Stato e priorità restano liberi.
     if (item.reportIllegibile && payload && typeof payload.notes === 'string') {
       alert('Il report di questo feedback non è leggibile su questo computer: manca la chiave privata. '
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
       return false;
     }
-    // Un cambio di stato passa SOLO se è una delle azioni che la segnalazione
-    // offre in questo momento (la stessa tabella che disegna i pulsanti). Il
-    // guardiano sta qui e non sui pulsanti: uno stato può essere cambiato
-    // mentre il pannello era aperto, e senza questo il clic scriverebbe una
-    // decisione che la pagina non offre più — è così che un attacco confermato
-    // si ritrovava riscritto ad "archiviato".
+    // Un cambio di stato passa SOLO se è fra le azioni che la segnalazione offre ORA: lo stato
+    // può cambiare a pannello aperto, e un attacco confermato finiva riscritto ad archiviato.
     if (payload && payload.status !== undefined
         && !MR.ownerActionAllowsStatus(item, payload.status, { releasedVersion })) {
       alert('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile. Aggiorna la lista e riprova.');
       return false;
     }
-    // Tutto ciò che l'aggiornamento ottimistico può toccare va salvato: se la
-    // scrittura fallisce, ripristinarne solo una parte lascia la card che dice
-    // una cosa e il database un'altra.
+    // Va salvato tutto ciò che l'aggiornamento ottimistico tocca: ripristinarne una parte sola
+    // lascia la card che dice una cosa e il database un'altra.
     const prev = {
       status: item.status, notes: item.notes, userNote: item.userNote,
       priority: item.priority, reviewDecision: item.reviewDecision,
@@ -670,9 +557,8 @@
     Object.assign(item, optimistic);
     if (!silenzioso && !inPlace) applyFilter();
     try {
-      // Instradata dal main process, che allega il Firebase ID token come
-      // Bearer e rifiuta se l'utente loggato non è admin (i token non sono mai
-      // esposti alle pagine — vedi SECURITY.md §3).
+      // Instradata dal main, che allega l'ID token come Bearer e rifiuta i non-admin: i token non
+      // sono mai esposti alle pagine (SECURITY.md §3).
       const r = await sendToMain({ type: 'feedback_update', id, ...payload });
       if (!r || r.ok === false) throw new Error(r?.error || 'aggiornamento rifiutato');
       return true;
@@ -684,22 +570,14 @@
     }
   }
 
-  // I pulsanti scrivono STATI CANONICI, gli stessi che scrive la dashboard di
-  // gestione. Prima scrivevano il vocabolario vecchio (new/draft/verified/
-  // ignored/blocked): ogni clic spingeva il feedback FUORI dalla macchina a
-  // stati, e la gemella doveva poi ridurlo a forza. Due cammini equivalenti
-  // devono fare la stessa cosa, non due cose che si somigliano.
-  // QUALI azioni esistono lo decide il modulo condiviso (MR.ownerActions): la
-  // dashboard di gestione legge la stessa tabella, quindi sulla stessa
-  // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
-  // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
+  // I pulsanti scrivono STATI CANONICI, gli stessi della dashboard di gestione: col vocabolario
+  // vecchio ogni clic spingeva il feedback FUORI dalla macchina a stati. QUALI azioni esistono
+  // lo decide MR.ownerActions, letto da entrambe le pagine; qui resta solo il modo di disegnarle.
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
-    // Stato illeggibile: i pulsanti nascono dalla sezione, e la sezione qui non
-    // si sa. Offrire "→ In coda" a un feedback che potrebbe essere già chiuso
-    // sarebbe peggio che non offrire niente. (ownerActions lo verifica sulla
-    // singola scheda; qui vale anche per la lista intera.)
+    // Stato illeggibile: i pulsanti nascono dalla sezione, e qui la sezione non si sa. Offrire
+    // «→ In coda» a un feedback che potrebbe essere già chiuso è peggio che non offrire niente.
     if (!sezioniAttendibili()) return '';
     const id = escapeHtml(f._id);
     const EXTRA = { accept: ' data-accept="1"', reject: ' data-reject="1"',
@@ -714,38 +592,24 @@
     }).join('\n');
   }
 
-  // ── UN CLIC, UNA SCHEDA ───────────────────────────────────────────────────
-  // Qui i pulsanti vivono DENTRO la scheda, in una lista che si riordina da sé.
-  // Finché ogni azione ridisegnava la lista, appena la scheda usciva dalla
-  // sezione le altre risalivano e sotto il puntatore FERMO arrivava il pulsante
-  // della scheda successiva: il secondo clic — anche mezzo secondo dopo, anche
-  // voluto, perché al primo non si vedeva succedere niente — cadeva su un ALTRO
-  // feedback. Due volte «→ In coda» nei Ricevuti mettevano in coda il primo e
-  // marcavano il secondo come ATTACCO CONFERMATO; due volte «Risolto» ne
-  // chiudevano due; due volte «Ripristina» ne ripristinavano due. Nella gemella
-  // non succede perché l'azione sta in un pannello fermo e riguarda la scheda
-  // selezionata.
-  //
-  // La regola che chiude tutte le porte insieme (non una per giro) è una sola:
-  // NESSUNA AZIONE PRESA DENTRO UNA SCHEDA RICOMPONE LA LISTA. La scheda si
-  // aggiorna al proprio posto — si spegne mentre scrive, poi dice cosa è
-  // successo — e la lista si ricompone solo quando lo chiedi tu (cambio
-  // sezione, ricerca, filtro, Aggiorna). Vale per tutte le vie che scrivono da
-  // una scheda: i pulsanti di stato, «Conferma riapertura», «Invia risposta» e
-  // i pallini della priorità (che in «In coda» sono un criterio di ordinamento,
-  // quindi anche loro rimescolavano la lista sotto il dito).
+  // UN CLIC, UNA SCHEDA. I pulsanti vivono DENTRO la scheda, in una lista che si riordina da
+  // sé: finché ogni azione ridisegnava la lista, sotto il puntatore FERMO arrivava il pulsante
+  // della scheda successiva e il secondo clic cadeva su un ALTRO feedback (due «→ In coda»
+  // mettevano in coda il primo e confermavano il secondo come attacco).
+  // La regola: NESSUNA AZIONE PRESA DENTRO UNA SCHEDA RICOMPONE LA LISTA. La scheda si aggiorna
+  // al proprio posto e la lista si ricompone solo su richiesta esplicita (sezione, ricerca,
+  // filtro, Aggiorna). Vale per i pulsanti di stato, la riapertura, la risposta e la priorità.
 
   // Schede con una scrittura in volo: il loro secondo clic non deve partire.
   const inScrittura = new Set();
   // Schede su cui l'azione è già andata: restano a schermo, spente, con l'esito.
   const decise = new Map(); // id -> esito (testo)
-  // Quante schede ha disegnato l'ultimo render: serve alla riga del totale, che
-  // non viene più riscritta a ogni azione (la lista non si ridisegna).
+  // Quante schede ha disegnato l'ultimo render: serve alla riga del totale, che non si
+  // riscrive più a ogni azione.
   let disegnate = 0;
 
-  // Spegne TUTTI i pulsanti della scheda, non solo quello premuto: la scrittura
-  // in corso riguarda la scheda intera, e «Archivia» premuto mentre «→ In coda»
-  // è in volo scriverebbe due decisioni sullo stesso feedback.
+  // Spegne TUTTI i pulsanti della scheda: la scrittura riguarda la scheda intera, e «Archivia»
+  // premuto mentre «→ In coda» è in volo scriverebbe due decisioni sullo stesso feedback.
   function spegniScheda(card) {
     if (!card) return;
     card.classList.add('fb-card--busy');
@@ -758,10 +622,8 @@
     card.querySelectorAll('button').forEach((b) => { b.disabled = false; });
   }
 
-  // Dove è finita la scheda dopo l'azione, detto con il nome della sezione che
-  // si legge nella barra. Si calcola con la stessa funzione che riempie le
-  // sezioni, così l'esito non può dire una cosa diversa da dove la scheda si
-  // troverà davvero.
+  // Dove è finita la scheda, col nome della sezione che si legge nella barra: calcolato con la
+  // stessa funzione che riempie le sezioni, o l'esito direbbe una cosa diversa dal vero.
   function esitoDi(item, optimistic) {
     const dopo = Object.assign({}, item, optimistic);
     const dest = MR.manageTabFor(dopo, { releasedVersion });
@@ -770,16 +632,14 @@
     return `Spostata in «${nome}»`;
   }
 
-  // L'azione è andata: la scheda resta dov'è (nessuno la vede sparire da sotto
-  // il cursore) ma smette di essere premibile e DICE cosa è successo. Sparisce
-  // alla prima ricomposizione della lista, che è sempre una richiesta esplicita.
+  // Azione andata: la scheda resta dov'è (nessuno la vede sparire da sotto il cursore) ma
+  // smette di essere premibile e DICE cosa è successo. Sparisce alla prima ricomposizione.
   function marcaDecisa(card, esito, item) {
     if (!card) return;
     card.classList.remove('fb-card--busy');
     card.classList.add('fb-card--decisa');
-    // L'etichetta dello stato si riscrive: la scheda resta a schermo, e senza
-    // questo continuerebbe a dire lo stato di prima. Su «Conferma attacco» è la
-    // differenza fra leggere "Attacco" e leggere "Attacco confermato".
+    // L'etichetta dello stato si riscrive: la scheda resta a schermo e senza questo direbbe
+    // ancora lo stato di prima («Attacco» invece di «Attacco confermato»).
     const badge = card.querySelector('.fb-state');
     if (badge && item) {
       const html = stateBadgeHtml(item);
@@ -797,14 +657,12 @@
       riga.textContent = `✓ ${esito}`;
       box.appendChild(riga);
     }
-    // Anche le caselle: la scheda non appartiene più a questa sezione, e una
-    // casella ancora scrivibile ("Commento:") direbbe il contrario.
+    // Anche le caselle: la scheda non è più di questa sezione, e una casella ancora scrivibile direbbe il contrario.
     card.querySelectorAll('button, textarea, input').forEach((b) => { b.disabled = true; });
   }
 
-  // Il totale in alto dice anche quante schede sono già state decise, altrimenti
-  // il numero della sezione (che scende subito, ed è vero) sembrerebbe non
-  // tornare con le schede che restano a schermo.
+  // Il totale dice anche quante schede sono già decise, altrimenti il numero della sezione —
+  // che scende subito, ed è vero — sembrerebbe non tornare con quel che resta a schermo.
   function aggiornaTotale() {
     if (!disegnate) return;
     const n = decise.size;
@@ -825,9 +683,8 @@
     spegniScheda(card);
     const ok = await patch(id, payload, optimistic, { inPlace: true });
     inScrittura.delete(id);
-    // Nel frattempo la lista può essere stata ricomposta (cambio sezione,
-    // Aggiorna): la scheda di prima non è più a schermo e non c'è niente da
-    // spegnere o riaccendere. Il dato è salvato lo stesso.
+    // Nel frattempo la lista può essere stata ricomposta: la scheda non è più a schermo e non
+    // c'è niente da riaccendere. Il dato è salvato lo stesso.
     const viva = card && card.isConnected ? card : null;
     if (ok) {
       decise.set(id, esito);
@@ -840,11 +697,8 @@
     aggiornaTotale();
   }
 
-  // Cattura il campo (textarea/input) attualmente a fuoco dentro la lista, se
-  // identificabile da data-id, così da poterlo riselezionare dopo un re-render.
-  // Senza questo, salvare le note (patch → applyFilter → render rigenera tutto
-  // l'innerHTML) faceva perdere fuoco e cursore: l'utente smetteva di scrivere
-  // per un attimo e la casella si "deselezionava" da sola.
+  // Cattura il campo a fuoco (se ha data-id) per riselezionarlo dopo il re-render: senza,
+  // salvare le note faceva perdere fuoco e cursore mentre l'utente stava scrivendo.
   function captureFocus() {
     const el = document.activeElement;
     if (!el || !listEl.contains(el)) return null;
@@ -877,8 +731,7 @@
 
   function render(items) {
     const focusSnap = captureFocus();
-    // Ricomporre la lista è SEMPRE una richiesta esplicita (cambio sezione,
-    // ricerca, filtro, Aggiorna, dati nuovi): è il momento in cui le schede già
+    // Ricomporre la lista è SEMPRE una richiesta esplicita: è il momento in cui le schede già
     // decise lasciano il posto, e l'unico in cui la lista si rimescola.
     decise.clear();
     disegnate = items.length;
@@ -886,24 +739,19 @@
     if (!items.length) {
       listEl.innerHTML = '';
       emptyEl.hidden = false;
-      // Caricamento fallito: qui non c'è una sezione vuota, c'è una sezione che
-      // non sappiamo. "Nessun feedback in arrivo." sarebbe la stessa bugia dello
-      // "(0)" sulle sezioni, per giunta al posto dell'unico tasto che permette
-      // di riprovare. Resta l'errore finché il dato non arriva davvero.
+      // Caricamento fallito: non è una sezione vuota, è una sezione che non sappiamo. «Nessun
+      // feedback» sarebbe una bugia, per giunta al posto dell'unico tasto per riprovare.
       if (loadError && !dataLoaded) {
         showLoadError(loadError);
         return;
       }
-      // Se il vuoto dipende dalla ricerca (e non dal tab davvero vuoto),
-      // dillo: il testo "Nessun feedback…" sembrerebbe un tab svuotato.
+      // Se il vuoto dipende dalla ricerca, dillo: «Nessun feedback…» sembrerebbe un tab svuotato.
       const q = (searchEl.value || '').trim();
       if (q && sectionItems().length) {
         emptyEl.textContent = `Nessun risultato per "${q}".`;
         return;
       }
-      // Stessa cosa per il filtro "Solo automatici": la sezione non è vuota, è
-      // vuota DI RITROVAMENTI AUTOMATICI. Dirlo evita di far credere che i
-      // feedback siano spariti.
+      // Idem per «Solo automatici»: la sezione non è vuota, è vuota DI RITROVAMENTI AUTOMATICI.
       if (agentOnly && sectionBase(currentTab).length) {
         emptyEl.textContent = 'Nessun ritrovamento automatico in questa sezione.';
         return;
@@ -911,8 +759,7 @@
       emptyEl.textContent = sezioniAttendibili()
         ? (TAB_EMPTY[currentTab] || 'Nessun feedback.')
         : 'Nessun feedback ricevuto.';
-      // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
-      // feedback più vecchi non sono in pagina. Il vuoto lo dice, come la gemella.
+      // Col caricamento al tetto una sezione «vuota» può non esserlo: i più vecchi non sono in pagina.
       if (dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE)) {
         emptyEl.textContent = `${emptyEl.textContent} ${SN_FEEDBACK.COUNT_CAP_HINT}`;
       }
@@ -922,12 +769,8 @@
     listEl.innerHTML = items.map((f) => {
       const when = fmtTs(f.createdAt || f._createTime);
       const url = f.url || '';
-      // L'indirizzo della pagina segnalata: si apre (serve a chi guarda la
-      // segnalazione: è il posto dove il problema è successo), ma la scritta la
-      // compone SN_FEEDBACK.linkLabel, che mostra il sito vero e dichiara il
-      // taglio. Prima erano i primi 80 caratteri dell'indirizzo, tagliati senza
-      // nemmeno un puntino: e l'indirizzo lo scrive chi manda la segnalazione,
-      // che sceglieva così cosa si leggeva e dove si finiva (#582, giro 3).
+      // L'indirizzo si apre, ma la scritta la compone SN_FEEDBACK.linkLabel, che mostra il sito
+      // vero e dichiara il taglio: lo scrive chi manda, e sceglieva cosa si leggeva (#582).
       const safeUrl = safeHref(url);
       const ua = (f.userAgent || '').slice(0, 80);
       const cid = (f.clientId || '').slice(0, 12);
@@ -939,9 +782,8 @@
       // Numero progressivo (#22, #22.1 per i sub creati dalle routine).
       const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
       const numHtml = num ? `<span class="fb-num">#${escapeHtml(num)}</span>` : '';
-      // Ritrovamento automatico (tab "Agente"): badge che distingue la fonte —
-      // 🤖 <modello> per l'agente esploratore LLM, 🔧 audit · <slug> per le
-      // routine cloud — + severità/area (solo agente) + titolo col numero.
+      // Badge che distingue la fonte: 🤖 <modello> per l'agente esploratore LLM, 🔧 audit · <slug>
+      // per le routine cloud, più severità e area per il solo agente.
       const agent = isAgent(f);
       const am = agent ? agentMeta(f) : null;
       const isRoutineFind = am && am.source === 'routine';
@@ -957,28 +799,22 @@
           ${am.area ? `<span class="fb-badge">${escapeHtml(am.area)}</span>` : ''}
         </div>
         ${agentTitleHtml}` : '';
-      // Titolo breve (#22 + nome generato dall'LLM all'invio) per i feedback
-      // non-agente; le issue d'agente hanno già il loro titolo in agentHtml.
+      // Le issue d'agente hanno già il loro titolo in agentHtml.
       const titleHtml = !agent && (num || f.name)
         ? `<div class="fb-title">${numHtml}${numHtml && f.name ? ' ' : ''}${escapeHtml(f.name || '')}</div>`
         : '';
-      // Conversazione a turni (#108): segnalazione + risposte di Filo + risposte
-      // dell'utente in BOLLE diverse, in ordine cronologico, invece di un unico
-      // blocco. Gli allegati vivono nella bolla della segnalazione.
+      // Conversazione a turni (#108): segnalazione, risposte di Filo e dell'utente in BOLLE
+      // distinte in ordine cronologico. Gli allegati vivono nella bolla della segnalazione.
       const turns = window.SN_FEEDBACK_THREAD ? SN_FEEDBACK_THREAD.parse(f) : [];
       const convoTurns = turns.filter((t) => t.kind !== 'report');
       const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(f.clientId) ? 'model' : 'user';
       const reportWho = reportRole === 'model' ? 'Agente' : 'Segnalazione';
-      // Note editabili (textarea) dove l'admin sta lavorando: Ricevuti e In
-      // coda. "Ricevuti" è incluso così si può COMMENTARE un feedback appena
-      // arrivato e poi metterlo in coda (il commento viaggia col cambio di
-      // stato — vedi il gestore .fb-act).
-      // La routine ha domande: `design` con motivo `clarify`. Vive nei Ricevuti
-      // (è una decisione che aspetta l'owner), non più in una sezione sua.
+      // «Ricevuti» è incluso così si può COMMENTARE un feedback appena arrivato e poi metterlo in
+      // coda: il commento viaggia col cambio di stato. Le domande della routine (`design`/`clarify`)
+      // vivono nei Ricevuti, perché sono una decisione che aspetta l'owner.
       const clarifyReply = isAdmin && statusOf(f) === 'design' && statusReasonOf(f) === 'clarify';
       const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply
         && (currentTab === 'inbox' || currentTab === 'queue');
-      // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';
         const tsLabel = t.ts ? `<span>${escapeHtml(String(t.ts))}</span>` : '';
@@ -1002,13 +838,8 @@
           ${imgsHtml}
           ${filesHtml}
         </div>`;
-      // Nei tab dove l'admin lavora la textarea modifica SOLO la nota
-      // dell'agente (il "capo" delle note). Le riaperture/risposte dell'utente
-      // (la "coda") NON finiscono più dentro quella stessa casella: restano
-      // bolle a sé, sotto la nota. Prima invece l'intero blob `notes` (nota +
-      // "--- Riaperto il … ---") cadeva in un'unica textarea, così la
-      // riapertura sembrava "dentro la stessa bolla". Negli altri tab tutti i
-      // turni sono già bolle di sola lettura.
+      // La textarea modifica SOLO la nota dell'agente: riaperture e risposte restano bolle a sé.
+      // Prima l'intero blob `notes` cadeva in un'unica casella e la riapertura sembrava la stessa bolla.
       let headText = '';
       let headAtts = [];
       let tailStr = '';
@@ -1031,15 +862,13 @@
       }
       const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
       const tailThreadHtml = tailBubblesHtml ? `<div class="fb-thread fb-thread--tail">${tailBubblesHtml}</div>` : '';
-      // Su "Ricevuti" la casella è un COMMENTO al volo (poi lo metti in coda);
-      // altrove è la nota di triage/decisioni di design.
+      // Su «Ricevuti» la casella è un commento al volo; altrove è la nota di triage e di design.
       const notesLabelText = currentTab === 'inbox' ? 'Commento:' : 'Note / decisioni di design:';
       const notesPlaceholder = currentTab === 'inbox'
         ? 'Aggiungi un commento… (verrà conservato quando metti il feedback in coda)'
         : 'Dettagli aggiuntivi, vincoli, scelte di design…';
-      // La textarea mostra il capo pulito (senza le righe-marcatore degli
-      // allegati: quelle vivono come thumbnail nel compositore) e porta la coda
-      // in `data-tail`, così il salvataggio la riallega intatta (notesValueOf).
+      // La textarea mostra il capo pulito (le righe-marcatore degli allegati vivono come
+      // thumbnail nel compositore) e porta la coda in `data-tail`, che il salvataggio riallega intatta.
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">${notesLabelText}
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" data-tail="${escapeHtml(tailStr)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(headText || '')}</textarea>
@@ -1051,9 +880,8 @@
                     value="${escapeHtml(String(f.userNote || ''))}">
            </label>`
         : '';
-      // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
-      // risposta si APPENDE allo storico (conserva la domanda) e il feedback
-      // torna "Da risolvere" perché una routine (o tu) lo riprenda.
+      // Chiarimenti: la risposta si APPENDE allo storico (conserva la domanda) e il feedback
+      // torna «Da risolvere» perché una routine lo riprenda.
       const replyBlock = clarifyReply
         ? `<div class="fb-reply">
              <label class="fb-notes-label">La tua risposta:
@@ -1094,7 +922,6 @@
           lightbox.classList.add('open');
         }
       });
-      // Decifra e riempi il src (o mostra il segnaposto testuale se non arriva).
       resolveImageSrc(img.dataset.url || '').then(({ dataUrl, error, soloDestinatario }) => {
         img.classList.remove('fb-img-loading');
         if (dataUrl) {
@@ -1103,15 +930,9 @@
         } else {
           const ph = document.createElement('div');
           ph.className = 'fb-img-broken';
-          // Chi ha mandato la segnalazione non rivedrà il proprio screenshot:
-          // quell'allegato lo apre solo chi riceve le segnalazioni. Non è un
-          // guasto e il segnaposto non deve farlo sembrare tale. Non è nemmeno
-          // «inviato»: l'elenco mostra a ogni tester le segnalazioni di tutti,
-          // quindi lo stesso segnaposto compare davanti all'allegato di un
-          // altro, che chi guarda non ha mandato.
-          // «Riservato», non «consegnato» (#582, giro 5): che sia arrivato Filo
-          // non l'ha guardato, e bastava un indirizzo scritto nella forma del
-          // deposito perché lo dichiarasse di un file mai caricato. Il motivo
+          // Chi ha mandato la segnalazione non rivedrà il proprio screenshot: l'allegato lo apre solo
+          // chi riceve. Non è un guasto, non è «inviato» (l'elenco mostra a ogni tester le segnalazioni
+          // di tutti) e non è «consegnato»: che sia arrivato Filo non l'ha guardato (#582). Il motivo
           // per esteso lo dà il main, una fonte sola per quella frase.
           ph.textContent = soloDestinatario ? '(allegato riservato)' : '(immagine non disponibile)';
           // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
@@ -1125,16 +946,12 @@
 
     bindCardActions(listEl);
 
-    // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
-    // captureFocus): salvare le note non deve più "deselezionare" il campo.
+    // Riseleziona la casella che aveva il fuoco (captureFocus): salvare le note non deve deselezionare.
     restoreFocus(focusSnap);
   }
 
-  // Aggancia i pulsanti di una scheda (o di tutta la lista). Sta in una
-  // funzione perché serve in due momenti: dopo un render completo e quando una
-  // sola scheda si riscrive AL PROPRIO POSTO (annullare la riapertura, i
-  // pallini della priorità) — che è l'unico modo di aggiornarla senza
-  // rimescolare la lista sotto il puntatore.
+  // Serve in due momenti: dopo un render completo e quando una sola scheda si riscrive AL
+  // PROPRIO POSTO — l'unico modo di aggiornarla senza rimescolare la lista sotto il puntatore.
   function bindCardActions(root) {
     root.querySelectorAll('.fb-act').forEach((b) => {
       b.addEventListener('click', () => {
@@ -1159,9 +976,7 @@
         // sull'auto-archiviazione a punteggio (DC3), in un verso e nell'altro.
         if (b.dataset.archive) { payload.archiveOverride = 'archived'; ottimistico.archiveOverride = 'archived'; }
         if (b.dataset.restore) { payload.archiveOverride = 'keep_open'; ottimistico.archiveOverride = 'keep_open'; }
-        // Quando metto in coda un feedback appena arrivato porto con me le note
-        // + allegati già scritti (notesValueOf ricompone capo modificato + coda
-        // intatta).
+        // Mettendo in coda un feedback appena arrivato porto con me note e allegati già scritti.
         const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
         if (ta) { payload.notes = notesValueOf(ta); ottimistico.notes = payload.notes; }
         const frase = listEl.querySelector(`.fb-usernote[data-id="${cssEsc(id)}"]`);
@@ -1170,10 +985,8 @@
       });
     });
 
-    // "Riapri" non cambia subito lo status: apre un form inline dove l'utente
-    // può spiegare meglio cosa non funziona. La spiegazione viene appesa alle
-    // note esistenti (con separatore + timestamp), così il commento del primo
-    // agente che ha lavorato al feedback resta visibile anche dopo la riapertura.
+    // «Riapri» apre un form inline: la spiegazione si appende alle note esistenti (separatore e
+    // timestamp), così il commento del primo agente resta visibile anche dopo la riapertura.
     root.querySelectorAll('.fb-reopen-start').forEach((b) => {
       b.addEventListener('click', () => {
         const id = b.dataset.id;
@@ -1200,10 +1013,8 @@
           initial: [],
         });
         ta.focus();
-        // Esc annulla, Ctrl/Cmd+Enter conferma — più comodo che cliccare.
-        // Annullare rimette i pulsanti originali NELLA SCHEDA, senza ridisegnare
-        // la lista: un ridisegno da qui rimescolerebbe l'elenco (e porterebbe via
-        // le schede già decise) mentre il puntatore è fermo su «Annulla».
+        // Esc annulla, Ctrl/Cmd+Enter conferma. Annullare rimette i pulsanti NELLA SCHEDA, senza
+        // ridisegnare la lista (vedi «Un clic, una scheda»).
         ta.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') {
             e.preventDefault();
@@ -1222,14 +1033,11 @@
           const reason = ta.value.trim();
           const atts = reopenComposer.getAttachments();
           const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
-          // La spiegazione (e/o gli allegati) si appendono come turno utente,
-          // conservando lo storico. Senza testo né allegati, le note restano com'erano.
+          // Senza testo né allegati, le note restano com'erano.
           const newNotes = window.SN_FEEDBACK_THREAD
             ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il', attachments: atts })
             : (reason ? (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`) : oldNotes);
-          // Riaprire = rimettere in coda (`todo`), la transizione che la
-          // macchina a stati prevede per "manca qualcosa". Prima si scriveva il
-          // legacy `new`, che nessuno riconosceva più.
+          // Riaprire = rimettere in coda (`todo`), la transizione prevista per «manca qualcosa».
           azioneScheda(ev.currentTarget, {
             id,
             payload: { status: 'todo', notes: newNotes },
@@ -1239,15 +1047,13 @@
       });
     });
 
-    // Composer "Invia risposta" del tab Chiarimenti: appende la risposta
-    // dell'utente come turno (conservando la domanda di Filo nello storico) e
-    // rimette il feedback in "Da risolvere" perché una routine lo riprenda.
+    // «Invia risposta» dei Chiarimenti: appende la risposta come turno, conservando la domanda
+    // di Filo, e rimette il feedback in «Da risolvere».
     root.querySelectorAll('.fb-reply-send').forEach((btn) => {
       const id = btn.dataset.id;
       const card = btn.closest('.fb-card');
       const ta = card && card.querySelector('.fb-reply-text');
-      // Compositore allegati della risposta (gli allegati si ancorano al turno
-      // della risposta dell'utente).
+      // Gli allegati si ancorano al turno della risposta dell'utente.
       const mount = card && card.querySelector('.fb-attach-mount[data-kind="reply"]');
       const composer = ta && mount ? makeAttachComposer({ textarea: ta, mount, initial: [] }) : null;
       const send = () => {
@@ -1272,12 +1078,9 @@
       });
     });
 
-    // Pallini priorità: clic sul pallino N imposta priorità = N; ri-clic sul
-    // pallino già attivo (== priorità corrente) la azzera.
-    // In "In coda" la priorità è un criterio di ORDINAMENTO: ridisegnando la
-    // lista la scheda saltava di posto sotto il dito e il pallino successivo
-    // finiva sotto il cursore. Come le altre azioni, si aggiorna al proprio
-    // posto: i pallini si ridipingono nella scheda, la lista resta ferma.
+    // Clic sul pallino N imposta priorità N; ri-clic su quello attivo la azzera. In «In coda» la
+    // priorità è un criterio di ORDINAMENTO, quindi i pallini si ridipingono nella scheda e la
+    // lista resta ferma (vedi «Un clic, una scheda»).
     root.querySelectorAll('.fb-dot').forEach((dot) => {
       dot.addEventListener('click', async () => {
         const id = dot.dataset.id;
@@ -1289,8 +1092,7 @@
         const card = dot.closest('.fb-card');
         inScrittura.add(id);
         spegniScheda(card);
-        // priorityManual:true segnala al backend che questa è una scelta manuale
-        // dell'owner: il giudice di priorità automatico non sovrascriverà.
+        // priorityManual:true dice al backend che è una scelta dell'owner: il giudice automatico non sovrascrive.
         const ok = await patch(id, { priority: next, priorityManual: true }, { priority: next }, { inPlace: true });
         inScrittura.delete(id);
         if (card && card.isConnected) {
@@ -1300,9 +1102,8 @@
       });
     });
 
-    // Compositore allegati per la nota editabile (il "capo"): inizializzato con
-    // gli allegati del capo. Persiste subito (onChange → patch): notesValueOf
-    // ricompone capo (testo + allegati) + coda intatta.
+    // Compositore del «capo»: persiste subito (onChange → patch), e notesValueOf ricompone
+    // capo (testo e allegati) più coda intatta.
     root.querySelectorAll('.fb-attach-mount[data-kind="notes"]').forEach((mount) => {
       const id = mount.dataset.id;
       const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
@@ -1319,17 +1120,14 @@
           const v = notesValueOf(ta);
           const it = all.find((f) => f._id === id);
           if (it && it.notes === v) return;
-          // Silenzioso come il salvataggio della casella: il compositore tiene
-          // già aggiornate le sue miniature, e un ridisegno le rigenererebbe
-          // sotto il cursore — la × appena premuta lascerebbe il posto a quella
-          // dell'allegato successivo.
+          // Silenzioso come il salvataggio della casella: un ridisegno rigenererebbe le miniature
+          // sotto il cursore, e la × appena premuta lascerebbe il posto a quella dell'allegato dopo.
           patch(id, { notes: v }, { notes: v }, { silenzioso: true });
         },
       });
     });
 
-    // Salvataggio note: debounce su input + blur. Salva capo (testo + allegati)
-    // ricomposto con la coda (notesValueOf).
+    // Debounce su input più blur; si salva il capo ricomposto con la coda (notesValueOf).
     root.querySelectorAll('.fb-notes').forEach((ta) => {
       let timer;
       const flush = () => {
@@ -1347,10 +1145,8 @@
       });
     });
 
-    // La frase per chi ha segnalato: stesso salvataggio delle note (debounce +
-    // blur). È l'altra metà dei due testi, e senza questa casella la dashboard
-    // era l'unica strada da cui quella metà si perdeva: chiudendo un feedback
-    // col pulsante, a chi l'aveva mandato restava solo la riga generica.
+    // La frase per chi ha segnalato: è l'altra metà dei due testi, e senza questa casella
+    // chiudendo un feedback col pulsante a chi l'aveva mandato restava la sola riga generica.
     root.querySelectorAll('.fb-usernote').forEach((input) => {
       let timer;
       const flush = () => {
@@ -1392,10 +1188,8 @@
     bindCardActions(nuovo);
   }
 
-  // I feedback della SEZIONE corrente, già ordinati: la lista la costruisce la
-  // stessa funzione pura della dashboard di gestione (ordinamento compreso —
-  // i bloccati gravi in cima ai Ricevuti, le lavorazioni attive in cima alla
-  // coda). Sopra passa solo il filtro "Solo automatici", che è di questa pagina.
+  // La lista la costruisce la stessa funzione pura della dashboard di gestione, ordinamento
+  // compreso. Sopra passa solo il filtro «Solo automatici», che è di questa pagina.
   function sectionBase(tab) {
     // Stati illeggibili: niente sezioni, un elenco solo (i più recenti in cima).
     if (!sezioniAttendibili()) {
@@ -1415,8 +1209,7 @@
     return agentOnly ? items.filter(isAgent) : items;
   }
 
-  // Mostra o nasconde la barra delle sezioni. Non è una decorazione: se gli
-  // stati non si leggono, quella barra scriverebbe numeri inventati.
+  // Non è una decorazione: se gli stati non si leggono, quella barra scriverebbe numeri inventati.
   function mostraSezioni() {
     const ok = sezioniAttendibili();
     if (tabsEl) tabsEl.hidden = !ok;
@@ -1442,10 +1235,8 @@
         })
       : base;
     if (sezioni && currentTab === 'resolved') {
-      // Sezione "Risolti": ordina per numero (#1, #2, … #22.1, #22.2). I
-      // feedback senza numero (seq assente) finiscono in coda. Confronto
-      // numerico su seq e poi subSeq, così #22.2 viene prima di #22.10 —
-      // l'ordine "umano" atteso per i sub-feedback.
+      // Ordine per numero: seq e poi subSeq confrontati come numeri, così #22.2 viene prima di
+      // #22.10. I feedback senza seq finiscono in coda.
       const numKey = (f) => {
         const seq = Number(f.seq);
         const sub = Number(f.subSeq);
@@ -1466,19 +1257,14 @@
 
   function updateTabCounts() {
     if (!sezioniAttendibili()) return;
-    // Il numero è la LUNGHEZZA della lista che quella sezione mostrerebbe, e si
-    // calcola con la stessa funzione che la costruisce (#495). Senza il filtro
-    // "Solo automatici" attivo sono ESATTAMENTE i numeri della dashboard di
-    // gestione: manageTabCounts è la funzione che conta anche là (#509).
+    // Il numero è la LUNGHEZZA della lista che la sezione mostrerebbe, calcolata dalla stessa
+    // funzione che la costruisce: manageTabCounts conta anche nella gemella (#495, #509).
     const counts = agentOnly
       ? TABS.reduce((acc, t) => { acc[t] = sectionItems(t).length; return acc; }, {})
       : MR.manageTabCounts(all, { releasedVersion });
-    // Il caricamento si ferma ai più recenti: quando li ha presi tutti fino al
-    // tetto, questi numeri sono minimi e lo dicono con un "+" (#495). Restare
-    // su "(312)" quando ce ne sono 400 sembra una risposta, e non lo è.
-    // E finché i feedback non sono arrivati (caricamento in corso, o fallito)
-    // non si scrive nessun numero: "(0)" direbbe "qui non c'è niente" mentre la
-    // verità è che non lo sappiamo ancora.
+    // Il caricamento si ferma ai più recenti: presi tutti fino al tetto, questi numeri sono
+    // minimi e lo dicono con un «+» — «(312)» su 400 sembra una risposta e non lo è. E finché i
+    // feedback non sono arrivati non si scrive nessun numero: «(0)» direbbe che non c'è niente.
     const capped = dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
     for (const tab of TABS) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
@@ -1492,13 +1278,9 @@
     }
   }
 
-  /**
-   * Il feedback come lo può leggere CHI STA GUARDANDO. Se il report è ancora
-   * cifrato (non siamo l'owner, o la decifratura non è riuscita) al suo posto
-   * va la frase in chiaro scritta per chi ha segnalato. Non tocca niente
-   * quando il report è leggibile: i feedback storici, che hanno un solo testo
-   * in chiaro, restano esattamente com'erano.
-   */
+  /** Il feedback come lo può leggere CHI STA GUARDANDO: se il report è ancora cifrato, al
+  * suo posto va la frase in chiaro scritta per chi ha segnalato. Non tocca niente quando il
+  * report è leggibile, così i feedback storici restano com'erano. */
   function sanitizeReportForReader(f) {
     const raw = String((f && f.notes) || '');
     const T = window.SN_FEEDBACK_THREAD;
@@ -1506,15 +1288,13 @@
       ? T.reportUnreadable(raw)
       : (raw.startsWith('FENC') || raw.startsWith('[cifrato'));
     if (!illeggibile) return f;
-    // `reportIllegibile` spegne la casella di modifica: riscrivere una nota che
-    // non si è potuta leggere significherebbe cancellare il report vero con
-    // quello che è rimasto sullo schermo.
+    // `reportIllegibile` spegne la casella di modifica: riscrivere una nota che non si è potuta
+    // leggere cancellerebbe il report vero con quello rimasto sullo schermo.
     return { ...f, notes: String((f && f.userNote) || '').trim(), reportIllegibile: true };
   }
 
-  // La frase d'errore comprensibile (mai il "Failed to fetch" grezzo) + il tasto
-  // per riprovare. Sta in una funzione perché serve in due momenti: quando il
-  // caricamento fallisce e ogni volta che un re-render svuoterebbe il riquadro.
+  // La frase comprensibile (mai il «Failed to fetch» grezzo) e il tasto per riprovare. Serve
+  // in due momenti: quando il caricamento fallisce e a ogni re-render che svuoterebbe il riquadro.
   function showLoadError(msg) {
     listEl.innerHTML = '';
     countEl.textContent = '';
@@ -1536,9 +1316,8 @@
     const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
-    // DB3: la versione dell'app in esecuzione è l'ultima rilasciata. Serve al
-    // gate di "Risolti" — la stessa domanda che si fa la gemella, con la stessa
-    // risposta, o un `done` non ancora uscito starebbe in due sezioni diverse.
+    // DB3: la versione in esecuzione è l'ultima rilasciata. Stessa domanda e stessa risposta
+    // della gemella, o un `done` non ancora uscito starebbe in due sezioni diverse.
     if (!releasedVersion) {
       try {
         const r = await sendToMain({ type: 'get_update_recap' });
@@ -1549,9 +1328,8 @@
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
       let list = await SN_FEEDBACK.list({ pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000 });
-      // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
-      // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
-      // restano invariati (la dashboard non si rompe, mostra il ciphertext).
+      // S1.3: decifratura batch dei campi FENC1:, una sola IPC per tutta la lista. Se l'utente non
+      // è admin o l'IPC fallisce i valori restano invariati: la dashboard non si rompe.
       if (isAdmin && list.length > 0) {
         try {
           const r = await sendToMain({ type: 'feedback_decrypt_fields', list });
@@ -1561,10 +1339,8 @@
       // Se nel frattempo è partito un caricamento più recente (o un test ha
       // iniettato dati), questo risultato è vecchio: si butta.
       if (gen !== loadGen) return;
-      // I DUE TESTI. Il report della lavorazione da qui in avanti è cifrato: chi
-      // non è l'owner non ha la chiave, e non deve averla. Al posto del blob
-      // illeggibile mostriamo la frase scritta per chi ha segnalato — e se non
-      // c'è, niente: una bolla vuota è meglio di una bolla di ciphertext.
+      // I DUE TESTI: il report della lavorazione è cifrato e chi non è l'owner non ha la chiave.
+      // Al suo posto la frase per chi ha segnalato; se non c'è, niente — meglio di una bolla di ciphertext.
       all = list.map(sanitizeReportForReader);
       // Da qui in poi i numeri delle sezioni sono veri e si possono scrivere.
       dataLoaded = true;
@@ -1572,9 +1348,8 @@
       applyFilter();
     } catch (e) {
       if (gen !== loadGen) return;
-      // Errore di caricamento: frase per l'utente (mai il "Failed to fetch"
-      // grezzo) + un tasto per riprovare, invece di lasciare l'utente bloccato a
-      // chiudere e riaprire la pagina. Stesso pattern della bacheca (SN_CHAT_ERRORS).
+      // Errore di caricamento: frase per l'utente (mai il «Failed to fetch» grezzo) più un tasto
+      // per riprovare, invece di costringere a chiudere e riaprire la pagina. Come la bacheca.
       console.error('[feedback] errore caricamento:', e);
       loadError = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
         ? SN_CHAT_ERRORS.sentence(e)
@@ -1621,19 +1396,16 @@
     });
   }
 
-  // ── Stato admin ──────────────────────────────────────────────────────────
   function renderAuthState(profile) {
     if (adminBanner) adminBanner.hidden = isAdmin;
     // Lo switch automazione è un controllo da owner: visibile solo agli admin.
     if (automationRow) automationRow.hidden = !isAdmin;
     if (isAdmin) loadAutomation();
     if (!isAdmin && adminBannerText) {
-      // Distingui "non loggato" da "loggato ma non admin": il secondo non può
-      // diventare admin cliccando Accedi, quindi nascondiamo il pulsante.
+      // «Loggato ma non admin» non diventa admin cliccando Accedi: il pulsante si nasconde.
       if (profile?.email) {
-        // #583: "sola lettura" non è più vero — i feedback non si leggono
-        // affatto senza essere admin. Dirlo com'è vale più di un invito che
-        // non porta da nessuna parte.
+        // #583: senza essere admin i feedback non si leggono affatto — dirlo com'è vale più di un
+        // invito che non porta da nessuna parte.
         adminBannerText.textContent = `L'account ${profile.email} non è un amministratore: i feedback li vede chi li gestisce.`;
         if (adminSignInBtn) adminSignInBtn.hidden = true;
       } else {
@@ -1671,10 +1443,8 @@
     });
   }
 
-  // ── Switch "gestione automatica dei feedback" (owner-only) ───────────────────
-  // Default OFF = autonomia spenta: ogni feedback, anche sicuro, passa da te. Lo
-  // stato vive nel doc Firestore config/automation (campo `enabled`); la
-  // scrittura passa dal main (handler admin-gated, ID token come Bearer).
+  // Switch «gestione automatica» (owner-only). Default OFF = ogni feedback, anche sicuro,
+  // passa da te. Lo stato vive in config/automation; la scrittura passa dal main, admin-gated.
   function renderAutomation(enabled) {
     if (automationToggle) automationToggle.checked = Boolean(enabled);
     if (automationDesc) {
@@ -1720,11 +1490,8 @@
     });
   }
 
-  // ── Aggancio di test (stesso pattern di manage: window.__mgTest) ──────────
-  // Gli spec iniettano dati DOPO l'apertura della pagina, senza gareggiare col
-  // caricamento reale: setData invalida (via loadGen) qualsiasi load in volo,
-  // così il risultato vero — che arriva secondi dopo — viene buttato invece di
-  // sovrascrivere i dati finti. È lo stesso rimedio che tiene stabile manage.
+  // Aggancio di test (come window.__mgTest): setData invalida via loadGen qualsiasi load in
+  // volo, così il risultato vero — che arriva secondi dopo — non sovrascrive i dati finti.
   window.__fbTest = {
     setAdmin(v, profile) {
       setIsAdmin(v);
@@ -1750,7 +1517,6 @@
     },
   };
 
-  // Carica prima lo stato admin, poi i feedback: così il primo render già
-  // mostra (o nasconde) i controlli di gestione in modo coerente.
+  // Prima lo stato admin, poi i feedback: il primo render mostra già i controlli in modo coerente.
   refreshAuth().finally(load);
 })();
