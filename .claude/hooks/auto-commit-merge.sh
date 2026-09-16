@@ -200,7 +200,7 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
   # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
   if is_spedibile "$BRANCH"; then
-    git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
+    spedisci_ramo "$BRANCH" "$wt" || true
   fi
 
 done
