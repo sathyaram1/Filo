@@ -67,7 +67,7 @@ function scenario() {
 }
 
 test.describe('hook di salvataggio — il problema di un\'altra cartella di lavoro', () => {
-  test('una fusione ferma in B arriva nel contesto della sessione che lavora in A, con le parole di un problema suo', async () => {
+  test('una fusione ferma in B arriva nel contesto della sessione che lavora in A come un guaio ALTRUI, in una riga, senza ordini', async () => {
     const s = scenario();
     const m = gitTenta(s.B, 'merge', 'main');
     expect(m.status).not.toBe(0);
