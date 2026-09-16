@@ -232,8 +232,24 @@ export async function work(t, opts) {
 // vorrebbe dire far cadere il semaforo di un lavoro ancora vivo.
 const BATTITO_FINITO = new Set(['bad_ticket', 'dead_ticket']);
 
-export async function heartbeat(t, opts) {
-  const { status, body } = await call('routineHeartbeat', { ticket: t }, opts);
+/**
+ * Lo stato del contenitore, da allegare a ogni battito (giro del 14/09: un
+ * worker morto di memoria non lasciava nessuna traccia, il semaforo cadeva e
+ * basta). Solo numeri: il server salva quelli e ignora il resto.
+ */
+export function statoContenitore({ osImpl = os, proc = process } = {}) {
+  const num = (v) => (Number.isFinite(v) ? v : undefined);
+  const carico = osImpl.loadavg();
+  return {
+    uptimeS: num(Math.round(osImpl.uptime())),
+    freeMb: num(Math.round(osImpl.freemem() / 1048576)),
+    rssMb: num(Math.round(proc.memoryUsage().rss / 1048576)),
+    loadAvg: num(Math.round(((Array.isArray(carico) && carico[0]) || 0) * 100) / 100),
+  };
+}
+
+export async function heartbeat(t, opts = {}) {
+  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
   const reason = String((body && body.reason) || `http_${status}`);
   return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
@@ -245,13 +261,95 @@ export async function heartbeat(t, opts) {
  * parole (il testo di ritorno di un worker non lo legge nessuna macchina). Il
  * server lo tronca e non lo interpreta; da lì in poi l'emissione dei biglietti
  * risponde `fault_declared` per il periodo di rispetto.
+ *
+ * `report`, se presente, è il rapporto di fine sessione (session-report.mjs):
+ * viaggia nel corpo col nome `report`. Per la ritentata quando il server lo
+ * rifiuta c'è releaseConRapporto, qui sotto.
  */
-export async function release(t, fault = '', opts) {
+export async function release(t, fault = '', opts, report = null) {
   const payload = { ticket: t };
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
+  if (report && typeof report === 'object') payload.report = report;
   const { status, body } = await call('routineRelease', payload, opts);
-  return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || '') };
+  return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
+}
+
+/**
+ * Rilascio col rapporto allegato, e le due ritentate che il server prevede:
+ *   - 413 `report_too_big` → una volta senza `tools.byName` e `notes`; se è
+ *     ancora troppo, senza rapporto, e lo si dice;
+ *   - 400 `report_malformed` → senza rapporto, e lo si dice.
+ * Il rilascio è idempotente: riprovare è sicuro. `esito.rapporto` dice cosa è
+ * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
+ * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
+ */
+export async function releaseConRapporto(t, fault, report, opts) {
+  const tenta = (rep) => release(t, fault, opts, rep);
+  if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
+  let r = await tenta(report);
+  if (r.status === 413 && r.reason === 'report_too_big') {
+    const misura = `${r.body && r.body.bytes ? r.body.bytes : '?'} byte, massimo ${r.body && r.body.max ? r.body.max : '?'}`;
+    const snello = { ...report, tools: { ...(report.tools || {}) } };
+    delete snello.tools.byName;
+    delete snello.notes;
+    r = await tenta(snello);
+    if (r.status === 413 && r.reason === 'report_too_big') {
+      r = await tenta(null);
+      return { ...r, rapporto: 'scartato', avviso: `rapporto troppo grande anche senza l'elenco degli strumenti (${misura}): rilasciato SENZA rapporto.` };
+    }
+    return { ...r, rapporto: 'ridotto', avviso: `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.` };
+  }
+  if (r.status === 400 && r.reason === 'report_malformed') {
+    r = await tenta(null);
+    return { ...r, rapporto: 'scartato', avviso: `il server non ha capito il rapporto (report_malformed${r.body && r.body.detail ? `: ${r.body.detail}` : ''}): rilasciato SENZA rapporto.` };
+  }
+  return { ...r, rapporto: 'allegato' };
+}
+
+/**
+ * Spedisce il ramo corrente su origin, prima del rilascio. L'hook di
+ * salvataggio parte solo su Edit/Write: un `git commit` fatto a mano dal
+ * worker restava a terra, e il contenitore moriva con lui (giro del 14/09).
+ *
+ * Salta (ok, skipped) con una HEAD staccata o su un ramo protetto — la stessa
+ * regola dell'hook e di finish-local (lib/branch-integrity.isProtectedBranch:
+ * main, master, il default dichiarato da origin). Prima un push normale; se
+ * git lo rifiuta per storia divergente (un rebase), --force-with-lease, che
+ * è contro il ref remoto conosciuto: se qualcun altro ha spinto nel frattempo
+ * git rifiuta, ed è giusto così. Un fallimento torna con la causa: chi chiama
+ * NON rilascia.
+ */
+export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (e) {
+      const testo = String((e && (e.stderr || e.stdout)) || (e && e.message) || '').trim();
+      return { ok: false, out: testo };
+    }
+  };
+  const head = run(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (!head.ok) return { ok: false, skipped: false, branch: '', reason: `stato di git illeggibile: ${head.out}` };
+  const ramo = head.out;
+  if (ramo === 'HEAD') return { ok: true, skipped: true, branch: '', reason: 'HEAD staccata: nessun ramo da spedire' };
+  const def = run(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok ? def.out.replace(/^origin\//, '') : '';
+  if (isProtectedBranch(ramo, principale)) return { ok: true, skipped: true, branch: ramo, reason: `'${ramo}' è un ramo protetto: non si spedisce da qui` };
+  const refspec = `HEAD:refs/heads/${ramo}`;
+  const push = run(['push', 'origin', refspec]);
+  if (push.ok) return { ok: true, skipped: false, branch: ramo };
+  if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
+    const lease = run(['push', '--force-with-lease', 'origin', refspec]);
+    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true };
+    return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
+  }
+  return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
+}
+
+/** Le righe di git che dicono qualcosa (via i `hint:` e le vuote), in una riga. */
+function pulisciGit(testo) {
+  return String(testo || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^hint:|^To /.test(l)).slice(0, 3).join(' ');
 }
 
 /**
