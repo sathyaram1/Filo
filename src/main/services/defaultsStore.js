@@ -376,14 +376,7 @@ function clampCap(n) {
 }
 
 async function getRoutineCaps(idToken) {
-<<<<<<< HEAD
-  // SOLO config/routines: è il documento che il server legge davvero, e
-  // mostrare un valore pescato altrove significa mostrare una regola che
-  // nessuno applica (vedi il commento in getAutomationProberIdle).
-=======
-  const { defs } = automationDefaults();
   // SOLO config/routines: mostrare un valore pescato altrove significa mostrare una regola che nessuno applica (vedi getAutomationProberIdle).
->>>>>>> 884ac2ba2 (potatura commenti: defaultsStore, downloads)
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '' };
   for (const k of CAP_KEYS) {
