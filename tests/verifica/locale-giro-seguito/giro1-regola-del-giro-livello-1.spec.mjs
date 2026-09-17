@@ -23,7 +23,17 @@ function caricaPubblico() {
   return globalThis.SN_VERIFIER_ROUND;
 }
 
-const COPIA_SERVER = resolve(ROOT, '..', '..', '..', '..', 'filo-security', 'functions', 'src', 'routine', 'verifierRound.js');
+/** La copia incorporata nel repo del server, se sta accanto (dal checkout principale o da una cartella di lavoro). */
+function copiaServer() {
+  let dir = ROOT;
+  for (let i = 0; i < 6; i++) {
+    const p = join(dir, 'filo-security', 'functions', 'src', 'routine', 'verifierRound.js');
+    if (existsSync(p)) return p;
+    dir = dirname(dir);
+  }
+  return '';
+}
+const COPIA_SERVER = copiaServer();
 
 function rilievi(ROUND, testo) {
   return ROUND.parseFindings(`riassunto di cosa funziona\n${testo}`).findings;
