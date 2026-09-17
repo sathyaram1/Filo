@@ -1439,8 +1439,7 @@
   // La parte che NON dipende da quale sezione si guarda: la condivide anche l'elenco unico di
   // quando le sezioni non ci sono.
   function renderListBody() {
-    // Col caricamento al tetto una sezione «vuota» può non esserlo: i più vecchi non sono qui.
-    // Il vuoto lo dice, invece di negarli.
+    // Il vuoto lo dice invece di negarli: come in src/pages/feedback/feedback.js.
     if (loadHitCap() && dataLoaded) {
       mgListEmpty.textContent = `${mgListEmpty.textContent} ${FB.COUNT_CAP_HINT}`;
     }
