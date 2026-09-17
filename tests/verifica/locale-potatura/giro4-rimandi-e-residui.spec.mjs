@@ -65,7 +65,8 @@ const testo = (f) => { if (!letti.has(f)) letti.set(f, readFileSync(join(ROOT, f
 test('ogni rimando a un file, un pattern o una sentinella punta a qualcosa che esiste', () => {
   // Le copie di regola dei giri passati sono diventate rimandi: un rimando nel vuoto lascia
   // la regola in nessun posto, che è peggio della copia.
-  const RE = /(?:patterns\/[\w-]+\.md|tests\/unit\/[\w.-]+\.mjs|tests\/(?:[\w-]+\/)*[\w.-]+\.spec\.mjs|src\/(?:[\w-]+\/)*[\w.-]+\.(?:js|html|css|mjs)|scripts\/[\w.-]+\.(?:mjs|js)|\b[A-Z][A-Z0-9-]{3,}\.md\b)/g;
+  // Un percorso preceduto da una barra è di un altro repo (functions/src/…): non si giudica qui.
+  const RE = /(?<![\w/])(?:patterns\/[\w-]+\.md|tests\/unit\/[\w.-]+\.mjs|tests\/(?:[\w-]+\/)*[\w.-]+\.spec\.mjs|src\/(?:[\w-]+\/)*[\w.-]+\.(?:js|html|css|mjs|md)|scripts\/[\w.-]+\.(?:mjs|js)|[A-Z][A-Z0-9-]{3,}\.md\b)/g;
   const rotti = [];
   for (const f of SRC) {
     for (const c of comments(testo(f))) c.rows.forEach((r, i) => {
