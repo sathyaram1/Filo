@@ -97,7 +97,7 @@ function provaRegola(nome, ROUND) {
       expect(d.consume).toBe(null);
     });
 
-    test('un 2 con la domanda ferma il lavoro: nemmeno l\'1 si corregge', () => {
+    test('un 2 con la domanda ferma il lavoro: nemmeno l\'1 entra nel giro', () => {
       const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2?] scelta di prodotto\n[1] bordo freddo'), caps: { cap2: 10, cap1: 5, cap0: 0 }, counts: {} });
       expect(d.stop).toBe(true);
       expect(d.fix).toEqual([]);
