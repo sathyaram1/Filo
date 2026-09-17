@@ -99,6 +99,33 @@ test('ogni rimando a una sezione di CLAUDE.md o a un pattern per titolo trova qu
   expect(rotti, 'rimandi a sezioni che non si trovano').toEqual([]);
 });
 
+test('ogni «§n.m» citato in un commento è il titolo di una sezione in un documento del repo', () => {
+  // Un numero di sezione senza documento, o di una sezione che nessun .md ha, è un rimando
+  // nel vuoto: chi legge non può seguirlo e la regola non sta in nessun posto.
+  function mdFiles(dir, acc = []) {
+    for (const e of readdirSync(dir)) {
+      if (e === 'node_modules' || e.startsWith('.')) continue;
+      const p = join(dir, e);
+      if (statSync(p).isDirectory()) mdFiles(p, acc);
+      else if (e.endsWith('.md') || e.endsWith('.txt')) acc.push(p);
+    }
+    return acc;
+  }
+  const sezioni = new Set();
+  for (const f of mdFiles(ROOT)) {
+    for (const m of readFileSync(f, 'utf8').matchAll(/^#+\s*(?:§\s*)?(\d+(?:\.\d+)*[a-z]?)\b/gm)) sezioni.add(m[1]);
+  }
+  const rotti = [];
+  for (const f of SRC) {
+    for (const c of comments(testo(f))) c.rows.forEach((r, i) => {
+      for (const m of r.matchAll(/§\s?(\d+(?:\.\d+)*[a-z]?)\b/g)) {
+        if (!sezioni.has(m[1])) rotti.push(`${f}:${c.ls + i}  §${m[1]}`);
+      }
+    });
+  }
+  expect(rotti, 'sezioni citate che nessun documento del repo ha').toEqual([]);
+});
+
 test('la stessa riga di commento non sta due volte nello stesso file', () => {
   const copie = [];
   for (const f of SRC) {
