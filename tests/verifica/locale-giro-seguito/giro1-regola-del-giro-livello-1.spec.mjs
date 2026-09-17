@@ -41,7 +41,7 @@ function rilievi(ROUND, testo) {
 
 function provaRegola(nome, ROUND) {
   test.describe(nome, () => {
-    test('un 1 insieme a un 2 si corregge anche a cap1 = 0, e il giro si paga da cap2', () => {
+    test('un 1 insieme a un 2 entra nel giro anche a cap1 = 0, e il conto del giro va a cap2', () => {
       const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2] non salva\n[1] bordo freddo'), caps: { cap2: 10, cap1: 0, cap0: 0 }, counts: {} });
       expect(d.stop).toBe(false);
       expect(d.fix.map((f) => f.level)).toEqual([2, 1]);
@@ -59,7 +59,7 @@ function provaRegola(nome, ROUND) {
       expect(d.counts.count1).toBe(1);
     });
 
-    test('un 3 con un 1: si corregge tutto, si paga dal bilancio del 3 (che è cap2)', () => {
+    test('un 3 con un 1: entrano tutti e due, e il conto va al bilancio del 3 (che è cap2)', () => {
       const d = ROUND.decideRound({ findings: rilievi(ROUND, '[3] si scrive nelle chiavi SSH\n[1] bordo freddo'), caps: { cap2: 10, cap1: 0, cap0: 0 }, counts: {} });
       expect(d.fix.map((f) => f.level)).toEqual([3, 1]);
       expect(d.consume).toBe('cap2');
@@ -73,7 +73,7 @@ function provaRegola(nome, ROUND) {
       expect(d.consume).toBe(null);
     });
 
-    test('un 1 da solo a cap1 = 1 si corregge e paga cap1, come prima', () => {
+    test('un 1 da solo a cap1 = 1 entra nel giro e il conto va a cap1, come prima', () => {
       const d = ROUND.decideRound({ findings: rilievi(ROUND, '[1] bordo freddo'), caps: { cap2: 10, cap1: 1, cap0: 0 }, counts: {} });
       expect(d.fix.map((f) => f.level)).toEqual([1]);
       expect(d.consume).toBe('cap1');
@@ -81,7 +81,7 @@ function provaRegola(nome, ROUND) {
       expect(d.counts.count2).toBe(0);
     });
 
-    test('un 1 con la domanda resta derivato anche accanto a un 2 che si corregge', () => {
+    test('un 1 con la domanda resta derivato anche accanto a un 2 che entra nel giro', () => {
       const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2] non salva\n[1?] bordo freddo: caldo come il resto?'), caps: { cap2: 10, cap1: 5, cap0: 0 }, counts: {} });
       expect(d.stop).toBe(false);
       expect(d.fix.map((f) => f.level)).toEqual([2]);

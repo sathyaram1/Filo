@@ -134,7 +134,7 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
     expect(r.stderr).toMatch(/non letto dal server \(rete\)/);
   });
 
-  test('`critica` senza i bilanci sul server non registra niente; con i bilanci veri calcola l\'esito (un 1 insieme a un 2 si corregge anche a cap1 = 0)', async () => {
+  test('`critica` senza i bilanci sul server non registra niente; con i bilanci veri calcola l\'esito (un 1 insieme a un 2 entra nel giro anche a cap1 = 0)', async () => {
     const repo = repoTemporaneo();
     const sha = git(repo, 'rev-parse', 'HEAD');
     const statoFile = join(repo, '.claude', 'verify-local.json');
