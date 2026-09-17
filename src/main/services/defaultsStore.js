@@ -1,36 +1,10 @@
-// Store della configurazione "predefinita" condivisa di Filo.
-//
-// Cosa contiene la config predefinita:
-//   - provider, models (modello per azione), modelRegistry
-//     → NON sono segreti (sono solo nomi di modelli): vivono nel doc Firestore
-//       `config/models`, leggibile da TUTTI (anche utenti non loggati), così la
-//       modifica fatta dall'admin si propaga a ogni installazione.
-//   - apiKeys (openrouter/tavily) e chiave Google Safe Browsing → SONO segreti.
-//     L'UNICA fonte per un'installazione normale sono le chiavi di build
-//     (default-keys.js, incastonate dalla CI a ogni release e consegnate
-//     dall'auto-update). L'admin le ruota scrivendo il doc Firestore
-//     `config/secrets`, che il bake rilegge al build successivo.
-//
-// #581 — perché l'app non legge più `config/secrets` a runtime. Quel documento
-// era leggibile da "qualunque utente loggato con email verificata". Ma il login
-// è aperto a qualsiasi account Google e la chiave web di Firebase sta in un repo
-// pubblico: chiunque, senza installare Filo, si autenticava e con una GET REST
-// si portava via le chiavi che pagano le chiamate di tutti. La regola ora è
-// admin-only (come `config/judgeSecrets`), e qui il documento si legge SOLO se
-// chi usa Filo è admin — cioè per la pagina "Modelli predefiniti", che lo scrive
-// e mostra "configurata / non configurata". Per tutti gli altri la rotazione
-// arriva dal build, che è la strada che serviva già chi non faceva login.
-//
-// Catena di precedenza (per le chiavi):  config/secrets (solo admin)  >  build.
-// Per la config modelli:                 Firestore config/models       >  costanti.
-//
-// L'admin scrive tramite l'handler DEFAULTS_UPDATE (main, con Firebase ID token
-// come Bearer): le regole Firestore accettano la PATCH solo se è un admin.
+// Store della configurazione "predefinita" condivisa: provider, modelli per azione e registro NON sono segreti e vivono nel doc Firestore `config/models`, leggibile da tutti, così una modifica dell'admin si propaga a ogni installazione.
+// Le chiavi API e quella di Safe Browsing sono segrete e per un'installazione normale arrivano SOLO dal build (default-keys.js, incastonate dalla CI a ogni release). #581: `config/secrets` era leggibile da qualunque account Google verificato e, con la chiave web di Firebase in un repo pubblico, chiunque poteva prendersi con una GET le chiavi che pagano le chiamate di tutti — ora è admin-only e qui si legge solo se chi usa Filo è admin (pagina "Modelli predefiniti").
+// Precedenza: chiavi = config/secrets (solo admin) > build; config modelli = config/models > costanti. L'admin scrive via DEFAULTS_UPDATE con Firebase ID token, e le regole accettano la PATCH solo da un admin.
 
 const auth = require('../auth/google-auth');
 const { getBuildKeys, getBuildSafeBrowsingKey } = require('../config/default-keys');
-// Registra SN_FEEDBACK_THREAD su globalThis: da lì viene l'elenco dei gruppi di
-// mittente dell'auto-approvazione, che deve restare uno solo (#446).
+// Da SN_FEEDBACK_THREAD viene l'elenco dei gruppi di mittente dell'auto-approvazione, che deve restare uno solo (#446).
 require('../../shared/feedbackThread.js');
 
 const PROJECT_ID = 'filo-8b9cb';
@@ -40,18 +14,15 @@ const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_I
 const MODELS_DOC = 'config/models';
 const SECRETS_DOC = 'config/secrets';
 const AUTOMATION_DOC = 'config/automation';
-// Le impostazioni che le ROUTINE leggono, in un documento a lettura pubblica:
-// le loro macchine non hanno credenziali (vedi getRoutinesEnabled).
+// Le impostazioni che le ROUTINE leggono stanno in un documento a lettura pubblica: le loro macchine non hanno credenziali (vedi getRoutinesEnabled).
 const ROUTINES_DOC = 'config/routines';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
-// Popolato SOLO quando chi usa Filo è admin (#581): per tutti gli altri resta
-// null e le chiavi effettive sono quelle del build.
+// Popolato SOLO quando chi usa Filo è admin (#581): per tutti gli altri resta null e le chiavi effettive sono quelle del build.
 let remoteSecrets = null; // { apiKeys?: { openrouter?, tavily? }, safeBrowsingKey? }
 let lastFetchTs = 0;
 
-// ── Firestore Value <-> JS ───────────────────────────────────────────────────
 function toFsValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === 'string') return { stringValue: v };
@@ -90,8 +61,7 @@ function fsDocToObject(doc) {
   return out;
 }
 
-// Legge un documento Firestore. Ritorna l'oggetto, {} se 404 (non esiste
-// ancora), oppure null se la lettura non è consentita/è fallita (403/altro).
+// Ritorna l'oggetto, {} se 404 (non esiste ancora), null se la lettura è negata o fallita.
 async function fetchDoc(docPath, idToken) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
@@ -112,19 +82,12 @@ async function fetchDoc(docPath, idToken) {
   }
 }
 
-// ── API ──────────────────────────────────────────────────────────────────────
-
-// Vero se chi sta usando Filo è nell'allowlist admin. È solo il gate LOCALE che
-// evita di bussare a un documento che non ci riguarda: la garanzia forte è la
-// regola Firestore (`config/secrets` → `allow read: if isAdmin()`), che risponde
-// permission denied a chiunque altro anche se questa funzione mentisse.
+// Gate LOCALE che evita di bussare a un documento che non ci riguarda: la garanzia forte è la regola Firestore (`config/secrets` → allow read: if isAdmin()), che risponde permission denied anche se questa funzione mentisse.
 function isAdminUser() {
   try { return Boolean(auth.isAdmin()); } catch (_) { return false; }
 }
 
-// Aggiorna la cache leggendo da Firestore. `config/models` è pubblico;
-// `config/secrets` si legge SOLO da admin (#581): per tutti gli altri le chiavi
-// sono quelle incastonate dal build, e questo documento non si tocca affatto.
+// `config/models` è pubblico; `config/secrets` si legge SOLO da admin (#581), per gli altri non si tocca affatto.
 async function refresh() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
@@ -136,10 +99,7 @@ async function refresh() {
     const secrets = await fetchDoc(SECRETS_DOC, idToken);
     if (secrets) remoteSecrets = secrets;
   } else {
-    // Chi non è admin non ha override: azzerare invece di lasciare la cache
-    // com'era tiene onesta la precedenza anche dopo un logout dell'owner sulla
-    // stessa installazione (altrimenti le chiavi lette da admin resterebbero in
-    // uso per un account che non può più leggerle).
+    // Chi non è admin non ha override: azzerare invece di lasciare la cache com'era tiene onesta la precedenza dopo un logout dell'owner sulla stessa installazione, altrimenti le chiavi lette da admin resterebbero in uso.
     remoteSecrets = null;
   }
   lastFetchTs = Date.now();
@@ -152,10 +112,7 @@ async function refreshIfStale(maxAgeMs = 5 * 60 * 1000) {
   return refresh();
 }
 
-// Config predefinita effettiva = costanti/build  <  override remoti.
-// Registro e catene "di build": nell'app sono VUOTI (nessun modello scritto
-// nel codice); nei test è il registro di prova, così i test hanno una
-// configurazione nota senza che l'app ne abbia una.
+// Registro e catene "di build" nell'app sono VUOTI (nessun modello scritto nel codice); nei test sono il registro di prova, così i test hanno una configurazione nota senza che l'app ne abbia una.
 function buildModels() {
   const C = globalThis.SN_CONST || {};
   const T = globalThis.SN_TEST_MODELS; // presente solo nei test (loader.js)
@@ -168,19 +125,11 @@ function get() {
     provider: C.DEFAULT_PROVIDER || 'openrouter',
     models: { ...buildModels().models },
     modelRegistry: { ...buildModels().registry },
-    // Politica sui fornitori (#421): lista di esclusione (forme base dei
-    // produttori di modelli) e ordinamento fra gli host ammessi. Curabili senza
-    // codice dal doc Firestore config/models: la lista remota SOSTITUISCE quella
-    // di build (l'owner deve poterla svuotare o riscrivere per intero).
+    // Politica sui fornitori (#421): lista di esclusione e ordinamento fra gli host ammessi, curabili senza codice dal doc remoto. La lista remota SOSTITUISCE quella di build — l'owner deve poterla svuotare o riscrivere per intero.
     excludedProviders: [ ...(C.DEFAULT_EXCLUDED_PROVIDERS || []) ],
     providerSort: '',
     apiKeys: getBuildKeys(),
-    // Chiave Google Safe Browsing condivisa (rilevamento siti pericolosi).
-    // Viaggia col build come le altre (#581): prima l'unica fonte era l'override
-    // Firestore, che però imponeva di tenere aperto a chiunque avesse un account
-    // Google il documento con dentro TUTTE le chiavi. Ora il documento è
-    // admin-only e la chiave arriva incastonata nell'installer, quindi la
-    // protezione si accende anche per chi non fa login — prima restava spenta.
+    // Chiave Google Safe Browsing incastonata nel build (#581): prima l'unica fonte era l'override Firestore, che imponeva di tenere il documento con TUTTE le chiavi aperto a chiunque avesse un account Google. Ora la protezione si accende anche per chi non fa login, prima restava spenta.
     safeBrowsingKey: getBuildSafeBrowsingKey(),
   };
 
@@ -190,26 +139,12 @@ function get() {
       out.models = { ...out.models, ...remoteModels.models };
     }
     if (remoteModels.modelRegistry && typeof remoteModels.modelRegistry === 'object') {
-      // Il registry remoto si SOVRAPPONE a quello di build invece di
-      // sostituirlo: i nickname integrati (flash, flash-or, tts, …) devono
-      // restare risolvibili anche se il doc remoto non li elenca, perché le
-      // azioni assenti dal doc remoto ricadono sulle catene di default che li
-      // citano. Un nickname irrisolvibile finirebbe GREZZO al provider
-      // (OpenRouter 400 "flash is not a valid model ID").
+      // Il registry remoto si SOVRAPPONE a quello di build invece di sostituirlo: i nickname integrati devono restare risolvibili anche se il doc remoto non li elenca, perché le azioni assenti da lì ricadono sulle catene di default che li citano. Un nickname irrisolvibile finirebbe GREZZO al provider (400 "flash is not a valid model ID").
       out.modelRegistry = { ...out.modelRegistry, ...remoteModels.modelRegistry };
     }
-    // Tombstone: nickname integrati che l'admin ha ESPLICITAMENTE rimosso
-    // dall'editor. Senza questo, il merge qui sopra (build sotto, remoto sopra)
-    // ri-inietterebbe ogni modello integrato cancellato: l'admin lo elimina,
-    // salva, ma alla riapertura riappare (non poteva mai davvero eliminarne uno
-    // di build). La cancellazione di un nickname NON di build funzionava già,
-    // perché non c'era nulla a re-iniettarlo. Distinguiamo "mai elencato dal
-    // doc remoto" (→ resta, invariante flash) da "cancellato apposta" (→ sparisce):
-    // solo il secondo caso finisce nella lista tombstone, quindi l'invariante
-    // dei nickname integrati non toccati resta intatta. Un nickname ridefinito
-    // dal doc remoto vince comunque (auto-guarigione se l'admin lo ri-aggiunge).
-    // Politica sui fornitori: la lista remota (se presente) sostituisce quella di
-    // build — così l'owner può aggiungere/togliere un produttore senza deploy.
+    // Tombstone: i nickname integrati che l'admin ha ESPLICITAMENTE rimosso dall'editor. Senza, il merge qui sopra (build sotto, remoto sopra) li ri-inietterebbe e un modello di build cancellato riapparirebbe alla riapertura.
+    // Si distingue "mai elencato dal doc remoto" (resta) da "cancellato apposta" (sparisce), così i nickname integrati non toccati restano; uno ridefinito dal remoto vince comunque, quindi ri-aggiungerlo guarisce da sé.
+    // La lista remota dei fornitori esclusi, se c'è, sostituisce quella di build: l'owner aggiunge o toglie un produttore senza deploy.
     if (Array.isArray(remoteModels.excludedProviders)) {
       out.excludedProviders = remoteModels.excludedProviders
         .filter((x) => typeof x === 'string' && x.trim())
@@ -242,9 +177,7 @@ function get() {
   return out;
 }
 
-// Versione "pubblica" della config predefinita per l'editor admin: NON espone
-// le chiavi vere, solo se ciascuna è configurata (così la pagina può mostrare
-// uno stato senza far trapelare il segreto nel renderer).
+// Versione "pubblica" per l'editor admin: NON espone le chiavi vere, solo se ciascuna è configurata, così la pagina mostra uno stato senza far trapelare il segreto nel renderer.
 function getPublicForAdmin() {
   const eff = get();
   return {
@@ -275,13 +208,7 @@ async function patchDoc(docPath, fields, mask, idToken) {
   }
 }
 
-// Scrive la config predefinita su Firestore. `partial` può contenere:
-//   provider, models, modelRegistry  → doc config/models
-//   apiKeys: { openrouter?, tavily? }, safeBrowsingKey → doc config/secrets
-// Richiede un Firebase ID token admin (le regole rifiutano i non-admin).
-// Le chiavi con valore '' o assenti NON vengono scritte (così "non toccare" è
-// diverso da "azzera": per azzerare passare esplicitamente null... ma per
-// semplicità l'editor admin invia solo le chiavi che l'admin ha digitato).
+// Richiede un Firebase ID token admin (le regole rifiutano i non-admin). Le chiavi con valore '' o assenti NON vengono scritte: "non toccare" è diverso da "azzera", e l'editor invia solo quelle digitate.
 async function update(partial, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per modificare i default.');
   partial = partial || {};
@@ -294,21 +221,14 @@ async function update(partial, idToken) {
   if (partial.modelRegistry && typeof partial.modelRegistry === 'object') {
     modelFields.modelRegistry = toFsValue(partial.modelRegistry);
     modelMask.push('modelRegistry');
-    // Tombstone dei nickname integrati che l'admin ha rimosso: i nickname di
-    // build ASSENTI dal registry inviato. Serve perché get() rifonde sempre il
-    // registry di build sotto il remoto: senza la lista dei cancellati, un
-    // modello integrato eliminato riapparirebbe alla riapertura. La lista è
-    // ricalcolata a ogni salvataggio dallo stato completo dell'editor (che
-    // mostra build+remoto fusi), quindi ri-aggiungere un modello lo toglie dai
-    // tombstone → auto-guarigione. Solo i nickname di BUILD possono finire qui:
-    // quelli custom, se rimossi, sono già assenti dal doc e non serve marcarli.
+    // Tombstone dei nickname di build ASSENTI dal registry inviato: get() rifonde sempre il registry di build sotto il remoto, quindi senza questa lista un modello integrato eliminato riapparirebbe. È ricalcolata a ogni salvataggio dallo stato completo dell'editor, così ri-aggiungere un modello lo toglie dai tombstone.
+    // Solo i nickname di BUILD possono finire qui: quelli custom, se rimossi, sono già assenti dal doc.
     const buildReg = buildModels().registry;
     const deleted = Object.keys(buildReg).filter((k) => !(k in partial.modelRegistry));
     modelFields.modelRegistryDeleted = toFsValue(deleted);
     modelMask.push('modelRegistryDeleted');
   }
-  // Politica sui fornitori (#421): stesso doc non-segreto. La lista inviata
-  // sostituisce quella remota per intero (l'array è la fonte di verità completa).
+  // Politica sui fornitori (#421), stesso doc non-segreto: la lista inviata sostituisce quella remota per intero, l'array è la fonte di verità completa.
   if (Array.isArray(partial.excludedProviders)) {
     const clean = partial.excludedProviders
       .filter((x) => typeof x === 'string' && x.trim())
@@ -322,15 +242,8 @@ async function update(partial, idToken) {
   }
   if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
 
-  // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
-  //
-  // IMPORTANTE — merge, non replace: la maschera DEVE puntare ai singoli leaf
-  // (`apiKeys.tavily`, `apiKeys.openrouter`, …) e NON al map intero `apiKeys`.
-  // Con `updateMask=apiKeys` Firestore SOSTITUISCE l'intera mappa col valore
-  // inviato: salvando solo la chiave Tavily cancellavi l'override OpenRouter già
-  // presente, che poi risultava «non configurata» (feedback alpha). Con la
-  // maschera per-leaf Firestore fonde: tocca solo le chiavi digitate e lascia
-  // intatte le altre.
+  // Doc segreti: si scrivono solo i campi presenti come stringa.
+  // IMPORTANTE — merge, non replace: la maschera DEVE puntare ai singoli leaf (`apiKeys.tavily`, `apiKeys.openrouter`) e NON al map intero `apiKeys`. Con `updateMask=apiKeys` Firestore SOSTITUISCE l'intera mappa, e salvando solo la chiave Tavily si cancellava l'override OpenRouter, che poi risultava «non configurata».
   const secretFields = {};
   const secretMask = [];
   const akFields = {};
@@ -356,16 +269,10 @@ async function update(partial, idToken) {
   return getPublicForAdmin();
 }
 
-// ── Interruttore master dell'auto-miglioramento (config/automation) ──────────
-// Campo `enabled` (bool). Doc o campo assente ⇒ false = autonomia OFF (stato
-// sicuro di default: ogni feedback passa da revisione umana). Letto dalla
-// dashboard owner (qui) e, in futuro, dal backend di sicurezza (via admin SDK,
-// che bypassa le regole). Scrittura riservata agli admin: le regole Firestore
-// rifiutano i non-admin.
+// Interruttore master dell'auto-miglioramento (config/automation, campo `enabled` bool): doc o campo assente ⇒ false, autonomia OFF — lo stato sicuro, dove ogni feedback passa da revisione umana. Scrittura riservata agli admin dalle regole Firestore.
 async function getAutomationGate(idToken) {
   const doc = await fetchDoc(AUTOMATION_DOC, idToken);
-  // doc === {} → 404 (mai scritto) ⇒ default OFF. null → lettura negata/fallita
-  // ⇒ default OFF prudente (non si attiva l'autonomia per un errore di rete).
+  // doc === {} è un 404 (mai scritto), null una lettura negata o fallita: in entrambi i casi OFF, perché l'autonomia non deve accendersi per un errore di rete.
   if (!doc || typeof doc.enabled !== 'boolean') return false;
   return doc.enabled;
 }
@@ -376,20 +283,13 @@ async function setAutomationGate(enabled, idToken) {
   return Boolean(enabled);
 }
 
-// Auto-approvazione per mittente (config/automation, campo `autoApprove`): quali
-// categorie di mittente possono entrare in coda da sole quando l'interruttore
-// master è acceso. La decisione vera la prende il backend di sicurezza; qui c'è
-// solo la lettura/scrittura per la dashboard. Campo assente ⇒ tutti ammessi, che
-// è ciò che l'automatica faceva prima che questi sottointerruttori esistessero.
+// Auto-approvazione per mittente (campo `autoApprove`): quali categorie possono entrare in coda da sole quando l'interruttore master è acceso. La decisione vera la prende il backend di sicurezza; qui solo lettura/scrittura per la dashboard. Campo assente ⇒ tutti ammessi, com'era prima che i sottointerruttori esistessero.
 function autoApproveGroups() {
   const T = globalThis.SN_FEEDBACK_THREAD;
   return (T && T.AUTO_APPROVE_GROUPS) || ['owner', 'filo', 'claude', 'user'];
 }
 
-// Un documento salvato prima che gli interruttori si sdoppiassero ha il solo
-// `claude` per tutte le istanze: il ripiego che fa ereditare quel valore vive
-// nel modulo condiviso (resolveAutoApprove), così la dashboard e il backend di
-// sicurezza leggono la stessa mappa dallo stesso documento.
+// Un documento salvato prima che gli interruttori si sdoppiassero ha il solo `claude` per tutte le istanze: il ripiego che fa ereditare quel valore vive nel modulo condiviso (resolveAutoApprove), così dashboard e backend leggono la stessa mappa dallo stesso documento.
 function normalizeAutoApprove(raw) {
   const T = globalThis.SN_FEEDBACK_THREAD;
   if (T && T.resolveAutoApprove) {
@@ -410,8 +310,7 @@ async function getAutomationAutoApprove(idToken) {
 
 async function setAutomationAutoApprove(partial, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'auto-approvazione.');
-  // Merge sul valore corrente: la dashboard manda un solo interruttore per volta
-  // e il documento tiene una mappa sola.
+  // Merge sul valore corrente: la dashboard manda un solo interruttore per volta e il documento tiene una mappa sola.
   const current = await getAutomationAutoApprove(idToken);
   const next = { ...current };
   if (partial && typeof partial === 'object') {
@@ -425,26 +324,12 @@ async function setAutomationAutoApprove(partial, idToken) {
   return next;
 }
 
-// ── Ciò che le routine devono sapere (config/routines) ──────────────────────
-// Interruttore master, esplorazione a coda vuota e tentativi del loop vivono in
-// un documento SEPARATO da config/automation, e leggibile senza credenziali.
-//
-// Perché separato: chi legge queste tre cose sono le macchine delle routine, che
-// non hanno nessuna credenziale. Finché stavano nel documento admin-only la
-// lettura falliva sempre, in silenzio, e si ricadeva sui default: in dashboard
-// sembravano attive, ma nessuna routine le ha mai viste (stessa radice del
-// registro worker sempre vuoto, #451). Dentro non c'è niente di segreto — solo
-// se e come le routine devono lavorare — e la scrittura resta all'owner.
-//
-// MIGRAZIONE: se il campo non c'è ancora nel documento nuovo lo si cerca in
-// quello vecchio, così i valori già scelti dall'owner non si azzerano sotto gli
-// occhi. Il primo salvataggio li porta di là.
+// Ciò che le routine devono sapere (config/routines): interruttore master, esplorazione a coda vuota e tentativi del loop, in un documento SEPARATO da config/automation e leggibile senza credenziali.
+// Perché separato: a leggerlo sono le macchine delle routine, che non hanno nessuna credenziale. Finché stava nel documento admin-only la lettura falliva sempre, in silenzio, e si ricadeva sui default: in dashboard sembravano attive, ma nessuna routine le ha mai viste (#451). Dentro non c'è niente di segreto e la scrittura resta all'owner.
+// MIGRAZIONE: un campo ancora assente dal documento nuovo si cerca in quello vecchio, così i valori già scelti non si azzerano; il primo salvataggio li porta di là.
 async function getRoutinesEnabled(idToken) {
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  // 404/campo assente ⇒ acceso: è il comportamento che c'è sempre stato, e
-  // spegnere dev'essere una scelta scritta, non l'effetto di un documento mai
-  // creato. (Il fail-closed sta dalla parte di chi legge — le routine si
-  // fermano se non riescono a leggere: qui siamo in dashboard.)
+  // 404 o campo assente ⇒ acceso: è il comportamento che c'è sempre stato, e spegnere dev'essere una scelta scritta, non l'effetto di un documento mai creato. Il fail-closed sta dalla parte di chi legge — le routine si fermano se non riescono a leggere — qui siamo in dashboard.
   if (!doc || typeof doc.enabled !== 'boolean') return true;
   return doc.enabled;
 }
@@ -455,17 +340,9 @@ async function setRoutinesEnabled(on, idToken) {
   return Boolean(on);
 }
 
-// Esplorazione automatica a coda vuota (campo `proberWhenIdle`): quando non c'è
-// più niente da lavorare, le routine vanno a cercare problemi che nessuno ha
-// segnalato. Campo assente ⇒ true (il comportamento che c'è sempre stato): solo
-// un `false` scritto apposta ferma l'esplorazione.
+// Esplorazione automatica a coda vuota (`proberWhenIdle`): quando non c'è più niente da lavorare le routine cercano problemi che nessuno ha segnalato. Campo assente ⇒ true: solo un `false` scritto apposta la ferma.
 async function getAutomationProberIdle(idToken) {
-  // SOLO config/routines: è il documento che il server legge davvero. Il
-  // ripiego sul documento vecchio (config/automation) mostrava all'owner un
-  // valore che il server ignorava — la manopola girava, le ruote no. È già
-  // successo: la migrazione ha seminato i default nel documento nuovo e le
-  // scelte fatte prima (esplorazione spenta, tetto a 5) sono rimaste in
-  // ombra nel vecchio, mai più lette da nessuno.
+  // SOLO config/routines: è il documento che il server legge davvero. Il ripiego sul vecchio mostrava all'owner un valore che il server ignorava — la manopola girava, le ruote no, ed è già successo.
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   if (doc && typeof doc.proberWhenIdle === 'boolean') return doc.proberWhenIdle;
   return true;
@@ -477,15 +354,8 @@ async function setAutomationProberIdle(on, idToken) {
   return Boolean(on);
 }
 
-// I tre bilanci dei giri di correzione (config/routines, campi `cap2`,
-// `cap1`, `cap0` — feedback #561) e il testo della fase 2 (`fixInstructions`).
-// Li applica il SERVER quando registra la critica; qui la dashboard li legge e
-// li scrive. Non c'è un default: i numeri stanno SOLO nel documento (decisione
-// dell'owner del 2026-09-16 — un default nel codice faceva ragionare la
-// verifica locale con 5/2/0 mentre la dashboard diceva 10/1/0). Un campo che
-// nel documento non c'è torna `null`, e la dashboard lo mostra vuoto. Il range
-// da SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura. Lo 0
-// è un valore valido per tutti e tre.
+// I tre bilanci dei giri di correzione (`cap2`, `cap1`, `cap0` — #561) e il testo della fase 2 (`fixInstructions`), in config/routines: li applica il SERVER quando registra la critica, qui la dashboard li legge e li scrive.
+// Nessun default: i numeri stanno SOLO nel documento (decisione dell'owner del 2026-09-16 — un default nel codice faceva ragionare la verifica locale con 5/2/0 mentre la dashboard diceva 10/1/0); un campo assente torna `null` e la dashboard lo mostra vuoto. Range da SN_CONST.AUTOMATION, clamp prudente in lettura e in scrittura; 0 è un valore valido per tutti e tre.
 const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap2', 'cap1', 'cap0'];
 const FIX_INSTRUCTIONS_MAX = Number(globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION && globalThis.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
 
@@ -506,9 +376,14 @@ function clampCap(n) {
 }
 
 async function getRoutineCaps(idToken) {
+<<<<<<< HEAD
   // SOLO config/routines: è il documento che il server legge davvero, e
   // mostrare un valore pescato altrove significa mostrare una regola che
   // nessuno applica (vedi il commento in getAutomationProberIdle).
+=======
+  const { defs } = automationDefaults();
+  // SOLO config/routines: mostrare un valore pescato altrove significa mostrare una regola che nessuno applica (vedi getAutomationProberIdle).
+>>>>>>> 884ac2ba2 (potatura commenti: defaultsStore, downloads)
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '' };
   for (const k of CAP_KEYS) {
@@ -541,12 +416,7 @@ async function setRoutineCaps(patch, idToken) {
 }
 
 
-// Log dei worker delle routine (config/automation, campo `workerLog`): elenco
-// delle ultime esecuzioni di scripts/dispatch.mjs, ciascuna { role, startedAt,
-// num }. Lo scrive dispatch a ogni worker spawnato; qui lo LEGGIAMO soltanto
-// (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
-// PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
-// campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
+// Log dei worker delle routine (config/automation, campo `workerLog`): lo scrive dispatch a ogni worker spawnato, qui si LEGGE soltanto (owner-gated) per la tab "Log". Documento o campo assente, o lettura fallita ⇒ lista vuota: mai un errore per un log.
 async function getWorkerLog(idToken) {
   const doc = await fetchDoc(AUTOMATION_DOC, idToken);
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];
