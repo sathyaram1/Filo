@@ -253,9 +253,8 @@ const UI_RUNTIME = `
     }
   }
 
-  // Tooltip: hover col mouse, tocco e tastiera ovunque. Il riquadro è UNO solo,
-  // riposizionato — così il testo delle glosse non resta nel documento come
-  // testo fantasma che il Ctrl+F della pagina troverebbe senza mostrarlo.
+  // Tooltip: hover, tocco e tastiera. Il riquadro è UNO solo, riposizionato, così le glosse
+  // non restano nel documento come testo fantasma che il Ctrl+F troverebbe senza mostrarlo.
   function mountGlossaryUi(root, pop) {
     if (!root || !pop) return;
     function show(el) {
