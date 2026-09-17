@@ -49,8 +49,7 @@
   }
 
   function cutSelection() {
-    // window.getSelection() non vede la selezione dentro <input>/<textarea>:
-    // recuperiamo il testo direttamente dal nodo attivo se serve.
+    // La selezione dentro <input>/<textarea> si recupera dal nodo attivo: regola in src/content/content.js.
     const sel = window.getSelection();
     let text = sel?.toString() || '';
     const activeEl = document.activeElement;
