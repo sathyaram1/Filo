@@ -109,7 +109,10 @@ function cartella({ nipoteAncoraVivo = false } = {}) {
     + turno({ ms: t0 + 9000, id: 'u1', agentId: 'fuori000000000', usage: UN_MILIONE }),
     null);
   // Le date di modifica: il nipote è l'ultimo scritto (se ancora vivo), poi il figlio, poi il worker.
+  // Tutte le date di modifica si fissano a mano: il disco le metterebbe a «adesso», tutte uguali.
   const tocca = (p, ms) => utimesSync(p, new Date(ms), new Date(ms));
+  tocca(join(dir, `${SESSIONE}.jsonl`), t0);
+  for (const n of ['altrowork00000', 'cugino00000000', 'orfano00000000', 'fuori000000000']) tocca(join(sub, `agent-${n}.jsonl`), chiamata + 30_000);
   tocca(worker, fineWorker);
   tocca(figlio, fineWorker + 1000);
   tocca(nipote, fineWorker + (nipoteAncoraVivo ? 5000 : -1000));
