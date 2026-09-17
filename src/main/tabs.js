@@ -1364,7 +1364,7 @@ class TabManager {
         const k = String(input.key || '').toLowerCase();
         if (k === 't') { event.preventDefault(); this.openTab('filo://newtab/'); return; }
         if (k === 'w') { event.preventDefault(); this.closeTab(tab.id); return; }
-        // L'indirizzo si scrive dalla home, quindi Ctrl+L apre la home.
+        // Ctrl+L apre la home: regola in src/renderer/shell.js.
         if (k === 'l') { event.preventDefault(); this.navigate(tab.id, 'filo://newtab/'); return; }
         if (k === 'r') { event.preventDefault(); this.reload(tab.id); return; }
       }
