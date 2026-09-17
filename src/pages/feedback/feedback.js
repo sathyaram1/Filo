@@ -1292,7 +1292,7 @@
     const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
-    // DB3 come sopra (releasedVersion): stessa domanda e stessa risposta della gemella.
+    // DB3 (releasedVersion): stessa domanda e stessa risposta di src/pages/manage/manage.js.
     if (!releasedVersion) {
       try {
         const r = await sendToMain({ type: 'get_update_recap' });
