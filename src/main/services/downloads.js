@@ -35,15 +35,8 @@ function storageKey() {
   return (globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS.DOWNLOADS) || 'downloads';
 }
 
-<<<<<<< HEAD
-// Nome file sicuro: niente separatori di percorso, caratteri di controllo o
-// tentativi di traversal. Stesso spirito di safeImageFilename in handlers/misc.
-// Il traversal non arriva solo in testa: Chromium ha già cambiato le barre in
-// `_`, e `../../pwned` si presenta come `_.._.._pwned`. Ogni fila di due o più
-// punti si comprime a uno, ovunque sia; i punti singoli (`a.b.txt`) restano.
-=======
-// Nome file sicuro: niente separatori di percorso, caratteri di controllo o tentativi di traversal.
->>>>>>> 884ac2ba2 (potatura commenti: defaultsStore, downloads)
+// Nome file sicuro: niente separatori di percorso, caratteri di controllo o tentativi di traversal. Stesso spirito di safeImageFilename in handlers/misc.
+// Il traversal non arriva solo in testa: Chromium ha già cambiato le barre in `_`, e `../../pwned` si presenta come `_.._.._pwned`. Ogni fila di due o più punti si comprime a uno, ovunque sia; i punti singoli (`a.b.txt`) restano.
 function safeName(name) {
   let s = String(name || '').trim().replace(/[\x00-\x1f]/g, '');
   s = s.split(/[\\/]/).pop() || '';
