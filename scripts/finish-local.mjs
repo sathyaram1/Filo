@@ -350,6 +350,35 @@ export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
   };
 }
 
+/**
+ * Spezza l'elenco degli spec in lotti che stanno in UNA riga di comando. PURA.
+ * Su Windows la riga ha un tetto di ~8.000 caratteri: con tutto `src` toccato
+ * gli spec mirati sono stati 245 e il lancio moriva con «riga troppo lunga»
+ * prima ancora di partire. Ogni lotto è un `npx playwright test …` a sé.
+ */
+export function lottiPerRigaDiComando(specs, maxChars = 6000) {
+  const lotti = [];
+  let corrente = [], lunghezza = 0;
+  for (const s of specs) {
+    const pezzo = s.length + 1;
+    if (corrente.length && lunghezza + pezzo > maxChars) { lotti.push(corrente); corrente = []; lunghezza = 0; }
+    corrente.push(s); lunghezza += pezzo;
+  }
+  if (corrente.length) lotti.push(corrente);
+  return lotti;
+}
+
+/** Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. */
+function runSpecsALotti(specs, label) {
+  const lotti = lottiPerRigaDiComando(specs.map((s) => `${s}.spec.mjs`));
+  let ok = true;
+  lotti.forEach((lotto, i) => {
+    const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
+    if (!run('npx', ['playwright', 'test', ...lotto], label + suffisso)) ok = false;
+  });
+  return ok;
+}
+
 function readKnownRed(root) {
   try {
     const j = JSON.parse(readFileSync(resolve(root, 'tests', 'rossi-noti.json'), 'utf8'));
@@ -445,8 +474,10 @@ async function main() {
       console.error('\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.');
       process.exit(1);
     }
-    // 2. Spec mirati alle aree toccate. La suite completa gira nel cancello di
-    //    pubblicazione e nelle routine: qui serve il segnale rapido.
+    // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
+    //    Actions, nel lavoro di release, ogni sei ore prima di pubblicare
+    //    (dal 2026-09-15: nessun ruolo e nessuna sessione la lancia): qui
+    //    serve il segnale rapido.
     const changed = git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
     // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
@@ -455,8 +486,7 @@ async function main() {
     const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
     if (blocking.length) {
-      const args = ['playwright', 'test', ...blocking.map((s) => `${s}.spec.mjs`)];
-      if (!run('npx', args, `Spec delle aree toccate (${blocking.length})`)) {
+      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
         process.exit(1);
       }
@@ -464,8 +494,7 @@ async function main() {
     if (informative.length) {
       // Rossi noti su questa macchina (tests/rossi-noti.json): si vedono, non
       // fermano. Se uno diventa verde, è ora di toglierlo dall'elenco.
-      const args = ['playwright', 'test', ...informative.map((s) => `${s}.spec.mjs`)];
-      const ok = run('npx', args, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`);
+      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`);
       console.log(ok
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');

@@ -8,6 +8,14 @@
 #   aggiorna i tester. Se NON ci sono commit nuovi, non fa nulla (niente release
 #   inutili).
 #
+#   PRIMA della costruzione gira la suite Playwright completa (job `suite`, su
+#   Linux senza schermo, come nel contenitore delle routine): dal 2026-09-15
+#   nessun agente la lancia più a mano, gira solo qui. Verde (o solo rossi noti
+#   del contenitore, tests/rossi-noti.json) → si pubblica; un rosso NUOVO → non
+#   si pubblica, il rosso diventa un feedback e la patch salta un giro.
+#   `solo_suite` (avvio a mano) fa girare la sola suite sul ramo scelto, senza
+#   pubblicare: serve a provarla su un ramo.
+#
 # QUESTO LAVORO NON SCRIVE SU `main` (SPEC-RIDISEGNO-MAX.md §10)
 #   Fino al 18/08/2026 alzava la patch version da sé e la pushava. Su `main`
 #   adesso scrive UNA SOLA identità, quella del server di sicurezza: la ruleset
@@ -40,7 +48,12 @@ name: Release Filo (Windows + Mac)
 on:
   schedule:
     - cron: '0 */6 * * *'   # ogni 6 ore (UTC); modificabile
-  workflow_dispatch: {}      # pulsante "Run workflow" manuale
+  workflow_dispatch:         # pulsante "Run workflow" manuale
+    inputs:
+      solo_suite:
+        description: 'Solo la suite Playwright sul ramo scelto: non pubblica niente'
+        type: boolean
+        default: false
 
 permissions:
   contents: write            # creare e pubblicare la Release (non serve piu' per scrivere su main)
@@ -50,7 +63,216 @@ concurrency:
   cancel-in-progress: false  # non interrompere un publish a meta'
 
 jobs:
+  # ─── PRIMA DI TUTTO: LA SUITE COMPLETA ─────────────────────────────────────
+  # Dal 2026-09-15 la suite Playwright completa (~390 spec, ~1.600 casi) non la
+  # lancia più nessun agente, né in locale né nelle routine: gira QUI, prima di
+  # ogni pubblicazione, su una macchina Linux senza schermo come quella delle
+  # routine. Per questo ELECTRON_DISABLE_SANDBOX=1 e xvfb-run -a: senza quei
+  # due Electron non parte proprio (lo dice anche scripts/ensure-electron.mjs).
+  # Un solo worker (Electron e le scorciatoie globali non reggono la
+  # concorrenza): nel contenitore delle routine ci mette un'ora e un quarto.
+  #
+  # Il verdetto NON è «tutto verde»: nel contenitore senza schermo ci sono
+  # rossi d'ambiente scritti in tests/rossi-noti.json (contenitore.specs) e
+  # scripts/suite-verdict.mjs li toglie dal conto. Resta un rosso NUOVO? La
+  # versione non esce, il rosso diventa un feedback (lo stesso allarme del
+  # cancello unit qui sotto) e la patch salta un giro. Un flaky ripassato al
+  # retry non conta: assorbirlo è già il compito dei retry.
+  #
+  # Esito e tracce (JSON dei risultati, screenshot e trace dei rossi) restano
+  # allegati all'esecuzione per sette giorni: chi prende il feedback parte da
+  # lì, non rilancia un'ora di suite per vedere cos'è successo.
+  #
+  # `solo_suite` (avvio a mano): fa girare SOLO questo lavoro, sempre, anche
+  # senza niente di nuovo, sul RAMO da cui si è lanciato, e senza pubblicare né
+  # aprire feedback: è il modo di provare la suite su un ramo.
+  #   gh workflow run release.yml --ref <ramo> -f solo_suite=true
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    outputs:
+      sha: ${{ steps.provato.outputs.sha }}
+    steps:
+      - name: Checkout (main, o il ramo scelto con solo_suite)
+        uses: actions/checkout@v4
+        with:
+          # Con solo_suite si prova il ramo da cui si e' lanciato; altrimenti
+          # quello che si sta per pubblicare, cioe' main. Su cron `inputs` e'
+          # vuoto e si cade su main.
+          ref: ${{ inputs.solo_suite && github.ref || 'main' }}
+          fetch-depth: 0
+
+      # Il commit che questa suite prova. La seconda meta' (release) lo
+      # confronta con quello che sta per costruire: la suite dura un'ora e un
+      # quarto, e in quell'ora su main possono entrare altre fusioni — codice
+      # mai passato di qui, che senza il confronto uscirebbe agli utenti
+      # (giro del 14/09, verifica). Si legge PRIMA del controllo "c'e'
+      # qualcosa di nuovo", cosi' c'e' anche quando la suite non gira.
+      - name: Il commit che la suite prova
+        id: provato
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # STESSA logica del passo omonimo del lavoro Windows: se cambia una delle
+      # due, cambia anche l'altra (la sentinella in tests/unit/releaseSuite
+      # le confronta). In piu': con solo_suite si gira sempre.
+      - name: C'e' qualcosa di nuovo da provare?
+        id: check
+        shell: bash
+        run: |
+          if [ "${{ inputs.solo_suite }}" = "true" ]; then
+            echo "solo_suite: la suite gira comunque, e non si pubblica niente."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --tags --force
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "Nessun tag precedente -> si prova."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            AHEAD=$(git rev-list --count "${LAST_TAG}..HEAD")
+            echo "Commit dopo $LAST_TAG: $AHEAD"
+            if [ "$AHEAD" -gt 0 ]; then
+              echo "run=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Niente di nuovo dal tag: la suite non gira (uscita verde)."
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Install dipendenze
+        if: steps.check.outputs.run == 'true'
+        run: npm ci
+
+      # `npm ci` scarica il binario di Electron da solo (qui github e'
+      # raggiungibile); lo script e' idempotente e serve se un giorno non lo
+      # facesse: senza binario nessuno spec parte, e la suite sarebbe «rossa»
+      # per un motivo che non c'entra col codice.
+      - name: Binario di Electron
+        if: steps.check.outputs.run == 'true'
+        run: node scripts/ensure-electron.mjs
+
+      - name: Schermo virtuale (xvfb)
+        if: steps.check.outputs.run == 'true'
+        shell: bash
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y xvfb
+          fi
+
+      # Il JSON va in un file (PLAYWRIGHT_JSON_OUTPUT_NAME), la lista a schermo
+      # per seguire l'esecuzione. `continue-on-error`: il verdetto lo da' lo
+      # script dopo, non l'uscita di Playwright, che e' rossa anche per i soli
+      # rossi noti.
+      # Un tetto SUO, sotto quello del job: con il solo tetto del job un
+      # Electron rimasto appeso faceva annullare il job PRIMA del verdetto,
+      # cioe' senza feedback e senza una riga che lo dicesse (verifica del
+      # giro 2). Scaduto questo, il passo e' rosso, il verdetto trova il JSON
+      # mancante (uscita 2, non un verde) e l'allarme parte come per un rosso.
+      - name: Suite Playwright completa
+        if: steps.check.outputs.run == 'true'
+        id: suite
+        continue-on-error: true
+        timeout-minutes: 200
+        shell: bash
+        run: ELECTRON_DISABLE_SANDBOX=1 PLAYWRIGHT_JSON_OUTPUT_NAME=suite-risultati.json xvfb-run -a npx playwright test --reporter=list,json
+
+      # Uscita 0: nessun rosso nuovo. 1: rossi nuovi (elenco in rossi-nuovi.txt,
+      # intero). 2: la suite non e' partita o non ha lasciato un esito
+      # leggibile, che NON e' un verde.
+      - name: Verdetto (rossi nuovi fuori dai rossi noti del contenitore)
+        if: steps.check.outputs.run == 'true'
+        id: verdetto
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt 2>&1 | tee verdetto.log
+
+      - name: Conserva esito e tracce (7 giorni)
+        if: always() && steps.check.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-playwright-${{ github.run_id }}
+          path: |
+            suite-risultati.json
+            rossi-nuovi.txt
+            verdetto.log
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Stesso allarme del cancello unit (stessa credenziale, stesso script):
+      # il rosso diventa un feedback in coda e al prossimo giro una routine lo
+      # prende in carico. Non con solo_suite: una prova su un ramo non e' una
+      # pubblicazione fermata, e un feedback aperto per un ramo di lavoro
+      # sarebbe rumore in coda (l'elenco resta nel registro e nell'artifact).
+      #
+      # Parte anche se e' rosso un passo PRIMA della suite (npm ci, il binario
+      # di Electron, xvfb: `failure()`): fino al giro 5 della verifica quel
+      # rosso fermava il lavoro prima del verdetto, senza feedback, e la
+      # pubblicazione si fermava in silenzio. `always()` serve perche' dopo un
+      # passo rosso i passi senza una funzione di stato vengono saltati.
+      - name: Rosso nuovo - apri un feedback e fermati
+        if: always() && !cancelled() && steps.check.outputs.run != 'false' && (steps.verdetto.outcome == 'failure' || failure())
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          SOLO_SUITE: ${{ inputs.solo_suite }}
+          SUITE_OUTCOME: ${{ steps.suite.outcome }}
+        shell: bash
+        run: |
+          echo "::error::Suite Playwright con rossi nuovi (o non partita): pubblicazione annullata."
+          if [ "$SOLO_SUITE" = "true" ]; then
+            echo "solo_suite: nessun feedback aperto, l'elenco dei rossi sta qui sopra e nell'artifact."
+            exit 1
+          fi
+          PREMESSA="La suite Playwright completa, che gira prima di ogni pubblicazione, ha trovato dei rossi NUOVI sul ramo principale (fuori dai rossi noti del contenitore in tests/rossi-noti.json): la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. Il JSON dei risultati e le tracce dei rossi (screenshot, trace) stanno nell artifact di questa esecuzione (Actions), per sette giorni."
+          # L'elenco intero sta in rossi-nuovi.txt (allegato): qui un tetto, e
+          # il taglio si DICE col numero di quelli rimasti fuori. Un elenco
+          # mozzato senza avviso fa credere di avere tutti i rossi.
+          ROSSI_TUTTE=$(cat rossi-nuovi.txt 2>/dev/null || true)
+          ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
+          N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
+          if [ "${N_TUTTE:-0}" -gt 80 ]; then
+            ROSSI="${ROSSI}
+          … elenco tagliato: altri $((N_TUTTE - 80)) casi rossi stanno in rossi-nuovi.txt, nell'artifact di questa esecuzione (Actions)"
+          fi
+          VERDETTO=$(tail -c 2500 verdetto.log 2>/dev/null || echo "(nessun verdetto: la suite non e partita)")
+          # Senza il JSON la suite o non e partita o e stata interrotta dal
+          # tetto del passo (un Electron rimasto appeso): lo si dice, perche
+          # chi prende il feedback sappia cosa cercare nel registro.
+          if [ "$SUITE_OUTCOME" != "success" ] && [ "$SUITE_OUTCOME" != "failure" ]; then
+            # La suite non e' nemmeno partita: e' rosso un passo prima di lei.
+            VERDETTO="La suite NON e partita: e rosso uno dei passi che la preparano (l installazione delle dipendenze con npm ci, il binario di Electron, lo schermo virtuale xvfb). Non e un rosso del codice di Filo: guarda il registro di questa esecuzione (Actions), sistema quel passo (un lockfile fuori sincrono, un download che non arriva) e la prossima corsa riprova.
+          ${VERDETTO}"
+          elif [ ! -f suite-risultati.json ]; then
+            VERDETTO="La suite non ha lasciato il JSON dei risultati: o non e partita, oppure ha superato il tetto del passo (200 minuti, di norma un Electron rimasto appeso) ed e stata interrotta prima della fine. Guarda il registro del passo Suite Playwright completa in questa esecuzione (Actions).
+          ${VERDETTO}"
+          fi
+          TESTO="${PREMESSA}
+
+          Rossi nuovi (${N_TUTTE:-0}):
+          ${ROSSI:-(nessun caso elencato: la suite non e partita o non ha lasciato un esito leggibile; guarda il verdetto)}
+
+
+          Verdetto:
+          ${VERDETTO}"
+          node scripts/build-alarm.mjs "Suite Playwright rossa: nessuna versione pubblicata" "$TESTO" || echo "::warning::allarme non consegnato"
+          exit 1
+
   release:
+    needs: suite
+    # Con solo_suite non si pubblica niente. Su cron `inputs` e' vuoto e la
+    # condizione resta vera. `success()` (suite verde) e' scritto per esteso
+    # invece di affidarsi al default implicito: a suite rossa qui non si parte.
+    if: ${{ success() && !inputs.solo_suite }}
     runs-on: windows-latest
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
@@ -85,6 +307,29 @@ jobs:
             else
               echo "should_release=false" >> "$GITHUB_OUTPUT"
             fi
+          fi
+          # ─── SI PUBBLICA SOLO IL COMMIT CHE LA SUITE HA PROVATO ────────
+          # La suite ha provato main com'era un'ora e un quarto fa; se nel
+          # frattempo su main e' entrato altro, questa corsa NON pubblica
+          # (l'ultima riga vince) e non apre feedback: la prossima, sei ore
+          # dopo, riprova sul main nuovo. Senza un commit provato non si
+          # pubblica alla cieca.
+          PROVATO="${{ needs.suite.outputs.sha }}"
+          QUI=$(git rev-parse HEAD)
+          if [ "$QUI" != "$PROVATO" ]; then
+            echo "main e' a $QUI, la suite ha provato ${PROVATO:-(niente)}: questa corsa NON pubblica; la prossima riprova sul main nuovo."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            # Il riassunto del lavoro lo dice a chi guarda Actions: se main
+            # riceve qualcosa durante OGNI corsa, nessuna versione esce e da
+            # nessun'altra parte si vede (giro 6 della verifica, 16/09/2026:
+            # scelta dell'owner non aprire un feedback, ma il caso va visto).
+            {
+              echo "## Pubblicazione ferma: main si e' mosso durante la suite"
+              echo ""
+              echo "La suite ha provato \`${PROVATO:-(niente)}\`; main ora e' a \`$QUI\`."
+              echo "Questa corsa NON pubblica; la prossima, fra sei ore, riprova sul main nuovo."
+              echo "Se succede a ogni corsa, nessuna versione esce: guardare la frequenza delle fusioni su main."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Install dipendenze
@@ -224,6 +469,24 @@ jobs:
           ATTESA="${{ steps.bump.outputs.version }}"
           if [ "v${LOCALE}" != "$ATTESA" ]; then
             echo "::error::il manifesto qui dice v${LOCALE}, il server ha scritto ${ATTESA}: non costruisco alla cieca."
+            exit 1
+          fi
+          # Sotto il commit di release del server deve esserci ESATTAMENTE il
+          # commit che la suite ha provato: fra il controllo di prima e il
+          # numero di versione passano minuti, e una fusione in quei minuti
+          # farebbe costruire codice mai provato. Qui un numero di versione
+          # e' gia' stato consumato: resta un buco nella numerazione, che
+          # non fa male; pubblicare codice mai provato si'.
+          PROVATO="${{ needs.suite.outputs.sha }}"
+          SOTTO=$(git rev-parse HEAD~1)
+          if [ "$SOTTO" != "$PROVATO" ]; then
+            echo "::error::su main e' entrato altro fra la suite e il numero di versione (provato ${PROVATO:-(niente)}, sotto la release c'e' ${SOTTO}): non costruisco codice mai provato. La prossima corsa riprova."
+            {
+              echo "## Pubblicazione ferma: main si e' mosso fra la suite e il numero di versione"
+              echo ""
+              echo "La suite ha provato \`${PROVATO:-(niente)}\`; sotto il commit di release c'e' \`$SOTTO\`."
+              echo "Il numero ${ATTESA} resta consumato (un buco nella numerazione, che non fa male); la prossima corsa riprova."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           # Il commit ESATTO che si sta costruendo. Serve alla meta' Mac, che

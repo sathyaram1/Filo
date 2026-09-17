@@ -13,7 +13,9 @@ const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 require(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
-const CAPS = globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
+// I bilanci di QUESTI test: nel codice non esiste un default (2026-09-16), i
+// numeri veri li scrive l'owner in config/routines.
+const CAPS = { cap2: 5, cap1: 2, cap0: 0 };
 
 const f = (level, text, decision = false) => ({ level, text, decision });
 const decide = (findings, counts = {}, caps = CAPS) => R.decideRound({ findings, caps, counts });
@@ -61,8 +63,13 @@ test('normalizeFindings: tetti su numero e lunghezza, decision solo se true', ()
 
 // ── I bilanci (spec §4) ──────────────────────────────────────────────────────
 
-test('default: cap2 5, cap1 2, cap0 0 (fonte unica, feedbackTransitions.js)', () => {
-  assert.deepEqual(CAPS, { cap2: 5, cap1: 2, cap0: 0 });
+test('nessun default nel codice: senza uno dei tre bilanci decideRound si ferma e dice quale manca', () => {
+  assert.equal(globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS, undefined);
+  assert.throws(() => R.decideRound({ findings: [f(2, 'rotto')], caps: { cap2: 5, cap0: 0 } }), /bilanci del verificatore mancanti: cap1/);
+  assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap2, cap1, cap0/);
+  assert.throws(() => R.decideRound({ findings: [], caps: { cap2: '', cap1: 'due', cap0: 0 } }), /cap2, cap1/);
+  assert.deepEqual(R.missingCaps({ cap2: 5, cap1: 2, cap0: 0 }), []);
+  assert.deepEqual(R.missingCaps({ cap2: 5 }, { cap1: 2, cap0: 0 }), [], 'i default espliciti del chiamante contano');
   assert.equal(R.capKeyOf(3), 'cap2', 'i livelli 3 e 2 condividono il bilancio');
   assert.equal(R.capKeyOf(2), 'cap2');
   assert.equal(R.capKeyOf(1), 'cap1');
@@ -120,6 +127,28 @@ test('bilancio esaurito su quel livello: un 1 con cap1 a zero → derivato', () 
   assert.equal(d.stop, false, 'un 1 non ferma mai il lavoro');
 });
 
+test('un 1 entra nel giro di un 2, anche a cap1 finito (decisione owner 2026-09-16)', () => {
+  const d = decide([f(2, 'rotto'), f(1, 'bordo'), f(1, 'ombra')], { count1: 2 });
+  assert.equal(d.stop, false);
+  assert.deepEqual(d.fix.map((x) => x.level), [2, 1, 1], 'gli 1 entrano nel giro del 2');
+  assert.deepEqual(d.derived, []);
+  assert.equal(d.consume, 'cap2', 'il giro lo paga il livello più alto');
+  assert.equal(d.counts.count1, 2, 'cap1 non si tocca');
+  // Con cap1 a zero dall'owner vale lo stesso.
+  const zero = decide([f(1, 'bordo'), f(2, 'rotto')], {}, { cap2: 10, cap1: 0, cap0: 0 });
+  assert.deepEqual(zero.fix.map((x) => x.level), [1, 2], 'ordine della critica conservato');
+  assert.equal(zero.consume, 'cap2');
+});
+
+test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se il 2 ferma il lavoro, si ferma tutto', () => {
+  const d = decide([f(2, 'rotto'), f(1, 'gusto?', true)], { count1: 2 });
+  assert.deepEqual(d.fix.map((x) => x.level), [2]);
+  assert.equal(d.derived.length, 1, 'la domanda non si corregge da soli');
+  const stop = decide([f(2, 'rotto'), f(1, 'bordo')], { count2: 5, count1: 2 });
+  assert.equal(stop.stop, true);
+  assert.deepEqual(stop.fix, [], 'fermandosi non si corregge nemmeno l\'1');
+});
+
 test('livello 2 o 3 con cap2 esaurito → stop, decide l\'owner', () => {
   const d = decide([f(2, 'rotto'), f(1, 'bordo'), f(0, 'raro')], { count2: 5 });
   assert.equal(d.stop, true);
@@ -142,7 +171,7 @@ test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {
   assert.equal(zero.derived.length, 1);
 });
 
-test('i bilanci si normalizzano: fuori scala si stringe, assenti → default, contatori negativi → 0', () => {
+test('i bilanci si normalizzano: fuori scala si stringe, assenti → i default ESPLICITI del chiamante, contatori negativi → 0', () => {
   assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap2: 10, cap1: 0, cap0: 0 });
   assert.deepEqual(R.normalizeCaps(null, CAPS), CAPS);
   assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count2: 0, count1: 2, count0: 0 });

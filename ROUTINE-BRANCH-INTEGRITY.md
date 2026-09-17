@@ -339,6 +339,9 @@ La regola "non lanciare mai la suite completa in locale" era stata **rimossa**
 da `CLAUDE.md` il 2026-08-20 (in locale si facevano poche cose critiche, e il
 tempo in più sembrava accettabile) ed è **tornata** il 2026-09-10: la suite è
 cresciuta a ~390 spec e ~1.600 casi, e sulla macchina di chi sviluppa Filo dura
-quasi sette ore con un solo worker. In locale si lancia `npm run finish:check`
-(unit test più gli spec delle aree toccate dal ramo); la suite intera gira nel
-cancello del server e nelle routine.
+quasi sette ore con un solo worker. Dal 2026-09-15 vale **ovunque**: la suite
+intera non la lancia più nessuno, né i ruoli delle routine né le sessioni
+locali. Si lancia `npm run finish:check` (unit test più gli spec delle aree
+toccate dal ramo) più le prove del giro; la suite intera gira in GitHub, nel
+lavoro di release, ogni sei ore prima di pubblicare, e un suo rosso nuovo ferma
+la patch e diventa un feedback.

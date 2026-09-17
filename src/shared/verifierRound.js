@@ -368,12 +368,24 @@
   // ── I bilanci ─────────────────────────────────────────────────────────────
   //
   // Tre bilanci per feedback (spec §4): x giri per i livelli 3 e 2, y per gli 1,
-  // z per gli 0. I DEFAULT vivono in feedbackTransitions.js (VERIFIER_CAPS,
-  // fonte unica incorporata dal server); i valori effettivi li detta l'owner
-  // dalla dashboard. Il tetto alto è lo stesso della dashboard.
+  // z per gli 0. I numeri li detta SOLO l'owner dalla dashboard
+  // (config/routines): nel codice non c'è un default (decisione del
+  // 2026-09-16), e un bilancio mancante non vale 0 né altro — decideRound si
+  // ferma con un errore che dice quale manca. Il tetto alto è lo stesso della
+  // dashboard.
   const CAP_MIN = 0;
   const CAP_MAX = 10;
   const CAP_KEYS = ['cap2', 'cap1', 'cap0'];
+
+  /** I bilanci che mancano (né in `caps` né in `defaults`): [] se ci sono tutti. PURA. */
+  function missingCaps(caps, defaults) {
+    const def = defaults && typeof defaults === 'object' ? defaults : {};
+    const src = caps && typeof caps === 'object' ? caps : {};
+    return CAP_KEYS.filter((k) => {
+      const raw = src[k] != null ? src[k] : def[k];
+      return !Number.isFinite(Number(raw)) || raw === '' || raw === true || raw === false;
+    });
+  }
 
   function normalizeCaps(caps, defaults) {
     const def = defaults && typeof defaults === 'object' ? defaults : {};
@@ -402,15 +414,21 @@
    *
    * Regole:
    *   - un rilievo di livello 3 o 2 che chiede una decisione ferma il lavoro;
-   *   - un rilievo di livello 3/2 (o 1) si corregge se il SUO bilancio ha
-   *     ancora giri; a bilancio finito un 3/2 ferma il lavoro, un 1 va nel
-   *     feedback derivato;
+   *   - un rilievo di livello 3/2 si corregge se il SUO bilancio ha ancora
+   *     giri; a bilancio finito ferma il lavoro;
+   *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
+   *     giro lo paga già il livello più alto, e un altro verificatore arriva
+   *     comunque: decisione dell'owner del 2026-09-16) oppure se il suo
+   *     bilancio ha ancora giri; altrimenti va nel feedback derivato;
    *   - un 1 che chiede una decisione va nel feedback derivato;
    *   - gli 0 si correggono solo se nello stesso giro si corregge anche altro
    *     (un altro verificatore arriva comunque) oppure se l'owner ha dato
    *     giri al loro bilancio; altrimenti vanno nel feedback derivato;
    *   - un giro consuma UN giro dal bilancio del livello più alto corretto;
-   *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto.
+   *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto;
+   *   - senza uno dei tre bilanci LANCIA (`bilanci del verificatore
+   *     mancanti: …`): un numero inventato al posto di quello dell'owner è
+   *     peggio di un errore (decisione del 2026-09-16).
    *
    * @param {object} p { findings, caps:{cap2,cap1,cap0}, counts:{count2,count1,count0} }
    * @returns {{
@@ -421,6 +439,10 @@
    */
   function decideRound(p) {
     const findings = normalizeFindings(p && p.findings);
+    const mancanti = missingCaps(p && p.caps, p && p.defaults);
+    if (mancanti.length) {
+      throw new Error(`bilanci del verificatore mancanti: ${mancanti.join(', ')} — li imposta l'owner in Gestione → Automazioni (config/routines); nel codice non c'è un default`);
+    }
     const caps = normalizeCaps(p && p.caps, p && p.defaults);
     const counts = normalizeCounts(p && p.counts);
     const left = (k) => caps[k] - counts[k.replace('cap', 'count')];
@@ -428,17 +450,25 @@
     const blocking = [];
     const fixable = [];
     const derived = [];
+    const ones = [];
     const zeros = [];
     for (const f of findings) {
       if (f.level >= 2) {
         if (f.decision || left('cap2') <= 0) blocking.push(f);
         else fixable.push(f);
       } else if (f.level === 1) {
-        if (f.decision || left('cap1') <= 0) derived.push(f);
-        else fixable.push(f);
+        ones.push(f);
       } else {
         zeros.push(f);
       }
+    }
+    // Gli 1: con un 3/2 da correggere nello stesso giro si correggono pure
+    // loro (il giro lo paga il 3/2); da soli seguono il loro bilancio.
+    const withHigher = fixable.length > 0;
+    for (const f of ones) {
+      if (f.decision) derived.push(f);
+      else if (withHigher || left('cap1') > 0) fixable.push(f);
+      else derived.push(f);
     }
     // Gli 0: con qualcos'altro da correggere si correggono pure loro; da soli
     // solo se il loro bilancio lo permette (z = 0 per default).
@@ -513,7 +543,7 @@
   global.SN_VERIFIER_ROUND = {
     LEVELS, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel,
-    normalizeCaps, normalizeCounts, decideRound,
+    missingCaps, normalizeCaps, normalizeCounts, decideRound,
     formatFinding, formatFindings, hasDecision, roundNote,
   };
 

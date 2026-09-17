@@ -30,7 +30,9 @@ pochi angoli (meglio profondità che ampiezza):
 Non limitarti a leggere il codice. Esercita un flusso reale cercando di
 romperlo: scrivi uno spec Playwright che esercita il flusso con input limite e
 **asserisce** il comportamento atteso (non solo "non crasha");
-`xvfb-run -a npm run test:shoot` per la cattura composita della finestra.
+`ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a npm run test:shoot` per la cattura
+composita della finestra (nel contenitore, da root, senza la sandbox spenta
+Electron non parte: il comando si scrive intero).
 
 ## Regole per un feedback d'audit leggibile e affidabile
 

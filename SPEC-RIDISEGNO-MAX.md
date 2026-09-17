@@ -264,17 +264,22 @@ Collegato (18/08, revisione del ruolo secaudit con l'owner):
   verificare se falso positivo) — e MAI in chiaro: è la descrizione esatta di
   come l'attacco è stato scoperto.
 
-## 11. Suite completa: per worker, non a fine giro
+## 11. Suite completa: in GitHub, non dentro il giro
 
-`npm test` (suite intera) lo lancia OGNI worker che scrive codice
-(new-work/fixer), PRIMA di consegnare al verificatore: le regressioni
-incrociate sono responsabilità di chi le introduce, e scoperte subito, non un
-giro dopo in un mucchio anonimo. L'orchestratore NON lancia più la suite (un
-compito in meno: più cieco e più scemo, che è la direzione giusta). Il
-verificatore non rifà i test del worker: fa verifica avversariale, scrivendone
-di nuovi se serve. In locale la suite intera NON si lancia (decisione
-2026-09-10: quasi sette ore sulla macchina dell'owner, con un solo worker); al
-suo posto `npm run finish:check`, unit test più gli spec delle aree toccate.
+**Dal 2026-09-15 la suite intera (`npm test`) non la lancia nessun ruolo**, e
+nemmeno una sessione locale: gira in GitHub, nel lavoro di release, che parte
+ogni sei ore — verde, e la patch si pubblica; un rosso nuovo (fuori dai rossi
+noti del contenitore), e la patch non esce, il rosso diventa un feedback e si
+corregge con calma, saltando un giro. Una regressione è rara: non vale un'ora
+d'attesa a ogni consegna.
+
+Dentro il giro: chi scrive codice fa unit test e spec mirati, e le regressioni
+incrociate restano responsabilità di chi le introduce. Il verificatore, prima
+di lasciar passare, lancia `npm run finish:check` (unit test più gli spec delle
+aree toccate) e le prove del giro in `tests/verifica/<numero>/`; per il resto
+non rifà i test del worker, fa verifica avversariale, scrivendone di nuovi se
+serve. L'orchestratore non lancia controlli (un compito in meno: più cieco e
+più scemo, che è la direzione giusta).
 
 ## 12. Ritorno dei worker: niente canale di testo
 
@@ -336,14 +341,15 @@ collegate:
 > esiti non esistono più: il verificatore registra
 > la critica coi livelli (3/2/1/0, più `?` = chiede una decisione dell'owner),
 > l'esito lo calcola il server da tre bilanci per feedback — `cap2` (giri di
-> correzione per i livelli 3/2, default 5), `cap1` (livello 1, default 2),
-> `cap0` (livello 0, default 0) — e poi si corregge ciò che il server dice di
-> correggere. Ogni correzione porta a un altro verificatore. I rilievi non
+> correzione per i livelli 3/2), `cap1` (livello 1), `cap0` (livello 0), che
+> l'owner scrive in Gestione → Automazioni e che dal 2026-09-16 non hanno un
+> default nel codice — e poi si corregge ciò che il server dice di correggere. Ogni correzione porta a un altro verificatore. I rilievi non
 > corretti finiscono in UN feedback derivato per lavoro, figlio `#N.k`, aperto
 > dal server (categoria `routine:residuo`); il verificatore non apre più
 > feedback. Regole in
-> `src/shared/verifierRound.js` (incorporato dal server al deploy), bilanci in
-> `src/shared/feedbackTransitions.js`, dashboard in Gestione → Automazioni.
+> `src/shared/verifierRound.js` (incorporato dal server al deploy), i nomi dei
+> bilanci in `src/shared/feedbackTransitions.js`, i numeri solo in
+> `config/routines` (dashboard, Gestione → Automazioni).
 > Quello che segue resta come storia della decisione precedente.
 
 Deciso con l'owner il 18/08, dopo la seconda tornata del laboratorio (§9): il

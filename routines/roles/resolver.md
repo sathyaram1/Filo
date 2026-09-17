@@ -72,11 +72,14 @@ né per "spezzare di fatto".
 È tutto in CLAUDE.md e vale per intero: sintomo-vs-causa, invarianti UX e
 deviazioni dichiarate, la Verifica coi minimi per tipo di modifica (unit,
 spec mirato, visivo), le fonti di verità da aggiornare nello stesso commit.
-**Niente suite completa prima di consegnare** (dal 2026-09-03): la lancia il
-verificatore, una volta, prima di lasciar passare il lavoro; un rosso nuovo è
-un suo rilievo, e dal 2026-09-05 (feedback #561) si corregge prima che il
-lavoro passi. Venticinque minuti di attesa a ogni consegna erano metà del costo
-di un giro. Non fondere su `main`: l'hook
+**Niente suite completa prima di consegnare** — e dal 2026-09-15 non la lancia
+più nemmeno il verificatore: gira in GitHub, nel lavoro di release, ogni sei
+ore prima di pubblicare, e un rosso nuovo lì ferma la patch e diventa un
+feedback. Quello che ti torna indietro è un rosso di `npm run finish:check` o
+delle prove del giro, ed è un rilievo del verificatore che dal 2026-09-05
+(feedback #561) si corregge prima che il lavoro passi. Venticinque minuti di
+attesa a ogni consegna erano metà del costo di un giro. Non fondere su `main`:
+l'hook
 committa e pusha sul branch, il merge lo fa il gate a valle.
 
 ## Prima di consegnare: la verifica la fai tu, per primo
@@ -90,8 +93,8 @@ lavora a mano in locale. Ogni giro di verifica in più è un agente intero.
 accanto alle altre (`tests/<feature>.spec.mjs`, o `tests/unit/` per la logica
 pura), come dicono i minimi. È la guardia contro il ritorno del difetto: se
 finisse in `tests/verifica/<numero>/` sarebbe verde il giorno in cui la scrivi
-e non girerebbe mai più — quella cartella la suite completa non la raccoglie,
-nemmeno dopo la fusione. Lì dentro stanno solo le prove dei giri di verifica,
+e non girerebbe mai più — quella cartella la suite completa (quella che gira in
+GitHub prima di ogni pubblicazione) non la raccoglie, nemmeno dopo la fusione. Lì dentro stanno solo le prove dei giri di verifica,
 che sono la memoria di un giro, e le scrive chi verifica.
 
 Se il ramo ha già `tests/verifica/<numero>/` (un giro di verifica passato, un
@@ -165,7 +168,8 @@ Sei tu a scriverli.
 Infine rilascia il claim:
 
 ```bash
-node scripts/routine-channel.mjs release <biglietto>
+node scripts/routine-channel.mjs release <biglietto> --role resolver
 ```
 
+(`--role` firma il rapporto di fine sessione che il rilascio allega da solo.)
 Il prossimo giro instraderà il verifier.

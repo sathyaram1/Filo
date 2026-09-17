@@ -18,7 +18,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const RULES = readFileSync(join(__dirname, '..', '..', 'firestore.rules'), 'utf8');
+// Fine riga normalizzata: in una cartella di lavoro git può estrarre il file
+// con `\r\n`, e una sentinella che cerca `\n` diventava rossa senza motivo.
+const RULES = readFileSync(join(__dirname, '..', '..', 'firestore.rules'), 'utf8').replace(/\r\n/g, '\n');
 
 function bloccoUpdate(guardia) {
   const i = RULES.indexOf(`allow update: if\n        ${guardia}()`);

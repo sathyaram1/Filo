@@ -66,7 +66,9 @@ test('nome file ostile (path traversal + emoji + XSS) non esce dalla cartella n�
     const page = await testServer.openReady(openTab, linkPage([s.url()]));
     await page.locator('#dl0').click();
 
-    await expect.poll(async () => (await listItems(shell)).length, { timeout: 20000 }).toBeGreaterThan(0);
+    // Si aspetta la FINE, non la comparsa: appena la voce c'è il file è ancora
+    // in scrittura, e su una macchina lenta il disco non ce l'ha ancora.
+    await expect.poll(async () => (await listItems(shell)).at(-1)?.state ?? null, { timeout: 20000 }).toBe('completed');
     const items = await listItems(shell);
     const it = items[items.length - 1];
 
@@ -95,7 +97,8 @@ test('nome file lunghissimo (600 caratteri): niente crash, avviso di dimensioni 
   try {
     const page = await testServer.openReady(openTab, linkPage([s.url()]));
     await page.locator('#dl0').click();
-    await expect.poll(async () => (await listItems(shell)).length, { timeout: 20000 }).toBeGreaterThan(0);
+    // Fine dello scaricamento, non comparsa della voce (vedi il caso ostile).
+    await expect.poll(async () => (await listItems(shell))[0]?.state ?? null, { timeout: 20000 }).toBe('completed');
     const it = (await listItems(shell))[0];
     expect(existsSync(it.savePath)).toBe(true);
     // il toast non deve diventare un muro di testo: la larghezza del riquadro

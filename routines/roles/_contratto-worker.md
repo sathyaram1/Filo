@@ -28,10 +28,13 @@ REGISTRATO con gli script, mentre lavori:
   `--segnala` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
   del sistema (per esempio `../segnala-<numero>.md`): la consegna rifiuta una
   directory con file non committati;
-- il claim → il rilascio, quando hai finito;
+- il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
+  release <biglietto> --role <il tuo ruolo>`: il rilascio allega da solo il
+  rapporto di fine sessione, e il ruolo è la firma di quel rapporto. Senza,
+  il rapporto esce anonimo);
 - un guasto che ti impedisce di lavorare → dichiaralo AL CANALE nel rilascio,
   col motivo (`node scripts/routine-channel.mjs release <biglietto>
-  --guasto "<motivo>"`): è così che il server smette di dare lavoro per
+  --role <il tuo ruolo> --guasto "<motivo>"`): è così che il server smette di dare lavoro per
   questo giro. Non "riportarlo" a parole: registralo.
 
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
@@ -47,8 +50,8 @@ credi facciano — senza dirtelo. Se scrivi `scripts/…` a mano, stai tornando 
 
 ## Il battito non è affar tuo
 
-Il semaforo che tiene il tuo lavoro cade dopo un'ora di silenzio, e la suite
-completa in cloud può durarne di più. Il battito che lo tiene vivo lo avvia
+Il semaforo che tiene il tuo lavoro cade dopo un'ora di silenzio, e un controllo
+lungo può durarne di più. Il battito che lo tiene vivo lo avvia
 **dispatch**, in sottofondo, nel momento in cui ti consegna il ruolo: non
 lanciarlo, non cercarlo, non fermarlo. Se leggi in un prompt che devi avviarlo
 tu, quel prompt è vecchio.
@@ -59,6 +62,25 @@ da solo i lavori di chi il battito l'ha perso — sessione morta, rete caduta,
 tetto delle otto ore — e lì guarda da quando il ramo non si muove. Quindi
 l'unica cosa da NON fare è morire in silenzio: se ti accorgi che non puoi
 proseguire, dichiaralo nel rilascio invece di lasciare il lavoro appeso.
+
+## Comandi lunghi
+
+La cache del contesto dura cinque minuti e ogni chiamata la rinnova. Una
+chiamata bloccante da dieci minuti la trova sempre scaduta, e il turno dopo
+riscrive tutto il contesto: ~250.000 token, circa 1,6 $ — e un ciclo di sette
+attese così lo paga sette volte. Quindi:
+
+- un comando che può superare i **due minuti** si lancia in **sottofondo**
+  (l'harness ti avvisa quando finisce);
+- se devi aspettarlo attivamente, aspetta a pezzi da **quattro minuti al
+  massimo** per chiamata (`timeout 240 tail --pid=<pid> -f /dev/null`, o un
+  ciclo `until` con tetto 240 s), mai da dieci;
+- il timeout della chiamata si dimensiona sulla **durata vera** del comando,
+  mai sotto: un comando ucciso a metà va rifatto da capo.
+
+Lunghi di sicuro: le prove di un feedback (otto minuti e mezzo),
+`npm run finish:check` (da quindici a quarantacinque minuti), l'installazione
+di Electron.
 
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 

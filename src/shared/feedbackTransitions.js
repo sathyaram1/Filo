@@ -156,12 +156,16 @@
   const CIPHER_PAD = 32;
 
   // ── I tre bilanci dei giri di correzione (feedback #561, §4) ────────
-  // DEFAULT quando la config non dice niente. I valori EFFETTIVI li detta
-  // l'owner dalla dashboard (doc Firestore `config/routines`, campi `cap2`,
-  // `cap1`, `cap0`) e li applica il SERVER quando registra la critica — mai il
-  // prompt, mai un conteggio dichiarato dal client. Le regole che li consumano
-  // stanno in `verifierRound.js` (decideRound), incorporato anch'esso dal
-  // server al deploy.
+  // I NUMERI non stanno qui. Li detta l'owner dalla dashboard (doc Firestore
+  // `config/routines`, campi `cap2`, `cap1`, `cap0`, Gestione → Automazioni)
+  // e li applica il SERVER quando registra la critica — mai il prompt, mai un
+  // conteggio dichiarato dal client. Fino al 2026-09-16 qui c'era un default
+  // (5/2/0) e la verifica locale ragionava con quello mentre la dashboard
+  // diceva 10/1/0: decisione dell'owner, nessun default nel codice — chi ha
+  // bisogno dei bilanci li legge dal server, e se non ci sono si ferma con un
+  // errore che dice cosa manca. Qui restano solo i NOMI dei tre campi. Le
+  // regole che li consumano stanno in `verifierRound.js` (decideRound),
+  // incorporato anch'esso dal server al deploy.
   //   cap2 (x): giri di correzione per i rilievi di livello 3 e 2 (la cosa
   //             chiesta non si ottiene, cammino principale). A bilancio finito
   //             un 3/2 ferma la pratica e chiama l'owner (statusReason `loop`).
@@ -174,10 +178,10 @@
   // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
   // I vecchi nomi (`failCap`/`improvableCap`, i tre esiti pass/migliorabile/
   // fail) sono aboliti: l'esito lo calcola il server dai livelli e dai bilanci.
-  const VERIFIER_CAPS = { cap2: 5, cap1: 2, cap0: 0 };
+  const VERIFIER_CAP_KEYS = ['cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {
-    STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAPS,
+    STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAP_KEYS,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

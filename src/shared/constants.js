@@ -132,9 +132,10 @@
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
   // dashboard Gestione). Il RANGE dei tre bilanci del verificatore vive qui;
-  // i DEFAULT (cap2 5, cap1 2, cap0 0) vivono con le transizioni promosse
-  // a dati (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS): una sola
-  // sorgente, letta dalla dashboard e incorporata dal server al deploy.
+  // i NUMERI vivono solo nel doc `config/routines` che l'owner scrive dalla
+  // dashboard: nel codice non c'è un default (decisione del 2026-09-16), i
+  // nomi dei campi stanno in `src/shared/feedbackTransitions.js`
+  // (VERIFIER_CAP_KEYS).
   const AUTOMATION = {
     // Lo 0 è un valore valido per tutti e tre (per cap0 è il default: i casi
     // rari da soli non si correggono mai); con cap2 a 0 il primo difetto grave

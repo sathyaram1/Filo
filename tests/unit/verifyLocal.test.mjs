@@ -14,9 +14,36 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const {
-  checkVerdict, withRequest, withCritique, withFixed, buildVerifierBrief, codaText, historyFromRounds,
-  realignPlan, afterRebase,
+  checkVerdict, withRequest, withCritique: withCritiqueRaw, withFixed, buildVerifierBrief, codaText, historyFromRounds,
+  realignPlan, afterRebase, leggiBilanciDalServer, numeroFirestore, bilanciText, SENZA_TOKEN_MSG,
 } = await import('../../scripts/verify-local.mjs');
+
+// I bilanci di QUESTI test. Dal 2026-09-16 nel codice non c'è un default: lo
+// script li legge dal server, e withCritique li pretende da chi chiama.
+const CAPS_TEST = { cap2: 5, cap1: 2, cap0: 0 };
+const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o });
+
+// Il server finto che serve config/routines ai comandi del CLI (processo
+// separato: i comandi si lanciano in modo sincrono). Vale per tutto il file.
+import { spawn as _spawn } from 'node:child_process';
+async function fintoConfigRoutines(env = {}) {
+  const helper = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'helpers', 'finto-config-routines.mjs');
+  const p = _spawn(process.execPath, [helper], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const port = await new Promise((ok, no) => {
+    let so = '';
+    p.stdout.on('data', (c) => { so += c; const m = so.match(/PORT=(\d+)/); if (m) ok(Number(m[1])); });
+    p.on('exit', (code) => no(new Error(`server finto uscito con ${code}`)));
+    setTimeout(() => no(new Error('server finto: nessuna porta entro 15 s')), 15000).unref();
+  });
+  // Il figlio non deve tenere in vita il processo dei test: senza unref il
+  // runner aspettava per sempre la fine del server.
+  p.unref(); p.stdout.unref(); p.stderr.unref();
+  return { url: `http://127.0.0.1:${port}/config/routines`, kill: () => { try { p.kill(); } catch (_) { /* già morto */ } } };
+}
+const FINTO = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify(CAPS_TEST) });
+process.env.FILO_ROUTINE_CONFIG_URL = FINTO.url;
+process.env.FILO_ADMIN_ID_TOKEN = 'finto-id-token';
+process.on('exit', () => FINTO.kill());
 
 const SHA = 'a'.repeat(40);
 const ALTRO_SHA = 'b'.repeat(40);
@@ -719,4 +746,91 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
   assert.match(p.out, /a\.txt/, 'dice quale file');
   assert.doesNotMatch(p.out, /verifica superata/);
   assert.match(vl(casa, 'status').out, /senza esito/, 'nessun pass registrato');
+});
+
+// ─── I bilanci si leggono dal server (decisione dell'owner, 2026-09-16) ──────
+
+test('leggiBilanciDalServer: i tre numeri dal documento Firestore, col token dell\'owner; fixInstructions se c\'è', async () => {
+  const chiamate = [];
+  const fetchImpl = async (url, opts) => {
+    chiamate.push({ url, auth: opts.headers.Authorization });
+    return { ok: true, status: 200, json: async () => ({ fields: { cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' }, fixInstructions: { stringValue: 'TESTO' } } }) };
+  };
+  const caps = await leggiBilanciDalServer({ fetchImpl, env: { FILO_ADMIN_ID_TOKEN: 'tok' } });
+  assert.deepEqual(caps, { cap2: 10, cap1: 1, cap0: 0, fixInstructions: 'TESTO' });
+  assert.equal(chiamate.length, 1);
+  assert.match(chiamate[0].url, /config\/routines/);
+  assert.equal(chiamate[0].auth, 'Bearer tok');
+  assert.equal(bilanciText(caps), 'Bilanci del giro (dal server, config/routines): cap2 10 · cap1 1 · cap0 0');
+  // Anche un doubleValue o una stringa numerica valgono; vuoto e parole no.
+  assert.equal(numeroFirestore({ doubleValue: 3 }), 3);
+  assert.equal(numeroFirestore({ stringValue: '4' }), 4);
+  assert.ok(Number.isNaN(numeroFirestore({ stringValue: '' })));
+  assert.ok(Number.isNaN(numeroFirestore({ stringValue: 'due' })));
+  assert.ok(Number.isNaN(numeroFirestore(undefined)));
+});
+
+test('leggiBilanciDalServer: senza token, senza documento o senza uno dei tre numeri si FERMA e dice cosa manca — mai un default', async () => {
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl: async () => { throw new Error('non deve chiamare'); }, env: {}, trovaRefresh: () => null }),
+    (e) => e.message === SENZA_TOKEN_MSG && /FILO_ADMIN_REFRESH_TOKEN/.test(e.message) && /tests\/agent\/\.env/.test(e.message) && /admin-login/.test(e.message),
+  );
+  const conCampi = (fields) => async () => ({ ok: true, status: 200, json: async () => ({ fields }) });
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    /non ha cap1: l'owner li imposta in Gestione → Automazioni/,
+  );
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl: conCampi({ cap2: { stringValue: '' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    /non ha cap2, cap0/,
+  );
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl: async () => ({ ok: false, status: 404, text: async () => '' }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    /config\/routines non esiste sul server/,
+  );
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl: async () => ({ ok: false, status: 403, text: async () => 'PERMISSION_DENIED' }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    /HTTP 403.*PERMISSION_DENIED/,
+  );
+  await assert.rejects(
+    () => leggiBilanciDalServer({ fetchImpl: async () => { throw new Error('ECONNREFUSED'); }, env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    /rete.*ECONNREFUSED/,
+  );
+});
+
+test('withCritique senza i bilanci lancia: non c\'è un default con cui rimpiazzarli', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA }), /senza i bilanci cap2, cap1, cap0/);
+  assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
+});
+
+test('CLI: status e start stampano i bilanci letti dal server; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
+  const casa = depositoUsaEGetta();
+  const st = vl(casa, 'status');
+  assert.match(st.out, /Bilanci del giro \(dal server, config\/routines\): cap2 5 · cap1 2 · cap0 0/);
+  const start = vl(casa, 'start', 'richiesta di prova');
+  assert.equal(start.code, 0, start.out);
+  assert.match(start.out, /cap2 5 · cap1 2 · cap0 0/);
+  // Un giro con la critica: i bilanci residui sono quelli del server (5 → 4).
+  const cr = vl(casa, 'critica', LUNGA_FIX);
+  assert.equal(cr.code, 0, cr.out);
+  assert.match(cr.out, /cap2: 4 giri residui su 5/);
+
+  // Server irraggiungibile: errore evidente, uscita 1, niente scritto.
+  const spento = { ...process.env, FILO_ROUTINE_CONFIG_URL: 'http://127.0.0.1:1/config/routines' };
+  const giu = spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), 'status'], { cwd: casa, encoding: 'utf8', env: { ...spento, FILO_REPO_ROOT: casa } });
+  assert.equal(giu.status, 1);
+  assert.match(giu.stderr, /BILANCI DEL GIRO NON LETTI DAL SERVER — mi fermo/);
+  assert.match(giu.stderr, /rete/);
+
+  // Documento senza cap1: si ferma e dice quale manca, anche su critica.
+  const parziale = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify({ cap2: 5, cap0: 0 }) });
+  try {
+    const env = { ...process.env, FILO_ROUTINE_CONFIG_URL: parziale.url, FILO_REPO_ROOT: casa };
+    const r = spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), 'critica', LUNGA_FIX], { cwd: casa, encoding: 'utf8', env });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /non ha cap1/);
+    assert.match(r.stderr, /Gestione → Automazioni/);
+  } finally { parziale.kill(); }
+
 });

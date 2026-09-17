@@ -108,30 +108,18 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 const ROUTINES_DOC = 'config/routines';
 
 // I tre bilanci dei giri di correzione (feedback #561: cap2 per i rilievi
-// di livello 3/2, cap1 per gli 1, cap0 per gli 0). Li CONSUMA il
-// SERVER quando registra la critica; qui servono solo come dato di riferimento
-// per gli strumenti. I DEFAULT vivono con le transizioni promosse a dati
-// (src/shared/feedbackTransitions.js): una sorgente sola, incorporata anche dal
-// server al deploy. Se il checkout non ce l'ha ancora (clone vecchio), i
-// letterali qui sotto sono il paracadute.
+// di livello 3/2, cap1 per gli 1, cap0 per gli 0) li CONSUMA il SERVER quando
+// registra la critica, coi numeri che l'owner scrive in config/routines: qui
+// non esistono, nemmeno come riferimento (fino al 2026-09-16 c'era una copia
+// del default con un paracadute 5/2/0, e un numero che nessuno applica è un
+// numero che mente). I bilanci residui si stampano come arrivano nella
+// risposta del server (verifierReplyText).
 //
 // `resolveLoopCap` (override d'ambiente FILO_LOOP_CAP > valore remoto > default,
 // range [1, 10]) è la regola di precedenza del tetto delle bocciature del giro
 // VECCHIO: resta per gli strumenti e per i test che la usano ancora.
 const LOOP_CAP_MIN = 1;
 const LOOP_CAP_MAX = 10;
-export const VERIFIER_CAPS = (() => {
-  try {
-    const req = createRequire(import.meta.url);
-    // Dagli STRUMENTI, non dal progetto: è un dato che governa il giro (quante
-    // bocciature si tollerano), e preso dal ramo di lavoro sarebbe di nuovo la
-    // versione di giorni fa.
-    req(resolve(TOOLS_ROOT, 'src', 'shared', 'feedbackTransitions.js'));
-    const caps = globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
-    if (caps && Number.isFinite(caps.cap2) && Number.isFinite(caps.cap1) && Number.isFinite(caps.cap0)) return caps;
-  } catch (_) { /* checkout senza il file dei dati: si usa il paracadute */ }
-  return { cap2: 5, cap1: 2, cap0: 0 };
-})();
 // Il tetto delle bocciature del giro VECCHIO (verdetto a tre valori): resta
 // solo per resolveLoopCap, che gli strumenti e i test usano ancora.
 const LOOP_CAP_DEFAULT = 10;
@@ -1945,7 +1933,9 @@ if (isMainModule) {
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
-      // la suite completa in cloud dura più di mezz'ora,
+      // una lavorazione lunga (finish:check più le prove del giro) lo supera
+      // — la suite completa, che lo superava sempre, dal 2026-09-15 gira solo
+      // in GitHub Actions nel lavoro di release, mai nelle routine —
       // quindi senza battito ogni lavorazione lunga arriva alla consegna con un
       // biglietto morto (è già costato un giro intero: venti commit spinti e
       // nessun esito registrato). Chiederlo al prompt del lavoratore è la

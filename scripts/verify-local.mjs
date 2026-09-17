@@ -64,14 +64,91 @@ import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
 
-// Le regole del giro e i default dei bilanci: le stesse del server e degli
-// strumenti delle routine (fonte unica). Lette dal progetto, accanto a questo
-// file: in locale non c'è una copia fissata degli strumenti.
+// Le regole del giro: le stesse del server e degli strumenti delle routine
+// (fonte unica). Lette dal progetto, accanto a questo file: in locale non c'è
+// una copia fissata degli strumenti. I BILANCI (cap2/cap1/cap0) invece non
+// stanno in nessun file: si leggono dal server (leggiBilanciDalServer).
 const require = createRequire(import.meta.url);
 require(resolve(__dirname, '..', 'src', 'shared', 'feedbackTransitions.js'));
 require(resolve(__dirname, '..', 'src', 'shared', 'verifierRound.js'));
 const ROUND = globalThis.SN_VERIFIER_ROUND;
-const CAPS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS) || { cap2: 5, cap1: 2, cap0: 0 };
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap2', 'cap1', 'cap0'];
+
+// ─── I bilanci del giro si leggono dal server ────────────────────────────────
+//
+// Fino al 2026-09-16 questo script ragionava con un default scritto nel
+// codice (5/2/0) mentre l'owner in dashboard aveva 10/1/0: i giri locali
+// facevano i conti coi numeri sbagliati. Decisione dell'owner: i tre bilanci
+// si leggono dal documento che la dashboard scrive (`config/routines`, campi
+// cap2/cap1/cap0, Gestione → Automazioni), con l'identità dell'owner — lo
+// stesso token admin degli altri script locali (FILO_ADMIN_REFRESH_TOKEN, in
+// tests/agent/.env del checkout principale) — e NON c'è un ripiego: se il
+// token manca, se la lettura fallisce o se il documento non ha i tre numeri,
+// ci si ferma con un errore che dice cosa manca e dove si mette.
+//
+// `FILO_ROUTINE_CONFIG_URL` e `FILO_ADMIN_ID_TOKEN` esistono per i controlli
+// (un server finto in ascolto in locale, un token già coniato): non sono un
+// ripiego, in produzione non sono impostate e la lettura resta quella vera.
+export const SENZA_TOKEN_MSG = 'Manca FILO_ADMIN_REFRESH_TOKEN: i bilanci del giro (cap2/cap1/cap0) si leggono dal server con l\'identità dell\'owner. '
+  + 'Mettilo in tests/agent/.env del checkout principale (riga FILO_ADMIN_REFRESH_TOKEN=…, lo genera `node scripts/admin-login.mjs`) '
+  + 'oppure esportalo nell\'ambiente. Senza, la verifica non parte: non c\'è un default.';
+
+/** Il numero di un campo Firestore (integerValue/doubleValue/stringValue numerica), o NaN. PURA. */
+export function numeroFirestore(campo) {
+  if (!campo || typeof campo !== 'object') return NaN;
+  const raw = campo.integerValue != null ? campo.integerValue
+    : campo.doubleValue != null ? campo.doubleValue
+      : campo.stringValue;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return NaN;
+  return Number(raw);
+}
+
+/**
+ * I tre bilanci come stanno nel documento del server. Lancia con un messaggio
+ * che dice cosa manca; mai un numero al posto di quello dell'owner.
+ * @returns {Promise<{cap2:number, cap1:number, cap0:number, fixInstructions:string}>}
+ */
+export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.env, trovaRefresh = null } = {}) {
+  const fa = await import('./lib/firestore-auth.mjs');
+  let idToken = String(env.FILO_ADMIN_ID_TOKEN || '').trim();
+  if (!idToken) {
+    const refresh = env.FILO_ADMIN_REFRESH_TOKEN || (trovaRefresh || fa.findAdminRefreshToken)();
+    if (!refresh) throw new Error(SENZA_TOKEN_MSG);
+    idToken = await fa.mintIdToken(refresh);
+  }
+  const url = env.FILO_ROUTINE_CONFIG_URL || `${fa.FIRESTORE_BASE}/config/routines?key=${fa.FIREBASE_API_KEY}`;
+  let res;
+  try {
+    res = await fetchImpl(url, { headers: { Authorization: `Bearer ${idToken}` } });
+  } catch (e) {
+    throw new Error(`config/routines non letto dal server (rete): ${String((e && e.message) || e)}. Senza i bilanci la verifica non parte.`);
+  }
+  if (res.status === 404) {
+    throw new Error('config/routines non esiste sul server: l\'owner deve salvare i tre bilanci in Gestione → Automazioni. Non c\'è un default.');
+  }
+  if (!res.ok) {
+    const testo = await res.text().catch(() => '');
+    throw new Error(`config/routines non letto dal server (HTTP ${res.status}): ${testo.slice(0, 200)}. Senza i bilanci la verifica non parte.`);
+  }
+  const json = await res.json();
+  const fields = (json && json.fields) || {};
+  const out = { fixInstructions: '' };
+  const mancanti = [];
+  for (const k of CAP_KEYS) {
+    const n = numeroFirestore(fields[k]);
+    if (Number.isFinite(n)) out[k] = n; else mancanti.push(k);
+  }
+  if (mancanti.length) {
+    throw new Error(`config/routines sul server non ha ${mancanti.join(', ')}: l'owner li imposta in Gestione → Automazioni (un numero, 0 compreso), poi si riprova. Non c'è un default.`);
+  }
+  if (fields.fixInstructions && typeof fields.fixInstructions.stringValue === 'string') out.fixInstructions = fields.fixInstructions.stringValue;
+  return out;
+}
+
+/** Una riga per chi guarda lo schermo. PURA. */
+export function bilanciText(caps) {
+  return `Bilanci del giro (dal server, config/routines): ${CAP_KEYS.map((k) => `${k} ${caps[k]}`).join(' · ')}`;
+}
 
 export function stateFile(root = ROOT) {
   return resolve(root, '.claude', 'verify-local.json');
@@ -177,7 +254,11 @@ export function withRequest(state, branch, { request, sha, at }) {
  *   outcome 'fix'  → verdict 'fix-pending' (con `pending`: i rilievi da correggere)
  *   outcome 'stop' → verdict 'fail'
  */
-export function withCritique(state, branch, { critique, sha, at, caps = CAPS, dirtyFiles = [] }) {
+export function withCritique(state, branch, { critique, sha, at, caps, dirtyFiles = [] }) {
+  // I bilanci arrivano dal server (leggiBilanciDalServer): qui non c'è un
+  // default con cui rimpiazzarli, e mancarne uno è un errore di chi chiama.
+  const mancanti = ROUND.missingCaps(caps);
+  if (mancanti.length) throw new Error(`withCritique senza i bilanci ${mancanti.join(', ')}: si leggono dal server prima di calcolare l'esito`);
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   // Una critica vuota non è un pass: un pass senza una riga di riassunto non
@@ -711,6 +792,17 @@ if (isMain) {
   const branch = currentBranch();
   const sha = headSha();
 
+  // I bilanci veri, o ci si ferma qui: un errore evidente, nessun ripiego.
+  const bilanciOStop = async () => {
+    try {
+      return await leggiBilanciDalServer();
+    } catch (e) {
+      console.error(`BILANCI DEL GIRO NON LETTI DAL SERVER — mi fermo, non ho toccato niente. ${String((e && e.message) || e)}`);
+      process.exit(1);
+    }
+    return null;
+  };
+
   if (cmd === 'start') {
     const prev = readState()[branch];
     // Dopo una correzione si riparte senza argomenti: la richiesta è la stessa.
@@ -726,6 +818,9 @@ if (isMain) {
       console.error('(node scripts/verify-local.mjs corretto "<report>"), poi si riparte.');
       process.exit(1);
     }
+    // I bilanci si leggono già qui, PRIMA del lavoro: se il token manca o il
+    // documento è incompleto, meglio saperlo adesso che dopo la verifica.
+    const capsStart = await bilanciOStop();
     // Prima di consegnare il compito il ramo si riallinea alla linea
     // principale (caso #500): la verifica deve giudicare il contenuto che
     // verrà pubblicato. Sul conflitto ci si ferma qui, col ramo intatto.
@@ -736,6 +831,7 @@ if (isMain) {
     const state = withRequest(readState(), b, { request, sha: headSha() });
     writeState(state);
     console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe(), history: historyFromRounds(state[b].rounds) }));
+    console.log(bilanciText(capsStart));
     process.exit(0);
   }
 
@@ -774,7 +870,9 @@ if (isMain) {
     // critica ristampa la risposta (persa), un'altra è respinta.
     const stato = statoDirectory(ROOT);
     if (!stato.ok) { console.error(statoIllegibileText(stato.motivo)); process.exit(1); }
-    const r = withCritique(readState(), branch, { critique: text, sha, caps: CAPS, dirtyFiles: stato.lines });
+    // I bilanci dal server, PRIMA di calcolare l'esito: nessun default.
+    const caps = await bilanciOStop();
+    const r = withCritique(readState(), branch, { critique: text, sha, caps, dirtyFiles: stato.lines });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
     if (!r.replayed) writeState(r.state);
     const e = r.state[branch];
@@ -832,6 +930,9 @@ if (isMain) {
   }
 
   if (cmd === 'status' || !cmd) {
+    // I bilanci veri, dal server: `status` è il modo di vederli senza aprire
+    // un giro, e di scoprire subito se il token manca.
+    console.log(bilanciText(await bilanciOStop()));
     const r = verdictForCurrentBranch();
     console.log(`${r.branch}: ${r.reason}`);
     // A correzione in sospeso si dice anche COSA c'è da correggere, e come

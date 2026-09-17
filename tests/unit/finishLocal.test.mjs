@@ -22,7 +22,7 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota, lottiPerRigaDiComando } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SORGENTE = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
@@ -480,7 +480,12 @@ test('i rossi del contenitore hanno nome, caso, motivo e un feedback', () => {
   const bloccanti = new Set(j.specs.map(String));
   for (const v of c.specs) {
     assert.ok(existsSync(resolve(ROOT, `${v.spec}.spec.mjs`)), `${v.spec} non esiste più: toglilo dall'elenco`);
-    assert.ok(v.caso && v.caso.length > 3, `${v.spec}: manca il caso preciso che è rosso`);
+    // `caso` è il titolo del test (o un elenco di titoli, quando la voce copre
+    // due test sorelle): è quello che scripts/suite-verdict.mjs confronta con
+    // l'esito della suite in GitHub prima di pubblicare.
+    const casi = Array.isArray(v.caso) ? v.caso : [v.caso];
+    assert.ok(casi.length && casi.every((c) => typeof c === 'string' && c.length > 3),
+      `${v.spec}: manca il caso preciso che è rosso (una stringa o un elenco di titoli)`);
     assert.ok(v.perche && v.perche.length > 20, `${v.spec}: manca il motivo, e senza motivo non si toglierà mai`);
     assert.match(String(v.feedback || ''), /#\d+/, `${v.spec}: manca il feedback che lo farà togliere`);
     // Di norma un rosso appartiene a UN ambiente, e trovarlo in tutti e due gli
@@ -496,4 +501,15 @@ test('i rossi del contenitore hanno nome, caso, motivo e un feedback', () => {
       !bloccanti.has(v.spec) || v.ancheSullaMacchinaDellOwner === true,
       `${v.spec} sta in tutti e due gli elenchi: se è voluto scrivilo (ancheSullaMacchinaDellOwner: true), altrimenti decidi quale`);
   }
+});
+
+test('gli spec mirati si spezzano in lotti che stanno nella riga di comando di Windows', () => {
+  const specs = Array.from({ length: 245 }, (_, i) => `tests/area-${String(i).padStart(3, '0')}-nome-lungo-quanto-basta.spec.mjs`);
+  const lotti = lottiPerRigaDiComando(specs, 6000);
+  assert.ok(lotti.length > 1, 'con 245 spec serve più di un lotto');
+  assert.deepEqual(lotti.flat(), specs, 'nessuno spec perso o duplicato, stesso ordine');
+  for (const l of lotti) assert.ok(l.join(' ').length <= 6000, 'ogni lotto sta nel tetto');
+  assert.deepEqual(lottiPerRigaDiComando(['tests/a.spec.mjs', 'tests/b.spec.mjs'], 6000), [['tests/a.spec.mjs', 'tests/b.spec.mjs']], 'pochi spec: un lotto solo');
+  assert.deepEqual(lottiPerRigaDiComando([], 6000), [], 'niente spec: nessun lotto');
+  assert.deepEqual(lottiPerRigaDiComando(['x'.repeat(7000)], 6000), [['x'.repeat(7000)]], 'uno spec più lungo del tetto va da solo, non sparisce');
 });

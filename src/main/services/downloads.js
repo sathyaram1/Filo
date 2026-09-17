@@ -71,10 +71,13 @@ function storageKey() {
 
 // Nome file sicuro: niente separatori di percorso, caratteri di controllo o
 // tentativi di traversal. Stesso spirito di safeImageFilename in handlers/misc.
+// Il traversal non arriva solo in testa: Chromium ha già cambiato le barre in
+// `_`, e `../../pwned` si presenta come `_.._.._pwned`. Ogni fila di due o più
+// punti si comprime a uno, ovunque sia; i punti singoli (`a.b.txt`) restano.
 function safeName(name) {
   let s = String(name || '').trim().replace(/[\x00-\x1f]/g, '');
   s = s.split(/[\\/]/).pop() || '';
-  s = s.replace(/[<>:"|?*]/g, '_').replace(/^\.+/, '').trim();
+  s = s.replace(/[<>:"|?*]/g, '_').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
   if (!s || s === '.' || s === '..') s = 'download';
   return s.slice(0, 180);
 }

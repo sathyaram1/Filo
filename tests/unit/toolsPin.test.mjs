@@ -771,56 +771,11 @@ test('senza remoto la guardia lascia passare', async () => {
   }
 });
 
-test('anche i DATI che governano il giro vengono dalla copia', async () => {
-  // Non solo il codice: il numero di bocciature che si tollerano prima di
-  // chiamare l'owner è un dato, e preso dal ramo di lavoro sarebbe quello di
-  // giorni fa. Qui il ramo dice una cosa e la copia un'altra: vince la copia.
-  const { spawn } = await import('node:child_process');
-  const { cpSync } = await import('node:fs');
-  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const casa = progettoFinto();
-  const dove = resolve(tmpdir(), `filo-strumenti-dati-${process.pid}`);
-
-  const tabella = (cap2) => `(function (global) {
-  'use strict';
-  global.SN_FB_TRANSITIONS = { VERIFIER_CAPS: { cap2: ${cap2}, cap1: 2, cap0: 0 } };
-})(typeof globalThis !== 'undefined' ? globalThis : self);
-`;
-
-  try {
-    cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
-    cpSync(resolve(REPO, 'src', 'main', 'auth'), resolve(casa, 'src', 'main', 'auth'), { recursive: true });
-    // La copia si prende quando il progetto dice 7.
-    writeFileSync(resolve(casa, 'src', 'shared', 'feedbackTransitions.js'), tabella(7), 'utf8');
-    const pin = pinTools(casa, { dest: dove });
-    assert.equal(pin.ok, true, pin.why);
-    // Poi si apre il ramo, che dice 2.
-    writeFileSync(resolve(casa, 'src', 'shared', 'feedbackTransitions.js'), tabella(2), 'utf8');
-
-    const out = await new Promise((fine) => {
-      const p = spawn(process.execPath, [
-        '--input-type=module', '-e',
-        `import { VERIFIER_CAPS } from ${JSON.stringify(`file:///${resolve(dove, 'scripts', 'dispatch.mjs').split('\\').join('/')}`)};
-         console.log('cap2=' + VERIFIER_CAPS.cap2);`,
-      ], {
-        cwd: casa,
-        env: { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1' },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      let so = ''; let se = '';
-      p.stdout.on('data', (c) => { so += c; });
-      p.stderr.on('data', (c) => { se += c; });
-      p.on('close', () => fine({ so, se }));
-    });
-
-    assert.match(out.so, /cap2=7/,
-      `ha letto il dato dal ramo invece che dalla copia: ${out.so.trim()} ${out.se.slice(-200)}`);
-  } finally {
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
-  }
-});
+// (Qui fino al 2026-09-16 c'era un test che leggeva VERIFIER_CAPS dalla copia
+// fissata di dispatch.mjs. Quel dato non esiste più: i tre bilanci del giro
+// non hanno un default nel codice, li scrive l'owner in config/routines e li
+// applica il server. Il principio — i DATI del giro vengono dalla copia, non
+// dal ramo — resta coperto dal codice: VERIFIER_ROUND si carica da TOOLS_ROOT.)
 
 test('aprire un ramo VECCHIO non riporta indietro gli strumenti del giro', () => {
   // Il guasto del 24 agosto, riprodotto: un progetto con lo strumento nuovo, un

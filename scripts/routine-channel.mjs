@@ -48,13 +48,20 @@
 //         deve succedere sempre non si chiede a chi lavora. Senza biglietto fra
 //         gli argomenti lo ritrova da solo, come le consegne.
 //
-//   node scripts/routine-channel.mjs release <biglietto> [--guasto "motivo"]
+//   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"]
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
 //         `--guasto` DICHIARI un guasto al server (SPEC-RIDISEGNO-MAX.md §12):
 //         è così che il server smette di dare lavoro per il giro — le
 //         richieste di biglietto successive escono con 3 — e il pacemaker
 //         rispetta una pausa prima di riaccendere. Non "riportarlo" a parole:
 //         il tuo testo di ritorno non lo legge nessuna macchina.
+//         Prima di parlare col server committa quello che è rimasto fuori
+//         dai commit (un file nato da una shell non passa dall'hook) e
+//         spedisce il ramo corrente su origin (--force-with-lease se la
+//         storia è stata riscritta): se il push fallisce NON rilascia ed
+//         esce diverso da zero. `--senza-push` dove non c'è un repo. Allega da solo il rapporto di fine sessione
+//         (session-report.mjs; `--role <ruolo>` per firmarlo; `--senza-rapporto`
+//         per saltarlo).
 //
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
@@ -77,9 +84,13 @@
 //   merge lo fa il SERVER (SPEC-RIDISEGNO-MAX.md §10): verdetti registrati,
 //   L5 sul diff che scarica lui, fusione via API con la sua identità.
 
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
+import { isProtectedBranch } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
 
@@ -229,8 +240,110 @@ export async function work(t, opts) {
 // vorrebbe dire far cadere il semaforo di un lavoro ancora vivo.
 const BATTITO_FINITO = new Set(['bad_ticket', 'dead_ticket']);
 
-export async function heartbeat(t, opts) {
-  const { status, body } = await call('routineHeartbeat', { ticket: t }, opts);
+/** Un file di sistema, o null se non c'è (Windows, un contenitore senza cgroup). */
+function leggiFileDiSistema(p) {
+  try { return readFileSync(p, 'utf8'); } catch (_) { return null; }
+}
+function elencaCartella(p) {
+  try { return readdirSync(p); } catch (_) { return []; }
+}
+
+/**
+ * La memoria del CONTENITORE, dal suo cgroup (prima v2, poi v1):
+ * { usedMb, limitMb }, con limitMb 0 se non c'è un tetto; null fuori da un
+ * cgroup. In un contenitore la memoria «libera» del kernel è quella della
+ * macchina che lo ospita, non la sua: un worker ucciso per aver superato il
+ * tetto del cgroup lasciava un battito con venti giga liberi. PURA (legge con
+ * `leggi`).
+ */
+export function memoriaContenitore(leggi = leggiFileDiSistema) {
+  const mb = (s) => { const n = Number(String(s == null ? '' : s).trim()); return Number.isFinite(n) ? n / 1048576 : NaN; };
+  const v2 = leggi('/sys/fs/cgroup/memory.current');
+  if (v2 !== null) {
+    const used = mb(v2);
+    if (!Number.isFinite(used)) return null;
+    const max = String(leggi('/sys/fs/cgroup/memory.max') || '').trim();
+    const limit = max && max !== 'max' ? mb(max) : 0;
+    return { usedMb: used, limitMb: Number.isFinite(limit) ? limit : 0 };
+  }
+  const v1 = leggi('/sys/fs/cgroup/memory/memory.usage_in_bytes');
+  if (v1 !== null) {
+    const used = mb(v1);
+    if (!Number.isFinite(used)) return null;
+    const limit = mb(leggi('/sys/fs/cgroup/memory/memory.limit_in_bytes'));
+    // In v1 «senza tetto» è un numero enorme (circa 2^63): non è un limite.
+    return { usedMb: used, limitMb: Number.isFinite(limit) && limit < 1024 * 1024 * 1024 ? limit : 0 };
+  }
+  return null;
+}
+
+/**
+ * Da quanto vive il CONTENITORE: l'età del suo processo 1, da /proc/1/stat
+ * (campo 22: l'avvio in tick dall'avvio del kernel, 100 tick al secondo su
+ * Linux). L'uptime del kernel, in un contenitore, è quello della macchina che
+ * lo ospita. null dove /proc non c'è. PURA (legge con `leggi`).
+ */
+export function uptimeContenitore(uptimeKernelS, leggi = leggiFileDiSistema) {
+  const stat = leggi('/proc/1/stat');
+  if (!stat) return null;
+  const dopoNome = String(stat).slice(String(stat).lastIndexOf(')') + 2).trim().split(/\s+/);
+  const avvioTick = Number(dopoNome[19]);
+  if (!Number.isFinite(avvioTick) || !Number.isFinite(uptimeKernelS)) return null;
+  const s = uptimeKernelS - avvioTick / 100;
+  return s >= 0 ? s : null;
+}
+
+/**
+ * La memoria residente di TUTTI i processi visibili (somma di
+ * /proc/<pid>/statm, pagine da 4 KB): la memoria del lavoro, non del solo
+ * processo che batte. null senza /proc. PURA (legge con `leggi`/`elenca`).
+ */
+export function rssProcessi(leggi = leggiFileDiSistema, elenca = elencaCartella) {
+  const pid = elenca('/proc').filter((n) => /^\d+$/.test(n));
+  if (!pid.length) return null;
+  let pagine = 0;
+  for (const p of pid) {
+    const statm = leggi(`/proc/${p}/statm`);
+    if (!statm) continue;
+    const n = Number(String(statm).trim().split(/\s+/)[1]);
+    if (Number.isFinite(n)) pagine += n;
+  }
+  return (pagine * 4096) / 1048576;
+}
+
+/**
+ * Lo stato del contenitore, da allegare a ogni battito (giro del 14/09: un
+ * worker morto di memoria non lasciava nessuna traccia, il semaforo cadeva e
+ * basta). Quattro numeri, gli stessi che il server salva:
+ *   uptimeS  da quanto vive il contenitore (l'età del suo processo 1; fuori
+ *            da un contenitore, l'uptime del sistema);
+ *   freeMb   quanto manca al tetto di memoria del cgroup; senza tetto, la
+ *            memoria libera del sistema;
+ *   rssMb    la memoria usata dal contenitore (cgroup), o la somma di tutti i
+ *            processi (Linux senza cgroup), o quella di questo processo (dove
+ *            /proc non c'è);
+ *   loadAvg  il carico dell'ultimo minuto.
+ * Solo numeri: il server salva quelli e ignora il resto. Fino al 16/09/2026
+ * rssMb era la memoria del processo che batte (piccola e costante) e uptime
+ * e memoria libera erano quelli del kernel, cioè della macchina ospite.
+ */
+export function statoContenitore({ osImpl = os, proc = process, leggi = leggiFileDiSistema, elenca = elencaCartella } = {}) {
+  const num = (v) => (Number.isFinite(v) ? v : undefined);
+  const carico = osImpl.loadavg();
+  const cg = memoriaContenitore(leggi);
+  const upC = uptimeContenitore(Number(osImpl.uptime()), leggi);
+  const usata = cg ? cg.usedMb : rssProcessi(leggi, elenca);
+  const libera = cg && cg.limitMb > 0 ? Math.max(0, cg.limitMb - cg.usedMb) : osImpl.freemem() / 1048576;
+  return {
+    uptimeS: num(Math.round(upC !== null ? upC : osImpl.uptime())),
+    freeMb: num(Math.round(libera)),
+    rssMb: num(Math.round(usata !== null ? usata : proc.memoryUsage().rss / 1048576)),
+    loadAvg: num(Math.round(((Array.isArray(carico) && carico[0]) || 0) * 100) / 100),
+  };
+}
+
+export async function heartbeat(t, opts = {}) {
+  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
   const reason = String((body && body.reason) || `http_${status}`);
   return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
@@ -242,13 +355,179 @@ export async function heartbeat(t, opts) {
  * parole (il testo di ritorno di un worker non lo legge nessuna macchina). Il
  * server lo tronca e non lo interpreta; da lì in poi l'emissione dei biglietti
  * risponde `fault_declared` per il periodo di rispetto.
+ *
+ * `report`, se presente, è il rapporto di fine sessione (session-report.mjs):
+ * viaggia nel corpo col nome `report`. Per la ritentata quando il server lo
+ * rifiuta c'è releaseConRapporto, qui sotto.
  */
-export async function release(t, fault = '', opts) {
+export async function release(t, fault = '', opts, report = null) {
   const payload = { ticket: t };
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
+  if (report && typeof report === 'object') payload.report = report;
   const { status, body } = await call('routineRelease', payload, opts);
-  return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || '') };
+  return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
+}
+
+/**
+ * Rilascio col rapporto allegato, e le due ritentate che il server prevede:
+ *   - 413 `report_too_big` → una volta senza `tools.byName` e `notes`; se è
+ *     ancora troppo, senza rapporto, e lo si dice;
+ *   - 400 `report_malformed` → senza rapporto, e lo si dice.
+ * Il rilascio è idempotente: riprovare è sicuro. `esito.rapporto` dice cosa è
+ * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
+ * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
+ */
+export async function releaseConRapporto(t, fault, report, opts) {
+  const tenta = (rep) => release(t, fault, opts, rep);
+  if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
+  let r = await tenta(report);
+  if (r.status === 413 && r.reason === 'report_too_big') {
+    const misura = `${r.body && r.body.bytes ? r.body.bytes : '?'} byte, massimo ${r.body && r.body.max ? r.body.max : '?'}`;
+    const snello = { ...report, tools: { ...(report.tools || {}) } };
+    delete snello.tools.byName;
+    delete snello.notes;
+    r = await tenta(snello);
+    if (r.status === 413 && r.reason === 'report_too_big') {
+      r = await tenta(null);
+      return { ...r, rapporto: 'scartato', avviso: `rapporto troppo grande anche senza l'elenco degli strumenti (${misura}): rilasciato SENZA rapporto.` };
+    }
+    return { ...r, rapporto: 'ridotto', avviso: `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.` };
+  }
+  if (r.status === 400 && r.reason === 'report_malformed') {
+    // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
+    // rapporto), non nella seconda: letto dopo la ritentata si perdeva.
+    const dettaglio = r.body && r.body.detail ? `: ${r.body.detail}` : '';
+    r = await tenta(null);
+    return { ...r, rapporto: 'scartato', avviso: `il server non ha capito il rapporto (report_malformed${dettaglio}): rilasciato SENZA rapporto.` };
+  }
+  return { ...r, rapporto: 'allegato' };
+}
+
+/**
+ * Spedisce il ramo corrente su origin, prima del rilascio. L'hook di
+ * salvataggio parte solo su Edit/Write: un `git commit` fatto a mano dal
+ * worker restava a terra, e il contenitore moriva con lui (giro del 14/09).
+ *
+ * Salta (ok, skipped) con una HEAD staccata o su un ramo protetto — la stessa
+ * regola dell'hook e di finish-local (lib/branch-integrity.isProtectedBranch:
+ * main, master, il default dichiarato da origin). Prima un push normale; se
+ * git lo rifiuta per storia divergente (un rebase), --force-with-lease, che
+ * è contro il ref remoto conosciuto: se qualcun altro ha spinto nel frattempo
+ * git rifiuta, ed è giusto così. Un fallimento torna con la causa: chi chiama
+ * NON rilascia.
+ */
+export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (e) {
+      const testo = String((e && (e.stderr || e.stdout)) || (e && e.message) || '').trim();
+      return { ok: false, out: testo };
+    }
+  };
+  const head = run(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (!head.ok) return { ok: false, skipped: false, branch: '', reason: `stato di git illeggibile: ${head.out}` };
+  const ramo = head.out;
+  if (ramo === 'HEAD') return { ok: true, skipped: true, branch: '', reason: 'HEAD staccata: nessun ramo da spedire' };
+  const def = run(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok ? def.out.replace(/^origin\//, '') : '';
+  if (isProtectedBranch(ramo, principale)) return { ok: true, skipped: true, branch: ramo, reason: `'${ramo}' è un ramo protetto: non si spedisce da qui` };
+  // La destinazione si dichiara sulla riga stessa (sorgente:destinazione),
+  // come nell'hook: una sentinella negli unit test la cerca lì.
+  const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
+  if (push.ok) return { ok: true, skipped: false, branch: ramo };
+  // «! [remote rejected]» è il SERVER che dice di no (un pre-receive, una
+  // regola del repo, il push protection): non è storia divergente, un rebase
+  // non lo cura e il lease non si tenta (verifica del giro 4, stessa regola
+  // dell'hook di salvataggio).
+  if (/\[remote rejected\]/i.test(push.out)) {
+    return { ok: false, skipped: false, branch: ramo, reason: `il server remoto ha rifiutato il push (una regola del repo, un pre-receive, il push protection?): ${pulisciGit(push.out)}` };
+  }
+  if (/rejected|non-fast-forward|fetch first|stale info/i.test(push.out)) {
+    // --force-if-includes: il lease da solo si fida del ref remoto che questa
+    // copia conosce, e dopo un `git fetch` quel ref è già il commit dell'altro
+    // — il lease combacia e il rinvio lo sovrascrive (verifica del giro 2).
+    // Con --force-if-includes git rifiuta se quel commit non è mai passato
+    // dalla storia locale di questo ramo.
+    const lease = run(['push', '--force-with-lease', '--force-if-includes', 'origin', `HEAD:refs/heads/${ramo}`]);
+    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true };
+    return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
+  }
+  return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
+}
+
+/**
+ * Committa quello che è rimasto fuori dai commit, prima di spedire. L'hook di
+ * salvataggio parte solo su Edit/Write: un file nato da una shell (rm, mv, un
+ * generatore) al rilascio non era in nessun commit, il rilascio spediva HEAD,
+ * diceva «spedito» e quel lavoro moriva col contenitore (giro del 14/09,
+ * verifica). Stesse regole dell'hook: niente commit su un ramo protetto o a
+ * HEAD staccata; l'autore dice la provenienza (routine o locale). Torna
+ * { ok, skipped, committed: [file…], reason }: un `ok` falso ferma il rilascio.
+ */
+export function commitRestante(root, { exec = execFileSync, env = process.env } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (e) {
+      return { ok: false, out: String((e && (e.stderr || e.stdout)) || (e && e.message) || '').trim() };
+    }
+  };
+  const head = run(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (!head.ok) return { ok: false, skipped: false, committed: [], reason: `stato di git illeggibile: ${head.out}` };
+  // Prima della HEAD staccata: durante un rebase la HEAD È staccata, e un
+  // rilascio che «salta» in silenzio lascerebbe il ramo a metà e mai su
+  // origin. Qui si dice cosa finire, e il rilascio si ferma.
+  const aMeta = operazioneGitInCorso(root, { exec });
+  if (aMeta) return { ok: false, skipped: false, committed: [], reason: `${aMeta} è a metà: finiscila prima (risolvi i file, git add, poi git rebase --continue o git commit), o metterei in commit i segni di conflitto` };
+  if (head.out === 'HEAD') return { ok: true, skipped: true, committed: [], reason: 'HEAD staccata: non committo' };
+  const def = run(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok ? def.out.replace(/^origin\//, '') : '';
+  if (isProtectedBranch(head.out, principale)) return { ok: true, skipped: true, committed: [], reason: `'${head.out}' è un ramo protetto: non committo` };
+  const st = statoDirectory(root);
+  if (!st.ok) return { ok: false, skipped: false, committed: [], reason: `non so cosa c'è fuori dai commit: ${st.motivo}` };
+  if (!st.lines.length) return { ok: true, skipped: false, committed: [], reason: '' };
+  const add = run(['add', '-A']);
+  if (!add.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(add.out) };
+  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
+  const nome = routine ? 'claude-routine' : 'claude-local';
+  const email = routine ? 'claude@routine' : 'claude@local';
+  const elenco = `${st.lines.slice(0, 3).join(', ')}${st.lines.length > 3 ? ` (+${st.lines.length - 3} file)` : ''}`;
+  const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: rilascio — ${elenco}`]);
+  if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
+  return { ok: true, skipped: false, committed: st.lines, reason: '' };
+}
+
+/**
+ * Un'operazione di git ferma a metà in `root` — «un rebase», «una fusione»,
+ * «un cherry-pick», «un revert», o «la risoluzione di un conflitto» (file
+ * non ancora fusi nell'indice) — oppure '' se non ce n'è nessuna. Stessa
+ * regola dell'hook di salvataggio: in quel momento `git add -A` metterebbe in
+ * commit i segni di conflitto (giro del 14/09, terza verifica).
+ */
+export function operazioneGitInCorso(root, { exec = execFileSync } = {}) {
+  const run = (args) => {
+    try {
+      return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
+    } catch (_) {
+      return { ok: false, out: '' };
+    }
+  };
+  const gitDir = run(['rev-parse', '--absolute-git-dir']);
+  if (gitDir.ok && gitDir.out) {
+    for (const [nome, cosa] of [['rebase-merge', 'un rebase'], ['rebase-apply', 'un rebase'], ['MERGE_HEAD', 'una fusione'], ['CHERRY_PICK_HEAD', 'un cherry-pick'], ['REVERT_HEAD', 'un revert']]) {
+      if (existsSync(join(gitDir.out, nome))) return cosa;
+    }
+  }
+  const nonFusi = run(['ls-files', '-u']);
+  if (nonFusi.ok && nonFusi.out) return 'la risoluzione di un conflitto';
+  return '';
+}
+
+/** Le righe di git che dicono qualcosa (via i `hint:` e le vuote), in una riga. */
+function pulisciGit(testo) {
+  return String(testo || '').split('\n').map((l) => l.trim()).filter((l) => l && !/^hint:|^To /.test(l)).slice(0, 3).join(' ');
 }
 
 /**
@@ -350,7 +629,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala',
+    'segnala', 'senza-push', 'senza-rapporto', 'role',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -375,14 +654,14 @@ if (isMain) {
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
-    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
   // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
   // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
   // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
-  const CAMPI_BANDIERA = new Set(['json']);
+  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto']);
   const args = [];
   const flags = [];
   const data = {};
@@ -545,7 +824,50 @@ if (isMain) {
       process.exit(1);
     }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
-    const r = await release(args[0], guasto);
+    // PRIMA del server: il ramo corrente va su origin. Un commit fatto a mano
+    // dal worker non passa dall'hook, e senza questo push moriva col
+    // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e
+    // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
+    // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
+    if (data['senza-push'] !== true) {
+      // Prima quello che è rimasto fuori dai commit (un file nato da una
+      // shell non passa dall'hook): si committa qui, e si dice.
+      const c = commitRestante(ROOT);
+      if (!c.ok) {
+        console.error(`Modifiche fuori dai commit che non riesco a committare: ${c.reason}`);
+        console.error('Non ho rilasciato niente: porta la directory a un commit e rilancia lo stesso comando.');
+        process.exit(1);
+      }
+      if (c.committed.length) {
+        console.error(`committate ${c.committed.length} modifiche rimaste fuori dai commit: ${c.committed.slice(0, 3).join(', ')}${c.committed.length > 3 ? ` (+${c.committed.length - 3} file)` : ''}`);
+      }
+      const p = pushRamoCorrente(ROOT);
+      if (!p.ok) {
+        console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
+        console.error('Non ho rilasciato niente: sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
+        process.exit(1);
+      }
+      console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
+    }
+    // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da
+    // solo qui. Se lo script fallisce si rilascia comunque, con la nota.
+    let rapporto = null;
+    if (data['senza-rapporto'] !== true) {
+      const ruolo = typeof data.role === 'string' ? data.role : '';
+      try {
+        const { generaRapporto } = await import('./session-report.mjs');
+        // Dal momento del biglietto: chi rilascia è quasi sempre un
+        // sotto-agente col suo transcript; quando è l'orchestratore a
+        // rilasciare per un worker morto, la finestra lascia fuori i worker
+        // dei biglietti prima.
+        const { readTicketSince } = await import('./lib/routine-ticket.mjs');
+        rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT, since: readTicketSince(ROOT) });
+      } catch (e) {
+        rapporto = { v: 1, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
+      }
+    }
+    const r = await releaseConRapporto(args[0], guasto, rapporto);
+    if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
     // evita dieci minuti di processo che batte per un morto.

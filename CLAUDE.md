@@ -59,6 +59,14 @@ costano dieci riletture, in un turno solo una. Quindi:
   uno alla volta).
 - **Si legge la parte, non il file.** Intervalli di righe, uscite filtrate
   (`tail`, `grep`), mai un file da centinaia di KB intero per una sezione.
+- **Attese.** La cache del contesto dura cinque minuti e ogni chiamata la
+  rinnova: una chiamata bloccante da dieci minuti la trova sempre scaduta, e il
+  turno dopo riscrive tutto il contesto (~250.000 token, circa 1,6 $ — sette
+  attese così lo riscrivono sette volte). Un comando che può superare i due
+  minuti si lancia in sottofondo (l'harness avvisa quando finisce); se serve
+  aspettarlo attivamente, a pezzi da quattro minuti al massimo per chiamata,
+  mai da dieci. Il timeout della chiamata si dimensiona sulla durata vera del
+  comando, mai sotto.
 - **Sessioni che finiscono.** Un compito nuovo in una sessione lunga paga tutto
   il passato a ogni turno: a un cambio di argomento si riparte.
 
@@ -239,18 +247,27 @@ modifica:
   (`npx playwright test tests/<feature>.spec.mjs`); se non esiste, scrivilo;
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
   screenshot (`tests/agent/.out/`); `test:explore` (LLM) è facoltativo;
-- **nelle routine** (dal 2026-09-03): chi risolve NON lancia la suite
-  completa; la lancia il verificatore, una volta, prima di dare `pass`. Un
-  rosso fuori dalla lista dei rossi noti torna a chi risolve con l'elenco
-  degli spec rotti. Le regressioni restano responsabilità di chi le
-  introduce: i minimi qui sopra (unit + spec mirato) valgono sempre;
-- **in locale** → la suite completa NON si lancia (decisione owner
-  2026-09-10): sulla sua macchina dura quasi sette ore con un solo worker e i
-  rossi che trova sono quelli già scritti nei rossi noti. Si lancia
-  `npm run finish:check`: unit test più gli spec delle aree toccate dal ramo
-  (è lo stesso controllo del cancello di `npm run finish`). Vale anche per
-  chi verifica in locale. Se temi una regressione precisa altrove, lancia
-  quello spec: non rimandarla, e non lanciare tutto per trovarla.
+- **la suite completa non la lancia più nessuno** (decisione owner
+  2026-09-15): né chi risolve, né chi verifica, né una sessione locale. Gira
+  in GitHub, nel lavoro di release, che parte ogni sei ore: verde, e la patch
+  si pubblica; un rosso nuovo — fuori dai rossi noti del contenitore — e la
+  patch non esce, il rosso diventa un feedback e si corregge con calma, la
+  patch salta un giro. È il job `suite` di `.github/workflows/release.yml`
+  (Linux senza schermo; `scripts/suite-verdict.mjs` toglie dal conto i rossi
+  noti del contenitore, `tests/rossi-noti.json`); `gh workflow run
+  release.yml --ref <ramo> -f solo_suite=true` prova la sola suite su un
+  ramo, senza pubblicare. Una regressione è rara: non vale un'ora d'attesa a
+  ogni consegna;
+- **al suo posto**, nelle routine come in locale, chi verifica lancia
+  `npm run finish:check` (unit test più gli spec delle aree toccate dal ramo:
+  è lo stesso controllo del cancello di `npm run finish`) e le prove del giro,
+  `npx playwright test tests/verifica/<numero>` — quel percorso scritto
+  relativo alla radice del repo e con le barre normali (vedi più sotto). Un
+  rosso fuori dai rossi noti torna a chi risolve con l'elenco degli spec
+  rotti. Le regressioni restano responsabilità di chi le introduce: i minimi
+  qui sopra (unit + spec mirato) valgono sempre. Se temi una regressione
+  precisa altrove, lancia quello spec: non rimandarla, e non lanciare tutto
+  per trovarla.
 
 **Prima di consegnare, la verifica te la fai tu.** Vale nelle routine e in
 locale: da tutte e due le parti il lavoro passa poi da una verifica
@@ -333,8 +350,10 @@ la scrittura chiara.
   unit test confronta le voci verificabili (scorciatoie, pagine interne) col
   codice reale e diventa rossa se derivano.
 - **`src/shared/feedbackTransitions.js`** — le TABELLE della macchina a stati
-  (stati, transizioni, statusPublic, imbottitura, default dei contatori del
-  verificatore N/M) come DATI. La dashboard le legge da qui; il server di
+  (stati, transizioni, statusPublic, imbottitura, i NOMI dei tre bilanci del
+  verificatore — i numeri NON stanno nel codice: li scrive l'owner in
+  Gestione → Automazioni, e chi ne ha bisogno li legge dal server o si ferma)
+  come DATI. La dashboard le legge da qui; il server di
   filo-security le INCORPORA al deploy (predeploy `bake-shared`), insieme a
   **`filo_filosofia.txt`** per i prompt dei giudici L2. Niente copie a mano:
   se tocchi transizioni o filosofia, l'unica cura è **rideployare le
@@ -347,8 +366,9 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~390 spec, ~1.600 casi): solo nel cancello del server e nelle routine.
-                           # Sulla macchina dell'owner dura ~7 ore: in locale NON si lancia (vedi § Verifica).
+npm test                   # SUITE COMPLETA (~390 spec, ~1.600 casi): NON si lancia a mano, da nessuna parte.
+                           # Gira solo in GitHub, nel lavoro di release, ogni sei ore prima di pubblicare (vedi § Verifica).
+                           # Sulla macchina dell'owner durerebbe ~7 ore con un solo worker.
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 
@@ -381,6 +401,11 @@ I rossi d'ambiente che restano sono **scritti** in `tests/rossi-noti.json`, col
 caso preciso, il motivo e il feedback che li toglierà: quelli del contenitore
 senza schermo delle routine e quelli della macchina dell'owner, in due elenchi
 separati. Un rosso che non è lì dentro è una regressione.
+
+**Nel contenitore delle routine** (Linux, senza schermo, da root) gli spec che
+aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`
+(lo dice già `scripts/ensure-electron.mjs`). Senza, Electron non parte proprio:
+quel rosso non è un rosso del codice, e ogni giro lo riscopriva da capo.
 
 Modelli per gli strumenti di test (`test:explore`): open via OpenRouter, chiave
 in `tests/agent/.env` — MAI chiavi del produttore dei pesi (politica modelli).

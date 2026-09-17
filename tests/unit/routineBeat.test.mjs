@@ -223,7 +223,10 @@ test('un rilascio RIFIUTATO dal server lascia vivo il battito', async () => {
     scriviMarcatore(casa, { pid: 999999, ticket: 'b-mio', since: new Date().toISOString() });
     await new Promise((fine) => {
       const p = spawn(process.execPath,
-        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio'],
+        // La casa finta non è un repo: senza `--senza-push` il rilascio si
+        // rifiuta (giusto: un worker vero ha sempre un ramo da spedire), e
+        // qui si prova solo il battito.
+        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio', '--senza-push', '--senza-rapporto'],
         { cwd: casa, env: { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa }, stdio: 'ignore' });
       p.on('close', fine);
     });
@@ -246,7 +249,10 @@ test('rilasciare il biglietto di un ALTRO giro non tocca il battito, dal comando
     scriviMarcatore(casa, { pid: 999999, ticket: 'b-di-un-altro', since: new Date().toISOString() });
     await new Promise((fine) => {
       const p = spawn(process.execPath,
-        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio'],
+        // La casa finta non è un repo: senza `--senza-push` il rilascio si
+        // rifiuta (giusto: un worker vero ha sempre un ramo da spedire), e
+        // qui si prova solo il battito.
+        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio', '--senza-push', '--senza-rapporto'],
         { cwd: casa, env: { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa }, stdio: 'ignore' });
       p.on('close', fine);
     });
@@ -269,7 +275,10 @@ test('un rilascio ACCETTATO spegne il battito', async () => {
     scriviMarcatore(casa, { pid: 999999, ticket: 'b-mio', since: new Date().toISOString() });
     await new Promise((fine) => {
       const p = spawn(process.execPath,
-        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio'],
+        // La casa finta non è un repo: senza `--senza-push` il rilascio si
+        // rifiuta (giusto: un worker vero ha sempre un ramo da spedire), e
+        // qui si prova solo il battito.
+        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio', '--senza-push', '--senza-rapporto'],
         { cwd: casa, env: { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa }, stdio: 'ignore' });
       p.on('close', fine);
     });

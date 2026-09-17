@@ -27,6 +27,25 @@ test('safeName: nessun nome può uscire dalla cartella Download', () => {
   assert.ok(DL._safeName('x'.repeat(500)).length <= 180);
 });
 
+// Il traversal arriva anche in MEZZO al nome: Chromium ha già cambiato le barre
+// in `_`, e `../../pwned` si presenta come `_.._.._pwned`. Togliere i punti
+// solo in testa lo lasciava passare (tests/verifier-stress-410, «nome file
+// ostile», rosso per questo).
+test('safeName: un ".." in mezzo al nome non sopravvive, i punti normali sì', () => {
+  for (const evil of ['_.._.._pwned.txt', 'a..b', 'pwned...txt', 'x.._y..']) {
+    const s = DL._safeName(evil);
+    assert.ok(!s.includes('..'), `resta un ".." in "${s}" (da "${evil}")`);
+  }
+  assert.equal(DL._safeName('_.._.._pwned.txt'), '_._._pwned.txt');
+  assert.equal(DL._safeName('pwned...txt'), 'pwned.txt');
+  // Estensioni e punti singoli non si toccano.
+  for (const ok of ['a.b.txt', 'archivio.tar.gz', 'foto 2026.jpg', 'v1.2.3.zip']) {
+    assert.equal(DL._safeName(ok), ok);
+  }
+  // Solo punti: non resta niente, e niente diventa «download».
+  for (const nulla of ['.', '..', '...', '....']) assert.equal(DL._safeName(nulla), 'download');
+});
+
 test('shortName: un nome lunghissimo viene accorciato in mezzo tenendo l\'estensione', () => {
   const lungo = 'relazione-' + 'x'.repeat(400) + '.pdf';
   const s = DL._shortName(lungo);
