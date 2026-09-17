@@ -88,7 +88,8 @@ test('ogni rimando a una sezione di CLAUDE.md o a un pattern per titolo trova qu
     for (const c of comments(testo(f))) c.rows.forEach((r, i) => {
       for (const m of r.matchAll(/CLAUDE\.md\s*§\s*«?([^»,;:.)]+)/g)) {
         const t = m[1].trim().toLowerCase();
-        if (!titoli.some(x => x.startsWith(t) || t.startsWith(x))) rotti.push(`${f}:${c.ls + i}  CLAUDE.md § ${m[1].trim()}`);
+        // «§ Mac» vale per «Filo gira anche su Mac»: basta che il titolo contenga la parola.
+        if (!titoli.some(x => x.includes(t) || t.startsWith(x))) rotti.push(`${f}:${c.ls + i}  CLAUDE.md § ${m[1].trim()}`);
       }
       for (const m of r.matchAll(/PATTERNS\.md\s*§?\s*«([^»]+)»/g)) {
         if (!patterns.includes(m[1].trim().toLowerCase())) rotti.push(`${f}:${c.ls + i}  PATTERNS.md «${m[1].trim()}»`);
