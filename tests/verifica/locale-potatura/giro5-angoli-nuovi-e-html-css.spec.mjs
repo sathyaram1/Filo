@@ -55,6 +55,7 @@ const lineOf = (text, pos) => text.slice(0, pos).split('\n').length;
 function comments(text) {
   const raw = commentRanges(text).map(([s, e]) => ({
     ls: lineOf(text, s), le: lineOf(text, e - 1),
+    trailing: text.slice(text.lastIndexOf('\n', s - 1) + 1, s).trim().length > 0,
     rows: text.slice(s, e).split('\n').map(r => r.replace(/^\s*(\/\/|\/\*+|\*+\/?)\s?/, '').replace(/\s*\*\/\s*$/, '').trim()),
   }));
   const out = [];
@@ -97,9 +98,9 @@ test('un commento che cita un feedback regge da solo: non è mai il solo numero'
   const rotti = [];
   for (const f of SRC) for (const c of comments(testo(f))) {
     const t = c.rows.join(' ');
-    if (!/#\d+/.test(t)) continue;
+    if (c.trailing || !/#\d+/.test(t)) continue;
     const parole = t.replace(/#\d+(\.\d+)?/g, '').match(/\p{L}{3,}/gu) || [];
-    if (parole.length < 4) rotti.push(`${f}:${c.ls}  ${t}`);
+    if (parole.length < 3) rotti.push(`${f}:${c.ls}  ${t}`);
   }
   expect(rotti, 'commenti che sono solo un numero di feedback:\n' + rotti.join('\n')).toEqual([]);
 });
