@@ -89,7 +89,7 @@ function provaRegola(nome, ROUND) {
       expect(d.derived[0].decision).toBeTruthy();
     });
 
-    test('a cap2 finito il 2 ferma il lavoro e l\'1 non si corregge da solo per la strada del 2', () => {
+    test('a cap2 finito il 2 ferma il lavoro e l\'1 non entra da solo per la strada del 2', () => {
       const d = ROUND.decideRound({ findings: rilievi(ROUND, '[2] non salva\n[1] bordo freddo'), caps: { cap2: 1, cap1: 0, cap0: 0 }, counts: { count2: 1 } });
       expect(d.stop).toBe(true);
       expect(d.blocking.map((f) => f.level)).toEqual([2]);
