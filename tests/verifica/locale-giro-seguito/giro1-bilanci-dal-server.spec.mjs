@@ -12,7 +12,7 @@
 
 import { test, expect } from '@playwright/test';
 import { createServer } from 'node:http';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,10 +64,17 @@ const doc = (cap2, cap1, cap0) => ({
 });
 const int = (n) => ({ integerValue: String(n) });
 
+/** Il comando in un sotto-processo, ASINCRONO: il server finto vive in questo stesso processo e deve poter rispondere. */
 function lancia(repo, url, ...args) {
   const env = { ...process.env, FILO_REPO_ROOT: repo, FILO_ROUTINE_CONFIG_URL: url, FILO_ADMIN_ID_TOKEN: 'token-finto-di-prova' };
   delete env.FILO_ADMIN_REFRESH_TOKEN;
-  return spawnSync(process.execPath, [SCRIPT, ...args], { cwd: repo, encoding: 'utf8', env });
+  return new Promise((ok) => {
+    const p = spawn(process.execPath, [SCRIPT, ...args], { cwd: repo, env });
+    let stdout = ''; let stderr = '';
+    p.stdout.on('data', (d) => { stdout += d; });
+    p.stderr.on('data', (d) => { stderr += d; });
+    p.on('close', (status) => ok({ status, stdout, stderr }));
+  });
 }
 
 test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, nessun ripiego', () => {
@@ -86,7 +93,7 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
     try {
       // Documento assente sul server.
       s.stato.risposta = { status: 404, body: { error: { code: 404 } } };
-      let r = lancia(repo, s.url, 'status');
+      let r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/BILANCI DEL GIRO NON LETTI DAL SERVER/);
       expect(r.stderr).toMatch(/Gestione → Automazioni/);
@@ -94,27 +101,27 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       expect(r.stdout).not.toMatch(/cap2 \d/);
       // Manca cap1.
       s.stato.risposta = { status: 200, body: doc(int(10), undefined, int(0)) };
-      r = lancia(repo, s.url, 'status');
+      r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/non ha cap1/);
       // cap0 c'è ma non è un numero.
       s.stato.risposta = { status: 200, body: doc(int(10), int(1), { stringValue: 'boh' }) };
-      r = lancia(repo, s.url, 'status');
+      r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/non ha cap0/);
       // cap2 vuoto.
       s.stato.risposta = { status: 200, body: doc({ stringValue: '' }, int(1), int(0)) };
-      r = lancia(repo, s.url, 'status');
+      r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/non ha cap2/);
       // Il server rifiuta l'identità.
       s.stato.risposta = { status: 403, body: { error: { message: 'PERMISSION_DENIED' } } };
-      r = lancia(repo, s.url, 'status');
+      r = await lancia(repo, s.url, 'status');
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/HTTP 403/);
       // I tre numeri ci sono, lo 0 compreso e uno scritto come stringa numerica: si va avanti.
       s.stato.risposta = { status: 200, body: doc(int(10), { stringValue: '1' }, { doubleValue: 0 }) };
-      r = lancia(repo, s.url, 'status');
+      r = await lancia(repo, s.url, 'status');
       expect(r.stdout).toMatch(/Bilanci del giro \(dal server, config\/routines\): cap2 10 · cap1 1 · cap0 0/);
       // Il token dell'owner è arrivato al server, non un altro.
       expect(s.stato.richieste.every((q) => q.auth === 'Bearer token-finto-di-prova')).toBe(true);
@@ -122,7 +129,7 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
       await s.chiudi();
     }
     // Rete giù: nessuno in ascolto.
-    const r = lancia(repo, 'http://127.0.0.1:1/config/routines', 'status');
+    const r = await lancia(repo, 'http://127.0.0.1:1/config/routines', 'status');
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/non letto dal server \(rete\)/);
   });
@@ -139,14 +146,14 @@ test.describe('bilanci del giro — dal server, con l\'identità dell\'owner, ne
     const s = await serverFinto();
     try {
       s.stato.risposta = { status: 200, body: doc(undefined, int(0), int(0)) };
-      let r = lancia(repo, s.url, 'critica', critica);
+      let r = await lancia(repo, s.url, 'critica', critica);
       expect(r.status).toBe(1);
       expect(r.stderr).toMatch(/non ha cap2/);
       expect(r.stderr).toMatch(/non ho toccato niente/);
       expect(readFileSync(statoFile, 'utf8')).toBe(prima);
 
       s.stato.risposta = { status: 200, body: doc(int(10), int(0), int(0)) };
-      r = lancia(repo, s.url, 'critica', critica);
+      r = await lancia(repo, s.url, 'critica', critica);
       expect(r.status).toBe(0);
       expect(r.stdout).toMatch(/Salva non salva/);
       expect(r.stdout).toMatch(/grigio freddo/);

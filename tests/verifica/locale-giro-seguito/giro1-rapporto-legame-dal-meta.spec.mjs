@@ -123,7 +123,8 @@ test.describe('rapporto di fine sessione — il legame dal meta, il tempo come r
   test('nel rapporto del worker entrano figlio, nipote e l\'orfano senza meta dentro la finestra; non il cugino di un altro lanciatore né chi è fuori', async () => {
     const c = cartella();
     const rep = await generaRapporto({ transcript: c.worker, cwd: c.progetto, configDir: c.configDir, env: {}, role: 'resolver' });
-    expect(rep.subagents).toBe(1);
+    // Le chiamate Agent si sommano come tutto il resto: quella del worker e quella del figlio (il nipote).
+    expect(rep.subagents).toBe(2);
     expect(rep.subagentRuns).toBe(3);
     // Tre milioni di token in ingresso a tariffa opus: 15 $, più le briciole del worker e del figlio.
     expect(rep.costUsd).toBeGreaterThan(15);
