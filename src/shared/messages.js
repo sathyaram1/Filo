@@ -324,10 +324,8 @@
     // Geo-block, proposta inline: un contenuto bloccato in Italia su un tab con login attivo non
     // si riprova in silenzio, si propone — «In questa tab non sarai loggato», con Apri/No.
     GEO_PROPOSE: 'geo_propose',                     // → { url, country, countryLabel }
-    // L'utente ha accettato la proposta inline: instrada la tab dal paese indicato.
+    // Cosa fanno le due risposte alla proposta: regola in src/main/tabs/tabGeoBlock.js.
     GEO_PROPOSE_ACCEPT: 'geo_propose_accept',       // { url, country } → { ok, country }
-    // L'utente ha rifiutato/chiuso la proposta: non riproporla per questo dominio
-    // nel tab.
     GEO_PROPOSE_DISMISS: 'geo_propose_dismiss',     // { url } → { ok }
 
     // === Gestione cookie / consenso (src/content/cookies.js) ===
