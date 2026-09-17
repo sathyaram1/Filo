@@ -123,6 +123,6 @@ function provaRegola(nome, ROUND) {
 
 provaRegola('regola del giro — copia pubblica', caricaPubblico());
 
-if (existsSync(COPIA_SERVER)) {
+if (COPIA_SERVER) {
   provaRegola('regola del giro — copia incorporata nel server (stessa risposta)', require(COPIA_SERVER));
 }
