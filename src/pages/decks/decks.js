@@ -29,9 +29,8 @@
   const CENTER_MIN = 260; // il mazzo (colonna flessibile) non deve sparire
   let layout = { ...LAYOUT_DEFAULT };
 
-  // Larghezze EFFETTIVE: le preferenze salvate ristrette allo spazio davvero disponibile,
-  // così il centro tiene sempre CENTER_MIN. NON tocca `layout`: riallargando la finestra
-  // tornano le misure scelte. Stesso calcolo della dashboard di gestione, in SN_PANE_LAYOUT.
+  // Le preferenze salvate ristrette allo spazio reale: il centro tiene sempre CENTER_MIN.
+  // NON tocca `layout`: riallargando la finestra tornano le misure scelte.
   function effectiveWidths() {
     const grid = $('builderGrid');
     const avail = (grid && grid.clientWidth) || window.innerWidth || 0;
@@ -59,7 +58,7 @@
       const saved = res && res[LAYOUT_KEY];
       if (saved && typeof saved === 'object') {
         layout.leftW = Math.max(LAYOUT_MIN.leftW, Number(saved.leftW) || LAYOUT_DEFAULT.leftW);
-        // I layout salvati prima avevano `centerW`: se manca `rightW`, riparti dal default.
+        // Un layout salvato senza `rightW` riparte dal default.
         layout.rightW = Math.max(LAYOUT_MIN.rightW, Number(saved.rightW) || LAYOUT_DEFAULT.rightW);
         if (DETAIL_MODULES[saved.module]) layout.module = saved.module;
       }
@@ -186,8 +185,7 @@
     $('deckEmpty').hidden = decks.length > 0;
   }
 
-  // Menu contestuale sulla card: stesso pattern dell'archivio (popup fixed alle coordinate
-  // del click, chiuso al primo click fuori / Escape).
+  // Stesso pattern di menu dell'archivio: popup fixed, chiuso al click fuori o con Escape.
 
   let ctxEl = null;
   function closeCtx() {
@@ -294,9 +292,8 @@
     symbolsMap = (r && r.ok && r.symbols) || {};
   }
 
-  // Due modalità, per azzerare l'attesa all'apertura: default cache-first sui campi
-  // STATICI (l'elenco compare subito, senza rete); freshPrices rifetcha i prezzi stantii
-  // (TTL 6h, §9.2) — serializzato e lento, quindi sempre in background, mai bloccante.
+  // Default cache-first sui campi STATICI: l'elenco compare subito, senza rete.
+  // freshPrices rifetcha i prezzi stantii (TTL 6h, §9.2): lento, sempre in background.
   async function loadDeckCards({ freshPrices = false } = {}) {
     const ids = current.carte.map((c) => c.scryfall_id);
     if (current.commander) ids.push(current.commander);
@@ -406,8 +403,7 @@
     el.textContent = parts.length ? `⚠ ${parts.join(' · ')}` : '';
   }
 
-  // Statistiche (§9), stato di riposo del pannello destro: tutto calcolato in pagina da
-  // (current, cardsById) via SN_DECK_STATS, rirenderizzate ad ogni renderBuilder.
+  // Stato di riposo del pannello destro: statistiche calcolate in pagina (§9), non dal main.
 
   const Stats = window.SN_DECK_STATS;
   const COLOR_LABEL = { W: 'Bianco', U: 'Blu', B: 'Nero', R: 'Rosso', G: 'Verde', C: 'Incolore' };
@@ -498,9 +494,8 @@
     $('probCard').hidden = !cats.length;
   }
 
-  // Calcolatore di probabilità (§9.3): la stima si raffina DA SOLA (feedback #354) appena
-  // cambiano turno, categorie o mazzo — niente bottone «Calcola» né oscillazione fra un
-  // ricalcolo e l'altro. A PROB_CAP mani l'errore è ~0,05 punti: salire costa solo CPU.
+  // La stima si raffina DA SOLA al cambiare di turno, categorie o mazzo: niente «Calcola».
+  // A PROB_CAP mani l'errore è ~0,05 punti: salire costa solo CPU (§9.3).
   const PROB_BATCH = 15000;
   const PROB_CAP = 1000000;
   let probRunId = 0;         // invalida i batch di run precedenti
@@ -513,7 +508,7 @@
   }
 
   function runProb() {
-    const runId = ++probRunId; // ogni run nuova cancella i batch di quella vecchia
+    const runId = ++probRunId;
     const out = $('probResult');
     const want = probWants();
     if (!want.length) {
@@ -586,7 +581,7 @@
       label: g.name,
       run: () => saveDeck(Decks.setGroupOverride(current, cardId, g.name, view)),
     }));
-    // «(gruppo naturale)» solo se un override in questa vista c'è davvero: altrimenti è un no-op.
+    // «(gruppo naturale)» solo se in questa vista c'è un override: altrimenti è un no-op.
     const entry = current.carte.find((c) => c.scryfall_id === cardId);
     const ov = entry && entry.gruppo_override;
     if (ov && typeof ov === 'object' && ov[view]) {
@@ -598,9 +593,8 @@
     openCtx(x, y, items);
   }
 
-  // Rilascio su una categoria (#344). Nella vista «per tag» la categoria È un tag, quindi
-  // c'è la scelta aggiungi-vs-sostituisci; nelle altre le categorie sono intrinseche e il
-  // drop forza il gruppo, come «Sposta in gruppo…». Popup SOLO se le due opzioni divergono.
+  // Nella vista «per tag» la categoria È un tag: scelta aggiungi-vs-sostituisci; altrove il
+  // drop forza il gruppo. Popup SOLO se le due opzioni divergono (#344).
   function dropCardOnGroup(cardId, groupName, x, y) {
     const entry = current.carte.find((c) => c.scryfall_id === cardId);
     if (!entry) return;
@@ -642,9 +636,8 @@
     ]);
   }
 
-  // Copia/Sposta in un altro mazzo: se la destinazione ha già la carta le quantità si
-  // SOMMANO (mai un no-op silenzioso); l'origine si svuota solo dopo che la destinazione
-  // è stata salvata. Ogni esito, successo o errore, ha il suo toast.
+  // Se la destinazione ha già la carta le quantità si SOMMANO, mai un no-op silenzioso.
+  // L'origine si svuota solo dopo che la destinazione è salvata; ogni esito ha il suo toast.
   async function chooseDeck(x, y, cardId, move) {
     const res = await send({ type: MSG.DECKS_LIST });
     const others = Decks.sortForLibrary((res && res.decks) || [])
@@ -701,9 +694,8 @@
     else await renderBuilder();
   }
 
-  // Colonna Chat / Risultati (§3): la ricerca È la chat. Messaggi TIPIZZATI (§3.2): la
-  // bolla di Filo ha testo (con [[Nome]] resi span hoverable, §3.5) e/o una CardList resa
-  // dagli id salvati come DATI, mai markdown. Le bolle vecchie collassano a una riga (§3.3).
+  // La ricerca È la chat, con messaggi TIPIZZATI (§3.2): testo con [[Nome]] hoverable e/o una
+  // CardList resa dagli id come DATI, mai markdown. Le bolle vecchie collassano (§3.3).
 
   const chatByDeck = new Map(); // deckId → [{ who, text, reply, cardIds, query, error, pending, expanded }]
   let chatBusy = false;
@@ -792,9 +784,8 @@
     return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${parts.join('')}</div>`;
   }
 
-  // `stickBottom` = porta comunque in fondo (turno nuovo dell'utente). Altrimenti si segue il
-  // fondo SOLO se l'utente era già in fondo: durante la generazione renderChat gira di
-  // continuo e strappava la vista, impedendo di leggere mentre Filo genera (#336).
+  // `stickBottom` = porta comunque in fondo (turno nuovo). Altrimenti si segue il fondo solo
+  // se l'utente era già in fondo: durante la generazione renderChat strappava la vista (#336).
   function renderChat(stickBottom) {
     const log = $('chatLog');
     const prevTop = log.scrollTop;
@@ -870,7 +861,7 @@
         // La chat può aver calcolato pareri nuovi (§6.1): svuotare la cache evita che il prossimo
         // hover mostri i vecchi.
         opinionsByCard.clear();
-        // La chat può aver modificato il mazzo (es. budget, §9.2): header e statistiche si rinfrescano.
+        // La chat può aver modificato il mazzo (es. budget): header e statistiche si rinfrescano.
         if (r.deck && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
       }
     } catch (e) {
@@ -891,7 +882,7 @@
       ? Decks.addCard(current, cardId, { qty })
       : (() => { const r = Decks.removeCard(current, cardId); return { deck: r.deck, added: r.removed }; })();
     if (added) {
-      await saveDeck(deck); // renderBuilder → renderDeckList + renderChat
+      await saveDeck(deck);
       // Parere per la carta appena aggiunta (§6.1): in background, pronto al prossimo hover.
       if (adding) requestOpinions([cardId], { refresh: true }).catch(() => {});
     }
@@ -1090,10 +1081,8 @@
     return p;
   }
 
-  // Pannello destro a tre stati (§5): statistiche a riposo, hover su una riga carta →
-  // preview, click → carosello pinnato. Il contenuto cambia, la geometria MAI.
-  // Timing (§5.1): apertura ~200ms anti-flicker, riga→riga con grace ~100ms e aggiornamento
-  // SUL POSTO (mai chiudi-riapri), uscita con linger ~1s prima di tornare alle statistiche.
+  // Tre stati (§5): statistiche, preview all'hover, carosello pinnato. La geometria MAI.
+  // Timing (§5.1): apertura ~200ms, riga→riga con grace ~100ms, uscita con linger ~1s.
   const PREVIEW_OPEN_MS = 200;
   const PREVIEW_GRACE_MS = 100;
   const PREVIEW_LINGER_MS = 1000;
@@ -1174,7 +1163,7 @@
           <p>Costo di mana convertito: ${esc(String(card.cmc))} · Prezzo: ${esc(price)}</p>`;
       },
     },
-    // Mini curva (§5.2.1): evidenzia dove cadrebbe la carta — «mi fixa la curva?» ha risposta visiva.
+    // Mini curva (§5.2.1): dove cadrebbe la carta — «mi fixa la curva?» ha risposta visiva.
     curve: {
       label: 'Mini curva di mana',
       render(card, host) {
@@ -1183,7 +1172,7 @@
         const n = Math.max(0, Math.floor(Number(card.cmc) || 0));
         const bucket = land ? null : (n >= 7 ? '7+' : String(n));
         const already = inDeck(card.id);
-        // Carta non nel mazzo: segmento «fantasma» (+1) sopra la barra, dove cadrebbe aggiungendola.
+        // Carta non nel mazzo: segmento «fantasma» (+1) dove cadrebbe aggiungendola.
         const ghost = bucket !== null && !already;
         const max = Math.max(1, ...curve.map((b) => b.n + (ghost && b.label === bucket ? 1 : 0)));
         const unit = 36;
@@ -1206,7 +1195,6 @@
             : (already ? `Conta nella colonna ${esc(bucket)}.` : `Cadrebbe nella colonna ${esc(bucket)}.`)}</p>`;
       },
     },
-    // Prezzo + dati (§5.2.2): prezzo, ristampe (lazy, cache permanente), legalità.
     price: {
       label: 'Prezzo e dati',
       render(card, host) {
@@ -1256,7 +1244,7 @@
     },
   };
 
-  // Renderizza il modulo scelto nello slot dello stato ATTIVO (preview o carosello: stesso sistema).
+  // Stesso slot per preview e carosello: il modulo scelto si disegna nello stato attivo.
   function renderDetailModule(card, hostId) {
     const host = $(hostId || (detailState === 'carousel' ? 'carouselModule' : 'previewModule'));
     if (!host) return;
@@ -1281,10 +1269,8 @@
     $('previewCtx').innerHTML = parts.join('');
   }
 
-  // Preview aggiornata SUL POSTO (immagine già scaldata da preloadVisibleCards, §5.1).
-  // OGNI riapertura riparte dal FRONTE (feedback #373): si ridipinge sia al cambio carta sia
-  // quando la preview era chiusa; se è già aperta sulla stessa carta no, o si perderebbe
-  // un flip volontario dell'utente.
+  // Ogni riapertura riparte dal FRONTE (#373): si ridipinge al cambio carta e da chiusa,
+  // ma non se è già aperta sulla stessa carta, o si perderebbe un flip voluto dall'utente.
   function showPreview(cardId) {
     const card = cardsById[cardId];
     if (!card) return;
@@ -1324,7 +1310,7 @@
     if (frame) frame.classList.toggle('dk-flipped', toBack);
   }
 
-  // L'id carta sotto il puntatore (§5.1), da riga (.dk-row) o da nome in prosa (.dk-prose-card).
+  // L'id carta sotto il puntatore: da riga (.dk-row) o da nome in prosa (.dk-prose-card).
   function hoverCardId(target) {
     if (!target || !target.closest) return null;
     const row = target.closest('.dk-row[data-card-id]');
@@ -1385,7 +1371,7 @@
     // Prefetch di precedente e successiva (§5.1): la navigazione non aspetta.
     preloadCardImages([carousel.ids[carousel.i - 1], carousel.ids[carousel.i + 1]].filter(Boolean));
     if (card) renderDetailModule(card, 'carouselModule');
-    // Parere attivo → prefetch delle carte vicine (§6.1), in una richiesta sola: scorrendo è già lì.
+    // Parere attivo → prefetch delle vicine in una richiesta sola: scorrendo è già lì.
     if (card && layout.module === 'opinion') {
       const near = [carousel.i, carousel.i - 1, carousel.i + 1]
         .map((j) => carousel.ids[j]).filter(Boolean);
@@ -1459,7 +1445,7 @@
       else hoverLeave();
     });
 
-    // Tastiera del carosello (§5.3): frecce naviga, Invio o Spazio aggiunge e toglie, Esc chiude.
+    // Tastiera (§5.3): frecce navigano, Invio o Spazio aggiunge e toglie, Esc chiude.
     document.addEventListener('keydown', (e) => {
       if (detailState !== 'carousel') return;
       if (e.target && /^(input|textarea|select)$/i.test(e.target.tagName)) return;
@@ -1559,7 +1545,7 @@
       await saveDeck(Decks.renameDeck(current, v));
     }));
     add('Budget…', () => startEdit('deckBudgetEdit', fmtBudgetInput(current.budget), async (v) => {
-      // Virgola decimale italiana accettata; testo non numerico lascia il tetto com'era, con avviso.
+      // Virgola decimale italiana accettata; un testo non numerico lascia il tetto com'era.
       const parsed = Decks.parseBudgetInput(v);
       if (!parsed.ok) {
         showToast(`Budget non valido: «${v}» non è un numero. Il tetto resta invariato.`);

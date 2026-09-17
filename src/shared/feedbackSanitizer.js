@@ -1,6 +1,6 @@
-// Sanitizzazione dei feedback per la bacheca pubblica (DD2): logica pura, zero I/O, con la funzione LLM iniettata dal chiamante (slot «sanitizer» di DD1).
-// La parte deterministica — quali campi di un feedback possono stare sotto gli occhi di chiunque — è diventata la VISTA PUBBLICA (#583): decide feedbackPublicView.js e la contiene `feedback-public/{id}`. Qui resta solo il passo che quella vista non fa, redigere con un LLM il TESTO libero; finché non servirà, la bacheca mostra solo il titolo.
-// Deve girare lato backend o owner-app, che hanno la chiave privata per decifrare S1: il client non ce l'ha e non deve ricevere il testo grezzo di altri utenti. Il risultato si salva in un campo a parte e la bacheca legge da lì, mai dal testo grezzo.
+// Sanitizzazione dei feedback per la bacheca: pura, con l'LLM iniettato dal chiamante.
+// La parte deterministica è passata alla VISTA PUBBLICA (feedbackPublicView.js): qui resta
+// solo la redazione LLM del testo libero, che gira dove c'è la chiave privata.
 
 (function (global) {
   'use strict';
@@ -15,11 +15,13 @@
     'sanitizedText',
   ]);
 
-  // Passo 1, deterministico: proietta il doc sui soli ALLOWED_FIELDS e scarta tutto il resto, compresi i campi aggiunti in futuro. `sanitizedText` resta null: lo popola eventualmente il passo 2.
+  // Proietta sui soli ALLOWED_FIELDS e scarta il resto, compresi i campi futuri.
+  // `sanitizedText` resta null: lo popola semmai il passo 2.
   function sanitizeMetadata(doc) {
     if (!doc || typeof doc !== 'object') return { sanitizedText: null };
 
-    // Si lavora su oggetti JS già decodificati. Se per sbaglio arriva il raw Firestore (.fields), i campi cercati non ci sono e il risultato esce quasi vuoto: meglio meno che di più.
+    // Oggetti JS già decodificati: col raw Firestore i campi non ci sono e l'esito esce
+    // quasi vuoto, che è la direzione giusta — meglio meno che di più.
     const out = { sanitizedText: null };
     for (const field of ALLOWED_FIELDS) {
       if (field === 'sanitizedText') continue; // lo gestisce passo 2
@@ -30,9 +32,8 @@
     return out;
   }
 
-  // Passo 2, redazione LLM. `text` è il testo libero già in CHIARO: questo modulo non sa decifrare, né deve. `llmFn` è async (prompt) => string e la sceglie il chiamante.
-  // Si chiede all'LLM se il testo contiene informazioni personali: risposta che comincia con CLEAN: → testo pulito, con REDACTED: → si usa il redatto. Il formato è volutamente semplice per ridurre le risposte malformate.
-  // In ogni altro caso — testo vuoto, llmFn assente, eccezione, timeout, risposta non conforme — si torna null: meglio mostrare meno che rivelare dati personali per un errore dell'LLM.
+  // `text` è il testo libero già in CHIARO: questo modulo non sa decifrare, né deve.
+  // Risposta CLEAN: → originale, REDACTED: → redatto, qualsiasi altra cosa → null.
   async function sanitizeText(text, llmFn) {
     if (text == null || String(text).trim() === '') return null;
     if (typeof llmFn !== 'function') return null; // fallback conservativo
@@ -72,12 +73,11 @@
       return redacted;
     }
 
-    // Risposta fuori formato: fallback conservativo.
     return null;
   }
 
-  // Passo 1 più passo 2, oggetto pronto. Il chiamante passa il testo GIÀ decifrato come `doc.text`, oppure omette il testo e la bacheca mostra solo il titolo: un ciphertext FENC1: l'LLM non lo interpreta.
-  // Chi lo chiama: la routine dopo aver chiuso un feedback e superato la verifica avversariale, un trigger su `status == 'done'`, oppure il main dell'owner, che ha la chiave privata.
+  // Il chiamante passa il testo GIÀ decifrato, o lo omette e la bacheca mostra il titolo:
+  // un ciphertext FENC1: l'LLM non lo interpreta.
   async function sanitize(doc, llmFn) {
     const meta = sanitizeMetadata(doc);
 
@@ -89,7 +89,6 @@
     if (rawText && !isCiphertext) {
       sanitizedText = await sanitizeText(rawText, llmFn);
     }
-    // Ciphertext o testo assente: `sanitizedText` resta null e in bacheca va solo il titolo.
 
     meta.sanitizedText = sanitizedText;
     return meta;

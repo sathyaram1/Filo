@@ -1,6 +1,6 @@
-// Storico versioni dei file dell'editor: punti di ripristino col contenuto serializzato di quel momento, la sorgente della modifica (`filo` automatica, `manual` dell'utente, `restore` lo stato salvato prima di un ripristino) e un timestamp.
-// Lo storico NON sta su localStorage, che va tenuto snello perché è la persistenza calda scritta a ogni battuta: vive sull'archivio file (storage.json), dati freddi scritti di rado e letti solo quando si sfoglia o si ripristina. Essendo solo testo può crescere illimitato; comprimerlo per differenze è l'ottimizzazione futura, e questo modulo è la frontiera unica dove introdurla.
-// LOGICA PURA: opera su una mappa `{ [fileId]: { versions: [...] } }` e la ritorna, la persistenza resta in editor.js.
+// Storico versioni dei file dell'editor: punti di ripristino col contenuto di quel momento.
+// Non sta su localStorage, che è la persistenza calda: vive sull'archivio file, dati freddi.
+// LOGICA PURA su una mappa { [fileId]: { versions } }: la persistenza resta in editor.js.
 
 (function (global) {
   'use strict';
@@ -15,10 +15,10 @@
     try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
   }
 
-  // Le modifiche automatiche di Filo creano sempre un punto di ripristino; quelle manuali no, perché versionare a ogni battuta sarebbe rumore: si salva solo quando il testo è cambiato in modo SIGNIFICATIVO rispetto all'ultimo riferimento.
-  // Serve un proxy cheap dell'entità della modifica, non una edit-distance O(n·m).
+  // Le modifiche di Filo creano sempre un punto; quelle manuali solo a testo cambiato molto,
+  // perché versionare a ogni battuta sarebbe rumore: serve un proxy cheap della modifica.
 
-  // Unica sorgente sia per l'anteprima nello storico sia per la soglia: cammina i nodi ProseMirror con un a-capo ai confini di blocco.
+  // Unica sorgente per l'anteprima e per la soglia: a-capo ai confini di blocco.
   function plainText(content) {
     const pm = content && content.content ? content.content : content;
     if (!pm || typeof pm !== 'object') return '';
@@ -34,7 +34,8 @@
     return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  // Si tolgono prefisso e suffisso comuni e si misura la regione centrale diversa: cattura aggiunte, cancellazioni e sostituzioni della stessa lunghezza, restando O(n).
+  // Si misura la regione centrale diversa, tolti prefisso e suffisso comuni: resta O(n)
+  // e cattura aggiunte, cancellazioni e sostituzioni della stessa lunghezza.
   function textChangeSize(prevContent, nextContent) {
     const a = plainText(prevContent);
     const b = plainText(nextContent);
@@ -48,7 +49,7 @@
     return Math.max(a.length, b.length) - p - s;
   }
 
-  // ~140 caratteri = un paio di frasi: sotto è «ho aggiustato una parola», non un punto a cui l'utente vorrà tornare.
+  // Un paio di frasi: sotto è «ho aggiustato una parola», non un punto a cui tornare.
   const MANUAL_SNAPSHOT_MIN_CHARS = 140;
 
   function isSignificantManualChange(prevContent, nextContent, minChars) {
@@ -66,7 +67,8 @@
     return s;
   }
 
-  // Dedup: se l'ultima versione ha contenuto identico non se ne crea una nuova, così un'azione che non cambia niente non lascia punti spazzatura. Ritorna { store, version, created }.
+  // Contenuto identico all'ultima versione: niente nuova, o resterebbero punti spazzatura.
+  // Ritorna { store, version, created }.
   function record(store, fileId, entry, idFactory) {
     const mkId = idFactory || defaultIdFactory;
     const s = ensureFile(store, fileId);
@@ -104,8 +106,8 @@
     return list.length ? list[list.length - 1] : null;
   }
 
-  // Una versione è uno snapshot dell'INTERO file, ma ripristinarla in blocco riporterebbe indietro anche cose che l'utente non sta chiedendo di annullare e che il pannello non gli mostra: il nome del documento, la conversazione con Filo, la disposizione dei riquadri. Sarebbe una perdita silenziosa.
-  // Confine scelto: dalla versione torna il CORPO — testo e commenti, che sono ancorati al testo e separarli lascerebbe commenti appesi a frasi inesistenti. Restano com'erano adesso nome, metadati e moduli del banco di lavoro coi loro dati.
+  // Dalla versione torna il CORPO: testo e commenti, che sono ancorati al testo.
+  // Nome, metadati e moduli restano com'erano: ripristinarli sarebbe una perdita silenziosa.
   function cloneJson(v) {
     try { return v == null ? v : JSON.parse(JSON.stringify(v)); } catch (_) { return v; }
   }

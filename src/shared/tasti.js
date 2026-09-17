@@ -1,12 +1,6 @@
-// Come si CHIAMA una scorciatoia sulla macchina di chi la sta leggendo. Le funzioni
-// rispondevano già a Cmd: a mentire erano le SCRITTE, una alla volta, perché ogni etichetta
-// era una stringa a sé. Questa è la porta unica — non si scrivono a mano, si chiedono qui,
-// e `tests/unit/macSupport.test.mjs` diventa rossa se qualcuno ne scrive una nuova.
-// Le regole di conversione (Ctrl→Cmd, Alt+lettera→Ctrl+Alt, Alt+cifra→Cmd+cifra, lo zero
-// su Mac) e il loro perché stanno in CLAUDE.md § «Filo gira anche su Mac»: chi ne cambia
-// una cambia INSIEME la tabella qui sotto e il codice che ascolta i tasti.
-// `riservato()` dice se una combinazione arriva mai a una pagina: senza, chi fa scegliere
-// una scorciatoia all'utente ne salva una che sembra valida e non parte mai.
+// Come si CHIAMA una scorciatoia sulla macchina di chi la legge: le etichette non si
+// scrivono a mano, si chiedono qui. Le regole di conversione stanno in CLAUDE.md § Mac.
+// `riservato()` dice se una combinazione arriva mai a una pagina, prima di farla scegliere.
 
 (function (global) {
   'use strict';
@@ -84,14 +78,8 @@
     return `${testo} (${etichetta(accel, esplicita)})`;
   }
 
-  // Il salto da una scheda all'altra sta qui accanto al suo nome perché nome e comportamento
-  // devono cambiare INSIEME: erano in due posti diversi e su Mac dicevano due cose diverse.
-  // Alt+cifra su Windows e Linux (non ruba il Ctrl+cifra del browser e non scrive), Cmd+cifra
-  // su Mac, dove Opzione+cifra SCRIVE (¡™£¢…) e prendersela impediva di digitare quei
-  // simboli in qualunque pagina. Lo ZERO su Mac non è una scheda: Cmd+0 è lo zoom al 100% e
-  // la barra dei menu se lo prende prima di chiunque, quindi l'ULTIMA scheda sta su Cmd+9.
-  // L'evento arriva in due forme (DOM e `before-input-event`) e si leggono entrambe.
-  // Torna l'indice 0-based o null; `quante` serve solo su Mac per sapere qual è l'ultima.
+  // Nome e comportamento del salto fra schede stanno insieme perché devono cambiare insieme.
+  // Regole in CLAUDE.md § Mac. Torna l'indice 0-based o null; `quante` serve solo su Mac.
   function indiceSaltoScheda(ev, esplicita, quante) {
     if (!ev) return null;
     // I due nomi con cui può arrivare ogni modificatore (DOM e main): nessuno dei due è
@@ -136,19 +124,14 @@
     return etichetta('Alt+1', esplicita).replace(/1$/, 'cifra');
   }
 
-  // Sta accanto al nome e al comportamento perché le tre cose devono cambiare insieme:
-  // dividerle ha fatto promettere su Mac una decima scheda irraggiungibile.
   function descrizioneSaltoScheda(esplicita) {
     return suMac(esplicita)
       ? 'Vai alla scheda in quella posizione (9 = l’ultima; Cmd+0 è lo zoom al 100%)'
       : 'Vai alla scheda in quella posizione (0 = la decima)';
   }
 
-  // I tasti che a una pagina non arrivano mai. Chi fa scegliere una scorciatoia all'utente
-  // (i moduli dell'Editor) deve poter rifiutare in faccia una combinazione che Filo si
-  // prende prima: altrimenti si salva, sembra valida e poi non parte. Su Mac la lista è più
-  // lunga perché la barra dei menu vede i tasti PRIMA di ogni pagina; le voci sono le stesse
-  // di src/main/menu.js e una sentinella diventa rossa se le due liste divergono.
+  // I tasti che a una pagina non arrivano mai: senza questa lista chi fa scegliere una
+  // scorciatoia ne salva una che sembra valida e non parte. Le voci sono quelle di menu.js.
 
   // Forma confrontabile: «Cmd+Shift+Z», «ctrl + shift + z» e «Control+Shift+Z» coincidono
   // (Cmd e Ctrl sono lo stesso tasto logico nelle scorciatoie di Filo).

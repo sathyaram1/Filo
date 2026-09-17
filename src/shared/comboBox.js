@@ -1,11 +1,12 @@
-// Combobox in stile Filo: input editabile più tendina tematizzata, al posto del popup NATIVO della <datalist>, che usa i colori di sistema e cade fuori palette.
-// Riusa .sn-select-pop / .sn-select-option (theme.css) così ogni menu a tendina di Filo si vede e si comporta allo stesso modo: una sorgente sola invece di due tendine che divergono.
+// Combobox in stile Filo al posto del popup nativo della <datalist>, che usa i colori di
+// sistema e cade fuori palette.
+// Riusa .sn-select-pop di theme.css: una sorgente sola invece di due tendine che divergono.
 
 (function (global) {
   'use strict';
 
-  // Attacca una tendina custom a `input`, ancorata dentro `host` (che dev'essere position:relative). L'input resta editabile: si scrive a mano o si sceglie dalla lista, e digitando la lista si filtra. Ritorna close().
-  // opts: readOptions () => [{ value, label }] (riletta a ogni build), onPick(value), validate(value) => { ok, reason } (le non valide restano visibili ma disabilitate), popClass, valueClass, labelClass, sizeInput (tiene input.size sulla lunghezza del testo).
+  // Attacca la tendina a `input` dentro `host` (position:relative). L'input resta editabile
+  // e digitando filtra; le non valide restano visibili ma disabilitate. Ritorna close().
   function attach(host, input, opts) {
     const o = opts || {};
     const readOptions = typeof o.readOptions === 'function' ? o.readOptions : () => [];
@@ -22,7 +23,8 @@
 
     let optionEls = [];
     let hoverEl = null;
-    // Il filtro si popola solo quando l'utente DIGITA, non al semplice focus: aprendo un campo già compilato si vedono comunque tutte le opzioni per cambiarlo.
+    // Il filtro si popola solo quando l'utente DIGITA, non al focus: aprendo un campo già
+    // compilato si vedono comunque tutte le opzioni per cambiarlo.
     let filterText = '';
 
     function fit() {

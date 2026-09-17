@@ -1,17 +1,6 @@
-// La chiave OpenRouter PERSONALE dell'installazione, cifrata a riposo
-// (feedback #598).
-//
-// È la chiave che il server crea al riscatto di un invito: il suo tetto di
-// spesa sono i crediti dell'utente. Vive qui e non in settings.apiKeys: le
-// chiavi in settings sono quelle che l'utente scrive e legge nelle Opzioni,
-// questa non deve comparire lì (non si modifica a mano, e mostrarla
-// inviterebbe a copiarla altrove). Stesso schema di token-store.js:
-// safeStorage, file suo, mai in chiaro su disco. Senza cifratura OS non si
-// persiste: al prossimo avvio la pagina Crediti dirà che manca e si potrà
-// chiedere di nuovo al server (il portafoglio non si perde, la chiave sì:
-// vedi walletRecover... no — la chiave compare una volta sola: in quel caso
-// l'utente vede il messaggio e il server può emetterne un'altra su richiesta
-// dell'owner). In pratica su Windows e Mac la cifratura c'è sempre.
+// La chiave OpenRouter personale dell'installazione, cifrata a riposo (#598).
+// Non sta in settings.apiKeys: lì ci sono le chiavi che l'utente scrive e legge, questa no.
+// Senza cifratura OS non si persiste: la pagina Crediti lo dice e il server può riemetterla.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -45,9 +34,8 @@ function save(wallet) {
   if (!wallet || !wallet.key) return false;
   cache = {
     key: wallet.key, pseudonym: wallet.pseudonym || '', redeemedAt: wallet.redeemedAt || new Date().toISOString(),
-    // L'ultimo stato letto dal server (saldo, codici, quota): serve quando il
-    // server non risponde, per non mostrare a chi ha già i crediti il campo
-    // dell'invito e un saldo locale che non compra niente.
+    // L'ultimo stato letto dal server (saldo, codici, quota): serve quando il server non
+    // risponde, per non offrire il campo dell'invito a chi i crediti li ha già.
     lastServer: wallet.lastServer || (cache && cache.lastServer) || null,
   };
   if (!canEncrypt()) {

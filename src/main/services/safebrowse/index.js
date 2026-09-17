@@ -1,6 +1,6 @@
-// SN_SAFEBROWSE: punto d'ingresso del rilevamento siti pericolosi. checkSync(url, ctx) dà il verdetto immediato dai soli segnali locali e dai dati di rete già in cache, e non blocca mai; analyze(url, ctx, onUpdate) fa lo stesso ma avvia in background GSB/RDAP/CT/sandbox/LLM e richiama onUpdate quando un dato cambia il verdetto.
-// recordCert registra l'esito del certificato visto da Electron; setProviders inietta i fetcher di rete.
-// Forme normalizzate, segnali, brand e whitelist sono raggiungibili da qui per i test; il modulo si registra su globalThis e su module.exports.
+// Punto d'ingresso del rilevamento siti pericolosi: checkSync dà il verdetto immediato dai
+// segnali locali e non blocca mai; analyze avvia GSB/RDAP/CT/sandbox/LLM e richiama onUpdate
+// quando un dato cambia il verdetto. setProviders inietta i fetcher di rete.
 
 'use strict';
 
@@ -29,7 +29,8 @@ class TtlCache {
 }
 
 const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
-// Verdetti: TTL breve, perché un dominio può diventare malevolo dopo essere stato visto pulito. Età del dominio: stabile, TTL lungo.
+// Verdetti con TTL breve: un dominio può diventare malevolo dopo essere stato visto pulito.
+// L'età del dominio è stabile: TTL lungo.
 const gsbCache = new TtlCache(30 * MIN);
 const ageCache = new TtlCache(7 * DAY);
 const certCache = new TtlCache(HOUR);
@@ -40,7 +41,8 @@ const llmCache = new TtlCache(HOUR);
 let providers = { gsb: null, rdap: null, ct: null, sandbox: null, llm: null };
 function setProviders(fns) { providers = { ...providers, ...(fns || {}) }; }
 
-// opts.gsbKey assente → stage 1 saltato; opts.runLlm è (messages) → testo per il giudice; enableSandbox ed enableNetwork accendono detonation e RDAP/CT.
+// Senza `gsbKey` lo stage 1 è saltato; `enableSandbox` ed `enableNetwork` accendono
+// detonation e RDAP/CT.
 function configure(opts = {}) {
   const { gsbKey, runLlm, enableSandbox = true, enableNetwork = true } = opts;
   setProviders({
@@ -75,7 +77,7 @@ function checkSync(url, ctx = {}) {
   return engine.evaluate(url, ctx, asyncData);
 }
 
-// Ritorna SUBITO il verdetto sincrono, poi aggiorna le cache in background e richiama onUpdate se il verdetto cambia.
+// Il verdetto sincrono torna SUBITO: il resto aggiorna le cache in background.
 function analyze(url, ctx = {}, onUpdate) {
   const norm = normalizeMod.normalize(url);
   if (!norm || !norm.ok) return engine.evaluate(url, ctx, {});

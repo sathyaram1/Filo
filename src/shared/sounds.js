@@ -1,10 +1,9 @@
-// Toni sintetici dell'interfaccia (nessun file audio): Preferenze, shell e timer
-// devono suonare gli STESSI motivi. IIFE su globalThis: `SN_SOUNDS`.
+// Toni sintetici dell'interfaccia (nessun file audio): Preferenze, shell e timer devono
+// suonare gli STESSI motivi.
 (function (global) {
   'use strict';
 
-  // Sequenze [frequenzaHz, durataMs], freq 0 = pausa: gli stessi motivi della
-  // suoneria del timer, riusati per le notifiche.
+  // Sequenze [frequenzaHz, durataMs]; freq 0 = pausa.
   const TONES = {
     default: [[880, 150], [0, 80], [880, 150], [0, 80], [880, 150], [0, 400]],
     gentle:  [[523, 200], [0, 100], [659, 200], [0, 100], [784, 300], [0, 600]],

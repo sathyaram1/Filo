@@ -11,7 +11,8 @@ module.exports = function register(on, ctx) {
   const FiloState = globalThis.SN_FILO_STATE;
   const Onboarding = globalThis.SN_ONBOARDING;
 
-  // I messaggi che leggono o riscrivono la memoria dell'utente non sono roba da pagine web: il canale `filo:message` è uno solo e ci arrivano anche i content script dei siti visitati (vedi patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
+  // Memoria dell'utente: non è roba da pagine web, e sul canale `filo:message` arrivano
+  // anche i content script dei siti. Confine d'origine: vedi handlers/origine.js.
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
   on(MSG.FILO_CHAT, async (msg, sender) => {
@@ -19,23 +20,26 @@ module.exports = function register(on, ctx) {
       const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, sender });
       return { ok: true, ...r };
     } catch (e) {
-      // #360 — la chat non è un log: se il turno fallisce l'utente deve leggere COSA non ha funzionato e cosa fare, non il messaggio grezzo dell'eccezione. Senza questo catch l'errore arriva al gestore IPC generico, che rimanda `e.message` così com'è.
+      // La chat non è un log: a turno fallito l'utente deve leggere cosa non ha funzionato, non il
+      // messaggio grezzo dell'eccezione che il gestore IPC generico rimanderebbe.
       console.error('[Filo] turno di chat fallito', e);
       const CE = globalThis.SN_CHAT_ERRORS;
       const error = CE ? CE.sentence(e) : 'Qualcosa è andato storto. Riprova.';
-      // Le azioni già eseguite prima del guasto restano nello storico della chat, così il tentativo successivo sa cosa era già stato fatto.
+      // Le azioni già eseguite restano nello storico: il tentativo dopo sa cosa era stato fatto.
       const actions = Array.isArray(e && e.filoActions) ? e.filoActions : [];
       return { ok: false, error, code: (e && e.code) || 'UNKNOWN', actions };
     }
   });
 
-  // Esecuzione di un'azione che l'utente ha confermato dal client. Il livello viene RICLASSIFICATO qui dentro (executeFiloAction consulta il registro anche con confirmed:true): un client compromesso non può far eseguire un'azione fuori registro.
+  // Il livello si riclassifica qui dentro anche con `confirmed`: un client compromesso non può
+  // far eseguire un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { confirmed: true, sender });
     return { ok: true, ...r };
   });
 
-  // Primo dispatch di un'azione chiesta dall'agente "Aiuto": passa per lo STESSO executeFiloAction della chat — stesso registro dei livelli, stesse conferme, e le azioni fuori registro sono rifiutate. La sidebar non è un canale privilegiato.
+  // Passa dallo STESSO executeFiloAction della chat: stesso registro, stesse conferme. La
+  // sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { sender });
     return { ok: true, ...r };
@@ -47,7 +51,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.FILO_GENERATE_DASHBOARD, async (msg, sender) => {
-    // Numero di schede web aperte: l'agente può suggerire una pulizia (§6).
+    // Serve all'agente per suggerire una pulizia delle schede.
     let openTabsCount = 0;
     try {
       const win = winOf(sender);
@@ -63,22 +67,25 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
 
-  // Compattazione FORZATA: porta subito il buffer delle lezioni dentro PROFILO/PREFERENZE senza aspettare la soglia. Serve alla chiusura dell'intervista di benvenuto (#524) e a chiunque voglia "fissa adesso quello che hai imparato".
+  // Compattazione forzata: porta il buffer delle lezioni in PROFILO/PREFERENZE senza aspettare
+  // la soglia, per la chiusura dell'intervista e per «fissa adesso quello che hai imparato».
   on(MSG.FILO_COMPACT_MEMORY, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const compacted = await maybeRunCompactor();
     return { ok: true, compacted: !!compacted, memory: await FiloMem.getMemory() };
   });
 
-  // Micro-intervista di benvenuto (#524): se è aperta e non è ancora cominciata la si apre QUI, mettendo da parte il primo messaggio, così la conversazione esiste da subito e la ripresa dopo una chiusura a metà legge sempre lo stesso posto. Il segno "già accolto" si scrive alla fine, non adesso.
+  // L'intervista si apre QUI mettendo da parte il primo messaggio: la conversazione esiste
+  // da subito e la ripresa legge sempre lo stesso posto. Il segno «accolto» arriva alla fine.
   on(MSG.FILO_GET_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: true, onboarding: { done: true, ticked: [], thread: [] }, ready: false };
-    // Senza un modello a disposizione Filo non può sostenere una conversazione: l'intervista resta in attesa e la home mostra come attivarlo, invece di accogliere l'utente con una bolla d'errore. Appena c'è la chiave parte da sola.
+    // Senza un modello Filo non conversa: l'intervista attende e la home mostra come attivarlo,
+    // invece di accogliere l'utente con una bolla d'errore. Appena c'è la chiave parte da sola.
     const settings = await ctx.getEffectiveSettings();
     const ready = !!(settings.apiKeys?.[settings.provider]);
     let state = await FiloMem.getOnboarding();
-    // `peek`: chi legge soltanto (Preferenze, per rileggere le interviste conservate) non deve aprire niente né prenotare la ripresa di un turno.
+    // `peek`: chi legge soltanto non deve aprire niente né prenotare la ripresa di un turno.
     if (msg?.peek) return { ok: true, onboarding: state, ready, resume: false };
     if (!ready) return { ok: true, onboarding: state, ready: false };
     if (!state.done && !state.thread.length) {
@@ -86,7 +93,8 @@ module.exports = function register(on, ctx) {
         Onboarding.appendTurn(state, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }),
       );
     }
-    // Un turno rimasto a metà riparte da solo, ma lo riprende UNA scheda sola: chi ne apre una seconda riceve `resume: false`, vede la conversazione e si aggiorna con FILO_ONBOARDING_UPDATED invece di rilanciare lo stesso messaggio.
+    // Un turno a metà lo riprende UNA scheda sola: le altre ricevono `resume:false` e si
+    // aggiornano dall'annuncio, invece di rilanciare lo stesso messaggio.
     const resume = Onboarding.hasPendingTurn(state) && claimOnboardingResume();
     return {
       ok: true,
@@ -98,7 +106,8 @@ module.exports = function register(on, ctx) {
     };
   });
 
-  // Rilancio dell'intervista dalle Preferenze: si riparte dal benvenuto con l'elenco di nuovo tutto da spuntare, e quella di prima finisce in archivio — rifarla non è cancellarla.
+  // Rifare l'intervista non è cancellarla: si riparte dal benvenuto con l'elenco da spuntare,
+  // e quella di prima finisce in archivio.
   on(MSG.FILO_RESTART_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
@@ -109,7 +118,8 @@ module.exports = function register(on, ctx) {
     return { ok: true, onboarding: state };
   });
 
-  // «Salta l'accoglienza»: la via d'uscita che NON passa dal modello, gemella della parola di stop. Senza, chi apre Filo la prima volta senza rete resta chiuso dentro l'intervista col solo pulsante "Riprova".
+  // La via d'uscita che NON passa dal modello: senza, chi apre Filo la prima volta senza rete
+  // resta chiuso nell'intervista col solo pulsante «Riprova».
   on(MSG.FILO_CLOSE_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
@@ -119,12 +129,14 @@ module.exports = function register(on, ctx) {
     const state = await saveOnboarding(
       Onboarding.close(Onboarding.appendTurn(cur, { role: 'filo', text: bye })),
     );
-    // Niente agente-lezioni: qui non c'è un turno da cui estrarre nulla, ma quello che l'utente aveva già raccontato va comunque messo in memoria.
+    // Niente agente-lezioni: non c'è un turno da cui estrarre, ma quanto l'utente ha già
+    // raccontato va in memoria lo stesso.
     finishOnboarding({ lessons: false });
     return { ok: true, onboarding: state, closing: bye };
   });
 
-  // Il congedo in chat dura quanto ci mette la home ad arrivare, a volte un istante: senza questa riga chi non fa in tempo a leggerlo non sa perché Filo ha smesso di presentarsi, né che si può rifare.
+  // Il congedo in chat dura quanto ci mette la home ad arrivare: senza questa riga chi non fa
+  // in tempo a leggerlo non sa perché Filo ha smesso, né che si può rifare.
   on(MSG.FILO_ONBOARDING_NOTICE_SEEN, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
@@ -132,7 +144,7 @@ module.exports = function register(on, ctx) {
     return { ok: true, onboarding: await saveOnboarding(Onboarding.dismissNotice(cur)) };
   });
 
-  // Gli appunti non hanno più un archivio proprio (né handler CRUD): sono file dell'editor, ci scrive l'azione SALVA_APPUNTO e si leggono o modificano aprendo l'editor.
+  // Gli appunti sono file dell'editor: ci scrive l'azione SALVA_APPUNTO, si leggono da lì.
 
   on(MSG.FILO_GET_TIMERS, async () => ({ ok: true, timers: await FiloMem.gcTimers() }));
 
@@ -174,7 +186,8 @@ module.exports = function register(on, ctx) {
     return { ok: true, notifications: list.filter((n) => !n.dismissed) };
   });
 
-  // F4 — annulla un auto-feedback appena inviato (undo dal toast), marcandolo `ignored`. Se l'utente non è loggato l'undo non può scrivere su Firestore (le regole vogliono admin): non è fatale, il feedback resta `new` e finisce solo nella tab Agente.
+  // Undo di un auto-feedback: senza login non si può scrivere su Firestore (le regole vogliono
+  // admin), e non è fatale — il feedback resta `new` e finisce solo nella tab Agente.
   on(MSG.CANCEL_AUTO_FEEDBACK, async (msg) => {
     const id = String(msg && msg.id || '').trim();
     if (!id) return { ok: false, error: 'id mancante' };

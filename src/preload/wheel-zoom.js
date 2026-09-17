@@ -1,11 +1,6 @@
-// La porta UNICA dello zoom della pagina: modalità rotella (click centrale, al
-// posto dell'autoscroll nativo) e, con `opts.pageZoom`, Ctrl/Cmd + rotella,
-// pinch e tasti. Gira nel preload, uguale su pagine web e pagine filo://.
-//
-// Chi passa di qui rispetta l'opt-out `dataset.filoOwnZoom = '1'`, con cui una
-// pagina che scala da sé (l'editor) evita il doppio zoom. Per questo anche i
-// tasti presi dalla barra di Filo rientrano da qui invece di agire per conto
-// loro: la regola su chi zooma deve restare una sola.
+// Porta UNICA dello zoom della pagina: rotella col clic centrale e, con `opts.pageZoom`,
+// Ctrl/Cmd+rotella, pinch e tasti. Rispetta l'opt-out `dataset.filoOwnZoom` delle pagine
+// che scalano da sé: la regola su chi zooma resta una sola, tasti della barra inclusi.
 
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
@@ -147,7 +142,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     if (!zoomMode) return;
     e.preventDefault();
     e.stopPropagation();
-    const dir = e.deltaY < 0 ? 1 : -1; // rotella su = zoom in
+    const dir = e.deltaY < 0 ? 1 : -1;
     let next = webFrame.getZoomLevel() + dir * ZOOM_STEP;
     next = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, next));
     webFrame.setZoomLevel(next);

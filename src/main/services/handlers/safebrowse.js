@@ -1,4 +1,5 @@
-// Rilevamento siti pericolosi e config cookie. Il verdetto safebrowse vive nel TabManager (per tab: bypass/dismiss): qui si inoltra alla finestra MITTENTE, così l'overlay agisce sul tab giusto.
+// Rilevamento siti pericolosi e config cookie. Il verdetto vive nel TabManager (per tab:
+// bypass/dismiss): si inoltra alla finestra MITTENTE, così l'overlay agisce sul tab giusto.
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
@@ -26,7 +27,7 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.safebrowseDismiss(tabId, msg.url || origin);
   });
 
-  // Geo-block: proposta accettata (#151) → instrada la tab dal paese indicato. Il tabId arriva dal sender.
+  // Geo-block accettato: instrada la tab dal paese indicato; il tabId arriva dal sender.
   on(MSG.GEO_PROPOSE_ACCEPT, async (msg, sender) => {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
@@ -43,7 +44,8 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.COOKIES_CONFIG, async () => {
-    // Il content script chiede la modalità corrente per decidere se rifiutare i banner CMP e riscrivere gli embed YouTube. È una config globale, non per-tab.
+    // Config globale, non per-tab: il content script la chiede per rifiutare i banner CMP e
+    // riscrivere gli embed YouTube.
     const settings = await Storage.getSettings();
     return { ok: true, mode: require('../cookies').getMode(settings) };
   });

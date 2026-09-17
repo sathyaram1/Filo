@@ -1,7 +1,6 @@
-// Geometria degli overlay posati a mano sopra la pagina (menu del tasto destro, riquadro
-// della risposta di Filo). CRESCONO dopo essere stati posati — dentro arriva la spiegazione
-// dell'LLM — e misurarli solo all'apertura taglia proprio la roba in coda: ultime voci del
-// menu, riga del modello, campo della domanda successiva (#500). Qui solo numeri, senza DOM.
+// Geometria degli overlay posati sopra la pagina (menu del tasto destro, riquadro di Filo).
+// CRESCONO dopo essere stati posati, e misurarli solo all'apertura taglia la roba in coda.
+// Qui solo numeri, senza DOM.
 
 (function (global) {
   'use strict';
@@ -9,19 +8,16 @@
   // Margine minimo fra l'overlay e i bordi della finestra.
   const GAP = 8;
 
-  // `null` = ci sta tutto: nessun tetto e nessuna barra di scorrimento. `scale` è la
-  // compensazione zoom: l'overlay è disegnato scalato e occupa `h * scale` sullo schermo,
-  // quindi il tetto torna in px di layout dividendo.
+  // `null` = ci sta tutto: nessun tetto, nessuna barra di scorrimento. `scale` è la
+  // compensazione zoom: l'overlay occupa `h * scale`, quindi il tetto si riporta dividendo.
   function computeCap({ h, vh, scale, gap = GAP, min = 96 }) {
     const s = (Number.isFinite(scale) && scale > 0) ? scale : 1;
     if (h * s + 2 * gap <= vh) return null;
     return Math.max(min, vh - 2 * gap) / s;
   }
 
-  // `visW`/`visH`: quanto occupa DAVVERO sullo schermo (tetto e zoom già applicati).
-  // `bias`: stacco dal punto di ancoraggio. `from`: la posa attuale, passata solo se
-  // l'overlay è GIÀ a schermo e ha cambiato altezza — lì non si ribalta (salterebbe via da
-  // sotto il cursore mentre l'utente sta per cliccare), si scivola in su quanto basta.
+  // `visW`/`visH`: quanto occupa DAVVERO sullo schermo. `from` è la posa attuale, passata solo
+  // se l'overlay è già a schermo: lì non si ribalta sotto il cursore, si scivola in su.
   function computeOffset({ x, y, visW, visH, vw, vh, from, gap = GAP, bias = 0 }) {
     let left = from ? from.left : x;
     let top = from ? from.top : y + bias;
@@ -42,9 +38,7 @@
   }
 
   // Si toglie il tetto, si misura l'altezza naturale e si rimette solo se serve ancora:
-  // quello del giro prima falserebbe la misura e resterebbe addosso a un overlay che nel
-  // frattempo si è ACCORCIATO. Tutto in un giro sincrono, quindi niente sfarfallio.
-  // `limit` è il tetto del chiamante, per chi non può spostare l'overlay (riquadro trascinato).
+  // quello del giro prima falserebbe la misura. Tutto sincrono, quindi niente sfarfallio.
   function applyCap(root, opts) {
     const o = opts || {};
     const gap = o.gap == null ? GAP : o.gap;
@@ -61,22 +55,19 @@
     if (cap != null) {
       root.style.maxHeight = `${cap}px`;
       root.style.overflowY = 'auto';
-      // Lo scorrimento si ferma DENTRO l'overlay: arrivati in fondo alla spiegazione il giro di
-      // rotella dopo passerebbe alla pagina, e uno scroll di pagina chiude il menu — col trackpad
-      // quasi sempre, perché l'inerzia continua da sola.
+      // Lo scorrimento si ferma DENTRO l'overlay: in fondo alla spiegazione la rotella passerebbe
+      // alla pagina, e uno scroll di pagina chiude il menu — col trackpad quasi sempre.
       root.style.overscrollBehavior = 'contain';
-      // `max-height` morde il box scelto dal CSS: con `content-box` (il valore di partenza in una
-      // pagina che non impone `box-sizing`) bordo e imbottitura restano FUORI dal conto e
-      // l'overlay sfora comunque. La differenza si misura e si toglie.
+      // `max-height` morde il box scelto dal CSS: con `content-box` bordo e imbottitura restano
+      // FUORI dal conto e l'overlay sfora comunque. La differenza si misura e si toglie.
       const extra = root.offsetHeight - cap;
       if (extra > 0) root.style.maxHeight = `${Math.max(48, cap - extra)}px`;
     }
     return { scale, cap };
   }
 
-  // Tetto per un overlay che NON si può spostare perché l'utente l'ha messo lì con le sue
-  // mani: cresce fino al bordo, poi scorre. Sotto il minimo il riquadro non serve più a
-  // niente e scivolare diventa il male minore — ci pensa `computeOffset`.
+  // Tetto per un overlay che NON si può spostare perché l'utente l'ha messo lì: cresce fino
+  // al bordo, poi scorre. Sotto il minimo scivolare è il male minore: ci pensa computeOffset.
   function computePinnedLimit({ top, vh, scale, gap = GAP, min = 96 }) {
     const s = (Number.isFinite(scale) && scale > 0) ? scale : 1;
     return Math.max(min, (vh - top - gap) / s);

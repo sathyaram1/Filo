@@ -1,7 +1,6 @@
 // GENERATO da scripts/build-transparency.mjs — NON modificare a mano.
-// Lo stesso codice è inlineato nelle pagine pubbliche del sito: si scrive una
-// volta sola in scripts/build-transparency.mjs, così la pagina dentro Filo e
-// quella sul sito non possono comportarsi in modo diverso.
+// Lo stesso codice è inlineato nelle pagine del sito: si scrive una volta sola lì, così la
+// pagina dentro Filo e quella sul sito non possono comportarsi in modo diverso.
 
 (function (global) {
   'use strict';
@@ -57,9 +56,8 @@
     }
   }
 
-  // Tooltip: hover col mouse, tocco e tastiera ovunque. Il riquadro è UNO solo,
-  // riposizionato — così il testo delle glosse non resta nel documento come
-  // testo fantasma che il Ctrl+F della pagina troverebbe senza mostrarlo.
+  // Tooltip: hover, tocco e tastiera. Il riquadro è UNO solo, riposizionato, così le glosse
+  // non restano nel documento come testo fantasma che il Ctrl+F troverebbe senza mostrarlo.
   function mountGlossaryUi(root, pop) {
     if (!root || !pop) return;
     function show(el) {

@@ -1,6 +1,6 @@
-// Whitelist (stage 2): lista curata di eTLD+1 noti e fidati per IDENTITÀ, con confronto ESATTO sull'eTLD+1 normalizzato — un sosia ha sempre un eTLD+1 diverso e non combacia mai.
-// Se combacia si saltano i controlli di impersonazione e l'LLM, ma NON certifica la sicurezza: i controlli indipendenti dal contenuto (certificato, contenuto misto, download, filtro contenuti) girano comunque.
-// Include tutti i domini legittimi dei brand, così il sito vero non si auto-segnala, più i siti più trafficati in IT/EN. Allungarla è sicuro.
+// Lista curata di eTLD+1 fidati per IDENTITÀ, confronto ESATTO: un sosia ha sempre un eTLD+1
+// diverso. Se combacia si saltano impersonazione e LLM, ma NON certifica la sicurezza:
+// certificato, contenuto misto e download girano comunque. Allungarla è sicuro.
 
 'use strict';
 

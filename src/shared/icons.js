@@ -150,9 +150,8 @@
     `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
     `<path d="M8 11V8a4 4 0 0 1 8 0v3"/>`;
 
-  // Trasparenza: libro APERTO. Lucchetto e foglio piegato erano già presi e dicevano il
-  // contrario: qui il senso è «sta scritto e lo puoi leggere».
-  // ATTENZIONE: copia gemella in src/main/popup-menu.js (è una BrowserWindow a parte).
+  // Trasparenza: libro APERTO — «sta scritto e lo puoi leggere».
+  // Copia gemella in src/main/popup-menu.js (BrowserWindow a parte): cambiala insieme.
   const transparency =
     `<path d="M12 6.6C10.4 5.1 8.3 4.6 4 4.6v12.6c4.3 0 6.4.5 8 2 1.6-1.5 3.7-2 8-2V4.6c-4.3 0-6.4.5-8 2z"/>` +
     `<path d="M12 6.6v14.6"/>`;
@@ -232,7 +231,6 @@
     `<path d="M20 19.5v.5"/>` +
     `<path d="M17.5 17h0.01"/>`;
 
-  // --- Alias semantico: "Salvati per dopo" usa il logo di Filo
   const openForLater = filoLogo;
 
   // --- Feedback: fumetto/balloon di chat con tre puntini (un messaggio).
@@ -294,9 +292,8 @@
     `<circle cx="11" cy="11" r="6"/>` +
     `<path d="M20 20l-4.3-4.3"/>`;
 
-  // Icone delle AZIONI dell'agente (#521): qui c'è solo il disegno, la corrispondenza
-  // azione → icona sta in src/shared/actionIcons.js. Le PREVISTE sono già disegnate
-  // perché l'agente le avrà a breve.
+  // Icone delle AZIONI dell'agente: la corrispondenza azione → icona sta in actionIcons.js.
+  // Le PREVISTE sono già disegnate perché l'agente le avrà a breve.
 
   // --- Apri una scheda: finestra con freccia che esce dall'angolo in alto a destra.
   const openTab =
@@ -326,7 +323,7 @@
     `<path d="M16.5 19l1.5 2"/>`;
 
   // Sveglia tolta: quadrante vuoto con una X al posto delle lancette — la sbarra universale
-  // si intrecciava con lancette, campanelle e piedini (parere dell'owner).
+  // si intrecciava con lancette, campanelle e piedini.
   const alarmOff =
     `<circle cx="12" cy="13" r="7"/>` +
     `<path d="M9.5 10.5l5 5"/>` +
@@ -411,8 +408,7 @@
     `<path d="M9.5 10l5.5 5.5"/>` +
     `<path d="M13.5 19H20"/>`;
 
-  // Estetica: tavolozza a fagiolo con tre pozzetti ad anello; il cerchio coi puntini
-  // sembrava un biscotto (parere dell'owner).
+  // Estetica: tavolozza a fagiolo con tre pozzetti ad anello.
   const palette =
     `<path d="M12 3.5c-4.7 0-8.5 3.6-8.5 8s3.8 8 8.5 8c1.2 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8h1.8c2.5 0 4.5-1.8 4.5-4.2C21 6.5 17 3.5 12 3.5z"/>` +
     `<circle cx="7.5" cy="12" r="1.2"/>` +
@@ -618,10 +614,8 @@
     home:         (size) => wrap(home, { size }),
     apps:         (size) => wrap(apps, { size }),
     caretDown:    (size) => wrap(caretDown, { size }),
-    // L'editor usa l'SVG degli appunti: ora che l'editor È anche il posto degli appunti, è
-    // l'icona più riconoscibile. ATTENZIONE: il popup del menu App/tasto destro è una
-    // BrowserWindow a parte e tiene una COPIA dei path in `ICON_PATHS`
-    // (src/main/popup-menu.js): cambiando un'icona qui, aggiorna anche là.
+    // L'editor usa l'SVG degli appunti: l'editor È anche il posto degli appunti.
+    // Copia dei path in `ICON_PATHS` (src/main/popup-menu.js): cambiando un'icona, aggiorna là.
     editor:       (size) => wrap(note, { size }),
     models:       (size) => wrap(models, { size }),
     openForLater: (size) => wrap(openForLater, { size }),
@@ -635,7 +629,7 @@
     decks:        (size) => wrap(decks, { size }),
     note:         (size) => wrap(note, { size }),
     search:       (size) => wrap(search, { size }),
-    // --- Azioni dell'agente (la tabella azione → icona è in actionIcons.js)
+    // Azioni dell'agente.
     openTab:      (size) => wrap(openTab, { size }),
     folder:       (size) => wrap(folder, { size }),
     timer:        (size) => wrap(timer, { size }),
@@ -684,8 +678,7 @@
     blocked:      (size) => wrap(blocked, { size }),
   };
 
-  // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
-  // o un glifo testuale (emoji/carattere).
+  // Un'«icona» può anche essere un glifo testuale (emoji): qui si distingue dall'SVG.
   function isSvgIcon(s) {
     return typeof s === 'string' && s.charCodeAt(0) === 60 /* '<' */ && s.startsWith('<svg');
   }

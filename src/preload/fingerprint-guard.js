@@ -1,7 +1,6 @@
-// Sorgente della guardia anti-fingerprint, iniettato da page-preload nel main
-// world PRIMA degli script della pagina (altrimenti un lettore di canvas arriva
-// prima degli override). `seed` uint32 = HMAC(segreto, eTLD+1 + finestra): stesso
-// sito stesso rumore, siti diversi scorrelati; `level` dice solo se siamo accesi.
+// Sorgente della guardia anti-fingerprint, iniettata nel main world PRIMA degli script
+// della pagina: un lettore di canvas arriverebbe prima degli override.
+// seed = HMAC(segreto, eTLD+1 + finestra): stesso sito stesso rumore, siti scorrelati.
 
 function buildGuardSource(seed, level) {
   const s = (seed >>> 0);

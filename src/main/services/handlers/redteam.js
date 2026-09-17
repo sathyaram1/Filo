@@ -1,5 +1,6 @@
-// Canale RED-TEAM: ponte fra la pagina `filo://redteam/` (e il menu del tasto destro) e le Cloud Function di filo-security. Il "cervello" — giudici, scoring, verifica — sta server-side e non nel client pubblico; qui c'è SOLO il trasporto, con l'ID token dell'utente: l'uid lo ricava il backend da quel token, quindi il client non può impersonare né auto-verificarsi.
-// Finché il backend non è deployato le chiamate falliscono con un errore di rete: gli handler ritornano una forma d'errore pulita e nessun credito viene toccato lato client.
+// Ponte fra la pagina filo://redteam/ e le Cloud Function di filo-security: qui c'è SOLO il
+// trasporto con l'ID token; l'uid lo ricava il backend, quindi il client non può impersonare
+// né auto-verificarsi. Senza backend deployato le chiamate falliscono con un errore pulito.
 
 const auth = require('../../auth/google-auth');
 
@@ -10,7 +11,7 @@ const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
 
-  // Protocollo onCall: POST {data} con Bearer ID token, risposta {result}. Lancia su errore di auth, rete o HTTP.
+  // Protocollo onCall: POST {data} con Bearer ID token, risposta {result}; lancia su errore.
   async function callable(name, data = {}) {
     const idToken = await auth.getIdToken();
     if (!idToken) throw new Error('not_signed_in');

@@ -22,7 +22,8 @@
   async function save(page) {
     const pages = await list();
 
-    // Dedupe per URL: ri-salvare una pagina già in "Aperti per dopo" NON crea un doppione — aggiorna la voce (titolo, favicon, anteprima, data) e la riporta in cima, preservando id e categoria già assegnata.
+    // Ri-salvare una pagina già in elenco aggiorna la voce e la riporta in cima, senza
+    // doppioni: id e categoria già assegnati restano.
     const idx = pages.findIndex((p) => p.url === page.url);
     if (idx >= 0) {
       const existing = pages[idx];
@@ -52,7 +53,8 @@
     return entry;
   }
 
-  // Aggiorna SOLO la miniatura di una scheda salvata: il salvataggio è committato subito col testo e la cattura arriva dopo (~120ms), quindi è opzionale. Se la scheda non esiste più è un no-op.
+  // La cattura arriva dopo il salvataggio, quindi la miniatura è opzionale: se la scheda
+  // non esiste più è un no-op.
   async function setThumbnail(id, thumbnail) {
     if (!id || !thumbnail) return null;
     const pages = await list();
@@ -70,7 +72,6 @@
     return filtered;
   }
 
-  // "Consuma": rimuove dalla lista, quando l'utente apre una scheda.
   async function consume(id) {
     return remove(id);
   }

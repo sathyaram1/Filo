@@ -1,9 +1,11 @@
-// Esecuzione di comandi shell per Filo (#146.6): la shell scelta nelle preferenze, un timeout oltre il quale il processo viene ucciso, stdout/stderr catturati e troncati se enormi (la chat non deve esplodere).
-// La classificazione di sicurezza NON avviene qui: la fa il gate dei livelli (src/shared/cmdClassify.js + actionLevels.js) PRIMA di chiamare runCommand. Qui si esegue solo ciò che è già stato autorizzato.
+// Esecuzione di comandi shell (#146.6): shell dalle preferenze, timeout che uccide il
+// processo, stdout/stderr troncati se enormi perché la chat non esploda.
+// La classificazione di sicurezza la fa prima il gate dei livelli, non questo file.
 
 const { spawn, execFile } = require('node:child_process');
 
-// Uccide l'INTERO albero: su Windows `child.kill()` non termina i figli, le pipe restano aperte, `close` non scatta e il timeout non libererebbe mai. taskkill /T /F chiude l'albero; su POSIX SIGKILL sul processo basta.
+// Su Windows `child.kill()` lascia vivi i figli: le pipe restano aperte, `close` non scatta
+// e il timeout non libererebbe mai. Su POSIX basta SIGKILL sul processo.
 function killTree(child) {
   if (!child || child.killed) return;
   if (process.platform === 'win32') {
@@ -15,12 +17,12 @@ function killTree(child) {
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 12_000;
 
-// Shell di default per piattaforma quando la preferenza non è impostata.
 function defaultShell() {
   return process.platform === 'win32' ? 'powershell' : 'bash';
 }
 
-// Fuori da Windows 'powershell'/'cmd' non esistono (pwsh è raro): si ricade su /bin/sh, esattamente come la shell persistente della modalità terminale, così i comandi dell'assistente girano davvero su Linux/macOS invece di fallire con ENOENT. 'bash' resta bash se esplicitamente preferito.
+// Fuori da Windows 'powershell'/'cmd' non esistono: si ricade su /bin/sh, o i comandi
+// dell'assistente fallirebbero con ENOENT. 'bash' resta bash se preferito apposta.
 function resolveShell(shell) {
   const s = String(shell || '').toLowerCase();
   if (process.platform === 'win32') {
@@ -31,7 +33,7 @@ function resolveShell(shell) {
   return s === 'bash' ? 'bash' : 'sh';
 }
 
-// (programma, argv) per lanciare la shell con un'unica stringa di comando; `shell` qui è già risolto da resolveShell().
+// `shell` qui è già risolto da resolveShell(), non è più il nome della preferenza.
 function shellInvocation(shell, command) {
   switch (resolveShell(shell)) {
     case 'cmd':
@@ -52,21 +54,23 @@ function truncate(text) {
   return { text: s.slice(0, MAX_OUTPUT_CHARS), truncated: true };
 }
 
-// Marcatore con cui un comando one-shot riporta exit code e cwd risultante: ogni comando parte da una shell nuova, quindi senza questo un `cd` non avrebbe effetto sul comando successivo. La cwd catturata viene ripassata come `cwd` al comando dopo (handlers.js).
+// Ogni comando parte da una shell nuova: senza questo marcatore un `cd` non avrebbe effetto
+// sul comando dopo. La cwd catturata torna come `cwd` della chiamata successiva.
 const CWD_MARK = '__FILO_ONESHOT_CWD_8b9cb__';
 
-// La sonda gira SEMPRE, anche se il comando fallisce, e riporta l'exit code reale del comando, non il proprio. Specifica per shell.
+// La sonda gira SEMPRE, anche se il comando fallisce, e riporta l'exit code del comando,
+// non il proprio.
 function withCwdProbe(shell, command) {
   const sh = resolveShell(shell);
   if (sh === 'cmd') {
-    // echo gira comunque; %errorlevel% = esito del comando, %cd% = directory.
     return `${command}\r\necho ${CWD_MARK}:%errorlevel%:%cd%`;
   }
   if (sh === 'powershell') {
-    // try/finally: il marcatore esce anche su errore terminante. $LASTEXITCODE azzerato prima, così i cmdlet (che non lo toccano) riportano 0.
+    // try/finally: il marcatore esce anche su errore terminante. $LASTEXITCODE azzerato prima,
+    // così i cmdlet, che non lo toccano, riportano 0.
     return `$global:LASTEXITCODE=0\ntry { ${command} } finally { Write-Output "${CWD_MARK}:$($LASTEXITCODE):$((Get-Location).Path)" }`;
   }
-  // bash/sh (routine cloud incluse): $? catturato subito dopo il comando, poi il marcatore su riga propria.
+  // $? va catturato SUBITO dopo il comando, prima di qualunque altra istruzione.
   return `${command}\n__filo_c=$?\nprintf '%s:%s:%s\\n' '${CWD_MARK}' "$__filo_c" "$PWD"`;
 }
 
@@ -85,7 +89,8 @@ function extractCwdMark(rawStdout) {
   };
 }
 
-// Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un esito da mostrare.
+// Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
+// esito da mostrare.
 function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, trackCwd = false } = {}) {
   const cmd = String(command || '').trim();
   const startedAt = Date.now();
@@ -135,7 +140,8 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
       let realCode = typeof code === 'number' ? code : (timedOut ? 124 : 1);
       let resultCwd = trackCwd ? (cwd || undefined) : undefined;
       if (trackCwd) {
-        // La sonda è l'ULTIMO comando eseguito: l'exit code del processo è il suo, non quello del comando. Si prendono entrambi dal marcatore.
+        // La sonda è l'ULTIMO comando eseguito: l'exit code del processo è il suo, non quello del
+        // comando. Entrambi si leggono dal marcatore.
         const parsed = extractCwdMark(rawOut);
         rawOut = parsed.stdout;
         if (parsed.code !== null) realCode = parsed.code;

@@ -7,10 +7,8 @@ const { ipcRenderer, webFrame } = require('electron');
 // Stesso zoom delle pagine web, comprese le regole (wheel-zoom.js).
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 
-// SICUREZZA. Il preload è legato al WebContents, non all'URL: un documento non
-// filo: può finire a girare qui (un redirect a metà caricamento, una
-// navigazione sfuggita alla guardia di tabs.js) e avrebbe chiavi e dati utente.
-// Gira DOPO il commit, quindi `location` è già l'origine vera del documento.
+// SICUREZZA: il preload è legato al WebContents, non all'URL, e un documento non filo: può
+// finire a girare qui — avrebbe chiavi e dati utente. Gira dopo il commit: location è vera.
 const IS_FILO_ORIGIN = (() => {
   try { return location.protocol === 'filo:'; } catch (_) { return false; }
 })();
@@ -41,9 +39,8 @@ const filoApi = {
     ipcRenderer.on('filo:answer', wrapped);
     return () => ipcRenderer.removeListener('filo:answer', wrapped);
   },
-  // { reqId, kind, ... }: 'start' { type } l'azione è stata nominata, 'done'
-  // { action } eseguita con esito, 'round' { text } fine di un giro — quel testo
-  // è una nota di lavoro, non la risposta.
+  // { reqId, kind, … }: 'start' { type } azione nominata, 'done' { action } eseguita con
+  // esito, 'round' { text } fine di un giro — quel testo è una nota, non la risposta.
   onAction: (fn) => {
     const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
     ipcRenderer.on('filo:action', wrapped);
@@ -206,9 +203,8 @@ const chromeShim = {
   contextMenus: { create: () => {}, onClicked: { addListener: () => {} } },
 };
 
-// Traduce l'evento IPC grezzo nel messaggio del catalogo che i content script
-// ascoltano: senza, le scorciatoie sono mute sulle pagine filo:// mentre
-// funzionano su quelle web. Gemello dell'adattatore in page-preload.js.
+// Traduce l'evento IPC grezzo nel messaggio del catalogo: senza, le scorciatoie sono mute
+// sulle pagine filo:// e vive su quelle web. Gemello dell'adattatore in page-preload.js.
 if (IS_FILO_ORIGIN) {
   ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
     const t = globalThis.SN_MSG?.MSG?.SHORTCUT_TRIGGERED || 'shortcut_triggered';
@@ -259,7 +255,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
-  safe(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2
+  safe(path.join(SHARED, 'feedbackClientIdHash.js'));
   safe(path.join(SHARED, 'feedbackAttachTypes.js')); // allowlist tipi allegato
   safe(path.join(CONTENT, 'feedback.js'));
   safe(path.join(CONTENT, 'redteamAttack.js'));
@@ -282,9 +278,8 @@ function loadContentScripts() {
     document.documentElement.dataset.filoContentScripts = '1';
   } catch (_) {}
 }
-// Lo stub chrome di Chromium va sovrascritto PRIMA dei content script: quando
-// content.js legge le impostazioni in init(), sendMessage dev'essere già il
-// nostro. E solo su origine filo:, come tutto il resto delle API privilegiate.
+// Lo stub chrome di Chromium va sovrascritto PRIMA dei content script: content.js legge le
+// impostazioni in init() e sendMessage dev'essere già il nostro. Solo su origine filo:.
 if (IS_FILO_ORIGIN) {
   try {
     Object.defineProperty(window, 'chrome', {

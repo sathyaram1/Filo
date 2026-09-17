@@ -1,6 +1,6 @@
-// SINGOLA SORGENTE del manifesto delle capacità: l'elenco curato di tutto ciò che Filo sa fare, visibile all'utente. Serve all'agente per rispondere con verità a «puoi fare X?», riconoscere «non posso fare Y» e come base per il feedback autonomo.
-// Ogni volta che una capacità visibile nasce, cambia o sparisce, la voce qui va aggiornata: una voce che mente è peggio di una assente, perché l'agente prometterebbe il falso.
-// Voce: { id kebab-case stabile (non cambiarlo), title breve in italiano, category fra CATEGORIES, desc cosa fa, invoke come si attiva, doesNot cosa NON fa (opzionale, prezioso per F4) }. desc, invoke e doesNot sono per l'utente finale, mai tecnici.
+// SINGOLA SORGENTE del manifesto delle capacità: tutto ciò che Filo sa fare, per l'utente.
+// Ogni capacità che nasce, cambia o sparisce si aggiorna qui: una voce che mente è peggio
+// di una assente, perché l'agente prometterebbe il falso. Testi per l'utente, mai tecnici.
 
 (function (global) {
   'use strict';
@@ -449,7 +449,8 @@
     },
   ];
 
-  // Indice COMPATTO pensato per stare sempre in contesto all'agente senza pesare: il dettaglio si recupera con get(id).
+  // Indice compatto, pensato per stare sempre in contesto all'agente senza pesare:
+  // il dettaglio si recupera con get(id).
   function index() {
     return CAPABILITIES.map((c) => ({ id: c.id, title: c.title, category: c.category }));
   }
@@ -467,8 +468,8 @@
     return CAPABILITIES.slice();
   }
 
-  // Indice per il prompt dell'agente (F2): una riga per capacità, raggruppata per categoria. Basta a capire SE Filo sa fare una cosa; il COME esatto e i limiti arrivano da renderDetailForPrompt, che l'agente chiede on-demand con CAPACITA_DETTAGLIO.
-  // L'id fra [] serve all'agente per chiedere il dettaglio della voce giusta.
+  // Indice per il prompt (F2): basta a capire SE Filo sa fare una cosa, il come e i limiti
+  // arrivano da renderDetailForPrompt; l'id fra [] serve a chiedere la voce giusta.
   function renderIndexForPrompt() {
     const lines = [];
     for (const [cat, label] of Object.entries(CATEGORIES)) {
@@ -480,7 +481,8 @@
     return lines.join('\n');
   }
 
-  // Dettaglio di una o più capacità, formattato per rientrare nel contesto come OSSERVAZIONE (dati, non istruzioni). Gli id sconosciuti sono segnalati esplicitamente, così l'agente non finge di averli trovati.
+  // Dettaglio formattato come OSSERVAZIONE: dati, non istruzioni. Gli id sconosciuti si
+  // segnalano, così l'agente non finge di averli trovati.
   function renderDetailForPrompt(ids) {
     const list = Array.isArray(ids) ? ids : (ids ? [ids] : []);
     if (!list.length) return '(nessuna capacità richiesta)';

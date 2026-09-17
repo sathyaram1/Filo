@@ -1,6 +1,6 @@
-// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7), parte I/O; la logica pura (staleness, parsing, piano di tagging) è in SN_DECK_OPINIONS.
-// Un parere per (carta, mazzo): si SOSTITUISCE al ricalcolo e non si cancella quando diventa stantio (resta visibile marcato). La cache tag è per carta, permanente e condivisa fra i mazzi: solo tag context-free.
-// Economia (§6.3): mai chiamate spontanee, si calcola solo ciò che il chiamante chiede, e il batch è UNA chiamata LLM per tutte le carte.
+// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7), parte I/O.
+// La logica pura (staleness, parsing, piano di tagging) sta in SN_DECK_OPINIONS.
+// Economia §6.3: mai chiamate spontanee, e un batch è UNA sola chiamata LLM.
 
 (function (global) {
   'use strict';
@@ -9,7 +9,7 @@
   const P = global.SN_DECK_OPINIONS;
   const Q = global.SN_SCRYFALL_Q;
 
-  // Un mazzo Commander è ≤100 carte: oltre il tetto è un errore del chiamante, non un caso d'uso.
+  // Un mazzo Commander è ≤100 carte: oltre il tetto è un errore del chiamante.
   const MAX_BATCH = 120;
 
   async function readOpinions() {
@@ -61,7 +61,8 @@
     }).join('\n');
   }
 
-  // mode: 'missing' (default) solo i pareri ASSENTI — uno stantio resta com'è, §6.2: il refresh non è mai automatico; 'stale' assenti + stantii ("valuta il mazzo"); 'force' tutti (refresh esplicito di una carta).
+  // mode: 'missing' solo i pareri assenti (uno stantio resta com'è, §6.2: il refresh non è mai
+  // automatico); 'stale' assenti e stantii; 'force' tutti, refresh esplicito di una carta.
   async function computeOpinions({ deck, cards, cardIds, mode = 'missing', wantSintesi = false, handleAIRequest }) {
     const ids = [...new Set((cardIds || []).map(String).filter((id) => cards[id]))].slice(0, MAX_BATCH);
     const all = await readOpinions();
@@ -113,7 +114,7 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.DECK_OPINIONS]: all });
   }
 
-  // Auto-tag (§7): riusa la cache (carta, tag) per i tag context-free e ritorna il mazzo coi tag applicati ma NON salvato — persiste il chiamante.
+  // Auto-tag (§7): ritorna il mazzo coi tag applicati ma NON salvato, persiste il chiamante.
   async function autoTag({ deck, cards, tags, handleAIRequest }) {
     const norm = (tags || []).map(P.normTag).filter(Boolean);
     if (!norm.length || !deck.carte.length) {
@@ -157,8 +158,8 @@
     };
   }
 
-  // Filtro semantico dei risultati di ricerca (§4.1): UNA chiamata LLM per i soli id non ancora in cache per quel criterio, e il giudizio (carta, criterio) resta cacheato cross-ricerca.
-  // Criterio vuoto: non filtra, tiene tutto.
+  // Filtro semantico della ricerca (§4.1): UNA chiamata LLM per i soli id non ancora in cache,
+  // e il giudizio (carta, criterio) resta cacheato cross-ricerca. Criterio vuoto: tiene tutto.
   async function filterSearch({ criterion, cardIds, cards, handleAIRequest }) {
     const ids = (cardIds || []).map(String).filter((id) => cards && cards[id]);
     const crit = P.normCriterion(criterion);

@@ -1,6 +1,6 @@
-// Icona di ogni azione dell'agente Filo: la tabella azione → nome in SN_ICONS, in un posto solo. Chi disegna una riga chiede `SN_ACTION_ICONS.svg(type, size)`, senza tabelle di emoji proprie.
-// Tre tabelle: AZIONI (quelle di actionLevels.js: una sentinella negli unit test diventa rossa se una resta senza icona), PREVISTE (poteri non ancora nati, nomi indicativi, da spostare in AZIONI quando arrivano), STATI (momenti del lavoro, non azioni).
-// Tipo sconosciuto → logo di Filo: meglio una riga col marchio che una riga con un buco.
+// Tabella azione → nome dell'icona, in un posto solo: chi disegna una riga chiede
+// `SN_ACTION_ICONS.svg(type)` invece di tenersi una tabella di emoji sua.
+// Tipo sconosciuto → logo di Filo: meglio il marchio che un buco.
 
 (function (global) {
   'use strict';
@@ -77,7 +77,7 @@
     BLOCCATO: 'blocked',
   };
 
-  // Aprire un'app mostra l'icona di QUELL'app (parere dell'owner): la griglia del menu App resta solo per un'app non censita qui.
+  // Aprire un'app mostra l'icona di QUELL'app: la griglia resta per le app non censite qui.
   // Chiavi: come l'azione nomina l'app (`app`, `id` o `nome`), in minuscolo.
   const APP = {
     mazzi: 'decks', deck: 'decks', decks: 'decks', board: 'decks',
@@ -93,7 +93,7 @@
 
   const RIPIEGO = 'filoLogo';
 
-  // `azione` è facoltativo: serve alle azioni la cui icona dipende dai parametri (oggi solo APRI_APP).
+  // `azione` è facoltativo: serve dove l'icona dipende dai parametri (oggi solo APRI_APP).
   function nome(type, azione) {
     const k = String(type || '').toUpperCase();
     if (k === 'APRI_APP' && azione && typeof azione === 'object') {
@@ -103,7 +103,8 @@
     return AZIONI[k] || PREVISTE[k] || STATI[k] || RIPIEGO;
   }
 
-  // Stringa SVG pronta per innerHTML (mai input utente: sicuro), oppure '' se la libreria delle icone non è caricata su questa pagina.
+  // Stringa SVG pronta per innerHTML: mai input utente, quindi sicura.
+  // '' se la libreria delle icone non è caricata su questa pagina.
   function svg(type, size, azione) {
     const I = global.SN_ICONS;
     const fn = I && I[nome(type, azione)];

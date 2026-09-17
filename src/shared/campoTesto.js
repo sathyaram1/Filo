@@ -1,11 +1,12 @@
-// Che cosa conta come «campo di testo», in un posto solo: se il cursore è in un campo Ctrl/Cmd+Z annulla quello che si sta scrivendo, altrimenti torna alla pagina precedente (#267).
-// La domanda arriva dalla pagina (Windows/Linux) e dal processo principale (su Mac la barra dei menu vince sempre sui tasti che la pagina ascolta, #527, src/main/menu.js): il main manda la SORGENTE a valutare dentro la pagina invece di tenersene una copia, che divergerebbe.
-// VINCOLO: `campoDiTesto` e `scriveQui` restano autosufficienti — nessun riferimento al resto del file, perché nella pagina esistono solo loro due.
+// Che cosa conta come «campo di testo», in un posto solo: lì Ctrl/Cmd+Z annulla quello che
+// si scrive, altrimenti torna alla pagina precedente (#267). Il main manda la SORGENTE da
+// valutare nella pagina, mai una copia. `campoDiTesto` e `scriveQui` sono autosufficienti.
 
 (function (global) {
   'use strict';
 
-  // Gli `input` non testuali (spunte, bottoni, colore…) non contano: lì Ctrl+Z non ha niente da annullare.
+  // Gli `input` non testuali (spunte, bottoni, colore…) non contano: lì Ctrl+Z non ha
+  // niente da annullare.
   function campoDiTesto(el) {
     if (!el) return false;
     if (el.matches && el.matches('input, textarea')) {
@@ -17,7 +18,8 @@
     return !!(el.closest && el.closest('[contenteditable=""], [contenteditable="true"]'));
   }
 
-  // Il fuoco può essere annidato in uno shadow DOM (un componente web che si porta dietro il suo campo): lì `activeElement` è l'ospite, non il campo, quindi si scende.
+  // Il fuoco può essere annidato in uno shadow DOM: lì `activeElement` è l'ospite, non il
+  // campo, quindi si scende.
   function scriveQui(doc) {
     let el = doc && doc.activeElement;
     let giri = 0;
@@ -27,7 +29,8 @@
     return campoDiTesto(el);
   }
 
-  // La stessa domanda in forma di sorgente da valutare dentro una pagina: così il main la fa senza tenersene una copia.
+  // La stessa domanda come sorgente da valutare dentro una pagina: così il main la fa
+  // senza tenersene una copia.
   function sorgenteScriveQui() {
     return '(() => { const campoDiTesto = ' + campoDiTesto.toString()
       + '; const scriveQui = ' + scriveQui.toString()

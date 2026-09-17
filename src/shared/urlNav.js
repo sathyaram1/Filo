@@ -1,18 +1,12 @@
-// SORGENTE UNICA della navigazione «testo → indirizzo» (#398): la logica viveva solo in
-// src/main/tabs.js e il campo «nuova scheda» ne aveva una copia più povera (pretendeva un
-// TLD alfabetico) che mandava localhost, gli IP e i nomi locali all'LLM invece di aprirli.
-// `looksLikeAddress` resta più severa di `normalizeUrl`: nel campo comando un `git log v1.2`
-// o `python3.11` non è un indirizzo, mentre sulla barra l'ambiguità coi comandi non esiste.
+// SORGENTE UNICA della navigazione «testo → indirizzo» (#398).
+// `looksLikeAddress` resta più severa di `normalizeUrl`: nel campo comando `git log v1.2`
+// non è un indirizzo, mentre sulla barra l'ambiguità coi comandi non esiste.
 
 (function (global) {
   'use strict';
 
-  // #433 — suffissi delle reti domestiche (.local, home.arpa, internal, home/corp, lan,
-  // intranet…): esistono SOLO dentro la rete di casa, li assegna il router o mDNS, e il
-  // resolver pubblico dà ENOTFOUND anche col dispositivo acceso. Quindi valgono come
-  // localhost: schema http e nessun controllo di esistenza. `box` è l'unica eccezione — è un
-  // gTLD pubblico vero, ma fritz.box è l'indirizzo dei router FRITZ!Box e quello è il caso
-  // reale; il prezzo è un sito .box pubblico aperto in http invece che https.
+  // #433 — i suffissi delle reti domestiche esistono SOLO dentro la rete di casa e il DNS
+  // pubblico dà ENOTFOUND: valgono come localhost. `box` è un gTLD vero, ma vince fritz.box.
   const LOCAL_NET_TLDS = new Set([
     'local', 'lan', 'home', 'internal', 'intranet', 'private', 'box',
     'homenet', 'localdomain', 'corp',
@@ -26,9 +20,8 @@
     return LOCAL_NET_TLDS.has(h.slice(h.lastIndexOf('.') + 1));
   }
 
-  // Host che parlano quasi sempre in chiaro (server di sviluppo, router/IoT su IP privato,
-  // dispositivi della rete di casa): per loro lo schema di default è http invece di https.
-  // Accetta anche la forma IPv6 fra parentesi ([::1]).
+  // Host che parlano quasi sempre in chiaro (dev, router/IoT su IP privato, rete di casa):
+  // per loro lo schema di default è http. Accetta anche la forma IPv6 fra parentesi ([::1]).
   function isLocalHost(host) {
     const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
     if (h === 'localhost' || h.endsWith('.localhost')) return true;
@@ -49,9 +42,8 @@
     return m.slice(1, 5).every((o) => Number(o) <= 255);
   }
 
-  // Schema esplicito → naviga com'è; indirizzo (dominio col punto, host locale noto,
-  // host:porta) → http per i locali e https altrimenti; il resto → ricerca Google.
-  // La parte «:porta» è il fix #233: prima ogni host:porta cadeva in ricerca.
+  // Schema esplicito → com'è; indirizzo (dominio col punto, host locale, host:porta) → http
+  // per i locali e https per gli altri; il resto → ricerca. Anche host:porta è un indirizzo.
   function normalizeUrl(input) {
     const raw = String(input || '').trim();
     if (!raw) return 'filo://newtab/';
@@ -79,9 +71,8 @@
     return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
   }
 
-  // Stretta di proposito: deve distinguere un indirizzo da un comando shell. Niente spazi;
-  // i path locali (./x, ~/x, /usr) li esegue la shell; un host a etichetta singola SENZA
-  // porta (git, python3.11) resta un comando, non un indirizzo.
+  // Stretta di proposito: deve distinguere un indirizzo da un comando shell. Niente spazi,
+  // i path locali li esegue la shell, e un host a etichetta singola senza porta è un comando.
   function looksLikeAddress(raw) {
     const s = String(raw || '');
     if (!s || /\s/.test(s)) return false;
@@ -99,18 +90,14 @@
     return /\.[a-z]{2,}$/i.test(host);                    // dominio con TLD alfabetico
   }
 
-  // #437 — schemi che NON sono indirizzi: non puntano da nessuna parte fuori dal documento
-  // in cui sono nati, quindi copiarli o condividerli dà una stringa che altrove non apre
-  // niente. javascript:/vbscript: è codice, data: è il contenuto stesso, blob:/filesystem:
-  // muoiono col documento, about: è uno stato interno del browser.
+  // #437 — schemi che NON sono indirizzi: non puntano fuori dal documento in cui sono nati,
+  // quindi copiarli dà una stringa che altrove non apre niente.
   const NON_ADDRESS_SCHEMES = new Set([
     'javascript:', 'vbscript:', 'data:', 'blob:', 'filesystem:', 'about:',
   ]);
 
-  // Serve alle azioni «Copia URL»/«Condividi» (#437): la sorgente di un'immagine o di un
-  // filmato può essere qualsiasi cosa il sito ci abbia messo. Gli href letti dal DOM sono
-  // già assoluti, quindi ciò che qui non si lascia analizzare non era un indirizzo nemmeno
-  // per la pagina che lo conteneva.
+  // Serve a «Copia URL» e «Condividi» (#437): la sorgente di un'immagine può essere qualsiasi
+  // cosa. Gli href del DOM sono assoluti: ciò che qui non si analizza non era un indirizzo.
   function isShareableAddress(raw) {
     const s = String(raw || '').trim();
     if (!s) return false;
@@ -120,10 +107,8 @@
     return !NON_ADDRESS_SCHEMES.has(proto);
   }
 
-  // #252 — indirizzo canonico di una pagina interna. Lo shim traduce `chrome.runtime.getURL`
-  // in `filo://src/pages/<page>/<file>` mentre i menu usano la forma corta, ed entrambe sono
-  // servite dal protocollo: la stessa pagina si apriva con due URL. Qui la forma legacy torna
-  // a quella corta, così la deduplica delle schede può confrontarle. Query e hash restano.
+  // #252 — indirizzo canonico di una pagina interna: la forma lunga e quella corta sono
+  // servite entrambe, e la stessa pagina si apriva con due URL. Query e hash restano.
   function canonicalizeFiloUrl(input) {
     const raw = String(input || '');
     if (!raw.startsWith('filo://')) return raw;

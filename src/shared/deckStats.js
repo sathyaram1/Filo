@@ -1,5 +1,5 @@
-// Statistiche del mazzo Commander (DECK-BUILDER-SPEC.md §9), logica pura su (deck, cardsById): curva, pip richiesti e prodotti, CMC medio, tipi, budget e Monte Carlo del calcolatore di probabilità (§9.3).
-// Gli unit test usano casi ipergeometrici noti come oracolo per il Monte Carlo.
+// Statistiche del mazzo Commander, logica pura su (deck, cardsById): curva, pip, budget.
+// Più il Monte Carlo del calcolatore di probabilità (DECK-BUILDER-SPEC.md §9.3).
 
 (function (global) {
   'use strict';
@@ -38,7 +38,8 @@
     return n ? sum / n : null;
   }
 
-  // Pip colorati nei costi: un simbolo ibrido conta per OGNI colore che contiene, perché è un requisito potenziale di quel colore; generici, X e incolore no.
+  // Un simbolo ibrido conta per OGNI colore che contiene: è un requisito potenziale.
+  // Generici, X e incolore non contano.
   function pipCounts(deck, cardsById) {
     const out = Object.fromEntries(WUBRG.map((c) => [c, 0]));
     const re = /\{([^}]+)\}/g;
@@ -61,7 +62,8 @@
     return out;
   }
 
-  // Conta le FONTI, non i pip (`producedMana` di Scryfall): una terra che produce U e R vale 1 in U e 1 in R. 'C' sono le fonti di solo incolore.
+  // Conta le FONTI, non i pip: una terra che produce U e R vale 1 in U e 1 in R.
+  // 'C' sono le fonti di solo incolore.
   function producedCounts(deck, cardsById) {
     const out = Object.fromEntries([...WUBRG, 'C'].map((c) => [c, 0]));
     for (const e of deck.carte) {
@@ -97,7 +99,8 @@
       .map(([name, n]) => ({ name, n }));
   }
 
-  // Budget (§9.2): totale EUR col commander incluso, si compra anche lui. `missing` sono le carte senza prezzo noto.
+  // Totale EUR col commander incluso: si compra anche lui.
+  // `missing` sono le carte senza prezzo noto.
   function budgetInfo(deck, cardsById) {
     let total = 0; let missing = 0;
     const addPrice = (id, qty) => {
@@ -116,8 +119,8 @@
     };
   }
 
-  // Libreria = mazzo espanso per quantità, commander escluso perché sta in zona di comando; ogni carta è un insieme di categorie (tag utente più «terre»).
-  // Si simula invece di usare la formula ipergeometrica chiusa proprio per le categorie sovrapposte: una carta taggata sia «ramp» che «draw» copre UNA sola richiesta per pescata, e lo decide un matching, non un conteggio.
+  // Libreria = mazzo espanso per quantità, commander escluso: sta in zona di comando.
+  // Si simula invece della formula chiusa: una carta con due tag copre UNA sola richiesta.
 
   const LAND_TAG = 'terre';
 
@@ -150,7 +153,7 @@
     return seen;
   }
 
-  // RNG deterministico: stesse pescate a parità di seed, così il confronto con l'oracolo non è flaky.
+  // RNG deterministico: stesse pescate a parità di seed, così i test non sono flaky.
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function () {
@@ -161,7 +164,7 @@
     };
   }
 
-  // Matching bipartito carta→richiesta (Kuhn): ogni carta copre al più UNA unità di richiesta. Gestisce nativamente i tag sovrapposti.
+  // Matching bipartito (Kuhn): ogni carta copre al più UNA unità di richiesta.
   function handSatisfies(drawn, want) {
     const units = [];
     for (const w of want) for (let k = 0; k < w.n; k++) units.push(w.tag);
@@ -184,8 +187,8 @@
     return true;
   }
 
-  // Probabilità di avere la mano desiderata al turno N: 7 + (N-1) carte viste, una in più con `onDraw`, più `extraDraws`. `mulligans` rifà la mano con una carta in meno (7→6→5…) finché `keep` non regge o le carte finiscono, e `keep` ha senso solo con mulligans > 0.
-  // `hits` e `iterations` sono ESATTI e sommabili: la UI raffina lanciando altri batch con seed diversi e accumulando, senza ricalcoli manuali.
+  // 7 + (N-1) carte viste al turno N; `mulligans` rifà la mano con una carta in meno.
+  // `hits` e `iterations` sono ESATTI e sommabili: la UI raffina accumulando altri batch.
   function simulate({ library, want, turn, onDraw = false, extraDraws = 0, mulligans = 0, keep = null, iterations = 10000, seed } = {}) {
     const lib = Array.isArray(library) ? library : [];
     const reqs = (Array.isArray(want) ? want : [])
@@ -216,7 +219,7 @@
         }
       };
 
-      // La mano tenuta resta nelle prime `handSize` posizioni: le pescate dopo escono dal resto della libreria, senza rimescolarla.
+      // La mano tenuta resta nelle prime `handSize` posizioni: le pescate escono dal resto.
       let handSize = Math.min(7, lib.length);
       shuffleRange(0, handSize);
       if (keepReqs.length && mulligans > 0) {

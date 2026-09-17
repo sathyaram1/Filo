@@ -1,5 +1,5 @@
-// Cache persistente delle chiamate LLM in chrome.storage.local (STORAGE_KEYS.AI_CACHE): chiave = SHA-256 di {provider, model, messages}.
-// Eviction delle entry meno usate di recente quando si supera AI_CACHE_MAX_ENTRIES.
+// Cache persistente delle chiamate LLM in chrome.storage.local (STORAGE_KEYS.AI_CACHE):
+// chiave = SHA-256 di {provider, model, messages}; sfratto LRU oltre AI_CACHE_MAX_ENTRIES.
 
 (function (global) {
   'use strict';
@@ -35,7 +35,7 @@
       if (!entry) return null;
       entry.lastUsed = Date.now();
       map[key] = entry;
-      // best-effort: non aspettiamo la scrittura, la lettura non deve rallentare per un aggiornamento di timestamp.
+      // Non si aspetta la scrittura: la lettura non deve rallentare per un timestamp aggiornato.
       writeAll(map).catch(() => {});
       return entry;
     } catch (_) {

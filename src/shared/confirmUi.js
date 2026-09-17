@@ -1,6 +1,6 @@
-// Conferme riusabili per i livelli di sicurezza delle azioni di Filo (#146.2), sui token del tema. confirm() è il livello 2 (spiega la modifica, OK e Annulla); confirmTyped() è il livello 3, col bottone bloccato finché non si digita la parola. Esc o click fuori annulla, una sola conferma alla volta.
-// SICUREZZA (#249): il dialogo vive in uno Shadow DOM CLOSED su un host neutro. Il DOM del documento è condiviso col mondo principale della pagina, e senza root chiuso uno script ostile trovava il bottone OK e lo auto-cliccava, confermando azioni di livello 2 senza consenso reale.
-// Con il root chiuso la pagina vede solo l'host vuoto, e il riferimento al root resta privato di questo modulo e degli hook _test, che sulle pagine esterne vivono anch'essi nel mondo isolato.
+// Conferme per i livelli di sicurezza (#146.2): confirm() è il livello 2, confirmTyped() il
+// 3, col bottone bloccato finché non si digita la parola. Una alla volta.
+// Shadow DOM CHIUSO (#249): col DOM condiviso uno script ostile auto-cliccava l'OK.
 
 (function (global) {
   'use strict';
@@ -130,14 +130,16 @@
   // `active` serve a done() e agli hook di test: il root chiuso è raggiungibile solo da qui.
   let active = null; // { host, root }
 
-  // Ritorna { overlay, box, done }, dove done(result) smonta tutto e risolve la Promise una volta sola.
+  // done(result) smonta tutto e risolve la Promise una volta sola.
   function buildOverlay(resolve) {
     const doc = global.document;
 
-    // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il posizionamento a tutto viewport, inline per non dover mettere CSS nel documento.
+    // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il posizionamento,
+    // inline per non dover mettere CSS nel documento del sito.
     const host = doc.createElement('div');
     host.className = 'sn-confirm-host';
-    // Su una pagina web l'host finisce nel <body> del sito: marcarlo tiene il riquadro fuori da chi cammina sulla pagina (la traduzione).
+    // Su una pagina web l'host finisce nel <body> del sito: marcarlo tiene il riquadro fuori
+    // da chi cammina sulla pagina (la traduzione).
     global.SN_FILO_UI?.mark(host);
     host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;';
 
@@ -247,7 +249,7 @@
     });
   }
 
-  // Avviso a un solo bottone: comunica senza chiedere una scelta. Risolve quando l'utente chiude.
+  // Avviso a un bottone: comunica senza chiedere una scelta, risolve alla chiusura.
   function notify({ title = '', text = '', okLabel = 'OK' } = {}) {
     return new Promise((resolve) => {
       const { box, done } = buildOverlay(resolve);
@@ -259,15 +261,16 @@
     });
   }
 
-  // Hook di TEST (tests/helpers/confirm.mjs): il root chiuso rende il dialogo invisibile ai locator Playwright, e gli spec sulle pagine filo:// passano da qui via page.evaluate.
-  // Sulle pagine web esterne SN_CONFIRM_UI vive nel mondo isolato del preload: la pagina non può chiamare questi hook, quindi non riaprono la falla del #249.
+  // Hook di TEST: il root chiuso rende il dialogo invisibile ai locator Playwright, e gli
+  // spec passano da qui. Sulle pagine web vive nel mondo isolato, quindi non riapre il #249.
   const _test = {
     state() {
       if (!active) return null;
       const q = (s) => active.root.querySelector(s);
       const okBtn = q('.sn-confirm-btn-ok') || q('.sn-confirm-btn-danger');
       const textEl = q('.sn-confirm-text');
-      // Scorrimento del testo lungo e colore della selezione vivono nello shadow root chiuso: solo da qui uno spec può ispezionarli.
+      // Scorrimento del testo lungo e colore della selezione vivono nel root chiuso:
+      // solo da qui uno spec può ispezionarli.
       let selectionBg = '';
       try {
         if (textEl) selectionBg = global.getComputedStyle(textEl, '::selection').backgroundColor || '';
@@ -281,7 +284,7 @@
         selectionBg,
       };
     },
-    // which = 'ok' | 'cancel' | 'danger'. False se non c'è dialogo, o il bottone manca o è disabilitato.
+    // which = 'ok'|'cancel'|'danger'. False se manca il dialogo o il bottone è disabilitato.
     click(which) {
       if (!active) return false;
       const btn = active.root.querySelector('.sn-confirm-btn-' + which);

@@ -1,6 +1,6 @@
-// Pagina Red Team (filo://redteam/) — spec: filo-redteam-ux-spec.md §3,§4,§6,§7,§8.4.
+// Pagina Red Team — spec: filo-redteam-ux-spec.md §3,§4,§6,§7,§8.4.
 // Rendering in funzioni PURE (esposte su window.RedteamUI per i test); le stringhe scelte
-// dall'utente o dal modello via textContent, mai innerHTML. Ogni risposta può mancare: degrada.
+// dall'utente o dal modello via textContent, mai innerHTML. Ogni risposta può mancare.
 
 (function () {
   'use strict';
@@ -209,7 +209,7 @@
       hrow.className = 'rt-summary-row';
       const hl = document.createElement('span'); hl.className = 'rt-summary-lbl'; hl.textContent = 'Handle';
       const hv = document.createElement('span'); hv.className = 'rt-summary-val'; hv.id = 'summaryHandle';
-      hv.textContent = s.handle; // textContent: nessuna interpolazione HTML
+      hv.textContent = s.handle;
       hrow.append(hl, hv);
       host.appendChild(hrow);
     }
@@ -243,7 +243,6 @@
       when.textContent = formatRelativeTime(at.createdAt, now);
       tr.appendChild(when);
 
-      // Titolo: output del modello → textContent (anti-XSS).
       const title = document.createElement('td');
       title.className = 'rt-hist-title';
       title.textContent = at.title ? String(at.title) : '—';
@@ -316,9 +315,8 @@
       detailRow.hidden = true;
       const detailCell = document.createElement('td');
       detailCell.colSpan = 5;
-      // Il dettaglio va in un wrapper INTERNO, non sul <td>: col `display:flex` sulla cella questa
-      // smette di essere una table-cell, il colspan viene ignorato e la cella collassa alla
-      // larghezza della prima colonna (feedback #295).
+      // Il dettaglio va in un wrapper INTERNO, non sul <td>: col display:flex sulla cella il
+      // colspan viene ignorato e la cella collassa alla larghezza della prima colonna.
       const detailInner = document.createElement('div');
       detailCell.appendChild(detailInner);
       detailRow.appendChild(detailCell);
@@ -341,9 +339,8 @@
     });
   }
 
-  // Dettaglio di un tentativo (feedback #295), usato dallo storico e dalla rivelazione live.
-  // Ogni stringa va in textContent, mai interpolata. opts.compact mostra solo i blocchi con
-  // contenuto reale, per non duplicare gli slot a schermo. Prova più nomi di campo del backend.
+  // Dettaglio di un tentativo, usato dallo storico e dalla rivelazione live. opts.compact
+  // mostra solo i blocchi con contenuto reale, per non duplicare gli slot a schermo.
   function firstText(obj, keys) {
     for (const k of keys) {
       const v = obj && obj[k];
@@ -490,7 +487,7 @@
       tr.appendChild(rank);
 
       const handle = document.createElement('td'); handle.className = 'rt-lb-handle';
-      handle.textContent = (e && e.handle) ? String(e.handle) : '—'; // textContent → niente XSS
+      handle.textContent = (e && e.handle) ? String(e.handle) : '—';
       tr.appendChild(handle);
 
       const record = document.createElement('td'); record.className = 'rt-lb-record';
@@ -618,7 +615,6 @@
     return sec;
   }
 
-  // Mappa lo status di redeem a un messaggio chiaro in italiano (spec §7.3).
   function redeemStatusMessage(status) {
     switch (status) {
       case 'ok': return { ok: true, text: 'Account verificato! Ora vedi i tuoi risultati.' };
@@ -644,7 +640,7 @@
     section.hidden = false;
 
     const a = attempt || {};
-    if (titleEl) titleEl.textContent = a.title ? String(a.title) : ''; // titolo auto-generato → textContent
+    if (titleEl) titleEl.textContent = a.title ? String(a.title) : '';
 
     slotsHost.textContent = '';
     const verdicts = a.verdicts || {};
@@ -709,8 +705,7 @@
       }
     }
 
-    // Compact: solo i blocchi con contenuto reale, così durante la rivelazione live — quando dal
-    // backend non arriva ancora nessuna motivazione — l'area resta vuota invece di duplicare gli slot.
+    // Compact come sopra: l'area resta vuota invece di duplicare gli slot.
     let detailEl = $('revealDetail');
     if (!detailEl) {
       detailEl = document.createElement('div');
@@ -738,10 +733,9 @@
     // fa prima il login, poi riscatta). Le statistiche solo da verificato.
     if (gateVerify) gateVerify.hidden = verified;
     if (content) content.hidden = !verified;
-    // Suggerimento "accedi" solo quando non sei loggato.
     if (signinHint) signinHint.hidden = signedIn;
 
-    // Tab «Codici»: riservata all'owner; se la stavi guardando e non lo sei più, torna a Statistiche.
+    // Tab «Codici» riservata all'owner: se non lo sei più, si torna a Statistiche.
     if (codesTab) codesTab.hidden = !isOwner;
     if (!isOwner) {
       const codesPanel = $('panel-codes');
@@ -794,7 +788,6 @@
   }
 
   // Rendering puro; «Revoca» solo sui codici liberi, con onRevoke iniettabile per i test.
-  // Le stringhe controllabili (code, handle) vanno via textContent.
   function renderCodesTable(data, onRevoke) {
     const body = $('codesBody');
     const emptyEl = $('codesEmpty');
@@ -834,7 +827,7 @@
       tr.appendChild(state);
 
       const handle = document.createElement('td'); handle.className = 'rt-ct-handle';
-      handle.textContent = (used && it.handle) ? String(it.handle) : '—'; // textContent → niente XSS
+      handle.textContent = (used && it.handle) ? String(it.handle) : '—';
       tr.appendChild(handle);
 
       const when = document.createElement('td'); when.className = 'rt-ct-when';
@@ -902,7 +895,7 @@
     if (btn) btn.disabled = true;
     const r = await send(MSG.REDTEAM_REVOKE_CODE, { code });
     if (r && r.ok) {
-      await loadCodes(); // ricarica la lista aggiornata
+      await loadCodes();
     } else if (btn) {
       btn.disabled = false;
       btn.textContent = 'Riprova';
@@ -925,7 +918,7 @@
       const r = await send(MSG.REDTEAM_ATTEMPT, { attemptId });
       if (r && r.attempt) {
         renderReveal(r.attempt);
-        if (r.attempt.status === 'complete') return; // stop: rivelazione finita
+        if (r.attempt.status === 'complete') return;
         revealTimer = setTimeout(tick, 1500);
         return;
       }
@@ -983,7 +976,7 @@
             if (btn) btn.disabled = false;
             return;
           }
-          await loadState(); // aggiorna signedIn/isOwner
+          await loadState();
         }
         const r = await send(MSG.REDTEAM_REDEEM, { code, handle });
         const result = redeemStatusMessage(r.status || (r.error ? 'error' : 'error'));

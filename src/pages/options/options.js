@@ -101,8 +101,6 @@
     }
   }
 
-  // «Usa modelli predefiniti» ON nasconde la config avanzata e mostra la lista read-only dei
-  // predefiniti; OFF mostra tutto.
   function applyDefaultModelsVisibility() {
     const useDefault = $('useDefaultModels').checked;
     for (const el of document.querySelectorAll('.sn-advanced-models')) {
@@ -111,9 +109,8 @@
     $('defaultModelsList').hidden = !useDefault;
   }
 
-  // «Solo modelli a pesi aperti»: un interruttore che promette e basta non si può verificare.
-  // Acceso, qui sotto compare quante funzioni cambiano modello, su quali finiscono e quali si
-  // fermano. Sorgente: la configurazione che l'app userà DAVVERO (condivisa o personale).
+  // Un interruttore che promette e basta non si può verificare: acceso, qui sotto compare
+  // quante funzioni cambiano modello, su quali finiscono e quali si fermano.
 
   // Ultima configurazione predefinita letta dal main ({ models, modelRegistry }).
   let defaultModelsPublic = null;
@@ -151,9 +148,8 @@
     return C.openWeightsBlockKind(true, entry) !== '';
   }
 
-  // Tutti i «Prova» della pagina in un posto solo (chiavi, predefiniti, registry personale):
-  // sono cammini diversi verso la stessa chiamata, quindi la regola dev'essere una sola.
-  // L'ultimo stato dell'interruttore serve a riconoscere la transizione acceso→spento.
+  // Tutti i «Prova» della pagina in un posto solo: sono cammini diversi verso la stessa
+  // chiamata, quindi la regola dev'essere una sola.
   let openWeightsWasOn = null;
 
   function applyOpenWeightsTestGates() {
@@ -310,7 +306,6 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
-      // Il cancello dei pesi aperti ha l'ultima parola (applyOpenWeightsTestGates).
       applyOpenWeightsTestGates();
     }
   }
@@ -332,14 +327,14 @@
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
 
-    // Registry PRIMA dell'editor a segmenti: le righe sono la sorgente dei nickname e l'editor le
-    // legge già al primo render, o l'avviso «modello inesistente» apparirebbe su TUTTI i segmenti.
+    // Registry PRIMA dell'editor a segmenti: le righe sono la sorgente dei nickname, e senza
+    // l'avviso «modello inesistente» apparirebbe su TUTTI i segmenti.
     renderModelRegistry(settings.modelRegistry || {});
 
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: settings.models || {},
       onChange: saveDebounced,
-      // Registry LIVE (righe correnti, anche non salvate): la validazione riflette subito le modifiche.
+      // Registry LIVE, anche le righe non salvate: la validazione riflette subito le modifiche.
       getRegistry: () => collectModelRegistry().registry,
     });
 
@@ -357,8 +352,8 @@
     renderOpenWeightsImpact();
   }
 
-  // Vecchie entry duali: si sceglie un solo provider (OpenRouter) e al primo salvataggio
-  // diventano single-provider; il gemello si aggiunge come riga separata se serve il fallback.
+  // Entry duali: si tiene un solo provider e al primo salvataggio diventano single-provider;
+  // il gemello si aggiunge come riga separata se serve il fallback.
   function entryToSingle(entry) {
     const e = entry || {};
     if (e.provider && e.model) return { provider: e.provider, model: e.model };
@@ -366,7 +361,7 @@
     return { provider: 'openrouter', model: '' };
   }
 
-  // Normalizza i risultati di test (flat o vecchio per-provider) in flat, col provider attivo.
+  // Normalizza i risultati di test (flat o per-provider) in flat, col provider attivo.
   function normalizeTest(entry, single) {
     const t = entry && entry.test;
     if (!t || typeof t !== 'object') return null;
@@ -408,9 +403,9 @@
     row.className = 'sn-model-row';
     row.dataset.originalNick = nick || '';
     const single = entryToSingle(entry);
-    // Etichetta preservata «in silenzio»: non ha più una colonna, ma serve come hint nella datalist.
+    // L'etichetta non ha una colonna, ma serve come hint nella datalist: si preserva.
     row.dataset.label = (entry && entry.label) || '';
-    // La voce intera resta appesa alla riga: ciò che la riga non modifica sopravvive al salvataggio.
+    // Ciò che la riga non modifica sopravvive al salvataggio: la voce intera resta appesa.
     row._entry = { ...(entry || {}) };
     // Risultato di test persistito (flat): { ttftMs, tokensPerSec, at }.
     row._test = normalizeTest(entry, single);
@@ -431,8 +426,8 @@
     });
     provSel.value = single.provider;
 
-    // Combobox custom (stile Filo, non il popup nativo): filtra digitando e resta libero di
-    // accettare un id fuori lista. Il wrapper è position:relative perché .sn-select-pop si ancora lì.
+    // Combobox custom (non il popup nativo): filtra digitando e accetta un id fuori lista.
+    // Il wrapper è position:relative perché .sn-select-pop si ancora lì.
     const idWrap = document.createElement('div');
     idWrap.className = 'sn-model-id-wrap';
     const idIn = document.createElement('input');
@@ -474,7 +469,6 @@
     del.textContent = I18n.t('options_model_remove');
     del.addEventListener('click', () => { row.remove(); save(); });
 
-    // Ordine richiesto: nickname · provider · stringa · Rimuovi · Prova, coi dati del test sotto.
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
@@ -504,7 +498,6 @@
 
     const entries = Object.entries(registry || {});
     if (!entries.length) {
-      // Editor vuoto: una riga vuota per iniziare.
       host.appendChild(makeModelRow('', {}));
     } else {
       for (const [nick, e] of entries) {
@@ -514,8 +507,8 @@
     populateNicknames(registry);
   }
 
-  // Ritorna anche le righe DOM scartate (nickname mancante o duplicato) così save() le segnala
-  // sul posto: prima l'utente perdeva la riga dietro un «Salvato» che non la riguardava (#216).
+  // Ritorna anche le righe scartate (nickname mancante o duplicato): save() le segnala sul
+  // posto, invece di farle sparire dietro un «Salvato» che non le riguarda.
   function collectModelRegistry() {
     const host = $('modelRegistryList');
     const out = {};
@@ -535,7 +528,7 @@
       if (label) entry.label = label;
       // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
-      // E ciò che la riga non modifica ma la voce dichiara: senza, un salvataggio da qui lo perderebbe.
+      // Ciò che la riga non modifica ma la voce dichiara: senza, un salvataggio lo perderebbe.
       for (const k of ['weights', 'inputs', 'outputs']) {
         if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
       }
@@ -588,7 +581,6 @@
       if (!res?.ok) {
         statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
-        // Il risultato si persiste nel registry: resta visibile e confrontabile tra le sessioni.
         row._test = {
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
@@ -601,7 +593,6 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
-      // Il cancello dei pesi aperti ha l'ultima parola (applyOpenWeightsTestGates).
       applyOpenWeightsTestGates();
     }
   }
@@ -652,7 +643,8 @@
     return lists.flat();
   }
 
-  // Gli id che il catalogo non conosce restano in tendina: toglierli farebbe sparire quello in uso.
+  // Gli id che il catalogo non conosce restano in tendina: toglierli farebbe sparire quello
+  // in uso.
   function withRegistryIds(provider, catalog) {
     const known = new Set(catalog.map((it) => it.id));
     const extra = [];
@@ -716,8 +708,8 @@
     const apiKey = $('apiKey').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
 
-    // Auto-save delle sole righe valide: le incomplete restano ignorate finché non sono complete
-    // — niente alert mentre si digita — ma evidenziate, e la conferma non dice «Salvato» secco (#216).
+    // Si salvano le sole righe valide: le incomplete restano ignorate — niente alert mentre si
+    // digita — ma evidenziate, e la conferma non dice «Salvato» secco.
     const { registry, missingNickRows, dupRows } = collectModelRegistry();
 
     const partial = {
@@ -731,7 +723,6 @@
 
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
 
-    // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
     markRegistryRowIssues(missingNickRows, dupRows);
 
@@ -763,7 +754,6 @@
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
       btn.disabled = false;
-      // Il cancello dei pesi aperti ha l'ultima parola (applyOpenWeightsTestGates).
       applyOpenWeightsTestGates();
     }
   }
@@ -776,7 +766,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    // Niente «Salva»: i controlli testuali si persistono allo `change` (al blur), gli altri subito.
+    // Niente «Salva»: i controlli testuali si persistono al blur, gli altri subito.
     $('page').addEventListener('change', () => saveDebounced());
     // Qualunque cosa cambi può cambiare l'effetto di «solo pesi aperti»: si ricalcola sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);

@@ -1,5 +1,6 @@
-// Riga icone globali del menu contestuale: registro con ID stabili, layout persistente primaria/secondaria, migrazioni del layout salvato e drag fra le due zone.
-// I preload lo caricano dopo actions.js (da cui prende gli onClick) e prima di content.js, che poi chiama init() passandogli lo stato "contenuto a tutto schermo".
+// Riga icone globali del menu: registro con id stabili, layout persistente fra primaria
+// e secondaria, migrazioni del layout salvato e drag fra le due zone.
+// Caricato dopo actions.js e prima di content.js, che gli passa lo stato a tutto schermo.
 
 (function (global) {
   'use strict';
@@ -10,14 +11,12 @@
   const Menu = global.SN_MENU;
   const Translate = global.SN_TRANSLATE_PAGE;
 
-  // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
     isContentFullscreen: () => false,
   };
 
-  // Le primarie stanno nella riga in alto del menu, le secondarie nel sotto-menu "Altro…".
-  // Dentro un riquadro incorporato (video, mappa, modulo) le icone globali restano azioni sulla PAGINA (#405): eseguirle lì condividerebbe l'indirizzo del player invece dell'articolo.
-  // Quindi si rimandano al frame principale, che le esegue come se il menu fosse stato aperto sulla pagina.
+  // Dentro un riquadro incorporato le icone globali restano azioni sulla PAGINA (#405):
+  // si rimandano al frame principale, o condividerebbero l'indirizzo del player.
   const IS_SUBFRAME = (() => {
     try { return window.top !== window.self; } catch (_) { return true; }
   })();
@@ -32,8 +31,8 @@
     return out;
   }
 
-  // «Feedback» apre la posta delle segnalazioni, che a un utente comune ha solo un invito ad accedere come amministratore — cosa che accedendo non si diventa: l'icona è quindi del solo owner (#583).
-  // Parte nascosta e si accende alla risposta del main: sbagliare per difetto costa un'icona a una persona, per eccesso manda tutti gli altri in un vicolo cieco.
+  // «Feedback» porta alla posta delle segnalazioni, che a un utente comune è un vicolo
+  // cieco: icona del solo owner, nascosta finché il main non risponde (#583).
   let isOwner = false;
   function refreshOwner() {
     try {
@@ -55,7 +54,8 @@
     } catch (_) {}
   }
 
-  // Eseguita nel frame principale per le azioni rimandate da un riquadro: passa solo un id del registro, nessun dato arbitrario attraversa il ponte.
+  // Eseguita nel frame principale per le azioni rimandate da un riquadro: passa solo un id del
+  // registro, nessun dato arbitrario attraversa il ponte.
   function runIconAction(iconId) {
     const entry = buildLocalIconRegistry(lastNavState)[String(iconId || '')];
     if (entry && typeof entry.onClick === 'function') entry.onClick();
@@ -66,11 +66,12 @@
     const Actions = global.SN_ACTIONS;
     // Icone SVG a 18px: la guida di stile sta in src/shared/icons.js e src/styles/ICONS.md.
     const I = (name) => Icons[name](18);
-    // Quattro stati, non due: senza traduzione → «Traduci»; completa e ferma → «Mostra originale»; interrotta a metà (#408) → «Riprendi»; completa ma con testo comparso dopo (#407: scorrimento infinito, schermate che cambiano senza ricaricare) → «Traduci il testo nuovo».
-    // Negli ultimi due l'icona serve a CONTINUARE, e il ritorno all'originale resta una voce etichettata (buildMenuItems in content.js); si traduce solo ciò che manca, il già tradotto non torna al modello.
+    // Quattro stati, non due: senza traduzione, completa, interrotta a metà (#408), completa
+    // ma con testo comparso dopo (#407). Negli ultimi due l'icona serve a CONTINUARE.
     const partialTranslation = typeof Translate.isPartial === 'function' && Translate.isPartial();
     const newContent = typeof Translate.hasNewContent === 'function' && Translate.hasNewContent();
-    // Mentre traduce, l'icona è il modo di FERMARE: aprire il menu a lavoro in corso e trovarci solo «Traduci la pagina», che non fa niente, è un vicolo cieco.
+    // Mentre traduce, l'icona è il modo di FERMARE: trovare solo «Traduci la pagina», che
+    // non fa niente, è un vicolo cieco.
     const restore = typeof Translate.showsRestore === 'function'
       ? Translate.showsRestore()
       : (Translate.hasTranslation() && !(partialTranslation || newContent));
@@ -108,7 +109,8 @@
       home:          { id: 'home',          icon: I('home'),        label: I18n.t('menu_open_home'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.GO_HOME }) },
       editorApp:     { id: 'editorApp',     icon: I('editor'),      label: I18n.t('menu_open_editor'),       onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }) },
     };
-    // Solo all'owner. Un id assente dal registro sparisce da solo anche dai layout che l'utente si era salvato: i builder filtrano su `registry[id]`.
+    // Un id assente dal registro sparisce da solo anche dai layout salvati dall'utente: i
+    // builder filtrano su `registry[id]`.
     if (isOwner) {
       registry.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
     }
@@ -121,15 +123,16 @@
     secondary: ['openOptions', 'home', 'editorApp', 'feedbackApp', 'incognito', 'screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
   };
 
-  // Promozione una-tantum di `qrCode` nella riga primaria: il QR è un'azione rapida, non va sepolto in "Altro…". Una volta sola per chi aveva già un layout salvato, poi è libero di rispostarla.
+  // Promozione una-tantum di `qrCode` nella riga primaria: il QR è un'azione rapida, non va sepolto
+  // in "Altro…". Una volta sola per chi aveva già un layout salvato, poi è libero di rispostarla.
   const QR_PRIMARY_MARKER = 'sn_qr_in_primary_migrated';
 
   // Icone ritirate dal registro: vanno purgate dal layout salvato per non
   // generare bottoni "fantasma" (registry lookup miss).
   const RETIRED_ICONS = new Set(['openForLater']);
 
-  // Vecchio default (prima del cambio a 5 slot): se trovo esattamente questo
-  // layout in storage, è il default che non è mai stato customizzato — migro.
+  // Se in storage c'è esattamente questo layout, è un default mai personalizzato: si può
+  // migrare senza perdere scelte dell'utente.
   const LEGACY_DEFAULT_LAYOUT = {
     primary: ['translate', 'screenshot', 'share', 'saveForLater'],
     secondary: ['openForLater', 'fullscreen', 'back', 'forward', 'reload'],
@@ -146,7 +149,8 @@
   }
 
   let iconLayoutCache = null;
-  // Stato di navigazione dell'ultima apertura del menu: senza, i redraw dopo un drag girerebbero con navState=undefined e avanti/indietro tornerebbero non grigi.
+  // Stato di navigazione dell'ultima apertura del menu: senza, i redraw dopo un drag girerebbero
+  // con navState=undefined e avanti/indietro tornerebbero non grigi.
   let lastNavState = null;
   function loadIconLayout() {
     try {
@@ -158,7 +162,8 @@
             iconLayoutCache = DEFAULT_ICON_LAYOUT;
             try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT, [QR_PRIMARY_MARKER]: true }); } catch (_) {}
           } else {
-            // Migrazione idempotente: purga le icone ritirate e aggiunge quelle introdotte dopo il salvataggio, così l'utente non perde le novità.
+            // Migrazione idempotente: purga le icone ritirate e aggiunge quelle introdotte dopo il
+            // salvataggio, così l'utente non perde le novità.
             const filterRetired = (arr) => (arr || []).filter((id) => !RETIRED_ICONS.has(id));
             const beforePrim = (v.primary || []).join('|');
             const beforeSec = (v.secondary || []).join('|');
@@ -207,7 +212,8 @@
   // Le icone che sforano la riga primaria traboccano nella griglia secondaria.
   const MAX_PRIMARY_ICONS = 6;
 
-  // beforeId = icona davanti alla quale inserire, null = in fondo. Se la primaria sfora il limite, l'ultima viene spinta in cima alla secondaria (di fatto uno scambio).
+  // beforeId = icona davanti alla quale inserire, null = in fondo. Se la primaria sfora il limite,
+  // l'ultima viene spinta in cima alla secondaria (di fatto uno scambio).
   function applyIconDrop({ id, source, target, beforeId }) {
     if (!id) return;
     const layout = { ...getIconLayout() };
@@ -258,7 +264,8 @@
     return secondaryIds.map((id) => ({ ...registry[id], draggable: true }));
   }
 
-  // Memorizza lo stato di navigazione dell'apertura corrente: serve a redrawIconRows() per i rebuild dopo un drag.
+  // Memorizza lo stato di navigazione dell'apertura corrente: serve a redrawIconRows() per i
+  // rebuild dopo un drag.
   function buildGlobalIconRow(navState) {
     lastNavState = navState || null;
     refreshOwner();
@@ -270,7 +277,8 @@
     };
   }
 
-  // Rigenera i bottoni in-place senza chiudere il menu, così l'utente può continuare a riordinare; la griglia secondaria solo se è aperta.
+  // Rigenera i bottoni in-place senza chiudere il menu, così l'utente può continuare a riordinare;
+  // la griglia secondaria solo se è aperta.
   function redrawIconRows() {
     try { Menu.refreshIconRow?.(buildPrimaryRowItems(lastNavState)); } catch (_) {}
     try { Menu.refreshIconGrid?.(buildSecondaryGridItems(lastNavState)); } catch (_) {}
@@ -282,8 +290,8 @@
     init,
     buildGlobalIconRow,
     runIconAction,
-    // Ridisegna le icone del menu già aperto quando cambia lo stato che decide il NOME di una voce (#514): lo schermo intero può spegnersi per un'altra strada,
-    // e la voce continuerebbe a promettere «Esci da schermo intero» quando non c'è più niente da cui uscire.
+    // Ridisegna le icone del menu aperto quando cambia lo stato che decide il NOME di una
+    // voce: lo schermo intero può spegnersi per un'altra strada (#514).
     redrawIconRows,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

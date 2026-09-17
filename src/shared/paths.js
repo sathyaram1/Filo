@@ -1,15 +1,6 @@
-// Raccolta percorsi dell'Aiuto: lettura diretta da Firestore REST UN DOMINIO ALLA VOLTA,
-// scrittura SOLO attraverso il server. La lettura serve all'agente di chiunque, anche senza
-// account, e resta aperta; la scrittura no — è l'unico contenuto che un utente scrive e un
-// ALTRO si ritrova nel prompt, e con la chiave pubblica del repo chiunque poteva depositare
-// un percorso saltando la pulizia (#585): ora passa dalla callable `pathSubmit`, che
-// riapplica SN_PATHS_SAFETY.sanitizeSubmission e tiene i limiti di frequenza.
-// Aperta non vuol dire intera (#584): con tutto in `paths/{doc}` e un `clientId` dentro, una
-// sola query scaricava l'archivio e rimetteva insieme i percorsi della stessa persona su
-// domini diversi, cioè il profilo di navigazione. Ora il dominio è un SEGMENTO del percorso
-// (`paths/<dominio>/entries`): chiederli vuol dire nominare un dominio, e nel documento non
-// c'è più niente del mittente. L'ora che Firestore scrive da sé la scolla dalla navigazione
-// la coda di pathsCollector.js, che ritarda l'invio di ore.
+// Raccolta percorsi dell'Aiuto: lettura da Firestore UN DOMINIO ALLA VOLTA, scrittura SOLO
+// dalla callable `pathSubmit`, che riapplica la pulizia e tiene i limiti di frequenza.
+// Il dominio è un SEGMENTO del percorso, così non si può scaricare l'archivio intero.
 
 (function (global) {
   'use strict';
@@ -25,23 +16,17 @@
   // farsi rifiutare la query.
   const MAX_PAGE_SIZE = 200;
 
-  // Il dominio diventa l'ID di un documento Firestore: fuori dalla forma di un host non si
-  // ripiega su qualcosa di simile ma si torna stringa vuota, perché un dominio «quasi giusto»
-  // leggerebbe da una cartella dove non c'è mai stato niente. La FORMA la decide la stessa
-  // pulizia che salva (`sanitizeDomain`), o le due porte divergono come già successo (#584):
-  // qui resta solo il vincolo in più di Firestore, gli ID riservati `__…__`.
+  // Il dominio diventa l'ID di un documento: fuori dalla forma di un host si torna stringa
+  // vuota, non qualcosa di simile. La FORMA la decide `sanitizeDomain`, la stessa che salva.
   const ID_RISERVATO_RE = /^__.*__$/;
 
   function segmentoDominio(domain) {
-    // I siti che non sono di nessuno non si scrivono (pathsSafety.js → sitoCondivisibile) e
-    // quindi non si leggono: `localhost` o `options` è la stessa cartella per tutti, l'unico
-    // posto dove un percorso depositato apposta arriverebbe a chiunque apra l'Aiuto lì (#584).
-    // Senza il modulo di pulizia non si tira a indovinare: non si legge, come non si spedisce.
+    // I siti che non sono di nessuno non si scrivono e quindi non si leggono: `localhost` è la
+    // stessa cartella per tutti. Senza il modulo di pulizia non si legge, come non si spedisce.
     const Safety = global.SN_PATHS_SAFETY;
     if (!Safety) return '';
-    // Il punto finale della forma assoluta si toglie come in scrittura: `esempio.it.` ed
-    // `esempio.it` sono lo stesso sito, e senza questa riga si leggerebbe da una cartella dove
-    // il server non scrive mai.
+    // Il punto finale si toglie come in scrittura: `esempio.it.` ed `esempio.it` sono lo stesso
+    // sito, e senza si leggerebbe da una cartella dove il server non scrive mai.
     const d = Safety._internal.normalizzaHost(domain);
     if (ID_RISERVATO_RE.test(d)) return '';
     // `sanitizeDomain` risponde con la stessa regola di chi salva: forma del nome, lunghezza
@@ -80,18 +65,14 @@
     return out;
   }
 
-  // `idToken` è l'identità su cui il server tiene i limiti di frequenza, e la manda ogni
-  // installazione: è il token dell'account anonimo che Filo si crea da sé, non il login
-  // Google, che è opzionale. Viaggia ACCANTO al documento e non ci entra, perché la raccolta
-  // la legge chiunque. `clientId` è il ripiego dichiarato nel contratto (SECURITY.md §8) e
-  // oggi resta vuoto: un identificativo che si dichiara da solo non regge un limite di
-  // frequenza, chi attacca ne scrive un altro.
+  // `idToken` è l'identità su cui il server tiene i limiti (account anonimo, non il login
+  // Google): viaggia ACCANTO al documento, che legge chiunque. `clientId` resta vuoto.
   async function submit({ domain, initialUrl, intent, steps, success, clientId, idToken }) {
     const Safety = global.SN_PATHS_SAFETY;
     // Senza il modulo di pulizia non si spedisce: un ripiego che manda il percorso com'è
     // sarebbe la porta di prima, aperta da un errore di caricamento invece che da una regola.
     if (!Safety) throw new Error('SN_PATHS_SAFETY non caricato: percorso non inviato');
-    // La stessa pulizia che rifarà il server: ciò che non passa di qui non vale la pena spedirlo.
+    // La stessa pulizia che rifarà il server: ciò che non passa qui non vale la pena spedirlo.
     const pulito = Safety.sanitizeSubmission({ domain, initialUrl, intent, steps, success });
     if (!pulito.ok) throw new Error(`percorso scartato prima dell'invio: ${pulito.reason}`);
 
@@ -115,13 +96,8 @@
     return { id: (r && r.id) || '' };
   }
 
-  // Legge i percorsi di UN dominio, dal più recente. La query gira SOTTO `paths/<dominio>`:
-  // non c'è nessun filtro `domain == …` da scrivere, ed è questo che rende impossibile
-  // chiederli tutti (una query di gruppo su `entries` le regole la negano). L'esito lo filtra
-  // IL SERVER: filtrandolo qui, un sito con tanti pollice in giù recenti lasciava l'assistente
-  // senza niente da riusare pur avendo percorsi buoni più vecchi. Il `where` vuole un indice
-  // composto: se fallisce perché non è ancora pubblicato si ritenta la query semplice e si
-  // filtra qui, così l'indice mancante costa una richiesta in più, non la funzione.
+  // La query gira SOTTO `paths/<dominio>`: senza filtro `domain == …`, ed è questo che rende
+  // impossibile chiederli tutti. L'esito lo filtra IL SERVER; senza indice si ritenta qui.
   function corpoQuery({ limit, onlySuccess }) {
     const q = {
       from: [{ collectionId: SUBCOLLECTION }],

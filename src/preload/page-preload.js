@@ -5,20 +5,14 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
-// #405 — questo preload gira in OGNI frame, pagina e riquadri incorporati.
-// Regola: nel frame principale si carica tutto al DOMContentLoaded; in un
-// riquadro NIENTE finché l'utente non lo tocca davvero (una pagina piena di
-// widget pagherebbe decine di volte il prezzo per frame che nessuno usa).
-// Le funzioni di PAGINA (colore della scheda, banner, traduzione) restano del
-// solo frame principale: in un riquadro descriverebbero il rettangolo sbagliato.
+// #405 — gira in ogni frame: nel principale carica tutto, in un riquadro
+// niente finché l'utente non lo tocca, o si paga per widget che nessuno usa.
 const IS_SUBFRAME = (() => {
   try { return window.top !== window.self; } catch (_) { return true; }
 })();
 
-// #145 — le schede riaperte all'avvio nascono col flag '--filo-suppress-autoplay'
-// e i loro media non devono partire da soli (ripartivano tutti insieme). Il
-// listener si installa SUBITO, prima della pagina, e cade alla prima
-// interazione dell'utente: da lì in poi comanda lui.
+// #145 — le schede riaperte all'avvio non fanno partire i media da sole, o ripartono tutte
+// insieme: il listener si installa prima della pagina e cade alla prima interazione.
 if (process.argv.includes('--filo-suppress-autoplay')) {
   try {
     let active = true;
@@ -42,11 +36,8 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
   } catch (_) { /* il blocco non deve MAI impedire il caricamento della pagina */ }
 }
 
-// Il listener `contextmenu` va registrato QUI, prima di ogni script di pagina:
-// certi siti (YouTube, Reddit) registrano il proprio su window+capture e lo
-// fermano con stopImmediatePropagation, e a parità di fase vince chi arriva
-// prima — registrandoci al DOMContentLoaded il menu di Filo non compariva.
-// L'handler vero si aggancia dopo via __snSetContextMenuHandler.
+// Va registrato prima degli script di pagina: certi siti fermano il contextmenu in capture,
+// e a parità di fase vince chi si è registrato prima.
 let contextMenuHandler = null;
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
@@ -63,9 +54,8 @@ try {
   }, { capture: true });
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
-// L'evento vero, una volta consegnato, perde composedPath(): l'elemento reale
-// (shadow DOM compreso) va fotografato SUBITO, o il menu si apre sul posto
-// sbagliato quando lo rigiochiamo.
+// L'evento consegnato perde composedPath(): l'elemento vero (shadow DOM compreso) va preso
+// subito, o rigiocandolo il menu si apre sul posto sbagliato.
 function replayContextMenu(e) {
   let node = null;
   try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
@@ -97,10 +87,8 @@ if (!IS_SUBFRAME) {
   try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
 }
 
-// Anti-fingerprint nel MAIN WORLD, prima degli script di pagina. Il seed arriva
-// SINCRONO dal main: il master secret non tocca mai il mondo non fidato. Solo
-// http(s) e solo nel frame principale — coprire anche i riquadri cambierebbe i
-// segnali dei widget di terzi, ed è una scelta a sé, non una conseguenza (#405).
+// Anti-fingerprint nel MAIN WORLD prima degli script di pagina: il seed arriva sincrono, il
+// master secret non tocca il mondo non fidato. Solo http(s) e solo nel frame principale.
 if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
@@ -120,10 +108,8 @@ let streamCounter = 0;
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
 const broadcastListeners = new Set();
-// #407 — messaggi che devono SVEGLIARE un riquadro: «Traduci la pagina» arriva
-// dalla pagina ospite, non da un clic lì dentro, e un riquadro addormentato
-// resterebbe in lingua originale sotto un avviso che dice "fatto". Valore
-// letterale perché SN_MSG qui non è ancora caricato.
+// #407 — messaggi che devono SVEGLIARE un riquadro: senza, resterebbe in lingua originale
+// sotto un avviso che dice «fatto». Valore letterale: qui SN_MSG non è ancora caricato.
 const WAKE_BROADCASTS = new Set(['frame_translate']);
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
   const deliver = () => {
@@ -243,10 +229,8 @@ const chromeShim = {
 globalThis.chrome = chromeShim;
 globalThis.self = globalThis; // i moduli IIFE controllano `self` come fallback
 
-// #405 — `webContents.send` consegna SOLO al frame principale, ma il testo
-// selezionato può stare in un riquadro: ogni frame segnala al main quando
-// l'utente ci interagisce (al più una volta ogni mezzo secondo), così il main
-// sa a chi consegnare le scorciatoie che lavorano sulla selezione.
+// #405 — `webContents.send` consegna solo al frame principale, ma la selezione può stare in
+// un riquadro: ogni frame segnala l'interazione, così il main sa a chi consegnarle.
 try {
   let lastClaim = 0;
   const claim = () => {
@@ -260,8 +244,6 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
-// Adattatore: l'evento IPC grezzo diventa il messaggio del catalogo che i
-// content script ascoltano.
 ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
   // `context` è opzionale: la voce "Aiuto" ci mette url e titolo della scheda,
   // così l'agente sa da dove è stato chiamato.
@@ -280,8 +262,6 @@ ipcRenderer.on('shortcut:triggered', (_event, { command, context } = {}) => {
   }
   deliver();
 });
-
-// CSS condivisi e content script, subito dopo il DOMContentLoaded della pagina.
 
 const STYLES = [
   'theme.css', 'menu.css', 'popup.css', 'sidebar.css',
@@ -303,9 +283,8 @@ const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
 function loadScripts() {
-  // #405 — `PAGE_ONLY` marca i moduli che parlano della SCHEDA intera (banner,
-  // colore della tab): in un riquadro descriverebbero il rettangolo sbagliato
-  // — un avviso "sito pericoloso" dentro un video — e lì non si caricano.
+  // #405 — `PAGE_ONLY` marca i moduli che parlano della SCHEDA intera (banner, colore della
+  // tab): in un riquadro descriverebbero il rettangolo sbagliato e lì non si caricano.
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
   // PRIMO fra i moduli che toccano il DOM: è il marchio con cui la UI di Filo
@@ -313,7 +292,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
-  try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
+  try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // prima di menu/actions/content, che ne usano i nomi
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
@@ -333,7 +312,7 @@ function loadScripts() {
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
-  try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
+  try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); }
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
   try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback content', e); }
   try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo CS] redteamAttack content', e); }
@@ -393,9 +372,8 @@ if (!IS_SUBFRAME) {
     start();
   }
 } else {
-  // Clic, tasto o fuoco su un campo dicono "sto usando questa cosa": da lì il
-  // riquadro risponde come il resto della pagina. Il tasto destro ha la sua
-  // strada (il bridge sopra), che monta e rigioca il clic.
+  // Clic, tasto o fuoco dicono «sto usando questa cosa»: da lì il riquadro risponde come il
+  // resto della pagina. Il tasto destro ha la sua strada (il bridge sopra).
   for (const ev of ['pointerdown', 'keydown', 'focusin']) {
     try {
       window.addEventListener(ev, ensureContentScripts, { capture: true, passive: true, once: true });

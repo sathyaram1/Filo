@@ -9,10 +9,8 @@
     return global.SN_I18N ? global.SN_I18N.t(key, ...args) : key;
   }
 
-  // Qui stanno SOLO le etichette (chiavi i18n): l'ELENCO delle funzioni viene dal censimento
-  // (modelUsage.js), sorgente di verità. Quando erano due liste scritte a mano potevano
-  // divergere, e una funzione dimenticata qui restava senza un posto dove impostarla. Una
-  // funzione senza etichetta ricade sul nome del censimento invece di sparire.
+  // Qui SOLO le etichette: l'ELENCO delle funzioni viene dal censimento (modelUsage.js), che
+  // è la sorgente di verità. Una funzione senza etichetta ricade sul nome del censimento.
   function labelKeys() {
     const A = global.SN_CONST.ACTIONS;
     return [
@@ -88,9 +86,8 @@
     inp.size = Math.max((inp.value || '').length + 1, 6);
   }
 
-  // Verifica che il modello soddisfi i requisiti dell'azione (un'azione di testo non può
-  // ricevere un modello di sola sintesi vocale). I nickname sconosciuti NON si bloccano:
-  // potrebbero essere id grezzi legacy.
+  // Verifica che il modello soddisfi i requisiti dell'azione (un'azione di testo non può avere
+  // un modello di sola sintesi vocale). I nickname sconosciuti non si bloccano: forse legacy.
   function makeValidator(action, getRegistry) {
     return function (ref) {
       const Caps = global.SN_MODEL_CAPS;
@@ -199,14 +196,11 @@
         inp.value = ref;
         inp.placeholder = i === 0 ? t('options_chain_primary') : t('options_chain_fallback');
         fit(inp);
-        // Durante la digitazione si è liberi (i valori parziali non sono nickname del registry);
-        // alla conferma un modello NON adatto viene rifiutato, si ripristina l'ultimo valore valido
-        // e si mostra il motivo, così un abbinamento incompatibile non si può SALVARE.
+        // Durante la digitazione si è liberi; alla conferma un modello NON adatto viene rifiutato,
+        // si ripristina l'ultimo valore valido e si dice il motivo: così non si può SALVARE.
         let lastGood = ref;
-        // Scorciatoia citata ma inesistente: la funzione non partirebbe, quindi si segnala QUI
-        // mentre si configura. Il segnale è il CAMPO che diventa rosso, con la spiegazione
-        // nell'hover: aggiungere testo sposterebbe i pulsanti «×» e «+» proprio mentre ci stai
-        // cliccando sopra. È solo un avviso, il valore resta scritto e modificabile.
+        // Scorciatoia citata ma inesistente: la funzione non partirebbe, quindi si segnala mentre
+        // si configura, col CAMPO rosso e la spiegazione nell'hover; il valore resta scritto.
         const markUnknown = (val) => {
           const bad = Boolean(val) && !isKnown(val);
           inp.style.color = bad ? 'var(--sn-danger,#c0392b)' : '';

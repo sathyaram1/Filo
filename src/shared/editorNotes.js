@@ -1,6 +1,6 @@
-// Appunti nell'editor: come Filo, in autonomia, scrive gli appunti dentro i FILE dell'editor invece che in un archivio separato, così sono testo vero — riordinabile, versionato, ritrovabile insieme al resto.
-// Accoda al file di appunti «attivo» finché l'argomento resta lo stesso, e ne apre uno nuovo quando cambia o su richiesta esplicita.
-// LOGICA PURA su oggetti (collezione + storico versioni + puntatore all'appunto attivo): la persistenza vive nel main (services/editorFiles.js) e nel renderer. Riusa SN_EDITOR_STORE e SN_EDITOR_VERSIONS.
+// Filo scrive gli appunti dentro i FILE dell'editor, non in un archivio separato:
+// sono testo vero, riordinabile, versionato e ritrovabile col resto.
+// LOGICA PURA: la persistenza sta nel main (services/editorFiles.js) e nel renderer.
 
 (function (global) {
   'use strict';
@@ -46,7 +46,7 @@
     return paras.length ? paras : [{ type: 'paragraph', content: [] }];
   }
 
-  // `meta.created/modified` in ISO come nel resto dell'editor, così il confronto «chi è più fresco» in fase di merge resta omogeneo.
+  // Date in ISO come nel resto dell'editor: il confronto «chi è più fresco» resta omogeneo.
   function blankNotesFile(id, title, now) {
     const iso = new Date(Number.isFinite(now) ? now : Date.now()).toISOString();
     return {
@@ -62,7 +62,7 @@
     try { return JSON.parse(JSON.stringify(x)); } catch (_) { return x; }
   }
 
-  // Se il file è vuoto (un solo paragrafo senza testo, com'è appena creato) i paragrafi rimpiazzano quel vuoto, e non resta una riga bianca in testa.
+  // Su un file vuoto i paragrafi rimpiazzano il vuoto: niente riga bianca in testa.
   function appendToContent(content, paras) {
     const base = (content && content.type === 'doc' && Array.isArray(content.content))
       ? content.content.slice() : [];
@@ -70,9 +70,8 @@
     return { type: 'doc', content: cleaned.concat(paras) };
   }
 
-  // Scrive un appunto nella collezione. opts: collection (v2, obbligatoria), versions (default {}), pointer { fileId, topic } cioè il file attivo e l'ultimo argomento, text (senza il quale è no-op), topic, forceNew per aprire comunque un file nuovo, ids e now per test deterministici.
-  // Regola: accoda a `pointer.fileId` finché l'argomento resta lo stesso; apre un file nuovo se `forceNew`, se il puntatore è assente o sparito, o se l'argomento è cambiato.
-  // Ogni scrittura registra punti di ripristino PRIMA e DOPO, così la modifica di Filo è sempre reversibile. Ritorna { collection, versions, pointer, fileId, createdFile, title, wrote }.
+  // Accoda a `pointer.fileId` finché l'argomento è lo stesso; se cambia apre un file nuovo.
+  // Ogni scrittura registra un punto di ripristino PRIMA e DOPO: Filo è sempre reversibile.
   function writeNote(opts) {
     const o = opts || {};
     const collection = o.collection;
@@ -101,7 +100,8 @@
       target = existing;
     }
 
-    // Per un append consecutivo il «prima» coincide col «dopo» precedente e il dedup evita un punto spazzatura; per un file nuovo cattura lo stato vuoto, ripristinabile.
+    // In append il «prima» coincide col «dopo» precedente: il dedup evita punti spazzatura.
+    // Su un file nuovo cattura lo stato vuoto, ripristinabile.
     if (VERS) {
       const pre = VERS.record(versions, target.id, {
         content: clone(target),
@@ -121,7 +121,7 @@
     STORE.replaceFile(collection, target.id, updated);
     collection.activeId = target.id;
 
-    // È il punto «dopo» a rendere la scrittura reversibile e ad alimentare lo storico del file.
+    // È il punto «dopo» ad alimentare lo storico del file.
     if (VERS) {
       const post = VERS.record(versions, target.id, {
         content: clone(STORE.findFile(collection, target.id)),
@@ -143,7 +143,8 @@
     };
   }
 
-  // Data e argomento che il vecchio archivio mostrava accanto al testo: senza, migrando si perderebbero il QUANDO e il DI-COSA di ogni nota, che l'utente aveva sotto gli occhi. Torna '' se mancano entrambi, per non lasciare righe vuote decorative.
+  // Data e argomento: migrando senza, di ogni nota si perderebbe il QUANDO e il DI-COSA.
+  // Torna '' se mancano entrambi: niente righe vuote decorative.
   function noteHeadline(note) {
     const parts = [];
     const ts = note && note.ts;
@@ -158,7 +159,8 @@
     return parts.join(' · ');
   }
 
-  // MIGRAZIONE dal vecchio archivio a un unico file «Appunti». `notes` arriva col più recente per primo, come lo storage: si inverte per avere l'ordine cronologico. Ritorna il file serializzato pronto da aggiungere alla collezione, o null se la lista è vuota.
+  // MIGRAZIONE a un unico file «Appunti»: `notes` arriva col più recente per primo,
+  // e si inverte per l'ordine cronologico. Null se la lista è vuota.
   function buildNotesFile(notes, opts) {
     const o = opts || {};
     const now = Number.isFinite(o.now) ? o.now : Date.now();

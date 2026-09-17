@@ -1,5 +1,5 @@
-// Persistenza delle tab archiviate (§3.1): alla chiusura di una scheda i suoi metadati finiscono qui e restano riapribili da filo://archive.
-// Solo metadati: riassunto LLM ed embedding per la ricerca semantica (§3.2) sono rimandati.
+// Persistenza delle tab archiviate (§3.1): alla chiusura i metadati finiscono qui e la
+// scheda resta riapribile da filo://archive. Riassunto ed embedding (§3.2) sono rimandati.
 
 (function (global) {
   'use strict';
@@ -36,7 +36,7 @@
       coOpenUrls: Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : [],
       // Posizione di scroll: rimandata (la consuma §2.1). Campo riservato.
       scrollPosition: typeof meta.scrollPosition === 'number' ? meta.scrollPosition : null,
-      // Location proxy alla chiusura: riaprendo dalla cronologia la tab rinasce proxata sulla stessa.
+      // Proxy alla chiusura: riaprendo dalla cronologia la tab rinasce sulla stessa location.
       proxy: meta.proxy && meta.proxy.country
         ? { country: String(meta.proxy.country), tier: meta.proxy.tier || null }
         : null,
@@ -53,7 +53,8 @@
     return items.map(({ embedding, ...rest }) => rest);
   }
 
-  // Gli embedding restano solo sulle tab più recenti (in testa all'array) per non sforare la quota; muta l'array in place.
+  // Gli embedding restano solo sulle tab più recenti (in testa) per non sforare la quota;
+  // muta l'array in place.
   function capEmbeddings(items) {
     let changed = false;
     for (let i = ARCHIVED_EMBED_LIMIT; i < items.length; i++) {

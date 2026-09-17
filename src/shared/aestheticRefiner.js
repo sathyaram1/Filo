@@ -1,6 +1,6 @@
-// Box di raffinamento estetico (#146.4): quando Filo cambia un token su richiesta in chat applica subito un valore ragionevole, e la bolla offre un bottone che apre questo box per scegliere il valore esatto con anteprima LIVE.
-// Il controllo deriva dal tipo del token nel registro (themeTokens.js): colore → picker, opacità e raggio → slider, font → menu di famiglie.
-// Puramente DOM, senza IPC né storage: le dipendenze arrivano da fuori — deps = { Tokens (SN_THEME_TOKENS), theme 'light'|'dark', overrides correnti (col valore appena messo da Filo), applyLive(overrides) senza persistere, persist(overrides), doc } — così si prova con callback-spia.
+// Box di raffinamento estetico (#146.4): dopo che Filo ha cambiato un token in chat, qui si
+// sceglie il valore esatto con anteprima live; il controllo deriva dal tipo del token.
+// Puramente DOM: niente IPC né storage, le dipendenze arrivano da fuori (deps) per i test.
 
 (function (global) {
   'use strict';
@@ -26,7 +26,7 @@
     }
   }
 
-  // Ritorna '#000000' se il valore non è interpretabile (non dovrebbe capitare per i token colore).
+  // '#000000' se il valore non è interpretabile: per un token colore non dovrebbe capitare.
   function toHexColor(value, Tokens) {
     const triplet = Tokens && Tokens.toRgbTriplet ? Tokens.toRgbTriplet(value) : null;
     if (!triplet) return '#000000';
@@ -65,7 +65,8 @@
 
     const theme = deps.theme === 'dark' ? 'dark' : 'light';
     const type = controlTypeFor(name, Tokens);
-    // Si parte dagli override correnti, che includono il valore già messo da Filo: «Annulla» ci ritorna, e ogni modifica lavora su una copia.
+    // Si parte dagli override correnti, che includono il valore già messo da Filo: «Annulla» ci
+    // ritorna, e ogni modifica lavora su una copia.
     const startOverrides = { ...(deps.overrides || {}) };
     const working = { ...startOverrides };
 
@@ -96,7 +97,7 @@
     title.textContent = `Regola: ${t.label || name}`;
     panel.appendChild(title);
 
-    // L'anteprima riflette il valore di lavoro, oltre alle superfici dietro che applyLive aggiorna comunque.
+    // L'anteprima riflette il valore di lavoro; le superfici dietro le aggiorna applyLive.
     const sample = doc.createElement('div');
     sample.className = 'sn-refine-sample';
     panel.appendChild(sample);
@@ -115,7 +116,7 @@
         sample.appendChild(sw);
         const btn = doc.createElement('span');
         btn.className = 'sn-refine-sample-btn';
-        // Il colore scelto va sullo sfondo del «bottone» se è un token bottone, altrimenti su testo e accento.
+        // Sullo sfondo se il token è del bottone, altrimenti su testo e accento.
         if (name === 'button.bg' || name === 'background') { btn.style.background = eff; btn.style.color = Tokens.effectiveValue('button.fg', working, theme); }
         else if (name === 'button.fg' || name === 'text') { btn.style.color = eff; }
         else { btn.style.background = Tokens.effectiveValue('button.bg', working, theme); btn.style.color = eff; }
@@ -185,7 +186,7 @@
       control.value = String(parseInt(startEff, 10) || 0);
       control.setAttribute('aria-label', t.label || name);
       control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || 0}px`));
-    } else { // font
+    } else {
       control = doc.createElement('select');
       control.className = 'sn-refine-input sn-refine-select';
       control.setAttribute('aria-label', t.label || name);
@@ -252,7 +253,8 @@
     btn.className = 'dash-action-btn sn-refine-trigger';
     btn.textContent = `🎨 ${triggerLabel(name, Tokens)}`;
     btn.addEventListener('click', () => {
-      // Le dipendenze possono essere risolte pigramente (deps.resolve) per leggere gli override più freschi al momento del click.
+      // Le dipendenze si possono risolvere pigramente (deps.resolve), per leggere gli override
+      // più freschi al momento del click.
       const resolved = typeof deps.resolve === 'function' ? deps.resolve() : deps;
       Promise.resolve(resolved).then((d) => openOverlay(action, d || deps));
     });

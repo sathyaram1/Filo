@@ -1,6 +1,6 @@
-// Gestione cookie/consenso, parte main: header Sec-GPC, blocco delle richieste ai tracker noti, scelta della partizione per ogni navigazione, wipe mirato dei cookie-tracker.
-// Modalità in settings.security.cookies.mode: 'manual' (niente), 'default' (GPC + rifiuto CMP + blocco tracker; i cookie funzionali e le scelte dell'utente NON si cancellano), 'privacy' (in più un jar isolato per sito, persistente solo per i siti fidati).
-// Il rifiuto dei banner CMP e gli embed YouTube stanno in src/content/cookies.js; l'iniezione di navigator.globalPrivacyControl in tabs.js.
+// Cookie e consenso, lato main: GPC, blocco dei tracker, partizione per sito, wipe mirato.
+// Modalità in settings.security.cookies.mode: manual, default, privacy.
+// Banner CMP ed embed YouTube stanno in src/content/cookies.js; l'iniezione GPC in tabs.js.
 
 'use strict';
 
@@ -8,8 +8,8 @@ const { session } = require('electron');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
-// REGOLA: solo host DEDICATI al tracciamento. Mai domini "buoni" (google.com, facebook.com) o si blocca il sito intero; per i servizi su dominio legittimo si elenca l'host preciso ('analytics.google.com').
-// Bloccare la richiesta è più efficace del cancellare il cookie dopo: lo script non si carica e il cookie non nasce. Match per host: host === voce, oppure host che termina con '.' + voce.
+// Solo host DEDICATI al tracciamento: un dominio buono (google.com) blocca il sito intero.
+// Bloccare la richiesta batte cancellare: lo script non si carica e il cookie non nasce.
 const TRACKER_HOSTS = [
   'google-analytics.com',
   'analytics.google.com',
@@ -71,7 +71,7 @@ function getMode(settings) {
   return m === MODES.MANUAL || m === MODES.PRIVACY ? m : MODES.DEFAULT;
 }
 
-// Siti "fidati" (eTLD+1) che in Privacy restano connessi; la vecchia chiave loginWhitelist è accettata per retrocompatibilità.
+// Siti fidati (eTLD+1) che in modalità privacy restano connessi.
 function getTrustedSites(settings) {
   const c = settings && settings.security && settings.security.cookies;
   const list = (c && (c.trustedSites || c.loginWhitelist)) || [];
@@ -82,7 +82,7 @@ function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
 
-// Fallback all'hostname grezzo se il normalizzatore non c'è o l'URL non ha un dominio analizzabile (IP, localhost).
+// Ripiego sull'hostname grezzo quando non c'è un dominio analizzabile (IP, localhost).
 function registrableOf(url) {
   try {
     const SB = globalThis.SN_SAFEBROWSE;
@@ -94,7 +94,8 @@ function registrableOf(url) {
   try { return new URL(url).hostname.toLowerCase() || null; } catch (_) { return null; }
 }
 
-// Slug sicuro per un nome di partizione Electron (solo [a-z0-9.-]). Il sito fidato prende una partizione PERSISTENTE: isolata per-sito ma sopravvive alla sessione, così l'utente resta connesso; gli altri effimera.
+// Sito fidato: partizione PERSISTENTE, isolata per sito ma superstite alla sessione, così
+// l'utente resta connesso; per gli altri effimera. Il nome è ristretto a [a-z0-9.-].
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
@@ -104,7 +105,8 @@ function partitionForUrl(url, trusted) {
   return (isTrusted ? 'persist:' : '') + base;
 }
 
-// Electron ammette un solo listener onBeforeSendHeaders per sessione (una seconda registrazione SOSTITUISCE la prima): si registra una volta sola e si accende/spegne col flag nella mappa.
+// Electron ammette un solo onBeforeSendHeaders per sessione: una seconda registrazione
+// sostituisce la prima, quindi si registra una volta e si accende col flag nella mappa.
 
 const gpcState = new WeakMap(); // session → { enabled }
 
@@ -138,7 +140,8 @@ function applyTrackerBlocking(ses, enabled) {
   if (!state) {
     state = { enabled: !!enabled };
     blockState.set(ses, state);
-    // UNICO choke point onBeforeRequest della sessione (Electron ne ammette uno solo per evento): blocco tracker curato e motore ad-blocking a liste devono convivere qui, con gate indipendenti.
+    // UNICO onBeforeRequest della sessione: Electron ne ammette uno solo per evento, quindi
+    // blocco tracker e ad-blocking convivono qui, con gate indipendenti.
     ses.webRequest.onBeforeRequest((details, callback) => {
       const s = blockState.get(ses);
       if (s && s.enabled && isTrackerUrl(details.url)) {
@@ -171,12 +174,13 @@ function ensureSiteSession(partition, { gpc } = {}) {
   }
   const on = gpc !== false;
   applyGpc(ses, on);
-  // applyTrackerBlocking registra l'unico onBeforeRequest, che copre anche l'ad-blocking: così lo ricevono pure i jar per-sito della modalità privacy, non solo la sessione di default.
+  // L'unico onBeforeRequest copre anche l'ad-blocking: così lo ricevono pure i jar per-sito
+  // della modalità privacy, non solo la sessione di default.
   applyTrackerBlocking(ses, on);
   return ses;
 }
 
-// partition null = sessione di default della finestra (modalità manual/default, pagine filo://, o finestra incognito che ha già il suo jar).
+// partition null = sessione di default della finestra (manual/default, filo://, incognito).
 function partitionForTab(url, { mode, incognito, trusted } = {}) {
   if (incognito) return { partition: null };           // incognito ha già il suo jar
   if (mode !== MODES.PRIVACY) return { partition: null };
@@ -190,7 +194,8 @@ function partitionForTab(url, { mode, incognito, trusted } = {}) {
   return { partition };
 }
 
-// Chiamato all'avvio e a ogni UPDATE_SETTINGS; le sessioni per-sito ricevono lo stesso trattamento alla creazione. In manual tutto è spento.
+// Chiamato all'avvio e a ogni UPDATE_SETTINGS; le sessioni per-sito ricevono lo stesso
+// trattamento alla creazione. In manual tutto è spento.
 function configureForMode(mode) {
   const on = mode !== MODES.MANUAL;
   applyGpc(session.defaultSession, on);
@@ -201,7 +206,7 @@ function configureForMode(mode) {
   }
 }
 
-// before-quit è sincrono: tiene l'ultima modalità vista per lanciare il wipe senza rileggere lo storage.
+// before-quit è sincrono: tiene l'ultima modalità vista, così il wipe non rilegge storage.
 let _cached = { mode: MODES.DEFAULT, trustedSites: [] };
 
 function configureFromSettings(settings) {
@@ -213,8 +218,8 @@ function wipeOnExit() {
   return wipeTrackerCookies({ security: { cookies: _cached } });
 }
 
-// In 'default' NON cancelliamo i cookie funzionali: login e scelte dell'utente devono restare. Si ripuliscono solo i cookie di dominio tracker rimasti da prima dell'Automatico o da una sessione precedente.
-// In 'privacy' le sessioni sono effimere e non serve; in 'manual' non si tocca nulla.
+// In 'default' i cookie funzionali restano (login e scelte dell'utente): si ripuliscono solo
+// quelli di dominio tracker. In privacy le sessioni sono effimere, in manual non si tocca.
 async function wipeTrackerCookies(settings) {
   if (getMode(settings) !== MODES.DEFAULT) return { removed: 0, skipped: true };
   const ses = session.defaultSession;

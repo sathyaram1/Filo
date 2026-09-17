@@ -1,6 +1,5 @@
-// Tempi e durate, logica pura (IIFE su globalThis). Da un'ora in su il conto alla
-// rovescia passa a H:MM:SS (non «120:00») e le durate brevi non si arrotondano ai
-// minuti: un timer di 30 secondi resta «30 sec», non «0 min» (#323).
+// Tempi e durate, logica pura. Da un'ora in su il conto alla rovescia passa a H:MM:SS
+// (non «120:00») e le durate brevi non si arrotondano: 30 secondi resta «30 sec» (#323).
 
 (function (global) {
   'use strict';

@@ -53,8 +53,6 @@
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // Le quattro sezioni della macchina a stati, le stesse della dashboard di gestione:
-  // 'inbox' aspettano una decisione, 'queue' in lavorazione, 'resolved' usciti, 'archived'.
   const TABS = ['inbox', 'queue', 'resolved', 'archived'];
   const TAB_LABELS = {
     inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
@@ -76,14 +74,15 @@
   // Finché i feedback non sono arrivati davvero la pagina non conosce nessun numero: le
   // sezioni restano col solo nome (#495).
   let dataLoaded = false;
-  // Ultimo caricamento fallito: la frase e «Riprova» da rimettere se un re-render svuota il riquadro.
+  // Ultimo caricamento fallito: la frase e «Riprova» da rimettere se un re-render svuota il
+  // riquadro.
   let loadError = null;
   // Generazione dei caricamenti: ogni load() butta il proprio risultato se nel frattempo ne
   // è partito un altro, o quello lento aperto all'avvio sovrascriverebbe il più recente.
   let loadGen = 0;
 
-  // Stato CANONICO (FEEDBACK-STATES.md §2). Unica porta d'ingresso: normalizeStatus scioglie
-  // anche gli stati legacy dello storico.
+  // Stato CANONICO (FEEDBACK-STATES.md §2): unica porta d'ingresso, normalizeStatus scioglie
+  // anche gli stati dello storico.
   function statusOf(f) {
     return MR.normalizeStatus(f).status;
   }
@@ -139,7 +138,7 @@
     return { source: 'agent', model, severity, area, title };
   }
 
-  // Più pallini pieni = priorità più alta: le routine affrontano prima i feedback con priorità maggiore.
+  // Più pallini pieni = le routine affrontano prima quel feedback.
   function priorityOf(f) {
     const p = Math.round(Number(f.priority) || 0);
     return p >= 1 && p <= 3 ? p : 0;
@@ -241,16 +240,16 @@
     return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s);
   }
 
-  // Nessun src iniziale: gli allegati sono CIFRATI su Storage (byte opachi) e un <img src=URL>
-  // diretto mostrerebbe un allegato rotto. Il main li decifra, resolveFbImages riempie src.
+  // Nessun src iniziale: gli allegati sono CIFRATI su Storage e un <img src=URL> diretto
+  // mostrerebbe un allegato rotto. Il main li decifra, resolveFbImages riempie src.
   function imagesGridHtml(urls) {
     const imgs = (urls || []).filter((u) => typeof u === 'string' && u);
     if (!imgs.length) return '';
     return `<div class="fb-imgs">${imgs.map((u) => `<img class="fb-img-loading" data-url="${escapeHtml(u)}" loading="lazy" alt="">`).join('')}</div>`;
   }
 
-  // Decifratura lazy (S1.2), cache url → { dataUrl, error }: `error` porta il MOTIVO preciso
-  // così il segnaposto lo spiega. `soloDestinatario` non è un guasto: apre solo chi riceve (#582).
+  // Decifratura lazy, cache url → { dataUrl, error }: `error` porta il MOTIVO preciso, così
+  // il segnaposto lo spiega. `soloDestinatario` non è un guasto: apre solo chi riceve.
   const fbImgCache = new Map();
   async function resolveImageSrc(url) {
     if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
@@ -269,9 +268,8 @@
     return res;
   }
 
-  // L'indirizzo di un allegato NON diventa mai un href: lo scrive chi manda la segnalazione, e
-  // una segnalazione la manda chiunque — un finto «schermata.png» che punta al proprio sito era
-  // un'esca dentro Filo. Il clic passa dal main, che confronta col deposito e decifra (#582).
+  // L'indirizzo di un allegato NON diventa mai un href: lo scrive chi manda la segnalazione,
+  // e chiunque può mandarne una. Il clic passa dal main, che confronta col deposito e decifra.
   function filesListHtml(files) {
     const fs = (files || []).filter((x) => x && typeof x.url === 'string' && x.url);
     if (!fs.length) return '';
@@ -313,8 +311,8 @@
     nota.textContent = soloDestinatario ? '(riservato)' : '(non disponibile)';
   }
 
-  // Il clic scarica e decifra dal main, poi salva col nome vero. Se non si può aprire lo dice:
-  // prima il collegamento portava ai byte cifrati, un .pdf col nome giusto che non si apriva.
+  // Il clic scarica e decifra dal main, poi salva col nome vero: un collegamento diretto
+  // darebbe i byte cifrati, un .pdf col nome giusto che non si apre.
   function resolveFileLinks(root) {
     root.querySelectorAll('a.fb-file').forEach((a) => {
       const url = a.dataset.url || '';
@@ -429,8 +427,8 @@
 
     async function addFile(file) {
       if (!file) return;
-      // Il TIPO si guarda PRIMA di caricare (#582): il selettore offre anche image/* e text/*, che
-      // il deposito rifiuta, e si leggeva il suo numero d'errore invece della frase giusta.
+      // Il TIPO si guarda PRIMA di caricare: il selettore offre anche image/* e text/*, che il
+      // deposito rifiuta — e se ne leggeva il numero d'errore invece della frase giusta.
       const kind = classificaAllegato(file);
       if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
       const isImg = kind === 'image';
@@ -524,8 +522,8 @@
     }
     const item = all.find((f) => f._id === id);
     if (!item) return false;
-    // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano sta qui perché
-    // i cammini che scrivono le note sono più d'uno: uno scoperto basta. Stato e priorità liberi.
+    // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano sta qui
+    // perché i cammini che scrivono le note sono più d'uno: uno scoperto basta.
     if (item.reportIllegibile && payload && typeof payload.notes === 'string') {
       alert('Il report di questo feedback non è leggibile su questo computer: manca la chiave privata. '
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
@@ -561,8 +559,8 @@
     }
   }
 
-  // I pulsanti scrivono STATI CANONICI, o il feedback esce dalla macchina a stati. QUALI azioni
-  // esistono lo decide MR.ownerActions, la stessa tabella della gemella; qui solo il disegno.
+  // I pulsanti scrivono STATI CANONICI, o il feedback esce dalla macchina a stati. QUALI
+  // azioni esistono lo decide MR.ownerActions, la stessa tabella della gemella.
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
@@ -582,11 +580,8 @@
     }).join('\n');
   }
 
-  // UN CLIC, UNA SCHEDA. I pulsanti vivono DENTRO la scheda, in una lista che si riordina da
-  // sé: finché ogni azione la ridisegnava, sotto il puntatore FERMO arrivava il pulsante della
-  // scheda successiva e il secondo clic cadeva su un ALTRO feedback. La regola: NESSUNA AZIONE
-  // PRESA DENTRO UNA SCHEDA RICOMPONE LA LISTA — la scheda si aggiorna al proprio posto e la
-  // lista si ricompone solo su richiesta esplicita (sezione, ricerca, filtro, Aggiorna).
+  // UN CLIC, UNA SCHEDA: nessuna azione presa dentro una scheda ricompone la lista — si
+  // aggiorna al proprio posto, o il secondo clic cade su un ALTRO feedback.
 
   // Schede con una scrittura in volo: il loro secondo clic non deve partire.
   const inScrittura = new Set();
@@ -645,7 +640,8 @@
       riga.textContent = `✓ ${esito}`;
       box.appendChild(riga);
     }
-    // Anche le caselle: la scheda non è più di questa sezione, e una casella ancora scrivibile direbbe il contrario.
+    // Anche le caselle: la scheda non è più di questa sezione, e una scrivibile direbbe il
+    // contrario.
     card.querySelectorAll('button, textarea, input').forEach((b) => { b.disabled = true; });
   }
 
@@ -747,7 +743,7 @@
       emptyEl.textContent = sezioniAttendibili()
         ? (TAB_EMPTY[currentTab] || 'Nessun feedback.')
         : 'Nessun feedback ricevuto.';
-      // Col caricamento al tetto una sezione «vuota» può non esserlo: i più vecchi non sono in pagina.
+      // Col caricamento al tetto una sezione «vuota» può non esserlo: i più vecchi non sono qui.
       if (dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE)) {
         emptyEl.textContent = `${emptyEl.textContent} ${SN_FEEDBACK.COUNT_CAP_HINT}`;
       }
@@ -826,7 +822,6 @@
           ${filesHtml}
         </div>`;
       // La textarea modifica SOLO la nota dell'agente: riaperture e risposte restano bolle a sé.
-      // Prima l'intero blob `notes` cadeva in un'unica casella e la riapertura sembrava la stessa bolla.
       let headText = '';
       let headAtts = [];
       let tailStr = '';
@@ -854,8 +849,8 @@
       const notesPlaceholder = currentTab === 'inbox'
         ? 'Aggiungi un commento… (verrà conservato quando metti il feedback in coda)'
         : 'Dettagli aggiuntivi, vincoli, scelte di design…';
-      // La textarea mostra il capo pulito (le righe-marcatore degli allegati vivono come
-      // thumbnail nel compositore) e porta la coda in `data-tail`, che il salvataggio riallega intatta.
+      // La textarea mostra il capo pulito (le righe-marcatore vivono come miniature nel
+      // compositore) e porta la coda in `data-tail`, che il salvataggio riallega intatta.
       const notesBlock = notesEditable
         ? `<label class="fb-notes-label">${notesLabelText}
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" data-tail="${escapeHtml(tailStr)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(headText || '')}</textarea>
@@ -917,9 +912,7 @@
         } else {
           const ph = document.createElement('div');
           ph.className = 'fb-img-broken';
-          // Chi ha mandato la segnalazione non rivedrà il proprio screenshot: l'allegato lo apre solo
-          // chi riceve. Non è un guasto, non è «inviato» (l'elenco mostra le segnalazioni di tutti) né
-          // «consegnato»: che sia arrivato Filo non l'ha guardato (#582). Il motivo lo dà il main.
+          // L'allegato lo apre solo chi riceve: non è un guasto. Il motivo lo dà il main.
           ph.textContent = soloDestinatario ? '(allegato riservato)' : '(immagine non disponibile)';
           // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
           ph.title = error || img.dataset.url || '';
@@ -932,7 +925,7 @@
 
     bindCardActions(listEl);
 
-    // Riseleziona la casella che aveva il fuoco (captureFocus): salvare le note non deve deselezionare.
+    // Salvare le note non deve far perdere fuoco e cursore a chi sta scrivendo.
     restoreFocus(focusSnap);
   }
 
@@ -1077,7 +1070,7 @@
         const card = dot.closest('.fb-card');
         inScrittura.add(id);
         spegniScheda(card);
-        // priorityManual:true dice al backend che è una scelta dell'owner: il giudice automatico non sovrascrive.
+        // priorityManual:true = scelta dell'owner: il giudice automatico non la sovrascrive.
         const ok = await patch(id, { priority: next, priorityManual: true }, { priority: next }, { inPlace: true });
         inScrittura.delete(id);
         if (card && card.isConnected) {
@@ -1299,8 +1292,7 @@
     const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
-    // DB3: la versione in esecuzione è l'ultima rilasciata. Stessa domanda e stessa risposta
-    // della gemella, o un `done` non ancora uscito starebbe in due sezioni diverse.
+    // DB3 come sopra (releasedVersion): stessa domanda e stessa risposta della gemella.
     if (!releasedVersion) {
       try {
         const r = await sendToMain({ type: 'get_update_recap' });
@@ -1323,7 +1315,7 @@
       // iniettato dati), questo risultato è vecchio: si butta.
       if (gen !== loadGen) return;
       // I DUE TESTI: il report della lavorazione è cifrato e chi non è l'owner non ha la chiave.
-      // Al suo posto la frase per chi ha segnalato; se non c'è, niente — meglio di una bolla di ciphertext.
+      // Al suo posto la frase per chi ha segnalato; se non c'è, niente.
       all = list.map(sanitizeReportForReader);
       // Da qui in poi i numeri delle sezioni sono veri e si possono scrivere.
       dataLoaded = true;
@@ -1331,8 +1323,6 @@
       applyFilter();
     } catch (e) {
       if (gen !== loadGen) return;
-      // Errore di caricamento: frase per l'utente (mai il «Failed to fetch» grezzo) più un tasto
-      // per riprovare, invece di costringere a chiudere e riaprire la pagina. Come la bacheca.
       console.error('[feedback] errore caricamento:', e);
       loadError = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
         ? SN_CHAT_ERRORS.sentence(e)
@@ -1426,8 +1416,7 @@
     });
   }
 
-  // Switch «gestione automatica» (owner-only). Default OFF = ogni feedback, anche sicuro,
-  // passa da te. Lo stato vive in config/automation; la scrittura passa dal main, admin-gated.
+  // Default OFF = ogni feedback, anche sicuro, passa dall'owner (vedi sopra).
   function renderAutomation(enabled) {
     if (automationToggle) automationToggle.checked = Boolean(enabled);
     if (automationDesc) {
@@ -1454,7 +1443,7 @@
         if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
         renderAutomation(Boolean(r.enabled));
       } catch (e) {
-        renderAutomation(!want); // ripristina lo stato precedente
+        renderAutomation(!want);
         alert('Non sono riuscito a salvare l\'impostazione: ' + (e?.message || e));
       } finally {
         automationToggle.disabled = false;

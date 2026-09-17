@@ -1,6 +1,6 @@
-// Le azioni della chat come STRUMENTI del modello (tool calling nativo): ragionamento, azione, risultato e testo in un giro solo gestito dal main (handleFiloChat), tutto in streaming.
-// Qui descrizione e parametri di ogni strumento; il LIVELLO di sicurezza sta solo in actionLevels.js, e una sentinella negli unit test pretende che i due elenchi combacino.
-// Il nome dello strumento È il tipo dell'azione: `{type: nome, ...argomenti}` entra pari pari in executeFiloAction.
+// Le azioni della chat come STRUMENTI del modello (tool calling nativo), descrizione e
+// parametri. Il LIVELLO di sicurezza sta solo in actionLevels.js, e i due elenchi devono
+// combaciare. Il nome dello strumento È il tipo dell'azione, passato tale e quale.
 
 (function (global) {
   'use strict';
@@ -9,7 +9,8 @@
   const B = (description) => ({ type: 'boolean', description });
   const I = (description) => ({ type: 'integer', description });
 
-  // Descrizione del sistema (shell, percorsi) per i testi che ne dipendono: la dà constants.js, che distingue Windows da Mac e Linux. Senza, restano frasi neutre.
+  // Shell e percorsi cambiano fra Windows, Mac e Linux: la descrizione la dà constants.js.
+  // Senza, i testi restano neutri.
   function sistemaInfo(sistema) {
     try {
       const C = global.SN_CONST;
@@ -26,7 +27,8 @@
     ],
   };
 
-  // `risultato: true`: l'esito torna al modello per intero (ricerche, testo di un documento, output di un comando); gli altri tornano una riga di conferma.
+  // `risultato: true`: l'esito torna al modello per intero (ricerche, testo di un documento,
+  // output di un comando); gli altri tornano una riga di conferma.
   const TOOLS = {
     NAVIGA: {
       description: 'APRE SUBITO un sito in una nuova scheda. Usalo quando l\'utente chiede di aprire qualcosa. Con `background: true` la scheda si apre in SECONDO PIANO (l\'utente resta dov\'è, la musica parte lo stesso): usalo per ciò che si ascolta e basta, o quando l\'utente chiede di non cambiare scheda. Se stai solo PROPONENDO dei siti tra cui scegliere, non usarlo: elenca i link nel testo.',
@@ -304,7 +306,8 @@
     return !!(t && t.risultato);
   }
 
-  // Ogni voce porta `_callId` (per il `tool_call_id` della risposta) e, se gli argomenti non erano JSON, `_argsError`: l'azione non si esegue e l'errore torna al modello come esito, così riprova invece di restare senza risposta.
+  // Ogni voce porta `_callId` e, se gli argomenti non erano JSON, `_argsError`: l'azione non
+  // si esegue e l'errore torna al modello come esito, così riprova invece di tacere.
   function toolCallsToActions(toolCalls) {
     const out = [];
     for (const c of Array.isArray(toolCalls) ? toolCalls : []) {
@@ -332,7 +335,8 @@
     return out;
   }
 
-  // Tolleranza per un modello che ignora gli strumenti e scrive il JSON con testo e azioni: non si ritenta, ma se c'è si accetta, così le azioni passano dal registro invece di finire in chat come JSON grezzo.
+  // Tolleranza per un modello che ignora gli strumenti e scrive il JSON con testo e azioni:
+  // se c'è si accetta, così passa dal registro invece di finire in chat come JSON grezzo.
   function legacyEnvelope(text) {
     if (!text) return null;
     let t = String(text).trim();
@@ -351,7 +355,8 @@
     };
   }
 
-  // Per un giro con chiamate il fornitore rivuole testo, chiamate e ragionamento com'era (`reasoning_details`): li rimette al posto giusto e il modello riprende da dove aveva lasciato.
+  // Per un giro con chiamate il fornitore rivuole testo, chiamate e ragionamento com'erano
+  // (`reasoning_details`): al posto giusto il modello riprende da dove aveva lasciato.
   function assistantMessage({ text, toolCalls, reasoningDetails }) {
     const msg = { role: 'assistant', content: text ? String(text) : '' };
     const calls = (Array.isArray(toolCalls) ? toolCalls : []).map((c, i) => ({

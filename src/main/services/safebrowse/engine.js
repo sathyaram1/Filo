@@ -1,6 +1,6 @@
-// Motore di decisione: dai segnali (locali sincroni + dati di rete, quando ci sono) calcola UN verdetto con livello e messaggio specifico.
-// Livelli: 'safe' nessun avviso, 'sospetto' banner chiudibile, 'pericoloso' interstitial bloccante.
-// Principio: "pericoloso" poggia SOLO su segnali che l'attaccante non può nascondere (blacklist, dominio, certificato, età); il contenuto rinforza, mai da solo. L'LLM è monotòno: può alzare a "sospetto", mai a "pericoloso" e mai dichiarare sicuro (lo applica chi orchestra).
+// Motore di decisione: dai segnali calcola UN verdetto con livello e messaggio.
+// Livelli: safe nessun avviso, sospetto banner chiudibile, pericoloso blocca la pagina.
+// «Pericoloso» poggia solo su segnali non nascondibili; l'LLM alza a sospetto, mai oltre.
 
 'use strict';
 
@@ -91,7 +91,8 @@ function joinIt(arr) {
   return arr.slice(0, -1).join(', ') + ' e ' + arr[arr.length - 1];
 }
 
-// `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays, sandbox, llm }; `ctx` sono gli indizi di pagina: { hasPassword, hasPayment, mixedContent, autoDownload, urlPath }.
+// `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays, sandbox, llm }.
+// `ctx`: indizi di pagina { hasPassword, hasPayment, mixedContent, autoDownload, urlPath }.
 function evaluate(url, ctx = {}, asyncData = {}) {
   const norm = normalize(url);
   if (!norm || !norm.ok) {
@@ -126,7 +127,8 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const doubleExt = sigs.some((s) => s.kind === 'double_extension');
   const sensitive = hasPassword || hasPayment;
 
-  // La whitelist certifica l'IDENTITÀ: niente impersonazione né LLM. Restano i controlli indipendenti dal contenuto (certificato, trasporto).
+  // La whitelist certifica l'IDENTITÀ: niente impersonazione né LLM, restano i controlli
+  // indipendenti dal contenuto.
   if (whitelisted) {
     if (certBad) {
       const message = buildMessage({ level: 'sospetto', norm, cert });
@@ -135,7 +137,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return { level: 'safe', reasons: ['whitelisted'], norm, message: null, needsLlm: false, whitelisted };
   }
 
-  // PERICOLOSO: la strict impersonation da sola basta, altrimenti servono rinforzi forti combinati.
+  // Pericoloso: la strict impersonation basta da sola, altrimenti servono rinforzi combinati.
   const strongCombo =
     (broad && (young || certBad)) ||
     (sandboxBad) ||
@@ -165,7 +167,8 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     };
   }
 
-  // needsLlm: c'è un indizio debole isolato che merita il giudizio LLM (es. http e nient'altro, con i dati di rete ancora assenti). Mai su siti puliti senza indizi, mai su whitelist.
+  // needsLlm: un indizio debole isolato merita il giudizio dell'LLM. Mai su siti puliti senza
+  // indizi, mai su whitelist.
   const weakHint = sigs.some((s) => s.kind === 'insecure_transport') || (ageDays == null && (broad || sensitive));
   return { level: 'safe', reasons: reasons.length ? reasons : ['clean'], norm, message: null, needsLlm: !!weakHint && !whitelisted, whitelisted };
 }

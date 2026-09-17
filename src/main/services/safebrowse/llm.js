@@ -1,6 +1,6 @@
-// Stage 4: giudizio LLM — metadata-only e MONOTÒNO.
-// Riceve SOLO metadati e provenienza (dominio, eTLD+1, brand somigliante, età, stato del certificato, origine del link, presenza di input sensibili), MAI il contenuto della pagina come istruzione: niente prompt injection dalla pagina.
-// L'output può solo ALZARE il sospetto: non dichiara sicuro un sito né porta da solo a "pericoloso", quindi anche un'iniezione riuscita al massimo annulla il contributo — i segnali deterministici restano il pavimento. `runLlm(messages)` è iniettato dall'orchestratore.
+// Giudizio LLM metadata-only e MONOTÒNO: solo metadati e provenienza, mai il contenuto
+// della pagina come istruzione — niente prompt injection dalla pagina.
+// Può solo ALZARE il sospetto: un'iniezione riuscita al massimo annulla il suo contributo.
 
 'use strict';
 
@@ -62,7 +62,7 @@ function parse(text) {
   return { suspicious: true, reasonKey: key && REASONS[key] ? key : null, reason: reasonText, confidence };
 }
 
-// Ritorna { suspicious, reason, confidence } o null se l'LLM manca o ha fallito. NON lancia mai.
+// Torna { suspicious, reason, confidence }, o null se l'LLM manca o fallisce. Non lancia.
 async function judge(meta, runLlm) {
   if (typeof runLlm !== 'function') return null;
   try {

@@ -1,6 +1,6 @@
-// Crediti sul server e chiave OpenRouter personale (#598): si parla con le funzioni `wallet*` di filo-security con l'identità dell'INSTALLAZIONE (anon-auth), non con l'account Google — i crediti seguono la copia di Filo, e Filo funziona senza login.
-// Al riscatto di un invito arriva la chiave personale, che finisce cifrata in wallet-store; da lì in poi withDefaults la usa per tutte le chiamate ai modelli quando l'utente non ha una chiave sua.
-// Qui si scrive anche il REGISTRO D'USO: una riga per chiamata fatta con la chiave personale. Il server confronta ogni ora la somma delle righe col consumo che OpenRouter dichiara per la chiave, quindi chi non le scrive si vede. Il saldo non lo calcola nessuno qui: lo dice il server.
+// Crediti sul server e chiave OpenRouter personale: si parla con filo-security con
+// l'identità dell'INSTALLAZIONE, non con l'account Google — Filo funziona senza login.
+// Qui si scrive anche il registro d'uso: il server lo confronta col consumo dichiarato.
 
 const auth = require('../../auth/google-auth');
 const identity = require('../../auth/anon-auth');
@@ -14,13 +14,16 @@ module.exports = function register(on, ctx) {
   const W = globalThis.SN_WALLET;
   const FB = globalThis.SN_FEEDBACK;
 
-  // Il conteggio locale già dichiarato al server a un riscatto, per non portarlo due volte. Sopravvive al riscatto e all'annullamento dell'identità.
+  // Quanto del conteggio locale è già stato dichiarato al server: non si porta due volte, e
+  // sopravvive al riscatto e all'annullamento dell'identità.
   const DECLARED_KEY = 'walletLocalDeclared';
 
-  // Ultimi parametri del server (euro per credito, cambio, quota): servono a scalare i crediti nelle righe del registro e a comporre i messaggi.
+  // Ultimi parametri del server: servono a scalare i crediti nelle righe del registro e a
+  // comporre i messaggi.
   let lastServer = null;
 
-  // `asOwner`: le funzioni riservate all'owner vogliono il token dell'account Google, dov'è l'email nella allowlist admin; tutto il resto usa l'identità dell'installazione.
+  // `asOwner`: le funzioni riservate vogliono il token Google, dov'è l'email in allowlist;
+  // tutto il resto usa l'identità dell'installazione.
   async function callable(name, data = {}, { asOwner = false } = {}) {
     const idToken = asOwner ? await auth.getIdToken() : await identity.getIdToken();
     if (!idToken) throw new Error(asOwner ? 'not_signed_in' : 'no_identity');
@@ -40,7 +43,8 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
-  // Da dove viene la chiave OpenRouter che parte davvero: 'own' (scritta dall'utente), 'personal' (creata dal server), 'factory' (incastonata, solo installazioni vecchie), 'none'.
+  // Da dove viene la chiave che parte davvero: 'own' dell'utente, 'personal' dal server,
+  // 'factory' incastonata, 'none'.
   async function keySource() {
     try {
       const s = await ctx.getEffectiveSettings();
@@ -71,7 +75,8 @@ module.exports = function register(on, ctx) {
       out.identity.error = String(e?.message || e);
       out.identity.lost = e && e.code === 'identity_lost';
       out.identity.offline = e && e.code === 'offline';
-      // Offline (o identità che non si rinnova) con la chiave personale qui: l'ultimo stato letto vale anche adesso — il campo dell'invito e il saldo locale a chi ha già il portafoglio sarebbero due bugie.
+      // Offline con la chiave personale qui: vale l'ultimo stato letto — il campo dell'invito e un
+      // saldo locale a chi ha già il portafoglio sarebbero due bugie.
       const cached = out.hasPersonalKey && !out.identity.lost ? walletStore.lastServer() : null;
       if (cached && cached.hasWallet) out.server = { ...cached, stale: true, cached: true };
       return out;
@@ -98,7 +103,8 @@ module.exports = function register(on, ctx) {
     return out;
   }
 
-  // Cancello sull'origine: saldo, codici d'invito, riscatto e nuova chiave leggono e muovono dati dell'utente. Solo pagine filo:// e shell; una pagina web riceve `forbidden`.
+  // Saldo, inviti e riscatto muovono dati dell'utente: solo pagine filo:// e shell, a una
+  // pagina web `forbidden`.
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
   const filoOnly = (fn) => async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
@@ -132,7 +138,8 @@ module.exports = function register(on, ctx) {
     return { ok: true, state: await readState() };
   }));
 
-  // L'identità dell'installazione che non si crea (provider anonimo spento su Firebase, rete assente) è un problema diverso da «il server dei crediti non risponde», e il messaggio deve dirlo invece di mandare a guardare la rete.
+  // L'identità dell'installazione che non si crea è un problema diverso da «il server non
+  // risponde»: il messaggio deve dirlo, invece di mandare a guardare la rete.
   async function identityProblem() {
     try { await identity.getIdToken(); return null; } catch (e) {
       return `Non riesco a preparare l'identità di questa installazione: ${String(e?.message || e)}.`;
@@ -140,13 +147,14 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.WALLET_REDEEM, filoOnly(async (msg) => {
-    // Il codice si estrae da ciò che è stato incollato — va bene la riga intera del messaggio: niente tetto di caratteri sul campo, niente taglio.
+    // Il codice si estrae da quello che è stato incollato, riga intera compresa: nessun tetto
+    // sul campo, nessun taglio.
     const code = W.extractCode((msg && msg.code) || '');
     if (!code) return { ok: false, status: 'invalid_code', message: W.redeemMessage('invalid_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
-    // I crediti del vecchio conteggio locale si portano sul server: chi li aveva guadagnati non deve perderli passando al portafoglio (entro un tetto che sta nella configurazione del server).
-    // Si dichiarano una volta sola: quanto è già stato dichiarato a un riscatto precedente non si ripresenta, e paga solo la parte guadagnata dopo.
+    // I crediti del conteggio locale si portano sul server: chi li ha guadagnati non li perde
+    // passando al portafoglio. Si dichiarano una volta sola, paga solo la parte nuova.
     let localCredits = 0;
     let balanceNow = 0;
     try {
@@ -165,7 +173,8 @@ module.exports = function register(on, ctx) {
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     if (localCredits > 0) { try { await globalThis.SN_STORAGE.setRaw(DECLARED_KEY, Math.floor(balanceNow)); } catch (_) {} }
-    // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è niente da ricaricare, si avvisano solo le pagine che il saldo è cambiato.
+    // La chiave si rilegge a ogni chiamata: non c'è niente da ricaricare, basta avvisare le
+    // pagine che il saldo è cambiato.
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     const state = await readState();
     return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, state };
@@ -178,7 +187,8 @@ module.exports = function register(on, ctx) {
   on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await callable('walletOverview', {}, { asOwner: true }) })));
   on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => {
     const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
-    // Se il regalo è alla propria installazione, la pagina Crediti aperta accanto deve muoversi: si avvisano le pagine come a ogni cambio di saldo.
+    // Regalo alla propria installazione: la pagina Crediti aperta accanto deve muoversi, come a
+    // ogni cambio di saldo.
     if (result && result.ok) { try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {} }
     return { result };
   }));
@@ -186,7 +196,8 @@ module.exports = function register(on, ctx) {
     codes: (await callable('walletCreateInvites', { count: msg.count || 1 }, { asOwner: true }))?.codes || [],
   })));
 
-  // Le righe del registro si accodano e si scrivono a gruppi: una chat con strumenti fa più chiamate al turno, e una scrittura per chiamata sarebbe rumore. Se la scrittura fallisce si ritenta al giro dopo; oltre il tetto della coda si perde la più vecchia dicendolo nel log — una riga persa la trova la riconciliazione, non è un segreto.
+  // Le righe si accodano e si scrivono a gruppi: una chat con strumenti fa più chiamate al
+  // turno. Oltre il tetto si perde la più vecchia dicendolo: la trova la riconciliazione.
   const queue = [];
   const QUEUE_CAP = 2000;
   let flushTimer = null;
@@ -238,7 +249,8 @@ module.exports = function register(on, ctx) {
     return s;
   }
 
-  // Chiamato da costTracker.record per OGNI chiamata AI, ma la riga si scrive solo se la chiamata è partita con la chiave personale: con una chiave dell'utente il consumo è affar suo e OpenRouter non lo conta sulla nostra.
+  // La riga si scrive solo se la chiamata è partita con la chiave personale: con la chiave
+  // dell'utente il consumo è affar suo e non conta sulla nostra.
   async function recordUsage({ action, model, servedBy, usage }) {
     const pseudonym = walletStore.pseudonym();
     if (!pseudonym || !walletStore.personalKey()) return;
@@ -255,7 +267,8 @@ module.exports = function register(on, ctx) {
     scheduleFlush(3000);
   }
 
-  // Un avviso ogni 10 minuti al massimo: il 402 arriva a ogni chiamata finché il tetto non sale, e un toast per chiamata sarebbe un martello.
+  // Un avviso ogni dieci minuti: il 402 torna a ogni chiamata finché il tetto non sale, e un
+  // toast per chiamata sarebbe un martello.
   let lastNoticeAt = 0;
   async function outOfCreditsNotice() {
     const now = Date.now();
@@ -273,6 +286,7 @@ module.exports = function register(on, ctx) {
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
   };
 
-  // All'avvio: identità pronta e stato del server letto una volta, così la prima riga del registro ha già i parametri di conversione. In background.
+  // All'avvio e in background: identità e stato del server letti una volta, così la prima riga
+  // del registro ha già i parametri di conversione.
   setTimeout(() => { readState().catch(() => {}); }, 4000);
 };

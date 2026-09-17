@@ -1,10 +1,12 @@
-// Utility PURE per gli allegati immagine dei feedback (S1.2). Le immagini sono cifrate su Storage come byte opachi (application/octet-stream) e il MIME originale NON è conservato, a differenza dei file non-immagine che salvano `type`.
-// Per mostrare un'immagine decifrata in un <img> il MIME va quindi indovinato dai magic byte. Usato dal main dopo SN_FEEDBACK_CRYPTO.decryptBytes.
+// Utility pure per gli allegati immagine dei feedback.
+// Le immagini sono cifrate come byte opachi e il MIME originale NON è conservato,
+// quindi per mostrarle in un <img> va indovinato dai magic byte.
 
 (function (global) {
   'use strict';
 
-  // Ripiego 'image/png' quando la firma non si riconosce: i browser renderizzano comunque per sniffing, ma dove sappiamo diamo il tipo giusto. `bytes` = Uint8Array o array-like di byte.
+  // Ripiego 'image/png' quando la firma non si riconosce: i browser fanno sniffing comunque,
+  // ma dove sappiamo diamo il tipo giusto.
   function sniffImageMime(bytes) {
     const b = bytes || [];
     const n = b.length || 0;
@@ -32,12 +34,12 @@
       let i = 0;
       if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) i = 3;
       while (i < n && (b[i] === 0x20 || b[i] === 0x09 || b[i] === 0x0a || b[i] === 0x0d)) i++;
-      if (b[i] === 0x3c) return 'image/svg+xml'; // '<'
+      if (b[i] === 0x3c) return 'image/svg+xml';
     }
     return 'image/png';
   }
 
-  // Usa Buffer in Node e btoa nel browser, portabile come il resto dei moduli shared. Il MIME è indovinato salvo override.
+  // Buffer in Node, btoa nel browser: portabile come il resto dei moduli shared.
   function bytesToDataUrl(bytes, mimeOverride) {
     const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
     const mime = mimeOverride || sniffImageMime(arr);

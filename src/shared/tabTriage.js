@@ -1,12 +1,10 @@
-// Logica pura del riordino schede (§2.1), fuori da tabs.js per provarla senza
-// Electron. Candidabili anche le pagine interne effimere (ignorarle faceva chiudere
-// un sito ma mai le home duplicate); i duplicati esatti si trovano in modo
-// deterministico, senza dipendere dal giudizio dell'LLM.
+// Logica pura del riordino schede (§2.1), fuori da tabs.js per provarla senza Electron.
+// Candidabili anche le pagine interne effimere: ignorarle faceva chiudere un sito ma mai
+// le home duplicate. I duplicati esatti si trovano senza il giudizio dell'LLM.
 
 (function (global) {
-  // Pagine interne effimere: sempre riaperte dall'app, quindi chiudibili senza
-  // archiviare nulla. Editor, board, decks, cronologia restano fuori: possono
-  // contenere lavoro in corso.
+  // Pagine interne effimere: sempre riaperte dall'app, quindi chiudibili senza archiviare.
+  // Editor, board, decks e cronologia restano fuori: possono contenere lavoro in corso.
   const EPHEMERAL_INTERNAL_HOSTS = new Set(['newtab', 'options', 'preferences']);
 
   function internalHostOf(url) {
@@ -32,10 +30,8 @@
     return u.replace(/^([a-z]+:\/\/[^/]*)/i, (m) => m.toLowerCase());
   }
 
-  // La scheda ATTIVA (mai chiusa) occupa già il suo URL: tutte le candidate con
-  // quell'URL sono duplicati. Per gruppo si tiene quella con interazione più recente;
-  // con un form non inviato (`formDirty`) non è mai un doppione usa-e-getta.
-  // Ritorna gli indici in `tabs` da archiviare/chiudere.
+  // La scheda ATTIVA occupa già il suo URL: tutte le candidate con quell'URL sono duplicati.
+  // Per gruppo si tiene la più recente; con un form non inviato non è mai un doppione.
   function findDuplicateIndices(tabs, activeUrl) {
     const list = Array.isArray(tabs) ? tabs : [];
     const seen = new Set();

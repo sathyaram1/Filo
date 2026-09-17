@@ -1,11 +1,6 @@
-// L'avviso delle fusioni in attesa — superficie dell'owner (SPEC-RIDISEGNO-MAX.md §10).
-// Il controllo deterministico del server blocca le fusioni che toccano le aree protette,
-// e il lavoro LOCALE dell'owner ci cade dentro quasi sempre: il blocco quindi non è un
-// rifiuto secco, il server apre una richiesta e l'owner la approva QUI, davanti allo
-// schermo — una sessione catturata ha le credenziali della macchina, non le mani
-// dell'owner sulla finestra. Vive SOLO nella dashboard, in cima ai Ricevuti, perché è una
-// decisione come i feedback. Le frasi che spiegano COSA è stato bloccato le manda il
-// server: una voce senza frase mostra il nome grezzo invece di nascondere il blocco.
+// L'avviso delle fusioni in attesa (SPEC-RIDISEGNO-MAX.md §10): il server apre una
+// richiesta invece di rifiutare e l'owner la approva QUI, davanti allo schermo — una
+// sessione catturata ha le credenziali, non le mani dell'owner. Le frasi le manda il server.
 
 (function (global) {
   'use strict';
@@ -32,9 +27,8 @@
     return d === 1 ? 'ieri' : d + ' giorni fa';
   }
 
-  // Quanto resta prima che la richiesta scada: si dice sempre, e PRIMA, perché scoprirlo
-  // premendo «Approva» è il modo peggiore. Sotto il minuto non si finge precisione, e si
-  // arrotonda per DIFETTO: l'avviso non promette mai più tempo di quanto ce n'è. PURA.
+  // Quanto resta prima della scadenza: si dice sempre e PRIMA, perché scoprirlo premendo
+  // «Approva» è il modo peggiore. Si arrotonda per DIFETTO: mai promettere più tempo. PURA.
   function expiresIn(expiresAtMs, nowMs) {
     var exp = Number(expiresAtMs);
     if (!isFinite(exp) || exp <= 0) return 'scaduta';
@@ -50,7 +44,7 @@
     return d === 1 ? 'scade fra 1 giorno' : 'scade fra ' + d + ' giorni';
   }
 
-  // Il titolo dell'avviso. Zero richieste → stringa vuota: chi non ne ha non vede niente. PURA.
+  // Il titolo dell'avviso. Zero richieste → stringa vuota: chi non ne ha non vede niente.
   function headline(count) {
     var n = Math.max(0, Math.floor(Number(count) || 0));
     if (!n) return '';
@@ -58,9 +52,8 @@
     return n + ' fusioni aspettano il tuo via libera';
   }
 
-  // Chi ha chiesto la fusione: questa superficie esiste per SEPARARE chi chiede da chi
-  // approva, e tacerlo le toglie metà del senso. Un identificativo tecnico non si stampa (a
-  // chi legge somiglia a rumore): si dice cosa significa, «un accesso senza email». PURA.
+  // Chi ha chiesto la fusione: la superficie esiste per SEPARARE chi chiede da chi approva.
+  // Un identificativo tecnico non si stampa: si dice «un accesso senza email». PURA.
   function requestedBy(who, req) {
     var s = String(who == null ? '' : who).trim().slice(0, 120);
     if (!s) return 'chi l’ha chiesta non risulta';
@@ -71,17 +64,14 @@
     return 'chiesta da un accesso senza email';
   }
 
-  // Le due provenienze finiscono nello STESSO elenco — un blocco che non si vede è un lavoro
-  // fermo per sempre — ma non sono la stessa cosa da leggere: il locale l'ha fatto l'owner
-  // con le sue mani, quello di un'automazione l'ha scritto un modello partendo dal testo di
-  // uno sconosciuto. Origine assente = `locale`, il caso storico: non «non si sa». PURA.
+  // Le due provenienze finiscono nello STESSO elenco, ma non si leggono uguale: il locale l'ha
+  // fatto l'owner, l'altro un modello dal testo di uno sconosciuto. Assente = `locale`. PURA.
   function originOf(req) {
     return String((req && req.origin) || '') === 'routine' ? 'routine' : 'locale';
   }
 
   // Senza cancelletto: il server a volte lo manda col `#`, e normalizzarlo qui fa sì che chi
-  // lo stampa ne metta uno solo e chi lo confronta con la lista feedback confronti la stessa
-  // cosa. PURA.
+  // stampa ne metta uno solo e chi confronta con la lista feedback confronti la stessa cosa.
   function feedbackNum(req) {
     return String((req && req.num) || '').trim().replace(/^#+/, '');
   }
@@ -115,8 +105,7 @@
     return items;
   }
 
-  // Come si riottiene una richiesta decaduta: dipende da CHI aveva chiesto la fusione, e
-  // sbagliarlo manda l'owner a lanciare un comando che non c'entra niente. Il lavoro locale
+  // Come si riottiene una richiesta decaduta dipende da CHI l'aveva chiesta: il lavoro locale
   // si ripropone da questo computer, quello di un'automazione torna in attesa. PURA.
   function lowerFirst(text) {
     var s = String(text || '');
@@ -129,9 +118,8 @@
       : 'Rilancia npm run finish.';
   }
 
-  // Il server registra il motivo con dentro un'etichetta tecnica (`realign_branch_moved`…):
-  // qui diventa una frase e il dettaglio fra parentesi resta com'è. Un'etichetta sconosciuta
-  // si stampa grezza: un motivo grezzo dice più di un motivo nascosto. PURA.
+  // Il motivo del server porta un'etichetta tecnica: qui diventa una frase, il dettaglio fra
+  // parentesi resta. Un'etichetta sconosciuta si stampa grezza: dice più di una nascosta.
   var REALIGN_REASONS = {
     realign_unavailable: 'il riallineamento automatico non è disponibile su questo server',
     realign_threw: 'il server si è fermato a metà del riallineamento',
@@ -161,9 +149,8 @@
     return t ? 'Il server ha provato a riallineare da sé, senza riuscirci: ' + t + '.' : '';
   }
 
-  // `supersedes` rimpiazza una richiesta che l'owner aveva GIÀ approvato: il server ha
-  // spostato il ramo su main, rifatto i controlli e trovato qualcosa di nuovo. I blocchi
-  // sotto sono SOLO quelli, o si leggerebbero come una richiesta da capo.
+  // `supersedes` rimpiazza una richiesta GIÀ approvata: il server ha spostato il ramo su main
+  // e rifatto i controlli. I blocchi sotto sono SOLO i nuovi, o si leggerebbero da capo.
   function realignedNote(req) {
     var r = req || {};
     if (!String(r.supersedes || '').trim()) return '';
@@ -172,9 +159,8 @@
       + ': qui solo ciò che non avevi ancora visto.';
   }
 
-  // `stale` con `used: true` è una richiesta CONSUMATA senza fusione: dirla «approvata»
-  // racconterebbe una fusione mai avvenuta. Con `realigned` il server l'ha spostata su main
-  // e ha chiesto di nuovo per la sola differenza; senza, è decaduta. PURA.
+  // `stale` con `used: true` = richiesta consumata senza fusione: dirla «approvata»
+  // racconterebbe una fusione mai avvenuta; con `realigned` è rifatta sulla sola differenza.
   function recentOutcome(r) {
     var v = r || {};
     var ria = !!(v.realigned && typeof v.realigned === 'object');
@@ -186,8 +172,8 @@
     return 'scaduta senza risposta';
   }
 
-  // L'esito di un'approvazione, detto all'owner. Stessa regola delle bolle di chat: mai il
-  // motivo tecnico lasciato lì da interpretare, sempre cosa è successo e cosa fare adesso. PURA.
+  // L'esito di un'approvazione, detto all'owner: mai il motivo tecnico lasciato lì da
+  // interpretare, sempre cosa è successo e cosa fare adesso. PURA.
   function outcomeMessage(reply, req) {
     var r = reply || {};
     var retry = howToRetry(req);
@@ -216,9 +202,8 @@
       return { kind: 'warn', text: tentativo ? base + ' ' + tentativo : base };
     }
     if (r.result === 'stale') {
-      // Riallineata dal server: la richiesta vecchia è consumata, ma il lavoro non è perso e non
-      // c'è niente da rilanciare — la scheda nuova, con la sola differenza, arriva nell'elenco
-      // (`reload` lo fa ricaricare).
+      // Riallineata dal server: la richiesta vecchia è consumata ma il lavoro non è perso e non
+      // c'è niente da rilanciare — la scheda nuova, con la sola differenza, arriva nell'elenco.
       if (ria) {
         return {
           kind: 'warn',
@@ -239,10 +224,8 @@
     return n;
   }
 
-  // «Approva» è irreversibile (il codice atterra su main e da lì va agli utenti): conferma
-  // SUL POSTO — il bottone diventa «Confermi?» e torna com'era da solo — e il gesto vale come
-  // «sì, so cosa c'è in questo ramo». «Scarta» va dritto: la richiesta si rifà con un
-  // `npm run finish`, e chiedere conferma sarebbe solo attrito.
+  // «Approva» è irreversibile (il codice atterra su main): conferma SUL POSTO, e il gesto vale
+  // «so cosa c'è in questo ramo». «Scarta» va dritto: la richiesta si rifà con un finish.
   function buildCard(req, opts) {
     var o = opts || {};
     var now = Number(o.nowMs) || Date.now();
@@ -253,9 +236,8 @@
     card.dataset.origin = originOf(req);
 
     var head = el('div', 'sn-mac-head');
-    // La provenienza PRIMA del resto: chi approva deve sapere subito quale delle due sta
-    // guardando. Se il lavoro nasce da una segnalazione e la pagina sa aprirla, l'etichetta
-    // diventa un bottone: «guarda cosa era stato chiesto» deve stare a un click.
+    // La provenienza PRIMA del resto: chi approva deve sapere subito quale delle due guarda.
+    // Se nasce da una segnalazione e la pagina sa aprirla, l'etichetta diventa un bottone.
     var origin;
     if (originOf(req) === 'routine' && feedbackNum(req) && typeof o.onFeedback === 'function') {
       origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(req));
@@ -278,9 +260,8 @@
     var when = el('span', 'sn-mac-when', timeAgo(req.createdAtMs, now));
     head.appendChild(when);
     var exp = el('span', 'sn-mac-expiry', expiresIn(req.expiresAtMs, now));
-    // Anche il suggerimento sotto il puntatore deve sapere di chi è il lavoro: mandare l'owner
-    // a lanciare la pubblicazione locale per un ramo scritto da un'automazione è un consiglio
-    // che non porta a niente.
+    // Anche il suggerimento sotto il puntatore deve sapere di chi è il lavoro: mandare l'owner a
+    // pubblicare in locale un ramo di un'automazione è un consiglio che non porta a niente.
     exp.title = 'Vale per il commit esaminato e per una settimana. Passata la scadenza, ' + lowerFirst(howToRetry(req));
     head.appendChild(exp);
     card.appendChild(head);
@@ -387,12 +368,8 @@
     return card;
   }
 
-  // `render` (più sotto): niente richieste = niente avviso, `host` resta vuoto e nascosto, ed
-  // è ciò che tiene i Ricevuti puliti per chi non ha nulla in sospeso.
-  // La scheda di una fusione APPROVATA e mai avvenuta (conflitto): non chiede un'altra
-  // approvazione, ma non può sparire fra le decisioni passate — è successo (#500) e l'owner
-  // si è ritrovato con «niente da accettare» e un ramo mai fuso. Resta in vista finché il
-  // lavoro rifatto non viene fuso o finché l'owner non la segna sistemata.
+  // Una fusione APPROVATA e mai avvenuta (conflitto) non chiede un'altra approvazione, ma non
+  // può sparire: resta in vista finché non è fusa o finché l'owner non la segna sistemata.
   function buildFailedCard(req, opts) {
     var o = opts || {};
     var now = Number(o.nowMs) || Date.now();
@@ -507,8 +484,8 @@
     return list.length + failed.length;
   }
 
-  // Le decisioni passate, in righe minute: un'apertura di questo tipo che non lascia segno
-  // non è verificabile. Vive in Gestione → Automazioni — fra le cose da decidere sarebbe rumore.
+  // Le decisioni passate, in righe minute: senza traccia non sono verificabili. Vivono in
+  // Automazioni — fra le cose da decidere sarebbero rumore.
   function renderRecent(host, opts) {
     if (!host) return 0;
     var o = opts || {};
@@ -555,9 +532,8 @@
     return 'fusa il ' + data + ' (' + timeAgo(atMs, nowMs) + ')';
   }
 
-  // Quante fusioni «senza chiedere» il server ha lasciato fuori dall'elenco ('' quando ci
-  // sono tutte): un elenco tagliato in silenzio è proprio ciò che il controllo a posteriori
-  // non può permettersi. PURA.
+  // Quante fusioni «senza chiedere» il server ha lasciato fuori ('' se ci sono tutte): un
+  // elenco tagliato in silenzio è ciò che un controllo a posteriori non può permettersi.
   function preapprovedMoreText(shown, total) {
     var n = Math.max(0, Math.floor(Number(total) || 0) - Math.max(0, Math.floor(Number(shown) || 0)));
     if (!n) return '';
@@ -580,10 +556,8 @@
     return 'Segno messo il ' + (data || s);
   }
 
-  // Le fusioni avvenute SENZA chiedere: l'owner aveva messo il segno sulla pratica e il
-  // server ha fuso da solo quando i controlli hanno bloccato. È il controllo a posteriori,
-  // quindi ciò che era stato segnalato si mostra PER INTERO: la decisione l'owner l'ha presa
-  // prima senza leggere, questa è l'unica occasione in cui legge.
+  // Fusioni avvenute SENZA chiedere: l'owner aveva messo il segno prima, senza leggere. È il
+  // controllo a posteriori, quindi ciò che era stato segnalato si mostra PER INTERO.
   function renderPreapproved(host, opts) {
     if (!host) return 0;
     var o = opts || {};
@@ -628,8 +602,8 @@
           b.appendChild(el('span', 'sn-mac-block-label', blockLabel(blocks[j])));
           var items = blockItems(blocks[j]);
           if (items.length) {
-            // Ogni voce sulla sua riga: qui l'elenco è la cosa da leggere, e cinquanta percorsi in una
-            // riga sola non si leggono.
+            // Ogni voce sulla sua riga: qui l'elenco è la cosa da leggere, e cinquanta percorsi in
+            // una riga sola non si leggono.
             var il = el('ul', 'sn-mac-block-list');
             for (var k = 0; k < items.length; k++) il.appendChild(el('li', 'sn-mac-block-items', items[k]));
             b.appendChild(il);

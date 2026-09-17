@@ -1,4 +1,5 @@
-// Popup risposta AI: streaming, posa, trascinamento, conversazione. Più popup insieme: aprirne uno nuovo non chiude i precedenti.
+// Popup risposta AI: streaming, posa, trascinamento, conversazione.
+// Più popup insieme: aprirne uno nuovo non chiude i precedenti.
 
 (function (global) {
   'use strict';
@@ -13,30 +14,28 @@
   const Z_BASE = 2147483600;
   const Z_STEP = 1;
 
-  // Calcolatrice locale: valuta le espressioni matematiche qui, senza chiamare l'LLM — più affidabile e gratis. Parser ricorsivo discendente.
-  // expr = term (('+'|'-') term)* · term = power (('*'|'/'|'%') power)* · power = unary ('^' power)? (destra-associativo, ** alias)
-  // unary = ('+'|'-') unary | postfix · postfix = atom ('!')* · atom = number | '(' expr ')' | ident ['(' expr ')'] | ident
+  // Calcolatrice locale: le espressioni si valutano qui, senza LLM — più affidabile e gratis.
+  // Parser ricorsivo discendente: expr → term → power (destra-assoc.) → unary → postfix.
   function tryMathEval(input) {
     if (input == null) return { ok: false };
     let s = String(input).trim();
     if (!s) return { ok: false };
 
     s = s
-      .replace(/×/g, '*')     // ×
-      .replace(/÷/g, '/')     // ÷
-      .replace(/−/g, '-')     // −
-      .replace(/[–—]/g, '-') // – —
-      .replace(/∕/g, '/')     // ∕
-      .replace(/√/g, 'sqrt')  // √
-      .replace(/π/g, 'pi')    // π
-      .replace(/²/g, '^2')    // ²
-      .replace(/³/g, '^3')    // ³
+      .replace(/×/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/−/g, '-')
+      .replace(/[–—]/g, '-')
+      .replace(/∕/g, '/')
+      .replace(/√/g, 'sqrt')
+      .replace(/π/g, 'pi')
+      .replace(/²/g, '^2')
+      .replace(/³/g, '^3')
       .replace(/\*\*/g, '^');
 
     // Decimali italiani: virgola tra cifre -> punto
     s = s.replace(/(\d),(\d)/g, '$1.$2');
     s = s.replace(/(\d)\s+(?=\d)/g, '$1');
-    // Rimuovi un eventuale segno '=' finale (es. "2+2=")
     s = s.replace(/=\s*$/, '').trim();
 
     if (!/^[0-9+\-*/^%().\s a-zA-Z!]+$/.test(s)) return { ok: false };
@@ -159,7 +158,8 @@
     return str.replace('.', ',');
   }
 
-  // Sostituisce i marker [[calc: …]] emessi dall'LLM col risultato calcolato in locale. I marker incompleti (in streaming «]]» non è ancora arrivato) si nascondono con «…» per evitare lo sfarfallio; quelli invalidi restano visibili.
+  // Sostituisce i marker [[calc: …]] emessi dall'LLM col risultato calcolato qui.
+  // In streaming i marker incompleti si nascondono con «…» per evitare lo sfarfallio.
   const CALC_MARKER_RE = /\[\[calc:\s*([^\[\]]+?)\s*\]\]/g;
   function resolveCalcMarkers(text) {
     if (!text) return text;
@@ -173,14 +173,14 @@
     return out;
   }
 
-  // Markdown dalla sorgente unica SN_MARKDOWN (#418), così popup, riquadro «Spiega», sidebar e chat della home rendono la stessa formattazione leggera.
+  // Markdown dalla sorgente unica SN_MARKDOWN (#418): popup, «Spiega», sidebar e chat uguali.
   const Md = global.SN_MARKDOWN;
   function renderMarkdown(text) {
     return Md ? Md.render(text) : (text || '');
   }
 
-  // Un solo listener sul documento apre in una NUOVA SCHEDA i link resi da Filo (filo-md-link): popup, riquadro «Spiega» e sidebar vivono tutti nello stesso documento.
-  // I link non sicuri (filo://, javascript:, relativi) non arrivano qui: li ha già scartati SN_MARKDOWN in fase di render.
+  // Un solo listener apre in una NUOVA SCHEDA i link resi da Filo: popup, «Spiega» e sidebar
+  // vivono nello stesso documento. I link non sicuri li ha già scartati SN_MARKDOWN.
   document.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a) return;
@@ -202,9 +202,8 @@
       const zoomRatio = (curDpr / baselineDpr) * (curVv / baselineVv);
       const scale = 1 / zoomRatio;
       root.style.transform = scale === 1 ? '' : `scale(${scale})`;
-      // Scala dal bordo ANCORATO alla selezione, non sempre dall'alto: un
-      // riquadro agganciato col fondo (posato sopra la selezione) altrimenti si
-      // staccherebbe dal punto appena l'utente cambia zoom.
+      // Scala dal bordo ANCORATO alla selezione, non sempre dall'alto: un riquadro agganciato
+      // col fondo si staccherebbe dal punto appena l'utente cambia zoom.
       const bottomAnchored = root.style.bottom && root.style.bottom !== 'auto';
       root.style.transformOrigin = bottomAnchored ? 'bottom left' : 'top left';
     };
@@ -258,16 +257,18 @@
     });
     function onMove(e) {
       if (!dragging) return;
-      // Il riquadro si è MOSSO davvero (un clic sull'intestazione per portarlo davanti non conta): da qui la posa è dell'utente, e chi rimisura si limita a tenerlo dentro lo schermo invece di riportarlo sul punto ancorato.
+      // Il riquadro si è MOSSO davvero (un clic sull'intestazione non conta): da qui la posa è
+      // dell'utente, e chi rimisura si limita a tenerlo dentro lo schermo.
       try { onDragStart && onDragStart(); } catch (_) {}
       let left = e.clientX - dx;
       let top = e.clientY - dy;
-      // L'ingombro si misura VISIBILE (`getBoundingClientRect`), non di layout (`offsetWidth/Height`): la compensazione zoom mette una `scale()` sul riquadro, e le due misure coincidono solo al 100%.
-      // Con la pagina rimpicciolita il riquadro occupa PIÙ di quanto dice `offsetHeight` e la riga per scrivere finiva sotto il fondo dello schermo; con la pagina ingrandita si fermava prima del bordo. Stessa asimmetria del difetto (#502).
+      // L'ingombro si misura VISIBILE (`getBoundingClientRect`), non di layout: la compensazione
+      // zoom mette una `scale()` e le due misure coincidono solo al 100% (#502).
       const r = root.getBoundingClientRect();
       const w = r.width, h = r.height;
       const vw = window.innerWidth, vh = window.innerHeight;
-      // Stesso ORDINE del guardiano: il bordo di sopra vince su quello di sotto. Se il riquadro è più alto della finestra i due limiti non valgono insieme, e a cedere dev'essere il fondo: con l'ordine invertito esce l'intestazione, cioè l'unica presa per rimetterlo a posto.
+      // Stesso ORDINE del guardiano: il bordo di sopra vince su quello di sotto. Se il riquadro
+      // è più alto della finestra a cedere dev'essere il fondo, o esce l'intestazione.
       if (left + w > vw) left = vw - w;
       if (top + h > vh) top = vh - h;
       if (left < 0) left = 0;
@@ -280,9 +281,8 @@
       handle.classList.remove('sn-popup-dragging');
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('mouseup', onUp, true);
-      // Lasciato il riquadro, l'ultima parola è del guardiano: se è più alto
-      // della finestra il limite del mouse può solo spostarlo, mentre lui sa
-      // anche stringergli il tetto.
+      // Lasciato il riquadro, l'ultima parola è del guardiano: se è più alto della finestra il
+      // limite del mouse può solo spostarlo, mentre lui sa anche stringergli il tetto.
       try { onDragEnd && onDragEnd(); } catch (_) {}
     }
   }
@@ -300,7 +300,8 @@
     popups.forEach((p, i) => { p.root.style.zIndex = String(Z_BASE + i * Z_STEP); });
   }
 
-  // Registra un elemento esterno (la modale feedback) nello stack, così partecipa allo z-ordering condiviso. La chiusura resta del chiamante.
+  // Registra un elemento esterno (la modale feedback) nello stack, così partecipa allo
+  // z-ordering condiviso. La chiusura resta del chiamante.
   function registerStack(root) {
     if (!root) return null;
     const entry = { root, isExternal: true };
@@ -318,18 +319,14 @@
     };
   }
 
-  // Posa del riquadro. Il racconto per intero sta in patterns/un-riquadro-che-si-riempie-dopo-si-ancora-dal-lato.md.
-  // Il riquadro nasce vuoto e si riempie mentre la risposta arriva: una posa calcolata una volta sola è calcolata sull'altezza sbagliata, e il fondo — la riga dove si scrive la domanda dopo — finisce fuori dallo schermo (#502).
-  // La cura non è inseguire l'altezza, che farebbe ballare il riquadro: il LATO si sceglie subito sulla massima altezza raggiungibile e non cambia più; il tetto d'altezza viene stretto allo spazio di quel lato; il bordo ancorato lo tiene il FOGLIO DI STILE (`top` o `bottom`), così l'unica coordinata che cambia col contenuto è quella libera.
-  // Un tetto però stringe solo finché sta sopra la somma dei minimi interni: sotto, i pezzi escono dal bordo invece di comprimersi, quindi qualcuno deve cedere DAVVERO — prima il minimo del corpo, poi la riga del costo. Intestazione e riga per scrivere non cedono mai.
-  // Resta un guardiano per ciò che la matematica non copre: stringe ancora il tetto (una direzione sola, non può oscillare) e guarda tutti e due i bordi, perché quando lo spazio si accorcia dopo la posa a uscire può essere quello ANCORATO, dove stringere non serve a niente. Il punto ancorato si ritaglia sulla finestra a OGNI misura; dopo un trascinamento la posa è dell'utente e ci si limita a non farlo uscire.
+  // Posa: il lato si sceglie subito e non cambia più, il bordo ancorato lo tiene il CSS.
+  // Il racconto: patterns/un-riquadro-che-si-riempie-dopo-si-ancora-dal-lato.md.
   const POSE_MARGIN = 8;   // aria fra riquadro e bordi della finestra
   const POSE_GAP = 8;      // stacco fra riquadro e punto ancorato
   const POSE_MAX_H_FALLBACK = 480;
   const POSE_W_FALLBACK = 380;
-  // Stati di compressione, definiti nel foglio di stile (§ "chi cede quando lo
-  // spazio si stringe"): il corpo perde il suo minimo e scorre; poi va via
-  // anche la riga del costo.
+  // Stati di compressione, definiti nel foglio di stile: il corpo perde il suo minimo e
+  // scorre; poi va via anche la riga del costo.
   const POSE_TIGHT = 'sn-popup-tight';
   const POSE_BARE = 'sn-popup-bare';
 
@@ -341,10 +338,8 @@
     return Number.isFinite(v) && v > 0 ? v : POSE_MAX_H_FALLBACK;
   }
 
-  // La larghezza naturale sta in una variabile del foglio di stile e non in
-  // `width`: quella, dentro un riquadro stretto, è già stata clampata dal
-  // `max-width` di rete, e rileggerla vorrebbe dire tenersi la misura di quando
-  // c'era meno posto anche dopo che il posto è tornato.
+  // La larghezza naturale sta in una variabile del foglio di stile e non in `width`: quella
+  // è già clampata dal max-width, e rileggerla terrebbe la misura di quando c'era meno posto.
   function styleWidth(root) {
     let v = NaN;
     try { v = parseFloat(getComputedStyle(root).getPropertyValue('--sn-popup-w')); } catch (_) {}
@@ -352,9 +347,8 @@
   }
 
   function attachPose(root, anchor) {
-    // Il punto ancorato va riportato DENTRO la finestra prima di ragionarci sopra: la scorciatoia ancora al fondo del rettangolo della selezione, e una selezione che continua sotto la piega ha il fondo fuori dallo schermo — «sopra il punto» sarebbe a sua volta fuori.
-    // E va rifatto a OGNI misura, non solo all'apertura: zoom e ridimensionamento accorciano la finestra sotto un punto che era dentro, e riposare il riquadro rispetto a un posto che non esiste più lo rimanda fuori dallo schermo. Per questo `ax()`/`ay()` sono funzioni, non costanti.
-    // Il punto ancorato non è UN punto, è la parola: sopra si misura dalla sua CIMA, sotto dal suo FONDO. Ancorando tutti e due i lati al solo fondo, il riquadro posato sopra finiva dentro la parola e la rendeva illeggibile proprio mentre l'utente leggeva cosa vuol dire. Chi passa un punto solo (il tasto destro) lo usa per entrambi i lati.
+    // Il punto ancorato si ritaglia sulla finestra a OGNI misura: zoom e ridimensionamento lo
+    // lasciano fuori. Sopra si misura dalla CIMA della parola, sotto dal suo FONDO.
     const rawX = Number.isFinite(anchor?.x) ? anchor.x : POSE_MARGIN;
     const rawY = Number.isFinite(anchor?.y) ? anchor.y : POSE_MARGIN;
     const rawYSopra = Number.isFinite(anchor?.top) ? anchor.top : rawY;
@@ -374,9 +368,8 @@
     const roomBelow = () => window.innerHeight - (ayFondo() + POSE_GAP) - POSE_MARGIN;
     const roomAbove = () => ayCima() - POSE_GAP - POSE_MARGIN;
 
-    // La compensazione zoom mette una `scale()` sul riquadro: il tetto è in px
-    // di layout, lo spazio sullo schermo è in px visibili. Senza la scala il
-    // tetto sarebbe stretto (o largo) del fattore di zoom.
+    // La compensazione zoom mette una `scale()` sul riquadro: il tetto è in px di layout, lo
+    // spazio sullo schermo in px visibili, e senza la scala sarebbe sbagliato del fattore zoom.
     function scale() {
       try {
         const t = getComputedStyle(root).transform;
@@ -386,9 +379,8 @@
       } catch (_) { return 1; }
     }
 
-    // `max-height` misura il CONTENUTO quando il box è content-box: bordi e
-    // imbottitura stanno fuori da quel numero, mentre lo spazio sullo schermo
-    // li comprende.
+    // `max-height` misura il CONTENUTO quando il box è content-box: bordi e imbottitura stanno
+    // fuori da quel numero, mentre lo spazio sullo schermo li comprende.
     function boxExtra() {
       try {
         const cs = getComputedStyle(root);
@@ -407,8 +399,8 @@
       } catch (_) { return 0; }
     }
 
-    // Chi cede quando lo spazio si stringe (#502). Stringere il tetto funziona finché resta sopra la somma dei minimi interni; sotto, i pezzi escono dal bordo del riquadro — e dentro un riquadro incorporato, dove per un `position: fixed` lo «schermo» È il riquadro (#405), il browser li taglia via e la riga per scrivere non si raggiunge più.
-    // Quindi qualcuno deve cedere davvero: prima il corpo della risposta, che si accorcia e scorre fino a sparire, poi la riga del costo (che resta leggibile passando sopra l'intestazione). Intestazione e riga per scrivere restano sempre.
+    // Chi cede quando lo spazio si stringe (#502): prima il corpo, che scorre fino a sparire,
+    // poi la riga del costo. Intestazione e riga per scrivere non cedono mai.
     const headerEl = root.querySelector('.sn-popup-header');
     const bodyEl = root.querySelector('.sn-popup-body');
     const footerEl = root.querySelector('.sn-popup-footer');
@@ -416,9 +408,8 @@
     // In px di LAYOUT: sullo schermo la compensazione zoom li scala.
     const altezza = (el) => (el ? el.getBoundingClientRect().height / (scale() || 1) : 0);
 
-    // Quanto occupa il corpo al minimo in ciascun gradino di compressione. Si legge ORA, una volta, prima che il riquadro sia posato: a decidere in corsa sul proprio esito la posa oscillerebbe.
-    // Il numero che mancava è il RESIDUO: `min-height: 0` azzera il contenuto, non l'ingombro — imbottitura e bordi restano, una ventina di pixel che il riquadro occupa quando non mostra più niente. Senza metterli in bilancio il conto prometteva un riquadro più basso di quello che il browser sa disegnare, e a uscire dal bordo era la riga per scrivere.
-    // Si LEGGONO dal foglio di stile accendendo per un attimo le classi, invece di ricopiarli qui: è il foglio di stile a decidere quanto cede il corpo, e un numero ricopiato in JS ricomincerebbe a mentire al primo ritocco. Nessun fotogramma viene disegnato in mezzo.
+    // Quanto occupa il corpo al minimo in ogni gradino, letto ORA dal foglio di stile e non
+    // ricopiato: `min-height: 0` lascia un residuo di imbottitura che va messo in bilancio.
     const residuoCorpo = (classi) => {
       if (!bodyEl) return 0;
       const messe = classi.filter((c) => !root.classList.contains(c));
@@ -443,14 +434,16 @@
     })();
     const bodyStretto = residuoCorpo([POSE_TIGHT]);
     const bodyNudo = residuoCorpo([POSE_TIGHT, POSE_BARE]);
-    // Idem per la riga del costo: da nascosta misurerebbe zero e non tornerebbe più. Nasce vuota, ma il foglio di stile le dà già l'altezza che avrà piena.
+    // Idem per la riga del costo: da nascosta misurerebbe zero e non tornerebbe più. Nasce
+    // vuota, ma il foglio di stile le dà già l'altezza che avrà piena.
     const footerH = altezza(footerEl);
 
     // Quello che non cede mai. Misurato ogni volta: la riga per scrivere si
     // allarga quando la domanda è lunga.
     const incomprimibile = () => altezza(headerEl) + altezza(composeEl);
 
-    // Minimo e tetto naturale della casella, letti UNA VOLTA e prima di scriverci sopra il tetto ristretto: dopo rileggeremmo il nostro stesso valore, stringendolo a ogni giro.
+    // Minimo e tetto naturale della casella, letti UNA VOLTA e prima di scriverci sopra il
+    // tetto ristretto: dopo rileggeremmo il nostro stesso valore, stringendolo a ogni giro.
     const inputEl = root.querySelector('.sn-popup-input');
     const misuraStile = (el, prop, ripiego) => {
       let v = NaN;
@@ -460,20 +453,21 @@
     const inputMin = inputEl ? misuraStile(inputEl, 'minHeight', 30) : 30;
     const inputMax = inputEl ? misuraStile(inputEl, 'maxHeight', 120) : 120;
 
-    // I tre gradini, dal più comodo al più stretto: quanto misura il riquadro AL MINIMO in ciascuno. Sotto quel numero i pezzi escono dal bordo invece di comprimersi, e in un riquadro incorporato il browser li taglia. Nell'ultimo il corpo ha ceduto anche l'imbottitura e sparisce del tutto.
+    // I tre gradini, dal più comodo al più stretto: quanto misura il riquadro AL MINIMO in
+    // ciascuno. Sotto quel numero i pezzi escono dal bordo invece di comprimersi.
     const minComodo = () => incomprimibile() + footerH + bodyComfort;
     const minStretto = () => incomprimibile() + footerH + bodyStretto;
     const minNudo = () => incomprimibile() + bodyNudo;
 
-    // Il livello di compressione è funzione SOLO del tetto e di misure prese una volta sola: a parità di spazio dà sempre la stessa risposta, quindi non può rincorrersi. Ogni soglia è il minimo VERO dello stato di sopra.
+    // Il livello di compressione dipende SOLO dal tetto e da misure prese una volta: a parità
+    // di spazio dà sempre la stessa risposta, quindi non può rincorrersi.
     function comprimi(cap) {
       root.classList.toggle(POSE_TIGHT, cap < minComodo() - 0.5);
       root.classList.toggle(POSE_BARE, cap < minStretto() - 0.5);
     }
 
-    // Il pavimento del tetto non è una costante: è il minimo del gradino più
-    // stretto, cioè quanto misurano i pezzi che non cedono mai. Più in basso il
-    // tetto non stringe più niente.
+    // Il pavimento del tetto non è una costante: è il minimo del gradino più stretto, cioè
+    // quanto misurano i pezzi che non cedono mai.
     const pavimento = () => minNudo();
 
     function chooseSide() {
@@ -481,30 +475,31 @@
       const below = roomBelow(), above = roomAbove();
       if (below >= want) return 'below';   // ci sta tutto sotto: preferenza naturale
       if (above >= want) return 'above';
-      // Nessuno dei due lati basta al riquadro pieno: si prende il più capiente e il tetto si stringe a quello. Ma se lì non ci sta nemmeno il MINIMO il punto ancorato non è onorabile, e tanto vale saperlo subito e dire che lo spazio è la finestra INTERA:
-      // stringendo il tetto al solo lato si butterebbe via posto che c'è, e nei riquadri incorporati più bassi il corpo della risposta finiva a zero — la spiegazione appena chiesta non si leggeva per niente.
+      // Nessuno dei due lati basta al riquadro pieno: si prende il più capiente. Ma se lì non ci
+      // sta nemmeno il minimo il punto ancorato non è onorabile, e lo spazio è la finestra intera.
       const migliore = above > below ? 'above' : 'below';
       const spazio = Math.max(above, below);
       const minimo = (pavimento() + boxExtra()) * scale();
       if (spazio < minimo) return 'dentro';
-      // …ma «ci sta il riquadro ridotto all'osso» è la soglia sbagliata, perché all'osso non si vede NIENTE. Il punto ancorato si onora finché lascia LEGGERE la risposta, cioè finché il corpo tiene il minimo che gli dà il foglio di stile.
-      // Sotto, il riquadro si aggrappa alla parola e paga tutto lo spazio che quel lato non ha: in un box commenti (230-420px, la misura tipica) della spiegazione restavano pochi pixel da scorrere. Meglio staccarsi e appoggiarsi al bordo, dove lo spazio c'è tutto.
+      // Il punto ancorato si onora finché lascia LEGGERE la risposta, cioè finché il corpo tiene
+      // il minimo del foglio di stile. Sotto, meglio staccarsi e appoggiarsi al bordo.
       const comodo = (minComodo() + boxExtra()) * scale();
       if (spazio >= comodo) return migliore;
-      // Staccarsi però costa: il riquadro copre la parola. Lo si fa solo quando frutta davvero, almeno un corpo comodo di spazio in più — senza questa condizione una finestra appena troppo bassa faceva coprire la parola per guadagnare gli otto pixel dello stacco.
+      // Staccarsi costa: il riquadro copre la parola. Si fa solo se frutta almeno un corpo
+      // comodo di spazio in più, o una finestra appena bassa la coprirebbe per otto pixel.
       const guadagno = (window.innerHeight - POSE_MARGIN * 2) - spazio;
       return guadagno >= bodyComfort * scale() ? 'dentro' : migliore;
     }
 
-    // Larghezza: stesso ragionamento del tetto d'altezza, sull'altro asse. In un riquadro incorporato lo «schermo» è il riquadro (#405) e i box dei commenti sono stretti: a larghezza fissa il tasto di invio finisce oltre il bordo destro, dove il browser lo taglia.
-    // Qui non deve cedere nessuno: basta stringere la larghezza allo spazio che c'è, rifacendola a ogni misura anche verso l'alto, così quando il posto torna torna la larghezza piena.
+    // Larghezza: stesso ragionamento del tetto d'altezza sull'altro asse. In un riquadro
+    // incorporato lo «schermo» è il riquadro (#405) e il tasto di invio finiva tagliato.
     function capWidth() {
       const room = (window.innerWidth - POSE_MARGIN * 2) / scale() - boxExtraX();
       root.style.maxWidth = `${Math.max(0, Math.floor(Math.min(baseW, room)))}px`;
     }
 
-    // Finché il riquadro è ancorato lo spazio in altezza è quello del lato scelto; dopo un trascinamento è la finestra intera: la posizione è dell'utente, l'ingombro no, e un riquadro più alto della finestra sborda comunque.
-    // È la regola che la larghezza applicava già (`capWidth()` si rifà anche da trascinato). L'altezza no, e quell'asimmetria ERA il difetto: finestra rimpicciolita e riquadro spostato, smetteva di accorciarsi e il fondo usciva con la riga per scrivere.
+    // Da ancorato lo spazio è quello del lato scelto, da trascinato la finestra intera: la
+    // posizione è dell'utente, l'ingombro no. L'altezza si rifà come già fa la larghezza.
     function roomForCap() {
       if (dragged) return window.innerHeight - POSE_MARGIN * 2;
       // 'dentro': il punto ancorato non era onorabile, il riquadro sta dove ci
@@ -513,13 +508,12 @@
       return side === 'above' ? roomAbove() : roomBelow();
     }
 
-    // Anche la CASELLA della domanda ha un tetto da stringere allo spazio: cresce mentre si scrive e non cede mai, quindi in una finestra bassa, o dentro un riquadro incorporato, sarebbe lei a spingere fuori il tasto di invio dopo che tutto il resto ha ceduto.
-    // Il suo tetto è quanto resta quando ha ceduto anche il corpo: da lì in giù smette di allungarsi e scorre al suo interno, col cursore in vista perché il browser segue chi scrive. Si rifà a ogni misura, in tutte e due le direzioni.
+    // Anche la CASELLA della domanda ha un tetto: cresce mentre si scrive e non cede mai,
+    // quindi sarebbe lei a spingere fuori il tasto di invio dopo che tutto il resto ha ceduto.
     function capInput() {
       if (!inputEl) return;
-      // Imbottitura e bordo della riga: quello che la riga occupa OLTRE la
-      // casella. È una differenza, quindi non risente del tetto che stiamo per
-      // scrivere.
+      // Imbottitura e bordo della riga: quello che la riga occupa OLTRE la casella. È una
+      // differenza, quindi non risente del tetto che stiamo per scrivere.
       const contorno = Math.max(0, altezza(composeEl) - altezza(inputEl));
       const room = roomForCap() / scale() - boxExtra();
       const disponibile = room - altezza(headerEl) - contorno - bodyNudo;
@@ -527,11 +521,13 @@
       inputEl.style.maxHeight = `${Math.floor(tetto)}px`;
     }
 
-    // La riga per scrivere CRESCE con la domanda, e quando cresce il bilancio dell'altezza è vecchio: il corpo resta al minimo comodo che aveva e a uscire dal bordo è la riga in basso, col tasto di invio. Il conto si rifaceva sui cambi di finestra, mai sulla domanda che cresce (#502).
+    // La riga per scrivere CRESCE con la domanda, e allora il bilancio dell'altezza è vecchio:
+    // a uscire dal bordo è la riga in basso col tasto di invio (#502).
     let bilancioSu = -1;
     const bilancioVecchio = () => Math.abs(incomprimibile() - bilancioSu) > 0.5;
 
-    // Si rifà da capo a ogni misura, in tutte e due le direzioni: stringe quando lo spazio manca e RIALLARGA quando torna. Un tetto che sa solo stringere lascia il riquadro schiacciato per sempre.
+    // Si rifà da capo a ogni misura, in tutte e due le direzioni: un tetto che sa solo
+    // stringere lascia il riquadro schiacciato per sempre quando lo spazio torna.
     function capHeight() {
       capInput();
       const room = roomForCap() / scale() - boxExtra();
@@ -543,9 +539,8 @@
       bilancioSu = incomprimibile();
     }
 
-    // Scrive le coordinate. Non dipendono dall'altezza corrente — solo dal punto
-    // ancorato e dalla finestra — quindi finché la finestra non cambia sono
-    // COSTANTI: riscriverle mille volte non muove il riquadro di un pixel.
+    // Scrive le coordinate. Non dipendono dall'altezza corrente ma solo dal punto ancorato e
+    // dalla finestra: finché non cambia sono costanti, e riscriverle non muove niente.
     function place() {
       const vw = window.innerWidth, vh = window.innerHeight;
       if (dragged) return;
@@ -555,7 +550,8 @@
       if (left < POSE_MARGIN) left = POSE_MARGIN;
       root.style.left = `${Math.round(left)}px`;
       if (side === 'dentro') {
-        // Il punto ancorato non era onorabile: il riquadro si appoggia in cima alla finestra e il tetto lo tiene dentro. Anche questa coordinata resta costante come le altre.
+        // Il punto ancorato non era onorabile: il riquadro si appoggia in cima alla finestra e il
+        // tetto lo tiene dentro. Anche questa coordinata resta costante.
         root.style.bottom = 'auto';
         root.style.top = `${POSE_MARGIN}px`;
       } else if (side === 'above') {
@@ -569,15 +565,18 @@
       }
     }
 
-    // Rete di sicurezza: col tetto stretto allo spazio il riquadro non dovrebbe mai sbordare, ma se succede lo stesso (i minimi interni non ci stanno, finestra bassissima) si stringe ANCORA. Solo in una direzione: non può oscillare.
+    // Rete di sicurezza: col tetto stretto non dovrebbe sbordare, ma se succede si stringe
+    // ANCORA. Solo in una direzione: non può oscillare.
     function guard() {
-      // Prima di guardare i bordi: se a cambiare è ciò che NON cede — la riga per scrivere che si allunga con la domanda — il bilancio è vecchio e va rifatto, come quando cambia la finestra. Rifarlo solo quando quel numero cambia impedisce di rincorrere lo stringimento che questo stesso guardiano applica qui sotto.
+      // Se a cambiare è ciò che NON cede — la riga per scrivere che si allunga — il bilancio è
+      // vecchio e va rifatto. Rifarlo solo quando quel numero cambia evita di rincorrersi.
       if (bilancioVecchio()) capHeight();
       if (dragged) {
         // Trascinato: lì la posa è dell'utente, si sposta solo se esce.
         const vw = window.innerWidth, vh = window.innerHeight;
         let r = root.getBoundingClientRect();
-        // Ma prima di spostarlo va fatto STARE: da trascinato non c'è un bordo ancorato, quindi se non ci sta è perché è più ALTO della finestra, e allora si stringe il tetto. Senza questo passo si appoggia in cima e la riga per scrivere resta fuori: spostarlo non basta.
+        // Ma prima di spostarlo va fatto STARE: da trascinato non c'è un bordo ancorato, quindi se
+        // non ci sta è perché è più alto della finestra, e va stretto il tetto.
         const fuori = r.height - vh;
         if (fuori > 0.5) {
           const cur = parseFloat(root.style.maxHeight) || root.offsetHeight;
@@ -598,18 +597,16 @@
       }
       const vh = window.innerHeight;
       let r = root.getBoundingClientRect();
-      // Guarda TUTTI E DUE i bordi, non solo quello da cui ci si aspetta lo sbordo. Sul lato LIBERO sborda il contenuto e la cura è stringere ancora il tetto; sul lato ANCORATO stringere non serve, perché quel bordo sta fermo: va riportato dentro di peso.
-      // Guardare il solo lato previsto lasciava passare proprio il caso in cui lo spazio si accorcia DOPO l'apertura.
+      // Guarda TUTTI E DUE i bordi: sul lato libero sborda il contenuto e si stringe il tetto,
+      // sul lato ancorato stringere non serve e va riportato dentro di peso.
       const libero = side === 'above'
         ? POSE_MARGIN - r.top
         : r.bottom - (vh - POSE_MARGIN);
       if (libero > 0.5) {
         const cur = parseFloat(root.style.maxHeight) || root.offsetHeight;
         const next = Math.max(pavimento(), Math.floor(cur - libero / scale()));
-        // Stringere il tetto senza far cedere nessuno non stringe niente:
-        // il livello di compressione va rifatto sul tetto nuovo, anche quando
-        // il tetto era già al pavimento (è il caso in cui a sbordare sono
-        // proprio i minimi interni).
+        // Stringere il tetto senza far cedere nessuno non stringe niente: il livello di
+        // compressione va rifatto sul tetto nuovo, anche quando era già al pavimento.
         comprimi(next);
         // Rileggere subito costa un layout, ma senza non sapremmo se lo
         // stringimento è bastato.
@@ -617,7 +614,8 @@
         r = root.getBoundingClientRect();
       }
       if (POSE_MARGIN - r.top <= 1 && r.bottom - (vh - POSE_MARGIN) <= 1) return;
-      // Sborda ancora: o il tetto è già al minimo (finestra più bassa del riquadro), o a sbordare è il bordo ancorato. Meglio coprire il punto ancorato che restare fuori dal bordo, dove non si clicca. Si passa all'aggancio dall'alto per non litigare con `bottom`.
+      // Sborda ancora: o il tetto è al minimo, o a sbordare è il bordo ancorato. Meglio coprire
+      // il punto ancorato che restare fuori dallo schermo, dove non si clicca.
       const top = Math.max(0, Math.min(vh - r.height, r.top));
       root.style.bottom = 'auto';
       root.style.top = `${Math.round(top)}px`;
@@ -639,13 +637,16 @@
       ro.observe(root);
     } catch (_) {}
 
-    // Finestra ridimensionata o zoom cambiato: il tetto va rifatto DA CAPO, anche verso l'alto — quando lo spazio torna il riquadro deve poter tornare alto com'era — e la posa riscritta sul punto ancorato, ritagliato sulla finestra di adesso.
+    // Finestra ridimensionata o zoom cambiato: il tetto si rifà DA CAPO, anche verso l'alto,
+    // e la posa si riscrive sul punto ancorato ritagliato sulla finestra di adesso.
     const vv = window.visualViewport;
-    // Larghezza E altezza si rifanno sempre, anche da trascinato: la posa è dell'utente, l'ingombro non l'ha scelto nessuno. Rifarne una sola delle due era il difetto.
+    // Larghezza E altezza si rifanno sempre, anche da trascinato: la posa è dell'utente,
+    // l'ingombro non l'ha scelto nessuno.
     const onViewport = () => { capWidth(); capHeight(); refresh(); };
     window.addEventListener('resize', onViewport);
     vv?.addEventListener('resize', onViewport);
-    // Lo zoom della pagina cambia la risoluzione: stessa rete della compensazione zoom, per i casi in cui `resize` da solo non arriva. Registrata DOPO quella, così alla rimisura la `scale()` del riquadro è già quella nuova.
+    // Lo zoom della pagina cambia la risoluzione: rete per i casi in cui `resize` non arriva.
+    // Registrata DOPO la compensazione zoom, così alla rimisura la `scale()` è già quella nuova.
     let mql = null;
     try {
       mql = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
@@ -653,9 +654,8 @@
     } catch (_) {}
 
     return {
-      // Ripassa SUBITO, in modo sincrono. Il ResizeObserver consegna solo al
-      // passo di rendering: in una scheda in secondo piano quel passo è
-      // strozzato. Chi allunga il contenuto chiama questa.
+      // Ripassa SUBITO, in modo sincrono: il ResizeObserver consegna solo al passo di rendering,
+      // che in una scheda in secondo piano è strozzato. Chi allunga il contenuto chiama questa.
       reflow: refresh,
       markDragged() {
         if (dragged) return;
@@ -665,9 +665,11 @@
         const r = root.getBoundingClientRect();
         root.style.bottom = 'auto';
         root.style.top = `${Math.round(r.top)}px`;
-        // Cambiato il bordo ancorato cambia anche il punto da cui scala la compensazione zoom: restando `bottom left`, ogni conto fatto su `style.top` parlerebbe di un posto dove il riquadro non è. La compensazione lo ricaverebbe al prossimo cambio di zoom: qui lo anticipiamo, così non passa nemmeno un fotogramma storto.
+        // Cambiato il bordo ancorato cambia anche il punto da cui scala la compensazione zoom:
+        // si anticipa qui, o passa un fotogramma in cui i conti parlano di un posto sbagliato.
         root.style.transformOrigin = 'top left';
-        // Preso in mano, lo spazio non è più quello del lato ancorato ma la finestra intera: rifare il tetto qui gli ridà l'altezza che lo spazio consente, invece di tenersi quella di quando era appeso alla selezione.
+        // Preso in mano, lo spazio non è più quello del lato ancorato ma la finestra intera:
+        // rifare il tetto qui gli ridà l'altezza che lo spazio consente.
         capHeight();
       },
       dispose() {
@@ -687,9 +689,8 @@
     popup.root.remove();
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
-    // Rimette la selezione che il fuoco della riga per scrivere aveva spento:
-    // la parola torna selezionata com'era, pronta per la cosa dopo. Solo se
-    // nel frattempo l'utente non ne ha fatta una sua, che comanda lei.
+    // Rimette la selezione che il fuoco della riga per scrivere aveva spento, pronta per la
+    // cosa dopo. Solo se nel frattempo l'utente non ne ha fatta una sua, che comanda lei.
     try {
       const sel = window.getSelection();
       if (popup.savedRange && sel && (sel.rangeCount === 0 || sel.isCollapsed)) {
@@ -703,8 +704,8 @@
     if (popups.length) closePopup(popups[popups.length - 1]);
   }
 
-  // La casella si allunga con quello che ci si scrive dentro. Il TETTO non si ricopia qui: lo tiene il foglio di stile e la posa lo stringe allo spazio che c'è, mentre un numero ricopiato terrebbe il tetto pieno anche dove non ci sta — è così che la riga per scrivere finiva fuori dal riquadro (#502).
-  // E `scrollHeight` comprende l'IMBOTTITURA, `height` no (box content-box): scriverlo tal quale lasciava la casella più alta del suo testo di quei pixel e non li restituiva più — cancellata la domanda restava gonfia e la risposta non si riprendeva lo spazio.
+  // La casella si allunga col testo; il tetto non si ricopia qui, lo tiene il foglio di stile
+  // e la posa lo stringe. `scrollHeight` comprende l'imbottitura, `height` no (#502).
   function autoGrow(el) {
     if (!el) return;
     el.style.height = 'auto';
@@ -718,7 +719,6 @@
     el.style.height = `${Math.max(0, el.scrollHeight - pad)}px`;
   }
 
-  // Crea un popup vuoto: intestazione, corpo della conversazione, riga per la domanda.
   function createPopup({ title, anchor }) {
     const root = document.createElement('div');
     root.className = 'sn-popup';
@@ -783,35 +783,35 @@
       reflow(popup);
     });
 
-    // Dare il fuoco alla casella spegne la selezione della pagina (un documento ne ha una sola), ma la parola su cui l'utente ha chiesto la spiegazione gli serve ancora quando il riquadro si chiude — tradurla, copiarla, cercarla — e rifarla a mano è lo stesso attrito da cui stiamo scappando: ce la teniamo da parte e gliela rimettiamo.
+    // Dare il fuoco alla casella spegne la selezione della pagina, ma la parola su cui si è
+    // chiesta la spiegazione serve ancora dopo: ce la teniamo da parte e gliela rimettiamo.
     try {
       const sel = window.getSelection();
       if (sel && sel.rangeCount && !sel.isCollapsed) popup.savedRange = sel.getRangeAt(0).cloneRange();
     } catch (_) {}
 
-    // Il cursore va SUBITO nella riga per scrivere: chi ha chiesto la spiegazione con la tastiera (Alt+E) doveva passare al mouse per fare la domanda dopo. Vale anche per la freccetta del tasto destro, che fa la stessa cosa.
-    // `preventScroll` perché dare il fuoco dentro un riquadro incorporato farebbe scorrere la pagina che lo contiene, e il riquadro appena aperto scapperebbe di vista.
+    // Il cursore va SUBITO nella riga per scrivere: chi ha chiesto con la tastiera doveva
+    // passare al mouse. `preventScroll`, o un riquadro incorporato farebbe scorrere la pagina.
     try { popup.inputEl.focus({ preventScroll: true }); } catch (_) {}
 
     popups.push(popup);
     return popup;
   }
 
-  // Aggiunge una bolla al corpo e ritorna l'elemento di testo.
   function appendBubble(popup, role) {
     const wrap = document.createElement('div');
     wrap.className = `sn-msg sn-msg-${role}`;
     const text = document.createElement('div');
     text.className = 'sn-msg-text';
     wrap.appendChild(text);
-    // Bolla nuova = turno nuovo, e il turno lo apre sempre l'utente: è l'eccezione esplicita «vai comunque in fondo», vuole vedere quello che ha chiesto.
+    // Bolla nuova = turno nuovo, e il turno lo apre l'utente: è l'eccezione «vai comunque in
+    // fondo», vuole vedere quello che ha chiesto.
     scrollaConservando(popup, () => popup.bodyEl.appendChild(wrap), true);
     return { wrap, text };
   }
 
-  // Aggiorna il corpo della risposta senza STRAPPARE la lettura — vedi patterns/liste-chat-che-si-ricostruiscono-in-streaming-auto-follow.md.
-  // Il corpo è una finestrella che scorre, e leggere mentre la risposta arriva è il modo normale di usarla: portare la vista in fondo a ogni pezzo vuol dire che chi torna su a rileggere viene sbalzato giù, a ogni pezzo. Si segue il fondo solo se l'utente ci era rimasto.
-  // La posizione si RIMETTE, non basta non toccarla: se il contenuto si accorcia il browser clampa `scrollTop` e la vista salta da sola. Il ritaglio va fatto DOPO la posa, perché `reflow` può accorciare il corpo.
+  // Il corpo si aggiorna senza strappare la lettura: si segue il fondo solo se l'utente ci
+  // era rimasto — patterns/liste-chat-che-si-ricostruiscono-in-streaming-auto-follow.md.
   const POPUP_FOLLOW_PX = 48;
   function scrollaConservando(popup, muta, vaiInFondo) {
     const el = popup?.bodyEl;
@@ -830,16 +830,16 @@
     try { popup?.pose?.reflow(); } catch (_) {}
   }
 
-  // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
-  // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
-  // posa), l'informazione resta comunque: passando sopra l'intestazione.
+  // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco che quella riga
+  // sparisce, l'informazione resta comunque passando sopra l'intestazione.
   function setMeta(popup, testo) {
     if (!popup?.metaEl) return;
     popup.metaEl.textContent = testo;
     try { popup.root.querySelector('.sn-popup-header').title = testo; } catch (_) {}
   }
 
-  // Avvia un turno di streaming; `messages` è la cronologia COMPLETA, compreso il messaggio user finale.
+  // Avvia un turno di streaming; `messages` è la cronologia COMPLETA, compreso il messaggio
+  // user finale.
   function startTurn(popup, messages, onAssistantDone) {
     try { popup.activePort?.disconnect(); } catch (_) {}
 
@@ -878,9 +878,8 @@
           bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf));
         });
       } else if (m.type === 'reset') {
-        // Il provider è caduto a metà risposta e il sistema riparte da zero su
-        // un fallback: butta il testo parziale e torna allo stato "in attesa",
-        // così il messaggio finale è SOLO la risposta del provider che riesce.
+        // Il provider è caduto a metà risposta e si riparte su un ripiego: il testo parziale si
+        // butta, così il messaggio finale è SOLO la risposta del provider che riesce.
         buf = '';
         firstDelta = true;
         // Si riparte da zero su un altro provider: il testo parziale sparisce e
@@ -896,9 +895,8 @@
         const vuota = firstDelta;   // nessun delta arrivato (es. cache vuota errore)
         const resolved = resolveCalcMarkers(buf);
         const eur = m.costEur || 0;
-        // L'ultima riscrittura è quella che può ACCORCIARE il testo (markdown
-        // completo al posto del parziale): senza rimettere la posizione, chi
-        // stava rileggendo a metà si ritrova sbalzato dal clamp del browser.
+        // L'ultima riscrittura può ACCORCIARE il testo (markdown completo al posto del parziale):
+        // senza rimettere la posizione, chi stava rileggendo viene sbalzato dal clamp del browser.
         scrollaConservando(popup, () => {
           if (vuota) bubble.text.textContent = '';
           if (popup.action === ACTIONS.EXPLAIN && /NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
@@ -947,7 +945,6 @@
     });
   }
 
-  // openStreaming: API pubblica. Apre un nuovo popup nello stack e avvia il primo turno.
   function openStreaming({ action, payload, anchor, title }) {
     installEscOnce();
     const popup = createPopup({ title, anchor });
@@ -970,13 +967,12 @@
     return sel || '';
   }
 
-  // Stack degli avvisi in pagina (#409): tutto ciò che Filo ancora nell'angolo in basso a destra — toast, pill della dettatura, conferma di «Salva per dopo» — vive in UN contenitore che li impila.
-  // Con ogni avviso `position: fixed` sullo stesso angolo, due ravvicinati (anche solo «sto lavorando» e il suo esito) finivano uno sopra l'altro. Stesso pattern della shell e dell'editor: patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
+  // Stack degli avvisi in pagina (#409): tutto ciò che Filo ancora in basso a destra vive in
+  // UN contenitore che li impila, o due avvisi ravvicinati finiscono uno sopra l'altro.
   let toastHostEl = null;
 
-  // Tetto al numero di avvisi vivi insieme: senza, una raffica (una pagina che
-  // salva venti immagini di fila) riempie lo schermo e spinge i più vecchi
-  // fuori dal viewport. Teniamo i più recenti, che sono i più rilevanti.
+  // Tetto al numero di avvisi vivi insieme: senza, una raffica riempie lo schermo e spinge i
+  // più vecchi fuori dal viewport. Teniamo i più recenti.
   const MAX_TOAST_STACK = 4;
 
   function toastHost() {
@@ -991,7 +987,8 @@
     return toastHostEl;
   }
 
-  // Sfratta subito, senza attendere il timeout, gli avvisi più vecchi oltre il tetto. I `sticky` sono esenti: portano un comando che esiste solo lì — la pill che ferma la dettatura, la conferma che apre la lista — e buttarli via toglierebbe l'unico modo di usarlo.
+  // Sfratta subito gli avvisi più vecchi oltre il tetto. I `sticky` sono esenti: portano un
+  // comando che esiste solo lì, e buttarli toglierebbe l'unico modo di usarlo.
   function enforceToastCap() {
     const host = toastHost();
     const live = Array.from(host.children).filter(
@@ -1005,11 +1002,12 @@
     }
   }
 
-  // L'animazione d'ingresso alza l'avviso di 8px, e in un contenitore scrollabile quello sposto allarga l'area scrollabile: senza tolleranza uno stack che ci sta comodo verrebbe dichiarato in overflow.
-  // Non è estetica: attivare lo scroll emette un evento `scroll` che altre superfici di Filo (il menu del tasto destro) leggono come «la pagina si è mossa» e si chiudono da sole.
+  // L'animazione d'ingresso alza l'avviso di 8px: senza tolleranza uno stack che ci sta
+  // comodo sembrerebbe in overflow, e lo scroll emette un evento che chiude il tasto destro.
   const TOAST_ENTER_SHIFT_PX = 8;
 
-  // Finestra molto bassa: anche col tetto lo stack può eccedere l'altezza. Lo rendiamo scrollabile, teniamo in vista il più recente e riattiviamo i pointer-events solo lì (di base spenti per non rubare i click alla pagina sotto).
+  // Finestra molto bassa: anche col tetto lo stack può eccedere. Si rende scrollabile, si
+  // tiene in vista il più recente e i pointer-events si riaccendono solo lì.
   function syncToastOverflow() {
     const host = toastHost();
     const scrollable = host.scrollHeight > host.clientHeight + TOAST_ENTER_SHIFT_PX + 1;
@@ -1036,8 +1034,8 @@
     syncToastOverflow();
   }
 
-  // Toast per avvisi brevi. `duration: 0` = resta finché non lo chiude il chiamante: l'avviso «sto lavorando» deve durare quanto il lavoro.
-  // Ritorna sempre un handle con close(), così chi mostra un avanzamento può sostituirlo con l'esito invece di impilarci sopra un secondo riquadro.
+  // `duration: 0` = resta finché non lo chiude il chiamante: «sto lavorando» dura quanto il
+  // lavoro. Torna sempre un handle con close(), per sostituire l'avviso invece di impilarlo.
   function showToast(text, opts = {}) {
     const t = document.createElement('div');
     t.className = 'sn-toast';
@@ -1067,7 +1065,6 @@
     return { close, el: t };
   }
 
-  // close API legacy: chiude il topmost (compatibilità con codice che chiamava SN_POPUP.close())
   function close() { closeTopmost(); }
 
   global.SN_POPUP = {

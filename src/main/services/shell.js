@@ -1,6 +1,6 @@
-// Sessione di shell PERSISTENTE per la modalità terminale: una shell di lunga durata per scheda, pilotata via stdin, così variabili d'ambiente, alias e directory persistono fra un comando e l'altro. Muore quando si chiude la scheda (ipc.js, hook 'destroyed') e NON si persiste su disco: alla riapertura di Filo si parte da una shell pulita.
-// Protocollo dei marcatori: FILO_RDY_<sid> è il "pronto" (e il prompt da rimuovere), FILO_META_<sid>:<code>:<cwd> la fine di un comando. I comandi partono uno alla volta e l'output è instradato alle callback del comando corrente fino al suo META.
-// SICUREZZA: esegue comandi arbitrari sulla macchina. Raggiungibile SOLO dalle pagine filo:// (ipc.js rifiuta i sender esterni), SOLO con la modalità terminale attiva e SOLO con comandi digitati a mano dall'utente — mai output dell'LLM, mai contenuto di pagine web.
+// Shell persistente per la modalità terminale: una per scheda, così env, alias e cwd durano.
+// SICUREZZA: esegue comandi arbitrari — solo da pagine filo://, solo digitati dall'utente,
+// mai output dell'LLM o di pagine web. Marcatori: FILO_RDY il pronto, FILO_META la fine.
 
 const { spawn } = require('node:child_process');
 const os = require('node:os');
@@ -10,7 +10,8 @@ function defaultCwd() {
   return os.homedir();
 }
 
-// La cartella iniziale può arrivare da uno stato persistito (#259): se nel frattempo è stata cancellata o rinominata, spawnare con una cwd inesistente farebbe morire la shell, quindi si ripiega sulla home. I path in stile Linux passati a WSL non sono verificabili con `fs` di Windows: passano, li valida WSL.
+// Spawnare con una cwd inesistente (cartella cancellata dopo un ripristino) ucciderebbe la
+// shell: si ripiega sulla home. I path Linux passati a WSL li valida WSL, non `fs`.
 function usableCwd(cwd) {
   if (!cwd) return defaultCwd();
   if (process.platform === 'win32' && /^\//.test(cwd)) return cwd;
@@ -25,9 +26,10 @@ function randSid() {
   return 'F' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-5);
 }
 
-// Per ogni shell: come avviare il processo persistente, la riga di "pronto" da inviare all'avvio, e come incartare un comando utente perché stampi il marcatore di fine (exit code + cwd) su una riga propria.
+// Per ogni shell: come avviarla, la riga di «pronto», e come incartare un comando utente
+// perché stampi il marcatore di fine (exit code + cwd) su una riga propria.
 function shellConfig(shell, sid, startCwd) {
-  // Fuori da Windows (routine cloud Linux, macOS): /bin/sh persistente. Letto da pipe è non-interattivo, quindi nessun prompt da ripulire.
+  // Fuori da Windows /bin/sh letto da pipe è non-interattivo: nessun prompt da ripulire.
   if (process.platform !== 'win32') {
     return {
       file: '/bin/sh',
@@ -39,7 +41,8 @@ function shellConfig(shell, sid, startCwd) {
     };
   }
   if (shell === 'cmd') {
-    // /q = niente echo dei comandi, /k = resta aperto leggendo da stdin. Il prompt diventa il marcatore RDY, così ogni prompt è una riga che possiamo rimuovere dall'output.
+    // /q toglie l'echo, /k tiene aperto lo stdin. Il prompt diventa il marcatore RDY, così è
+    // una riga riconoscibile da togliere dall'output.
     return {
       file: process.env.ComSpec || 'cmd.exe',
       args: ['/q', '/k'],
@@ -50,7 +53,7 @@ function shellConfig(shell, sid, startCwd) {
     };
   }
   if (shell === 'bash') {
-    // WSL bash persistente: `--cd` accetta sia path Windows sia Linux e imposta la dir iniziale. Letto da pipe, niente prompt.
+    // `--cd` accetta path Windows e Linux; letto da pipe, niente prompt da ripulire.
     const args = ['--cd', startCwd || defaultCwd(), '--', 'bash'];
     return {
       file: 'wsl.exe',
@@ -61,7 +64,8 @@ function shellConfig(shell, sid, startCwd) {
         `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
     };
   }
-  // PowerShell (default): `-Command -` legge ed esegue da stdin in modo incrementale, senza prompt. $LASTEXITCODE si azzera prima di ogni comando, altrimenti i cmdlet (che non lo toccano) riporterebbero l'ultimo codice nativo rimasto appeso.
+  // `-Command -` esegue da stdin in modo incrementale, senza prompt. $LASTEXITCODE si azzera
+  // prima di ogni comando: i cmdlet non lo toccano e riporterebbero un codice vecchio.
   return {
     file: 'powershell.exe',
     args: ['-NoLogo', '-NoProfile', '-Command', '-'],
@@ -73,8 +77,8 @@ function shellConfig(shell, sid, startCwd) {
   };
 }
 
-// exec(command, { onData, onExit, onError }) accoda ed esegue; write(text) manda testo grezzo allo stdin; kill() termina l'albero di processi; shell, cwd, dead sono lo stato osservabile.
-// Le callback sono PER COMANDO: onData({chunk, stream}), onExit({code, cwd}), onError({message}).
+// exec() accoda, write() manda testo grezzo a stdin, kill() termina l'albero di processi.
+// Callback PER COMANDO: onData({chunk,stream}), onExit({code,cwd}), onError({message}).
 function createSession({ shell, cwd } = {}) {
   const sid = randSid();
   const wantShell = process.platform !== 'win32' ? 'sh' : (shell || 'powershell');
@@ -90,7 +94,7 @@ function createSession({ shell, cwd } = {}) {
     proc: null,
     queue: [],        // comandi in attesa: { command, cb }
     current: null,    // comando in esecuzione: { cb }
-    _buf: '',         // buffer di linea per stdout
+    _buf: '',
     _pendingBlank: 0, // righe vuote in attesa (separatori prompt/marcatore)
     exec, write, kill,
   };
@@ -112,7 +116,8 @@ function createSession({ shell, cwd } = {}) {
 
   proc.stdout && proc.stdout.on('data', onStdout);
   proc.stderr && proc.stderr.on('data', (chunk) => {
-    // stderr non passa dal protocollo a righe: si inoltra grezzo al comando corrente (rosso nella bolla), normalizzando solo i \r\n.
+    // stderr non passa dal protocollo a righe: si inoltra grezzo al comando corrente,
+    // normalizzando solo i fine riga.
     if (session.current && session.current.cb.onData) {
       session.current.cb.onData({ chunk: String(chunk).replace(/\r\n/g, '\n'), stream: 'stderr' });
     }
@@ -138,7 +143,8 @@ function createSession({ shell, cwd } = {}) {
       if (line.endsWith('\r')) line = line.slice(0, -1);
       processLine(line);
     }
-    // Una coda parziale senza newline resta in _buf e si mostra subito solo se NON contiene l'inizio di un marcatore: i comandi che non terminano con a-capo restano reattivi senza rischiare di spezzare un marcatore a metà.
+    // Una coda senza newline si mostra subito solo se non contiene l'inizio di un marcatore:
+    // restare reattivi non deve costare un marcatore spezzato a metà.
     if (session._buf && session._buf.indexOf(META_PREFIX) === -1 && session._buf !== RDY_LINE) {
     }
   }
@@ -181,7 +187,8 @@ function createSession({ shell, cwd } = {}) {
       return;
     }
 
-    // Riga vuota differita: se segue un prompt o un marcatore è un separatore e si scarta, altrimenti si emette quando arriva la prossima riga vera.
+    // Riga vuota differita: dopo un prompt o un marcatore è un separatore e si scarta,
+    // altrimenti si emette quando arriva la prossima riga vera.
     if (line === '') { session._pendingBlank++; return; }
 
     flushBlanks();
@@ -244,17 +251,17 @@ function createSession({ shell, cwd } = {}) {
   return session;
 }
 
-// Verifica "usa e getta" se un comando esiste nella shell scelta: serve all'evidenziazione live della dashboard, dove un "/comando" inesistente va colorato di rosso. Separata dalla sessione persistente per non interferire con lo streaming.
-// SICUREZZA: il nome del comando NON viene mai interpolato in una stringa di shell né appeso a un `-Command`. Sui resolver POSIX e su `where.exe` viaggia come argomento (argv), che non passa da nessuna shell; su PowerShell in una VARIABILE D'AMBIENTE, il cui valore non viene mai rivalutato come codice, quindi `node;calc` resta la stringa "node;calc". (Trappola di PowerShell 5.1: i token dopo `-Command '<script>'` NON finiscono in $args, vengono concatenati ed ESEGUITI.)
-// Builtin di cmd.exe che `where` non vede, non essendo eseguibili nel PATH.
+// SICUREZZA: il nome del comando non viene mai interpolato in una stringa di shell — argv
+// o variabile d'ambiente, mai rivalutati. Sotto: i builtin di cmd che `where` non vede.
 const CMD_BUILTINS = new Set(['cd', 'dir', 'echo', 'cls', 'copy', 'del', 'move',
   'type', 'set', 'md', 'mkdir', 'rd', 'rmdir', 'ren', 'rename', 'exit',
   'pushd', 'popd', 'title', 'ver', 'vol', 'path', 'start', 'call', 'color']);
 
-// I probe in ordine di tentativo: si prova il primo e SOLO se non conferma si passa al successivo. Ogni probe è { file, args } e l'esistenza è segnalata da exit code 0.
+// In ordine: si passa al probe successivo SOLO se il precedente non conferma. Ogni probe è
+// { file, args }, e l'esistenza è l'exit code 0.
 function existenceProbes({ shell, cmd }) {
   if (process.platform !== 'win32') {
-    // Linux/macOS (routine cloud incluse): `command -v` copre builtin, funzioni ed eseguibili nel PATH.
+    // `command -v` copre builtin, funzioni ed eseguibili nel PATH.
     return [{ file: '/bin/sh', args: ['-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd] }];
   }
   if (shell === 'cmd') {
@@ -264,13 +271,14 @@ function existenceProbes({ shell, cmd }) {
   if (shell === 'bash') {
     return [{ file: 'wsl.exe', args: ['--', 'bash', '-c', 'command -v "$1" >/dev/null 2>&1', '_', cmd] }];
   }
-  // `where.exe` PER PRIMO: risolve ogni eseguibile nel PATH in ~100ms ed è affidabile anche con gli shim .ps1/.cmd di npm, mentre Get-Command su quegli shim deve analizzare lo script e può metterci 5s — oltre il timeout — finendo per colorare di rosso un comando valido.
-  // Get-Command resta il fallback per ciò che `where` non vede (cmdlet, alias, funzioni): lì non è mai un eseguibile esterno, quindi risolve in fretta.
+  // `where.exe` per primo: regge gli shim .ps1/.cmd di npm in ~100ms, dove Get-Command deve
+  // leggere lo script e può sforare il timeout, colorando di rosso un comando valido.
   return [
     { file: 'where.exe', args: [cmd] },
     {
       file: 'powershell.exe',
-      // Il nome entra come env, che PowerShell tratta come dato: sulla riga `-Command` in 5.1 verrebbe eseguito invece che passato in $args. `-Name` prende una stringa e non la rivaluta.
+      // Il nome entra come env, che PowerShell tratta come dato: sulla riga `-Command` in 5.1
+      // verrebbe ESEGUITO invece che passato in $args.
       args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
         'if (Get-Command -Name $env:FILO_WHICH_CMD -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }'],
       env: { FILO_WHICH_CMD: cmd },
@@ -278,18 +286,18 @@ function existenceProbes({ shell, cmd }) {
   ];
 }
 
-// Esegue UN probe e risolve true se il processo esce con codice 0.
 function runProbe({ file, args, env: probeEnv }, cwd) {
   return new Promise((resolve) => {
     let done = false;
     let proc;
     const finish = (val) => { if (done) return; done = true; try { proc.kill(); } catch (_) {} resolve(val); };
     try {
-      // Il nome del comando da controllare viaggia nell'env del probe, mai sulla riga di comando di PowerShell, così non può essere eseguito.
+      // Il nome viaggia nell'env, mai sulla riga di comando: vedi existenceProbes.
       const env = probeEnv ? { ...process.env, ...probeEnv } : undefined;
       proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve(false); return; }
-    // Timeout difensivo largo di proposito (10s): qui il danno vero è il falso negativo — un comando valido colorato di rosso — mentre una risposta lenta è solo lenta, e sotto carico (antivirus, suite in parallelo) anche `where.exe` può metterci secondi.
+    // Timeout largo di proposito: il danno vero è il falso negativo — un comando valido
+    // colorato di rosso — mentre una risposta lenta è solo lenta.
     const timer = setTimeout(() => finish(false), 10000);
     proc.on('error', () => { clearTimeout(timer); finish(false); });
     proc.on('exit', (code) => { clearTimeout(timer); finish(code === 0); });
@@ -310,5 +318,6 @@ async function commandExists({ shell, cwd, command } = {}) {
   return false;
 }
 
-// `existenceProbes` è esportata SOLO per il guard di regressione nei test ("firebase rosso"): l'ordine dei probe — `where.exe` prima di Get-Command — è ciò che tiene veloci gli shim npm, e un assert sul cronometro era rumore su una macchina carica.
+// Esportata solo per il test di regressione sull'ORDINE dei probe: `where.exe` prima di
+// Get-Command è ciò che tiene veloci gli shim npm, e un assert sul cronometro era rumore.
 module.exports = { createSession, defaultCwd, commandExists, existenceProbes };

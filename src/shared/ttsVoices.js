@@ -1,8 +1,6 @@
-// Voci della lettura ad alta voce. Ogni modello di sintesi ha il SUO catalogo con i SUOI
-// nomi (Kokoro `if_sara`, MAI-Voice `it-IT-ElsaNeural`, Aura-2 `aura-2-cinzia-it`): mandargli
-// la voce di un altro è un 400 secco, e la lettura ripiega sulla voce del browser senza che
-// si capisca perché. Un modello fuori catalogo non è un errore: gli si manda la voce scritta
-// a mano o nessuna, e se il router elenca le voci ammesse si può riprovare. Tutto PURO.
+// Voci della lettura ad alta voce. Ogni modello ha il SUO catalogo coi SUOI nomi:
+// mandargli la voce di un altro è un 400 secco e la lettura ripiega senza dire perché.
+// Un modello fuori catalogo non è un errore: gli si manda la voce scritta a mano o nessuna.
 (function (global) {
   'use strict';
 
@@ -178,9 +176,8 @@
     return v ? v.label : String(id == null ? '' : id);
   }
 
-  // Voce di partenza per una lingua: la prima di quella lingua; se la lingua non c'è la prima
-  // inglese (quella che ogni modello conosce meglio); se nemmeno quella, la prima del
-  // catalogo. Senza modello vale Kokoro. '' se il modello non pretende una voce.
+  // Voce di partenza: la prima di quella lingua, se non c'è la prima inglese (quella che ogni
+  // modello conosce meglio), altrimenti la prima del catalogo. '' se il modello non la vuole.
   function defaultVoiceFor(lang, modelId) {
     const c = modelId === undefined ? CATALOGS[0] : catalogFor(modelId);
     if (!c || !c.required || !c.voices.length) return '';
@@ -191,14 +188,8 @@
     return hit.id;
   }
 
-  // LA regola, quale voce mandare a un modello:
-  // - scelta a mano e il modello la conosce → quella;
-  // - scelta a mano ma di un ALTRO catalogo → ignorata (è rimasta da un modello precedente,
-  // mandarla è un 400 sicuro): si va alla voce di partenza per la lingua;
-  // - un nome che nessun catalogo conosce → passa tale e quale, è l'unico modo di usare un
-  // modello che non conosciamo;
-  // - niente scelto → la voce di partenza ('' se il modello sceglie da sé).
-  // `learned` è l'elenco dichiarato dal router in una risposta precedente: vale come catalogo.
+  // Scelta a mano: vale se il modello la conosce; se è di un ALTRO catalogo si ignora (è un
+  // 400 sicuro); se nessun catalogo la conosce passa tale e quale. Niente → voce di partenza.
   function resolveVoice({ chosen, lang, modelId, learned } = {}) {
     const want = String(chosen == null ? '' : chosen).trim();
     const c = catalogFor(modelId);
@@ -239,7 +230,7 @@
     return (want && byLang(want)) || byLang('en') || arr[0];
   }
 
-  // Voci raggruppate per lingua, per una tendina: [{ lang, label, voices }]. Senza modello, Kokoro.
+  // Voci per lingua, per una tendina: [{ lang, label, voices }]. Senza modello, Kokoro.
   function groupedByLang(modelId) {
     const voices = modelId === undefined ? KOKORO_VOICES : voicesFor(modelId);
     const langs = [];

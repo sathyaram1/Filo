@@ -8,15 +8,16 @@
   const isSvgIcon = global.SN_ICONS_UTIL?.isSvgIcon
     || ((s) => typeof s === 'string' && s.startsWith('<svg'));
 
-  // Le SVG sono compilate in src/shared/icons.js e non contengono mai dati utente: per questo innerHTML qui è sicuro. Glifi unicode ed emoji vanno in textContent.
+  // Le SVG sono compilate in src/shared/icons.js e non contengono mai dati utente: per questo
+  // innerHTML qui è sicuro. Glifi unicode ed emoji vanno in textContent.
   function setIconContent(el, value) {
     if (value == null) { el.textContent = ''; return; }
     if (isSvgIcon(value)) el.innerHTML = value;
     else el.textContent = value;
   }
 
-  // In fullscreen HTML5 il browser disegna solo l'elemento a tutto schermo e i suoi discendenti (top layer): un menu appeso a <html> resterebbe nascosto dietro al video.
-  // Con un fullscreenElement si monta lì dentro.
+  // In fullscreen HTML5 il browser disegna solo l'elemento a tutto schermo e i suoi
+  // discendenti: un menu appeso a <html> resterebbe nascosto dietro al video.
   function menuHost() {
     return document.fullscreenElement || document.documentElement;
   }
@@ -61,7 +62,8 @@
     };
     arrow.addEventListener('mouseenter', () => {
       clearSubCloseTimer();
-      // L'hover su una nuova freccetta chiude il sotto-menu già aperto, anche se «pinnato»: altrimenti si resta bloccati su quello senza poter esplorare gli altri.
+      // L'hover su una nuova freccetta chiude il sotto-menu già aperto, anche se «pinnato»:
+      // altrimenti si resta bloccati su quello senza poter esplorare gli altri.
       if (activeMenu?.subRoot && activeMenu.subOwner !== arrow) {
         activeMenu.subLocked = false;
         closeSubmenu();
@@ -96,11 +98,12 @@
     });
   }
 
-  // Geometria condivisa col riquadro della risposta di Filo (src/shared/overlayPlacement.js): l'altra superficie che cresce dopo essere stata posata.
-  // #405 — il tetto d'altezza serve anche dentro un riquadro incorporato: con meno spazio verticale del menu, le voci in fondo (feedback, aiuto) resterebbero tagliate.
+  // Geometria condivisa col riquadro della risposta (src/shared/overlayPlacement.js). Il
+  // tetto d'altezza serve anche dentro un riquadro, o le voci in fondo restano tagliate.
   const Place = global.SN_PLACE;
 
-  // `keep: true` = il menu è già a schermo e ha cambiato altezza: si parte dalla posa corrente, non dal cursore.
+  // `keep: true` = il menu è già a schermo e ha cambiato altezza: si parte dalla posa corrente, non
+  // dal cursore.
   function place(root, x, y, opts) {
     const keep = !!(opts && opts.keep);
     const { scale } = Place.applyCap(root);
@@ -122,15 +125,16 @@
     const primaTop = parseFloat(root.style.top);
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
-    // #500 — l'etichetta si toglie solo se il menu si è mosso davvero: spiegherebbe un bottone non più sotto al puntatore, ma un menu che cresce restando fermo non deve farla sparire a chi la legge.
+    // L'etichetta si toglie solo se il menu si è mosso davvero: un menu che cresce restando
+    // fermo non deve farla sparire a chi la sta leggendo (#500).
     const mosso = (Number.isFinite(primaTop) && Math.abs(p.top - primaTop) > 0.5)
       || (Number.isFinite(primaLeft) && Math.abs(p.left - primaLeft) > 0.5);
     if (mosso) dismissTooltip();
     repositionSub();
   }
 
-  // Dove posare un pannello ancorato (griglia "Altro…", cronologia incolla, sotto-menu a lista). Pura, come computeOffset.
-  // `mode` 'anchor': a fianco della voce che l'ha aperto, a sinistra se a destra non ci sta. 'edge': attaccato al bordo del menu con un pelo di sovrapposizione, così si leggono come un pezzo solo.
+  // 'anchor': a fianco della voce che l'ha aperto, a sinistra se a destra non ci sta.
+  // 'edge': attaccato al bordo del menu, così si leggono come un pezzo solo.
   function computeSubOffset({ aTop, aLeft, aRight, mLeft, mRight, w, h, vw, vh, mode }) {
     const edge = mode === 'edge';
     let left = edge ? mRight - 2 : aRight + 4;
@@ -140,7 +144,8 @@
     return { left, top };
   }
 
-  // Misura ADESSO dove si trova l'ancora: chiamabile quante volte serve, anche mentre il menu si muove.
+  // Misura ADESSO dove si trova l'ancora: chiamabile quante volte serve, anche mentre il menu si
+  // muove.
   function placeSub(sub, anchorEl, mode) {
     const a = anchorEl.getBoundingClientRect();
     const m = ((activeMenu && activeMenu.root) || anchorEl).getBoundingClientRect();
@@ -155,7 +160,8 @@
     sub.style.top = `${p.top}px`;
   }
 
-  // #500 — il menu si muove sotto un pannello già posato: se il pannello resta fermo si stacca dalla freccetta e galleggia sopra le voci. Quindi segue la sua ancora, e si chiude quando l'ancora esce dal bordo.
+  // Il menu si muove sotto un pannello già posato: se il pannello resta fermo si stacca
+  // dalla freccetta. Segue la sua ancora e si chiude quando esce dal bordo (#500).
   function repositionSub() {
     if (!activeMenu || !activeMenu.subRoot || !activeMenu.subAnchor) return;
     const sub = activeMenu.subRoot;
@@ -172,9 +178,8 @@
     placeSub(sub, anchor, activeMenu.subMode);
   }
 
-  // items: array di { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled, onClick, items? }
-  // - 'inline': sezione che mostra contenuto dinamico (es. spiegazione AI). { content?: string, onMount?: (el) => cleanup }
-  // - 'paste': come 'item' ma con freccetta a destra che apre il sotto-menu della cronologia
+  // items: { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled,
+  // onClick, items? }. 'inline' mostra contenuto dinamico, 'paste' apre la cronologia.
   function open({ x, y, items, keepOnScroll }) {
     close();
     const root = document.createElement('div');
@@ -186,7 +191,8 @@
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     const cleanups = [];
-    // Le sezioni che si riempiono più tardi si guardano da vicino, così la rimisura parte appena il testo cambia.
+    // Le sezioni che si riempiono più tardi si guardano da vicino, così la rimisura parte appena il
+    // testo cambia.
     const crescite = [];
 
     for (const it of items) {
@@ -214,11 +220,13 @@
       if (it.type === 'inline') {
         const el = document.createElement('div');
         el.className = 'sn-menu-inline';
-        // Di cosa parla il riquadro deve restare lo STESSO da qualunque punto della scheda lo si apra (#444); scritto qui, è leggibile anche prima che la risposta sostituisca il testo di attesa.
+        // Di cosa parla il riquadro deve restare lo stesso da qualunque punto della scheda lo si
+        // apra (#444), ed è leggibile già prima che arrivi la risposta.
         if (it.subject) el.dataset.subject = it.subject;
         if (it.content) el.textContent = it.content;
         root.appendChild(el);
-        // #500 — questa sezione cresce quando arriva la spiegazione. Il ResizeObserver se ne accorge, ma la sua consegna dipende dal ciclo di disegno: guardare il contenuto è più corto, e chi lo riempie non deve saperlo.
+        // Questa sezione cresce quando arriva la spiegazione: guardare il contenuto è più corto
+        // del ResizeObserver, e chi la riempie non deve saperlo (#500).
         crescite.push(el);
         if (typeof it.onMount === 'function') {
           try {
@@ -229,7 +237,8 @@
         continue;
       }
       if (it.type === 'correction') {
-        // Bottone composito: a sinistra la parola corretta (clic = applica), a destra una freccetta col sotto-menu (dizionario, correggi automaticamente, gestisci correttore).
+        // Bottone composito: a sinistra la parola corretta (clic = applica), a destra una freccetta
+        // col sotto-menu (dizionario, correggi automaticamente, gestisci correttore).
         const wrap = document.createElement('div');
         wrap.className = 'sn-menu-correction';
         keepPageFocus(wrap);
@@ -237,7 +246,8 @@
         if (it.loading) wrap.classList.add('sn-menu-correction-loading');
         if (it.id) wrap.id = it.id;
 
-        // `hidden`: riga presente ma in display:none, per riservare lo slot e rivelarlo con update() se la correzione arriva. Evita il flash «Cerco una correzione…» prima di sapere se la parola è sbagliata.
+        // `hidden`: riga in display:none per riservare lo slot e rivelarlo con update(). Evita
+        // il flash «Cerco una correzione…» prima di sapere se la parola è sbagliata.
         if (it.hidden) {
           wrap.style.display = 'none';
         }
@@ -276,7 +286,8 @@
         continue;
       }
       if (it.type === 'split') {
-        // Bottone generico: corpo cliccabile più freccetta col sotto-menu di varianti (subItems) — «Spiega ▸ approfondisci», «Detta ▸ scegli modello».
+        // Bottone generico: corpo cliccabile più freccetta col sotto-menu di varianti (subItems) —
+        // «Spiega ▸ approfondisci», «Detta ▸ scegli modello».
         const wrap = document.createElement('div');
         wrap.className = 'sn-menu-split';
         if (it.disabled) wrap.classList.add('sn-disabled');
@@ -401,7 +412,8 @@
 
     menuHost().appendChild(root);
 
-    // #405 — i clic non attraversano il confine di un riquadro incorporato: chi ha un menu aperto dall'altra parte non saprebbe di doverlo chiudere. L'avviso agli altri frame tiene la regola: un solo menu alla volta.
+    // I clic non attraversano il confine di un riquadro: chi ha un menu aperto dall'altra
+    // parte non saprebbe di doverlo chiudere, e la regola è un menu solo (#405).
     try {
       const nested = window.top !== window.self || (window.frames && window.frames.length > 0);
       const T = global.SN_MSG?.MSG?.CLOSE_OTHER_MENUS;
@@ -413,11 +425,12 @@
 
     place(root, x, y);
 
-    // #500 — quando lo si posa il menu non ha l'altezza definitiva: le sezioni dinamiche nascono a una riga e diventano tre quando arriva la spiegazione. Misurando una volta sola cresceva oltre il bordo basso, con l'ultima voce tagliata.
-    // Rimisurare a ogni cambio d'altezza lo tiene dentro; la posa «keep» scivola del minimo invece di ribaltarlo sotto il cursore.
+    // Posato, il menu non ha l'altezza definitiva: le sezioni dinamiche crescono quando
+    // arriva la spiegazione, e misurando una volta sola l'ultima voce finiva tagliata (#500).
     const riposa = () => place(root, x, y, { keep: true });
     cleanups.push(Place.observeGrowth(root, riposa));
-    // …e le sezioni che si riempiono dopo si guardano anche da vicino: la mutazione arriva subito, senza passare dal ciclo di disegno. Più richieste nello stesso fotogramma diventano una misura sola.
+    // Le sezioni che si riempiono dopo si guardano da vicino: la mutazione arriva subito,
+    // senza il ciclo di disegno; più richieste nello stesso fotogramma fanno una misura sola.
     if (crescite.length && typeof MutationObserver === 'function') {
       let inAttesa = false;
       const mo = new MutationObserver(() => {
@@ -445,11 +458,13 @@
       e.stopPropagation();
     };
     const onScroll = (e) => {
-      // Lo scroll DENTRO il menu non deve chiuderlo: il listener è in capture su window e vede anche gli scroll dei discendenti, quindi senza guardia la rotella sulla cronologia chiude il box invece di scorrerlo.
+      // Lo scroll DENTRO il menu non deve chiuderlo: il listener è in capture su window e vede
+      // anche i discendenti, quindi la rotella sulla cronologia chiudeva il box.
       const t = e && e.target;
       if (t && t.nodeType === 1) {
         if (root.contains(t)) {
-          // #500 — il menu ha scorso sotto al pannello ancorato: la freccetta si è spostata e il pannello va con lei, o si chiude se è uscita dal bordo. Stesso trattamento per il tooltip.
+          // Il menu ha scorso sotto al pannello ancorato: la freccetta si è spostata e il pannello
+          // va con lei, o si chiude se è uscita dal bordo (#500).
           try { dismissTooltip?.(); } catch (_) {}
           repositionSub();
           return;
@@ -459,8 +474,8 @@
       if (keepOnScroll) return;
       close();
     };
-    // #500 — la finestra che si accorcia è lo stesso difetto preso dall'altro verso: in entrambi i casi il fondo del menu finisce oltre il bordo e le ultime voci diventano irraggiungibili.
-    // Quindi qui si rifà il conto di dove sta il menu, invece di chiuderlo o di non fare niente. Capita ridimensionando la finestra, e ogni volta che l'area della pagina si accorcia da sola.
+    // La finestra che si accorcia è lo stesso difetto dall'altro verso: il fondo del menu
+    // finisce oltre il bordo. Si rifà il conto della posa invece di chiuderlo (#500).
     const onResize = () => {
       if (!root.isConnected) return;
       riposa();
@@ -477,13 +492,14 @@
     };
   }
 
-  // Il mousedown non deve spostare il fuoco dal campo di scrittura al bottone del menu: il punto in cui si scriveva — e la parola selezionata dal correttore di sistema — sparirebbe prima che l'azione parta.
-  // Pesa nei blocchi sigillati (#438), dove riscrivere la selezione è l'unica strada per correggere; altrove la correzione ritrova il campo da sé. preventDefault su mousedown non annulla il click.
+  // Il mousedown non deve spostare il fuoco dal campo al bottone: il punto in cui si
+  // scriveva, e la parola selezionata dal correttore, sparirebbero prima dell'azione.
   function keepPageFocus(el) {
     el.addEventListener('mousedown', (e) => { e.preventDefault(); });
   }
 
-  // `cleanups` va passato esplicitamente: renderCorrection sta a livello di modulo e non chiude sullo scope di open. Senza, setupArrowSubmenu solleva «cleanups is not defined» e il menu di correzione fallisce, senza suggerimento.
+  // `cleanups` va passato esplicitamente: renderCorrection sta a livello di modulo e non
+  // chiude sullo scope di open, o il menu di correzione solleva un errore.
   function renderCorrection(wrap, props, cleanups = []) {
     wrap.innerHTML = '';
     wrap.classList.toggle('sn-menu-correction-loading', !!props.loading);
@@ -580,7 +596,8 @@
     attachSubmenuHover(sub);
   }
 
-  // Sotto-menu cronologia incolla, ancorato alla freccetta. `handlers` può essere una funzione (retrocompat: solo onPick) o un oggetto { onPick, onRemove, onClear }.
+  // Sotto-menu cronologia incolla, ancorato alla freccetta. `handlers` può essere una funzione
+  // (retrocompat: solo onPick) o un oggetto { onPick, onRemove, onClear }.
   function openSubmenu(anchorEl, entries, handlers) {
     const onPick = typeof handlers === 'function' ? handlers : (handlers && handlers.onPick);
     const onRemove = handlers && typeof handlers === 'object' ? handlers.onRemove : null;
@@ -610,7 +627,8 @@
         (entry.type === 'image' ? (entry.description || 'Immagine') : (entry.text || ''))
           .replace(/\s+/g, ' ').trim();
 
-      // noResults = nessuna corrispondenza nella ricerca; emptyMsg = l'utente ha rimosso tutte le voci. Creati prima così i gestori possono riferirli.
+      // noResults = nessuna corrispondenza nella ricerca; emptyMsg = l'utente ha rimosso tutte le
+      // voci. Creati prima così i gestori possono riferirli.
       const noResults = document.createElement('div');
       noResults.className = 'sn-menu-empty';
       noResults.textContent = I18n.t('menu_paste_no_results');
@@ -640,15 +658,16 @@
         if (clearWrap) clearWrap.style.display = 'none';
       };
 
-      // La rimozione deve valere anche per la LISTA che il menu tiene in mano: `entries` è lo stesso array ripassato a ogni riapertura, perché la cronologia si legge una volta sola.
-      // Togliendo solo il nodo dal DOM basta richiudere e riaprire perché la voce ricompaia: su una password copiata è la bugia peggiore possibile.
+      // La rimozione vale anche per la LISTA che il menu tiene in mano: togliendo solo il nodo
+      // dal DOM la voce ricompare alla riapertura — su una password è la bugia peggiore.
       const forgetEntry = (entry) => {
         if (!Array.isArray(entries)) return;
         const i = entries.indexOf(entry);
         if (i >= 0) entries.splice(i, 1);
       };
 
-      // Il filtro si riapplica anche DOPO una rimozione: se togli l'unica voce trovata, la lista resterebbe muta senza dire che quella ricerca ora non ha risultati.
+      // Il filtro si riapplica dopo una rimozione: togliendo l'unica voce trovata la lista
+      // resterebbe muta invece di dire che quella ricerca non ha più risultati.
       const applyFilter = () => {
         const q = input.value.trim().toLowerCase();
         let visible = 0;
@@ -770,14 +789,16 @@
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
 
-    // La cronologia incolla va ATTACCATA al box principale: ancorata al bordo del menu padre con un leggero overlap, non alla freccetta con un gap. In verticale è allineata alla riga «Incolla» e ricade in alto se sfora.
+    // La cronologia incolla è ATTACCATA al bordo del menu con un leggero overlap, non
+    // ancorata alla freccetta con un gap: si leggono come un pezzo solo.
     activeMenu.subAnchor = anchorEl;
     activeMenu.subMode = 'edge';
     placeSub(sub, anchorEl, 'edge');
     attachSubmenuHover(sub);
   }
 
-  // Griglia di icone del pannello «Altro…»: ancorata a un bottone del menu principale ma NON chiude il menu padre, e regge il drag fra griglia secondaria e riga principale.
+  // Griglia del pannello «Altro…»: ancorata a un bottone ma NON chiude il menu padre, e
+  // regge il drag fra griglia secondaria e riga principale.
   function openIconGridSubmenu(anchorEl, items, opts = {}) {
     if (!activeMenu) return;
     if (activeMenu.subRoot) {
@@ -804,7 +825,8 @@
     activeMenu.subMode = 'anchor';
 
     placeSub(sub, anchorEl, 'anchor');
-    // Senza questo, il timer di mouseleave sull'ancora chiude il sotto-menu appena il cursore entra nella griglia.
+    // Senza questo, il timer di mouseleave sull'ancora chiude il sotto-menu appena il cursore entra
+    // nella griglia.
     attachSubmenuHover(sub);
   }
 
@@ -840,7 +862,8 @@
     if (!tooltipEl) return;
     tooltipEl.style.display = 'none';
   }
-  // Toglie l'etichetta E l'attesa che sta per farla comparire: quando a muoversi è il menu e non il puntatore, quell'attesa farebbe comparire fra un attimo l'etichetta di un bottone che nel frattempo è altrove.
+  // Toglie l'etichetta e l'attesa che sta per farla comparire: se a muoversi è il menu,
+  // comparirebbe l'etichetta di un bottone che nel frattempo è altrove.
   function dismissTooltip() {
     clearTimeout(tooltipHideTimer);
     tooltipHideTimer = null;
@@ -866,7 +889,8 @@
     b.className = 'sn-menu-row-btn';
     if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
     if (sub.kind === 'empty') b.classList.add('sn-menu-row-empty');
-    // Disabilitazione «soft» con una classe invece dell'attributo `disabled`, che azzera i pointer event e impedirebbe di trascinare l'icona per riordinarla. Il click resta neutralizzato dal guard più sotto.
+    // Disabilitazione «soft» con una classe: l'attributo `disabled` azzera i pointer event e
+    // impedirebbe di trascinare l'icona. Il click lo neutralizza il guard più sotto.
     if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     // L'overflow apre subito un sotto-menu su hover: non mostrare il tooltip
     // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
@@ -877,7 +901,8 @@
     if (sub.label) b.setAttribute('aria-label', sub.label);
     if (sub.id) b.dataset.snIconId = sub.id;
     if (sub.kind === 'overflow') {
-      // L'overflow apre la griglia delle icone secondarie come sotto-menu ancorato, SENZA chiudere il menu principale; durante un drag è hover-target e si apre da sé.
+      // L'overflow apre la griglia secondaria come sotto-menu ancorato, senza chiudere il menu
+      // principale; durante un drag è hover-target e si apre da sé.
       b.dataset.snDragHoverOpen = '1';
       const openOverflow = () => {
         if (sub.disabled) return;
@@ -975,7 +1000,8 @@
     return !!(activeMenu && activeMenu.subRoot && document.documentElement.contains(activeMenu.subRoot));
   }
 
-  // Drag pointer-based: quello HTML5 nativo non parte in modo affidabile con un transform sul menu (compensazione zoom) o su un <button>, e su molte pagine ospite l'immagine di trascinamento non si vede. Qui muoviamo un'anteprima clonata.
+  // Drag pointer-based: quello HTML5 non parte in modo affidabile con un transform sul
+  // menu o su un <button>, e l'immagine di trascinamento spesso non si vede.
   const dropZones = [];
 
   function attachDrag(el, { id, source }) {
@@ -1100,7 +1126,8 @@
     return null;
   }
 
-  // Trova il bottone davanti al quale inserire, in reading order (alto→basso, sinistra→destra). Salta l'elemento sorgente per non auto-collidere.
+  // Trova il bottone davanti al quale inserire, in reading order (alto→basso, sinistra→destra).
+  // Salta l'elemento sorgente per non auto-collidere.
   function findInsertBefore(zoneEl, x, y, skipEl) {
     const btns = Array.from(zoneEl.querySelectorAll('[data-sn-icon-id]'))
       .filter((b) => b !== skipEl);

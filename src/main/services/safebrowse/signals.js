@@ -1,13 +1,14 @@
-// Stage 3: segnali deterministici locali (sincroni, istantanei) dal solo dominio normalizzato.
-// I segnali che vengono dal CONTENUTO della pagina (password, contenuto misto) arrivano dal chiamante via `ctx` e sono solo RINFORZO: mai l'unica base di un avviso ad alta gravità.
-// Impersonazione strict = confusable (omoglifi UTS-39) o typo puro sulla label di brand, e da sola basta per "Pericoloso"; broad = combosquat, nome esatto su suffisso non ufficiale o brand come sottodominio con eTLD+1 altro → "Sospetto".
+// Segnali deterministici locali, sincroni, dal solo dominio normalizzato.
+// Quelli che vengono dal CONTENUTO della pagina arrivano via `ctx` e sono solo RINFORZO.
+// Impersonazione strict (omoglifi o typo puro) basta per «pericoloso»; broad dà «sospetto».
 
 'use strict';
 
 const { BRANDS } = require('./brands');
 const { skeleton } = require('./confusables');
 
-// Damerau-Levenshtein (OSA): la trasposizione di due adiacenti conta 1, così "amzaon" dista 1 da "amazon" e non 2 come nella Levenshtein semplice.
+// Damerau-Levenshtein: la trasposizione di due adiacenti conta 1, così «amzaon» dista 1 da
+// «amazon».
 function osaDistance(a, b) {
   const al = a.length, bl = b.length;
   if (al === 0) return bl;
@@ -27,16 +28,18 @@ function osaDistance(a, b) {
   return d[al][bl];
 }
 
-// Soglia di typo per la lunghezza del brand: brand corti → distanza 1 e solo da 5 lettere in su (evita "wise"↔"wine"), brand lunghi → fino a 2.
+// Brand corti: distanza 1 e solo da 5 lettere in su (evita «wise»↔«wine»); brand lunghi fino
+// a 2.
 function typoThreshold(tokenLen) {
   if (tokenLen < 5) return 0;     // troppo corto: il typo è indistinguibile dal caso
   if (tokenLen >= 8) return 2;
   return 1;
 }
 
-// Migliore corrispondenza di impersonazione fra i brand noti: { strict, broad }, ciascuno null o { brand, reason, … }.
+// Migliore corrispondenza fra i brand noti: { strict, broad }, ciascuno null o un oggetto.
 function matchBrands(norm) {
-  // Confronti SEMPRE sulla forma Unicode decodificata: un dominio camuffato in punycode (xn--80ak6aa92e) va confrontato per ciò che mostra, "аррӏе".
+  // Confronti SEMPRE sulla forma Unicode decodificata: un dominio in punycode va confrontato
+  // per quello che mostra.
   const sld = (norm.sldUnicode || norm.sld || '').toLowerCase();
   const sldSkel = skeleton(sld);
   const uLabels = (norm.hostUnicode || norm.host || '').split('.');
@@ -78,10 +81,11 @@ function matchBrands(norm) {
   return { strict, broad: strict ? null : broad };
 }
 
-// Doppia estensione eseguibile nell'URL (fattura.pdf.exe): forte indizio di download ingannevole.
+// Doppia estensione eseguibile (fattura.pdf.exe): indizio forte di download ingannevole.
 const DOUBLE_EXT = /\.(pdf|jpe?g|png|gif|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp[34]|avi|html?)\.(exe|scr|bat|cmd|com|pif|vbs|vbe|js|jar|msi|apk|dmg|ps1|hta|cpl)(\?|#|$)/i;
 
-// `ctx` = indizi opzionali, mai unica base: { hasPassword, hasPayment, mixedContent, autoDownload, linkOrigin, urlPath }.
+// `ctx`: indizi opzionali, mai unica base — { hasPassword, hasPayment, mixedContent,
+// autoDownload, linkOrigin, urlPath }.
 function localSignals(norm, ctx = {}) {
   const out = [];
   if (!norm || !norm.ok) return out;

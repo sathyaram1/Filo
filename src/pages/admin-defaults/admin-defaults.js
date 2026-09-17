@@ -1,6 +1,6 @@
-// Pagina admin «Modelli predefiniti»: editor della config condivisa che si propaga a TUTTI
-// via Firestore. Riservata agli admin (il main rifiuta i non-admin, le regole Firestore sono
-// la garanzia forte). Le chiavi vere non arrivano mai qui: solo booleani `apiKeysPresent`.
+// Pagina admin «Modelli predefiniti»: la config condivisa che si propaga a tutti via
+// Firestore. Il main rifiuta i non-admin, ma la garanzia forte sono le regole Firestore.
+// Le chiavi vere non arrivano mai qui: solo booleani `apiKeysPresent`.
 
 (function () {
   'use strict';
@@ -12,8 +12,8 @@
 
   let modelChains = {};
 
-  // Cache dei cataloghi per provider, recuperati dal MAIN con le chiavi predefinite: questa
-  // pagina non vede mai le chiavi. `null` = non ancora caricato.
+  // Cataloghi per provider, recuperati dal MAIN con le chiavi predefinite: questa pagina non
+  // vede mai le chiavi. `null` = non ancora caricato.
   const providerModelCache = { openrouter: null };
 
   function $(id) { return document.getElementById(id); }
@@ -57,7 +57,7 @@
         providerModelCache[provider] = res.items;
         populateDatalist(provider, res.items);
       }
-    } catch (_) { /* lista non disponibile: il campo resta libero */ }
+    } catch (_) { /* lista non disponibile */ }
   }
 
   // Il valore corrente compare subito; il catalogo completo poi lo rimpiazza.
@@ -157,7 +157,7 @@
       ensureProviderModels(provSel.value);
     });
 
-    // Livello di reasoning per QUESTO modello (#369). Select nativa, per coerenza coi controlli fratelli.
+    // Livello di reasoning per QUESTO modello (#369). Select nativa, come i controlli fratelli.
     const reasonSel = document.createElement('select');
     reasonSel.className = 'sn-model-reason';
     reasonSel.title = I18n.t('admin_defaults_reasoning_desc');
@@ -206,7 +206,7 @@
     statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     try {
-      // Testa la riga com'è scritta, anche prima del salvataggio: il main usa le chiavi predefinite.
+      // Testa la riga com'è scritta, anche prima di salvare: il main usa le chiavi predefinite.
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
         nickname,
@@ -288,8 +288,8 @@
     }
   }
 
-  // Fornitori esclusi (#421/#518): la lista salvata qui SOSTITUISCE quella del codice — l'owner
-  // deve poterla svuotare — quindi la pagina confronta le due e dice cosa manca.
+  // Fornitori esclusi (#421/#518): la lista salvata qui SOSTITUISCE quella del codice —
+  // l'owner deve poterla svuotare — quindi la pagina confronta le due e dice cosa manca.
   function makeExcludedRow(name) {
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-excluded-row';
@@ -341,7 +341,7 @@
     return out;
   }
 
-  // L'avviso le nomina e offre di rimetterle: un elenco senza rimedio è solo una brutta notizia.
+  // L'avviso le nomina e offre di rimetterle: un elenco senza rimedio è una brutta notizia.
   function excludedMissingFromBuild() {
     const C = window.SN_CONST;
     if (!C || typeof C.missingExcludedProviders !== 'function') return [];
@@ -384,7 +384,7 @@
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
-    // Lista EFFETTIVA (codice ⊕ override remoto): quella che l'app applica e che il salvataggio riscrive.
+    // Lista EFFETTIVA (codice più override remoto): quella che l'app applica e che si riscrive.
     renderExcluded(cfg.excludedProviders || []);
     // Poi i cataloghi completi in background, senza bloccare il render.
     seedDatalistsFromRegistry(cfg.modelRegistry || {});
@@ -432,14 +432,13 @@
       modelRegistry: collectModelRegistry(),
       models: collectModels(),
     };
-    // La lista si invia SOLO se l'owner l'ha toccata ([] compreso): salvarla sempre congelerebbe
-    // nel doc remoto quella letta dal codice, e un'esclusione aggiunta con un rilascio non arriverebbe più.
+    // La lista si invia SOLO se l'owner l'ha toccata, [] compreso: salvarla sempre congelerebbe
+    // nel doc quella letta dal codice, e un'esclusione aggiunta con un rilascio non arriverebbe.
     const excluded = collectExcluded();
     if (JSON.stringify(excluded) !== JSON.stringify(loadedExcluded)) {
       config.excludedProviders = excluded;
     }
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
-    // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();
     if (gsb) config.safeBrowsingKey = gsb;
 

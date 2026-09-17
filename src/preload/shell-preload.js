@@ -3,8 +3,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('filoShell', {
-  // 'darwin' | 'win32' | 'linux': serve alla barra per nominare il tasto giusto
-  // nei suggerimenti (su Mac è Cmd, non Ctrl). Dato del sistema, non dell'utente.
+  // Alla barra serve per nominare il tasto giusto: regola in CLAUDE.md § Mac.
   sistema: process.platform,
   tabs: {
     open: (url) => ipcRenderer.invoke('tabs:open', { url }),

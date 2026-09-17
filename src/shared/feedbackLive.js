@@ -1,14 +1,15 @@
-// Aggiornamento continuo della lista dei feedback (dashboard di gestione): qui sta la logica pura — confronto e fusione — così si prova senza rete.
-// La dashboard non ricarica mai tutto: a ogni giro chiede le sole VERSIONI (id + ultima scrittura, pochi byte) e riscarica solo i documenti cambiati o nuovi.
+// Aggiornamento continuo della lista feedback: qui la logica pura, si prova senza rete.
+// La dashboard non ricarica mai tutto: chiede le VERSIONI e riscarica solo ciò che cambia.
 
 (function (global) {
   'use strict';
 
-  // Ogni quanto la dashboard chiede «cosa è cambiato?». Un giro costa una lettura per feedback in pagina (500 al tetto), quindi il ritmo è anche una spesa: un minuto tiene il passo con le routine (che lavorano per minuti, non secondi) per pochi euro al mese.
+  // Un giro costa una lettura per feedback in pagina: il ritmo è anche una spesa.
+  // Un minuto tiene il passo con le routine, che lavorano per minuti e non per secondi.
   const POLL_MS = 60 * 1000;
 
-  // local: documenti in mano (`_id` e, se vengono da Firestore, `_updateTime`); remote: [{ _id, _updateTime }] nell'ordine della pagina. Ritorna { changed, added, removed } di id.
-  // Senza versione locale si rilegge comunque: non sappiamo cosa abbiamo. `removed` copre sia il cancellato sia lo scivolato oltre il tetto — un ricaricamento non lo mostrerebbe, quindi neanche noi.
+  // Senza versione locale si rilegge comunque: non sappiamo cosa abbiamo.
+  // `removed` copre il cancellato e lo scivolato oltre il tetto: un ricarico non lo vedrebbe.
   function diffVersions(local, remote) {
     const seen = new Map();
     for (const fb of Array.isArray(local) ? local : []) {
@@ -35,7 +36,7 @@
     return Number.isFinite(t) ? t : 0;
   }
 
-  // Ritorna una lista NUOVA, dal più recente al più vecchio come quella del caricamento iniziale; la lista d'ingresso non viene toccata.
+  // Lista NUOVA, dal più recente come il caricamento iniziale; l'ingresso non si tocca.
   function applyChanges(list, { fresh = [], removed = [] } = {}) {
     const drop = new Set((removed || []).map(String));
     const byId = new Map();

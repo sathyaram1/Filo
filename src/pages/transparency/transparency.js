@@ -1,6 +1,6 @@
-// Documenti di trasparenza: il contenuto arriva da src/shared/transparency.js, generato dai
-// markdown in transparency/. Il documento sta nella QUERY (?doc=models), non in schede, così
-// l'indirizzo dice cosa stai leggendo e un link a una sezione precisa porta davvero lì.
+// Documenti di trasparenza, generati dai markdown in transparency/.
+// Il documento sta nella QUERY (?doc=…): l'indirizzo dice cosa stai leggendo e un link a
+// una sezione precisa porta davvero lì.
 
 (function () {
   'use strict';
@@ -23,7 +23,7 @@
     for (const item of T.NAV) {
       const doc = T.get(item.id);
       if (!doc) {
-        // Sezione non ancora scritta: resta visibile e spenta. Farla sparire direbbe che Filo non ha
+        // Sezione non ancora scritta: visibile e spenta. Farla sparire direbbe che Filo non ha
         // niente da dire su privacy o sicurezza, il contrario di quello che la pagina promette.
         const span = document.createElement('span');
         span.className = 'sn-nav-item is-soon';

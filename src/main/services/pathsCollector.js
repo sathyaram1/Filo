@@ -1,6 +1,6 @@
-// Raccolta percorsi della sidebar Aiuto: sanitizzazione e invio. Prima che qualcosa entri nella raccolta pubblica passa per due LLM distinti — INTENT_GUESS vede SOLO i dati programmatici e propone un intento neutro; INTENT_JUDGE vede l'intento, i messaggi raw dell'utente E QUELLO CHE VERREBBE PUBBLICATO (nome del sito, indirizzo di partenza, nomi degli elementi) e risponde un solo bit. È l'unica cosa che ferma un nome di persona scritto dentro l'etichetta di un pulsante, perché nessuna regola di forma distingue un nome da una parola qualunque (#584).
-// Il nome del sito non si può ripulire: è anche l'indirizzo sotto cui il documento va a finire, e su un sito personale è un nome e cognome. Due difese in ordine: i siti che non sono di nessuno (indirizzi numerici, nomi di una parola sola, suffissi di rete locale, pagine interne di Filo) non si raccolgono affatto, senza spendere una chiamata; per tutti gli altri decide il giudice.
-// Se il judge approva il percorso NON parte: entra in una coda sul disco e lo invia il server ore dopo (callable `pathSubmit`; nessun client scrive più in /paths), perché Firestore scrive da sé l'ora di creazione al microsecondo e due percorsi arrivati a un secondo l'uno dall'altro sono la stessa persona. La pulizia deterministica sta in src/shared/pathsSafety.js, da dove la incorpora anche il server.
+// Raccolta percorsi dell'Aiuto: due LLM in fila, uno propone l'intento, l'altro vede anche
+// quello che verrebbe pubblicato e risponde un bit — è l'unica cosa che ferma un nome di
+// persona in un'etichetta. Chi passa entra in coda: lo manda il server ore dopo (#584).
 
 (function (global) {
   'use strict';
@@ -9,7 +9,8 @@
   const Paths = global.SN_PATHS;
   const Safety = global.SN_PATHS_SAFETY;
 
-  // Limiti difensivi sui messaggi raw dell'utente: non escono dalla macchina, ma un prompt non deve poter esplodere — e un messaggio a più righe aprirebbe nella domanda al giudice sezioni che sembrano parte della domanda stessa (#584).
+  // Limiti difensivi sui messaggi raw: un prompt non deve poter esplodere, e un messaggio
+  // a più righe aprirebbe nella domanda al giudice sezioni che sembrano parte della domanda.
   const MAX_USER_MSG_LEN = 1000;
   const MAX_USER_MSGS = 20;
 
@@ -30,7 +31,7 @@
       .filter(Boolean);
   }
 
-  // Oltre alla pulizia condivisa si riconosce la risposta "intento non chiaro", che significa: non salvare.
+  // Oltre alla pulizia condivisa si riconosce «intento non chiaro»: vuol dire non salvare.
   function cleanGuessedIntent(text) {
     const s = Safety._internal.sanitizeIntent(typeof text === 'string' ? text : '');
     if (!s) return null;
@@ -52,20 +53,20 @@
     }
   }
 
-  // La coda che stacca l'orologio (perché esista, vedi la testata). RITARDO: ogni percorso esce fra mezz'ora e ventiquattr'ore dopo, sorteggiato per ciascuno a parte.
-  // UNO ALLA VOLTA per giro, con pausa sorteggiata fra due e venti minuti: svuotare tutto insieme dopo giorni di app chiusa rimetterebbe i percorsi in fila nell'ordine della sessione, a millisecondi l'uno dall'altro — la ricucitura che si vuole impedire.
-  // Invio fallito (niente rete, server giù): resta in coda e si riprova al giro dopo; dopo trenta giorni si rinuncia.
+  // La coda che stacca l'orologio: ogni percorso esce fra mezz'ora e un giorno dopo, uno per
+  // giro, con pausa sorteggiata. Invio fallito: resta in coda; dopo un mese si rinuncia.
 
   const CHIAVE_CODA = (global.SN_CONST && global.SN_CONST.STORAGE_KEYS
     && global.SN_CONST.STORAGE_KEYS.PATHS_OUTBOX) || 'pathsOutbox';
 
-  const RITARDO_MIN_MS = 30 * 60 * 1000;          // mezz'ora
-  const RITARDO_MAX_MS = 24 * 60 * 60 * 1000;     // un giorno
-  const PAUSA_MIN_MS = 2 * 60 * 1000;             // due minuti
-  const PAUSA_MAX_MS = 20 * 60 * 1000;            // venti minuti
-  // Quando la coda è piena a restare fuori è il percorso NUOVO, con un motivo scritto nei log: quello già in coda è stato accettato e ha già aspettato ore, e farlo sparire in silenzio era il guasto (#584). Il tetto è dimensionato sul caso peggiore vero: Aiuto usato molte volte al giorno e Filo chiuso per giorni.
+  const RITARDO_MIN_MS = 30 * 60 * 1000;
+  const RITARDO_MAX_MS = 24 * 60 * 60 * 1000;
+  const PAUSA_MIN_MS = 2 * 60 * 1000;
+  const PAUSA_MAX_MS = 20 * 60 * 1000;
+  // Quando la coda è piena a restare fuori è il percorso NUOVO, con un motivo nei log: quello
+  // già in coda è stato accettato e ha aspettato ore; farlo sparire in silenzio era il guasto.
   const MAX_IN_CODA = 500;
-  const MAX_ETA_MS = 30 * 24 * 60 * 60 * 1000;    // un mese
+  const MAX_ETA_MS = 30 * 24 * 60 * 60 * 1000;
 
   let coda = [];
   let caricamento = null;   // la lettura del disco, una sola per tutti
@@ -73,7 +74,8 @@
   let auto = true;          // spegnibile nei test
   let timer = null;
   let sorteggio = Math.random;
-  // Il token si chiede fresco al momento dell'invio: fra la raccolta e la partenza passano ore, e un token scaduto è una richiesta senza mittente.
+  // Il token si chiede fresco all'invio: fra raccolta e partenza passano ore, e uno
+  // scaduto è una richiesta senza mittente.
   let ottieniIdToken = async () => '';
 
   function sorteggia(min, max) {
@@ -87,7 +89,8 @@
     catch (e) { console.warn('[Filo] coda percorsi: salvataggio fallito', e?.message || e); }
   }
 
-  // Una sola lettura del disco, e chi arriva mentre è in corso ASPETTA QUELLA: con un semplice "già fatta?" chi accodava nei millisecondi della lettura scriveva sulla coda ancora vuota e la lettura gli passava sopra, facendo sparire la coda dal disco senza dire niente (#584).
+  // Una sola lettura del disco, e chi arriva mentre è in corso ASPETTA QUELLA: con un «già
+  // fatta?» chi accodava durante la lettura si vedeva passare sopra la coda, in silenzio.
   function carica() {
     if (caricamento) return caricamento;
     caricamento = leggiDaDisco();
@@ -155,13 +158,14 @@
     try {
       await carica();
       const prima = coda.length;
-      // La scadenza butta il percorso e lo DICE: se gli invii falliscono tutti (funzione del server assente, rete giù) la coda si svuota solo così, e senza una riga nei log la raccolta si fermerebbe senza che nessuno se ne accorga (#584).
+      // La scadenza butta il percorso e lo DICE: se gli invii falliscono tutti la coda si svuota
+      // solo così, e senza una riga nei log la raccolta si fermerebbe senza che nessuno lo sappia.
       const scaduti = coda.filter((v) => now - v.accodatoIl > MAX_ETA_MS);
       if (scaduti.length) {
         console.warn(`[Filo] coda percorsi: ${scaduti.length} percorso/i scaduto/i dopo trenta giorni senza riuscire a partire, buttati`);
       }
       coda = coda.filter((v) => now - v.accodatoIl <= MAX_ETA_MS);
-      // Fra i maturi si sceglie A CASO, non il più vecchio: l'ordine di uscita non deve rifare l'ordine della sessione.
+      // Fra i maturi si sceglie A CASO: l'ordine di uscita non deve rifare quello della sessione.
       const maturi = coda.filter((v) => v.nonPrimaDi <= now);
       let inviato = false;
       if (maturi.length) {
@@ -193,7 +197,7 @@
 
   function inCoda() { return coda.length; }
 
-  // All'avvio si riparte con una pausa, non subito: un lampo di invii all'apertura sarebbe di nuovo un orario.
+  // All'avvio si riparte con una pausa: un lampo di invii all'apertura è di nuovo un orario.
   function init(opzioni) {
     if (opzioni && typeof opzioni.ottieniIdToken === 'function') {
       ottieniIdToken = opzioni.ottieniIdToken;
@@ -203,8 +207,8 @@
     }).catch(() => {});
   }
 
-  // LA PORTA UNICA della domanda «se l'utente rispondesse, partirebbe qualcosa?»: la fa la raccolta prima di spendere i due modelli e il riquadro «Ha funzionato?» prima di comparire. Erano due cose diverse, e il riquadro prometteva di condividere anche da dove non si raccoglie: chi rispondeva leggeva «Grazie!» e non partiva niente (#584). Una promessa che non si avvera è peggio del silenzio.
-  // Tre controlli, nessuno dei quali costa una chiamata: il protocollo, il nome del sito e lo spazio in coda. Ritorna { ok } oppure { ok:false, reason }, lo stesso motivo che riporterebbe `collectAndSave`.
+  // LA PORTA UNICA di «se rispondesse, partirebbe qualcosa?»: la fanno la raccolta e il
+  // riquadro «Ha funzionato?», o il riquadro promette una condivisione che non avviene.
   async function raccoglibile(rawUrl) {
     const domain = Safety._internal.domainOf(rawUrl);
     if (!domain) return { ok: false, reason: 'dominio non valido' };
@@ -216,12 +220,14 @@
     return { ok: true };
   }
 
-  // Non lancia: i fallimenti tornano come `reason` testuale, così il chiamante logga senza che l'utente veda errori (telemetria best-effort).
+  // Non lancia: i fallimenti tornano come `reason` testuale, così il chiamante logga senza che
+  // l'utente veda errori.
   async function collectAndSave({ session, invokeAI }) {
     if (!session || typeof session !== 'object') {
       return { saved: false, reason: 'session vuota' };
     }
-    // Si scopre PRIMA dei due modelli: chiederglielo costerebbe due chiamate per un percorso che verrebbe buttato comunque. È la stessa porta del riquadrino, o le due risposte divergono.
+    // Si scopre PRIMA dei due modelli: chiederglielo costerebbe due chiamate per un percorso da
+    // buttare. È la stessa porta del riquadrino, o le due risposte divergono.
     const porta = await raccoglibile(session.rawUrl);
     if (!porta.ok) return { saved: false, reason: porta.reason };
     const domain = Safety._internal.domainOf(session.rawUrl);
@@ -245,7 +251,8 @@
     }
     if (!guessedIntent) return { saved: false, reason: 'intento non chiaro' };
 
-    // 2. judge: intento proposto + messaggi raw + QUELLO CHE VERREBBE PUBBLICATO (nome del sito, indirizzo di partenza, nomi degli elementi, già ripuliti). Output: solo 1 bit.
+    // 2. judge: intento proposto, messaggi raw e QUELLO CHE VERREBBE PUBBLICATO, già ripulito.
+    // Output: un bit solo.
     let ok = false;
     try {
       const r = await invokeAI({
@@ -286,7 +293,7 @@
     init,
     flush,
     inCoda,
-    // La pulizia deterministica è quella condivisa col server: qui è solo ri-esportata, non riscritta.
+    // La pulizia deterministica è quella condivisa col server: qui solo ri-esportata.
     _internal: {
       sanitizeUserMessages, cleanGuessedIntent, parseJudgeOutput,
       accoda, sorteggia, RITARDO_MIN_MS, RITARDO_MAX_MS, MAX_IN_CODA,
@@ -296,7 +303,7 @@
       normalizedPath: Safety._internal.normalizedPath,
       redigiPercorso: Safety._internal.redigiPercorso,
     },
-    // ---- helper per i test (nessun effetto in produzione) ----
+    // Helper per i test: nessun effetto in produzione.
     _peek: () => coda.map((v) => ({ ...v })),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _setSorteggio: (fn) => { sorteggio = typeof fn === 'function' ? fn : Math.random; },

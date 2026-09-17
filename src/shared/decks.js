@@ -1,12 +1,13 @@
-// Modello dati dei mazzi Commander (DECK-BUILDER-SPEC.md §13.1), solo logica pura; la persistenza vive in src/main/services/deckStore.js.
-// Invariante centrale: `versione` incrementa a OGNI modifica, ed è la chiave di invalidazione dei pareri LLM (§6.2), cacheati per (carta, versione mazzo).
+// Modello dati dei mazzi Commander (logica pura), persistenza in services/deckStore.js.
+// Invariante: `versione` incrementa a OGNI modifica ed è la chiave che invalida i pareri.
 
 (function (global) {
   'use strict';
 
   const RAGGRUPPAMENTI = ['tipo', 'tag', 'cmc', 'colore'];
 
-  // Nomi segnaposto dell'app: un mazzo che ne porta uno (o è marcato `nomeAuto`) può essere rinominato dal commander senza calpestare una scelta reale dell'utente.
+  // Nomi segnaposto: un mazzo che ne porta uno può essere rinominato dal commander
+  // senza calpestare una scelta reale dell'utente.
   const NOME_DEFAULT = 'Nuovo mazzo';
   const NOMI_SEGNAPOSTO = [NOME_DEFAULT, 'Mazzo senza nome'];
 
@@ -14,8 +15,8 @@
     return NOMI_SEGNAPOSTO.includes(String(nome || '').trim());
   }
 
-  // L'override di gruppo è PER-VISTA — mappa { raggruppamento: gruppo } — così uno spostamento fatto «per tipo» vale solo lì (#316).
-  // Il vecchio formato a stringa unica va alla vista corrente del mazzo: la carta resta dove l'utente la vede aprendo il mazzo e smette di seguire le altre viste.
+  // L'override di gruppo è PER-VISTA: uno spostamento fatto «per tipo» vale solo lì (#316).
+  // Il formato vecchio a stringa unica finisce nella vista corrente del mazzo.
   function normalizeOverride(raw, defaultView) {
     if (!raw) return null;
     if (typeof raw === 'string') {
@@ -33,7 +34,7 @@
     return null;
   }
 
-  // Immutabile: ritorna la nuova mappa, o undefined se resta vuota, così il campo sparisce dall'entry.
+  // Ritorna una nuova mappa, o undefined se resta vuota, così il campo sparisce dall'entry.
   function overrideWithoutView(ov, view) {
     if (!ov || typeof ov !== 'object') return undefined;
     if (!(view in ov)) return ov;
@@ -49,14 +50,16 @@
 
   function nowIso() { return new Date().toISOString(); }
 
-  // Il commander è un PARAMETRO del mazzo (§8.4), non una carta dell'elenco. `commanderMeta` è la cache di presentazione scritta quando viene impostato o risolto, così la libreria non rifà un lookup a ogni render.
+  // Il commander è un PARAMETRO del mazzo, non una carta dell'elenco.
+  // `commanderMeta` è cache di presentazione: la libreria non rifà un lookup a ogni render.
   function newDeck({ nome } = {}) {
     const t = nowIso();
     const nomeScelto = String(nome || '').trim();
     return {
       id: uuid(),
       nome: nomeScelto || NOME_DEFAULT,
-      // `nomeAuto` = il nome è segnaposto o derivato, non scelto dall'utente: finché è true, impostare un commander rinomina il mazzo. Una rinomina manuale lo azzera, perché una scelta esplicita non si calpesta.
+      // `nomeAuto`: il nome non è scelto dall'utente, quindi un commander nuovo lo rinomina.
+      // Una rinomina manuale lo azzera: una scelta esplicita non si calpesta.
       nomeAuto: !nomeScelto,
       commander: '',
       commanderMeta: null,
@@ -69,7 +72,7 @@
     };
   }
 
-  // Riporta un oggetto letto dallo storage a un mazzo valido. Null se manca l'id, cioè se non è recuperabile.
+  // Null se manca l'id: senza, il mazzo non è recuperabile.
   function sanitizeDeck(raw) {
     if (!raw || typeof raw !== 'object' || !raw.id) return null;
     const carte = Array.isArray(raw.carte) ? raw.carte : [];
@@ -78,7 +81,7 @@
     return {
       id: String(raw.id),
       nome,
-      // I mazzi salvati prima del flag non ce l'hanno: lo si deduce dal nome, perché un segnaposto è auto-nominabile e un nome vero è dell'utente.
+      // Senza il flag lo si deduce dal nome: un segnaposto è auto-nominabile, un nome vero no.
       nomeAuto: typeof raw.nomeAuto === 'boolean' ? raw.nomeAuto : isNomeSegnaposto(nome),
       commander: String(raw.commander || ''),
       commanderMeta: (raw.commanderMeta && typeof raw.commanderMeta === 'object') ? raw.commanderMeta : null,
@@ -106,7 +109,8 @@
     return { ...deck, versione: (Number(deck.versione) || 1) + 1, updated_at: nowIso() };
   }
 
-  // Se la carta c'è già NON si duplica: { deck, added:false } col mazzo invariato e la versione ferma, perché non c'è stato nessun edit reale.
+  // Se la carta c'è già NON si duplica: mazzo invariato e versione ferma,
+  // perché non c'è stato nessun edit reale.
   function addCard(deck, scryfallId, { qty = 1, tags = [] } = {}) {
     const id = String(scryfallId || '').trim();
     if (!id) return { deck, added: false };
@@ -118,7 +122,8 @@
     return { deck: next, added: true };
   }
 
-  // Copia o sposta VERSO un altro mazzo: se manca si aggiunge, se c'è le quantità si SOMMANO e i tag si uniscono — mai un no-op silenzioso che farebbe sparire copie (chi «sposta» rimuove dall'origine solo dopo che il merge è salvato).
+  // Se la carta c'è già le quantità si SOMMANO e i tag si uniscono: un no-op qui
+  // farebbe sparire copie, perché chi «sposta» rimuove dall'origine dopo il merge.
   function mergeCard(deck, scryfallId, { qty = 1, tags = [] } = {}) {
     const id = String(scryfallId || '').trim();
     if (!id) return { deck, added: false, merged: false };
@@ -145,7 +150,8 @@
     return { deck: touch({ ...deck, carte }), removed: true };
   }
 
-  // Import bulk (§11): le carte già presenti aggiornano la qty e tengono i loro tag, utile per reimportare lo stesso mazzo dopo una modifica esterna; le nuove entrano con tags vuoti. UN solo touch se c'è almeno una modifica reale.
+  // Le carte già presenti aggiornano la qty e TENGONO i loro tag: reimportare non li perde.
+  // UN solo touch, e solo se c'è almeno una modifica reale.
   function importCards(deck, entries) {
     const list = Array.isArray(entries) ? entries : [];
     const byId = new Map(deck.carte.map((c) => [c.scryfall_id, c]));
@@ -167,14 +173,15 @@
     return { deck: touch({ ...deck, carte: [...byId.values()] }), addedCount, updatedCount };
   }
 
-  // Rinomina esplicita: fissa il nome e marca `nomeAuto:false`, così un commander cambiato in seguito non lo sovrascrive più.
+  // Marca `nomeAuto:false`: un commander cambiato dopo non sovrascrive più il nome.
   function renameDeck(deck, nome) {
     const n = String(nome || '').trim();
     if (!n || (n === deck.nome && deck.nomeAuto === false)) return deck;
     return touch({ ...deck, nome: n, nomeAuto: false });
   }
 
-  // Se il mazzo ha ancora un nome automatico prende quello del commander, restando `nomeAuto:true` per seguire anche un cambio di commander. Un nome scelto a mano non si tocca mai.
+  // Col nome ancora automatico prende quello del commander e resta `nomeAuto:true`,
+  // così segue anche un cambio di commander. Un nome scelto a mano non si tocca mai.
   function setCommander(deck, scryfallId, meta = null) {
     const id = String(scryfallId || '').trim();
     const m = meta || null;
@@ -184,8 +191,8 @@
     return touch(next);
   }
 
-  // L'app mostra i prezzi in formato italiano, quindi il tetto con la virgola decimale è l'input naturale: virgola e punto valgono uguale, e si tollerano €, spazi e separatore delle migliaia.
-  // { ok:false } se il testo non è un numero: il chiamante non salva niente, perché il tetto non si stravolge né si cancella in silenzio.
+  // L'app mostra i prezzi all'italiana: virgola e punto valgono uguale, si tollera anche €.
+  // { ok:false } se non è un numero: il tetto non si stravolge né si cancella in silenzio.
   function parseBudgetInput(text) {
     if (text === null || text === undefined) return { ok: true, value: null };
     let s = String(text).replace(/€/g, '').replace(/\s+/g, '');
@@ -212,7 +219,8 @@
   function setBudget(deck, budget) {
     let b;
     if (typeof budget === 'string') {
-      // Difesa in profondità: se arriva la stringa grezza dell'input passa dal parser. Testo non numerico → mazzo INVARIATO, mai un Number()||0 che azzererebbe il tetto in silenzio.
+      // Anche la stringa grezza passa dal parser: testo non numerico → mazzo INVARIATO.
+      // Mai un Number()||0, che azzererebbe il tetto in silenzio.
       const p = parseBudgetInput(budget);
       if (!p.ok) return deck;
       b = p.value;
@@ -227,14 +235,14 @@
     return deck.carte.reduce((n, c) => n + (Number(c.qty) || 1), 0);
   }
 
-  // Copia per «duplica»: nuovo id e versione da 1, perché i pareri cacheati del mazzo di origine non valgono per la copia.
+  // Nuovo id e versione da 1: i pareri cacheati dell'originale non valgono per la copia.
   function duplicateDeck(deck) {
     const t = nowIso();
     return {
       ...deck,
       id: uuid(),
       nome: `${deck.nome} (copia)`,
-      // Il nome derivato della copia è deliberato: non deve inseguire un eventuale cambio di commander sulla copia.
+      // Il nome della copia è fissato apposta: non deve inseguire il commander della copia.
       nomeAuto: false,
       carte: deck.carte.map((c) => ({ ...c, tags: [...c.tags] })),
       versione: 1,
@@ -243,12 +251,11 @@
     };
   }
 
-  // Ultima modifica in cima.
   function sortForLibrary(decks) {
     return [...decks].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
   }
 
-  // Il raggruppamento è una FUNZIONE DI VISUALIZZAZIONE (§8.1): il mazzo resta una lista piatta e i gruppi si calcolano al volo da (deck, dati carta).
+  // Il raggruppamento è VISUALIZZAZIONE: il mazzo resta piatto e i gruppi si fanno al volo.
 
   const TIPO_ORDINE = ['Comandante', 'Creature', 'Istantanei', 'Stregonerie', 'Artefatti', 'Incantesimi', 'Planeswalker', 'Battaglie', 'Terre', 'Altro'];
   const COLORE_ORDINE = ['Bianco', 'Blu', 'Nero', 'Rosso', 'Verde', 'Multicolore', 'Incolore'];
@@ -281,7 +288,8 @@
     return n >= 7 ? '7+' : String(n);
   }
 
-  // `tagOrder` è l'ordine dei gruppi-tag, per la regola «primo gruppo che matcha» (§8.1). L'override dell'utente vince, ma SOLO nella vista in cui è stato fatto: è una mappa per-vista (#316), non un valore che seguirebbe la carta ovunque.
+  // Regola «primo gruppo che matcha», nell'ordine di `tagOrder`.
+  // L'override dell'utente vince, ma SOLO nella vista in cui è stato fatto (#316).
   function groupOf(entry, card, raggruppamento, tagOrder = []) {
     const ov = entry && entry.gruppo_override;
     if (ov && typeof ov === 'object' && ov[raggruppamento]) return ov[raggruppamento];
@@ -304,7 +312,8 @@
     return seen;
   }
 
-  // Ogni carta appare UNA sola volta; dentro il gruppo si ordina per CMC crescente, poi per nome. I gruppi extra (override o tag ignoti) vanno in coda, in ordine alfabetico.
+  // Ogni carta appare UNA sola volta; dentro il gruppo, CMC crescente e poi nome.
+  // I gruppi extra (override o tag ignoti) vanno in coda, in ordine alfabetico.
   function groupDeck(deck, cardsById) {
     const view = deck.raggruppamento || 'tipo';
     const tagOrder = view === 'tag' ? tagOrderOf(deck) : [];
@@ -337,7 +346,8 @@
     return names.map((name) => ({ name, entries: buckets.get(name) }));
   }
 
-  // Legalità Commander (§8.4): check PURI su (deck, dati carta) — singleton salvo basics, color identity rispetto al commander, banned list. `violations` sono nomi carta, pronti da mostrare.
+  // Singleton salvo basics, color identity rispetto al commander, banned list.
+  // `violations` sono nomi carta, pronti da mostrare.
   function legalityChecks(deck, cardsById) {
     const nameOf = (id) => (cardsById[id] && cardsById[id].name) || id;
     const isBasic = (id) => /\bBasic\b.*\bLand\b/i.test(String(cardsById[id] && cardsById[id].typeLine || ''));
@@ -378,7 +388,8 @@
     };
   }
 
-  // L'override agisce solo sulla vista `view`, senza toccare quelli fatti altrove (#316); gruppo vuoto o null lo rimuove da QUELLA vista. Con una `view` non valida vale il raggruppamento corrente del mazzo, e rimettere lo stesso override è un no-op: stesso riferimento, versione ferma.
+  // Tocca solo la vista `view` (#316); gruppo vuoto o null lo rimuove da QUELLA vista.
+  // Rimettere lo stesso override è un no-op: stesso riferimento, versione ferma.
   function setGroupOverride(deck, scryfallId, gruppo, view) {
     const id = String(scryfallId || '');
     const v = RAGGRUPPAMENTI.includes(view) ? view : (deck.raggruppamento || 'tipo');
@@ -388,7 +399,7 @@
       if (c.scryfall_id !== id) return c;
       const cur = (c.gruppo_override && typeof c.gruppo_override === 'object') ? c.gruppo_override : null;
       const before = cur ? cur[v] : undefined;
-      if ((before || undefined) === (g || undefined)) return c; // nessun cambiamento reale
+      if ((before || undefined) === (g || undefined)) return c;
       changed = true;
       const nextOv = g
         ? { ...(cur || {}), [v]: g }
@@ -406,8 +417,8 @@
     return touch({ ...deck, raggruppamento: view });
   }
 
-  // Aggiunge UN tag a UNA carta (#344, trascinandola su una categoria della vista per tag); tag già presente = no-op.
-  // L'override manuale della sola VISTA TAG viene rimosso: il trascinamento è un gesto di raggruppamento esplicito e deve vincere, altrimenti la carta resterebbe bloccata nel vecchio gruppo forzato. Gli override delle altre viste restano.
+  // Aggiunge UN tag a UNA carta (#344); tag già presente = no-op.
+  // Toglie l'override della sola vista tag: il trascinamento è esplicito e deve vincere.
   function addTagToCard(deck, scryfallId, tag) {
     const id = String(scryfallId || '');
     const t = String(tag || '').trim();
@@ -427,7 +438,8 @@
     return changed ? touch({ ...deck, carte }) : deck;
   }
 
-  // Sostituisce TUTTI i tag ([] li toglie), normalizzati e resi unici conservando l'ordine. Come addTagToCard rimuove l'override della sola vista tag. Mazzo invariato se l'insieme è già quello attuale.
+  // Sostituisce TUTTI i tag ([] li toglie); invariato se l'insieme è già quello attuale.
+  // Toglie l'override della vista tag come addTagToCard.
   function replaceCardTags(deck, scryfallId, tags) {
     const id = String(scryfallId || '');
     const uniq = [];

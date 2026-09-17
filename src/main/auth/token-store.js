@@ -1,15 +1,8 @@
-// Persistenza cifrata dei token di sessione (vedi Filo/SECURITY.md §2).
-//
-// I token NON vanno mai in chiaro su disco né in localStorage. Usiamo
-// `safeStorage` di Electron, che cifra con le API del sistema operativo
-// (DPAPI su Windows, Keychain su macOS, libsecret su Linux). Il blob cifrato
-// vive in userData/auth.bin. Se la cifratura OS non è disponibile, NON
-// scriviamo in chiaro: rinunciamo alla persistenza (l'utente rifarà il login).
+// Persistenza cifrata dei token di sessione (SECURITY.md §2).
+// Mai in chiaro su disco: safeStorage cifra con le API del sistema, file userData/auth.bin.
+// Senza cifratura OS si rinuncia alla persistenza: l'utente rifarà il login.
 
-// Niente require('electron') a livello di modulo: questo file viene richiesto
-// (transitivamente, via google-auth → defaultsStore/supportModelsStore) anche
-// dagli unit test node:test che girano fuori da Electron. `app`/`safeStorage`
-// servono solo dentro le funzioni, quindi si richiedono lazy lì.
+// electron si richiede dentro le funzioni: gli unit test girano fuori da Electron.
 const fs = require('node:fs');
 const path = require('node:path');
 

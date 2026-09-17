@@ -5,9 +5,8 @@
 
   const { STORAGE_KEYS, DEFAULT_SETTINGS } = global.SN_CONST;
 
-  // Chiavi da SOSTITUIRE invece di fondere: il loro contratto è «questa è la lista
-  // completa, chi manca è stato rimosso» (togliere un nickname dalla UI deve
-  // cancellarlo, non lasciarlo in vita perché era nei default).
+  // Chiavi da SOSTITUIRE invece di fondere: il loro contratto è «questa è la lista completa,
+  // chi manca è stato rimosso»: togliere un nickname dalla UI deve cancellarlo davvero.
   const REPLACE_KEYS = new Set(['modelRegistry', 'themeTokens']);
 
   function deepMerge(target, source, path = '') {

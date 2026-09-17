@@ -12,10 +12,8 @@ const SHELL_HEIGHT = 88;
 // Finestre invisibili nei test: il perché sta in `test-window-mode.js`.
 const { HIDDEN, posizioneFuoriSchermo, hideForTests } = require('./test-window-mode');
 
-// Serve al primo disegno: in certe configurazioni la WebContentsView appena
-// creata resta un quadrato vuoto finché la finestra non riceve attenzione dal
-// compositor. Nei test si mostra lo stesso (i menu nativi sono finestre figlie
-// e senza madre mostrata non si aprono), ma invisibile e senza fuoco.
+// Serve al primo disegno: in certe configurazioni la WebContentsView resta un quadrato
+// vuoto finché non riceve attenzione. Nei test si mostra invisibile e senza fuoco.
 function revealWindow(win) {
   try {
     if (HIDDEN) {
@@ -41,9 +39,8 @@ function wireWindowCommon(win, tabs) {
   } catch (_) {}
 
   win.on('resize', () => tabs.layout());
-  // A tutto schermo per una strada che non è quella di Filo (gesto o tasto del
-  // sistema) si adotta comunque la modalità: altrimenti resta uno schermo intero
-  // che Filo non sa di avere, e l'Esc non ha niente da spegnere.
+  // A tutto schermo per una strada che non è quella di Filo si adotta comunque la modalità,
+  // o resta uno schermo intero che Filo non sa di avere e l'Esc non ha niente da spegnere.
   win.on('enter-full-screen', () => {
     if (!tabs.contentFullscreen) tabs.setContentFullscreen(true);
     else tabs.layout();
@@ -53,9 +50,8 @@ function wireWindowCommon(win, tabs) {
     else tabs.layout();
   });
 
-  // #514 — a tutto schermo la barra è nascosta ma può tenere il fuoco, e da lì
-  // l'Esc non passa dal before-input-event di nessuna scheda. Qui non si decide
-  // niente: la regola sta in tabs.js, che risponde false se la barra è visibile.
+  // #514 — a tutto schermo la barra è nascosta ma può tenere il fuoco, e da lì l'Esc non passa
+  // dal before-input-event di nessuna scheda. La regola sta in tabs.js, qui non si decide.
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
@@ -105,9 +101,8 @@ function createMainWindow() {
   return win;
 }
 
-// Incognito: niente deve sopravvivere alla chiusura. Sessione web effimera più
-// storage filo:// dirottato sull'overlay in RAM dello shim; `_filoIncognito`
-// è il marcatore che fa avvolgere i messaggi dell'IPC in runIncognito().
+// Incognito: niente deve sopravvivere alla chiusura. Sessione web effimera più storage
+// filo:// sull'overlay in RAM; `_filoIncognito` fa avvolgere i messaggi in runIncognito().
 function createIncognitoWindow() {
   // SENZA prefisso 'persist:': è quello che la rende una sessione in memoria.
   const partition = 'filo-incognito-' + randomUUID();

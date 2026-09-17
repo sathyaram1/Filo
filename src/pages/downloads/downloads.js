@@ -1,6 +1,6 @@
-// Elenco scaricamenti (#410.3): cronologia persistita dal main, dal più recente. Clic
-// sinistro = azione primaria, tasto destro = menu completo. Gli aggiornamenti live arrivano
-// come segnale contentless: nessun percorso su disco viaggia verso le schede dei siti.
+// Elenco scaricamenti: cronologia persistita dal main, dal più recente.
+// Clic sinistro = azione primaria, tasto destro = menu completo.
+// Gli aggiornamenti live non portano contenuto: nessun percorso su disco va alle schede.
 
 (function () {
   'use strict';
@@ -73,8 +73,8 @@
     render();
   }
 
-  // Il file di uno scaricamento concluso può sparire (spostato, cestinato): il main guarda il
-  // disco e risponde missing, e la riga diventa subito «non più disponibile» — non si riprova.
+  // Il file di uno scaricamento concluso può sparire: il main guarda il disco e risponde
+  // missing, così la riga diventa «non più disponibile» invece di riprovare.
   async function openFile(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id });
     if (!res || res.ok !== false) return;
@@ -145,11 +145,11 @@
   function onMenuKeydown(e) { if (e.key === 'Escape') closeCtxMenu(); }
 
   function menuActionsFor(r) {
-    // Ogni azione compare solo quando ha senso (niente «Apri file» su un download mai completato).
+    // Ogni azione compare solo quando ha senso (niente «Apri file» su un download mai finito).
     // Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
     const acts = [];
     if (isActive(r)) {
-      // canPause === false: scaricamento «a mano», non sospendibile. Meglio nessuna azione che una muta.
+      // canPause === false: scaricamento «a mano». Meglio nessuna azione che una muta.
       if (r.canPause !== false) {
         if (r.state === 'paused') acts.push(['Riprendi', () => resume(r)]);
         else acts.push(['Pausa', () => pause(r)]);
@@ -281,8 +281,7 @@
     addBtn('Rimuovi', () => removeItem(r));
     row.appendChild(actions);
 
-    // Clic sinistro = azione primaria: apre solo se completato e il file c'è ancora, altrimenti
-    // non prometterebbe nulla.
+    // Clic sinistro = azione primaria: apre solo se completato e il file c'è ancora.
     if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
@@ -365,14 +364,14 @@
       render();
     });
 
-    // Tornando su questa scheda dopo aver spostato o cancellato i file da fuori, la lista va
-    // riletta: nessun evento annuncia una cartella svuotata, e le voci resterebbero «aperibili».
+    // Tornando qui dopo aver spostato o cancellato i file da fuori la lista va riletta: nessun
+    // evento annuncia una cartella svuotata, e le voci resterebbero «aperibili».
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) scheduleReload();
     });
     window.addEventListener('focus', scheduleReload);
 
-    // Il main pusha un segnale contentless a ogni cambiamento: si rilegge la lista dal canale interno.
+    // Il main segnala ogni cambiamento senza contenuto: la lista si rilegge dal canale interno.
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();

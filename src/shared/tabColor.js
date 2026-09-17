@@ -1,7 +1,6 @@
-// Logica pura del colore delle tab: decide se un colore «ha identità» (croma
-// sufficiente per rappresentare il brand) o è chrome neutra da non usare come tinta.
-// È la stessa regola del campionatore del favicon, qui perché theme-color, manifest e
-// shell la applichino allo stesso modo.
+// Logica pura del colore delle tab: decide se un colore «ha identità» (croma sufficiente
+// per rappresentare il brand) o è chrome neutra da non usare come tinta. È la stessa regola
+// del campionatore favicon, qui perché theme-color, manifest e shell la applichino uguale.
 
 (function (global) {
   'use strict';
@@ -10,7 +9,7 @@
   // non ha identità. Stesso valore del campionatore favicon, così i tre percorsi concordano.
   const IDENTITY_CHROMA_MIN = 24;
 
-  // NON risolve named/hex: i chiamanti passano già stringhe rgb() risolte da getComputedStyle.
+  // NON risolve named/hex: i chiamanti passano rgb() già risolto da getComputedStyle.
   function parseRgb(str) {
     const m = /rgba?\(([^)]+)\)/.exec(str || '');
     if (!m) return null;
@@ -31,14 +30,11 @@
     return chroma(str) >= IDENTITY_CHROMA_MIN;
   }
 
-  // Estrazione del colore identità dai pixel del favicon (logica pura: gli RGBA del canvas
-  // li passa pageColor.js). Due strade: cromatica — cluster per tinta e punteggio
-  // saturazione×centralità, così il giallo e il blu di Poste non si annullano — e acromatica
-  // quando nessun pixel è saturo, così X, Wikipedia e GitHub restano bianchi/neri.
+  // Estrazione del colore identità dai pixel del favicon. Due strade: cromatica (cluster per
+  // tinta, così giallo e blu non si annullano) e acromatica, così Wikipedia resta bianca.
 
-  // `opacita_tab` governa il BLEND del colore sul fondo della barra delle schede ed è
-  // applicato dalla shell: non entra nell'estrazione, quindi resta fuori da IDENTITY_PARAMS
-  // (i soli parametri letti da extractIdentityFromPixels).
+  // `opacita_tab` governa il BLEND sul fondo della barra ed è applicato dalla shell:
+  // non entra nell'estrazione, quindi resta fuori da IDENTITY_PARAMS.
   const IDENTITY_PARAMS = {
     soglia_saturazione: 0.30, // 0–0.5: sotto questa saturazione il pixel è ignorato dal path cromatico
     peso_centralita: 5.0,     // 0–10: forza del bias gaussiano verso il centro del favicon
@@ -49,7 +45,6 @@
 
   // Unica fonte di verità per default, range ed etichette dei sei parametri: la leggono le
   // Preferenze avanzate e la validazione quando li si cambia a voce dalla chat.
-  // `stage`: 'extract' = estrazione dal favicon, 'blend' = mix col fondo della barra.
   const IDENTITY_PARAM_META = [
     { key: 'soglia_saturazione', def: 0.30, min: 0, max: 0.5, step: 0.01, stage: 'extract',
       label: 'Soglia saturazione',
@@ -142,7 +137,7 @@
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
-        if (pixels[idx + 3] < 128) continue; // trasparente → ignora
+        if (pixels[idx + 3] < 128) continue;
         const r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2];
         const [h, s, l] = rgbToHsl(r, g, b);
         lumSum += l; lumCount++;

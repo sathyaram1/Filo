@@ -1,6 +1,6 @@
-// Outbox del feedback (#341): alla pressione di "Invia" il box sparisce SUBITO e il main si fa carico dell'invio, ritentando da solo appena la connessione torna — l'utente non deve gestire nulla.
-// Coda persistita (un feedback accodato offline riparte al prossimo avvio) con backoff crescente fino a ~30s; l'invio è idempotente lato server (submissionId → dedup), quindi ritentare non crea mai duplicati.
-// Dipende da SN_STORAGE, SN_FEEDBACK e SN_CONST su globalThis, caricati prima dal loader.
+// Outbox del feedback (#341): il box sparisce subito e il main si fa carico dell'invio,
+// ritentando appena la connessione torna. Coda persistita, backoff crescente fino a ~30s.
+// L'invio è idempotente lato server (submissionId), quindi ritentare non crea duplicati.
 
 (function (global) {
   'use strict';
@@ -63,7 +63,7 @@
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
-    // Riprende i feedback accodati e non ancora inviati (app riavviata mentre era offline) e prova subito a smaltirli.
+    // Un feedback accodato offline riparte al prossimo avvio.
     load().then(() => { if (queue.length) scheduleFlush(0); }).catch(() => {});
   }
 
@@ -90,7 +90,7 @@
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
 
-  // Su fallimento (offline) le voci restano in coda e, se `auto`, si pianifica un nuovo tentativo con backoff crescente.
+  // Su fallimento le voci restano in coda e, se auto, si ripianifica con backoff crescente.
   async function flush() {
     if (flushing) return queue.length === 0;
     flushing = true;
@@ -106,7 +106,7 @@
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
-          // Titolo breve calcolato UNA volta all'invio (offline ripiega sul fallback) e riusato dai ritentativi.
+          // Titolo calcolato UNA volta all'invio e riusato dai ritentativi (offline: ripiego).
           if (!it.prepared) {
             let name = '';
             if (prepareFn) {

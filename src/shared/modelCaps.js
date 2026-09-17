@@ -1,8 +1,6 @@
 // Capacità dei modelli e requisiti delle funzioni: categoria nel picker, ordinamento per
-// recency e validazione dell'abbinamento modello↔funzione (una funzione che vuole testo
-// non può ricevere un modello di sola sintesi vocale). Si ricavano dai metadati dell'API
-// quando ci sono (OpenRouter: modalità e `created`), altrimenti dal nome o dalle modalità
-// dichiarate nella riga del registro personale.
+// recency, validazione dell'abbinamento modello↔funzione. Si ricavano dai metadati dell'API
+// quando ci sono, altrimenti dal nome o dalle modalità dichiarate nel registro personale.
 
 (function (global) {
   'use strict';
@@ -54,9 +52,8 @@
       return { inputs: [M.TEXT, M.IMAGE], outputs: [M.VIDEO] };
     }
 
-    // Per un modello OpenRouter senza metadati di modalità le capacità reali sono IGNOTE
-    // (tanti accettano immagini senza dirlo nel nome): si marca `uncertain` così il gate non
-    // blocca chi lo sceglie, e a runtime scatta semmai il fallback.
+    // Modello OpenRouter senza metadati: capacità IGNOTE (tanti accettano immagini senza dirlo
+    // nel nome). Si marca `uncertain` così il gate non blocca, e a runtime scatta il fallback.
     const inputs = [M.TEXT];
     const uncertain = provider === 'openrouter';
     return { inputs, outputs: [M.TEXT], uncertain };
@@ -81,7 +78,7 @@
     return t ? t('caps_cat_' + key) : key;
   }
 
-  // Default: testo in output, nessun input speciale. Le eccezioni sono le funzioni multimodali.
+  // Default: testo in output, nessun input speciale; le eccezioni sono le multimodali.
   function requirementsFor(action) {
     const A = (global.SN_CONST && global.SN_CONST.ACTIONS) || {};
     switch (action) {
@@ -108,7 +105,7 @@
     const t = (global.SN_I18N && global.SN_I18N.t) || ((k) => k);
 
     // Capacità non note: non si blocca, come per i nickname sconosciuti — un blocco falso
-    // impedirebbe di usare un modello valido (una vision di OpenRouter per «Descrizione immagini»).
+    // impedirebbe di usare un modello valido, per esempio una vision senza modalità dichiarate.
     if (caps.uncertain) return { ok: true };
 
     if (!caps.outputs.includes(req.output)) {
@@ -126,10 +123,8 @@
     return { ok: true };
   }
 
-  // Chiave di ordinamento «più recente = più grande». Si ordina SEMPRE dentro lo stesso
-  // provider, quindi le scale diverse non si mischiano: OpenRouter usa `created` (unix),
-  // gli altri il numero di versione dall'id (3.5 > 3.1 > 3), con la data in `version`
-  // come spareggio fine.
+  // Chiave di ordinamento «più recente = più grande», sempre dentro lo stesso provider così
+  // le scale non si mischiano: OpenRouter usa `created`, gli altri la versione dall'id.
   function recencyKey(provider, modelId, meta) {
     if (provider === 'openrouter') {
       const c = meta && meta.created;

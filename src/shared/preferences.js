@@ -1,11 +1,6 @@
-// Mappa «linguaggio naturale → preferenza» per quando Filo cambia le impostazioni dalla
-// chat (azione IMPOSTA_PREFERENZA). Modulo condiviso perché quali preferenze sono
-// scrivibili e come si interpretano i valori è la stessa conoscenza della pagina
-// Preferenze, e deve restare testabile senza Electron. Solo le preferenze elencate qui sono
-// scrivibili; ognuna dichiara il proprio `level` (1 = applica subito, 2 = popup di
-// conferma), e le sensibili (sicurezza, modelli, chiavi, provider, costi) sono di livello 2.
-// REGOLA (#183): ogni setter di livello 2 DEVE dichiarare anche `risk`, la frase in chiaro
-// che il popup mostra; senza, tests/unit/preferences.test.mjs diventa rosso.
+// Mappa «linguaggio naturale → preferenza» per quando Filo cambia le impostazioni da chat.
+// Scrivibili solo le preferenze elencate qui; ognuna dichiara `level` (2 = conferma).
+// Ogni setter di livello 2 DEVE dichiarare `risk`, la frase che il popup mostra (#183).
 
 (function (global) {
   'use strict';
@@ -28,31 +23,22 @@
     return `${s.slice(0, 4)}…${s.slice(-4)}`;
   }
 
-  // Numero in linguaggio naturale, formato italiano senza rompere quello inglese: «2.500
-  // euro» veniva letto 2,50 perché il punto delle migliaia faceva da decimale. Nell'ordine:
-  // - c'è una virgola → è lei il decimale e ogni punto è migliaia («2.500,50» → 2500.50);
-  // - solo punti, in gruppi esatti da 3 cifre → migliaia («2.500» → 2500);
-  // - altrimenti il punto è decimale, formato inglese («1.5» → 1.5).
-  // NaN se non è un numero.
+  // Numero in linguaggio naturale: «2.500 euro» veniva letto 2,50 perché il punto delle
+  // migliaia faceva da decimale. Il formato inglese («1.5») deve continuare a funzionare.
   function parseItalianNumber(raw) {
     let s = String(raw == null ? '' : raw).trim().replace(/[^0-9.,-]/g, '');
     if (!s) return NaN;
     if (s.includes(',')) {
-      // virgola = decimale, punto = migliaia (formato italiano completo)
       s = s.replace(/\./g, '').replace(',', '.');
     } else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
-      // solo punti come raggruppamento delle migliaia (gruppi esatti da 3)
       s = s.replace(/\./g, '');
     }
     const n = parseFloat(s);
     return Number.isFinite(n) ? n : NaN;
   }
 
-  // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }. `partial` è il pezzo
-  // di settings da fondere (deepMerge preserva i campi annidati vicini), `label` la conferma
-  // leggibile. `level` (default 1) è il livello di sicurezza quando è FILO a cambiare la
-  // preferenza via chat (#146.2): 2 chiede conferma col popup. `risk` è obbligatorio con
-  // level=2 (#183): cosa controlla l'impostazione e quali rischi comporta toccarla.
+  // Ogni voce: sinonimi + build(valore) → { partial, label }; `partial` si fonde coi vicini.
+  // `level` 2 chiede conferma col popup (#146.2) e allora `risk` è obbligatorio (#183).
   const PREF_SETTERS = [
     {
       keys: ['tema', 'theme', 'aspetto'],
@@ -398,11 +384,8 @@
       },
     },
 
-    // Colore identità delle tab, cosmetico e reversibile → livello 1. Mappa le richieste
-    // verbali («colori più vivaci», «rendile più neutre», «niente colore») sui sei parametri di
-    // tabColor.js. I valori sono preset ASSOLUTI, non delta — il setter non vede lo stato
-    // corrente — così il risultato è deterministico; il merge è profondo, quindi un preset
-    // parziale lascia intatti gli altri parametri.
+    // Colore identità delle tab, cosmetico e reversibile → livello 1. I valori sono preset
+    // ASSOLUTI, non delta (il setter non vede lo stato): il risultato è deterministico.
     {
       keys: ['colore_tab', 'colore delle tab', 'colore tab', 'colori tab', 'colori delle tab',
         'colore schede', 'colori schede', 'tinta tab', 'tinta delle tab', 'vivacita tab', 'vivacità tab'],

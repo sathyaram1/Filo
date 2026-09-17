@@ -13,7 +13,7 @@ function initAutoUpdater() {
   try {
     ({ autoUpdater } = require('electron-updater'));
   } catch (_) {
-    // Dipendenza assente (build vecchia): nessun auto-update, ma l'app parte.
+    // Dipendenza assente: niente auto-update, ma l'app parte lo stesso.
     return;
   }
 
@@ -45,9 +45,8 @@ function initAutoUpdater() {
   });
 }
 
-// Un aggiornamento che non si installa e tace lascia l'utente su una versione
-// vecchia per sempre: su Mac lo scriviamo fra le notifiche. Solo su Mac e solo
-// con una versione trovata (altrove è rumore), e una sola scheda per versione.
+// Un aggiornamento che non si installa e tace lascia l'utente su una versione vecchia per
+// sempre: su Mac lo si scrive fra le notifiche, una sola scheda per versione.
 async function avvisaSeAggiornamentoBloccato(versione) {
   if (process.platform !== 'darwin' || !versione) return;
   try {

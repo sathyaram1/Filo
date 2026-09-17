@@ -1,6 +1,6 @@
-// Le quattro scorciatoie GLOBALI (valgono in tutto il sistema, anche con Filo
-// in background). Si consegnano alla tab attiva come 'shortcut:triggered', che
-// page-preload gira al content script.
+// Le scorciatoie GLOBALI: valgono in tutto il sistema, anche con Filo in background.
+// Si consegnano alla scheda attiva come 'shortcut:triggered', che il preload gira al
+// content script.
 
 const { globalShortcut, BrowserWindow } = require('electron');
 
@@ -11,9 +11,8 @@ const COMMANDS = {
   'Alt+H': 'open-help-sidebar',
 };
 
-// Su Mac Alt è Opzione e SCRIVE (Opzione+E fa gli accenti): registrarlo
-// globalmente lo toglierebbe a ogni programma. Ctrl+Opzione è libero.
-// COMMANDS resta la forma canonica, qui si aggiunge solo il modificatore.
+// Su Mac Alt è Opzione e SCRIVE: una scorciatoia globale con Alt lo toglierebbe a ogni
+// programma, quindi ci va un Ctrl davanti. Regola in CLAUDE.md § Mac.
 function acceleratorePerPiattaforma(accel) {
   return process.platform === 'darwin' ? `Control+${accel}` : accel;
 }
@@ -30,8 +29,7 @@ function registerShortcuts(window) {
   }
 }
 
-// Due controlli: isInternal è il campo canonico, l'URL regge anche le tab in
-// stati di transizione, quando il flag non è ancora aggiornato.
+// L'URL serve alle schede in transizione, dove `isInternal` non è ancora aggiornato.
 function isInternalTab(tab) {
   if (!tab) return false;
   return !!tab.isInternal || String(tab.url || '').startsWith('filo://');
@@ -45,16 +43,15 @@ function dispatch(command, window) {
   if (!active) return;
 
   if (command === 'save-for-later') {
-    // Una pagina filo:// non va salvata né chiusa: qui l'uscita è esplicita
-    // perché questo comando, a differenza degli altri tre, agisce comunque.
+    // Una pagina filo:// non va salvata né chiusa: l'uscita è esplicita perché questo comando,
+    // a differenza degli altri, agisce comunque.
     if (isInternalTab(active)) return;
     saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
     return;
   }
   const wc = active.view.webContents;
-  // #405 — la selezione può stare in un riquadro incorporato, e
-  // `webContents.send` parla solo col frame principale: i comandi che lavorano
-  // sul testo selezionato vanno all'ultimo frame toccato dall'utente.
+  // #405 — la selezione può stare in un riquadro incorporato, e `webContents.send` parla solo
+  // col frame principale: questi comandi vanno all'ultimo frame toccato dall'utente.
   const SELECTION_COMMANDS = new Set(['explain-selection', 'translate-selection']);
   let target = wc;
   if (SELECTION_COMMANDS.has(command)) {
@@ -70,8 +67,8 @@ function dispatch(command, window) {
 
 async function saveForLater(win, tab) {
   const { handleMessage } = require('./services/handlers');
-  // #334 — url e titolo si leggono SUBITO, prima di qualsiasi await: se la
-  // pagina naviga mentre raccogliamo metadata e miniatura, salveremmo l'altra.
+  // #334 — url e titolo si leggono SUBITO, prima di ogni await: se la pagina naviga mentre
+  // raccogliamo metadata e miniatura, salveremmo l'altra.
   const url = tab.url;
   const title = tab.title;
   const favicon = tab.favicon || '';

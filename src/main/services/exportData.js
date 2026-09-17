@@ -1,6 +1,6 @@
-// Esportazione dei dati di Filo come archivio ZIP: data.json con tutto lo storage, più images/… con le immagini estratte dai data-URL base64 (nel JSON resta il percorso relativo, così il JSON è leggero e le immagini si sfogliano come file veri).
-// Modulo puro (niente Electron): riceve i dati e ritorna un Buffer ZIP.
-// Lo ZIP usa il metodo STORE (nessuna compressione): niente dipendenze esterne ed è comunque standard.
+// Esporta i dati di Filo in uno ZIP: data.json più images/… estratte dai data-URL base64,
+// col percorso relativo nel JSON. Modulo puro: riceve i dati e ritorna un Buffer.
+// Metodo STORE, nessuna compressione: nessuna dipendenza esterna ed è comunque standard.
 
 'use strict';
 
@@ -138,12 +138,13 @@ function buildExportZip(storageData) {
   return zipStore(entries);
 }
 
-// IMPORTAZIONE — l'inverso esatto di buildExportZip: un backup che non si può ripristinare non è un backup.
-// Accettiamo anche DEFLATE e data.json dentro una cartella: l'utente ha tutto il diritto di scompattare, guardare e ri-comprimere.
+// IMPORTAZIONE, l'inverso esatto dell'export: un backup che non si può ripristinare non è
+// un backup. Si accetta anche DEFLATE e data.json in una cartella: l'utente ricomprime.
 
 const zlib = require('node:zlib');
 
-// Ritorna una Map nome → Buffer leggendo la central directory, la sola struttura autorevole di uno zip: i local header possono avere size a 0 con data descriptor.
+// Si legge la central directory, la sola struttura autorevole di uno zip: i local header
+// possono avere size a 0 con data descriptor. Torna una Map nome → Buffer.
 function unzip(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 22) throw new Error('not_a_zip');
 
@@ -191,7 +192,8 @@ function unzip(buf) {
   return out;
 }
 
-// buildExportZip deriva l'estensione dal mime togliendo i caratteri non alfanumerici (image/svg+xml → "svgxml"): qui il cammino inverso sui casi reali, con ripiego su image/<ext>.
+// L'export deriva l'estensione dal mime togliendo i non alfanumerici (image/svg+xml →
+// «svgxml»): qui il cammino inverso sui casi reali, con ripiego su image/<ext>.
 const EXT_TO_MIME = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
   webp: 'image/webp', bmp: 'image/bmp', avif: 'image/avif', tiff: 'image/tiff',
@@ -231,7 +233,7 @@ function inlineImages(node, files, prefix, stats) {
 function readExportZip(zipBuffer) {
   const files = unzip(zipBuffer);
 
-  // data.json può stare in radice o dentro una cartella (utente che ha scompattato e ri-compresso): si prende quello meno profondo.
+  // data.json può stare in radice o in una cartella (zip rifatto): vince il meno profondo.
   let dataName = null;
   for (const name of files.keys()) {
     if (!/(^|\/)data\.json$/.test(name)) continue;
@@ -258,7 +260,8 @@ function readExportZip(zipBuffer) {
   return { data, imageCount: stats.images, exportedAt, sectionCount: Object.keys(data).length };
 }
 
-// Identità di un elemento di lista: l'id quando c'è (le liste di Filo sono tutte oggetti con id), altrimenti il contenuto serializzato. Serve a non duplicare le voci già presenti quando si ripristina un backup sopra dati vivi.
+// Identità di una voce: l'id se c'è, altrimenti il contenuto serializzato. Serve a non
+// duplicare ciò che c'è già quando si ripristina un backup sopra dati vivi.
 function itemKey(item) {
   if (item && typeof item === 'object' && !Array.isArray(item)) {
     for (const k of ['id', 'uuid', 'key']) {
@@ -272,7 +275,7 @@ function isPlainObject(v) {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
 
-// Si tengono TUTTE le voci locali — nulla di ciò che c'è ora va perso — e si accodano quelle del backup non ancora presenti.
+// Nulla di ciò che c'è ora va perso: si accodano solo le voci del backup non presenti.
 function mergeLists(local, imported) {
   const seen = new Set(local.map(itemKey));
   const out = local.slice();
@@ -294,12 +297,12 @@ function mergeValue(local, imported) {
     }
     return out;
   }
-  // Tipi diversi o valori semplici: vince il backup, è ciò che l'utente ha chiesto di ripristinare.
+  // Tipi diversi o valori semplici: vince il backup, è ciò che l'utente vuole ripristinare.
   return imported;
 }
 
-// Regole della fusione (una sola modalità, spiegata all'utente nella conferma): una sezione che qui non esiste si prende dal backup; le liste si UNISCONO senza duplicati; sui valori in conflitto vince il backup, perché è un ripristino.
-// Le statistiche contano le sezioni di primo livello.
+// Regole della fusione, spiegate all'utente nella conferma: una sezione assente si prende
+// dal backup, le liste si uniscono senza duplicati, sui conflitti vince il backup.
 function mergeImportedData(current, imported) {
   const cur = current && typeof current === 'object' ? current : {};
   const imp = imported && typeof imported === 'object' ? imported : {};

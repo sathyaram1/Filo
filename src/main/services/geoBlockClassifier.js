@@ -1,6 +1,6 @@
-// Rilevamento geo-block, livello 2: CLASSIFICATORE LLM della coda ambigua che il livello 1 non risolve — HTTP 403, "contenuto non disponibile" senza pattern noto, pagina vuota dopo il load (proxy-per-tab-spec.md §4).
-// Classificazione CHIUSA: solo `geo_block` apre al flusso proxy; `bot_block` mai retry datacenter (brucia l'IP); paywall, login_wall ed errore_generico nessuna azione.
-// SICUREZZA: il contenuto della pagina è INPUT NON FIDATO e può imitare istruzioni, quindi il prompt lo tratta sempre come dato inerte e l'output è validato contro la lista chiusa — un modello dirottato cade su errore_generico, cioè niente azione.
+// Geo-block livello 2: classificatore LLM della coda ambigua (403, pagina vuota, messaggi
+// senza pattern noto — proxy-per-tab-spec.md §4). Solo geo_block apre al flusso proxy.
+// Il contenuto della pagina è INPUT NON FIDATO: output validato contro la lista chiusa.
 
 'use strict';
 
@@ -15,14 +15,15 @@ const CLASSES = {
 
 const VALID = new Set(Object.values(CLASSES));
 
-// Oltre ~500 caratteri non si aggiunge segnale e si spendono token: questo livello deve restare "frazione di centesimo a chiamata".
+// Oltre ~500 caratteri non si aggiunge segnale: questo livello resta frazione di centesimo.
 const TEXT_BUDGET = 500;
 const TITLE_BUDGET = 200;
 
-// Sotto questa soglia di testo visibile la pagina non ha contenuto utile: spesso è un blocco che ha svuotato il body.
+// Sotto questa soglia di testo visibile è spesso un blocco che ha svuotato il body.
 const EMPTY_PAGE_MAX_CHARS = 40;
 
-// La coda ambigua, e SOLO quella: se il livello 1 ha già concluso non si chiama l'LLM, e gli stati ovvi (2xx pieno, 404, 5xx) non sono geo-block ambiguo.
+// La coda ambigua e SOLO quella: se il livello 1 ha già concluso non si chiama l'LLM,
+// e gli stati ovvi (2xx pieno, 404, 5xx) non sono geo-block.
 function shouldClassify({ statusCode, text, deterministicHit } = {}) {
   if (deterministicHit) return false; // livello 1 ha già vinto
   const code = Number(statusCode);
@@ -31,12 +32,13 @@ function shouldClassify({ statusCode, text, deterministicHit } = {}) {
   // HTTP 403: ambiguo per eccellenza (bot-block, paywall, permessi, geo).
   if (code === 403) return true;
 
-  // Body svuotato dopo il load, tipico di certi blocchi via JS. Solo su risposte che si dicono "ok": un 404/500 con body vuoto è semplicemente un errore.
+  // Body svuotato dopo il load, tipico di certi blocchi via JS. Solo su risposte che si
+  // dicono ok: un 404 o 500 con body vuoto è semplicemente un errore.
   if (t.length <= EMPTY_PAGE_MAX_CHARS && (!code || (code >= 200 && code < 300))) {
     return true;
   }
 
-  // Frasi generiche SENZA pattern noto (i noti li ha già presi il livello 1): spesso nascondono un blocco.
+  // Frasi generiche senza pattern noto (i noti li ha presi il livello 1): spesso un blocco.
   const low = t.toLowerCase();
   const GENERIC_UNAVAILABLE = [
     'content is unavailable',
@@ -54,7 +56,8 @@ function shouldClassify({ statusCode, text, deterministicHit } = {}) {
   return false;
 }
 
-// Il testo della pagina è delimitato e marcato esplicitamente come dato non fidato; il system prompt vincola l'output alla lista chiusa e ordina di ignorare qualsiasi istruzione contenuta nel contenuto.
+// Il testo della pagina è delimitato e marcato come dato non fidato; il system prompt lega
+// l'output alla lista chiusa e ordina di ignorare le istruzioni contenute nella pagina.
 function clip(s, n) {
   return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
 }
@@ -102,8 +105,8 @@ function buildPrompt({ title, text, statusCode, host } = {}) {
   };
 }
 
-// L'output reale è disordinato (maiuscole, virgolette, frasi intorno, traduzioni): si prende la PRIMA etichetta valida che compare come parola intera, altrimenti errore_generico.
-// Mai inventare: un output dirottato o fuori-formato non deve MAI risolversi in geo_block.
+// L'output reale è disordinato (maiuscole, virgolette, frasi intorno): si prende la PRIMA
+// etichetta valida come parola intera. Fuori formato non deve MAI diventare geo_block.
 function parseClassification(raw) {
   if (raw == null) return CLASSES.ERRORE_GENERICO;
   const norm = String(raw).toLowerCase();
@@ -121,11 +124,12 @@ function parseClassification(raw) {
   return best || CLASSES.ERRORE_GENERICO;
 }
 
-// Questo modulo NON agisce: dice solo cosa la classe ABILITA, le regole d'azione complete sono il livello §5. Vincolo di sicurezza chiave: bot_block non deve MAI provocare un retry via datacenter — peggiora, brucia l'IP e alza il muro.
+// Questo modulo NON agisce: dice cosa la classe ABILITA, le regole d'azione sono il §5.
+// Vincolo chiave: bot_block non deve MAI provocare un retry via datacenter, brucia l'IP.
 function routeForClass(cls) {
   switch (cls) {
     case CLASSES.GEO_BLOCK:
-      // L'unica classe che apre al flusso proxy; le condizioni (login attivo, flag sicurezza) le valuta il livello §5.
+      // L'unica classe che apre al proxy; le condizioni le valuta il livello §5.
       return { proxy: true, allowDatacenterRetry: true, reason: 'geo_block' };
     case CLASSES.BOT_BLOCK:
       return { proxy: false, allowDatacenterRetry: false, reason: 'bot_block' };
@@ -139,14 +143,15 @@ function routeForClass(cls) {
   }
 }
 
-// Il path-pattern raggruppa URL diversi ma equivalenti (id numerici, hash, uuid → segnaposto): /video/123 e /video/456 condividono il verdetto, /video e /live restano distinti. La query è ignorata, è rumore.
+// Raggruppa URL equivalenti: /video/123 e /video/456 condividono il verdetto, /video e
+// /live restano distinti. La query si ignora, è rumore.
 function pathPattern(url) {
   let u;
   try { u = new URL(String(url || '')); } catch (_) { return '/'; }
   const segs = u.pathname.split('/').filter(Boolean).map((seg) => {
-    if (/^\d+$/.test(seg)) return ':id';                            // 123
-    if (/^[0-9a-f]{8,}$/i.test(seg)) return ':hash';                // sha/uuid-ish
-    if (/^[0-9a-f-]{16,}$/i.test(seg)) return ':hash';              // uuid con trattini
+    if (/^\d+$/.test(seg)) return ':id';
+    if (/^[0-9a-f]{8,}$/i.test(seg)) return ':hash';
+    if (/^[0-9a-f-]{16,}$/i.test(seg)) return ':hash';
     if (/\d/.test(seg) && /[a-z]/i.test(seg) && seg.length >= 12) return ':slug';
     return seg.toLowerCase();
   });
@@ -188,8 +193,8 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500 } =
   return { get, set, prune, get size() { return map.size; } };
 }
 
-// Dependency injection: `complete({ messages, signal })` fa la chiamata al modello (in produzione la passa tabs.js con un provider economico), `cache` è una createCache() condivisa.
-// Non lancia mai: un errore di rete o di modello cade su errore_generico (nessuna azione), il comportamento prudente per una feature opzionale.
+// `complete({ messages, signal })` fa la chiamata al modello (in produzione la passa tabs.js
+// con un provider economico). Non lancia mai: un errore cade su errore_generico.
 async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {
   const { title, text, statusCode, host, url } = input;
 
@@ -218,7 +223,8 @@ async function classify(input = {}, { complete, cache, now = Date.now, signal } 
     cls = CLASSES.ERRORE_GENERICO;
   }
 
-  // Si memorizza anche errore_generico: evita di ri-bombardare il modello su una pagina che non sa classificare, e il TTL lo farà riprovare più tardi.
+  // Si memorizza anche errore_generico: non si ri-bombarda il modello su una pagina che non
+  // sa classificare, e il TTL lo farà riprovare più tardi.
   if (cache) { void now; cache.set(key, cls); }
 
   return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}) };
@@ -239,5 +245,4 @@ const api = {
 };
 
 module.exports = api;
-// Esposto su globalThis come gli altri moduli condivisi: il wiring (tabs.js) e i livelli successivi lo trovano senza import.
 try { globalThis.SN_GEOBLOCK_CLASSIFIER = api; } catch (_) {}

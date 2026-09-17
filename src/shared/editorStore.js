@@ -1,5 +1,6 @@
-// Modello di storage dell'editor: una COLLEZIONE di file (non più un solo doc), ognuno nel formato serializzato dell'editor più un `id` stabile, con `activeId` per riaprire sull'ultimo file aperto.
-// LOGICA PURA — niente DOM, niente localStorage: la persistenza e il parse/serialize legati al DOM restano in editor.js, così migrazione e operazioni sulla collezione si provano senza Electron.
+// Storage dell'editor: una COLLEZIONE di file, ognuno serializzato con un `id` stabile,
+// più `activeId` per riaprire sull'ultimo file aperto.
+// LOGICA PURA, niente DOM: la persistenza e il parse legati al DOM restano in editor.js.
 
 (function (global) {
   'use strict';
@@ -21,7 +22,7 @@
     return f;
   }
 
-  // Migra a una collezione v2 da, in ordine di priorità: una collezione già valida (solo normalizzata), il vecchio documento singolo (diventa il primo file), oppure niente → un unico file vuoto.
+  // Migra a una collezione v2: una collezione valida, il documento singolo, o un file vuoto.
   // `idFactory` e `blankFactory` sono iniettati così il modulo resta puro.
   function migrateToCollection(opts) {
     const o = opts || {};
@@ -74,8 +75,8 @@
     return next;
   }
 
-  // Se era attivo, l'attivo passa al vicino (il precedente se esiste, altrimenti il primo).
-  // Se la collezione resta VUOTA `activeId` diventa null: crearne uno nuovo sta al chiamante (invariante «almeno un file»). Ritorna { removed, emptied }.
+  // Se era attivo, l'attivo passa al vicino (il precedente, o il primo).
+  // Collezione vuota ⇒ `activeId` null: crearne uno nuovo sta al chiamante.
   function removeFile(collection, id) {
     const idx = collection.files.findIndex((f) => f.id === id);
     if (idx < 0) return { removed: false, emptied: false };

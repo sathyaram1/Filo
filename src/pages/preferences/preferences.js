@@ -27,14 +27,13 @@
     _savedTimers[id] = setTimeout(() => hint.classList.remove('sn-show'), 1200);
   }
 
-  // Sezione «token estetici» (#146.3): tutti i token del registro in forma di config testuale.
-  // Gli override vivono in una mappa piatta (settings.themeTokens, REPLACE in storage): un token
-  // è «personalizzato» SOLO con un override diretto, non se eredita da una categoria sovrascritta.
+  // Gli override dei token estetici vivono in una mappa piatta (REPLACE in storage): un token
+  // è «personalizzato» SOLO con un override diretto, non se eredita da una categoria.
 
   let currentOverrides = {};
   let tokensSaveTimer = null;
 
-  // Tema risolto com'è applicato su <html>: i default di alcuni token cambiano fra chiaro e scuro.
+  // I default di alcuni token cambiano fra chiaro e scuro: serve il tema risolto su <html>.
   function resolvedTheme() {
     return document.documentElement.dataset.snTheme === 'dark' ? 'dark' : 'light';
   }
@@ -106,7 +105,8 @@
       input.addEventListener('blur', () => {
         const v = input.value.trim();
         if (v !== '' && !Tokens.validate(name, v)) {
-          // Valore non valido: errore puntuale, gli altri token intatti, il testo resta correggibile.
+          // Valore non valido: errore puntuale, gli altri token intatti, il testo resta
+          // correggibile.
           const errEl = row.querySelector('.sn-token-error');
           errEl.hidden = false;
           errEl.textContent = tokenErrorMsg(name);
@@ -205,9 +205,8 @@
     persistTokens();
   }
 
-  // Ripristino completo (#184): un solo bottone riporta TUTTE le impostazioni ai predefiniti,
-  // perché una personalizzazione fatta a voce resta appiccicata e i reset parziali non bastano.
-  // Le chiavi API si preservano (lo fa il main): un reset estetico non deve sloggare l'utente.
+  // Un solo bottone riporta TUTTE le impostazioni ai predefiniti: una personalizzazione
+  // fatta a voce resta appiccicata e i reset parziali non bastano. Le chiavi API restano.
   async function resetAllSettings() {
     const Ui = window.SN_CONFIRM_UI;
     const text = 'Riporta TUTTE le impostazioni di Filo ai valori predefiniti: '
@@ -244,8 +243,8 @@
     } catch (_) { return 'Intervista di benvenuto'; }
   }
 
-  // Le interviste conservate, rileggibili: la prima conversazione è la prima cosa che l'utente
-  // ha raccontato di sé, e «conservata» senza un posto dove rileggerla non vuol dire niente.
+  // «Conservata» senza un posto dove rileggerla non vuol dire niente: la prima intervista è
+  // la prima cosa che l'utente ha raccontato di sé.
   function renderOnboardingArchive(state) {
     const box = $('onboardingArchive');
     if (!box) return;
@@ -298,9 +297,8 @@
     } catch (_) {}
   }
 
-  // Colore identità delle tab: stessa estetica «a codice» dei token, una riga per ognuno dei
-  // sei parametri di src/shared/tabColor.js. Un valore si clampa al range, si persiste e
-  // aggiorna live il colore delle tab; ↺ per uno, il bottone in fondo per tutti.
+  // Colore identità delle tab: una riga per ognuno dei sei parametri di shared/tabColor.js,
+  // clampata al range e applicata live; ↺ per uno, il bottone in fondo per tutti.
   let currentTabColor = {};
   let tabColorSaveTimer = null;
 
@@ -426,7 +424,6 @@
     return $('agentStyleText').value;
   }
 
-  // Se il testo combacia con un preset noto seleziona quello, altrimenti «Personalizzato».
   function syncPresetSelect() {
     const text = currentStyleText().trim();
     const match = AGENT_STYLE_PRESETS.find((p) => p.text.trim() === text);
@@ -438,8 +435,8 @@
       && typeof window.SpeechSynthesisUtterance === 'function';
   }
 
-  // getVoices() può tornare [] al primo giro e popolarsi più tardi (voiceschanged), quindi si
-  // richiama anche da lì. La scelta corrente si mantiene se ancora disponibile.
+  // getVoices() può tornare [] al primo giro e popolarsi dopo (voiceschanged): si richiama
+  // anche da lì, mantenendo la scelta corrente se ancora disponibile.
   function populateVoices(selected) {
     const sel = $('ttsVoice');
     if (!sel || !ttsSupported()) return;
@@ -455,9 +452,8 @@
     if (want && [...sel.options].some((o) => o.value === want)) sel.value = want;
   }
 
-  // Voce NATURALE (del modello): le voci sono quelle del MODELLO di lettura in uso, le dice il
-  // main. «Altra voce» apre un campo di testo per un modello che Filo non conosce o una voce
-  // fuori elenco; una voce salvata che non è fra le opzioni finisce lì, così non sparisce.
+  // Le voci sono quelle del MODELLO di lettura in uso. «Altra voce» apre un campo libero, e
+  // una voce salvata fuori elenco finisce lì invece di sparire.
   const CUSTOM_VOICE = '__custom__';
   function currentModelVoice() {
     const sel = $('ttsModelVoice');
@@ -554,7 +550,6 @@
   }
 
   let modelPreviewAudio = null;
-  // Ascolta la voce scelta: una frase nella sua lingua, sintetizzata dal modello via main.
   async function previewModelVoice() {
     const btn = $('ttsModelPreview');
     const status = $('ttsModelPreviewStatus');
@@ -604,7 +599,7 @@
   // toni vivono in SN_SOUNDS, riusato anche dalla shell per le notifiche (#170.1).
   const Sounds = window.SN_SOUNDS;
 
-  // Riempie il <select> dei suoni notifica con le stesse voci della suoneria.
+  // Stesse voci della suoneria: i due elenchi non devono divergere.
   function populateNotifSounds() {
     const sel = $('notifSound');
     if (!sel || sel.options.length) return;
@@ -726,9 +721,8 @@
 
     const terminal = settings.terminal || {};
     $('terminalEnabled').checked = terminal.enabled === true;
-    // PowerShell e cmd esistono solo su Windows: fuori da lì il comando parte lo stesso (il main
-    // ricade su /bin/sh) ma offrire tre shell di Windows a chi sta su un Mac è un menu che mente.
-    // Il valore salvato da una macchina Windows si legge come «la shell di sistema».
+    // PowerShell e cmd esistono solo su Windows: offrirle su un Mac è un menu che mente (là il
+    // main ricade su /bin/sh). Un valore salvato da Windows si legge come «shell di sistema».
     const suWindows = (() => { try { return (window.filo?.sistema || 'win32') === 'win32'; } catch (_) { return true; } })();
     const sel = $('terminalShell');
     if (!suWindows) {
@@ -782,7 +776,6 @@
     currentOverrides = { ...(settings.themeTokens || {}) };
     buildTokenSection();
 
-    // Colore delle tab: valori salvati clampati ai range, o i default se mancano.
     currentTabColor = TabColor
       ? TabColor.clampParams(settings.tabColor || {})
       : { ...(settings.tabColor || {}) };
@@ -807,7 +800,7 @@
     $('autoArchiveEnabled').addEventListener('change', persist);
     $('autoArchiveOnClose').addEventListener('change', persist);
     $('autoArchiveIdleHours').addEventListener('change', persist);
-    // Al blur il campo torna al valore salvato: un numero fuori scala non deve restare a mentire.
+    // Al blur il campo torna al salvato: un numero fuori scala non deve restare a mentire.
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
     $('terminalEnabled').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);

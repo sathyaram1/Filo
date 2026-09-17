@@ -1,8 +1,6 @@
 // Generatore di QR puro, senza dipendenze né rete: port fedele di «qrcode-generator» di
-// Kazuhiko Arase (MIT), byte mode UTF-8, versioni 1-40, versione minima automatica, mask
-// con penalty scoring. Tutto in locale: l'URL della pagina non esce verso nessun servizio.
-// SN_QR.toMatrix(text, { ecc }) -> boolean[][]; SN_QR.create(text, ecc) -> { moduleCount,
-// isDark(r,c) }. `ecc` ∈ 'L' | 'M' | 'Q' | 'H' (default 'M').
+// Kazuhiko Arase (MIT), byte mode UTF-8, versioni 1-40. L'URL non esce verso nessuno.
+// SN_QR.toMatrix(text, { ecc }) → boolean[][]; `ecc` ∈ 'L'|'M'|'Q'|'H' (default 'M').
 
 (function (global) {
   'use strict';
@@ -21,7 +19,6 @@
   }
   for (let i = 0; i < 255; i++) QRMath.LOG_TABLE[QRMath.EXP_TABLE[i]] = i;
 
-  // ---- Polinomi su GF(256) ----
   function QRPolynomial(num, shift) {
     if (num.length === undefined) throw new Error(num.length + '/' + shift);
     let offset = 0;
@@ -53,7 +50,6 @@
     },
   };
 
-  // ---- Bit buffer ----
   function QRBitBuffer() { this.buffer = []; this.length = 0; }
   QRBitBuffer.prototype = {
     get(index) { return ((this.buffer[Math.floor(index / 8)] >>> (7 - index % 8)) & 1) === 1; },
@@ -69,7 +65,6 @@
     },
   };
 
-  // ---- Dato in byte mode (UTF-8) ----
   function utf8Bytes(str) {
     const out = [];
     for (let i = 0; i < str.length; i++) {
@@ -279,7 +274,6 @@
     return list;
   };
 
-  // ---- QRCode ----
   function QRCodeModel(typeNumber, errorCorrectLevel) {
     this.typeNumber = typeNumber;
     this.errorCorrectLevel = errorCorrectLevel;
@@ -483,7 +477,6 @@
     let totalDataCount = 0;
     for (let i = 0; i < rsBlocks.length; i++) totalDataCount += rsBlocks[i].dataCount;
     const lengthBits = QRUtil.getLengthInBits(4, typeNumber);
-    // bit disponibili - 4 (mode) - lengthBits, in byte (floor)
     return Math.floor((totalDataCount * 8 - 4 - lengthBits) / 8);
   }
 

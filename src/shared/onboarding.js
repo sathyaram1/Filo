@@ -1,8 +1,6 @@
-// Onboarding: la micro-intervista del primo avvio (#524). Qui la parte PURA — elenco delle
-// cose da spuntare, stato della conversazione, chiusura, resa per il prompt — testabile
-// senza Electron e senza LLM. Persistenza in filoMemory.js, azione e prompt in handlers.js,
-// chat in dashboard.js. REGOLA: il segno «già accolto» si scrive alla FINE, o chi chiude la
-// finestra a metà intervista non rivede più il benvenuto.
+// Onboarding: la micro-intervista del primo avvio. Qui la parte PURA (elenco, stato della
+// conversazione, chiusura, resa per il prompt), testabile senza Electron e senza LLM.
+// REGOLA: il segno «già accolto» si scrive alla FINE, o chi chiude a metà non lo rivede.
 
 (function (global) {
   'use strict';
@@ -17,14 +15,12 @@
     + 'Se non ti va, scrivi «basta così» e chiudiamo. Vado avanti coi valori '
     + 'predefiniti.';
 
-  // Quando si riprende un'intervista lasciata a metà la conversazione ricompare com'era e
-  // l'ultima bolla di Filo È la domanda in sospeso: questa riga la introduce, così non
-  // sembra un déjà vu.
+  // Riprendendo un'intervista a metà la conversazione ricompare com'era e l'ultima bolla di
+  // Filo È la domanda in sospeso: questa riga la introduce, così non sembra un déjà vu.
   const RESUME_NOTE = 'Bentornato. Eravamo rimasti qui.';
 
-  // Quando a chiudere è l'APP e non il modello (parola di stop, «Salta l'accoglienza»),
-  // l'ultima bolla è questa: fissa e disponibile anche senza rete, perché deve arrivare
-  // comunque — è l'unica cosa che l'utente vede prima della home.
+  // Quando a chiudere è l'APP e non il modello l'ultima bolla è questa: fissa e disponibile
+  // anche senza rete, perché è l'unica cosa che l'utente vede prima della home.
   const CLOSING_MESSAGE =
     'Va bene, chiudo qui. Vado avanti coi valori predefiniti e imparo strada '
     + 'facendo.\n'
@@ -87,16 +83,8 @@
   const ITEM_IDS = ITEMS.map((i) => i.id);
   const ITEM_BY_ID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
-  // L'uscita che NON passa dal modello. Il benvenuto promette «scrivi «basta così» e
-  // chiudiamo», ma una promessa affidata al modello non è una promessa: un modello piccolo
-  // se ne dimentica, un provider giù non risponde, e chi apre Filo senza rete resterebbe
-  // chiuso dentro l'accoglienza. Quindi la parola di stop la riconosce l'APP, prima di ogni
-  // chiamata, ed è riconosciuta STRETTA: l'intera frase deve essere una richiesta di uscita,
-  // perché «basta che tu non sia prolisso» è una risposta, non un congedo.
-  // CHIEDERE DI USCIRE ≠ DIRE DI NO A UNA PROPOSTA: Filo propone (accesso Google, tema
-  // scuro) e «no grazie» è un no a QUELLA proposta — trattarlo da stop chiudeva tutto al
-  // primo rifiuto. Da qui due elenchi: STOP_PHRASES chiudono sempre, anche col modello muto;
-  // DECLINE_PHRASES le gestisce il modello, che ha davanti la domanda a cui si riferiscono.
+  // La parola di stop la riconosce l'APP prima di ogni chiamata: affidarla al modello non è
+  // una promessa. Un rifiuto no: «no grazie» è un no a QUELLA proposta, non un congedo.
   const STOP_PHRASES = [
     'basta', 'basta cosi', 'basta con le domande', 'basta domande',
     'basta le domande', 'niente intervista', 'niente domande',
@@ -162,9 +150,8 @@
     return normalize(state).thread.some((m) => m.role === 'filo');
   }
 
-  // La decisione dell'app in un posto solo: un'uscita esplicita chiude senza passare dal
-  // modello; un rifiuto resta al modello, che ha davanti la domanda a cui si riferisce — a
-  // meno che non ci sia niente a cui riferirsi, e allora «lascia stare» è l'accoglienza.
+  // La decisione dell'app in un posto solo: un'uscita esplicita chiude senza modello, un
+  // rifiuto resta al modello, che ha davanti la domanda — se c'è una domanda a cui riferirsi.
   function isExitRequest(state, text) {
     if (isStopRequest(text)) return true;
     if (!isDecline(text)) return false;
@@ -209,9 +196,8 @@
           closedAt: p.closedAt || null,
           thread: normalizeThread(p.thread),
         }))
-        // Solo le conversazioni VERE: una senza risposte non dice niente e occupava un posto dei
-        // cinque, così bastavano cinque rilanci a vuoto per buttare fuori la prima conversazione
-        // con Filo. Il filtro sta qui, non solo dove si archivia, così ripulisce anche l'esistente.
+        // Solo le conversazioni VERE: una senza risposte occupava un posto dei cinque, e cinque
+        // rilanci a vuoto buttavano fuori la prima. Il filtro sta qui, così ripulisce l'esistente.
         .filter((p) => hasUserTurn(p.thread))
         .slice(-PAST_CAP)
       : [];
@@ -248,10 +234,8 @@
     return { state: next, applied: valid.filter((x) => !cur.ticked.includes(x)) };
   }
 
-  // Da qui passano TUTTE le strade che chiudono l'intervista (`fine` dal modello, parola di
-  // stop, «Salta», tetto duro): è l'unico posto dove decidere se l'utente merita una riga di
-  // spiegazione. Il congedo in chat dura pochi istanti e il segno «già accolto» è definitivo,
-  // quindi una chiusura anticipata la dice la home, dove la riga resta finché non si toglie.
+  // Da qui passano TUTTE le strade che chiudono l'intervista: è l'unico posto dove decidere
+  // se serve una riga di spiegazione. Il congedo in chat dura poco, la riga sulla home resta.
   function close(state, nowIso) {
     const cur = normalize(state);
     if (cur.done) return cur;
@@ -268,11 +252,8 @@
     return { ...normalize(state), notice: '' };
   }
 
-  // Ricomincia da capo (il pulsante in Preferenze): si riparte dal benvenuto, ma l'intervista
-  // di PRIMA finisce nell'archivio invece di sparire. Si archivia solo ciò che è davvero una
-  // conversazione: senza nemmeno una risposta l'archivio si riempiva di voci «0 tue
-  // risposte», e visto che se ne tengono cinque bastava aprire e chiudere sei volte per
-  // perdere la prima conversazione vera.
+  // Ricomincia da capo: l'intervista di PRIMA finisce nell'archivio invece di sparire, e si
+  // archivia solo ciò che è davvero una conversazione (se ne tengono cinque).
   function restart(prev, nowIso) {
     const cur = normalize(prev);
     const at = nowIso || new Date().toISOString();
@@ -308,10 +289,8 @@
     return remaining(state).length === 0;
   }
 
-  // Accoda un turno SALTANDO la ripetizione immediata dello stesso messaggio: lo stesso
-  // messaggio subito dopo sé stesso è lo stesso turno ripartito (finestra riaperta mentre
-  // Filo scriveva, «Riprova», una seconda scheda aperta durante l'attesa). Altrimenti contava
-  // per due dei cinque scambi, e un intoppo di rete costava una cosa da scoprire o da dire.
+  // Accoda un turno SALTANDO la ripetizione immediata dello stesso messaggio: è lo stesso
+  // turno ripartito (finestra riaperta, «Riprova»), e contava per due dei cinque scambi.
   function appendTurn(state, turn) {
     const cur = normalize(state);
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';

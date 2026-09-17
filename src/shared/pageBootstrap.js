@@ -19,9 +19,8 @@
     const n = Number(scale);
     const clamped = Number.isFinite(n) ? Math.min(2, Math.max(0.8, n)) : 1;
     document.documentElement.style.zoom = clamped === 1 ? '' : String(clamped);
-    // Il fattore esce anche come variabile CSS perché le pagine che riempiono la viewport
-    // possano compensare le altezze in `vh`: con `zoom > 1` un layout `100vh` sfora e fa
-    // comparire una barra di scorrimento che sposta gli elementi (`calc(100vh / var(--sn-zoom))`).
+    // Il fattore esce anche come variabile CSS: con `zoom > 1` un layout `100vh` sfora e fa
+    // comparire una barra che sposta gli elementi (`calc(100vh / var(--sn-zoom))`).
     document.documentElement.style.setProperty('--sn-zoom', String(clamped));
   }
 
@@ -54,9 +53,8 @@
     });
   }
 
-  // Il canale affidabile fra schede è il broadcast `settings_updated`: `chrome.storage.
-  // onChanged` NON viene propagato fra i WebContentsView, quindi da solo non aggiornava le
-  // tab già aperte (il cambio dimensione testo non ci arrivava).
+  // Il canale fra schede è il broadcast `settings_updated`: `chrome.storage.onChanged` NON
+  // si propaga fra i WebContentsView, e da solo non aggiornava le tab già aperte.
   function applyFromSettings(s) {
     if (!s) return;
     if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
@@ -76,13 +74,8 @@
     });
   } catch (_) {}
 
-  // Dropdown custom per i <select>: il popup nativo usa l'highlight blu di sistema e in
-  // Chromium non rispetta `option:hover`, quindi non si può rendere coerente con la palette.
-  // Il <select> nativo resta nel DOM (nascosto) come sorgente di verità, così `.value`,
-  // `change` e `selectOption` di Playwright continuano a funzionare. Selezionata e hover
-  // usano lo stesso arancione a due opacità che si SOMMANO, così l'hover sull'opzione già
-  // selezionata risponde comunque. L'editor è escluso: il suo <select> del font ha una
-  // gestione speciale del focus.
+  // Dropdown custom per i <select>: il popup nativo non rispetta `option:hover` e non si può
+  // rendere coerente con la palette. Il <select> nativo resta nel DOM come sorgente di verità.
   function enhanceSelect(select) {
     if (!select || select.dataset.snEnhanced) return;
     if (select.multiple || select.size > 1) return;
@@ -223,9 +216,8 @@
       }
     });
 
-    // Override di `value`/`selectedIndex` su QUESTA istanza, così i set programmatici del
-    // codice di pagina risincronizzano la UI custom; i cambi via `selectOption` o dalla UI
-    // nativa passano invece dall'evento `change`.
+    // Override di `value`/`selectedIndex` su QUESTA istanza, così i set programmatici
+    // risincronizzano la UI custom; i cambi dalla UI passano invece dall'evento `change`.
     const sproto = Object.getPrototypeOf(select);
     for (const prop of ['value', 'selectedIndex']) {
       const d = Object.getOwnPropertyDescriptor(sproto, prop);

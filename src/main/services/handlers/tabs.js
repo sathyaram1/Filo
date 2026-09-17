@@ -38,7 +38,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.RUN_TAB_TRIAGE, async (msg, sender) => {
-    // Pulizia/riordino su richiesta esplicita dell'utente. Gira sul TabManager della finestra del mittente.
+    // Su richiesta esplicita dell'utente, sul TabManager della finestra del mittente.
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
@@ -48,7 +48,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.REORDER_TABS, async (msg, sender) => {
-    // "/riordina": riordino cromatico esplicito della striscia, senza archiviare nulla (a differenza di RUN_TAB_TRIAGE).
+    // Riordino cromatico esplicito: non archivia nulla, a differenza del triage.
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = win._filoTabs.reorderTabs();
@@ -57,8 +57,8 @@ module.exports = function register(on, ctx) {
     return { ok: false, reordered: false };
   });
 
-  // #376 — porta in primo piano una scheda già aperta: il riferimento in chat a qualcosa che Filo ha aperto in secondo piano deve PORTARCI, non aprire un doppione.
-  // Confine d'origine come in nav.js: solo le pagine filo:// possono spostare il primo piano, per un sito esterno non è mai legittimo.
+  // Porta in primo piano una scheda già aperta, invece di aprire un doppione.
+  // Solo pagine filo://: spostare il primo piano non è mai legittimo per un sito esterno.
   on(MSG.FOCUS_TAB, async (msg, sender, origin) => {
     if (!String(origin || '').startsWith('filo://')) return { ok: false };
     const win = winOf(sender);
@@ -105,7 +105,8 @@ module.exports = function register(on, ctx) {
     if (win && win._filoTabs && msg.url) {
       const pct = typeof msg.scrollPct === 'number' ? msg.scrollPct : null;
       const id = win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct });
-      // Se la scheda archiviata era instradata "da un altro paese", si riapre proxata sulla stessa location: setTabProxy ricrea la view nella partition proxata e ricarica l'URL attraverso l'endpoint del paese.
+      // Una scheda archiviata instradata «da un altro paese» si riapre proxata sulla stessa
+      // location, o tornerebbe dal paese sbagliato.
       const px = msg.proxy;
       if (id && px && px.country) {
         try { await win._filoTabs.setTabProxy(id, px.country, { tier: px.tier || undefined }); } catch (_) {}

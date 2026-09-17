@@ -25,7 +25,8 @@
     return state.months[month];
   }
 
-  // Se il fornitore ha già detto quanto è costata la chiamata (`usage.costUsd`: voce, dettatura, indicizzazione, che non si contano a token), quel numero vale più di qualunque listino.
+  // Se il fornitore dice quanto è costata la chiamata (usage.costUsd), quel numero vale
+  // più di qualunque listino: voce, dettatura e indicizzazione non si contano a token.
   function estimateCostEur({ usage, pricing, usdToEur }) {
     const direct = usage && Number(usage.costUsd);
     if (Number.isFinite(direct) && direct > 0) return direct * (usdToEur || 0.92);
@@ -48,8 +49,8 @@
     m.byAction[action] = (m.byAction[action] || 0) + eur;
     m.byProvider[provider] = (m.byProvider[provider] || 0) + eur;
     await setState(state);
-    // I crediti usano un costo NOZIONALE, non `eur`: `eur` è 0 quando non c'è un listino per il modello, e un saldo che non si muove sembra rotto. Il limite di spesa REALE resta su `eur`.
-    // Precedenza: prezzo reale passato → listino nozionale del modello → ripiego, così una chiamata reale non costa mai 0 crediti.
+    // I crediti usano un costo NOZIONALE: eur è 0 senza listino e un saldo fermo sembra rotto.
+    // Il limite di spesa reale resta su eur; precedenza: prezzo reale, listino, ripiego.
     const C = global.SN_CONST || {};
     const creditPricing = pricing
       || (C.notionalPricingFor && C.notionalPricingFor(model))
@@ -59,7 +60,8 @@
     try {
       await global.SN_CREDITS?.recordConsumption({ action, costEur: creditEur, provider, model, usage });
     } catch (_) { /* i crediti non devono mai far fallire una chiamata AI */ }
-    // Registro d'uso sul server (#598): una riga per chiamata fatta con la chiave personale. Qui si passa solo quello che si sa, decide l'handler wallet se scriverla. Best-effort come i crediti.
+    // Registro d'uso sul server (#598): una riga per chiamata con la chiave personale. Qui si
+    // passa solo ciò che si sa, decide l'handler wallet; best-effort come i crediti.
     try {
       await global.SN_WALLET_MAIN?.recordUsage({ action, provider, model, servedBy: usage && usage.servedBy, usage });
     } catch (_) {}

@@ -1,6 +1,6 @@
-// Lettura dei DOCUMENTI dell'utente dal disco (azione LEGGI_DOCUMENTO): un PDF è binario e col terminale restituisce spazzatura, qui diventa testo e rientra nel contesto dell'agente.
+// Lettura dei documenti dal disco (LEGGI_DOCUMENTO): un PDF binario diventa testo.
 // SOLA LETTURA: non scrive, non sposta, non esegue nulla.
-// CONFINAMENTO DEI PERCORSI: nessuno, di proposito — i documenti veri stanno spesso fuori dal profilo (disco esterno, NAS) e il terminale non confina comunque, quindi sarebbe una sicurezza finta. Il confine vero è che il testo estratto entra SOLO nel contesto del modello, sempre come DATO non fidato (vedi il formattatore in handlers.js).
+// Nessun confine sui percorsi: il testo estratto è sempre DATO non fidato (handlers.js).
 
 'use strict';
 
@@ -8,19 +8,20 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 
-// Tetto sul TESTO restituito, allineato al documento di trasparenza: un contratto intero ci sta, il prompt non esplode. Oltre il tetto si tronca e lo si DICHIARA.
+// Tetto sul testo restituito: un contratto intero ci sta, il prompt non esplode.
+// Oltre il tetto si tronca, e il troncamento si DICHIARA.
 const MAX_TEXT_CHARS = 16000;
 
-// Tetto sul FILE prima ancora di aprirlo: un PDF da mezzo giga bloccherebbe il processo main per minuti.
+// Tetto sul FILE prima di aprirlo: un PDF da mezzo giga bloccherebbe il main per minuti.
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
-// Ci sono anche i formati "di dati" (csv, json, xml…) perché è ciò che l'utente si scarica dalla banca quando non prende il PDF.
+// Anche i formati di dati (csv, json, xml): è ciò che si scarica dalla banca senza il PDF.
 const TEXT_EXT = new Set([
   '.txt', '.md', '.markdown', '.csv', '.tsv', '.log', '.json', '.xml',
   '.yml', '.yaml', '.ini', '.cfg', '.conf', '.env', '.srt', '.vtt', '.tex',
 ]);
 
-// Formati che non sappiamo leggere, con la spiegazione da dare all'utente: meglio "è un'immagine" che "formato non supportato".
+// Con la spiegazione per l'utente: meglio «è un'immagine» che «formato non supportato».
 const KNOWN_BINARY = {
   '.jpg': 'è un\'immagine', '.jpeg': 'è un\'immagine', '.png': 'è un\'immagine',
   '.gif': 'è un\'immagine', '.bmp': 'è un\'immagine', '.webp': 'è un\'immagine',
@@ -40,7 +41,7 @@ const KNOWN_BINARY = {
   '.db': 'è un database', '.sqlite': 'è un database',
 };
 
-/** Normalizza il percorso che arriva dall'LLM: toglie virgolette e spazi, espande `~`, restituisce un assoluto. PURA. */
+// Il percorso arriva dall'LLM: va normalizzato ad assoluto prima di toccarlo. PURA.
 function normalizePath(input) {
   let p = String(input == null ? '' : input).trim();
   if (!p) return '';
@@ -54,7 +55,7 @@ function normalizePath(input) {
   return path.resolve(p);
 }
 
-/** Tipo di file dalla sola estensione: 'pdf' | 'text' | { binary: 'spiegazione' } | 'unknown'. PURA. */
+// Dalla sola estensione: 'pdf' | 'text' | { binary: 'spiegazione' } | 'unknown'. PURA.
 function kindFromExtension(filePath) {
   const ext = path.extname(String(filePath || '')).toLowerCase();
   if (ext === '.pdf') return 'pdf';
@@ -63,8 +64,8 @@ function kindFromExtension(filePath) {
   return 'unknown';
 }
 
-/** Un buffer è testo o roba binaria? Per i file senza estensione nota (un `.eml`, un `.bak`) invece di rifiutarli in blocco si guarda cosa c'è dentro. PURA.
-* Criterio: nessun byte NUL e pochissimi byte di controllo nel primo tratto. */
+// Per i file senza estensione nota (.eml, .bak) si guarda dentro invece di rifiutarli. PURA.
+// Criterio: nessun byte NUL e pochissimi byte di controllo nel primo tratto.
 function looksLikeText(buf) {
   if (!buf || !buf.length) return true; // un file vuoto è testo vuoto, non binario
   const n = Math.min(buf.length, 8192);
@@ -78,7 +79,8 @@ function looksLikeText(buf) {
   return controls / n < 0.02;
 }
 
-/** Decodifica UTF-8 (BOM tolto); se il risultato è pieno di caratteri di sostituzione ripiega su latin1 — gli export CSV italiani sono windows-1252 e altrimenti perdono tutti gli accenti. PURA. */
+// UTF-8 col BOM tolto; se esce pieno di caratteri di sostituzione si ripiega su latin1:
+// gli export CSV italiani sono windows-1252 e perderebbero tutti gli accenti. PURA.
 function decodeText(buf) {
   let b = buf;
   if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) b = b.subarray(3);
@@ -95,7 +97,8 @@ function capText(text, max = MAX_TEXT_CHARS) {
   return { text: s.slice(0, max), truncated: true };
 }
 
-/** Estrae il testo con unpdf: è pdf.js senza visualizzatore, canvas e font di serie — stessa qualità (encoding strani, font CID) a 2,4 MB invece di 34 e senza dipendenze transitive. */
+// unpdf è pdf.js senza visualizzatore, canvas e font: stessa qualità su encoding strani e
+// font CID, a 2,4 MB invece di 34 e senza dipendenze transitive.
 async function extractPdf(buf) {
   const { getDocumentProxy, extractText } = require('unpdf');
   const pdf = await getDocumentProxy(new Uint8Array(buf));
@@ -104,7 +107,8 @@ async function extractPdf(buf) {
   return { text, pages: Number(r?.totalPages) || 0 };
 }
 
-/** Legge un documento dal disco e ne restituisce il TESTO. Esito sempre nella stessa forma, anche in caso di rifiuto: chi formatta l'osservazione per il modello non deve indovinare niente. */
+// Esito sempre nella stessa forma, anche in caso di rifiuto: chi formatta l'osservazione
+// per il modello non deve indovinare niente.
 async function readDocument(input) {
   const base = {
     ok: false, path: '', name: '', kind: '', text: '', truncated: false,
@@ -156,16 +160,16 @@ async function readDocument(input) {
     }
     base.pages = out.pages;
     const text = String(out.text || '').trim();
-    // Un PDF di sole immagini restituisce spesso solo spazi e a capo: se dopo il trim non resta nulla, testo estraibile non ce n'è.
+    // Un PDF di sole immagini restituisce spazi e a capo: dopo il trim non resta niente.
     if (!text) {
-      // PDF senza testo estraibile: è una scansione o una foto. Risposta onesta, niente OCR (per ora) e soprattutto niente contenuto inventato.
+      // PDF scansionato: risposta onesta, niente OCR e soprattutto niente contenuto inventato.
       return { ...base, ok: true, kind: 'pdf', empty: true, text: '' };
     }
     const capped = capText(text);
     return { ...base, ok: true, kind: 'pdf', text: capped.text, truncated: capped.truncated };
   }
 
-  // Estensione non nota: si decide dal contenuto invece di rifiutare in blocco, un `.eml` o un file senza estensione è spesso testo leggibile.
+  // Estensione non nota: decide il contenuto, non il rifiuto in blocco (vedi looksLikeText).
   if (kind === 'unknown' && !looksLikeText(buf)) {
     return { ...base, error: 'unsupported', detail: 'è un file binario, non testo' };
   }

@@ -1,7 +1,6 @@
-// Larghezze delle colonne nei layout a tre pannelli (deck builder, dashboard di
-// gestione). Logica pura: numeri in, numeri fuori. Le larghezze salvate possono non
-// entrare (finestra rimpicciolita, altro schermo): qui le esterne si restringono
-// quanto basta SENZA toccare le preferenze, così riallargando tornano quelle scelte.
+// Larghezze delle colonne nei layout a tre pannelli. Logica pura: numeri in, numeri fuori.
+// Le larghezze salvate possono non entrare: le esterne si restringono quanto basta SENZA
+// toccare le preferenze, così riallargando tornano quelle scelte.
 
 (function (global) {
   'use strict';

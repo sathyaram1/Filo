@@ -1,11 +1,12 @@
-// F4 — feedback autonomo di Filo, logica PURA: compone un auto-feedback quando l'agente rileva con ALTA CONFIDENZA una richiesta fuori capacità (confrontata col manifesto SN_CAPABILITIES), una lamentela di sfuggita, o una capacità che ESISTE ma che l'assistente non sa azionare e spiega a parole (#419).
-// Privacy: il feedback di compose() è GENERICO — nessun URL, nessun testo utente verbatim, solo l'id strutturale del gap e una descrizione derivata dal manifesto.
-// composeProposal() è l'altra faccia (#360): la segnalazione compare in chat già scritta, col tasto di conferma. Siccome l'utente la legge prima che parta, lì la sua richiesta si può citare per intero — senza, la segnalazione non servirebbe a chi sviluppa.
+// F4 — feedback autonomo di Filo, logica PURA: compone una segnalazione quando l'agente
+// rileva un buco fra ciò che gli chiedono e il manifesto delle capacità.
+// compose() non porta URL né testo utente; composeProposal() cita, ma l'utente legge prima.
 
 (function (global) {
   'use strict';
 
-  // Frammenti che l'AGENTE usa quando si trova senza una capacità. Si guardano solo le sue risposte, non l'input dell'utente: così non c'è injection.
+  // Frammenti che l'AGENTE usa quando si trova senza una capacità. Si guardano solo le sue
+  // risposte, mai l'input dell'utente: così non c'è injection.
   const NOT_CAPABLE_PHRASES = [
     'non posso fare',
     'non so fare',
@@ -24,7 +25,8 @@
     'al momento non è possibile',
     'per ora non è possibile',
     'questa funzionalità non è disponibile',
-    // #360: a «quanti crediti ho?» Filo ammise di non saperlo con parole che le frasi qui sopra non intercettavano, e il gap passò inosservato. Queste sono le formulazioni con cui ammette di non avere un dato o un canale, tenute strette (serve il «non ho / non posso / non riesco» attaccato) per non scattare su una frase qualunque.
+    // #360 — formulazioni con cui l'agente ammette di non avere un dato o un canale: le frasi
+    // sopra non le prendevano. Strette (serve «non ho/non posso») per non scattare a caso.
     'non ho accesso',
     'non posso accedere',
     'non ho modo di',
@@ -59,11 +61,12 @@
     'non sta funzionando',
   ];
 
-  // Alta confidenza = almeno una frase segnale E una risposta relativamente lunga: l'agente ha spiegato il rifiuto, non è un errore di parsing o un «(vuoto)».
+  // Alta confidenza = una frase segnale E una risposta lunga: l'agente ha spiegato il rifiuto,
+  // non è un errore di parsing o un «(vuoto)».
   const MIN_REPLY_LENGTH = 30;
 
-  // #419, il buco muto: non Filo che ammette di non saper fare una cosa — lì l'ammissione fa scattare la rete qui sopra — ma la funzione che ESISTE nel manifesto e che l'assistente, non avendo un'azione per comandarla, spiega a parole. Quella risposta è indistinguibile da una riuscita, e senza rete il buco resta invisibile a tutti.
-  // Segnale = indicazioni manuali («clicca», «tasto destro») su una capacità riconoscibile nel manifesto, senza nessuna azione eseguita nel turno.
+  // #419 — il buco muto: la funzione esiste nel manifesto ma l'assistente, senza un'azione,
+  // la spiega a parole: quella risposta sembra riuscita e il buco resta invisibile a tutti.
   const MANUAL_HOWTO_PHRASES = [
     'clicca',
     'cliccando',
@@ -103,7 +106,8 @@
     'seleziona la voce',
   ];
 
-  // Se l'utente ha chiesto ISTRUZIONI («come faccio a…», «cosa sai fare?»), spiegargliele è la risposta GIUSTA e una proposta di segnalazione sarebbe rumore: il segnale vale solo quando voleva che la cosa venisse fatta.
+  // Se l'utente ha chiesto ISTRUZIONI («come faccio a…»), spiegargliele è la risposta giusta:
+  // il segnale vale solo quando voleva che la cosa venisse fatta.
   const HOWTO_QUESTION_RE = new RegExp([
     '\\b(come|dove)\\s+(si|posso|puoi|potrei|faccio|fare|far|trovo|attivo|apro|cambio|metto|funziona|configuro|imposto)',
     'come si fa',
@@ -125,7 +129,8 @@
     'a cosa serve',
   ].join('|'), 'i');
 
-  // Una risposta di sole indicazioni è lunga: sotto questa soglia è più probabile un frammento o un errore di parsing.
+  // Una risposta di sole indicazioni è lunga: sotto la soglia è più probabile un frammento
+  // o un errore di parsing.
   const MIN_HOWTO_REPLY_LENGTH = 80;
 
   // Parole troppo comuni per identificare una capacità.
@@ -140,7 +145,7 @@
     return String(s || '').toLowerCase().replace(/['''"""]/g, "'");
   }
 
-  // Match semplice e puro coi titoli e le descrizioni del manifesto: ritorna l'id stabile della voce, o null.
+  // Match puro coi titoli e le descrizioni del manifesto: l'id stabile della voce, o null.
   function guessCapabilityId(replyNorm, capabilities) {
     if (!capabilities || !Array.isArray(capabilities)) return null;
     // Fra le corrispondenze vince la più lunga, cioè la più specifica.
@@ -158,7 +163,8 @@
     return best;
   }
 
-  // Radici (prime 6 lettere) delle parole significative: bastano a far combaciare «ingrandisci» del manifesto con «ingrandire» della risposta senza tirare dentro un analizzatore morfologico.
+  // Radici (prime 6 lettere) delle parole significative: bastano a far combaciare
+  // «ingrandisci» con «ingrandire» senza tirare dentro un analizzatore morfologico.
   function stems(phrase) {
     const out = [];
     const words = normalize(phrase).replace(/[^a-zà-ÿ0-9\s]/g, ' ').split(/\s+/);
@@ -170,8 +176,8 @@
     return out;
   }
 
-  // Riconosce di QUALE capacità parla uno scambio anche quando il titolo non compare alla lettera. Servono almeno due radici in comune, di cui una lunga: una parola sola (es. «pagina») non identifica niente.
-  // Le parole della RICHIESTA pesano il doppio di quelle della risposta: è ciò che l'utente voleva a dire quale capacità c'entra, mentre la risposta nomina di passaggio anche cose vicine che farebbero vincere la capacità sbagliata.
+  // Servono almeno due radici in comune, di cui una lunga: una parola sola non identifica
+  // niente. La RICHIESTA pesa il doppio: la risposta nomina di passaggio anche cose vicine.
   function matchCapabilityByWords(userText, replyText, capabilities) {
     if (!capabilities || !Array.isArray(capabilities)) return null;
     const hayOf = (t) => ` ${normalize(t).replace(/[^a-zà-ÿ0-9\s]/g, ' ')} `;
@@ -191,7 +197,7 @@
     return best;
   }
 
-  // #419: l'id della capacità che l'assistente ha spiegato a parole invece di azionare, o null.
+  // #419 — l'id della capacità spiegata a parole invece di azionarla, o null.
   function detectUncommandable(reply, replyNorm, userMessage, actions, capabilities) {
     // Un turno in cui qualcosa è stato fatto non è un turno a mani vuote.
     if (Array.isArray(actions) && actions.length) return null;
@@ -207,8 +213,8 @@
       || guessCapabilityId(replyNorm, capabilities);
   }
 
-  // Ritorna { kind: null } oppure { kind, capabilityId?, genericDesc } con kind 'capability-gap', 'complaint' o 'capability-uncommandable' (#419).
-  // Si guarda la risposta dell'agente, non dell'utente: più sicuro. `userMessage` serve SOLO a rilevare segnali di lamentela nelle sue parole, mai a finire nel feedback.
+  // Ritorna { kind, capabilityId?, genericDesc }, kind fra 'capability-gap', 'complaint' e
+  // 'capability-uncommandable'. `userMessage` serve ai segnali, mai a finire nel feedback.
   function analyzeReply(textReply, actions, userMessage, capabilities) {
     const reply = String(textReply || '');
     if (reply.length < MIN_REPLY_LENGTH) return { kind: null };
@@ -245,7 +251,8 @@
     return { kind: null };
   }
 
-  // Payload sanitizzato per SN_FEEDBACK.submit(): nessun URL e nessun testo verbatim, descrizione generica derivata dal manifesto o dal tipo di segnale, clientId strutturato per il dedup di F5. Null se il kind non è un segnale valido.
+  // Payload sanitizzato per submit(): nessun URL né testo verbatim, descrizione derivata dal
+  // manifesto, clientId strutturato per il dedup. Null se il kind non è un segnale valido.
   function compose(analysis, options) {
     if (!analysis || !analysis.kind) return null;
     const opts = options || {};
@@ -277,7 +284,8 @@
       };
     }
 
-    // #419: stessa famiglia di dedup dei gap (l'id resta estraibile dal clientId) ma con un prefisso a parte, perché «non esiste» ed «esiste ma l'assistente non la sa azionare» si risolvono in modi diversi.
+    // #419: stessa famiglia di dedup dei gap ma con un prefisso a parte, perché «non esiste» ed
+    // «esiste ma l'assistente non la sa azionare» si risolvono in modi diversi.
     if (analysis.kind === 'capability-uncommandable') {
       const capId = `uncommandable-${String(analysis.capabilityId || 'unknown')}`
         .replace(/[^a-z0-9-]/g, '-');
@@ -293,9 +301,10 @@
     return null;
   }
 
-  // Proposta in chat (#360): quando Filo ammette una mancanza la segnalazione compare già scritta, e l'anteprima con l'OK (livello 2) la chiede il sistema, quindi niente parte da solo. A differenza di compose() questo testo CITA la richiesta dell'utente, che la legge prima di autorizzare: è ciò che la rende utile.
+  // Proposta in chat (#360): a differenza di compose() questo testo CITA la richiesta
+  // dell'utente, che la legge prima di autorizzare — è ciò che la rende utile.
 
-  // Prima frase sensata, per citare l'ammissione di Filo senza trascinarsi dietro tutta la risposta.
+  // Prima frase sensata: cita l'ammissione senza trascinarsi dietro tutta la risposta.
   function firstSentence(s, max) {
     const t = String(s || '').replace(/\s+/g, ' ').trim();
     if (!t) return '';
@@ -323,7 +332,8 @@
     if (!analysis || !analysis.kind) return null;
     const opts = options || {};
     const userMessage = String(opts.userMessage || '').replace(/\s+/g, ' ').trim();
-    // Senza la richiesta dell'utente la segnalazione non dice niente di azionabile: meglio nessuna proposta che una vuota.
+    // Senza la richiesta dell'utente la segnalazione non dice niente di azionabile: meglio
+    // nessuna proposta che una vuota.
     if (!userMessage) return null;
     const asked = userMessage.length > 400 ? `${userMessage.slice(0, 399).trimEnd()}…` : userMessage;
     const admitted = firstSentence(opts.textReply, 260);
@@ -369,7 +379,8 @@
     return null;
   }
 
-  // Bonus giornaliero crediti, PURO: il delta se il setting è ON e il bonus non è già stato dato OGGI (`lastAutoFeedbackBonusDate`), così un secondo refill nello stesso giorno non ripaga. L'applicazione spetta ad applyRefill in creditStore.js.
+  // Bonus giornaliero crediti, PURO: il delta se il setting è ON e il bonus non è già stato
+  // dato oggi, così un secondo refill nello stesso giorno non ripaga.
   function calcAutoFeedbackBonus(state, today, autoFeedbackEnabled) {
     if (!autoFeedbackEnabled) return 0;
     const last = String(state.lastAutoFeedbackBonusDate || '');

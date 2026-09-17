@@ -1,6 +1,6 @@
 // Pagina «Inviti e utenti», solo owner (#598): codici d'invito, regali di crediti per
-// pseudonimo, tabella utenti con saldo, consumo e dettaglio d'uso. Sta a parte dalla pagina
-// Crediti dell'utente: due lavori diversi, due pagine. Chi non è owner vede una riga sola.
+// pseudonimo, tabella utenti con saldo e consumo. Chi non è owner vede una riga sola.
+// Sta a parte dalla pagina Crediti dell'utente: due lavori diversi, due pagine.
 
 (function () {
   'use strict';
@@ -248,8 +248,7 @@
   function formatInt(n) {
     return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
   }
-  // Al più un decimale: «137» per un intero e «0,3» per una frazione, così un consumo sotto il
-  // credito resta visibile invece di sparire arrotondato a zero.
+  // Al più un decimale: un consumo sotto il credito deve restare visibile, non sparire a zero.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
     return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);

@@ -1,4 +1,5 @@
-// Assegna automaticamente una categoria a una scheda salvata; le categorie stanno in chrome.storage.local sotto STORAGE_KEYS.CATEGORIES.
+// Assegna automaticamente una categoria a una scheda salvata.
+// Le categorie stanno in chrome.storage.local sotto STORAGE_KEYS.CATEGORIES.
 
 (function (global) {
   'use strict';
@@ -120,7 +121,7 @@
     }
   }
 
-  // invokeAI arriva dal chiamante per evitare una dipendenza circolare col routing dei messaggi.
+  // invokeAI lo passa il chiamante: evita la dipendenza circolare col routing dei messaggi.
   async function categorize({ invokeAI, page }) {
     const cats = await listCategories();
     const existing = cats.map((c) => c.name);

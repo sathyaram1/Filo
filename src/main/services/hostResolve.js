@@ -1,10 +1,10 @@
-// "Questo host esiste davvero?" — risoluzione DNS leggera per la barra comando della dashboard: senza, un dominio inventato porterebbe a una pagina bianca di errore.
-// IP letterali, localhost e i nomi della rete locale (nas.lan, raspberrypi.local — SN_URL_NAV.isLocalNetworkName) sono validi SENZA interrogare il DNS: il resolver pubblico non li conosce e risponde ENOTFOUND anche quando il dispositivo è lì e risponde (#433).
-// Per gli altri si usa il resolver del sistema. Politica volutamente conservativa: meglio lasciar navigare che bloccare per sbaglio un sito buono.
+// «Questo host esiste?» — risoluzione DNS leggera per la barra comando della dashboard.
+// IP, localhost e nomi di rete locale valgono senza DNS: il resolver pubblico risponde
+// ENOTFOUND anche se il dispositivo c'è. Meglio lasciar navigare che bloccare un sito buono.
 
 const dns = require('node:dns').promises;
 const net = require('node:net');
-// Una sola definizione di "host locale" per tutta l'app: la stessa che sceglie http:// invece di https://.
+// Una sola definizione di «host locale» in tutta l'app: la stessa che sceglie http://.
 require('../../shared/urlNav.js');
 
 function isCheckableHost(host) {
@@ -28,7 +28,7 @@ async function hostResolves(host, { lookup = dns.lookup } = {}) {
     await lookup(h);
     return true;
   } catch (err) {
-    // SOLO "il dominio non esiste" blocca. Errori di rete o transitori (timeout, EAI_AGAIN) sono un dubbio: si torna "esiste".
+    // Blocca solo «il dominio non esiste»: un errore transitorio è un dubbio, e passa.
     if (err && err.code === 'ENOTFOUND') return false;
     return true;
   }

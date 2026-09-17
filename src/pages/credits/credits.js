@@ -1,6 +1,6 @@
-// Pagina Crediti: saldo, torta del consumo per TIPO D'USO e movimenti recenti. Il costo in €
-// non si mostra MAI (la vista pubblica del motore crediti lo elimina già a monte).
-// Crediti sul server (#598): col portafoglio il saldo grande è quello del server, non il locale.
+// Pagina Crediti: saldo, torta del consumo per tipo d'uso e movimenti recenti.
+// Il costo in € non si mostra MAI: la vista pubblica del motore crediti lo toglie a monte.
+// Col portafoglio sul server (#598) il saldo grande è quello del server, non il locale.
 
 (function () {
   'use strict';
@@ -40,7 +40,7 @@
   function render(r, w) {
     const credits = r.credits || {};
     // Saldo a un decimale: un uso leggero consuma frazioni di credito e l'intero le
-    // nasconderebbe. balanceExact conserva la frazione; ripiego su balance per retrocompatibilità.
+    // nasconderebbe. balanceExact conserva la frazione, `balance` è il ripiego.
     const bal = credits.balanceExact != null ? credits.balanceExact : (credits.balance || 0);
     $('balance').textContent = formatCredits(bal);
     $('offlineHint').hidden = !!r.signedIn;
@@ -50,8 +50,8 @@
     renderMoves(credits.rewards || []);
   }
 
-  // Una conferma deve restare leggibile: l'avviso di saldo cambiato arriva nello stesso istante
-  // e il ridisegno cancellava la frase. La conferma vince sui ridisegni finché non si fa altro.
+  // Una conferma deve restare leggibile: l'avviso di saldo cambiato arriva nello stesso
+  // istante e il ridisegno cancellava la frase. La conferma vince finché non si fa altro.
   let confirmation = null;
   function showConfirmation(text) {
     confirmation = text || null;
@@ -78,8 +78,8 @@
     const has = Boolean(server && server.hasWallet);
     const note = $('walletNote');
     note.hidden = true;
-    // Senza nessuna chiave il conteggio locale non compra niente: saldo, ricarica a mezzanotte e
-    // invito al login sono promesse vuote e si tolgono. Vale anche con l'identità annullata.
+    // Senza nessuna chiave il conteggio locale non compra niente: saldo, ricarica e invito al
+    // login sono promesse vuote e si tolgono. Vale anche con l'identità annullata.
     const noKey = !has && (w.keySource === 'none' || Boolean(w.identity && w.identity.lost));
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
@@ -224,7 +224,7 @@
     if (r && r.ok) {
       msg.textContent = r.message || 'Fatto.';
       msg.classList.add('is-ok');
-      // Il modulo dell'invito sparisce col portafoglio: la frase resta nella nota, fuori dal modulo.
+      // Il modulo dell'invito sparisce col portafoglio: la frase resta nella nota, fuori.
       showConfirmation(r.message || 'Fatto.');
       // La vista owner sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.
       render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
@@ -237,8 +237,8 @@
   }
 
   function renderUsage(byUsage) {
-    // Solo i gruppi con consumo > 0. NON arrotondare all'intero: il motore dà già i crediti al
-    // decimo, e arrotondando un uso leggero sparirebbe dalla torta come «non hai consumato».
+    // Solo i gruppi con consumo > 0, e NON arrotondati all'intero: il motore dà i crediti al
+    // decimo, e un uso leggero sparirebbe dalla torta come «non hai consumato».
     const groups = Object.entries(byUsage)
       .map(([label, v]) => ({ label, credits: (v && v.credits) || 0, calls: (v && v.calls) || 0 }))
       .filter((g) => g.credits > 0)
@@ -254,8 +254,8 @@
     drawLegend(groups);
   }
 
-  // Un <path> per fetta (data-group) così un test può asserirle. Con un solo gruppo un cerchio
-  // pieno: l'arco da 0 a 2π collasserebbe.
+  // Un <path> per fetta (data-group) così un test può asserirle. Con un solo gruppo un
+  // cerchio pieno: l'arco da 0 a 2π collasserebbe.
   function drawChart(groups, total) {
     const chart = $('chart');
     chart.innerHTML = '';
@@ -357,8 +357,8 @@
   function formatInt(n) {
     return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
   }
-  // Al più un decimale: «137» per un intero e «0,3» per una frazione, così un consumo sotto il
-  // credito resta visibile invece di sparire arrotondato a zero.
+  // Al più un decimale: «137» per un intero e «0,3» per una frazione, così un consumo sotto
+  // il credito resta visibile invece di sparire arrotondato a zero.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
     return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);

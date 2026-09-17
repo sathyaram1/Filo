@@ -1,29 +1,31 @@
-// Blocco dell'apertura di siti in blacklist (#170.3): l'ad-blocking annulla le SINGOLE richieste verso ad/tracker, qui si decide se la navigazione TOP-LEVEL verso un sito va bloccata del tutto.
-// Sorgenti: le liste pubbliche già scaricate dall'ad-blocker (opzionali, useAdblockLists) più una blacklist DEDICATA dell'utente.
-// Due eccezioni consentono l'apertura anche di un sito in blacklist: la navigazione viene da un MOTORE DI RICERCA (l'utente l'ha cercato apposta) oppure è originata DA FILO (azione NAVIGA, pagine filo://). Quando blocca, tabs.js mostra la notifica con "Apri comunque".
+// Blocco della navigazione TOP-LEVEL verso siti in blacklist: l'ad-blocker annulla le
+// singole richieste, qui si apre o no. Liste pubbliche più la blacklist dell'utente.
+// Due eccezioni: si arriva da un motore di ricerca, o l'apertura è originata da Filo.
 
 let enabled = true;
 let useAdblockLists = true;
 let userBlacklist = new Set(); // domini extra inseriti dall'utente
 
-// Second-level public suffix dei motori multi-TLD (co.uk, com.au, co.jp…): la label del motore può stare subito prima di questi.
+// Suffissi pubblici di secondo livello (co.uk, com.au…): la label del motore sta prima.
 const PUB_SLD = '(?:co|com|net|org|gov|edu|ac|ne|or|go|nom|nic)';
 
-// Il nome del motore dev'essere la label subito prima del suffisso pubblico (google.co.uk, search.yahoo.com, yandex.com.tr), NON una label iniziale qualsiasi: google.evil.com non è Google (#230).
+// Il nome dev'essere la label subito prima del suffisso pubblico, non una qualsiasi:
+// google.evil.com non è Google (#230).
 function engineOnPublicSuffix(name) {
   return new RegExp(`(^|\\.)${name}\\.(?:${PUB_SLD}\\.)?[a-z]{2,}$`);
 }
 
-// Motori di ricerca il cui referrer rende lecita l'apertura di un sito in blacklist. Riconoscimento per pattern sul dominio registrabile, robusto ai molti TLD e ai sottodomini.
+// Motori il cui referrer rende lecita l'apertura di un sito in blacklist. Per pattern sul
+// dominio registrabile, per reggere i molti TLD e i sottodomini.
 const SEARCH_ENGINE_PATTERNS = [
-  engineOnPublicSuffix('google'), // google.com, google.it, google.co.uk, …
+  engineOnPublicSuffix('google'),
   /(^|\.)bing\.com$/,
   /(^|\.)duckduckgo\.com$/,
   /(^|\.)ecosia\.org$/,
   /(^|\.)startpage\.com$/,
   /(^|\.)qwant\.com$/,
-  engineOnPublicSuffix('yahoo'), // search.yahoo.com, yahoo.com, yahoo.co.jp, …
-  engineOnPublicSuffix('yandex'), // yandex.com, yandex.ru, yandex.com.tr, …
+  engineOnPublicSuffix('yahoo'),
+  engineOnPublicSuffix('yandex'),
   /(^|\.)baidu\.com$/,
   /(^|\.)brave\.com$/, // search.brave.com
   /(^|\.)kagi\.com$/,
@@ -40,21 +42,21 @@ function hostnameOf(url) {
   }
 }
 
-// Normalizza un dominio inserito dall'utente: via schema, path, porta, www.
 function normalizeDomain(raw) {
   if (!raw) return '';
   let s = String(raw).trim().toLowerCase();
   if (!s) return '';
-  s = s.replace(/^[a-z]+:\/\//, ''); // schema
-  s = s.split('/')[0]; // path
+  s = s.replace(/^[a-z]+:\/\//, '');
+  s = s.split('/')[0];
   s = s.split('?')[0];
   s = s.split('#')[0];
-  s = s.split(':')[0]; // porta
+  s = s.split(':')[0];
   s = s.replace(/^www\./, '');
   return s;
 }
 
-// Una voce senza estensione ("facebook") o un IP non è mai un host reale: nel Set matcherebbe cose sbagliate e darebbe falsa sicurezza. Allineato al campo "siti fidati".
+// Una voce senza punto («facebook») o un IP non è un host reale: nel Set matcherebbe cose
+// sbagliate e darebbe falsa sicurezza. Stessa regola del campo «siti fidati».
 function isValidDomain(host) {
   return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host);
 }
@@ -97,7 +99,8 @@ function isBlacklistedHost(host) {
   return false;
 }
 
-// Decisione centrale → { block, host, reason }. `fromUrl` è la pagina di partenza o referrer (eccezione ricerca), `viaFilo` dice che l'apertura è originata da Filo.
+// Decisione centrale → { block, host, reason }. `fromUrl` è la pagina di partenza o il
+// referrer, `viaFilo` dice che l'apertura nasce da Filo.
 function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}) {
   const res = { block: false, host: '', reason: '' };
   if (!enabled) return res;
@@ -108,7 +111,7 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '', viaFilo = false } = {}
   } catch (_) {
     return res; // URL non valido: non interferiamo
   }
-  // Solo navigazioni web top-level: gli altri schemi, comprese le pagine interne di Filo, non si bloccano mai.
+  // Solo http/https: gli altri schemi, comprese le pagine di Filo, non si bloccano mai.
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return res;
 
   const host = u.hostname.toLowerCase();

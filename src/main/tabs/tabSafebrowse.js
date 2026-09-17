@@ -1,14 +1,6 @@
-// Rilevamento siti pericolosi (safebrowse) — estratto da tabs.js come livello
-// separato. (vedi src/main/services/safebrowse/.) Tutto best-effort: NIENTE
-// blocca mai la navigazione. L'overlay "pericoloso"/banner "sospetto" vive in
-// un content script sulla pagina; qui calcoliamo il verdetto e lo spingiamo via
-// broadcast SAFEBROWSE_UPDATE. Bypass (confermo) e dismiss (ok) sono per
-// (tab, dominio) e durano solo finché il tab vive.
-//
-// Questi metodi vengono installati sul prototype di TabManager (mixin): `this`
-// è l'istanza TabManager, quindi `this.tabs`, `this._sbBroadcast(...)`, ecc.
-// funzionano identici a quando vivevano inline in tabs.js. Le dipendenze sono
-// solo i globali SN_SAFEBROWSE / SN_MSG (caricati dal loader), come prima.
+// Verdetto sui siti pericolosi: tutto best-effort, NIENTE blocca mai la navigazione.
+// L'overlay e il banner vivono nel content script; qui si calcola e si spinge il verdetto.
+// Mixin sul prototype di TabManager. Bypass e dismiss valgono per (tab, dominio).
 
 const safebrowseMethods = {
   _sbState(tab) {
@@ -35,9 +27,8 @@ const safebrowseMethods = {
 
   // Spinge il verdetto al content script del tab (l'overlay/banner si ridisegna).
   _sbBroadcast(tab, url, verdict) {
-    // Memorizza l'ultimo livello di sicurezza applicato al tab: è l'input
-    // "sito flaggato sospetto/pericoloso" delle regole d'azione geo-block
-    // (#151), che NON deve mai aggirare i controlli di sicurezza di Filo.
+    // L'ultimo livello applicato è un input delle regole geo-block (#151): il proxy non deve
+    // mai aggirare i controlli di sicurezza di Filo.
     try { tab.sbLevel = verdict ? (verdict.level || 'safe') : 'safe'; } catch (_) {}
     const T = (globalThis.SN_MSG && globalThis.SN_MSG.MSG && globalThis.SN_MSG.MSG.SAFEBROWSE_UPDATE) || 'safebrowse_update';
     try {
@@ -50,9 +41,8 @@ const safebrowseMethods = {
     } catch (_) {}
   },
 
-  // Richiesto dal content script (SAFEBROWSE_GET) quando la pagina parte. Ritorna
-  // SUBITO il verdetto sincrono (rispettando bypass/dismiss) e, se ci sono
-  // segnali di rete da approfondire, li avvia: a verdetto cambiato fa broadcast.
+  // Ritorna SUBITO il verdetto sincrono (con bypass/dismiss applicati) e, se ci sono segnali
+  // di rete da approfondire, li avvia: a verdetto cambiato fa broadcast.
   safebrowseGet(tabId, url, ctx = {}) {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
@@ -118,7 +108,6 @@ const safebrowseMethods = {
   },
 };
 
-// Installa i metodi sul prototype di TabManager (mixin). `this` resta l'istanza.
 function installSafebrowse(TabManager) {
   Object.assign(TabManager.prototype, safebrowseMethods);
 }

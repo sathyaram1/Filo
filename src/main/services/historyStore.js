@@ -20,7 +20,8 @@
     try { return JSON.stringify(items).length; } catch (_) { return 0; }
   }
 
-  // Via i campi voluminosi che non hanno valore storico: la quota di chrome.storage.local è ~10 MB e lo screenshot del flusso Aiuto è un data URL da centinaia di KB per turno.
+  // Via i campi voluminosi senza valore storico: la quota di chrome.storage.local è ~10 MB e
+  // uno screenshot del flusso Aiuto è un data URL da centinaia di KB per turno.
   function sanitizeInput(input) {
     if (!input || typeof input !== 'object') return input || {};
     const out = { ...input };
@@ -36,16 +37,18 @@
       action: entry.action,
       provider: entry.provider,
       model: entry.model,
-      // Chi ha DAVVERO servito la risposta upstream (#421), quando il provider lo riporta: è la controprova della politica sui fornitori. null se il dato non è arrivato (per voce e dettatura arriva dopo, via patch).
+      // Chi ha DAVVERO servito la risposta, quando il provider lo riporta: è la controprova della
+      // politica sui fornitori. null se non è arrivato (voce e dettatura lo mandano dopo).
       servedBy: entry.servedBy || null,
-      // Chi ha servito era fra i fornitori esclusi dalla politica: la voce resta marchiata, così la prova di cosa è successo non vive solo in un log che nessuno riapre.
+      // Servita da un fornitore escluso: la voce resta marchiata, così la prova non vive solo in
+      // un log che nessuno riapre.
       policyViolation: entry.policyViolation === true,
       input: sanitizeInput(entry.input),
       output: entry.output || '',
       origin: entry.origin || '',
       costEur: entry.costEur || 0,
       usage: entry.usage || null,
-      // Tempi del turno (ms dalla partenza): primo pezzo di ragionamento, prima parola, prima azione, fine. Senza questi numeri ogni scelta sui modelli è a occhio.
+      // Tempi del turno in ms: senza questi numeri ogni scelta sui modelli è a occhio.
       timing: (entry.timing && typeof entry.timing === 'object') ? entry.timing : null,
     };
     items.unshift(full);
@@ -58,7 +61,8 @@
     return full;
   }
 
-  // Simmetrica ad append: se l'utente può aggiungere una voce deve poter togliere quella singola (testo privato, risultato sbagliato) senza svuotare tutto lo storico. Ritorna la lista aggiornata, così il chiamante riallinea la vista senza rileggere.
+  // Simmetrica ad append: chi aggiunge una voce deve poter togliere quella singola (testo
+  // privato, risultato sbagliato). Torna la lista aggiornata, così il chiamante non rilegge.
   async function remove(id) {
     const items = await list();
     const next = items.filter((it) => it && it.id !== id);
@@ -68,7 +72,8 @@
     return next;
   }
 
-  // Serve al riscontro "chi ha servito" delle chiamate audio, che arriva qualche secondo DOPO la risposta: la voce nasce senza e viene marchiata quando il dato c'è.
+  // Il riscontro «chi ha servito» delle chiamate audio arriva secondi DOPO la risposta: la
+  // voce nasce senza e viene marchiata quando il dato c'è.
   async function patch(id, fields) {
     if (!id || !fields || typeof fields !== 'object') return null;
     const items = await list();
@@ -83,7 +88,8 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: [] });
   }
 
-  // Migrazione one-shot: ripulisce le voci dagli screenshot salvati prima del fix. Idempotente: se non c'è nulla da ripulire e la dimensione è entro soglia, non scrive.
+  // Ripulisce le voci dagli screenshot salvati. Idempotente: se non c'è niente da togliere e
+  // la dimensione è entro soglia, non scrive.
   async function cleanupScreenshots() {
     let items;
     try { items = await list(); } catch (_) { return { changed: false }; }
@@ -108,7 +114,7 @@
       trimmed.pop();
     }
 
-    // Lo storage può essere già pieno per colpa di altri consumer: se la scrittura fallisce per quota si dimezza progressivamente.
+    // Lo storage può essere già pieno per altri: se la scrittura fallisce per quota si dimezza.
     while (trimmed.length > 0) {
       try {
         await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: trimmed });

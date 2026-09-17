@@ -22,18 +22,14 @@ try {
   if (cleaned) app.userAgentFallback = cleaned;
 } catch (_) { /* best-effort: in peggio resta la UA di default */ }
 
-// I moduli condivisi si auto-registrano su `globalThis` (convenzione IIFE):
-// chi li usa non li richiede, li trova già lì.
 require('./shim/chrome-api');
 require('./services/loader');
 
 // Dentro app.evaluate `require` non esiste: i test arrivano ai servizi veri da
 // qui. SINCRONO, non dentro whenReady: un test può valutare prima che finisca.
 if (process.env.NODE_ENV === 'test') {
-  // Niente browser né gestore file aperti dal sistema durante i test: su un
-  // contenitore senza desktop l'apertura non torna mai e l'app non si chiude
-  // più (vedi test-window-mode.js). Le prove che vogliono lo stub lo mettono
-  // dopo, per conto loro, sopra a questo.
+  // Niente browser né gestore file aperti dal sistema durante i test: su un contenitore
+  // senza desktop l'apertura non torna mai e l'app non si chiude più.
   try { require('./test-window-mode').silenziaApertureDiSistema(require('electron').shell); } catch (_) {}
   try {
     globalThis.__filoHandlers = require('./services/handlers');
@@ -62,9 +58,8 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// Senza queste lingue Hunspell resta sulla sola lingua di sistema e i
-// suggerimenti dietro lo zigzag non arrivano. #169: l'inglese NON si forza, o
-// le parole italiane sbagliate ricevono correzioni inglesi. Su macOS è ignorata.
+// Senza queste lingue Hunspell resta sulla lingua di sistema e i suggerimenti non arrivano.
+// L'inglese NON si forza (#169), o le parole italiane sbagliate ricevono correzioni inglesi.
 function configureSpellchecker() {
   try {
     const ses = session.defaultSession;
@@ -118,9 +113,8 @@ app.whenReady().then(async () => {
 
   initAutoUpdater();
 
-  // Smoke: l'ORDINE è la regola. Il sentinel è l'unica cosa che lo script fuori
-  // aspetta e si scrive appena le schede sono pronte, PRIMA delle catture: se
-  // viene dopo, una cattura lenta è indistinguibile da un'app che non parte.
+  // Smoke: l'ORDINE è la regola. Il sentinel è l'unica cosa che lo script fuori aspetta e va
+  // scritto PRIMA delle catture: dopo, una cattura lenta sembra un'app che non parte.
   if (process.env.FILO_SMOKE) {
     const fs = require('node:fs');
     const path = require('node:path');
@@ -276,9 +270,8 @@ app.on('before-quit', () => {
   } catch (_) {}
 });
 
-// Pulizia dei soli cookie di tracker all'uscita: login e cookie funzionali
-// restano. È asincrona, quindi l'uscita si rimanda — ma con un tetto, o un wipe
-// impallato impedisce di chiudere l'app.
+// Pulizia dei soli cookie di tracker all'uscita: login e cookie funzionali restano.
+// L'uscita si rimanda, ma con un tetto: un wipe impallato non deve impedire di chiudere.
 let cookieWipeDone = false;
 app.on('before-quit', (e) => {
   if (cookieWipeDone) return;

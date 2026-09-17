@@ -1,5 +1,6 @@
-// Modale «Invia feedback» dell'alpha test: testo libero persistito fra aperture e riavvii, annotazione a mano libera dello schermo, immagini incollate o trascinate, altri allegati dal selettore.
-// All'invio immagini su Firebase Storage e record su Firestore, sempre instradati dal main (il perché sta più sotto).
+// Modale «Invia feedback»: testo persistito fra aperture, annotazione a mano libera,
+// immagini incollate o trascinate, altri allegati dal selettore.
+// Immagini e record vanno a Firebase instradati dal main (il perché è più sotto).
 
 (function (global) {
   'use strict';
@@ -15,7 +16,8 @@
   const ATTACH_REJECT_MSG =
     'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
-  // Fallback prudente se il modulo condiviso non fosse caricato: si consentono solo le immagini raster note.
+  // Fallback prudente se il modulo condiviso non fosse caricato: si consentono solo le immagini
+  // raster note.
   function classifyAttachment(file) {
     if (AttachTypes && typeof AttachTypes.classify === 'function') {
       return AttachTypes.classify(file);
@@ -24,7 +26,8 @@
     return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
   }
 
-  // La bozza sopravvive a chiusura e riapertura del box e al riavvio di Filo (chrome.storage.local → storage.json).
+  // La bozza sopravvive a chiusura e riapertura del box e al riavvio di Filo (chrome.storage.local
+  // → storage.json).
   const DRAFT_KEY = 'sn_feedback_draft_text';
   const STROKE_COLOR = '#ff3b30';
   const STROKE_WIDTH = 3;
@@ -33,7 +36,8 @@
   let activeStack = null;
   let clientIdCache = null;
 
-  // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area pagina.
+  // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area
+  // pagina.
   function setShellDim(on) {
     try { chrome.runtime.sendMessage({ type: MSG.FEEDBACK_ANNOTATE, on: !!on }); } catch (_) {}
   }
@@ -82,7 +86,8 @@
     return null;
   }
 
-  // Object URL invece di dataUrl perché le CSP delle pagine ospiti bloccano img-src data:. Va revocato quando l'immagine viene rimossa.
+  // Object URL invece di dataUrl perché le CSP delle pagine ospiti bloccano img-src data:. Va
+  // revocato quando l'immagine viene rimossa.
   function dataUrlToBlobUrl(dataUrl) {
     try {
       const m = /^data:([^;,]+)(;base64)?,(.*)$/.exec(dataUrl);
@@ -103,8 +108,8 @@
     catch (_) { return ''; }
   }
 
-  // Monete credito che volano verso l'icona profilo alla chiusura del box. Vivono nel content overlay perché la barra della shell è coperta dalla WebContentsView nativa e un'animazione della shell sarebbe occlusa.
-  // Decorativa: best-effort, non blocca, si auto-rimuove; con prefers-reduced-motion resta la sola etichetta.
+  // Le monete vivono nel content overlay perché la barra della shell è coperta dalla
+  // WebContentsView nativa. Decorative: best-effort, non bloccano, si auto-rimuovono.
   function flyCredits(originRect, amount) {
     try {
       const n = Math.max(1, Math.round(Number(amount) || 0));
@@ -192,7 +197,8 @@
     root.className = 'sn-fb-overlay';
     global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    // Layout chiesto dall'utente: solo il box e quattro bottoni; «Cancella disegno» c'è solo quando c'è qualcosa da cancellare.
+    // Solo il box e quattro bottoni; «Cancella disegno» c'è solo quando c'è qualcosa da
+    // cancellare.
     root.innerHTML = `
       <canvas class="sn-fb-canvas"></canvas>
       <div class="sn-fb-modal" role="dialog" aria-modal="true" aria-label="Invia feedback">
@@ -214,10 +220,12 @@
     document.documentElement.appendChild(root);
     activeRoot = root;
     setShellDim(true);
-    // Abbandonando la pagina senza close() il content script muore e il velo della shell resterebbe appeso: va chiesto di toglierlo.
+    // Abbandonando la pagina senza close() il content script muore e il velo della shell resterebbe
+    // appeso: va chiesto di toglierlo.
     window.addEventListener('pagehide', () => setShellDim(false), { once: true });
     Popup?.attachZoomCompensation?.(root);
-    // Stacking dei popup: sopra i box aperti prima, sotto quelli dopo. Il menu del tasto destro ha z-index più alto e resta sempre sopra.
+    // Stacking dei popup: sopra i box aperti prima, sotto quelli dopo. Il menu del tasto destro ha
+    // z-index più alto e resta sempre sopra.
     activeStack = Popup?.registerStack?.(root) || null;
 
     const modal = root.querySelector('.sn-fb-modal');
@@ -232,7 +240,6 @@
     const canvas = root.querySelector('.sn-fb-canvas');
     const fileInput = root.querySelector('.sn-fb-file');
 
-    // Data URL delle immagini incollate o trascinate.
     const images = [];
     const MAX_IMAGES = 5;
     // Allegati NON immagine (pdf, txt, md, json, …): { name, type, size, dataUrl }
@@ -240,8 +247,8 @@
     const MAX_FILES = 5;
     const MAX_ATTACH_BYTES = 4 * 1024 * 1024;
 
-    // Anti-duplicati (#370): id STABILE della composizione, condiviso da tutti i tentativi di invio. Se un invio va in timeout lato UI ma riesce sul server, ripremere «Invia» non duplica: il server rifiuta un secondo documento con lo stesso id.
-    // Cambia solo quando cambia il contenuto: un messaggio diverso è un feedback diverso e deve poter partire a parte.
+    // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
+    // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
     function newSubmissionId() {
       try {
         if (global.crypto?.randomUUID) return global.crypto.randomUUID();
@@ -276,7 +283,8 @@
     const strokes = []; // [{ color, width, points: [{x,y}] }] in coordinate viewport CSS
     let drawing = false;
     let curStroke = null;
-    // La barra in alto vive in un altro processo: se ci si è disegnato sopra lo sappiamo solo via broadcast FEEDBACK_DRAW_STATE.
+    // La barra in alto vive in un altro processo: se ci si è disegnato sopra lo sappiamo solo via
+    // broadcast FEEDBACK_DRAW_STATE.
     let topbarHasDrawing = false;
 
     function sizeCanvas() {
@@ -311,7 +319,8 @@
     function hasPageDrawing() { return strokes.some((s) => s.points.length > 0); }
     function hasAnyDrawing() { return hasPageDrawing() || topbarHasDrawing; }
 
-    // Un bottone, due stati: «Allega screenshot» (all'invio si allega lo scatto anche senza disegnare), e appena si disegna diventa «Cancella».
+    // Un bottone, due stati: «Allega screenshot» (all'invio si allega lo scatto anche senza
+    // disegnare), e appena si disegna diventa «Cancella».
     let shotArmed = false;
     function updateClearBtn() {
       const drawing = hasAnyDrawing();
@@ -345,7 +354,8 @@
     window.addEventListener('resize', sizeCanvas);
     sizeCanvas();
 
-    // «Cancella disegno» pulisce i tratti della pagina E quelli della barra in alto, che vivono nella shell: un bottone solo cancella tutto.
+    // «Cancella disegno» pulisce i tratti della pagina E quelli della barra in alto, che vivono
+    // nella shell: un bottone solo cancella tutto.
     clearBtn.addEventListener('click', () => {
       if (hasAnyDrawing()) {
         strokes.length = 0;
@@ -359,7 +369,8 @@
       updateClearBtn();
     });
 
-    // La shell dice se c'è o non c'è più un disegno sulla barra, così «Cancella disegno» compare anche quando si è disegnato SOLO lassù.
+    // La shell dice se c'è o non c'è più un disegno sulla barra, così «Cancella disegno» compare
+    // anche quando si è disegnato SOLO lassù.
     function onBroadcast(message) {
       // Auto-rimozione quando il box non è più questo (chiuso e riaperto).
       if (activeRoot !== root) {
@@ -434,7 +445,8 @@
     }
 
     async function addImageFromBlob(blob) {
-      // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro tipo che si spacci per immagine.
+      // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
+      // tipo che si spacci per immagine.
       if (!blob || classifyAttachment(blob) !== 'image') return;
       if (images.length >= MAX_IMAGES) {
         statusEl.textContent = `Massimo ${MAX_IMAGES} immagini.`;
@@ -452,7 +464,8 @@
 
     async function addAttachment(file) {
       if (!file) return;
-      // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
+      // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta
+      // «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
       const kind = classifyAttachment(file);
       if (!kind) {
         statusEl.textContent = ATTACH_REJECT_MSG;
@@ -513,7 +526,8 @@
       });
     }
 
-    // Impila lo scatto della barra sopra quello della pagina: un'unica immagine di tutta l'app coi tratti di entrambe; senza, resta la sola pagina.
+    // Impila lo scatto della barra sopra quello della pagina: un'unica immagine di tutta l'app coi
+    // tratti di entrambe; senza, resta la sola pagina.
     function stackTopbar(pageDataUrl, topbarDataUrl) {
       return new Promise((resolve) => {
         if (!topbarDataUrl) { resolve(pageDataUrl); return; }
@@ -610,7 +624,8 @@
       for (const f of dropped) await addAttachment(f);
     });
 
-    // Dal selettore anche file non immagine (pdf, txt, md, json…): i cammini equivalenti fanno la stessa cosa.
+    // Dal selettore anche file non immagine (pdf, txt, md, json…): i cammini equivalenti fanno la
+    // stessa cosa.
     attachBtn.addEventListener('click', () => { try { fileInput.click(); } catch (_) {} });
     fileInput.addEventListener('change', async () => {
       const picked = Array.from(fileInput.files || []);
@@ -620,7 +635,6 @@
 
     sendBtn.addEventListener('click', async () => {
       const text = textEl.value.trim();
-      // Screenshot allegato quando c'è un disegno, o quando l'utente ha premuto «Allega screenshot».
       const wantShot = shotArmed || hasAnyDrawing();
       if (!text && images.length === 0 && files.length === 0 && !wantShot) {
         statusEl.textContent = 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.';
@@ -631,7 +645,8 @@
       statusEl.textContent = 'Invio in corso…';
       try {
         const clientId = await getClientId();
-        // S1.F2.2: hash deterministico del clientId per il match C5. Il confronto lo fa il main, che qui non ha la chiave privata.
+        // S1.F2.2: hash deterministico del clientId per il match C5. Il confronto lo fa il main,
+        // che qui non ha la chiave privata.
         const clientIdHash = await (async () => {
           try {
             const H = global.SN_FEEDBACK_CLIENT_ID_HASH;
@@ -672,17 +687,18 @@
             statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
           }
         }
-        // Instradato dal main perché la CSP della pagina ospite blocca i fetch verso firestore e firebasestorage dal preload; il main usa undici (Node) e non è soggetto a quella CSP.
+        // Instradato dal main perché la CSP della pagina ospite blocca i fetch verso firestore e
+        // firebasestorage dal preload; il main usa undici (Node) e non è soggetto a quella CSP.
         const payload = {
           text,
           url: location.href,
           title: document.title,
           userAgent: navigator.userAgent,
           clientId,
-          clientIdHash, // S1.F2.2: hash deterministico in chiaro per match C5
+          clientIdHash,
           images: outImages,
-          files: files.slice(), // allegati non-immagine (pdf, txt, md, json…)
-          submissionId, // #370: id stabile → il server deduplica i re-invii
+          files: files.slice(),
+          submissionId,
         };
         const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
         if (!res?.ok) throw new Error(res?.error || 'invio fallito');
@@ -691,14 +707,16 @@
         // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
         const originRect = modal.getBoundingClientRect();
         close();
-        // Ricompensa best-effort, non blocca; l'importo vero lo decide il main (CREDIT.FEEDBACK_SEND).
+        // Ricompensa best-effort, non blocca; l'importo vero lo decide il main
+        // (CREDIT.FEEDBACK_SEND).
         let awarded = 5;
         try {
           const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK });
           if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
         } catch (_) {}
         flyCredits(originRect, awarded);
-        // Un allegato non caricato non ferma l'invio, ma va detto QUALE si è perso: altrimenti l'utente lo crede inviato.
+        // Un allegato non caricato non ferma l'invio, ma va detto QUALE si è perso: altrimenti
+        // l'utente lo crede inviato.
         const failed = Array.isArray(res.failed) ? res.failed : [];
         if (failed.length) {
           const names = failed.map((f) => f?.name || 'allegato').join(', ');
@@ -714,7 +732,8 @@
       }
     });
 
-    // Centra orizzontalmente con `left` INTERO: translateX(-50%) su display HiDPI cadrebbe su un pixel frazionario e sfocherebbe il testo.
+    // Centra orizzontalmente con `left` INTERO: translateX(-50%) su display HiDPI cadrebbe su un
+    // pixel frazionario e sfocherebbe il testo.
     function centerModal() {
       const w = modal.offsetWidth || 540;
       modal.style.left = Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px';

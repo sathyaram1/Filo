@@ -1,6 +1,6 @@
-// Cookie e consenso lato pagina: rifiuto automatico dei banner CMP (OneTrust, Cookiebot, Didomi, TCF, Usercentrics…) e riscrittura degli embed YouTube in youtube-nocookie.
-// Inattivo con settings.security.cookies.mode = 'manual'; 'privacy' qui è uguale a 'default' (l'isolamento del jar sta nel main).
-// Il GPC non è qui: la proprietà la inietta tabs.js nel main world, l'header services/cookies.js.
+// Cookie e consenso lato pagina: rifiuta i banner CMP e riscrive gli embed YouTube in
+// nocookie. Inattivo con cookies.mode = 'manual'; 'privacy' qui è uguale a 'default'.
+// Il GPC non è qui: la proprietà la inietta tabs.js, l'header services/cookies.js.
 
 (function (global) {
   'use strict';
@@ -43,7 +43,8 @@
     return false;
   }
 
-  // querySelector che entra anche negli shadow root aperti: alcuni CMP (Usercentrics) montano l'UI lì dentro, irraggiungibile altrimenti.
+  // querySelector che entra anche negli shadow root aperti: alcuni CMP (Usercentrics) montano l'UI
+  // lì dentro, irraggiungibile altrimenti.
   function queryIn(root, selectors) {
     for (const sel of selectors) {
       let el = null;
@@ -62,8 +63,8 @@
     return roots;
   }
 
-  // Per ogni CMP: `reject` = pulsante "rifiuta tutto" diretto; `openSettings` + `rejectInSettings` = quando il rifiuto sta dietro un pannello;
-  // `shadowHosts` = id degli host shadow-DOM in cui cercare.
+  // `reject` = pulsante «rifiuta tutto» diretto; `openSettings` + `rejectInSettings`
+  // quando il rifiuto sta dietro un pannello; `shadowHosts` = host shadow in cui cercare.
 
   const CMPS = [
     {

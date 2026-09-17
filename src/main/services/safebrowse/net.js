@@ -1,4 +1,5 @@
-// Chiamate di rete della pipeline: TUTTE best-effort e asincrone — non lanciano mai, ritornano null su qualsiasi errore e non bloccano mai la navigazione, perché servono ad arricchire il verdetto, non a decidere se caricare. Timeout corti.
+// Chiamate di rete della pipeline: best-effort e asincrone, non lanciano mai e non bloccano
+// la navigazione — arricchiscono il verdetto, non decidono se caricare. Timeout corti.
 
 'use strict';
 
@@ -18,7 +19,7 @@ async function fetchJson(url, opts = {}, timeoutMs = TIMEOUT_MS) {
   }
 }
 
-// Google Safe Browsing v4 (stage 1, blacklist): richiede una API key. Senza chiave → null, lo stage 1 viene saltato e gli altri reggono.
+// Safe Browsing richiede una API key: senza, torna null e gli altri stadi reggono da soli.
 const GSB_THREATS = {
   SOCIAL_ENGINEERING: 'phishing',
   MALWARE: 'malware',
@@ -50,7 +51,8 @@ async function safeBrowsingLookup(rawUrl, apiKey) {
   return { listed: true, category: GSB_THREATS[m.threatType] || 'phishing', threatType: m.threatType };
 }
 
-// RDAP, età del dominio (stage 3): rdap.org fa da bootstrap e redirige al registro giusto. null se non disponibile — molti ccTLD non espongono RDAP.
+// rdap.org fa da bootstrap e redirige al registro giusto; null se manca, molti ccTLD non
+// espongono RDAP.
 async function rdapAgeDays(registrable) {
   if (!registrable) return null;
   const data = await fetchJson(`https://rdap.org/domain/${encodeURIComponent(registrable)}`, {
@@ -65,7 +67,8 @@ async function rdapAgeDays(registrable) {
   return days >= 0 ? days : null;
 }
 
-// Certificate Transparency (stage 3): il not_before più vecchio su crt.sh è un proxy dell'età del dominio. Lento: timeout più generoso, comunque non bloccante.
+// Il not_before più vecchio su crt.sh è un proxy dell'età del dominio. Lento: timeout più
+// generoso, comunque non bloccante.
 async function ctFirstSeenDays(registrable) {
   if (!registrable) return null;
   const data = await fetchJson(

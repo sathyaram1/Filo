@@ -42,7 +42,6 @@
   }
 
   const inlineTimers = Object.create(null);
-  // Avviso inline rosso sopra una lista, auto-nascosto dopo 3.5s.
   function showInlineMessage(id, anchorId, text) {
     let el = $(id);
     if (!el) {
@@ -129,9 +128,8 @@
       const newKey = wIn.value.trim().toLowerCase();
       const newVal = cIn.value.trim();
       if (!newKey || !newVal) {
-        // Campo svuotato: non è né un salvataggio valido né una rimozione implicita. Si ripristinano
-        // i valori reali — la UI torna coerente con ciò che è salvato — e si spiega come rimuovere
-        // davvero. Senza, il campo restava vuoto a video mentre la regola era ancora attiva.
+        // Campo svuotato: non è un salvataggio né una rimozione implicita. Si ripristina il valore
+        // reale e si spiega come rimuovere, o la regola resterebbe attiva col campo vuoto.
         wIn.value = wIn.dataset.original || oldKey;
         cIn.value = correction;
         showEmptyFieldMessage();
@@ -157,7 +155,6 @@
   async function updateAutocorrect(oldKey, newKey, newVal, opts = {}) {
     const data = await chrome.storage.local.get(STORAGE_KEYS.AUTOCORRECT);
     const map = { ...(data[STORAGE_KEYS.AUTOCORRECT] || {}) };
-    // Rinomina su una chiave già presente in un'altra riga: blocca e avvisa.
     if (newKey && oldKey !== newKey && Object.prototype.hasOwnProperty.call(map, newKey)) {
       if (opts.onConflict) opts.onConflict(newKey);
       return false;
@@ -195,7 +192,7 @@
   function renderDict(words) {
     const list = $('dictList');
     list.innerHTML = '';
-    // Dedup case-insensitive: tenere la prima occorrenza trovata (preserva il casing originale).
+    // Dedup case-insensitive tenendo la prima occorrenza: preserva il casing originale.
     const seen = new Set();
     const deduped = [];
     for (const w of (words || [])) {
@@ -247,14 +244,12 @@
   async function addDictFromInput() {
     const raw = $('newDictWord').value.trim();
     if (!raw) return;
-    // Il dizionario si confronta PAROLA PER PAROLA: una voce con spazi («New York») non
-    // incontrerebbe mai un singolo token e resterebbe inerte. Più parole diventano voci separate,
-    // così l'input fa davvero qualcosa.
+    // Il dizionario si confronta parola per parola: una voce con spazi non incontrerebbe mai
+    // un token e resterebbe inerte, quindi si spezza in voci separate.
     const words = raw.split(/\s+/).filter(Boolean);
     if (!words.length) return;
     const data = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
     const existing = data[STORAGE_KEYS.PERSONAL_DICT] || [];
-    // Dedup case-insensitive: non aggiungere parole già presenti (anche con casing diverso).
     const present = new Set(existing.map((x) => String(x).toLowerCase()));
     const added = [];
     for (const w of words) {
@@ -265,8 +260,8 @@
       added.push(w);
     }
     if (!added.length) {
-      // Tutte già presenti: avvisa invece di ingoiare l'input in silenzio. Il campo non si svuota,
-      // così l'utente vede cosa aveva digitato.
+      // Tutte già presenti: avvisa invece di ingoiare l'input. Il campo non si svuota, così si
+      // vede cosa si era digitato.
       showDictConflictMessage(raw);
       $('newDictWord').select();
       return;

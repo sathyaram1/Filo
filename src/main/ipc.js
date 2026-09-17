@@ -14,13 +14,12 @@ const DiskStorage = require('./shim/storage');
 const inFlightStreams = new Map(); // requestId → AbortController
 // Una shell PERSISTENTE per scheda: i comandi successivi riusano lo stesso
 // processo, quindi variabili e cwd restano. Muore con la scheda.
-const shellSessions = new Map(); // webContents.id → sessione shell persistente
+const shellSessions = new Map();
 
 function senderInfo(event) {
   const wc = event.sender;
-  // `fromWebContents` torna null per le WebContentsView figlie: senza il giro
-  // su tutte le finestre `tab` resta null e le voci del menu che leggono il suo
-  // id (indietro, ricarica, chiudi) non fanno niente.
+  // `fromWebContents` torna null per le WebContentsView figlie: senza il giro su tutte le
+  // finestre `tab` resta null e le voci del menu che leggono il suo id non fanno niente.
   let win = BrowserWindow.fromWebContents(wc);
   let tab = null;
   if (win?._filoTabs) {
@@ -36,9 +35,8 @@ function senderInfo(event) {
     tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,
     url: wc.getURL(),
     isShell: win ? win.webContents === wc : false,
-    // `win`, `wc` e `frame` sono oggetti vivi: l'handler è chiamato in-process,
-    // non attraversano mai il confine IPC. Servono ad aprire le schede nella
-    // finestra giusta e a spingere dati fuori dal ciclo richiesta/risposta.
+    // Oggetti vivi: l'handler è chiamato in-process e non attraversano mai il confine IPC.
+    // Servono ad aprire le schede nella finestra giusta e a spingere dati fuori dalla risposta.
     win: win || null,
     isIncognito: !!win?._filoIncognito,
     wc,

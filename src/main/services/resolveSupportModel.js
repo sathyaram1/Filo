@@ -1,12 +1,13 @@
-// Risolve il modello (catena di nickname) per uno slot di supporto — sanitizer, judge1…judgePriority — leggendolo dalla config remota `config/supportModels`.
-// INVARIANTE DURA: se la config non c'è (rete giù, doc non creato, slot vuoto) ritorna il fallback passato dal chiamante, cioè il comportamento di prima. Nessuna regressione possibile.
-// Il getter è iniettabile per i test; in produzione usa supportModelsStore.get(). Il risultato si passa a buildAttemptChain come qualunque altra catena.
+// Risolve il modello di uno slot di supporto dalla config remota `config/supportModels`.
+// INVARIANTE: se la config manca (rete giù, slot vuoto) torna il fallback del chiamante.
+// Il getter è iniettabile per i test; in produzione è supportModelsStore.get().
 
 'use strict';
 
 const SupportModels = require('./supportModelsStore');
 
-// Mirror dei default del backend: cambiarli qui cambia solo il fallback in-process, il valore vero è sul doc Firestore che l'owner configura dalla dashboard.
+// Mirror dei default del backend: qui cambia solo il fallback, il valore vero sta sul doc
+// che l'owner configura dalla dashboard.
 const SLOT_DEFAULTS = {
   sanitizer:     'flash',
   judge1:        'flash, flash-or',
@@ -17,9 +18,7 @@ const SLOT_DEFAULTS = {
   judgePriority: 'flash',
 };
 
-/** @param {string} slot sanitizer | judge1 | judge2 | judge3 | judgeDynamic | judgeRedTeam | judgePriority
-* @param {string} [hardcoded] fallback se la config è assente/vuota; omesso → SLOT_DEFAULTS[slot] oppure 'flash'.
-* @param {Function} [getConfig] getter asincrono { [slot]: string }, iniettabile per i test. @returns {Promise<string>} catena di nickname. */
+// `hardcoded` omesso → SLOT_DEFAULTS[slot], poi 'flash'.
 async function resolveSupportModel(slot, hardcoded, getConfig) {
   const fallback = (typeof hardcoded === 'string' && hardcoded.trim())
     ? hardcoded.trim()

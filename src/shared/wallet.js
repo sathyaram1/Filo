@@ -1,7 +1,6 @@
 // Crediti sul server e chiave personale, logica PURA condivisa fra main e pagine (#598).
 // Un 402 del provider è «crediti finiti» e NON si ritenta; la riga del registro d'uso porta
-// SOLO i campi che le regole Firestore accettano (hasOnly): uno in più la fa rifiutare, e un
-// registro che non si scrive è un abuso agli occhi della riconciliazione.
+// SOLO i campi che le regole Firestore accettano: uno in più la fa rifiutare.
 
 (function (global) {
   'use strict';
@@ -100,9 +99,8 @@
     return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più ${passati} (${why}).`;
   }
 
-  // Il codice si ricopia dal messaggio con la riga intorno («Codice: ABCD-EFGH»): se il testo
-  // ripulito non è un codice si cerca un blocco di otto caratteri (anche quattro più quattro)
-  // staccato dal resto. Se non c'è, torna il testo com'era: sarà il server a dire «non esiste».
+  // Il codice si ricopia con la riga intorno («Codice: ABCD-EFGH»): se il testo ripulito non
+  // è un codice si cerca un blocco di otto caratteri staccato; se non c'è, torna com'era.
   function extractCode(raw) {
     const s = String(raw || '').trim();
     const norm = s.toUpperCase().replace(/[^A-Z0-9]/g, '');

@@ -1,6 +1,6 @@
-// Traduce un errore Firestore del triage feedback in un messaggio AZIONABILE. Modulo puro (niente electron), testabile in isolamento.
-// Un 403 ha DUE cause e confonderle costa caro: l'account non è admin LATO SERVER (il gate client cfg.adminEmails è un'allowlist distinta da quella delle regole), oppure È admin ma il CONTENUTO viola un vincolo di forma — tipicamente `notes` oltre il tetto, e allora le regole respingono QUALUNQUE scrittura, anche il solo cambio di stato.
-// opts.serverAdmin dice quale delle due è, così il messaggio non manda l'owner a creare un documento admins che esiste già.
+// Traduce un errore Firestore del triage feedback in un messaggio AZIONABILE. Modulo puro.
+// Un 403 ha due cause: l'account non è admin lato server, oppure il contenuto viola un
+// vincolo di forma (notes oltre il tetto), e allora le regole respingono ogni scrittura.
 
 function permissionDeniedHelp(rawError, claims, opts) {
   const raw = String(rawError || '');
@@ -48,14 +48,14 @@ function permissionDeniedHelp(rawError, claims, opts) {
   return lines.join('\n');
 }
 
-// #582 — una riga sola, senza a capo: questo testo finisce nell'hover del segnaposto dell'immagine in dashboard.
-// La causa è una sola: il link non ha un token di download valido (mai avuto o ritirato). Le regole chiudono la lettura del deposito a chiunque, owner compreso, quindi mandare a «farsi mettere fra gli amministratori» manda a fare una cosa che non apre più niente.
+// #582 — una riga sola, senza a capo: finisce nell'hover del segnaposto in dashboard.
+// La causa è una sola: manca un token di download valido, e il deposito è chiuso a tutti.
 function attachmentForbiddenHelp() {
   return 'allegato non leggibile: il link non porta un token di download valido (mancante o ritirato), e il deposito non lo apre a nessuno — resta raggiungibile solo dalla console del progetto';
 }
 
-// #582 — una riga sola (finisce in un hover), e NON dice che l'allegato è arrivato né che viaggia cifrato: l'indirizzo di un allegato sta dentro la segnalazione, che può mandare chiunque anche senza account, quindi basterebbe scriverne uno nella forma del deposito perché Filo dichiari consegnato e cifrato un file mai caricato.
-// Senza token il deposito risponde 403 sia per un oggetto che c'è sia per uno che non c'è: da qui l'esistenza non si può controllare, quindi si dice solo ciò che è vero in ogni caso — chi apre quel file. Vale anche davanti all'allegato di un altro, che l'elenco mostra a ogni tester.
+// #582 — una riga (finisce in un hover) che NON dice che l'allegato è arrivato: l'indirizzo
+// sta nella segnalazione, che manda chiunque, e senza token il 403 non distingue i casi.
 function attachmentNotForYouHelp() {
   return 'questo allegato lo apre solo chi riceve le segnalazioni';
 }

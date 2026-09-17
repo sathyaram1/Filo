@@ -1,12 +1,13 @@
 // Scadenze di timer e sveglie controllate nel processo main (#322).
-// La suoneria vive nella dashboard: una scadenza arrivata mentre nessuna newtab è aperta non verrebbe mai marcata né notificata, e una sveglia scatta quasi sempre così.
-// Notifica di sistema + broadcastLiveUpdate alle superfici aperte.
+// La suoneria vive nella dashboard: senza una newtab aperta una scadenza non verrebbe mai
+// notificata, ed è così che scatta quasi sempre una sveglia.
 
 const { Notification } = require('electron');
 
 const CHECK_MS = 5000;
 let handle = null;
-// Le scadenze già notificate in questa sessione non si ri-notificano a ogni tick; una ancora `ringing` al boot viene notificata una volta: meglio un avviso in ritardo che nessun avviso.
+// Le scadenze già notificate in questa sessione non si ri-notificano a ogni tick; una
+// ancora `ringing` al boot si notifica una volta: meglio un avviso tardi che nessuno.
 const notified = new Set();
 
 async function tick() {
@@ -14,7 +15,8 @@ async function tick() {
   if (!FiloMem) return;
   let list;
   try { list = await FiloMem.gcTimers(); } catch (_) { return; }
-  // Una sveglia ricorrente resta in lista dopo essere stata fermata: se il suo id non si dimentica qui resta "notificato" per sempre e la sveglia non avviserebbe mai più.
+  // Una sveglia ricorrente resta in lista dopo essere stata fermata: se il suo id non si
+  // dimentica qui resta «notificato» per sempre e non avviserebbe mai più.
   const ringingNow = new Set((list || []).filter((t) => t.ringing).map((t) => t.id));
   for (const id of notified) if (!ringingNow.has(id)) notified.delete(id);
   const fresh = (list || []).filter((t) => t.ringing && !notified.has(t.id));

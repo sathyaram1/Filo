@@ -1,6 +1,6 @@
-// Dettatura «in diretta»: spezza il flusso del microfono in segmenti di parlato, perché il modello di trascrizione lavora su spezzoni chiusi mentre chi detta vuole vedere il testo comparire.
-// Si ascolta a blocchi riconoscendo la voce dall'energia del segnale: ogni `interimEveryMs` di parlato lo spezzone corrente si manda com'è (PROVVISORIA, mostrata ma non inserita), e a una pausa di `silenceMs` o oltre `maxSegmentMs` si chiude (DEFINITIVA).
-// Il tempo si misura sui campioni, non sull'orologio: stessa sequenza, stessi eventi, quindi verificabile in un unit test. Qui solo logica pura: la cattura sta in src/content/tts.js, la trascrizione nel main.
+// Dettatura in diretta: spezza il flusso del microfono in spezzoni chiusi da trascrivere.
+// Ogni `interimEveryMs` di parlato una PROVVISORIA; a `silenceMs` si chiude (DEFINITIVA).
+// Il tempo si misura sui campioni, non sull'orologio: stessa sequenza, stessi eventi.
 
 (function (global) {
   'use strict';
@@ -75,8 +75,8 @@
     return out;
   }
 
-  // Opzioni in millisecondi salvo sampleRate: frameMs granularità dell'analisi, interimEveryMs ogni quanto parlato mandare una provvisoria, silenceMs pausa che chiude uno spezzone, minSpeechMs sotto cui lo spezzone si butta, maxSegmentMs durata oltre cui si chiude comunque, leadMs silenzio tenuto prima della prima parola (attacco pulito).
-  // onInterim/onFinal({ samples, sampleRate, ms, speechMs }).
+  // Le opzioni sono in millisecondi, salvo `sampleRate`.
+  // `leadMs` è il silenzio tenuto prima della prima parola, per un attacco pulito.
   function createSegmenter(opts) {
     const o = Object.assign({
       sampleRate: 16000, frameMs: 50, interimEveryMs: 1200, silenceMs: 700,
@@ -93,7 +93,8 @@
     let silenceRun = 0;
     let sinceInterim = 0;
     let interimDirty = false;            // voce nuova dopo l'ultima provvisoria
-    // Rumore di fondo: media mobile dell'energia dei blocchi senza voce, che parte bassa e si adatta. La soglia sta sopra di un margine fisso, così un ventilatore non diventa «parlato».
+    // Rumore di fondo: media mobile dei blocchi senza voce, parte bassa e si adatta.
+    // La soglia sta sopra di un margine fisso: un ventilatore non deve diventare «parlato».
     let noise = 0.004;
     const emitted = { interim: 0, final: 0 };
 
@@ -129,7 +130,7 @@
       if (o.onInterim) o.onInterim(seg);
     }
 
-    // Quando finora è stato solo silenzio si tiene la sola coda: non serve mandare al modello secondi di niente.
+    // Dopo solo silenzio si tiene la sola coda: al modello non servono secondi di niente.
     function trimToTail(ms) {
       const keep = Math.round(o.sampleRate * ms / 1000);
       if (total <= keep) return;

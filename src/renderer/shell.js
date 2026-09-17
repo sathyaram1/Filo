@@ -9,8 +9,7 @@
     return;
   }
 
-  // L'HTML è uno solo per tutti i sistemi: il nome del tasto si compone qui,
-  // o su Mac il suggerimento direbbe Ctrl dove si preme Cmd.
+  // Il nome del tasto si compone qui, non nell'HTML: regola in CLAUDE.md § Mac.
   const TASTI = window.SN_TASTI;
   const tasto = (accel) => (TASTI ? TASTI.etichetta(accel) : accel);
 
@@ -100,13 +99,8 @@
     }
   }
 
-  // Registro delle app del launcher.
-  // "Aperti per dopo" ci sta perché "Salva per dopo" chiude la scheda: senza un
-  // ingresso sempre visibile la lista sarebbe irraggiungibile.
-  // #583 — "Feedback" e "Gestione" sono superfici dell'owner e compaiono solo
-  // all'admin: a un altro aprirebbero una pagina vuota, con un invito ad
-  // accedere che non porta da nessuna parte. MANDARE un feedback si fa dal menu
-  // del tasto destro, che questo non tocca.
+  // «Aperti per dopo» c'è perché «Salva per dopo» chiude la scheda: senza, la lista è
+  // irraggiungibile. «Feedback» e «Gestione» sono dell'owner: solo all'admin (#583).
   function buildApps() {
     const entries = [
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
@@ -146,9 +140,8 @@
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
-    // Le icone vivono DENTRO la home, non nella barra: qui il loro rect è nullo
-    // e la posizione va calcolata a mano. Coordinate relative alla finestra;
-    // popup-menu.js poi riallinea per restare nello schermo.
+    // Le icone vivono dentro la home, non nella barra: qui il rect è nullo e la posizione si
+    // calcola a mano, relativa alla finestra; popup-menu.js poi riallinea sullo schermo.
     if (r.width === 0 && r.height === 0) {
       x = Math.max(8, window.innerWidth - 250);
       y = 86;
@@ -337,13 +330,11 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
-  // Riordino a mouse event, non col drag HTML5: quello è inaffidabile sopra le
-  // WebContentsView e non si lascia provare da Playwright. `drag` vale per
-  // tutta la trascinata, `moved` solo oltre la soglia — o un clic sarebbe drag.
+  // Riordino a mouse event, non col drag HTML5: quello è inaffidabile sopra le WebContentsView
+  // e Playwright non lo prova. `moved` scatta oltre la soglia, o un clic sarebbe un drag.
   let drag = null; // { id, el, startX, moved }
   let suppressClickId = null; // id della tab il cui prossimo click va ignorato
 
-  // Elemento .tab (escluso quello trascinato) dopo cui inserire, in base alla X.
   function tabDragAfter(x) {
     const els = [...tabsEl.querySelectorAll('.tab:not(.dragging)')];
     let best = null;
@@ -360,10 +351,8 @@
     if (!drag) return;
     if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
     drag.moved = true;
-    // Invariante: mai due .tab con lo stesso id. Se il nodo trascinato è stato
-    // orfanato da un ridisegno, reinserirlo ne creerebbe un doppione: si
-    // riaggancia quello vivo. Con la sospensione del render non dovrebbe
-    // scattare, ma regge comunque cambi la logica di render.
+    // Invariante: mai due .tab con lo stesso id. Se il nodo trascinato è stato orfanato da un
+    // ridisegno, reinserirlo ne creerebbe un doppione: si riaggancia quello vivo.
     if (!drag.el.isConnected) {
       const live = tabsEl.querySelector(`.tab[data-id="${drag.id}"]`);
       if (live) drag.el = live;
@@ -435,9 +424,8 @@
     return L > 0.45 ? '#1a1918' : '#f8f6f0';
   }
 
-  // Un colore "ha identità" solo con croma bastante: il bianco dell'header di
-  // YouTube non rappresenta il sito. Soglia allineata a SN_TAB_COLOR
-  // (src/shared/tabColor.js) e al campionatore in pageColor.js: vanno insieme.
+  // Un colore «ha identità» solo con croma bastante: il bianco dell'header di YouTube non
+  // rappresenta il sito. Soglia allineata a tabColor.js e a pageColor.js: vanno insieme.
   function hasColorIdentity(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return false;
@@ -465,7 +453,7 @@
       else h = (r - g) / d + 4;
       h /= 6;
     }
-    s *= 0.18; // saturazione ridotta al ~18% dell'originale (spec: 15-20%)
+    s *= 0.18; // la spec chiede 15-20%
     const hue2rgb = (pp, qq, t) => {
       if (t < 0) t += 1;
       if (t > 1) t -= 1;
@@ -566,12 +554,9 @@
   }
 
   function render() {
-    // Durante una trascinata non si ridisegna: i nodi rifatti orfanerebbero
-    // `drag.el`, che poi rientrerebbe accanto al suo gemello — due schede
-    // fantasma e indice di rilascio sbagliato. Si sospende già dal mousedown,
-    // non dalla soglia: nel mezzo basta un cambio di titolo o favicon.
+    // Durante una trascinata non si ridisegna: i nodi rifatti orfanerebbero `drag.el`, che poi
+    // rientrerebbe accanto al gemello. Si sospende dal mousedown, non dalla soglia.
     if (drag) return;
-    // tabs
     tabsEl.innerHTML = '';
     for (const t of state.tabs) {
       const el = document.createElement('div');
@@ -579,10 +564,8 @@
       el.dataset.id = t.id;
       el.dataset.tip = t.title || t.url;
 
-      // §1.1 — si scrive --tab-active così anche i piedini a goccia seguono.
-      // Se il colore campionato in cima alla pagina è neutro (un header bianco)
-      // non dice niente del sito: si ripiega sul colore identità, e la scheda
-      // attiva mostra il brand invece del bianco.
+      // §1.1 — si scrive --tab-active così anche i piedini a goccia seguono. Un colore campionato
+      // neutro (un header bianco) non dice niente del sito: si ripiega sul colore identità.
       if (t.id === state.activeId) {
         const activeColor = hasColorIdentity(t.color) ? t.color : (t.identityColor || t.color);
         if (activeColor) {
@@ -705,9 +688,8 @@
     return url;
   }
 
-  // Il nome sulla scheda di una pagina interna è quello del TASTO che la apre
-  // (le Opzioni sono "Modelli"), senza prefisso: due nomi per la stessa cosa
-  // sono un modo di non farla trovare. Le pagine web tengono il loro titolo.
+  // Il nome sulla scheda di una pagina interna è quello del TASTO che la apre, senza prefisso:
+  // due nomi per la stessa cosa sono un modo di non farla trovare.
   const FILO_TAB_LABELS = {
     'newtab': 'Home',
     'options/options.html': 'Modelli',
@@ -749,9 +731,8 @@
     return !url || url.startsWith('filo://newtab/');
   }
 
-  // La barra indirizzi è sempre nascosta: indietro/avanti/ricarica stanno nel
-  // menu del tasto destro, le altre icone dentro la home. Resta la fila di
-  // schede e la vista della pagina risale a coprire lo spazio.
+  // La barra indirizzi è sempre nascosta: indietro/avanti/ricarica stanno nel menu del tasto
+  // destro, le altre icone dentro la home, e la vista della pagina risale a coprire lo spazio.
   let chromeCompact = null;
   function applyChrome(_isHome) {
     const compact = true;
@@ -883,12 +864,11 @@
     return { show, dismiss };
   })();
 
-  // Anche il vecchio toast passa di qui, o non rispetterebbe la durata scelta.
+  // Anche il toast semplice passa di qui, o non rispetterebbe la durata scelta.
   function showToast(text) { return NOTIFS.show(text); }
 
-  // Se il file non c'è più il main risponde { missing: true }, e va DETTO: un
-  // clic che non produce niente è indistinguibile da un'app bloccata. La
-  // cartella resta come via d'uscita, il file potrebbe essere lì rinominato.
+  // Se il file non c'è più il main risponde { missing: true }, e va DETTO: un clic che non
+  // produce niente è indistinguibile da un'app bloccata. La cartella resta come via d'uscita.
   function openDownloadFile(id) {
     if (!api.downloads) return Promise.resolve();
     return api.downloads.openFile(id).then((res) => {
@@ -943,9 +923,8 @@
   });
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
-  // #410.1 — l'indicatore sta nella fila di schede, dove la vista nativa della
-  // pagina non lo copre; il pannello si apre riservando spazio in alto, o
-  // finirebbe sotto la pagina.
+  // #410.1 — l'indicatore sta nella fila di schede, dove la vista nativa della pagina non lo
+  // copre; il pannello si apre riservando spazio in alto, o finirebbe sotto la pagina.
   if (api.downloads) {
     const dlBtn = document.getElementById('dl-indicator');
     const dlIcon = document.getElementById('dl-ind-icon');
@@ -1215,10 +1194,8 @@
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.reload(a.id);
     } else {
-      // Salto alla N-esima scheda col fuoco sulla barra (per le pagine ci pensa
-      // il main). La combinazione la decide src/shared/tasti.js, che ha bisogno
-      // del numero di schede: su Mac il 9 vuol dire "l'ultima", perché lo 0 lì
-      // è già lo zoom e non può essere anche la decima.
+      // Salto alla N-esima scheda col fuoco sulla barra (per le pagine ci pensa il main). La
+      // combinazione la decide src/shared/tasti.js: regola in CLAUDE.md § Mac.
       const idx = TASTI ? TASTI.indiceSaltoScheda(e, undefined, (state.tabs || []).length) : null;
       if (idx != null) {
         e.preventDefault();
@@ -1234,9 +1211,8 @@
   });
   api.tabs.snapshot().then((snap) => { state = snap; render(); });
 
-  // Il box feedback vive sulla pagina e da lì oscura solo la pagina: la barra
-  // la deve oscurare la shell, o l'app resta a metà in penombra. Il velo
-  // intercetta anche i clic, così non si tocca una scheda per sbaglio.
+  // Il box feedback vive sulla pagina e da lì oscura solo la pagina: la barra la deve oscurare
+  // la shell, o l'app resta a metà in penombra. Il velo intercetta anche i clic.
   if (api.onFeedbackDim) {
     let dimTabId = null;
 
@@ -1347,9 +1323,8 @@
     });
   }
 
-  // Un popup bloccato va detto, con la via d'uscita: "Apri" lo apre come
-  // scheda. La chip sta dentro la shell, quindi è già sopra l'area pagina e non
-  // serve riservare spazio.
+  // Un popup bloccato va detto, con la via d'uscita: «Apri» lo apre come scheda. La chip sta
+  // nella shell, quindi è già sopra l'area pagina e non serve riservare spazio.
   if (api.tabs.onPopupBlocked) {
     const chipHost = document.createElement('div');
     chipHost.id = 'popup-chips';

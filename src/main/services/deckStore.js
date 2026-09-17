@@ -1,5 +1,5 @@
-// Persistenza dei mazzi Commander (DECK-BUILDER-SPEC.md §13.1): storage interamente locale, sync cloud fuori scope alpha.
-// Qui SOLO lettura/scrittura della lista: creazione, invarianti e versione stanno in SN_DECKS (src/shared/decks.js).
+// Persistenza dei mazzi Commander (DECK-BUILDER-SPEC.md §13.1), storage solo locale.
+// Qui SOLO lettura/scrittura: creazione, invarianti e versione in src/shared/decks.js.
 
 (function (global) {
   'use strict';

@@ -85,9 +85,8 @@ async function filoHandler(request) {
     }
 
     const res = await net.fetch(pathToFileURL(resolved).href);
-    // CSP solo sui documenti HTML: le pagine filo:// hanno storage e shellExec,
-    // e senza script inline/eval un XSS futuro non diventa esecuzione. Lo
-    // 'unsafe-inline' è solo per gli stili (le pagine usano attributi style=).
+    // CSP solo sui documenti HTML: le pagine filo:// hanno storage e shellExec, e senza script
+    // inline/eval un XSS futuro non diventa esecuzione. 'unsafe-inline' è solo per gli stili.
     const ct = res.headers.get('content-type') || '';
     if (/text\/html/i.test(ct)) {
       const headers = new Headers(res.headers);

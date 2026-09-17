@@ -1,6 +1,6 @@
-// Store della config "modelli di supporto" (doc Firestore `config/supportModels`): un campo per ogni slot, valore = catena di nickname ("flash, flash-or"), lo stesso formato di `config/models`. Dal client è write-only admin; il backend filo-security lo legge con l'Admin SDK senza passare da queste regole.
-// Ogni giudice del panel L2 ha il suo slot, così l'owner può impostarli separatamente dalla dashboard. Il doc contiene anche `judgeRegistry` (nickname → { provider, model }): il registro dedicato ai giudici, SEPARATO da quello di "Modelli predefiniti" e unito a quello con precedenza dal backend. Provider OpenRouter, l'unico che il backend giudici usa.
-// La CHIAVE OpenRouter dei giudici è un SEGRETO e vive nel doc separato `config/judgeSecrets` (regole solo-owner, mai inviata alle pagine): qui si espone solo il booleano presente/assente.
+// Config «modelli di supporto» (doc Firestore `config/supportModels`): uno slot per giudice,
+// valore = catena di nickname. Scrittura solo admin, la garanzia forte sono le regole.
+// La chiave dei giudici sta nel doc separato `config/judgeSecrets`: qui solo un booleano.
 
 const auth = require('../auth/google-auth');
 
@@ -9,13 +9,13 @@ const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per desig
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 const SUPPORT_MODELS_DOC = 'config/supportModels';
-// Doc separato per la chiave (segreta) dei giudici. Regole: solo owner.
 const JUDGE_SECRETS_DOC = 'config/judgeSecrets';
 
 // Slot validi, stabili: i backend filo-security li leggono per nome.
 const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
 
-// Timeout per giudice, in MILLISECONDI nel campo `judgeTimeoutMs` dello stesso doc (lo legge il backend dei giudici). I bound stanno nelle costanti condivise, in secondi; fallback letterali se non sono caricate su globalThis.
+// I bound del timeout stanno nelle costanti condivise, in SECONDI, mentre il campo salvato
+// è in millisecondi; i letterali sono il ripiego se le costanti non sono su globalThis.
 function timeoutBoundsMs() {
   const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
   const s = (v, d) => (Number.isFinite(v) ? v : d) * 1000;
@@ -100,7 +100,8 @@ async function patchDoc(docPath, fields, mask, idToken) {
   }
 }
 
-// Richiede il Firebase ID token admin; la garanzia forte resta comunque la regola Firestore. I campi assenti (doc non ancora creato, slot non impostato) valgono ''.
+// Richiede l'ID token admin, ma la garanzia forte resta la regola Firestore. I campi
+// assenti (doc mai creato, slot non impostato) valgono ''.
 async function get() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
@@ -115,7 +116,8 @@ async function get() {
   return out;
 }
 
-// PATCH per-campo. La chiave OpenRouter dei giudici va sul doc separato e si scrive solo se passata e non vuota: vuoto = "non toccare".
+// PATCH per-campo: un valore vuoto vuol dire «non toccare», non «cancella».
+// La chiave dei giudici va sul doc separato.
 async function update(partial, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per modificare i modelli di supporto.');
   partial = partial || {};
@@ -131,7 +133,6 @@ async function update(partial, idToken) {
     fields.judgeRegistry = toFsValue(sanitizeRegistry(partial.judgeRegistry));
     mask.push('judgeRegistry');
   }
-  // Timeout per giudice: si scrive solo se è un numero valido, clampato.
   if (partial.judgeTimeoutMs != null && Number.isFinite(Number(partial.judgeTimeoutMs))) {
     const ms = clampTimeoutMs(partial.judgeTimeoutMs);
     if (ms != null) {
@@ -141,7 +142,6 @@ async function update(partial, idToken) {
   }
   if (mask.length) await patchDoc(SUPPORT_MODELS_DOC, fields, mask, idToken);
 
-  // Chiave giudici (doc separato): si scrive solo se digitata.
   if (typeof partial.openrouterKey === 'string' && partial.openrouterKey.trim()) {
     await patchDoc(
       JUDGE_SECRETS_DOC,
@@ -173,7 +173,8 @@ function sanitize(doc) {
   return out;
 }
 
-// Solo le voci valide: provider OpenRouter (il backend giudici è OR-only) e model non vuoto; `label` opzionale conservata.
+// Solo voci valide: il backend giudici è OpenRouter-only e il model non può essere vuoto;
+// `label` è opzionale e si conserva.
 function sanitizeRegistry(reg) {
   const out = {};
   if (!reg || typeof reg !== 'object') return out;

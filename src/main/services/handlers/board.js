@@ -1,9 +1,10 @@
-// Bacheca utente: voto funziona/non-funziona (DC2). Il voto va su Firestore con l'ID token del votante (mai esposto al renderer) e premia +10 crediti UNA SOLA VOLTA per feedback per utente (rewardedVotes in creditStore.js, namespace separato dal premio di risoluzione C5).
-// Niente penalità: il premio resta accreditato anche se l'utente ritira o cambia voto.
-// Il renderer non parla mai direttamente con FB.castVote: passa da qui perché il voto richiede l'uid Firebase REALE (claim dell'ID token, request.auth.uid nelle regole), non l'email, che è quanto il renderer vede di sé.
+// Bacheca utente: voto funziona/non-funziona e riapertura a pagamento.
+// Il voto premia una sola volta per feedback per utente; ritirarlo non toglie il premio.
+// Passa dal main perché il voto vuole l'uid Firebase reale, che il renderer non conosce.
 
 const auth = require('../../auth/google-auth');
-// #583 — queste porte non sono del proprietario: valgono per chiunque abbia fatto l'accesso, e su una macchina con una sessione aperta «hai una sessione?» è sempre sì. Senza guardare da dove arriva la richiesta, la pagina di un sito visitato votava al posto dell'utente, gli cancellava il voto, gli spendeva i crediti e apriva segnalazioni a suo nome.
+// Queste porte non sono del proprietario: basta una sessione aperta, e senza guardare da
+// dove arriva, un sito visitato votava e spendeva i crediti al posto dell'utente (#583).
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
@@ -31,11 +32,11 @@ module.exports = function register(on, ctx) {
 
       await FB.castVote(id, { uid, vote, credibilitySnapshot: 1 }, { idToken });
 
-      // Una sola volta per feedback per utente: cambiare idea works↔broken o rivotare lo stesso valore NON ripaga.
+      // Una sola volta per feedback per utente: cambiare voto o rivotare lo stesso NON ripaga.
       const amount = SN_CONST.CREDIT.BOARD_VOTE;
       const reward = await Credits.awardVoteOnce(id, amount);
 
-      // Rilegge il documento per tornare il tally REALE (altri voti compresi), così la UI non si fida solo dell'aggiornamento ottimistico locale.
+      // Rilegge il documento per il conteggio vero, non solo l'aggiornamento ottimistico.
       const votes = await fetchVotes(id);
 
       return {
@@ -51,9 +52,8 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Riapertura a pagamento (DC4): l'utente segnala che un fix "Risolti" è ancora rotto. Si verifica l'idoneità, si scala CREDIT.BOARD_REOPEN (rifiutando senza scrivere nulla se il saldo non basta), si marca il guard anti-doppia-riapertura e si crea il feedback collegato.
-  // ORDINE DELIBERATO, guard PRIMA del feedback: le due scritture Firestore non sono atomiche, e creando prima il feedback una caduta di rete lascerebbe un figlio orfano col guard mai marcato — l'utente potrebbe ripetere all'infinito creando duplicati gratis, bypassando l'anti-spam.
-  // Marcando il guard per primo: se fallisce non è stato creato nulla (retry pulito), se riesce ma la creazione fallisce il guard blocca comunque i tentativi successivi. In entrambi i fallimenti dopo lo scalo, i crediti si restituiscono (best-effort).
+  // ORDINE DELIBERATO, guard PRIMA del feedback: le due scritture non sono atomiche, e col
+  // feedback per primo una caduta di rete lasciava duplicati gratis. Crediti resi se fallisce.
   on(MSG.BOARD_REOPEN, soloFilo(async (msg) => {
     try {
       if (!auth.isSignedIn()) {
@@ -85,7 +85,7 @@ module.exports = function register(on, ctx) {
           : { ok: false, error: 'Questo fix non è (più) riapribile dalla bacheca.' };
       }
 
-      // Anti-spam: scala i crediti SOLO se il saldo basta — nessun saldo negativo, nessun tentativo "gratis".
+      // Anti-spam: si scala solo se il saldo basta, niente saldo negativo né tentativi gratis.
       const amount = SN_CONST.CREDIT.BOARD_REOPEN;
       const spend = await Credits.spendIfAffordable(amount, { kind: 'board_reopen', ref: id });
       if (!spend.ok) {
@@ -94,7 +94,7 @@ module.exports = function register(on, ctx) {
 
       let created;
       try {
-        // Guard PRIMA (vedi la nota d'ordine sopra): chiude la porta ai duplicati anche se la creazione del feedback qui sotto fallisce a metà.
+        // Guard prima (vedi sopra): chiude ai duplicati anche se la creazione qui sotto fallisce.
         await FB.castReopenRequest(id, uid, { idToken });
         created = await FB.submit({
           text: `[Riapertura #${original.seq || id}] ${text}`,
@@ -107,7 +107,7 @@ module.exports = function register(on, ctx) {
           name: '',
         });
       } catch (e) {
-        // Compensazione best-effort: crediti restituiti invece di lasciare l'utente scalato senza nulla in cambio.
+        // Best-effort: i crediti tornano invece di lasciare l'utente scalato senza nulla in cambio.
         try { await Credits.award({ kind: 'board_reopen_refund', credits: amount, ref: id }); } catch (_) {}
         throw e;
       }
@@ -132,7 +132,7 @@ module.exports = function register(on, ctx) {
       if (!FB?.clearVote) throw new Error('SN_FEEDBACK non caricato nel main process');
 
       await FB.clearVote(id, uid, { idToken });
-      // Nessuna revoca del premio: non è una penalità, è solo ritiro del voto. rewardedVotes resta marcato, un voto successivo non ripaga.
+      // Il ritiro del voto non è una penalità: il premio resta, e un voto successivo non ripaga.
       const votes = await fetchVotes(id);
       return { ok: true, uid, votes };
     } catch (e) {
@@ -140,7 +140,8 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Legge la SCHEDA PUBBLICA del fix (#583) per verificare l'idoneità con i dati freschi dal server, non con quanto il renderer ha in cache. È la scheda e non il documento perché da quando la collezione non è più pubblica questa macchina non lo può aprire — e non deve: testo e URL sono di chi l'ha mandato. null se non trovato o su errore di rete.
+  // Idoneità dai dati freschi del server, non dalla cache del renderer. È la SCHEDA e non il
+  // documento: la collezione non è pubblica e questa macchina non lo può aprire (#583).
   async function fetchFeedback(id) {
     if (!FB?.getPublic) return null;
     try {
@@ -150,7 +151,8 @@ module.exports = function register(on, ctx) {
     }
   }
 
-  // Solo il campo `votes` (GET con proiezione): più leggero di una lista intera per un documento solo. {} se non ci sono ancora voti o in caso d'errore — il chiamante ha comunque appena scritto il proprio voto.
+  // Solo il campo `votes`: più leggero di una lista intera per un documento solo. {} se non ci
+  // sono voti o su errore — il chiamante ha comunque appena scritto il proprio.
   async function fetchVotes(id) {
     if (!FB?.rest) return {};
     try {

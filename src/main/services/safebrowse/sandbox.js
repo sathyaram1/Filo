@@ -1,6 +1,6 @@
-// Stage 5: sandbox (detonation). Per la coda sospetta in cui la destinazione vera è incerta (redirect, accorciatori): il link si apre in anticipo in una finestra NASCOSTA e ISOLATA, senza cookie né dati dell'utente, si seguono i redirect, si esegue il JS e si osservano URL finale e download.
-// "Sembra pulito" vale poco — gli attacchi mascherano il contenuto agli scanner — quindi al massimo 'clean', mai una patente di sicurezza; "sembra pericoloso" è invece un forte rinforzo. Non blocca MAI il click: è sempre in background.
-// Richiede Electron (BrowserWindow/session): in ambiente senza Electron ritorna null.
+// Detonation: per la coda sospetta con destinazione incerta il link si apre prima in una
+// finestra nascosta e isolata, senza dati dell'utente, per vedere URL finale e download.
+// «Sembra pulito» vale poco: al massimo 'clean'. Non blocca mai il click.
 
 'use strict';
 
@@ -14,7 +14,8 @@ function electron() {
   return _electron;
 }
 
-// `evaluateFinal(finalUrl)` è iniettata: ri-valuta l'URL finale coi segnali locali per capire se la destinazione vera è ingannevole.
+// `evaluateFinal` è iniettata: ri-valuta l'URL finale per capire se la destinazione vera è
+// ingannevole.
 async function detonate(url, evaluateFinal) {
   const el = electron();
   if (!el || !el.BrowserWindow || !el.session) return null;
@@ -77,7 +78,7 @@ async function detonate(url, evaluateFinal) {
 
       wc.on('did-stop-loading', async () => {
         clearTimeout(timer);
-        // Download forzato → pericoloso. Altrimenti decide l'URL finale: se la destinazione vera è impersonazione o blacklist → pericoloso.
+        // Download forzato → pericoloso. Altrimenti decide la destinazione vera dell'URL finale.
         if (downloadStarted) return done('dangerous');
         let verdict = 'clean';
         if (typeof evaluateFinal === 'function' && finalUrl && finalUrl !== url) {

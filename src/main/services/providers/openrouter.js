@@ -1,5 +1,5 @@
-// Provider OpenRouter: client minimale con streaming SSE. Dal router passano anche le tre funzioni che prima volevano l'API diretta di un produttore — lettura ad alta voce (/audio/speech), dettatura (/audio/transcriptions) e indicizzazione (/embeddings) — con la stessa chiave e la stessa lista di esclusione.
-// Dove il router non dice nella risposta chi ha davvero servito, il riscontro si chiede a posteriori (lookupServedBy).
+// Provider OpenRouter: client minimale con streaming SSE; ci passano anche lettura ad alta
+// voce, dettatura e indicizzazione. Se la risposta non dice chi ha servito, si chiede dopo.
 
 (function (global) {
   'use strict';
@@ -21,8 +21,8 @@
     };
   }
 
-  // Traduce il livello di reasoning scelto dall'owner (#369): 'off' → { enabled: false }, low/medium/high → { effort }. `wantThoughts` chiede anche i token di ragionamento in streaming; null se non c'è nulla da chiedere.
-  // I modelli che non ragionano ignorano il campo: è best-effort.
+  // Traduce il livello di reasoning scelto dall'owner; `wantThoughts` chiede i token di
+  // ragionamento in streaming. I modelli che non ragionano ignorano il campo: best-effort.
   function reasoningField(level, wantThoughts) {
     if (level === 'off') return { enabled: false };
     const out = {};
@@ -31,9 +31,8 @@
     return Object.keys(out).length ? out : null;
   }
 
-  // Blocco `provider` per il routing (politica sui fornitori, #421): di suo OpenRouter sceglie l'host col prezzo migliore, che può essere il produttore del modello. Con `ignore` gli diciamo quali NON usare.
-  // Se dopo l'esclusione non resta nessun host ammesso, OpenRouter risponde con un errore che risale come un normale errore provider: la richiesta FALLISCE in modo evidente invece di passare da un host escluso.
-  // `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece del prezzo; `allow_fallbacks` non si tocca, perché fra gli host AMMESSI il ripiego automatico deve restare attivo.
+  // Politica sui fornitori: di suo OpenRouter sceglie l'host col prezzo migliore, anche il
+  // produttore; con `ignore` si escludono. Senza host ammessi la richiesta FALLISCE, evidente.
   function providerBlock(routing) {
     if (!routing || typeof routing !== 'object') return null;
     const p = {};
@@ -43,7 +42,8 @@
       p.sort = routing.sort;
     }
     if (routing.allowFallbacks === false) p.allow_fallbacks = false;
-    // Con gli strumenti in richiesta, solo gli host che li supportano davvero: senza, il router può passare a un host che ignora `tools` in silenzio e il modello risponde a parole invece di agire.
+    // Con gli strumenti in richiesta solo gli host che li supportano: altrimenti uno ignora
+    // `tools` in silenzio e il modello risponde a parole invece di agire.
     if (routing.requireParameters === true) p.require_parameters = true;
     return Object.keys(p).length ? p : null;
   }
@@ -72,8 +72,8 @@
     return out;
   }
 
-  // In streaming le chiamate arrivano a pezzi: l'indice, poi id e nome, poi i frammenti di argomenti da accodare.
-  // `onStart(call)` avvisa appena si conosce il NOME di una chiamata nuova: la chat lo usa per dire subito «Cerco sul web…», prima che gli argomenti siano finiti di arrivare.
+  // In streaming le chiamate arrivano a pezzi: indice, poi id e nome, poi i frammenti da
+  // accodare. `onStart` avvisa appena si conosce il NOME, per dire subito «Cerco sul web…».
   function createToolCallAccumulator(onStart) {
     const calls = [];
     const byIndex = new Map();
@@ -104,7 +104,8 @@
     };
   }
 
-  // I blocchi di ragionamento strutturati (`reasoning_details`) si ricompongono per indice per poterli RIMANDARE tali e quali nel messaggio dell'assistente al giro dopo: il fornitore li reinserisce e il modello riprende da dove aveva lasciato invece di ripensare tutto.
+  // I `reasoning_details` si ricompongono per indice per RIMANDARLI tali e quali al giro dopo:
+  // il fornitore li reinserisce e il modello riprende invece di ripensare tutto.
   function createReasoningDetailsAccumulator() {
     const items = [];
     const byIndex = new Map();
@@ -131,9 +132,8 @@
     };
   }
 
-  // Marcatura esplicita della parte riusabile: NON serve per i modelli che Filo usa davvero (#422), che riconoscono da soli il prefisso identico a una richiesta precedente. La vogliono i modelli Anthropic, oggi configurati solo su funzioni dal prompt corto; se un domani ne finisse uno sulla chat andrebbe aggiunto il marcatore in fondo alla parte immutabile, e si vedrebbe subito perché il riuso resterebbe a zero in cronologia.
-  // Quanta parte del testo in ingresso è stata RIUSATA invece che ricalcolata (#422): il router riporta i token letti dalla cache del fornitore in `usage.prompt_tokens_details.cached_tokens` (0 o assente = nessun riuso). È la sola prova che il prefisso immutabile dei prompt funziona.
-  // Il costo in dollari dichiarato dal router (`usage.cost`, con `usage.include`): 0 se assente, e chi lo legge sa che deve stimare.
+  // `cached_tokens` è la sola prova che il prefisso immutabile dei prompt viene riusato; il
+  // costo in dollari arriva da `usage.cost`, 0 se assente e allora si stima.
   function costUsdOf(usage) {
     const c = usage && Number(usage.cost);
     return Number.isFinite(c) && c > 0 ? c : 0;
@@ -149,7 +149,8 @@
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
-  // Chi ha DAVVERO servito la risposta (#421): il router lo riporta a livello di risposta, ma per robustezza si guarda anche dentro la choice.
+  // Chi ha DAVVERO servito: il router lo riporta sulla risposta, ma si guarda anche nella
+  // choice.
   function extractServedBy(obj) {
     if (!obj || typeof obj !== 'object') return null;
     const v = obj.provider || obj.choices?.[0]?.provider || null;
@@ -174,7 +175,8 @@
   }
 
   async function complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
-    // usage.include: il router aggiunge il costo in dollari della chiamata, quello che conta sul tetto della chiave personale (#598). Senza, il costo si stima dal listino.
+    // `usage.include`: il router aggiunge il costo in dollari, quello che conta sul tetto della
+    // chiave personale. Senza, il costo si stima dal listino.
     const body = { model, messages, stream: false, usage: { include: true }, ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
@@ -188,7 +190,8 @@
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      // status/provider strutturati sull'errore: chi lo mostra all'utente può tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
+      // status e provider strutturati sull'errore: chi lo mostra può tradurlo in una frase invece
+      // del codice HTTP nudo.
       const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
       err.status = res.status;
       err.provider = 'openrouter';
@@ -214,10 +217,11 @@
     };
   }
 
-  // onDelta(testo), onReasoning(chunk), onToolCall({ id, name }) appena si conosce il nome. Ritorna { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
+  // onDelta(testo), onReasoning(chunk), onToolCall({ id, name }) appena si conosce il nome.
+  // Ritorna { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
   async function streamComplete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
     const reqBody = { model, messages, stream: true, usage: { include: true }, ...toolsFields(tools, toolChoice) };
-    // Unisce il livello scelto dall'owner (#369) e la richiesta del caller di STREAMARE i token di ragionamento. Best-effort: i modelli che non ragionano non ne emettono.
+    // Livello dell'owner più la richiesta di streamare il ragionamento (vedi reasoningField).
     const r = reasoningField(reasoning, !!onReasoning);
     if (r) reqBody.reasoning = r;
     const pb = providerBlock(providerRouting);
@@ -259,7 +263,7 @@
         if (payload === '[DONE]') continue;
         try {
           const obj = JSON.parse(payload);
-          // Chi ha servito arriva in streaming insieme ai chunk (di norma con l'ultimo): si tiene l'ultimo valore visto.
+          // Chi ha servito arriva coi chunk, di norma con l'ultimo: si tiene l'ultimo valore visto.
           const sb = extractServedBy(obj);
           if (sb) servedBy = sb;
           const choice = obj.choices?.[0] || {};
@@ -286,7 +290,6 @@
             };
           }
         } catch (_) {
-          // riga malformata, ignora
         }
       }
     }
@@ -295,7 +298,7 @@
     };
   }
 
-  // Errore HTTP con status e provider strutturati (come per le chat, #331).
+  // Come per le chat: status e provider strutturati sull'errore.
   async function httpError(res) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
@@ -304,7 +307,8 @@
     return err;
   }
 
-  // Audio in PCM grezzo (16 bit, mono): il content script lo incapsula in un WAV e lo suona. Il router risponde coi soli byte, ma l'id della generazione è negli header e con quello si chiede dopo chi ha servito (lookupServedBy).
+  // Audio in PCM grezzo (16 bit, mono): il content script lo incapsula in un WAV. Il router
+  // manda i soli byte; l'id della generazione negli header serve per chiedere chi ha servito.
   async function synthesizeSpeech({ apiKey, model, text, voice, speed, providerRouting, signal }) {
     const body = { model, input: String(text == null ? '' : text), response_format: 'pcm' };
     if (voice) body.voice = voice;
@@ -334,7 +338,8 @@
     };
   }
 
-  // `audioBase64` sono i byte grezzi del file (niente data URI); `format` è l'estensione; `language` è un ISO-639-1 e se manca il modello la riconosce da sé.
+  // `audioBase64` sono i byte grezzi, niente data URI; senza `language` il modello riconosce
+  // la lingua da sé.
   async function transcribe({ apiKey, model, audioBase64, format, language, providerRouting, signal }) {
     const body = { model, input_audio: { data: audioBase64, format: format || 'wav' } };
     if (language) body.language = language;
@@ -358,13 +363,14 @@
         completionTokens: 0,
         cachedPromptTokens: 0,
         seconds: Number(usage.seconds) || 0,
-        // Per l'audio il costo in dollari del router è l'unico numero che abbia senso (non ci sono token): si registra tale e quale.
+        // Per l'audio non ci sono token: l'unico numero sensato è il costo in dollari del router.
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
       },
     };
   }
 
-  // Vettori nell'ordine dei testi. `dim` chiede vettori accorciati (i modelli "a matrioska" lo permettono); se il fornitore ne manda di più lunghi si tagliano qui: le prime `dim` componenti sono quelle che contano, e la ricerca vuole vettori tutti della stessa lunghezza.
+  // `dim` chiede vettori accorciati; se ne arrivano di più lunghi si tagliano qui: contano le
+  // prime componenti, e la ricerca vuole vettori tutti della stessa lunghezza.
   async function embed({ apiKey, model, texts, dim, providerRouting, signal }) {
     const input = (texts || []).map((t) => String(t == null ? '' : t));
     const body = { model, input };
@@ -400,7 +406,8 @@
     };
   }
 
-  // Per voce e dettatura il fornitore non è nella risposta: lo si chiede con l'id della generazione, consultabile qualche secondo dopo (finché non lo è risponde 404). Ritorna { servedBy, costUsd } oppure null.
+  // Per voce e dettatura il fornitore non è nella risposta: si chiede con l'id della
+  // generazione, consultabile qualche secondo dopo. Torna { servedBy, costUsd } o null.
   async function lookupServedBy({ apiKey, generationId, signal }) {
     if (!generationId) return null;
     const res = await fetch(`${GENERATION_ENDPOINT}?id=${encodeURIComponent(generationId)}`, {

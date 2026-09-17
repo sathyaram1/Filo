@@ -4,32 +4,26 @@
 (function (global) {
   'use strict';
 
-  // Motivi di blocco, in ordine di severità discendente; `color` diventa --mg-item-color nel
-  // CSS. `loop` è il blocco duro delle routine — un fix che fallisce la verifica tre volte di
-  // fila — e ha severità massima perché è l'unico che non viene dal pipeline di sicurezza ma
-  // dall'iter di lavorazione fermo: decide l'owner.
+  // Motivi di blocco in ordine di severità; `color` diventa --mg-item-color nel CSS.
+  // `loop` (fix che fallisce la verifica tre volte) è il più severo: lo decide l'owner.
   const REASONS = {
     loop:       { label: 'Loop',         color: '#111111', severity: 5 },
-    // «Non filtrato»: il panel dei giudici non si è completato. BIANCO perché non è una classe
-    // di rischio ma filtraggio incompleto, e per instradamento vale come il più severo: mai in
-    // coda, resta nei Ricevuti finché l'owner non lo risolve o ri-valuta i giudici mancanti.
+    // «Non filtrato»: il panel dei giudici non si è completato, non è una classe di rischio.
+    // Per instradamento vale come il più severo: mai in coda, resta nei Ricevuti.
     unfiltered: { label: 'Non filtrato', color: '#ffffff', severity: 4 },
-    // Bocciatura di SICUREZZA sul fix (`secaudit`): era approvato e lavorato, ma l'audit ha
-    // detto no e la pratica è tornata all'owner. ROSSO come l'attacco: col verde di `design` un
-    // allarme di sicurezza sembrava questione di gusto (scelta dell'owner).
+    // Bocciatura di SICUREZZA sul fix: torna all'owner. ROSSO come l'attacco — col verde di
+    // `design` un allarme di sicurezza sembrava questione di gusto.
     secaudit:   { label: 'Bloccato dalla sicurezza', color: '#c0392b', severity: 3 },
-    // Fermata al CANCELLO DI FUSIONE (`l5`): il fix c'è e l'audit l'ha passato, ma i controlli
-    // deterministici non fanno entrare il ramo in main senza il via libera dell'owner. Rosso
-    // come la bocciatura di sicurezza: è un allarme che aspetta una persona.
+    // Fermata al cancello di fusione: fix e audit ok, ma il ramo non entra in main senza
+    // l'owner. Rosso: è un allarme che aspetta una persona.
     l5:         { label: 'Fusione ferma', color: '#c0392b', severity: 3 },
     attack:     { label: 'Attacco',      color: '#c0392b', severity: 3 },
     spam:       { label: 'Spam',         color: '#e08e0b', severity: 2 },
     design:     { label: 'Design',       color: '#2e9e5b', severity: 1 },
   };
 
-  // Panel atteso: 3 giudici fissi + 1 dinamico. Per la pipeline nuova il numero esatto è in
-  // `pipeline.expectedJudges`; per lo storico vale questo default, e meno verdetti del
-  // previsto vuol dire che un giudice è saltato.
+  // Panel atteso: 3 fissi + 1 dinamico; il numero esatto sta in `pipeline.expectedJudges`.
+  // Per lo storico vale questo default: meno verdetti del previsto = un giudice è saltato.
   const DEFAULT_PANEL_SIZE = 4;
   function panelSize(p) {
     if (p && Array.isArray(p.expectedJudges) && p.expectedJudges.length) {
@@ -41,9 +35,8 @@
   // Stati "chiusi": non vanno (più) giudicati, restano nei loro flussi.
   const CLOSED_STATUSES = ['done', 'verified', 'archived', 'ignored'];
 
-  // Mittenti FIDATI = automazione dell'owner (owner:/routine:/agent:). I loro feedback non
-  // sono attacchi: se risultano bloccati a livello di identità è un errore e vanno
-  // ri-giudicati, non mostrati come «attacco». Speculare a isTrustedIdentity nel backend.
+  // Mittenti FIDATI = automazione dell'owner: i loro feedback non sono attacchi, se risultano
+  // bloccati per identità vanno ri-giudicati. Speculare a isTrustedIdentity nel backend.
   function isTrustedClient(clientId) {
     return /^(owner|routine|agent):/i.test(String(clientId || ''));
   }
@@ -56,16 +49,14 @@
     return m;
   }
 
-  // Classificazione LEGACY dai campi grezzi (`pipeline.*`, `blockReason`, `reviewDecision`):
-  // serve SOLO a normalizeStatus per sciogliere gli stati ritirati (`new`, `blocked`) dello
-  // storico. Non è più il criterio delle tab: nessun consumer ricalcola lo stato dai grezzi.
+  // Classificazione LEGACY dai campi grezzi: serve SOLO a normalizeStatus per sciogliere gli
+  // stati ritirati (`new`, `blocked`) dello storico. Nessun consumer ricalcola lo stato.
   function classifyLegacyBlock(fb) {
     // Override dell'owner: un feedback sbloccato a mano non è più un blocco e rientra nel
     // flusso normale. Vince su qualsiasi verdetto del pipeline.
     if (fb && fb.reviewDecision === 'accepted') return null;
 
-    // Loop: un fix bloccato dopo tre verifiche fallite di fila, scritto da dispatch/triage e
-    // non dal pipeline di sicurezza. Vince su tutto: richiede una decisione dell'owner.
+    // Vince su tutto: il blocco `loop` richiede una decisione dell'owner (vedi REASONS).
     if (fb && fb.status === 'blocked' && fb.blockReason === 'loop') {
       return { reason: 'loop', ...REASONS.loop };
     }
@@ -78,9 +69,8 @@
     // con l'owner, non un'attesa dei giudici.
     const judgeable = !CLOSED_STATUSES.includes(status) && status !== 'clarify';
 
-    // Mittente FIDATO senza verdetti = i giudici non sono ancora girati su un feedback
-    // dell'owner, spesso perché l'identità era stata flaggata per errore. Non è un blocco ma
-    // «da ri-giudicare» (bianco), e va prima dei controlli di blocco identità.
+    // Mittente FIDATO senza verdetti: i giudici non sono girati, spesso per un'identità flaggata
+    // per errore. Non è un blocco ma «da ri-giudicare», e precede i controlli di identità.
     if (p && trusted && verdicts.length === 0 && judgeable) {
       return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
@@ -100,10 +90,8 @@
       return { reason: 'spam', ...REASONS.spam };
     }
 
-    // Panel parziale («non filtrato») vince su attacco/spam/design, perché dice che il
-    // filtraggio NON è affidabile. Tre modi di rilevarlo: `l2Unfiltered` (dichiarato),
-    // `l2Degraded` (zero verdetti) e DEDOTTO per lo storico — avere almeno un verdetto implica
-    // che L2 è girato, quindi verdetti sotto il panel atteso = un giudice è saltato.
+    // Panel parziale vince su attacco/spam/design: dice che il filtraggio NON è affidabile.
+    // Per lo storico si DEDUCE: verdetti sotto il panel atteso = un giudice è saltato.
     if (
       p.l2Unfiltered === true ||
       p.l2Degraded === true ||
@@ -120,7 +108,6 @@
       return { reason: 'spam', ...REASONS.spam };
     }
 
-    // Design.
     if (p.l2Class === 'design') {
       return { reason: 'design', ...REASONS.design };
     }
@@ -138,7 +125,6 @@
       const sa = ca ? ca.severity : 0;
       const sb = cb ? cb.severity : 0;
       if (sb !== sa) return sb - sa;
-      // A parità di severità: più recenti prima.
       const ta = new Date(a.createdAt || 0).getTime();
       const tb = new Date(b.createdAt || 0).getTime();
       return tb - ta;
@@ -158,12 +144,8 @@
     return 0;
   }
 
-  // Un feedback chiuso è «in produzione» solo se il fix è davvero uscito.
-  // `releasedVersion` è la versione dell'APP IN ESECUZIONE, che il chiamante passa: l'owner
-  // gira sempre una build rilasciata, quindi la sua versione è l'ultima che gli utenti hanno.
-  // Senza, non si gatta e il feedback vale come spedito (nessuna regressione sullo storico).
-  // `resolvedInVersion` la timbra chi consegna il `done`: se è futura il fix non è in
-  // produzione e resta «In coda» finché quella versione esce; se manca (storico) è già uscito.
+  // «In produzione» solo se il fix è uscito: `releasedVersion` è la versione in esecuzione
+  // (l'owner gira una build rilasciata); `resolvedInVersion` futura = resta «In coda».
   function isShipped(fb, releasedVersion) {
     if (!releasedVersion) return true;
     const v = fb && fb.resolvedInVersion;
@@ -187,11 +169,8 @@
     return verdicts.length > 0 && verdicts.every((v) => v.class === 'aligned');
   }
 
-  // normalizeStatus: la SOLA porta d'ingresso allo stato. Torna sempre uno status CANONICO
-  // (FEEDBACK-STATES.md §2) più il sottotesto statusReason. Uno status già canonico passa
-  // invariato, i legacy semplici hanno una mappa fissa, e new/blocked/assente si derivano UNA
-  // volta dai campi grezzi: è il ponte per lo storico, e a migrazione fatta quel ramo non
-  // scatta più.
+  // normalizeStatus: la SOLA porta d'ingresso allo stato, torna sempre uno status CANONICO
+  // (FEEDBACK-STATES.md §2) più statusReason. new/blocked/assente si derivano dai grezzi.
   function normalizeStatus(fb) {
     const fs = FS();
     const s = fb && fb.status;
@@ -220,45 +199,35 @@
     return { status: 'unlabeled', statusReason: null };
   }
 
-  // Quando lo stato non si LEGGE, il criterio delle sezioni non esiste. Lo status fine
-  // viaggia CIFRATO (#476): senza chiave privata resta un blob e ogni feedback ricade in
-  // `unlabeled`. Le pagine disegnavano lo stesso «In coda (0) · Risolti (0) · Archiviati (0)»,
-  // cioè tre numeri che DICHIARANO IL VUOTO dove la verità è che non lo sappiamo.
-  // La regola vive QUI, non dentro una pagina: quando stava nella pagina dei feedback, la
-  // dashboard ha continuato a mentire finché non si sono guardate affiancate (#509).
+  // Lo status fine viaggia CIFRATO: senza chiave ogni feedback ricade in `unlabeled`, e le
+  // sezioni «(0)» dichiarerebbero il vuoto dove la verità è che non lo sappiamo.
   const CIPHER_PREFIXES = ['FENC', '[cifrato'];
   function looksEncrypted(value) {
     const raw = String(value == null ? '' : value).trim();
     return CIPHER_PREFIXES.some((p) => raw.startsWith(p));
   }
 
-  // Lo status di QUESTO feedback è illeggibile (ciphertext)? Riconoscimento STRETTO apposta:
-  // uno status assente, vuoto o inventato la macchina lo scioglie davvero (→ `unlabeled`) e lì
-  // le pagine restano allineate.
+  // Lo status di QUESTO feedback è illeggibile? Riconoscimento STRETTO: uno status assente o
+  // inventato la macchina lo scioglie davvero (→ `unlabeled`) e le pagine restano allineate.
   function statusUnreadable(fb) {
     return looksEncrypted(fb && fb.status);
   }
 
-  // Questo VALORE è arrivato cifrato? Stesso riconoscimento stretto, per gli altri campi che
-  // viaggiano cifrati (revisione dell'owner, conversazione): mostrare un blob al posto di un
-  // testo è la stessa bugia delle sezioni, in piccolo.
+  // Questo VALORE è arrivato cifrato? Stesso riconoscimento stretto per gli altri campi
+  // cifrati: mostrare un blob al posto di un testo è la stessa bugia, in piccolo.
   function valueUnreadable(value) {
     return looksEncrypted(value);
   }
 
-  // Si possono disegnare le sezioni per QUESTA lista? No solo quando la pagina non legge
-  // NESSUNO stato, che è il caso vero (o hai la chiave e li leggi tutti, o non ne leggi uno).
-  // Un documento storto in mezzo a mille leggibili lascia la barra al suo posto: toglierla a
-  // tutti sarebbe sproporzionato e farebbe divergere le due superfici. Lista vuota → sezioni
-  // sì, e «(0)» lì è la verità.
+  // Sezioni disegnabili solo se la pagina non legge NESSUNO stato: o hai la chiave e li leggi
+  // tutti, o nessuno. Un documento storto fra mille leggibili lascia la barra al suo posto.
   function sectionsReliable(feedbacks) {
     const list = feedbacks || [];
     return !list.length || !list.every(statusUnreadable);
   }
 
-  // L'unica cosa vera in mano a chi non ha la chiave: l'enum grossolano in chiaro
-  // (`statusPublic`), lo stesso che guarda la ricompensa. 'Aperta' | 'Chiusa' | '' (non si sa
-  // nemmeno quello), e le due pagine lo scrivono con QUESTE parole.
+  // L'unica cosa vera senza chiave: l'enum grossolano in chiaro (`statusPublic`).
+  // 'Aperta' | 'Chiusa' | '' (non si sa nemmeno quello), con QUESTE parole in ogni pagina.
   function publicStateLabel(fb) {
     const pub = String((fb && fb.statusPublic) || '');
     if (pub === 'closed') return 'Chiusa';
@@ -275,13 +244,8 @@
     return status; // attack | spam | design | suspicious_file
   }
 
-  // Sicurezza-conservativa: la categoria PIÙ ALTA, non la maggioritaria. I giudici possono
-  // dissentire, e la dashboard deve far emergere la categoria segnalata anche da UN SOLO
-  // giudice: un falso negativo (attacco mostrato come allineato) costa molto più di un falso
-  // positivo, che finisce comunque in revisione umana senza bloccare nessuno. Stesso spirito
-  // del guard red-team di listBoardTab. Solo attack/spam/design sono categorie di verdetto:
-  // `unfiltered`/`loop`/`suspicious_file` vengono dallo status o dal gate file e restano più
-  // severi.
+  // Sicurezza-conservativa: vale la categoria PIÙ ALTA, non la maggioritaria — un falso
+  // negativo costa più di un falso positivo, che finisce comunque in revisione umana.
   const VERDICT_RISK = { attack: 'attack', spam: 'spam', design: 'design' };
   function worstVerdictBlock(fb) {
     const p = fb && fb.pipeline;
@@ -296,12 +260,8 @@
     return worst;
   }
 
-  // Classifica un feedback per Revisione/Ricevuti: deriva dallo status normalizzato e poi
-  // applica l'escalation sicurezza-conservativa, cioè mostra la categoria di rischio più alta
-  // votata da un singolo giudice. Torna { reason, color, severity, label } per gli stati di
-  // revisione umana, null per il resto. Un `aligned` con un voto di attacco resta da guardare,
-  // non è approvabile in blocco. L'escalation vale SOLO nei «Ricevuti»: su un feedback già
-  // accettato o chiuso la decisione umana ha superato i verdetti dei giudici.
+  // Classifica per Revisione/Ricevuti: dallo status normalizzato più l'escalation più alta
+  // votata da un giudice. Solo nei «Ricevuti»: dopo, la decisione umana vince sui verdetti.
   function classifyBlock(fb) {
     const fs = FS();
     const { status, statusReason } = normalizeStatus(fb);
@@ -317,11 +277,8 @@
     if (status === 'design' && statusReason === 'l5') {
       return { reason: 'l5', ...REASONS.l5 };
     }
-    // Panel COMPLETO su un feedback rimasto `unlabeled`: capita ai mittenti fidati che i
-    // giudici hanno segnalato (la pipeline non li marchia mai attack/spam). Ma un panel completo
-    // non ha niente da ri-giudicare: mostrarlo bianco era falso, e «Ri-valuta» ritentava per
-    // sempre rispondendo «nessun giudice recuperato». Prende la categoria più alta segnalata:
-    // decide l'owner.
+    // Panel COMPLETO su un `unlabeled` (mittenti fidati segnalati): non c'è niente da
+    // ri-giudicare, quindi prende la categoria più alta segnalata e decide l'owner.
     if (status === 'unlabeled' && panelComplete(fb)) {
       const worst = worstVerdictBlock(fb);
       if (worst) return worst;
@@ -332,9 +289,8 @@
     return base;
   }
 
-  // Panel COMPLETO: tutti i verdetti attesi ci sono e la pipeline non lo dichiara
-  // parziale/degradato. È il discrimine fra «manca un giudice, ha senso ri-valutare» e
-  // «giudicato per intero».
+  // Panel COMPLETO: ci sono tutti i verdetti attesi e la pipeline non lo dice parziale.
+  // È il discrimine fra «manca un giudice, ri-valuta» e «giudicato per intero».
   function panelComplete(fb) {
     const p = fb && fb.pipeline;
     if (!p || typeof p !== 'object') return false;
@@ -343,16 +299,13 @@
     return verdicts.length > 0 && verdicts.length >= panelSize(p);
   }
 
-  // Frase accanto ai pallini dei giudici: i pallini dicono COSA hanno votato, la frase dice
-  // PERCHÉ il feedback è in quello stato, che non sempre coincide (#462: giudici tutti
-  // allineati, fix poi bocciato dalla sicurezza). { text, color } (color null = neutro), o
-  // null quando non c'è niente da spiegare e i pallini sono solo storia.
+  // I pallini dicono COSA hanno votato i giudici, questa frase PERCHÉ il feedback è in quello
+  // stato: non sempre coincidono. → { text, color } o null se non c'è niente da spiegare.
   function judgesNote(fb) {
     const fs = FS();
     const S = fs.STATUSES;
-    // Stato illeggibile: qui non c'è niente da spiegare. La macchina lo ridurrebbe a
-    // `unlabeled` e la frase direbbe «In attesa del giudizio» anche su una segnalazione chiusa.
-    // Chi disegna mette al suo posto l'enum grossolano in chiaro.
+    // Stato illeggibile: niente da spiegare. Ridotto a `unlabeled` direbbe «In attesa del
+    // giudizio» anche su una segnalazione chiusa; chi disegna mette l'enum in chiaro.
     if (statusUnreadable(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (status === 'design') {
@@ -402,9 +355,8 @@
     return null;
   }
 
-  // Motivo dello stato in parole, per tooltip e sottotesti: i codici grezzi ('secaudit'…)
-  // non dicono niente a chi legge. Un motivo sconosciuto passa invariato, meglio grezzo che
-  // muto.
+  // Motivo dello stato in parole, per tooltip e sottotesti: i codici grezzi non dicono niente.
+  // Un motivo sconosciuto passa invariato: meglio grezzo che muto.
   const REASON_TEXTS = {
     secaudit: 'bloccato dalla sicurezza',
     l5: 'fermo al cancello di fusione',
@@ -434,29 +386,16 @@
     return ['todo', 'working', 'revision_capability', 'revision_security', 'done'].includes(status);
   }
 
-  // Dashboard unificata (DB1): lookup PURO sul vocabolario (§4), niente pipeline né modalità
-  // automatica. L'unico ingrediente extra è il gate DB3 (`opts.releasedVersion`): un `done`
-  // è «Risolti» solo se davvero spedito, altrimenti resta visibile «In coda».
+  // Dashboard unificata: lookup PURO sul vocabolario, niente pipeline né modalità automatica.
+  // Unico extra: un `done` è «Risolti» solo se davvero spedito (`opts.releasedVersion`).
   function manageTabFor(fb, opts) {
     const { status } = normalizeStatus(fb);
     const shipped = status === 'done' ? isShipped(fb, opts && opts.releasedVersion) : false;
     return FS().tabFor(status, { shipped });
   }
 
-  // Le AZIONI dell'owner: UNA tabella per tutte le superfici. Le due pagine disegnavano le
-  // stesse sezioni ma si costruivano i pulsanti per conto proprio, e sulla STESSA segnalazione
-  // offrivano azioni diverse: su un archiviato «Ripristina» di là e «Archivia» di qua, e su un
-  // attacco confermato quel bottone scriveva `archived` SOPRA la conferma, cioè cancellava in
-  // silenzio una decisione di sicurezza (#509).
-  // Da qui le azioni si LEGGONO: sezione (manageTabFor) e status canonico decidono quali sono,
-  // con quale etichetta e verso quale stato scrivono; chi ne vuole una in più la aggiunge QUI.
-  // Invariante: se puoi archiviare puoi togliere dall'archivio, e mai il contrario nello
-  // stesso posto — «Archiviati» offre SOLO il ripristino, così nessun cammino riscrive uno
-  // stato terminale con `archived`.
-  // `kind` dice cosa scrive il pulsante oltre allo status: 'accept' (override di revisione),
-  // 'reject' (conferma di un blocco), 'archive', 'restore', 'resolve' (chiusura a mano),
-  // 'reopen' (chiede prima cosa manca, poi rimette in coda).
-  // Stato ILLEGGIBILE → nessuna azione: i pulsanti nascono dalla sezione, e qui non si sa.
+  // UNA tabella delle azioni dell'owner per tutte le superfici: sezione e status decidono
+  // quali sono. «Archiviati» offre SOLO il ripristino: nessun `archived` su stato terminale.
   function ownerActions(fb, opts) {
     if (statusUnreadable(fb)) return [];
     const { status } = normalizeStatus(fb);
@@ -465,8 +404,7 @@
       // Aspetta una decisione: approvare È scrivere `todo`.
       const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: '→ In coda', primary: true }];
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai Ricevuti e resta
-      // consultabile negli Archiviati. Il file sospetto non è ancora classificato: le conferme
-      // possibili sono DUE.
+      // negli Archiviati. Il file sospetto non è ancora classificato: le conferme sono DUE.
       if (status === 'attack' || status === 'suspicious_file') {
         acts.push({ key: 'confirm_attack', kind: 'reject', to: 'attack_confirmed', label: 'Conferma attacco', primary: false });
       }
@@ -504,21 +442,15 @@
     return ownerActions(fb, opts).find((a) => a.key === String(key)) || null;
   }
 
-  // Questa scrittura di stato è UNA DELLE AZIONI che la segnalazione offre adesso? È il
-  // guardiano sotto ai pulsanti, non accanto: un pannello rimasto aperto mentre lo stato
-  // cambiava, o una pagina non aggiornata, e la scrittura sarebbe di nuovo quella che cancella
-  // una conferma.
+  // Guardiano SOTTO ai pulsanti, non accanto: un pannello rimasto aperto mentre lo stato
+  // cambiava riscriverebbe di nuovo sopra una conferma.
   function ownerActionAllowsStatus(fb, to, opts) {
     const t = String(to == null ? '' : to);
     return ownerActions(fb, opts).some((a) => a.to === t);
   }
 
-  // L'etichetta di stato in DATI: le due pagine la disegnano col loro markup ma dicono le
-  // STESSE parole. Serve anche a non lasciare muta una superficie — la dashboard non scriveva
-  // da nessuna parte che una segnalazione era un attacco confermato, e la conversazione
-  // continuava a dire che Filo «non ha ancora un parere».
-  // → { label, color, hint, reason, reasonText, showReason, encrypted }, o null quando non
-  // c'è niente di vero da scrivere.
+  // L'etichetta di stato in DATI: ogni pagina col suo markup, ma le STESSE parole.
+  // → { label, color, hint, reason, reasonText, showReason, encrypted } o null.
   function stateBadge(fb) {
     const fs = FS();
     // Stato cifrato: la macchina lo ridurrebbe a «Non filtrato» anche su una segnalazione
@@ -555,10 +487,8 @@
     return p >= 1 && p <= 3 ? p : 0;
   }
 
-  // Avanzamento della lavorazione: l'iter ha tre passaggi in ordine — implementazione
-  // (working), controllo funzionalità (revision_capability), controllo sicurezza
-  // (revision_security). Lo status dice QUAL è il passaggio corrente; i campi claim* e
-  // workingSince dicono se un'istanza ci sta lavorando ORA.
+  // L'iter ha tre passaggi in ordine: implementazione, controllo funzionalità, controllo
+  // sicurezza. Lo status dice quale; claim*/workingSince dicono se qualcuno ci lavora ORA.
   const WORK_STAGES = ['working', 'revision_capability', 'revision_security'];
   const WORK_STEPS = [
     { key: 'impl',     label: 'Implementazione' },
@@ -567,9 +497,7 @@
   ];
 
   // Stato di avanzamento nell'iter, o null se non è in lavorazione (opts.now iniettabile).
-  // → { status, steps:[{key,label,state:'done'|'current'|'pending'}], current, active, by }.
-  // `active` = un'istanza ci sta lavorando adesso: claim vivo in qualunque fase, oppure — solo
-  // per `working`, l'unica fase con un lock a TTL suo — un workingSince fresco.
+  // `active` = claim vivo, o un workingSince fresco per `working`, l'unica fase con lock TTL.
   function workProgress(fb, opts) {
     const { status } = normalizeStatus(fb);
     const idx = WORK_STAGES.indexOf(status);
@@ -588,17 +516,13 @@
     };
   }
 
-  // Feedback di una singola tab, già ordinati. «Ricevuti»: severità del blocco poi recenza,
-  // così i non-filtrati e i bloccati gravi salgono. «In coda»: i feedback IN LAVORAZIONE
-  // pinnati in cima (prima quelli con un'istanza attiva, poi per fase più avanzata), sotto il
-  // resto per priorità DESC, severità e recenza. Altre: createdAt DESC.
-  // `opts.releasedVersion` va a manageTabFor per il gate «Risolti».
+  // Feedback di una tab, già ordinati: «Ricevuti» per severità poi recenza, «In coda» con i
+  // lavorati in cima e poi priorità DESC, le altre createdAt DESC.
   function listForManageTab(feedbacks, tab, opts) {
     const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
     if (tab === 'inbox') return sortReview(items);
-    // In coda la priorità DESC è il criterio primario fra i non-in-lavorazione. `sort` è
-    // stabile, quindi a parità resta l'ordine di sortReview e il pinning conserva l'ordine per
-    // priorità dentro ogni gruppo.
+    // In coda la priorità DESC è il criterio fra i non-in-lavorazione. `sort` è stabile, quindi
+    // a parità resta l'ordine di sortReview e il pinning lo conserva dentro ogni gruppo.
     if (tab === 'queue') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
       // Rango di pinning: istanza attiva ora > fase più avanzata > non in lavorazione (-1).
@@ -619,17 +543,14 @@
     });
   }
 
-  // Preferiti ⭐ (DB2): `starred` è un parcheggio per il futuro, si mette su un feedback
-  // qualsiasi a prescindere dallo status. Il filtro ⭐ degli Archiviati mostra TUTTI i
-  // preferiti, non solo gli `archived`.
+  // `starred` è un parcheggio, si mette su un feedback qualsiasi a prescindere dallo status:
+  // il filtro ⭐ degli Archiviati mostra TUTTI i preferiti, non solo gli `archived`.
   function isStarred(fb) {
     return !!(fb && fb.starred === true);
   }
 
-  // Lista della tab Archiviati: starredOnly=false → gli `archived`; starredOnly=true → tutti
-  // i preferiti di qualunque status; confirmedOnly=true → di quelli, solo attacchi e spam
-  // CONFERMATI. I filtri vivono qui e non nella pagina: il conteggio della scheda deve contare
-  // esattamente ciò che la lista mostra, o sembra mentire.
+  // Filtri della tab Archiviati (starredOnly, confirmedOnly). Vivono qui e non nella pagina:
+  // il conteggio della scheda deve contare esattamente ciò che la lista mostra.
   function listArchiveTab(feedbacks, opts) {
     const starredOnly = !!(opts && opts.starredOnly);
     const confirmedOnly = !!(opts && opts.confirmedOnly);
@@ -645,11 +566,8 @@
     });
   }
 
-  // Quanti feedback ci sono in ogni scheda-lista (#495): si conta ESATTAMENTE ciò che la
-  // scheda elencherebbe, riusando le funzioni che costruiscono le liste — un numero calcolato
-  // con una regola sua prima o poi diverge da quello che si vede aprendo la scheda. Per
-  // Ricevuti/In coda/Risolti basta l'appartenenza; Archiviati passa da listArchiveTab, che ha
-  // filtri suoi. `opts`: { releasedVersion, starredOnly, confirmedOnly }.
+  // Si conta ESATTAMENTE ciò che la scheda elencherebbe, riusando le funzioni delle liste: un
+  // numero con una regola sua prima o poi diverge da quello che si vede aprendo la scheda.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
     const counts = { inbox: 0, queue: 0, resolved: 0, archived: 0 };
@@ -661,28 +579,19 @@
     return counts;
   }
 
-  // DC1: la board utente (filo://board/), superficie POSITIVA a permessi ridotti: solo i fix
-  // già in produzione (gate «Risolti», DB3) e MAI niente del red-team — si esclude qualunque
-  // feedback con un blocco nel pipeline, nemmeno se per qualche motivo è finito in `done`.
-  // Un fix con una riapertura in sospeso (DC4) ESCE dalla board: l'utente l'ha segnalato come
-  // ancora rotto e il fix è tornato nell'iter, quindi non va più mostrato come «risolto,
-  // conferma se funziona» (il flip di `status` lo applica poi il percorso fidato).
+  // Board utente: superficie a permessi ridotti — solo fix già in produzione e MAI niente del
+  // red-team. Un fix con una riapertura in sospeso esce dalla board: è tornato nell'iter.
   function listBoardTab(feedbacks, opts) {
     const releasedVersion = opts && opts.releasedVersion;
     return listForManageTab(feedbacks, 'resolved', { releasedVersion })
-      // Guard red-team: qui si guardano APPOSTA i verdetti grezzi del pipeline e non lo status,
-      // perché un feedback segnalato dalla sicurezza non vada mai in board nemmeno se è arrivato
-      // a `done`.
+      // Guard red-team: si guardano APPOSTA i verdetti grezzi e non lo status, così un feedback
+      // segnalato dalla sicurezza non va in board nemmeno se è arrivato a `done`.
       .filter((fb) => !classifyLegacyBlock(fb))
       .filter((fb) => !hasReopenRequest(fb));
   }
 
-  // DC4: un fix è riapribile solo se è OGGI visibile nella board (stessa regola di
-  // listBoardTab applicata al singolo feedback) e nessuno l'ha già riaperto. Il guard su
-  // `reopenRequests` non è «un utente riapre una volta sola» ma «una volta riaperto da
-  // chiunque, il fix è già nell'iter normale»: evita N feedback collegati per lo stesso fix.
-  // Finché chi applica il done successivo non azzera la mappa il fix resta bloccato: meglio
-  // prudente che riaperture a raffica.
+  // Riapribile solo se OGGI è visibile in board e nessuno l'ha già riaperto: una volta
+  // riaperto da chiunque il fix è nell'iter normale, e N feedback collegati non servono.
   function hasReopenRequest(fb) {
     const r = fb && fb.reopenRequests;
     return !!(r && typeof r === 'object' && Object.keys(r).length > 0);
@@ -694,16 +603,8 @@
     return listBoardTab([fb], opts).length > 0;
   }
 
-  // Ri-valutazione dei «non filtrati», un id per chiamata: il backend riesegue SOLO i giudici
-  // mancanti e torna `recovered` (quanti hanno finalmente votato) e `attempted` (quanti ne ha
-  // ritentati, cioè quanti hanno potenzialmente speso crediti). Qui quel dettaglio diventa
-  // l'esito che conta per l'owner, così la UI non conta come «valutato» un feedback rimasto
-  // bianco:
-  // 'recovered' almeno un giudice mancante ha votato → progresso reale;
-  // 'wasted'    crediti spesi e nessuno recuperato (modelli mal configurati, credito finito);
-  // 'budget'    il backend si è fermato per tempo/budget: riprovare più tardi;
-  // 'noop'      niente da ri-valutare, nessun credito speso;  'error' chiamata fallita.
-  // `r` è la risposta completa del canale. → { outcome, recovered }
+  // Ri-valutazione dei «non filtrati», un id per chiamata: `recovered` (un giudice mancante ha
+  // votato), `wasted` (crediti spesi a vuoto), `budget` (riprovare), `noop`, `error`.
   function classifyReevalResult(r) {
     if (!r || r.ok === false) return { outcome: 'error', recovered: 0 };
     if (r.remaining) return { outcome: 'budget', recovered: 0 };
@@ -740,20 +641,12 @@
     }
   }
 
-  // Quanti 'wasted' di fila tollerare prima di fermare l'intera ri-valutazione: se i giudici
-  // falliscono a vuoto più volte è quasi certo un problema di configurazione o credito, e
-  // bruciare crediti sul resto della lista non serve. Basso di proposito.
+  // Quanti 'wasted' di fila tollerare prima di fermare tutto: se i giudici falliscono a vuoto
+  // è quasi certo un problema di configurazione o di credito, e bruciare crediti non serve.
   const REEVAL_WASTE_LIMIT = 3;
 
-  // I cinque livelli di sicurezza come una fila di forme. La dashboard ne mostrava due: il
-  // filtro d'ingresso spariva dentro una parola, quello che Claude segnalava lavorando finiva
-  // in mezzo alla conversazione, l'audit lasciava traccia solo quando bocciava e il cancello
-  // di fusione viveva in un riquadro a parte. Qui sono cinque forme in fila, sempre le stesse
-  // e sempre nello stesso posto — triangolo (filtro d'ingresso), cerchi (giudici), rombo
-  // (segnalazione di Claude), pentagono (audit), quadrato (fusione) — e un livello senza
-  // parere è GRIGIO ma resta al suo posto: la fila ha sempre la stessa lunghezza e un buco si
-  // vede. Questa funzione non disegna niente: dice esito, colore, titolo sotto il puntatore e
-  // cosa scrivere nel pannello, così l'intera tabella si prova senza aprire Filo.
+  // I cinque livelli come una fila di forme sempre uguale e sempre nello stesso posto: un
+  // livello senza parere è GRIGIO ma resta, così un buco si vede. Qui dati, niente disegno.
 
   // I quattro colori sono quelli dei pallini dei giudici: stessa scala di severità in tutta
   // la pagina, così il rosso vuol dire la stessa cosa ovunque.
@@ -764,9 +657,8 @@
     aligned: ALIGNED.color,          // blu    — pulito
   };
 
-  // Perché il filtro d'ingresso ha deciso così. I codici arrivano dal server; uno che questa
-  // tabella non conosce si scrive lo stesso, coi trattini bassi sciolti in spazi: un motivo
-  // grezzo dice più di un motivo nascosto.
+  // Perché il filtro d'ingresso ha deciso così. Un codice che questa tabella non conosce si
+  // scrive lo stesso, coi trattini bassi sciolti: un motivo grezzo dice più di uno nascosto.
   const L1_MOTIVI = {
     linked_prior_attack: 'collegato a un attacco precedente',
     prior_attack: 'chi l’ha scritta aveva già tentato un attacco',
@@ -826,10 +718,8 @@
     return { etichetta: String(etichetta || ''), valore: String(valore == null ? '' : valore) };
   }
 
-  // Dove è arrivata la pratica e perché, in righe. La fila delle forme racconta i cinque
-  // controlli; questo racconta la DECISIONE («attacco confermato», «aspetta la tua
-  // approvazione»), che non viene da un controllo ma dall'owner o dalla macchina a stati.
-  // Vive nel pannello del triangolo, il primo della fila e l'unico che c'è sempre.
+  // Dove è arrivata la pratica e perché: non viene da un controllo ma dall'owner o dalla
+  // macchina a stati. Vive nel pannello del triangolo, l'unico della fila che c'è sempre.
   function righeStato(fb) {
     const righe = [];
     const b = stateBadge(fb);
@@ -982,7 +872,6 @@
     return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
   }
 
-  // Questa richiesta di fusione nasce da QUESTA segnalazione?
   function richiestaDiQuesto(req, fb) {
     if (!req || !fb) return false;
     const id = String(req.feedbackId || '').trim();
@@ -992,7 +881,7 @@
   }
 
   // Livello 5: il cancello di fusione. Le richieste arrivano dal server e si legano alla
-  // segnalazione per id o per numero. `opts.fusioni` = { pending, failed, preapproved, recent }.
+  // segnalazione per id o numero. `opts.fusioni`: pending, failed, preapproved, recent.
   function livelloL5(fb, opts) {
     const titolo = 'Fusione';
     const f = (opts && opts.fusioni && typeof opts.fusioni === 'object') ? opts.fusioni : {};
@@ -1002,9 +891,8 @@
     const preapproved = lista('preapproved');
     const { status, statusReason } = normalizeStatus(fb);
 
-    // Il server segna sul documento che la pratica è ferma al cancello (`design`/`l5`), e vale
-    // da solo: gli elenchi delle richieste possono non essere ancora arrivati, o essere vuoti
-    // perché questo non è il computer dell'owner — e un quadrato grigio direbbe il falso.
+    // Il documento dice da solo che la pratica è ferma al cancello: gli elenchi delle richieste
+    // possono non essere arrivati, o essere vuoti su un altro computer, e il grigio mentirebbe.
     const fermaDaStato = status === 'design' && statusReason === 'l5';
 
     // Una fusione approvata e mai avvenuta (conflitto) pesa quanto una richiesta ferma: è un sì
@@ -1078,21 +966,16 @@
     return l5.esito === 'bloccato' || l5.esito === 'conflitto';
   }
 
-  // Le richieste di fusione che NON hanno una segnalazione in questa lista: non hanno una
-  // scheda dove vivere e restano visibili in Automazioni. Senza, una fusione locale (un ramo
-  // senza numero) sparirebbe.
+  // Le richieste di fusione senza una segnalazione in lista non hanno una scheda dove vivere:
+  // restano visibili in Automazioni, o una fusione locale sparirebbe.
   function fusioniSenzaFeedback(richieste, feedbacks) {
     const list = Array.isArray(feedbacks) ? feedbacks : [];
     return (Array.isArray(richieste) ? richieste : [])
       .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
   }
 
-  // Il testo di un livello spezzato in righe tipizzate, per disegnarlo senza HTML. I file di
-  // `--segnala` e `--nota` sono markdown con tre titoli obbligatori e voci a trattino: mostrati
-  // grezzi, cancelletti e trattini compaiono come caratteri e l'owner legge simboli invece di
-  // tre sezioni. Si riconoscono SOLO titoli e voci d'elenco: niente HTML dal testo, che resta
-  // testo. → { tipo:'titolo', livello:1..6, testo } | { tipo:'voce', testo } |
-  // { tipo:'testo', testo } (le righe di seguito si uniscono in un paragrafo)
+  // Testo di un livello spezzato in righe tipizzate, per disegnarlo senza HTML: si riconoscono
+  // SOLO titoli e voci d'elenco, così il testo resta testo e non diventa HTML.
   function righeTesto(testo) {
     const out = [];
     const righe = String(testo == null ? '' : testo).replace(/\r\n?/g, '\n').split('\n');
@@ -1114,10 +997,8 @@
 
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
-    // Il guard «questo è passato dalle mani della sicurezza», letto dai campi grezzi. Lo usano
-    // listBoardTab qui dentro e feedbackPublicView.js (#583) per decidere se un feedback può
-    // avere una scheda pubblica: stessa domanda, stessa funzione — una seconda copia sarebbe
-    // quella che un giorno dice sì dove questa dice no.
+    // Il guard «questo è passato dalle mani della sicurezza». Lo usano listBoardTab e
+    // feedbackPublicView.js: stessa domanda, stessa funzione — una copia un giorno divergerebbe.
     classifyLegacyBlock,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
     workProgress, WORK_STAGES,

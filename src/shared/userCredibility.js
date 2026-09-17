@@ -1,7 +1,6 @@
 // Substrato dati per la credibilità di chi vota (DC5): struttura, campi grezzi e gate
-// pass-through, SENZA calcolo né policy. Tarare le soglie senza dati reali farebbe più
-// danno che bene, quindi oggi la credibilità è sempre 1 e il gate lascia passare tutti.
-// Logica PURA: store e persistenza sono del chiamante.
+// pass-through, SENZA calcolo né policy. Tarare le soglie senza dati reali farebbe danno,
+// quindi la credibilità è sempre 1 e il gate lascia passare tutti. Store: del chiamante.
 
 (function (global) {
   'use strict';
@@ -30,7 +29,7 @@
       credibility: DEFAULT_CREDIBILITY,
       firstSeenAt,
       // Campi grezzi per il futuro algoritmo:
-      voteCount: 0,        // quanti voti ha espresso in totale
+      voteCount: 0,
       matchCount: 0,       // quante volte il voto coincideva con la decisione finale
       missCount: 0,        // quante volte il voto era opposto alla decisione finale
       lastVoteAt: null,    // ISO string dell'ultimo voto espresso
@@ -49,9 +48,8 @@
     };
   }
 
-  // Aggiorna i grezzi matchCount/missCount/outcomes confrontando il voto con l'esito con
-  // cui il feedback si è chiuso. NON ricalcola `credibility`: la policy è rimandata.
-  // PURA: ritorna la nuova entry, non muta l'input.
+  // Aggiorna i grezzi confrontando il voto con l'esito con cui il feedback si è chiuso.
+  // NON ricalcola `credibility`: la policy è rimandata. PURA: ritorna la nuova entry.
   function recordVoteOutcome(entry, { feedbackId, vote, finalOutcome, at = new Date().toISOString() } = {}) {
     if (!entry || typeof entry !== 'object') return freshEntry('');
     const e = Object.assign({}, entry);
@@ -65,7 +63,6 @@
     e.outcomes.push({ feedbackId: String(feedbackId || ''), vote: String(vote || ''), finalOutcome: String(finalOutcome || ''), at: String(at) });
     if (e.outcomes.length > 50) e.outcomes = e.outcomes.slice(-50);
 
-    // credibility invariata: la politica di aggiornamento non è ancora definita.
     return e;
   }
 

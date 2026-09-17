@@ -1,13 +1,14 @@
-// Logica pura: «questa scheda esisteva solo per far partire uno scaricamento?». Due casi: scheda mai riempita, che resta bianca dopo un link di download (#412), e pagina-ponte «il download partirà a breve» che avvia il file da sola (#441).
-// Il ponte chiude una pagina CON contenuto, quindi la firma è stretta: nata da link/window.open, senza cronologia indietro, mai toccata dall'utente (click, tasto, scroll, tocco), download partito entro pochi secondi dal caricamento.
-// Se manca anche una sola condizione la scheda resta aperta: tenerne una di troppo costa un clic, chiuderne una fa sparire qualcosa che l'utente stava guardando.
+// «Questa scheda esisteva solo per far partire uno scaricamento?». Logica pura.
+// Due casi: scheda mai riempita (#412) e pagina-ponte che avvia il file da sola (#441).
+// Se manca una sola condizione la scheda resta aperta: chiuderla fa sparire qualcosa.
 (function (global) {
   'use strict';
 
-  // Finestra «il download è partito da solo poco dopo il caricamento»: copre i conti alla rovescia delle pagine-ponte più la risposta del server. Oltre, la pagina è rimasta lì abbastanza da non essere più un ponte.
+  // Copre il conto alla rovescia di una pagina-ponte più la risposta del server.
+  // Oltre, la pagina è rimasta lì abbastanza da non essere più un ponte.
   const BRIDGE_MAX_AGE_MS = 15000;
 
-  // signals: isInternal (pagina filo://), everNavigated (ha mai committato una pagina nel frame principale), openedByLink, canBack, userInputAt (ultimo input REALE dell'utente, o null), navigatedAt, now (orologio iniettabile per i test).
+  // `userInputAt` è l'ultimo input REALE dell'utente, o null; `now` è iniettabile nei test.
   // Ritorna { close, reason: 'blank' | 'bridge' | null }.
   function decideCloseOnDownload(signals, opts) {
     const s = signals || {};

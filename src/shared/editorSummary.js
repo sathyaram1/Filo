@@ -1,13 +1,14 @@
-// Riassunto per file dell'editor (#379.5): estrarre il testo di un file serializzato, decidere quando rigenerarne il riassunto, e costruire l'elenco {titolo, riassunto} che entra nel contesto di Filo al posto del testo integrale.
-// Filo deve poter «vedere» i file senza pagarne il testo intero a ogni risposta: nel contesto va solo il riassunto, e il contenuto completo di un singolo file si chiede on-demand (azione LEGGI_FILE).
-// LOGICA PURA sugli oggetti-file serializzati (stesso schema di editorStore.js): la generazione vera vive nel renderer dell'editor, la lettura della collezione in services/editorFiles.js.
+// Riassunto per file dell'editor (#379.5): estrazione del testo, quando rigenerare,
+// e l'elenco {titolo, riassunto} che entra nel contesto di Filo al posto del testo.
+// Filo vede i file senza pagarne il testo intero: il contenuto si chiede con LEGGI_FILE.
 
 (function (global) {
   'use strict';
 
-  // Sotto questa soglia il testo È già la sua sintesi: si usa un estratto grezzo invece di sprecare una chiamata.
+  // Sotto questa soglia il testo È già la sua sintesi: basta un estratto, niente chiamata.
   const MIN_WORDS = 60;
-  // «Cambiamento significativo»: si rigenera quando le parole differiscono da quelle di allora di almeno ABS parole OPPURE di almeno RATIO in proporzione — il più permissivo dei due, così un file corto che cambia molto e uno lungo che cambia poco sono coperti entrambi senza rigenerare a ogni battitura.
+  // Si rigenera quando le parole differiscono di almeno ABS OPPURE di almeno RATIO:
+  // il più permissivo dei due copre sia un file corto sia uno lungo, senza rigenerare sempre.
   const CHANGE_ABS = 40;
   const CHANGE_RATIO = 0.4;
   // Taglio difensivo sul riassunto iniettato.
@@ -15,7 +16,8 @@
   // Ripiego finché non c'è un riassunto.
   const EXCERPT_LEN = 200;
 
-  // Albero PM-like (doc → paragraph/heading/blockquote/list… → text), blocchi separati da newline. Robusto a nodi mancanti o forme inattese.
+  // Albero PM-like (doc → paragraph/heading/list… → text), blocchi separati da newline.
+  // Robusto a nodi mancanti o forme inattese.
   function plainText(content) {
     const root = content && content.content ? content : (content && content.meta ? content.content : content);
     if (!root || !Array.isArray(root.content)) return '';
@@ -48,7 +50,8 @@
     return countWords(fileText(file));
   }
 
-  // Nessun riassunto → non fresco. Riassunto senza firma → fresco: non si rigenera a vuoto qualcosa scritto o mantenuto altrove. Con firma, si confrontano le parole di allora con quelle di adesso.
+  // Nessun riassunto → non fresco.
+  // Riassunto senza firma → fresco: non si rigenera ciò che è mantenuto altrove.
   function isSummaryFresh(file, currentWords) {
     const meta = (file && file.meta) || {};
     if (!meta.summary) return false;
@@ -60,7 +63,6 @@
     return delta < threshold;
   }
 
-  // Sotto MIN_WORDS non vale la chiamata: ci pensa l'estratto.
   function needsSummary(file, opts) {
     const o = opts || {};
     const minWords = Number.isFinite(o.minWords) ? o.minWords : MIN_WORDS;
@@ -79,7 +81,6 @@
     return t.length > n ? t.slice(0, n).trim() + '…' : t;
   }
 
-  // Il riassunto AI se c'è, altrimenti un estratto grezzo, altrimenti «(vuoto)».
   function summaryFor(file) {
     const meta = (file && file.meta) || {};
     if (meta.summary && String(meta.summary).trim()) {

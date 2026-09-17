@@ -1,24 +1,9 @@
-// Manager del login "Accedi con Google" per Filo desktop.
-//
-// Flusso (vedi Filo/SECURITY.md §1):
-//   Fase 1 — Google OAuth 2.0 Authorization Code + PKCE:
-//     apre il consenso nel browser di SISTEMA, riceve il codice su un
-//     micro-server loopback temporaneo, lo scambia per un id_token Google.
-//   Fase 2 — Firebase Identity Toolkit (signInWithIdp):
-//     scambia l'id_token Google per un Firebase ID token + refresh token.
-//     Solo il Firebase ID token popola request.auth nelle regole Firestore.
-//
-// Persistiamo SOLO il refresh token Firebase + il profilo, cifrati via
-// token-store (safeStorage). L'ID token (vita breve) si rigenera al bisogno.
-//
-// Tutto vive nel processo main: i token non sono mai esposti alle pagine web.
+// Login «Accedi con Google»: OAuth PKCE nel browser di sistema, poi Firebase signInWithIdp.
+// Solo il Firebase ID token popola request.auth nelle regole Firestore (SECURITY.md §1).
+// Si persiste solo il refresh token, cifrato; i token non escono mai dal processo main.
 
 const http = require('node:http');
-// Niente require('electron') a livello di modulo: questo file viene richiesto
-// (transitivamente, via defaultsStore/supportModelsStore) anche dagli unit test
-// node:test che girano fuori da Electron. `shell` serve solo dentro signIn(),
-// quindi si richiede lazy lì (vedi CLAUDE.md — pattern usato anche altrove,
-// es. adblock.js/proxyTab.js).
+// electron si richiede dentro signIn(): gli unit test caricano questo file senza Electron.
 const cfg = require('./config');
 const pkce = require('./pkce');
 const store = require('./token-store');
@@ -87,14 +72,8 @@ async function exchangeCodeForGoogleToken(code, verifier, redirectUri) {
   return res.json(); // { id_token, access_token, ... }
 }
 
-// Fase 2: Google id_token → Firebase ID token + refresh token.
-//
-// COLLEGAMENTO all'identità dell'installazione (#598): se questa copia di Filo
-// ha già un account anonimo (crediti e chiave personale stanno lì), si passa
-// il suo idToken: Firebase aggiunge Google a QUELLO stesso account, e l'uid
-// non cambia. Se l'account Google è già legato altrove (seconda
-// installazione) Firebase rifiuta il collegamento: allora si fa il login
-// normale, con due identità distinte — il portafoglio resta sull'installazione.
+// Collegamento all'identità dell'installazione (#598): si passa il suo idToken, così l'uid
+// non cambia. Se Google è già legato altrove si fa il login normale, a identità distinte.
 async function signInWithFirebase(googleIdToken) {
   const anonToken = await installationToken();
   const attempt = async (linkTo) => {
@@ -125,9 +104,8 @@ async function signInWithFirebase(googleIdToken) {
   return attempt(null);
 }
 
-// L'idToken dell'identità anonima, rinnovato se scaduto (una chiamata di
-// rete, che il login sta già facendo comunque). Senza un'identità non c'è
-// niente da collegare; se non si riesce a rinnovarla si fa il login normale.
+// L'idToken dell'identità anonima, rinnovato se scaduto: senza identità non c'è niente da
+// collegare, e se il rinnovo non riesce si fa il login normale.
 async function installationToken() {
   try {
     const anon = require('./anon-auth');
@@ -157,7 +135,7 @@ function setSession(fb) {
   };
 }
 
-// ─── API pubblica ──────────────────────────────────────────────────────────
+// API pubblica
 
 // Carica la sessione persistita all'avvio (non fa rete: l'id token si
 // rinnoverà alla prima richiesta che lo serve).
@@ -235,10 +213,8 @@ async function getIdToken() {
   return refreshIfNeeded();
 }
 
-// uid Firebase (claim user_id/sub) dell'utente loggato corrente. È QUESTO uid —
-// non l'email — quello che le Firestore rules vedono come request.auth.uid (es.
-// nel vincolo chiave==uid di `votes.<uid>` per il voto board, DC2). null se non
-// loggato o se il token non è disponibile.
+// È l'uid, non l'email, quello che le regole Firestore vedono come request.auth.uid
+// (es. il vincolo chiave==uid del voto sulla board). null se non loggato.
 async function getUid() {
   if (!isSignedIn()) return null;
   try {
@@ -254,10 +230,8 @@ function getProfile() {
   return { email: session.email, name: session.name, picture: session.picture };
 }
 
-// Claim diagnostiche dell'ID token corrente: email e email_verified come le
-// vedono le regole Firestore (request.auth.token.*). Usate per spiegare un 403
-// "Missing or insufficient permissions" in termini azionabili. `email_verified`
-// è null se il token non è ancora stato emesso o non porta il claim.
+// Claim email/email_verified come le vedono le regole: servono a spiegare un 403
+// «Missing or insufficient permissions» in termini azionabili. null se il token manca.
 function getTokenClaims() {
   const tok = session?.idToken;
   const p = tok ? decodeJwtPayload(tok) : {};

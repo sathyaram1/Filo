@@ -1,6 +1,6 @@
-// Client Scryfall (DECK-BUILDER-SPEC.md §13.2-§13.3), parte I/O; la logica pura (query, semplificazione carte, TTL) è in SN_SCRYFALL_Q.
-// Cache (§13.3): i campi statici della carta sono permanenti, il PREZZO si considera stantio dopo PRICE_TTL_MS (chi lo vuole fresco passa maxAgeMs); i simboli di mana sono permanenti; le immagini restano URL diretti di Scryfall, le cachea il browser e non si duplicano su disco.
-// Rate limit di cortesia (~10 req/s): coda interna serializzata con distanza minima, e tutte le chiamate passano da qui.
+// Client Scryfall (DECK-BUILDER-SPEC.md §13): parte I/O; la logica pura è in SN_SCRYFALL_Q.
+// Cache: i campi statici e i simboli non scadono, il prezzo è stantio dopo PRICE_TTL_MS.
+// Ogni chiamata passa dalla coda interna, che tiene il rate limit di cortesia di Scryfall.
 
 (function (global) {
   'use strict';
@@ -10,9 +10,10 @@
 
   const BASE = process.env.FILO_SCRYFALL_BASE || 'https://api.scryfall.com';
   const MIN_GAP_MS = 110;               // ~9 req/s, sotto il tetto di cortesia
-  const PRICE_TTL_MS = 6 * 60 * 60 * 1000; // prezzi: stantii dopo 6 ore
+  const PRICE_TTL_MS = 6 * 60 * 60 * 1000;
 
-  // User-Agent identificativo OBBLIGATORIO: con la UA di default del fetch di Node/Electron l'API risponde 400 `generic_user_agent`, e senza questo header in produzione fallisce OGNI chiamata.
+  // Senza una User-Agent identificativa l'API risponde 400 `generic_user_agent`: con quella
+  // di default di Node/Electron fallisce ogni chiamata.
   let USER_AGENT = 'Filo/0.0.0 (https://singolarita.com)';
   try {
     USER_AGENT = `Filo/${require('../../../package.json').version} (https://singolarita.com)`;
@@ -43,7 +44,8 @@
       });
       if (res.status === 404) return null; // "nessun risultato" per Scryfall
       if (!res.ok) {
-        // Scryfall spiega gli errori nel body JSON (`details`, es. la sintassi sbagliata di una query): recuperarlo permette di correggere la query o spiegare il problema all'utente invece di mostrare un codice HTTP nudo (#331).
+        // Scryfall spiega l'errore nel body (`details`): recuperarlo permette di correggere la
+        // query invece di mostrare un codice HTTP nudo.
         let details = '';
         try {
           const body = await res.json();
@@ -58,7 +60,7 @@
     });
   }
 
-  // Ricerca (§4): il vincolo di identity lo aggiunge il chiamante via buildSearchQuery, qui si esegue e si semplifica.
+  // Il vincolo di identity lo aggiunge il chiamante (buildSearchQuery), qui si esegue e basta.
   async function search(userQuery, { identity } = {}) {
     const q = Q.buildSearchQuery(userQuery, identity);
     if (!q) return { cards: [], hasMore: false, query: q };
@@ -79,8 +81,6 @@
     return card;
   }
 
-  // Cache dati carta, chiave = scryfall_id.
-
   async function readCardCache() {
     const res = await chrome.storage.local.get(STORAGE_KEYS.SCRYFALL_CARDS);
     const map = res[STORAGE_KEYS.SCRYFALL_CARDS];
@@ -95,7 +95,8 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.SCRYFALL_CARDS]: map });
   }
 
-  // Dalla cache quando abbastanza fresche (default: i campi statici non scadono). Chi vuole PREZZI freschi passa maxAgeMs = PRICE_TTL_MS; le mancanti si scaricano una a una. Gli id introvabili restano semplicemente assenti dalla mappa.
+  // I campi statici non scadono; chi vuole prezzi freschi passa maxAgeMs. Le mancanti si
+  // scaricano una a una, gli id introvabili restano assenti dalla mappa.
   async function cards(ids, { maxAgeMs = Infinity } = {}) {
     const wanted = [...new Set((ids || []).map(String).filter(Boolean))];
     const map = await readCardCache();
@@ -103,7 +104,7 @@
     const missing = [];
     for (const id of wanted) {
       const e = map[id];
-      // Campo `undefined` = entry scritta prima che il campo esistesse (schema vecchio): si rifetcha per avere il dato nuovo.
+      // Campo `undefined` = entry scritta prima che il campo esistesse: si rifetcha.
       if (e && Q.isFresh(e.fetchedAt, maxAgeMs) && e.card
           && e.card.producedMana !== undefined && e.card.oracleText !== undefined) out[id] = e.card;
       else missing.push(id);
@@ -128,7 +129,7 @@
     return map[String(id)] || null;
   }
 
-  // Conteggio ristampe per nome (§5.2): `unique=prints` conta tutte le stampe, e il numero cambia solo quando esce un set nuovo → cache permanente.
+  // Il numero di ristampe cambia solo quando esce un set nuovo: cache permanente.
   async function prints(name) {
     const n = String(name || '').trim();
     if (!n) return null;

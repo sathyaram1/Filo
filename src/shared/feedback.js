@@ -1,4 +1,5 @@
-// Client Firebase REST per i feedback alpha: niente SDK, solo fetch(), così funziona sia nei content script sia nelle pagine dell'estensione.
+// Client Firebase REST per i feedback: niente SDK, solo fetch(),
+// così gira sia nei content script sia nelle pagine interne.
 
 (function (global) {
   'use strict';
@@ -7,7 +8,8 @@
   const BUCKET = 'filo-8b9cb.firebasestorage.app';
   const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY';
   const COLLECTION = 'feedback';
-  // #583: la vista pubblica (un documento per feedback, stesso id, solo i campi sicuri) e il contatore dei numeri. La collezione vera non si legge più senza credenziali — firestore.rules e feedbackPublicView.js.
+  // La vista pubblica: un documento per feedback, stesso id, solo i campi sicuri (#583).
+  // La collezione vera non si legge senza credenziali: vedi feedbackPublicView.js.
   const VIEW_COLLECTION = 'feedback-public';
   const COUNTERS_COLLECTION = 'counters';
   const SEQ_COUNTER = 'feedbackSeq';
@@ -15,8 +17,8 @@
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
 
-  // L'uuid non serve solo a evitare collisioni di nome: da #582 è ANCHE il segreto del percorso di un allegato, perché storage.rules concede la creazione solo su un nome che lo contiene e mai la sovrascrittura.
-  // Quindi i bit vengono dal generatore crittografico quando c'è; `Math.random()` è l'ultima spiaggia per non rompere ambienti senza `crypto`, mai la prima.
+  // L'uuid è ANCHE il segreto del percorso di un allegato: storage.rules concede la creazione
+  // solo su un nome che lo contiene, quindi i bit vengono dal generatore crittografico.
   function uuid() {
     const c = global.crypto;
     if (c?.randomUUID) return c.randomUUID();
@@ -34,8 +36,8 @@
     });
   }
 
-  // FONTE UNICA della forma del nome di un allegato: storage.rules concede la creazione SOLO su un nome fatto così, e una sentinella confronta quello che esce di qui con l'espressione scritta nelle regole. Cambiarla qui senza cambiarla là vuol dire che dal deploy nessun allegato si carica più.
-  // Forma: feedback/<etichetta_>?<millisecondi>_<uuid>.<estensione>. L'etichetta dice la provenienza, i millisecondi si leggono a occhio, l'uuid è la parte che non si indovina.
+  // FONTE UNICA della forma del nome di un allegato: storage.rules concede la creazione SOLO
+  // su un nome fatto così. Cambiarla qui e non là = dal deploy nessun allegato si carica.
   function attachmentPath(mimeOrExt, label) {
     const raw = String(mimeOrExt || '');
     const ext = (raw.includes('/') ? raw.split('/')[1] : raw).replace(/[^a-z0-9]/gi, '').slice(0, 12) || 'bin';
@@ -43,44 +45,45 @@
     return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ext}`;
   }
 
-  // I due modi di nominare un oggetto del bucket — percorso REST di Firebase e percorso diretto di Google Storage — mappati a host → inizi ammessi, NOME DEL DEPOSITO compreso.
-  // I nomi del deposito sono due e sono lo stesso deposito: l'attuale e quello storico in `appspot.com`, che gli allegati più vecchi hanno ancora dentro l'indirizzo. Col solo nome attuale un allegato del 2025 non sarebbe più riconosciuto e la dashboard smetterebbe di aprirlo.
+  // Host → inizi ammessi, NOME DEL DEPOSITO compreso: REST di Firebase e diretto di Storage.
+  // I nomi del deposito sono due: senza quello storico un allegato vecchio non si apre più.
   const DEPOSITI = [BUCKET, `${PROJECT_ID}.appspot.com`];
-  // Tabella SENZA eredità (`Object.create(null)`): la chiave è il nome di dominio scritto da chi manda la segnalazione, e una tabella normale contiene già `__proto__`, `constructor`, `toString` — chiedendo quelli il `.some()` esplodeva invece di rispondere «no» (#582). Cadeva dal lato chiuso, ma una domanda di sicurezza deve RISPONDERE.
+  // Tabella SENZA eredità: la chiave la scrive chi manda, e su `__proto__` o `toString`
+  // una tabella normale esplodeva invece di dire «no»: una domanda di sicurezza risponde.
   const PREFISSI_ALLEGATO = Object.assign(Object.create(null), {
     'firebasestorage.googleapis.com': DEPOSITI.map((b) => `/v0/b/${b}/o/`),
     'storage.googleapis.com': DEPOSITI.map((b) => `/${b}/`),
   });
 
-  // Un URL è un allegato del bucket dei feedback? PURA, e serve a due cose che devono dare la stessa risposta: il guard anti-SSRF del main e la decisione di allegare il token dell'owner alla richiesta.
-  // Il confronto è sul BUCKET, non sull'host: l'indirizzo dell'allegato sta dentro il documento del feedback, e un feedback lo crea chiunque anche senza account — col solo host bastava indicare un bucket qualsiasi ospitato da Google e la dashboard ci portava il token dell'owner.
-  // L'URL si PARSA, non si confronta a regex: `new URL` normalizza i casi in cui una regex si fa fregare (host in maiuscolo, `@`, `..`), e un indirizzo che non si parsa vale «no».
+  // Un URL è un allegato del bucket dei feedback? Il confronto è sul BUCKET, non sull'host:
+  // un feedback lo crea chiunque, e col solo host basterebbe un altro bucket di Google.
   function isAttachmentUrl(url) {
     let u;
     try { u = new URL(String(url || '')); } catch (_) { return false; }
     if (u.protocol !== 'https:') return false;
     const prefissi = PREFISSI_ALLEGATO[u.hostname];
-    // `Array.isArray` e non `!!`: se un giorno la tabella tornasse un oggetto normale, qui si continua a rispondere «no» invece di esplodere su una domanda che decide se firmare col gettone dell'owner.
+    // `Array.isArray` e non `!!`: se la tabella tornasse un oggetto normale qui si dice «no»
+    // invece di esplodere su una domanda che decide se firmare col gettone dell'owner.
     return Array.isArray(prefissi) && prefissi.some((p) => u.pathname.startsWith(p));
   }
 
-  // Dal #583 la lettura del deposito è negata dalle regole a CHIUNQUE, owner compreso: quello che apre un allegato è il download token dentro l'URL. Questo Bearer non apre più niente da solo, e resta perché se un domani le regole tornassero a riconoscere un'identità la richiesta sia già firmata nel modo giusto.
-  // La regola che conta è DOVE va: il token dell'owner esce SOLO verso il deposito di Filo, e `isAttachmentUrl` lo confronta per intero. Su qualunque altro indirizzo queste intestazioni sono vuote.
+  // Quello che apre un allegato è il download token nell'URL, non questo Bearer (#583).
+  // Il token dell'owner esce SOLO verso il deposito di Filo, altrove niente intestazioni.
   function attachmentFetchHeaders(url, idToken) {
     const t = String(idToken || '');
     if (!t || !isAttachmentUrl(url)) return {};
     return { Authorization: `Bearer ${t}` };
   }
 
-  // Etichetta con cui si MOSTRA un indirizzo che arriva da fuori. Un indirizzo dentro una segnalazione lo scrive chi manda, e manda chiunque: quando diventa qualcosa su cui si clicca, la scritta deve dire dove si va, o è un'esca dentro una pagina di Filo. La vecchia mostrava i primi 80 caratteri tagliati senza puntino, e chi li costruisce apposta sceglie cosa ci cade dentro.
-  // Tre regole, in ordine: la parte prima della chiocciola non si mostra mai, è lì solo per mentire; l'host non si taglia MAI dalla coda, perché la coda è il posto vero — se non entra si taglia da DAVANTI, col puntino all'inizio; un indirizzo tagliato lo dice.
-  // Fuori si passa l'indirizzo già normalizzato da `new URL`, così etichetta e destinazione parlano dello stesso indirizzo; se non si parsa torna stringa vuota e chi chiama mostra l'indirizzo crudo, che però non è un collegamento.
+  // Etichetta di un indirizzo che arriva da fuori: deve dire dove si va, o è un'esca.
+  // La parte prima della chiocciola non si mostra; l'host non si taglia MAI dalla coda.
   const LINK_LABEL_MAX = 80;
   function linkLabel(rawUrl, max) {
     const limite = Number.isFinite(max) && max >= 8 ? Math.floor(max) : LINK_LABEL_MAX;
     let u;
     try { u = new URL(String(rawUrl || '')); } catch (_) { return ''; }
-    // Solo indirizzi che portano su un sito: `javascript:alert(1)` si parsa benissimo, ha host vuoto, e l'etichetta diventerebbe `alert(1)` — una scritta che non dice dove si va, cioè quello che questa funzione esiste per evitare.
+    // Solo indirizzi che portano su un sito: `javascript:alert(1)` si parsa, ha host vuoto,
+    // e l'etichetta diventerebbe `alert(1)`, che non dice dove si va.
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
     const host = u.host; // host = dominio + porta, senza credenziali davanti
     const resto = `${u.pathname}${u.search}${u.hash}`;
@@ -89,8 +92,8 @@
     return `${host}${resto.slice(0, limite - host.length - 1)}…`;
   }
 
-  // Anti-duplicati (#370): con un submissionId il documento nasce con QUELL'id, e un secondo invio uguale — un tentativo andato in timeout lato UI ma riuscito sul server, poi ripetuto — viene rifiutato invece di creare un duplicato.
-  // Id fuori dai caratteri ammessi o nei pattern vietati → '', cioè id auto-generato e nessuna idempotenza.
+  // Anti-duplicati (#370): col submissionId il documento nasce con QUELL'id, e un secondo
+  // invio uguale viene rifiutato. Id non ammesso → '', cioè nessuna idempotenza.
   function sanitizeDocId(id) {
     if (!id) return '';
     const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 200);
@@ -107,8 +110,8 @@
     return new Blob([arr], { type: mime });
   }
 
-  // L'upload è una CREAZIONE e basta: dal #582 le regole non concedono la sovrascrittura, quindi un nome già esistente torna 403 invece di calpestare l'allegato di qualcun altro.
-  // L'URL che torna porta il download token, e da quando la lettura del bucket è riservata all'owner quel token È il permesso di leggere l'allegato: va trattato come il contenuto, non come un indirizzo.
+  // L'upload è una CREAZIONE: le regole non concedono la sovrascrittura, un nome già usato
+  // torna 403. L'URL che torna porta il download token, da trattare come il contenuto.
   async function uploadImage(blob) {
     const name = attachmentPath(blob.type || 'png');
     const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
@@ -123,7 +126,8 @@
     }
     const json = await res.json();
     const token = json.downloadTokens || (json.metadata?.downloadTokens) || '';
-    // Il token di scarico è la CHIAVE dell'allegato, non un ornamento del link (#583): senza, l'indirizzo non apre più niente, nemmeno al main dell'owner. Prima il link si costruiva lo stesso perché il file era aperto a chiunque; adesso sarebbe un allegato perso in silenzio, scoperto settimane dopo. Meglio dirlo subito: chi invia lo ritrova fra i non caricati e riprova.
+    // Il token di scarico è la CHIAVE dell'allegato (#583): senza, l'indirizzo non apre nulla.
+    // Meglio dirlo subito: chi invia lo ritrova fra i non caricati e riprova.
     if (!token) {
       throw new Error('il deposito non ha rilasciato il codice di scarico: '
         + "senza, l'allegato non sarebbe più leggibile da nessuno.");
@@ -132,32 +136,30 @@
     return { url: publicUrl, name };
   }
 
-  // S1.F2.1 — mapping status fine → pubblico: 'open' (in lavorazione OPPURE bloccato, che collassano per non regalare hill-climbing), 'closed', 'pending-approval' (riservato al futuro).
-  // `blocked` DEVE mappare su 'open': su 'closed' o su un valore distinto, chi legge Firestore senza chiave riconoscerebbe un attacco beccato.
-  // Gli stati CANONICI stanno in SN_FB_STATUS.PUBLIC_MAP; qui resta solo il mapping dei LEGACY ritirati. Non duplicarlo altrove.
+  // Mapping status fine → pubblico. Gli stati CANONICI stanno in SN_FB_STATUS.PUBLIC_MAP:
+  // qui resta solo il mapping dei LEGACY ritirati, e non si duplica altrove.
   const STATUS_PUBLIC_MAP = {
     new:     'open',
     draft:   'open',
     todo:    'open',
     clarify: 'open',
     review:  'open',
-    blocked: 'open',   // ← CUORE DI SICUREZZA: collassa insieme agli "in lavorazione"
+    blocked: 'open', // sicurezza: collassa sugli «in lavorazione» (feedbackTransitions.js)
     done:     'closed',
     verified: 'closed',
     ignored:  'closed',
     archived: 'closed',
   };
 
-  /**
-  * Mappa uno status fine al valore pubblico grossolano, da un unico posto per tutti i percorsi di scrittura. Lookup pigra su SN_FB_STATUS così i due file non impongono un ordine di caricamento; il ripiego legacy copre gli stati ritirati.
-  */
+  // Un unico posto per tutti i percorsi di scrittura.
+  // Lookup pigra su SN_FB_STATUS: i due file non impongono un ordine di caricamento.
   function statusToPublic(fineStatus) {
     const FS = global.SN_FB_STATUS;
     if (FS && FS.PUBLIC_MAP[fineStatus]) return FS.PUBLIC_MAP[fineStatus];
     return STATUS_PUBLIC_MAP[fineStatus] || 'open'; // default safe: unknown → 'open'
   }
 
-  // Cifra un campo testo se la chiave pubblica c'è; altrimenti lo lascia invariato — niente crash, scrittura in chiaro come prima.
+  // Senza chiave pubblica il valore passa invariato: niente crash, scrittura in chiaro.
   async function maybeEncrypt(value) {
     if (value == null || value === '') return value;
     const C = global.SN_FEEDBACK_CRYPTO;
@@ -166,20 +168,21 @@
     catch (e) { console.warn('[SN feedback] cifratura testo fallita:', e?.message || e); return value; }
   }
 
-  // S1.F2.1: cifra `status` quando il gate è acceso. `statusPublic` si calcola PRIMA e si scrive sempre in chiaro accanto, perché i lettori senza chiave privata (C5, bacheca) usano quello.
+  // `statusPublic` si calcola PRIMA e si scrive sempre in chiaro accanto allo status cifrato:
+  // i lettori senza chiave privata (bacheca, popup ricompense) usano quello.
   async function encryptStatus(status) {
     const publicStatus = statusToPublic(status);
-    // #476: si cifra a LUNGHEZZA FISSA. La cifratura non imbottisce, quindi senza questo contare i caratteri del campo cifrato equivale a leggerlo: dal database pubblico si pescavano i feedback beccati misurando il campo, senza chiave e senza login.
+    // Lunghezza fissa dello status cifrato: regola in feedbackTransitions.js (#476).
     const FS = global.SN_FB_STATUS;
     const daCifrare = FS && FS.padForCipher ? FS.padForCipher(status) : status;
-    const fineStatus = await maybeEncrypt(daCifrare); // cifra solo se isEnabled()
+    const fineStatus = await maybeEncrypt(daCifrare);
     return { fineStatus, publicStatus };
   }
 
-  // Il contenuto diventa opaco (application/octet-stream). Senza pubkey torna il blob originale.
+  // Il contenuto diventa opaco; senza chiave pubblica torna il blob originale.
   async function maybeEncryptBlob(blob) {
     const C = global.SN_FEEDBACK_CRYPTO;
-    if (!C || !C.isEnabled()) return blob; // dormiente finché il cutover non accende SN_FEEDBACK_ENC_ENABLED
+    if (!C || !C.isEnabled()) return blob;
     try {
       const ab = await blob.arrayBuffer();
       const plain = new Uint8Array(ab);
@@ -191,9 +194,10 @@
     }
   }
 
-  // Allegati ai COMMENTI dei feedback (#190.3). Su feedback/* chiunque può CREARE un allegato nuovo senza login, ma nessuno può sovrascriverne uno: niente token da passare di qui.
+  // Allegati ai COMMENTI (#190.3): chiunque può CREARE senza login, nessuno sovrascrivere.
+  // Quindi di qui non passa nessun token.
   async function uploadAttachment(blob, name) {
-    const u = await uploadImage(blob); // upload generico (usa blob.type)
+    const u = await uploadImage(blob);
     const type = (blob && blob.type) || '';
     const kind = type.startsWith('image/') ? 'img' : 'file';
     return {
@@ -239,8 +243,8 @@
     return null;
   }
 
-  // Chi legge la collezione vera (#583): le regole ammettono solo l'owner e il server. L'ID token dell'owner vive nel main e non deve mai arrivare in una pagina, quindi da una pagina filo:// la lettura si CHIEDE al main, che la esegue col token e torna le righe già decodificate; nel main e negli script la fetch è diretta.
-  // Solo `window.filo`, il ponte delle pagine interne: un content script ha `chrome.runtime.sendMessage` ma di feedback non ne legge, e il canale del main rifiuta comunque le origini che non sono filo://.
+  // La collezione vera la leggono solo owner e server (#583), e il token dell'owner vive nel
+  // main: da una pagina la lettura si CHIEDE al main, che torna le righe già decodificate.
   function pageBridge() {
     const w = (typeof window !== 'undefined') ? window : null;
     if (w && w.filo && typeof w.filo.message === 'function') return (m) => w.filo.message(m);
@@ -253,7 +257,7 @@
     if (!r || r.ok !== true) {
       const code = r && r.code;
       if (code === 'not_admin' || code === 'forbidden') {
-        // Non è un guasto, è un permesso che manca: tradotto in «controlla la connessione» manderebbe a guardare la cosa sbagliata, e riprovare non servirebbe.
+        // Non è un guasto ma un permesso che manca: «controlla la connessione» sarebbe fuorviante.
         const e = new Error('i feedback li legge solo chi li gestisce: accedi con l\'account amministratore per vederli.');
         e.code = 'FEEDBACK_READ_DENIED';
         throw e;
@@ -268,13 +272,13 @@
     for (const [k, v] of Object.entries(doc.fields || {})) out[k] = fromFsValue(v);
     out._id = doc.name?.split('/').pop() || '';
     out._createTime = doc.createTime || null;
-    // Ultima scrittura sul documento, messa da Firestore: è il segno con cui la dashboard riconosce a ogni giro quali feedback sono cambiati senza rileggerli tutti.
+    // È il segno con cui la dashboard riconosce cosa è cambiato senza rileggere tutto.
     out._updateTime = doc.updateTime || null;
     return out;
   }
 
-  // Ogni feedback ha un numero leggibile, `seq`. Il campo `subSeq` è SOLO STORICO: lo scrivevano le routine quando spezzavano una spec, meccanica abolita col ridisegno.
-  // I sub-feedback esistenti restano visibili, quindi formatNum produce ancora anche la forma #N.M.
+  // `subSeq` è SOLO STORICO: la spezzatura delle spec in sotto-feedback è abolita.
+  // I sub-feedback esistenti restano visibili, quindi si produce ancora la forma #N.M.
   function formatNum(seq, subSeq) {
     const s = Number(seq);
     if (!Number.isInteger(s) || s <= 0) return '';
@@ -282,8 +286,8 @@
     return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
   }
 
-  // Tronca senza mai spezzare un carattere: `String.slice` lavora su unità UTF-16, e tagliare in mezzo a un'emoji lascia un surrogato solitario che si vede come glifo rotto.
-  // Si conta per grafema con Intl.Segmenter quando c'è, così restano insieme anche le emoji composte e i modificatori di tono pelle; ripiego a code point.
+  // Tronca senza spezzare un carattere: `slice` lavora su unità UTF-16 e taglierebbe un'emoji
+  // a metà. Si conta per grafema con Intl.Segmenter, con ripiego a code point.
   function truncateSafe(str, max) {
     const s = String(str == null ? '' : str);
     let units;
@@ -310,9 +314,8 @@
     return words.length > maxWords ? out + '…' : out;
   }
 
-  // Il numero progressivo (#583) viene da un contatore suo, non più da una query sulla collezione: quella è una LETTURA, e la collezione non si legge senza credenziali mentre l'invio resta anonimo per scelta. Nel contatore c'è un intero e basta: chiunque può farlo avanzare di uno, nessuno può farlo tornare indietro.
-  // Avanzamento con controllo di versione: se due invii partono insieme il secondo si accorge che è cambiato sotto e rilegge, invece di sovrascrivere come faceva prima, quando la race DUPLICAVA un numero.
-  // Torna `null` invece di lanciare: il feedback parte senza numero, come già faceva quando la query falliva. A crearlo e rimetterlo in pari è l'app dell'owner.
+  // Il numero viene da un contatore, non da una query: la collezione non si legge senza
+  // credenziali e l'invio resta anonimo. Torna `null` invece di lanciare: meglio senza numero.
   const SEQ_RETRIES = 5;
 
   async function nextSeq() {
@@ -343,9 +346,8 @@
     return null;
   }
 
-  // Rimette il contatore in pari: lo crea se manca, lo alza se un `seq` più alto è già in giro. Solo owner.
-  // `allowLower` lo riporta GIÙ quando è più alto di qualunque `seq` esistente: farlo avanzare lo può fare chiunque, e senza questa cura un estraneo che lo spinge a diecimila lascerebbe i feedback nuovi con numeri assurdi per sempre. Si passa `true` SOLO col numero più alto VERO in mano: col massimo dei soli feedback caricati si riassegnerebbero numeri già usati.
-  // Resta comunque una corsa, quindi si scende solo con uno scarto più largo di qualunque corsa realistica: uno o due è gente che sta inviando adesso, cento è un contatore gonfiato. Uno scarto piccolo resta com'è — numeri saltati valgono meno del rischio di stamparne due uguali.
+  // `allowLower` riporta GIÙ il contatore: farlo salire lo può chiunque, e senza questa cura
+  // i numeri nuovi resterebbero assurdi. Si scende solo con uno scarto più largo di una corsa.
   const SEQ_LOWER_MARGIN = 10;
 
   async function ensureSeqCounter(maxSeq, opts = {}) {
@@ -378,10 +380,10 @@
     return value;
   }
 
-  // Invia un feedback. `name` è il titolo breve, generato da un LLM nel main prima della chiamata.
-  // `parentId` (DC4): il feedback nasce COLLEGATO a un altro, per esempio la riapertura di un fix dalla bacheca. Nessuna sub-numerazione automatica — la spezzatura in #seq.subSeq è abolita — il collegato ha un numero proprio e `parentId` serve solo a far comparire «collegato a #N» e a far risalire all'originale.
+  // `name` è il titolo breve, generato da un LLM nel main prima della chiamata.
+  // `parentId`: il feedback nasce collegato a un altro, che ha comunque un numero proprio.
   async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }) {
-    // Allegati che NON sono riusciti a caricarsi: tornano al chiamante così la UI avvisa. Prima un upload fallito veniva ingoiato e il feedback partiva senza il file, senza alcun segnale.
+    // Gli allegati non caricati tornano al chiamante: un upload fallito non si ingoia.
     const failed = [];
     const imgs = Array.isArray(images) ? images.slice(0, 5) : [];
     const uploaded = [];
@@ -389,13 +391,12 @@
       const img = imgs[i];
       if (!img?.dataUrl) continue;
       const rawBlob = dataUrlToBlob(img.dataUrl);
-      // Limite difensivo lato client, misurato sul raw: la cifratura aggiunge una novantina di byte fissi.
+      // Limite misurato sul raw: la cifratura aggiunge una novantina di byte fissi.
       if (rawBlob.size > 4 * 1024 * 1024) {
         failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'troppo grande (max 4 MB)' });
         continue;
       }
       try {
-        // S1.2: si cifrano i byte prima dell'upload; senza pubkey il blob passa invariato.
         const blobToUpload = await maybeEncryptBlob(rawBlob);
         const u = await uploadImage(blobToUpload);
         uploaded.push(u.url);
@@ -405,7 +406,7 @@
       }
     }
 
-    // Stesso bucket delle immagini, ma nome e tipo originali si conservano per mostrarli come link scaricabili in dashboard.
+    // Nome e tipo originali si conservano: in dashboard diventano link scaricabili.
     const docs = Array.isArray(files) ? files.slice(0, 5) : [];
     const uploadedFiles = [];
     for (const f of docs) {
@@ -414,9 +415,8 @@
       const rawBlob = dataUrlToBlob(f.dataUrl);
       if (rawBlob.size > 4 * 1024 * 1024) { failed.push({ name: fname, reason: 'troppo grande (max 4 MB)' }); continue; }
       try {
-        // S1.2: cifra anche gli allegati non-immagine.
         const blobToUpload = await maybeEncryptBlob(rawBlob);
-        const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
+        const u = await uploadImage(blobToUpload);
         uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || rawBlob.type || '') });
       } catch (e) {
         console.warn('[SN feedback] upload file fallito:', e);
@@ -424,19 +424,19 @@
       }
     }
 
-    // Numero progressivo best-effort: il feedback parte anche se la query fallisce, resterà senza numero invece di bloccare l'invio.
+    // Best-effort: il feedback parte anche senza numero, invece di bloccare l'invio.
     let seq = null;
     try { seq = await nextSeq(); }
     catch (e) { console.warn('[SN feedback] numerazione non disponibile:', e?.message || e); }
 
-    // S1.2 fase 1: si cifra SOLO il contenuto dell'utente che nessun altro utente deve poter leggere — `text` e `url`, cioè la superficie d'attacco e il contesto di navigazione.
-    // NON si cifrano `title`/`name`: li mostra il popup ricompense, che gira sulla macchina di chi ha inviato, SENZA chiave privata. Restano per la fase 2, con proiezione sanitizzata.
+    // Si cifra SOLO il contenuto che nessun altro utente deve leggere: `text` e `url`.
+    // `title`/`name` no: li mostra il popup ricompense, sulla macchina di chi ha inviato.
     const [encText, encUrl] = await Promise.all([
       maybeEncrypt(text || ''),
       maybeEncrypt(url || ''),
     ]);
 
-    // S1.F2.2: hash deterministico del clientId, calcolato SEMPRE (anche a gate dormiente) per uniformità del match C5. Se il chiamante l'ha già calcolato si riusa il suo.
+    // L'hash del clientId si calcola SEMPRE, anche a cifratura spenta: il match passa da lì.
     let resolvedClientIdHash = (typeof clientIdHash === 'string' && clientIdHash.length === 32) ? clientIdHash : '';
     if (!resolvedClientIdHash) {
       try {
@@ -447,7 +447,7 @@
       } catch (_) {}
     }
 
-    // S1.F2.2: `clientId` cifrato quando la cifratura è attiva, perché il match passa dall'hash. A gate dormiente resta in chiaro.
+    // Il `clientId` si può cifrare perché il match passa dall'hash.
     const encClientId = await maybeEncrypt(clientId || '');
 
     const doc = {
@@ -458,11 +458,9 @@
         name: toFsValue(String(name || '').slice(0, 200)),
         userAgent: toFsValue(userAgent || ''),
         clientId: toFsValue(encClientId),
-        // S1.F2.2: hash in chiaro per il match C5 (il raw clientId può essere cifrato).
         clientIdHash: toFsValue(resolvedClientIdHash),
         images: toFsValue(uploaded),
         files: toFsValue(uploadedFiles),
-        // S1.F2.1: statusPublic SEMPRE in chiaro anche con status cifrato. Un feedback nuovo parte da 'new' → 'open'.
         statusPublic: toFsValue('open'),
         createdAt: { timestampValue: new Date().toISOString() },
       },
@@ -479,7 +477,7 @@
       doc.fields.capabilityGapId = toFsValue(String(capabilityGapId).slice(0, 100));
     }
 
-    // Idempotenza (#370): col submissionId il documento nasce con QUELL'id, così un invio andato in timeout lato UI ma riuscito sul server non diventa un duplicato quando l'utente ripete — il server rifiuta il doc già presente.
+    // Idempotenza: vedi sanitizeDocId (#370).
     const docId = sanitizeDocId(submissionId);
     const idParam = docId ? `documentId=${encodeURIComponent(docId)}&` : '';
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?${idParam}key=${API_KEY}`;
@@ -489,12 +487,13 @@
       body: JSON.stringify(doc),
     });
     if (res.status === 403) {
-      // Rules non ancora aggiornate ai campi nuovi: meglio un feedback senza numero, titolo o collegamento che un invio fallito. Si ritenta col solo schema storico.
+      // Se le rules non conoscono i campi nuovi si ritenta col solo schema storico:
+      // meglio un feedback senza numero o titolo che un invio fallito.
       delete doc.fields.name;
       delete doc.fields.seq;
       delete doc.fields.subSeq;
       delete doc.fields.parentId;
-      delete doc.fields.clientIdHash; // S1.F2.2: rules vecchie potrebbero rifiutarlo
+      delete doc.fields.clientIdHash; // le rules vecchie potrebbero rifiutarlo
       seq = null;
       res = await fetch(endpoint, {
         method: 'POST',
@@ -502,7 +501,7 @@
         body: JSON.stringify(doc),
       });
     }
-    // 409 ALREADY_EXISTS con documentId: il feedback c'era già da un tentativo precedente. Non è un errore, è un successo idempotente.
+    // 409 con documentId: il feedback c'era già. Non è un errore, è un successo idempotente.
     if (docId && res.status === 409) {
       return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true };
     }
@@ -514,31 +513,31 @@
     return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed };
   }
 
-  // Quante segnalazioni chiedono al massimo le pagine che le ELENCANO, dalla più recente. È un TETTO, non un totale: superata la soglia i più vecchi restano fuori e nessun conteggio calcolato in pagina può vederli.
+  // È un TETTO, non un totale: oltre la soglia i più vecchi restano fuori,
+  // e nessun conteggio calcolato in pagina può vederli.
   const LIST_PAGE_SIZE = 500;
 
-  // Se il caricamento ha toccato il tetto, ogni numero che ne deriva è un «almeno N», non un totale.
+  // Toccato il tetto, ogni numero che ne deriva è un «almeno N», non un totale.
   function listHitCap(loaded, pageSize) {
     const cap = Number(pageSize) > 0 ? Number(pageSize) : LIST_PAGE_SIZE;
     return Array.isArray(loaded) && loaded.length >= cap;
   }
 
-  // «(24)» quando il numero è il totale, «(24+)» quando il caricamento ha toccato il tetto ed è solo un minimo. Un numero che afferma un totale che non conosce sembra una risposta ed è peggio di nessun numero; il «+» costa un carattere e dice la verità.
+  // Il «+» dice che è un minimo: un numero che afferma un totale che non conosce
+  // sembra una risposta ed è peggio di nessun numero.
   function countLabel(n, truncated) {
     const v = Math.max(0, Math.trunc(Number(n) || 0));
     return truncated ? `(${v}+)` : `(${v})`;
   }
 
-  // L'hover spiega il «+» così non resta un enigma, e serve anche a una sezione che sembra vuota perché i più vecchi non sono in pagina: per questo non nomina il numero.
+  // Spiega il «+», e anche una sezione che sembra vuota perché i vecchi non sono in pagina:
+  // per questo non nomina il numero.
   const COUNT_CAP_HINT =
     `Caricati i ${LIST_PAGE_SIZE} feedback più recenti: se ce ne sono di più vecchi, non sono in pagina e non entrano nel conto.`;
 
-  // Lista i feedback, più recenti prima.
-  // `timeoutMs`: la fetch si arrende invece di restare muta finché il sistema operativo non molla (offline, un fetch del renderer può metterci una dozzina di secondi). Chi lo passa vuole mostrare un errore in tempi umani.
-  // `fields`: i soli campi da scaricare — la dashboard rimanda i campi pesanti al dettaglio e, col solo `__name__`, chiede «cosa è cambiato?» pagando pochi byte, perché ogni riga porta comunque `updateTime`.
-  // `afterName` (anche stringa vuota, «dall'inizio»): pagina ordinata per NOME del documento. È il cursore di `listAll` e non passa dal ponte col main: da una pagina filo:// una lettura completa della collezione vera non si fa.
+  // `timeoutMs`: la fetch si arrende invece di restare muta finché il sistema operativo molla.
+  // `afterName` (anche ''): pagina ordinata per NOME del documento, il cursore di `listAll`.
   async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null } = {}) {
-    // Da una pagina filo:// la lettura passa dal main, che ha il token admin (#583): qui non c'è nessuna credenziale, e torna le righe già decodificate.
     const bridge = pageBridge();
     if (bridge) {
       if (typeof afterName === 'string') {
@@ -553,15 +552,14 @@
     return listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken });
   }
 
-  // I feedback CHIUSI più di recente, non i più recenti per data d'invio: una segnalazione vecchia chiusa oggi sta fuori dalla pagina che si carica, e senza questa domanda la sua scheda non verrebbe scritta mai — niente bacheca, niente annuncio, niente crediti per chi l'aveva mandata.
-  // La data di chiusura è in chiaro, quindi si può ordinare, e chi non è mai stato chiuso non ce l'ha. Serve il token dell'owner.
+  // I feedback CHIUSI più di recente, non i più recenti per data: una segnalazione vecchia
+  // chiusa oggi non entrerebbe mai in bacheca, e chi l'ha mandata non avrebbe i crediti.
   async function listResolved({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '' } = {}) {
     return listDirect(COLLECTION, { pageSize, timeoutMs, idToken, orderField: 'resolvedAt' });
   }
 
-  // TUTTE le segnalazioni, non una pagina: `list` è una FINESTRA sui più recenti per data d'invio, buona per chi guarda gli ultimi arrivati, non per chi fa una domanda sull'INSIEME.
-  // Il caso che l'ha fatta nascere è l'archiviazione automatica: sulla finestra dei cinquecento più recenti non guardava nemmeno le segnalazioni più vecchie, cioè quelle da prendere per prime — con 711 ne restavano fuori 211, i cui fix non uscivano mai dalla bacheca e restavano votabili e riapribili a pagamento. Il numero peggiora da solo (patterns/una-pagina-dei-piu-recenti-non-e-tutto.md).
-  // Quindi si pagina col nome del documento, unico e stabile, passando sempre dalla porta ESPOSTA così chi la sostituisce in una prova sostituisce anche questa; se il freno sulle pagine scatta, la risposta lo dice.
+  // TUTTE le segnalazioni: `list` è una finestra sui più recenti, e una domanda sull'INSIEME
+  // salta i più vecchi (patterns/una-pagina-dei-piu-recenti-non-e-tutto.md).
   async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX } = {}) {
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
     const rows = [];
@@ -593,9 +591,8 @@
     return rows;
   }
 
-  // La query vera, senza ponti: la usano il main col token dell'owner, gli script e la vista pubblica, che di token non ha bisogno.
+  // La query vera, senza ponti: main con token, script, e la vista pubblica senza token.
   async function listDirect(collectionId, { pageSize = 200, timeoutMs = 0, fields = null, idToken = '', orderField = 'createdAt' } = {}) {
-    // structuredQuery via runQuery, ordinamento decrescente sul campo chiesto (la data d'invio, salvo richiesta diversa).
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const body = {
       structuredQuery: {
@@ -616,7 +613,8 @@
       headers,
       body: JSON.stringify(body),
     };
-    // Se il timeout scatta si rilancia un errore con «timeout» nel messaggio, così SN_CHAT_ERRORS lo riconosce come guasto di rete e non come annullamento volontario, che invece non va segnalato.
+    // L'errore porta «timeout» nel messaggio: SN_CHAT_ERRORS lo riconosce come guasto di rete
+    // e non come annullamento volontario, che invece non va segnalato.
     let timer = null;
     let timedOut = false;
     if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
@@ -646,7 +644,8 @@
     return out;
   }
 
-  // Il numero più alto MAI assegnato, chiesto al server con una query sua. Il massimo dei feedback caricati non basta: il caricamento si ferma ai più recenti per data, e chi guardava solo quella pagina non poteva sapere se il contatore era gonfiato o solo più alto di quello che aveva visto, quindi per prudenza non lo toccava e la cura non partiva mai. Questa domanda costa UNA lettura ed è esatta.
+  // Il numero più alto MAI assegnato, chiesto al server: il massimo dei feedback caricati
+  // non basta, perché il caricamento si ferma ai più recenti. Costa UNA lettura ed è esatto.
   async function maxSeq({ idToken = '', timeoutMs = 0 } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
@@ -680,17 +679,17 @@
       const n = Number(fromFsValue(row.document.fields?.seq));
       if (Number.isInteger(n) && n >= 0) return n;
     }
-    // `null`, non 0: chi chiama deve distinguere «non lo so» da «zero», o riporterebbe il contatore a zero su un database vuoto.
+    // `null`, non 0: «non lo so» non è «zero», o il contatore tornerebbe a zero.
     return null;
   }
 
-  // Solo le «versioni»: id più `_updateTime`, niente campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata senza riscaricare tutto.
+  // Id e `_updateTime`, niente campi: la dashboard si aggiorna senza riscaricare tutto.
   async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
     const rows = await list({ pageSize, timeoutMs, fields: ['__name__'] });
     return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime }));
   }
 
-  // batchGet: torna solo i documenti trovati, quindi un id cancellato nel frattempo non compare.
+  // batchGet torna solo i documenti trovati: un id cancellato nel frattempo non compare.
   async function getMany(ids, { timeoutMs = 0, idToken = '' } = {}) {
     const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
     if (wanted.length === 0) return [];
@@ -733,11 +732,11 @@
     return out;
   }
 
-  // La vista pubblica (#583): `feedback-public/{id}`, una scheda per feedback chiuso coi soli campi pubblici (li decide feedbackPublicView.js).
-  // È ciò che leggono la bacheca e il popup delle ricompense: niente token e niente ponte col main, qui dentro non c'è nulla da proteggere.
+  // La vista pubblica (#583): una scheda per feedback chiuso, coi soli campi pubblici.
+  // La leggono bacheca e popup ricompense: niente token, qui non c'è nulla da proteggere.
 
-  // Senza `afterName`: le più recenti per data d'invio, come la lista vera, così chi la mostra non cambia ragionamento.
-  // Con `afterName` (anche stringa vuota, cioè «dall'inizio»): pagina ordinata per NOME del documento, il cursore con cui `listAllPublic` arriva in fondo. Il nome è unico e stabile e non salta né ripete righe; una data sì, perché due schede possono averla identica.
+  // Senza `afterName`: le più recenti per data d'invio, come la lista vera.
+  // Con `afterName` (anche ''): ordine per NOME, unico e stabile — una data può ripetersi.
   async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = null } = {}) {
     if (typeof afterName === 'string') {
       const { rows } = await listByNameDirect(VIEW_COLLECTION, { pageSize, timeoutMs, afterName });
@@ -746,8 +745,8 @@
     return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs });
   }
 
-  // TUTTE le schede, non una pagina. Il tetto qui sopra è una finestra sui più recenti PER DATA D'INVIO, e le domande che si fanno alle schede non sono su quell'asse: «mi spetta una ricompensa?» (una segnalazione vecchia chiusa oggi ha la scheda in fondo, e chi l'ha mandata non riceve né annuncio né crediti), «quali schede vanno tolte?» (una fuori dalla finestra non la toglie più nessuno, e un fix riaperto resta in bacheca come risolto), «cosa mostra la bacheca?». Con 552 schede e un tetto di 500 la risposta ne dimenticava 52, in silenzio (#583).
-  // Quindi si PAGINA fino in fondo passando sempre da `listPublic`, una porta sola. Il costo è una lettura per scheda, lo stesso che pagava la finestra ma completo. `maxPages` è un freno contro un ciclo infinito, non un tetto di prodotto: se scatta la risposta lo DICE (`complete: false`).
+  // TUTTE le schede: la finestra sui più recenti per DATA D'INVIO non risponde a «mi spetta
+  // una ricompensa?» né a «quale scheda va tolta?». `maxPages` è un freno: se scatta lo dice.
   const ALL_PAGES_MAX = 40;
 
   async function listAllPublicPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, maxPages = ALL_PAGES_MAX } = {}) {
@@ -757,7 +756,8 @@
     let cursor = '';
     let complete = false;
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
-      // Si passa dalla porta ESPOSTA, non dal riferimento interno: chi sostituisce `SN_FEEDBACK.listPublic` in una prova deve sostituire anche questa lettura, o si ritroverebbe la rete vera sotto una pagina che crede finta.
+      // Si passa dalla porta ESPOSTA: chi sostituisce `listPublic` in una prova sostituisce
+      // anche questa lettura, o si ritrova la rete vera sotto una pagina che crede finta.
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listPublic) || listPublic;
       // eslint-disable-next-line no-await-in-loop
       const batch = await porta({ pageSize: limit, timeoutMs, afterName: cursor });
@@ -770,7 +770,7 @@
         rows.push(r);
         nuove += 1;
       }
-      // Una sorgente che ignora il cursore torna sempre la stessa pagina: se non arriva niente di nuovo si è già in fondo, e continuare sarebbe un ciclo.
+      // Una sorgente che ignora il cursore ripete la pagina: niente di nuovo = si è in fondo.
       const ultimo = nomeDocumento(VIEW_COLLECTION, arr[arr.length - 1]);
       if (arr.length < limit || nuove === 0 || !ultimo || ultimo === cursor) { complete = true; break; }
       cursor = ultimo;
@@ -778,9 +778,8 @@
     return { rows, complete };
   }
 
-  // Memoria breve della lettura completa. L'annuncio della ricompensa gira a ogni caricamento della home, e la home è la pagina di OGNI scheda nuova: senza memoria chi ha mandato almeno una segnalazione si riscarica tutte le schede ogni volta che apre una scheda — misurate, quattro aperture costavano 2208 schede in otto richieste. La risposta che serve cambia una volta ogni mai.
-  // Trenta secondi sono gli stessi che si dà chi gestisce i feedback dal lato suo: era l'asimmetria da chiudere.
-  // La memoria tiene anche il riferimento della PORTA da cui è stata riempita: chi la sostituisce mette una funzione nuova, la memoria non combacia più e si rilegge, così una prova non si ritrova davanti le schede della scena precedente. E si ricorda solo una lettura COMPLETA: memorizzare un troncamento vorrebbe dire ripeterlo per mezzo minuto.
+  // Memoria breve: l'annuncio della ricompensa gira a ogni caricamento della home, e senza
+  // rileggerebbe tutte le schede ogni volta. Si ricorda solo una lettura COMPLETA.
   const ALL_CACHE_TTL_MS = 30_000;
   let allCache = { at: 0, rows: null, porta: null };
 
@@ -806,8 +805,8 @@
     return `${FIRESTORE_BASE.replace(/^https:\/\/firestore\.googleapis\.com\/v1\//, '')}/${collectionId}/${id}`;
   }
 
-  // Una pagina ordinata per nome del documento, con cursore: è il mattone delle letture complete, e l'ordine degli id a chi mostra le righe non serve — ordina lui.
-  // `idToken` serve per la collezione vera, che senza credenziali non si legge (#583); la vista pubblica lo lascia vuoto.
+  // Una pagina ordinata per nome, con cursore: è il mattone delle letture complete.
+  // `idToken` serve per la collezione vera; la vista pubblica lo lascia vuoto.
   async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '' } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const structuredQuery = {
@@ -864,7 +863,8 @@
     return fsDocToObject(await res.json());
   }
 
-  // La maschera elenca SOLO i campi della scheda: `votes` e `reopenRequests` li scrivono gli utenti e una ripubblicazione non deve cancellarli. Serve il token dell'owner o del server.
+  // La maschera elenca SOLO i campi della scheda: `votes` e `reopenRequests` li scrivono
+  // gli utenti, e una ripubblicazione non deve cancellarli.
   async function publishPublicCard(id, card, opts = {}) {
     const key = String(id || '');
     if (!key) throw new Error('id mancante');
@@ -880,7 +880,8 @@
     }
     fields.publishedAt = toFsValue(new Date().toISOString());
     mask.push('publishedAt');
-    // Voti e riaperture li scrivono gli UTENTI, quindi di norma non entrano nella maschera. L'unica volta che ci entrano è il travaso dal documento alla scheda (carryUserFields), e lì il valore che arriva ha già dentro anche quello che c'era sulla scheda.
+    // Entrano nella maschera solo per il travaso dal documento alla scheda (carryUserFields),
+    // e lì il valore che arriva contiene già quello che c'era sulla scheda.
     const userFields = (V && V.USER_FIELDS) ? V.USER_FIELDS : ['votes', 'reopenRequests'];
     for (const f of userFields) {
       const v = (card || {})[f];
@@ -900,7 +901,7 @@
     return true;
   }
 
-  // Un fix riaperto o riclassificato esce dalla bacheca perché la sua scheda non c'è più, non perché la pagina la nasconde.
+  // Un fix riaperto esce dalla bacheca perché la scheda non c'è più, non perché è nascosta.
   async function unpublishPublicCard(id, opts = {}) {
     const key = String(id || '');
     if (!key) throw new Error('id mancante');
@@ -916,43 +917,41 @@
     return true;
   }
 
-  // Aggiorna stato e note di un feedback. `opts.idToken` va come Bearer perché le rules verifichino che l'utente è un admin: senza, la scrittura riesce solo dove le regole ammettono l'anonimo.
+  // `idToken` va come Bearer: senza, passa solo ciò che le regole ammettono all'anonimo.
   async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
     const mask = [];
     if (status !== undefined) {
-      // S1.F2.1: status fine cifrato se il gate è acceso, statusPublic SEMPRE in chiaro.
       const { fineStatus, publicStatus } = await encryptStatus(status);
       fields.status = toFsValue(fineStatus);
       mask.push('status');
       fields.statusPublic = toFsValue(publicStatus);
       mask.push('statusPublic');
     }
-    // I DUE TESTI (ROUTINE-AUTH-SPEC.md §8). `notes` è il report per l'OWNER e viaggia CIFRATO: il documento è a lettura pubblica, e quel testo prima o poi racconta come è stato chiuso un fix di sicurezza — cioè cosa non funzionava — prima che la correzione arrivi sui computer degli utenti.
-    // Non si poteva cifrare perché era anche il testo che l'utente leggeva nel popup ricompense, sulla sua macchina, che la chiave non ce l'ha. Ora quella è una frase a parte in chiaro (`userNote`).
-    // La conversazione ha un tetto: oltre quello le regole respingono OGNI scrittura successiva sul feedback, non solo quella sulle note, e il feedback resterebbe immobile. I turni più vecchi si tagliano qui, PRIMA di cifrare.
+    // `notes` è il report per l'OWNER e viaggia CIFRATO: racconta come è stato chiuso un fix
+    // di sicurezza. Ha un tetto: oltre, le regole respingono OGNI scrittura sul feedback.
     if (notes !== undefined) {
       const T = global.SN_FEEDBACK_THREAD;
       const capped = T && T.capNotes ? T.capNotes(notes) : notes;
       const C = global.SN_FEEDBACK_CRYPTO;
       let value = capped;
       if (C && C.isEnabled && C.isEnabled() && capped && !C.isEncrypted(capped)) {
-        // Fail-safe: se la cifratura non riesce NON si scrive il report in chiaro, si lascia la conversazione com'era.
+        // Se la cifratura non riesce NON si scrive in chiaro: la conversazione resta com'era.
         try { value = await C.encryptForOwner(capped); } catch (_) { value = undefined; }
       }
       if (value !== undefined) { fields.notes = toFsValue(value); mask.push('notes'); }
     }
-    // La frase per chi ha mandato il feedback: in chiaro per forza, perché la legge senza chiave, e corta per costruzione.
-    // Il tetto è in CARATTERI e combacia con quello delle regole, provato dal vivo su un documento-cavia. Diverso dal tetto della conversazione, che è in byte perché lì sul documento finisce il testo CIFRATO.
+    // La frase per chi ha mandato il feedback: in chiaro per forza, la legge senza chiave.
+    // Il tetto è in CARATTERI e combacia con quello delle regole, provato su un documento-cavia.
     if (userNote !== undefined) {
-      // Il taglio degli spazi si fa alla consegna e non mentre l'owner scrive: riscrivere la casella sotto le dita gli mangia lo spazio appena battuto e incolla insieme due parole.
+      // Il taglio degli spazi si fa alla consegna, non mentre l'owner scrive: riscrivere
+      // la casella sotto le dita mangia lo spazio appena battuto.
       fields.userNote = toFsValue(String(userNote || '').trim().slice(0, 500)); mask.push('userNote');
     }
-    // #476 — la revisione dell'owner viaggia TUTTA cifrata. Li scrive solo la dashboard quando sblocca o conferma un feedback fermato dalla sicurezza, e le letture della collezione sono pubbliche: in chiaro erano un annuncio a chi aveva mandato quel feedback.
-    // `reviewComment` diceva il PERCHÉ era stato beccato, cioè il manuale per riprovare meglio; `reviewDecision` l'esito in una parola; e persino la SOLA PRESENZA di `reviewedAt` bastava, perché un feedback normale non ce l'ha. Vanno insieme: cifrarne uno solo lascia all'attaccante il campo rimasto.
-    // Li rilegge chi ha la chiave: la dashboard e il backend di sicurezza, che su `reviewDecision === 'accepted'` sa di non dover ri-bloccare un feedback sbloccato a mano. I valori vecchi in chiaro continuano a leggersi.
+    // La revisione dell'owner viaggia TUTTA cifrata (#476): in chiaro diceva a chi ha mandato
+    // un attacco che è stato beccato e perché. Vanno insieme: anche solo `reviewedAt` basta.
     if (reviewDecision !== undefined) {
       fields.reviewDecision = toFsValue(await maybeEncrypt(reviewDecision));
       mask.push('reviewDecision');
@@ -965,12 +964,12 @@
       fields.reviewedAt = toFsValue(await maybeEncrypt(reviewedAt));
       mask.push('reviewedAt');
     }
-    // Preferito (DB2), parcheggio per il futuro: le rules accettano `starred` nel ramo update admin.
+    // Preferito (DB2): le rules accettano `starred` nel ramo update admin.
     if (starred !== undefined) { fields.starred = { booleanValue: !!starred }; mask.push('starred'); }
     // Override owner per l'auto-archiviazione a punteggio (DC3, boardArchive.js).
     if (archiveOverride !== undefined) { fields.archiveOverride = toFsValue(archiveOverride); mask.push('archiveOverride'); }
-    // La pre-approvazione della fusione per QUESTA pratica: `{ by, at }` per metterla, `null` per toglierla.
-    // Togliere è CANCELLARE il campo: la maschera lo nomina e i campi non lo portano, che per Firestore vuol dire «via». Un `null` scritto come valore resterebbe sul documento e le regole lo respingerebbero.
+    // La pre-approvazione della fusione per QUESTA pratica: `{ by, at }` per metterla,
+    // `null` per toglierla, cioè CANCELLARE il campo: scritto come valore resterebbe lì.
     if (mergePreapproved !== undefined) {
       if (mergePreapproved && typeof mergePreapproved === 'object') {
         fields.mergePreapproved = toFsValue({
@@ -983,7 +982,7 @@
     if (priority !== undefined) {
       // Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
-      // Con cifratura attiva `priority` va come stringValue (ciphertext); senza, integerValue come prima.
+      // Con la cifratura attiva `priority` va come stringValue, altrimenti come integerValue.
       const C = global.SN_FEEDBACK_CRYPTO;
       if (C && C.isEnabled()) {
         try {
@@ -998,7 +997,8 @@
       }
       mask.push('priority');
     }
-    // `priorityManual` non è cifrato: dice che l'owner ha fissato la priorità a mano, e il backend di sicurezza lo usa per saltare l'override automatico. Si scrive solo quando passato esplicitamente.
+    // `priorityManual` non è cifrato: dice che l'owner ha fissato la priorità a mano,
+    // e il backend di sicurezza lo legge per saltare l'override automatico.
     if (priorityManual === true) {
       fields.priorityManual = { booleanValue: true };
       mask.push('priorityManual');
@@ -1027,19 +1027,19 @@
     return true;
   }
 
-  // Voti di verifica (DB4): un campo `votes` con chiave = uid del votante e valore { vote, at, credibilitySnapshot }, un voto per utente e cambiabile, con le rules che vincolano ognuno a scrivere solo la propria chiave.
-  // #583: stanno sulla SCHEDA PUBBLICA, non sul documento — è lì che la bacheca li legge, il documento vero chi vota non lo può nemmeno aprire, e tenerli in due posti avrebbe voluto dire due copie che divergono. Chi fa i conti dal lato owner li riceve dal main, che unisce scheda e documento; i voti storici sul documento restano leggibili.
+  // Un voto per utente, cambiabile; le rules vincolano ognuno a scrivere solo la sua chiave.
+  // Stanno sulla SCHEDA pubblica (#583): il documento vero chi vota non lo può aprire.
   const VOTE_WORKS = 'works';
   const VOTE_BROKEN = 'broken';
   const VOTE_VALUES = [VOTE_WORKS, VOTE_BROKEN];
 
-  // Credibilità di default 1: il substrato per-utente arriva con DC5, finché non c'è ogni voto pesa uguale.
+  // Credibilità di default 1: finché non c'è il substrato per-utente ogni voto pesa uguale.
   function normalizeCredibility(v) {
     const c = Number(v);
     return Number.isFinite(c) && c >= 0 ? c : 1;
   }
 
-  // PURA: tiene solo le entry ben formate, scarta i voti non validi e normalizza `at` e `credibilitySnapshot`.
+  // Tiene solo le entry ben formate: i voti non validi si scartano.
   function normalizeVotes(raw) {
     const out = {};
     if (!raw || typeof raw !== 'object') return out;
@@ -1055,7 +1055,7 @@
     return out;
   }
 
-  // PURA: score = Σ credibilità(«works») − Σ credibilità(«broken»), total = votanti validi.
+  // score = Σ credibilità(«works») − Σ credibilità(«broken»); total = votanti validi.
   function tallyVotes(raw) {
     const votes = normalizeVotes(raw);
     let works = 0;
@@ -1068,14 +1068,15 @@
     return { works, broken, total: works + broken, score };
   }
 
-  // PURA: il voto corrente di un utente ('works' | 'broken' | null).
+  // Il voto corrente di un utente: 'works' | 'broken' | null.
   function userVote(raw, uid) {
     if (!uid) return null;
     const votes = normalizeVotes(raw);
     return votes[uid] ? votes[uid].vote : null;
   }
 
-  // RETE: l'utente loggato esprime o cambia il proprio voto. Scrive solo `votes.<uid>` con updateMask mirato, così non tocca né altri voti né altri campi; le rules verificano chiave==uid.
+  // Scrive solo `votes.<uid>` con updateMask mirato: non tocca altri voti né altri campi.
+  // Le rules verificano chiave == uid.
   async function castVote(id, { uid, vote, credibilitySnapshot } = {}, opts = {}) {
     if (!id) throw new Error('id mancante');
     if (!uid) throw new Error('uid mancante');
@@ -1101,7 +1102,8 @@
     return entry;
   }
 
-  // updateMask sul field path SENZA includerlo nel body: Firestore elimina solo quella chiave e lascia intatti i voti altrui.
+  // updateMask sul field path SENZA metterlo nel body: Firestore elimina quella chiave
+  // e lascia intatti i voti altrui.
   async function clearVote(id, uid, opts = {}) {
     if (!id) throw new Error('id mancante');
     if (!uid) throw new Error('uid mancante');
@@ -1118,8 +1120,8 @@
     return true;
   }
 
-  // Riapertura a pagamento (DC4): si marca sul feedback ORIGINALE che l'uid l'ha chiesta, scrivendo solo `reopenRequests.<uid>` con updateMask mirato, come castVote.
-  // Un utente normale non può toccare `status` di un documento che non ha creato: spostare l'originale fuori da «Risolti» resta al percorso fidato che legge questo campo.
+  // Si marca sul feedback ORIGINALE che l'uid ha chiesto la riapertura, come castVote.
+  // Un utente non può toccare `status` di un documento che non ha creato.
   async function castReopenRequest(id, uid, opts = {}) {
     if (!id) throw new Error('id mancante');
     if (!uid) throw new Error('uid mancante');
@@ -1141,29 +1143,21 @@
   global.SN_FEEDBACK = {
     submit,
     list,
-    // Così una segnalazione vecchia chiusa oggi arriva in bacheca, senza allargare il caricamento per data d'invio.
     listResolved,
-    // Per chi fa una domanda sull'INSIEME (chi va archiviato?), non per chi guarda gli ultimi arrivati: a quelli basta `list`, che è una lettura sola.
     listAll,
     listAllPaged,
     listVersions,
     getMany,
-    // #583 — l'unica lettura dei feedback che non chiede credenziali: i soli campi pubblici dei feedback chiusi.
     listPublic,
-    // TUTTE le schede: è la risposta a «mi spetta una ricompensa?», «quali schede vanno tolte?» e «cosa mostra la bacheca?», che sull'asse della data d'invio non si possono chiedere.
     listAllPublic,
     listAllPublicPaged,
-    // La memoria breve di `listAllPublic` si butta via da qui, dopo aver
-    // scritto o tolto una scheda.
     forgetAllPublic,
     getPublic,
     publishPublicCard,
     unpublishPublicCard,
-    // Il contatore dei numeri (l'owner lo crea e lo rimette in pari).
     ensureSeqCounter,
     nextSeq,
     maxSeq,
-    // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
     listHitCap,
     countLabel,
@@ -1182,16 +1176,16 @@
     castReopenRequest,
     uploadImage,
     uploadAttachment,
-    // #582 — il confine degli allegati: forma del nome (che storage.rules pretende), riconoscimento di un URL del bucket, intestazioni di scarico. Pure, usate anche dal main.
+    // Il confine degli allegati (#582), usato anche dal main.
     attachmentPath,
     isAttachmentUrl,
     attachmentFetchHeaders,
-    // #582 — la scritta di un collegamento verso un indirizzo che arriva da fuori: dice dove si va, anche quando è tagliata.
+    // La scritta di un collegamento che arriva da fuori: dice dove si va (#582).
     linkLabel,
     LINK_LABEL_MAX,
     formatNum,
     fallbackName,
-    // Plumbing REST riutilizzabile (es. dal motore crediti). L'API_KEY è la chiave web pubblica Firebase, già nel client, non un segreto.
+    // L'API_KEY è la chiave web pubblica Firebase, già nel client: non è un segreto.
     toFsValue,
     fromFsValue,
     fsDocToObject,

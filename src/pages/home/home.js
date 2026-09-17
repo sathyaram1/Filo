@@ -1,4 +1,4 @@
-// «Aperti per dopo»: lista flat, o vista a tile per categoria se featureFlags.categorize è ON.
+// «Aperti per dopo»: lista piatta, o vista a tile per categoria col flag categorize.
 
 (function () {
   'use strict';
@@ -13,8 +13,8 @@
   let categories = [];
   let useCategoryView = false;
   let currentCategoryId = null; // null = vista categorie; '' = "non categorizzate"; id = vista categoria
-  // Scheda da evidenziare al primo render (#252): la conferma di «Salva per dopo» apre la
-  // pagina con ?highlight=<id> per mostrare dove è finita. Si consuma dopo averla mostrata.
+  // Scheda da evidenziare al primo render: la conferma di «Salva per dopo» apre la pagina
+  // con ?highlight=<id> per mostrare dove è finita. Si consuma dopo averla mostrata.
   let highlightId = null;
 
   function readHighlightId() {
@@ -40,8 +40,8 @@
     allPages = pagesRes?.pages || [];
     categories = catsRes?.categories || [];
 
-    // Nella vista a tile la card non sarebbe visibile: se c'è una scheda da evidenziare si apre
-    // direttamente dentro la sua categoria (o «non categorizzate»).
+    // Nella vista a tile la card non sarebbe visibile: con una scheda da evidenziare si apre
+    // direttamente dentro la sua categoria.
     highlightId = readHighlightId();
     if (highlightId && useCategoryView) {
       const target = allPages.find((p) => p.id === highlightId);
@@ -71,7 +71,6 @@
     $('back').hidden = true;
     $('search').hidden = true;
 
-    // Solo le categorie popolate, ordinate per recenza della pagina più recente.
     const counts = new Map();
     const lastSavedAt = new Map();
     const lastThumb = new Map();
@@ -190,8 +189,8 @@
     card.className = 'sn-card';
     if (page.id) card.dataset.pageId = page.id;
 
-    // Evidenziazione una tantum (#252): l'id si consuma così ricerche e re-render successivi non
-    // la ri-evidenziano; data-highlighted resta come traccia stabile dopo l'animazione.
+    // Evidenziazione una tantum: l'id si consuma, così ricerche e re-render non la ripetono;
+    // data-highlighted resta come traccia dopo l'animazione.
     if (highlightId && page.id === highlightId) {
       highlightId = null;
       card.dataset.highlighted = '1';

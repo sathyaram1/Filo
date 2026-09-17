@@ -1,7 +1,6 @@
 // Logica PURA della lettura ad alta voce a blocchi e della parola da evidenziare
-// (niente DOM né rete: la usa src/content/tts.js). Si spezza in chunk perché la sintesi
-// produce TUTTO l'audio prima di rispondere: suonando una frase corta mentre si prepara
-// la successiva, l'attesa prima della PRIMA parola crolla.
+// (la usa src/content/tts.js). Si spezza in chunk perché la sintesi produce TUTTO l'audio
+// prima di rispondere: una frase corta suona mentre si prepara la successiva.
 
 (function (global) {
   'use strict';
@@ -25,10 +24,8 @@
     return /[.!?…।。！？]["'»”’)\]]?$/.test(String(word || ''));
   }
 
-  // Ritorna { from, to (indici token, inclusivi), start, end (offset nel testo) }.
-  // Cap morbido: si taglia solo a fine frase; cap duro: taglio forzato anche a metà,
-  // per non far crescere troppo il primo pezzo. Il primo chunk ha un cap più piccolo
-  // (firstCap), così la prima parola si sente prima possibile.
+  // Ritorna { from, to (indici token), start, end (offset nel testo) }. Cap morbido: taglio
+  // solo a fine frase; cap duro: anche a metà. Il primo chunk ha il suo cap (firstCap).
   function chunkTokens(tokens, opts) {
     const o = opts || {};
     const firstCap = o.firstCap || 140;

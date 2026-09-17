@@ -1,5 +1,6 @@
-// Web search per la sidebar Aiuto: Tavily come primario (API pensata per LLM, snippet già rilevanti), fallback sullo scraping di duckduckgo.com/html — gratis ma fragile, si rompe se DDG cambia il markup.
-// Non lancia mai: in caso di errore ritorna { ok:false, results:[], reason }. Espone SN_WEB_SEARCH = { search({query, tavilyKey, maxResults}) }.
+// Web search per la sidebar Aiuto: Tavily come primario, fallback sullo scraping di
+// duckduckgo.com/html — gratis ma fragile, si rompe se DDG cambia il markup.
+// Non lancia mai: in caso di errore ritorna { ok:false, results:[], reason }.
 
 (function (global) {
   'use strict';
@@ -54,7 +55,7 @@
     });
   }
 
-  // Parsing con regex perché in service worker non c'è DOMParser: blocchi <a class="result__a">titolo</a> e result__snippet. Best-effort.
+  // Regex e non DOMParser, che in un service worker non c'è. Best-effort.
   async function searchDuckDuckGo({ query, maxResults }) {
     return withTimeout(async (signal) => {
       const body = `q=${encodeURIComponent(query)}`;

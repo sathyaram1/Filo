@@ -1,23 +1,26 @@
-// Allowlist degli allegati ammessi nel box «Invia feedback», per il pulsante «Allega» e per il trascinamento: `accept` su un <input type=file> è solo un suggerimento e non vincola né «Tutti i file» né il drop.
-// Serve un gate deterministico che rifiuti i tipi ATTIVI (text/html, image/svg+xml…), eseguibili nel dominio di Google Storage quando chi fa triage apre il link. Prima linea soltanto: la cintura è `storage.rules`, con la stessa allowlist — da tenere allineate.
-// classify({ name, type }) → 'image' | 'file' | null (non ammesso).
+// Allowlist degli allegati ammessi: `accept` su un <input type=file> è un suggerimento
+// e non vincola né «Tutti i file» né il drop, quindi serve un gate deterministico.
+// Rifiuta i tipi ATTIVI (text/html, svg…). La cintura è storage.rules, da tenere allineata.
 
 (function (global) {
   'use strict';
 
-  // Immagini raster. NIENTE image/svg+xml: un SVG è un documento attivo (può contenere <script>).
+  // NIENTE image/svg+xml: un SVG è un documento attivo, può contenere <script>.
   const RASTER_IMAGE_MIME = new Set([
     'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp',
   ]);
 
-  // Documenti passivi ammessi per MIME esplicito, da tenere uguale a storage.rules. NIENTE text/html, application/xhtml+xml, text/xml.
+  // Documenti passivi per MIME esplicito, da tenere uguale a storage.rules.
+  // NIENTE text/html, application/xhtml+xml, text/xml.
   const DOC_MIME = new Set([
     'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
-    // `.tsv` e `.yaml` col loro tipo esplicito: senza, un .yaml tipizzato `application/x-yaml` era rifiutato qui mentre il deposito lo accettava, e la riga di comando mandava quello che una persona non poteva allegare (#582).
+    // Col tipo esplicito perché il deposito li accetta: senza, la riga di comando mandava
+    // quello che una persona non poteva allegare (#582).
     'text/tab-separated-values', 'application/x-yaml',
   ]);
 
-  // Estensioni ammesse SOLO con MIME vuoto o generico: il sistema non sempre mappa .md/.yml/.log/.csv. Mai per «salvare» un MIME esplicito pericoloso: un .txt tipizzato text/html resta rifiutato.
+  // Ammesse SOLO con MIME vuoto o generico: il sistema non sempre mappa .md/.yml/.log.
+  // Mai per «salvare» un MIME pericoloso: un .txt tipizzato text/html resta rifiutato.
   const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
   const DOC_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'log', 'yml', 'yaml', 'pdf']);
 
@@ -39,7 +42,7 @@
     if (RASTER_IMAGE_MIME.has(type)) return 'image';
     if (DOC_MIME.has(type)) return 'file';
 
-    // MIME esplicito ma fuori allowlist (text/html, image/svg+xml…) → rifiuto a prescindere dall'estensione: è il caso del .html trascinato.
+    // MIME esplicito fuori allowlist → rifiuto a prescindere dall'estensione (.html trascinato).
     if (!isGenericMime(type)) return null;
 
     if (IMAGE_EXT.has(ext)) return 'image';

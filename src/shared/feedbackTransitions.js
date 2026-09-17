@@ -1,15 +1,12 @@
-// Macchina a stati dei feedback: le TABELLE come DATI, fonte di verità singola
-// (SPEC-RIDISEGNO-MAX.md §7). Vivevano in due copie a mano — dashboard e server — e due
-// copie che divergono sono peggio di una sola permissiva. La dashboard le legge via
-// feedbackStatus.js; il server le INCORPORA al deploy (bake-shared.js →
-// stateMachine.data.js), quindi cambia comportamento solo al rideploy.
-// SOLO DATI: le funzioni stanno in feedbackStatus.js e stateMachine.js.
+// Macchina a stati dei feedback: le TABELLE come DATI, fonte di verità singola.
+// La dashboard le legge via feedbackStatus.js; il server le INCORPORA al deploy,
+// quindi cambia comportamento solo al rideploy. SOLO DATI: le funzioni stanno altrove.
 
 (function (global) {
   'use strict';
 
-  // Stati canonici, lista CHIUSA (FEEDBACK-STATES.md §2). La presentazione (tab, colori,
-  // etichette) sta in feedbackStatus.js, che verifica di coprire ESATTAMENTE questa lista.
+  // Stati canonici, lista CHIUSA (FEEDBACK-STATES.md §2).
+  // La presentazione sta in feedbackStatus.js, che verifica di coprire ESATTAMENTE questa.
   const STATUSES = [
     'unlabeled', 'suspicious_file', 'attack', 'spam', 'design', 'aligned',
     'todo', 'working', 'revision_capability', 'revision_security', 'done',
@@ -18,11 +15,8 @@
 
   const ACTORS = ['owner', 'pipeline', 'routine'];
 
-  // Transizioni legali (FEEDBACK-STATES.md §3): from → { to: [attori autorizzati] }.
-  // 'owner' = dashboard di gestione, l'unico che fa uscire dagli stati di revisione umana;
-  // 'pipeline' = filo-security (giudici + gate file), l'UNICO che fa uscire da `unlabeled`;
-  // 'routine' = routine Claude via canale autenticato.
-  // Una coppia (from,to) assente è una transizione ILLEGALE: il writer la rifiuta.
+  // Transizioni legali: from → { to: [attori] }. 'pipeline' è l'UNICO che esce da `unlabeled`,
+  // 'owner' l'unico che esce dalla revisione umana. Coppia assente = transizione ILLEGALE.
   const TRANSITIONS = {
     unlabeled: {
       suspicious_file: ['pipeline'], // gate file (corre prima dei giudici)
@@ -59,15 +53,14 @@
     todo: {
       working: ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:  ['routine'], // la routine ha domande → chat + statusReason clarify
-      // Il passo diretto todo→done è stato RITIRATO (SPEC-RIDISEGNO-MAX.md §1): serviva al
-      // pianificatore che spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
-      // manuali senza branch restano legali come CATENA di passi (canReach attraversa l'iter).
+      // Niente passo diretto todo→done: le chiusure manuali restano legali come CATENA di passi,
+      // che canReach attraversa.
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
       design:              ['routine'], // domande a metà lavorazione
-      // Arenato: il ramo non avanza da un'ora → il pacemaker lo rimette in coda
-      // da solo (FEEDBACK-STATES.md §6a). Alla terza volta va in `design`.
+      // Arenato: il ramo fermo da un'ora torna in coda da solo (FEEDBACK-STATES.md §6a).
+      // Alla terza volta va in `design`.
       todo:                ['routine'],
     },
     revision_capability: {
@@ -77,10 +70,8 @@
     revision_security: {
       done:   ['routine'], // PASS secaudit + merge-gate fonde su main
       design: ['routine'], // FAIL fixer-loop → statusReason loop
-      // Conflitto di fusione: main è andato avanti mentre il lavoro aspettava e le modifiche non
-      // si incastrano più. Non è una bocciatura di qualità — il ramo torna in lavorazione per il
-      // RIALLINEAMENTO e ripassa verifica e sicurezza sul contenuto nuovo. Senza questa riga il
-      // giro di riallineamento moriva alla consegna: la macchina rifiutava il rientro.
+      // Conflitto di fusione: non è una bocciatura di qualità, il ramo torna in lavorazione
+      // per il riallineamento. Senza questa riga il giro moriva alla consegna, rifiutato.
       revision_capability: ['routine'],
     },
     done: {
@@ -98,14 +89,8 @@
     },
   };
 
-  // statusPublic (S1.F2.1): enum grossolano IN CHIARO, accanto allo status fine (cifrato).
-  // SICUREZZA: tutti gli stati «beccati» (attack/spam/suspicious_file e i confermati) DEVONO
-  // collassare sugli stessi valori dei feedback normali, o chi legge Firestore senza chiave
-  // riconosce un attacco intercettato e fa hill-climbing. E conta SU QUALE valore (#476):
-  // 'closed' non è passivo, è il grilletto del premio da 50 crediti con notifica «risolto» e
-  // della sanificazione per la bacheca pubblica — gli confermavamo il colpo e lo pagavamo.
-  // I confermati stanno su 'open': per chi li ha mandati restano per sempre «in lavorazione»,
-  // che è il silenzio. Nessun valore nuovo: sarebbe di nuovo un segnale, con un altro nome.
+  // SICUREZZA: gli stati «beccati» DEVONO collassare sui valori dei feedback normali, o chi
+  // legge senza chiave fa hill-climbing. Su 'open', mai 'closed' (premia) né un valore nuovo.
   const PUBLIC_MAP = {
     unlabeled: 'open', suspicious_file: 'open', attack: 'open', spam: 'open',
     design: 'open', aligned: 'open', todo: 'open', working: 'open',
@@ -115,17 +100,11 @@
   };
 
   // Lunghezza fissa dello status cifrato (#476): la cifratura non imbottisce, e contare i
-  // caratteri del campo cifrato equivale a leggerlo. Prima di cifrare lo status si porta a
-  // questa lunghezza con spazi in coda (padForCipher). La misura è larga apposta (canonici,
-  // legacy e stati futuri) e cambiarla NON rompe i documenti già scritti.
+  // caratteri equivale a leggerlo. La misura è larga apposta e cambiarla non rompe i vecchi.
   const CIPHER_PAD = 32;
 
-  // I tre bilanci dei giri di correzione (#561 §4): qui ci stanno solo i NOMI dei campi. I NUMERI li detta l'owner dalla dashboard (`config/routines`: cap2, cap1, cap0) e li applica il SERVER quando registra la critica, mai il prompt e mai un conteggio dichiarato dal client.
-  // Nessun default nel codice (2026-09-16: un 5/2/0 qui faceva ragionare la verifica locale con numeri diversi da quelli della dashboard) — chi ha bisogno dei bilanci li legge dal server, e se non ci sono si ferma con un errore che dice cosa manca. Le regole che li consumano stanno in verifierRound.js (decideRound).
-  // cap2: giri per i rilievi di livello 3 e 2 (la cosa chiesta non si ottiene, cammino principale). A bilancio finito la pratica si ferma e chiama l'owner (`loop`).
-  // cap1: giri per i rilievi di livello 1 (cosmetica, attrito fuori cammino). A bilancio finito un 1 va nel feedback derivato invece di essere corretto.
-  // cap0: con z = 0 gli 0 da soli non si correggono mai, solo insieme ad altro.
-  // Ogni giro consuma UN giro dal bilancio del livello più alto corretto. I vecchi nomi (`failCap`/`improvableCap`, gli esiti pass/migliorabile/fail) sono aboliti: l'esito lo calcola il server dai livelli e dai bilanci.
+  // I NUMERI li detta l'owner dalla dashboard e li applica il SERVER: nessun default qui,
+  // o la verifica locale userebbe numeri diversi. Le regole stanno in verifierRound.js.
   const VERIFIER_CAP_KEYS = ['cap2', 'cap1', 'cap0'];
   global.SN_FB_TRANSITIONS = {
     STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAP_KEYS,

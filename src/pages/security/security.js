@@ -10,8 +10,8 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // Estrae l'host del fornitore proxy dal template datacenter configurato; '' se manca o non è
-  // parsabile. La pagina lo mostra per dichiarare per chi passa il traffico delle tab.
+  // La pagina mostra l'host del fornitore proxy per dichiarare per chi passa il traffico
+  // delle tab. '' se manca o non è parsabile.
   function proxyProviderHost(proxy) {
     const tmpl = String((proxy && proxy.datacenter) || '').trim();
     if (!tmpl) return '';
@@ -196,7 +196,7 @@
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
     $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
-    // Voci salvate da prima del controllo, o non valide: dillo subito invece di lasciarle passare mute.
+    // Voci non valide: dirlo subito invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     syncSiteBlockEnabled();
     const sb = sec.safeBrowse || {};
@@ -245,8 +245,8 @@
     return checked ? checked.value : 'default';
   }
 
-  // I «siti fidati» hanno effetto SOLO in «Privacy massima», dove ogni sito è isolato: altrove
-  // i login restano comunque, quindi la lista è informativa (disabilitata, con nota).
+  // I «siti fidati» contano SOLO in «Privacy massima», dove ogni sito è isolato: altrove i
+  // login restano comunque, quindi la lista è informativa.
   function syncCookieMode() {
     const privacy = currentMode() === 'privacy';
     $('sec-cookies-trusted-note').style.display = privacy ? 'none' : 'block';
@@ -302,7 +302,7 @@
     }
   }
 
-  // Senza questo avviso, un input rifiutato spariva senza spiegazione.
+  // Un input rifiutato senza avviso sparirebbe senza spiegazione.
   function setWhitelistError(msg) {
     const el = $('cookie-wl-error');
     if (!el) return;
@@ -316,7 +316,7 @@
     if (!raw) { setWhitelistError(''); return; }
     const domain = cleanDomain(raw);
     if (!domain) {
-      // Non è un dominio valido: avvisa invece di svuotare in silenzio, e lascia il testo correggibile.
+      // Avvisa invece di svuotare in silenzio, e lascia il testo correggibile.
       setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
       input.focus();
       return;
@@ -365,8 +365,8 @@
     $('sec-siteblock-blacklist').disabled = !on;
   }
 
-  // Avviso inline che nomina le righe scartate: senza, una voce come «facebook» veniva salvata
-  // muta e non bloccava mai il sito.
+  // Nomina le righe scartate: una voce come «facebook» salvata muta non bloccherebbe mai il
+  // sito, e nessuno saprebbe perché.
   function setBlacklistError(invalidRows) {
     const el = $('sec-siteblock-blacklist-error');
     if (!el) return;
@@ -379,8 +379,8 @@
     }
   }
 
-  // Stessa normalizzazione dei «siti fidati», e tiene solo domini con estensione (niente IP né
-  // etichette singole). Ritorna i validi deduplicati e le righe scartate com'erano, per l'avviso.
+  // Stessa normalizzazione dei «siti fidati»; tiene solo domini con estensione (niente IP).
+  // Ritorna i validi deduplicati e le righe scartate com'erano, per l'avviso.
   function parseBlacklist(raw) {
     const valid = [];
     const seen = new Set();

@@ -1,5 +1,5 @@
-// Tassi di cambio EUR → altre valute da frankfurter.dev (BCE, gratuito, senza API key). Cache in chrome.storage.local con TTL 24h.
-// Usato dai prompt explain/explainDeep per far convertire le valute al modello col marker [[calc: ...]] (vedi popup.js).
+// Tassi di cambio EUR → altre valute da frankfurter.dev (BCE, senza API key), cache 24h.
+// Usati dai prompt explain per le conversioni col marker [[calc: ...]] (vedi popup.js).
 
 (function (global) {
   'use strict';
@@ -10,7 +10,7 @@
   const SYMBOLS = ['USD', 'GBP', 'CHF', 'JPY', 'CNY', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK'];
   const URL = `https://api.frankfurter.dev/v1/latest?base=EUR&symbols=${SYMBOLS.join(',')}`;
 
-  // Ultima spiaggia se la prima fetch fallisce e non c'è cache: valori indicativi ~2026.
+  // Ultima spiaggia se la fetch fallisce e non c'è cache: valori solo indicativi.
   const FALLBACK = {
     base: 'EUR',
     date: '2026-01-01',
@@ -54,7 +54,8 @@
     }
   }
 
-  // Ritorna sempre qualcosa (cache fresca, cache stale o fallback) e aggiorna in background se la cache è scaduta ma ancora utilizzabile.
+  // Ritorna sempre qualcosa: cache fresca, cache stale o fallback, e aggiorna in background
+  // se la cache è scaduta ma ancora utilizzabile.
   async function get() {
     const cached = await readCache();
     const now = Date.now();

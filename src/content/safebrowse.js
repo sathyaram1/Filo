@@ -1,6 +1,6 @@
-// Siti pericolosi, lato pagina: disegna il verdetto del main (interstitial per "pericoloso", popup di conferma per "sospetto").
-// Non blocca mai la navigazione: la pagina carica e l'avviso la copre; il verdetto può cambiare in corsa (SAFEBROWSE_UPDATE) e qui si ridisegna.
-// Stili via CSSOM dentro uno Shadow DOM: passa anche sotto le CSP più rigide, e il CSS della pagina non lo tocca.
+// Siti pericolosi lato pagina: disegna il verdetto del main (interstitial o conferma).
+// Non blocca la navigazione: la pagina carica e l'avviso la copre; il verdetto può cambiare.
+// Stili via CSSOM in Shadow DOM: passa sotto le CSP rigide e il CSS del sito non lo tocca.
 
 (function (global) {
   'use strict';
@@ -12,7 +12,7 @@
   const T_UPDATE = MSG.SAFEBROWSE_UPDATE || 'safebrowse_update';
 
   const HOST_ID = 'filo-safebrowse-host';
-  let host = null;        // elemento host dello shadow root
+  let host = null;
   let shadow = null;
   let currentLevel = 'safe';
 
@@ -150,8 +150,8 @@
     const doProceed = () => { send({ type: T_PROCEED, url }); clear(); };
     proceed.addEventListener('click', doProceed);
     back.addEventListener('click', () => {
-      // "Torna indietro" non deve MAI confermare il sito: senza cronologia si esce e basta, senza mandare T_PROCEED,
-      // che registrerebbe il bypass come se l'utente avesse scelto "Procedi comunque".
+      // «Torna indietro» non deve mai confermare il sito: senza cronologia si esce e basta,
+      // senza T_PROCEED, che registrerebbe il bypass come un «Procedi comunque» dell'utente.
       try { if (history.length > 1) history.back(); else location.replace('about:blank'); }
       catch (_) {}
     });
@@ -164,8 +164,8 @@
     try { input.focus(); } catch (_) {}
   }
 
-  // Il "sospetto" pretende una scelta attiva e blocca l'interazione (#176): una striscia chiudibile si ignora e non protegge nessuno.
-  // Resta meno severo del "pericoloso": qui non c'è nessuna parola da digitare.
+  // Il «sospetto» pretende una scelta attiva e blocca l'interazione (#176): una striscia
+  // chiudibile si ignora e non protegge nessuno. Resta senza parola da digitare.
   function renderSuspect(url, message) {
     ensureHost();
     shadow.replaceChildren();

@@ -1,23 +1,14 @@
-// Registro dei token estetici (#146.1): nome stabile, tipo, default e — per i token
-// specifici — una CATEGORIA da cui ereditano, così si cambia il singolo elemento o l'intera
-// categoria con una modifica sola (l'override specifico vince). Gli override vivono in
-// `settings.themeTokens`, chiave in REPLACE_KEYS: ogni salvataggio sostituisce l'intera
-// mappa, quindi togliere una chiave torna al predefinito. L'eredità è scritta DUE volte di
-// proposito: nel CSS, perché il rendering segua la catena senza JS, e qui in
-// `effectiveValue`, perché preferenze e test calcolino il valore effettivo senza DOM.
-// SICUREZZA: finiscono in <style> iniettati in TUTTE le superfici, pagine web comprese,
-// quindi `validate` è una whitelist severa per tipo: niente ';', '}', 'url('.
+// Registro dei token estetici (#146.1): i token specifici ereditano da una CATEGORIA e
+// l'override specifico vince. L'eredità è scritta due volte: nel CSS e qui in JS.
+// SICUREZZA: finiscono in <style> su TUTTE le superfici, quindi `validate` è una whitelist.
 
 (function (global) {
   'use strict';
 
   const FONT_DEFAULT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
-  // name → { label, type, css, shellCss?, dashCss?, default | category }.
-  // `css`: la variabile --sn-* delle superfici, shell esclusa. `shellCss`: le gemelle della
-  // shell, che ha una palette propria, emesse SOLO lì. `dashCss`: le gemelle --dash-* della
-  // dashboard, emesse fra le --sn-* così una modifica estetica si vede anche in home.
-  // `default` può essere unico o { light, dark }; chi ha `category` ne eredita il default.
+  // `css`: variabile --sn-* delle superfici; `shellCss`: le gemelle della shell, solo lì;
+  // `dashCss`: le gemelle --dash-* della dashboard. `default` può essere { light, dark }.
   const TOKENS = {
     // categorie
     accent: {
@@ -25,9 +16,8 @@
       type: 'color',
       css: '--sn-accent',
       shellCss: ['--accent'],
-      // La dashboard ha una palette propria (--dash-*): senza `dashCss` un «rendi l'accento
-      // verde» non si vedeva lì (#164). Le gemelle si emettono solo per i token davvero
-      // sovrascritti, così l'estetica «carta» di default resta.
+      // La dashboard ha una palette propria (--dash-*): senza `dashCss` un «rendi l'accento verde»
+      // non si vedeva lì (#164). Solo per i token davvero sovrascritti, così i default restano.
       dashCss: ['--dash-accent'],
       // Emette anche la tripletta r,g,b usata dalle tinte rgba(…)
       rgbCss: '--sn-accent-rgb',
@@ -51,9 +41,7 @@
       default: { light: '#1a1918', dark: '#e5e3dc' },
     },
     // Barra in alto: superficie della SOLA shell, quindi solo `shellCss`. Mappa insieme
-    // `--bg-deep` e `--tab-bg` così «rendi la barra verde scuro» colora l'intera fascia: prima
-    // non c'era modo di cambiare solo la barra — `background` tingeva tutto e `colore_tab`
-    // agiva sulle singole tab (#184).
+    // `--bg-deep` e `--tab-bg` così «rendi la barra verde scuro» colora l'intera fascia (#184).
     topbar: {
       label: 'Barra in alto',
       type: 'color',
@@ -82,18 +70,16 @@
       css: '--sn-error',
       default: { light: '#b91c1c', dark: '#ff6b6b' },
     },
-    // Sfondo al passaggio del mouse (menu, righe, bottoni secondari): era l'unico colore di
-    // superficie non esposto come token, e «rendi più evidente l'hover» non aveva appiglio.
-    // Sola pagina: la shell deriva i suoi hover per color-mix.
+    // Sfondo al passaggio del mouse (menu, righe, bottoni secondari): «rendi più evidente
+    // l'hover» non aveva appiglio. Sola pagina: la shell deriva i suoi hover per color-mix.
     hover: {
       label: 'Sfondo al passaggio del mouse',
       type: 'color',
       css: '--sn-hover',
       default: { light: '#ffffff', dark: '#282725' },
     },
-    // Sfondo di menu, popup, sidebar e dropdown: variante quasi-opaca dello sfondo (alpha 0.98
-    // col blur dietro), distinta da `background` perché tinge SOLO le superfici sovrapposte.
-    // Accetta rgba(...) per tenere la trasparenza.
+    // Sfondo di menu, popup, sidebar e dropdown: tinge SOLO le superfici sovrapposte, perciò
+    // è distinto da `background`. Accetta rgba(...) per tenere la trasparenza.
     overlay: {
       label: 'Sfondo di menu e popup',
       type: 'color',
@@ -210,7 +196,6 @@
     return defaultValue(name, theme);
   }
 
-  // colore → tripletta «r, g, b» per le tinte rgba
   function toRgbTriplet(color) {
     const v = String(color || '').trim();
     let m = v.match(/^#([0-9a-f]{3,8})$/i);
@@ -232,9 +217,8 @@
     return null;
   }
 
-  // Leggibilità testo/sfondo per il gate dei livelli (#146.2/#146.4): se Filo rende il testo
-  // quasi uguale allo sfondo, la modifica sale a livello 2 (conferma) invece di 1. Rapporto
-  // di contrasto WCAG: colori identici 1.0, nero su bianco ~21.
+  // Leggibilità testo/sfondo per il gate dei livelli (#146.2): se il testo diventa quasi
+  // uguale allo sfondo la modifica sale a livello 2. Rapporto WCAG: identici 1.0, max ~21.
   function _rgbArray(color) {
     const t = toRgbTriplet(color);
     if (!t) return null;
@@ -264,9 +248,8 @@
     return (hi + 0.05) / (lo + 0.05);
   }
 
-  // Soglia di illeggibilità estrema, vicino a 1 di proposito: solo i casi gravi (testo ≈
-  // sfondo), non ogni basso contrasto ancora leggibile — un popup a ogni ritocco sarebbe
-  // più fastidioso che utile.
+  // Soglia vicina a 1 di proposito: solo i casi gravi (testo ≈ sfondo), non ogni basso
+  // contrasto ancora leggibile — un popup a ogni ritocco sarebbe più fastidioso che utile.
   const LEGIBILITY_MIN_RATIO = 1.6;
 
   // Le coppie testo-su-superficie che contano per la leggibilità: il testo
@@ -276,9 +259,8 @@
     ['button.fg', 'button.bg'],
   ];
 
-  // Vero se l'override rende illeggibile una delle coppie testo/sfondo. Calcolato sul valore
-  // EFFETTIVO risultante, così cattura sia «rendi il testo bianco» su sfondo chiaro sia
-  // «rendi lo sfondo nero» con testo già scuro.
+  // Vero se l'override rende illeggibile una coppia testo/sfondo. Calcolato sul valore
+  // EFFETTIVO, così prende sia «rendi il testo bianco» sia «rendi lo sfondo nero».
   function illegibleAfter(name, value, overrides, theme) {
     const next = { ...(overrides || {}) };
     if (validate(name, value)) next[name] = String(value).trim();
@@ -294,8 +276,7 @@
   }
 
   // Emette SOLO le variabili sovrascritte: i default restano in theme.css e l'eredità la fa
-  // la catena var(). html[data-sn-theme] (0,1,1) vince sui blocchi di theme.css (0,1,0) a
-  // prescindere dall'ordine dei fogli.
+  // la catena var(). html[data-sn-theme] (0,1,1) vince a prescindere dall'ordine dei fogli.
   function declsFor(overrides, { shell = false } = {}) {
     const { clean } = sanitize(overrides);
     const decls = [];
@@ -315,8 +296,7 @@
           const rgb = toRgbTriplet(value);
           if (rgb) decls.push(`${t.rgbCss}: ${rgb};`);
         }
-        // Gemelle --dash-* solo per i token sovrascritti, così la modifica chiesta in chat si vede
-        // anche sulla dashboard, dove vive la chat (#164). Innocue dove non servono.
+        // Gemelle --dash-* solo per i token sovrascritti: vedi sopra, `dashCss`.
         for (const v of t.dashCss || []) decls.push(`${v}: ${value};`);
       }
     }

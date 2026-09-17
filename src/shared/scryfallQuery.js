@@ -24,10 +24,8 @@
     return `${q} id<=${identityCode(identity)}`.trim();
   }
 
-  // Dentro l'identità se OGNI colore della carta è fra quelli del commander (regola Commander
-  // §8.4); incolori sempre ammesse, nessun commander = nessun vincolo. È il filtro DURO sui
-  // DATI: buildSearchQuery agisce sulla stringa e cede a un `id` esplicito, qui invece nessuna
-  // sintassi fa passare una carta fuori identità — è la rete sui risultati dell'agente.
+  // Dentro l'identità se OGNI colore della carta è fra quelli del commander (Commander §8.4).
+  // È il filtro DURO sui DATI: qui nessuna sintassi fa passare una carta fuori identità.
   function withinIdentity(cardColorIdentity, commanderColors) {
     if (!Array.isArray(commanderColors)) return true;
     const allowed = new Set(commanderColors.map((c) => String(c).toUpperCase()));
@@ -44,7 +42,7 @@
     return out;
   }
 
-  // Gestisce le carte a due facce: image_uris/mana_cost stanno sulle card_faces, non sulla radice.
+  // Carte a due facce: image_uris e mana_cost stanno sulle card_faces, non sulla radice.
   function simplifyCard(api) {
     if (!api || typeof api !== 'object' || !api.id) return null;
     const faces = Array.isArray(api.card_faces) ? api.card_faces : [];
@@ -78,8 +76,7 @@
       // Mana prodotto (terre, rock, dork) per le statistiche §9.1. Sempre array (vuoto = non
       // produce): `undefined` marca le entry di cache vecchio schema da rifare.
       producedMana: Array.isArray(api.produced_mana) ? api.produced_mana.map(String) : [],
-      // Testo Oracle per i giudizi LLM (§7, §6). Sempre stringa (vuota = carta senza testo):
-      // `undefined` marca le entry di cache vecchio schema da rifetchare.
+      // Testo Oracle per i giudizi LLM (§7, §6). Sempre stringa; `undefined` = cache vecchia.
       oracleText: String(oracleText || ''),
       legalCommander: !!(api.legalities && api.legalities.commander === 'legal'),
       scryfallUri: String(api.scryfall_uri || ''),
@@ -93,11 +90,8 @@
     return now - t < ttlMs;
   }
 
-  // Chat unificata (§3): l'agente risponde con un JSON { reply?, query?, cards?, budget?,
-  // prob? } che i modelli a volte avvolgono in ```json o circondano di testo, quindi si
-  // estrae il primo oggetto valido in modo tollerante. Uscita normalizzata: reply, query e
-  // cards sempre presenti; hasBudget/budget = tetto da impostare o togliere (§9.2); prob =
-  // { turn, needs } per il calcolatore (§9.3).
+  // Chat unificata (§3): l'agente risponde con un JSON che i modelli a volte avvolgono in
+  // ```json o circondano di testo, quindi si estrae il primo oggetto valido.
   function normalizeProb(p) {
     if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
     const turn = Math.floor(Number(p.turn));
@@ -150,20 +144,20 @@
         return {
           reply: typeof o.reply === 'string' ? o.reply.trim() : '',
           query: typeof o.query === 'string' ? o.query.trim() : '',
-          // Filtro semantico (§4.1): un LLM economico tiene solo le carte che rispettano il criterio.
+          // Filtro semantico (§4.1): un LLM economico tiene solo le carte che rispettano il
+          // criterio.
           filter: typeof o.filter === 'string' ? o.filter.trim() : '',
           cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
           hasBudget,
           budget,
           prob: normalizeProb(o.prob),
-          // Valutazione batch (§6.1): 'deck' | 'results'. true legacy dei modelli → 'deck', il resto → ''.
+          // Valutazione batch (§6.1): 'deck' | 'results'; un `true` dei modelli vale 'deck'.
           evaluate: o.evaluate === 'deck' || o.evaluate === 'results' ? o.evaluate
             : (o.evaluate === true ? 'deck' : ''),
           tagWith: Array.isArray(o.tagWith)
             ? o.tagWith.map((t) => String(t).trim().toLowerCase()).filter(Boolean) : [],
-          // Import via chat (§11.2): nomi indovinati dal modello (typo, italiano, formati strani),
-          // MAI scryfall_id — la risoluzione la fa il sistema via fuzzy match, e di un id inventato
-          // dal modello non ci si fida.
+          // Import via chat (§11.2): nomi indovinati dal modello, MAI scryfall_id — la risoluzione
+          // la fa il sistema via fuzzy match, e di un id inventato dal modello non ci si fida.
           import: Array.isArray(o.import)
             ? o.import.map((it) => ({
                 name: typeof (it && it.name) === 'string' ? it.name.trim() : '',

@@ -1,23 +1,24 @@
-// Gestore degli scaricamenti "nativi" della navigazione (#410.1): Electron emette `will-download` sulla sessione che ha originato la richiesta, e qui si segue ogni download — nome, dimensione, byte ricevuti, stato — così la barra in alto ne mostra l'avanzamento fedele invece di lasciarlo al buio.
-// "Salva immagine/video come…" (handlers/misc.js) NON passa di qui — deve scaricare i byte a mano per presentare il Referer della pagina — ma dal #436 si iscrive allo STESSO registro via beginManual(): per l'utente i due cammini sono la stessa cosa, quindi stessa barra, stesso pannello, stessa cronologia.
-// Niente dialogo "Salva come" (l'attrito è negativo): si salva nella cartella Download di sistema risolvendo le collisioni con " (2)", e a fine scaricamento si offre "Apri file" / "Apri cartella". La cronologia vive in chrome.storage.local (STORAGE_KEYS.DOWNLOADS) e sopravvive al riavvio.
+// Scaricamenti nativi della navigazione: si segue ogni download di Electron (will-download)
+// così la barra ne mostra l'avanzamento. «Salva immagine come…» entra nello stesso registro
+// via beginManual(). Cronologia in chrome.storage.local, salvataggio diretto senza dialogo.
 
 const path = require('node:path');
 const fs = require('node:fs');
 
-// Tetto della cronologia persistita, le voci più recenti: 200 è ampio per l'uso reale e non gonfia storage.json.
+// Tetto della cronologia: 200 è ampio per l'uso reale e non gonfia storage.json.
 const HISTORY_LIMIT = 200;
 
-// Stati non terminali ritrovati all'avvio: il DownloadItem non esiste più, quindi la voce va normalizzata a 'interrupted'.
+// Ritrovati all'avvio: il DownloadItem non esiste più, la voce va portata a 'interrupted'.
 const NON_TERMINAL = new Set(['progressing', 'paused']);
 
 // Fonte di verità in memoria: scaricamenti in corso più la cronologia caricata da storage.
 const records = new Map();
-// I DownloadItem di Electron non sono serializzabili: vivono a parte e non finiscono mai nello storage.
+// I DownloadItem di Electron non sono serializzabili: non finiscono mai nello storage.
 const liveItems = new Map();
-// Scaricamenti "a mano" in corso: non hanno un DownloadItem perché i byte li muove handlers/misc.js (vedi beginManual).
+// Scaricamenti a mano: niente DownloadItem, i byte li muove handlers/misc.js (beginManual).
 const liveManual = new Map();
-// Evita doppioni se una session torna più volte. Le sessioni incognito NON vengono mai agganciate (tabs.js _makeView): "nessuna traccia" vale anche per i download.
+// Evita doppioni se una sessione torna più volte. Le incognito non si agganciano mai
+// (tabs.js _makeView): «nessuna traccia» vale anche per i download.
 const attached = new WeakSet();
 
 let loaded = false;
@@ -35,8 +36,8 @@ function storageKey() {
   return (globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS.DOWNLOADS) || 'downloads';
 }
 
-// Nome file sicuro: niente separatori di percorso, caratteri di controllo o tentativi di traversal. Stesso spirito di safeImageFilename in handlers/misc.
-// Il traversal non arriva solo in testa: Chromium ha già cambiato le barre in `_`, e `../../pwned` si presenta come `_.._.._pwned`. Ogni fila di due o più punti si comprime a uno, ovunque sia; i punti singoli (`a.b.txt`) restano.
+// Nome file sicuro: niente separatori, caratteri di controllo o traversal. Chromium ha già
+// cambiato le barre in `_`, quindi ogni fila di due o più punti si comprime a uno, ovunque.
 function safeName(name) {
   let s = String(name || '').trim().replace(/[\x00-\x1f]/g, '');
   s = s.split(/[\\/]/).pop() || '';
@@ -45,7 +46,8 @@ function safeName(name) {
   return s.slice(0, 180);
 }
 
-// Un nome può essere lunghissimo e farebbe dell'avviso di fine scaricamento un riquadro enorme: si taglia in MEZZO, così restano leggibili sia l'inizio sia l'estensione.
+// Un nome lunghissimo farebbe dell'avviso un riquadro enorme: si taglia in MEZZO, così
+// restano leggibili sia l'inizio sia l'estensione.
 function shortName(name, max = 44) {
   const s = String(name || '');
   if (s.length <= max) return s;
@@ -54,7 +56,8 @@ function shortName(name, max = 44) {
   return `${head}…${ext}`;
 }
 
-// Cartella Download di sistema (ripiego: home). In test un hook d'ambiente la forza sotto lo userData isolato, così uno spec può far partire un download reale senza il dialogo nativo, impossibile da automatizzare headless.
+// Cartella Download di sistema (ripiego: home). Nei test un hook d'ambiente la porta sotto
+// lo userData isolato, così uno spec fa un download vero senza il dialogo nativo.
 function downloadsDir() {
   const test = process.env.FILO_DOWNLOAD_DIR;
   if (test) { try { fs.mkdirSync(test, { recursive: true }); } catch (_) {} return test; }
@@ -62,7 +65,7 @@ function downloadsDir() {
   try { return electron().app.getPath('home'); } catch (_) { return process.cwd(); }
 }
 
-// "file.pdf" → "file (2).pdf" se esiste già: non si sovrascrive in silenzio uno scaricamento omonimo.
+// Non si sovrascrive in silenzio uno scaricamento omonimo: «file.pdf» → «file (2).pdf».
 function uniquePath(dir, filename) {
   const ext = path.extname(filename);
   const base = path.basename(filename, ext);
@@ -75,9 +78,8 @@ function uniquePath(dir, filename) {
   return candidate;
 }
 
-// Il file può sparire DOPO lo scaricamento: il percorso è dell'utente, che può spostare, rinominare o cestinare. Da quel momento "Apri file" non ha più niente da aprire, e va detto invece di fingere.
-// Non ci si fida dell'esito dell'apertura: su Linux `shell.openPath` risponde "riuscito" anche su un percorso inesistente. L'unica risposta uguale ovunque è guardare il disco PRIMA.
-// La presenza passa da una cache a scadenza breve: la lista si rilegge a ogni avanzamento (fino a ~8 volte al secondo, fino a 200 voci) e senza cache ogni tacca costerebbe centinaia di stat.
+// Il file può sparire dopo: si guarda il disco PRIMA, perché su Linux shell.openPath dice
+// «riuscito» anche su un percorso inesistente. Cache breve: la lista si rilegge ~8 volte/s.
 const EXIST_TTL_MS = 1500;
 const existCache = new Map();   // savePath → { at, ok }
 
@@ -93,10 +95,12 @@ function fileExists(p) {
   return ok;
 }
 
-// Prima di un'azione dell'utente la cache non vale: il file può averlo spostato un istante fa, e su un'azione singola lo stat costa zero.
+// Prima di un'azione dell'utente la cache non vale: può averlo spostato un istante fa,
+// e su un'azione singola lo stat costa zero.
 function forgetExists(p) { if (p) existCache.delete(p); }
 
-// Vale solo per gli scaricamenti COMPLETATI: per uno interrotto o annullato il file non è mai esistito, e marcarlo "sparito" direbbe una cosa falsa.
+// Solo per gli scaricamenti COMPLETATI: per uno interrotto il file non è mai esistito,
+// e marcarlo «sparito» direbbe una cosa falsa.
 function isMissing(r) {
   if (!r || r.state !== 'completed') return false;
   return !r.savePath || !fileExists(r.savePath);
@@ -117,9 +121,10 @@ function publicRecord(r) {
     endedAt: r.endedAt || null,
     paused: !!r.paused,
     canResume: !!r.canResume,
-    // Gli scaricamenti "a mano" (#436) non si mettono in pausa: la richiesta http resterebbe appesa e il server la chiuderebbe. Il pannello nasconde il pulsante invece di offrirne uno che non fa niente.
+    // Gli scaricamenti a mano non si mettono in pausa: la richiesta http resterebbe appesa e
+    // il server la chiuderebbe. Il pannello nasconde il pulsante invece di offrirlo inerte.
     canPause: r.canPause !== false,
-    // Il file scaricato non è più al suo posto: le superfici lo mostrano attenuato e senza "Apri file".
+    // Il file non è più al suo posto: le superfici lo attenuano e tolgono «Apri file».
     missing: isMissing(r),
   };
 }
@@ -141,7 +146,7 @@ async function loadHistory() {
       for (const raw of arr) {
         if (!raw || !raw.id) continue;
         const rec = { ...raw };
-        // Un download che risultava "in corso" alla chiusura non può più proseguire: il suo DownloadItem è morto.
+        // Un download «in corso» alla chiusura non può proseguire: il suo DownloadItem è morto.
         if (NON_TERMINAL.has(rec.state)) { rec.state = 'interrupted'; rec.paused = false; rec.canResume = false; }
         records.set(rec.id, rec);
       }
@@ -169,7 +174,8 @@ function broadcast(kind, rec) {
   notifyTabs();
 }
 
-// Segnale CONTENTLESS alle schede: questo canale raggiunge ANCHE le schede di siti esterni, e il record contiene il percorso ASSOLUTO su disco (con lo username). I dati veri la pagina li legge da DOWNLOADS_LIST, riservato alle superfici interne.
+// Segnale CONTENTLESS: questo canale raggiunge anche le schede dei siti, e il record porta
+// il percorso assoluto con lo username. I dati veri passano da DOWNLOADS_LIST, solo interne.
 function notifyTabs() {
   try {
     const { BrowserWindow } = electron();
@@ -197,7 +203,8 @@ function shellToast(text, opts) {
   } catch (_) {}
 }
 
-// #412 — chiude una scheda rimasta VUOTA quando un link "Scarica" con target=_blank apre una scheda che si trasforma subito in scaricamento (nessuna pagina si committa mai). Best-effort e non bloccante: se non c'è niente da chiudere è un no-op.
+// Chiude la scheda rimasta VUOTA quando un link «Scarica» con target=_blank apre una scheda
+// che diventa subito scaricamento e non committa mai una pagina (#412). Best-effort.
 function notifyDownloadStarted(webContents) {
   if (!webContents) return;
   try {
@@ -219,7 +226,7 @@ function onWillDownload(item, webContents) {
     catch (_) { return ''; }
   })() || 'download');
 
-  // Salvataggio diretto nella cartella Download: setSavePath disattiva il dialogo nativo, indispensabile anche per i test headless.
+  // setSavePath toglie il dialogo nativo: l'attrito è negativo, e headless non si automatizza.
   let savePath = '';
   try {
     savePath = uniquePath(downloadsDir(), filename);
@@ -244,12 +251,11 @@ function onWillDownload(item, webContents) {
   liveItems.set(id, item);
   persist();
   broadcast('start', rec);
-  // #412 — deferito, così il ciclo di vita del download è completamente cablato prima di toccare l'albero delle view.
+  // Deferito: il ciclo di vita del download è cablato prima di toccare l'albero delle view.
   setImmediate(() => notifyDownloadStarted(webContents));
 
-  // Argine anti-silenzio: quando un server tronca la connessione a metà, Chromium NON conclude lo scaricamento — lo marca interrotto e lo riprende da solo, e se il server tronca ancora ignorando le richieste Range il ciclo si ripete all'infinito senza che l'utente veda mai un errore.
-  // Il segnale non è il TEMPO passato senza byte (un server semplicemente lento fa lo stesso, e veniva ucciso con un errore falso) ma il fatto che sia CHROMIUM a dichiarare caduto il trasferimento: alla prima caduta si concede una FINESTRA DI GRAZIA per la ripresa automatica, e se lì dentro non guadagna terreno si dichiara fallito. Se riprende, la finestra si annulla.
-  // Il cronometro puro resta solo come RETE DI SICUREZZA per una connessione appesa che non emette né progressi né interruzioni: soglia nell'ordine dei minuti, e senza buttare via i byte già scaricati.
+  // Il segnale non è il TEMPO senza byte (un server lento veniva ucciso con un errore falso)
+  // ma la caduta dichiarata da Chromium: grazia alla ripresa, poi fallisce se non avanza.
   const STALL_MS = 3 * 60 * 1000;    // 3 minuti di silenzio assoluto
   const INTERRUPT_GRACE_MS = 20_000; // attesa concessa alla ripresa automatica
   let maxRecv = 0;
@@ -259,7 +265,8 @@ function onWillDownload(item, webContents) {
     rec._stallTimer = setTimeout(() => {
       rec._stallTimer = null;
       if (rec._final || rec.paused) return;
-      // Rete di sicurezza: si mette in PAUSA invece di annullare — pause() lascia su disco il pezzo già scaricato, cancel() lo cancellerebbe: niente lavoro buttato, e comunque un avviso.
+      // Rete di sicurezza: si mette in PAUSA invece di annullare, perché pause() lascia su disco
+      // il pezzo già scaricato mentre cancel() lo butta. E un avviso arriva comunque.
       finalize('interrupted');
       try { if (!item.isPaused()) item.pause(); } catch (_) {}
     }, STALL_MS);
@@ -271,8 +278,8 @@ function onWillDownload(item, webContents) {
     rec._resumeTimer = setTimeout(() => {
       rec._resumeTimer = null;
       if (rec._final || rec.paused) return;
-      // Passata la grazia senza riprendersi è un guasto vero, non lentezza. Annullare serve a fermare il ciclo di ritentativi, e il pezzo su disco è comunque inservibile: ogni ritentativo riparte da zero.
-      // finalize PRIMA di cancel(): cancel() emette 'done' con stato 'cancelled' in modo SINCRONO, e senza il flag _final quell'esito diventerebbe "annullato", senza toast d'errore.
+      // Passata la grazia è un guasto, non lentezza: annullare ferma il ciclo di ritentativi.
+      // finalize PRIMA di cancel(): 'done' arriva sincrono e l'esito diventerebbe «annullato».
       finalize('interrupted');
       try { item.cancel(); } catch (_) {}
     }, INTERRUPT_GRACE_MS);
@@ -299,7 +306,7 @@ function onWillDownload(item, webContents) {
       rec.state = 'completed';
       persist();
       broadcast('done', rec);
-      // Le azioni dichiarative le traduce la shell in api.downloads.openFile / openFolder (shell.js onToast).
+      // Le azioni dichiarative le traduce la shell in openFile / openFolder (shell.js onToast).
       shellToast(`Scaricato: ${shortName(rec.filename)}`, {
         durationSec: 8,
         actions: [
@@ -308,7 +315,7 @@ function onWillDownload(item, webContents) {
         ],
       });
     } else {
-      // 'cancelled' (annullato dall'utente) o 'interrupted' (rete caduta, 4xx/5xx, spazio finito): niente silenzio.
+      // 'cancelled' è l'utente, 'interrupted' è rete, 4xx/5xx o spazio finito: niente silenzio.
       rec.state = state === 'cancelled' ? 'cancelled' : 'interrupted';
       persist();
       broadcast('error', rec);
@@ -327,7 +334,8 @@ function onWillDownload(item, webContents) {
     rec.paused = item.isPaused();
     rec.canResume = item.canResume();
 
-    // Terreno guadagnato: si ricarica il cronometro e si chiude la finestra di grazia — una ripresa produttiva perdona le cadute precedenti, il caso della rete ballerina.
+    // Terreno guadagnato: una ripresa produttiva perdona le cadute precedenti (rete ballerina),
+    // quindi si ricarica il cronometro e si chiude la finestra di grazia.
     if (recv > maxRecv) { maxRecv = recv; clearInterruptGrace(); armWatchdog(); }
 
     if (rec.paused) {
@@ -336,7 +344,8 @@ function onWillDownload(item, webContents) {
       clearInterruptGrace();
       if (rec._stallTimer) { clearTimeout(rec._stallTimer); rec._stallTimer = null; }
     } else if (state === 'interrupted') {
-      // Chromium dichiara caduto il trasferimento: gli si concede la finestra di grazia e per l'utente resta "in corso", perché se riparte davvero non deve vedere allarmi inutili.
+      // Caduta dichiarata da Chromium: si concede la grazia e per l'utente resta «in corso»,
+      // perché se riparte davvero non deve vedere allarmi inutili.
       rec.state = 'progressing';
       armInterruptGrace();
     } else {
@@ -353,8 +362,8 @@ function onWillDownload(item, webContents) {
   });
 }
 
-// Scaricamenti "a mano" (#436): "Salva immagine/video come…" scarica i byte da sé perché è l'unico modo di presentare il Referer della pagina, che webContents.downloadURL perde sempre. Il prezzo era che quel cammino restava MUTO — nessuna barra, nessuna percentuale, nessun modo di annullare — mentre arrivavano centinaia di MB.
-// Uso: beginManual() apre la voce, il chiamante la nutre con progress() a ogni blocco e la chiude con done()/fail(); cancelled() dice se l'utente ha premuto "Annulla", così il trasferimento si ferma davvero.
+// Scaricamenti a mano (#436): «Salva immagine come…» muove i byte da sé, unico modo di
+// presentare il Referer; senza questo registro quel cammino resterebbe muto per l'utente.
 function finalizeManual(rec, state, savePath) {
   if (rec._final) return;
   rec._final = true;
@@ -366,7 +375,7 @@ function finalizeManual(rec, state, savePath) {
   rec.state = state;
   persist();
   broadcast(state === 'completed' ? 'done' : 'error', rec);
-  // Nessun avviso a fine corsa: chi ha chiesto il salvataggio dal menu riceve già la conferma nella pagina.
+  // Nessun avviso a fine corsa: chi salva dal menu ha già la conferma nella pagina.
 }
 
 function beginManual({ url, filename, totalBytes } = {}) {
@@ -392,7 +401,8 @@ function beginManual({ url, filename, totalBytes } = {}) {
   persist();
   broadcast('start', rec);
 
-  // Su rete veloce 'data' arriva migliaia di volte al secondo e ogni broadcast attraversa l'IPC verso ogni finestra: senza freno l'avanzamento costerebbe più del download. ~8 aggiornamenti al secondo bastano all'occhio.
+  // Su rete veloce 'data' arriva migliaia di volte al secondo e ogni broadcast attraversa
+  // l'IPC verso ogni finestra: ~8 aggiornamenti al secondo bastano all'occhio.
   const MIN_PUSH_MS = 120;
   let lastPush = 0;
 
@@ -409,7 +419,8 @@ function beginManual({ url, filename, totalBytes } = {}) {
       broadcast('progress', rec);
     },
     done(savePath) {
-      // L'ultimo progress() può essere caduto nel freno: a file completo i byte ricevuti SONO il totale, e la riga non deve restare ferma al 95% dopo essersi conclusa.
+      // L'ultimo progress() può essere caduto nel freno: a file completo i byte ricevuti SONO
+      // il totale, e la riga non deve restare ferma al 95% a scaricamento finito.
       if (rec.totalBytes > 0) rec.receivedBytes = rec.totalBytes;
       finalizeManual(rec, 'completed', savePath);
     },
@@ -443,7 +454,7 @@ function clearCompleted() {
 }
 
 function remove(id) {
-  // Un download in corso non si "rimuove" dalla lista: prima lo si annulla. Vale per entrambi i cammini.
+  // Un download in corso prima si annulla, poi si rimuove. Vale per entrambi i cammini.
   if (liveItems.has(id)) { try { liveItems.get(id).cancel(); } catch (_) {} }
   if (liveManual.has(id)) { try { liveManual.get(id).cancel(); } catch (_) {} }
   records.delete(id);
@@ -453,17 +464,17 @@ function remove(id) {
   return listRecords();
 }
 
-// Messaggio unico per "il file non c'è più": lo dicono sia la barra in alto sia la pagina elenco, e devono dirlo con le stesse parole.
+// Messaggio unico: barra in alto e pagina elenco devono dirlo con le stesse parole.
 const MISSING_TEXT = 'Il file non c’è più: forse è stato spostato o cancellato';
 const MISSING_FOLDER_TEXT = 'La cartella non c’è più: forse è stata spostata o cancellata';
 
 function openFile(id) {
   const rec = records.get(id);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
-  // Si guarda il disco PRIMA di tentare: l'esito dell'apertura non è affidabile su tutte le piattaforme.
+  // Si guarda il disco PRIMA: l'esito dell'apertura non è affidabile (vedi existCache).
   forgetExists(rec.savePath);
   if (!rec.savePath || !fileExists(rec.savePath)) {
-    // La voce è appena diventata "sparita" agli occhi dell'utente: avvisa le superfici aperte, così la attenuano senza ricaricare.
+    // La voce è appena diventata «sparita»: le superfici aperte la attenuano senza ricaricare.
     broadcast('missing', rec);
     return { ok: false, missing: true, error: MISSING_TEXT };
   }
@@ -486,13 +497,15 @@ function openFolder(id) {
   if (!here) broadcast('missing', rec);
   try {
     if (here) { electron().shell.showItemInFolder(rec.savePath); return { ok: true }; }
-    // Il file non c'è più, ma la cartella dove stava spesso sì: aprirla è comunque il passo avanti che l'utente cercava. Solo se manca anche quella non resta niente da aprire.
+    // Il file non c'è più ma la cartella spesso sì: aprirla è comunque il passo avanti che
+    // l'utente cercava. Solo se manca anche quella non resta niente da aprire.
     const dir = path.dirname(rec.savePath);
     let dirThere = false;
     try { dirThere = fs.existsSync(dir); } catch (_) {}
     if (!dirThere) return { ok: false, missing: true, missingFolder: true, error: MISSING_FOLDER_TEXT };
     const r = electron().shell.openPath(dir);
-    // ok:true + missing:true = "cartella aperta, ma il file dentro non c'è più". Se invece la cartella c'è e il sistema non l'ha aperta (nessun gestore file, permessi) è un'altra storia, e va detta com'è.
+    // ok:true + missing:true = «cartella aperta, ma il file dentro non c'è più».
+    // Se la cartella c'è e il sistema non l'ha aperta è un'altra storia, e va detta com'è.
     const done = (msg) => (msg
       ? { ok: false, missing: true, error: 'Non è stato possibile aprire la cartella' }
       : { ok: true, missing: true });
@@ -523,7 +536,8 @@ module.exports = {
   init,
   attachSession,
   beginManual,
-  // Serve a chi scarica i byte da sé (#436): il file parziale va nella stessa cartella in cui atterrerebbe un download nativo, così la rinomina finale è istantanea invece di una copia fra volumi.
+  // Per chi scarica i byte da sé: il file parziale va nella stessa cartella del download
+  // nativo, così la rinomina finale è istantanea invece di una copia fra volumi.
   downloadsDir,
   uniquePath,
   list,

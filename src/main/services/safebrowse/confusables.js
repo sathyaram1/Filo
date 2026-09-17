@@ -1,10 +1,11 @@
-// Scheletro UTS-39 (sottoinsieme curato) per l'impersonazione stretta: due stringhe sono confondibili se, sostituendo ogni carattere col suo prototipo visivo, collassano sulla stessa sequenza — così "раура1.com" in cirillico finisce sullo scheletro di "paypal".
-// Qui c'è solo il sottoinsieme mirato agli attacchi reali sui domini (lookalike cross-script, fullwidth, omoglifi ASCII); leetspeak e refusi li cattura la distanza di edit in signals.js.
-// Si mappa sempre verso lettere latine minuscole.
+// Scheletro UTS-39: due stringhe sono confondibili se, sostituendo ogni carattere col suo
+// prototipo visivo, collassano sulla stessa sequenza («раура1» sullo scheletro di «paypal»).
+// Solo il sottoinsieme degli attacchi reali; leetspeak e refusi li prende signals.js.
 
 'use strict';
 
-// Aggiungere righe è sicuro: serve solo coerenza, lo stesso char deve mappare sempre allo stesso prototipo.
+// Aggiungere righe è sicuro: serve solo coerenza, lo stesso char sempre allo stesso
+// prototipo.
 const MAP = new Map(Object.entries({
   'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'х': 'x', 'у': 'y',
   'і': 'i', 'ј': 'j', 'к': 'k', 'м': 'm', 'н': 'h', 'т': 't', 'в': 'b',
@@ -28,7 +29,8 @@ const MAP = new Map(Object.entries({
   'ñ': 'n', 'ç': 'c', 'ý': 'y', 'ß': 'b',
 }));
 
-// NFC, minuscole, poi il prototipo di ogni carattere mappato (i non mappati restano). Si rimuovono i separatori non alfanumerici: un attaccante può spezzare la parola con trattini o punti ("p-a-y-p-a-l").
+// I separatori non alfanumerici si rimuovono: un attaccante può spezzare la parola con
+// trattini o punti («p-a-y-p-a-l»).
 function skeleton(s) {
   if (!s || typeof s !== 'string') return '';
   const norm = s.normalize('NFC').toLowerCase();
@@ -41,7 +43,7 @@ function skeleton(s) {
   return out;
 }
 
-// Vero se hanno lo stesso scheletro senza essere già identiche: si assomigliano otticamente pur essendo stringhe diverse.
+// Vero se hanno lo stesso scheletro senza essere identiche: si somigliano otticamente.
 function looksLike(a, b) {
   if (!a || !b) return false;
   const sa = skeleton(a);

@@ -1,10 +1,6 @@
-// Rilevatore di esfiltrazione dati via URL (sicurezza NAVIGA). Una pagina ostile può
-// istruire il modello ad aprire un URL che porta fuori, in query/path/sottodominio, i dati
-// sensibili che aveva nel contesto: una GET silenziosa verso il server dell'attaccante.
-// Non si indovina se un URL «sembra» sensibile (indistinguibile da una ricerca legittima):
-// si chiede se contiene pezzi del corpus sensibile (taint-match), più un fallback
-// strutturale per chi cifra o spezza i dati. Il verdetto non blocca, alza NAVIGA a livello
-// 2: un falso positivo costa una conferma in più, mai un'esecuzione silenziosa.
+// Rilevatore di esfiltrazione dati via URL (sicurezza NAVIGA): una pagina ostile può far
+// aprire al modello un URL che porta fuori i dati del contesto. Non si indovina se «sembra»
+// sensibile: si cerca il corpus dentro l'URL. Non blocca, alza NAVIGA a livello 2.
 
 (function (global) {
   'use strict';
@@ -117,8 +113,7 @@
   }
 
   // Fallback strutturale: un payload corposo o un blob opaco copre i dati cifrati che il
-  // taint-match non riconosce. Solo con fromUntrusted, per non infastidire sui link
-  // legittimi con query lunghe (tracking, OAuth) nati da input diretto.
+  // taint-match non vede. Solo con fromUntrusted, per non infastidire sui link legittimi.
   function structural(url) {
     let u;
     try { u = new URL(url); } catch (_) {

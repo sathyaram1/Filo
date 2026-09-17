@@ -1,13 +1,6 @@
 // Censimento dei punti in cui Filo usa un modello, e SORGENTE DI VERITÀ della lista di
-// funzioni in Opzioni → Modelli (modelChainEditor.js): un punto che non è qui non compare
-// da nessuna parte, quindi non può nascondersi. Ogni volta che aggiungi, sposti o togli un
-// punto, aggiornalo nello stesso commit: il test incrocia l'elenco col codice reale.
-// Campi meno ovvi di una voce: `id` stabile (non si riusa e non si cambia); `from` è da dove
-// viene il modello — 'user' (Opzioni → Modelli), 'owner' (Gestione → Modelli di supporto:
-// girano sui server di Filo), 'none' (non ne usa nessuno, scritto qui apposta perché
-// sembrerebbe di sì), 'code' (deciso dal codice e non cambiabile: DEVE restare vuoto, è
-// l'invariante che il test verifica); `ref` è il nome interno per 'user' e lo slot per
-// 'owner'; `where` è dove si imposta, in parole per l'utente.
+// Opzioni → Modelli: un punto che non è qui non compare da nessuna parte. Aggiornalo nello
+// stesso commit; `from:'code'` deve restare vuoto, è l'invariante che il test verifica.
 
 (function (global) {
   'use strict';

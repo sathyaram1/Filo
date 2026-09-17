@@ -1,5 +1,6 @@
 // Parser dello stato audio di una WebContents, robusto tra versioni di Electron.
-// `audio-state-changed` ha cambiato firma: da Electron 32 `audible` sta sull'evento, prima stava nel secondo argomento (oggetto o booleano). Leggendo solo il secondo, su Electron 33 l'indicatore audio delle schede non si accendeva mai.
+// `audio-state-changed` ha due firme: `audible` sull'evento o nel secondo argomento.
+// Leggendo solo il secondo, l'indicatore audio delle schede non si accende mai.
 
 (function (global) {
   'use strict';

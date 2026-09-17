@@ -11,8 +11,8 @@
   // errore di rete, ma la scheda resta bianca allo stesso modo.
   const CRASH_CODE = 'crash';
 
-  // Schemi che il «Riprova» può ri-tentare. Mai altro: il bersaglio arriva dalla query
-  // string e NON va navigato alla cieca (filo://error?url=javascript:… non deve eseguire nulla).
+  // Schemi che il «Riprova» può ri-tentare. Mai altro: il bersaglio arriva dalla query e non
+  // va navigato alla cieca (filo://error?url=javascript:… non deve eseguire nulla).
   function isRetriableTarget(url) {
     let proto = '';
     try { proto = new URL(String(url || '')).protocol.toLowerCase(); } catch (_) { return false; }
@@ -54,9 +54,8 @@
     return (p && p.target) || null;
   }
 
-  // -3 (ERR_ABORTED) no: navigazione annullata (stop, redirect, _recreateView) non è un
-  // errore da mostrare. La pagina d'errore stessa no, per non entrare in loop.
-  // Solo main frame (lo passa il chiamante).
+  // -3 (ERR_ABORTED) no: una navigazione annullata non è un errore da mostrare, e la pagina
+  // d'errore stessa no, per non entrare in loop. Solo main frame (lo passa il chiamante).
   function shouldShowErrorPage({ code, failedUrl, isMainFrame }) {
     if (isMainFrame === false) return false;
     const n = Number(code);

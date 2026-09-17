@@ -1,12 +1,9 @@
-// Finestre invisibili nei test (FILO_HIDE_WINDOW=1). Due difese insieme perché
-// nessuna regge da sola: fuori schermo (con `show:false` i menu nativi figli non
-// si aprono) e opacità zero, anche sulle figlie (a tutto schermo il sistema
-// riaggancia la finestra a un monitor vero). test:shoot/test:smoke non la usano:
-// lì la finestra È il risultato.
+// Finestre invisibili nei test (FILO_HIDE_WINDOW=1). Due difese insieme perché nessuna regge
+// da sola: fuori schermo (con `show:false` i menu figli non si aprono) e opacità zero.
+// test:shoot e test:smoke non la usano: lì la finestra È il risultato.
 
-// In pixel FISICI: le coordinate delle finestre sono interi a 16 bit (±32767) e
-// il numero passato a Electron è logico, quindi su uno schermo al 125% un -32000
-// logico diventa -40000 fisici, gira di segno e la finestra torna visibile.
+// In pixel FISICI: le coordinate sono interi a 16 bit e il numero passato a Electron è
+// logico, quindi al 125% un -32000 gira di segno e la finestra torna visibile.
 const LONTANO_FISICO = 30000;
 
 /** Coordinata LOGICA di parcheggio, dato il fattore di scala. Pura. */
@@ -35,9 +32,8 @@ function hideForTests(win, { main = false } = {}) {
     if (!main) return true;
     const via = posizioneFuoriSchermo();
     win.setPosition(via.x, via.y);
-    // Uscendo dal tutto schermo il sistema rimette la finestra dov'era: via di
-    // nuovo. La bandierina è obbligatoria: su X11 spostarla qui dentro riemette
-    // `leave-full-screen` e senza guardia si rientra fino allo stack esaurito.
+    // Uscendo dal tutto schermo il sistema rimette la finestra dov'era: via di nuovo. La
+    // bandierina serve: su X11 spostarla qui riemette l'evento e si rientra all'infinito.
     let riposizionando = false;
     win.on('leave-full-screen', () => {
       if (riposizionando) return;
@@ -53,35 +49,16 @@ function hideForTests(win, { main = false } = {}) {
   return true;
 }
 
-// NIENTE APERTURE DI SISTEMA DURANTE I TEST.
-//
-// `shell.openExternal(url)` e `shell.openPath(p)` chiedono al sistema di aprire
-// il browser o il gestore file. Su Linux passano da `xdg-open` e ne aspettano
-// l'uscita: in un contenitore senza desktop (la suite in GitHub) non esce mai,
-// la promise resta appesa, l'IPC che l'aspettava non risponde e l'app non si
-// chiude più (tre spec, quindici «Worker teardown timeout» nella prima corsa,
-// 2026-09-16). Su Windows e Mac si apre davvero il browser di chi lancia i
-// test, che non è meglio. Quindi in modalità test le due funzioni non aprono
-// niente e risolvono subito — openPath con '' , che per Electron è «riuscito»
-// — e lo dicono su stderr, così una prova che voglia asserirlo può leggerla:
-//   [test] openExternal soppresso: <url>
-//   [test] openPath soppresso: <percorso>
-// Vale su ogni piattaforma e mai in produzione.
-//
-// La modalità test è NODE_ENV=test: la fixture e ogni spec che apre Filo per
-// conto suo lo impostano (una sentinella negli unit test lo controlla per il
-// fattore di scala, e la stessa lista di lanci vale qui).
+// Nei test openExternal/openPath non aprono niente e lo dicono su stderr: su Linux senza
+// desktop `xdg-open` non esce mai e l'app non si chiude più. Mai in produzione.
 
 /** Vero se l'ambiente è quello dei test automatici. PURA. */
 function inModalitaTest(env = process.env) {
   return !!env && env.NODE_ENV === 'test';
 }
 
-/**
- * Sostituisce openExternal/openPath dello `shell` di Electron con versioni che
- * non aprono niente. No-op fuori dalla modalità test (lo shell resta com'è).
- * Ritorna true se ha sostituito.
- */
+// Sostituisce openExternal/openPath con versioni che non aprono niente. No-op fuori dalla
+// modalità test; ritorna true se ha sostituito.
 function silenziaApertureDiSistema(shell, {
   inTest = inModalitaTest(),
   avvisa = (riga) => { try { process.stderr.write(riga + '\n'); } catch (_) {} },

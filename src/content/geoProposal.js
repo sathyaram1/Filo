@@ -1,6 +1,6 @@
-// Proposta inline "Apri da un altro paese" per il geo-block (proxy-per-tab-spec.md §5).
-// Filo non riprova in silenzio: propone, avvertendo che nell'altro paese l'utente non sarà loggato.
-// Stili via CSSOM dentro uno Shadow DOM: passa anche sotto le CSP più rigide, e il CSS della pagina non lo tocca.
+// Proposta inline «Apri da un altro paese» per il geo-block (proxy-per-tab-spec.md §5).
+// Filo non riprova in silenzio: propone, e avverte che là l'utente non sarà loggato.
+// Stili via CSSOM in uno Shadow DOM: passa sotto le CSP e il CSS della pagina non lo tocca.
 
 (function (global) {
   'use strict';

@@ -1,6 +1,6 @@
-// Motore crediti (gamification): 1 credito = 0,08 centesimi di € (€0,0008).
-// Il costo € reale resta DIETRO LE QUINTE, mai mostrato all'utente: recordConsumption è chiamato da costTracker.record dopo il calcolo dell'EUR, così tutti i call site AI sono coperti senza ritoccarli.
-// Logica pura + cache locale; la sincronizzazione su Firestore (doc `credits/<uid>`) vive in handlers/credits.js via serialize()/adopt()/onChange().
+// Motore crediti: 1 credito = €0,0008. Logica pura più cache locale.
+// Il costo € reale resta dietro le quinte, mai mostrato all'utente.
+// La sincronizzazione su Firestore vive in handlers/credits.js (serialize/adopt/onChange).
 
 (function (global) {
   'use strict';
@@ -16,7 +16,7 @@
     return `${y}-${m}-${day}`;
   }
 
-  // Giorni interi tra due chiavi 'YYYY-MM-DD', calcolati a mezzogiorno UTC per evitare derive di fuso/DST.
+  // Calcolo a mezzogiorno UTC per evitare le derive di fuso e ora legale.
   function daysBetween(fromKey, toKey) {
     if (!fromKey || !toKey) return 0;
     const a = Date.parse(`${fromKey}T12:00:00Z`);
@@ -36,7 +36,8 @@
       totalCostEur: 0,    // dietro le quinte
       rewards: [],        // [{ ts, kind, credits, ref }]
       rewardedFeedback: {},// { [feedbackId]: true } — anti doppio premio risoluzione (C5)
-      // Namespace SEPARATO da rewardedFeedback: un feedback può essere sia risolto (premio C5) sia votato in bacheca (premio DC2), due eventi distinti che non devono bloccarsi a vicenda.
+      // Namespace SEPARATO da rewardedFeedback: risoluzione (C5) e voto in bacheca (DC2) sono
+      // due eventi distinti e non devono bloccarsi a vicenda.
       rewardedVotes: {},  // { [feedbackId]: true }
       owner: null,        // uid/email a cui appartiene questa cache (switch account)
       // Data dell'ultimo bonus giornaliero "feedback autonomo attivo" (F4); '' = mai ricevuto.
@@ -57,7 +58,8 @@
     return s;
   }
 
-  // Accredita una ricarica per ogni mezzanotte passata, al massimo MAX_REFILL_DAYS: il tetto è l'argine a un orologio spostato indietro.
+  // Una ricarica per ogni mezzanotte passata, al massimo MAX_REFILL_DAYS: il tetto è l'argine
+  // a un orologio spostato indietro.
   function applyRefill(state, today = dateKey(), autoFeedbackEnabled = false) {
     const s = ensure(state);
     const missed = daysBetween(s.lastRefillDate, today);
@@ -82,7 +84,7 @@
     return costEur / CREDIT.EUR_PER_CREDIT;
   }
 
-  // Ricompensa per la risoluzione di un feedback secondo la priorità 0-3 (C5); priorità mancante o fuori scala → fascia 0.
+  // Priorità mancante o fuori scala → fascia 0 (C5).
   function rewardForPriority(priority) {
     const table = CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY || {};
     const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
@@ -122,14 +124,15 @@
     return { state: s, credits: amount };
   }
 
-  // PURA: decide senza I/O se il premio voto è ancora dovuto, ed è ciò che tiene awardVoteOnce idempotente a chiamate ripetute (cambio voto, doppio click, retry di rete).
+  // Tiene awardVoteOnce idempotente a chiamate ripetute: cambio voto, doppio click, retry
+  // di rete. Pura: decide senza I/O.
   function isVoteRewardPending(state, feedbackId) {
     const s = ensure(state);
     return !!feedbackId && !s.rewardedVotes[feedbackId];
   }
 
-  // Spesa anti-spam (DC4): costo NOTO pagato di tasca dall'utente, quindi o scala ESATTAMENTE amount o rifiuta col saldo INTOCCATO — niente saldo negativo, niente scalo parziale.
-  // Diversa da applyConsumption, che clampa a 0 e scala sempre perché lì il costo AI è dietro le quinte.
+  // Spesa anti-spam (DC4): costo NOTO pagato dall'utente, quindi o scala esattamente amount o
+  // rifiuta col saldo intoccato. applyConsumption invece clampa a 0, lì il costo è nascosto.
   function applyConsumptionIfAffordable(state, amount) {
     const s = ensure(state);
     const cost = Math.max(0, Number(amount) || 0);
@@ -140,7 +143,7 @@
     return { state: s, ok: true, balance: Math.round(s.balance) };
   }
 
-  // Vista PUBBLICA per la UI: niente costo € (né totale né per-azione), solo saldo, consumo per tipo d'uso e ricompense.
+  // Vista pubblica per la UI: nessun costo €, né totale né per-azione.
   function publicView(state) {
     const s = ensure(state);
     const byUsage = {};
@@ -173,7 +176,8 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.CREDITS]: state });
   }
 
-  // Persiste solo se lo stato è cambiato (refill applicato o prima inizializzazione), e notifica solo se ha accreditato.
+  // Persiste solo se lo stato è cambiato (refill o prima inizializzazione) e notifica solo se
+  // ha accreditato.
   async function load({ autoFeedbackEnabled = false } = {}) {
     const raw = await chrome.storage.local.get(STORAGE_KEYS.CREDITS);
     const had = !!raw[STORAGE_KEYS.CREDITS];
@@ -217,7 +221,7 @@
     return !!state.rewardedVotes[id];
   }
 
-  // Accredita il premio voto UNA SOLA VOLTA per feedback per utente (DC2): cambiare idea works↔broken o rivotare non accredita di nuovo.
+  // Un premio voto per feedback per utente (DC2): cambiare idea o rivotare non riaccredita.
   async function awardVoteOnce(feedbackId, amount) {
     const state = await load();
     if (!isVoteRewardPending(state, feedbackId)) {
@@ -229,8 +233,8 @@
     return { credits, balance: Math.round(state.balance), awarded: true };
   }
 
-  // Logga la spesa come award negativo così compare nello storico accanto alle ricompense ("ho speso 5 crediti per riaprire #22").
-  // Se il saldo non basta NON scrive nulla e lascia il saldo invariato: l'utente non perde crediti per un tentativo respinto.
+  // La spesa è un award negativo così compare nello storico accanto alle ricompense.
+  // Se il saldo non basta non scrive nulla: un tentativo respinto non costa crediti.
   async function spendIfAffordable(amount, { kind = 'spend', ref = null } = {}) {
     const state = await load();
     const { ok, balance } = applyConsumptionIfAffordable(state, amount);
@@ -241,7 +245,7 @@
     return { ok: true, balance };
   }
 
-  // Sostituisce lo stato locale con quello adottato da Firestore per `owner` (cambio account / primo login).
+  // Sostituisce lo stato locale con quello di Firestore per owner (cambio account o login).
   async function adopt(remoteState, owner) {
     const { state } = applyRefill(ensure(remoteState), dateKey());
     state.owner = owner || null;

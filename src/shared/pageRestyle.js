@@ -1,7 +1,6 @@
-// Estetica del CONTENUTO della pagina chiesta in chat (#185): la parte PURA che normalizza
-// e SANIFICA le regole CSS prodotte dall'LLM prima che il main le inietti nella scheda.
-// Il CSS non è fidato: una regola che non passa si SCARTA, non si aggiusta — meglio non
-// applicare nulla che applicare qualcosa di inatteso.
+// Estetica del CONTENUTO della pagina chiesta in chat: la parte PURA che normalizza e
+// SANIFICA le regole CSS dell'LLM prima che il main le inietti. Il CSS non è fidato: una
+// regola che non passa si SCARTA, non si aggiusta.
 
 (function (global) {
   'use strict';
@@ -10,13 +9,10 @@
   const MAX_SELECTOR_LEN = 400;
   const MAX_DECL_LEN = 600;
 
-  // Token vietati ovunque (selettore o dichiarazioni), case-insensitive: graffe e < >
-  // impediscono di «uscire» dalla regola e iniettarne altre; @import/@charset/expression(
-  // di caricare fogli esterni; url( di fare richieste di rete dal CSS iniettato.
-  // Il backslash è vietato di per sé: un escape (\75rl( , ur\6c( ) verrebbe decodificato
-  // dal browser in un token vietato, e vietarlo chiude l'intera classe di bypass.
+  // Token vietati ovunque: graffe e < > fanno «uscire» dalla regola, @import/expression(/url(
+  // caricano o chiamano fuori. Vietato anche il backslash: un escape li ricostruirebbe.
   const FORBIDDEN_RE = /[<>{}\\]|@import|@charset|@namespace|expression\s*\(|url\s*\(|javascript:/i;
-  // Caratteri di controllo: costruiti via stringa per non mettere byte di controllo nel sorgente.
+  // Costruita via stringa per non mettere byte di controllo nel sorgente.
   const CONTROL_RE = new RegExp('[\\u0000-\\u001f\\u007f]');
 
   function isBadChunk(s) {
@@ -58,7 +54,7 @@
     return { selector, css };
   }
 
-  // Normalizza le forme che l'azione può avere (oggetto, { regole/rules }, array, singola regola).
+  // Le forme che l'azione può avere: oggetto, { regole/rules }, array, singola regola.
   function normalizeRules(input) {
     let raw = input;
     if (input && typeof input === 'object' && !Array.isArray(input)) {
@@ -75,9 +71,8 @@
     return out;
   }
 
-  // !important SERVE: insertCSS applica a livello utente, più BASSO degli stili del sito,
-  // e «scrivi in grassetto i titoli» perderebbe contro un h1{font-weight:400}.
-  // L'utente ha chiesto questa estetica: deve vincere sulla pagina.
+  // !important SERVE: insertCSS applica a livello utente, più BASSO degli stili del sito, e
+  // «scrivi in grassetto i titoli» perderebbe. L'utente l'ha chiesto: deve vincere.
   function importantify(decls) {
     return decls
       .split(';')

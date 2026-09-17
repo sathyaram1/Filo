@@ -1,14 +1,6 @@
-// SINGOLA SORGENTE del recap aggiornamento (popup all'avvio) e del calcolo
-// "quante patch sei indietro". Vedi CLAUDE.md → "Patch notes".
-//
-// Ogni volta che chiudi un fix o aggiungi una feature VISIBILE all'utente,
-// aggiungi una riga al blocco della versione corrente (features/fixes), in
-// italiano e NON tecnica. Le voci interne (refactor/test/infra) NON vanno qui.
-//
-// Formato (lista ordinata dalla versione PIÙ RECENTE alla più vecchia):
-//   { version: '0.2.50', date: '2026-06-18',
-//     features: ['Testo per l’utente…'],
-//     fixes: ['Testo per l’utente…'] }
+// SINGOLA SORGENTE del recap aggiornamento e del «quante patch sei indietro».
+// Ogni fix o feature VISIBILE all'utente aggiunge una riga alla versione corrente, in
+// italiano e non tecnica; refactor, test e infrastruttura NON vanno qui.
 
 (function (global) {
   'use strict';
@@ -469,9 +461,6 @@
     },
     {
       version: '0.2.160', date: '2026-07-24',
-      // NB: la ricerca "a senso" della dashboard di gestione aveva una voce qui,
-      // rimossa: quella pagina è riservata all'owner, quindi per l'utente comune
-      // era il racconto di una funzione che non può nemmeno aprire.
       fixes: [
         'Salvare un’immagine da una pagina web ora funziona davvero: con «Salva immagine come…» dal clic destro il file viene scaricato e si apre la finestra per scegliere dove metterlo, con una conferma a salvataggio riuscito. Prima, per le immagini ospitate su un sito diverso da quello della pagina (cioè quasi tutte), la scheda abbandonava la pagina e mostrava solo l’immagine, senza scaricare nulla. Ora vengono salvate anche le immagini dei siti che le proteggono dal collegamento esterno, e se il download non riesce (immagine irraggiungibile o connessione interrotta) te lo dice invece di restare in silenzio.',
         'Sull’avviso a schermo intero «Sito pericoloso», il pulsante «Torna indietro» ora ti fa davvero uscire dal sito anche quando l’avviso compare in una scheda appena aperta (senza una pagina precedente su cui tornare). Prima, in quel caso, premere «Torna indietro» aveva lo stesso effetto di confermare il sito: veniva marcato come sicuro per quella scheda, così se lo stesso dominio si ripresentava (per un redirect o un link) l’avviso di pericolo non compariva più.',
@@ -1016,9 +1005,8 @@
     return 0;
   }
 
-  // Note delle versioni STRETTAMENTE successive a `lastSeen` (escluso), fino a
-  // `current` incluso. Se `lastSeen` è nullo/assente → tutte (primo avvio non
-  // mostra nulla a sorpresa: lo decide il chiamante). Ordinate dalla più recente.
+  // Note delle versioni successive a `lastSeen` (escluso) fino a `current` incluso, dalla più
+  // recente. `lastSeen` assente → tutte, e sta al chiamante non mostrarle al primo avvio.
   function since(lastSeen, current = latestVersion()) {
     return NOTES
       .filter((n) => cmpVersion(n.version, current) <= 0

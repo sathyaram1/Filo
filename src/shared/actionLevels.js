@@ -1,6 +1,6 @@
-// Registro azione→livello di sicurezza (#146.2), assegnato STATICAMENTE qui e mai dall'LLM a runtime: 1 reversibile, si esegue subito; 2 popup che spiega modifica e rischi, aperto da solo sulle risposte fresche (#183) e uno alla volta; 3 irreversibile, l'utente digita «conferma».
-// Il dispatch RIFIUTA le azioni non registrate: ogni nuovo potere deve dichiarare qui il proprio livello, o non viene eseguito.
-// Per IMPOSTA_PREFERENZA il livello lo dà il setter in preferences.js (default 1): cambiare tema è innocuo, accendere la modalità terminale dà a Filo la shell.
+// Registro azione→livello (#146.2), statico: il livello non lo decide mai l'LLM a runtime.
+// 1 si esegue subito, 2 popup che spiega, 3 l'utente digita «conferma».
+// Il dispatch RIFIUTA un'azione non registrata: ogni nuovo potere dichiara qui il livello.
 
 (function (global) {
   'use strict';
@@ -21,7 +21,8 @@
     return action.valore ?? action.value ?? action.val ?? action.colore;
   }
 
-  // Le location curate combaciano con ProxyTab.LOCATIONS; per ogni altro alpha-2 valido si ripiega sul codice maiuscolo, perché il linguaggio naturale può chiedere paesi fuori dalla lista.
+  // Le location curate combaciano con ProxyTab.LOCATIONS; ogni altro alpha-2 valido ripiega
+  // sul codice maiuscolo: a voce si può chiedere un paese fuori dalla lista.
   const COUNTRY_LABELS = {
     us: 'Stati Uniti', gb: 'Regno Unito', fr: 'Francia', de: 'Germania',
     es: 'Spagna', nl: 'Paesi Bassi', jp: 'Giappone',
@@ -38,7 +39,8 @@
     return action.dominio ?? action.domain ?? action.sito;
   }
 
-  // `_targets` è l'elenco di ciò che l'azione colpirebbe DAVVERO: lo calcola il main leggendo la lista, mai l'LLM. Quando manca (registro consultato fuori dal main) i conti tornano null e si ripiega sulla forma della richiesta.
+  // `_targets` è ciò che l'azione colpirebbe DAVVERO: lo calcola il main sulla lista vera,
+  // mai l'LLM. Quando manca i conti tornano null e vale la forma della richiesta.
   function targetList(action) {
     return Array.isArray(action && action._targets) ? action._targets : [];
   }
@@ -67,7 +69,8 @@
 
   const REGISTRY = {
     NAVIGA: {
-      // Aprire un link è di norma innocuo → 1. ECCEZIONE anti-esfiltrazione: se l'URL porta fuori dati sensibili che il modello aveva in contesto, o ha la forma di un payload da origine non fidata, sale a 2 e la conferma mostra l'URL. Il flag `_exfil` lo calcola il main (urlExfil.js), mai l'LLM.
+      // Aprire un link è di norma innocuo → 1. Eccezione anti-esfiltrazione: se l'URL porta fuori
+      // dati sensibili sale a 2 e la conferma lo mostra. `_exfil` lo calcola il main, mai l'LLM.
       level: (a) => (a && a._exfil ? 2 : 1),
       describe: (a) => {
         const url = a.url || a.href || a.link || 'una pagina';
@@ -91,8 +94,8 @@
       level: 1,
       describe: (a) => `Impostare una sveglia ${a.time || a.orario || ''}`.trim(),
     },
-    // Conta QUANTE cose sparirebbero, non come è formulata la richiesta: togliere la sveglia appena nominata è reversibile a costo zero → 1. Cancellarne più d'una in un colpo no: «leva tutte le sveglie, sono in ferie» porta via anche quella dell'antibiotico, e ci si accorge il giorno dopo → 2, col popup che elenca cosa sparisce.
-    // Il conto (`_targets`) lo fa il main, che ha la lista vera; senza, vale la forma della richiesta («tutte» → 2), il caso prudente.
+    // Conta QUANTE cose sparirebbero, non come è formulata la richiesta: una sola è reversibile
+    // → 1; «leva tutte le sveglie» porta via anche quella dell'antibiotico → 2, col popup.
     CANCELLA_SVEGLIA: {
       level: (a) => (targetCount(a) > 1 || (targetCount(a) == null && wantsAll(a)) ? 2 : 1),
       describe: (a) => {
@@ -107,7 +110,8 @@
       },
     },
     MODIFICA_SVEGLIA: {
-      // Spostare un orario è reversibile → 1, con lo stesso freno della cancellazione quando il riferimento ne prende più d'una: cambiare in blocco cose che l'utente non ha in mente è indistinguibile da un errore di comprensione.
+      // Spostare un orario è reversibile → 1, con lo stesso freno della cancellazione quando il
+      // riferimento ne prende più d'una: un cambio in blocco somiglia a un fraintendimento.
       level: (a) => (targetCount(a) > 1 ? 2 : 1),
       describe: (a) => {
         const list = targetList(a);
@@ -127,8 +131,8 @@
       describe: () => 'Salvare un appunto',
     },
     SALVA_LEZIONE: {
-      // Una LEZIONE entra nello stesso buffer che l'agente-lezioni riempie da solo e vale subito ovunque: livello 1 per la stessa ragione per cui le lezioni automatiche non chiedono conferma — stesso canale, stessa fiducia, e restano visibili e cancellabili fra le memorie.
-      // Un popup sarebbe anche controproducente quando la lezione serve a proteggere i dati dell'utente da una richiesta sospetta: confermerebbe chiunque sia alla tastiera, cioè proprio chi la lezione vuole tenere fuori.
+      // Una LEZIONE entra nello stesso buffer che l'agente riempie da solo → 1: stesso canale,
+      // stessa fiducia; e un popup confermerebbe proprio chi la lezione vuole tenere fuori.
       level: 1,
       describe: (a) => {
         const testo = String(a?.testo ?? a?.text ?? a?.lezione ?? '').trim();
@@ -136,10 +140,12 @@
       },
     },
     INVIA_FEEDBACK: {
-      // Un feedback esce dall'app verso un servizio esterno a NOME dell'utente (#146.5) → livello 2: il testo va nel popup e parte solo dopo l'OK.
+      // Un feedback esce dall'app a NOME dell'utente (#146.5) → livello 2: il testo va nel popup
+      // e parte solo dopo l'OK.
       level: 2,
       describe: (a) => {
-        // Il popup mostra il testo INTERO, mai tagliato: è quello che parte a nome dell'utente, e un consenso su un testo che non si può leggere per intero non è un consenso. Se è lungo scorre il popup, non si accorcia il testo.
+        // Il popup mostra il testo INTERO, mai tagliato: un consenso su un testo che non si può
+        // leggere per intero non è un consenso. Se è lungo scorre il popup.
         const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
         return `Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n“${testo || '(vuoto)'}”`;
       },
@@ -149,7 +155,8 @@
       describe: (a) => `Cercare sul web "${a.query || ''}"`,
     },
     ONBOARDING: {
-      // Tiene il conto della micro-intervista di benvenuto (#524): non tocca nulla dell'utente (le impostazioni passano dalle LORO azioni, ognuna col suo livello) e non ha niente da annullare, visto che dalle Preferenze l'intervista si rilancia. Livello 1.
+      // Tiene il conto della micro-intervista di benvenuto (#524): non tocca nulla dell'utente e
+      // non ha niente da annullare — dalle Preferenze si rilancia. Livello 1.
       level: 1,
       describe: (a) => {
         if (a && (a.fine ?? a.chiudi ?? a.done)) return 'Chiudere l’intervista di benvenuto';
@@ -166,7 +173,8 @@
       },
     },
     LEGGI_FILE: {
-      // Apre per intero un file dell'EDITOR di cui il contesto ha solo il riassunto (#379.5): sola lettura, nessuna scrittura, nessuna uscita → 1. Senza una voce qui il dispatch rifiuta l'azione e la lettura on-demand non parte mai.
+      // Apre per intero un file dell'editor di cui il contesto ha solo il riassunto (#379.5):
+      // sola lettura → 1. Senza una voce qui il dispatch rifiuta e la lettura non parte mai.
       level: 1,
       describe: (a) => {
         const id = a && (a.fileId ?? a.id ?? a.file);
@@ -174,8 +182,8 @@
       },
     },
     LEGGI_DOCUMENTO: {
-      // Legge un documento dal DISCO perché l'utente gliel'ha chiesto. Livello 1 come un comando di sola lettura nel terminale: non modifica, non esegue, non manda niente fuori — il testo entra solo nel contesto.
-      // Una conferma a ogni documento sarebbe attrito su una cosa appena chiesta, e una conferma che si accetta sempre smette di essere un controllo.
+      // Legge un documento dal disco su richiesta dell'utente: non modifica, non esegue, non manda
+      // niente fuori → 1. Una conferma che si accetta sempre smette di essere un controllo.
       level: 1,
       describe: (a) => {
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
@@ -183,7 +191,7 @@
       },
     },
     LEGGI_TRASPARENZA: {
-      // Rilettura dei documenti di trasparenza inclusi nell'app: testo statico, nessuna uscita → 1.
+      // Documenti di trasparenza inclusi nell'app: testo statico, nessuna uscita → 1.
       level: 1,
       describe: (a) => `Rileggere la pagina di trasparenza${a && a.doc ? ` (${a.doc})` : ''}`,
     },
@@ -202,14 +210,16 @@
         + `“${a.query || a.testo || ''}”.`,
     },
     CANCELLA_MEMORIA: {
-      // Cancella tutti i moduli di memoria e il buffer delle lezioni non ancora compattate: il profilo che Filo ha costruito nel tempo va perso, ed è irreversibile → livello 3.
+      // Cancella tutti i moduli di memoria e il buffer delle lezioni: il profilo costruito nel
+      // tempo va perso ed è irreversibile → livello 3.
       level: 3,
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
     },
     IMPOSTA_PREFERENZA: {
-      // Livello per-preferenza dichiarato dal setter in preferences.js (default 1). Preferenza sconosciuta o non valida → 2 per prudenza, tanto il dispatch non la eseguirà.
+      // Il livello lo dichiara il setter in preferences.js (default 1). Preferenza sconosciuta o
+      // non valida → 2 per prudenza, tanto il dispatch non la eseguirà.
       level: (a) => {
         const built = prefBuilt(a);
         return (built && built.level) || (built ? 1 : 2);
@@ -217,7 +227,8 @@
       describe: (a) => {
         const built = prefBuilt(a);
         if (!built) return 'Modificare una preferenza';
-        // Il popup spiega COSA Filo sta per fare e, per le impostazioni sensibili di livello 2, anche i RISCHI (#183). Il `risk` arriva dal setter in preferences.js ed è obbligatorio per il livello 2.
+        // Il popup spiega COSA Filo sta per fare e, per le impostazioni sensibili di livello 2,
+        // anche i RISCHI (#183): `risk` arriva dal setter ed è obbligatorio per il livello 2.
         const base = `Filo vuole impostare: ${built.label}.`;
         return built.risk ? `${base}\n\n${built.risk}` : base;
       },
@@ -228,8 +239,8 @@
       },
     },
     IMPOSTA_ESTETICA: {
-      // Cambio di un token estetico (#146.4): reversibile → 1, si applica subito e nella bolla compare un controllo per raffinarlo.
-      // ECCEZIONE: se rende il testo quasi uguale allo sfondo sale a 2. Il flag `_illegible` lo calcola il main, che ha i token correnti.
+      // Cambio di un token estetico (#146.4): reversibile → 1, si applica subito.
+      // Eccezione: se rende il testo quasi uguale allo sfondo sale a 2 (`_illegible`, dal main).
       level: (a) => (a && a._illegible ? 2 : 1),
       describe: (a) => {
         const T = global.SN_THEME_TOKENS;
@@ -244,8 +255,8 @@
       },
     },
     ESEGUI_COMANDO: {
-      // Il livello NON è fisso: dipende dal comando EFFETTIVO, classificato dal main (mai dall'LLM) in cmdClassify.js — 1 sola lettura, 2 modifica recuperabile, 3 cancellazioni, comandi pericolosi e qualunque comando non riconosciuto.
-      // Una sequenza (`&&`/`||`/`;`) prende il livello massimo dei pezzi. Comando assente o classificatore non caricato → 3.
+      // Il livello dipende dal comando EFFETTIVO, classificato dal main in cmdClassify.js, mai
+      // dall'LLM. Una sequenza prende il massimo dei pezzi; senza comando o classificatore → 3.
       level: (a) => {
         const C = global.SN_CMD_CLASSIFY;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
@@ -261,7 +272,8 @@
           + (cwd ? `\nCartella di lavoro: ${cwd}` : '');
       },
     },
-    // Proxy per-tab (#152), tutte livello 1: instradare una scheda da un altro paese o salvare una regola per dominio è reversibile, e la separazione del cookie jar è inerente al proxy che l'utente ha chiesto. Il flusso automatico da geo-block vive altrove.
+    // Proxy per-tab (#152), tutte livello 1: instradare una scheda da un altro paese o salvare
+    // una regola per dominio è reversibile, e il jar separato è inerente al proxy chiesto.
     PROXY_TAB: {
       level: 1,
       describe: (a) => `Aprire questa scheda da ${countryLabel(proxyCountry(a)) || 'un altro paese'}`,
@@ -282,7 +294,8 @@
       level: 1,
       describe: (a) => `Togliere la regola "apri sempre da un altro paese" per ${proxyDomain(a) || 'questo sito'}`,
     },
-    // Comandi della finestra e della barra via chat (#419): livello 1, azionare un controllo della finestra è benigno e reversibile. «close» è ESCLUSO di proposito — l'AI non chiude né finestra né schede.
+    // Comandi della finestra e della barra via chat (#419): livello 1, azionare un controllo è
+    // benigno e reversibile. «close» è ESCLUSO: l'AI non chiude né finestra né schede.
     COMANDO_FINESTRA: {
       level: 1,
       describe: (a) => {
@@ -298,7 +311,8 @@
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
     },
-    // Estetica del CONTENUTO della pagina (#185): livello 1 perché vale solo per quella pagina (CSS live) ed è reversibile ricaricando o con RIPRISTINA_STILE_PAGINA. Il CSS dell'LLM è SANIFICATO dal main (pageRestyle.js): niente at-rule, url(), graffe o markup.
+    // Estetica del CONTENUTO della pagina (#185) → 1: vale solo per quella pagina ed è
+    // reversibile ricaricando. Il CSS dell'LLM lo sanifica il main (pageRestyle.js).
     STILE_PAGINA: {
       level: 1,
       describe: (a) => {
@@ -330,7 +344,7 @@
     try { return entry.describe(action) || ''; } catch (_) { return ''; }
   }
 
-  // La stessa cosa a fatto compiuto, per l'esito che torna al modello; dove il registro non distingue vale `describe`.
+  // A fatto compiuto, per l'esito che torna al modello; senza voce propria vale `describe`.
   function describeDone(action) {
     if (!action || typeof action !== 'object') return '';
     const entry = REGISTRY[String(action.type || '').toUpperCase()];

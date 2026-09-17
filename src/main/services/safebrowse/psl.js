@@ -1,6 +1,6 @@
-// Public Suffix List (sottoinsieme curato) + estrazione del dominio registrabile (eTLD+1).
-// NON è la PSL completa: copre i TLD comuni e i ccSLD più diffusi; per i suffissi non elencati vale la regola implicita "*" (ogni etichetta è un suffisso valido), quindi l'eTLD+1 resta sempre calcolabile. Per casi più esotici basta aggiungere righe a SUFFIX_RULES.
-// L'algoritmo segue publicsuffix.org: vince la regola che combacia col maggior numero di etichette (con wildcard `*` ed eccezioni `!`), e il registrabile è suffisso + 1 etichetta.
+// Public Suffix List (sottoinsieme curato) ed estrazione dell'eTLD+1.
+// Per i suffissi non elencati vale la regola implicita «*»: l'eTLD+1 resta calcolabile,
+// e per i casi esotici bastano righe in più. Algoritmo di publicsuffix.org.
 
 'use strict';
 
@@ -46,17 +46,18 @@ const NORMAL = new Set([
   'co.at', 'or.at', 'gv.at', 'ac.at',
 ]);
 
-// Wildcard: ogni etichetta sotto di essi è un suffisso pubblico (`*.ck` → `foo.ck`). Raro, incluso per correttezza.
+// Wildcard: ogni etichetta sotto di essi è un suffisso pubblico (`*.ck` → `foo.ck`).
 const WILDCARD = new Set([
   'ck', 'jm', 'kw', 'mm', 'np',
 ]);
 
-// Eccezioni alle wildcard (`!suffix`): rendono il suffisso un dominio registrabile invece che pubblico.
+// Eccezioni (`!suffix`): rendono il suffisso registrabile invece che pubblico.
 const EXCEPTION = new Set([
   'www.ck',
 ]);
 
-// `host` dev'essere già in forma ascii/punycode minuscola e senza porta. Ritorna { registrable, publicSuffix, sld, labels } o null per input invalido (IP, vuoto, singola etichetta).
+// `host` dev'essere già ascii/punycode minuscolo e senza porta.
+// Torna { registrable, publicSuffix, sld, labels }, o null per IP o etichetta singola.
 function getDomainInfo(host) {
   if (!host || typeof host !== 'string') return null;
   host = host.replace(/\.$/, '').toLowerCase();
@@ -83,7 +84,7 @@ function getDomainInfo(host) {
       suffixLabels = labels.length - i;
       break;
     }
-    // Wildcard: se la parte dopo la prima etichetta del candidato è una wildcard, allora candidate è un public suffix.
+    // Se la parte dopo la prima etichetta è una wildcard, il candidato è un public suffix.
     const parent = labels.slice(i + 1).join('.');
     if (parent && WILDCARD.has(parent)) {
       suffixLabels = labels.length - i;

@@ -1,5 +1,4 @@
-// Assemblatore del «Filo State» (§5 di filo-architettura.md), senza LLM: tempo, schede
-// aperte, processi attivi, notifiche non gestite, azioni delle ultime 24h, dashboard.
+// Assemblatore del «Filo State» (§5 di filo-architettura.md), senza LLM.
 // Ritorna sia l'oggetto strutturato sia il testo pronto per i prompt.
 
 (function (global) {
@@ -12,8 +11,8 @@
     try {
       if (!global.chrome?.tabs?.query) return [];
       const tabs = await chrome.tabs.query({});
-      // `lastAccessed` manca nelle versioni vecchie di Chrome: si ripiega su `id`, proxy debole
-      // della recency (id più alti = aperti più di recente).
+      // `lastAccessed` manca nelle versioni vecchie: si ripiega su `id`,
+      // proxy debole della recency (id più alti = aperti più di recente).
       const sorted = [...tabs].sort((a, b) => {
         const la = a.lastAccessed || 0;
         const lb = b.lastAccessed || 0;
@@ -51,10 +50,8 @@
     return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${days[dt.getDay()]} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   }
 
-  // Il saldo serve a rispondere in chat a «quanti crediti mi restano?» senza aprire la pagina
-  // Crediti (#359). Il motore si legge a runtime perché non c'è in tutti i contesti in cui
-  // questo modulo può caricarsi; getPublic() applica il refill di mezzanotte e non espone il
-  // costo in €, che resta privato.
+  // Il saldo serve a rispondere in chat a «quanti crediti mi restano?» (#359).
+  // Il motore si legge a runtime: non c'è in tutti i contesti in cui questo modulo si carica.
   async function readCredits() {
     try {
       const Credits = global.SN_CREDITS;
@@ -98,16 +95,14 @@
         session: sessionInfo,
       },
       tabs,
-      // I timer scaduti e non in pausa si filtrano: se Filo era chiuso alla scadenza non c'è
-      // stata notifica, e mostrarli come processi attivi fa dire all'LLM «il timer sta per
-      // suonare» per sempre. Rete di sicurezza se assemble() gira prima di gcTimers().
+      // I timer scaduti si filtrano: se Filo era chiuso alla scadenza non c'è stata notifica,
+      // e l'LLM direbbe «sta per suonare» per sempre. Rete se assemble() gira prima di gcTimers().
       timers: timers
         .map((t) => ({
           id: t.id,
           kind: t.kind || 'timer', // 'alarm' per le sveglie (#322)
           label: t.label,
-          // Ricorrenza della sveglia (assente = una volta sola): serve all'agente per dire quali
-          // sveglie ci sono e per capire a quale l'utente si riferisce.
+          // Assente = una volta sola. Serve all'agente per sapere a quale sveglia si riferisce.
           repeat: Array.isArray(t.repeat) && t.repeat.length ? t.repeat : null,
           endsAt: t.endsAt,
           paused: !!t.paused,
@@ -143,8 +138,7 @@
       lines.push(`Inizio sessione: ${formatDate(state.time.session.startedAt)} (${state.time.session.ageMin} min fa, ${state.time.session.count} interazioni)`);
     }
     lines.push('');
-    // Il refill giornaliero si legge dal valore in vigore, non scritto a mano, così la frase
-    // resta veritiera se cambia.
+    // Il refill si legge dal valore in vigore: la frase resta veritiera se cambia.
     if (state.credits) {
       const refill = global.SN_CONST?.CREDIT?.DAILY_REFILL ?? 100;
       lines.push('CREDITI');
@@ -169,12 +163,11 @@
     else {
       state.timers.forEach((t) => {
         if (t.kind === 'alarm') {
-          // #322 — le sveglie si descrivono con l'orario assoluto, non col countdown, che a ore di
-          // distanza confonderebbe.
+          // Le sveglie si descrivono con l'orario assoluto: a ore di distanza un countdown
+          // confonde.
           const d = new Date(t.endsAt);
           const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          // Dicitura unica con la colonna destra (SN_FILO_MEMORY): l'agente e l'utente leggono la
-          // stessa cosa.
+          // Dicitura unica con la colonna destra: agente e utente leggono la stessa cosa.
           const M = global.SN_FILO_MEMORY;
           const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
           lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`);

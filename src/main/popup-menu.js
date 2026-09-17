@@ -7,9 +7,8 @@ const { hideForTests } = require('./test-window-mode');
 
 let activePopup = null;
 
-// Icone del menu: viewBox 0 0 24 24, solo tratto. Il popup è una finestra a sé
-// e non carica src/shared/icons.js, quindi queste ne sono una COPIA: una voce
-// che esiste in tutte e due deve disegnare la stessa cosa in tutte e due.
+// Icone del menu: il popup è una finestra a sé e non carica src/shared/icons.js, quindi
+// queste ne sono una COPIA — una voce che sta in tutte e due deve disegnare lo stesso.
 const ICON_PATHS = {
   // `note` in src/shared/icons.js: gli appunti vivono nell'editor, stessa icona.
   editor:
@@ -156,7 +155,6 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   const cb = parentWin.getContentBounds();
   let popX = cb.x + x - MARGIN;
   let popY = cb.y + y + 6 - MARGIN;
-  // Non uscire dal bordo destro
   if (popX + WIN_W > cb.x + cb.width) {
     popX = cb.x + cb.width - WIN_W;
   }

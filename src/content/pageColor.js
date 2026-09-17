@@ -1,5 +1,6 @@
-// Colore della tab: campiona il colore dominante della cima pagina (spec §1.1) e il colore identità del sito (spec §1.2: theme-color → manifest → favicon).
-// Manda entrambi al main via IPC; a tingere le tab è la shell. I preload lo caricano prima di content.js.
+// Colore della tab: campiona il colore della cima pagina (§1.1) e il colore identità del
+// sito (§1.2: theme-color → manifest → favicon), e li manda al main.
+// A tingere le tab è la shell. Caricato prima di content.js.
 
 (function (global) {
   'use strict';
@@ -74,8 +75,8 @@
     setTimeout(schedule, 1200);
   }
 
-  // Colore identità (spec §1.2): si calcola una volta per pagina, con qualche retry per i siti che mettono theme-color o favicon dopo il paint; il main lo cacha per dominio.
-  // getParams è opzionale e porta i parametri correnti (settings.tabColor) dentro l'estrazione, così cambiarli a voce o in Preferenze cambia davvero il colore; senza, valgono i default di SN_TAB_COLOR.
+  // Il colore identità si calcola una volta per pagina, con qualche retry per chi lo mette
+  // dopo il paint. `getParams` porta i parametri correnti, o valgono i default.
   function reportTabIdentityColor(getParams) {
     let lastSent;
     const params = () => {
@@ -178,8 +179,8 @@
     }
 
     async function compute() {
-      // Il favicon è la fonte primaria: è l'unica universale e quasi sempre porta il colore del marchio. theme-color e manifest sono quasi sempre bianchi, neri o assenti,
-      // quindi restano un fallback (solo con croma sufficiente) per i favicon illeggibili — CORS tainted, errore di caricamento. Senza identità la tab resta neutra.
+      // Il favicon è la fonte primaria: quasi sempre porta il colore del marchio. theme-color
+      // e manifest restano un fallback per i favicon illeggibili; senza identità, tab neutra.
       const TC = self.SN_TAB_COLOR;
       const ident = (c) => c && (!TC || TC.hasIdentity(c));
 

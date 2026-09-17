@@ -1,6 +1,6 @@
-// Rilevamento geo-block, livello 1 DETERMINISTICO (proxy-per-tab-spec.md §4): segnali conclusivi qui, LLM solo sulla coda ambigua (geoBlockClassifier.js).
-// Questo livello RILEVA ed ESPONE il segnale, non agisce MAI: niente retry via proxy né proposta UI: le regole d'azione sono il livello decisionale, che consuma onDetected().
-// Niente require('electron'): la logica pura gira anche sotto node:test. Il wiring sugli eventi della webview sta in tabs.js (_wireGeoBlock).
+// Rilevamento geo-block, livello 1 deterministico (proxy-per-tab-spec.md §4): i segnali
+// conclusivi stanno qui, la coda ambigua va all'LLM di geoBlockClassifier.js.
+// RILEVA ed espone, non agisce mai; niente electron, il wiring è in tabs.js (_wireGeoBlock).
 
 'use strict';
 
@@ -8,20 +8,22 @@ const SOURCES = {
   HTTP_451: 'http_451',
   REDIRECT: 'redirect_pattern',
   TEXT: 'text_pattern',
-  // Livello 2 (geoBlockClassifier.js): la coda ambigua che i pattern deterministici non risolvono, classificata come geo_block.
+  // Livello 2: la coda ambigua che i pattern deterministici non risolvono.
   LLM: 'llm_classifier',
 };
 
-// 451 Unavailable For Legal Reasons: geo-block per definizione (RFC 7725), conclusivo. Il 403 NON sta qui: è ambiguo (bot-block, paywall, permessi) e appartiene alla coda del livello 2.
+// 451 è geo-block per definizione (RFC 7725), conclusivo. Il 403 NON sta qui: è ambiguo
+// (bot-block, paywall, permessi) e appartiene alla coda del livello 2.
 function matchStatus(statusCode) {
   return Number(statusCode) === 451 ? SOURCES.HTTP_451 : null;
 }
 
-// Lista CURATA di pattern sul path (+query) della destinazione di un redirect. Si applica solo ai redirect, mai all'URL digitato dall'utente: un sito che TI MANDA su /geo-blocked sta dichiarando il blocco.
+// Solo sui redirect, mai sull'URL digitato dall'utente: un sito che TI MANDA su /geo-blocked
+// sta dichiarando il blocco. Lista curata sul path più query della destinazione.
 const REDIRECT_PATTERNS = [
   { id: 'geo_segment', re: /(^|\/)geo(\/|$)/ },            // …/geo, …/geo/…
-  { id: 'geo_block', re: /geo[-_]?block/ },                 // geoblock, geo-blocked…
-  { id: 'geo_restrict', re: /geo[-_]?restrict/ },           // geo-restricted…
+  { id: 'geo_block', re: /geo[-_]?block/ },
+  { id: 'geo_restrict', re: /geo[-_]?restrict/ },
   { id: 'not_available', re: /(^|\/)not[-_]?available([/._?-]|$)/ },
   { id: 'region_block', re: /region[-_]?block/ },
   { id: 'country_block', re: /country[-_]?block/ },
@@ -40,7 +42,8 @@ function matchRedirectUrl(url) {
   return null;
 }
 
-// Pattern ESPLICITI dei messaggi di geo-block noti. Niente euristiche vaghe: i casi ambigui ("content unavailable" generico, pagina vuota) sono la coda del livello 2.
+// Solo pattern ESPLICITI, niente euristiche vaghe: i casi ambigui («content unavailable»,
+// pagina vuota) sono la coda del livello 2.
 const TEXT_PATTERNS = [
   { id: 'yt_uploader_country', re: /not made this video available in your country/ },
   { id: 'not_available_in_your', re: /not (?:currently )?(?:be )?(?:available|viewable) in your (?:country|region|location|area)/ },
@@ -58,7 +61,7 @@ const TEXT_PATTERNS = [
 function matchText(text) {
   const t = String(text || '')
     .toLowerCase()
-    .replace(/[‘’ʼ]/g, "'") // apostrofi tipografici → ASCII
+    .replace(/[‘’ʼ]/g, "'")
     .replace(/\s+/g, ' ');
   if (!t) return null;
   for (const { id, re } of TEXT_PATTERNS) {
@@ -77,7 +80,8 @@ function classify({ statusCode, redirectUrl, text } = {}) {
   return null;
 }
 
-// Il livello decisionale si registra con onDetected(cb), tabs.js emette via emitDetected. Il segnale porta { tabId, url, host, source, detail, at }.
+// Il livello decisionale si registra con onDetected(cb), tabs.js emette con emitDetected.
+// Il segnale porta { tabId, url, host, source, detail, at }.
 const listeners = new Set();
 
 function onDetected(cb) {
@@ -103,5 +107,4 @@ const api = {
 };
 
 module.exports = api;
-// Esposto su globalThis come gli altri moduli condivisi: i livelli successivi e i test lo trovano senza import.
 try { globalThis.SN_GEOBLOCK = api; } catch (_) {}

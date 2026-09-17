@@ -1,17 +1,12 @@
-// SORGENTE UNICA del rendering «testo di Filo -> HTML leggero» (#418): chat della home,
-// popup sulle pagine web, riquadro «Spiega», sidebar. Il testo del modello NON è fidato
-// (può nascere da una pagina che ha letto): un link si rende cliccabile solo con schema
-// esplicito http/https/mailto — filo://, javascript:, data:, file:, i relativi e i //host
-// risolverebbero verso le pagine INTERNE dell'app — e porta rel="noopener noreferrer
-// nofollow" su nuova scheda. `filo-md-link` è l'aggancio con cui ogni superficie
-// intercetta il click e apre il link nel modo giusto.
+// SORGENTE UNICA del rendering «testo di Filo → HTML leggero» (#418).
+// Il testo del modello NON è fidato: un link si rende cliccabile solo con schema http,
+// https o mailto, perché filo://, javascript: e i relativi puntano dentro l'app.
 
 (function (global) {
   'use strict';
 
   const LINK_CLASS = 'filo-md-link';
-  // Sentinelle Private-Use: non compaiono mai nel testo del modello, quindi un innocente
-  // « T3 » nella prosa non viene scambiato per un segnaposto.
+  // Sentinelle Private-Use: non compaiono nel testo del modello, quindi la prosa è al sicuro.
   const S0 = '';
   const S1 = '';
 
@@ -21,9 +16,8 @@
     })[c]);
   }
 
-  // URL già HTML-escapato. Ritorna l'URL solo se è un link esterno SICURO: niente filo://,
-  // javascript:, data:, file:, né relativi o protocol-relative (punterebbero alle pagine
-  // interne dell'app); altrimenti null e il testo resta visibile ma non cliccabile.
+  // Ritorna l'URL solo se è un link esterno SICURO: niente filo://, javascript:, data:, file:,
+  // né relativi o protocol-relative. Altrimenti null: il testo resta visibile, non cliccabile.
   function safeLinkUrl(rawUrl) {
     const u = String(rawUrl || '').trim();
     if (!u) return null;
@@ -40,9 +34,8 @@
       + 'rel="noopener noreferrer nofollow">' + text + '</a>';
   }
 
-  // Codice e link vengono messi da parte con segnaposto, così le trasformazioni successive
-  // (autolink, grassetto/corsivo) non ne corrompono il contenuto e non ri-linkano l'href
-  // appena creato.
+  // Codice e link si mettono da parte con segnaposto: così autolink e grassetto non ne
+  // corrompono il contenuto e non ri-linkano l'href appena creato.
   function inlineMd(escaped) {
     const tokens = [];
     const stash = (html) => S0 + (tokens.push(html) - 1) + S1;
@@ -121,9 +114,8 @@
     return out.join('\n');
   }
 
-  // Ogni superficie passa il proprio opener (nuova scheda via IPC sulle pagine filo://,
-  // window.open nei content script). Un solo listener delegato sul contenitore: sopravvive
-  // ai re-render dello streaming. Ritorna la funzione per staccarlo.
+  // Ogni superficie passa il proprio opener (IPC sulle pagine filo://, window.open altrove).
+  // Un solo listener delegato: sopravvive ai re-render dello streaming. Ritorna il distacco.
   function bindLinks(rootEl, openUrl) {
     if (!rootEl || typeof openUrl !== 'function') return () => {};
     const onClick = (e) => {

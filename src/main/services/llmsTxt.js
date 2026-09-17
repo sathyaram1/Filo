@@ -1,15 +1,15 @@
-// Fetcher di /llms.txt, la convenzione per dare istruzioni machine-readable ai bot su come usare un sito (llmstxt.org).
-// Una prova per dominio ogni 24h, esito (o assenza) in cache; il testo si tronca a 20 KB (~5k token).
+// Fetcher di /llms.txt: le istruzioni che un sito dà ai bot su come usarlo (llmstxt.org).
+// Una prova per dominio ogni 24h, esito o assenza in cache; il testo si tronca a 20 KB.
 // Espone SN_LLMS_TXT = { get(domain) → { text, cachedAt, present } | null }.
 
 (function (global) {
   'use strict';
 
   const STORAGE_KEY = 'sn_llmstxt_cache';
-  const TTL_MS = 24 * 60 * 60 * 1000;       // 24h
-  const MAX_BYTES = 20 * 1024;              // 20KB
+  const TTL_MS = 24 * 60 * 60 * 1000;
+  const MAX_BYTES = 20 * 1024;
   const FETCH_TIMEOUT_MS = 4000;
-  // Bound difensivo sul numero di domini in cache: quando lo si supera si scartano i più vecchi.
+  // Bound difensivo sui domini in cache: oltre il tetto si scartano i più vecchi.
   const MAX_DOMAINS_CACHED = 500;
 
   async function readCache() {
@@ -24,7 +24,7 @@
     return entry && (Date.now() - (entry.cachedAt || 0)) < TTL_MS;
   }
 
-  // Si preserva la testa del file: la convenzione llms.txt mette in alto la sintesi, ed è la parte più informativa.
+  // Si preserva la testa: la convenzione mette in alto la sintesi, la parte più informativa.
   function truncate(text) {
     if (typeof text !== 'string') return '';
     // Bytes pessimisti: 1 char ≤ 4 byte UTF-8, quindi si taglia per char.
@@ -43,7 +43,7 @@
       // Evita di scaricare l'HTML di una 404 mascherata da 200.
       if (ct.includes('text/html')) return { present: false, text: '' };
       const raw = await r.text();
-      // Body che sembra HTML (SPA che ritornano index.html per ogni path): il file si considera assente.
+      // Body che sembra HTML (SPA che servono index.html ovunque): il file si considera assente.
       if (/^\s*<!DOCTYPE\s+html|^\s*<html[\s>]/i.test(raw)) return { present: false, text: '' };
       return { present: true, text: truncate(raw) };
     } catch (_) {
@@ -61,7 +61,7 @@
     return cache;
   }
 
-  // Cache fresca → nessuna rete; stale o assente → fetch e aggiornamento. Non lancia mai: errori → { text:'', present:false }.
+  // Cache fresca: nessuna rete. Non lancia mai: gli errori tornano { text:'', present:false }.
   async function get(domain) {
     if (!domain || typeof domain !== 'string') return { text: '', present: false, cachedAt: 0 };
     const cache = await readCache();

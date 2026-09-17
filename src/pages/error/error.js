@@ -1,6 +1,6 @@
-// Pagina d'errore di rete, caricata dal main quando una navigazione fallisce o il renderer
-// della scheda muore. Parsing e traduzione vivono in SN_NET_ERROR; qui rendering e «Riprova».
-// Gira anche in una view esterna (contextIsolation): niente chrome.* qui, solo DOM standard.
+// Pagina d'errore di rete: la mostra il main quando una navigazione fallisce.
+// Parsing e traduzione dei codici vivono in SN_NET_ERROR; qui solo rendering e «Riprova».
+// Gira in una view esterna (contextIsolation): niente chrome.*, solo DOM standard.
 
 (function () {
   'use strict';
@@ -27,14 +27,14 @@
   if (code && String(code) !== (NE && NE.CRASH_CODE)) detailBits.push(`(${code})`);
   document.getElementById('err-detail').textContent = detailBits.join(' ');
 
-  // Il titolo del documento diventa il titolo della scheda: il sito fallito, non «Nuova scheda».
+  // Il titolo del documento è quello della scheda: il sito fallito, non «Nuova scheda».
   document.title = host || msg.title;
 
   const retryBtn = document.getElementById('err-retry');
   function retry() {
     if (!target) return;
-    // replace(): il tentativo non aggiunge un'ulteriore voce di cronologia
-    // sopra la pagina d'errore. target è già validato (solo http/https/filo).
+    // replace(): il tentativo non lascia una voce di cronologia sopra la pagina d'errore.
+    // `target` è già validato altrove: solo http/https/filo.
     try { window.location.replace(target); } catch (_) {}
   }
   if (target) {

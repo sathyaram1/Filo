@@ -1,5 +1,5 @@
-// Box "Modifica": preview con diff e conferma esplicita, mai sovrascrittura cieca.
-// I preload lo caricano prima di content.js, che poi chiama init() passandogli il pasteContext (che resta suo).
+// Box «Modifica»: anteprima con diff e conferma esplicita, mai sovrascrittura cieca.
+// Caricato prima di content.js, che gli passa il contesto d'incolla con init().
 
 (function (global) {
   'use strict';
@@ -9,7 +9,6 @@
   const I18n = global.SN_I18N;
   const Popup = global.SN_POPUP;
 
-  // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
     getPasteContext: () => null,
     setPasteContext: () => {},
@@ -137,7 +136,8 @@
     $replace.addEventListener('click', () => {
       deps.setPasteContext(savedCtx);
       deps.restorePasteContext();
-      // In contenteditable l'inserimento passa da execCommand dopo aver ripristinato la selezione, così Ctrl+Z funziona.
+      // In contenteditable l'inserimento passa da execCommand dopo aver ripristinato la selezione,
+      // così Ctrl+Z funziona.
       if (savedCtx.kind === 'input') {
         const el = savedCtx.el;
         const start = savedCtx.start, end = savedCtx.end;
@@ -164,7 +164,7 @@
     };
     document.addEventListener('keydown', onDocKey, true);
     root.addEventListener('mousedown', (e) => {
-      if (e.target === root) close(); // click fuori dal box
+      if (e.target === root) close();
     });
 
     $instr.value = '';

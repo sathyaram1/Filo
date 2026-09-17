@@ -22,8 +22,7 @@
     $('openHistory').textContent = 'Cronologia AI';
     $('openSpellcheck').textContent = 'Gestisci correttore';
 
-    // Su Mac le stesse scorciatoie si premono con altri tasti: i nomi si chiedono a
-    // src/shared/tasti.js, o l'elenco direbbe cose che su quella macchina non funzionano.
+    // I nomi dei tasti si chiedono a src/shared/tasti.js (regola in CLAUDE.md § Mac).
     const sc = $('shortcutsList');
     sc.innerHTML = '';
     const T = window.SN_TASTI;
@@ -139,8 +138,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
     $('blocklist').addEventListener('change', saveDebounced);
-    // #252 — indirizzo canonico filo://<page>/<file>, non la forma legacy: un solo URL per
-    // pagina, e la scheda già aperta torna a fuoco invece di duplicarsi.
+    // Indirizzo canonico filo://<page>/<file>: un solo URL per pagina, e la scheda già aperta
+    // torna a fuoco invece di duplicarsi.
     $('openHome').addEventListener('click', () => {
       chrome.tabs.create({ url: 'filo://home/home.html' });
     });

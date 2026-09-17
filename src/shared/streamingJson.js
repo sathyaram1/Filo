@@ -7,10 +7,8 @@
 
   const ESCAPES = { '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t' };
 
-  // Decodifica il corpo di una stringa JSON da raw[start] (il carattere subito dopo la
-  // virgoletta di apertura). Si ferma prima di un escape troncato: mai mezzo \n o \uXXXX.
-  // È «prefix-stable» — allungando `raw` il testo può solo estendersi, mai cambiare i
-  // caratteri già prodotti: è ciò che permette di emettere i delta con una slice.
+  // «Prefix-stable»: allungando `raw` il testo può solo estendersi, mai cambiare i caratteri
+  // già prodotti: è così che i delta si emettono con una slice. Mai mezzo escape.
   function decodeStringPrefix(raw, start) {
     let out = '';
     let i = start;
@@ -47,14 +45,13 @@
     return m ? m.index + m[0].length : -1;
   }
 
-  // push(chunk) ritorna { delta, done }: i soli caratteri nuovi ormai sicuri.
-  // reset() serve quando il provider cade a metà e il router ripiega: il testo già
-  // scritto va BUTTATO e riscritto dal tentativo nuovo, non accodato (#273).
+  // push(chunk) → { delta, done }: i soli caratteri nuovi ormai sicuri.
+  // reset() quando il provider cade a metà: il testo già scritto va BUTTATO, non accodato.
   function createTextStreamer(field) {
     const key = field || 'text';
     let raw = '';
     let start = -1;
-    let emitted = 0; // quanti caratteri decodificati abbiamo già restituito
+    let emitted = 0;
     let done = false;
     return {
       push(chunk) {

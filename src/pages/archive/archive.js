@@ -1,5 +1,5 @@
-// Archivio tab (§3.3): le schede chiuse in chip orizzontali, per giorno e in ordine
-// cromatico. Riapri ed elimina dal tasto destro; svuota tutto dalla toolbar.
+// Archivio tab (§3.3): le schede chiuse in chip, per giorno e in ordine cromatico.
+// Riapri ed elimina dal tasto destro; svuota tutto dalla toolbar.
 
 (function () {
   'use strict';
@@ -10,7 +10,7 @@
   function $(id) { return document.getElementById(id); }
 
   let tabs = [];
-  // Se valorizzato, si mostrano i risultati della ricerca semantica (lista piatta per
+  // Se valorizzato si mostrano i risultati della ricerca semantica (lista piatta per
   // pertinenza) invece dell'archivio raggruppato per giorno.
   let semanticResults = null;
 
@@ -41,8 +41,8 @@
     return (h / 6) * 360;
   }
 
-  // Tinta identità ATTENUATA come le tab in alto (§1.2): saturazione al ~18% e luminosità al
-  // CSS, così una scheda molto satura non diventa un blocco acceso. null → la chip usa il neutro.
+  // Tinta identità ATTENUATA come le schede in alto (§1.2): una scheda molto satura non deve
+  // diventare un blocco acceso. null → la chip usa il neutro.
   function tintOf(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return null;
@@ -60,7 +60,7 @@
       else h = (r - g) / d + 4;
       h /= 6;
     }
-    s *= 0.18; // saturazione ridotta al ~18% dell'originale (come §1.2)
+    s *= 0.18;
     const hue2rgb = (pp, qq, t) => {
       if (t < 0) t += 1;
       if (t > 1) t -= 1;
@@ -102,8 +102,8 @@
     return new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // Il testo di default vale solo per «archivio realmente vuoto»: con una ricerca attiva senza
-  // risultati serve un messaggio dedicato, o l'elenco svuotato sembra un archivio cancellato.
+  // Il testo di default vale solo per «archivio davvero vuoto»: con una ricerca senza
+  // risultati serve una frase dedicata, o l'elenco svuotato sembra un archivio cancellato.
   const EMPTY_DEFAULT = 'Nessuna tab archiviata, per ora.';
   function showEmpty() {
     const rawQ = ($('search').value || '').trim();
@@ -122,7 +122,7 @@
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.SEARCH_ARCHIVED_TABS, query: q }); } catch (_) {}
     if (!r || !Array.isArray(r.results)) {
-      // Niente embedding (manca la chiave o nessuna tab indicizzata): ripiego sul filtro per sottostringa.
+      // Niente embedding (manca la chiave o nessuna tab indicizzata): si filtra per sottostringa.
       semanticResults = null;
       note.textContent = 'Ricerca nei contenuti non disponibile: mostro i risultati per testo.';
       render();
@@ -213,8 +213,8 @@
     render();
   }
 
-  // Menu contestuale invece di bottoni sempre visibili, coerente con le chip compatte. Riusa le
-  // classi dei menu di Filo (patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md).
+  // Menu contestuale invece di bottoni sempre visibili, coerente con le chip compatte.
+  // Pattern: patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md
   let openMenu = null;
   function closeCtxMenu() {
     if (!openMenu) return;
@@ -260,7 +260,7 @@
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
 
     openMenu = menu;
-    // setTimeout: evita che il click che ha aperto il menu lo chiuda subito col listener «outside click».
+    // Senza il rinvio, il click che ha aperto il menu lo richiuderebbe subito.
     setTimeout(() => {
       document.addEventListener('mousedown', onOutsideClick, true);
       document.addEventListener('keydown', onMenuKeydown, true);
@@ -326,9 +326,8 @@
     return row;
   }
 
-  // La rotellina verticale scrolla in orizzontale la riga di un giorno (come la barra delle
-  // tab): senza, con molte schede le eccedenti restavano irraggiungibili col solo mouse.
-  // Delegato su #list, scrolla solo con overflow vero; i risultati vanno a capo, fuori di qui.
+  // La rotellina verticale scrolla in orizzontale la riga di un giorno, come la barra delle
+  // schede: senza, con molte schede le eccedenti restavano irraggiungibili col solo mouse.
   function onListWheel(e) {
     const row = e.target.closest && e.target.closest('.arc-tabs');
     if (!row) return;
@@ -368,7 +367,7 @@
     $('openHistory').addEventListener('click', () => {
       try { chrome.tabs.create({ url: 'filo://history/history.html' }); } catch (_) {}
     });
-    // Simmetria fra le tre liste sorelle: mancava la strada di ritorno da qui verso «Aperti per dopo».
+    // Simmetria fra le tre liste sorelle: da qui si deve poter tornare ad «Aperti per dopo».
     $('openHome').addEventListener('click', () => {
       try { chrome.tabs.create({ url: 'filo://home/home.html' }); } catch (_) {}
     });

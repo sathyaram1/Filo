@@ -1,6 +1,6 @@
-// Cifratura asimmetrica dei feedback (S1.1), «sealed box» verso l'owner: chi legge Firestore o la storia del repo PUBBLICO non deve poter leggere testo e verdetti, altrimenti lo stato `blocked` («il tuo attacco è stato beccato») regala hill-climbing all'attaccante.
-// Chi cifra usa SOLO la chiave pubblica: per ogni messaggio una coppia ECDH P-256 effimera, HKDF-SHA256 sul segreto condiviso, AES-256-GCM. Il ciphertext porta la pubblica effimera, e solo chi ha la PRIVATA rifà l'ECDH — chi cifra non può rileggere ciò che ha cifrato, ed è il punto.
-// Formato: stringa «FENC1:» + base64url([ver:1][ephPubRaw:65][iv:12][ct…]), o gli stessi byte per gli screenshot. Solo WebCrypto e TextEncoder, quindi gira uguale in Node e nel browser.
+// Cifratura asimmetrica dei feedback, «sealed box» verso l'owner: chi legge Firestore o il
+// repo pubblico non deve leggere testo e verdetti, o `blocked` regala hill-climbing.
+// Chi cifra usa SOLO la pubblica e non può rileggere ciò che ha cifrato: è il punto.
 
 (function (global) {
   'use strict';
@@ -53,7 +53,8 @@
     const raw = b64ToBytes(b64url);
     return subtle().importKey('raw', raw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
   }
-  // La privata importata resta in memoria (una sola voce): la dashboard decifra centinaia di campi con la stessa chiave e reimportarla ogni volta costava più della decifratura. Se cambia la stringa cambia la voce; un import fallito non resta in cache.
+  // La privata importata resta in memoria: reimportarla a ogni campo costava più della
+  // decifratura stessa. Un import fallito non resta in cache.
   let privKeyCache = null; // { b64, key }
   async function importPrivateKey(b64) {
     if (privKeyCache && privKeyCache.b64 === b64) return privKeyCache.key;
@@ -155,7 +156,7 @@
   function hasPublicKey() {
     return !!(global.SN_FEEDBACK_PUBKEY);
   }
-  // Attiva solo con la chiave pubblica E l'interruttore di cutover acceso (feedbackPublicKey.js → SN_FEEDBACK_ENC_ENABLED).
+  // Serve la chiave pubblica E l'interruttore acceso (feedbackPublicKey.js).
   function isEnabled() {
     return hasPublicKey() && !!global.SN_FEEDBACK_ENC_ENABLED;
   }

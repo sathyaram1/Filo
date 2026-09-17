@@ -1,6 +1,6 @@
-// Groomer della coda feedback: dedup più ricalcolo priorità (F5). Logica PURA — ritorna { merges, priorityBumps }, l'applicazione spetta a un applier esterno (routine, script, handler IPC).
-// Due canali di dedup, con strategie diverse per sicurezza. Gli auto-feedback (`auto:*`) si deduplicano sul DATO STRUTTURATO `capabilityGapId`: stesso id = duplicati certi, e il canale è immune a injection perché non guarda il testo. Il testo libero degli utenti si deduplica per similarità (Jaccard, con un giudice semantico iniettabile come secondo livello) ed è trattato come NON FIDATO: si misura «simili sì/no», non si esegue niente di ciò che contiene.
-// Le priorità si alzano e basta, mai si abbassano, con cap a 3: un duplicato +1 (segnale di interesse), tre o più +2 (molti utenti colpiti). I bump partono dalla priorità corrente dell'originale, non da un contatore astratto.
+// Groomer della coda feedback: dedup più ricalcolo priorità. PURA, ritorna il piano.
+// Gli auto-feedback si deduplicano sul dato strutturato, immune a injection; il testo utente
+// per similarità, ed è NON FIDATO: si misura «simili sì/no», non si esegue nulla.
 
 (function (global) {
   'use strict';
@@ -8,10 +8,11 @@
   // Prefisso dei clientId generati da Filo in autonomia (F4).
   const AUTO_SOURCE_PREFIX = 'auto:';
 
-  // Soglia Jaccard per il testo utente; sotto questa, se è iniettata, interviene la giudice semantica.
+  // Soglia Jaccard; sotto, se è iniettata, interviene la giudice semantica.
   const JACCARD_THRESHOLD = 0.65;
 
-  // dupeCount = duplicati già trovati per quell'originale. Ritorna il delta da sommare alla priorità corrente.
+  // dupeCount = duplicati già trovati per quell'originale.
+  // Ritorna il delta da sommare alla priorità corrente, che non si abbassa mai.
   function priorityDelta(dupeCount) {
     if (dupeCount >= 5) return 2; // forte interesse
     if (dupeCount >= 3) return 2;
@@ -19,7 +20,8 @@
     return 0;
   }
 
-  // Un auto-feedback lo porta nel campo omonimo oppure come tag `cap-gap:<id>` dentro il clientId. Stringa non vuota, o null.
+  // Nel campo omonimo oppure come tag `cap-gap:<id>` dentro il clientId.
+  // Stringa non vuota, o null.
   function extractCapabilityGapId(fb) {
     if (fb.capabilityGapId && typeof fb.capabilityGapId === 'string') {
       return fb.capabilityGapId.trim() || null;
@@ -38,7 +40,7 @@
   function tokenize(str) {
     return String(str || '')
       .toLowerCase()
-      .replace(/[^\w\s]/g, ' ')  // punteggiatura → spazio
+      .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
       .filter((t) => t.length > 2); // scarta stop-words ultra-corte
   }
@@ -55,15 +57,13 @@
     return union === 0 ? 1 : intersection / union;
   }
 
-  // Due livelli: sopra JACCARD_THRESHOLD sono duplicati certi e nessuna LLM serve; sotto, se `llmSimilar` è fornita, la si chiama per le coppie semanticamente equivalenti che condividono pochi token di superficie («segnalibri» contro «preferiti»).
-  // In entrambi i casi il testo resta NON FIDATO: si misura «simili sì/no», non si esegue nessuna istruzione contenuta nel testo.
+  // Sopra la soglia sono duplicati certi; sotto, `llmSimilar` prende le coppie equivalenti
+  // con pochi token in comune («segnalibri» contro «preferiti»).
   function areSimilarText(fbA, fbB, llmSimilar) {
     const tA = tokenize(fbA.text || fbA.name || '');
     const tB = tokenize(fbB.text || fbB.name || '');
     const j = jaccard(tA, tB);
-    // Certezza senza LLM.
     if (j >= JACCARD_THRESHOLD) return true;
-    // Giudizio iniettato, per quando la similarità lessicale non basta ma un giudice esterno può stabilire l'equivalenza.
     if (llmSimilar) {
       try {
         return !!llmSimilar(
@@ -78,9 +78,10 @@
     return false;
   }
 
-  // Solo i campi NON identificanti del duplicato (mai clientId, userAgent, IP). Il testo grezzo entra perché porta contesto utile a chi risolve, ma questa funzione non lo esegue.
+  // Solo i campi NON identificanti del duplicato: mai clientId, userAgent, IP.
+  // Il testo grezzo entra perché serve a chi risolve, e qui non viene eseguito.
   function buildMergedNotes(original, duplicate) {
-    const now = new Date().toISOString().slice(0, 10); // solo data, no ora
+    const now = new Date().toISOString().slice(0, 10);
     const dupText = String(duplicate.text || duplicate.name || '').slice(0, 300);
     const origNotes = String(original.notes || '').trim();
     const dupNotes = String(duplicate.notes || '').trim();
@@ -90,11 +91,8 @@
     return [origNotes, header, dupText.slice(0, 200) + extra].filter(Boolean).join('\n');
   }
 
-  /**
-  * Decisione PURA, niente I/O. feedbacks: oggetti plain JS con almeno { id, text?, name?, clientId?, priority?, capabilityGapId?, seq?, subSeq?, notes?, status?, createdAt? }; opts.llmSimilar è il giudice semantico iniettabile.
-  * Ordine: separa auto da utente, dedup auto per capabilityGapId, dedup utente per similarità, bump di priorità per gli originali con duplicati.
-  * L'originale è sempre il feedback più vecchio (createdAt minore, id minore come tiebreak): determinismo, e la storia si preserva.
-  */
+  // Decisione PURA, niente I/O; `opts.llmSimilar` è il giudice semantico iniettabile.
+  // L'originale è sempre il più vecchio (id minore come tiebreak): determinismo.
   function groom(feedbacks, opts) {
     const { llmSimilar } = opts || {};
     if (!Array.isArray(feedbacks)) return { merges: [], priorityBumps: [] };
@@ -103,13 +101,13 @@
 
     const merges = [];
     // keepId → duplicati trovati finora.
-    const dupeCountFor = new Map(); // Map<keepId, number>
+    const dupeCountFor = new Map();
 
     // Id già caduti come duplicati: non li riusiamo come keep.
     const dropped = new Set();
 
     // Mappa gapId → primo auto-feedback con quel gapId.
-    const gapIdSeen = new Map(); // Map<gapId, feedback>
+    const gapIdSeen = new Map();
 
     for (const fb of fbs) {
       if (!isAutoFeedback(fb)) continue;
@@ -118,7 +116,6 @@
       if (!gapId) continue;
 
       if (gapIdSeen.has(gapId)) {
-        // Duplicato: si tiene il più vecchio come originale.
         const orig = gapIdSeen.get(gapId);
         const keep = olderOf(orig, fb);
         const drop = keep === orig ? fb : orig;
@@ -141,7 +138,7 @@
       }
     }
 
-    // Lista ORDINATA dei non-auto non ancora caduti, poi confronto O(n²): accettabile per code di qualche centinaio di elementi.
+    // Confronto O(n²): accettabile per code di qualche centinaio di elementi.
     const userFbs = fbs.filter((fb) => !isAutoFeedback(fb) && !dropped.has(fb.id));
 
     for (let i = 0; i < userFbs.length; i++) {
@@ -184,7 +181,7 @@
     return { merges, priorityBumps };
   }
 
-  // Più vecchio = `createdAt` minore (il confronto fra stringhe ISO funziona); a parità o in assenza, id minore come tiebreak deterministico.
+  // Il confronto fra stringhe ISO funziona; a parità, id minore come tiebreak.
   function olderOf(a, b) {
     const tA = String(a.createdAt || '');
     const tB = String(b.createdAt || '');

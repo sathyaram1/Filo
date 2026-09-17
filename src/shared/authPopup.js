@@ -1,10 +1,12 @@
-// Riconosce i popup di autenticazione (OAuth, «Accedi con Google»…) così il blocco-popup non li scambi per pubblicità (#209).
-// Aprono una finestra verso il provider e ne comunicano l'esito via window.opener: negarli fa fallire l'accesso. Vanno sempre consentiti, e come VERA finestra popup — una scheda separata perderebbe la relazione opener↔popup.
+// Riconosce i popup di autenticazione (OAuth, «Accedi con Google»…) perché il blocco-popup
+// non li scambi per pubblicità (#209): negarli fa fallire l'accesso.
+// Vanno consentiti come VERA finestra popup: una scheda perderebbe la relazione opener.
 
 (function (global) {
   'use strict';
 
-  // Host noti dei provider di identità: un popup verso questi è quasi sempre un login OAuth. Match su host esatto o sottodominio.
+  // Host noti dei provider di identità: un popup verso questi è quasi sempre un login OAuth.
+  // Match su host esatto o sottodominio.
   const AUTH_HOSTS = [
     'accounts.google.com',
     'accounts.youtube.com',
@@ -30,8 +32,8 @@
     'slack.com',
   ];
 
-  // Host «prodotto» che sono ANCHE provider di identità: hanno una navigazione pubblica vasta su cui l'utente può non essere loggato, quindi l'esenzione anti-fingerprint si restringe alle superfici di accesso e il resto del sito resta protetto (#209).
-  // Gli altri host di AUTH_HOSTS sono dedicati all'autenticazione (accounts.google.com, appleid.apple.com…): lì l'intero host È la superficie di accesso.
+  // Host «prodotto» che sono anche provider di identità: hanno una navigazione pubblica vasta,
+  // quindi l'esenzione anti-fingerprint si restringe alle superfici di accesso (#209).
   const IDENTITY_PRODUCT_HOSTS = new Set([
     'github.com',
     'gitlab.com',
@@ -58,7 +60,8 @@
     '.b2clogin.com',
   ];
 
-  // Path tipici di OAuth/SSO: catturano i provider non elencati sopra senza aprire le porte ai popup pubblicitari, che vanno su path casuali.
+  // Path tipici di OAuth/SSO: prendono i provider non elencati sopra senza aprire ai popup
+  // pubblicitari, che vanno su path casuali.
   const AUTH_PATH_RE = /(^|\/)(oauth2?|o\/oauth2|authorize|signin|sign[-_]?in|login|auth|sso|saml|openid)(\/|$|[?#])/i;
 
   function hostMatches(host) {
@@ -71,10 +74,11 @@
     return false;
   }
 
-  // Firma condivisa da isAuthPopup e dalla restrizione dell'esenzione anti-fingerprint sugli host prodotto.
+  // Firma condivisa da isAuthPopup e dalla restrizione dell'esenzione sugli host prodotto.
   function looksLikeAuthPath(u) {
     if (AUTH_PATH_RE.test(u.pathname)) return true;
-    // Alcuni provider mettono i parametri OAuth solo in query (response_type, client_id, redirect_uri): firma forte di un endpoint di autorizzazione.
+    // Alcuni provider mettono i parametri OAuth solo in query (response_type, client_id,
+    // redirect_uri): firma forte di un endpoint di autorizzazione.
     const q = u.searchParams;
     if (q.has('client_id') && (q.has('redirect_uri') || q.has('response_type'))) {
       return true;
@@ -92,7 +96,8 @@
     return looksLikeAuthPath(u);
   }
 
-  // Criterio STRETTO, senza l'euristica su path/query di isAuthPopup: qui un falso positivo esenta un sito qualunque dalla protezione anti-fingerprint, e basterebbe un path «/login» per disattivarla apposta.
+  // Criterio STRETTO, senza l'euristica su path/query: qui un falso positivo esenta un sito
+  // qualunque dall'anti-fingerprint, e basterebbe un «/login» per disattivarla apposta.
   function isKnownIdentityHost(url) {
     if (!url || typeof url !== 'string') return false;
     let u;
@@ -101,8 +106,8 @@
     return hostMatches(u.host);
   }
 
-  // La SUPERFICIE DI ACCESSO esente dal rumore anti-fingerprint (#209): host dedicato all'autenticazione (o suffisso Auth0/Okta/…) → esente per intero; host prodotto → esente solo dove path/query somigliano a un accesso.
-  // L'euristica vale SOLO per host già fidati, così un tracker qualunque non si auto-esenta scegliendo un path «/login».
+  // Superficie di accesso esente dal rumore anti-fingerprint (#209): host dedicato → esente
+  // per intero; host prodotto → solo dove path e query somigliano a un accesso.
   function isIdentityAuthSurface(url) {
     if (!url || typeof url !== 'string') return false;
     let u;

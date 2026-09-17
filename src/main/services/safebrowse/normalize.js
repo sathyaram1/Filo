@@ -1,13 +1,13 @@
-// Stage 0: forma canonica del dominio. Prima di QUALSIASI confronto serve, perché un sito camuffato va confrontato per ciò che è davvero, non per come appare nella barra degli indirizzi.
-// Hostname senza porta/userinfo/path, punycode/IDNA in entrambe le direzioni, Unicode NFC + case-folding, eTLD+1 dalla Public Suffix List.
-// Si usano `domainToASCII`/`domainToUnicode` di node:url (ICU, non deprecati) invece del modulo `punycode` (DEP0040): applicano già IDNA UTS-46 e tornano stringa vuota su input non valido.
+// Forma canonica del dominio: un sito camuffato va confrontato per ciò che è, non per come
+// appare nella barra. Host senza porta, IDNA nei due sensi, NFC, eTLD+1 dalla PSL.
+// Si usano domainToASCII/Unicode di node:url (ICU) invece del modulo punycode, deprecato.
 
 'use strict';
 
 const { domainToASCII, domainToUnicode } = require('node:url');
 const { getDomainInfo, isIpAddress } = require('./psl');
 
-// Accetta un URL completo o un host nudo. Ritorna { host, protocol, port } oppure null se non parsabile.
+// Accetta un URL completo o un host nudo; { host, protocol, port } o null se non parsabile.
 function parseHost(input) {
   if (!input || typeof input !== 'string') return null;
   let s = input.trim();
@@ -28,7 +28,7 @@ function parseHost(input) {
   return { host: host.toLowerCase(), protocol: proto, port: u.port || '' };
 }
 
-// null se l'input non contiene un hostname analizzabile (about:, data:, javascript:, file senza host).
+// null se l'input non ha un hostname analizzabile (about:, data:, javascript:, file).
 function normalize(input) {
   const parsed = parseHost(input);
   if (!parsed) return null;
@@ -55,7 +55,8 @@ function normalize(input) {
 
   // Se domainToASCII fallisce (input degenere) si ricade sull'host così com'è.
   const ascii = (domainToASCII(host) || host).toLowerCase();
-  // Forma Unicode leggibile: NFC + lowercase, così le varianti di compatibilità collassano ma "Е" cirillico resta distinto dal latino.
+  // NFC più minuscole: le varianti di compatibilità collassano, ma la «Е» cirillica resta
+  // distinta dalla latina.
   let unicode = domainToUnicode(ascii) || host;
   unicode = unicode.normalize('NFC').toLowerCase();
 

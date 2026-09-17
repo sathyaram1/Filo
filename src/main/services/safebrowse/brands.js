@@ -1,6 +1,6 @@
 // Brand ad alto valore per il phishing: i bersagli che gli attaccanti imitano più spesso.
-// token = la parola del brand, per il match combosquat e per scheletro/distanza di edit sulla label del dominio candidato; display = nome per gli avvisi; domains = gli eTLD+1 LEGITTIMI, che NON sono impersonazione.
-// Lista volutamente corta e curata per tenere bassi i falsi positivi. Allungarla è sicuro finché i token restano parole distintive: mai token generici come "pay" o "mail".
+// `domains` sono gli eTLD+1 LEGITTIMI, che NON sono impersonazione.
+// Lista corta per tenere bassi i falsi positivi: mai token generici come «pay» o «mail».
 
 'use strict';
 

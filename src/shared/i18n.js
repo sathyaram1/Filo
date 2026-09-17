@@ -175,9 +175,8 @@
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
     err_blocked_domain: 'Estensione disabilitata su questo dominio.',
     err_no_selection: 'Nessuna selezione di testo.',
-    // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
-    // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
-    // funzione, poi dove si imposta.
+    // Una funzione senza modello NON parte e lo dice: niente ripieghi silenziosi su modelli
+    // scritti nel codice. %s = nome della funzione, poi dove si imposta.
     err_no_model_for_action: 'Nessun modello impostato per «%s»: questa funzione resta ferma finché non ne scegli uno. %s',
     err_unknown_model_for_action: '«%s» usa un modello che non esiste (%s): forse è stato rinominato o eliminato. %s',
     err_open_weights_only_no_model:
@@ -195,17 +194,15 @@
     toast_save_failed: 'Salvataggio non riuscito',
     toast_link_saved: 'Link salvato',
     toast_copied: 'Copiato negli appunti',
-    // #437 — la sorgente di un'immagine o l'href di un link possono essere qualsiasi cosa il
-    // sito ci abbia messo: dirlo è meglio che riempire gli appunti con una stringa che altrove
-    // non apre niente.
+    // #437 — src di un'immagine o href di un link possono essere qualsiasi cosa: dirlo è meglio
+    // che riempire gli appunti con una stringa che altrove non apre niente.
     toast_not_an_address: 'Questo non è un indirizzo: non c\'è niente da copiare',
     toast_copied_saving: 'Copiato negli appunti, salvataggio in corso…',
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_translating_page_progress: 'Traduzione pagina… %s/%s',
     toast_page_translated: 'Pagina tradotta',
-    // Il sito continua ad aggiungere testo mentre traduciamo, e a un certo punto si smette di
-    // rincorrerlo. Vale per tutti i messaggi qui sotto: si dice sempre cosa è rimasto in
-    // inglese, perché «Pagina tradotta» sarebbe falso con le righe nuove sotto gli occhi.
+    // Il sito aggiunge testo mentre traduciamo, e a un certo punto si smette di rincorrerlo.
+    // Qui sotto si dice sempre cosa è rimasto in inglese: «Pagina tradotta» sarebbe falso.
     toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: dal tasto destro trovi «Traduci il testo nuovo».',
     // #439 — parti della pagina che nessuno script può leggere (componenti chiusi a chiave).
     toast_page_translated_partial: 'Pagina tradotta solo in parte: alcuni componenti di questo sito sono chiusi e restano nella lingua originale.',
@@ -213,9 +210,9 @@
     // #407 — un riquadro incorporato che il sito chiude con `sandbox`: un rettangolo intero
     // che resta in inglese in mezzo a una pagina italiana.
     toast_page_translated_partial_frame: 'Pagina tradotta, tranne un riquadro incorporato. Il sito non lascia leggere il testo lì dentro, e resta nella lingua originale.',
-    // Traduzione interrotta a metà (#408): quanto ne manca, perché si è fermata e come riprendere.
+    // Traduzione interrotta a metà (#408): quanto manca, perché si è fermata, come riprendere.
     toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',
-    // Pagina più lunga di quanta ne entri in un giro solo: non è un guasto, è un lavoro a tratti.
+    // Più lunga di quanta ne entri in un giro solo: non è un guasto, è un lavoro a tratti.
     toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dal tasto destro per continuare.',
     toast_page_translate_failed: 'Non sono riuscito a tradurre la pagina. %s',
     reason_translate_incomplete: 'Alcuni blocchi sono tornati vuoti dal modello.',
@@ -586,8 +583,8 @@
     history_reuse_title: '%s token su %s riusati da una richiesta precedente invece di essere rielaborati: costano meno e la risposta arriva prima.',
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
     history_policy_violation: '⚠ fornitore escluso',
-    // Tempi del turno (idee «Latenza della chat»): quando è arrivato il primo
-    // pezzo di ragionamento, la prima parola, e quando è finito.
+    // Tempi del turno: quando è arrivato il primo pezzo di ragionamento, la prima parola, e
+    // quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',
     history_timing_title: 'Dalla partenza della richiesta: primo pezzo di ragionamento, prima parola (o prima azione), fine della risposta.',
     history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',

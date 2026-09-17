@@ -1,13 +1,12 @@
-// LRU in RAM per l'audio della sintesi vocale: è grosso (~64KB per secondo di
-// parlato) e in storage.json rallenterebbe ogni lettura/scrittura; entro la sessione
-// la seconda lettura è istantanea, allo spegnimento si svuota ed è accettabile.
-// Factory pura (niente Electron): i test provano l'eviction senza aprire finestre.
+// LRU in RAM per l'audio della sintesi vocale: è grosso (~64KB al secondo di parlato) e in
+// storage.json rallenterebbe ogni lettura. Nella sessione la seconda lettura è istantanea,
+// allo spegnimento si svuota ed è accettabile.
 
 (function (global) {
   'use strict';
 
   function createTtsCache(opts) {
-    const maxBytes = (opts && opts.maxBytes) || 64 * 1024 * 1024; // 64MB default
+    const maxBytes = (opts && opts.maxBytes) || 64 * 1024 * 1024;
     // Map mantiene l'ordine di inserimento: la prima chiave è la meno recente.
     const map = new Map();
     let totalBytes = 0;
@@ -19,7 +18,6 @@
     function get(key) {
       const v = map.get(key);
       if (!v) return null;
-      // Bump LRU: rimuovi e re-inserisci.
       map.delete(key);
       map.set(key, v);
       return v;

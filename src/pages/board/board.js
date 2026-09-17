@@ -1,6 +1,6 @@
-// Bacheca utente (filo://board/, DC1+DC2): superficie a PERMESSI RIDOTTI, non owner-gated —
-// gli anonimi leggono, per votare serve il login. Mostra SOLO i fix già usciti in una versione
-// (DB3) col solo titolo breve: zero informazioni di sicurezza, mai il testo grezzo.
+// Bacheca utente (filo://board/): superficie a PERMESSI RIDOTTI, non owner-gated — gli
+// anonimi leggono, per votare serve il login.
+// Mostra SOLO i fix già usciti in una versione, col solo titolo breve: mai il testo grezzo.
 
 (function () {
   'use strict';
@@ -18,14 +18,14 @@
   const bdList    = document.getElementById('bdList');
 
   // Timeout della fetch: offline la richiesta resta muta ~13 s prima che il sistema la lasci
-  // cadere, e aspettare al buio è più attrito che un errore subito.
+  // cadere, e aspettare al buio è più attrito di un errore subito.
   const LOAD_TIMEOUT_MS = 8000;
 
   let signedIn = false;
   let uid = null;               // uid Firebase REALE (claim id token), per votes.<uid>
   let allFeedbacks = [];
-  // Serve a OGNI ridisegno, non solo al primo: un re-render (es. dopo un login) ripartirebbe
-  // da una lista vuota e scriverebbe «Nessun miglioramento» al posto dell'errore (#495).
+  // Serve a OGNI ridisegno: un re-render (dopo un login) ripartirebbe da una lista vuota e
+  // scriverebbe «Nessun miglioramento» al posto dell'errore.
   let dataLoaded = false;
   let lastLoadError = null;
   let releasedVersion = '';
@@ -39,7 +39,7 @@
   }
 
   // `uid` è il claim Firebase REALE (request.auth.uid nelle rules), non l'email: è la chiave
-  // con cui i voti sono salvati (DB4), o dopo un reload «il mio voto» non si riconoscerebbe.
+  // con cui i voti sono salvati, o dopo un reload «il mio voto» non si riconoscerebbe.
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
@@ -68,8 +68,8 @@
       .catch(() => {});
   });
 
-  // Solo il titolo breve già generato (`name`), mai il testo grezzo (cifrato e potenzialmente
-  // tecnico). Se manca, un'etichetta neutra col numero.
+  // Solo il titolo breve già generato, mai il testo grezzo, che è cifrato e può essere
+  // tecnico. Se manca, un'etichetta neutra col numero.
   function safeTitle(fb) {
     const name = (fb && typeof fb.name === 'string') ? fb.name.trim() : '';
     if (name) return name;
@@ -130,9 +130,8 @@
     return card;
   }
 
-  // Riapertura a pagamento (DC4): «Ancora rotto?» apre un form inline, non un prompt nativo
-  // (PATTERNS.md). Nascosto se l'utente ha già chiesto la riapertura di QUESTO fix: la
-  // riapertura è UNA volta sola per fix (guard SN_MANAGE_REVIEW.canReopen), non per voto.
+  // «Ancora rotto?» apre un form inline, non un prompt nativo (PATTERNS.md). Nascosto se la
+  // riapertura di QUESTO fix è già stata chiesta: è una volta sola per fix, non per voto.
   function renderReopen(fb) {
     if (MR.hasReopenRequest(fb)) {
       const done = document.createElement('div');
@@ -192,9 +191,8 @@
         sendToMain({ type: 'auth_signin' })
           .then((r) => refreshAuth().then(() => r))
           .then((r) => {
-            // `openReopenAfterLogin` resta impostato fino a QUESTO render finale: i render intermedi di
-            // refreshAuth/AUTH_CHANGED non devono consumarlo prima, o il form si richiuderebbe subito
-            // dopo essersi aperto. Se il login non riesce si azzera PRIMA di ridisegnare.
+            // `openReopenAfterLogin` si consuma solo a QUESTO render finale: i render intermedi lo
+            // richiuderebbero appena aperto. Se il login non riesce si azzera prima di ridisegnare.
             const ok = !!(r && r.ok && signedIn && uid);
             if (!ok) openReopenAfterLogin = null;
             renderList();
@@ -225,7 +223,7 @@
   }
 
   // Invio della riapertura: scala crediti e crea il feedback collegato lato main. Errore
-  // inline, e a successo il form scompare — niente duplicati possibili senza ricaricare.
+  // inline, e a successo il form scompare — niente duplicati senza ricaricare.
   function onReopen(fb, textarea, sendBtn, errEl) {
     const text = textarea.value.trim();
     errEl.hidden = true;
@@ -286,11 +284,8 @@
     return btn;
   }
 
-  // Voto: anonimo → invito al login; loggato → scrive via main (DC2), che allega l'idToken e
-  // accredita +10 crediti una volta sola per feedback per utente. Ottimistico per reattività,
-  // poi sostituito dal tally REALE riletto da Firestore.
-  // Dopo un login riuscito il voto scelto riparte da solo (niente secondo click): renderList
-  // ricrea il DOM, quindi il retry richiama onVote con l'`fb` fresco della lista ricreata.
+  // Voto: anonimo → invito al login. Ottimistico per reattività, poi sostituito dal tally
+  // REALE. Dopo un login riuscito il voto riparte da solo, con l'`fb` della lista ricreata.
   function onVote(fb, vote, btn) {
     if (!signedIn || !uid) {
       sendToMain({ type: 'auth_signin' })
@@ -346,8 +341,8 @@
       });
   }
 
-  // Variante locale della ricompensa (questa pagina non ha l'icona account in vista): vola dal
-  // pulsante verso l'angolo. Decorativa, best-effort, rispetta prefers-reduced-motion.
+  // Variante locale della ricompensa: questa pagina non ha l'icona account in vista, quindi
+  // vola verso l'angolo. Decorativa, best-effort, rispetta prefers-reduced-motion.
   function flyCreditsFromButton(originRect, amount) {
     try {
       const n = Math.max(1, Math.round(Number(amount) || 0));
@@ -421,8 +416,7 @@
   }
 
   // Stato d'errore, DISTINTO dal vuoto: «Nessun miglioramento…» direbbe il falso quando i
-  // miglioramenti ci sono e non sono stati scaricati. Riusa SN_CHAT_ERRORS: frase per l'utente,
-  // mai il messaggio grezzo dell'eccezione.
+  // miglioramenti ci sono e non sono stati scaricati. Frase per l'utente, mai l'eccezione.
   function showLoadError(err) {
     bdLoading.hidden = true;
     bdList.hidden = true;
@@ -446,15 +440,12 @@
       try {
         const r = await sendToMain({ type: 'get_update_recap' });
         if (r && r.current) releasedVersion = r.current;
-      } catch (_) { /* senza versione il gate è inattivo: done→bacheca come prima */ }
+      } catch (_) { /* senza versione il gate è inattivo */ }
     }
 
     try {
-      // #583: la bacheca legge la VISTA pubblica (`feedback-public`), non i feedback: «filtrato in
-      // pagina» vuol dire solo «non disegnato», il resto era già arrivato. Ogni scheda ha i soli
-      // campi pubblici (la decisione sta in src/shared/feedbackPublicView.js); i filtri qui sotto
-      // restano come seconda rete, e il gate «uscito in produzione» (DB3) dipende dalla versione di
-      // QUESTA macchina. TUTTE le schede, paginate: col tetto per data sparivano le più vecchie.
+      // #583 — si legge la VISTA pubblica, non i feedback: «filtrato in pagina» vuol dire solo
+      // «non disegnato». I filtri qui sotto sono la seconda rete. Tutte le schede, paginate.
       allFeedbacks = FB.listAllPublic
         ? await FB.listAllPublic({ timeoutMs: LOAD_TIMEOUT_MS })
         : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
@@ -468,11 +459,11 @@
       showLoadError(err);
       return;
     }
-    // renderList nasconde sempre il loader, anche a lista vuota: la pagina si ferma in uno stato stabile.
+    // Il loader si nasconde anche a lista vuota: la pagina si ferma in uno stato stabile.
     renderList();
   }
 
-  // Il tasto si disabilita mentre la fetch è in volo: un doppio click non lancia due richieste.
+  // Disabilitato mentre la fetch è in volo: un doppio click non lancia due richieste.
   if (bdRetry) {
     bdRetry.addEventListener('click', () => {
       bdRetry.disabled = true;
@@ -494,9 +485,8 @@
     // Rilancia il caricamento reale: i test esercitano il cammino d'errore e il retry senza
     // dover simulare la rete davvero assente.
     reload() { return loadData(); },
-    // Va scritta sulla stessa reference `FB` che usa loadData: su pagine filo:// la vista
-    // globale SN_FEEDBACK può essere diversa da quella catturata qui. Anche `listAllPublic` va
-    // sostituita, o la prova crederebbe di avere dati finti mentre la pagina legge la rete.
+    // Va scritta sulla stessa reference `FB` che usa loadData: su pagine filo:// il globale può
+    // essere un altro, e la prova crederebbe di avere dati finti mentre si legge la rete.
     setList(fn) { if (typeof fn === 'function') { FB.listAllPublic = fn; FB.listPublic = fn; FB.list = fn; } },
   };
 

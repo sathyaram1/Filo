@@ -1,6 +1,6 @@
-// Overlay di evidenziazione per la sidebar Aiuto: cornice e tooltip sull'elemento indicato da un selettore CSS.
-// Due modalità: "click" (il clic sul target conferma il passo) e "fill" (propone un valore e lo inserisce senza Invio al tocco di ✓ Accetta).
-// La cornice resta pointer-events:none per non bloccare l'utente; solo il bottone Accetta è interattivo.
+// Evidenziazione per la sidebar Aiuto: cornice e tooltip sull'elemento di un selettore.
+// Modalità «click» (il clic conferma il passo) e «fill» (propone un valore e lo inserisce).
+// La cornice è pointer-events:none: solo il bottone Accetta è interattivo.
 
 (function (global) {
   'use strict';
@@ -27,8 +27,8 @@
     }
     onTargetClick = null;
     activeTarget = null;
-    // Il force-hover NON si pulisce qui: deve sopravvivere fra un turno e l'altro, perché dopo un hover su un menu l'agente vorrà evidenziare una voce interna.
-    // Lo tolgono solo la fine sessione o un click utente vero (clearForceHover).
+    // Il force-hover sopravvive fra un turno e l'altro: dopo un hover su un menu l'agente
+    // vorrà evidenziare una voce interna. Lo tolgono la fine sessione o un click vero.
   }
 
   function safeQuery(selector) {
@@ -36,9 +36,8 @@
     catch (_) { return null; }
   }
 
-  // Azioni "auto", eseguite dall'agente senza l'utente. reveal: per il pattern aria-expanded l'unica via programmatica affidabile è .click() sull'elemento,
-  // e a garantire che quel click non navighi né faccia submit è la whitelist stretta di SN_EXTRACT.canRevealElement.
-  // hover: mouseenter/over per i menu guidati da JS; in fallback una regola CSS che forza la visibilità del figlio.
+  // reveal: per aria-expanded l'unica via affidabile è .click(), e a garantire che non
+  // navighi è la whitelist di SN_EXTRACT.canRevealElement. hover: mouseenter/over.
 
   const forceHoverTargets = new Set();
   function ensureForceHoverSheet() {
@@ -46,7 +45,8 @@
     const s = document.createElement('style');
     s.id = 'sn-force-hover-sheet';
     global.SN_FILO_UI?.mark(s);
-    // Best effort sui pattern dropdown più comuni: il dispatch di mouseenter copre quasi tutti i casi veri, questa regola serve ai menu che vivono solo su :hover CSS.
+    // Best effort sui pattern dropdown più comuni: il dispatch di mouseenter copre quasi tutti i
+    // casi veri, questa regola serve ai menu che vivono solo su :hover CSS.
     s.textContent =
       '[data-sn-force-hover] > [role="menu"],'
       + '[data-sn-force-hover] + [role="menu"],'
@@ -132,7 +132,8 @@
     return { ok: false, action, reason: 'unknown-action' };
   }
 
-  // Inserisce il testo senza simulare Invio, e passa dal setter del prototype perché i framework reattivi (React, Vue, Svelte) intercettano le scritture dirette di .value.
+  // Inserisce il testo senza simulare Invio, e passa dal setter del prototype perché i framework
+  // reattivi (React, Vue, Svelte) intercettano le scritture dirette di .value.
   function fillElement(el, text) {
     if (!el) return false;
     try {
@@ -149,7 +150,8 @@
       }
       if (el.isContentEditable) {
         el.focus();
-        // Selezione totale e sostituzione via execCommand: gli editor con handler di paste/input (Slate, Lexical, ProseMirror) ricevono l'evento solo così.
+        // Selezione totale e sostituzione via execCommand: gli editor con handler di paste/input
+        // (Slate, Lexical, ProseMirror) ricevono l'evento solo così.
         const sel = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(el);
@@ -164,8 +166,7 @@
     return false;
   }
 
-  // opts: { note?, action?: 'click'|'fill', value?: string, onAction?: () => void }
-  // Backward-compat: se opts è una stringa, viene trattato come opts.note.
+  // Se `opts` è una stringa vale come opts.note.
   function show(selector, opts, legacyOnClick) {
     clear();
     const target = safeQuery(selector);

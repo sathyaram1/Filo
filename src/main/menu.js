@@ -1,15 +1,13 @@
-// La barra dei menu dell'applicazione (#527). Su Mac esiste sempre ed è la
-// PRIMA a vedere i tasti: ogni voce deve fare ESATTAMENTE quello che Filo fa già
-// per quel tasto, e togliere la barra non è un'uscita (spegnerebbe copia e
-// incolla). Perché e storia: patterns/quello-che-il-sistema-aggancia-da-se-va-dichiarato.md.
+// La barra dei menu dell'applicazione (#527). Su Mac esiste sempre ed è la prima a vedere
+// i tasti: ogni voce fa esattamente quello che Filo fa già, e toglierla spegnerebbe copia
+// e incolla. Il perché: patterns/quello-che-il-sistema-aggancia-da-se-va-dichiarato.md
 
 // Electron si chiede DENTRO le funzioni: così `template()` lo legge anche la
 // sentinella degli unit test, che gira in Node puro.
 const MAC = process.platform === 'darwin';
 
-// Voce che mostra la scritta senza registrare il tasto. Su Mac non si può:
-// Electron onora `registerAccelerator: false` solo su Windows e Linux, quindi
-// lì la barra il tasto se lo prende e la voce deve fare la cosa giusta.
+// Voce che mostra la scritta senza registrare il tasto. Su Mac non si può: Electron onora
+// `registerAccelerator: false` solo altrove, quindi lì la voce deve fare la cosa giusta.
 const SOLO_SCRITTA = MAC ? {} : { registerAccelerator: false };
 
 function finestra() {

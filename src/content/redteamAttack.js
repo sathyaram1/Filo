@@ -1,6 +1,6 @@
-// Pannello "Invia attacco" del canale Red-team (spec §8.1), aperto dal tasto destro su qualsiasi pagina.
-// I due campi sono separati apposta: il testo dell'attacco va ai 4 giudici del panel, la descrizione solo al giudice di validità.
-// Il backend può non esserci: un REDTEAM_SUBMIT in errore deve diventare un messaggio, mai un pannello che crasha.
+// Pannello «Invia attacco» del canale Red-team (spec §8.1), dal tasto destro su una pagina.
+// Due campi separati: l'attacco va ai 4 giudici, la descrizione solo al giudice di validità.
+// Il backend può mancare: un REDTEAM_SUBMIT in errore diventa un messaggio, non un crash.
 
 (function (global) {
   'use strict';
@@ -114,7 +114,6 @@
     function refreshSendState() {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
-      // Crediti insufficienti noti → disabilita con messaggio (spec §8.1 punto 4).
       if (signedIn && balance != null && balance < COST) {
         sendBtn.disabled = true;
         setStatus(`Crediti insufficienti: hai ${balance}, ne servono ${COST}.`, 'err');
