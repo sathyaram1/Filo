@@ -47,7 +47,6 @@ function gsbText(category) {
 // `lead` è il segnale guida; gli altri diventano frasi di rinforzo.
 function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox }) {
   const dom = norm.registrableUnicode || norm.registrable || norm.host;
-  // Blacklist: prevale su tutto.
   if (gsb && gsb.listed) {
     return {
       title: 'Sito segnalato come pericoloso',

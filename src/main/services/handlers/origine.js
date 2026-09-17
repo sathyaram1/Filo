@@ -7,7 +7,6 @@ function daFilo(origin, sender) {
   return String(origin || '').startsWith('filo://') || !!(sender && sender.isShell);
 }
 
-/** Avvolge un handler: da un sito visitato risponde «rifiutato per provenienza». */
 function soloFilo(handler) {
   return async (msg, sender, origin) => {
     if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };

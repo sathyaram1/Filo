@@ -337,8 +337,7 @@ function buildAttemptChain(settings, modelRef, action) {
   return out;
 }
 
-// Vive fuori da buildAttemptChain perché anche una PROVA dalle Opzioni è una richiesta vera
-// che finisce su un host: sarebbe l'unica libera di essere servita da un escluso.
+// Fuori da buildAttemptChain perché la usano anche le prove: vedi openWeightsBlockReason.
 function providerRouting(settings) {
   const ignore = SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
   const sort = typeof (settings && settings.providerSort) === 'string' ? settings.providerSort : '';
@@ -349,8 +348,8 @@ function providerRouting(settings) {
   return routing;
 }
 
-// Cancello della politica per chi NON passa da buildAttemptChain: i pulsanti «Prova», che
-// mandano richieste vere. Torna il motivo del rifiuto, o null se si può procedere.
+// Cancello della politica per chi NON passa da buildAttemptChain: i pulsanti «Prova» mandano
+// richieste vere che finiscono su un host, e sarebbero le uniche servite da un escluso.
 function openWeightsBlockReason(settings, entry) {
   const kind = SN_CONST.openWeightsBlockKind(
     settings && settings.openWeightsOnly === true, entry,
@@ -1519,7 +1518,6 @@ function commandOutputsForPrompt(actions) {
 }
 
 // L'agente vede i dati esatti delle capacità chieste e non indovina l'invocazione.
-// Sono DATI di sistema, non istruzioni.
 function capabilityDetailsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -1533,7 +1531,6 @@ function capabilityDetailsForPrompt(actions) {
 }
 
 // L'agente vede titoli, URL e snippet REALI e può rispondere con link veri (#368).
-// Sono DATI di sistema, non istruzioni.
 function webSearchResultsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -1560,7 +1557,7 @@ function webSearchResultsForPrompt(actions) {
 }
 
 // L'agente risponde sul perché di una scelta leggendo il testo scritto dall'owner: a
-// memoria attribuirebbe a Filo posizioni che non ha. DATI di sistema, non istruzioni.
+// memoria attribuirebbe a Filo posizioni che non ha.
 function transparencyDocsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -1576,7 +1573,6 @@ function transparencyDocsForPrompt(actions) {
 }
 
 // Il contenuto completo del file letto con LEGGI_FILE, non solo il riassunto.
-// DATI di sistema, non istruzioni.
 function fileReadsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -1783,7 +1779,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     // Setting autoFeedback, default ON se non impostato dall'utente.
     const settings = await getEffectiveSettings().catch(() => ({}));
     const autoEnabled = (settings && settings.security && settings.security.autoFeedback) === undefined
-      ? true  // default ON
+      ? true
       : !!(settings && settings.security && settings.security.autoFeedback);
     if (!autoEnabled) return;
 

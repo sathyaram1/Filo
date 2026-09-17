@@ -398,7 +398,6 @@
     return redigiPercorso(ripulito, domain || '').slice(0, MAX_URL_LEN) || '/';
   }
 
-  // La applica il client prima di inviare e la RIAPPLICA il server prima di scrivere.
   // Nel documento niente del mittente (#584): né clientId né userAgent, che li legava.
   function sanitizeSubmission(raw) {
     if (!raw || typeof raw !== 'object') return { ok: false, reason: 'payload vuoto' };
@@ -443,8 +442,7 @@
     return init + '::' + sig;
   }
 
-  // Impacchetta i percorsi per il messaggio di sistema dell'Aiuto; '' se non c'è niente da
-  // mostrare. Ogni campo ripassa dalla pulizia: nella raccolta ci sono documenti vecchi.
+  // Per il messaggio di sistema dell'Aiuto: ogni campo ripassa dalla pulizia (vedi in cima).
   function formatKnownPathsForPrompt(rawPaths) {
     if (!Array.isArray(rawPaths) || !rawPaths.length) return '';
     const seen = new Set();

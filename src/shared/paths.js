@@ -1,5 +1,5 @@
 // Raccolta percorsi dell'Aiuto: lettura da Firestore UN DOMINIO ALLA VOLTA, scrittura SOLO
-// dalla callable `pathSubmit`, che riapplica la pulizia e tiene i limiti di frequenza.
+// dalla callable `pathSubmit`, che tiene i limiti di frequenza (la pulizia: pathsSafety.js).
 // Il dominio è un SEGMENTO del percorso, così non si può scaricare l'archivio intero.
 
 (function (global) {
@@ -72,7 +72,7 @@
     // Senza il modulo di pulizia non si spedisce: un ripiego che manda il percorso com'è
     // sarebbe la porta di prima, aperta da un errore di caricamento invece che da una regola.
     if (!Safety) throw new Error('SN_PATHS_SAFETY non caricato: percorso non inviato');
-    // La stessa pulizia che rifarà il server: ciò che non passa qui non vale la pena spedirlo.
+    // Ciò che non passa la pulizia qui non vale la pena spedirlo.
     const pulito = Safety.sanitizeSubmission({ domain, initialUrl, intent, steps, success });
     if (!pulito.ok) throw new Error(`percorso scartato prima dell'invio: ${pulito.reason}`);
 

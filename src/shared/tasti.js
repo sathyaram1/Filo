@@ -55,8 +55,8 @@
     const haAlt = modificatori.some((m) => ALT.test(m.toLowerCase()));
     const altri = modificatori.filter((m) => !CTRL.test(m.toLowerCase()) && !ALT.test(m.toLowerCase()));
 
-    // Alt+cifra è il salto di scheda, su Mac Cmd+cifra. Lo zero fa eccezione: su Mac Cmd+0 è
-    // lo zoom al 100% e la decima scheda si raggiunge con Cmd+9 (vedi `indiceSaltoScheda`).
+    // Alt+cifra è il salto di scheda, su Mac Cmd+cifra; lo zero fa eccezione (CLAUDE.md § Mac
+    // e `indiceSaltoScheda`).
     if (haAlt && !haCtrl && /^[0-9]$/.test(tastoFinale)) {
       return `Cmd+${tastoFinale === '0' ? '9' : tastoFinale}`;
     }

@@ -53,7 +53,6 @@
     };
     items.unshift(full);
     if (items.length > HISTORY_ITEMS_HARD_CAP) items.length = HISTORY_ITEMS_HARD_CAP;
-    // Oltre il limite di byte si ruota cancellando i più vecchi.
     while (approximateBytes(items) > HISTORY_LIMIT_BYTES && items.length > 10) {
       items.pop();
     }

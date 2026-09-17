@@ -377,7 +377,6 @@ function automationRange() {
   };
 }
 
-/** Il bilancio nel range, o `null` se non è un numero. */
 function clampCap(n) {
   const { min, max } = automationRange();
   const v = Math.round(Number(n));

@@ -199,7 +199,6 @@
     return out;
   }
 
-  // Il livello più alto fra i rilievi (null se non ce ne sono).
   function maxLevel(findings) {
     let m = null;
     for (const f of findings || []) {

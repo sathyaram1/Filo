@@ -322,8 +322,8 @@
     `<path d="M7.5 19l-1.5 2"/>` +
     `<path d="M16.5 19l1.5 2"/>`;
 
-  // Sveglia tolta: quadrante vuoto con una X al posto delle lancette — la sbarra universale
-  // si intrecciava con lancette, campanelle e piedini.
+  // Sveglia tolta: quadrante vuoto con una X al posto delle lancette, perché una sbarra
+  // diagonale si confonde con lancette, campanelle e piedini.
   const alarmOff =
     `<circle cx="12" cy="13" r="7"/>` +
     `<path d="M9.5 10.5l5 5"/>` +

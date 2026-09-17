@@ -18,7 +18,6 @@ const SLOT_DEFAULTS = {
   judgePriority: 'flash',
 };
 
-// `hardcoded` omesso → SLOT_DEFAULTS[slot], poi 'flash'.
 async function resolveSupportModel(slot, hardcoded, getConfig) {
   const fallback = (typeof hardcoded === 'string' && hardcoded.trim())
     ? hardcoded.trim()
@@ -30,7 +29,6 @@ async function resolveSupportModel(slot, hardcoded, getConfig) {
   try {
     config = await getter();
   } catch (_) {
-    // Rete giù, Firestore non raggiungibile, ecc. → fallback.
     return fallback;
   }
 

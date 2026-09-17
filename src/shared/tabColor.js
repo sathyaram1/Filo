@@ -6,7 +6,7 @@
   'use strict';
 
   // Soglia di croma (max-min sui canali RGB): sotto, il colore è grigio/bianco/nero e
-  // non ha identità. Stesso valore del campionatore favicon, così i tre percorsi concordano.
+  // non ha identità.
   const IDENTITY_CHROMA_MIN = 24;
 
   // NON risolve named/hex: i chiamanti passano rgb() già risolto da getComputedStyle.

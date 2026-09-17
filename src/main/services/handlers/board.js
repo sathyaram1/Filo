@@ -3,8 +3,7 @@
 // Passa dal main perché il voto vuole l'uid Firebase reale, che il renderer non conosce.
 
 const auth = require('../../auth/google-auth');
-// Queste porte non sono del proprietario: basta una sessione aperta, e senza guardare da
-// dove arriva, un sito visitato votava e spendeva i crediti al posto dell'utente (#583).
+// Votare e spendere hanno potere: confine d'origine, vedi origine.js (#583).
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {

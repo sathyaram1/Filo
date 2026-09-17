@@ -256,8 +256,8 @@ function onWillDownload(item, webContents) {
 
   // Il segnale non è il TEMPO senza byte (un server lento veniva ucciso con un errore falso)
   // ma la caduta dichiarata da Chromium: grazia alla ripresa, poi fallisce se non avanza.
-  const STALL_MS = 3 * 60 * 1000;    // 3 minuti di silenzio assoluto
-  const INTERRUPT_GRACE_MS = 20_000; // attesa concessa alla ripresa automatica
+  const STALL_MS = 3 * 60 * 1000;
+  const INTERRUPT_GRACE_MS = 20_000;
   let maxRecv = 0;
 
   function armWatchdog() {

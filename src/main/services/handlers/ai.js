@@ -290,8 +290,8 @@ module.exports = function register(on, ctx) {
     try {
       const provider = msg.provider;
       const apiKey = (msg.apiKey || '').trim();
-      // «Solo modelli a pesi aperti»: la prova è una chiamata VERA e passa dallo stesso cancello.
-      // Il fornitore si controlla prima del modello: se non può servire, il modello non conta.
+      // Stesso cancello della politica di ogni richiesta (vedi openWeightsBlockReason). Il
+      // fornitore si controlla prima del modello: se non può servire, il modello non conta.
       const s = await getEffectiveSettings();
       if (s.openWeightsOnly === true && SN_CONST.PRODUCER_DIRECT_PROVIDERS.includes(provider)) {
         return { ok: false, error: openWeightsBlockReason(s, { provider }) };
@@ -304,8 +304,6 @@ module.exports = function register(on, ctx) {
         };
       }
       if (!apiKey) return { ok: false, error: 'API key mancante' };
-      // Se il modello della riga è proprietario la prova non parte: sarebbe l'unica richiesta
-      // non fermata dall'interruttore, lanciata proprio dalla pagina dove lo si accende.
       const modelBlocked = openWeightsBlockReason(s, { provider, model });
       if (modelBlocked) return { ok: false, error: modelBlocked };
       // Un modello non di testo (voce, dettatura, indicizzazione) si prova nel suo mestiere.
@@ -319,7 +317,6 @@ module.exports = function register(on, ctx) {
       let charCount = 0;
       const result = await Providers.streamComplete({
         provider, apiKey, model, messages,
-        // Anche la prova porta la lista di esclusione: sarebbe l'unica servibile da un escluso.
         providerRouting: providerRouting(s),
         onDelta: (delta) => {
           if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
@@ -439,8 +436,7 @@ module.exports = function register(on, ctx) {
         modelId = single.model || '';
         if (!modelId) return { ok: false, error: 'Stringa modello vuota' };
       }
-      // Queste righe sono i modelli che Filo userebbe e provarne uno è una richiesta vera, pagata
-      // con le chiavi predefinite: con l'interruttore acceso le proprietarie non partono.
+      // Prove pagate con le chiavi predefinite: stesso cancello (vedi openWeightsBlockReason).
       const eff = await getEffectiveSettings();
       // Si passa la voce intera: se l'owner ha classificato a mano quel modello come aperto,
       // la prova lo rispetta come fanno le richieste vere.

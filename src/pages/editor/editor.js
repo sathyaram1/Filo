@@ -90,7 +90,6 @@
     serif: null, // reso come "A" testuale
   };
 
-  // Stato
   let collection = null; // { version, activeId, files:[...] } — vedi editorStore.js
   let versions = {};     // { [fileId]: { versions:[...] } } — storico, su archivio app
   let versionsReady = Promise.resolve(); // risolta quando lo storico è caricato
@@ -3904,7 +3903,6 @@
     snapshotManual: () => maybeRecordManualVersion(),
   };
 
-  // Boot
   applySavedTheme();
   loadVersions();                           // storico dall'archivio app (async)
   loadTrash();

@@ -134,7 +134,6 @@
     menu_link_loading: 'Analizzo il link…',
     menu_link_suspicious: '⚠️ Link sospetto',
 
-    // Edit box
     edit_box_title: 'Modifica testo',
     edit_box_original: 'Originale',
     edit_box_proposed: 'Proposta',
@@ -151,7 +150,6 @@
     edit_box_error: 'Errore nella generazione',
     edit_box_replaced: 'Testo sostituito',
 
-    // Coming soon
     coming_soon: 'Prossimamente',
     feature_off_help: 'Attiva "Aiuto" nelle Opzioni → Funzionalità sperimentali',
 
@@ -169,7 +167,6 @@
     popup_followup_placeholder: 'Domanda di follow-up… (Invio per inviare, Shift+Invio nuova riga)',
     popup_send: 'Invia',
 
-    // Errori
     err_no_api_key: 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti. In alternativa imposta una tua chiave OpenRouter nelle Opzioni.',
     err_provider_failed: 'Il provider AI ha fallito. Controlla la connessione e la API key.',
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
@@ -188,7 +185,6 @@
     err_model_where_own: 'Lo imposti in Opzioni → Modelli per azione.',
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
 
-    // Toast
     toast_saved: 'Salvata in: %s',
     toast_saved_open: 'Apri la lista',
     toast_save_failed: 'Salvataggio non riuscito',
@@ -563,14 +559,12 @@
     security_import_invalid: 'Non è un archivio esportato da Filo',
     security_import_fail: 'Importazione non riuscita',
 
-    // Home
     home_title: 'Aperti per dopo',
     home_search_placeholder: 'Cerca per titolo o URL…',
     home_empty: 'Nessuna scheda salvata. Click destro su una pagina → "Salva per dopo".',
     home_no_results: 'Nessun risultato per la ricerca.',
     home_remove: 'Rimuovi',
 
-    // History
     history_title: 'Cronologia AI',
     history_search_placeholder: 'Cerca…',
     history_filter_all: 'Tutte',
@@ -592,7 +586,6 @@
     history_no_results: 'Nessun risultato per la ricerca.',
     history_no_results_filter: 'Nessuna interazione per il filtro selezionato.',
 
-    // Spellcheck
     spell_correct: 'Correggi',
     spell_add_dict: 'Aggiungi al dizionario',
     spell_autocorrect: 'Correggi automaticamente',

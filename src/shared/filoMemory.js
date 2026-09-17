@@ -1,6 +1,6 @@
 // Persistenza della memoria di Filo: raw_log, buffer delle lezioni, moduli persistenti.
-// Qui stanno anche i timer e le notifiche della colonna destra.
-// Gli appunti NON sono più qui: SALVA_APPUNTO scrive nei file dell'editor.
+// Qui stanno anche i timer e le notifiche della colonna destra; gli appunti no: sono file
+// dell'editor.
 
 (function (global) {
   'use strict';
@@ -50,8 +50,6 @@
     await chrome.storage.local.set({ [key]: value });
   }
 
-  // Raw log
-
   async function appendRaw(entry) {
     const list = await getRaw(KEYS.FILO_RAW_LOG, []);
     list.unshift({
@@ -75,8 +73,6 @@
     return out.slice(0, limit);
   }
 
-  // Lessons buffer
-
   async function getLessonsBuffer() {
     return getRaw(KEYS.FILO_LESSONS_BUFFER, []);
   }
@@ -97,8 +93,6 @@
   async function clearLessonsBuffer() {
     await setRaw(KEYS.FILO_LESSONS_BUFFER, []);
   }
-
-  // Moduli
 
   // Forma in storage: { PROFILO: "...", PREFERENZE: "...", <ESPANSIONE>: "..." }
   async function getMemory() {
@@ -189,15 +183,13 @@
     return next;
   }
 
-  // Timer
-
   async function listTimers() {
     return getRaw(KEYS.FILO_TIMERS, []);
   }
 
   async function addTimer({ label, seconds }) {
-    // Una durata non interpretabile o non positiva NON crea un timer: si torna null.
-    // Un `Math.max(1, …)` rendeva la guardia irraggiungibile e faceva suonare subito 1s.
+    // Una durata non interpretabile o non positiva NON crea un timer: si torna null, mai un
+    // minimo di un secondo che suona subito.
     const sec = Math.round(Number(seconds) || 0);
     if (sec <= 0) return null;
     const list = await listTimers();
@@ -594,8 +586,6 @@
     return filtered;
   }
 
-  // Notifications
-
   async function listNotifications({ includeDismissed = false } = {}) {
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     return includeDismissed ? list : list.filter((n) => !n.dismissed);
@@ -629,8 +619,6 @@
     }
     return list;
   }
-
-  // Dashboard cache
 
   async function getDashboardCache() {
     return getRaw(KEYS.FILO_DASHBOARD_CACHE, null);
@@ -681,8 +669,6 @@
     const rules = await listProxyRules();
     return rules[normProxyDomain(domain)] || null;
   }
-
-  // Session
 
   async function getSession() {
     const s = await getRaw(KEYS.FILO_SESSION, null);

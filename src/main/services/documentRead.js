@@ -90,7 +90,6 @@ function decodeText(buf) {
   return utf8;
 }
 
-/** Taglia al tetto dichiarando il troncamento. PURA. */
 function capText(text, max = MAX_TEXT_CHARS) {
   const s = String(text == null ? '' : text);
   if (s.length <= max) return { text: s, truncated: false };

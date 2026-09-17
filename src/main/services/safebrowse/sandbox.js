@@ -56,7 +56,6 @@ async function detonate(url, evaluateFinal) {
 
   const cleanup = () => {
     try { if (!win.isDestroyed()) win.destroy(); } catch (_) {}
-    // Svuota i dati effimeri della sessione.
     try { ses.clearStorageData().catch(() => {}); } catch (_) {}
   };
 

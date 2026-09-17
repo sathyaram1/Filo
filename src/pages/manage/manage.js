@@ -131,7 +131,6 @@
   const mgLightbox    = document.getElementById('mgLightbox');
   const mgLightboxImg = document.getElementById('mgLightboxImg');
 
-  // Stato
   let isAdmin       = false;
   let allFeedbacks  = [];
   let dataLoaded    = false;    // i feedback sono arrivati davvero (vs. in corso/fallito)
@@ -3777,7 +3776,6 @@
   // sotto misure salvate più grandi dello spazio. Le preferenze NON si toccano.
   window.addEventListener('resize', applyLayout);
 
-  // Init
   async function init() {
     // La lista è la più lenta (secondi di rete): parte SUBITO e le altre letture di avvio girano
     // mentre viaggia. loadData la aspetta; un errore lo raccoglie lì.

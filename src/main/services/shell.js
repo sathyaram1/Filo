@@ -64,8 +64,7 @@ function shellConfig(shell, sid, startCwd) {
         `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
     };
   }
-  // `-Command -` esegue da stdin in modo incrementale, senza prompt. $LASTEXITCODE si azzera
-  // prima di ogni comando: i cmdlet non lo toccano e riporterebbero un codice vecchio.
+  // `-Command -` esegue da stdin in modo incrementale, senza prompt. $LASTEXITCODE: terminal.js.
   return {
     file: 'powershell.exe',
     args: ['-NoLogo', '-NoProfile', '-Command', '-'],
@@ -251,8 +250,8 @@ function createSession({ shell, cwd } = {}) {
   return session;
 }
 
-// SICUREZZA: il nome del comando non viene mai interpolato in una stringa di shell — argv
-// o variabile d'ambiente, mai rivalutati. Sotto: i builtin di cmd che `where` non vede.
+// SICUREZZA: il nome del comando non finisce mai su una riga di shell (il perché sta in
+// existenceProbes). Sotto: i builtin di cmd che `where` non vede.
 const CMD_BUILTINS = new Set(['cd', 'dir', 'echo', 'cls', 'copy', 'del', 'move',
   'type', 'set', 'md', 'mkdir', 'rd', 'rmdir', 'ren', 'rename', 'exit',
   'pushd', 'popd', 'title', 'ver', 'vol', 'path', 'start', 'call', 'color']);
@@ -292,7 +291,7 @@ function runProbe({ file, args, env: probeEnv }, cwd) {
     let proc;
     const finish = (val) => { if (done) return; done = true; try { proc.kill(); } catch (_) {} resolve(val); };
     try {
-      // Il nome viaggia nell'env, mai sulla riga di comando: vedi existenceProbes.
+      // L'env dei probe: vedi existenceProbes.
       const env = probeEnv ? { ...process.env, ...probeEnv } : undefined;
       proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve(false); return; }
@@ -318,6 +317,5 @@ async function commandExists({ shell, cwd, command } = {}) {
   return false;
 }
 
-// Esportata solo per il test di regressione sull'ORDINE dei probe: `where.exe` prima di
-// Get-Command è ciò che tiene veloci gli shim npm, e un assert sul cronometro era rumore.
+// existenceProbes è esportata per il test di regressione sull'ORDINE dei probe.
 module.exports = { createSession, defaultCwd, commandExists, existenceProbes };

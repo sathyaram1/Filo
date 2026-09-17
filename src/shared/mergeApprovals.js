@@ -442,8 +442,7 @@
     host.hidden = list.length === 0 && failed.length === 0;
     if (!list.length && !failed.length) return 0;
 
-    // Prima delle richieste in attesa: sono un sì già dato che non ha prodotto niente, e più
-    // invecchia più costa accorgersene.
+    // Prima delle richieste in attesa: più invecchia, più costa accorgersene.
     if (failed.length) {
       var fbox = el('section', 'sn-mac sn-mac-failed');
       fbox.setAttribute('aria-label', 'Fusioni approvate ma non avvenute');

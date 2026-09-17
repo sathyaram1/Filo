@@ -72,7 +72,7 @@ function getDomainInfo(host) {
   }
 
   // Si cerca dalla regola più specifica (più etichette) alla meno specifica.
-  let suffixLabels = 0; // numero di etichette del public suffix scelto
+  let suffixLabels = 0;
   for (let i = 0; i < labels.length; i++) {
     const candidate = labels.slice(i).join('.');
     if (EXCEPTION.has(candidate)) {

@@ -20,7 +20,6 @@ const LOCATIONS = [
 // sta nelle regole d'azione, qui c'è solo la selezione.
 const TIERS = { DATACENTER: 'datacenter', RESIDENTIAL: 'residential' };
 
-// Codice paese normalizzato ('FR' → 'fr') o null se non è un alpha-2 valido.
 function normalizeCountry(country) {
   const c = String(country || '').trim().toLowerCase();
   return /^[a-z]{2}$/.test(c) ? c : null;

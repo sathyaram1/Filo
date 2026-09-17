@@ -11,8 +11,8 @@
     // «Non filtrato»: il panel dei giudici non si è completato, non è una classe di rischio.
     // Per instradamento vale come il più severo: mai in coda, resta nei Ricevuti.
     unfiltered: { label: 'Non filtrato', color: '#ffffff', severity: 4 },
-    // Bocciatura di SICUREZZA sul fix: torna all'owner. ROSSO come l'attacco — col verde di
-    // `design` un allarme di sicurezza sembrava questione di gusto.
+    // Bocciatura di SICUREZZA sul fix: torna all'owner, ma col rosso dell'attacco, non col
+    // verde di `design`: un allarme di sicurezza non è una questione di gusto.
     secaudit:   { label: 'Bloccato dalla sicurezza', color: '#c0392b', severity: 3 },
     // Fermata al cancello di fusione: fix e audit ok, ma il ramo non entra in main senza
     // l'owner. Rosso: è un allarme che aspetta una persona.
@@ -226,8 +226,8 @@
     return !list.length || !list.every(statusUnreadable);
   }
 
-  // L'unica cosa vera senza chiave: l'enum grossolano in chiaro (`statusPublic`).
-  // 'Aperta' | 'Chiusa' | '' (non si sa nemmeno quello), con QUESTE parole in ogni pagina.
+  // Senza chiave l'unica cosa vera è l'enum grossolano in chiaro (`statusPublic`), e va
+  // detto con QUESTE parole in ogni pagina.
   function publicStateLabel(fb) {
     const pub = String((fb && fb.statusPublic) || '');
     if (pub === 'closed') return 'Chiusa';
@@ -268,8 +268,7 @@
     if (status === 'aligned') return worstVerdictBlock(fb);
     const info = fs.STATUSES[status];
     if (!info || info.tab !== 'inbox') return null;
-    // Bocciatura di sicurezza sul fix: lo stato è `design` (torna all'owner) ma non è una
-    // questione di design. Rosso.
+    // Lo stato è `design` ma la ragione è la sicurezza: il colore lo dice REASONS.secaudit.
     if (status === 'design' && statusReason === 'secaudit') {
       return { reason: 'secaudit', ...REASONS.secaudit };
     }
@@ -304,8 +303,7 @@
   function judgesNote(fb) {
     const fs = FS();
     const S = fs.STATUSES;
-    // Stato illeggibile: niente da spiegare. Ridotto a `unlabeled` direbbe «In attesa del
-    // giudizio» anche su una segnalazione chiusa; chi disegna mette l'enum in chiaro.
+    // Stato illeggibile: niente da spiegare (vedi looksEncrypted e publicStateLabel).
     if (statusUnreadable(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (status === 'design') {
@@ -453,8 +451,7 @@
   // → { label, color, hint, reason, reasonText, showReason, encrypted } o null.
   function stateBadge(fb) {
     const fs = FS();
-    // Stato cifrato: la macchina lo ridurrebbe a «Non filtrato» anche su una segnalazione
-    // chiusa. L'unica cosa vera è l'enum grossolano in chiaro.
+    // Stato cifrato: vedi publicStateLabel.
     if (statusUnreadable(fb)) {
       const label = publicStateLabel(fb);
       if (!label) return null;
@@ -895,8 +892,7 @@
     // possono non essere arrivati, o essere vuoti su un altro computer, e il grigio mentirebbe.
     const fermaDaStato = status === 'design' && statusReason === 'l5';
 
-    // Una fusione approvata e mai avvenuta (conflitto) pesa quanto una richiesta ferma: è un sì
-    // già dato che non ha prodotto niente.
+    // Una fusione approvata e mai avvenuta pesa quanto una richiesta ferma (vedi mergeApprovals).
     const ferme = failed.concat(pending);
     if (!ferme.length && fermaDaStato) {
       return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {

@@ -12,7 +12,6 @@
   // stanno in src/shared/onboarding.js, qui solo la chat.
   const Onb = self.SN_ONBOARDING;
 
-  // DOM
   const $ = (id) => document.getElementById(id);
   const body = document.body;
   const homeMessageEl = $('homeMessage');

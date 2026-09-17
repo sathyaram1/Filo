@@ -351,7 +351,6 @@
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',
 
-    // Categorie
     GET_CATEGORIES: 'get_categories',
     RENAME_CATEGORY: 'rename_category',         // { id, name }
     DELETE_CATEGORY: 'delete_category',         // { id }

@@ -218,7 +218,6 @@
   }
 
   // onDelta(testo), onReasoning(chunk), onToolCall({ id, name }) appena si conosce il nome.
-  // Ritorna { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
   async function streamComplete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
     const reqBody = { model, messages, stream: true, usage: { include: true }, ...toolsFields(tools, toolChoice) };
     // Livello dell'owner più la richiesta di streamare il ragionamento (vedi reasoningField).
