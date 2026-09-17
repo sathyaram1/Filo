@@ -235,6 +235,7 @@ function loadContentScripts() {
   // Alcuni moduli sono già caricati via <script> nelle pagine interne: il
   // require li riesegue, ma è idempotente (riassegna gli stessi oggetti).
   const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
+  // L'ordine conta: le ragioni stanno in fila nella gemella src/preload/page-preload.js.
   safe(path.join(SHARED, 'constants.js'));
   safe(path.join(SHARED, 'filoUi.js'));
   safe(path.join(SHARED, 'i18n.js'));
