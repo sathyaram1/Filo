@@ -98,7 +98,8 @@ module.exports = function register(on, ctx) {
         await FB.castReopenRequest(id, uid, { idToken });
         created = await FB.submit({
           text: `[Riapertura #${original.seq || id}] ${text}`,
-          // #583: URL e titolo del feedback originale non arrivano più fin qui, sono di chi l'aveva mandato. Il collegamento resta `parentId` più il numero nel testo, che è ciò che serve al triage.
+          // URL e titolo dell'originale sono di chi l'ha mandato e non arrivano qui (#583):
+          // al triage bastano `parentId` e il numero nel testo.
           url: '',
           title: '',
           userAgent: '',

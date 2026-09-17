@@ -871,9 +871,8 @@
           firstDelta = false;
         }
         buf += m.delta;
-        // Ogni delta allunga il riquadro: la posa va rifatta ADESSO, non al
-        // prossimo disegno (#502). E la lettura resta dov'è se l'utente era
-        // tornato su a rileggere.
+        // Ogni delta allunga il riquadro: la posa va rifatta subito, non al prossimo disegno
+        // (#502), e la lettura resta dov'è se l'utente era tornato su a rileggere.
         scrollaConservando(popup, () => {
           bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf));
         });

@@ -213,10 +213,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     // il main li inoltra qui.
     if (ipc && typeof ipc.on === 'function') {
       ipc.on('filo:zoom-key', (_e, dir) => {
-        // Alla pagina che zooma da sé il tasto va comunque CONSEGNATO: su Mac
-        // questa è l'unica strada (la barra dei menu lo prende prima), e senza
-        // consegna il suo zoom morirebbe in silenzio. Il verso sta nel NOME
-        // dell'evento: un `detail` non passa dal mondo isolato del preload.
+        // Alla pagina che zooma da sé il tasto va comunque consegnato: su Mac la barra dei menu
+        // lo prende prima ed è l'unica strada. Il verso sta nel NOME dell'evento (niente `detail`).
         if (pageHandlesZoom()) {
           try {
             const nomi = { in: 'filo:zoom-in', out: 'filo:zoom-out', reset: 'filo:zoom-reset' };

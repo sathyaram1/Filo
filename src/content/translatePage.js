@@ -121,7 +121,8 @@
         newContentSeen = false;
         result = await runPass(progress, myRun);
         if (aborted()) return;
-        // Il sito ha allungato la pagina mentre lavoravamo: la finiamo adesso, senza far ricliccare e senza rimandare al modello ciò che è già fatto. Vale anche se il primo giro non aveva trovato niente: «non ho trovato testo» mentre il testo compare è la stessa bugia.
+        // Il sito ha allungato la pagina mentre lavoravamo: si finisce adesso, senza ricliccare
+        // né ripagare ciò che è fatto. Vale anche se il primo giro non aveva trovato testo.
         if (!newContentSeen || (result.kind !== 'done' && result.kind !== 'none')) break;
       }
       if (aborted()) return;

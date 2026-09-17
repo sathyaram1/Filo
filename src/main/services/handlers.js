@@ -2008,7 +2008,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         if (res.output) rendered._output = res.output;
         // L'esito viaggia con l'azione: il diario deve dire «fatto» o «non riuscito».
         rendered._executed = !!res.executed;
-        // `kept: false` non vuol dire invisibile: vuol dire che in chat non c'è niente da CLICCARE. Nel diario ci va lo stesso, come riga — se Filo fa una cosa, l'utente deve poter vedere che l'ha fatta. Un'azione rifiutata dal registro invece non è successa, e non entra.
+        // `kept: false` = niente da cliccare in chat, ma nel diario ci va: se Filo fa una cosa
+        // l'utente deve vederlo. Un'azione rifiutata dal registro invece non è successa.
         if (!res.rejected) {
           if (!res.kept) rendered._traccia = true;
           renderedActions.push(rendered);

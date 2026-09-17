@@ -273,7 +273,8 @@ module.exports = function register(on, ctx) {
             return d;
           });
           askTimer = setTimeout(ensureDest, ASK_AFTER_MS);
-          // Il file parziale cresce nella cartella dove atterrerebbe un download nativo: se la destinazione è lì (quasi sempre) la consegna finale è una rinomina istantanea invece della copia di un filmato intero.
+          // Il file parziale cresce dove atterrerebbe un download nativo: se la destinazione è lì,
+          // la consegna è una rinomina e non la copia di un filmato intero.
           partPath = downloads.uniquePath(downloads.downloadsDir(), `${name}.filo-part`);
           return partPath;
         },

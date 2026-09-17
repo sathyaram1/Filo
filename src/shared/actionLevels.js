@@ -266,7 +266,8 @@
       },
       describe: (a) => {
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
-        // DOVE il comando agisce non si legge nel comando: la cartella di lavoro è persistente e la sposta l'assistente da sé (`cd` è livello 1). `wget http://x/authorized_keys` ha lo stesso testo nella home, dove è innocuo, e dentro ~/.ssh, dove sovrascrive una chiave. La cartella la inietta il main come `_cwd`.
+        // DOVE agisce non si legge nel comando: `wget http://x/authorized_keys` è innocuo nella
+        // home e sovrascrive una chiave in ~/.ssh. La cartella la inietta il main come `_cwd`.
         const cwd = String((a && a._cwd) || '').trim();
         return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
           + (cwd ? `\nCartella di lavoro: ${cwd}` : '');

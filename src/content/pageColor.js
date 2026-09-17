@@ -149,7 +149,8 @@
         img.onerror = () => finish(null);
         img.onload = () => {
           try {
-            // L'estrazione vera sta nella logica pura di SN_TAB_COLOR, condivisa e unit-testata: qui si scala il favicon a 64×64 e si delega, degradando alla vecchia media se non è caricata.
+            // L'estrazione vera sta in SN_TAB_COLOR (pura, unit-testata): qui si scala il favicon a
+            // 64×64 e si delega, ripiegando sulla media se non è caricata.
             const W = 64, H = 64;
             const cv = document.createElement('canvas');
             cv.width = W; cv.height = H;

@@ -336,10 +336,8 @@
     return head + tagliato + '…';
   }
 
-  // Cosa legge CHI HA MANDATO il feedback: `userNote` è la frase in chiaro per lui,
-  // `notes` è il report per l'owner e viaggia cifrato. Se non c'è la frase, si tace.
-  // Due forme da riconoscere entrambe: il testo cifrato e il SEGNAPOSTO messo al suo posto.
-  // Riconoscerne una sola lascia la casella aperta, e il primo salvataggio cancella il report.
+  // `userNote` è la frase in chiaro per chi ha mandato, `notes` il report cifrato per l'owner.
+  // Si riconoscono sia il cifrato sia il SEGNAPOSTO, o il primo salvataggio cancella il report.
   function reportUnreadable(notes) {
     const s = String(notes || '').trim();
     return s.startsWith('FENC') || s.startsWith('[cifrato');

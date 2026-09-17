@@ -171,7 +171,8 @@ module.exports = function register(on, ctx) {
         const remote = await loadRemote(uid);
         if (remote) {
           await Credits.adopt(remote, uid);
-          // Registro utenti: email e nome si aggiornano subito, senza aspettare la prossima mutazione del saldo, così l'owner trova l'account in /users e /gift.
+          // Email e nome si aggiornano subito, senza aspettare una mutazione del saldo:
+          // l'owner deve trovare l'account in /users e /gift.
           const profile = auth.getProfile?.();
           const wantEmail = profile?.email ? String(profile.email).toLowerCase() : null;
           if (wantEmail && (remote.email !== wantEmail || (profile?.name && remote.name !== profile.name))) {

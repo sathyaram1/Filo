@@ -328,7 +328,8 @@ module.exports = function register(on, ctx) {
         try {
           bytes = await C.decryptBytes(raw, priv);
         } catch (e) {
-          // Byte che iniziano come un ciphertext valido ma non si decifrano (chiave sbagliata, dato corrotto): non si ripiega sui byte cifrati, sarebbero comunque illeggibili — si dichiara l'errore.
+          // Byte che sembrano un ciphertext ma non si decifrano: niente ripiego sui byte cifrati
+          // (illeggibili comunque), si dichiara l'errore.
           return { ok: false, error: 'decifratura immagine fallita' };
         }
       }

@@ -416,8 +416,8 @@
       await chrome.runtime.sendMessage({
         type: MSG.SAVE_PATH,
         payload: {
-          // Nessun identificativo del mittente parte da qui, neanche vuoto: chi manda si presenta col token dell'identità dell'installazione, che il server verifica e il processo principale allega all'invio (#585).
-          // Uno generato in questa pagina sarebbe autodichiarato, e chi attacca ne scriverebbe un altro a ogni invio; un campo vuoto col nome giusto invita a riempirlo.
+          // Nessun identificativo del mittente da qui, neanche vuoto: il main allega il token
+          // dell'installazione, che il server verifica (#585). Uno locale sarebbe autodichiarato.
           session: {
             rawUrl: session.initialUrl,
             rawSteps: session.executedSteps,
@@ -958,7 +958,8 @@
               setTimeout(() => submit({ userAction: aiNote, preActionUrl: location.href }), 150);
             }
           } else {
-            // Reveal rifiutato dalla whitelist o target mancante: si chiede all'AI di correggersi senza toccare la pagina.
+            // Reveal rifiutato dalla whitelist o bersaglio mancante:
+            // si chiede all'AI di correggersi senza toccare la pagina.
             const aiNote = act === 'reveal'
               ? `reveal rifiutato (motivo: ${result.reason}). L'elemento non è un disclosure sicuro (details/aria-expanded+aria-controls non-link non-submit). Usa "click" con highlight per chiedere conferma all'utente, oppure scegli un altro target.`
               : `hover non eseguibile (motivo: ${result.reason}). Selector non trovato o azione fallita.`;
