@@ -367,9 +367,8 @@ function emitModule({ docs, glossary }) {
 
 function emitUiModule() {
   return `// GENERATO da scripts/build-transparency.mjs — NON modificare a mano.
-// Lo stesso codice è inlineato nelle pagine pubbliche del sito: si scrive una
-// volta sola in scripts/build-transparency.mjs, così la pagina dentro Filo e
-// quella sul sito non possono comportarsi in modo diverso.
+// Lo stesso codice è inlineato nelle pagine del sito: si scrive una volta sola lì, così la
+// pagina dentro Filo e quella sul sito non possono comportarsi in modo diverso.
 
 (function (global) {
   'use strict';
