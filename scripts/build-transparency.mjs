@@ -335,12 +335,8 @@ function emitModule({ docs, glossary }) {
     sections: d.sections, sources: d.sources, html: d.html, text: d.text,
   }));
   return `// GENERATO da scripts/build-transparency.mjs — NON modificare a mano.
-// La sorgente sono i markdown in transparency/. Per rigenerare:
-//   node scripts/build-transparency.mjs
-//
-// Contiene i documenti di trasparenza in due forme: \`html\` per la pagina
-// (dentro Filo e sul sito) e \`text\` per l'agente, che lo legge on-demand
-// quando l'utente chiede conto di una scelta (azione LEGGI_TRASPARENZA).
+// Sorgente: i markdown in transparency/. I documenti stanno qui in due forme: \`html\` per
+// la pagina, \`text\` per l'agente (azione LEGGI_TRASPARENZA).
 
 (function (global) {
   'use strict';
