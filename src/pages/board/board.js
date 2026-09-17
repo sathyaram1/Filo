@@ -440,7 +440,7 @@
       try {
         const r = await sendToMain({ type: 'get_update_recap' });
         if (r && r.current) releasedVersion = r.current;
-      } catch (_) { /* senza versione il gate è inattivo */ }
+      } catch (_) { /* senza versione il gate è inattivo: done→bacheca come prima */ }
     }
 
     try {

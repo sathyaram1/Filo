@@ -57,7 +57,7 @@
         providerModelCache[provider] = res.items;
         populateDatalist(provider, res.items);
       }
-    } catch (_) { /* lista non disponibile */ }
+    } catch (_) { /* lista non disponibile: il campo resta libero */ }
   }
 
   // Il valore corrente compare subito; il catalogo completo poi lo rimpiazza.
