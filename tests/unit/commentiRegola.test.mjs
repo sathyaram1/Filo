@@ -79,15 +79,17 @@ test('una riga di commento resta una riga: al massimo 120 caratteri di testo', (
 });
 
 test('un commento a sé non supera le due righe, salvo l’intestazione del file', () => {
-  const lunghi = [];
+  const blocchi = [];
   for (const [f, cs] of perFile) {
     let blocco = null;
     for (const c of cs) {
       if (c.trailing) { blocco = null; continue; }
-      if (blocco && blocco.le + 1 >= c.ls) blocco.le = c.le; else blocco = { ls: c.ls, le: c.le }, lunghi.push(blocco), (blocco.f = f);
+      if (blocco && blocco.le + 1 >= c.ls) { blocco.le = c.le; continue; }
+      blocco = { f, ls: c.ls, le: c.le };
+      blocchi.push(blocco);
     }
   }
-  const fuori = lunghi.filter((b) => b.le - b.ls + 1 > (b.ls <= 3 ? 3 : 2)).map((b) => `${b.f}:${b.ls}-${b.le}`);
+  const fuori = blocchi.filter((b) => b.le - b.ls + 1 > (b.ls <= 3 ? 3 : 2)).map((b) => `${b.f}:${b.ls}-${b.le}`);
   assert.deepEqual(fuori, [], 'blocchi di commento sopra le due righe (tre per l’intestazione)');
 });
 
