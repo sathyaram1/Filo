@@ -1297,7 +1297,7 @@
       try {
         const r = await sendToMain({ type: 'get_update_recap' });
         if (r && r.current) releasedVersion = r.current;
-      } catch (_) { /* senza versione: gate inattivo */ }
+      } catch (_) { /* il gate non si attiva: senza versione niente confronto */ }
     }
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
