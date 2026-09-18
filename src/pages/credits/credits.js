@@ -264,35 +264,76 @@
     }
   }
 
+  // Un invito si dà come LINK (#651): chi lo riceve lo apre, scarica Filo e si
+  // ritrova i crediti dentro senza ricopiare niente. Il codice resta accanto,
+  // per chi lo detta a voce. Ogni link vale per più persone: quanti sono
+  // entrati e chi, si legge qui.
+  function copiaCon(btn, testo) {
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(testo); } catch (_) {}
+      const prev = btn.textContent;
+      btn.textContent = 'Copiato';
+      btn.classList.add('is-copied');
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove('is-copied'); }, 1200);
+    });
+  }
+
   function renderInvites(invites) {
     const section = $('invitesSection');
     const list = $('invites');
     list.innerHTML = '';
-    section.hidden = invites.length === 0;
-    for (const inv of invites) {
+    const views = (invites || []).map((inv) => W.inviteView(inv));
+    section.hidden = views.length === 0;
+    for (const inv of views) {
+      const spento = inv.exhausted || inv.revoked;
       const li = document.createElement('li');
-      li.className = 'sn-wallet-invite' + (inv.used ? ' is-used' : '');
+      li.className = 'sn-wallet-invite' + (spento ? ' is-used' : '');
       li.dataset.code = inv.code;
+
+      const row = document.createElement('div');
+      row.className = 'sn-wallet-invite-row';
+
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'sn-wallet-invite-link';
+      link.textContent = inv.link;
+      link.disabled = spento || !inv.link;
+      link.title = inv.revoked ? 'Annullato' : (inv.exhausted ? 'Nessun posto libero' : 'Copia il link');
+      copiaCon(link, inv.link);
 
       const code = document.createElement('button');
       code.type = 'button';
       code.className = 'sn-wallet-code';
       code.textContent = inv.code;
-      code.title = inv.used ? 'Già usato' : 'Copia';
-      code.disabled = Boolean(inv.used);
-      code.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(inv.code); } catch (_) {}
-        const prev = code.textContent;
-        code.textContent = 'Copiato';
-        code.classList.add('is-copied');
-        setTimeout(() => { code.textContent = prev; code.classList.remove('is-copied'); }, 1200);
-      });
+      code.disabled = spento;
+      code.title = inv.revoked ? 'Annullato' : (inv.exhausted ? 'Nessun posto libero' : 'Copia il codice');
+      copiaCon(code, inv.code);
 
       const state = document.createElement('span');
       state.className = 'sn-wallet-invite-state';
-      state.textContent = inv.used ? `usato${inv.usedAt ? ' il ' + formatDate(inv.usedAt) : ''}` : 'da dare';
+      state.textContent = W.inviteStateLine(inv);
 
-      li.append(code, state);
+      row.append(link, code, state);
+      li.appendChild(row);
+
+      if (inv.uses.length) {
+        const chi = document.createElement('ul');
+        chi.className = 'sn-wallet-invite-uses';
+        for (const u of inv.uses) {
+          const item = document.createElement('li');
+          const who = document.createElement('span');
+          who.className = 'sn-wallet-invite-who';
+          who.textContent = u.pseudonym || 'qualcuno';
+          who.title = 'Come si chiama in Filo chi è entrato con questo invito';
+          const when = document.createElement('span');
+          when.className = 'sn-wallet-invite-when';
+          when.textContent = formatDate(u.at);
+          item.append(who, when);
+          chi.appendChild(item);
+        }
+        li.appendChild(chi);
+      }
+
       list.appendChild(li);
     }
   }
