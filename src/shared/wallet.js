@@ -289,11 +289,32 @@
     return c ? INVITE_LINK_BASE + c : '';
   }
 
+  // Il link d'invito DENTRO un testo qualunque. Da un telefono un messaggio si
+  // copia tenendolo premuto, e negli appunti finisce la frase intera: saluto
+  // davanti, congedo dietro, il link in mezzo. In quel caso `normalizeCode` non
+  // basta (l'ultimo pezzo del percorso si porta dietro le parole che seguono) e
+  // il blocco di otto caratteri può cadere sul posto sbagliato: «Ciao Anna» è
+  // quattro più quattro, e vince sul link perché viene prima (terzo giro di
+  // verifica del #651). L'indirizzo è il segno più forte che ci sia, quindi si
+  // cerca per primo.
+  const LINK_NEL_TESTO = /(?:https?:\/\/)?(?:[a-z0-9-]+\.)*filo\.red\/i\/([a-z0-9-]+)/i;
+  const INVITO_NEL_TESTO = /filo:\/*invito\/([a-z0-9-]+)/i;
+  function codeFromLinkInText(raw) {
+    const s = String(raw == null ? '' : raw);
+    for (const re of [LINK_NEL_TESTO, INVITO_NEL_TESTO]) {
+      const m = re.exec(s);
+      const c = m ? normalizeCode(m[1]) : null;
+      if (c) return c;
+    }
+    return null;
+  }
+
   // Quello che l'utente ha messo nel campo dell'invito → il codice, o `null`.
-  // Prima si prova a leggerlo com'è (codice o link); se non basta, si cerca il
-  // blocco di otto caratteri dentro la riga incollata («Codice: ABCD-EFGH»).
+  // Prima si prova a leggerlo com'è (codice o link); poi si cerca un link
+  // d'invito dentro il testo; da ultimo il blocco di otto caratteri dentro la
+  // riga incollata («Codice: ABCD-EFGH»).
   function codeFromInput(raw) {
-    return normalizeCode(raw) || normalizeCode(extractCode(raw));
+    return normalizeCode(raw) || codeFromLinkInText(raw) || normalizeCode(extractCode(raw));
   }
 
   // `filo://invito/<codice>` — il collegamento che porta un invito dentro
