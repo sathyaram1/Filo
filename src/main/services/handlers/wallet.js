@@ -311,10 +311,14 @@ module.exports = function register(on, ctx) {
   const NOTICE_KEY = 'walletNotice';
   const NOTICE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+  // L'avviso si SPINGE, non si aspetta che qualcuno lo chieda: la home è già
+  // aperta quando l'invito viene riscattato (quattro secondi dopo l'avvio, o
+  // a Filo acceso), e farle chiedere lo stato del portafoglio a ogni apertura
+  // costerebbe un giro dal server per ogni scheda nuova.
   async function setNotice(kind, text) {
     const rec = { kind, text: String(text || ''), at: new Date().toISOString(), seenHome: false, seenCredits: false };
     try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {}
-    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, walletNotice: { kind: rec.kind, text: rec.text } }); } catch (_) {}
     return rec;
   }
 
