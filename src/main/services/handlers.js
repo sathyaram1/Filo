@@ -2369,6 +2369,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let textReply = '';
   let reasoningDetails = [];
   let costEur = 0;
+  // Un giro qualunque del turno servito dalla chiave personale dopo il rifiuto
+  // della propria (#629): la scheda lo dice una volta, sotto la risposta.
+  let keyFallback = null;
   // Resta vero solo se il modello ha chiamato azioni fino al tetto senza mai
   // rispondere: allora l'utente deve saperlo, non ricevere l'ultima nota di
   // lavoro spacciata per risposta.
@@ -2381,6 +2384,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         origin: 'filo:chat',
         onReasoning, onText, onToolCall, tools,
       });
+      if (r && r.keyFallback) keyFallback = r.keyFallback;
       costEur += Number(r.costEur) || 0;
       let text = String(r.text || '');
       // Un id a ogni chiamata, anche se il fornitore non lo manda: la risposta
