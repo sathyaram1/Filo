@@ -65,6 +65,10 @@ test('diagnostica home', async ({ app }) => {
   await expect.poll(() => visto.redeems.length, { timeout: 40000, intervals: [500] }).toBeGreaterThan(0);
   console.log('REDEEMS:', JSON.stringify(visto.redeems), 'PENDING:', visto.pending);
   await new Promise((r) => setTimeout(r, 8000));
+  const dlg = await home.evaluate(() => (window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test.state()) || null);
+  console.log('DIALOGO:', JSON.stringify(dlg));
+  const hostVisibile = await home.locator('.sn-confirm-host').count();
+  console.log('HOST:', hostVisibile);
   const info = await home.evaluate(() => ({
     overlays: document.querySelectorAll('.sn-confirm-overlay').length,
     titles: [...document.querySelectorAll('.sn-confirm-title')].map((e) => e.textContent),
