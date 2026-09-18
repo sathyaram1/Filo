@@ -256,12 +256,32 @@ test('la chiave messa e tolta dalle Impostazioni si vede subito in Crediti, e vi
     await opts.fill('#apiKey', '');
     await opts.dispatchEvent('#apiKey', 'change');
     await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 15_000 });
-    // E da Crediti alle Impostazioni, senza ricaricare.
+    // E da Crediti alle Impostazioni: riaperte, la vedono.
     await mettiChiave(page, PROPRIA);
+    await opts.reload();
+    await expect(opts.locator('#useDefaultModels')).toBeVisible({ timeout: 15_000 });
+    if (await opts.locator('#useDefaultModels').isChecked()) await opts.click('#useDefaultModels');
     await expect(opts.locator('#apiKey')).toHaveValue(PROPRIA, { timeout: 15_000 });
     await page.click('#ownKeyRemoveBtn');
     await page.click('#ownKeyRemoveYes');
+    await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 15_000 });
+    await opts.reload();
+    await expect(opts.locator('#useDefaultModels')).toBeVisible({ timeout: 15_000 });
+    if (await opts.locator('#useDefaultModels').isChecked()) await opts.click('#useDefaultModels');
     await expect(opts.locator('#apiKey')).toHaveValue('', { timeout: 15_000 });
+
+    // La porta: le Impostazioni già aperte (campo vuoto) mentre la chiave si
+    // mette in Crediti. Cambiare QUALUNQUE altra cosa nelle Impostazioni non
+    // deve portarsi via la chiave appena messa.
+    await mettiChiave(page, PROPRIA);
+    await expect(page.locator('#ownKeyTail')).toHaveText(`…${CODA}`);
+    await opts.fill('#monthlyLimit', '7');
+    await opts.dispatchEvent('#monthlyLimit', 'change');
+    await opts.waitForTimeout(1500);
+    const dopo = await filo.app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).apiKeys.openrouter);
+    console.log('[nota]', `Impostazioni aperte prima della chiave, poi un altro campo cambiato: la chiave ${dopo ? 'resta' : 'SPARISCE'}`);
+    await expect(page.locator('#ownKeyHave')).toBeVisible({ timeout: 5000 });
+    expect(dopo).toBe(PROPRIA);
   } finally { await chiudi(filo); }
 });
 
