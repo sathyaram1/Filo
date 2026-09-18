@@ -1,11 +1,11 @@
 // Giro di verifica locale del ramo claude/link-invito — giro 2.
 //
 // Un invito si riscatta una volta sola e lega per sempre l'installazione a chi
-// l'ha invitata: è una porta che si chiude alle spalle. Adesso quella porta
-// la può spingere anche un collegamento scritto da una pagina qualsiasi, e
-// Filo È un browser — quelle pagine girano dentro Filo. Qui si prova a farle
-// riscattare un invito SENZA che nessuno abbia cliccato niente: apertura
-// automatica, riquadro incorporato, finestra nuova, rinvio della pagina.
+// l'ha invitata: è una porta che si chiude alle spalle. Adesso quella porta la
+// può spingere anche un collegamento scritto da una pagina qualsiasi, e Filo È
+// un browser — quelle pagine girano dentro Filo. Qui si prova a farle
+// riscattare un invito SENZA che nessuno abbia cliccato niente: riquadro
+// incorporato, finestra nuova, clic finto, e rinvio della pagina.
 //
 // Server finto: nessun codice vero viene toccato.
 
@@ -51,25 +51,34 @@ test.afterAll(async () => {
   await new Promise((r) => server.close(r));
 });
 
-const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>una pagina qualsiasi</title></head>
+// Le strade che una pagina può prendere da sola: un riquadro incorporato, una
+// finestra nuova, un clic che non ha fatto nessuno, un rinvio.
+const PASSIVA = `<!doctype html><html><head><meta charset="utf-8"><title>una pagina qualsiasi</title></head>
 <body>
 <h1>Una pagina qualsiasi</h1>
 <a id="ancora" href="filo://invito/AAAA2222">niente di che</a>
 <iframe id="dentro" src="filo://invito/BBBB3333" width="10" height="10"></iframe>
 <script>
   try { window.open('filo://invito/CCCC4444', '_blank'); } catch (e) {}
-  setTimeout(function () { try { document.getElementById('ancora').click(); } catch (e) {} }, 300);
-  setTimeout(function () { try { location.href = 'filo://invito/DDDD5555'; } catch (e) {} }, 800);
+  setTimeout(function () { try { document.getElementById('ancora').click(); } catch (e) {} }, 400);
 </script>
+</body></html>`;
+
+const RINVIO = `<!doctype html><html><head><meta charset="utf-8"><title>rinvio</title></head>
+<body><h1>rinvio</h1>
+<script>setTimeout(function () { try { location.href = 'filo://invito/DDDD5555'; } catch (e) {} }, 400);</script>
 </body></html>`;
 
 test('una pagina qualsiasi non riscatta un invito da sola, senza che nessuno abbia cliccato', async ({ openTab, testServer }) => {
   test.setTimeout(180000);
   redeems = [];
-  const page = await testServer.openReady(openTab, PAGINA);
-  await expect(page.locator('h1')).toHaveText('Una pagina qualsiasi');
 
-  // Dodici secondi: la pagina ha già provato tutte le sue strade.
-  await page.waitForTimeout(12000);
-  expect(redeems, `una pagina ha fatto riscattare da sola i codici ${redeems.join(', ')}`).toEqual([]);
+  const page = await openTab(testServer.html(PASSIVA));
+  await expect(page.locator('h1')).toHaveText('Una pagina qualsiasi', { timeout: 20000 });
+  await page.waitForTimeout(8000);
+
+  await openTab(testServer.html(RINVIO));
+  await new Promise((r) => setTimeout(r, 8000));
+
+  expect(redeems, `una pagina ha fatto riscattare da sola i codici ${redeems.join(', ') || '(nessuno)'}`).toEqual([]);
 });
