@@ -815,11 +815,11 @@ test('un filo:// che arriva da fuori si legge cercando il prefisso, mai per posi
     'l\'indirizzo si cerca fra gli argomenti (inviteCodeFromArgv), non si prende per indice');
   assert.match(main, /setAsDefaultProtocolClient\('filo', process\.execPath, \[path\.resolve\(process\.argv\[1\]\)\]\)/,
     'l\'unico argomento preso per indice è il percorso del progetto in sviluppo');
-  assert.match(main, /apriInvitoDaArgv[\s\S]{0,200}inviteCodeFromArgv/,
+  assert.match(main, /apriInvitoDaArgv[\s\S]{0,200}filoUrlFromArgv/,
     'gli argomenti si leggono con la funzione che li scandisce tutti');
   require('../../src/shared/wallet.js');
   const W = globalThis.SN_WALLET;
-  assert.equal(W.inviteCodeFromArgv(['electron.exe', '.', 'filo://invito/ABCDEFGH']), 'ABCDEFGH');
+  assert.equal(W.filoUrlFromArgv(['electron.exe', '.', 'filo://invito/ABCDEFGH']), 'filo://invito/ABCDEFGH');
   // Registrato come gestore, il sistema consegna QUALUNQUE filo://: una
   // pagina interna messa in un link da un sito qualsiasi non deve aprirsi.
   assert.equal(W.inviteCodeFromDeepLink('filo://credits/credits.html'), null);
