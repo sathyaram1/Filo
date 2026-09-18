@@ -225,7 +225,11 @@ test('senza portafoglio: la chiave rifiutata è un errore che porta a Crediti; c
     const bolla = await chiediInChat(dash, 'ciao');
     const testo = await bolla.innerText();
     console.log('[nota]', `senza portafoglio, chiave rifiutata: «${testo.slice(0, 200)}»`);
-    expect(testo).toMatch(/chiave|credit/i);
+    // È la SUA chiave a secco, e la strada è un invito: niente «crediti di
+    // domani» che non arrivano (rilievo del primo giro).
+    expect(testo).toMatch(/la tua chiave OpenRouter non ha più credito/i);
+    expect(testo).toMatch(/invito/i);
+    expect(testo).not.toMatch(/domani/i);
     await expect(bolla.locator('button', { hasText: 'Apri Crediti' })).toBeVisible();
     expect((await chiamateChat(filo.app)).length).toBe(1);
 
