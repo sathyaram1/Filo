@@ -442,10 +442,15 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
+    // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
+    // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
+    // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
+    // l'indirizzo si CERCA, mai si prende per indice.
+    apriInvitoDaArgv(argv);
   });
 }
