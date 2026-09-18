@@ -7,10 +7,16 @@
 //  · un portafoglio a zero crediti con la chiave propria che funziona: la
 //    chat va con la chiave, nessun «crediti finiti» a sbarrare la strada;
 //  · «spiega» su una pagina web con la chiave propria a secco: la risposta
-//    arriva coi crediti di Filo, e il riquadro lo dice? (in chat la riga c'è);
+//    arriva coi crediti di Filo, e il riquadro lo dice? (in chat la riga c'è;
+//    nel riquadro no: rilievo di livello 1, prova rossa attesa);
+//  · lo stesso «spiega», contate le richieste: con la chiave rifiutata non ne
+//    partono più che con la chiave buona, e ognuna è una coppia propria →
+//    personale (nessuna tempesta di tentativi);
 //  · i vettori (embeddings) con la chiave propria a secco: stesso ripiego
 //    della chat (una chiamata con la propria, poi una con la personale);
-//  · una chiave che non comincia con sk-or- incollata in Crediti.
+//  · una chiave di un altro servizio (sk-proj-…) incollata in Crediti: si
+//    salva senza una parola, ma la riga accanto ai sei caratteri dice subito
+//    che OpenRouter non la riconosce.
 import { test, expect } from '@playwright/test';
 import {
   avviaServer, avviaFilo, apriCrediti, fintoOpenRouter, impostaOpenRouter,
@@ -184,44 +190,54 @@ test('i vettori (embeddings) con la chiave propria a secco passano dallo stesso 
 });
 
 test('«spiega» sulla pagina con la chiave propria a secco fa le stesse richieste di quando la chiave va (ognuna rifatta con la personale): nessuna tempesta di tentativi', async () => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
-  const web = await paginaWeb('<!doctype html><meta charset="utf-8"><title>Pagina di prova</title><p id="t">Una frase da spiegare sulla pagina.</p>');
+  // Due pagine diverse (due indirizzi): quello che il riquadro precalcola per
+  // una pagina non deve servire la seconda, altrimenti il conto non torna.
+  const html = (t) => `<!doctype html><meta charset="utf-8"><title>Pagina di prova</title><p id="t">${t}</p>`;
+  const webA = await paginaWeb(html('Una frase da spiegare sulla prima pagina.'));
+  const webB = await paginaWeb(html('Un altro paragrafo, sulla seconda pagina, con parole diverse.'));
   try {
     const page = await apriCrediti(filo.openTab);
     await riscatta(page, code);
     await fintoOpenRouter(filo.app, {});
     await mettiChiave(page, PROPRIA);
-    const pagina = await filo.openTab(web.url);
-    const spiega = async () => {
+    const spiega = async (url) => {
+      const pagina = await filo.openTab(url);
       await pagina.locator('#t').click();
       await pagina.evaluate(() => {
         const p = document.querySelector('#t');
         const range = document.createRange();
         range.selectNodeContents(p);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
+        const s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(range);
       });
       await filo.app.evaluate(({ BrowserWindow }) => {
         const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
         globalThis.__filoShortcuts.dispatch('explain-selection', win);
       });
       await expect(pagina.locator('.sn-popup').last()).toContainText('Ciao dal modello finto.', { timeout: 30_000 });
-      await pagina.waitForTimeout(3000); // le richieste precalcolate dal riquadro
+      await pagina.waitForTimeout(4000); // le richieste precalcolate dal riquadro
     };
-    await spiega();
+    await spiega(webA.url);
     const conBuona = (await chiamateChat(filo.app)).length;
-    await pagina.keyboard.press('Escape');
     await impostaOpenRouter(filo.app, { byKey: { [PROPRIA]: { status: 402 } } });
-    await spiega();
+    await spiega(webB.url);
     const dopo = (await chiamateChat(filo.app)).slice(conBuona);
     const chiavi = dopo.map((c) => (c.key === PROPRIA ? 'propria' : (c.key === chiavePersonale() ? 'personale' : '?')));
     console.log('[nota]', `«spiega» con la chiave buona: ${conBuona} richieste; con la chiave a 402: ${JSON.stringify(chiavi)}`);
-    expect(dopo.length).toBe(conBuona * 2);
+    // Quante richieste fa il riquadro dipende da cosa fa in tempo a
+    // precalcolare (misurate 2, 3 o 4): quello che conta è che con la chiave
+    // rifiutata non ne faccia PIÙ che con la chiave buona, e che ognuna sia
+    // una coppia: la propria, poi la personale.
+    expect(conBuona).toBeGreaterThan(0);
+    expect(dopo.length).toBeGreaterThan(0);
+    expect(dopo.length % 2).toBe(0);
+    expect(dopo.length / 2).toBeLessThanOrEqual(conBuona);
     for (let i = 0; i < chiavi.length; i += 2) expect(chiavi.slice(i, i + 2)).toEqual(['propria', 'personale']);
-  } finally { await web.chiudi(); await chiudi(filo); }
+  } finally { await webA.chiudi(); await webB.chiudi(); await chiudi(filo); }
 });
 
 test('una chiave di un altro servizio incollata in Crediti: OpenRouter non la riconosce, e la riga accanto ai sei caratteri lo dice subito', async () => {
