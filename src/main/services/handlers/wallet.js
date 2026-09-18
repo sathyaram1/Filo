@@ -294,10 +294,40 @@ module.exports = function register(on, ctx) {
   // ritenta al giro dopo; la coda non cresce oltre un tetto largo, e oltre si
   // perde il più vecchio dicendolo nel log (una riga persa la trova la
   // riconciliazione, non è un segreto).
+  //
+  // La coda sta anche su disco (#629): le righe ancora da scrivere alla
+  // chiusura di Filo ripartono all'avvio dopo, invece di sparire con il
+  // processo. E l'esito dell'ultima scrittura resta leggibile (usageLogStatus,
+  // nella pagina Crediti): una riga rifiutata dal server che si ritenta in
+  // silenzio per settimane è indistinguibile da un registro che funziona.
   const queue = [];
   const QUEUE_CAP = 2000;
+  const QUEUE_KEY = 'walletUsageQueue';
   let flushTimer = null;
   let flushing = false;
+  let queueLoaded = false;
+  const log = { written: 0, lastWriteAt: null, lastError: '', lastErrorAt: null };
+
+  function usageLogStatus() {
+    return { pending: queue.length, written: log.written, lastWriteAt: log.lastWriteAt, lastError: log.lastError, lastErrorAt: log.lastErrorAt };
+  }
+
+  async function loadQueue() {
+    if (queueLoaded) return;
+    queueLoaded = true;
+    try {
+      const saved = await globalThis.SN_STORAGE.getRaw(QUEUE_KEY, null);
+      if (Array.isArray(saved) && saved.length) {
+        queue.unshift(...saved.filter((r) => r && r.pseudonym));
+        if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+        if (queue.length) scheduleFlush(5000);
+      }
+    } catch (_) {}
+  }
+
+  async function saveQueue() {
+    try { await globalThis.SN_STORAGE.setRaw(QUEUE_KEY, queue.length ? queue.slice() : null); } catch (_) {}
+  }
 
   async function flush() {
     flushTimer = null;
@@ -319,8 +349,14 @@ module.exports = function register(on, ctx) {
         body: JSON.stringify({ writes }),
       });
       if (!res.ok) throw new Error(`wallet-usage commit ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+      log.written += batch.length;
+      log.lastWriteAt = new Date().toISOString();
+      log.lastError = '';
+      log.lastErrorAt = null;
     } catch (e) {
-      console.warn('[wallet] registro d\'uso non scritto, ritento:', e?.message || e);
+      log.lastError = String(e?.message || e);
+      log.lastErrorAt = new Date().toISOString();
+      console.warn('[wallet] registro d\'uso non scritto, ritento:', log.lastError);
       queue.unshift(...batch);
       if (queue.length > QUEUE_CAP) {
         console.warn(`[wallet] registro d'uso: coda oltre ${QUEUE_CAP} righe, scarto le più vecchie`);
@@ -329,6 +365,7 @@ module.exports = function register(on, ctx) {
       scheduleFlush(30000);
     } finally {
       flushing = false;
+      await saveQueue();
       if (queue.length && !flushTimer) scheduleFlush(5000);
     }
   }
