@@ -174,7 +174,6 @@ test('(A) chiave propria rifiutata: la risposta arriva coi crediti di Filo, la c
   await prepare(app);
 
   // Si torna alla home e si chiede qualcosa.
-  await shell.evaluate(() => window.filoShell.tabs.select ? null : null);
   await home.bringToFront().catch(() => {});
   await home.locator('#input').fill('ciao ripiego');
   await home.locator('#sendBtn').click();
