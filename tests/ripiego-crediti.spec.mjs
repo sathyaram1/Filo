@@ -217,8 +217,10 @@ test('(A) chiave propria rifiutata: la risposta arriva coi crediti di Filo, la c
   expect(f.costUsd.doubleValue).toBeCloseTo(0.00021, 6);
   expect(Object.keys(f).sort()).toEqual(['action', 'at', 'completionTokens', 'costUsd', 'credits', 'model', 'promptTokens', 'pseudonym', 'servedBy'].sort());
 
-  // La pagina Crediti ricorda il rifiuto.
+  // La pagina Crediti ricorda il rifiuto. (openTab ritrova la scheda già
+  // aperta dal riscatto: si ricarica, così la prova non dipende dall'avviso.)
   const credits = await openTab('filo://credits/credits.html');
+  await credits.reload();
   await expect(credits.locator('#ownKeyHave')).toBeVisible({ timeout: 15000 });
   await expect(credits.locator('#ownKeyTail')).toHaveText('…123456');
   await expect(credits.locator('#ownKeyRefusal')).toBeVisible();
