@@ -163,6 +163,27 @@ test('codeFromInput: legge anche la riga intera in cui il codice è arrivato', (
   assert.equal(W.codeFromInput(''), null);
 });
 
+// Da un telefono un messaggio si copia tenendolo premuto, e negli appunti
+// finisce la frase intera: saluto davanti, congedo dietro, il link in mezzo.
+// Il link dev'essere il segno più forte. Prima vinceva il primo blocco di
+// quattro più quattro caratteri, e «Ciao Anna» faceva rifiutare un incollaggio
+// giusto (terzo giro di verifica del #651).
+test('codeFromInput: il link dentro un messaggio intero vince sulle parole intorno', () => {
+  const messaggi = [
+    'Ciao Anna, ecco: https://filo.red/i/ABCDEFGH fammi sapere',
+    'Ciao Luca, ecco: https://filo.red/i/ABCDEFGH ci vediamo',
+    'Ciao come va, ecco il link https://filo.red/i/ABCDEFGH fammi sapere',
+    'Anna ecco https://filo.red/i/ABCDEFGH subito',
+    'Ecco qua: https://filo.red/i/ABCD-EFGH — scaricalo',
+    'Ciao Anna, ecco: filo://invito/ABCDEFGH fammi sapere',
+    'Ciao Anna, ecco: filo.red/i/abcdefgh fammi sapere',
+  ];
+  for (const m of messaggi) assert.equal(W.codeFromInput(m), 'ABCDEFGH', m);
+  // Un messaggio senza nessun link resta quello che era: nessun codice.
+  assert.equal(W.codeFromInput('Ciao Anna, come stai?'), null);
+  assert.equal(W.codeFromInput('Ciao Anna, ecco: https://filo.red/i/ fammi sapere'), null);
+});
+
 test('filo://invito/<codice>: si accetta il solo host invito, il resto non apre niente', () => {
   assert.equal(W.inviteCodeFromDeepLink('filo://invito/ABCDEFGH'), 'ABCDEFGH');
   assert.equal(W.inviteCodeFromDeepLink('filo://invito/abcd-efgh'), 'ABCDEFGH');
