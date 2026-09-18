@@ -89,10 +89,10 @@ test('chi genera gli inviti vede il link e quanti sono entrati, e un invito con 
   expect(await simulaOwner(app)).toBe(true);
   const page = await openTab('filo://credits/owner.html');
   await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 20000 });
-  const righe = page.locator('#ownerCodes li');
+  const righe = page.locator('#ownerCodes > li');
   await expect(righe).toHaveCount(2, { timeout: 20000 });
 
-  const conUnPosto = page.locator('#ownerCodes li[data-code="AAAA2222"], #ownerCodes li[data-code="AAAA-2222"]').first();
+  const conUnPosto = page.locator('#ownerCodes > li[data-code="AAAA2222"], #ownerCodes > li[data-code="AAAA-2222"]').first();
 
   // Un posto su tre occupato: restano due persone da invitare, quindi
   // l'invito NON è finito e si deve poter ancora dare.

@@ -33,6 +33,23 @@ module.exports = function register(on, ctx) {
   const W = globalThis.SN_WALLET;
   const FB = globalThis.SN_FEEDBACK;
 
+  // Con cosa Filo paga le risposte è appena cambiato: portafoglio riscattato,
+  // identità azzerata, chiave propria messa o tolta. La home già aperta non se
+  // ne accorgeva e restava ferma sull'ultimo messaggio: a un invito riscattato
+  // da solo al primo avvio continuava a dire «Per attivare Filo serve un
+  // codice d'invito», col primo suggerimento che portava a riscattare un
+  // invito già riscattato. Qui la home si rifà e si spinge alle pagine aperte.
+  // Senza chiave il messaggio si ricostruisce sul posto e non costa niente;
+  // con la chiave il ricalcolo passa dal solito giro in background, che si
+  // annuncia da sé quando è pronto, e qui non si spinge una cache vecchia.
+  async function rinfrescaHome() {
+    try {
+      const r = await ctx.handleFiloGenerateDashboard({ openTabsCount: 0 });
+      if (!r || !r.message || r.cached) return;
+      broadcastToTabs({ type: MSG.FILO_DASHBOARD_UPDATED, message: r.message, suggestions: r.suggestions, ts: r.ts });
+    } catch (_) { /* la home resta com'è: non è un motivo per fallire un riscatto */ }
+  }
+
   // Il conteggio locale già dichiarato al server a un riscatto (per non
   // portarlo due volte). Sopravvive al riscatto e all'annullamento dell'identità.
   const DECLARED_KEY = 'walletLocalDeclared';
