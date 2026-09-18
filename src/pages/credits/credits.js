@@ -521,7 +521,11 @@
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.CREDITS_CHANGED) load().catch(() => {});
+      if (!msg || msg.type !== MSG.CREDITS_CHANGED) return;
+      load().catch(() => {});
+      // Una chiamata pagata con la chiave propria (o il suo rifiuto superato):
+      // spesa e residuo sono cambiati, si richiedono senza svuotare la riga.
+      if (msg.ownKeyUsed && !$('ownKeyHave').hidden) loadOwnKeyInfo({ quiet: true }).catch(() => {});
     });
   }
 
