@@ -64,11 +64,22 @@
   //   usingOwnKey: la chiamata è partita con una chiave dell'utente (non quella
   //                personale di Filo): allora è il SUO conto OpenRouter.
   //   dailyCredits: quota giornaliera, se nota, per dire quanto arriva domani.
-  function outOfCreditsMessage({ usingOwnKey = false, dailyCredits = null } = {}) {
+  //   fallbackFailed: la chiave propria è stata rifiutata E la personale ha
+  //                risposto 402: sono finiti tutti e due (#629).
+  //   hasWallet:   c'è un portafoglio (chiave personale su questo computer).
+  //                Senza, «togli la chiave per tornare ai crediti di Filo»
+  //                è una promessa vuota: la strada è un invito.
+  function outOfCreditsMessage({ usingOwnKey = false, dailyCredits = null, fallbackFailed = false, hasWallet = null } = {}) {
+    const domani = dailyCredits ? ` (domani ne arrivano ${dailyCredits})` : '';
+    if (fallbackFailed) {
+      return `OpenRouter ha rifiutato la tua chiave (il suo credito è finito) e anche i crediti di Filo sono finiti${domani}: ricarica il tuo conto OpenRouter, oppure aspetta i crediti di domani.`;
+    }
     if (usingOwnKey) {
+      if (hasWallet === false) {
+        return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo conto OpenRouter, oppure riscatta un invito nella pagina Crediti per usare i crediti di Filo.';
+      }
       return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo account OpenRouter, oppure togli la chiave dalla pagina Crediti per tornare ai crediti di Filo.';
     }
-    const domani = dailyCredits ? ` (domani ne arrivano ${dailyCredits})` : '';
     return `i crediti di Filo sono finiti${domani}. Puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nella pagina Crediti.`;
   }
 
