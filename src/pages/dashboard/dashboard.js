@@ -1907,8 +1907,12 @@
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
       // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
       // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
+      // Il main dice se è un rifiuto della chiave (un 403 di moderazione non
+      // lo è: lì Crediti non c'entra); per le risposte senza quel campo vale
+      // lo status.
       const W = window.SN_WALLET;
-      if (r?.code === 'NO_API_KEY' || (W && W.isKeyRefusalStatus(r?.status))) {
+      const keyRefused = r && 'keyRefused' in r ? Boolean(r.keyRefused) : Boolean(W && W.isKeyRefusalStatus(r?.status));
+      if (r?.code === 'NO_API_KEY' || keyRefused) {
         const credits = document.createElement('button');
         credits.type = 'button';
         credits.className = 'dash-action-btn';
