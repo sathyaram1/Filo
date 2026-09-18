@@ -73,7 +73,12 @@ test.beforeAll(async () => {
 
       // ── OpenRouter ──
       if (url === '/api/v1/chat/completions') {
-        seen.completions.push({ key: bearer, model: body.model, text: JSON.stringify(body.messages || []) });
+        // Si registra l'ULTIMO messaggio: dopo un turno Filo fa altre chiamate
+        // (la home si rigenera con la conversazione dentro), e quelle non sono
+        // il turno di chat.
+        const msgs = Array.isArray(body.messages) ? body.messages : [];
+        const last = msgs[msgs.length - 1] || {};
+        seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
         const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? 200 : 401);
         if (status !== 200) return json(res, status, { error: { message: status === 401 ? 'User not found.' : 'no', code: status } });
         res.writeHead(200, { 'Content-Type': 'text/event-stream' });
