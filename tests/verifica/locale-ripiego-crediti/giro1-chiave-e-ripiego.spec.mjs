@@ -241,7 +241,10 @@ test('senza portafoglio: la chiave rifiutata è un errore che porta a Crediti; c
     console.log('[nota]', `propria 402 e personale 402: «${testo2.slice(0, 300)}»`);
     const calls = await chiamateChat(filo.app);
     expect(calls.slice(1).map((c) => c.key)).toEqual([PROPRIA, chiavePersonale()]);
-    expect(testo2).toMatch(/credit/i);
+    // Tutte e due a secco: lo dice, con quanti crediti arrivano domani.
+    expect(testo2).toMatch(/rifiutato la tua chiave/i);
+    expect(testo2).toMatch(/anche i crediti di Filo sono finiti/i);
+    expect(testo2).toMatch(/domani ne arrivano/i);
     await expect(page.locator('#ownKeyRefusal')).toBeVisible({ timeout: 15_000 });
   } finally { await chiudi(filo); }
 });
