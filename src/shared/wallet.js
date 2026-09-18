@@ -93,17 +93,18 @@
     return m ? Number(m[1]) : 0;
   }
 
+  // Il perché, da incastonare dopo «OpenRouter ha rifiutato la chiave».
   function keyRefusalReason(status) {
     const st = Number(status);
-    if (st === 401) return 'OpenRouter non la riconosce';
+    if (st === 401) return 'non la riconosce';
     if (st === 402) return 'il suo credito è finito';
-    if (st === 403) return 'OpenRouter ha bloccato la richiesta per quella chiave';
-    return 'OpenRouter l\'ha rifiutata';
+    if (st === 403) return 'ha bloccato la richiesta';
+    return 'senza dire perché';
   }
 
   // La riga discreta in chat, quando il ripiego è appena avvenuto.
   function ownKeyFallbackLine(status) {
-    return `La tua chiave OpenRouter è stata rifiutata (${keyRefusalReason(status)}): ho usato i crediti di Filo.`;
+    return `OpenRouter ha rifiutato la tua chiave (${keyRefusalReason(status)}): ho usato i crediti di Filo.`;
   }
 
   // Lo stato nella pagina Crediti: l'ultimo rifiuto, e cosa succede finché la
@@ -116,7 +117,7 @@
         quando = ` l'ultima volta il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
       }
     } catch (_) { quando = ''; }
-    return `La tua chiave è stata rifiutata${quando} (${keyRefusalReason(status)}) e Filo ha usato i tuoi crediti. Finché resta qui, ogni chiamata prova prima lei.`;
+    return `OpenRouter ha rifiutato la tua chiave${quando} (${keyRefusalReason(status)}) e Filo ha usato i tuoi crediti. Finché resta qui, ogni chiamata prova prima lei.`;
   }
 
   // Gli ultimi sei caratteri della chiave, per riconoscerla senza mostrarla.
