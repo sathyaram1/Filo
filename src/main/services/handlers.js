@@ -517,7 +517,7 @@ function auditServedByLater({ settings, action, provider, model, apiKey, generat
     if (recordCost && Number.isFinite(r.costUsd) && r.costUsd > 0) {
       try {
         await Costs.record({
-          action, provider, model, usage: { costUsd: r.costUsd }, pricing: null, usdToEur: settings.usdToEur,
+          action, provider, model, usage: { costUsd: r.costUsd, keySource }, pricing: null, usdToEur: settings.usdToEur,
         });
       } catch (_) {}
     }
