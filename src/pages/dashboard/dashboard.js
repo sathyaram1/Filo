@@ -1905,8 +1905,10 @@
       retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
       row.appendChild(retry);
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
-      // strada è la pagina Crediti, e sta qui sotto, non in un menu.
-      if (r?.code === 'NO_API_KEY') {
+      // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
+      // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
+      const W = window.SN_WALLET;
+      if (r?.code === 'NO_API_KEY' || (W && W.isKeyRefusalStatus(r?.status))) {
         const credits = document.createElement('button');
         credits.type = 'button';
         credits.className = 'dash-action-btn';
