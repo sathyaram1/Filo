@@ -1,9 +1,10 @@
 // TEMPORANEO — diagnostica, si cancella prima della critica.
 import { createServer } from 'node:http';
+import { mkdirSync } from 'node:fs';
 import { test, expect } from '../../fixtures/electron.mjs';
 
 let server;
-const visto = { pending: 0, redeems: [] };
+let visto = { redeems: [] };
 let riscattato = false;
 
 function json(res, status, body) {
@@ -25,9 +26,13 @@ test.beforeAll(async () => {
       if (auth !== 'Bearer anon-id-token') return json(res, 401, { error: { message: 'no auth' } });
       if (url === '/walletState') {
         if (!riscattato) return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
-        return json(res, 200, { result: { hasWallet: true, pseudonym: 'abcdef0123456789', balance: { credits: 5000, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0, remainingUsd: 4.2, eurUsd: 1.2, eurPerCredit: 0.0007 }, stale: false, dailyCredits: 100, invites: [{ code: 'AAAA2222', max: 3, used: 0, uses: [] }] } });
+        return json(res, 200, { result: { hasWallet: true, pseudonym: 'abcdef0123456789', balance: { credits: 5000, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0, remainingUsd: 4.2, eurUsd: 1.2, eurPerCredit: 0.0007 }, stale: false, dailyCredits: 100, invites: [
+          { code: 'AAAA2222', max: 3, used: 1, uses: [{ pseudonym: 'fedebb00cafe1234', at: '2026-09-17T10:00:00.000Z' }] },
+          { code: 'BBBB3333', max: 3, used: 0, uses: [] },
+          { code: 'CCCC4444', max: 3, used: 3, uses: [{ pseudonym: 'aaa1', at: '2026-09-10T10:00:00.000Z' }, { pseudonym: 'bbb2', at: '2026-09-11T10:00:00.000Z' }, { pseudonym: 'ccc3', at: '2026-09-12T10:00:00.000Z' }] },
+        ] } });
       }
-      if (url === '/walletPendingInvite') { visto.pending += 1; return json(res, 200, { result: { status: 'ok', code: 'ABCDEFGH' } }); }
+      if (url === '/walletPendingInvite') return json(res, 200, { result: { status: 'none' } });
       if (url === '/walletRedeem') {
         visto.redeems.push(String((body.data && body.data.code) || ''));
         riscattato = true;
@@ -43,52 +48,63 @@ test.beforeAll(async () => {
   process.env.FILO_SECURE_TOKEN_ENDPOINT = `${base}/token`;
 });
 
+test.beforeEach(() => { visto = { redeems: [] }; riscattato = false; });
+
 test.afterAll(async () => {
   for (const k of ['FILO_FUNCTIONS_BASE', 'FILO_IDENTITY_ENDPOINT', 'FILO_SECURE_TOKEN_ENDPOINT']) delete process.env[k];
   await new Promise((r) => server.close(r));
 });
 
-test('diagnostica home', async ({ app }) => {
+test('riscatto A MANO: la home già aperta si aggiorna?', async ({ app, openTab }) => {
   let home = null;
-  const scadenza = Date.now() + 25000;
-  while (Date.now() < scadenza && !home) {
+  const scad = Date.now() + 25000;
+  while (Date.now() < scad && !home) {
     home = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } }) || null;
     if (!home) await new Promise((r) => setTimeout(r, 200));
   }
-  console.log('HOME URL:', home && home.url());
-  const log = [];
-  home.on('console', (m) => log.push(`[${m.type()}] ${m.text()}`));
-  await home.evaluate(() => {
-    window.__msgs = [];
-    chrome.runtime.onMessage.addListener((m) => { try { window.__msgs.push(JSON.stringify(m).slice(0, 200)); } catch (_) { window.__msgs.push('?'); } });
-  });
-  await expect.poll(() => visto.redeems.length, { timeout: 40000, intervals: [500] }).toBeGreaterThan(0);
-  console.log('REDEEMS:', JSON.stringify(visto.redeems), 'PENDING:', visto.pending);
-  await new Promise((r) => setTimeout(r, 8000));
-  const dlg = await home.evaluate(() => (window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test.state()) || null);
-  console.log('DIALOGO:', JSON.stringify(dlg));
-  const hostVisibile = await home.locator('.sn-confirm-host').count();
-  console.log('HOST:', hostVisibile);
-  const info = await home.evaluate(() => ({
-    overlays: document.querySelectorAll('.sn-confirm-overlay').length,
-    titles: [...document.querySelectorAll('.sn-confirm-title')].map((e) => e.textContent),
-    hasConfirmUi: !!window.SN_CONFIRM_UI,
-    onb: !!document.querySelector('.dash-onb'),
-    bodyStart: document.body.innerText.slice(0, 300),
-    msgs: window.__msgs || [],
-  }));
-  console.log('INFO:', JSON.stringify(info, null, 2));
-  console.log('CONSOLE:', log.slice(-40).join('\n'));
-
-  // Una home NUOVA, aperta dopo che i crediti sono arrivati: dice ancora di
-  // riscattare un invito?
-  const shell = await app.firstWindow();
-  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  const prima = await home.evaluate(() => document.body.innerText.slice(0, 160));
+  console.log('HOME PRIMA:', JSON.stringify(prima));
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 20000 });
+  await page.fill('#inviteCode', 'ABCD-EFGH');
+  await page.click('#redeemBtn');
+  await expect(page.locator('#redeemMsg')).toContainText('riscattato', { timeout: 20000 });
   await new Promise((r) => setTimeout(r, 6000));
-  const home2 = app.windows().filter((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } });
-  console.log('HOME APERTE:', home2.length);
-  for (const h of home2) {
-    const t = await h.evaluate(() => document.body.innerText.slice(0, 200)).catch(() => '(errore)');
-    console.log('--- home:', JSON.stringify(t));
+  const dopo = await home.evaluate(() => document.body.innerText.slice(0, 160));
+  console.log('HOME DOPO RISCATTO A MANO:', JSON.stringify(dopo));
+});
+
+test('foto della pagina Crediti con gli inviti, tema chiaro e scuro, e finestra stretta', async ({ app, openTab }) => {
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 20000 });
+  await page.fill('#inviteCode', 'ABCD-EFGH');
+  await page.click('#redeemBtn');
+  await expect(page.locator('#invites > li')).toHaveCount(3, { timeout: 20000 });
+  mkdirSync('tests/.shots', { recursive: true });
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate((t) => { document.documentElement.setAttribute('data-theme', t); }, tema);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `tests/.shots/verifica-651-crediti-${tema}.png`, fullPage: true });
   }
+  // Finestra stretta: il link è lungo, la riga deve reggere.
+  const win = app.windows()[0];
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; w.setBounds({ width: 620, height: 800 }); });
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: 'tests/.shots/verifica-651-crediti-stretto.png', fullPage: true });
+  const overflow = await page.evaluate(() => {
+    const li = document.querySelector('#invites > li');
+    const row = li && li.querySelector('.sn-wallet-invite-row');
+    const link = li && li.querySelector('.sn-wallet-invite-link');
+    return {
+      scrollW: document.documentElement.scrollWidth,
+      clientW: document.documentElement.clientWidth,
+      rowW: row ? row.getBoundingClientRect().width : 0,
+      linkW: link ? link.getBoundingClientRect().width : 0,
+      linkScrollW: link ? link.scrollWidth : 0,
+      stato: li ? li.querySelector('.sn-wallet-invite-state').textContent : '',
+      chi: li ? li.querySelector('.sn-wallet-invite-who').textContent : '',
+    };
+  });
+  console.log('LARGHEZZE:', JSON.stringify(overflow));
+  expect(win).toBeTruthy();
 });
