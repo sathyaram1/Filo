@@ -128,6 +128,41 @@ test('due clic attaccati sul pulsante non fanno sparire il link dalla riga', asy
   await expect(link).toHaveText('https://filo.red/i/AAAA2222');
 });
 
+test('due clic attaccati non fanno sparire nemmeno il codice accanto', async ({ app, openTab }) => {
+  const page = await apriCrediti(openTab);
+  const code = page.locator('#invites > li').first().locator('.sn-wallet-code');
+  await code.dblclick();
+  await page.waitForTimeout(3000);
+  await expect(code).toHaveText('AAAA-2222');
+});
+
+async function simulaOwner(app) {
+  return app.evaluate(async ({}, o) => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    const cfg = req('./auth/config');
+    const store = req('./auth/token-store');
+    const ga = req('./auth/google-auth');
+    cfg.secureTokenEndpoint = o.tokenEndpoint;
+    store.save({ refreshToken: o.refresh, email: o.email, name: 'Owner di prova', picture: '' });
+    ga.restore();
+    await ga.getIdToken();
+    return ga.isAdmin();
+  }, { tokenEndpoint: process.env.FILO_SECURE_TOKEN_ENDPOINT, refresh: OWNER_REFRESH, email: OWNER_EMAIL });
+}
+
+test('la stessa cosa succede nella pagina di chi genera gli inviti', async ({ app, openTab }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  const page = await openTab('filo://credits/owner.html');
+  await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 20000 });
+  const link = page.locator('#ownerCodes > li').first().locator('.sn-wallet-invite-link');
+  await expect(link).toHaveText('https://filo.red/i/AAAA2222', { timeout: 20000 });
+  await link.dblclick();
+  await page.waitForTimeout(3000);
+  await expect(link).toHaveText('https://filo.red/i/AAAA2222');
+});
+
 test('anche a clic ripetuti quello che si incolla resta il link giusto', async ({ app, openTab }) => {
   const page = await apriCrediti(openTab);
   const riga = page.locator('#invites > li').nth(1);
