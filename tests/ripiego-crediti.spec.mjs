@@ -29,8 +29,10 @@ const PSEUDONYM = 'abcdef0123456789';
 
 let server;
 let base = '';
-const seen = { completions: [], commits: [], keyInfo: [] };
+const seen = { completions: [], commits: [], keyInfo: [], credits: [] };
 let ownKeyStatus = 401; // cosa risponde OpenRouter alla chiave propria
+let personalKeyStatus = 200; // …e alla personale (402 = anche i crediti di Filo finiti)
+let ownKeyLimit = 10;   // il tetto della chiave propria; null = nessun tetto
 let redeemed = false;   // il portafoglio esiste solo dopo il riscatto (ogni test riparte da zero)
 
 function json(res, status, body) {
