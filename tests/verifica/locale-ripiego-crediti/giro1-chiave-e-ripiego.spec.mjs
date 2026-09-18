@@ -244,6 +244,10 @@ test('la chiave messa e tolta dalle Impostazioni si vede subito in Crediti, e vi
     await riscatta(page, code);
     await fintoOpenRouter(filo.app, {});
     const opts = await filo.openTab('filo://options/options.html');
+    // Il campo della chiave nelle Impostazioni sta nella parte «avanzata», che
+    // compare solo togliendo «usa i modelli predefiniti» (era già così).
+    await expect(opts.locator('#useDefaultModels')).toBeVisible({ timeout: 15_000 });
+    if (await opts.locator('#useDefaultModels').isChecked()) await opts.click('#useDefaultModels');
     await expect(opts.locator('#apiKey')).toBeVisible({ timeout: 15_000 });
     await opts.fill('#apiKey', PROPRIA);
     await opts.dispatchEvent('#apiKey', 'change');
