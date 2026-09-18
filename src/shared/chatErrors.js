@@ -100,6 +100,13 @@
       // crediti di Filo è già scattato prima di arrivare qui; se l'errore
       // arriva in chat, di portafoglio non ce n'è, e la strada è la pagina
       // Crediti (dove la chiave si mette, si vede e si toglie).
+      // Un 403 di moderazione non è la chiave: è il testo della richiesta,
+      // che il modello scelto fa passare da una moderazione (secondo giro di
+      // verifica del ramo: dava la colpa alla chiave, che era a posto).
+      const W = globalThis.SN_WALLET;
+      if (st === 403 && W && W.isModerationBlock(raw)) {
+        return 'OpenRouter ha bloccato questa richiesta per la moderazione dei contenuti (la tua chiave è a posto): cambia il testo, o scegli un modello senza moderazione in Modelli predefiniti.';
+      }
       if (st === 401 || st === 403) {
         return 'il servizio AI ha rifiutato la tua chiave API: controlla che sia giusta (e ancora valida) nella pagina Crediti.';
       }
