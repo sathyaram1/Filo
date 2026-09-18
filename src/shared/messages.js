@@ -180,6 +180,11 @@
     //   l'utente sceglie di ricominciare con un'identità nuova e un nuovo
     //   invito. { } → { ok, state }
     WALLET_RESET_IDENTITY: 'wallet_reset_identity',
+    // WALLET_OWN_KEY_INFO (#629): spesa e residuo che OpenRouter dichiara per
+    //   la chiave OpenRouter scritta dall'utente (la pagina Crediti li mostra;
+    //   la chiave resta nel main). { } → { ok, limit|null, usage,
+    //   limit_remaining|null, line } oppure { ok:false, status, message }
+    WALLET_OWN_KEY_INFO: 'wallet_own_key_info',
     // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
     // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
     //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).
