@@ -96,15 +96,19 @@
       if (/tool/i.test(raw) && (st === 404 || st === 400)) {
         return 'il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
       }
+      // Chiave rifiutata (#629): se c'era un portafoglio, il ripiego sui
+      // crediti di Filo è già scattato prima di arrivare qui; se l'errore
+      // arriva in chat, di portafoglio non ce n'è, e la strada è la pagina
+      // Crediti (dove la chiave si mette, si vede e si toglie).
       if (st === 401 || st === 403) {
-        return 'il servizio AI ha rifiutato la chiave API: controlla che sia giusta (e ancora valida) nelle Impostazioni.';
+        return 'il servizio AI ha rifiutato la chiave OpenRouter: controlla che sia giusta (e ancora valida) nella pagina Crediti.';
       }
       // 402 (#598): il tetto della chiave è esaurito. Con la chiave personale
       // di Filo sono i crediti finiti; con una chiave propria è il conto
       // OpenRouter dell'utente. Non si ritenta: OpenRouter rifiuta finché il
       // tetto non sale (i crediti del giorno dopo, o una ricarica).
       if (st === 402) {
-        return 'i crediti sono finiti: puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nelle Impostazioni. Se usi già una chiave tua, è il suo credito a essere esaurito.';
+        return 'i crediti sono finiti: puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nella pagina Crediti. Se usi già una chiave tua, è il suo credito a essere esaurito.';
       }
       if (st === 429 || st >= 500) {
         return 'il servizio AI è momentaneamente sovraccarico o non disponibile. Riprova tra qualche minuto.';
