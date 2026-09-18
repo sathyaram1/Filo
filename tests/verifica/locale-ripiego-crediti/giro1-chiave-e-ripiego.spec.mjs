@@ -214,6 +214,13 @@ test('senza portafoglio: la chiave rifiutata è un errore che porta a Crediti; c
     const regola = await page.locator('#ownKeyRule').innerText();
     console.log('[nota]', `senza portafoglio, regola: «${regola}»`);
     expect(regola).toMatch(/paghi tu/i);
+    // Togliere la chiave senza portafoglio: la domanda non deve promettere
+    // crediti di Filo che non ci sono.
+    await page.click('#ownKeyRemoveBtn');
+    const domanda = await page.locator('#ownKeyConfirmText').innerText();
+    console.log('[nota]', `senza portafoglio, la domanda del togli: «${domanda}»`);
+    await page.click('#ownKeyRemoveNo');
+    expect(domanda).not.toMatch(/crediti di Filo/i);
     const dash = await apriHome(filo);
     const bolla = await chiediInChat(dash, 'ciao');
     const testo = await bolla.innerText();
