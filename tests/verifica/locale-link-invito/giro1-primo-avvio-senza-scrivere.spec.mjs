@@ -133,6 +133,8 @@ test('la home racconta il benvenuto a chi non ha chiesto niente', async ({ app, 
     if (!home) await new Promise((r) => setTimeout(r, 200));
   }
   expect(home, 'la home non si è aperta all’avvio').toBeTruthy();
-  await expect(home.locator('.sn-confirm-title')).toContainText('Benvenuto', { timeout: 40000 });
-  await expect(home.locator('.sn-confirm-text')).toContainText('crediti');
+  // Il dialogo di Filo vive in uno Shadow DOM chiuso: si legge dall'hook.
+  await expect(home.locator(CONFIRM_HOST)).toBeVisible({ timeout: 45000 });
+  await expect.poll(() => confirmText(home), { timeout: 15000 }).toContain('Benvenuto in Filo');
+  await expect.poll(() => confirmText(home)).toContain('Sei entrato con un invito');
 });
