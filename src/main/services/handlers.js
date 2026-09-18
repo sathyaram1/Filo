@@ -495,7 +495,7 @@ function noteServedProvider(settings, action, result) {
 // escluso: log, toast a interruttore acceso, e la voce di cronologia (se c'è)
 // viene marchiata. Con `recordCost` registra anche il costo che il router
 // riporta lì (la lettura ad alta voce non lo dice nella risposta).
-function auditServedByLater({ settings, action, provider, model, apiKey, generationId, historyId, recordCost }) {
+function auditServedByLater({ settings, action, provider, model, apiKey, generationId, historyId, recordCost, keySource = '' }) {
   if (!generationId) return;
   const P = Providers.getProvider(provider);
   if (!P || typeof P.lookupServedBy !== 'function') return;
