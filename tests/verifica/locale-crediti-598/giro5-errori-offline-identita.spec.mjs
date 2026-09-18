@@ -49,23 +49,19 @@ test('ogni esito del riscatto ha un testo chiaro, il campo torna usabile, gli in
     expect(n()).toBe(0);
     await expect(page.locator('#redeemMsg')).toBeHidden();
 
-    // Codice inesistente, HTML, emoji, 10.000 caratteri: un rifiuto spiegato,
-    // niente markup iniettato. Da #651 quello che non ha nemmeno la FORMA di un
-    // codice si ferma prima, senza disturbare il server, e lo dice con parole
-    // sue; quello che la forma ce l'ha va al server, che risponde «non esiste».
+    // Codice inesistente, HTML, emoji, 10.000 caratteri: «non esiste», niente markup iniettato.
     for (const brutto of ['ZZZZ-ZZZZ', '<script>alert(1)</script><b>x</b>', '🎁🎁🎁🎁🎁🎁🎁🎁', 'A'.repeat(10_000)]) {
       const msg = await riscatta(page, brutto);
-      expect(msg).toMatch(/non esiste|non è un codice d’invito/);
+      expect(msg).toMatch(/non esiste/);
       expect(await page.locator('#redeemMsg').innerHTML()).not.toMatch(/<script|<b>/);
       expect(await page.evaluate(() => [...document.querySelectorAll('script')].some((s) => /alert\(1\)/.test(s.textContent)))).toBe(false);
       await campoUsabile();
     }
 
-    // Invito coi posti finiti. Da #651 un invito vale per più persone, e la
-    // frase lo dice così: prima diceva «già stato usato».
+    // Codice già usato.
     const [usato] = await server.codiciOwner(1);
     server.store.docs.invites.get(usato.replace('-', '')).usedBy = 'qualcun-altro';
-    expect(await riscatta(page, usato)).toMatch(/pieno|post[oi]/i);
+    expect(await riscatta(page, usato)).toMatch(/già stato usato/);
     await campoUsabile();
 
     // Codice revocato → come inesistente.
