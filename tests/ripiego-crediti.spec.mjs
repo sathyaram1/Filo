@@ -66,6 +66,7 @@ test.beforeAll(async () => {
         });
       }
       if (url === '/walletRedeem') {
+        redeemed = true;
         return json(res, 200, { result: { status: 'ok', key: PERSONAL_KEY, pseudonym: PSEUDONYM, credits: 5000, entryCredits: 5000, migrated: 0, localRequested: 0, inviteCodes: [] } });
       }
 
