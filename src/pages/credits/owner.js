@@ -137,13 +137,23 @@
     for (const v of views) list.appendChild(inviteItem(v.view, v.createdAt));
   }
 
+  // Come nella pagina Crediti: l'etichetta si legge alla nascita del pulsante e
+  // l'attesa in corso si annulla. Presa al momento del clic, due clic attaccati
+  // lasciavano «Copiato» al posto del link per sempre (terzo giro di verifica
+  // del #651).
   function copiaCon(btn, testo) {
+    const etichetta = btn.textContent;
+    let attesa = null;
     btn.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(testo); } catch (_) {}
-      const prev = btn.textContent;
       btn.textContent = 'Copiato';
       btn.classList.add('is-copied');
-      setTimeout(() => { btn.textContent = prev; btn.classList.remove('is-copied'); }, 1200);
+      if (attesa) clearTimeout(attesa);
+      attesa = setTimeout(() => {
+        attesa = null;
+        btn.textContent = etichetta;
+        btn.classList.remove('is-copied');
+      }, 1200);
     });
   }
 
