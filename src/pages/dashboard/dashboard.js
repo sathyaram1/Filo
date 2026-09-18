@@ -3195,15 +3195,12 @@
   // (testo non tecnico preso dalle note) e animiamo i crediti verso il profilo.
   // Sei appena entrato con un invito (#651): il collegamento aperto da fuori,
   // o il primo avvio dopo aver scaricato Filo dalla pagina dell'invito. I
-  // crediti sono arrivati senza che tu chiedessi niente, e la prima cosa che
-  // vedi è la home: te lo dice qui, una volta sola.
-  async function maybeShowInviteWelcome() {
-    let w;
-    try { w = await send({ type: MSG.WALLET_STATE }); } catch (_) { return false; }
-    const n = w && w.ok ? w.notice : null;
-    if (!n || !n.text || n.seenHome) return false;
+  // crediti arrivano senza che tu chieda niente, e mentre guardi la home: il
+  // main spinge l'avviso appena il riscatto è andato, e la home lo racconta
+  // una volta sola (il segno «già visto» lo tiene il main).
+  async function showInviteWelcome(n) {
+    if (!n || !n.text || !window.SN_CONFIRM_UI?.notify) return false;
     try { await send({ type: MSG.WALLET_NOTICE_SEEN, where: 'home' }); } catch (_) {}
-    if (!window.SN_CONFIRM_UI?.notify) return false;
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
       title: entrato ? 'Benvenuto in Filo 🎉' : 'Il tuo invito',
@@ -3211,6 +3208,15 @@
       okLabel: entrato ? 'Evviva!' : 'Va bene',
     });
     return true;
+  }
+
+  // I popup dell'avvio si incatenano, mai sovrapposti: l'avviso dell'invito
+  // arriva quando arriva (quattro secondi dopo l'avvio), e può cadere in mezzo
+  // al recap di un aggiornamento.
+  let codaPopup = Promise.resolve();
+  function inCodaPopup(fn) {
+    codaPopup = codaPopup.then(fn, fn);
+    return codaPopup;
   }
 
   async function maybeShowFeedbackRewards() {
