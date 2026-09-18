@@ -101,7 +101,7 @@
       // arriva in chat, di portafoglio non ce n'è, e la strada è la pagina
       // Crediti (dove la chiave si mette, si vede e si toglie).
       if (st === 401 || st === 403) {
-        return 'il servizio AI ha rifiutato la chiave OpenRouter: controlla che sia giusta (e ancora valida) nella pagina Crediti.';
+        return 'il servizio AI ha rifiutato la tua chiave API: controlla che sia giusta (e ancora valida) nella pagina Crediti.';
       }
       // 402 (#598): il tetto della chiave è esaurito. Con la chiave personale
       // di Filo sono i crediti finiti; con una chiave propria è il conto
