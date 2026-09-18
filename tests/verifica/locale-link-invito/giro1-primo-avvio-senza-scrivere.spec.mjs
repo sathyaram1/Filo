@@ -11,6 +11,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from '../../fixtures/electron.mjs';
+import { confirmText, CONFIRM_HOST } from '../../helpers/confirm.mjs';
 
 let server;
 const visto = { pending: 0, redeems: [], states: 0 };
