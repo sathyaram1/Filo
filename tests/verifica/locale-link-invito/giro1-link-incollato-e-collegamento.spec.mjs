@@ -165,6 +165,16 @@ test('il collegamento aperto da fuori mentre Filo è acceso porta dentro l’inv
   expect(primaTab).toBeGreaterThan(0);
 });
 
+test('un collegamento d’invito col codice storto lo dice, invece di non fare niente', async ({ app, openTab }) => {
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 20000 });
+  // Un link rovinato nel passaggio da una chat all'altra: chi ha cliccato
+  // aspetta che succeda qualcosa.
+  await app.evaluate(({ app: a }, argv) => { a.emit('second-instance', {}, argv); }, ['electron.exe', '.', 'filo://invito/ABCD']);
+  await expect(page.locator('#walletNote')).toContainText('codice', { timeout: 20000 });
+  expect(visto.redeems.length, 'un codice storto non si manda al server').toBe(0);
+});
+
 test('un invito che arriva quando i crediti ci sono già lo dice, invece di tacere', async ({ app, openTab }) => {
   // Prima si entra normalmente.
   const page = await openTab('filo://credits/credits.html');
