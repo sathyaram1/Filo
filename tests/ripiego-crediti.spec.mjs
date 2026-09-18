@@ -198,7 +198,7 @@ test('(A) chiave propria rifiutata: la risposta arriva coi crediti di Filo, la c
 
   // OpenRouter ha visto DUE chiamate per questo messaggio: prima la propria
   // (rifiutata), poi la personale, con lo stesso messaggio.
-  const mine = seen.completions.filter((c) => c.text.includes('ciao ripiego'));
+  const mine = seen.completions.filter((c) => c.tools && c.lastRole === 'user' && c.lastText.includes('ciao ripiego'));
   expect(mine.map((c) => c.key)).toEqual([OWN_KEY, PERSONAL_KEY]);
 
   // La riga d'uso parte verso Firestore col pseudonimo del portafoglio e il
