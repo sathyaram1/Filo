@@ -446,12 +446,10 @@
     if (language) body.language = language;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(TRANSCRIPTIONS_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
-    });
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(TRANSCRIPTIONS_ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
     if (!res.ok) throw await httpError(res);
     const data = await res.json();
     const usage = data.usage || {};
@@ -459,6 +457,7 @@
       text: typeof data.text === 'string' ? data.text : '',
       servedBy: extractServedBy(data),
       generationId: res.headers.get('x-generation-id') || data.id || null,
+      keyUsed, keyFallback,
       usage: {
         promptTokens: 0,
         completionTokens: 0,
@@ -467,6 +466,7 @@
         // Il router riporta il costo in dollari: per l'audio è l'unico numero
         // che abbia senso (non ci sono token), e va registrato tale e quale.
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        keySource, keyFallback,
       },
     };
   }
