@@ -58,10 +58,11 @@ test('ogni esito del riscatto ha un testo chiaro, il campo torna usabile, gli in
       await campoUsabile();
     }
 
-    // Codice già usato.
+    // Invito coi posti finiti. Da #651 un invito vale per più persone, e la
+    // frase lo dice così: prima diceva «già stato usato».
     const [usato] = await server.codiciOwner(1);
     server.store.docs.invites.get(usato.replace('-', '')).usedBy = 'qualcun-altro';
-    expect(await riscatta(page, usato)).toMatch(/già stato usato/);
+    expect(await riscatta(page, usato)).toMatch(/pieno|post[oi]/i);
     await campoUsabile();
 
     // Codice revocato → come inesistente.
