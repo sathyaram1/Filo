@@ -154,10 +154,11 @@ test('i codici appena generati escono col loro link, non nudi', async ({ app, op
 });
 
 test('i codici appena generati dicono anche per quante persone valgono', async ({ app, openTab }) => {
-  // Attesa rossa: il conteggio dei posti manca sui codici appena generati e
-  // ricompare solo riaprendo la pagina. Il bilancio dei rilievi di livello 1 è
-  // esaurito in questo giro, quindi la porta resta aperta e segnata.
-  test.fail(true, 'il conteggio «entrati 0 su 3» non compare sui codici appena generati');
+  // Al giro 2 questa prova era rossa, ma per colpa del server finto: non
+  // teneva i codici che aveva appena generato, e la pagina non poteva
+  // rileggerli. Col server che li conserva — come quello vero — il conteggio
+  // c'è. Resta come guardia: se un domani i codici nuovi tornassero a
+  // comparire senza dire per quante persone valgono, questa diventa rossa.
   test.setTimeout(180000);
   const page = await apriInviti(app, openTab);
   await generaDue(page);
