@@ -927,7 +927,19 @@ async function applySettingsUpdate(partial) {
   if (partial && partial.themeTokens && globalThis.SN_THEME_TOKENS) {
     partial = { ...partial, themeTokens: globalThis.SN_THEME_TOKENS.sanitize(partial.themeTokens).clean };
   }
+  // La chiave OpenRouter propria si mette e si toglie da due posti
+  // (Impostazioni e pagina Crediti, #629): se cambia, il rifiuto registrato
+  // per quella di prima non vale più, e la pagina Crediti aperta accanto si
+  // aggiorna da sé. Si guarda il valore, non il campo: le Impostazioni
+  // rimandano la stessa chiave a ogni salvataggio automatico.
+  let ownKeyBefore = null;
+  if (partial && partial.apiKeys && Object.prototype.hasOwnProperty.call(partial.apiKeys, 'openrouter')) {
+    try { ownKeyBefore = String((await Storage.getSettings())?.apiKeys?.openrouter || '').trim(); } catch (_) { ownKeyBefore = null; }
+  }
   const merged = await Storage.updateSettings(partial);
+  if (ownKeyBefore !== null && ownKeyBefore !== String(merged?.apiKeys?.openrouter || '').trim()) {
+    try { await globalThis.SN_WALLET_MAIN?.ownKeyChanged?.(); } catch (_) {}
+  }
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   try {
     const { nativeTheme } = require('electron');
