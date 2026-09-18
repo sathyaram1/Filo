@@ -389,11 +389,17 @@
   }
 
   // Errore HTTP con status e provider strutturati (come per le chat, #331).
+  // Porta con sé anche da quale chiave si era partiti e se il ripiego sulla
+  // personale c'è stato e ha fallito (fetchWithKey li lascia sulla risposta):
+  // un 402 «la tua chiave» e un 402 «anche i crediti di Filo» sono due frasi
+  // diverse per l'utente.
   async function httpError(res) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
     err.provider = 'openrouter';
+    if (res.keySource) err.keySource = res.keySource;
+    if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
   }
 
