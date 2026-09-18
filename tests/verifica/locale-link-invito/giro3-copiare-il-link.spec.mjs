@@ -49,10 +49,25 @@ test.beforeAll(async () => {
     req.on('data', (c) => { raw += c; });
     req.on('end', () => {
       const url = req.url.split('?')[0];
-      if (url === '/accounts:signUp') return json(res, 200, { idToken: 'anon-id-token', refreshToken: 'anon-refresh', expiresIn: '3600', localId: 'anon-uid-1' });
-      if (url === '/token') return json(res, 200, { id_token: 'anon-id-token', refresh_token: 'anon-refresh', expires_in: '3600', user_id: 'anon-uid-1' });
+      if (url === '/accounts:signUp') return json(res, 200, { idToken: jwt('anon-1'), refreshToken: 'rt-anon', expiresIn: '3600', localId: 'anon-1' });
+      if (url === '/token') {
+        const p = new URLSearchParams(raw);
+        const rt = p.get('refresh_token');
+        if (rt === OWNER_REFRESH) return json(res, 200, { id_token: jwt('owner-1', { email: OWNER_EMAIL }), refresh_token: rt, expires_in: '3600', user_id: 'owner-1' });
+        return json(res, 200, { id_token: jwt('anon-1'), refresh_token: rt, expires_in: '3600', user_id: 'anon-1' });
+      }
       if (url === '/walletState') return json(res, 200, { result: statoConPortafoglio() });
       if (url === '/walletPendingInvite') return json(res, 200, { result: { status: 'none' } });
+      if (url === '/walletOverview') {
+        return json(res, 200, {
+          result: {
+            config: { invitesRemaining: 9, entryCredits: 5000, dailyCredits: 100, eurUsd: 1.2, eurUsdAt: '2026-09-10', maxGrantUsd: 50 },
+            totals: { users: 1, totalLimitUsd: 4.2, maxGrantUsd: 50 },
+            ownerInvites: INVITI.map((i) => ({ ...i, createdAt: '2026-09-10T09:00:00.000Z' })),
+            users: [],
+          },
+        });
+      }
       json(res, 404, { error: { message: 'not found ' + url } });
     });
   });
