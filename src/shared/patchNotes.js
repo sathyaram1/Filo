@@ -18,7 +18,7 @@
     {
       version: '0.2.228', date: '2026-09-11',
       features: [
-        'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta; la pagina Crediti ricorda l’ultimo rifiuto.',
+        'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta. La pagina Crediti ricorda l’ultimo rifiuto.',
       ],
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
