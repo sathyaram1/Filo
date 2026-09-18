@@ -1913,7 +1913,7 @@
         credits.type = 'button';
         credits.className = 'dash-action-btn';
         credits.textContent = 'Apri Crediti';
-        credits.title = 'Riscatta il codice d\'invito';
+        credits.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter';
         credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
         row.appendChild(credits);
       }
