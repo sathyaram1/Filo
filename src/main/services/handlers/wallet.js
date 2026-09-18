@@ -13,7 +13,10 @@
 //     Il server confronta ogni ora la somma delle righe col consumo che
 //     OpenRouter dichiara per la chiave: chi non le scrive si vede;
 //   - avvisa quando OpenRouter rifiuta per crediti finiti (402), una volta,
-//     senza ritentare.
+//     senza ritentare;
+//   - dà al provider la chiave di RISERVA (#629): se una chiamata partita con
+//     la chiave scritta dall'utente viene rifiutata (401/402/403), si rifà
+//     con la personale, e il rifiuto resta registrato per la pagina Crediti.
 //
 // Il saldo NON lo calcola nessuno qui: lo dice il server, che lo legge da
 // OpenRouter (tetto della chiave meno consumo).
