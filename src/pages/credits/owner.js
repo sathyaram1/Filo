@@ -234,8 +234,16 @@
     msg.classList.add('is-ok');
     const list = $('ownerCodes');
     $('ownerCodesTitle').hidden = false;
-    for (const code of r.codes.slice().reverse()) list.prepend(inviteItem({ code, used: false }));
-    loadOverview().catch(() => {});
+    // Quanti posti abbia un invito lo sa il server, non chi l'ha chiesto: la
+    // vista si rilegge prima di mostrarli, così accanto a ogni codice nuovo
+    // c'è il conteggio vero. Se la rilettura non riesce, i codici compaiono
+    // lo stesso col loro link, senza inventare un numero di posti.
+    let riletta = true;
+    try { await loadOverview(); } catch (_) { riletta = false; }
+    const comparsi = r.codes.every((code) => list.querySelector(`li[data-code="${W.formatCode(code)}"]`));
+    if (!riletta || !comparsi) {
+      for (const code of r.codes.slice().reverse()) list.prepend(inviteItem({ code }, null, { stato: false }));
+    }
   }
 
   async function ownerGrant(ev) {
