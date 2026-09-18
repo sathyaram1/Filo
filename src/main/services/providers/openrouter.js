@@ -484,12 +484,10 @@
     if (Number.isInteger(d) && d > 0) body.dimensions = d;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(EMBEDDINGS_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
-    });
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
     if (!res.ok) throw await httpError(res);
     const data = await res.json();
     const rows = Array.isArray(data.data) ? data.data.slice() : [];
@@ -503,11 +501,13 @@
       vectors,
       servedBy: extractServedBy(data),
       generationId: res.headers.get('x-generation-id') || data.id || null,
+      keyUsed, keyFallback,
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: 0,
         cachedPromptTokens: 0,
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        keySource, keyFallback,
       },
     };
   }
