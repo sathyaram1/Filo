@@ -58,6 +58,10 @@ test('diagnostica home', async ({ app }) => {
   console.log('HOME URL:', home && home.url());
   const log = [];
   home.on('console', (m) => log.push(`[${m.type()}] ${m.text()}`));
+  await home.evaluate(() => {
+    window.__msgs = [];
+    chrome.runtime.onMessage.addListener((m) => { try { window.__msgs.push(JSON.stringify(m).slice(0, 200)); } catch (_) { window.__msgs.push('?'); } });
+  });
   await expect.poll(() => visto.redeems.length, { timeout: 40000, intervals: [500] }).toBeGreaterThan(0);
   console.log('REDEEMS:', JSON.stringify(visto.redeems), 'PENDING:', visto.pending);
   await new Promise((r) => setTimeout(r, 8000));
