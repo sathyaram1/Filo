@@ -196,7 +196,10 @@
     ok: 'Invito riscattato: i tuoi crediti sono pronti.',
     bad_code: 'Questo non è un codice d’invito. Un invito è fatto di otto caratteri, come ABCD-EFGH, e qui va bene anche il link intero.',
     invalid_code: 'Questo codice non esiste. Controlla di averlo copiato tutto.',
-    code_used: 'Questo codice è già stato usato.',
+    // Un invito vale per più persone (#651): «già usato» faceva credere che
+    // chi l'ha mandato se lo fosse speso lui, e si andava a chiedergliene un
+    // altro che non esiste. Quello che è finito sono i POSTI.
+    code_used: 'Questo invito è pieno: i posti che aveva sono tutti occupati. Fatti mandare un altro link da chi ti ha invitato.',
     own_code: 'È un tuo codice: dallo a qualcun altro.',
     already_in: 'Hai già i tuoi crediti su questa installazione.',
     invites_exhausted: 'Per ora i posti sono finiti: riprova fra qualche giorno.',
