@@ -152,6 +152,7 @@ module.exports = function register(on, ctx) {
   async function ownKeyChanged() {
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    rinfrescaHome();
   }
   // La chiave propria ha servito una chiamata (lo dice il provider a ogni
   // risposta buona): il rifiuto ricordato, se c'era, è superato — il conto è
@@ -251,6 +252,7 @@ module.exports = function register(on, ctx) {
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status === 'no_wallet' ? 'internal' : status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    rinfrescaHome();
     return { ok: true, status, message: 'Nuova chiave pronta: i tuoi crediti si usano di nuovo da qui.', state: await readState() };
   }));
 
@@ -259,6 +261,7 @@ module.exports = function register(on, ctx) {
     walletStore.clear();
     lastServer = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    rinfrescaHome();
     return { ok: true, state: await readState() };
   }));
 
@@ -305,8 +308,10 @@ module.exports = function register(on, ctx) {
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     if (localCredits > 0) { try { await globalThis.SN_STORAGE.setRaw(DECLARED_KEY, Math.floor(balanceNow)); } catch (_) {} }
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
-    // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato.
+    // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato, e
+    // la home si rifà: da adesso Filo risponde.
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    rinfrescaHome();
     const state = await readState();
     return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, state };
   }

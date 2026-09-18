@@ -237,3 +237,34 @@ test('il riscatto dice quanti crediti locali sono passati; si dichiarano una vol
   expect(seen.reissues).toBe(1);
   expect(await app.evaluate(() => globalThis.SN_WALLET_MAIN.keySource())).toBe('personal');
 });
+
+// #651 — la home già aperta non deve restare ferma su «Per attivare Filo serve
+// un codice d'invito» dopo che l'invito è stato riscattato: era il primo
+// suggerimento della home, e portava a riscattare un invito già riscattato.
+// Vale per il riscatto a mano come per quello automatico al primo avvio.
+test('riscattato l’invito, la home aperta smette di mandare a riscattarlo', async ({ app, openTab }) => {
+  redeemed = false;
+  let home = null;
+  const scadenza = Date.now() + 25000;
+  while (Date.now() < scadenza && !home) {
+    home = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } }) || null;
+    if (!home) await new Promise((r) => setTimeout(r, 200));
+  }
+  expect(home, 'la home si apre all’avvio').toBeTruthy();
+  await home.waitForLoadState('domcontentloaded').catch(() => {});
+  // Senza crediti la home manda a prenderli.
+  await expect.poll(() => home.evaluate(() => document.body.innerText), { timeout: 25000, intervals: [500] })
+    .toContain('serve un codice d\'invito');
+
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+  await page.fill('#inviteCode', 'ABCD-EFGH');
+  await page.click('#redeemBtn');
+  await expect(page.locator('#redeemMsg')).toContainText('riscattato', { timeout: 15000 });
+
+  // Adesso i crediti ci sono: la home lo sa, senza aspettare una scheda nuova.
+  await expect.poll(() => home.evaluate(() => document.body.innerText), { timeout: 25000, intervals: [500] })
+    .not.toContain('serve un codice d\'invito');
+  const testo = await home.evaluate(() => document.body.innerText);
+  expect(testo).not.toContain('riscatta l\'invito');
+});
