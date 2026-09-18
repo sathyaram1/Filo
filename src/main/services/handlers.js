@@ -588,9 +588,11 @@ async function handleTranscription({ settings, payload, origin, signal }) {
         } catch (_) {}
       }
       if (!servedBy) {
+        // La generazione si rilegge con la chiave che l'ha fatta: dopo un
+        // ripiego (#629) non è più quella con cui si era partiti.
         auditServedByLater({
           settings, action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
-          apiKey: a.apiKey, generationId: r.generationId, historyId,
+          apiKey: r.keyUsed || a.apiKey, generationId: r.generationId, historyId,
         });
       }
       return { text, model: a.model, provider: a.provider, costEur, usage: r.usage };
