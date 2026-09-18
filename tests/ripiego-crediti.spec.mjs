@@ -238,7 +238,7 @@ test('(B) chiave propria valida: una chiamata sola, nessun avviso, nessuna riga 
   await home.locator('#sendBtn').click();
   await expect(home.locator('.dash-bubble-filo').last()).toContainText('RISPOSTA-DALLA-PROPRIA', { timeout: 30000 });
   await expect(home.locator('.dash-bubble-note')).toHaveCount(0);
-  const mine = seen.completions.filter((c) => c.text.includes('ciao propria'));
+  const mine = seen.completions.filter((c) => c.tools && c.lastRole === 'user' && c.lastText.includes('ciao propria'));
   expect(mine.map((c) => c.key)).toEqual([OWN_KEY]);
   // Con la chiave propria il consumo è affar suo: nessuna riga (si aspetta
   // più del ritardo di scrittura, che è di tre secondi).
