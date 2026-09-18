@@ -7,7 +7,9 @@
 // chiedergliene un altro che non esiste. La pagina del link lo dice bene
 // («l'hanno già usato in tanti quanti ne poteva portare»); dentro Filo no.
 //
-// Attesa rossa: il bilancio dei rilievi di livello 1 è esaurito in questo giro.
+// Corretto nello stesso giro, su indicazione del server: la frase adesso parla
+// di posti finiti. Questa resta come memoria del giro; la guardia che la suite
+// rilancia per sempre sta negli unit test.
 
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
