@@ -272,12 +272,10 @@
     if (r) body.reasoning = r;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
-    });
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       // status/provider strutturati sull'errore: chi lo mostra all'utente può
@@ -297,12 +295,14 @@
       reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
       finishReason: data.choices?.[0]?.finish_reason || null,
       servedBy: extractServedBy(data),
+      keyUsed, keyFallback,
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
         cachedPromptTokens: cachedPromptTokens(usage),
         costUsd: costUsdOf(usage),
         servedBy: extractServedBy(data),
+        keySource, keyFallback,
       },
     };
   }
