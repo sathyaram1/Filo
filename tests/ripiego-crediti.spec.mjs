@@ -369,7 +369,7 @@ test('(D) chiave senza tetto: resta il credito dell’account; senza portafoglio
   await home.locator('#input').fill('ciao senza portafoglio');
   await home.locator('#sendBtn').click();
   const err1 = home.locator('.dash-bubble-filo').last();
-  await expect(err1).toContainText('la tua chiave OpenRouter non ha più credito', { timeout: 30000 });
+  await expect(err1).toContainText('a tua chiave OpenRouter non ha più credito', { timeout: 30000 });
   await expect(err1).toContainText('invito');
   await expect(err1).not.toContainText('domani');
   await expect(home.locator('.dash-bubble-actions button', { hasText: 'Apri Crediti' })).toHaveCount(1);
