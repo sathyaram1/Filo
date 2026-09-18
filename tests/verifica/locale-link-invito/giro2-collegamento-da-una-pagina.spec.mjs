@@ -69,19 +69,20 @@ const RINVIO = `<!doctype html><html><head><meta charset="utf-8"><title>rinvio</
 <script>setTimeout(function () { try { location.href = 'filo://invito/DDDD5555'; } catch (e) {} }, 400);</script>
 </body></html>`;
 
-test('una pagina qualsiasi non riscatta un invito da sola, senza che nessuno abbia cliccato', async ({ app, openTab, testServer }) => {
+// Una pagina che spinge sui collegamenti può anche far chiudere la propria
+// scheda: qui non interessa la scheda, interessa se al server arriva un
+// riscatto. Quindi si apre, si aspetta, e si tollera che sparisca.
+async function apriEAspetta(openTab, testServer, html, ms) {
+  try { await openTab(testServer.html(html)); } catch (_) { /* la scheda può già essere sparita */ }
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+test('una pagina qualsiasi non riscatta un invito da sola, senza che nessuno abbia cliccato', async ({ openTab, testServer }) => {
   test.setTimeout(180000);
   redeems = [];
 
-  const page = await openTab(testServer.html(PASSIVA));
-  await page.waitForTimeout(3000);
-  console.log('TAB:', page.url());
-  console.log('FINESTRE:', app.windows().map((w) => w.url()).join(' | '));
-  console.log('HTML:', (await page.content().catch(() => '')).slice(0, 400));
-  await page.waitForTimeout(8000);
-
-  await openTab(testServer.html(RINVIO));
-  await new Promise((r) => setTimeout(r, 8000));
+  await apriEAspetta(openTab, testServer, PASSIVA, 10000);
+  await apriEAspetta(openTab, testServer, RINVIO, 10000);
 
   expect(redeems, `una pagina ha fatto riscattare da sola i codici ${redeems.join(', ') || '(nessuno)'}`).toEqual([]);
 });
