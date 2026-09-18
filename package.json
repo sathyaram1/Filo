@@ -50,6 +50,15 @@
       "assets/**/*",
       "package.json"
     ],
+    "protocols": [
+      {
+        "name": "Filo",
+        "schemes": [
+          "filo"
+        ],
+        "role": "Viewer"
+      }
+    ],
     "win": {
       "target": "nsis",
       "artifactName": "Filo-Setup.${ext}",
