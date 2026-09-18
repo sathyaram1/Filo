@@ -176,11 +176,13 @@
     code.title = view.revoked ? 'Annullato' : (view.exhausted ? 'Nessun posto libero' : 'Copia il codice');
     copiaCon(code, view.code);
 
-    const state = document.createElement('span');
-    state.className = 'sn-wallet-invite-state';
-    state.textContent = W.inviteStateLine(view);
-
-    row.append(link, code, state);
+    row.append(link, code);
+    if (stato) {
+      const state = document.createElement('span');
+      state.className = 'sn-wallet-invite-state';
+      state.textContent = W.inviteStateLine(view);
+      row.appendChild(state);
+    }
     li.appendChild(row);
 
     if (view.uses.length) {
