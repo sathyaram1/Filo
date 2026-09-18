@@ -131,7 +131,8 @@ test('il campo dell’invito regge gli abusi: vuoto, spazi, diecimila caratteri,
   // Due clic di fila sul codice buono: un solo riscatto.
   visto.redeems = [];
   await page.fill('#inviteCode', 'https://filo.red/i/ABCDEFGH');
-  await Promise.all([page.click('#redeemBtn'), page.click('#redeemBtn', { force: true }).catch(() => {})]);
+  // Due clic davvero attaccati, prima che la risposta arrivi.
+  await page.evaluate(() => { const b = document.getElementById('redeemBtn'); b.click(); b.click(); b.click(); });
   await expect(page.locator('#redeemMsg')).toContainText('riscattato', { timeout: 20000 });
   await page.waitForTimeout(1500);
   expect(visto.redeems.filter((c) => c === 'ABCDEFGH').length, 'due clic non devono valere due riscatti').toBe(1);
