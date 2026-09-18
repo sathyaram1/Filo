@@ -79,4 +79,16 @@ test('diagnostica home', async ({ app }) => {
   }));
   console.log('INFO:', JSON.stringify(info, null, 2));
   console.log('CONSOLE:', log.slice(-40).join('\n'));
+
+  // Una home NUOVA, aperta dopo che i crediti sono arrivati: dice ancora di
+  // riscattare un invito?
+  const shell = await app.firstWindow();
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  await new Promise((r) => setTimeout(r, 6000));
+  const home2 = app.windows().filter((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } });
+  console.log('HOME APERTE:', home2.length);
+  for (const h of home2) {
+    const t = await h.evaluate(() => document.body.innerText.slice(0, 200)).catch(() => '(errore)');
+    console.log('--- home:', JSON.stringify(t));
+  }
 });
