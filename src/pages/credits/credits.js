@@ -277,13 +277,24 @@
   // ritrova i crediti dentro senza ricopiare niente. Il codice resta accanto,
   // per chi lo detta a voce. Ogni link vale per più persone: quanti sono
   // entrati e chi, si legge qui.
+  // L'etichetta da rimettere si legge UNA volta, quando il pulsante nasce, e
+  // l'attesa in corso si annulla invece di accumularsi. Letta al momento del
+  // clic, un secondo clic dentro l'animazione la leggeva «Copiato» e la
+  // rimetteva: la riga restava «Copiato» per sempre e il link non si vedeva
+  // più finché non si riapriva la pagina (terzo giro di verifica del #651).
   function copiaCon(btn, testo) {
+    const etichetta = btn.textContent;
+    let attesa = null;
     btn.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(testo); } catch (_) {}
-      const prev = btn.textContent;
       btn.textContent = 'Copiato';
       btn.classList.add('is-copied');
-      setTimeout(() => { btn.textContent = prev; btn.classList.remove('is-copied'); }, 1200);
+      if (attesa) clearTimeout(attesa);
+      attesa = setTimeout(() => {
+        attesa = null;
+        btn.textContent = etichetta;
+        btn.classList.remove('is-copied');
+      }, 1200);
     });
   }
 
