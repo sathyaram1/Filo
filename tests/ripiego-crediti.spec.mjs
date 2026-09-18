@@ -195,6 +195,12 @@ test('(A) chiave propria rifiutata: la risposta arriva coi crediti di Filo, la c
   await expect(note).toContainText('crediti di Filo');
   // Nessuna bolla d'errore.
   await expect(home.locator('.dash-bubble-actions button', { hasText: 'Riprova' })).toHaveCount(0);
+  // Una foto della riga, chiara e scura, da guardare (tests/agent/.out/629/,
+  // cartella non tracciata). La home applica il tema da sé al cambio.
+  await home.screenshot({ path: 'tests/agent/.out/629/chat-nota-chiaro.png' }).catch(() => {});
+  await home.evaluate(async () => { await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }); });
+  await new Promise((r) => setTimeout(r, 800));
+  await home.screenshot({ path: 'tests/agent/.out/629/chat-nota-scuro.png' }).catch(() => {});
 
   // OpenRouter ha visto DUE chiamate per questo messaggio: prima la propria
   // (rifiutata), poi la personale, con lo stesso messaggio.
