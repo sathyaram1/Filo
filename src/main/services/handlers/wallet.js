@@ -437,13 +437,24 @@ module.exports = function register(on, ctx) {
   // ── Crediti finiti ────────────────────────────────────────────────────────
   // Un avviso ogni 10 minuti al massimo: il 402 arriva a ogni chiamata finché
   // il tetto non sale, e un toast per chiamata sarebbe un martello.
+  // La frase si scrive qui, dove si sa tutto: quale chiave OpenRouter ha
+  // rifiutato (l'errore lo porta, #629), se il ripiego sulla personale c'è
+  // stato e ha fallito, se c'è un portafoglio, quanti crediti arrivano domani.
+  // Resta sull'errore (userMessage) per la chat, che altrimenti dovrebbe
+  // tirare a indovinare.
   let lastNoticeAt = 0;
-  async function outOfCreditsNotice() {
+  async function outOfCreditsNotice(err) {
+    const src = err && err.keySource;
+    const usingOwnKey = src ? src === 'own' : await ownKeySet();
+    const fallbackFailed = Boolean(err && err.keyFallback && err.keyFallback.failed);
+    const text = W.outOfCreditsMessage({
+      usingOwnKey, fallbackFailed, hasWallet: Boolean(walletStore.personalKey()),
+      dailyCredits: lastServer && lastServer.dailyCredits,
+    });
+    if (err && typeof err === 'object') { try { err.userMessage = text; } catch (_) {} }
     const now = Date.now();
     if (now - lastNoticeAt < 10 * 60 * 1000) return;
     lastNoticeAt = now;
-    const usingOwnKey = await ownKeySet();
-    const text = W.outOfCreditsMessage({ usingOwnKey, dailyCredits: lastServer && lastServer.dailyCredits });
     try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000 }); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
