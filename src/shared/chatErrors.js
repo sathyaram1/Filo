@@ -96,15 +96,43 @@
       if (/tool/i.test(raw) && (st === 404 || st === 400)) {
         return 'il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
       }
+      // Chiave rifiutata (#629): se c'era un portafoglio, il ripiego sui
+      // crediti di Filo è già scattato prima di arrivare qui; se l'errore
+      // arriva in chat, di portafoglio non ce n'è, e la strada è la pagina
+      // Crediti (dove la chiave si mette, si vede e si toglie).
+      // Un 403 di moderazione non è la chiave: è il testo della richiesta,
+      // che il modello scelto fa passare da una moderazione (secondo giro di
+      // verifica del ramo: dava la colpa alla chiave, che era a posto).
+      const W = globalThis.SN_WALLET;
+      if (st === 403 && W && W.isModerationBlock(raw)) {
+        return 'OpenRouter ha bloccato questa richiesta per la moderazione dei contenuti (la tua chiave è a posto): cambia il testo, o scegli un modello senza moderazione in Modelli predefiniti.';
+      }
       if (st === 401 || st === 403) {
-        return 'il servizio AI ha rifiutato la chiave API: controlla che sia giusta (e ancora valida) nelle Impostazioni.';
+        return 'il servizio AI ha rifiutato la tua chiave API: controlla che sia giusta (e ancora valida) nella pagina Crediti.';
       }
       // 402 (#598): il tetto della chiave è esaurito. Con la chiave personale
       // di Filo sono i crediti finiti; con una chiave propria è il conto
       // OpenRouter dell'utente. Non si ritenta: OpenRouter rifiuta finché il
       // tetto non sale (i crediti del giorno dopo, o una ricarica).
+      // Chi tiene le chiavi (nel main) sa quale chiave è stata rifiutata, se
+      // c'era un portafoglio e quanti crediti arrivano domani, e lascia la
+      // frase già scritta sull'errore (userMessage). Senza, si ragiona con
+      // quello che l'errore porta: la chiave con cui si era partiti e se il
+      // ripiego sulla personale c'è stato e ha fallito (#629).
       if (st === 402) {
-        return 'i crediti sono finiti: puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nelle Impostazioni. Se usi già una chiave tua, è il suo credito a essere esaurito.';
+        if (e && typeof e.userMessage === 'string' && e.userMessage) return e.userMessage;
+        const src = e && e.keySource;
+        const fb = e && e.keyFallback;
+        if (fb && fb.failed) {
+          return 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito) e anche i crediti di Filo sono finiti: ricarica il tuo conto OpenRouter, oppure aspetta i crediti di domani.';
+        }
+        if (src === 'own') {
+          return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo conto OpenRouter, oppure riscatta un invito nella pagina Crediti per usare i crediti di Filo.';
+        }
+        if (src === 'personal') {
+          return 'i crediti di Filo sono finiti: puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nella pagina Crediti.';
+        }
+        return 'i crediti sono finiti: puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nella pagina Crediti. Se usi già una chiave tua, è il suo credito a essere esaurito.';
       }
       if (st === 429 || st >= 500) {
         return 'il servizio AI è momentaneamente sovraccarico o non disponibile. Riprova tra qualche minuto.';

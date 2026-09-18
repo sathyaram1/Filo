@@ -1905,13 +1905,19 @@
       retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
       row.appendChild(retry);
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
-      // strada è la pagina Crediti, e sta qui sotto, non in un menu.
-      if (r?.code === 'NO_API_KEY') {
+      // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
+      // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
+      // Il main dice se è un rifiuto della chiave (un 403 di moderazione non
+      // lo è: lì Crediti non c'entra); per le risposte senza quel campo vale
+      // lo status.
+      const W = window.SN_WALLET;
+      const keyRefused = r && 'keyRefused' in r ? Boolean(r.keyRefused) : Boolean(W && W.isKeyRefusalStatus(r?.status));
+      if (r?.code === 'NO_API_KEY' || keyRefused) {
         const credits = document.createElement('button');
         credits.type = 'button';
         credits.className = 'dash-action-btn';
         credits.textContent = 'Apri Crediti';
-        credits.title = 'Riscatta il codice d\'invito';
+        credits.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter';
         credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
         row.appendChild(credits);
       }
@@ -1956,6 +1962,16 @@
       // niente da dire) non lascia una bolla vuota sotto.
       if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
         filoBubble.remove();
+      }
+      // #629 — la chiave OpenRouter dell'utente è stata rifiutata e ha
+      // risposto la chiave personale (i crediti di Filo): una riga discreta
+      // sotto la risposta, non un errore: la risposta è arrivata.
+      if (r.keyFallback && window.SN_WALLET) {
+        const note = document.createElement('div');
+        note.className = 'dash-bubble-note';
+        note.dataset.keyFallback = String(r.keyFallback.status || '');
+        note.textContent = window.SN_WALLET.ownKeyFallbackLine(r.keyFallback.status);
+        bubblesEl.appendChild(note);
       }
       // Il ragionamento del turno entra nello storico del thread insieme al
       // messaggio. Il testo resta con la conversazione; i blocchi strutturati

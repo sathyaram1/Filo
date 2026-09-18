@@ -151,3 +151,13 @@
 .sn-wallet-usage-detail ul { list-style: none; margin: 0; padding: 0; }
 .sn-wallet-usage-detail li { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
 #resetIdentityBtn { margin-top: 8px; }
+
+/* La chiave OpenRouter propria (#629). Il campo ha la stessa riga del codice
+   d'invito ma è una chiave, non un codice: niente maiuscole né spaziatura. */
+.sn-ownkey-row input { text-transform: none; letter-spacing: normal; font-size: 15px; }
+.sn-ownkey-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0 0; }
+.sn-ownkey-tail { cursor: default; }
+.sn-ownkey-balance { font-size: 14px; }
+.sn-ownkey-refusal { color: var(--sn-danger, #c45a3b); }
+.sn-ownkey-rule { margin: 6px 0 0; font-size: 13px; }
+.sn-ownkey-actions { margin-top: 10px; }

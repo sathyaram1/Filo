@@ -1306,3 +1306,14 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   color: var(--dash-ink-soft);
   white-space: pre-wrap;
 }
+
+/* #629 — riga discreta sotto una risposta: la chiave OpenRouter dell'utente è
+   stata rifiutata e ha risposto la chiave personale (i crediti di Filo). Non è
+   un errore, la risposta c'è: sta in tono col blocco di attività. */
+.dash-bubble-note {
+  align-self: flex-start;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--dash-ink-mute);
+  padding: 0 12px;
+}

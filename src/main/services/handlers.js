@@ -495,7 +495,7 @@ function noteServedProvider(settings, action, result) {
 // escluso: log, toast a interruttore acceso, e la voce di cronologia (se c'è)
 // viene marchiata. Con `recordCost` registra anche il costo che il router
 // riporta lì (la lettura ad alta voce non lo dice nella risposta).
-function auditServedByLater({ settings, action, provider, model, apiKey, generationId, historyId, recordCost }) {
+function auditServedByLater({ settings, action, provider, model, apiKey, generationId, historyId, recordCost, keySource = '' }) {
   if (!generationId) return;
   const P = Providers.getProvider(provider);
   if (!P || typeof P.lookupServedBy !== 'function') return;
@@ -517,7 +517,7 @@ function auditServedByLater({ settings, action, provider, model, apiKey, generat
     if (recordCost && Number.isFinite(r.costUsd) && r.costUsd > 0) {
       try {
         await Costs.record({
-          action, provider, model, usage: { costUsd: r.costUsd }, pricing: null, usdToEur: settings.usdToEur,
+          action, provider, model, usage: { costUsd: r.costUsd, keySource }, pricing: null, usdToEur: settings.usdToEur,
         });
       } catch (_) {}
     }
@@ -588,9 +588,11 @@ async function handleTranscription({ settings, payload, origin, signal }) {
         } catch (_) {}
       }
       if (!servedBy) {
+        // La generazione si rilegge con la chiave che l'ha fatta: dopo un
+        // ripiego (#629) non è più quella con cui si era partiti.
         auditServedByLater({
           settings, action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
-          apiKey: a.apiKey, generationId: r.generationId, historyId,
+          apiKey: r.keyUsed || a.apiKey, generationId: r.generationId, historyId,
         });
       }
       return { text, model: a.model, provider: a.provider, costEur, usage: r.usage };
@@ -774,6 +776,9 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   return {
     text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
+    // La chiave propria è stata rifiutata e ha risposto la personale (#629):
+    // chi mostra la risposta lo dice all'utente.
+    keyFallback: result.keyFallback || null,
   };
 }
 
@@ -922,7 +927,19 @@ async function applySettingsUpdate(partial) {
   if (partial && partial.themeTokens && globalThis.SN_THEME_TOKENS) {
     partial = { ...partial, themeTokens: globalThis.SN_THEME_TOKENS.sanitize(partial.themeTokens).clean };
   }
+  // La chiave OpenRouter propria si mette e si toglie da due posti
+  // (Impostazioni e pagina Crediti, #629): se cambia, il rifiuto registrato
+  // per quella di prima non vale più, e la pagina Crediti aperta accanto si
+  // aggiorna da sé. Si guarda il valore, non il campo: le Impostazioni
+  // rimandano la stessa chiave a ogni salvataggio automatico.
+  let ownKeyBefore = null;
+  if (partial && partial.apiKeys && Object.prototype.hasOwnProperty.call(partial.apiKeys, 'openrouter')) {
+    try { ownKeyBefore = String((await Storage.getSettings())?.apiKeys?.openrouter || '').trim(); } catch (_) { ownKeyBefore = null; }
+  }
   const merged = await Storage.updateSettings(partial);
+  if (ownKeyBefore !== null && ownKeyBefore !== String(merged?.apiKeys?.openrouter || '').trim()) {
+    try { await globalThis.SN_WALLET_MAIN?.ownKeyChanged?.(); } catch (_) {}
+  }
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   try {
     const { nativeTheme } = require('electron');
@@ -2366,6 +2383,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let textReply = '';
   let reasoningDetails = [];
   let costEur = 0;
+  // Un giro qualunque del turno servito dalla chiave personale dopo il rifiuto
+  // della propria (#629): la scheda lo dice una volta, sotto la risposta.
+  let keyFallback = null;
   // Resta vero solo se il modello ha chiamato azioni fino al tetto senza mai
   // rispondere: allora l'utente deve saperlo, non ricevere l'ultima nota di
   // lavoro spacciata per risposta.
@@ -2378,6 +2398,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         origin: 'filo:chat',
         onReasoning, onText, onToolCall, tools,
       });
+      if (r && r.keyFallback) keyFallback = r.keyFallback;
       costEur += Number(r.costEur) || 0;
       let text = String(r.text || '');
       // Un id a ogni chiamata, anche se il fornitore non lo manda: la risposta
@@ -2527,6 +2548,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // giro: la scheda li tiene con la conversazione, e il ragionamento torna
     // al modello al turno dopo.
     notes, reasoningDetails,
+    ...(keyFallback ? { keyFallback } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
     ...(onboardingClosed ? { onboardingClosed: true } : {}),
@@ -2631,7 +2653,7 @@ function buildNoKeyDashboard(settings, saved) {
   }
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
-    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, puoi mettere una tua chiave OpenRouter nelle Opzioni. Intanto, le tue pagine salvate sono qui.';
+    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 

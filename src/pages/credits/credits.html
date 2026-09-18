@@ -13,6 +13,7 @@
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/wallet.js"></script>
 </head>
 <body>
   <main class="sn-page">
@@ -47,6 +48,38 @@
     <p class="sn-muted" id="offlineHint" hidden>
       Accedi col tuo account per sincronizzare i crediti su tutti i dispositivi.
     </p>
+
+    <!-- La chiave OpenRouter propria (#629): stesso campo delle Impostazioni
+         (settings.apiKeys.openrouter), gestito da qui perché è qui che si
+         decide con cosa si paga. Con la chiave: gli ultimi sei caratteri,
+         spesa e residuo che dice OpenRouter, l'ultimo rifiuto se c'è stato,
+         il pulsante per toglierla (con conferma). Senza: il campo. -->
+    <section class="sn-wallet-section sn-ownkey" id="ownKeySection" hidden>
+      <h2>La tua chiave OpenRouter</h2>
+      <form id="ownKeyForm" class="sn-ownkey-form" autocomplete="off" hidden>
+        <div class="sn-wallet-redeem-row sn-ownkey-row">
+          <input type="password" id="ownKeyInput" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="sn-btn" id="ownKeySaveBtn">Usa questa chiave</button>
+        </div>
+        <p class="sn-wallet-msg" id="ownKeyMsg" role="status" hidden></p>
+      </form>
+      <div id="ownKeyHave" hidden>
+        <p class="sn-ownkey-line">
+          <span class="sn-wallet-code sn-ownkey-tail" id="ownKeyTail"></span>
+          <span class="sn-muted sn-ownkey-balance" id="ownKeyBalance" role="status"></span>
+        </p>
+        <p class="sn-wallet-note sn-ownkey-refusal" id="ownKeyRefusal" role="status" hidden></p>
+        <p class="sn-muted sn-ownkey-rule" id="ownKeyRule"></p>
+        <div class="sn-wallet-inline sn-ownkey-actions">
+          <button type="button" class="sn-btn sn-btn-secondary" id="ownKeyRemoveBtn">Togli la chiave</button>
+          <span class="sn-wallet-inline" id="ownKeyConfirm" hidden>
+            <span class="sn-muted" id="ownKeyConfirmText">Da qui in poi paghi coi crediti di Filo. Confermi?</span>
+            <button type="button" class="sn-btn sn-btn-danger" id="ownKeyRemoveYes">Sì, toglila</button>
+            <button type="button" class="sn-btn sn-btn-secondary" id="ownKeyRemoveNo">Annulla</button>
+          </span>
+        </div>
+      </div>
+    </section>
 
     <section id="invitesSection" class="sn-wallet-section" hidden>
       <h2>I tuoi inviti</h2>

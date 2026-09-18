@@ -13,7 +13,10 @@
 //     Il server confronta ogni ora la somma delle righe col consumo che
 //     OpenRouter dichiara per la chiave: chi non le scrive si vede;
 //   - avvisa quando OpenRouter rifiuta per crediti finiti (402), una volta,
-//     senza ritentare.
+//     senza ritentare;
+//   - dà al provider la chiave di RISERVA (#629): se una chiamata partita con
+//     la chiave scritta dall'utente viene rifiutata (401/402/403), si rifà
+//     con la personale, e il rifiuto resta registrato per la pagina Crediti.
 //
 // Il saldo NON lo calcola nessuno qui: lo dice il server, che lo legge da
 // OpenRouter (tetto della chiave meno consumo).
@@ -76,20 +79,94 @@ module.exports = function register(on, ctx) {
     } catch (_) { return 'none'; }
   }
 
-  async function ownKeySet() {
+  // La chiave scritta dall'utente (Impostazioni o pagina Crediti: è lo
+  // stesso campo), o ''.
+  async function ownKey() {
     try {
       const s = await globalThis.SN_STORAGE.getSettings();
-      return Boolean(s && s.apiKeys && String(s.apiKeys.openrouter || '').trim());
-    } catch (_) { return false; }
+      return String((s && s.apiKeys && s.apiKeys.openrouter) || '').trim();
+    } catch (_) { return ''; }
+  }
+
+  async function ownKeySet() {
+    return Boolean(await ownKey());
+  }
+
+  // ── Ripiego dalla chiave propria ai crediti (#629) ────────────────────────
+  // Il provider chiama queste due a ogni chiamata: sono confronti di stringhe.
+  // Da dove viene UNA chiave data (quella che ha servito davvero).
+  async function keySourceOf(apiKey) {
+    const k = String(apiKey || '').trim();
+    if (!k) return '';
+    if (k === (await ownKey())) return 'own';
+    if (k === walletStore.personalKey()) return 'personal';
+    return 'factory';
+  }
+
+  // La riserva per la chiave con cui una chiamata è partita: la personale del
+  // portafoglio, solo se si era partiti con la chiave PROPRIA. Con la
+  // personale già in uso non c'è riserva (un 402 lì sono i crediti finiti), e
+  // con la chiave di fabbrica nemmeno.
+  async function alternativeKeyFor(apiKey) {
+    const k = String(apiKey || '').trim();
+    const personal = walletStore.personalKey();
+    if (!k || !personal || k === personal) return null;
+    if (k !== (await ownKey())) return null;
+    return { key: personal, source: 'personal' };
+  }
+
+  // L'ultimo rifiuto della chiave propria: { at, status, detail }. Lo legge
+  // la pagina Crediti (readState); si cancella quando la chiave cambia.
+  const REFUSAL_KEY = 'walletOwnKeyRefusal';
+  async function noteOwnKeyRefusal({ status, detail } = {}) {
+    const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300) };
+    try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, rec); } catch (_) {}
+    console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ripiego sulla chiave personale`);
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+  }
+  async function lastOwnKeyRefusal() {
+    try {
+      const r = await globalThis.SN_STORAGE.getRaw(REFUSAL_KEY, null);
+      return r && r.at ? r : null;
+    } catch (_) { return null; }
+  }
+  // La chiave propria è cambiata (messa, tolta, sostituita): il rifiuto di
+  // quella di prima non dice niente su questa.
+  async function ownKeyChanged() {
+    try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+  }
+  // La chiave propria ha servito una chiamata (lo dice il provider a ogni
+  // risposta buona): il rifiuto ricordato, se c'era, è superato — il conto è
+  // stato ricaricato — e la pagina Crediti, se è aperta, richiede spesa e
+  // residuo. L'avviso parte a ogni chiamata solo se c'è qualcosa da
+  // aggiornare: senza rifiuto ricordato, al massimo uno ogni pochi secondi.
+  let lastOwnKeyUsedAt = 0;
+  async function noteOwnKeySuccess() {
+    const had = await lastOwnKeyRefusal();
+    if (had) {
+      try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
+      console.info('[wallet] la chiave propria risponde di nuovo: rifiuto dimenticato');
+    }
+    const now = Date.now();
+    if (!had && now - lastOwnKeyUsedAt < 3000) return;
+    lastOwnKeyUsedAt = now;
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, ownKeyUsed: true }); } catch (_) {}
   }
 
   // ── Stato per la pagina Crediti ───────────────────────────────────────────
   // { ok, identity:{ ok, error? }, hasPersonalKey, pseudonym, usingOwnKey,
   //   server: <walletState> | null, error? }
   async function readState() {
+    const own = await ownKey();
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
-      usingOwnKey: await ownKeySet(), keySource: await keySource(), isOwner: Boolean(ctx.isAdmin()), server: null,
+      usingOwnKey: Boolean(own), keySource: await keySource(), isOwner: Boolean(ctx.isAdmin()), server: null,
+      // La chiave propria, per riconoscerla senza mostrarla; l'ultimo rifiuto
+      // (#629); lo stato del registro d'uso (righe in attesa e l'ultimo
+      // errore di scrittura: un registro che non si scrive non è un segreto).
+      ownKeyTail: W.keyTail(own), ownKeyRefusal: own ? await lastOwnKeyRefusal() : null,
+      usageLog: usageLogStatus(),
     };
     try {
       await identity.getIdToken();
@@ -237,10 +314,40 @@ module.exports = function register(on, ctx) {
   // ritenta al giro dopo; la coda non cresce oltre un tetto largo, e oltre si
   // perde il più vecchio dicendolo nel log (una riga persa la trova la
   // riconciliazione, non è un segreto).
+  //
+  // La coda sta anche su disco (#629): le righe ancora da scrivere alla
+  // chiusura di Filo ripartono all'avvio dopo, invece di sparire con il
+  // processo. E l'esito dell'ultima scrittura resta leggibile (usageLogStatus,
+  // nella pagina Crediti): una riga rifiutata dal server che si ritenta in
+  // silenzio per settimane è indistinguibile da un registro che funziona.
   const queue = [];
   const QUEUE_CAP = 2000;
+  const QUEUE_KEY = 'walletUsageQueue';
   let flushTimer = null;
   let flushing = false;
+  let queueLoaded = false;
+  const log = { written: 0, lastWriteAt: null, lastError: '', lastErrorAt: null };
+
+  function usageLogStatus() {
+    return { pending: queue.length, written: log.written, lastWriteAt: log.lastWriteAt, lastError: log.lastError, lastErrorAt: log.lastErrorAt };
+  }
+
+  async function loadQueue() {
+    if (queueLoaded) return;
+    queueLoaded = true;
+    try {
+      const saved = await globalThis.SN_STORAGE.getRaw(QUEUE_KEY, null);
+      if (Array.isArray(saved) && saved.length) {
+        queue.unshift(...saved.filter((r) => r && r.pseudonym));
+        if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+        if (queue.length) scheduleFlush(5000);
+      }
+    } catch (_) {}
+  }
+
+  async function saveQueue() {
+    try { await globalThis.SN_STORAGE.setRaw(QUEUE_KEY, queue.length ? queue.slice() : null); } catch (_) {}
+  }
 
   async function flush() {
     flushTimer = null;
@@ -262,8 +369,14 @@ module.exports = function register(on, ctx) {
         body: JSON.stringify({ writes }),
       });
       if (!res.ok) throw new Error(`wallet-usage commit ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+      log.written += batch.length;
+      log.lastWriteAt = new Date().toISOString();
+      log.lastError = '';
+      log.lastErrorAt = null;
     } catch (e) {
-      console.warn('[wallet] registro d\'uso non scritto, ritento:', e?.message || e);
+      log.lastError = String(e?.message || e);
+      log.lastErrorAt = new Date().toISOString();
+      console.warn('[wallet] registro d\'uso non scritto, ritento:', log.lastError);
       queue.unshift(...batch);
       if (queue.length > QUEUE_CAP) {
         console.warn(`[wallet] registro d'uso: coda oltre ${QUEUE_CAP} righe, scarto le più vecchie`);
@@ -272,6 +385,7 @@ module.exports = function register(on, ctx) {
       scheduleFlush(30000);
     } finally {
       flushing = false;
+      await saveQueue();
       if (queue.length && !flushTimer) scheduleFlush(5000);
     }
   }
@@ -289,12 +403,18 @@ module.exports = function register(on, ctx) {
   }
 
   // Chiamato da costTracker.record per OGNI chiamata AI. Scrive la riga solo
-  // se la chiamata è partita con la chiave personale: con una chiave
+  // se la chiamata è stata SERVITA dalla chiave personale: con una chiave
   // dell'utente il consumo è affar suo e OpenRouter non lo conta sulla nostra.
+  // Chi l'ha servita lo dice il provider (`usage.keySource`), così una
+  // chiamata partita con la chiave propria e ripiegata sulla personale (#629)
+  // si registra come ogni altra chiamata con la personale. Senza quel campo
+  // (una chiamata che non passa dal provider) vale la precedenza delle chiavi.
   async function recordUsage({ action, model, servedBy, usage }) {
     const pseudonym = walletStore.pseudonym();
     if (!pseudonym || !walletStore.personalKey()) return;
-    if (await ownKeySet()) return;
+    const src = usage && usage.keySource;
+    if (src ? src !== 'personal' : await ownKeySet()) return;
+    await loadQueue();
     const costUsd = Number(usage && usage.costUsd) || 0;
     const fx = lastServer && lastServer.balance ? lastServer.balance : {};
     const row = W.usageRow({
@@ -304,30 +424,68 @@ module.exports = function register(on, ctx) {
     if (!row) return;
     queue.push(row);
     if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+    await saveQueue();
     scheduleFlush(3000);
   }
+
+  // ── Chiave propria dalla pagina Crediti (#629) ────────────────────────────
+  // Spesa e residuo che OpenRouter dichiara per la chiave scritta dall'utente.
+  // La chiave non esce dal main: alla pagina tornano i numeri e la frase.
+  on(MSG.WALLET_OWN_KEY_INFO, filoOnly(async () => {
+    const key = await ownKey();
+    if (!key) return { ok: false, status: 'no_own_key' };
+    const P = globalThis.SN_PROVIDER_OPENROUTER;
+    if (!P || typeof P.keyInfo !== 'function') return { ok: false, status: 'internal' };
+    try {
+      const info = await P.keyInfo({ apiKey: key });
+      return { ok: true, ...info, line: W.ownKeyBalanceLine(info) };
+    } catch (e) {
+      const st = Number(e && e.status) || 0;
+      const refused = W.isKeyRefusalStatus(st);
+      return {
+        ok: false, status: refused ? 'refused' : 'not_reachable', httpStatus: st,
+        message: refused
+          ? `OpenRouter non accetta questa chiave (${W.keyRefusalReason(st)}).`
+          : 'Non riesco a chiedere a OpenRouter cosa resta su questa chiave: riprova fra poco.',
+      };
+    }
+  }));
 
   // ── Crediti finiti ────────────────────────────────────────────────────────
   // Un avviso ogni 10 minuti al massimo: il 402 arriva a ogni chiamata finché
   // il tetto non sale, e un toast per chiamata sarebbe un martello.
+  // La frase si scrive qui, dove si sa tutto: quale chiave OpenRouter ha
+  // rifiutato (l'errore lo porta, #629), se il ripiego sulla personale c'è
+  // stato e ha fallito, se c'è un portafoglio, quanti crediti arrivano domani.
+  // Resta sull'errore (userMessage) per la chat, che altrimenti dovrebbe
+  // tirare a indovinare.
   let lastNoticeAt = 0;
-  async function outOfCreditsNotice() {
+  async function outOfCreditsNotice(err) {
+    const src = err && err.keySource;
+    const usingOwnKey = src ? src === 'own' : await ownKeySet();
+    const fallbackFailed = Boolean(err && err.keyFallback && err.keyFallback.failed);
+    const text = W.outOfCreditsMessage({
+      usingOwnKey, fallbackFailed, hasWallet: Boolean(walletStore.personalKey()),
+      dailyCredits: lastServer && lastServer.dailyCredits,
+    });
+    if (err && typeof err === 'object') { try { err.userMessage = text; } catch (_) {} }
     const now = Date.now();
     if (now - lastNoticeAt < 10 * 60 * 1000) return;
     lastNoticeAt = now;
-    const usingOwnKey = await ownKeySet();
-    const text = W.outOfCreditsMessage({ usingOwnKey, dailyCredits: lastServer && lastServer.dailyCredits });
     try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000 }); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
+    keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
   };
 
   // All'avvio: identità pronta e stato del server letto una volta, così la
-  // prima riga del registro ha già i parametri di conversione. In background.
-  setTimeout(() => { readState().catch(() => {}); }, 4000);
+  // prima riga del registro ha già i parametri di conversione; e le righe
+  // rimaste da scrivere alla chiusura precedente ripartono. In background.
+  setTimeout(() => { readState().catch(() => {}); loadQueue().catch(() => {}); }, 4000);
 };

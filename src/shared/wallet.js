@@ -64,12 +64,131 @@
   //   usingOwnKey: la chiamata è partita con una chiave dell'utente (non quella
   //                personale di Filo): allora è il SUO conto OpenRouter.
   //   dailyCredits: quota giornaliera, se nota, per dire quanto arriva domani.
-  function outOfCreditsMessage({ usingOwnKey = false, dailyCredits = null } = {}) {
-    if (usingOwnKey) {
-      return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo account OpenRouter, oppure togli la chiave dalle Impostazioni per tornare ai crediti di Filo.';
-    }
+  //   fallbackFailed: la chiave propria è stata rifiutata E la personale ha
+  //                risposto 402: sono finiti tutti e due (#629).
+  //   hasWallet:   c'è un portafoglio (chiave personale su questo computer).
+  //                Senza, «togli la chiave per tornare ai crediti di Filo»
+  //                è una promessa vuota: la strada è un invito.
+  function outOfCreditsMessage({ usingOwnKey = false, dailyCredits = null, fallbackFailed = false, hasWallet = null } = {}) {
     const domani = dailyCredits ? ` (domani ne arrivano ${dailyCredits})` : '';
-    return `i crediti di Filo sono finiti${domani}. Puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nelle Impostazioni.`;
+    if (fallbackFailed) {
+      return `OpenRouter ha rifiutato la tua chiave (il suo credito è finito) e anche i crediti di Filo sono finiti${domani}: ricarica il tuo conto OpenRouter, oppure aspetta i crediti di domani.`;
+    }
+    if (usingOwnKey) {
+      if (hasWallet === false) {
+        return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo conto OpenRouter, oppure riscatta un invito nella pagina Crediti per usare i crediti di Filo.';
+      }
+      return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo account OpenRouter, oppure togli la chiave dalla pagina Crediti per tornare ai crediti di Filo.';
+    }
+    return `i crediti di Filo sono finiti${domani}. Puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nella pagina Crediti.`;
+  }
+
+  // ── Ripiego dalla chiave propria ai crediti di Filo (#629) ───────────────
+  // OpenRouter documenta i codici così: 401 chiave disattivata o non valida,
+  // 402 credito finito, 403 permessi insufficienti, guardia sui contenuti o
+  // moderazione. I primi due sono sempre la CHIAVE; il 403 lo è solo se la
+  // risposta non parla di moderazione (secondo giro di verifica del ramo: un
+  // testo segnalato dalla moderazione lo è con qualunque chiave, e rimandarlo
+  // coi crediti di Filo lo fa bloccare di nuovo mentre Crediti segna un
+  // rifiuto che non c'è stato). Solo per un rifiuto della chiave, se la
+  // chiamata era partita con la chiave scritta dall'utente e c'è la chiave
+  // personale del portafoglio, si ritenta la stessa richiesta con la
+  // personale. Rete, 429, 5xx, errori di modello: no — non è la chiave.
+  function isKeyRefusalStatus(status) {
+    const st = Number(status);
+    return st === 401 || st === 402 || st === 403;
+  }
+
+  // La risposta di OpenRouter dice che è la moderazione (o una guardia sui
+  // contenuti) a bloccare il testo: il corpo porta `metadata.reasons` e
+  // `flagged_input`, o lo dice a parole.
+  function isModerationBlock(body) {
+    const text = typeof body === 'string' ? body : (body ? JSON.stringify(body) : '');
+    if (!text) return false;
+    return /moderat|flagged|guardrail|content policy/i.test(text);
+  }
+
+  // Rifiuto della CHIAVE: status più, per il 403, il corpo della risposta.
+  function isKeyRefusal(status, body) {
+    const st = Number(status);
+    if (st === 401 || st === 402) return true;
+    if (st === 403) return !isModerationBlock(body);
+    return false;
+  }
+
+  // Lo status di rifiuto della chiave dentro un errore del provider, o 0. Il
+  // messaggio dell'errore porta il corpo della risposta («OpenRouter 403: …»):
+  // un 403 di moderazione non è un rifiuto.
+  function keyRefusalOf(err) {
+    if (!err) return 0;
+    const msg = String(err.message || err || '');
+    let st = Number(err.status);
+    if (!isKeyRefusalStatus(st)) {
+      const m = /^OpenRouter(?:\s+\S+)?\s+(40[123])\b/.exec(msg);
+      st = m ? Number(m[1]) : 0;
+    }
+    if (!st) return 0;
+    return isKeyRefusal(st, msg) ? st : 0;
+  }
+
+  // Il perché, da incastonare dopo «OpenRouter ha rifiutato la chiave».
+  function keyRefusalReason(status) {
+    const st = Number(status);
+    if (st === 401) return 'non la riconosce';
+    if (st === 402) return 'il suo credito è finito';
+    if (st === 403) return 'ha bloccato la richiesta';
+    return 'senza dire perché';
+  }
+
+  // La riga discreta in chat, quando il ripiego è appena avvenuto.
+  function ownKeyFallbackLine(status) {
+    return `OpenRouter ha rifiutato la tua chiave (${keyRefusalReason(status)}): ho usato i crediti di Filo.`;
+  }
+
+  // Lo stato nella pagina Crediti: l'ultimo rifiuto, e cosa succede finché la
+  // chiave resta lì. `at` è ISO.
+  function ownKeyRefusalNote({ at, status } = {}) {
+    let quando = '';
+    try {
+      const d = new Date(at);
+      if (!Number.isNaN(d.getTime())) {
+        quando = ` l'ultima volta il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+    } catch (_) { quando = ''; }
+    return `OpenRouter ha rifiutato la tua chiave${quando} (${keyRefusalReason(status)}) e Filo ha usato i tuoi crediti. Finché resta qui, ogni chiamata prova prima lei.`;
+  }
+
+  // Gli ultimi sei caratteri della chiave, per riconoscerla senza mostrarla.
+  function keyTail(key) {
+    const k = String(key || '').trim();
+    return k ? k.slice(-6) : '';
+  }
+
+  // Spesa e residuo della chiave propria, come li dice `GET /api/v1/auth/key`
+  // di OpenRouter: { limit, usage, limit_remaining }. `limit` null = nessun
+  // tetto sulla chiave: allora quello che resta è il credito dell'account
+  // (`account`: { credits, usage } da `GET /api/v1/credits`), e senza nemmeno
+  // quello resta la sola spesa.
+  function ownKeyBalanceLine({ limit, usage, limit_remaining, account } = {}) {
+    const usd = (n) => `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+    const spesa = `Spesi ${usd(usage)}`;
+    const conto = account && Number.isFinite(Number(account.credits))
+      ? Math.max(0, Number(account.credits) - (Number(account.usage) || 0))
+      : null;
+    if (limit == null || !Number.isFinite(Number(limit))) {
+      if (conto != null) return `${spesa} · restano ${usd(conto)} sul tuo conto OpenRouter`;
+      return `${spesa} · nessun tetto`;
+    }
+    const resta = limit_remaining != null && Number.isFinite(Number(limit_remaining))
+      ? Number(limit_remaining)
+      : Number(limit) - (Number(usage) || 0);
+    // Il tetto di una chiave è un limite, non un saldo: se il conto ha meno
+    // del residuo del tetto, OpenRouter rifiuta quando finisce il conto
+    // (secondo giro di verifica del ramo).
+    if (conto != null && conto < Math.max(0, resta)) {
+      return `${spesa} · restano ${usd(conto)} sul tuo conto OpenRouter, meno del tetto della chiave (${usd(limit)})`;
+    }
+    return `${spesa} · restano ${usd(Math.max(0, resta))} su ${usd(limit)}`;
   }
 
   // Gli esiti del riscatto, tradotti. `status` è quello del server.
@@ -127,5 +246,8 @@
     return m ? m[1] + m[2] : s;
   }
 
-  global.SN_WALLET = { USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES };
+  global.SN_WALLET = {
+    USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
+    isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

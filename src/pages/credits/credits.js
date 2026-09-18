@@ -76,10 +76,113 @@
   }
   function renderWallet(w) {
     renderWalletState(w);
+    renderOwnKey(w);
     if (confirmation) {
       const note = $('walletNote');
       note.textContent = confirmation;
       note.hidden = false;
+    }
+  }
+
+  // ── La chiave OpenRouter propria (#629) ────────────────────────────────────
+  // È lo stesso campo delle Impostazioni: metterla o toglierla da qui si vede
+  // subito di là, e viceversa (il main avvisa la pagina a ogni cambio).
+  const W = window.SN_WALLET;
+  let ownKeyInfoFor = ''; // la coda della chiave per cui spesa e residuo sono già stati chiesti
+  function renderOwnKey(w) {
+    const section = $('ownKeySection');
+    if (!w || !w.ok) { section.hidden = true; return; }
+    section.hidden = false;
+    const has = Boolean(w.usingOwnKey);
+    const hasWallet = Boolean(w.server && w.server.hasWallet);
+    $('ownKeyForm').hidden = has;
+    $('ownKeyHave').hidden = !has;
+    if (!has) {
+      ownKeyInfoFor = '';
+      return;
+    }
+    $('ownKeyTail').textContent = `…${w.ownKeyTail || ''}`;
+    $('ownKeyTail').title = 'Gli ultimi sei caratteri della chiave';
+    const refusal = $('ownKeyRefusal');
+    if (w.ownKeyRefusal && W) {
+      refusal.textContent = W.ownKeyRefusalNote(w.ownKeyRefusal);
+      refusal.hidden = false;
+    } else {
+      refusal.hidden = true;
+    }
+    $('ownKeyRule').textContent = hasWallet
+      ? (w.ownKeyRefusal ? '' : 'Ogni chiamata prova prima lei; se OpenRouter la rifiuta, Filo usa i tuoi crediti.')
+      : 'Paghi tu, sul tuo conto OpenRouter.';
+    $('ownKeyRule').hidden = !$('ownKeyRule').textContent;
+    // La domanda del «Togli» dice cosa succede DOPO: coi crediti di Filo se
+    // c'è un portafoglio; senza, Filo resta senza una chiave (primo giro di
+    // verifica del ramo).
+    $('ownKeyConfirmText').textContent = hasWallet
+      ? 'Da qui in poi paghi coi crediti di Filo. Confermi?'
+      : 'Senza una chiave Filo non può usare i modelli, finché non riscatti un invito o ne metti un\'altra. Confermi?';
+    $('ownKeyConfirm').hidden = true;
+    $('ownKeyRemoveBtn').hidden = false;
+    // Spesa e residuo li dice OpenRouter: si chiedono una volta per chiave,
+    // appena la chiave è a schermo, non a ogni ridisegno.
+    if (ownKeyInfoFor !== w.ownKeyTail) {
+      ownKeyInfoFor = w.ownKeyTail;
+      loadOwnKeyInfo().catch(() => {});
+    }
+  }
+
+  // `quiet`: la riga resta com'è finché non arriva la nuova (dopo una
+  // chiamata pagata con la chiave, non al primo giro).
+  async function loadOwnKeyInfo({ quiet = false } = {}) {
+    const el = $('ownKeyBalance');
+    if (!quiet) el.textContent = 'Chiedo a OpenRouter…';
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWN_KEY_INFO }); } catch (_) { r = null; }
+    if (!$('ownKeyHave').hidden) {
+      el.textContent = r && r.ok ? (r.line || '') : ((r && r.message) || 'OpenRouter non ha risposto.');
+    }
+  }
+
+  async function saveOwnKey(ev) {
+    ev.preventDefault();
+    const input = $('ownKeyInput');
+    const msg = $('ownKeyMsg');
+    const key = String(input.value || '').trim();
+    msg.classList.remove('is-error', 'is-ok');
+    if (!key) {
+      msg.textContent = 'Incolla la chiave: comincia con sk-or-.';
+      msg.classList.add('is-error');
+      msg.hidden = false;
+      input.focus();
+      return;
+    }
+    $('ownKeySaveBtn').disabled = true;
+    try {
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { apiKeys: { openrouter: key } } });
+      input.value = '';
+      msg.hidden = true;
+      confirmation = null;
+      await load();
+    } catch (_) {
+      msg.textContent = 'Non sono riuscito a salvarla: riprova.';
+      msg.classList.add('is-error');
+      msg.hidden = false;
+    } finally {
+      $('ownKeySaveBtn').disabled = false;
+    }
+  }
+
+  async function removeOwnKey() {
+    $('ownKeyRemoveYes').disabled = true;
+    try {
+      // Stringa vuota, non campo assente: è così che le Impostazioni tolgono
+      // una chiave, e il salvataggio conserva le stringhe vuote.
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { apiKeys: { openrouter: '' } } });
+      confirmation = null;
+      await load();
+    } finally {
+      $('ownKeyRemoveYes').disabled = false;
+      $('ownKeyConfirm').hidden = true;
+      $('ownKeyRemoveBtn').hidden = false;
     }
   }
   function renderWalletState(w) {
@@ -119,7 +222,7 @@
         : 'I crediti li tiene il server.';
       $('redeemForm').hidden = true;
       if (w.usingOwnKey) {
-        note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo restano fermi finché la tieni.';
+        note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
         note.hidden = false;
       } else if (server.cached) {
         note.textContent = 'Ultimo saldo letto: il server dei crediti non risponde adesso.';
@@ -399,13 +502,30 @@
   }
 
   $('redeemForm').addEventListener('submit', (ev) => { redeem(ev).catch(() => {}); });
+  $('ownKeyForm').addEventListener('submit', (ev) => { saveOwnKey(ev).catch(() => {}); });
+  // Togliere la chiave chiede una conferma sul posto: il pulsante lascia il
+  // posto alla domanda, e «Annulla» lo rimette.
+  $('ownKeyRemoveBtn').addEventListener('click', () => {
+    $('ownKeyRemoveBtn').hidden = true;
+    $('ownKeyConfirm').hidden = false;
+    $('ownKeyRemoveYes').focus();
+  });
+  $('ownKeyRemoveNo').addEventListener('click', () => {
+    $('ownKeyConfirm').hidden = true;
+    $('ownKeyRemoveBtn').hidden = false;
+  });
+  $('ownKeyRemoveYes').addEventListener('click', () => { removeOwnKey().catch(() => {}); });
   $('reissueBtn').addEventListener('click', () => { reissueKey().catch(() => {}); });
   $('resetIdentityBtn').addEventListener('click', () => { resetIdentity().catch(() => {}); });
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.CREDITS_CHANGED) load().catch(() => {});
+      if (!msg || msg.type !== MSG.CREDITS_CHANGED) return;
+      load().catch(() => {});
+      // Una chiamata pagata con la chiave propria (o il suo rifiuto superato):
+      // spesa e residuo sono cambiati, si richiedono senza svuotare la riga.
+      if (msg.ownKeyUsed && !$('ownKeyHave').hidden) loadOwnKeyInfo({ quiet: true }).catch(() => {});
     });
   }
 

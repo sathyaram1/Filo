@@ -16,6 +16,8 @@
   const TRANSCRIPTIONS_ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
   const EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
   const GENERATION_ENDPOINT = 'https://openrouter.ai/api/v1/generation';
+  const AUTH_KEY_ENDPOINT = 'https://openrouter.ai/api/v1/auth/key';
+  const CREDITS_ENDPOINT = 'https://openrouter.ai/api/v1/credits';
 
   function buildHeaders(apiKey) {
     return {
@@ -25,6 +27,65 @@
       'HTTP-Referer': 'https://filo.local',
       'X-Title': 'Filo',
     };
+  }
+
+  // Il punto unico in cui la chiave entra in una chiamata (#629). Ogni
+  // funzione qui sotto passa di qua, così il ripiego vale per tutte: chat,
+  // spiega, traduci, voce, dettatura, vettori. Se OpenRouter rifiuta la
+  // CHIAVE (401, 402, 403) e chi tiene le chiavi (SN_WALLET_MAIN, nel main)
+  // ne conosce una di riserva per quella con cui si è partiti — la chiave
+  // personale del portafoglio, quando la chiamata era partita con la chiave
+  // scritta dall'utente — si rifà subito la stessa richiesta con la riserva,
+  // nella stessa risposta. Rete, 429, 5xx e gli errori di modello non
+  // c'entrano con la chiave e non passano di qui. Torna la risposta da
+  // leggere più:
+  //   keyUsed    la chiave che ha servito davvero (per le letture a posteriori,
+  //              che vogliono la stessa chiave della generazione);
+  //   keySource  'own' | 'personal' | 'factory' | '' — chi la registra decide
+  //              da qui se la riga d'uso va scritta;
+  //   keyFallback { status } se il ripiego è avvenuto, altrimenti null.
+  // Se anche la riserva rifiuta, l'errore che risale è il SUO (con la
+  // personale un 402 sono i crediti finiti), e il rifiuto della chiave
+  // propria resta comunque registrato: la pagina Crediti lo mostra.
+  async function fetchWithKey(url, apiKey, makeInit) {
+    let res = await fetch(url, makeInit(apiKey));
+    let keyUsed = apiKey;
+    let keyFallback = null;
+    const W = global.SN_WALLET;
+    const K = global.SN_WALLET_MAIN;
+    if (!res.ok && W && W.isKeyRefusalStatus(res.status) && K && typeof K.alternativeKeyFor === 'function') {
+      // Un 403 è un rifiuto della chiave solo se il corpo non parla di
+      // moderazione: un testo segnalato lo è con qualunque chiave, e la
+      // risposta deve risalire com'è (il corpo resta da leggere per chi la
+      // racconta all'utente).
+      const detail = (await res.clone().text().catch(() => '')).slice(0, 300);
+      let alt = null;
+      if (W.isKeyRefusal(res.status, detail)) {
+        try { alt = await K.alternativeKeyFor(apiKey); } catch (_) { alt = null; }
+      }
+      if (alt && alt.key) {
+        const refused = { status: res.status, detail };
+        try { await K.noteOwnKeyRefusal(refused); } catch (_) {}
+        res = await fetch(url, makeInit(alt.key));
+        keyUsed = alt.key;
+        keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
+        if (!res.ok) keyFallback.failed = res.status;
+      }
+    }
+    let keySource = '';
+    if (K && typeof K.keySourceOf === 'function') {
+      try { keySource = await K.keySourceOf(keyUsed); } catch (_) { keySource = ''; }
+    }
+    // La chiave propria ha appena servito una chiamata: il rifiuto ricordato
+    // in Crediti (se c'era) non vale più, e spesa e residuo sono cambiati.
+    if (res.ok && keySource === 'own' && K && typeof K.noteOwnKeySuccess === 'function') {
+      try { K.noteOwnKeySuccess().catch(() => {}); } catch (_) {}
+    }
+    // Anche sulla risposta: così l'errore che httpError costruisce da un
+    // rifiuto sa con quale chiave si era partiti e se il ripiego c'è stato
+    // (e ha fallito), e chi lo racconta all'utente può dirlo per esteso.
+    try { res.keySource = keySource; res.keyFallback = keyFallback; } catch (_) {}
+    return { res, keyUsed, keySource, keyFallback };
   }
 
   // Traduce il livello di reasoning scelto dall'owner (#369) nel campo
@@ -229,21 +290,13 @@
     if (r) body.reasoning = r;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      // status/provider strutturati sull'errore: chi lo mostra all'utente può
-      // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-      const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
-      err.status = res.status;
-      err.provider = 'openrouter';
-      throw err;
-    }
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
+    // status/provider strutturati sull'errore: chi lo mostra all'utente può
+    // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
+    if (!res.ok) throw await httpError(res);
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
@@ -254,12 +307,14 @@
       reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
       finishReason: data.choices?.[0]?.finish_reason || null,
       servedBy: extractServedBy(data),
+      keyUsed, keyFallback,
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
         cachedPromptTokens: cachedPromptTokens(usage),
         costUsd: costUsdOf(usage),
         servedBy: extractServedBy(data),
+        keySource, keyFallback,
       },
     };
   }
@@ -277,19 +332,13 @@
     if (r) reqBody.reasoning = r;
     const pb = providerBlock(providerRouting);
     if (pb) reqBody.provider = pb;
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(reqBody),
-      signal,
-    });
-    if (!res.ok || !res.body) {
-      const errText = await res.text().catch(() => '');
-      const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
-      err.status = res.status;
-      err.provider = 'openrouter';
-      throw err;
-    }
+    const payload = JSON.stringify(reqBody);
+    // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
+    // il ripiego qui non ha ancora niente da azzerare nel chiamante.
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
+    if (!res.ok || !res.body) throw await httpError(res);
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -347,16 +396,23 @@
       }
     }
     return {
-      text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy, usage,
+      text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy,
+      keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
     };
   }
 
   // Errore HTTP con status e provider strutturati (come per le chat, #331).
+  // Porta con sé anche da quale chiave si era partiti e se il ripiego sulla
+  // personale c'è stato e ha fallito (fetchWithKey li lascia sulla risposta):
+  // un 402 «la tua chiave» e un 402 «anche i crediti di Filo» sono due frasi
+  // diverse per l'utente.
   async function httpError(res) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
     err.provider = 'openrouter';
+    if (res.keySource) err.keySource = res.keySource;
+    if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
   }
 
@@ -372,12 +428,10 @@
     if (Number.isFinite(sp) && sp > 0 && sp !== 1) body.speed = sp;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(SPEECH_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
-    });
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(SPEECH_ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
     if (!res.ok) throw await httpError(res);
     const buf = Buffer.from(await res.arrayBuffer());
     if (!buf.length) {
@@ -391,6 +445,7 @@
       audioBase64: buf.toString('base64'),
       mimeType,
       generationId: res.headers.get('x-generation-id') || null,
+      keyUsed, keySource, keyFallback,
     };
   }
 
@@ -403,12 +458,10 @@
     if (language) body.language = language;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(TRANSCRIPTIONS_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
-    });
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(TRANSCRIPTIONS_ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
     if (!res.ok) throw await httpError(res);
     const data = await res.json();
     const usage = data.usage || {};
@@ -416,6 +469,7 @@
       text: typeof data.text === 'string' ? data.text : '',
       servedBy: extractServedBy(data),
       generationId: res.headers.get('x-generation-id') || data.id || null,
+      keyUsed, keyFallback,
       usage: {
         promptTokens: 0,
         completionTokens: 0,
@@ -424,6 +478,7 @@
         // Il router riporta il costo in dollari: per l'audio è l'unico numero
         // che abbia senso (non ci sono token), e va registrato tale e quale.
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        keySource, keyFallback,
       },
     };
   }
@@ -441,12 +496,10 @@
     if (Number.isInteger(d) && d > 0) body.dimensions = d;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(EMBEDDINGS_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
-    });
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
     if (!res.ok) throw await httpError(res);
     const data = await res.json();
     const rows = Array.isArray(data.data) ? data.data.slice() : [];
@@ -460,11 +513,13 @@
       vectors,
       servedBy: extractServedBy(data),
       generationId: res.headers.get('x-generation-id') || data.id || null,
+      keyUsed, keyFallback,
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: 0,
         cachedPromptTokens: 0,
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        keySource, keyFallback,
       },
     };
   }
@@ -488,10 +543,50 @@
     return { servedBy: name || null, costUsd: Number.isFinite(cost) ? cost : null };
   }
 
+  // ─── Cosa sa OpenRouter di una chiave ─────────────────────────────────────
+  // `GET /auth/key` con la chiave come Bearer: etichetta, tetto (null = nessun
+  // tetto), spesa, residuo. La pagina Crediti lo mostra per la chiave propria.
+  // Nessun ripiego qui: la domanda è proprio su QUELLA chiave.
+  //
+  // Il tetto su una chiave è facoltativo e di solito non c'è: allora quello
+  // che resta da spendere è il credito dell'ACCOUNT (comprato meno consumato),
+  // che OpenRouter dice a `GET /credits` con la stessa chiave. Si chiede solo
+  // in quel caso, e se non risponde resta la sola spesa (primo giro di
+  // verifica del ramo).
+  async function keyInfo({ apiKey, signal }) {
+    const res = await fetch(AUTH_KEY_ENDPOINT, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal,
+    });
+    if (!res.ok) throw await httpError(res);
+    const data = (await res.json()).data || {};
+    const num = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    const out = {
+      label: typeof data.label === 'string' ? data.label : '',
+      limit: num(data.limit),
+      usage: num(data.usage) || 0,
+      limit_remaining: num(data.limit_remaining),
+      account: null,
+    };
+    // Il credito del conto serve sempre: è quello che resta a una chiave
+    // senza tetto, e con un tetto è il numero che conta quando il conto ha
+    // meno del residuo del tetto (secondo giro di verifica del ramo).
+    try {
+      const r2 = await fetch(CREDITS_ENDPOINT, { headers: { Authorization: `Bearer ${apiKey}` }, signal });
+      if (r2.ok) {
+        const d2 = (await r2.json()).data || {};
+        const credits = num(d2.total_credits);
+        const used = num(d2.total_usage);
+        if (credits != null) out.account = { credits, usage: used || 0 };
+      }
+    } catch (_) { out.account = null; }
+    return out;
+  }
+
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy,
+    cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
-    ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT,
+    ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -33,7 +33,12 @@ module.exports = function register(on, ctx) {
       // Le azioni già eseguite prima del guasto: la chat le tiene nello
       // storico, così il tentativo successivo sa cosa era già stato fatto.
       const actions = Array.isArray(e && e.filoActions) ? e.filoActions : [];
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', actions };
+      // Lo status HTTP del provider e se è un rifiuto della CHIAVE (#629: un
+      // 403 di moderazione non lo è): la scheda ci mette accanto la strada
+      // per la pagina Crediti solo quando è lì che si sistema.
+      const W = globalThis.SN_WALLET;
+      const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
     }
   });
 

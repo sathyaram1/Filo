@@ -70,7 +70,7 @@
   function stopOnOutOfCredits(err) {
     const W = global.SN_WALLET;
     if (!W || !W.isOutOfCredits(err)) return false;
-    try { global.SN_WALLET_MAIN?.outOfCreditsNotice(); } catch (_) {}
+    try { global.SN_WALLET_MAIN?.outOfCreditsNotice(err); } catch (_) {}
     return true;
   }
 
