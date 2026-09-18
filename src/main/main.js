@@ -74,6 +74,69 @@ require('./protocol').registerProtocolSchemes();
 
 let mainWindow = null;
 
+// ── Il collegamento d'invito: filo://invito/<codice> (#651) ──────────────────
+// Chi riceve un invito riceve un link. Se Filo c'è già, il link lo apre (o lo
+// porta davanti) e riscatta da solo, senza far ricopiare otto caratteri a
+// nessuno.
+//
+// ATTENZIONE: registrando `filo://` come protocollo di SISTEMA, il sistema
+// consegna all'app QUALUNQUE `filo://…` — anche un `filo://credits/credits.html`
+// messo in un link da un sito qualsiasi. Si accetta il solo host `invito`
+// (`SN_WALLET.inviteCodeFromDeepLink`); tutto il resto non apre niente e non
+// fa niente, in silenzio.
+//
+// Da dove arriva l'indirizzo: su Windows e Linux sta fra gli ARGOMENTI (del
+// primo avvio, o di `second-instance`); su Mac arriva con `open-url`, che va
+// agganciato prima che l'app sia pronta.
+let invitoInAttesa = null;
+
+function apriCodiceInvito(code) {
+  if (!code) return false;
+  // Senza finestra (avvio a freddo: l'apertura è ancora a metà) l'invito
+  // aspetta lì e parte appena la finestra c'è.
+  if (!mainWindow) { invitoInAttesa = code; return true; }
+  try { revealWindow(mainWindow); } catch (_) {}
+  // La pagina Crediti è dove l'esito si legge: il riscatto e l'apertura
+  // partono insieme, e la pagina si aggiorna da sé all'avviso di saldo
+  // cambiato.
+  try { globalThis.SN_WALLET_MAIN?.redeemFromInvite?.(code)?.catch?.(() => {}); } catch (_) {}
+  try { mainWindow._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+  return true;
+}
+
+function apriLinkFilo(rawUrl) {
+  const code = globalThis.SN_WALLET?.inviteCodeFromDeepLink?.(rawUrl) || null;
+  if (!code) return false;
+  return apriCodiceInvito(code);
+}
+
+function apriInvitoDaArgv(argv) {
+  const code = globalThis.SN_WALLET?.inviteCodeFromArgv?.(argv) || null;
+  return code ? apriCodiceInvito(code) : false;
+}
+
+// Mac: l'indirizzo arriva di qui, e può arrivare PRIMA che l'app sia pronta.
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  apriLinkFilo(url);
+});
+
+// Filo si dichiara al sistema come chi apre i `filo://`. In sviluppo l'exe è
+// quello di Electron e va passato il percorso del progetto, altrimenti il
+// sistema aprirebbe Electron a mani vuote. Durante i test non si tocca: la
+// registrazione cambia il sistema di chi lancia la prova, e non è una cosa
+// che una prova ha il diritto di fare.
+function dichiaraProtocolloInvito() {
+  if (process.env.NODE_ENV === 'test' || process.env.FILO_SMOKE) return;
+  try {
+    if (process.defaultApp && process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient('filo', process.execPath, [path.resolve(process.argv[1])]);
+    } else {
+      app.setAsDefaultProtocolClient('filo');
+    }
+  } catch (_) { /* il link resta copiabile a mano: non è un motivo per non partire */ }
+}
+
 function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
