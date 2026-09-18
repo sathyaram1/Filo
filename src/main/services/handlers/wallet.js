@@ -401,7 +401,7 @@ module.exports = function register(on, ctx) {
   // non ha niente da riscattare, e sentirselo dire è meglio di un silenzio.
   async function redeemFromInvite(code) {
     if (walletStore.personalKey()) {
-      const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer: questo invito puoi darlo a qualcun altro.');
+      const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer. Questo invito puoi darlo a qualcun altro.');
       return { ok: false, status: 'already_in', message: rec.text };
     }
     const out = await doRedeem(code);
