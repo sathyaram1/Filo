@@ -75,6 +75,15 @@
     if (confirmation) { note.textContent = confirmation; note.hidden = false; }
   }
   function renderWallet(w) {
+    // Un invito arrivato da fuori — il link aperto da un'altra applicazione, o
+    // il primo avvio dopo aver scaricato Filo dalla pagina dell'invito — ha
+    // cambiato il saldo senza che l'utente chiedesse niente. La pagina lo
+    // dice, una volta: poi il main se lo segna come già raccontato.
+    if (w && w.notice && w.notice.text && !w.notice.seenCredits) {
+      confirmation = w.notice.text;
+      w.notice.seenCredits = true;
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.WALLET_NOTICE_SEEN, where: 'credits' })).catch(() => {});
+    }
     renderWalletState(w);
     renderOwnKey(w);
     if (confirmation) {
