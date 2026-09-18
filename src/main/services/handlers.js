@@ -2653,7 +2653,7 @@ function buildNoKeyDashboard(settings, saved) {
   }
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
-    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, puoi mettere una tua chiave OpenRouter nelle Opzioni. Intanto, le tue pagine salvate sono qui.';
+    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 
