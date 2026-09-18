@@ -378,7 +378,7 @@
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
-    normalizeCode, formatCode, inviteLink, codeFromInput, inviteCodeFromDeepLink, inviteCodeFromArgv,
+    normalizeCode, formatCode, inviteLink, codeFromInput, isInviteDeepLink, inviteCodeFromDeepLink, filoUrlFromArgv,
     inviteView, inviteStateLine, entryNoticeText,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
