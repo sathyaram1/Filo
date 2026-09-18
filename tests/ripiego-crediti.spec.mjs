@@ -79,7 +79,7 @@ test.beforeAll(async () => {
         const msgs = Array.isArray(body.messages) ? body.messages : [];
         const last = msgs[msgs.length - 1] || {};
         seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
-        const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? 200 : 401);
+        const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? personalKeyStatus : 401);
         if (status !== 200) return json(res, status, { error: { message: status === 401 ? 'User not found.' : 'no', code: status } });
         res.writeHead(200, { 'Content-Type': 'text/event-stream' });
         const who = bearer === PERSONAL_KEY ? 'RISPOSTA-DALLA-PERSONALE' : 'RISPOSTA-DALLA-PROPRIA';
