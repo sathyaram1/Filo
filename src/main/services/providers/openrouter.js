@@ -534,6 +534,12 @@
   // `GET /auth/key` con la chiave come Bearer: etichetta, tetto (null = nessun
   // tetto), spesa, residuo. La pagina Crediti lo mostra per la chiave propria.
   // Nessun ripiego qui: la domanda è proprio su QUELLA chiave.
+  //
+  // Il tetto su una chiave è facoltativo e di solito non c'è: allora quello
+  // che resta da spendere è il credito dell'ACCOUNT (comprato meno consumato),
+  // che OpenRouter dice a `GET /credits` con la stessa chiave. Si chiede solo
+  // in quel caso, e se non risponde resta la sola spesa (primo giro di
+  // verifica del ramo).
   async function keyInfo({ apiKey, signal }) {
     const res = await fetch(AUTH_KEY_ENDPOINT, {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -542,12 +548,25 @@
     if (!res.ok) throw await httpError(res);
     const data = (await res.json()).data || {};
     const num = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
-    return {
+    const out = {
       label: typeof data.label === 'string' ? data.label : '',
       limit: num(data.limit),
       usage: num(data.usage) || 0,
       limit_remaining: num(data.limit_remaining),
+      account: null,
     };
+    if (out.limit == null) {
+      try {
+        const r2 = await fetch(CREDITS_ENDPOINT, { headers: { Authorization: `Bearer ${apiKey}` }, signal });
+        if (r2.ok) {
+          const d2 = (await r2.json()).data || {};
+          const credits = num(d2.total_credits);
+          const used = num(d2.total_usage);
+          if (credits != null) out.account = { credits, usage: used || 0 };
+        }
+      } catch (_) { out.account = null; }
+    }
+    return out;
   }
 
   global.SN_PROVIDER_OPENROUTER = {
