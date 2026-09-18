@@ -150,7 +150,7 @@
   // `inv` è già una vista (`W.inviteView`), o il dato grezzo del server: i
   // codici appena generati arrivano come stringa e valgono tre posti come
   // tutti gli altri.
-  function inviteItem(inv, createdAt) {
+  function inviteItem(inv, createdAt, { stato = true } = {}) {
     const view = inv && inv.max ? inv : W.inviteView(inv);
     const spento = view.exhausted || view.revoked;
     const li = document.createElement('li');
