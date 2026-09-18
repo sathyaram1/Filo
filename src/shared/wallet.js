@@ -139,11 +139,19 @@
 
   // Spesa e residuo della chiave propria, come li dice `GET /api/v1/auth/key`
   // di OpenRouter: { limit, usage, limit_remaining }. `limit` null = nessun
-  // tetto: allora solo la spesa.
-  function ownKeyBalanceLine({ limit, usage, limit_remaining } = {}) {
+  // tetto sulla chiave: allora quello che resta è il credito dell'account
+  // (`account`: { credits, usage } da `GET /api/v1/credits`), e senza nemmeno
+  // quello resta la sola spesa.
+  function ownKeyBalanceLine({ limit, usage, limit_remaining, account } = {}) {
     const usd = (n) => `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
     const spesa = `Spesi ${usd(usage)}`;
-    if (limit == null || !Number.isFinite(Number(limit))) return `${spesa} · nessun tetto`;
+    if (limit == null || !Number.isFinite(Number(limit))) {
+      if (account && Number.isFinite(Number(account.credits))) {
+        const resta = Math.max(0, Number(account.credits) - (Number(account.usage) || 0));
+        return `${spesa} · restano ${usd(resta)} sul tuo conto OpenRouter`;
+      }
+      return `${spesa} · nessun tetto`;
+    }
     const resta = limit_remaining != null && Number.isFinite(Number(limit_remaining))
       ? Number(limit_remaining)
       : Number(limit) - (Number(usage) || 0);
