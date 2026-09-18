@@ -333,8 +333,17 @@ test('input limite nel campo della chiave: vuoto, soli spazi, spazi attorno, die
     await page.click('#ownKeyRemoveBtn');
     await page.click('#ownKeyRemoveYes');
     await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 15_000 });
-    // Nessun tetto sulla chiave: solo la spesa.
-    await impostaOpenRouter(filo.app, { byKey: { [PROPRIA]: { keyInfo: { limit: null, usage: 0.5, limit_remaining: null } } } });
+    // Nessun tetto sulla chiave (il caso normale): quello che resta è il
+    // credito dell'account OpenRouter, e la riga lo dice (era il rilievo di
+    // livello 2 del primo giro: diceva solo «nessun tetto»).
+    await impostaOpenRouter(filo.app, { byKey: { [PROPRIA]: { keyInfo: { limit: null, usage: 0.5, limit_remaining: null }, account: { total_credits: 20, total_usage: 11.23 } } } });
+    await mettiChiave(page, PROPRIA);
+    await expect(page.locator('#ownKeyBalance')).toHaveText('Spesi 0,50 $ · restano 8,77 $ sul tuo conto OpenRouter', { timeout: 15_000 });
+    // Se OpenRouter non dice il credito dell'account, resta la sola spesa.
+    await page.click('#ownKeyRemoveBtn');
+    await page.click('#ownKeyRemoveYes');
+    await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 15_000 });
+    await impostaOpenRouter(filo.app, { byKey: { [PROPRIA]: { keyInfo: { limit: null, usage: 0.5, limit_remaining: null }, account: null } } });
     await mettiChiave(page, PROPRIA);
     await expect(page.locator('#ownKeyBalance')).toHaveText('Spesi 0,50 $ · nessun tetto', { timeout: 15_000 });
     // OpenRouter muto (500) sulla domanda: la riga lo dice, non resta «Chiedo a OpenRouter…».
