@@ -33,7 +33,9 @@ module.exports = function register(on, ctx) {
       // Le azioni già eseguite prima del guasto: la chat le tiene nello
       // storico, così il tentativo successivo sa cosa era già stato fatto.
       const actions = Array.isArray(e && e.filoActions) ? e.filoActions : [];
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', actions };
+      // Lo status HTTP del provider (401/402/403 = chiave rifiutata, #629): la
+      // scheda ci mette accanto la strada per la pagina Crediti.
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, actions };
     }
   });
 
