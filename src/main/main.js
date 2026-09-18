@@ -81,13 +81,16 @@ let mainWindow = null;
 //
 // ATTENZIONE: registrando `filo://` come protocollo di SISTEMA, il sistema
 // consegna all'app QUALUNQUE `filo://…` — anche un `filo://credits/credits.html`
-// messo in un link da un sito qualsiasi. Si accetta il solo host `invito`
-// (`SN_WALLET.inviteCodeFromDeepLink`); tutto il resto non apre niente e non
-// fa niente, in silenzio.
+// messo in un link da un sito qualsiasi. Si accetta il solo host `invito`;
+// tutto il resto non apre niente e non fa niente, in silenzio. Un invito col
+// codice storto, invece, si dice: l'ha cliccato una persona.
 //
 // Da dove arriva l'indirizzo: su Windows e Linux sta fra gli ARGOMENTI (del
 // primo avvio, o di `second-instance`); su Mac arriva con `open-url`, che va
 // agganciato prima che l'app sia pronta.
+//
+// Il pattern per intero:
+// patterns/un-protocollo-di-sistema-ti-consegna-tutto-filtra-lhost.md
 let invitoInAttesa = null;
 
 // `code` può essere null: il collegamento era un invito (host `invito`) ma il
