@@ -390,7 +390,8 @@
       }
     }
     return {
-      text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy, usage,
+      text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy,
+      keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
     };
   }
 
