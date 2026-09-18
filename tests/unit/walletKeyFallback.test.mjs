@@ -29,10 +29,10 @@ test('ripiegano solo i rifiuti della CHIAVE: 401, 402, 403; non rete, 429, 5xx, 
 });
 
 test('i testi del ripiego: riga in chat, nota in Crediti, coda della chiave, spesa e residuo', () => {
-  assert.match(W.ownKeyFallbackLine(401), /chiave OpenRouter.*rifiutata.*crediti di Filo/i);
+  assert.match(W.ownKeyFallbackLine(401), /OpenRouter ha rifiutato la tua chiave.*crediti di Filo/i);
   assert.match(W.ownKeyFallbackLine(402), /credito è finito/i);
   const note = W.ownKeyRefusalNote({ at: '2026-09-18T07:41:00.000Z', status: 401 });
-  assert.match(note, /rifiutata/i);
+  assert.match(note, /ha rifiutato/i);
   assert.match(note, /prova prima lei/i);
   assert.match(note, /18 set/i, `manca la data: ${note}`);
   assert.equal(W.keyTail('sk-or-v1-abcdef123456'), '123456');
