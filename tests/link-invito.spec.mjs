@@ -240,6 +240,14 @@ test(T_DEEP_LINK, async ({ app }) => {
   expect(seen.redeems, 'un filo:// che non è un invito non riscatta niente').toEqual([]);
   expect(await attendiPagina(app, 'credits', 0), 'e non apre la pagina che nomina').toBeNull();
 
+  // Un invito col codice storto, invece, è stato CLICCATO da qualcuno: Filo
+  // apre Crediti e dice cos'è andato storto, invece di non fare niente.
+  await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, ['filo.exe', 'filo://invito/ABCD'], process.cwd()); });
+  const storto = await attendiPagina(app, 'credits');
+  expect(storto, 'un invito storto porta comunque dove si legge il perché').toBeTruthy();
+  await expect(storto.locator('#walletNote')).toContainText('otto caratteri', { timeout: 15000 });
+  expect(seen.redeems, 'e non si spreca un giro dal server').toEqual([]);
+
   // L'invito vero, come arriva su Windows e Linux: fra gli argomenti della
   // seconda istanza, in una posizione qualsiasi.
   await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, ['filo.exe', 'filo://invito/abcd-efgh', '.'], process.cwd()); });
