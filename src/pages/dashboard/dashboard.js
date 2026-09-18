@@ -3420,13 +3420,12 @@
     // subito. Con l'intervista di benvenuto a schermo (#524) non parte niente:
     // un popup sopra l'accoglienza è la prima cosa che l'utente vedrebbe di Filo.
     if (onbState) return;
-    (async () => {
+    inCodaPopup(async () => {
       try {
-        await maybeShowInviteWelcome();
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
         if (!shown) await maybeShowFeedbackRewards();
       } catch (_) {}
-    })();
+    });
   })();
 
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
