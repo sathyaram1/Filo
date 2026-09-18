@@ -76,6 +76,15 @@ test('ogni esito del server ha una frase; uno sconosciuto cade su quella generic
   assert.equal(W.redeemMessage('boh'), W.REDEEM_MESSAGES.internal);
 });
 
+// Un invito vale per più persone: un rifiuto per posti finiti non si racconta
+// come «il codice è già stato usato», o chi l'ha ricevuto crede che se lo sia
+// speso chi gliel'ha mandato e va a chiedergliene un altro che non esiste.
+test('l’invito pieno si spiega coi posti finiti, non come un codice a un uso solo', () => {
+  const frase = W.redeemMessage('code_used');
+  assert.ok(!/gi[àa] stato usato/i.test(frase), frase);
+  assert.match(frase, /post[oi]/i);
+});
+
 test('il codice si estrae da quello che si incolla: riga intera, spazi, minuscole; il resto torna com\'è', () => {
   // Un codice già pulito passa com'è: lo normalizza il server.
   assert.equal(W.extractCode('ABCD-EFGH'), 'ABCD-EFGH');
