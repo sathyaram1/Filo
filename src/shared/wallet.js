@@ -193,5 +193,8 @@
     return m ? m[1] + m[2] : s;
   }
 
-  global.SN_WALLET = { USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES };
+  global.SN_WALLET = {
+    USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
+    isKeyRefusalStatus, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
