@@ -103,7 +103,11 @@ test('la chiave si mette in Crediti, si riconosce dagli ultimi sei caratteri, di
     await page.click('#ownKeyRemoveYes');
     await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('#ownKeyHave')).toBeHidden();
-    expect(await page.locator('#walletNote').innerText().catch(() => '')).not.toMatch(/tua chiave/i);
+    // La nota «stai usando la tua chiave» non deve restare a schermo (nascosta
+    // col testo vecchio dentro va bene: non si legge).
+    if (await page.locator('#walletNote').isVisible()) {
+      expect(await page.locator('#walletNote').innerText()).not.toMatch(/tua chiave/i);
+    }
     await opts.reload();
     await expect(opts.locator('#apiKey')).toHaveValue('', { timeout: 15_000 });
     // Da qui in poi paga la personale.
