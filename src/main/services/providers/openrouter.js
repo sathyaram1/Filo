@@ -531,10 +531,30 @@
     return { servedBy: name || null, costUsd: Number.isFinite(cost) ? cost : null };
   }
 
+  // ─── Cosa sa OpenRouter di una chiave ─────────────────────────────────────
+  // `GET /auth/key` con la chiave come Bearer: etichetta, tetto (null = nessun
+  // tetto), spesa, residuo. La pagina Crediti lo mostra per la chiave propria.
+  // Nessun ripiego qui: la domanda è proprio su QUELLA chiave.
+  async function keyInfo({ apiKey, signal }) {
+    const res = await fetch(AUTH_KEY_ENDPOINT, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal,
+    });
+    if (!res.ok) throw await httpError(res);
+    const data = (await res.json()).data || {};
+    const num = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    return {
+      label: typeof data.label === 'string' ? data.label : '',
+      limit: num(data.limit),
+      usage: num(data.usage) || 0,
+      limit_remaining: num(data.limit_remaining),
+    };
+  }
+
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy,
+    cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
-    ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT,
+    ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
