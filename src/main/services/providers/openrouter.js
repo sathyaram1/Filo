@@ -416,12 +416,10 @@
     if (Number.isFinite(sp) && sp > 0 && sp !== 1) body.speed = sp;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(SPEECH_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
-    });
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(SPEECH_ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
     if (!res.ok) throw await httpError(res);
     const buf = Buffer.from(await res.arrayBuffer());
     if (!buf.length) {
@@ -435,6 +433,7 @@
       audioBase64: buf.toString('base64'),
       mimeType,
       generationId: res.headers.get('x-generation-id') || null,
+      keyUsed, keySource, keyFallback,
     };
   }
 
