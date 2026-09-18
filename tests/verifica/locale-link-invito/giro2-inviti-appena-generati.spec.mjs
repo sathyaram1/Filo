@@ -75,9 +75,12 @@ test.beforeAll(async () => {
       }
       if (url === '/walletCreateInvites') {
         const n = Math.max(1, Math.floor(Number((body.data && body.data.count) || 1)));
+        // Codici nuovi, dell'alfabeto giusto, mai visti prima nella lista. Il
+        // server li TIENE: chi riapre la pagina li ritrova, e con essi quanti
+        // posti hanno.
+        const codes = Array.from({ length: n }, (_, i) => `EEEE${String(6666 + generati + i)}`.slice(0, 8));
         generati += n;
-        // Codici nuovi, dell'alfabeto giusto, mai visti prima nella lista.
-        const codes = Array.from({ length: n }, (_, i) => `EEEE${String(6666 + i)}`.slice(0, 8));
+        for (const code of codes) NUOVI.push({ code, max: 3, used: 0, uses: [], createdAt: '2026-09-18T09:00:00.000Z' });
         return json(res, 200, { result: { codes } });
       }
       json(res, 404, { error: { message: 'not found ' + url } });
