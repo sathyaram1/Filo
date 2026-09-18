@@ -382,6 +382,11 @@ export async function fintoOpenRouter(app, opts = {}) {
           if (st !== 200) return new Response(JSON.stringify({ error: { message: 'No auth credentials found', code: st } }), { status: st, headers: H });
           return new Response(JSON.stringify({ data: { label: 'finta', ...(per.keyInfo || base.keyInfo || {}) } }), { status: 200, headers: H });
         }
+        if (u.startsWith('https://openrouter.ai/api/v1/credits')) {
+          const acc = per.account !== undefined ? per.account : base.account;
+          if (!acc) return new Response(JSON.stringify({ error: { message: 'no', code: 404 } }), { status: 404, headers: H });
+          return new Response(JSON.stringify({ data: { total_credits: acc.total_credits, total_usage: acc.total_usage } }), { status: 200, headers: H });
+        }
         if (u.startsWith('https://openrouter.ai/api/v1/generation')) {
           return new Response(JSON.stringify({ data: { provider_name: 'FintoHost', total_cost: o.costUsd } }), { status: 200, headers: H });
         }
