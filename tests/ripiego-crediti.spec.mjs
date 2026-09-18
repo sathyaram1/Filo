@@ -129,7 +129,10 @@ test.beforeEach(() => {
   seen.completions.length = 0;
   seen.commits.length = 0;
   seen.keyInfo.length = 0;
+  seen.credits.length = 0;
   ownKeyStatus = 401;
+  personalKeyStatus = 200;
+  ownKeyLimit = 10;
   redeemed = false;
 });
 
