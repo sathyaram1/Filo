@@ -774,6 +774,9 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   return {
     text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
+    // La chiave propria è stata rifiutata e ha risposto la personale (#629):
+    // chi mostra la risposta lo dice all'utente.
+    keyFallback: result.keyFallback || null,
   };
 }
 
