@@ -21,7 +21,8 @@ test('ripiegano solo i rifiuti della CHIAVE: 401, 402, 403; non rete, 429, 5xx, 
   for (const st of [401, 402, 403]) assert.equal(W.isKeyRefusalStatus(st), true, `status ${st}`);
   for (const st of [0, 200, 400, 404, 408, 429, 500, 502, 503, undefined, null, 'x']) assert.equal(W.isKeyRefusalStatus(st), false, `status ${st}`);
   assert.equal(W.keyRefusalOf(Object.assign(new Error('OpenRouter 401: {"error":{"message":"User not found."}}'), { status: 401, provider: 'openrouter' })), 401);
-  assert.equal(W.keyRefusalOf(new Error('OpenRouter 403: moderation')), 403, 'anche senza status strutturato');
+  assert.equal(W.keyRefusalOf(new Error('OpenRouter 403: forbidden')), 403, 'anche senza status strutturato');
+  assert.equal(W.keyRefusalOf(new Error('OpenRouter 403: input flagged by moderation')), 0, 'un 403 di moderazione non è la chiave');
   assert.equal(W.keyRefusalOf(Object.assign(new Error('fetch failed'), { cause: { code: 'ENOTFOUND' } })), 0, 'rete');
   assert.equal(W.keyRefusalOf(Object.assign(new Error('OpenRouter 429: slow down'), { status: 429 })), 0);
   assert.equal(W.keyRefusalOf(Object.assign(new Error('OpenRouter 500: boom'), { status: 500 })), 0);
@@ -209,4 +210,60 @@ test('vale anche per lo streaming, la voce, la dettatura e i vettori: stesso pun
   const e = await P.embed({ apiKey: OWN, model: 'm', texts: ['a'] });
   assert.equal(e.keyUsed, PERSONAL); assert.equal(e.usage.keySource, 'personal');
   assert.deepEqual(calls.map((c) => c.key), [OWN, PERSONAL, OWN, PERSONAL, OWN, PERSONAL, OWN, PERSONAL]);
+});
+
+// ── Secondo giro di verifica del ramo ────────────────────────────────────────
+// OpenRouter documenta il 403 anche come moderazione del testo: non è la
+// chiave, non si ripiega, Crediti non segna un rifiuto, e la chat parla del
+// contenuto. Un 403 senza traccia di moderazione resta un rifiuto.
+test('un 403 di moderazione non è un rifiuto della chiave; uno senza moderazione sì', async () => {
+  const moderazione = '{"error":{"message":"Your chosen model requires moderation and your input was flagged","code":403,"metadata":{"reasons":["sexual"],"flagged_input":"…"}}}';
+  assert.equal(W.isModerationBlock(moderazione), true);
+  assert.equal(W.isModerationBlock('{"error":{"message":"forbidden"}}'), false);
+  assert.equal(W.isKeyRefusal(403, moderazione), false);
+  assert.equal(W.isKeyRefusal(403, '{"error":{"message":"forbidden"}}'), true);
+  assert.equal(W.isKeyRefusal(401, moderazione), true, '401 e 402 sono sempre la chiave');
+  assert.equal(W.isKeyRefusal(402, ''), true);
+  const eMod = Object.assign(new Error(`OpenRouter 403: ${moderazione}`), { status: 403, provider: 'openrouter' });
+  assert.equal(W.keyRefusalOf(eMod), 0);
+  assert.equal(W.keyRefusalOf(Object.assign(new Error('OpenRouter 403: {"error":{"message":"forbidden"}}'), { status: 403 })), 403);
+  const frase = CE.friendly(eMod);
+  assert.match(frase, /moderazione/i, frase);
+  assert.match(frase, /chiave è a posto/i, frase);
+  assert.ok(!/rifiutato la tua chiave/i.test(frase), frase);
+
+  // Nel provider: la chiave propria riceve il 403 di moderazione, nessun
+  // secondo tentativo con la personale, nessun rifiuto registrato, e
+  // l'errore che risale porta il corpo (per la frase in chat).
+  globalThis.fetch = async (url, init) => {
+    const key = String(init.headers.Authorization || '').replace('Bearer ', '');
+    calls.push({ url, key });
+    if (key === OWN) return new Response(moderazione, { status: 403, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }], usage: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  await assert.rejects(P.complete({ apiKey: OWN, model: 'm', messages: [] }), (e) => e.status === 403 && /flagged/.test(e.message) && W.keyRefusalOf(e) === 0);
+  assert.deepEqual(calls.map((c) => c.key), [OWN]);
+  assert.equal(refusals.length, 0);
+});
+
+test('la chiave propria che risponde: il tenutario lo viene a sapere (il rifiuto ricordato si supera); non dopo un ripiego né con la personale', async () => {
+  const successi = [];
+  globalThis.SN_WALLET_MAIN.noteOwnKeySuccess = async () => { successi.push(Date.now()); };
+  await P.complete({ apiKey: OWN, model: 'm', messages: [] });
+  assert.equal(successi.length, 1, 'chiamata buona con la propria');
+  await P.complete({ apiKey: PERSONAL, model: 'm', messages: [] });
+  assert.equal(successi.length, 1, 'con la personale niente');
+  statusFor = { [OWN]: 402 };
+  await P.complete({ apiKey: OWN, model: 'm', messages: [] });
+  assert.equal(successi.length, 1, 'dopo un ripiego ha risposto la personale, non la propria');
+  statusFor = { [OWN]: 500 };
+  await assert.rejects(P.complete({ apiKey: OWN, model: 'm', messages: [] }));
+  assert.equal(successi.length, 1, 'una risposta cattiva non conta');
+});
+
+test('quanto resta con un tetto sulla chiave: il minore fra il residuo del tetto e il credito del conto', () => {
+  assert.equal(W.ownKeyBalanceLine({ limit: 10, usage: 1.23, limit_remaining: 8.77, account: { credits: 20, usage: 18 } }), 'Spesi 1,23 $ · restano 2,00 $ sul tuo conto OpenRouter, meno del tetto della chiave (10,00 $)');
+  assert.equal(W.ownKeyBalanceLine({ limit: 10, usage: 1.23, limit_remaining: 8.77, account: { credits: 20, usage: 5 } }), 'Spesi 1,23 $ · restano 8,77 $ su 10,00 $', 'col conto più alto conta il tetto');
+  assert.equal(W.ownKeyBalanceLine({ limit: 10, usage: 1.23, limit_remaining: 8.77, account: { credits: 20, usage: 20 } }), 'Spesi 1,23 $ · restano 0,00 $ sul tuo conto OpenRouter, meno del tetto della chiave (10,00 $)', 'conto a zero');
+  assert.equal(W.ownKeyBalanceLine({ limit: 10, usage: 1.23, limit_remaining: 8.77, account: null }), 'Spesi 1,23 $ · restano 8,77 $ su 10,00 $', 'senza il conto resta il tetto');
 });

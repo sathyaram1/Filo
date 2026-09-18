@@ -33,6 +33,7 @@ const seen = { completions: [], commits: [], keyInfo: [], credits: [] };
 let ownKeyStatus = 401; // cosa risponde OpenRouter alla chiave propria
 let personalKeyStatus = 200; // …e alla personale (402 = anche i crediti di Filo finiti)
 let ownKeyLimit = 10;   // il tetto della chiave propria; null = nessun tetto
+let ownKeyUsage = 1.5;  // quanto la chiave propria ha speso, secondo OpenRouter
 let redeemed = false;   // il portafoglio esiste solo dopo il riscatto (ogni test riparte da zero)
 
 function json(res, status, body) {
@@ -82,6 +83,8 @@ test.beforeAll(async () => {
         const last = msgs[msgs.length - 1] || {};
         seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
         const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? personalKeyStatus : 401);
+        // Il 403 è quello della moderazione, come lo scrive OpenRouter: non è la chiave.
+        if (status === 403) return json(res, 403, { error: { message: 'Your chosen model requires moderation and your input was flagged', code: 403, metadata: { reasons: ['x'], flagged_input: '…' } } });
         if (status !== 200) return json(res, status, { error: { message: status === 401 ? 'User not found.' : 'no', code: status } });
         res.writeHead(200, { 'Content-Type': 'text/event-stream' });
         const who = bearer === PERSONAL_KEY ? 'RISPOSTA-DALLA-PERSONALE' : 'RISPOSTA-DALLA-PROPRIA';
@@ -93,8 +96,8 @@ test.beforeAll(async () => {
       if (url === '/api/v1/auth/key') {
         seen.keyInfo.push(bearer);
         if (bearer !== OWN_KEY && !bearer.startsWith('sk-or-v1-new')) return json(res, 401, { error: { message: 'User not found.' } });
-        if (ownKeyLimit == null) return json(res, 200, { data: { label: 'la mia', limit: null, usage: 1.5, limit_remaining: null } });
-        return json(res, 200, { data: { label: 'la mia', limit: ownKeyLimit, usage: 1.5, limit_remaining: ownKeyLimit - 1.5 } });
+        if (ownKeyLimit == null) return json(res, 200, { data: { label: 'la mia', limit: null, usage: ownKeyUsage, limit_remaining: null } });
+        return json(res, 200, { data: { label: 'la mia', limit: ownKeyLimit, usage: ownKeyUsage, limit_remaining: ownKeyLimit - ownKeyUsage } });
       }
       // Il credito dell'account: quello che resta a una chiave senza tetto.
       if (url === '/api/v1/credits') {
@@ -133,6 +136,7 @@ test.beforeEach(() => {
   ownKeyStatus = 401;
   personalKeyStatus = 200;
   ownKeyLimit = 10;
+  ownKeyUsage = 1.5;
   redeemed = false;
 });
 
@@ -430,4 +434,69 @@ test('(E) le Impostazioni già aperte non si portano via la chiave messa in Cred
   await new Promise((r) => setTimeout(r, 1500));
   expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).apiKeys.openrouter)).toBe('');
   await expect(page.locator('#ownKeyForm')).toBeVisible();
+});
+
+// ── Secondo giro di verifica del ramo ────────────────────────────────────────
+//  (F) il rifiuto ricordato in Crediti si supera da solo quando la chiave torna
+//      a rispondere (conto ricaricato), e la riga della spesa si aggiorna con
+//      la pagina aperta, senza ricaricarla;
+//  (G) un 403 di moderazione non è la chiave: nessun ripiego, nessun rifiuto
+//      in Crediti, e la chat parla del contenuto, senza il tasto «Apri Crediti».
+test('(F) la chiave torna a funzionare: Crediti dimentica il rifiuto e aggiorna la spesa, a pagina aperta', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtabPage(app);
+  await expect(home.locator('#input')).toBeVisible();
+  const credits = await redeemWallet(openTab);
+  await prepare(app);
+  await credits.reload();
+  await expect(credits.locator('#ownKeyBalance')).toContainText('Spesi 1,50 $', { timeout: 15000 });
+
+  // Rifiutata (401): il ripiego, e Crediti lo ricorda.
+  await home.locator('#input').fill('ciao rifiuto');
+  await home.locator('#sendBtn').click();
+  await expect(home.locator('.dash-bubble-filo').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
+  await expect(credits.locator('#ownKeyRefusal')).toBeVisible({ timeout: 15000 });
+
+  // Il conto viene ricaricato: la chiave risponde, e ha speso di più.
+  ownKeyStatus = 200;
+  ownKeyUsage = 2.5;
+  await home.locator('#input').fill('ciao di nuovo');
+  await home.locator('#sendBtn').click();
+  await expect(home.locator('.dash-bubble-filo').last()).toContainText('RISPOSTA-DALLA-PROPRIA', { timeout: 30000 });
+  // SUCCESSO: la pagina Crediti, ancora aperta, non dice più che la chiave è
+  // rifiutata, e la riga della spesa è quella nuova. Senza il fix la riga
+  // rossa restava (per sempre) e la spesa a 1,50 fino al ricaricamento.
+  await expect(credits.locator('#ownKeyRefusal')).toBeHidden({ timeout: 15000 });
+  await expect(credits.locator('#ownKeyBalance')).toContainText('Spesi 2,50 $', { timeout: 15000 });
+  await expect(credits.locator('#ownKeyRule')).toContainText('prova prima lei');
+  // E ricaricata dice lo stesso: il rifiuto è dimenticato davvero, non solo nascosto.
+  await credits.reload();
+  await expect(credits.locator('#ownKeyHave')).toBeVisible({ timeout: 15000 });
+  await expect(credits.locator('#ownKeyRefusal')).toBeHidden();
+});
+
+test('(G) un 403 di moderazione non è la chiave: nessun ripiego, nessun rifiuto in Crediti, la chat parla del contenuto', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 403;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtabPage(app);
+  await expect(home.locator('#input')).toBeVisible();
+  const credits = await redeemWallet(openTab);
+  await prepare(app);
+
+  await home.locator('#input').fill('testo segnalato');
+  await home.locator('#sendBtn').click();
+  const bolla = home.locator('.dash-bubble-filo').last();
+  await expect(bolla).toContainText('moderazione', { timeout: 30000 });
+  await expect(bolla).toContainText('chiave è a posto');
+  await expect(bolla.locator('button', { hasText: 'Apri Crediti' })).toHaveCount(0);
+  // Una chiamata sola: la stessa richiesta non si rimanda coi crediti di Filo.
+  const mine = seen.completions.filter((c) => c.tools && c.lastRole === 'user' && c.lastText.includes('testo segnalato'));
+  expect(mine.map((c) => c.key)).toEqual([OWN_KEY]);
+  // Crediti non segna un rifiuto.
+  await credits.reload();
+  await expect(credits.locator('#ownKeyHave')).toBeVisible({ timeout: 15000 });
+  await expect(credits.locator('#ownKeyRefusal')).toBeHidden();
+  await expect(credits.locator('#ownKeyRule')).toContainText('prova prima lei');
 });

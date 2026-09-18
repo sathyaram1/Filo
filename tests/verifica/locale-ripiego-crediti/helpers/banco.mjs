@@ -347,7 +347,8 @@ export async function apriCrediti(openTab) {
 // OpenRouter (modelli) e Firestore (registro d'uso) finti DENTRO l'app:
 // `fetch` del processo principale viene avvolto. `opts`:
 //   status, text, costUsd     la risposta di default (per ogni chiave);
-//   byKey: { '<chiave>': { status?, text?, keyInfo?: { limit, usage, limit_remaining }, keyInfoStatus? } }
+//   byKey: { '<chiave>': { status?, text?, moderation?, keyInfo?: { limit, usage, limit_remaining }, keyInfoStatus? } }
+//                             (moderation: true col 403 = il corpo della moderazione, non la chiave)
 //                             la risposta per UNA chiave (la propria, la personale);
 //   keyInfo                   spesa e residuo di default per /auth/key;
 //   account                   { total_credits, total_usage } per /credits (il
@@ -394,7 +395,13 @@ export async function fintoOpenRouter(app, opts = {}) {
           return new Response(JSON.stringify({ data: { provider_name: 'FintoHost', total_cost: o.costUsd } }), { status: 200, headers: H });
         }
         if (o.status !== 200) {
-          const msg = o.status === 402 ? 'Key limit exceeded' : (o.status === 401 ? 'No auth credentials found' : (o.status === 403 ? 'Input flagged by moderation' : (o.status === 429 ? 'Rate limited' : 'boom')));
+          // I corpi come li scrive OpenRouter: un 403 è «permessi insufficienti»
+          // (la chiave), oppure la moderazione del testo se chi prova lo chiede
+          // con `moderation: true` (secondo giro: quello non è la chiave).
+          if (o.status === 403 && per.moderation) {
+            return new Response(JSON.stringify({ error: { message: 'Your chosen model requires moderation and your input was flagged', code: 403, metadata: { reasons: ['x'], flagged_input: '…' } } }), { status: 403, headers: H });
+          }
+          const msg = o.status === 402 ? 'Key limit exceeded' : (o.status === 401 ? 'No auth credentials found' : (o.status === 403 ? 'Forbidden: insufficient permissions' : (o.status === 429 ? 'Rate limited' : 'boom')));
           return new Response(JSON.stringify({ error: { message: msg, code: o.status } }), { status: o.status, headers: H });
         }
         const usage = { prompt_tokens: 12, completion_tokens: 5, cost: o.costUsd };

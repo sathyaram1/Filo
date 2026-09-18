@@ -183,7 +183,7 @@ test('un 403 (OpenRouter blocca la richiesta per moderazione) non è la chiave: 
     const page = await apriCrediti(filo.openTab);
     await riscatta(page, code);
     // L'input è bloccato dalla moderazione: lo è con qualunque chiave.
-    await fintoOpenRouter(filo.app, { byKey: { [PROPRIA]: { status: 403 }, [chiavePersonale()]: { status: 403 } } });
+    await fintoOpenRouter(filo.app, { byKey: { [PROPRIA]: { status: 403, moderation: true }, [chiavePersonale()]: { status: 403, moderation: true } } });
     await mettiChiave(page, PROPRIA);
     const dash = await apriHome(filo);
     const bolla = await chiediInChat(dash, 'testo bloccato');
