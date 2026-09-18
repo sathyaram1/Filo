@@ -568,17 +568,18 @@
       limit_remaining: num(data.limit_remaining),
       account: null,
     };
-    if (out.limit == null) {
-      try {
-        const r2 = await fetch(CREDITS_ENDPOINT, { headers: { Authorization: `Bearer ${apiKey}` }, signal });
-        if (r2.ok) {
-          const d2 = (await r2.json()).data || {};
-          const credits = num(d2.total_credits);
-          const used = num(d2.total_usage);
-          if (credits != null) out.account = { credits, usage: used || 0 };
-        }
-      } catch (_) { out.account = null; }
-    }
+    // Il credito del conto serve sempre: è quello che resta a una chiave
+    // senza tetto, e con un tetto è il numero che conta quando il conto ha
+    // meno del residuo del tetto (secondo giro di verifica del ramo).
+    try {
+      const r2 = await fetch(CREDITS_ENDPOINT, { headers: { Authorization: `Bearer ${apiKey}` }, signal });
+      if (r2.ok) {
+        const d2 = (await r2.json()).data || {};
+        const credits = num(d2.total_credits);
+        const used = num(d2.total_usage);
+        if (credits != null) out.account = { credits, usage: used || 0 };
+      }
+    } catch (_) { out.account = null; }
     return out;
   }
 
