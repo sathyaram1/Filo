@@ -320,12 +320,12 @@
     if (r) reqBody.reasoning = r;
     const pb = providerBlock(providerRouting);
     if (pb) reqBody.provider = pb;
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(reqBody),
-      signal,
-    });
+    const payload = JSON.stringify(reqBody);
+    // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
+    // il ripiego qui non ha ancora niente da azzerare nel chiamante.
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
     if (!res.ok || !res.body) {
       const errText = await res.text().catch(() => '');
       const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
