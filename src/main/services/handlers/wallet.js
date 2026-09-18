@@ -479,7 +479,7 @@ module.exports = function register(on, ctx) {
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
-    keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
+    keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
   };

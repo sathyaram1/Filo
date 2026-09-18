@@ -130,9 +130,11 @@
     }
   }
 
-  async function loadOwnKeyInfo() {
+  // `quiet`: la riga resta com'è finché non arriva la nuova (dopo una
+  // chiamata pagata con la chiave, non al primo giro).
+  async function loadOwnKeyInfo({ quiet = false } = {}) {
     const el = $('ownKeyBalance');
-    el.textContent = 'Chiedo a OpenRouter…';
+    if (!quiet) el.textContent = 'Chiedo a OpenRouter…';
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWN_KEY_INFO }); } catch (_) { r = null; }
     if (!$('ownKeyHave').hidden) {
