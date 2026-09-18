@@ -1,18 +1,16 @@
-// Banco del giro sul ramo -b: copia del banco del quinto giro, con UNA differenza:
-// il riscatto passa al servizio i crediti locali dichiarati dall'app
-// (data.localCredits), come fa la funzione vera in filo-security/functions/index.js.
-// Banco di prova del quinto giro di verifica sui crediti (#598).
+// Banco del giro di verifica sul ramo ripiego-crediti (la chiave OpenRouter
+// propria con ripiego sui crediti di Filo). Copia del banco dei giri sul
+// ramo -b del #598, con UNA differenza: l'OpenRouter finto dentro l'app
+// risponde PER CHIAVE (`byKey`): la chiave propria può essere rifiutata
+// (401/402/403) mentre la personale risponde, e `/auth/key` dice spesa e
+// residuo di ciascuna. `/generation` risponde come il router vero.
 //
 // Un server HTTP locale prende il posto di TRE cose che in produzione stanno
 // su Google: l'identità anonima (accounts:signUp), il rinnovo del token
 // (securetoken) e le funzioni `wallet*` di filo-security. Le funzioni non
 // sono finte: è il servizio VERO di filo-security (src/wallet/service.js),
 // fatto girare sopra un archivio in memoria e un OpenRouter delle chiavi
-// finto. Così quello che l'app riceve è quello che riceverebbe dal server,
-// e quello che il server decide è deciso dal suo codice.
-//
-// Dentro l'app, OpenRouter (le chiamate ai modelli) e Firestore (il registro
-// d'uso) si intercettano sostituendo `fetch` nel processo principale.
+// finto.
 
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
@@ -270,7 +268,7 @@ export const ENV_OFFLINE = {
   FILO_ADMIN_EMAILS: OWNER_EMAIL,
 };
 
-export async function avviaFilo({ userData = cartellaTemporanea('filo-598-'), env = {} } = {}) {
+export async function avviaFilo({ userData = cartellaTemporanea('filo-ripiego-'), env = {} } = {}) {
   const app = await electron.launch({
     args: [...argomentiScala, '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9', '.'],
     cwd: APP_ROOT,
@@ -347,15 +345,19 @@ export async function apriCrediti(openTab) {
 }
 
 // OpenRouter (modelli) e Firestore (registro d'uso) finti DENTRO l'app:
-// `fetch` del processo principale viene avvolto. `opts` si può cambiare dopo
-// con `impostaOpenRouter`.
+// `fetch` del processo principale viene avvolto. `opts`:
+//   status, text, costUsd     la risposta di default (per ogni chiave);
+//   byKey: { '<chiave>': { status?, text?, keyInfo?: { limit, usage, limit_remaining }, keyInfoStatus? } }
+//                             la risposta per UNA chiave (la propria, la personale);
+//   keyInfo                   spesa e residuo di default per /auth/key.
+// Si cambia dopo con `impostaOpenRouter`.
 export async function fintoOpenRouter(app, opts = {}) {
   await app.evaluate(({}, o) => {
     const g = globalThis;
     if (!g.__orOrig) g.__orOrig = g.fetch;
     g.__orCalls = [];
     g.__fsCommits = [];
-    g.__orOpts = { status: 200, text: 'Ciao dal modello finto.', costUsd: 0.0021, ...o };
+    g.__orOpts = { status: 200, text: 'Ciao dal modello finto.', costUsd: 0.0021, byKey: {}, keyInfo: { limit: 10, usage: 1.23, limit_remaining: 8.77 }, ...o };
     const headerOf = (h, name) => {
       if (!h) return '';
       if (typeof h.get === 'function') return h.get(name) || '';
@@ -367,28 +369,40 @@ export async function fintoOpenRouter(app, opts = {}) {
       if (u.startsWith('https://openrouter.ai/')) {
         let body = {};
         try { body = init && init.body ? JSON.parse(init.body) : {}; } catch (_) {}
-        g.__orCalls.push({ url: u, auth: headerOf(init && init.headers, 'authorization'), model: body.model, stream: Boolean(body.stream), at: Date.now() });
-        const o = g.__orOpts;
+        const auth = headerOf(init && init.headers, 'authorization');
+        const key = auth.replace(/^Bearer\s+/i, '');
+        g.__orCalls.push({ url: u, auth, key, model: body.model, stream: Boolean(body.stream), at: Date.now() });
+        const base = g.__orOpts;
+        const per = (base.byKey && base.byKey[key]) || {};
+        const o = { ...base, ...per };
         const H = { 'Content-Type': 'application/json' };
         if (u.endsWith('/models')) return new Response(JSON.stringify({ data: [] }), { status: 200, headers: H });
+        if (u.startsWith('https://openrouter.ai/api/v1/auth/key')) {
+          const st = per.keyInfoStatus || ([401, 402, 403].includes(o.status) ? o.status : 200);
+          if (st !== 200) return new Response(JSON.stringify({ error: { message: 'No auth credentials found', code: st } }), { status: st, headers: H });
+          return new Response(JSON.stringify({ data: { label: 'finta', ...(per.keyInfo || base.keyInfo || {}) } }), { status: 200, headers: H });
+        }
+        if (u.startsWith('https://openrouter.ai/api/v1/generation')) {
+          return new Response(JSON.stringify({ data: { provider_name: 'FintoHost', total_cost: o.costUsd } }), { status: 200, headers: H });
+        }
         if (o.status !== 200) {
-          const msg = o.status === 402 ? 'Key limit exceeded' : (o.status === 429 ? 'Rate limited' : 'boom');
+          const msg = o.status === 402 ? 'Key limit exceeded' : (o.status === 401 ? 'No auth credentials found' : (o.status === 403 ? 'Input flagged by moderation' : (o.status === 429 ? 'Rate limited' : 'boom')));
           return new Response(JSON.stringify({ error: { message: msg, code: o.status } }), { status: o.status, headers: H });
         }
         const usage = { prompt_tokens: 12, completion_tokens: 5, cost: o.costUsd };
         if (body.stream) {
           const lines = [
-            `data: ${JSON.stringify({ id: 'x', provider: 'FintoHost', choices: [{ index: 0, delta: { content: o.text } }] })}\n\n`,
-            `data: ${JSON.stringify({ id: 'x', provider: 'FintoHost', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage })}\n\n`,
+            `data: ${JSON.stringify({ id: 'gen-x', provider: 'FintoHost', choices: [{ index: 0, delta: { content: o.text } }] })}\n\n`,
+            `data: ${JSON.stringify({ id: 'gen-x', provider: 'FintoHost', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage })}\n\n`,
             'data: [DONE]\n\n',
           ];
           return new Response(lines.join(''), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
         }
-        return new Response(JSON.stringify({ id: 'x', provider: 'FintoHost', choices: [{ index: 0, message: { role: 'assistant', content: o.text }, finish_reason: 'stop' }], usage }), { status: 200, headers: H });
+        return new Response(JSON.stringify({ id: 'gen-x', provider: 'FintoHost', choices: [{ index: 0, message: { role: 'assistant', content: o.text }, finish_reason: 'stop' }], usage }), { status: 200, headers: H });
       }
       if (u.includes('firestore.googleapis.com') && u.includes(':commit')) {
         let b = null; try { b = JSON.parse(init.body); } catch (_) {}
-        g.__fsCommits.push({ auth: headerOf(init && init.headers, 'authorization'), body: b });
+        g.__fsCommits.push({ auth: headerOf(init && init.headers, 'authorization'), body: b, at: Date.now() });
         return new Response(JSON.stringify({ writeResults: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
       return g.__orOrig(url, init);
@@ -396,8 +410,29 @@ export async function fintoOpenRouter(app, opts = {}) {
   }, opts);
 }
 export async function impostaOpenRouter(app, opts) {
-  await app.evaluate(({}, o) => { globalThis.__orOpts = { ...globalThis.__orOpts, ...o }; }, opts);
+  await app.evaluate(({}, o) => {
+    const prev = globalThis.__orOpts || {};
+    globalThis.__orOpts = { ...prev, ...o, byKey: { ...(prev.byKey || {}), ...(o.byKey || {}) } };
+  }, opts);
 }
+// Le righe del registro d'uso arrivate a Firestore, già piatte (un oggetto per riga).
+export async function righeRegistro(app) {
+  const commits = await commitFirestore(app);
+  const rows = [];
+  for (const c of commits) {
+    for (const w of (c.body && c.body.writes) || []) {
+      const f = (w.update && w.update.fields) || {};
+      const row = {};
+      for (const [k, v] of Object.entries(f)) {
+        const t = Object.keys(v)[0];
+        row[k] = t === 'integerValue' || t === 'doubleValue' ? Number(v[t]) : v[t];
+      }
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
 export async function chiamateOpenRouter(app) { return app.evaluate(() => globalThis.__orCalls || []); }
 export async function commitFirestore(app) { return app.evaluate(() => globalThis.__fsCommits || []); }
 
