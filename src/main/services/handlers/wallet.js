@@ -138,9 +138,15 @@ module.exports = function register(on, ctx) {
   // { ok, identity:{ ok, error? }, hasPersonalKey, pseudonym, usingOwnKey,
   //   server: <walletState> | null, error? }
   async function readState() {
+    const own = await ownKey();
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
-      usingOwnKey: await ownKeySet(), keySource: await keySource(), isOwner: Boolean(ctx.isAdmin()), server: null,
+      usingOwnKey: Boolean(own), keySource: await keySource(), isOwner: Boolean(ctx.isAdmin()), server: null,
+      // La chiave propria, per riconoscerla senza mostrarla; l'ultimo rifiuto
+      // (#629); lo stato del registro d'uso (righe in attesa e l'ultimo
+      // errore di scrittura: un registro che non si scrive non è un segreto).
+      ownKeyTail: W.keyTail(own), ownKeyRefusal: own ? await lastOwnKeyRefusal() : null,
+      usageLog: usageLogStatus(),
     };
     try {
       await identity.getIdToken();
