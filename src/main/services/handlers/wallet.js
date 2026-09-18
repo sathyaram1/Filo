@@ -293,6 +293,120 @@ module.exports = function register(on, ctx) {
 
   on(MSG.WALLET_REDEEM, filoOnly(async (msg) => doRedeem((msg && msg.code) || '')));
 
+  // ── L'invito che arriva da fuori (#651) ───────────────────────────────────
+  // Due strade portano un invito dentro Filo senza far ricopiare niente a
+  // nessuno:
+  //   - il PRIMO AVVIO dopo aver scaricato Filo dalla pagina del link: il
+  //     server ha segnato l'apertura (l'impronta dell'indirizzo, un'ora di
+  //     tempo) e `walletPendingInvite` la ridà a chi arriva da lì;
+  //   - il collegamento `filo://invito/<codice>`, per chi Filo ce l'ha già:
+  //     apre Filo, o lo porta davanti, e riscatta.
+  // In tutti e due i casi l'utente non ha chiesto niente e non sta guardando
+  // la pagina Crediti: l'esito si scrive qui e lo raccontano la home e la
+  // pagina Crediti. Un riscatto silenzioso è indistinguibile da un invito
+  // perso.
+  const NOTICE_KEY = 'walletNotice';
+  const NOTICE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+  async function setNotice(kind, text) {
+    const rec = { kind, text: String(text || ''), at: new Date().toISOString(), seenHome: false, seenCredits: false };
+    try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {}
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    return rec;
+  }
+
+  // L'avviso ancora da mostrare, o null. Sparisce quando l'hanno visto tutte
+  // e due le superfici, e comunque dopo una settimana: un benvenuto che
+  // ricompare a ogni avvio per sempre diventa rumore.
+  async function readNotice() {
+    let r = null;
+    try { r = await globalThis.SN_STORAGE.getRaw(NOTICE_KEY, null); } catch (_) { return null; }
+    if (!r || !r.text) return null;
+    const at = Date.parse(String(r.at || ''));
+    const scaduto = !Number.isFinite(at) || Date.now() - at > NOTICE_TTL_MS;
+    if (scaduto || (r.seenHome && r.seenCredits)) {
+      try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, null); } catch (_) {}
+      return null;
+    }
+    return r;
+  }
+
+  on(MSG.WALLET_NOTICE_SEEN, filoOnly(async (msg) => {
+    const where = String((msg && msg.where) || '');
+    let r = null;
+    try { r = await globalThis.SN_STORAGE.getRaw(NOTICE_KEY, null); } catch (_) {}
+    if (!r) return { ok: true };
+    if (where === 'home') r.seenHome = true;
+    else if (where === 'credits') r.seenCredits = true;
+    else return { ok: false, error: 'bad_where' };
+    try {
+      await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, r.seenHome && r.seenCredits ? null : r);
+    } catch (_) {}
+    return { ok: true };
+  }));
+
+  // Il segno del «ci ho già provato»: { since, done }. Senza `done`, l'invito
+  // in attesa si richiede a ogni avvio per un giorno — un server muto al
+  // primo avvio non deve costare l'invito.
+  const PENDING_KEY = 'walletPendingInvite';
+  const PENDING_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  async function markPending(patch) {
+    let cur = null;
+    try { cur = await globalThis.SN_STORAGE.getRaw(PENDING_KEY, null); } catch (_) {}
+    const rec = { since: (cur && cur.since) || new Date().toISOString(), done: false, ...(cur || {}), ...patch };
+    try { await globalThis.SN_STORAGE.setRaw(PENDING_KEY, rec); } catch (_) {}
+    return rec;
+  }
+
+  // Primo avvio: c'è un invito che aspetta questa installazione? Non blocca
+  // niente e non dice niente se non c'è.
+  async function tryPendingInvite() {
+    if (walletStore.personalKey()) return null;
+    let mark = null;
+    try { mark = await globalThis.SN_STORAGE.getRaw(PENDING_KEY, null); } catch (_) {}
+    if (mark && mark.done) return null;
+    const since = mark && mark.since ? Date.parse(String(mark.since)) : NaN;
+    if (Number.isFinite(since) && Date.now() - since > PENDING_WINDOW_MS) {
+      await markPending({ done: true });
+      return null;
+    }
+    await markPending({});
+    let r = null;
+    try {
+      r = await callable('walletPendingInvite');
+    } catch (e) {
+      // Server muto, o identità non ancora pronta: non è un errore
+      // dell'utente, non ferma l'avvio, e si riprova domani.
+      console.info('[wallet] invito in attesa: il server non risponde, riprovo al prossimo avvio');
+      return null;
+    }
+    if (!r || r.status !== 'ok' || !r.code) return null;
+    const out = await doRedeem(r.code);
+    if (out && out.ok) {
+      await markPending({ done: true });
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+    }
+    return out;
+  }
+
+  // Il codice arrivato da `filo://invito/<codice>`. Chi ha già un portafoglio
+  // non ha niente da riscattare, e sentirselo dire è meglio di un silenzio.
+  async function redeemFromInvite(code) {
+    if (walletStore.personalKey()) {
+      const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer: questo invito puoi darlo a qualcun altro.');
+      return { ok: false, status: 'already_in', message: rec.text };
+    }
+    const out = await doRedeem(code);
+    if (out && out.ok) {
+      await markPending({ done: true });
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+    } else {
+      await setNotice('failed', (out && out.message) || W.redeemMessage('internal'));
+    }
+    return out;
+  }
+
   // ── Owner ─────────────────────────────────────────────────────────────────
   const ownerOnly = (fn) => filoOnly(async (msg) => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
