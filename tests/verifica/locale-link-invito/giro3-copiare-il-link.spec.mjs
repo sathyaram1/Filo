@@ -13,7 +13,14 @@
 import { createServer } from 'node:http';
 import { test, expect } from '../../fixtures/electron.mjs';
 
+const OWNER_EMAIL = 'owner@prova.test';
+const OWNER_REFRESH = 'rt-owner';
 let server;
+
+function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
+function jwt(uid, extra = {}) {
+  return `${b64url(JSON.stringify({ alg: 'none' }))}.${b64url(JSON.stringify({ user_id: uid, sub: uid, ...extra }))}.firma`;
+}
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
