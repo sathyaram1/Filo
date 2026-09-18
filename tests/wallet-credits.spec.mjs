@@ -145,7 +145,9 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   // la chiave effettiva è quella personale.
   const source = await app.evaluate(() => globalThis.SN_WALLET_MAIN.keySource());
   expect(source).toBe('personal');
-  expect(seen.redeems).toEqual(['ZZZZ-9999', 'abcd-efgh']);
+  // Al server arriva il codice normalizzato, non quello che l'utente ha
+  // scritto: trattini, spazi e minuscole li toglie l'app (#651).
+  expect(seen.redeems).toEqual(['ZZZZ9999', 'ABCDEFGH']);
 
   // Una pagina web non legge saldo e codici né riscatta: forbidden. Da
   // filo:// la stessa chiamata passa.
