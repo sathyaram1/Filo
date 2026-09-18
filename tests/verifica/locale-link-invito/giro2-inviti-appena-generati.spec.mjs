@@ -17,6 +17,8 @@ const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
 let server;
 let generati = 0;
+// I codici generati durante la prova: il server li conserva, come quello vero.
+const NUOVI = [];
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
@@ -68,7 +70,7 @@ test.beforeAll(async () => {
           result: {
             config: { invitesRemaining: 9, entryCredits: 5000, dailyCredits: 100, eurUsd: 1.2, eurUsdAt: '2026-09-10', maxGrantUsd: 50 },
             totals: { users: 1, totalLimitUsd: 4.2, maxGrantUsd: 50 },
-            ownerInvites: INVITI.map((i) => ({ ...i, createdAt: '2026-09-10T09:00:00.000Z' })),
+            ownerInvites: INVITI.map((i) => ({ ...i, createdAt: '2026-09-10T09:00:00.000Z' })).concat(NUOVI),
             users: [{ pseudonym: 'abcdef0123456789', balance: { credits: 5000, creditsGranted: 5000, usageUsd: 0 }, invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z', usage: { rows: 0 } }],
           },
         });
@@ -98,6 +100,9 @@ test.afterAll(async () => {
   for (const k of ['FILO_FUNCTIONS_BASE', 'FILO_IDENTITY_ENDPOINT', 'FILO_SECURE_TOKEN_ENDPOINT', 'FILO_ADMIN_EMAILS']) delete process.env[k];
   await new Promise((r) => server.close(r));
 });
+
+// Ogni prova parte da un server senza codici generati prima.
+test.beforeEach(() => { NUOVI.length = 0; generati = 0; });
 
 async function simulaOwner(app) {
   return app.evaluate(async ({}, o) => {
