@@ -117,6 +117,7 @@ test.beforeEach(() => {
   seen.commits.length = 0;
   seen.keyInfo.length = 0;
   ownKeyStatus = 401;
+  redeemed = false;
 });
 
 // OpenRouter e Firestore hanno l'indirizzo scritto nel codice: nel main il
