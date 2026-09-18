@@ -62,6 +62,8 @@ test('riscatto A MANO: la home già aperta si aggiorna?', async ({ app, openTab 
     home = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } }) || null;
     if (!home) await new Promise((r) => setTimeout(r, 200));
   }
+  await home.waitForLoadState('domcontentloaded').catch(() => {});
+  await home.waitForTimeout(3000);
   const prima = await home.evaluate(() => document.body.innerText.slice(0, 160));
   console.log('HOME PRIMA:', JSON.stringify(prima));
   const page = await openTab('filo://credits/credits.html');
@@ -81,11 +83,10 @@ test('foto della pagina Crediti con gli inviti, tema chiaro e scuro, e finestra 
   await page.click('#redeemBtn');
   await expect(page.locator('#invites > li')).toHaveCount(3, { timeout: 20000 });
   mkdirSync('tests/.shots', { recursive: true });
-  for (const tema of ['light', 'dark']) {
-    await page.evaluate((t) => { document.documentElement.setAttribute('data-theme', t); }, tema);
-    await page.waitForTimeout(400);
-    await page.screenshot({ path: `tests/.shots/verifica-651-crediti-${tema}.png`, fullPage: true });
-  }
+  await page.screenshot({ path: 'tests/.shots/verifica-651-crediti-light.png', fullPage: true });
+  await page.evaluate(async () => { await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }); });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: 'tests/.shots/verifica-651-crediti-dark.png', fullPage: true });
   // Finestra stretta: il link è lungo, la riga deve reggere.
   const win = app.windows()[0];
   await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; w.setBounds({ width: 620, height: 800 }); });
