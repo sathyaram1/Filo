@@ -114,6 +114,12 @@
       ? (w.ownKeyRefusal ? '' : 'Ogni chiamata prova prima lei; se OpenRouter la rifiuta, Filo usa i tuoi crediti.')
       : 'Paghi tu, sul tuo conto OpenRouter.';
     $('ownKeyRule').hidden = !$('ownKeyRule').textContent;
+    // La domanda del «Togli» dice cosa succede DOPO: coi crediti di Filo se
+    // c'è un portafoglio; senza, Filo resta senza una chiave (primo giro di
+    // verifica del ramo).
+    $('ownKeyConfirmText').textContent = hasWallet
+      ? 'Da qui in poi paghi coi crediti di Filo. Confermi?'
+      : 'Senza una chiave Filo non può usare i modelli, finché non riscatti un invito o ne metti un\'altra. Confermi?';
     $('ownKeyConfirm').hidden = true;
     $('ownKeyRemoveBtn').hidden = false;
     // Spesa e residuo li dice OpenRouter: si chiedono una volta per chiave,
