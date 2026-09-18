@@ -181,6 +181,15 @@ test(T_CAMPO, async ({ app, openTab }) => {
   await primo.locator('.sn-wallet-code').click();
   expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('AAAA-2222');
 
+  // Due clic attaccati — quello che fa chiunque non sia sicuro che il primo
+  // sia andato a segno — non devono lasciare «Copiato» al posto del link: la
+  // riga restava così per sempre, e l'indirizzo da mandare non si rileggeva
+  // più fino alla riapertura della pagina (terzo giro di verifica del #651).
+  await primo.locator('.sn-wallet-invite-link').dblclick();
+  await expect(primo.locator('.sn-wallet-invite-link')).toHaveText('https://filo.red/i/AAAA2222', { timeout: 10000 });
+  await primo.locator('.sn-wallet-code').dblclick();
+  await expect(primo.locator('.sn-wallet-code')).toHaveText('AAAA-2222', { timeout: 10000 });
+
   // Un invito pieno si vede, e non si dà più: né il link né il codice.
   const pieno = invites.nth(1);
   await expect(pieno).toHaveClass(/is-used/);
