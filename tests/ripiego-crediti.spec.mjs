@@ -265,6 +265,7 @@ test('(C) la pagina Crediti gestisce la chiave: si vede, dice spesa e residuo, s
   });
 
   const page = await openTab('filo://credits/credits.html');
+  await page.reload();
   const have = page.locator('#ownKeyHave');
   await expect(have).toBeVisible({ timeout: 15000 });
   await expect(page.locator('#ownKeyForm')).toBeHidden();
