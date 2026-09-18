@@ -91,7 +91,13 @@ test.beforeAll(async () => {
       if (url === '/api/v1/auth/key') {
         seen.keyInfo.push(bearer);
         if (bearer !== OWN_KEY && !bearer.startsWith('sk-or-v1-new')) return json(res, 401, { error: { message: 'User not found.' } });
-        return json(res, 200, { data: { label: 'la mia', limit: 10, usage: 1.5, limit_remaining: 8.5 } });
+        if (ownKeyLimit == null) return json(res, 200, { data: { label: 'la mia', limit: null, usage: 1.5, limit_remaining: null } });
+        return json(res, 200, { data: { label: 'la mia', limit: ownKeyLimit, usage: 1.5, limit_remaining: ownKeyLimit - 1.5 } });
+      }
+      // Il credito dell'account: quello che resta a una chiave senza tetto.
+      if (url === '/api/v1/credits') {
+        seen.credits.push(bearer);
+        return json(res, 200, { data: { total_credits: 25, total_usage: 5.5 } });
       }
       if (url === '/api/v1/generation') return json(res, 404, { error: { message: 'not yet' } });
 
