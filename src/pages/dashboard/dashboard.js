@@ -3193,6 +3193,26 @@
   // accreditato la ricompensa per priorità (50/100/200/300, una volta sola) e
   // ci ritorna il testo da mostrare. Qui ringraziamo, spieghiamo cosa è cambiato
   // (testo non tecnico preso dalle note) e animiamo i crediti verso il profilo.
+  // Sei appena entrato con un invito (#651): il collegamento aperto da fuori,
+  // o il primo avvio dopo aver scaricato Filo dalla pagina dell'invito. I
+  // crediti sono arrivati senza che tu chiedessi niente, e la prima cosa che
+  // vedi è la home: te lo dice qui, una volta sola.
+  async function maybeShowInviteWelcome() {
+    let w;
+    try { w = await send({ type: MSG.WALLET_STATE }); } catch (_) { return false; }
+    const n = w && w.ok ? w.notice : null;
+    if (!n || !n.text || n.seenHome) return false;
+    try { await send({ type: MSG.WALLET_NOTICE_SEEN, where: 'home' }); } catch (_) {}
+    if (!window.SN_CONFIRM_UI?.notify) return false;
+    const entrato = n.kind === 'entry';
+    await window.SN_CONFIRM_UI.notify({
+      title: entrato ? 'Benvenuto in Filo 🎉' : 'Il tuo invito',
+      text: entrato ? `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.` : n.text,
+      okLabel: entrato ? 'Evviva!' : 'Va bene',
+    });
+    return true;
+  }
+
   async function maybeShowFeedbackRewards() {
     let res;
     try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
