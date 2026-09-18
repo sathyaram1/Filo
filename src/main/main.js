@@ -90,11 +90,13 @@ let mainWindow = null;
 // agganciato prima che l'app sia pronta.
 let invitoInAttesa = null;
 
-function apriCodiceInvito(code) {
-  if (!code) return false;
+// `code` può essere null: il collegamento era un invito (host `invito`) ma il
+// codice dentro è storto. Chi ha cliccato aspetta che succeda qualcosa, e lo
+// dice la pagina Crediti — è il riscatto a rifiutarlo, con la sua frase.
+function apriInvito(code) {
   // Senza finestra (avvio a freddo: l'apertura è ancora a metà) l'invito
   // aspetta lì e parte appena la finestra c'è.
-  if (!mainWindow) { invitoInAttesa = code; return true; }
+  if (!mainWindow) { invitoInAttesa = { code }; return true; }
   try { revealWindow(mainWindow); } catch (_) {}
   // La pagina Crediti è dove l'esito si legge: il riscatto e l'apertura
   // partono insieme, e la pagina si aggiorna da sé all'avviso di saldo
@@ -105,14 +107,16 @@ function apriCodiceInvito(code) {
 }
 
 function apriLinkFilo(rawUrl) {
-  const code = globalThis.SN_WALLET?.inviteCodeFromDeepLink?.(rawUrl) || null;
-  if (!code) return false;
-  return apriCodiceInvito(code);
+  const W = globalThis.SN_WALLET;
+  // Ogni `filo://` che non è un invito si lascia cadere, in silenzio e senza
+  // aprire niente: non l'ha chiesto l'utente, l'ha scritto una pagina.
+  if (!W?.isInviteDeepLink?.(rawUrl)) return false;
+  return apriInvito(W.inviteCodeFromDeepLink(rawUrl));
 }
 
 function apriInvitoDaArgv(argv) {
-  const code = globalThis.SN_WALLET?.inviteCodeFromArgv?.(argv) || null;
-  return code ? apriCodiceInvito(code) : false;
+  const url = globalThis.SN_WALLET?.filoUrlFromArgv?.(argv) || null;
+  return url ? apriLinkFilo(url) : false;
 }
 
 // Mac: l'indirizzo arriva di qui, e può arrivare PRIMA che l'app sia pronta.
