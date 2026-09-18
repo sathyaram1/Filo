@@ -17,6 +17,7 @@
   const EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
   const GENERATION_ENDPOINT = 'https://openrouter.ai/api/v1/generation';
   const AUTH_KEY_ENDPOINT = 'https://openrouter.ai/api/v1/auth/key';
+  const CREDITS_ENDPOINT = 'https://openrouter.ai/api/v1/credits';
 
   function buildHeaders(apiKey) {
     return {
