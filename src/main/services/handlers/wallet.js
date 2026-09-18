@@ -167,6 +167,9 @@ module.exports = function register(on, ctx) {
       // errore di scrittura: un registro che non si scrive non è un segreto).
       ownKeyTail: W.keyTail(own), ownKeyRefusal: own ? await lastOwnKeyRefusal() : null,
       usageLog: usageLogStatus(),
+      // L'avviso di un invito arrivato da fuori (#651), finché le superfici
+      // che lo raccontano non l'hanno mostrato.
+      notice: await readNotice(),
     };
     try {
       await identity.getIdToken();
