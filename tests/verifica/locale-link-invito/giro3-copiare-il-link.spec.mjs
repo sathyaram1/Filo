@@ -76,10 +76,11 @@ test.beforeAll(async () => {
   process.env.FILO_FUNCTIONS_BASE = base;
   process.env.FILO_IDENTITY_ENDPOINT = `${base}/accounts:signUp`;
   process.env.FILO_SECURE_TOKEN_ENDPOINT = `${base}/token`;
+  process.env.FILO_ADMIN_EMAILS = OWNER_EMAIL;
 });
 
 test.afterAll(async () => {
-  for (const k of ['FILO_FUNCTIONS_BASE', 'FILO_IDENTITY_ENDPOINT', 'FILO_SECURE_TOKEN_ENDPOINT']) delete process.env[k];
+  for (const k of ['FILO_FUNCTIONS_BASE', 'FILO_IDENTITY_ENDPOINT', 'FILO_SECURE_TOKEN_ENDPOINT', 'FILO_ADMIN_EMAILS']) delete process.env[k];
   await new Promise((r) => server.close(r));
 });
 
