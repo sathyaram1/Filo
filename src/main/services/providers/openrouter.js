@@ -325,13 +325,7 @@
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
       method: 'POST', headers: buildHeaders(key), body: payload, signal,
     }));
-    if (!res.ok || !res.body) {
-      const errText = await res.text().catch(() => '');
-      const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
-      err.status = res.status;
-      err.provider = 'openrouter';
-      throw err;
-    }
+    if (!res.ok || !res.body) throw await httpError(res);
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
