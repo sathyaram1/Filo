@@ -185,6 +185,12 @@
     //   la chiave resta nel main). { } → { ok, limit|null, usage,
     //   limit_remaining|null, line } oppure { ok:false, status, message }
     WALLET_OWN_KEY_INFO: 'wallet_own_key_info',
+    // WALLET_NOTICE_SEEN (#651): l'avviso di benvenuto («Sei entrato con un
+    //   invito: hai N crediti») è stato mostrato da una superficie. Lo dicono
+    //   la home e la pagina Crediti, ognuna per sé: chi l'ha già visto in
+    //   home non se lo ritrova addosso a ogni apertura di Crediti, e
+    //   viceversa. { where: 'home'|'credits' } → { ok }
+    WALLET_NOTICE_SEEN: 'wallet_notice_seen',
     // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
     // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
     //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).

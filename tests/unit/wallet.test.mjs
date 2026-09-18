@@ -109,3 +109,120 @@ test('la frase del riscatto riuscito dice quanti crediti locali sono passati e p
   // Nessuno passato.
   assert.match(W.redeemOkMessage({ entryCredits: 5000, migrated: 0, localRequested: 300, cutReason: 'global_cap' }), /nessuno dei 300/);
 });
+
+// ── Link d'invito (#651) ────────────────────────────────────────────────────
+
+test('normalizeCode: codice, codice sporco, link intero — e tutto il resto è null', () => {
+  // Il codice com'è, e come lo si copia da un messaggio.
+  assert.equal(W.normalizeCode('ABCDEFGH'), 'ABCDEFGH');
+  assert.equal(W.normalizeCode(' abcd-efgh '), 'ABCDEFGH');
+  assert.equal(W.normalizeCode('AB CD EF GH'), 'ABCDEFGH');
+  // Il link intero, in tutte le forme in cui lo si incolla.
+  assert.equal(W.normalizeCode('https://filo.red/i/ABCDEFGH'), 'ABCDEFGH');
+  assert.equal(W.normalizeCode('https://filo.red/i/abcdefgh/'), 'ABCDEFGH');
+  assert.equal(W.normalizeCode('filo.red/i/ABCD-EFGH'), 'ABCDEFGH');
+  assert.equal(W.normalizeCode('filo.red/ABCDEFGH'), 'ABCDEFGH');
+  // Lunghezza sbagliata, caratteri ambigui (0 1 I L O non sono nell'alfabeto),
+  // niente del tutto.
+  assert.equal(W.normalizeCode('ABCD'), null);
+  assert.equal(W.normalizeCode('ABCDEFGHIJ'), null);
+  assert.equal(W.normalizeCode('ABCD-EFGO'), null, 'la O non esiste nei codici');
+  assert.equal(W.normalizeCode('ABCD-EFG0'), null, 'nemmeno lo zero');
+  assert.equal(W.normalizeCode('ABCD-EFG1'), null);
+  assert.equal(W.normalizeCode(''), null);
+  assert.equal(W.normalizeCode(null), null);
+  assert.equal(W.normalizeCode(undefined), null);
+  assert.equal(W.normalizeCode('   '), null);
+  assert.equal(W.normalizeCode('https://filo.red/i/'), null, 'un link senza codice non è un codice');
+  assert.equal(W.normalizeCode('x'.repeat(10000)), null, 'un incollato enorme non è un codice');
+});
+
+test('formatCode e inviteLink: il codice si legge a metà, il link si dà intero', () => {
+  assert.equal(W.formatCode('abcdefgh'), 'ABCD-EFGH');
+  assert.equal(W.formatCode('ABCD-EFGH'), 'ABCD-EFGH');
+  assert.equal(W.formatCode('non un codice'), 'non un codice', 'formatCode non inventa');
+  assert.equal(W.inviteLink('abcd-efgh'), 'https://filo.red/i/ABCDEFGH');
+  assert.equal(W.inviteLink('https://filo.red/i/ABCDEFGH'), 'https://filo.red/i/ABCDEFGH');
+  assert.equal(W.inviteLink('boh'), '', 'senza un codice valido non si costruisce un link che non porta da nessuna parte');
+});
+
+test('codeFromInput: legge anche la riga intera in cui il codice è arrivato', () => {
+  assert.equal(W.codeFromInput('Codice: ABCD-EFGH'), 'ABCDEFGH');
+  assert.equal(W.codeFromInput('il tuo invito è abcd efgh, buon divertimento'), 'ABCDEFGH');
+  assert.equal(W.codeFromInput('https://filo.red/i/ABCDEFGH?utm=chat'), 'ABCDEFGH');
+  assert.equal(W.codeFromInput('ciao come stai'), null);
+  assert.equal(W.codeFromInput(''), null);
+});
+
+test('filo://invito/<codice>: si accetta il solo host invito, il resto non apre niente', () => {
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/ABCDEFGH'), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/abcd-efgh'), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/ABCDEFGH/'), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromDeepLink('FILO://INVITO/abcdefgh'), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/ABCDEFGH?da=chat'), 'ABCDEFGH');
+  // Il sistema consegna QUALUNQUE filo://…: una pagina interna messa in un
+  // link da un sito qualsiasi non deve aprire niente.
+  assert.equal(W.inviteCodeFromDeepLink('filo://credits/credits.html'), null);
+  assert.equal(W.inviteCodeFromDeepLink('filo://shell/shell.html'), null);
+  assert.equal(W.inviteCodeFromDeepLink('filo://newtab/'), null);
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito.example.com/ABCDEFGH'), null);
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/../credits/credits.html'), null);
+  assert.equal(W.inviteCodeFromDeepLink('https://filo.red/i/ABCDEFGH'), null, 'un link web non è un deep link');
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/ABCD'), null);
+  assert.equal(W.inviteCodeFromDeepLink(''), null);
+  assert.equal(W.inviteCodeFromDeepLink(null), null);
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/%41BCDEFGH'), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/%zz'), null, 'una percentuale storta non fa esplodere niente');
+});
+
+test('il codice si CERCA negli argomenti: la posizione non è mai fissa', () => {
+  // In sviluppo il secondo argomento è «.», nei test «.» è l'ultimo: cercarlo
+  // per posizione vuol dire trovarlo solo per caso.
+  assert.equal(W.inviteCodeFromArgv(['filo.exe', 'filo://invito/ABCDEFGH']), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromArgv(['electron.exe', '.', 'filo://invito/abcd-efgh']), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromArgv(['electron.exe', 'filo://invito/ABCDEFGH', '.']), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromArgv(['filo.exe', '--flag', '.']), null);
+  assert.equal(W.inviteCodeFromArgv(['filo.exe', 'filo://credits/credits.html']), null);
+  assert.equal(W.inviteCodeFromArgv([]), null);
+  assert.equal(W.inviteCodeFromArgv(null), null);
+});
+
+test('un invito si legge a posti: «entrati N su M», e i vecchi valgono un posto solo', () => {
+  const tre = W.inviteView({
+    code: 'ABCD-EFGH', link: 'https://filo.red/i/ABCDEFGH', used: 2, max: 3,
+    uses: [{ pseudonym: 'aaaa1111bbbb2222', at: '2026-09-10T10:00:00.000Z' }, { pseudonym: 'cccc3333dddd4444', at: null }],
+    revoked: false,
+  });
+  assert.equal(tre.used, 2);
+  assert.equal(tre.left, 1);
+  assert.equal(tre.exhausted, false);
+  assert.equal(W.inviteStateLine(tre), 'entrati 2 su 3');
+  assert.equal(tre.uses.length, 2);
+
+  const pieno = W.inviteView({ code: 'ABCDEFGH', used: 3, max: 3, uses: [{}, {}, {}] });
+  assert.equal(pieno.exhausted, true);
+  assert.equal(W.inviteStateLine(pieno), 'entrati 3 su 3');
+
+  // Il link si ricostruisce se il server non lo manda (portafoglio letto da
+  // una copia vecchia dello stato).
+  assert.equal(W.inviteView({ code: 'ABCD-EFGH', used: 0, max: 3 }).link, 'https://filo.red/i/ABCDEFGH');
+
+  // Forma vecchia: «used» booleano, nessun «max».
+  const vecchio = W.inviteView({ code: 'AAAA-2222', used: true, usedAt: '2026-09-08T10:00:00.000Z' });
+  assert.equal(vecchio.max, 1);
+  assert.equal(vecchio.used, 1);
+  assert.equal(vecchio.exhausted, true);
+  assert.equal(W.inviteStateLine(vecchio), 'entrati 1 su 1');
+  const vecchioLibero = W.inviteView({ code: 'AAAA-2222', used: false });
+  assert.equal(vecchioLibero.exhausted, false);
+  assert.equal(W.inviteStateLine(vecchioLibero), 'entrati 0 su 1');
+
+  // Annullato dall'owner: lo dice, e non conta i posti.
+  assert.equal(W.inviteStateLine(W.inviteView({ code: 'ABCDEFGH', used: 0, max: 3, revoked: true })), 'annullato');
+});
+
+test('un codice storto non arriva nemmeno al server: lo dice la frase', () => {
+  assert.match(W.redeemMessage('bad_code'), /otto caratteri/);
+  assert.match(W.entryNoticeText({ credits: 5000 }), /5\.000 crediti/);
+  assert.match(W.entryNoticeText({}), /crediti sono pronti/);
+});
