@@ -170,6 +170,15 @@ test('un invito con un posto occupato su tre resta da dare, col suo link e il co
     await expect(conPosti.locator('.sn-wallet-code')).toBeEnabled();
     await expect(conPosti.locator('.sn-wallet-invite-who')).toHaveText('fedebb00');
 
+    // Due clic attaccati sul pulsante che copia — quello che fa chiunque non
+    // sia sicuro che il primo sia andato a segno — non devono lasciare
+    // «Copiato» al posto del link: la riga tornava illeggibile fino alla
+    // riapertura della pagina (terzo giro di verifica del #651).
+    await conPosti.locator('.sn-wallet-invite-link').dblclick();
+    await expect(conPosti.locator('.sn-wallet-invite-link')).toHaveText('https://filo.red/i/AAAA2222', { timeout: 10_000 });
+    await conPosti.locator('.sn-wallet-code').dblclick();
+    await expect(conPosti.locator('.sn-wallet-code')).toHaveText('AAAA-2222', { timeout: 10_000 });
+
     // Quello pieno invece è finito: barrato e non più da dare.
     const pieno = page.locator('#ownerCodes > li[data-code="CCCC-4444"]');
     await expect(pieno).toHaveClass(/is-used/);
