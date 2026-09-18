@@ -340,3 +340,94 @@ test('(C) la pagina Crediti gestisce la chiave: si vede, dice spesa e residuo, s
   });
   await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 10000 });
 });
+
+// Le quattro porte del primo giro di verifica del ramo.
+test('(D) chiave senza tetto: resta il credito dell’account; senza portafoglio il «Togli» non promette crediti di Filo e la chat dice che è la TUA chiave a secco; con tutte e due a secco lo dice', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  ownKeyLimit = null;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtabPage(app);
+  await expect(home.locator('#input')).toBeVisible();
+  await prepare(app); // chiave propria, NESSUN portafoglio
+
+  // Senza portafoglio: la domanda del «Togli» non parla di crediti di Filo.
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#ownKeyHave')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#ownKeyRule')).toContainText('Paghi tu');
+  await page.click('#ownKeyRemoveBtn');
+  await expect(page.locator('#ownKeyConfirmText')).not.toContainText('crediti di Filo');
+  await expect(page.locator('#ownKeyConfirmText')).toContainText('invito');
+  await page.click('#ownKeyRemoveNo');
+  // Chiave senza tetto: la riga dice quanto resta sul conto (25 − 5,5).
+  await expect(page.locator('#ownKeyBalance')).toHaveText('Spesi 1,50 $ · restano 19,50 $ sul tuo conto OpenRouter', { timeout: 10000 });
+  expect(seen.credits).toContain(OWN_KEY);
+
+  // In chat, senza portafoglio: è la TUA chiave a essere a secco, e la strada
+  // è un invito (non «i crediti di domani», che non arrivano).
+  await home.bringToFront().catch(() => {});
+  await home.locator('#input').fill('ciao senza portafoglio');
+  await home.locator('#sendBtn').click();
+  const err1 = home.locator('.dash-bubble-filo').last();
+  await expect(err1).toContainText('la tua chiave OpenRouter non ha più credito', { timeout: 30000 });
+  await expect(err1).toContainText('invito');
+  await expect(err1).not.toContainText('domani');
+  await expect(home.locator('.dash-bubble-actions button', { hasText: 'Apri Crediti' })).toHaveCount(1);
+
+  // Col portafoglio ma anche la personale a secco: lo dice, e dice di domani.
+  await redeemWallet(openTab);
+  personalKeyStatus = 402;
+  await home.bringToFront().catch(() => {});
+  await home.locator('#input').fill('ciao tutte e due');
+  await home.locator('#sendBtn').click();
+  const err2 = home.locator('.dash-bubble-filo').last();
+  await expect(err2).toContainText('anche i crediti di Filo sono finiti', { timeout: 30000 });
+  await expect(err2).toContainText('domani ne arrivano 100');
+  const mine = seen.completions.filter((c) => c.tools && c.lastRole === 'user' && c.lastText.includes('ciao tutte e due'));
+  expect(mine.map((c) => c.key)).toEqual([OWN_KEY, PERSONAL_KEY]);
+  // E il «Togli» adesso parla dei crediti di Filo.
+  await page.reload();
+  await expect(page.locator('#ownKeyHave')).toBeVisible({ timeout: 15000 });
+  await page.click('#ownKeyRemoveBtn');
+  await expect(page.locator('#ownKeyConfirmText')).toContainText('crediti di Filo');
+});
+
+test('(E) le Impostazioni già aperte non si portano via la chiave messa in Crediti (né rimettono quella tolta)', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app, { ownKey: '' }); // modelli propri, campo della chiave vuoto
+  const options = await openTab('filo://options/options.html');
+  await expect(options.locator('#apiKey')).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => options.locator('#apiKey').inputValue(), { timeout: 10000 }).toBe('');
+
+  // La chiave si mette in Crediti, con le Impostazioni ancora aperte.
+  const page = await openTab('filo://credits/credits.html');
+  await page.reload();
+  await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 15000 });
+  await page.fill('#ownKeyInput', OWN_KEY);
+  await page.click('#ownKeySaveBtn');
+  await expect(page.locator('#ownKeyHave')).toBeVisible({ timeout: 10000 });
+  // Le Impostazioni si sono riallineate da sole…
+  await expect.poll(() => options.locator('#apiKey').inputValue(), { timeout: 10000 }).toBe(OWN_KEY);
+  // …e un cambio qualunque lì non tocca la chiave.
+  await options.bringToFront().catch(() => {});
+  await options.fill('#monthlyLimit', '7');
+  await options.dispatchEvent('#monthlyLimit', 'change');
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).apiKeys.openrouter)).toBe(OWN_KEY);
+  await expect(page.locator('#ownKeyHave')).toBeVisible();
+
+  // Strada inversa: tolta in Crediti, un altro salvataggio delle Impostazioni non la rimette.
+  await page.bringToFront().catch(() => {});
+  await page.click('#ownKeyRemoveBtn');
+  await page.click('#ownKeyRemoveYes');
+  await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 10000 });
+  await expect.poll(() => options.locator('#apiKey').inputValue(), { timeout: 10000 }).toBe('');
+  await options.bringToFront().catch(() => {});
+  await options.fill('#monthlyLimit', '8');
+  await options.dispatchEvent('#monthlyLimit', 'change');
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).apiKeys.openrouter)).toBe('');
+  await expect(page.locator('#ownKeyForm')).toBeVisible();
+});
