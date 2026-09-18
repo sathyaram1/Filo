@@ -779,3 +779,48 @@ test('quello che si legge sul salto di scheda è quello che succede', () => {
   assert.ok(!/Cmd\+0/.test(cap.invoke) || /100%/.test(cap.invoke),
     'il manifesto promette ancora una scheda su Cmd+0, che su Mac è lo zoom');
 });
+
+// ── Il collegamento d'invito filo:// (#651) ─────────────────────────────────
+// Su Windows e Linux l'indirizzo arriva fra gli ARGOMENTI (primo avvio e
+// `second-instance`); su Mac non ci arriva mai: lo consegna l'evento
+// `open-url`, e può arrivare prima che l'app sia pronta. Un ramo solo dei due
+// vuol dire che su una delle due piattaforme il link non fa niente, in
+// silenzio — e nessuno se ne accorge senza quella piattaforma sotto mano.
+test('il collegamento d\'invito arriva da tutte e due le strade: argomenti e open-url', () => {
+  const main = readFileSync(join(ROOT, 'src', 'main', 'main.js'), 'utf8');
+  assert.match(main, /app\.on\(\s*'open-url'/,
+    'su Mac un link filo:// arriva solo con open-url: senza questo, chi apre l\'invito su Mac non vede succedere niente');
+  assert.match(main, /app\.on\(\s*'second-instance'\s*,\s*\(\s*[^)]*,\s*argv/,
+    'su Windows e Linux il link arriva negli argomenti della seconda istanza: `second-instance` deve riceverli');
+  assert.match(main, /apriInvitoDaArgv\(\s*process\.argv\s*\)/,
+    'e all\'avvio a freddo l\'indirizzo sta negli argomenti del processo');
+  assert.match(main, /setAsDefaultProtocolClient\(\s*'filo'/,
+    'senza dichiararsi al sistema, filo:// non arriva a Filo su nessuna piattaforma');
+
+  // La ricetta del pacchetto: su Mac il protocollo vive nell'Info.plist, e lo
+  // scrive electron-builder solo se `protocols` è dichiarato.
+  const protocolli = (pkg.build && pkg.build.protocols) || [];
+  const filo = protocolli.find((p) => Array.isArray(p.schemes) && p.schemes.includes('filo'));
+  assert.ok(filo, 'senza build.protocols il .dmg non dichiara filo:// e su Mac il link non apre Filo');
+});
+
+test('un filo:// che arriva da fuori si legge cercando il prefisso, mai per posizione', () => {
+  const main = readFileSync(join(ROOT, 'src', 'main', 'main.js'), 'utf8');
+  // In sviluppo il secondo argomento è «.», nei test «.» è l'ultimo: chi
+  // prende l'argomento per indice trova il link solo per caso. L'unico indice
+  // ammesso è quello della dichiarazione al sistema in sviluppo, dove
+  // argv[1] è il percorso del progetto e non un indirizzo.
+  const perIndice = main.match(/argv\s*\[\s*\d+\s*\]/g) || [];
+  assert.deepEqual(perIndice, ['argv[1]'],
+    'l\'indirizzo si cerca fra gli argomenti (inviteCodeFromArgv), non si prende per indice');
+  assert.match(main, /setAsDefaultProtocolClient\('filo', process\.execPath, \[path\.resolve\(process\.argv\[1\]\)\]\)/,
+    'l\'unico argomento preso per indice è il percorso del progetto in sviluppo');
+  assert.match(main, /apriInvitoDaArgv[\s\S]{0,200}inviteCodeFromArgv/,
+    'gli argomenti si leggono con la funzione che li scandisce tutti');
+  require('../../src/shared/wallet.js');
+  const W = globalThis.SN_WALLET;
+  assert.equal(W.inviteCodeFromArgv(['electron.exe', '.', 'filo://invito/ABCDEFGH']), 'ABCDEFGH');
+  // Registrato come gestore, il sistema consegna QUALUNQUE filo://: una
+  // pagina interna messa in un link da un sito qualsiasi non deve aprirsi.
+  assert.equal(W.inviteCodeFromDeepLink('filo://credits/credits.html'), null);
+});
