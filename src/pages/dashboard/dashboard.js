@@ -1959,6 +1959,16 @@
       if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
         filoBubble.remove();
       }
+      // #629 — la chiave OpenRouter dell'utente è stata rifiutata e ha
+      // risposto la chiave personale (i crediti di Filo): una riga discreta
+      // sotto la risposta, non un errore: la risposta è arrivata.
+      if (r.keyFallback && window.SN_WALLET) {
+        const note = document.createElement('div');
+        note.className = 'dash-bubble-note';
+        note.dataset.keyFallback = String(r.keyFallback.status || '');
+        note.textContent = window.SN_WALLET.ownKeyFallbackLine(r.keyFallback.status);
+        bubblesEl.appendChild(note);
+      }
       // Il ragionamento del turno entra nello storico del thread insieme al
       // messaggio. Il testo resta con la conversazione; i blocchi strutturati
       // del fornitore (reasoningDetails) tornano al modello al turno dopo,
