@@ -84,9 +84,13 @@
   }
 
   // ── Ripiego dalla chiave propria ai crediti di Filo (#629) ───────────────
-  // OpenRouter rifiuta una CHIAVE (non una richiesta) con tre codici: 401 la
-  // chiave non esiste più o non è valida, 402 il suo credito è finito, 403 la
-  // moderazione ha bloccato l'input per quella chiave. Solo per questi, se la
+  // OpenRouter documenta i codici così: 401 chiave disattivata o non valida,
+  // 402 credito finito, 403 permessi insufficienti, guardia sui contenuti o
+  // moderazione. I primi due sono sempre la CHIAVE; il 403 lo è solo se la
+  // risposta non parla di moderazione (secondo giro di verifica del ramo: un
+  // testo segnalato dalla moderazione lo è con qualunque chiave, e rimandarlo
+  // coi crediti di Filo lo fa bloccare di nuovo mentre Crediti segna un
+  // rifiuto che non c'è stato). Solo per un rifiuto della chiave, se la
   // chiamata era partita con la chiave scritta dall'utente e c'è la chiave
   // personale del portafoglio, si ritenta la stessa richiesta con la
   // personale. Rete, 429, 5xx, errori di modello: no — non è la chiave.
@@ -95,13 +99,36 @@
     return st === 401 || st === 402 || st === 403;
   }
 
-  // Lo status di rifiuto della chiave dentro un errore del provider, o 0.
+  // La risposta di OpenRouter dice che è la moderazione (o una guardia sui
+  // contenuti) a bloccare il testo: il corpo porta `metadata.reasons` e
+  // `flagged_input`, o lo dice a parole.
+  function isModerationBlock(body) {
+    const text = typeof body === 'string' ? body : (body ? JSON.stringify(body) : '');
+    if (!text) return false;
+    return /moderat|flagged|guardrail|content policy/i.test(text);
+  }
+
+  // Rifiuto della CHIAVE: status più, per il 403, il corpo della risposta.
+  function isKeyRefusal(status, body) {
+    const st = Number(status);
+    if (st === 401 || st === 402) return true;
+    if (st === 403) return !isModerationBlock(body);
+    return false;
+  }
+
+  // Lo status di rifiuto della chiave dentro un errore del provider, o 0. Il
+  // messaggio dell'errore porta il corpo della risposta («OpenRouter 403: …»):
+  // un 403 di moderazione non è un rifiuto.
   function keyRefusalOf(err) {
     if (!err) return 0;
-    const st = Number(err.status);
-    if (isKeyRefusalStatus(st)) return st;
-    const m = /^OpenRouter(?:\s+\S+)?\s+(40[123])\b/.exec(String(err.message || err || ''));
-    return m ? Number(m[1]) : 0;
+    const msg = String(err.message || err || '');
+    let st = Number(err.status);
+    if (!isKeyRefusalStatus(st)) {
+      const m = /^OpenRouter(?:\s+\S+)?\s+(40[123])\b/.exec(msg);
+      st = m ? Number(m[1]) : 0;
+    }
+    if (!st) return 0;
+    return isKeyRefusal(st, msg) ? st : 0;
   }
 
   // Il perché, da incastonare dopo «OpenRouter ha rifiutato la chiave».
@@ -145,16 +172,22 @@
   function ownKeyBalanceLine({ limit, usage, limit_remaining, account } = {}) {
     const usd = (n) => `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
     const spesa = `Spesi ${usd(usage)}`;
+    const conto = account && Number.isFinite(Number(account.credits))
+      ? Math.max(0, Number(account.credits) - (Number(account.usage) || 0))
+      : null;
     if (limit == null || !Number.isFinite(Number(limit))) {
-      if (account && Number.isFinite(Number(account.credits))) {
-        const resta = Math.max(0, Number(account.credits) - (Number(account.usage) || 0));
-        return `${spesa} · restano ${usd(resta)} sul tuo conto OpenRouter`;
-      }
+      if (conto != null) return `${spesa} · restano ${usd(conto)} sul tuo conto OpenRouter`;
       return `${spesa} · nessun tetto`;
     }
     const resta = limit_remaining != null && Number.isFinite(Number(limit_remaining))
       ? Number(limit_remaining)
       : Number(limit) - (Number(usage) || 0);
+    // Il tetto di una chiave è un limite, non un saldo: se il conto ha meno
+    // del residuo del tetto, OpenRouter rifiuta quando finisce il conto
+    // (secondo giro di verifica del ramo).
+    if (conto != null && conto < Math.max(0, resta)) {
+      return `${spesa} · restano ${usd(conto)} sul tuo conto OpenRouter, meno del tetto della chiave (${usd(limit)})`;
+    }
     return `${spesa} · restano ${usd(Math.max(0, resta))} su ${usd(limit)}`;
   }
 
@@ -215,6 +248,6 @@
 
   global.SN_WALLET = {
     USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
-    isKeyRefusalStatus, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
+    isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

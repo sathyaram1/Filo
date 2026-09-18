@@ -54,10 +54,17 @@
     const W = global.SN_WALLET;
     const K = global.SN_WALLET_MAIN;
     if (!res.ok && W && W.isKeyRefusalStatus(res.status) && K && typeof K.alternativeKeyFor === 'function') {
+      // Un 403 è un rifiuto della chiave solo se il corpo non parla di
+      // moderazione: un testo segnalato lo è con qualunque chiave, e la
+      // risposta deve risalire com'è (il corpo resta da leggere per chi la
+      // racconta all'utente).
+      const detail = (await res.clone().text().catch(() => '')).slice(0, 300);
       let alt = null;
-      try { alt = await K.alternativeKeyFor(apiKey); } catch (_) { alt = null; }
+      if (W.isKeyRefusal(res.status, detail)) {
+        try { alt = await K.alternativeKeyFor(apiKey); } catch (_) { alt = null; }
+      }
       if (alt && alt.key) {
-        const refused = { status: res.status, detail: (await res.text().catch(() => '')).slice(0, 300) };
+        const refused = { status: res.status, detail };
         try { await K.noteOwnKeyRefusal(refused); } catch (_) {}
         res = await fetch(url, makeInit(alt.key));
         keyUsed = alt.key;
@@ -68,6 +75,11 @@
     let keySource = '';
     if (K && typeof K.keySourceOf === 'function') {
       try { keySource = await K.keySourceOf(keyUsed); } catch (_) { keySource = ''; }
+    }
+    // La chiave propria ha appena servito una chiamata: il rifiuto ricordato
+    // in Crediti (se c'era) non vale più, e spesa e residuo sono cambiati.
+    if (res.ok && keySource === 'own' && K && typeof K.noteOwnKeySuccess === 'function') {
+      try { K.noteOwnKeySuccess().catch(() => {}); } catch (_) {}
     }
     // Anche sulla risposta: così l'errore che httpError costruisce da un
     // rifiuto sa con quale chiave si era partiti e se il ripiego c'è stato
