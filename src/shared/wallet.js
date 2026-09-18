@@ -194,6 +194,7 @@
   // Gli esiti del riscatto, tradotti. `status` è quello del server.
   const REDEEM_MESSAGES = Object.freeze({
     ok: 'Invito riscattato: i tuoi crediti sono pronti.',
+    bad_code: 'Questo non è un codice d’invito: un invito è fatto di otto caratteri, come ABCD-EFGH. Va bene anche incollare il link intero.',
     invalid_code: 'Questo codice non esiste. Controlla di averlo copiato tutto.',
     code_used: 'Questo codice è già stato usato.',
     own_code: 'È un tuo codice: dallo a qualcun altro.',
