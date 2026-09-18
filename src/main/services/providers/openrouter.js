@@ -68,6 +68,10 @@
     if (K && typeof K.keySourceOf === 'function') {
       try { keySource = await K.keySourceOf(keyUsed); } catch (_) { keySource = ''; }
     }
+    // Anche sulla risposta: così l'errore che httpError costruisce da un
+    // rifiuto sa con quale chiave si era partiti e se il ripiego c'è stato
+    // (e ha fallito), e chi lo racconta all'utente può dirlo per esteso.
+    try { res.keySource = keySource; res.keyFallback = keyFallback; } catch (_) {}
     return { res, keyUsed, keySource, keyFallback };
   }
 
