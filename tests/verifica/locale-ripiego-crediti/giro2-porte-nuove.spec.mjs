@@ -144,7 +144,11 @@ test('Impostazioni aperte con la chiave dentro, poi la chiave tolta in Crediti: 
     console.log('[nota]', `chiave tolta in Crediti, poi le Impostazioni (aperte prima) cambiano il limite: la chiave ${dopo ? 'TORNA' : 'resta tolta'}`);
     expect(dopo || '').toBe('');
     await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 5000 });
-    // E la chiamata dopo parte con la personale, non con quella tolta.
+    // E la chiamata dopo parte con la personale, non con quella tolta (la
+    // home vuole i modelli predefiniti, spenti sopra per vedere il campo).
+    await opts.click('#useDefaultModels');
+    await opts.waitForTimeout(1000);
+    expect(await chiaveSalvata(filo) || '').toBe('');
     const dash = await apriHome(filo);
     await chiediInChat(dash, 'ciao');
     const calls = await chiamateChat(filo.app);
@@ -209,7 +213,7 @@ test('il ripiego vale anche fuori dalla chat: «spiega» con la chiave propria r
     await mettiChiave(page, PROPRIA);
     const r = await filo.app.evaluate(async () => {
       try {
-        const MSG = globalThis.SN_MESSAGES;
+        const MSG = globalThis.SN_MSG.MSG;
         const res = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.AI_REQUEST, action: 'explain', payload: { selection: 'ciao', sentence: 'ciao mondo' } }, {});
         return { ok: true, text: res && res.text };
       } catch (e) { return { ok: false, message: String(e && e.message || e) }; }
@@ -227,7 +231,7 @@ test('il ripiego vale anche fuori dalla chat: «spiega» con la chiave propria r
     // E con la chiave che funziona, «spiega» non scrive righe nel registro di Filo.
     await impostaOpenRouter(filo.app, { byKey: { [PROPRIA]: { status: 200 } } });
     await filo.app.evaluate(async () => {
-      const MSG = globalThis.SN_MESSAGES;
+      const MSG = globalThis.SN_MSG.MSG;
       await globalThis.SN_HANDLE_MESSAGE({ type: MSG.AI_REQUEST, action: 'explain', payload: { selection: 'ciao', sentence: 'ciao mondo' } }, {});
     });
     await page.waitForTimeout(5000);
