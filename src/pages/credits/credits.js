@@ -494,6 +494,19 @@
   }
 
   $('redeemForm').addEventListener('submit', (ev) => { redeem(ev).catch(() => {}); });
+  $('ownKeyForm').addEventListener('submit', (ev) => { saveOwnKey(ev).catch(() => {}); });
+  // Togliere la chiave chiede una conferma sul posto: il pulsante lascia il
+  // posto alla domanda, e «Annulla» lo rimette.
+  $('ownKeyRemoveBtn').addEventListener('click', () => {
+    $('ownKeyRemoveBtn').hidden = true;
+    $('ownKeyConfirm').hidden = false;
+    $('ownKeyRemoveYes').focus();
+  });
+  $('ownKeyRemoveNo').addEventListener('click', () => {
+    $('ownKeyConfirm').hidden = true;
+    $('ownKeyRemoveBtn').hidden = false;
+  });
+  $('ownKeyRemoveYes').addEventListener('click', () => { removeOwnKey().catch(() => {}); });
   $('reissueBtn').addEventListener('click', () => { reissueKey().catch(() => {}); });
   $('resetIdentityBtn').addEventListener('click', () => { resetIdentity().catch(() => {}); });
 
