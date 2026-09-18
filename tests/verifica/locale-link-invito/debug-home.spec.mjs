@@ -71,6 +71,7 @@ test('diagnostica home', async ({ app }) => {
     hasConfirmUi: !!window.SN_CONFIRM_UI,
     onb: !!document.querySelector('.dash-onb'),
     bodyStart: document.body.innerText.slice(0, 300),
+    msgs: window.__msgs || [],
   }));
   console.log('INFO:', JSON.stringify(info, null, 2));
   console.log('CONSOLE:', log.slice(-40).join('\n'));
