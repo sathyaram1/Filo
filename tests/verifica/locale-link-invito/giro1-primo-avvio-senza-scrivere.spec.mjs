@@ -123,10 +123,15 @@ test('primo avvio dopo il link: i crediti arrivano da soli, l’avviso lo dice, 
 test('la home racconta il benvenuto a chi non ha chiesto niente', async ({ app, shell }) => {
   // La scheda nuova è la home: l'avviso dell'invito arriva lì da solo, senza
   // che l'utente apra la pagina Crediti.
-  const home = app.windows().find((w) => {
-    try { return new URL(w.url()).hostname === 'newtab' || w.url().includes('dashboard'); } catch (_) { return false; }
-  });
-  test.skip(!home, 'la home non è fra le pagine aperte in questa corsa');
+  let home = null;
+  const scadenza = Date.now() + 20000;
+  while (Date.now() < scadenza && !home) {
+    home = app.windows().find((w) => {
+      try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; }
+    }) || null;
+    if (!home) await new Promise((r) => setTimeout(r, 200));
+  }
+  expect(home, 'la home non si è aperta all’avvio').toBeTruthy();
   await expect(home.locator('.sn-confirm-title')).toContainText('Benvenuto', { timeout: 40000 });
   await expect(home.locator('.sn-confirm-text')).toContainText('crediti');
 });
