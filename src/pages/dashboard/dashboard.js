@@ -3208,7 +3208,7 @@
     try { await send({ type: MSG.WALLET_NOTICE_SEEN, where: 'home' }); } catch (_) {}
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
-      title: entrato ? 'Benvenuto in Filo 🎉' : 'Il tuo invito',
+      title: entrato ? 'Benvenuto in Filo' : 'Il tuo invito',
       text: entrato ? `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.` : n.text,
       okLabel: entrato ? 'Evviva!' : 'Va bene',
     });
