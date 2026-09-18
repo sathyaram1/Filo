@@ -281,15 +281,9 @@
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
       method: 'POST', headers: buildHeaders(key), body: payload, signal,
     }));
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      // status/provider strutturati sull'errore: chi lo mostra all'utente può
-      // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-      const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
-      err.status = res.status;
-      err.provider = 'openrouter';
-      throw err;
-    }
+    // status/provider strutturati sull'errore: chi lo mostra all'utente può
+    // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
+    if (!res.ok) throw await httpError(res);
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
