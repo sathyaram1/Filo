@@ -107,7 +107,24 @@
       // di Filo sono i crediti finiti; con una chiave propria è il conto
       // OpenRouter dell'utente. Non si ritenta: OpenRouter rifiuta finché il
       // tetto non sale (i crediti del giorno dopo, o una ricarica).
+      // Chi tiene le chiavi (nel main) sa quale chiave è stata rifiutata, se
+      // c'era un portafoglio e quanti crediti arrivano domani, e lascia la
+      // frase già scritta sull'errore (userMessage). Senza, si ragiona con
+      // quello che l'errore porta: la chiave con cui si era partiti e se il
+      // ripiego sulla personale c'è stato e ha fallito (#629).
       if (st === 402) {
+        if (e && typeof e.userMessage === 'string' && e.userMessage) return e.userMessage;
+        const src = e && e.keySource;
+        const fb = e && e.keyFallback;
+        if (fb && fb.failed) {
+          return 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito) e anche i crediti di Filo sono finiti: ricarica il tuo conto OpenRouter, oppure aspetta i crediti di domani.';
+        }
+        if (src === 'own') {
+          return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo conto OpenRouter, oppure riscatta un invito nella pagina Crediti per usare i crediti di Filo.';
+        }
+        if (src === 'personal') {
+          return 'i crediti di Filo sono finiti: puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nella pagina Crediti.';
+        }
         return 'i crediti sono finiti: puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nella pagina Crediti. Se usi già una chiave tua, è il suo credito a essere esaurito.';
       }
       if (st === 429 || st >= 500) {
