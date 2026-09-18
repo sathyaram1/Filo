@@ -56,6 +56,7 @@ test.beforeAll(async () => {
         return json(res, 200, { id_token: 'anon-id-token', refresh_token: 'anon-refresh', expires_in: '3600', user_id: 'anon-uid-1' });
       }
       if (url === '/walletState') {
+        if (!redeemed) return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
         return json(res, 200, {
           result: {
             hasWallet: true, pseudonym: PSEUDONYM,
