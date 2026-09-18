@@ -247,8 +247,127 @@
     return m ? m[1] + m[2] : s;
   }
 
+  // ── Il codice di un invito (#651) ────────────────────────────────────────
+  // L'alfabeto dei codici non ha 0, 1, I, L, O: a leggerli da un messaggio si
+  // scambiano. Le tre costanti e `normalizeCode` sono IDENTICHE al server
+  // (functions/src/wallet/credits.js di filo-security): se cambiano lì,
+  // cambiano anche qui, e gli unit test sono gli stessi dalle due parti.
+  const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  const CODE_LEN = 8;
+  const INVITE_LINK_BASE = 'https://filo.red/i/';
+
+  // Il codice come lo scrive la gente: «ABCD-EFGH», «abcd efgh», o il link
+  // intero («filo.red/i/ABCD-EFGH», «https://filo.red/i/abcdefgh/»). Se c'è un
+  // percorso si prende l'ultimo pezzo non vuoto; poi restano solo lettere e
+  // cifre, maiuscole. Torna il codice o `null`: tutto il resto non è un codice.
+  function normalizeCode(raw) {
+    let s = String(raw == null ? '' : raw).trim();
+    if (s.includes('/')) {
+      const parts = s.split('/').map((p) => p.trim()).filter(Boolean);
+      s = parts.length ? parts[parts.length - 1] : '';
+    }
+    s = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (s.length !== CODE_LEN) return null;
+    for (const ch of s) if (!CODE_ALPHABET.includes(ch)) return null;
+    return s;
+  }
+
+  // Il codice come si mostra: ABCD-EFGH. Quello che non è un codice torna
+  // com'era (non si inventa un trattino a metà di un testo qualsiasi).
+  function formatCode(code) {
+    const c = normalizeCode(code);
+    return c ? `${c.slice(0, 4)}-${c.slice(4)}` : String(code == null ? '' : code);
+  }
+
+  // Il link da dare a qualcuno. Senza un codice valido torna '': un link
+  // costruito attorno a un codice storto porterebbe a una pagina che non c'è.
+  function inviteLink(code) {
+    const c = normalizeCode(code);
+    return c ? INVITE_LINK_BASE + c : '';
+  }
+
+  // Quello che l'utente ha messo nel campo dell'invito → il codice, o `null`.
+  // Prima si prova a leggerlo com'è (codice o link); se non basta, si cerca il
+  // blocco di otto caratteri dentro la riga incollata («Codice: ABCD-EFGH»).
+  function codeFromInput(raw) {
+    return normalizeCode(raw) || normalizeCode(extractCode(raw));
+  }
+
+  // `filo://invito/<codice>` — il collegamento che porta un invito dentro
+  // Filo da fuori (la pagina del link, un messaggio). Registrando `filo://`
+  // come protocollo di sistema, il sistema consegna all'app QUALUNQUE
+  // `filo://…`: anche un `filo://credits/credits.html` messo in un link da un
+  // sito qualsiasi. Si accetta il solo host `invito`; tutto il resto torna
+  // `null` e chi chiama non apre niente.
+  function inviteCodeFromDeepLink(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    const m = /^filo:\/*([^/?#]+)(?:\/([^?#]*))?/i.exec(s);
+    if (!m || m[1].toLowerCase() !== 'invito') return null;
+    let rest = m[2] || '';
+    try { rest = decodeURIComponent(rest); } catch (_) { /* resta com'è */ }
+    return normalizeCode(rest);
+  }
+
+  // L'indirizzo arriva fra gli argomenti del processo (su Windows: primo
+  // avvio e `second-instance`). La posizione NON è fissa — in sviluppo il
+  // secondo argomento è `.`, nei test `.` è l'ultimo — quindi si cerca il
+  // prefisso, scandendo tutto.
+  function inviteCodeFromArgv(argv) {
+    for (const a of (Array.isArray(argv) ? argv : [])) {
+      const s = String(a == null ? '' : a).trim();
+      if (!/^filo:\/\//i.test(s)) continue;
+      const code = inviteCodeFromDeepLink(s);
+      if (code) return code;
+    }
+    return null;
+  }
+
+  // Un invito come lo manda il server: { code, link, used, max, uses, revoked }.
+  // `used` è QUANTI sono entrati, non «sì o no»: un invito da tre posti con un
+  // ingresso è ancora da dare. Un invito scritto prima degli inviti a più usi
+  // ha `used` booleano e vale un posto solo.
+  function inviteView(inv) {
+    const src = inv || {};
+    const rawMax = Math.floor(Number(src.max));
+    const legacy = !Number.isFinite(rawMax) || rawMax < 1;
+    const max = legacy ? 1 : rawMax;
+    const uses = (Array.isArray(src.uses) ? src.uses : []).filter(Boolean);
+    const counted = src.used === true ? 1 : Math.max(0, Math.floor(Number(src.used) || 0));
+    const used = Math.min(max, Math.max(uses.length, counted));
+    const code = formatCode(src.code);
+    return {
+      code,
+      link: String(src.link || inviteLink(src.code) || ''),
+      used, max, uses,
+      left: Math.max(0, max - used),
+      exhausted: used >= max,
+      revoked: src.revoked === true,
+    };
+  }
+
+  // Quanti sono entrati con questo invito, in parole.
+  function inviteStateLine(v) {
+    const view = v && v.max ? v : inviteView(v);
+    if (view.revoked) return 'annullato';
+    return `entrati ${view.used} su ${view.max}`;
+  }
+
+  // Si è appena entrati con un invito: la frase che lo dice, in home e nella
+  // pagina Crediti. Chi ha invitato non si può nominare — il server non manda
+  // il suo pseudonimo con lo stato del portafoglio.
+  function entryNoticeText({ credits } = {}) {
+    const n = Math.max(0, Math.floor(Number(credits) || 0));
+    return n > 0
+      ? `Sei entrato con un invito: hai ${fmtInt(n)} crediti.`
+      : 'Sei entrato con un invito: i tuoi crediti sono pronti.';
+  }
+
   global.SN_WALLET = {
     USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
+    // Inviti e link d'invito (#651)
+    CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
+    normalizeCode, formatCode, inviteLink, codeFromInput, inviteCodeFromDeepLink, inviteCodeFromArgv,
+    inviteView, inviteStateLine, entryNoticeText,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
