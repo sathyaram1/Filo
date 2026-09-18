@@ -76,11 +76,62 @@ module.exports = function register(on, ctx) {
     } catch (_) { return 'none'; }
   }
 
-  async function ownKeySet() {
+  // La chiave scritta dall'utente (Impostazioni o pagina Crediti: è lo
+  // stesso campo), o ''.
+  async function ownKey() {
     try {
       const s = await globalThis.SN_STORAGE.getSettings();
-      return Boolean(s && s.apiKeys && String(s.apiKeys.openrouter || '').trim());
-    } catch (_) { return false; }
+      return String((s && s.apiKeys && s.apiKeys.openrouter) || '').trim();
+    } catch (_) { return ''; }
+  }
+
+  async function ownKeySet() {
+    return Boolean(await ownKey());
+  }
+
+  // ── Ripiego dalla chiave propria ai crediti (#629) ────────────────────────
+  // Il provider chiama queste due a ogni chiamata: sono confronti di stringhe.
+  // Da dove viene UNA chiave data (quella che ha servito davvero).
+  async function keySourceOf(apiKey) {
+    const k = String(apiKey || '').trim();
+    if (!k) return '';
+    if (k === (await ownKey())) return 'own';
+    if (k === walletStore.personalKey()) return 'personal';
+    return 'factory';
+  }
+
+  // La riserva per la chiave con cui una chiamata è partita: la personale del
+  // portafoglio, solo se si era partiti con la chiave PROPRIA. Con la
+  // personale già in uso non c'è riserva (un 402 lì sono i crediti finiti), e
+  // con la chiave di fabbrica nemmeno.
+  async function alternativeKeyFor(apiKey) {
+    const k = String(apiKey || '').trim();
+    const personal = walletStore.personalKey();
+    if (!k || !personal || k === personal) return null;
+    if (k !== (await ownKey())) return null;
+    return { key: personal, source: 'personal' };
+  }
+
+  // L'ultimo rifiuto della chiave propria: { at, status, detail }. Lo legge
+  // la pagina Crediti (readState); si cancella quando la chiave cambia.
+  const REFUSAL_KEY = 'walletOwnKeyRefusal';
+  async function noteOwnKeyRefusal({ status, detail } = {}) {
+    const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300) };
+    try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, rec); } catch (_) {}
+    console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ripiego sulla chiave personale`);
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+  }
+  async function lastOwnKeyRefusal() {
+    try {
+      const r = await globalThis.SN_STORAGE.getRaw(REFUSAL_KEY, null);
+      return r && r.at ? r : null;
+    } catch (_) { return null; }
+  }
+  // La chiave propria è cambiata (messa, tolta, sostituita): il rifiuto di
+  // quella di prima non dice niente su questa.
+  async function ownKeyChanged() {
+    try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
   // ── Stato per la pagina Crediti ───────────────────────────────────────────
