@@ -598,6 +598,9 @@ module.exports = function register(on, ctx) {
 
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // L'invito che arriva da fuori (#651): lo chiama main.js per il
+    // collegamento filo://invito/<codice>, e l'avvio per l'invito in attesa.
+    redeemFromInvite, tryPendingInvite,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
