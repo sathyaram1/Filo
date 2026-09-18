@@ -383,12 +383,18 @@ module.exports = function register(on, ctx) {
   }
 
   // Chiamato da costTracker.record per OGNI chiamata AI. Scrive la riga solo
-  // se la chiamata è partita con la chiave personale: con una chiave
+  // se la chiamata è stata SERVITA dalla chiave personale: con una chiave
   // dell'utente il consumo è affar suo e OpenRouter non lo conta sulla nostra.
+  // Chi l'ha servita lo dice il provider (`usage.keySource`), così una
+  // chiamata partita con la chiave propria e ripiegata sulla personale (#629)
+  // si registra come ogni altra chiamata con la personale. Senza quel campo
+  // (una chiamata che non passa dal provider) vale la precedenza delle chiavi.
   async function recordUsage({ action, model, servedBy, usage }) {
     const pseudonym = walletStore.pseudonym();
     if (!pseudonym || !walletStore.personalKey()) return;
-    if (await ownKeySet()) return;
+    const src = usage && usage.keySource;
+    if (src ? src !== 'personal' : await ownKeySet()) return;
+    await loadQueue();
     const costUsd = Number(usage && usage.costUsd) || 0;
     const fx = lastServer && lastServer.balance ? lastServer.balance : {};
     const row = W.usageRow({
