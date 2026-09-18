@@ -9,6 +9,7 @@
 
   const { MSG } = window.SN_MSG;
   const Storage = window.SN_STORAGE;
+  const W = window.SN_WALLET;
 
   function $(id) { return document.getElementById(id); }
 
