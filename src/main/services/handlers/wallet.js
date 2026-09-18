@@ -447,11 +447,14 @@ module.exports = function register(on, ctx) {
 
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
+    keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
   };
 
   // All'avvio: identità pronta e stato del server letto una volta, così la
-  // prima riga del registro ha già i parametri di conversione. In background.
-  setTimeout(() => { readState().catch(() => {}); }, 4000);
+  // prima riga del registro ha già i parametri di conversione; e le righe
+  // rimaste da scrivere alla chiusura precedente ripartono. In background.
+  setTimeout(() => { readState().catch(() => {}); loadQueue().catch(() => {}); }, 4000);
 };
