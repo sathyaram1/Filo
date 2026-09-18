@@ -103,7 +103,7 @@ test('primo avvio dopo il link: i crediti arrivano da soli, l’avviso lo dice, 
   await expect(page.locator('#walletNote')).toContainText('invito', { timeout: 10000 });
 
   // Gli inviti da dare: un LINK per ciascuno, e quanti sono entrati.
-  const righe = page.locator('#invites li');
+  const righe = page.locator('#invites > li');
   await expect(righe).toHaveCount(3);
   await expect(righe.nth(0).locator('.sn-wallet-invite-link')).toHaveText('https://filo.red/i/AAAA2222');
   await expect(righe.nth(0).locator('.sn-wallet-invite-state')).toHaveText('entrati 1 su 3');
