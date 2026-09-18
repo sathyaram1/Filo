@@ -175,16 +175,28 @@ test('filo://invito/<codice>: si accetta il solo host invito, il resto non apre 
   assert.equal(W.inviteCodeFromDeepLink('filo://invito/%zz'), null, 'una percentuale storta non fa esplodere niente');
 });
 
-test('il codice si CERCA negli argomenti: la posizione non è mai fissa', () => {
+test('un invito col codice storto è comunque un invito: si dice, non si tace', () => {
+  // «Non è un invito» e «è un invito ma il codice è storto» sono due cose
+  // diverse: la prima si lascia cadere in silenzio (l'ha scritta una pagina),
+  // la seconda va detta (l'ha cliccata una persona, che aspetta qualcosa).
+  assert.equal(W.isInviteDeepLink('filo://invito/ABCDEFGH'), true);
+  assert.equal(W.isInviteDeepLink('filo://invito/ABCD'), true);
+  assert.equal(W.isInviteDeepLink('filo://invito/'), true);
+  assert.equal(W.isInviteDeepLink('filo://credits/credits.html'), false);
+  assert.equal(W.isInviteDeepLink('https://filo.red/i/ABCDEFGH'), false);
+  assert.equal(W.isInviteDeepLink(''), false);
+  assert.equal(W.inviteCodeFromDeepLink('filo://invito/ABCD'), null);
+});
+
+test('l\'indirizzo si CERCA negli argomenti: la posizione non è mai fissa', () => {
   // In sviluppo il secondo argomento è «.», nei test «.» è l'ultimo: cercarlo
   // per posizione vuol dire trovarlo solo per caso.
-  assert.equal(W.inviteCodeFromArgv(['filo.exe', 'filo://invito/ABCDEFGH']), 'ABCDEFGH');
-  assert.equal(W.inviteCodeFromArgv(['electron.exe', '.', 'filo://invito/abcd-efgh']), 'ABCDEFGH');
-  assert.equal(W.inviteCodeFromArgv(['electron.exe', 'filo://invito/ABCDEFGH', '.']), 'ABCDEFGH');
-  assert.equal(W.inviteCodeFromArgv(['filo.exe', '--flag', '.']), null);
-  assert.equal(W.inviteCodeFromArgv(['filo.exe', 'filo://credits/credits.html']), null);
-  assert.equal(W.inviteCodeFromArgv([]), null);
-  assert.equal(W.inviteCodeFromArgv(null), null);
+  assert.equal(W.filoUrlFromArgv(['filo.exe', 'filo://invito/ABCDEFGH']), 'filo://invito/ABCDEFGH');
+  assert.equal(W.filoUrlFromArgv(['electron.exe', '.', 'filo://invito/abcd-efgh']), 'filo://invito/abcd-efgh');
+  assert.equal(W.filoUrlFromArgv(['electron.exe', 'filo://invito/ABCDEFGH', '.']), 'filo://invito/ABCDEFGH');
+  assert.equal(W.filoUrlFromArgv(['filo.exe', '--flag', '.']), null);
+  assert.equal(W.filoUrlFromArgv([]), null);
+  assert.equal(W.filoUrlFromArgv(null), null);
 });
 
 test('un invito si legge a posti: «entrati N su M», e i vecchi valgono un posto solo', () => {
