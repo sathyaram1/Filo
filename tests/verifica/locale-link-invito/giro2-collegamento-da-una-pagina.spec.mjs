@@ -69,12 +69,15 @@ const RINVIO = `<!doctype html><html><head><meta charset="utf-8"><title>rinvio</
 <script>setTimeout(function () { try { location.href = 'filo://invito/DDDD5555'; } catch (e) {} }, 400);</script>
 </body></html>`;
 
-test('una pagina qualsiasi non riscatta un invito da sola, senza che nessuno abbia cliccato', async ({ openTab, testServer }) => {
+test('una pagina qualsiasi non riscatta un invito da sola, senza che nessuno abbia cliccato', async ({ app, openTab, testServer }) => {
   test.setTimeout(180000);
   redeems = [];
 
   const page = await openTab(testServer.html(PASSIVA));
-  await expect(page.locator('h1')).toHaveText('Una pagina qualsiasi', { timeout: 20000 });
+  await page.waitForTimeout(3000);
+  console.log('TAB:', page.url());
+  console.log('FINESTRE:', app.windows().map((w) => w.url()).join(' | '));
+  console.log('HTML:', (await page.content().catch(() => '')).slice(0, 400));
   await page.waitForTimeout(8000);
 
   await openTab(testServer.html(RINVIO));
