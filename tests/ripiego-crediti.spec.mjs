@@ -31,6 +31,7 @@ let server;
 let base = '';
 const seen = { completions: [], commits: [], keyInfo: [] };
 let ownKeyStatus = 401; // cosa risponde OpenRouter alla chiave propria
+let redeemed = false;   // il portafoglio esiste solo dopo il riscatto (ogni test riparte da zero)
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
