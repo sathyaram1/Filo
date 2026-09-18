@@ -299,25 +299,36 @@
   // `filo://…`: anche un `filo://credits/credits.html` messo in un link da un
   // sito qualsiasi. Si accetta il solo host `invito`; tutto il resto torna
   // `null` e chi chiama non apre niente.
+  function deepLinkHost(raw) {
+    const m = /^filo:\/*([^/?#]+)(?:\/([^?#]*))?/i.exec(String(raw == null ? '' : raw).trim());
+    return m ? { host: m[1].toLowerCase(), rest: m[2] || '' } : null;
+  }
+
+  // È un collegamento d'invito? La domanda è separata da «qual è il codice»
+  // apposta: un `filo://` che non è un invito si lascia cadere in silenzio
+  // (non l'ha chiesto l'utente), ma un invito col codice storto va DETTO —
+  // chi ha cliccato aspetta che succeda qualcosa.
+  function isInviteDeepLink(raw) {
+    const p = deepLinkHost(raw);
+    return Boolean(p && p.host === 'invito');
+  }
+
   function inviteCodeFromDeepLink(raw) {
-    const s = String(raw == null ? '' : raw).trim();
-    const m = /^filo:\/*([^/?#]+)(?:\/([^?#]*))?/i.exec(s);
-    if (!m || m[1].toLowerCase() !== 'invito') return null;
-    let rest = m[2] || '';
+    const p = deepLinkHost(raw);
+    if (!p || p.host !== 'invito') return null;
+    let rest = p.rest;
     try { rest = decodeURIComponent(rest); } catch (_) { /* resta com'è */ }
     return normalizeCode(rest);
   }
 
-  // L'indirizzo arriva fra gli argomenti del processo (su Windows: primo
-  // avvio e `second-instance`). La posizione NON è fissa — in sviluppo il
-  // secondo argomento è `.`, nei test `.` è l'ultimo — quindi si cerca il
+  // L'indirizzo arriva fra gli argomenti del processo (su Windows e Linux:
+  // primo avvio e `second-instance`). La posizione NON è fissa — in sviluppo
+  // il secondo argomento è `.`, nei test `.` è l'ultimo — quindi si cerca il
   // prefisso, scandendo tutto.
-  function inviteCodeFromArgv(argv) {
+  function filoUrlFromArgv(argv) {
     for (const a of (Array.isArray(argv) ? argv : [])) {
       const s = String(a == null ? '' : a).trim();
-      if (!/^filo:\/\//i.test(s)) continue;
-      const code = inviteCodeFromDeepLink(s);
-      if (code) return code;
+      if (/^filo:\/\//i.test(s)) return s;
     }
     return null;
   }
