@@ -349,7 +349,10 @@ export async function apriCrediti(openTab) {
 //   status, text, costUsd     la risposta di default (per ogni chiave);
 //   byKey: { '<chiave>': { status?, text?, keyInfo?: { limit, usage, limit_remaining }, keyInfoStatus? } }
 //                             la risposta per UNA chiave (la propria, la personale);
-//   keyInfo                   spesa e residuo di default per /auth/key.
+//   keyInfo                   spesa e residuo di default per /auth/key;
+//   account                   { total_credits, total_usage } per /credits (il
+//                             credito dell'account, per le chiavi senza tetto);
+//                             null = OpenRouter non risponde.
 // Si cambia dopo con `impostaOpenRouter`.
 export async function fintoOpenRouter(app, opts = {}) {
   await app.evaluate(({}, o) => {
