@@ -2905,6 +2905,11 @@
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
       // scheda nuova.
       if (msg.signedIn) maybeOpenOnboardingLater();
+    } else if (msg?.type === MSG.CREDITS_CHANGED && msg.walletNotice) {
+      // Un invito riscattato da fuori (#651): il link aperto da un'altra
+      // applicazione, o l'invito che aspettava questa installazione al primo
+      // avvio. Il main lo spinge una volta sola.
+      inCodaPopup(() => showInviteWelcome(msg.walletNotice));
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
       const n = Math.round(Number(msg.amount) || 0);
