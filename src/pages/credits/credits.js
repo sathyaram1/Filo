@@ -214,7 +214,7 @@
         : 'I crediti li tiene il server.';
       $('redeemForm').hidden = true;
       if (w.usingOwnKey) {
-        note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo si usano solo se lei viene rifiutata.';
+        note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
         note.hidden = false;
       } else if (server.cached) {
         note.textContent = 'Ultimo saldo letto: il server dei crediti non risponde adesso.';
