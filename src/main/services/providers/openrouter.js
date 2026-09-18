@@ -27,6 +27,49 @@
     };
   }
 
+  // Il punto unico in cui la chiave entra in una chiamata (#629). Ogni
+  // funzione qui sotto passa di qua, così il ripiego vale per tutte: chat,
+  // spiega, traduci, voce, dettatura, vettori. Se OpenRouter rifiuta la
+  // CHIAVE (401, 402, 403) e chi tiene le chiavi (SN_WALLET_MAIN, nel main)
+  // ne conosce una di riserva per quella con cui si è partiti — la chiave
+  // personale del portafoglio, quando la chiamata era partita con la chiave
+  // scritta dall'utente — si rifà subito la stessa richiesta con la riserva,
+  // nella stessa risposta. Rete, 429, 5xx e gli errori di modello non
+  // c'entrano con la chiave e non passano di qui. Torna la risposta da
+  // leggere più:
+  //   keyUsed    la chiave che ha servito davvero (per le letture a posteriori,
+  //              che vogliono la stessa chiave della generazione);
+  //   keySource  'own' | 'personal' | 'factory' | '' — chi la registra decide
+  //              da qui se la riga d'uso va scritta;
+  //   keyFallback { status } se il ripiego è avvenuto, altrimenti null.
+  // Se anche la riserva rifiuta, l'errore che risale è il SUO (con la
+  // personale un 402 sono i crediti finiti), e il rifiuto della chiave
+  // propria resta comunque registrato: la pagina Crediti lo mostra.
+  async function fetchWithKey(url, apiKey, makeInit) {
+    let res = await fetch(url, makeInit(apiKey));
+    let keyUsed = apiKey;
+    let keyFallback = null;
+    const W = global.SN_WALLET;
+    const K = global.SN_WALLET_MAIN;
+    if (!res.ok && W && W.isKeyRefusalStatus(res.status) && K && typeof K.alternativeKeyFor === 'function') {
+      let alt = null;
+      try { alt = await K.alternativeKeyFor(apiKey); } catch (_) { alt = null; }
+      if (alt && alt.key) {
+        const refused = { status: res.status, detail: (await res.text().catch(() => '')).slice(0, 300) };
+        try { await K.noteOwnKeyRefusal(refused); } catch (_) {}
+        res = await fetch(url, makeInit(alt.key));
+        keyUsed = alt.key;
+        keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
+        if (!res.ok) keyFallback.failed = res.status;
+      }
+    }
+    let keySource = '';
+    if (K && typeof K.keySourceOf === 'function') {
+      try { keySource = await K.keySourceOf(keyUsed); } catch (_) { keySource = ''; }
+    }
+    return { res, keyUsed, keySource, keyFallback };
+  }
+
   // Traduce il livello di reasoning scelto dall'owner (#369) nel campo
   // `reasoning` che OpenRouter capisce. `wantThoughts` = il caller vuole anche i
   // token di ragionamento in streaming (onReasoning). Ritorna null se non c'è
