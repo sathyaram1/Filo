@@ -66,10 +66,76 @@
   //   dailyCredits: quota giornaliera, se nota, per dire quanto arriva domani.
   function outOfCreditsMessage({ usingOwnKey = false, dailyCredits = null } = {}) {
     if (usingOwnKey) {
-      return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo account OpenRouter, oppure togli la chiave dalle Impostazioni per tornare ai crediti di Filo.';
+      return 'la tua chiave OpenRouter non ha più credito: ricarica il tuo account OpenRouter, oppure togli la chiave dalla pagina Crediti per tornare ai crediti di Filo.';
     }
     const domani = dailyCredits ? ` (domani ne arrivano ${dailyCredits})` : '';
-    return `i crediti di Filo sono finiti${domani}. Puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nelle Impostazioni.`;
+    return `i crediti di Filo sono finiti${domani}. Puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nella pagina Crediti.`;
+  }
+
+  // ── Ripiego dalla chiave propria ai crediti di Filo (#629) ───────────────
+  // OpenRouter rifiuta una CHIAVE (non una richiesta) con tre codici: 401 la
+  // chiave non esiste più o non è valida, 402 il suo credito è finito, 403 la
+  // moderazione ha bloccato l'input per quella chiave. Solo per questi, se la
+  // chiamata era partita con la chiave scritta dall'utente e c'è la chiave
+  // personale del portafoglio, si ritenta la stessa richiesta con la
+  // personale. Rete, 429, 5xx, errori di modello: no — non è la chiave.
+  function isKeyRefusalStatus(status) {
+    const st = Number(status);
+    return st === 401 || st === 402 || st === 403;
+  }
+
+  // Lo status di rifiuto della chiave dentro un errore del provider, o 0.
+  function keyRefusalOf(err) {
+    if (!err) return 0;
+    const st = Number(err.status);
+    if (isKeyRefusalStatus(st)) return st;
+    const m = /^OpenRouter(?:\s+\S+)?\s+(40[123])\b/.exec(String(err.message || err || ''));
+    return m ? Number(m[1]) : 0;
+  }
+
+  function keyRefusalReason(status) {
+    const st = Number(status);
+    if (st === 401) return 'OpenRouter non la riconosce';
+    if (st === 402) return 'il suo credito è finito';
+    if (st === 403) return 'OpenRouter ha bloccato la richiesta per quella chiave';
+    return 'OpenRouter l\'ha rifiutata';
+  }
+
+  // La riga discreta in chat, quando il ripiego è appena avvenuto.
+  function ownKeyFallbackLine(status) {
+    return `La tua chiave OpenRouter è stata rifiutata (${keyRefusalReason(status)}): ho usato i crediti di Filo.`;
+  }
+
+  // Lo stato nella pagina Crediti: l'ultimo rifiuto, e cosa succede finché la
+  // chiave resta lì. `at` è ISO.
+  function ownKeyRefusalNote({ at, status } = {}) {
+    let quando = '';
+    try {
+      const d = new Date(at);
+      if (!Number.isNaN(d.getTime())) {
+        quando = ` l'ultima volta il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+    } catch (_) { quando = ''; }
+    return `La tua chiave è stata rifiutata${quando} (${keyRefusalReason(status)}) e Filo ha usato i tuoi crediti. Finché resta qui, ogni chiamata prova prima lei.`;
+  }
+
+  // Gli ultimi sei caratteri della chiave, per riconoscerla senza mostrarla.
+  function keyTail(key) {
+    const k = String(key || '').trim();
+    return k ? k.slice(-6) : '';
+  }
+
+  // Spesa e residuo della chiave propria, come li dice `GET /api/v1/auth/key`
+  // di OpenRouter: { limit, usage, limit_remaining }. `limit` null = nessun
+  // tetto: allora solo la spesa.
+  function ownKeyBalanceLine({ limit, usage, limit_remaining } = {}) {
+    const usd = (n) => `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+    const spesa = `Spesi ${usd(usage)}`;
+    if (limit == null || !Number.isFinite(Number(limit))) return `${spesa} · nessun tetto`;
+    const resta = limit_remaining != null && Number.isFinite(Number(limit_remaining))
+      ? Number(limit_remaining)
+      : Number(limit) - (Number(usage) || 0);
+    return `${spesa} · restano ${usd(Math.max(0, resta))} su ${usd(limit)}`;
   }
 
   // Gli esiti del riscatto, tradotti. `status` è quello del server.
