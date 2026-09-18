@@ -136,6 +136,23 @@ module.exports = function register(on, ctx) {
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
+  // La chiave propria ha servito una chiamata (lo dice il provider a ogni
+  // risposta buona): il rifiuto ricordato, se c'era, è superato — il conto è
+  // stato ricaricato — e la pagina Crediti, se è aperta, richiede spesa e
+  // residuo. L'avviso parte a ogni chiamata solo se c'è qualcosa da
+  // aggiornare: senza rifiuto ricordato, al massimo uno ogni pochi secondi.
+  let lastOwnKeyUsedAt = 0;
+  async function noteOwnKeySuccess() {
+    const had = await lastOwnKeyRefusal();
+    if (had) {
+      try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
+      console.info('[wallet] la chiave propria risponde di nuovo: rifiuto dimenticato');
+    }
+    const now = Date.now();
+    if (!had && now - lastOwnKeyUsedAt < 3000) return;
+    lastOwnKeyUsedAt = now;
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, ownKeyUsed: true }); } catch (_) {}
+  }
 
   // ── Stato per la pagina Crediti ───────────────────────────────────────────
   // { ok, identity:{ ok, error? }, hasPersonalKey, pseudonym, usingOwnKey,
