@@ -610,5 +610,14 @@ module.exports = function register(on, ctx) {
   // All'avvio: identità pronta e stato del server letto una volta, così la
   // prima riga del registro ha già i parametri di conversione; e le righe
   // rimaste da scrivere alla chiusura precedente ripartono. In background.
-  setTimeout(() => { readState().catch(() => {}); loadQueue().catch(() => {}); }, 4000);
+  // Poi, senza portafoglio, si chiede se c'è un invito che aspetta questa
+  // installazione (#651): dopo la lettura dello stato, così l'identità è già
+  // pronta, e comunque senza bloccare niente.
+  setTimeout(() => {
+    readState()
+      .catch(() => {})
+      .then(() => tryPendingInvite())
+      .catch(() => {});
+    loadQueue().catch(() => {});
+  }, 4000);
 };
