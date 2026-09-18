@@ -183,22 +183,65 @@ test('i vettori (embeddings) con la chiave propria a secco passano dallo stesso 
   } finally { await chiudi(filo); }
 });
 
-test('una chiave che non comincia con sk-or- incollata in Crediti', async () => {
+test('«spiega» sulla pagina con la chiave propria a secco fa le stesse richieste di quando la chiave va (ognuna rifatta con la personale): nessuna tempesta di tentativi', async () => {
+  test.setTimeout(180_000);
+  const [code] = await server.codiciOwner(1);
+  const filo = await avviaFilo({ env: server.env });
+  const web = await paginaWeb('<!doctype html><meta charset="utf-8"><title>Pagina di prova</title><p id="t">Una frase da spiegare sulla pagina.</p>');
+  try {
+    const page = await apriCrediti(filo.openTab);
+    await riscatta(page, code);
+    await fintoOpenRouter(filo.app, {});
+    await mettiChiave(page, PROPRIA);
+    const pagina = await filo.openTab(web.url);
+    const spiega = async () => {
+      await pagina.locator('#t').click();
+      await pagina.evaluate(() => {
+        const p = document.querySelector('#t');
+        const range = document.createRange();
+        range.selectNodeContents(p);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+      await filo.app.evaluate(({ BrowserWindow }) => {
+        const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+        globalThis.__filoShortcuts.dispatch('explain-selection', win);
+      });
+      await expect(pagina.locator('.sn-popup').last()).toContainText('Ciao dal modello finto.', { timeout: 30_000 });
+      await pagina.waitForTimeout(3000); // le richieste precalcolate dal riquadro
+    };
+    await spiega();
+    const conBuona = (await chiamateChat(filo.app)).length;
+    await pagina.keyboard.press('Escape');
+    await impostaOpenRouter(filo.app, { byKey: { [PROPRIA]: { status: 402 } } });
+    await spiega();
+    const dopo = (await chiamateChat(filo.app)).slice(conBuona);
+    const chiavi = dopo.map((c) => (c.key === PROPRIA ? 'propria' : (c.key === chiavePersonale() ? 'personale' : '?')));
+    console.log('[nota]', `«spiega» con la chiave buona: ${conBuona} richieste; con la chiave a 402: ${JSON.stringify(chiavi)}`);
+    expect(dopo.length).toBe(conBuona * 2);
+    for (let i = 0; i < chiavi.length; i += 2) expect(chiavi.slice(i, i + 2)).toEqual(['propria', 'personale']);
+  } finally { await web.chiudi(); await chiudi(filo); }
+});
+
+test('una chiave di un altro servizio incollata in Crediti: OpenRouter non la riconosce, e la riga accanto ai sei caratteri lo dice subito', async () => {
   test.setTimeout(120_000);
+  const ALTRA = 'sk-proj-questa-non-e-di-openrouter';
   const filo = await avviaFilo({ env: server.env });
   try {
     const page = await apriCrediti(filo.openTab);
-    await fintoOpenRouter(filo.app, {});
+    // Una chiave che OpenRouter non conosce: 401 a tutto, anche alla domanda su spesa e residuo.
+    await fintoOpenRouter(filo.app, { byKey: { [ALTRA]: { status: 401 } } });
     await expect(page.locator('#ownKeyForm')).toBeVisible({ timeout: 15_000 });
-    await page.fill('#ownKeyInput', 'sk-proj-questa-non-e-di-openrouter');
+    await page.fill('#ownKeyInput', ALTRA);
     await page.click('#ownKeySaveBtn');
-    await page.waitForTimeout(2000);
-    const salvata = await page.locator('#ownKeyHave').isVisible();
+    await expect(page.locator('#ownKeyHave')).toBeVisible({ timeout: 15_000 });
     const msg = (await page.locator('#ownKeyMsg').isVisible()) ? await page.locator('#ownKeyMsg').innerText() : '';
-    console.log('[nota]', `chiave «sk-proj-…»: ${salvata ? 'salvata senza una parola' : 'non salvata'}; messaggio «${msg}»`);
-    // Una chiave di un altro servizio, incollata per sbaglio, va detta subito:
-    // il campo vuoto già spiega che comincia con sk-or-.
-    expect(salvata || Boolean(msg)).toBe(true);
-    if (salvata) console.log('[nota]', `riga spesa: «${await page.locator('#ownKeyBalance').innerText()}»`);
+    await expect(page.locator('#ownKeyBalance')).not.toHaveText(/Chiedo a OpenRouter|^$/, { timeout: 15_000 });
+    const riga = await page.locator('#ownKeyBalance').innerText();
+    console.log('[nota]', `chiave «sk-proj-…»: salvata (messaggio al salvataggio «${msg}»); riga spesa «${riga}»`);
+    expect(riga).toMatch(/non accetta questa chiave/);
+    expect(riga).toMatch(/non la riconosce/);
+    await expect(page.locator('#ownKeyTail')).toHaveText(`…${ALTRA.slice(-6)}`);
   } finally { await chiudi(filo); }
 });
