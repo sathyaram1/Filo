@@ -404,8 +404,32 @@ module.exports = function register(on, ctx) {
     if (!row) return;
     queue.push(row);
     if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+    await saveQueue();
     scheduleFlush(3000);
   }
+
+  // ── Chiave propria dalla pagina Crediti (#629) ────────────────────────────
+  // Spesa e residuo che OpenRouter dichiara per la chiave scritta dall'utente.
+  // La chiave non esce dal main: alla pagina tornano i numeri e la frase.
+  on(MSG.WALLET_OWN_KEY_INFO, filoOnly(async () => {
+    const key = await ownKey();
+    if (!key) return { ok: false, status: 'no_own_key' };
+    const P = globalThis.SN_PROVIDER_OPENROUTER;
+    if (!P || typeof P.keyInfo !== 'function') return { ok: false, status: 'internal' };
+    try {
+      const info = await P.keyInfo({ apiKey: key });
+      return { ok: true, ...info, line: W.ownKeyBalanceLine(info) };
+    } catch (e) {
+      const st = Number(e && e.status) || 0;
+      const refused = W.isKeyRefusalStatus(st);
+      return {
+        ok: false, status: refused ? 'refused' : 'not_reachable', httpStatus: st,
+        message: refused
+          ? `OpenRouter non accetta questa chiave (${W.keyRefusalReason(st)}).`
+          : 'Non riesco a chiedere a OpenRouter cosa resta su questa chiave: riprova fra poco.',
+      };
+    }
+  }));
 
   // ── Crediti finiti ────────────────────────────────────────────────────────
   // Un avviso ogni 10 minuti al massimo: il 402 arriva a ogni chiamata finché
