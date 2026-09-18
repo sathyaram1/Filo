@@ -870,6 +870,22 @@
     saveTimer = setTimeout(save, 400);
   }
 
+  // La chiave OpenRouter si mette e si toglie anche dalla pagina Crediti
+  // (#629), e questa pagina risalva TUTTO il modulo a ogni modifica: con la
+  // fotografia di quando è stata aperta, un cambio qualunque qui riportava la
+  // chiave a com'era prima (o la cancellava, se all'apertura non c'era). Al
+  // cambio arrivato da fuori il campo si riallinea, a meno che l'utente ci
+  // stia scrivendo dentro proprio adesso.
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || !msg.settings.apiKeys) return;
+      const field = $('apiKey');
+      if (!field || document.activeElement === field) return;
+      const now = String(msg.settings.apiKeys.openrouter || '');
+      if (field.value !== now) field.value = now;
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
     // Niente pulsante "Salva": ogni modifica viene applicata e persistita
