@@ -248,6 +248,7 @@ test('(B) chiave propria valida: una chiamata sola, nessun avviso, nessuna riga 
   expect(seen.commits.length).toBe(0);
 
   const credits = await openTab('filo://credits/credits.html');
+  await credits.reload();
   await expect(credits.locator('#ownKeyHave')).toBeVisible({ timeout: 15000 });
   await expect(credits.locator('#ownKeyRefusal')).toBeHidden();
   await expect(credits.locator('#ownKeyRule')).toContainText('prova prima lei');
