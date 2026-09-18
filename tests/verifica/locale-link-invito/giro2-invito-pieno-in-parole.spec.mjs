@@ -19,7 +19,6 @@ require('../../../src/shared/wallet.js');
 const W = globalThis.SN_WALLET;
 
 test('un invito pieno lo dice da invito a più persone, non da codice a un uso solo', () => {
-  test.fail(true, 'la frase è rimasta quella degli inviti a un uso solo');
   const frase = W.redeemMessage('code_used');
   expect(frase).not.toMatch(/già stato usato/i);
   expect(frase).toMatch(/posti|pieno|tre|nessun posto/i);
