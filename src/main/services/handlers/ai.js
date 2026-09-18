@@ -241,9 +241,12 @@ module.exports = function register(on, ctx) {
           ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
           // Chi ha servito (e quanto è costato) il router lo dice solo dopo:
           // si chiede a parte, senza far aspettare la lettura.
+          // Con la chiave che ha fatto la generazione (dopo un ripiego, #629,
+          // non è quella di partenza), e da dove viene: la riga d'uso si
+          // scrive solo se ha pagato la personale.
           auditServedByLater({
             settings, action: SN_CONST.ACTIONS.TTS, provider: a.provider, model: a.model,
-            apiKey: a.apiKey, generationId: r.generationId, recordCost: true,
+            apiKey: r.keyUsed || a.apiKey, generationId: r.generationId, recordCost: true, keySource: r.keySource || '',
           });
           return {
             ok: true,
