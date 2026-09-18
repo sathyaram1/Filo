@@ -42,6 +42,41 @@ test('i testi del ripiego: riga in chat, nota in Crediti, coda della chiave, spe
   assert.equal(W.ownKeyBalanceLine({ limit: 10, usage: 12 }), 'Spesi 12,00 $ · restano 0,00 $ su 10,00 $', 'senza limit_remaining si calcola, mai negativo');
 });
 
+// Primo giro di verifica del ramo: una chiave senza tetto (il caso normale)
+// deve dire lo stesso quanto resta — il credito dell'account — e chi resta
+// senza niente con cui ripiegare deve leggere cos'è successo davvero.
+test('chiave senza tetto: resta il credito dell’account; senza risposta, la sola spesa', () => {
+  assert.equal(W.ownKeyBalanceLine({ limit: null, usage: 1.5, account: { credits: 25, usage: 5.5 } }), 'Spesi 1,50 $ · restano 19,50 $ sul tuo conto OpenRouter');
+  assert.equal(W.ownKeyBalanceLine({ limit: null, usage: 1.5, account: { credits: 3, usage: 9 } }), 'Spesi 1,50 $ · restano 0,00 $ sul tuo conto OpenRouter', 'mai negativo');
+  assert.equal(W.ownKeyBalanceLine({ limit: null, usage: 1.5, account: null }), 'Spesi 1,50 $ · nessun tetto');
+  assert.equal(W.ownKeyBalanceLine({ limit: 10, usage: 1.5, limit_remaining: 8.5, account: { credits: 25, usage: 5.5 } }), 'Spesi 1,50 $ · restano 8,50 $ su 10,00 $', 'col tetto conta il tetto');
+});
+
+test('crediti finiti: la frase dice quale chiave e cosa resta da fare, in chat e nel toast', () => {
+  // Propria rifiutata E personale a secco: tutte e due, e domani ne arrivano.
+  const both = W.outOfCreditsMessage({ usingOwnKey: true, fallbackFailed: true, hasWallet: true, dailyCredits: 100 });
+  assert.match(both, /rifiutato la tua chiave/);
+  assert.match(both, /anche i crediti di Filo sono finiti/);
+  assert.match(both, /domani ne arrivano 100/);
+  assert.ok(!/mettere una tua chiave/.test(both), both);
+  // Propria rifiutata senza portafoglio: niente crediti di domani, la strada è un invito.
+  const noWallet = W.outOfCreditsMessage({ usingOwnKey: true, hasWallet: false });
+  assert.match(noWallet, /tua chiave OpenRouter non ha più credito/);
+  assert.match(noWallet, /riscatta un invito/);
+  assert.ok(!/domani/.test(noWallet), noWallet);
+  assert.ok(!/togli la chiave/.test(noWallet), noWallet);
+  // Personale a secco (nessuna chiave propria): i crediti di Filo.
+  assert.match(W.outOfCreditsMessage({ usingOwnKey: false, hasWallet: true, dailyCredits: 100 }), /crediti di Filo sono finiti \(domani ne arrivano 100\)/);
+
+  // In chat: la frase scritta da chi tiene le chiavi vince; senza, si legge dall'errore.
+  const e402 = (extra) => Object.assign(new Error('OpenRouter 402: Key limit exceeded'), { status: 402, provider: 'openrouter', ...extra });
+  assert.equal(CE.friendly(e402({ userMessage: 'frase del main' })), 'frase del main');
+  assert.match(CE.friendly(e402({ keySource: 'own', keyFallback: { status: 402, from: 'own', to: 'personal', failed: 402 } })), /anche i crediti di Filo sono finiti/);
+  assert.match(CE.friendly(e402({ keySource: 'own' })), /riscatta un invito/);
+  assert.match(CE.friendly(e402({ keySource: 'personal' })), /crediti di Filo sono finiti/);
+  assert.match(CE.friendly(e402({})), /Se usi già una chiave tua/, 'senza informazioni resta la frase prudente');
+});
+
 test('chiave rifiutata in chat: la frase rimanda alla pagina Crediti, non alle Impostazioni', () => {
   for (const st of [401, 403, 402]) {
     const e = Object.assign(new Error(`OpenRouter ${st}: no`), { status: st, provider: 'openrouter' });
