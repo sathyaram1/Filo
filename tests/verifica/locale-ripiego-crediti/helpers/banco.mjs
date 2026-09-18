@@ -360,7 +360,7 @@ export async function fintoOpenRouter(app, opts = {}) {
     if (!g.__orOrig) g.__orOrig = g.fetch;
     g.__orCalls = [];
     g.__fsCommits = [];
-    g.__orOpts = { status: 200, text: 'Ciao dal modello finto.', costUsd: 0.0021, byKey: {}, keyInfo: { limit: 10, usage: 1.23, limit_remaining: 8.77 }, ...o };
+    g.__orOpts = { status: 200, text: 'Ciao dal modello finto.', costUsd: 0.0021, byKey: {}, keyInfo: { limit: 10, usage: 1.23, limit_remaining: 8.77 }, account: { total_credits: 20, total_usage: 11.23 }, ...o };
     const headerOf = (h, name) => {
       if (!h) return '';
       if (typeof h.get === 'function') return h.get(name) || '';
