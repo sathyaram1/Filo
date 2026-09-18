@@ -230,7 +230,7 @@ app.whenReady().then(async () => {
   // dell'avvio a freddo (Windows e Linux lo mettono fra gli argomenti) e
   // quello arrivato da `open-url` mentre la finestra non c'era ancora.
   dichiaraProtocolloInvito();
-  if (invitoInAttesa) { const c = invitoInAttesa; invitoInAttesa = null; apriCodiceInvito(c); }
+  if (invitoInAttesa) { const a = invitoInAttesa; invitoInAttesa = null; apriInvito(a.code); }
   else apriInvitoDaArgv(process.argv);
 
   // Sveglie e timer (#322): controlla nel main le scadenze arrivate, mostra la
