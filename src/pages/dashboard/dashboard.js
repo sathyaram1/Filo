@@ -3412,13 +3412,13 @@
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
     else refreshOnboardingNotice().catch(() => {});
-    // Popup all'avvio, in sequenza per non sovrapporsi: prima il benvenuto di
-    // un invito appena riscattato (#651 — è la cosa appena successa, e spiega
-    // perché il saldo non è a zero), poi il recap aggiornamento (solo se c'è
-    // una versione precedente vista e note nuove), POI il ringraziamento per i
-    // feedback risolti (C5). Se il recap non compare, il ringraziamento parte
-    // subito. Con l'intervista di benvenuto a schermo (#524) non parte niente:
-    // un popup sopra l'accoglienza è la prima cosa che l'utente vedrebbe di Filo.
+    // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
+    // aggiornamento (solo se c'è una versione precedente vista e note nuove),
+    // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
+    // il ringraziamento parte subito. Passano dalla stessa coda del benvenuto
+    // di un invito (#651), che arriva quando arriva. Con l'intervista di
+    // benvenuto a schermo (#524) non parte niente: un popup sopra l'accoglienza
+    // è la prima cosa che l'utente vedrebbe di Filo.
     if (onbState) return;
     inCodaPopup(async () => {
       try {
