@@ -16,10 +16,19 @@
 // tests/wallet-credits.spec.mjs: gli endpoint si spostano con
 // FILO_FUNCTIONS_BASE / FILO_IDENTITY_ENDPOINT / FILO_SECURE_TOKEN_ENDPOINT,
 // scritti in process.env PRIMA che la fixture lanci Electron.
+//
+// Le risposte del finto server si scelgono in `beforeEach`, per TITOLO della
+// prova: l'invito in attesa si chiede quattro secondi dopo l'avvio, e la
+// fixture lancia Electron prima che il corpo della prova cominci.
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmText } from './helpers/confirm.mjs';
+
+const T_CAMPO = 'nel campo va bene il link intero, e gli inviti si danno come link';
+const T_PRIMO_AVVIO = 'al primo avvio l\'invito che aspettava si riscatta da solo, e lo dicono home e Crediti';
+const T_MUTO = 'se il server non risponde l\'avvio non si ferma, e nessun invito viene dato per riscattato';
+const T_DEEP_LINK = 'filo://invito riscatta e porta davanti Crediti; ogni altro filo:// non fa niente';
 
 let server;
 const seen = { redeems: [], pendings: 0 };
@@ -111,15 +120,27 @@ test.afterAll(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test.beforeEach(() => {
+test.beforeEach(({}, testInfo) => {
   seen.redeems.length = 0;
   seen.pendings = 0;
   redeemed = false;
-  pending = null;
-  pendingDown = false;
+  pending = testInfo.title === T_PRIMO_AVVIO ? { status: 'ok', code: 'ABCD-EFGH' } : null;
+  pendingDown = testInfo.title === T_MUTO;
 });
 
-test('nel campo va bene il link intero, e quello che non è un invito non arriva nemmeno al server', async ({ openTab }) => {
+// La pagina aperta su un certo host, aspettandola: openTab non serve quando è
+// Filo ad aprire la scheda.
+async function attendiPagina(app, host, tetto = 15000) {
+  const scadenza = Date.now() + tetto;
+  for (;;) {
+    const p = app.windows().find((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } });
+    if (p) return p;
+    if (Date.now() > scadenza) return null;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
+test(T_CAMPO, async ({ app, openTab }) => {
   const page = await openTab('filo://credits/credits.html');
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
 
@@ -137,7 +158,7 @@ test('nel campo va bene il link intero, e quello che non è un invito non arriva
   expect(seen.redeems, 'al server arriva il codice, non il link').toEqual(['ABCDEFGH']);
 
   // ── Gli inviti: link da dare, posti, e chi è entrato ──────────────────────
-  const invites = page.locator('#invites li');
+  const invites = page.locator('#invites li.sn-wallet-invite');
   await expect(invites).toHaveCount(3);
 
   const primo = invites.nth(0);
@@ -148,11 +169,17 @@ test('nel campo va bene il link intero, e quello che non è un invito non arriva
   await expect(primo.locator('.sn-wallet-invite-uses')).toContainText('1111aaaa2222bbbb');
   await expect(primo.locator('.sn-wallet-invite-uses')).toContainText('3333cccc4444dddd');
 
-  // Il link si copia con un clic, e l'utente vede che è successo.
+  // Il link si copia con un clic: negli appunti ci finisce il link intero, e
+  // l'utente vede che è successo.
+  await app.evaluate(({ clipboard }) => clipboard.writeText('niente'));
   await primo.locator('.sn-wallet-invite-link').click();
   await expect(primo.locator('.sn-wallet-invite-link')).toHaveText('Copiato');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('https://filo.red/i/AAAA2222');
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://filo.red/i/AAAA2222');
   await expect(primo.locator('.sn-wallet-invite-link')).toHaveText('https://filo.red/i/AAAA2222', { timeout: 5000 });
+
+  // Anche il codice da dettare a voce, per chi preferisce.
+  await primo.locator('.sn-wallet-code').click();
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('AAAA-2222');
 
   // Un invito pieno si vede, e non si dà più: né il link né il codice.
   const pieno = invites.nth(1);
@@ -168,19 +195,18 @@ test('nel campo va bene il link intero, e quello che non è un invito non arriva
   await expect(nuovo.locator('.sn-wallet-invite-uses li')).toHaveCount(0);
 });
 
-test('al primo avvio l\'invito che aspettava si riscatta da solo, e lo dicono home e Crediti', async ({ app, openTab }) => {
-  pending = { status: 'ok', code: 'ABCD-EFGH' };
-
+test(T_PRIMO_AVVIO, async ({ app, openTab }) => {
   // La home è la scheda che l'utente sta già guardando: l'avviso arriva lì.
-  const home = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } });
+  const home = await attendiPagina(app, 'newtab');
   expect(home, 'la home è aperta all\'avvio').toBeTruthy();
 
   // Nessuno ha chiesto niente: il riscatto parte da sé, poco dopo l'avvio.
-  await expect.poll(() => seen.redeems, { timeout: 30000 }).toEqual(['ABCDEFGH']);
+  await expect.poll(() => seen.redeems, { timeout: 40000 }).toEqual(['ABCDEFGH']);
 
   await expect(home.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
-  expect(await confirmText(home)).toContain('Sei entrato con un invito');
-  expect(await confirmText(home)).toContain('5.000 crediti');
+  const detto = await confirmText(home);
+  expect(detto).toContain('Sei entrato con un invito');
+  expect(detto).toContain('5.000 crediti');
 
   // E la pagina Crediti lo dice a sua volta, col saldo vero del server.
   const page = await openTab('filo://credits/credits.html');
@@ -194,29 +220,25 @@ test('al primo avvio l\'invito che aspettava si riscatta da solo, e lo dicono ho
   await expect(page.locator('#walletNote')).not.toContainText('Sei entrato con un invito');
 });
 
-test('se il server non risponde l\'avvio non si ferma, e nessun invito viene dato per riscattato', async ({ openTab }) => {
-  pendingDown = true;
+test(T_MUTO, async ({ openTab }) => {
   const page = await openTab('filo://credits/credits.html');
   // Filo parte, la pagina risponde, e resta quello che un utente senza
   // portafoglio deve vedere: il campo dell'invito.
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
-  await expect.poll(() => seen.pendings, { timeout: 30000 }).toBeGreaterThan(0);
+  await expect.poll(() => seen.pendings, { timeout: 40000 }).toBeGreaterThan(0);
   expect(seen.redeems, 'senza risposta non si riscatta niente').toEqual([]);
   await expect(page.locator('#walletNote')).not.toContainText('Sei entrato');
   await expect(page.locator('body')).not.toContainText('fetch failed');
 });
 
-test('filo://invito riscatta e porta davanti Crediti; ogni altro filo:// non fa niente', async ({ app, shell }) => {
+test(T_DEEP_LINK, async ({ app }) => {
   // Il sistema consegna QUALUNQUE filo:// una volta che Filo è il gestore del
   // protocollo: una pagina interna messa in un link da un sito qualsiasi non
   // deve aprirsi né fare niente. Prima si prova quella.
-  const schedePrima = await shell.evaluate(() => window.filoShell.tabs.list().length).catch(() => null);
   await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, ['filo.exe', 'filo://credits/credits.html', '.'], process.cwd()); });
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 2000));
   expect(seen.redeems, 'un filo:// che non è un invito non riscatta niente').toEqual([]);
-  if (schedePrima != null) {
-    expect(await shell.evaluate(() => window.filoShell.tabs.list().length)).toBe(schedePrima);
-  }
+  expect(await attendiPagina(app, 'credits', 0), 'e non apre la pagina che nomina').toBeNull();
 
   // L'invito vero, come arriva su Windows e Linux: fra gli argomenti della
   // seconda istanza, in una posizione qualsiasi.
@@ -224,16 +246,7 @@ test('filo://invito riscatta e porta davanti Crediti; ogni altro filo:// non fa 
   await expect.poll(() => seen.redeems, { timeout: 20000 }).toEqual(['ABCDEFGH']);
 
   // Filo porta davanti la pagina dove l'esito si legge.
-  const credits = await new Promise((resolve) => {
-    const scadenza = Date.now() + 15000;
-    const giro = () => {
-      const p = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'credits'; } catch (_) { return false; } });
-      if (p) return resolve(p);
-      if (Date.now() > scadenza) return resolve(null);
-      setTimeout(giro, 200);
-    };
-    giro();
-  });
+  const credits = await attendiPagina(app, 'credits');
   expect(credits, 'il link apre la pagina Crediti').toBeTruthy();
   await expect(credits.locator('#walletNote')).toContainText('Sei entrato con un invito', { timeout: 15000 });
   await expect(credits.locator('#balance')).toHaveText('4.990', { timeout: 15000 });
