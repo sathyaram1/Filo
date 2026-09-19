@@ -159,7 +159,25 @@
   background: var(--sn-bg-elev, var(--sn-bg)); color: var(--sn-fg); width: 9em;
 }
 .sn-manopola-riga input:focus { outline: none; border-color: var(--sn-accent); }
+/* Il campo mostra un numero che il server non ha ancora: finché dura si vede.
+   Sparisce da solo appena il numero parte, cioè quando il cursore lascia il
+   campo. */
+.sn-page .sn-manopola.is-sporco .sn-manopola-riga input[type="number"] {
+  border-color: var(--sn-accent);
+  box-shadow: 0 0 0 3px rgba(var(--sn-accent-rgb), 0.16);
+}
 .sn-manopola-msg { margin: 0; font-size: 13px; }
+
+/* Il menu del tasto destro su una persona: riusa il popup di Filo
+   (.sn-select-pop in theme.css), che però nasce ancorato al suo campo. Qui si
+   posa dove ha cliccato il cursore. */
+.sn-wallet-ctx { position: fixed; left: 0; top: 0; right: auto; min-width: 190px; }
+.sn-wallet-ctx .sn-select-option { transition: background-color 120ms ease; }
+.sn-wallet-ctx .sn-select-option:hover,
+.sn-wallet-ctx .sn-select-option:focus-visible {
+  background-color: rgba(var(--sn-accent-rgb), 0.18);
+  outline: none;
+}
 
 .sn-wallet-section { margin-top: 24px; }
 .sn-wallet-owner-row { display: flex; flex-wrap: wrap; gap: 18px 32px; margin-top: 10px; }
