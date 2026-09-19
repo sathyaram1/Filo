@@ -54,6 +54,12 @@ test.beforeAll(async () => {
             hasWallet: true, pseudonym: 'abcdef0123456789',
             balance: { credits: 4990, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0.0084, remainingUsd: 4.1916, eurUsd: 1.2, eurPerCredit: 0.0007 },
             stale: false, dailyCredits: 100,
+            // #652 — i movimenti del portafoglio: da dove vengono i crediti.
+            grants: [
+              { at: '2026-09-08T10:00:00.000Z', credits: 5000, why: 'entry' },
+              { at: '2026-09-09T03:10:00.000Z', credits: 100, why: 'daily' },
+              { at: '2026-09-10T12:00:00.000Z', credits: 50, why: 'feedback_closed:Zz99' },
+            ],
             invites: [
               { code: 'AAAA-2222', used: false, usedAt: null },
               { code: 'BBBB-3333', used: true, usedAt: '2026-09-08T10:00:00.000Z' },
@@ -267,4 +273,29 @@ test('riscattato l’invito, la home aperta smette di mandare a riscattarlo', as
     .not.toContain('serve un codice d\'invito');
   const testo = await home.evaluate(() => document.body.innerText);
   expect(testo).not.toContain('riscatta l\'invito');
+});
+
+// #652 — con un portafoglio i crediti li tiene il server, e i movimenti veri
+// sono i suoi: ingresso, quota del giorno, premi per le segnalazioni. Il
+// conteggio locale delle ricompense, che con quel saldo non c'entra niente,
+// non si mostra più accanto.
+test('con un portafoglio i movimenti sono quelli del server, non il conteggio locale', async ({ app, openTab }) => {
+  const page = await openTab('filo://credits/credits.html');
+  await page.waitForFunction(() => { const w = document.getElementById('wallet'); return w && !w.hidden; }, null, { timeout: 15000 });
+  // Il portafoglio può esserci già (il finto server lo ricorda fra una prova e
+  // l'altra): in quel caso non c'è niente da riscattare.
+  if (await page.locator('#redeemForm').isVisible()) {
+    await page.fill('#inviteCode', 'abcd-efgh');
+    await page.click('#redeemBtn');
+  }
+  await expect(page.locator('#balance')).toHaveText('4.990', { timeout: 15000 });
+
+  const moves = page.locator('#moves li');
+  await expect(moves).toHaveCount(3, { timeout: 15000 });
+  // Più recenti in cima, col motivo scritto in italiano.
+  await expect(moves.nth(0)).toContainText('Segnalazione risolta');
+  await expect(moves.nth(0)).toContainText('+50');
+  await expect(moves.nth(1)).toContainText('Quota del giorno');
+  await expect(moves.nth(2)).toContainText('Sei entrato con un invito');
+  await expect(moves.nth(2)).toContainText('+5.000');
 });
