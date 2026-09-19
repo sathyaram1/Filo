@@ -1352,6 +1352,43 @@
         campi: { Etichetta: etichetta, Selettore: selettore },
       }),
 
+    // #593 — IL TURNO AUTOMATICO DELL'AGENTE AIUTO, COMPOSTO IN UN POSTO SOLO.
+    //
+    // Dopo un'azione (un click dell'utente, una ricerca web, un comando
+    // eseguito) l'agente riparte da solo, e il turno che gli arriva ha due
+    // parti che non vanno confuse:
+    //
+    //   • LA NOTA DI FILO, che arriva come «(Sistema: …)». Le istruzioni
+    //     dicono al modello che quello è il canale di Filo, quindi ci passa
+    //     solo testo che nasce dentro Filo. `perCanaleSistema` lo riduce a una
+    //     riga e gli toglie qualunque marcatura: non è la difesa principale —
+    //     quella è non metterci dentro roba di fuori — ma è quella che regge
+    //     se domani qualcuno scrive una nota nuova interpolandoci qualcosa.
+    //
+    //   • LE BUSTE, cioè quello che viene da fuori: i risultati di una ricerca
+    //     web, l'etichetta di un elemento della pagina. Prima stavano dentro
+    //     la nota, e chi controllava una pagina fra i primi risultati parlava
+    //     all'agente col timbro di Filo.
+    //
+    // Lo stesso testo serve in due punti: il main lo mette nel messaggio che
+    // parte, la sidebar lo mette nella propria cronologia, che tornerà al
+    // modello nei turni dopo. Cambia solo la coda. Perciò si compone qui: due
+    // composizioni a mano divergerebbero in silenzio, e la cronologia è
+    // proprio il posto dove un testo avvelenato resterebbe per tutta la
+    // sessione.
+    turnoAutomaticoAiuto: ({ nota = '', dati = null, perCronologia = false } = {}) => {
+      const buste = [];
+      if (dati && dati.ricercaWeb) buste.push(PROMPTS.ricercaWebImbustata(dati.ricercaWeb));
+      if (dati && dati.elementoPagina) buste.push(PROMPTS.elementoPaginaImbustato(dati.elementoPagina));
+      const pulite = buste.filter(Boolean);
+      if (!nota) return pulite.join('\n\n');
+      const coda = perCronologia
+        ? 'Stato pagina aggiornato.'
+        : 'Stato pagina aggiornato — valuta lo screenshot e l\'outline correnti, poi indica il passo successivo o status:"done" se l\'obiettivo è completato.';
+      const sistema = `(Sistema: ${esterno().perCanaleSistema(nota)}. ${coda})`;
+      return [sistema, ...pulite].join('\n\n');
+    },
+
     // Modifica testo: l'utente seleziona un testo in una casella di input e dà
     // un'istruzione su come modificarlo. L'AI restituisce SOLO il testo modificato,
     // niente preamboli/virgolette.
