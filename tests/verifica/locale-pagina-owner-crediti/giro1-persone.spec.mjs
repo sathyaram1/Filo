@@ -107,7 +107,7 @@ test('la riga di una persona apre la sua scheda di spesa, col clic e con la tast
     await riga.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('tr.sn-wallet-user-detail:not([hidden])')).toHaveCount(1, { timeout: 20_000 });
-    await expect(page.locator('tr.sn-wallet-user-detail:not([hidden])')).toContainText('Saldo');
+    await expect(page.locator('tr.sn-wallet-user-detail:not([hidden])').first()).toContainText('Saldo');
 
     // L'altra persona, che non ha speso niente: la scheda si apre lo stesso.
     const riga2 = page.locator('tr.sn-wallet-user', { hasText: pb });
