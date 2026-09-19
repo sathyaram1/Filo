@@ -59,6 +59,9 @@
 
     const table = $('ownerUsers');
     const tbody = table.querySelector('tbody');
+    // Le righe si rifanno: un menu aperto su una riga che non esiste più
+    // resterebbe appeso sopra la pagina.
+    chiudiMenuPersona();
     tbody.innerHTML = '';
     // Le righe si rifanno da zero: le schede già chieste vanno richieste.
     schedeChieste.clear();
