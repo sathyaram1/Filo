@@ -92,10 +92,13 @@ test('col server giù la pagina lo dice, invece di restare muta', async () => {
     server.flags.walletDown = true;
     const page = await apriOwner(filo);
     // Qualcosa deve comparire: un avviso, non una pagina vuota e ferma.
+    await page.waitForTimeout(8000);
+    // eslint-disable-next-line no-console
+    console.log('PAGINA COL SERVER GIÙ >>>\n' + (await page.locator('main').innerText()) + '\n<<<');
     await expect.poll(async () => {
       const t = await page.locator('main').innerText();
       return /non (si|è)|errore|riprova|non raggiungibile|più tardi/i.test(t);
-    }, { timeout: 30_000 }).toBe(true);
+    }, { timeout: 20_000 }).toBe(true);
   } finally {
     try { await filo.app.close(); } catch (_) {}
   }
