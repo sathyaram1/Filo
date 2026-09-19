@@ -61,21 +61,31 @@ test.afterAll(() => {
 test('#572 giro 2 — una copia di lavoro già storta: il rosso dice una cura che funziona davvero', () => {
   test.setTimeout(300_000);
   const copia = join(base, 'copia-vecchia');
-  git(['clone', '--quiet', ROOT, copia], ROOT);
+  // Come la clona git di Windows, con core.autocrlf acceso di serie.
+  git(['clone', '--quiet', '-c', 'core.autocrlf=true', ROOT, copia], ROOT);
 
-  // La copia che esisteva prima della correzione: i file sul disco sono a CRLF
-  // (li ha scritti git di Windows con core.autocrlf acceso) mentre il repo
-  // ormai dice LF. Una fusione non li tocca: riscrive solo ciò che cambia.
-  const testuali = tracciati(copia).filter(diTesto);
-  for (const f of testuali) {
-    const p = join(copia, f);
-    if (!existsSync(p)) continue;
-    const b = readFileSync(p);
-    if (b.includes(0x00)) continue;
-    writeFileSync(p, Buffer.from(b.toString('binary').replace(/\r?\n/g, '\r\n'), 'binary'));
-  }
+  // La copia che esisteva PRIMA della correzione: si torna indietro allo stato
+  // senza la regola di fine riga, si rifà il checkout (e lì autocrlf scrive
+  // CRLF dappertutto), poi si riprende la correzione come farebbe una fusione
+  // — che riscrive solo il file cambiato e lascia storto tutto il resto.
+  const comeGit = ['-c', 'user.email=prova@filo.test', '-c', 'user.name=prova'];
+  git(['rm', '--quiet', '.gitattributes'], copia);
+  git([...comeGit, 'commit', '--quiet', '-m', 'senza attributi, come prima'], copia);
+  const senzaAttributi = git(['rev-parse', 'HEAD'], copia).trim();
+  git(['rm', '--cached', '-r', '.', '--quiet'], copia);
+  git(['reset', '--hard', '--quiet'], copia);
   expect(conRitornoCarrello(copia).length,
-    'la copia storta non si è sporcata: la prova non sta provando niente').toBeGreaterThan(100);
+    'senza la regola di fine riga il clone non si è sporcato: la prova non sta provando niente')
+    .toBeGreaterThan(100);
+  git([...comeGit, 'revert', '--no-edit', '--no-commit', senzaAttributi], copia);
+  git([...comeGit, 'commit', '--quiet', '-m', 'arriva la correzione'], copia);
+  expect(existsSync(join(copia, '.gitattributes')),
+    'la correzione non è arrivata nella copia').toBe(true);
+  expect(git(['status', '--porcelain'], copia).trim(),
+    'la copia non è in uno stato pulito: git la vede già sporca e la prova non vale').toBe('');
+  expect(conRitornoCarrello(copia).length,
+    'la copia si è raddrizzata da sola prendendo la correzione: non è il caso da provare')
+    .toBeGreaterThan(100);
 
   // Il rosso arriva, e dice cosa fare. Senza la riga della cura chi lo legge
   // resta davanti a milleduecento nomi e nessuna strada.
