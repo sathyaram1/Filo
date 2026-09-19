@@ -664,6 +664,13 @@
     const v = Math.round((Number(n) || 0) * 10) / 10;
     return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
   }
+  // Un numero con la virgola come si scrive in italiano, senza zeri finti in
+  // coda (0,0007 resta 0,0007, 1,17 resta 1,17).
+  function formatDecimale(n, decimali) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '—';
+    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: decimali }).format(v);
+  }
   function formatDate(ts) {
     if (!ts) return '';
     try {
