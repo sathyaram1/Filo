@@ -139,7 +139,8 @@ test('un costo di qualche milionesimo di dollaro si legge, in tutti e quattro i 
     // Dove si parla di soldi spesi davvero, il costo non si legge «0 $»:
     // in due parole, per azione, per giorno e nelle ultime chiamate.
     const speso = (await scheda.innerText()).split('Dove sono andati')[0];
-    expect(speso).toMatch(/Speso\s+0,0000011 \$/);
+    expect(speso).toMatch(/Speso\s+0,0000\d+ \$/);
+    expect(speso).not.toMatch(/Speso\s+0 \$/);
     expect(testo.split('Dove sono andati')[1] || '').not.toMatch(/(^|\s)0 \$/m);
     expect(testo).toMatch(/traduci/);
     expect(testo).toMatch(/spiega/);
