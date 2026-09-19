@@ -205,6 +205,35 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
       if (!s || s.revoked) return json(res, 400, { error: { code: 400, message: 'TOKEN_EXPIRED' } });
       return json(res, 200, { id_token: jwt(s.uid, s.uid === OWNER_UID ? { email: OWNER_EMAIL } : {}), refresh_token: p.get('refresh_token'), expires_in: '3600', user_id: s.uid });
     }
+    // ── Firestore finto, solo per i documenti `config/*` ───────────────────
+    // Le manopole dell'owner non passano dalle funzioni: sono un documento che
+    // l'account admin scrive direttamente. Qui quel documento è lo STESSO che
+    // legge il servizio (store.docs.config), così un numero cambiato dalla
+    // pagina cambia davvero quello che il server regala.
+    if (path.startsWith('/fsdoc/')) {
+      const docPath = path.slice('/fsdoc/'.length);
+      const auth = String(req.headers.authorization || '');
+      const email = payloadOf(auth.replace(/^Bearer\s+/i, '')).email;
+      counters.fsCalls.push({ method: req.method, docPath, email, mask: url.searchParams.getAll('updateMask.fieldPaths'), body });
+      if (flags.fsDown) return json(res, 500, { error: { message: 'boom' } });
+      // La regola vera: `allow read, write: if isAdmin()`.
+      if (flags.fsDenied || email !== OWNER_EMAIL) {
+        return json(res, 403, { error: { code: 403, message: 'Missing or insufficient permissions.', status: 'PERMISSION_DENIED' } });
+      }
+      if (docPath !== 'config/credits') return json(res, 404, { error: { code: 404, message: 'not found' } });
+      if (req.method === 'PATCH') {
+        let incoming = {};
+        try { incoming = JSON.parse(body || '{}').fields || {}; } catch (_) {}
+        const mask = url.searchParams.getAll('updateMask.fieldPaths');
+        for (const k of mask) {
+          if (!(k in incoming)) { delete docs_config()[k]; continue; }
+          docs_config()[k] = fromFs(incoming[k]);
+        }
+      }
+      const fields = {};
+      for (const [k, v] of Object.entries(docs_config())) fields[k] = toFs(v);
+      return json(res, 200, { name: `projects/finto/databases/(default)/documents/${docPath}`, fields });
+    }
     if (path.startsWith('/wallet')) {
       const name = path.slice(1);
       const auth = String(req.headers.authorization || '');
