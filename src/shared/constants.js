@@ -1091,7 +1091,9 @@
       `L'utente ha selezionato un testo durante la navigazione di una pagina web. Testo e frase che lo conteneva sono qui sotto.\n\n` +
       esterno().imbustaCampi({
         tipo: 'TESTO_IN_PAGINA',
-        campi: { 'Testo selezionato': selection, 'Frase intera': sentence },
+        // I segnaposto non sono decorazione: senza un campo valorizzato la
+        // busta non si apre, e la frase qui sopra rimanderebbe al nulla.
+        campi: { 'Testo selezionato': selection || '(vuoto)', 'Frase intera': sentence || '(ignota)' },
       }) +
       `\n\nDevi decidere fra tre risposte (la selezione è il "testo selezionato" qui sopra):\n` +
       `1. TRADUZIONE — se il testo è prevalentemente in una lingua diversa dall'italiano (inglese, francese, spagnolo, tedesco, ecc.), traducilo in italiano. ` +
@@ -1117,7 +1119,7 @@
       `Spiega in modo approfondito ma conciso il testo selezionato dall'utente durante la navigazione web. Testo e frase che lo conteneva sono qui sotto.\n\n` +
       esterno().imbustaCampi({
         tipo: 'TESTO_IN_PAGINA',
-        campi: { 'Testo selezionato': selection, 'Frase intera': sentence },
+        campi: { 'Testo selezionato': selection || '(vuoto)', 'Frase intera': sentence || '(ignota)' },
       }) +
       `\n\nFornisci contesto, definizione e dettagli rilevanti. ` +
       `Limite tassativo: massimo 1000 caratteri totali. ` +
@@ -1355,7 +1357,10 @@
     elementoPaginaImbustato: ({ etichetta = '', selettore = '' } = {}) =>
       esterno().imbustaCampi({
         tipo: 'ELEMENTO_PAGINA',
-        campi: { Etichetta: etichetta, Selettore: selettore },
+        // Un elemento senza nome e senza selettore capita (un nodo sparito fra
+        // un turno e l'altro): la busta si apre lo stesso, o la nota rimanda a
+        // qualcosa che non c'è.
+        campi: { Etichetta: etichetta || '(senza nome)', Selettore: selettore || '(ignoto)' },
       }),
 
     // #593 — IL TURNO AUTOMATICO DELL'AGENTE AIUTO, COMPOSTO IN UN POSTO SOLO.
@@ -1386,7 +1391,7 @@
     schedaImbustata: ({ titolo = '', url = '' } = {}) =>
       esterno().imbustaCampi({
         tipo: 'DATI_PAGINA',
-        campi: { 'Titolo della scheda': titolo, 'Indirizzo': url },
+        campi: { 'Titolo della scheda': titolo || '(senza titolo)', Indirizzo: url || '(ignoto)' },
       }),
 
     turnoAutomaticoAiuto: ({ nota = '', dati = null, perCronologia = false } = {}) => {
@@ -1535,8 +1540,8 @@
       esterno().imbustaCampi({
         tipo: 'TESTO_IN_PAGINA',
         campi: {
-          'Parola su cui ha cliccato': word,
-          'Frase in cui compare': sentence,
+          'Parola su cui ha cliccato': word || '(vuota)',
+          'Frase in cui compare': sentence || word || '(ignota)',
           'Frase precedente': prev,
           'Frase successiva': next,
         },
