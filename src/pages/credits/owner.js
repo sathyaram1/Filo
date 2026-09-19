@@ -43,7 +43,7 @@
     const tot = o.totals || {};
     renderNumeri(cfg, tot, o.ownerInvites || []);
     $('ownerTotals').textContent = cfg.eurUsd
-      ? `Un credito vale ${fmtUsd((Number(cfg.eurPerCredit) || 0) * cfg.eurUsd)} al cambio di oggi, ${cfg.eurUsd} (${cfg.eurUsdAt || 'data ignota'}).`
+      ? `Un credito vale ${cfg.eurPerCredit} €, e un euro ${cfg.eurUsd} $ (cambio del ${cfg.eurUsdAt || 'giorno ignoto'}).`
       : 'Manca il cambio del giorno: finché non arriva, nessuna elargizione parte.';
     riempiManopole(cfg, tot);
     // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
