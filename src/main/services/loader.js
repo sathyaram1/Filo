@@ -12,6 +12,10 @@ const SVC = __dirname;
 
 // Ordine identico al vecchio background.js importScripts(...).
 require(path.join(SHARED, 'constants.js'));
+// #593 — la porta unica da cui passa il contenuto esterno (pagina, ricerca
+// web, percorsi di altri) prima di entrare in un prompt. Va PRIMA di chi la
+// usa: pathsSafety in lettura, i prompt di constants.js a ogni chiamata.
+require(path.join(SHARED, 'contenutoEsterno.js'));
 // Il marchio della UI di Filo dentro le pagine web: serve ai content script,
 // ma sta fra i moduli condivisi e segue l'ordine di tutti gli altri.
 require(path.join(SHARED, 'filoUi.js'));

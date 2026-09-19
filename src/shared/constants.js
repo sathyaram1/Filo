@@ -1065,6 +1065,22 @@
       .slice(0, Number.isFinite(max) && max > 0 ? max : 4000);
   }
 
+  // La porta unica del contenuto esterno (#593): tutto ciò che entra in un
+  // prompt senza essere stato scritto da Filo o dall'utente che sta parlando
+  // adesso passa da `SN_ESTERNO.imbusta`. Si prende al momento dell'uso: in
+  // Node questo file se lo carica da solo, in una pagina filo:// lo porta lo
+  // <script> che sta subito dopo constants.js. Se manca, meglio fermarsi con un
+  // errore chiaro che spedire a un modello del testo di terzi senza busta.
+  function esterno() {
+    if (!global.SN_ESTERNO && typeof require === 'function') {
+      require('./contenutoEsterno.js');
+    }
+    if (!global.SN_ESTERNO) {
+      throw new Error('SN_ESTERNO mancante: carica shared/contenutoEsterno.js prima di constants.js');
+    }
+    return global.SN_ESTERNO;
+  }
+
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
     explain: ({ selection, sentence, fxLine }) =>
