@@ -82,10 +82,15 @@ test('il pulsante della pagina dell’invito, cliccato da una persona dentro Fil
 
   // Il clic vero: nessuno script, il puntatore sul pulsante.
   await pagina.locator('#apri').click({ timeout: 15000 }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 8000));
+
+  // Cosa si ritrova davanti chi ha cliccato: serve al racconto del rilievo.
+  let dove = '(la scheda è sparita)';
+  try { dove = `${pagina.url()} — «${(await pagina.title()) || ''}»`; } catch (_) {}
 
   // Dal punto di vista di chi ha cliccato: l'invito è entrato in Filo.
   await expect
     .poll(() => redeems.length, { timeout: 45000, intervals: [500] })
     .toBeGreaterThan(0);
-  expect(redeems[0]).toBe(CODICE);
+  expect(redeems[0], `dopo il clic la scheda mostra: ${dove}`).toBe(CODICE);
 });
