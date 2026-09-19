@@ -106,7 +106,7 @@ test('il tasto destro fuori dalla tabella apre ancora il menu della pagina', asy
     await page.locator('#title').click({ button: 'right' });
     await page.waitForTimeout(1500);
     const visto = await page.evaluate(() => {
-      const n = document.querySelector('.sn-ctx, .sn-context-menu, [class*="context-menu"], [class*="ctx-menu"]');
+      const n = document.querySelector('.sn-menu');
       return n ? n.innerText : '';
     });
     expect(visto.length).toBeGreaterThan(0);
