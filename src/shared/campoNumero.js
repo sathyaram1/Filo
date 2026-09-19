@@ -265,7 +265,7 @@
       const verso = ev && ev.relatedTarget;
       if (verso && (verso === o.salvaBtn || verso === rimetti)) return;
       if (String(input.value) === attuale) return;
-      salvaOra().catch(() => {});
+      salvaOra({ riprendiIlFuoco: false }).catch(() => {});
     });
     // Invio dentro il campo salva: è quello che fa chiunque dopo aver scritto
     // un numero, e senza sarebbe l'unica strada che non funziona.
