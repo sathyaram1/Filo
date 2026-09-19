@@ -2905,6 +2905,11 @@
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
       // scheda nuova.
       if (msg.signedIn) maybeOpenOnboardingLater();
+    } else if (msg?.type === MSG.CREDITS_CHANGED && msg.walletNotice) {
+      // Un invito riscattato da fuori (#651): il link aperto da un'altra
+      // applicazione, o l'invito che aspettava questa installazione al primo
+      // avvio. Il main lo spinge una volta sola.
+      inCodaPopup(() => showInviteWelcome(msg.walletNotice));
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
       const n = Math.round(Number(msg.amount) || 0);
@@ -3193,6 +3198,38 @@
   // accreditato la ricompensa per priorità (50/100/200/300, una volta sola) e
   // ci ritorna il testo da mostrare. Qui ringraziamo, spieghiamo cosa è cambiato
   // (testo non tecnico preso dalle note) e animiamo i crediti verso il profilo.
+  // Sei appena entrato con un invito (#651): il collegamento aperto da fuori,
+  // o il primo avvio dopo aver scaricato Filo dalla pagina dell'invito. I
+  // crediti arrivano senza che tu chieda niente, e mentre guardi la home: il
+  // main spinge l'avviso appena il riscatto è andato, e la home lo racconta
+  // una volta sola (il segno «già visto» lo tiene il main).
+  // Lo stesso avviso non si racconta due volte: adesso arriva da due strade
+  // (la spinta del main e la domanda all'apertura) e possono incrociarsi.
+  let avvisoInvitoMostrato = '';
+  async function showInviteWelcome(n) {
+    if (!n || !n.text || !window.SN_CONFIRM_UI?.notify) return false;
+    const firma = `${n.kind || ''}|${n.text}`;
+    if (firma === avvisoInvitoMostrato) return false;
+    avvisoInvitoMostrato = firma;
+    try { await send({ type: MSG.WALLET_NOTICE_SEEN, where: 'home' }); } catch (_) {}
+    const entrato = n.kind === 'entry';
+    await window.SN_CONFIRM_UI.notify({
+      title: entrato ? 'Benvenuto in Filo' : 'Il tuo invito',
+      text: entrato ? `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.` : n.text,
+      okLabel: entrato ? 'Evviva!' : 'Va bene',
+    });
+    return true;
+  }
+
+  // I popup dell'avvio si incatenano, mai sovrapposti: l'avviso dell'invito
+  // arriva quando arriva (quattro secondi dopo l'avvio), e può cadere in mezzo
+  // al recap di un aggiornamento.
+  let codaPopup = Promise.resolve();
+  function inCodaPopup(fn) {
+    codaPopup = codaPopup.then(fn, fn);
+    return codaPopup;
+  }
+
   async function maybeShowFeedbackRewards() {
     let res;
     try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
@@ -3389,16 +3426,28 @@
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
-    // il ringraziamento parte subito. Con l'intervista di benvenuto a schermo
-    // (#524) non parte niente: un popup sopra l'accoglienza è la prima cosa che
-    // l'utente vedrebbe di Filo.
+    // il ringraziamento parte subito. Passano dalla stessa coda del benvenuto
+    // di un invito (#651), che arriva quando arriva. Con l'intervista di
+    // benvenuto a schermo (#524) non parte niente: un popup sopra l'accoglienza
+    // è la prima cosa che l'utente vedrebbe di Filo.
+    // Il benvenuto di un invito può essere arrivato PRIMA che questa pagina
+    // fosse in ascolto: al primo avvio il riscatto si chiude in pochi secondi,
+    // mentre la home si sta ancora aprendo, e la spinta del main non trova
+    // nessuno. Chiederlo all'apertura non costa un giro dal server (l'avviso
+    // è scritto in locale) e non dipende più da chi arriva prima.
+    inCodaPopup(async () => {
+      try {
+        const r = await send({ type: MSG.WALLET_NOTICE_PENDING, where: 'home' });
+        if (r && r.ok && r.notice) await showInviteWelcome(r.notice);
+      } catch (_) {}
+    });
     if (onbState) return;
-    (async () => {
+    inCodaPopup(async () => {
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
         if (!shown) await maybeShowFeedbackRewards();
       } catch (_) {}
-    })();
+    });
   })();
 
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat

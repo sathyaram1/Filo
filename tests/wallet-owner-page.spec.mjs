@@ -15,6 +15,7 @@ const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
 let server;
 const seen = { invites: [], grants: [], codes: [] };
+let extraInvites = [];
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
@@ -49,7 +50,8 @@ test.beforeAll(async () => {
             config: { invitesRemaining: 9, entryCredits: 5000, dailyCredits: 100, eurUsd: 1.2, eurUsdAt: '2026-09-10', maxGrantUsd: 50 },
             totals: { users: 1, totalLimitUsd: 4.2, maxGrantUsd: 50 },
             // I codici generati fin qui: la pagina rilegge la vista dopo «Genera».
-            ownerInvites: seen.codes.map((code) => ({ code, used: false, createdAt: '2026-09-10T09:00:00.000Z' })),
+            // `extraInvites` serve agli inviti a più posti (#651).
+            ownerInvites: seen.codes.map((code) => ({ code, used: false, createdAt: '2026-09-10T09:00:00.000Z' })).concat(extraInvites),
             users: [{ pseudonym: 'abcdef0123456789', balance: { credits: 5000, creditsGranted: 5000, usageUsd: 0 }, invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z', usage: { rows: 0 } }],
           },
         });
@@ -142,4 +144,47 @@ test('i moduli dell’owner rifiutano con parole di Filo zero codici, crediti co
   await page.click('#ownerGrantBtn');
   await expect(msg).toContainText('+10 crediti a abcdef0123456789', { timeout: 15_000 });
   expect(seen.grants).toEqual([{ pseudonym: 'abcdef0123456789', credits: 10, why: 'owner' }]);
+});
+
+// #651 — un invito vale per più persone, e questa è la pagina da cui escono i
+// codici per i primi invitati. Con un posto occupato su tre l'invito è ancora
+// da dare: il link resta copiabile e accanto si legge quanti sono entrati.
+// Prima bastava un ingresso perché il codice si barrasse, col pulsante spento
+// e la sola parola «usato»: gli altri due posti sparivano da qui.
+test('un invito con un posto occupato su tre resta da dare, col suo link e il conto di chi è entrato', async ({ app, openTab }) => {
+  extraInvites = [
+    { code: 'AAAA2222', max: 3, used: 1, uses: [{ pseudonym: 'fedebb00', at: '2026-09-17T10:00:00.000Z' }], createdAt: '2026-09-11T09:00:00.000Z' },
+    { code: 'CCCC4444', max: 3, used: 3, uses: [], createdAt: '2026-09-11T09:00:00.000Z' },
+  ];
+  try {
+    expect(await simulaOwner(app)).toBe(true);
+    const page = await openTab('filo://credits/owner.html');
+    await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
+
+    const conPosti = page.locator('#ownerCodes > li[data-code="AAAA-2222"]');
+    await expect(conPosti).toHaveCount(1, { timeout: 15_000 });
+    await expect(conPosti).not.toHaveClass(/is-used/);
+    await expect(conPosti.locator('.sn-wallet-invite-state')).toHaveText('entrati 1 su 3');
+    await expect(conPosti.locator('.sn-wallet-invite-link')).toHaveText('https://filo.red/i/AAAA2222');
+    await expect(conPosti.locator('.sn-wallet-invite-link')).toBeEnabled();
+    await expect(conPosti.locator('.sn-wallet-code')).toBeEnabled();
+    await expect(conPosti.locator('.sn-wallet-invite-who')).toHaveText('fedebb00');
+
+    // Due clic attaccati sul pulsante che copia — quello che fa chiunque non
+    // sia sicuro che il primo sia andato a segno — non devono lasciare
+    // «Copiato» al posto del link: la riga tornava illeggibile fino alla
+    // riapertura della pagina (terzo giro di verifica del #651).
+    await conPosti.locator('.sn-wallet-invite-link').dblclick();
+    await expect(conPosti.locator('.sn-wallet-invite-link')).toHaveText('https://filo.red/i/AAAA2222', { timeout: 10_000 });
+    await conPosti.locator('.sn-wallet-code').dblclick();
+    await expect(conPosti.locator('.sn-wallet-code')).toHaveText('AAAA-2222', { timeout: 10_000 });
+
+    // Quello pieno invece è finito: barrato e non più da dare.
+    const pieno = page.locator('#ownerCodes > li[data-code="CCCC-4444"]');
+    await expect(pieno).toHaveClass(/is-used/);
+    await expect(pieno.locator('.sn-wallet-invite-state')).toHaveText('entrati 3 su 3');
+    await expect(pieno.locator('.sn-wallet-invite-link')).toBeDisabled();
+  } finally {
+    extraInvites = [];
+  }
 });

@@ -185,6 +185,20 @@
     //   la chiave resta nel main). { } → { ok, limit|null, usage,
     //   limit_remaining|null, line } oppure { ok:false, status, message }
     WALLET_OWN_KEY_INFO: 'wallet_own_key_info',
+    // WALLET_NOTICE_SEEN (#651): l'avviso di benvenuto («Sei entrato con un
+    //   invito: hai N crediti») è stato mostrato da una superficie. Lo dicono
+    //   la home e la pagina Crediti, ognuna per sé: chi l'ha già visto in
+    //   home non se lo ritrova addosso a ogni apertura di Crediti, e
+    //   viceversa. { where: 'home'|'credits' } → { ok }
+    WALLET_NOTICE_SEEN: 'wallet_notice_seen',
+    // WALLET_NOTICE_PENDING (#651): l'avviso di benvenuto che questa
+    //   superficie non ha ancora mostrato. L'avviso si SPINGE appena il
+    //   riscatto è andato, ma al primo avvio quella spinta parte mentre la
+    //   home si sta ancora aprendo e non la sente nessuno: chi apre chiede
+    //   anche se c'era qualcosa da dire. Si legge da quello che è scritto in
+    //   locale, senza toccare il server. { where: 'home'|'credits' } →
+    //   { ok, notice: { kind, text } | null }
+    WALLET_NOTICE_PENDING: 'wallet_notice_pending',
     // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
     // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
     //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).

@@ -19,8 +19,10 @@
       version: '0.2.228', date: '2026-09-11',
       features: [
         'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta. La pagina Crediti ricorda l’ultimo rifiuto finché la chiave non torna a funzionare.',
+        'Un invito adesso è un link. Chi lo apre scarica Filo e al primo avvio si ritrova i crediti già dentro, senza ricopiare il codice. Ogni tuo link vale per tre persone, e nella pagina Crediti vedi quanti sono entrati e quanti posti restano.',
       ],
       fixes: [
+        'Appena l\'invito è riscattato la home lo sa. Prima continuava a dire che per attivare Filo serve un codice, e il suo primo suggerimento portava a riscattare un invito già riscattato: il messaggio giusto arrivava solo aprendo una scheda nuova.',
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
         'L\'Aiuto tratta le tracce di navigazione lasciate da altri come indizi da verificare sulla pagina, non come istruzioni da eseguire. E nessuno può più aggiungerne una senza passare da Filo. Quelle che mandi tu partono senza i tuoi dati: indirizzi email, IBAN, codici fiscali e numeri di telefono vengono cancellati prima.',
         'Quello che scrivi in un feedback lo leggono solo Filo e chi lo lavora: testo, indirizzo della pagina e screenshot non sono raggiungibili da nessun altro. Pubblici restano i miglioramenti già usciti, che vedi in bacheca: il titolo, la versione e la frase scritta per chi li aveva segnalati.',

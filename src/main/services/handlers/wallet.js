@@ -33,6 +33,23 @@ module.exports = function register(on, ctx) {
   const W = globalThis.SN_WALLET;
   const FB = globalThis.SN_FEEDBACK;
 
+  // Con cosa Filo paga le risposte è appena cambiato: portafoglio riscattato,
+  // identità azzerata, chiave propria messa o tolta. La home già aperta non se
+  // ne accorgeva e restava ferma sull'ultimo messaggio: a un invito riscattato
+  // da solo al primo avvio continuava a dire «Per attivare Filo serve un
+  // codice d'invito», col primo suggerimento che portava a riscattare un
+  // invito già riscattato. Qui la home si rifà e si spinge alle pagine aperte.
+  // Senza chiave il messaggio si ricostruisce sul posto e non costa niente;
+  // con la chiave il ricalcolo passa dal solito giro in background, che si
+  // annuncia da sé quando è pronto, e qui non si spinge una cache vecchia.
+  async function rinfrescaHome() {
+    try {
+      const r = await ctx.handleFiloGenerateDashboard({ openTabsCount: 0 });
+      if (!r || !r.message || r.cached) return;
+      broadcastToTabs({ type: MSG.FILO_DASHBOARD_UPDATED, message: r.message, suggestions: r.suggestions, ts: r.ts });
+    } catch (_) { /* la home resta com'è: non è un motivo per fallire un riscatto */ }
+  }
+
   // Il conteggio locale già dichiarato al server a un riscatto (per non
   // portarlo due volte). Sopravvive al riscatto e all'annullamento dell'identità.
   const DECLARED_KEY = 'walletLocalDeclared';
@@ -135,6 +152,7 @@ module.exports = function register(on, ctx) {
   async function ownKeyChanged() {
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    rinfrescaHome();
   }
   // La chiave propria ha servito una chiamata (lo dice il provider a ogni
   // risposta buona): il rifiuto ricordato, se c'era, è superato — il conto è
@@ -167,6 +185,9 @@ module.exports = function register(on, ctx) {
       // errore di scrittura: un registro che non si scrive non è un segreto).
       ownKeyTail: W.keyTail(own), ownKeyRefusal: own ? await lastOwnKeyRefusal() : null,
       usageLog: usageLogStatus(),
+      // L'avviso di un invito arrivato da fuori (#651), finché le superfici
+      // che lo raccontano non l'hanno mostrato.
+      notice: await readNotice(),
     };
     try {
       await identity.getIdToken();
@@ -231,6 +252,7 @@ module.exports = function register(on, ctx) {
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status === 'no_wallet' ? 'internal' : status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    rinfrescaHome();
     return { ok: true, status, message: 'Nuova chiave pronta: i tuoi crediti si usano di nuovo da qui.', state: await readState() };
   }));
 
@@ -239,6 +261,7 @@ module.exports = function register(on, ctx) {
     walletStore.clear();
     lastServer = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    rinfrescaHome();
     return { ok: true, state: await readState() };
   }));
 
@@ -252,11 +275,12 @@ module.exports = function register(on, ctx) {
   }
 
   // Riscatto: { code } → { ok, status, message, state? }.
-  on(MSG.WALLET_REDEEM, filoOnly(async (msg) => {
-    // Il codice si estrae da ciò che è stato incollato (la riga intera del
-    // messaggio va bene): niente tetto di caratteri sul campo, niente taglio.
-    const code = W.extractCode((msg && msg.code) || '');
-    if (!code) return { ok: false, status: 'invalid_code', message: W.redeemMessage('invalid_code') };
+  // `code` è quello che l'utente ha incollato: il codice nudo, la riga intera
+  // del messaggio in cui è arrivato, o il link di filo.red. Niente tetto di
+  // caratteri sul campo, niente taglio: o dentro c'è un codice, o si dice.
+  async function doRedeem(rawCode) {
+    const code = W.codeFromInput(rawCode || '');
+    if (!code) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
     // I crediti del vecchio conteggio locale si portano sul server: chi li
@@ -284,11 +308,149 @@ module.exports = function register(on, ctx) {
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     if (localCredits > 0) { try { await globalThis.SN_STORAGE.setRaw(DECLARED_KEY, Math.floor(balanceNow)); } catch (_) {} }
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
-    // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato.
+    // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato, e
+    // la home si rifà: da adesso Filo risponde.
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    rinfrescaHome();
     const state = await readState();
     return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, state };
+  }
+
+  on(MSG.WALLET_REDEEM, filoOnly(async (msg) => doRedeem((msg && msg.code) || '')));
+
+  // ── L'invito che arriva da fuori (#651) ───────────────────────────────────
+  // Due strade portano un invito dentro Filo senza far ricopiare niente a
+  // nessuno:
+  //   - il PRIMO AVVIO dopo aver scaricato Filo dalla pagina del link: il
+  //     server ha segnato l'apertura (l'impronta dell'indirizzo, un'ora di
+  //     tempo) e `walletPendingInvite` la ridà a chi arriva da lì;
+  //   - il collegamento `filo://invito/<codice>`, per chi Filo ce l'ha già:
+  //     apre Filo, o lo porta davanti, e riscatta.
+  // In tutti e due i casi l'utente non ha chiesto niente e non sta guardando
+  // la pagina Crediti: l'esito si scrive qui e lo raccontano la home e la
+  // pagina Crediti. Un riscatto silenzioso è indistinguibile da un invito
+  // perso.
+  const NOTICE_KEY = 'walletNotice';
+  const NOTICE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+  // L'avviso si SPINGE appena il riscatto è andato. Non basta: al PRIMO
+  // avvio il riscatto si chiude in pochi secondi, mentre la home si sta
+  // ancora aprendo, e la spinta non trova nessuno in ascolto — l'invitato si
+  // ritrova i crediti senza che niente glielo dica, che è indistinguibile da
+  // un invito perso (quarto giro di verifica del #651: col server rallentato
+  // apposta l'avviso arrivava, con un server svelto mai). Quindi chi apre lo
+  // CHIEDE anche, con WALLET_NOTICE_PENDING: l'avviso è scritto in locale e
+  // chiederlo non costa un giro dal server, a differenza dello stato del
+  // portafoglio.
+  async function setNotice(kind, text) {
+    const rec = { kind, text: String(text || ''), at: new Date().toISOString(), seenHome: false, seenCredits: false };
+    try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {}
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, walletNotice: { kind: rec.kind, text: rec.text } }); } catch (_) {}
+    return rec;
+  }
+
+  // L'avviso ancora da mostrare, o null. Sparisce quando l'hanno visto tutte
+  // e due le superfici, e comunque dopo una settimana: un benvenuto che
+  // ricompare a ogni avvio per sempre diventa rumore.
+  async function readNotice() {
+    let r = null;
+    try { r = await globalThis.SN_STORAGE.getRaw(NOTICE_KEY, null); } catch (_) { return null; }
+    if (!r || !r.text) return null;
+    const at = Date.parse(String(r.at || ''));
+    const scaduto = !Number.isFinite(at) || Date.now() - at > NOTICE_TTL_MS;
+    if (scaduto || (r.seenHome && r.seenCredits)) {
+      try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, null); } catch (_) {}
+      return null;
+    }
+    return r;
+  }
+
+  // Quale superficie non l'ha ancora visto. `where` è la stessa parola di
+  // WALLET_NOTICE_SEEN: chi l'ha già mostrato non se lo ritrova addosso alla
+  // prossima apertura.
+  on(MSG.WALLET_NOTICE_PENDING, filoOnly(async (msg) => {
+    const where = String((msg && msg.where) || '');
+    if (where !== 'home' && where !== 'credits') return { ok: false, error: 'bad_where' };
+    const r = await readNotice();
+    const visto = where === 'home' ? r && r.seenHome : r && r.seenCredits;
+    return { ok: true, notice: r && !visto ? { kind: r.kind, text: r.text } : null };
   }));
+
+  on(MSG.WALLET_NOTICE_SEEN, filoOnly(async (msg) => {
+    const where = String((msg && msg.where) || '');
+    let r = null;
+    try { r = await globalThis.SN_STORAGE.getRaw(NOTICE_KEY, null); } catch (_) {}
+    if (!r) return { ok: true };
+    if (where === 'home') r.seenHome = true;
+    else if (where === 'credits') r.seenCredits = true;
+    else return { ok: false, error: 'bad_where' };
+    try {
+      await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, r.seenHome && r.seenCredits ? null : r);
+    } catch (_) {}
+    return { ok: true };
+  }));
+
+  // Il segno del «ci ho già provato»: { since, done }. Senza `done`, l'invito
+  // in attesa si richiede a ogni avvio per un giorno — un server muto al
+  // primo avvio non deve costare l'invito.
+  const PENDING_KEY = 'walletPendingInvite';
+  const PENDING_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  async function markPending(patch) {
+    let cur = null;
+    try { cur = await globalThis.SN_STORAGE.getRaw(PENDING_KEY, null); } catch (_) {}
+    const rec = { since: (cur && cur.since) || new Date().toISOString(), done: false, ...(cur || {}), ...patch };
+    try { await globalThis.SN_STORAGE.setRaw(PENDING_KEY, rec); } catch (_) {}
+    return rec;
+  }
+
+  // Primo avvio: c'è un invito che aspetta questa installazione? Non blocca
+  // niente e non dice niente se non c'è.
+  async function tryPendingInvite() {
+    if (walletStore.personalKey()) return null;
+    let mark = null;
+    try { mark = await globalThis.SN_STORAGE.getRaw(PENDING_KEY, null); } catch (_) {}
+    if (mark && mark.done) return null;
+    const since = mark && mark.since ? Date.parse(String(mark.since)) : NaN;
+    if (Number.isFinite(since) && Date.now() - since > PENDING_WINDOW_MS) {
+      await markPending({ done: true });
+      return null;
+    }
+    await markPending({});
+    let r = null;
+    try {
+      r = await callable('walletPendingInvite');
+    } catch (e) {
+      // Server muto, o identità non ancora pronta: non è un errore
+      // dell'utente, non ferma l'avvio, e si riprova domani.
+      console.info('[wallet] invito in attesa: il server non risponde, riprovo al prossimo avvio');
+      return null;
+    }
+    if (!r || r.status !== 'ok' || !r.code) return null;
+    const out = await doRedeem(r.code);
+    if (out && out.ok) {
+      await markPending({ done: true });
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+    }
+    return out;
+  }
+
+  // Il codice arrivato da `filo://invito/<codice>`. Chi ha già un portafoglio
+  // non ha niente da riscattare, e sentirselo dire è meglio di un silenzio.
+  async function redeemFromInvite(code) {
+    if (walletStore.personalKey()) {
+      const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer. Questo invito puoi darlo a qualcun altro.');
+      return { ok: false, status: 'already_in', message: rec.text };
+    }
+    const out = await doRedeem(code);
+    if (out && out.ok) {
+      await markPending({ done: true });
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+    } else {
+      await setNotice('failed', (out && out.message) || W.redeemMessage('internal'));
+    }
+    return out;
+  }
 
   // ── Owner ─────────────────────────────────────────────────────────────────
   const ownerOnly = (fn) => filoOnly(async (msg) => {
@@ -478,6 +640,9 @@ module.exports = function register(on, ctx) {
 
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // L'invito che arriva da fuori (#651): lo chiama main.js per il
+    // collegamento filo://invito/<codice>, e l'avvio per l'invito in attesa.
+    redeemFromInvite, tryPendingInvite,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
@@ -487,5 +652,14 @@ module.exports = function register(on, ctx) {
   // All'avvio: identità pronta e stato del server letto una volta, così la
   // prima riga del registro ha già i parametri di conversione; e le righe
   // rimaste da scrivere alla chiusura precedente ripartono. In background.
-  setTimeout(() => { readState().catch(() => {}); loadQueue().catch(() => {}); }, 4000);
+  // Poi, senza portafoglio, si chiede se c'è un invito che aspetta questa
+  // installazione (#651): dopo la lettura dello stato, così l'identità è già
+  // pronta, e comunque senza bloccare niente.
+  setTimeout(() => {
+    readState()
+      .catch(() => {})
+      .then(() => tryPendingInvite())
+      .catch(() => {});
+    loadQueue().catch(() => {});
+  }, 4000);
 };

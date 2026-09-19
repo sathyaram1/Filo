@@ -9,6 +9,7 @@
 
   const { MSG } = window.SN_MSG;
   const Storage = window.SN_STORAGE;
+  const W = window.SN_WALLET;
 
   function $(id) { return document.getElementById(id); }
 
@@ -122,35 +123,96 @@
     return wrap;
   }
 
+  // Un invito si dà come LINK (#651), qui come nella pagina Crediti: è da
+  // questa pagina che escono i codici per i primi invitati, e un invito da tre
+  // posti con uno occupato è ancora da dare. Un invito «usato» e basta faceva
+  // sparire gli altri due posti: barrato, pulsante spento, nessun link.
   function renderOwnerCodes(invites) {
     const list = $('ownerCodes');
     list.innerHTML = '';
     $('ownerCodesTitle').hidden = invites.length === 0;
-    const sorted = invites.slice().sort((a, b) => Number(Boolean(a.used)) - Number(Boolean(b.used)) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-    for (const inv of sorted) list.appendChild(inviteItem(inv));
+    const views = invites.map((inv) => ({ view: W.inviteView(inv), createdAt: inv && inv.createdAt }));
+    views.sort((a, b) => Number(a.view.exhausted || a.view.revoked) - Number(b.view.exhausted || b.view.revoked)
+      || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    for (const v of views) list.appendChild(inviteItem(v.view, v.createdAt));
   }
 
-  function inviteItem(inv) {
-    const li = document.createElement('li');
-    li.className = 'sn-wallet-invite' + (inv.used ? ' is-used' : '');
-    li.dataset.code = inv.code;
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'sn-wallet-code'; b.textContent = inv.code;
-    b.title = inv.used ? 'Già usato' : 'Copia';
-    b.disabled = Boolean(inv.used);
-    b.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(inv.code); } catch (_) {}
-      const prev = b.textContent;
-      b.textContent = 'Copiato';
-      b.classList.add('is-copied');
-      setTimeout(() => { b.textContent = prev; b.classList.remove('is-copied'); }, 1200);
+  // Come nella pagina Crediti: l'etichetta si legge alla nascita del pulsante e
+  // l'attesa in corso si annulla. Presa al momento del clic, due clic attaccati
+  // lasciavano «Copiato» al posto del link per sempre (terzo giro di verifica
+  // del #651).
+  function copiaCon(btn, testo) {
+    const etichetta = btn.textContent;
+    let attesa = null;
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(testo); } catch (_) {}
+      btn.textContent = 'Copiato';
+      btn.classList.add('is-copied');
+      if (attesa) clearTimeout(attesa);
+      attesa = setTimeout(() => {
+        attesa = null;
+        btn.textContent = etichetta;
+        btn.classList.remove('is-copied');
+      }, 1200);
     });
-    const state = document.createElement('span');
-    state.className = 'sn-wallet-invite-state';
-    state.textContent = inv.used
-      ? `usato${inv.usedAt ? ' il ' + formatDate(inv.usedAt) : ''}${inv.usedBy ? ' da ' + inv.usedBy : ''}`
-      : 'da dare';
-    li.append(b, state);
+  }
+
+  // `inv` è già una vista (`W.inviteView`), o il dato grezzo del server: i
+  // codici appena generati arrivano come stringa e valgono tre posti come
+  // tutti gli altri.
+  function inviteItem(inv, createdAt, { stato = true } = {}) {
+    const view = inv && inv.max ? inv : W.inviteView(inv);
+    const spento = view.exhausted || view.revoked;
+    const li = document.createElement('li');
+    li.className = 'sn-wallet-invite' + (spento ? ' is-used' : '');
+    li.dataset.code = view.code;
+
+    const row = document.createElement('div');
+    row.className = 'sn-wallet-invite-row';
+
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'sn-wallet-invite-link';
+    link.textContent = view.link;
+    link.disabled = spento || !view.link;
+    link.title = view.revoked ? 'Annullato' : (view.exhausted ? 'Nessun posto libero' : 'Copia il link');
+    copiaCon(link, view.link);
+
+    const code = document.createElement('button');
+    code.type = 'button';
+    code.className = 'sn-wallet-code';
+    code.textContent = view.code;
+    code.disabled = spento;
+    code.title = view.revoked ? 'Annullato' : (view.exhausted ? 'Nessun posto libero' : 'Copia il codice');
+    copiaCon(code, view.code);
+
+    row.append(link, code);
+    if (stato) {
+      const state = document.createElement('span');
+      state.className = 'sn-wallet-invite-state';
+      state.textContent = W.inviteStateLine(view);
+      row.appendChild(state);
+    }
+    li.appendChild(row);
+
+    if (view.uses.length) {
+      const chi = document.createElement('ul');
+      chi.className = 'sn-wallet-invite-uses';
+      for (const u of view.uses) {
+        const item = document.createElement('li');
+        const who = document.createElement('span');
+        who.className = 'sn-wallet-invite-who';
+        who.textContent = u.pseudonym || 'qualcuno';
+        who.title = 'Come si chiama in Filo chi è entrato con questo invito';
+        const when = document.createElement('span');
+        when.className = 'sn-wallet-invite-when';
+        when.textContent = formatDate(u.at);
+        item.append(who, when);
+        chi.appendChild(item);
+      }
+      li.appendChild(chi);
+    }
+    if (createdAt) li.dataset.createdAt = String(createdAt);
     return li;
   }
 
@@ -184,8 +246,16 @@
     msg.classList.add('is-ok');
     const list = $('ownerCodes');
     $('ownerCodesTitle').hidden = false;
-    for (const code of r.codes.slice().reverse()) list.prepend(inviteItem({ code, used: false }));
-    loadOverview().catch(() => {});
+    // Quanti posti abbia un invito lo sa il server, non chi l'ha chiesto: la
+    // vista si rilegge prima di mostrarli, così accanto a ogni codice nuovo
+    // c'è il conteggio vero. Se la rilettura non riesce, i codici compaiono
+    // lo stesso col loro link, senza inventare un numero di posti.
+    let riletta = true;
+    try { await loadOverview(); } catch (_) { riletta = false; }
+    const comparsi = r.codes.every((code) => list.querySelector(`li[data-code="${W.formatCode(code)}"]`));
+    if (!riletta || !comparsi) {
+      for (const code of r.codes.slice().reverse()) list.prepend(inviteItem({ code }, null, { stato: false }));
+    }
   }
 
   async function ownerGrant(ev) {
