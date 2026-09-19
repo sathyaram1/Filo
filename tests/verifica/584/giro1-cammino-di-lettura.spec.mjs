@@ -40,7 +40,10 @@ const APP_ROOT = resolve(__dirname, '..', '..', '..');
 // prima, aperta da un errore di caricamento invece che da una regola.
 function caricaPaths() {
   const g = {};
-  for (const modulo of ['constants.js', 'pathsSafety.js', 'paths.js']) {
+  // contenutoEsterno.js apre la fila dal #593: e' la porta unica da cui passa
+  // il contenuto esterno, e constants/pathsSafety la chiedono. Qui la scatola e'
+  // finta e non ha require, quindi va caricata a mano come le altre.
+  for (const modulo of ['contenutoEsterno.js', 'constants.js', 'pathsSafety.js', 'paths.js']) {
     const src = readFileSync(resolve(APP_ROOT, 'src', 'shared', modulo), 'utf8');
     new Function('globalThis', 'self', 'fetch', `${src}`).call(
       g, g, g, (...a) => g.__fetch(...a),
