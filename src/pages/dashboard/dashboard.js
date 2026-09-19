@@ -3430,6 +3430,17 @@
     // di un invito (#651), che arriva quando arriva. Con l'intervista di
     // benvenuto a schermo (#524) non parte niente: un popup sopra l'accoglienza
     // è la prima cosa che l'utente vedrebbe di Filo.
+    // Il benvenuto di un invito può essere arrivato PRIMA che questa pagina
+    // fosse in ascolto: al primo avvio il riscatto si chiude in pochi secondi,
+    // mentre la home si sta ancora aprendo, e la spinta del main non trova
+    // nessuno. Chiederlo all'apertura non costa un giro dal server (l'avviso
+    // è scritto in locale) e non dipende più da chi arriva prima.
+    inCodaPopup(async () => {
+      try {
+        const r = await send({ type: MSG.WALLET_NOTICE_PENDING, where: 'home' });
+        if (r && r.ok && r.notice) await showInviteWelcome(r.notice);
+      } catch (_) {}
+    });
     if (onbState) return;
     inCodaPopup(async () => {
       try {
