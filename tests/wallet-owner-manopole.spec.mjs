@@ -149,7 +149,7 @@ test.beforeAll(async () => {
             createdAt: '2026-09-10T08:00:00.000Z',
             invitedBy: 'owner',
             reconcile: { flagged: false },
-            usage: { rows: 2, byAction: { chat: 0.2, traduci: 0.01 }, byDay: { '2026-09-17': 0.21 } },
+            usage: { rows: 3, byAction: { chat: 0.2, traduci: 0.01, spiega: 0.0031 }, byDay: { '2026-09-17': 0.21, '2026-09-16': 0.0031 } },
             grants: [
               { at: '2026-09-10T08:00:00.000Z', credits: 5000, why: 'entry' },
               { at: '2026-09-17T03:10:00.000Z', credits: 100, why: 'daily' },
