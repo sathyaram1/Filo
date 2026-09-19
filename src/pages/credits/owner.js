@@ -57,6 +57,8 @@
     const table = $('ownerUsers');
     const tbody = table.querySelector('tbody');
     tbody.innerHTML = '';
+    // Le righe si rifanno da zero: le schede già chieste vanno richieste.
+    schedeChieste.clear();
     const users = (o.users || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
     table.hidden = users.length === 0;
     for (const u of users) {
