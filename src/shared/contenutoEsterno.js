@@ -150,14 +150,13 @@
   // la busta è la marcatura, non la fine della riga.
   function neutralizza(testo, { unaRiga = false } = {}) {
     let s = String(testo == null ? '' : testo)
-      // Caratteri di controllo. In modalità blocco a capo e tabulazione
-      // sopravvivono; tutto il resto diventa uno spazio.
-      .replace(unaRiga
-        ? /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g
-        : /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
+      // Caratteri di controllo. L'intervallo lascia fuori tabulazione, a capo
+      // e ritorno a capo di proposito: in modalità blocco sono contenuto vero,
+      // e in modalità campo li toglie la riga qui sotto.
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
       .replace(INVISIBILI_RE, '');
     if (unaRiga) {
-      s = s.replace(/[\r\n  ]+/g, ' ')
+      s = s.replace(/[\t\r\n  ]+/g, ' ')
         // In un campo due parentesi angolari di fila non servono a niente di
         // legittimo: si schiacciano, come faceva già la pulizia dei percorsi.
         .replace(/<{2,}/g, '<')
