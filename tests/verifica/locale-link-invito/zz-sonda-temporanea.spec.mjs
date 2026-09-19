@@ -100,3 +100,41 @@ test('sonda: com’è messo l’onboarding dopo il riscatto automatico', async (
   console.log('SONDA home:', JSON.stringify({ statoHome }));
   expect(true).toBe(true);
 });
+
+const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>Il tuo invito a Filo</title></head>
+<body style="margin:0;font:16px sans-serif;padding:40px">
+<h1>Hai un invito</h1>
+<p>Codice: ABCD-EFGH</p>
+<p><a id="apri" href="filo://invito/${CODICE}">Apri in Filo</a></p>
+<p><a id="web" href="https://filo.red/i/ABCD-EFGH">https://filo.red/i/ABCD-EFGH</a></p>
+</body></html>`;
+
+test('sonda: cosa offre il tasto destro e cosa fa il clic, dentro Filo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(240000);
+
+  const pagina = await testServer.openReady(openTab, PAGINA);
+
+  // 1. Il menu del tasto destro sul collegamento d'invito del sito.
+  await pagina.locator('#web').click({ button: 'right' });
+  const menu = pagina.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 20000 });
+  console.log('SONDA menu web:', JSON.stringify((await menu.innerText()).replace(/\s+/g, ' | ')));
+  await pagina.keyboard.press('Escape').catch(() => {});
+
+  // 2. Il menu del tasto destro sul pulsante che apre Filo.
+  await pagina.locator('#apri').click({ button: 'right' });
+  await expect(menu).toBeVisible({ timeout: 20000 });
+  console.log('SONDA menu apri:', JSON.stringify((await menu.innerText()).replace(/\s+/g, ' | ')));
+  await pagina.keyboard.press('Escape').catch(() => {});
+
+  // 3. Il clic vero sul pulsante: dove si finisce.
+  const prima = app.windows().map((w) => w.url());
+  await pagina.locator('#apri').click({ timeout: 15000 }).catch((e) => console.log('SONDA clic errore:', e.message));
+  await new Promise((r) => setTimeout(r, 10000));
+  const dopo = app.windows().map((w) => w.url());
+  console.log('SONDA finestre prima:', JSON.stringify(prima));
+  console.log('SONDA finestre dopo:', JSON.stringify(dopo));
+  console.log('SONDA riscatti:', JSON.stringify(redeems));
+  try { console.log('SONDA scheda:', pagina.url(), '—', await pagina.title()); } catch (e) { console.log('SONDA scheda sparita'); }
+  expect(true).toBe(true);
+});
