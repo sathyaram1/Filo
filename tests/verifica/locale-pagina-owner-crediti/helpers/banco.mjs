@@ -200,7 +200,10 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
     walletHang: false,   // la connessione si chiude senza risposta
     signUpDown: false,   // l'identità non si crea (500)
     anonDisabled: false, // ADMIN_ONLY_OPERATION
+    fsDown: false,       // il documento delle manopole risponde 500
+    fsDenied: false,     // le regole rifiutano la scrittura (403)
   };
+  const docs_config = () => store.docs.config;
   const clock = { now: () => Date.now() };
   const log = { entries: [], info(...a) { log.entries.push(['info', ...a]); }, warn(...a) { log.entries.push(['warn', ...a]); }, error(...a) { log.entries.push(['error', ...a]); } };
   const frankfurter = async () => (flags.frankDown
