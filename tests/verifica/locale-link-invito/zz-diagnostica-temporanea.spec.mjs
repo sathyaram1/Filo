@@ -74,8 +74,14 @@ test('diagnostica: cosa c’è nella home dopo il riscatto automatico', async ({
   })).catch((e) => ({ errore: String(e) }));
   console.log('[diag] home:', JSON.stringify(info, null, 1));
 
-  const stato = await home.evaluate(async () => {
-    try { return await chrome.runtime.sendMessage({ type: 'FILO_WALLET_STATE' }); } catch (e) { return { errore: String(e) }; }
-  }).catch((e) => ({ errore: String(e) }));
-  console.log('[diag] stato portafoglio dalla home:', JSON.stringify(stato).slice(0, 700));
+  // L'avviso è ancora lì ad aspettare? Si ricarica la home: se il benvenuto
+  // compare adesso, l'avviso c'era e la home non l'aveva raccolto da viva.
+  await home.reload().catch(() => {});
+  await new Promise((r) => setTimeout(r, 8000));
+  const dopo = await home.evaluate(() => ({
+    host: Boolean(document.querySelector('.sn-confirm-host')),
+    stato: (window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test && window.SN_CONFIRM_UI._test.state()) || null,
+    testo: (document.body.innerText || '').slice(0, 600),
+  })).catch((e) => ({ errore: String(e) }));
+  console.log('[diag] home dopo ricarica:', JSON.stringify(dopo, null, 1));
 });
