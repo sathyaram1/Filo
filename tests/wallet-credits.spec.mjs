@@ -280,10 +280,15 @@ test('riscattato l’invito, la home aperta smette di mandare a riscattarlo', as
 });
 
 // #652 — con un portafoglio i crediti li tiene il server, e i movimenti veri
-// sono i suoi: ingresso, quota del giorno, premi per le segnalazioni. Il
-// conteggio locale delle ricompense, che con quel saldo non c'entra niente,
-// non si mostra più accanto.
-test('con un portafoglio i movimenti sono quelli del server, non il conteggio locale', async ({ app, openTab }) => {
+// sono i suoi: invito riscattato, quota del giorno, regali, premi per le
+// segnalazioni. Il conteggio locale delle ricompense, che con quel saldo non
+// c'entra niente, non si mostra più accanto.
+//
+// L'ORDINE è la metà del test: il server li manda dal più recente, e il più
+// recente deve stare in cima. Rovesciarli (la pagina lo faceva, quando si
+// aspettava l'ordine del documento) mette in cima il giorno dell'ingresso e
+// l'ultima cosa successa in fondo: questo test diventa rosso.
+test('con un portafoglio i movimenti sono quelli del server, col più recente in cima', async ({ app, openTab }) => {
   const page = await openTab('filo://credits/credits.html');
   await page.waitForFunction(() => { const w = document.getElementById('wallet'); return w && !w.hidden; }, null, { timeout: 15000 });
   // Il portafoglio può esserci già (il finto server lo ricorda fra una prova e
