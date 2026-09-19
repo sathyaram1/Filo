@@ -95,6 +95,162 @@
     $('ownerRuns').textContent = runs.length ? `Ultime: ${runs.join(' · ')}` : 'Giornaliera e riconciliazione non hanno ancora girato.';
   }
 
+  // ── I numeri che il server calcola ─────────────────────────────────────────
+  // Sola lettura: qui si guarda quanto è già uscito, quanto resta da dare e
+  // quanto è ancora in mano alle persone. Un riquadro che non si può toccare
+  // accanto a uno che si può toccare deve VEDERSI diverso: il valore grande,
+  // il nome sotto, nessun campo.
+  function riquadro(valore, nome, spiega, { barra = null } = {}) {
+    const li = document.createElement('li');
+    li.className = 'sn-wallet-numero';
+    if (spiega) li.title = spiega;
+    const v = document.createElement('span');
+    v.className = 'sn-wallet-numero-valore';
+    v.textContent = valore;
+    const n = document.createElement('span');
+    n.className = 'sn-wallet-numero-nome';
+    n.textContent = nome;
+    li.append(v, n);
+    if (barra != null && Number.isFinite(barra)) {
+      const b = document.createElement('span');
+      b.className = 'sn-wallet-numero-barra';
+      const dentro = document.createElement('span');
+      dentro.style.width = `${Math.max(0, Math.min(100, barra * 100))}%`;
+      b.appendChild(dentro);
+      li.appendChild(b);
+    }
+    return li;
+  }
+
+  function renderNumeri(cfg, tot, ownerInvites) {
+    const lista = $('ownerNumeri');
+    lista.innerHTML = '';
+    const nUsers = Number(tot.users) || 0;
+    const tetto = Number(tot.maxGrantCredits);
+    const dati = Number(tot.grantedCredits);
+    const restano = Number.isFinite(tetto) && Number.isFinite(dati) ? Math.max(0, tetto - dati) : null;
+    const vivi = tot.liveCredits;
+
+    lista.appendChild(riquadro(formatInt(nUsers), nUsers === 1 ? 'utente' : 'utenti',
+      'Quante persone hanno un portafoglio su questo server.'));
+    lista.appendChild(riquadro(
+      Number.isFinite(dati) ? formatInt(dati) : '—',
+      Number.isFinite(tetto) ? `crediti elargiti su ${formatInt(tetto)}` : 'crediti elargiti',
+      'Tutto quello che è stato dato finora, contro il tetto che hai messo.',
+      { barra: Number.isFinite(tetto) && tetto > 0 && Number.isFinite(dati) ? dati / tetto : null },
+    ));
+    lista.appendChild(riquadro(restano == null ? '—' : formatInt(restano), 'ancora elargibili',
+      'Quanto puoi ancora dare prima di sbattere sul tetto. A zero si fermano ingressi, quote e premi.'));
+    lista.appendChild(riquadro(vivi == null ? '—' : formatCredits(vivi), 'crediti vivi',
+      'La somma dei saldi di tutti: quello che le persone hanno ancora da spendere.'));
+
+    // «In circolazione» sono i codici che questa pagina ha generato e che
+    // hanno ancora un posto libero: sono gli unici che il server manda qui.
+    const buoni = (ownerInvites || []).map((i) => W.inviteView(i)).filter((v) => !v.exhausted && !v.revoked);
+    const posti = buoni.reduce((a, v) => a + Math.max(0, (Number(v.max) || 0) - (Number(v.used) || 0)), 0);
+    lista.appendChild(riquadro(formatInt(buoni.length), buoni.length === 1 ? 'tuo invito da dare' : 'tuoi inviti da dare',
+      `Codici usciti da qui con ancora un posto libero: ${formatInt(posti)} ${posti === 1 ? 'persona può entrare' : 'persone possono entrare'}.`));
+    lista.appendChild(riquadro(formatInt(cfg.invitesRemaining || 0), 'riscatti rimasti',
+      'Quante volte in tutto si può ancora entrare con un invito, su questo server.'));
+  }
+
+  // ── Le manopole ────────────────────────────────────────────────────────────
+  // Sette campi identici: nome, limiti e spiegazione stanno nella tabella di
+  // src/shared/wallet.js, il comportamento in src/shared/campoNumero.js. Qui
+  // resta solo il cucito.
+  const campi = new Map();
+
+  function costruisciManopole() {
+    if (campi.size) return;
+    const CN = window.SN_CAMPO_NUMERO;
+    const scatola = $('ownerKnobs');
+    for (const k of W.OWNER_KNOBS) {
+      const riga = document.createElement('div');
+      riga.className = 'sn-manopola';
+      riga.dataset.chiave = k.chiave;
+
+      const label = document.createElement('label');
+      label.setAttribute('for', `knob-${k.chiave}`);
+      label.textContent = k.etichetta;
+      label.title = k.aiuto;
+
+      const controlli = document.createElement('div');
+      controlli.className = 'sn-manopola-riga';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.id = `knob-${k.chiave}`;
+      input.inputMode = 'numeric';
+      input.autocomplete = 'off';
+      input.title = k.aiuto;
+
+      const salva = document.createElement('button');
+      salva.type = 'button';
+      salva.className = 'sn-btn';
+      salva.id = `knob-${k.chiave}-salva`;
+      salva.textContent = 'Salva';
+
+      const rimetti = document.createElement('button');
+      rimetti.type = 'button';
+      rimetti.className = 'sn-btn sn-btn-secondary';
+      rimetti.id = `knob-${k.chiave}-rimetti`;
+      rimetti.textContent = 'Rimetti com’era';
+
+      const msg = document.createElement('p');
+      msg.className = 'sn-wallet-msg sn-manopola-msg';
+      msg.id = `knob-${k.chiave}-msg`;
+      msg.setAttribute('role', 'status');
+      msg.hidden = true;
+
+      controlli.append(input, salva, rimetti);
+      riga.append(label, controlli, msg);
+      scatola.appendChild(riga);
+
+      campi.set(k.chiave, CN.collega({
+        input, salvaBtn: salva, rimetti, msg,
+        regole: { min: k.min, max: k.max, intero: true, etichetta: k.etichetta },
+        salva: (valore) => salvaManopola(k.chiave, valore),
+        // Cambiata una manopola, i numeri calcolati accanto non valgono più.
+        onSalva: () => { loadOverview().catch(() => {}); },
+      }));
+    }
+  }
+
+  async function salvaManopola(chiave, valore) {
+    const r = await chrome.runtime
+      .sendMessage({ type: MSG.WALLET_OWNER_KNOBS_SET, patch: { [chiave]: valore } })
+      .catch(() => null);
+    if (!(r && r.ok)) return { ok: false, errore: (r && r.error) || 'il server non ha risposto' };
+    const letto = r.knobs ? r.knobs[chiave] : null;
+    return { ok: true, valore: letto == null ? valore : letto };
+  }
+
+  // Il tetto in crediti può non essere scritto: allora vale quello in dollari,
+  // e il numero da mostrare è quello che il server ha calcolato (totals).
+  function valoreManopola(chiave, cfg, tot) {
+    if (chiave === 'maxGrantCredits') {
+      const scritto = cfg.maxGrantCredits;
+      return scritto == null ? tot.maxGrantCredits : scritto;
+    }
+    return cfg[chiave];
+  }
+
+  function riempiManopole(cfg, tot) {
+    costruisciManopole();
+    for (const k of W.OWNER_KNOBS) {
+      const campo = campi.get(k.chiave);
+      if (!campo) continue;
+      // Non si riscrive un campo che qualcuno sta usando, né uno che ha ancora
+      // un salvataggio da poter rimettere com'era: la rilettura arriva anche
+      // mentre si digita (il server avvisa a ogni cambio di crediti).
+      const st = campo.stato();
+      if (!primaLettura && (!st.pulito || st.disfabile)) continue;
+      const v = valoreManopola(k.chiave, cfg, tot);
+      campo.mostra(v == null ? '' : v, { daCapo: true });
+    }
+    primaLettura = false;
+  }
+
   function usageDetail(usage) {
     const wrap = document.createElement('div');
     wrap.className = 'sn-wallet-usage-detail';
