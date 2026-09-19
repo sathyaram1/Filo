@@ -146,8 +146,14 @@ test('il costo di una chiamata vera non si legge «0 $»', async () => {
     await riga.click();
     const scheda = page.locator('tr.sn-wallet-user-detail:not([hidden])');
     await expect(scheda).toContainText('chat', { timeout: 20_000 });
-    // Quella chiamata è costata qualcosa: la scheda deve dirlo.
-    expect(await scheda.innerText()).not.toMatch(/(^|\s)0 \$/m);
+    // Quella chiamata è costata qualcosa: dove si parla di lei il costo non
+    // può essere zero (uno zero vero, dove non si è speso niente, resta «0 $»).
+    const dove = await scheda.evaluate((el) => {
+      const blocchi = [...el.querySelectorAll('.sn-wallet-scheda-blocco')]
+        .filter((b) => /Dove sono andati i crediti|Ultime chiamate/.test(b.querySelector('h4')?.textContent || ''));
+      return blocchi.map((b) => b.innerText).join('\n');
+    });
+    expect(dove).not.toMatch(/(^|\s)0 \$/m);
   } finally {
     try { await filo.app.close(); } catch (_) {}
   }
