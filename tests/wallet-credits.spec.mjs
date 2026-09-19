@@ -55,10 +55,14 @@ test.beforeAll(async () => {
             balance: { credits: 4990, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0.0084, remainingUsd: 4.1916, eurUsd: 1.2, eurPerCredit: 0.0007 },
             stale: false, dailyCredits: 100,
             // #652 — i movimenti del portafoglio: da dove vengono i crediti.
+            // Il server li manda DAL PIÙ RECENTE (al più gli ultimi 200), ed è
+            // l'ordine in cui vanno letti: qui stanno come arrivano davvero.
             grants: [
-              { at: '2026-09-08T10:00:00.000Z', credits: 5000, why: 'entry' },
+              { at: '2026-09-12T09:00:00.000Z', credits: 50, why: 'feedback_closed:Zz99' },
+              { at: '2026-09-11T18:00:00.000Z', credits: 10, why: 'feedback_sent:Zz99' },
+              { at: '2026-09-10T12:00:00.000Z', credits: 300, why: 'owner' },
               { at: '2026-09-09T03:10:00.000Z', credits: 100, why: 'daily' },
-              { at: '2026-09-10T12:00:00.000Z', credits: 50, why: 'feedback_closed:Zz99' },
+              { at: '2026-09-08T10:00:00.000Z', credits: 5000, why: 'entry' },
             ],
             invites: [
               { code: 'AAAA-2222', used: false, usedAt: null },
