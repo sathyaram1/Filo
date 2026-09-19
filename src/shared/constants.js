@@ -1385,11 +1385,24 @@
       `Inserisci la punteggiatura appropriata (virgole, punti, punti interrogativi) inferendola dall'intonazione. ` +
       `Se l'audio è silenzioso, incomprensibile o vuoto, rispondi con una stringa vuota.`,
 
+    // #593 — indirizzo, titolo, descrizione ed estratto li scrive chi possiede
+    // il sito: entravano grezzi in un prompt che poi chiede al modello di
+    // rispondere con un nome di categoria. Bastava una riga nell'estratto per
+    // dettargliela. Adesso entrano imbustati, come qualunque altro contenuto
+    // esterno.
     categorize: ({ url, title, description, excerpt, existing }) =>
-      `Categorizza la pagina seguente.\n` +
-      `URL: ${url}\nTitolo: ${title}\nDescrizione: ${description || '-'}\n` +
-      `Estratto:\n${excerpt || '-'}\n\n` +
-      `Categorie esistenti: ${existing.length ? existing.map((c) => `"${c}"`).join(', ') : '(nessuna)'}.\n\n` +
+      `Categorizza la pagina descritta qui sotto.\n\n` +
+      esterno().imbustaCampi({
+        tipo: 'DATI_PAGINA',
+        campi: { URL: url, Titolo: title, Descrizione: description || '-' },
+      }) + '\n\n' +
+      esterno().imbusta({
+        tipo: 'DATI_PAGINA',
+        testo: `Estratto:\n${excerpt || '-'}`,
+      }) + '\n\n' +
+      // Le categorie che l'utente ha già in casa sono roba sua, non del sito:
+      // restano fuori dalla busta, perché è su quelle che deve scegliere.
+      `Categorie esistenti (queste vengono da Filo, non dal sito): ${existing.length ? existing.map((c) => `"${c}"`).join(', ') : '(nessuna)'}.\n\n` +
       `Rispondi SOLO con un JSON valido (nessun testo extra) nel formato:\n` +
       `{ "category": "nome esatto di una categoria esistente OPPURE nome nuovo se nessuna calza", "confidence": 0.0-1.0, "isNew": true|false }\n\n` +
       `Crea una categoria nuova solo se nessuna delle esistenti è realmente appropriata. ` +
