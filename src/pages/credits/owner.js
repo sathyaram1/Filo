@@ -377,9 +377,14 @@
     menuAperto = null;
     document.removeEventListener('mousedown', fuoriDalMenu, true);
     document.removeEventListener('keydown', tastoSulMenu, true);
-    window.removeEventListener('scroll', chiudiMenuPersona, true);
+    window.removeEventListener('wheel', fuoriDalMenu, true);
     window.removeEventListener('resize', chiudiMenuPersona);
   }
+  // Il menu si chiude a un clic o a una rotella fuori da lui. Non si chiude a
+  // ogni evento di scorrimento: il menu sta in coordinate fisse e non scappa
+  // via, e uno scorrimento lo fa anche il browser da solo quando porta in
+  // vista quello su cui si sta per cliccare — chiudendo il menu proprio mentre
+  // lo si usa.
   function fuoriDalMenu(ev) { if (menuAperto && !menuAperto.contains(ev.target)) chiudiMenuPersona(); }
   function tastoSulMenu(ev) { if (ev.key === 'Escape') { ev.preventDefault(); chiudiMenuPersona(); } }
 
