@@ -131,8 +131,8 @@ describe('fine riga: LF in ogni copia di lavoro', () => {
       if (!existsSync(p)) continue;
       if (readFileSync(p).includes(0x00)) colpevoli.push(f);
     }
-    assert.deepEqual(colpevoli, [],
-      'questi sorgenti contengono un NUL vero: scrivilo come escape (`\\u0000`), '
-      + 'altrimenti git li tratta da binari e la regola di fine riga non li tocca');
+    assert.equal(colpevoli.length, 0,
+      `sorgenti con un NUL vero dentro: ${elenco(colpevoli)}. Scrivilo come escape `
+      + '(`\\u0000`), altrimenti git li tratta da binari e la regola di fine riga non li tocca');
   });
 });
