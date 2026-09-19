@@ -1,6 +1,18 @@
+// Giro di verifica locale del ramo claude/link-invito — giro 5.
+//
+// Il benvenuto dell'invito non si deve raccontare due volte. Al primo avvio
+// di un'installazione nuova la home è una sola e va bene; ma l'altra strada
+// dello stesso invito è il collegamento cliccato mentre Filo è già acceso, e
+// lì di schede della home ce n'è quante ne ha aperte l'utente. L'avviso viene
+// spinto a tutte, e ognuna apre il suo riquadro: chi ha tre schede nuove
+// aperte si ritrova a chiudere tre volte lo stesso benvenuto.
+//
+// Scritto da chi verifica, non da chi ha fatto il lavoro. Server finto: un
+// codice vero a usi contati non si brucia per una prova.
+
 import { createServer } from 'node:http';
 import { test, expect } from '../../fixtures/electron.mjs';
-import { confirmText, CONFIRM_HOST } from '../../helpers/confirm.mjs';
+import { confirmText } from '../../helpers/confirm.mjs';
 
 const CODICE = 'ABCDEFGH';
 let server;
