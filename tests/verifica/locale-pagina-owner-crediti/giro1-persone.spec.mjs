@@ -112,7 +112,8 @@ test('la riga di una persona apre la sua scheda di spesa, col clic e con la tast
     // L'altra persona, che non ha speso niente: la scheda si apre lo stesso.
     const riga2 = page.locator('tr.sn-wallet-user', { hasText: pb });
     await riga2.click();
-    await expect(page.locator('tr.sn-wallet-user-detail:not([hidden])')).toContainText('Saldo', { timeout: 20_000 });
+    await expect(page.locator('tr.sn-wallet-user-detail:not([hidden])')).toHaveCount(2, { timeout: 20_000 });
+    await expect(page.locator('tr.sn-wallet-user-detail:not([hidden])').last()).toContainText('Saldo');
     mkdirSync(SHOTS, { recursive: true });
     await page.screenshot({ path: join(SHOTS, 'verifica-owner-scheda.png'), fullPage: true });
   } finally {
