@@ -1114,9 +1114,12 @@
       `\n\nRispondi in italiano. Non aggiungere preamboli o spiegazioni meta sulla tua risposta.`,
 
     explainDeep: ({ selection, sentence, fxLine }) =>
-      `Spiega in modo approfondito ma conciso il seguente testo selezionato dall'utente durante la navigazione web: "${selection}". ` +
-      `La frase intera in cui era contenuto è: "${sentence}". ` +
-      `Fornisci contesto, definizione e dettagli rilevanti. ` +
+      `Spiega in modo approfondito ma conciso il testo selezionato dall'utente durante la navigazione web. Testo e frase che lo conteneva sono qui sotto.\n\n` +
+      esterno().imbustaCampi({
+        tipo: 'TESTO_IN_PAGINA',
+        campi: { 'Testo selezionato': selection, 'Frase intera': sentence },
+      }) +
+      `\n\nFornisci contesto, definizione e dettagli rilevanti. ` +
       `Limite tassativo: massimo 1000 caratteri totali. ` +
       `\n\nCalcolatrice: per qualunque risultato numerico di un'operazione aritmetica (esplicita o implicita dal contesto) NON calcolare a mente. ` +
       `Scrivi al suo posto il marker \`[[calc: <espressione>]]\` (operatori + - * / ^, parentesi, funzioni sqrt/sin/cos/tan/log/ln/exp/abs, costanti pi/e, punto decimale). ` +
