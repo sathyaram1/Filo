@@ -564,7 +564,15 @@
     // Rilancia il caricamento reale (loadData): usato dai test per esercitare il
     // cammino d'errore (FB.list che rigetta → stato d'errore) e il retry, senza
     // dover simulare la rete davvero assente.
-    reload() { return loadData(); },
+    // La lettura della vista pubblica ha una MEMORIA BREVE (trenta secondi):
+    // senza buttarla via, un ricaricamento chiesto da una prova risponderebbe
+    // con le schede del caricamento precedente senza chiedere niente al
+    // server — e la prova crederebbe di aver riletto. La memoria da buttare è
+    // quella dell'istanza catturata qui (`FB`): su una pagina filo:// non è
+    // la stessa che si raggiunge da `window.SN_FEEDBACK`, quindi una prova
+    // non può buttarla da fuori. Il tasto "Riprova" non passa di qui: lì la
+    // memoria è già vuota, perché un caricamento fallito non la riempie.
+    reload() { try { if (FB.forgetAllPublic) FB.forgetAllPublic(); } catch (_) {} return loadData(); },
     // Sostituisce la sorgente dati usata da loadData con una funzione di test
     // (che risolve o rigetta). Va scritta sulla stessa reference `FB` che
     // loadData usa: su pagine filo:// `window.SN_FEEDBACK` può essere una vista
