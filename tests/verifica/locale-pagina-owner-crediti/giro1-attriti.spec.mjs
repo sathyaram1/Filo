@@ -1,9 +1,8 @@
 // Primo giro — le prove che riproducono i rilievi della critica.
 //
-// Sono ATTESE ROSSE (`test.fail`): dicono cosa dovrebbe succedere, e finché il
-// difetto c'è falliscono. Chi correggerà uno di questi rilievi toglie il
-// `test.fail` di quella prova e la lascia verde: così il giro dopo la ritrova
-// pronta invece di riscoprire la porta da capo.
+// Erano attese rosse: ognuna falliva per il suo difetto. Corretti tutti e sei
+// nello stesso giro, sono diventate verdi e restano qui come memoria: se una
+// di queste porte si riapre, il giro dopo la trova senza doverla ricercare.
 import { test, expect } from '@playwright/test';
 import {
   avviaServer, avviaFilo, apriOwner, simulaOwner, fintoOpenRouter, cartellaFiloSecurity,
@@ -23,7 +22,6 @@ async function ownerPronto() {
 }
 
 test('un numero scritto e non salvato si vede che non è in vigore', async () => {
-  test.fail(true, 'il campo mostra il numero nuovo senza nessun segno, e la quota in vigore è ancora quella di prima');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
@@ -51,7 +49,6 @@ test('un numero scritto e non salvato si vede che non è in vigore', async () =>
 });
 
 test('un numero scritto e non salvato non sparisce senza dirlo quando si torna sulla pagina', async () => {
-  test.fail(true, 'ricaricando la pagina il numero scritto sparisce in silenzio');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
@@ -73,7 +70,6 @@ test('un numero scritto e non salvato non sparisce senza dirlo quando si torna s
 });
 
 test('un salvataggio rifiutato dal server si spiega a parole, non col codice dell’errore', async () => {
-  test.fail(true, 'la pagina stampa il numero dell’errore e la risposta del server per intero');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
@@ -92,7 +88,6 @@ test('un salvataggio rifiutato dal server si spiega a parole, non col codice del
 });
 
 test('col server irraggiungibile l’avviso è una frase, e «Quanto vale cosa» non resta un titolo vuoto', async () => {
-  test.fail(true, 'l’avviso cita il nome della chiamata e il codice, e sotto il titolo delle manopole non resta niente');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
@@ -112,7 +107,6 @@ test('col server irraggiungibile l’avviso è una frase, e «Quanto vale cosa»
 });
 
 test('dopo un salvataggio rifiutato non compare «Rimetti com’era»: non c’è niente da rimettere', async () => {
-  test.fail(true, 'il tasto compare anche se non è stato salvato niente');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
@@ -129,7 +123,6 @@ test('dopo un salvataggio rifiutato non compare «Rimetti com’era»: non c’�
 });
 
 test('il costo di una chiamata vera non si legge «0 $»', async () => {
-  test.fail(true, 'i costi si arrotondano ai centesimi: sotto il mezzo centesimo diventano 0 $');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
@@ -160,7 +153,6 @@ test('il costo di una chiamata vera non si legge «0 $»', async () => {
 });
 
 test('il tasto destro su una persona offre qualcosa di quella persona', async () => {
-  test.fail(true, 'si apre il menu generale della pagina: niente che riguardi la riga');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
