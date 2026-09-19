@@ -103,8 +103,12 @@ test('i moduli dell’owner rifiutano con parole di Filo zero codici, crediti co
   expect(await simulaOwner(app)).toBe(true);
   const page = await openTab('filo://credits/owner.html');
   await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
-  await expect(page.locator('#ownerTotals')).toContainText('1 utente ·', { timeout: 15_000 });
-  await expect(page.locator('#ownerTotals')).not.toContainText('1 utenti');
+  // I numeri calcolati stanno nei riquadri in cima (#652): un utente si conta
+  // al singolare.
+  const utenti = page.locator('#ownerNumeri .sn-wallet-numero').first();
+  await expect(utenti).toContainText('1', { timeout: 15_000 });
+  await expect(utenti).toContainText('utente');
+  await expect(utenti).not.toContainText('utenti');
 
   const msg = page.locator('#ownerMsg');
 
