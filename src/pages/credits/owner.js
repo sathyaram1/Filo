@@ -499,6 +499,7 @@
         r.action || '—',
         r.model || '—',
         r.servedBy || 'non detto',
+        formatCredits(r.credits),
         fmtUsd(r.costUsd),
       ];
       celle.forEach((c) => {
