@@ -51,6 +51,28 @@ dentro una stringa (casi di input avversariale: «byte nullo») invece dell'esca
 generale c'era e su di loro non valeva. Un NUL in un sorgente si scrive sempre come
 escape — è identico per JavaScript e lascia il file a essere testo.
 
+## Una copia di lavoro che esiste già non si raddrizza da sola
+
+`.gitattributes` decide come nasce un file **al checkout**. Su un clone nuovo quindi vale
+subito; su una copia che c'era già prima, no: una fusione riscrive solo i file che
+cambiano, e tutti gli altri restano com'erano. Chi tira dentro questa regola su una
+cartella storta si ritrova gli hook storti come prima, e il salvataggio automatico fermo
+senza dirlo.
+
+Le due strade che vengono in mente per prime non funzionano, provate tutte e due:
+`git checkout -- .` non riscrive un file che per git è già a posto, e
+`git add --renormalize .` sistema l'indice, non il disco. Quella che funziona è svuotare
+l'indice e ripristinare dai byte che stanno in git:
+
+```bash
+git rm --cached -r .   # toglie tutto dall'indice, non dal disco
+git reset --hard       # ATTENZIONE: butta le modifiche non committate
+```
+
+In alternativa si riclona. Il controllo in `tests/unit/fineRigaLf.test.mjs` diventa rosso
+proprio in questo caso, e il comando sta scritto nel messaggio del rosso: chi ci finisce
+dentro non deve andarselo a cercare.
+
 **Dove:** `.gitattributes` (la regola), test: `tests/unit/fineRigaLf.test.mjs` — verifica
 che la regola ci sia, che nessun file di testo tracciato contenga un ritorno carrello,
 che gli hook comincino con uno shebang pulito e che nessun sorgente porti un NUL grezzo.
