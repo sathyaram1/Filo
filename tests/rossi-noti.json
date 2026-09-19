@@ -64,6 +64,20 @@
         "feedback": "da aprire: rossi del contenitore GitHub Actions (corse della suite #35088361658 e #35101566321)"
       },
       {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-attriti",
+        "caso": [
+          "un numero scritto e non salvato si vede che non è in vigore",
+          "un numero scritto e non salvato non sparisce senza dirlo quando si torna sulla pagina",
+          "un salvataggio rifiutato dal server si spiega a parole, non col codice dell’errore",
+          "col server irraggiungibile l’avviso è una frase, e «Quanto vale cosa» non resta un titolo vuoto",
+          "dopo un salvataggio rifiutato non compare «Rimetti com’era»: non c’è niente da rimettere",
+          "il costo di una chiamata vera non si legge «0 $»",
+          "il tasto destro su una persona offre qualcosa di quella persona"
+        ],
+        "perche": "stesso motivo delle voci qui sotto: l'owner si finge salvando una sessione su disco, e nel contenitore delle routine safeStorage non c'è. Queste prove la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
         "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-manopole",
         "caso": [
           "le sette manopole nascono col valore in vigore, si salvano, e il server ubbidisce",

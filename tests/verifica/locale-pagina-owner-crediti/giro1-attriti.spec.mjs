@@ -4,8 +4,11 @@
 // nello stesso giro, sono diventate verdi e restano qui come memoria: se una
 // di queste porte si riapre, il giro dopo la trova senza doverla ricercare.
 import { test, expect } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   avviaServer, avviaFilo, apriOwner, simulaOwner, fintoOpenRouter, cartellaFiloSecurity,
+  APP_ROOT,
 } from './helpers/banco.mjs';
 
 test.skip(!cartellaFiloSecurity(), 'filo-security non è accanto al repo: il server dei crediti non si può far girare');
