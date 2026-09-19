@@ -662,6 +662,10 @@ module.exports = function register(on, ctx) {
 
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // Lo pseudonimo di questa installazione, letto dal deposito locale (niente
+    // rete): lo scrive chi manda un feedback, così il server sa a chi
+    // accreditare il premio (#652). Vuoto se non c'è un portafoglio.
+    pseudonym: () => { try { return walletStore.pseudonym() || ''; } catch (_) { return ''; } },
     // L'invito che arriva da fuori (#651): lo chiama main.js per il
     // collegamento filo://invito/<codice>, e l'avvio per l'invito in attesa.
     redeemFromInvite, tryPendingInvite,
