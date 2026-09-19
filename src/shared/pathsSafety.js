@@ -174,6 +174,13 @@
   // solo a fingere di essere la struttura del prompt: caratteri di controllo,
   // a capo (ogni campo è una riga sola), sequenze di < o > che imiterebbero le
   // marcature, e il nome delle marcature stesse.
+  //
+  // Questa è la pulizia in SCRITTURA, e gira anche sul server, dove SN_ESTERNO
+  // non c'è: resta quindi autonoma. Non conosce i nomi delle buste degli altri
+  // tipi, e non le serve — schiacciando ogni coppia di parentesi angolari non
+  // può uscirne una marcatura di nessun tipo. Il nome per esteso lo cancella
+  // comunque SN_ESTERNO quando imbusta, in lettura, dove la tabella dei tipi
+  // c'è tutta.
   function neutralizzaMarcature(testo) {
     return String(testo == null ? '' : testo)
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
