@@ -38,12 +38,29 @@
   // più al modello.
   const MAX_PATH_CHARS = Math.floor(KNOWN_PATHS_BUDGET_CHARS / 4);
 
-  // Le due righe che delimitano il blocco nel messaggio di sistema. Il testo
-  // dei percorsi non può contenerle (vedi `neutralizzaMarcature`): senza questa
-  // precauzione basterebbe un intento che scrive la riga di chiusura per far
-  // credere al modello che quello che segue non è più contenuto esterno.
-  const FENCE_START = '<<<PERCORSI_CONDIVISI>>>';
-  const FENCE_END = '<<<FINE_PERCORSI_CONDIVISI>>>';
+  // Il tipo di contenuto esterno sotto cui i percorsi entrano nel prompt. La
+  // busta — le due righe che delimitano il blocco, e la pulizia che impedisce
+  // al contenuto di scriversele da sé — la fa SN_ESTERNO
+  // (src/shared/contenutoEsterno.js), che è la porta unica di tutto ciò che
+  // arriva da fuori (#593).
+  //
+  // Si prende al momento dell'uso, non al caricamento, e per un motivo
+  // preciso: questo file viene INCORPORATO nel backend di sicurezza al deploy
+  // (predeploy `bake-shared`), dove gira da solo e dove serve la sola
+  // scrittura (`sanitizeSubmission`). La lettura — l'unica parte che imbusta —
+  // là non viene mai chiamata. Un `require` in testa spegnerebbe il deploy per
+  // una funzione che il server non usa.
+  const TIPO_ESTERNO = 'PERCORSI_CONDIVISI';
+
+  function esterno() {
+    if (!global.SN_ESTERNO && typeof require === 'function') {
+      require('./contenutoEsterno.js');
+    }
+    if (!global.SN_ESTERNO) {
+      throw new Error('SN_ESTERNO mancante: carica shared/contenutoEsterno.js prima di pathsSafety.js');
+    }
+    return global.SN_ESTERNO;
+  }
 
   const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
   const LONG_NUM_RE = /\b\d{6,}\b/g;
