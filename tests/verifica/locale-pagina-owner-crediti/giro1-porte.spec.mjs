@@ -24,10 +24,11 @@ test('chi non è l’owner non vede i numeri e non riesce a cambiarli nemmeno di
     // E chiedendolo direttamente, senza passare dai campi: rifiutato, e niente
     // è cambiato nel documento da cui il server legge.
     const esito = await page.evaluate(async () => {
-      const tipi = Object.values(window.SN_MSG || {}).filter((t) => typeof t === 'string' && /KNOBS/i.test(t));
       const fuori = [];
-      for (const t of [...tipi, 'wallet:owner:knobs:set']) {
-        try { fuori.push(await window.filo.send({ type: t, patch: { entryCredits: 999999 } })); } catch (e) { fuori.push({ errore: String(e && e.message || e) }); }
+      for (const t of ['wallet_owner_knobs_set', 'wallet_owner_overview', 'wallet_owner_user_detail', 'wallet_owner_grant']) {
+        try {
+          fuori.push(await chrome.runtime.sendMessage({ type: t, patch: { entryCredits: 999999 }, pseudonym: 'chiunque', credits: 9999 }));
+        } catch (e) { fuori.push({ errore: String((e && e.message) || e) }); }
       }
       return fuori;
     }).catch((e) => [{ errore: String(e) }]);
