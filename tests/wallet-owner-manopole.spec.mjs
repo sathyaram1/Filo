@@ -349,11 +349,15 @@ test('la riga di una persona apre la sua scheda: movimenti, suoi inviti e ultime
   await expect(scheda).toContainText('0,21 $');
   await expect(scheda).toContainText('te');
 
-  // I movimenti, col premio per la segnalazione risolta scritto in italiano.
-  await expect(scheda).toContainText('Segnalazione risolta');
-  await expect(scheda).toContainText('+28');
-  await expect(scheda).toContainText('Invito riscattato');
-  await expect(scheda).toContainText('Quota del giorno');
+  // I movimenti, col premio per la segnalazione risolta scritto in italiano e
+  // il più recente in cima (il server li manda nell'ordine del documento, dal
+  // più vecchio: l'ordine lo decide la pagina, sulla data).
+  const movimenti = scheda.locator('.sn-wallet-scheda-blocco', { hasText: 'Movimenti' }).locator('li');
+  await expect(movimenti).toHaveCount(3);
+  await expect(movimenti.nth(0)).toContainText('Segnalazione risolta');
+  await expect(movimenti.nth(0)).toContainText('+28');
+  await expect(movimenti.nth(1)).toContainText('Quota del giorno');
+  await expect(movimenti.nth(2)).toContainText('Invito riscattato');
 
   // I suoi inviti, con chi è entrato.
   await expect(scheda.locator('.sn-wallet-invite-link')).toHaveText('https://filo.red/i/BBBB3333');
