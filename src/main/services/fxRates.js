@@ -84,15 +84,24 @@
 
   // Formatta i tassi come riga compatta per il prompt.
   // Esempio: "1 EUR = 1.08 USD, 0.85 GBP, ..."
+  // #593 (quarto giro di verifica) — LA DATA LA SCRIVE IL SERVIZIO, NON FILO.
+  // Questa riga entra nei prompt di «Spiega» e «Approfondisci» come frase di
+  // Filo, fuori da qualunque recinzione: i numeri li filtra il codice (sono
+  // numeri o non passano), la data invece finiva nel prompt come arrivava dal
+  // servizio dei cambi. Una data è una data: o ha la forma anno-mese-giorno o
+  // non si scrive. Non serve una busta per un campo che può avere una forma
+  // sola, serve pretendere quella forma.
+  const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
   function formatForPrompt(data) {
     if (!data || !data.rates) return '';
     const parts = SYMBOLS
       .filter((s) => typeof data.rates[s] === 'number')
       .map((s) => `${trimNum(data.rates[s])} ${s}`);
     if (!parts.length) return '';
-    const date = data.date || '';
+    const date = DATA_RE.test(String(data.date || '')) ? String(data.date) : '';
     const stale = data.stale ? ' (stimati)' : '';
-    return `Cambi attuali al ${date}${stale}: 1 EUR = ${parts.join(', ')}.`;
+    return `Cambi attuali${date ? ` al ${date}` : ''}${stale}: 1 EUR = ${parts.join(', ')}.`;
   }
 
   function trimNum(n) {
