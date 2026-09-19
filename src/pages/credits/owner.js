@@ -482,7 +482,10 @@
     tabella.className = 'sn-wallet-table sn-wallet-chiamate';
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
-    for (const t of ['Quando', 'Per cosa', 'Modello', 'Chi ha servito', 'Costo']) {
+    // I crediti accanto al costo: sono quelli che la persona si è vista
+    // scalare, e sono numeri interi che si leggono. Il costo in dollari da
+    // solo, per una chiamata sola, è un numero con quattro zeri davanti.
+    for (const t of ['Quando', 'Per cosa', 'Modello', 'Chi ha servito', 'Crediti', 'Costo']) {
       const th = document.createElement('th');
       th.textContent = t;
       trh.appendChild(th);
