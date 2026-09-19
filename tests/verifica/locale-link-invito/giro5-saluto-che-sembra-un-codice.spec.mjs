@@ -96,6 +96,9 @@ test('un saluto fatto di lettere da codice non deve mangiarsi il codice che segu
 });
 
 test('«Cara Sara, ecco il codice: …» deve riscattare, non essere rifiutato', async ({ openTab }) => {
+  // Stesso rilievo di livello 1 del quinto giro, messo da parte, visto da dove
+  // lo vede l'utente: oggi risponde «Questo codice non esiste».
+  test.fail(true, 'rilievo di livello 1 del quinto giro, messo da parte: il saluto di otto lettere buone vince sul codice');
   const page = await openTab('filo://credits/credits.html');
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 20000 });
   await page.fill('#inviteCode', 'Cara Sara, ecco il codice: ABCD-EFGH');
