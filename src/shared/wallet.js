@@ -433,7 +433,7 @@
   // feedback attaccato (`feedback_closed:abc123`). Qui diventa una riga che una
   // persona legge.
   const GRANT_LABELS = Object.freeze({
-    entry: 'Sei entrato con un invito',
+    entry: 'Invito riscattato',
     daily: 'Quota del giorno',
     owner: 'Regalo di Filo',
     gift: 'Regalo di Filo',
