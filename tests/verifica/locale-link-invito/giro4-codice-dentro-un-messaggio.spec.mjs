@@ -81,11 +81,9 @@ test('il codice nudo dentro una riga di messaggio si riscatta, com’è arrivato
   expect(visto.redeems).toContain(CODICE);
 });
 
-// ATTESA ROSSA: riproduce un rilievo di livello 1 del quarto giro, e il
-// bilancio dei livelli 1 e 0 di questo lavoro è esaurito — il rilievo viene
-// messo da parte, non corretto. La prova resta come memoria del giro.
+// Rilievo di livello 1 del quarto giro, poi corretto: il saluto davanti al
+// codice non deve più mangiarselo.
 test('il saluto davanti al codice nudo non deve far sparire il codice', async ({ openTab }) => {
-  test.fail(true, 'rilievo di livello 1 del quarto giro, messo da parte: bilancio esaurito');
   const page = await openTab('filo://credits/credits.html');
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 20000 });
   // Due parole di quattro lettere davanti al codice: è come comincia un
