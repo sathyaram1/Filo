@@ -56,7 +56,7 @@ test('le sette manopole nascono col valore in vigore, si salvano, e il server ub
     const pseudo = server.store.docs.wallets.get('anon-nuovo').pseudonym;
     const premio = await server.premio({ feedbackId: 'fb-1', pseudonym: pseudo, kind: 'sent' });
     expect(premio.ok).toBe(true);
-    expect(server.store.docs.wallets.get('anon-nuovo').credits).toBe(777 + 42);
+    expect(server.store.docs.wallets.get('anon-nuovo').creditsGranted).toBe(777 + 42);
 
     // Persone per invito: 1. Vale anche per un codice già in giro.
     await page.fill('#knob-invitesMaxUses', '1');
@@ -69,9 +69,9 @@ test('le sette manopole nascono col valore in vigore, si salvano, e il server ub
     await page.fill('#knob-dailyCredits', '9');
     await page.click('#knob-dailyCredits-salva');
     await expect(page.locator('#knob-dailyCredits-msg')).toContainText('Salvato', { timeout: 20_000 });
-    const prima = server.store.docs.wallets.get('anon-x').credits;
+    const prima = server.store.docs.wallets.get('anon-x').creditsGranted;
     await server.daily(Date.now() + 86_400_000);
-    expect(server.store.docs.wallets.get('anon-x').credits).toBe(prima + 9);
+    expect(server.store.docs.wallets.get('anon-x').creditsGranted).toBe(prima + 9);
 
     // Riaprendo la pagina i numeri salvati sono quelli.
     await page.reload();
@@ -153,12 +153,12 @@ test('il tetto dei crediti elargibili ferma OGNI strada: ingresso, quota, regalo
     const premio = await server.premio({ feedbackId: 'fb-tetto', pseudonym: pseudo, kind: 'closed' });
     expect(premio.ok).toBe(false);
     // 4. Nemmeno il regalo a mano dell'owner passa, e la pagina lo dice.
-    const saldoPrima = server.store.docs.wallets.get('anon-a').credits;
+    const saldoPrima = server.store.docs.wallets.get('anon-a').creditsGranted;
     await page.fill('#ownerGrantPseudonym', pseudo);
     await page.fill('#ownerGrantCredits', '10');
     await page.click('#ownerGrantBtn');
     await expect(page.locator('#ownerMsg')).toContainText(/tetto/i, { timeout: 20_000 });
-    expect(server.store.docs.wallets.get('anon-a').credits).toBe(saldoPrima);
+    expect(server.store.docs.wallets.get('anon-a').creditsGranted).toBe(saldoPrima);
 
     // Rialzato il tetto, il regalo torna a passare: il tetto è una manopola,
     // non un muro definitivo.
@@ -169,7 +169,7 @@ test('il tetto dei crediti elargibili ferma OGNI strada: ingresso, quota, regalo
     await page.fill('#ownerGrantCredits', '10');
     await page.click('#ownerGrantBtn');
     await expect(page.locator('#ownerMsg')).toContainText(/\+10/, { timeout: 20_000 });
-    expect(server.store.docs.wallets.get('anon-a').credits).toBe(saldoPrima + 10);
+    expect(server.store.docs.wallets.get('anon-a').creditsGranted).toBe(saldoPrima + 10);
   } finally {
     try { await filo.app.close(); } catch (_) {}
   }
