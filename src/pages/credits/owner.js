@@ -429,7 +429,7 @@
     setTimeout(() => {
       document.addEventListener('mousedown', fuoriDalMenu, true);
       document.addEventListener('keydown', tastoSulMenu, true);
-      window.addEventListener('scroll', chiudiMenuPersona, true);
+      window.addEventListener('wheel', fuoriDalMenu, true);
       window.addEventListener('resize', chiudiMenuPersona);
     }, 0);
   }
