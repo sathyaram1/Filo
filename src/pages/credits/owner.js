@@ -45,8 +45,10 @@
     const cfg = o.config || {};
     const tot = o.totals || {};
     renderNumeri(cfg, tot, o.ownerInvites || []);
+    const quando = formatDate(cfg.eurUsdAt);
     $('ownerTotals').textContent = cfg.eurUsd
-      ? `Un credito vale ${cfg.eurPerCredit} €, e un euro ${cfg.eurUsd} $ (cambio del ${cfg.eurUsdAt || 'giorno ignoto'}).`
+      ? `Un credito vale ${formatDecimale(cfg.eurPerCredit, 6)} €, e un euro ${formatDecimale(cfg.eurUsd, 4)} $`
+        + `${quando ? ` (cambio del ${quando})` : ''}.`
       : 'Manca il cambio del giorno: finché non arriva, nessuna elargizione parte.';
     riempiManopole(cfg, tot);
     // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
