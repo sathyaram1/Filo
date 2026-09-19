@@ -1376,10 +1376,18 @@
     // composizioni a mano divergerebbero in silenzio, e la cronologia è
     // proprio il posto dove un testo avvelenato resterebbe per tutta la
     // sessione.
+    // #593 — la busta di una scheda: titolo e indirizzo li scrive il sito.
+    schedaImbustata: ({ titolo = '', url = '' } = {}) =>
+      esterno().imbustaCampi({
+        tipo: 'DATI_PAGINA',
+        campi: { 'Titolo della scheda': titolo, 'Indirizzo': url },
+      }),
+
     turnoAutomaticoAiuto: ({ nota = '', dati = null, perCronologia = false } = {}) => {
       const buste = [];
       if (dati && dati.ricercaWeb) buste.push(PROMPTS.ricercaWebImbustata(dati.ricercaWeb));
       if (dati && dati.elementoPagina) buste.push(PROMPTS.elementoPaginaImbustato(dati.elementoPagina));
+      if (dati && dati.scheda) buste.push(PROMPTS.schedaImbustata(dati.scheda));
       const pulite = buste.filter(Boolean);
       if (!nota) return pulite.join('\n\n');
       const coda = perCronologia

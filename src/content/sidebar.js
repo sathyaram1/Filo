@@ -94,7 +94,15 @@
       history.push({
         role: 'user',
         kind: 'action',
-        content: `(Sistema: l'utente ha aperto Aiuto col tasto destro sulla scheda «${ctxTitle}» (${ctxUrl}). Aspetta la sua domanda sulla scheda.)`,
+        // #593 — titolo e indirizzo della scheda li scrive il sito: la nota
+        // dice cosa ha fatto l'utente (quella è la voce di Filo), la scheda va
+        // nella busta. Prima entravano fra virgolette dentro «(Sistema: …)»,
+        // cioè nel canale che le istruzioni presentano come fidato.
+        content: PROMPTS.turnoAutomaticoAiuto({
+          nota: 'l\'utente ha aperto Aiuto col tasto destro sulla scheda descritta qui sotto. Aspetta la sua domanda sulla scheda',
+          dati: { elementoPagina: { etichetta: ctxTitle, selettore: ctxUrl } },
+          perCronologia: true,
+        }),
       });
     }
     root = document.createElement('div');
@@ -1069,7 +1077,14 @@
 
       // Aggiorna la storia AI
       if (userAction && !userMessage) {
-        history.push({ role: 'user', content: testoDiSistema(userAction, esterno), kind: 'action' });
+        history.push({
+          role: 'user',
+          // Stessa funzione che compone il messaggio in partenza (#593): qui
+          // cambia solo la coda, perché la cronologia non deve ripetere a ogni
+          // turno l'invito a valutare screenshot e outline.
+          content: PROMPTS.turnoAutomaticoAiuto({ nota: userAction, dati: esterno, perCronologia: true }),
+          kind: 'action',
+        });
       }
       history.push({ role: 'assistant', content: parsed.display || res.text });
 
