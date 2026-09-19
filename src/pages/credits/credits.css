@@ -191,6 +191,20 @@
 .sn-wallet-usage-detail h4 { margin: 0 0 4px; font-size: 13px; color: var(--sn-muted); font-weight: 600; }
 .sn-wallet-usage-detail ul { list-style: none; margin: 0; padding: 0; }
 .sn-wallet-usage-detail li { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
+
+/* La scheda di una persona (#652): blocchi affiancati finché c'è spazio, in
+   colonna quando la finestra si stringe. */
+.sn-wallet-scheda { display: flex; flex-wrap: wrap; gap: 18px 32px; align-items: flex-start; }
+.sn-wallet-scheda-blocco { flex: 1 1 260px; min-width: 240px; }
+.sn-wallet-scheda-blocco h4 { margin: 0 0 4px; font-size: 13px; color: var(--sn-muted); font-weight: 600; }
+.sn-wallet-scheda-elenco { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.sn-wallet-scheda-elenco li { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
+.sn-wallet-scheda-attesa { margin: 6px 0 0; font-size: 13px; }
+.sn-wallet-chiamate { font-size: 12px; }
+.sn-wallet-chiamate th, .sn-wallet-chiamate td { padding: 3px 8px; }
+.sn-wallet-scheda .sn-wallet-invites { gap: 10px; }
+.sn-wallet-scheda .sn-wallet-invite-link { font-size: 12px; }
+.sn-wallet-scheda .sn-wallet-code { font-size: 13px; }
 #resetIdentityBtn { margin-top: 8px; }
 
 /* La chiave OpenRouter propria (#629). Il campo ha la stessa riga del codice
