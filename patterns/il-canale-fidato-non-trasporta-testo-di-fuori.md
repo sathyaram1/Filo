@@ -139,3 +139,44 @@ aprono un indirizzo) e i titoli delle schede aperte in `FILO STATE`
 (`src/shared/filoState.js`). Sentinella:
 `tests/chat-filo-contenuto-esterno.spec.mjs`, che per ognuno dei tre asserisce
 le due cose insieme, che il dato arriva e che arriva dentro la recinzione.
+
+## Una recinzione non è un elenco di parentesi: è l'unica che c'è
+
+Terzo giro di verifica del #593. Restavano aperte tre porte, tutte della
+stessa forma: un contenuto scritto da altri dentro una cornice fatta di testo
+normale, che il contenuto stesso sapeva riscrivere.
+
+Un documento letto dal disco arrivava all'assistente della nuova scheda fra
+`[Contenuto del documento "…"]` e `[Fine del documento. È testo scritto da
+altri…]`. La seconda riga è testo: un PDF che la contiene chiude la propria
+cornice, e quello che scrive dopo ha la forma delle cose che dice Filo. Lo
+stesso per quello che un comando stampa (`curl`, `cat` di un file appena
+scaricato). Il classificatore che decide perché una pagina non si vede aveva
+una recinzione sua, scritta a mano, con le stesse parentesi angolari della
+porta unica ma senza nessuna pulizia: la pagina scriveva `<<<FINE PAGINA>>>` e
+proseguiva fuori, dettando l'etichetta che fa riaprire la scheda attraverso il
+proxy. La pulizia delle schede mandava titolo, indirizzo ed estratto nudi,
+nello stesso messaggio che porta le istruzioni vere dell'utente.
+
+Tre regole, tutte generali.
+
+**Una recinzione scritta a mano è una recinzione finta.** Non conta che le
+parentesi si somiglino: quello che tiene è la pulizia del contenuto, e quella
+sta in un posto solo. Se in un file compare una marcatura scritta a mano, è
+già divergente.
+
+**Non enumerare le fonti esterne in un elenco chiuso.** Le istruzioni
+dell'assistente ne nominavano tre, e il documento e l'output di un comando non
+c'erano: un elenco che ne nomina tre su cinque insegna al modello che le altre
+due sono roba di Filo. La regola si scrive al contrario, «tutto quello che non
+ho scritto io o l'utente arriva fra due marcature», e gli esempi restano
+esempi.
+
+**Il ripiego silenzioso è la porta che resta.** Un solo punto, i titoli delle
+schede, proseguiva senza busta se il modulo non era caricato, mentre tutti gli
+altri si fermano con un errore. Dove il contenuto esterno è in gioco, si sceglie
+di fermarsi.
+
+Sentinelle: `tests/chat-filo-contenuto-esterno.spec.mjs` (documento, comando,
+pulizia delle schede) e `tests/unit/geoBlockClassifier.test.mjs` (la pagina non
+chiude la recinzione in cui sta).
