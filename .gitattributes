@@ -23,6 +23,14 @@
 # lavoro nasce con gli stessi byte su tutte e tre le piattaforme. `text=auto`
 # normalizza a LF anche cio' che viene committato da Windows.
 #
+# Attenzione: questa regola vale AL CHECKOUT, quindi su un clone nuovo. Una
+# copia di lavoro che esiste gia' resta storta com'e' (una fusione riscrive solo
+# i file che cambiano), e ne' `git checkout -- .` ne' `git add --renormalize .`
+# la raddrizzano: provate tutte e due. Si rimette a posto cosi', o riclonando:
+#
+#   git rm --cached -r .   # toglie tutto dall'indice, non dal disco
+#   git reset --hard       # ATTENZIONE: butta le modifiche non committate
+#
 # In questo repo NESSUN file ha bisogno di CRLF: non ci sono .bat ne' .cmd (gli
 # unici formati che lo pretendono davvero). Se un giorno ce ne fosse uno, va
 # aggiunto qui con `eol=crlf`, non tolta la regola generale.
