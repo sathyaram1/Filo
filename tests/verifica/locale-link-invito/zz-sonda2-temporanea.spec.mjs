@@ -87,12 +87,33 @@ test('sonda 2: la chiave personale arriva davvero alle impostazioni effettive?',
   });
   console.log('SONDA2 home:', JSON.stringify(testoHome));
 
-  const s = await app.evaluate(async () => {
-    const eff = {};
-    eff.globals = Object.keys(globalThis).filter((k) => /^SN_/.test(k)).join(',');
-    try { eff.personale = globalThis.SN_WALLET_MAIN ? Object.keys(globalThis.SN_WALLET_MAIN).join(',') : '(assente)'; } catch (e) { eff.personale = 'ERR'; }
-    return eff;
+  // Controllo: con una chiave scritta a mano nelle impostazioni, l'accoglienza
+  // parte? Se sì, il meccanismo funziona e a non accenderlo è la chiave che
+  // arriva dall'invito.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: {
+        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_LESSON]: 'deepseek-flash',
+        [C.ACTIONS.FILO_COMPACT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
+      },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
   });
+  await home.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 12000));
+  const dopoChiave = await home.evaluate(() => ({
+    stato: document.body.dataset.state,
+    bolle: document.querySelectorAll('.dash-bubble-filo').length,
+    prima: (document.querySelector('.dash-bubble-filo')?.innerText || '').slice(0, 80),
+  }));
+  console.log('SONDA2 con chiave a mano:', JSON.stringify(dopoChiave));
+
+  const s = await app.evaluate(async () => ({ ok: true }));
   console.log('SONDA2 main:', JSON.stringify(s));
   expect(true).toBe(true);
 });
