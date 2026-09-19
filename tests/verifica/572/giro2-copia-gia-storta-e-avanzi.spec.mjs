@@ -14,7 +14,7 @@
 
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
@@ -81,8 +81,14 @@ test('#572 giro 2 — una copia di lavoro già storta: il rosso dice una cura ch
   git([...comeGit, 'commit', '--quiet', '-m', 'arriva la correzione'], copia);
   expect(existsSync(join(copia, '.gitattributes')),
     'la correzione non è arrivata nella copia').toBe(true);
-  expect(git(['status', '--porcelain'], copia).trim(),
-    'la copia non è in uno stato pulito: git la vede già sporca e la prova non vale').toBe('');
+  // È qui la trappola: per git i file di testo storti non risultano nemmeno
+  // modificati (li normalizza prima di confrontarli), quindi non c'è niente
+  // che dica a chi guarda che la sua copia è da buttare. Si muovono solo i
+  // binari, che una conversione l'avevano subita davvero.
+  const sporchi = git(['status', '--porcelain'], copia).split('\n')
+    .map((r) => r.slice(3).trim()).filter(Boolean).filter(diTesto);
+  expect(sporchi, 'git segnala da sé i file di testo storti: la prova non è il caso vero')
+    .toEqual([]);
   expect(conRitornoCarrello(copia).length,
     'la copia si è raddrizzata da sola prendendo la correzione: non è il caso da provare')
     .toBeGreaterThan(100);
