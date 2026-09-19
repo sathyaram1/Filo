@@ -1324,16 +1324,22 @@
     // Anche la query sta dentro la busta: la scrive il modello, ma spesso
     // ricopiando qualcosa che ha letto sulla pagina.
     ricercaWebImbustata: ({ query = '', provider = '', results = [] } = {}) => {
+      // Ogni campo è UNA riga, e ci resta: titolo, indirizzo e riassunto li
+      // scrive il proprietario della pagina trovata, e un a capo dentro un
+      // riassunto serve solo a far sembrare una riga di dati l'inizio di
+      // qualcos'altro. La recinzione la tiene la marcatura, ma la lista deve
+      // restare leggibile come lista.
+      const riga = (v) => esterno().neutralizza(v, { unaRiga: true });
       const righe = [
-        `Richiesta di ricerca: "${query}"`,
-        `Motore: ${provider || 'non dichiarato'}`,
+        `Richiesta di ricerca: "${riga(query)}"`,
+        `Motore: ${riga(provider) || 'non dichiarato'}`,
         '',
       ];
       for (let i = 0; i < results.length; i++) {
         const r = results[i] || {};
-        righe.push(`${i + 1}. ${r.title || '(senza titolo)'}`);
-        righe.push(`   ${r.url || '(senza indirizzo)'}`);
-        if (r.snippet) righe.push(`   ${r.snippet}`);
+        righe.push(`${i + 1}. ${riga(r.title) || '(senza titolo)'}`);
+        righe.push(`   ${riga(r.url) || '(senza indirizzo)'}`);
+        if (r.snippet) righe.push(`   ${riga(r.snippet)}`);
       }
       return esterno().imbusta({
         tipo: 'RICERCA_WEB',

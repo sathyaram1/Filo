@@ -100,7 +100,7 @@
         // cioè nel canale che le istruzioni presentano come fidato.
         content: PROMPTS.turnoAutomaticoAiuto({
           nota: 'l\'utente ha aperto Aiuto col tasto destro sulla scheda descritta qui sotto. Aspetta la sua domanda sulla scheda',
-          dati: { elementoPagina: { etichetta: ctxTitle, selettore: ctxUrl } },
+          dati: { scheda: { titolo: ctxTitle, url: ctxUrl } },
           perCronologia: true,
         }),
       });

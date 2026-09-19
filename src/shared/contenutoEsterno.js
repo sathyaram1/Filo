@@ -126,7 +126,7 @@
   // zero, marcatori di direzione del testo, il BOM. Servono solo a spezzare
   // una parola che qualcuno sta cercando — per esempio il nome di una
   // marcatura.
-  const INVISIBILI_RE = /[​-‏‪-‮⁠-⁤⁪-⁯﻿]/g;
+  const INVISIBILI_RE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u206A-\u206F\uFEFF]/g;
 
   // I nomi delle marcature, tutti, in un'alternativa sola. Con il `FINE_`
   // davanti o senza: `FINE_RICERCA_WEB` contiene già `RICERCA_WEB`, quindi
@@ -138,7 +138,7 @@
   // qualcuno, quando torna dal modello, deve poter essere ritrovato identico
   // (il correttore semantico ci ripesca dentro le porzioni segnate). Con il
   // trattino basso il nome non è più una parola di nessuna lingua.
-  const NOMI_RE = new RegExp(`\\b(?:${Object.keys(TIPI).join('|')})\\b`, 'gi');
+  const NOMI_RE = new RegExp(`\\b(?:FINE_)?(?:${Object.keys(TIPI).join('|')})\\b`, 'gi');
 
   // Ripulisce un testo esterno di tutto ciò che, dentro un prompt, servirebbe
   // solo a fingersi la struttura del prompt.
@@ -156,13 +156,13 @@
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
       .replace(INVISIBILI_RE, '');
     if (unaRiga) {
-      s = s.replace(/[\t\r\n  ]+/g, ' ')
+      s = s.replace(/[\t\r\n\u2028\u2029]+/g, ' ')
         // In un campo due parentesi angolari di fila non servono a niente di
         // legittimo: si schiacciano, come faceva già la pulizia dei percorsi.
         .replace(/<{2,}/g, '<')
         .replace(/>{2,}/g, '>');
     } else {
-      s = s.replace(/[  ]/g, '\n')
+      s = s.replace(/[\u2028\u2029]/g, '\n')
         // In un blocco `<<` può essere codice vero (l'operatore di scorrimento
         // in C++, un heredoc di shell): si schiacciano solo le sequenze da tre
         // in su, cioè quelle che possono comporre una marcatura. `<<<X>>>`
