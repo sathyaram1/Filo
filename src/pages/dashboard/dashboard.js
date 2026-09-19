@@ -3203,8 +3203,14 @@
   // crediti arrivano senza che tu chieda niente, e mentre guardi la home: il
   // main spinge l'avviso appena il riscatto è andato, e la home lo racconta
   // una volta sola (il segno «già visto» lo tiene il main).
+  // Lo stesso avviso non si racconta due volte: adesso arriva da due strade
+  // (la spinta del main e la domanda all'apertura) e possono incrociarsi.
+  let avvisoInvitoMostrato = '';
   async function showInviteWelcome(n) {
     if (!n || !n.text || !window.SN_CONFIRM_UI?.notify) return false;
+    const firma = `${n.kind || ''}|${n.text}`;
+    if (firma === avvisoInvitoMostrato) return false;
+    avvisoInvitoMostrato = firma;
     try { await send({ type: MSG.WALLET_NOTICE_SEEN, where: 'home' }); } catch (_) {}
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
