@@ -96,6 +96,33 @@ test('se la scheda di una persona non arriva, lo dice a parole e si può riprova
   }
 });
 
+test('col server giù il «Riprova» in cima rimette in piedi la pagina quando torna', async () => {
+  test.setTimeout(240_000);
+  const filo = await ownerPronto();
+  try {
+    server.flags.walletDown = true;
+    const page = await apriOwner(filo);
+    const riprova = page.locator('#ownerTotals button', { hasText: /riprova/i });
+    await expect(riprova).toBeVisible({ timeout: 20_000 });
+    // Finché il server è giù non c'è niente da toccare: nessuna manopola
+    // orfana del suo titolo.
+    expect(await page.locator('#ownerKnobs input').count()).toBe(0);
+    await expect(page.locator('#ownerKnobsTitle')).toBeHidden();
+
+    // Tornato il server, il tasto basta: né ricarica né riapertura.
+    server.flags.walletDown = false;
+    await riprova.click();
+    await expect.poll(() => page.inputValue('#knob-dailyCredits').catch(() => null), { timeout: 30_000 }).toBe('100');
+    await expect(page.locator('#ownerKnobsTitle')).toBeVisible();
+    // E da lì in poi si salva davvero.
+    await page.fill('#knob-dailyCredits', '250');
+    await page.click('#knob-dailyCredits-salva');
+    await expect.poll(async () => (await server.configEffettiva()).dailyCredits, { timeout: 20_000 }).toBe(250);
+  } finally {
+    try { await filo.app.close(); } catch (_) {}
+  }
+});
+
 test('un pseudonimo che non esiste non è un guasto: lo dice in italiano', async () => {
   test.setTimeout(240_000);
   const filo = await ownerPronto();
