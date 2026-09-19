@@ -48,18 +48,28 @@ const SCHEDA = {
 
 // Sostituisce fetch nella pagina registrando ogni URL: quello che conta non è
 // solo cosa si vede, ma COSA SI CHIEDE al server.
+//
+// Il finto server RISPONDE COME QUELLO VERO a una lettura paginata: la prima
+// pagina porta le schede, e a chi torna col cursore (`startAt`, il nome del
+// documento da cui ripartire) dice che non c'è altro — una risposta senza
+// documenti, la forma che manda Firestore quando la raccolta è finita. Un
+// finto server che ripete all'infinito la stessa pagina farebbe vedere la
+// stessa scheda tante volte quante sono le pagine chieste.
 async function spiaFetch(page, payload) {
   await page.evaluate((rows) => {
     window.__chieste = [];
     window.fetch = async (url, opts) => {
       // Con runQuery la collezione sta nel CORPO, non nell'indirizzo: guardare
       // solo l'URL non distinguerebbe una vista da una raccolta intera.
-      window.__chieste.push({ url: String(url), body: (opts && opts.body) ? String(opts.body) : '' });
+      const body = (opts && opts.body) ? String(opts.body) : '';
+      window.__chieste.push({ url: String(url), body });
+      // `readTime` senza `document`: la pagina vuota di Firestore.
+      const pagina = body.includes('"startAt"') ? [{ readTime: '2026-06-22T10:00:00Z' }] : rows;
       return {
         ok: true,
         status: 200,
-        json: async () => rows,
-        text: async () => JSON.stringify(rows),
+        json: async () => pagina,
+        text: async () => JSON.stringify(pagina),
       };
     };
   }, payload);
