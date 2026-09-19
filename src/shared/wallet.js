@@ -309,12 +309,30 @@
     return null;
   }
 
+  // Il blocco di otto caratteri dentro una riga incollata («Codice:
+  // ABCD-EFGH»). Si guardano TUTTI i blocchi, non solo il primo: un messaggio
+  // comincia con un saluto, e «Ciao Anna» è quattro più quattro: fermarsi lì
+  // vuol dire rifiutare un incollaggio giusto perché davanti al codice c'erano
+  // due parole corte (quarto giro di verifica del #651). Il primo blocco che è
+  // davvero un codice vince; se nessuno lo è, `null`.
+  const BLOCCO_OTTO = /(?<![A-Z0-9])([A-Z0-9]{4})[\s-]*([A-Z0-9]{4})(?![A-Z0-9])/g;
+  function codeBlockInText(raw) {
+    const s = String(raw == null ? '' : raw).toUpperCase();
+    BLOCCO_OTTO.lastIndex = 0;
+    let m;
+    while ((m = BLOCCO_OTTO.exec(s))) {
+      const c = normalizeCode(m[1] + m[2]);
+      if (c) { BLOCCO_OTTO.lastIndex = 0; return c; }
+    }
+    return null;
+  }
+
   // Quello che l'utente ha messo nel campo dell'invito → il codice, o `null`.
   // Prima si prova a leggerlo com'è (codice o link); poi si cerca un link
-  // d'invito dentro il testo; da ultimo il blocco di otto caratteri dentro la
-  // riga incollata («Codice: ABCD-EFGH»).
+  // d'invito dentro il testo; da ultimo un blocco di otto caratteri lungo la
+  // riga incollata.
   function codeFromInput(raw) {
-    return normalizeCode(raw) || codeFromLinkInText(raw) || normalizeCode(extractCode(raw));
+    return normalizeCode(raw) || codeFromLinkInText(raw) || codeBlockInText(raw);
   }
 
   // `filo://invito/<codice>` — il collegamento che porta un invito dentro
