@@ -399,6 +399,12 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
     }, null, { timeout: 15_000 });
     // La pagina prende davvero il tema chiesto.
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);
+    // Nello scatto ci deve stare anche quello che compare solo quando si usa
+    // la pagina: il pulsante «Rimetti com'era» e la scheda di una persona.
+    await page.fill('#knob-entryCredits', '6000');
+    await expect(page.locator('#knob-entryCredits-rimetti')).toBeVisible();
+    await page.locator('#ownerUsers tr.sn-wallet-user').click();
+    await expect(page.locator('#ownerUsers .sn-wallet-scheda')).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(300);
     await page.screenshot({ path: join(cartella, `owner-${tema}.png`), fullPage: true });
   }
