@@ -2658,7 +2658,21 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     appunti: filesList.length
       ? filesList.map((f) => `- [${f.id}] ${f.title}: ${f.summary}`).join('\n')
       : '(nessuno)',
-    salvati: saved.length ? saved.slice(0, 20).map((p) => `- ${p.title || p.url} (${p.url})`).join('\n') : '(nessuno)',
+    // #593 (secondo giro di verifica) — il titolo di una pagina salvata lo
+    // scrive il sito, non l'utente e non Filo: da qui escono il messaggio al
+    // centro della nuova scheda e dei bottoni che aprono un indirizzo, quindi
+    // un titolo che detta la frase o il bottone parla con la voce di Filo.
+    // Stessa busta dei risultati di ricerca, stessa pulizia: una riga per
+    // pagina, e la riga non la può forgiare chi scrive il titolo.
+    salvati: saved.length
+      ? globalThis.SN_ESTERNO.imbusta({
+        tipo: 'DATI_PAGINA',
+        conIntestazione: true,
+        testo: saved.slice(0, 20)
+          .map((p) => `- ${globalThis.SN_ESTERNO.neutralizza(p.title || p.url, { unaRiga: true })} (${globalThis.SN_ESTERNO.neutralizza(p.url, { unaRiga: true })})`)
+          .join('\n'),
+      })
+      : '(nessuno)',
     tabAperte: openTabsCount,
     momento,
   };
