@@ -37,6 +37,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { leggiTestoRepo, normalizzaFiniRiga } from '../helpers/testo.mjs';
@@ -161,6 +162,34 @@ test('il repo pretende LF da qualunque checkout (.gitattributes)', () => {
   assert.match(riga, /eol=lf/, `la regola c'è ma non fissa i fini riga: "${riga}"`);
 });
 
+// Le estensioni che NON sono testo. `text=auto` indovina guardando i primi
+// byte e su un PDF sbaglia: senza una riga che lo dichiari, il giorno in cui un
+// documento di prova contiene un `\r\n` quel byte viene riscritto al
+// salvataggio e il file arriva rotto a chi lo legge.
+const NON_TESTO = /\.(pdf|png|jpe?g|gif|ico|icns|dmg|zip|woff2?|ttf|otf|mp3|mp4|webm)$/i;
+
+test('i file che non sono testo sono DICHIARATI tali, non lasciati indovinare', () => {
+  let righe;
+  try {
+    righe = execFileSync('git', ['ls-files', '--eol'], { cwd: ROOT, encoding: 'utf8' });
+  } catch (_) {
+    return; // fuori da un deposito git non c'è niente da controllare
+  }
+  const indovinati = [];
+  for (const riga of normalizzaFiniRiga(righe).split('\n')) {
+    if (!riga.trim()) continue;
+    const [attributi, nome] = riga.split('\t');
+    if (!nome || !NON_TESTO.test(nome.trim())) continue;
+    if (!/(^|\s)attr\/(.*\s)?-text(\s|$)/.test(attributi)) indovinati.push(nome.trim());
+  }
+  assert.deepEqual(
+    indovinati,
+    [],
+    'questi file non sono testo ma nessuna riga di .gitattributes lo dice: `text=auto` lo indovina dai primi '
+    + 'byte, e su un PDF sbaglia — aggiungi `*.<estensione> -text`',
+  );
+});
+
 test('il lettore normalizza davvero CRLF e CR soli', () => {
   assert.equal(normalizzaFiniRiga('a\r\nb\r\n'), 'a\nb\n');
   assert.equal(normalizzaFiniRiga('a\rb'), 'a\nb'); // vecchio Mac
@@ -169,9 +198,15 @@ test('il lettore normalizza davvero CRLF e CR soli', () => {
   assert.ok(!leggiTestoRepo(join(ROOT, 'firestore.rules')).includes('\r'));
 });
 
-test('la rete sulle ricerche riconosce tutte e tre le forme che un CRLF rompe', () => {
-  // Taratura: senza questa prova la rete potrebbe non riconoscere più niente e
-  // la sentinella resterebbe verde per sempre. Sono le tre forme con cui il
+test('le due reti riconoscono le forme che un CRLF rompe, e lasciano stare le altre', () => {
+  // La lettura vale in tutte le forme che leggono davvero dal disco.
+  assert.ok(LETTURA_GREZZA.test("const r = readFileSync(PERCORSO, 'utf8');"));
+  assert.ok(LETTURA_GREZZA.test("const r = await readFile(PERCORSO, 'utf8');"));
+  assert.ok(LETTURA_GREZZA.test("const r = await fs.promises.readFile(PERCORSO, 'utf8');"));
+  assert.ok(!LETTURA_GREZZA.test('const r = leggiTestoRepo(PERCORSO);'));
+
+  // Taratura: senza questa prova le reti potrebbero non riconoscere più niente
+  // e la sentinella resterebbe verde per sempre. Sono le forme con cui il
   // difetto si è presentato davvero (#565 e #569).
   assert.deepEqual(ricercheFragili("RULES.indexOf('allow update: if\\n        isAdmin()')").length, 1);
   assert.deepEqual(ricercheFragili("RULES.replace('if\\n   isAdmin()', 'x')").length, 1);

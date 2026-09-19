@@ -3,8 +3,9 @@
 [← Tutti i pattern](../PATTERNS.md)
 
 **La regola.** Un file del repo che una sentinella legge e analizza si legge con
-`leggiTestoRepo()` (`tests/helpers/testo.mjs`), e non lo si cerca con una stringa
-che contiene un «a capo». I fini riga non li decide il repo: li decide il
+`leggiTestoRepo()` (`tests/helpers/testo.mjs`), e non ci si cerca dentro niente
+che un `\r` di troppo faccia sparire: un «a capo» in mezzo a una stringa o a una
+regex, un `$` di fine riga. I fini riga non li decide il repo: li decide il
 checkout della macchina che esegue i test.
 
 ## Il caso
@@ -73,6 +74,21 @@ tenuto in una variabile (`const RULES = join(ROOT, 'firestore.rules')`, e la
 lettura una riga più giù): con il solo confronto sulla riga della lettura
 bastava spostare il percorso per sparire.
 
+E vale la FORMA, non il nome. Le prime due reti sorvegliavano `readFileSync` e
+le stringhe passate a `indexOf` e compagnia: la stessa lettura scritta con
+`readFile` di `node:fs/promises`, e la stessa ricerca scritta come regex con un
+«a capo» dentro, come `replace`, o con un `$` di fine riga in modalità
+multiriga, passavano indisturbate — ed è esattamente la malattia di questa
+pagina, scritta con altre parole. Chiudere una porta per giro è il modo in cui
+questo difetto è già rientrato due volte. Quindi le reti guardano cosa il codice
+FA: legge un file del repo senza normalizzarlo, cerca una cosa che un `\r` fa
+sparire.
+
+Il confine è la prudenza contro il rumore: se prima dell'«a capo» c'è un
+quantificatore o una classe che il `\r` se lo mangia (`\s*`, `[\s\S]*?`, `\r?`)
+la ricerca regge e non viene segnalata. Una sentinella che accusa il codice sano
+la si spegne, e allora non protegge più niente.
+
 Le eccezioni esistono, e si scrivono sulla riga che le usa, non si tolgono in
 silenzio da un elenco di cartelle. Dove il testo del file viene solo passato a
 qualcun altro invece che analizzato — le regole date in pasto agli emulatori
@@ -86,9 +102,10 @@ cartella esclusa in silenzio no.
 - `tests/helpers/testo.mjs` — `leggiTestoRepo()` e `normalizzaFiniRiga()`.
 - `tests/unit/finiDiRiga.test.mjs` — la sentinella: pretende la riga in
   `.gitattributes`, prova che il lettore normalizzi davvero, e diventa rossa se
-  un test torna a leggere per conto suo un file che analizza, o se ci cerca
-  dentro una stringa con un «a capo» in mezzo. Guarda tutto `tests/`, a
-  qualunque profondità.
+  un test torna a leggere per conto suo un file che analizza — in qualunque
+  forma, sincrona o asincrona — o se ci cerca dentro una stringa o una regex con
+  un «a capo» in mezzo, o un `$` di fine riga in modalità multiriga. Guarda
+  tutto `tests/`, a qualunque profondità.
 - `tests/unit/verificaWindows.test.mjs` — tiene il lavoro su Windows allineato
   al cancello (stesso sistema, stessa versione di Node, stesso comando) e
   registra che gli unit test non aprono Filo, quindi non ne scaricano il

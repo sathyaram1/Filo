@@ -44,8 +44,17 @@
 # script che non parte. Dichiarato a parte perche' si legga senza dedurlo.
 *.sh text eol=lf
 
-# Binari: niente conversione, nemmeno per sbaglio. `text=auto` li riconosce da
-# solo, ma scriverlo evita che un file "quasi testo" ci finisca dentro.
+# I file che NON sono testo si DICHIARANO, non si lasciano indovinare:
+# `text=auto` decide dai primi byte e su un PDF sbaglia — oggi i due documenti
+# di prova del repo git li scambia per testo, e il giorno in cui uno contenesse
+# un CRLF quel byte verrebbe riscritto e il file arriverebbe rotto a chi legge.
 *.png binary
 *.ico binary
 *.pdf binary
+*.icns binary
+*.dmg binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
