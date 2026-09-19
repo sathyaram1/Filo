@@ -105,7 +105,11 @@ costano dieci riletture, in un turno solo una. Quindi:
   regex `\r` è già un fine riga. Conseguenze pratiche: non togliere quella
   regola; un NUL dentro un sorgente si scrive come escape (`\u0000`), perché il
   carattere vero fa considerare il file BINARIO a git e lo lascia fuori dalla
-  normalizzazione. La sentinella è `tests/unit/fineRigaLf.test.mjs`; il racconto
+  normalizzazione. La regola vale al CHECKOUT, quindi su un clone nuovo: una
+  cartella che esiste già e ha i file storti si raddrizza con `git rm --cached
+  -r .` seguito da `git reset --hard` (che butta le modifiche non committate),
+  oppure riclonando; `git checkout -- .` e `git add --renormalize .` non
+  bastano. La sentinella è `tests/unit/fineRigaLf.test.mjs`; il racconto
   sta in `patterns/la-fine-riga-la-decide-il-repo-non-la-macchina-che-clona.md`.
 
 ## Filo gira anche su Mac
