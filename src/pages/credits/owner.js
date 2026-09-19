@@ -302,6 +302,152 @@
     return wrap;
   }
 
+  // ── La scheda di una persona ───────────────────────────────────────────────
+  // Tutto quello che si può sapere di chi usa Filo con un portafoglio, senza
+  // mai un nome: saldo, quanto ha ricevuto e quanto ha speso, dove sono andati
+  // i crediti, i movimenti, chi l'ha invitata, i suoi inviti e le ultime
+  // chiamate che ha fatto. Si chiede alla prima apertura della riga.
+  const schedeChieste = new Set();
+
+  async function caricaScheda(u, td) {
+    if (schedeChieste.has(u.pseudonym)) return;
+    schedeChieste.add(u.pseudonym);
+    const attesa = document.createElement('p');
+    attesa.className = 'sn-muted sn-wallet-scheda-attesa';
+    attesa.textContent = 'Apro la scheda…';
+    td.appendChild(attesa);
+    const r = await chrome.runtime
+      .sendMessage({ type: MSG.WALLET_OWNER_USER_DETAIL, pseudonym: u.pseudonym })
+      .catch(() => null);
+    attesa.remove();
+    const d = r && r.ok && r.detail;
+    if (!d || d.found === false) {
+      // Riprovabile: la prossima apertura la richiede.
+      schedeChieste.delete(u.pseudonym);
+      const err = document.createElement('p');
+      err.className = 'sn-wallet-msg is-error';
+      err.textContent = d && d.found === false
+        ? 'Questa persona non risulta più al server.'
+        : `Scheda non arrivata${r && r.error ? ` (${r.error})` : ''}. Richiudi e riapri per riprovare.`;
+      td.appendChild(err);
+      return;
+    }
+    td.innerHTML = '';
+    td.appendChild(schedaPersona(u, d));
+  }
+
+  function bloccoScheda(titolo, corpo) {
+    const box = document.createElement('div');
+    box.className = 'sn-wallet-scheda-blocco';
+    const h = document.createElement('h4');
+    h.textContent = titolo;
+    box.append(h, corpo);
+    return box;
+  }
+
+  function elencoSemplice(voci, vuoto) {
+    if (!voci.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = vuoto;
+      return p;
+    }
+    const ul = document.createElement('ul');
+    ul.className = 'sn-wallet-scheda-elenco';
+    for (const [sinistra, destra] of voci) {
+      const li = document.createElement('li');
+      const a = document.createElement('span'); a.textContent = sinistra;
+      const b = document.createElement('span'); b.textContent = destra;
+      li.append(a, b);
+      ul.appendChild(li);
+    }
+    return ul;
+  }
+
+  function schedaPersona(u, d) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-wallet-scheda';
+
+    const b = d.balance || u.balance || {};
+    const rec = d.reconcile || u.reconcile;
+    const invitata = (d.invitedBy || u.invitedBy) === 'owner' ? 'te' : (d.invitedBy || u.invitedBy || 'nessuno');
+    wrap.appendChild(bloccoScheda('In due parole', elencoSemplice([
+      ['Saldo', `${formatCredits(b.credits)} crediti`],
+      ['Ricevuti in tutto', `${formatInt(b.creditsGranted)} crediti`],
+      ['Speso', fmtUsd(b.usageUsd)],
+      ['Tetto della sua chiave', fmtUsd(b.limitUsd)],
+      ['Riconciliazione', !rec ? 'mai fatta' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'torna')],
+      ['Invitata da', invitata],
+      ['Con Filo dal', formatDate(d.createdAt || u.createdAt) || '—'],
+    ], '')));
+
+    wrap.appendChild(bloccoScheda('Dove sono andati i crediti', usageDetail(d.usage || u.usage)));
+
+    // I movimenti: da dove vengono i crediti che ha ricevuto. È qui che si
+    // vedono i premi per le segnalazioni.
+    const movimenti = (d.grants || []).slice().reverse().slice(0, 50)
+      .map((g) => [`${W.grantLabel(g.why)} · ${formatDate(g.at)}`, `+${formatInt(g.credits)}`]);
+    wrap.appendChild(bloccoScheda('Movimenti', elencoSemplice(movimenti, 'Nessun movimento.')));
+
+    // I suoi inviti, con chi è entrato: stessa forma dei propri codici.
+    const suoi = d.invites || [];
+    const boxInviti = document.createElement('div');
+    if (!suoi.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Non ha inviti da dare.';
+      boxInviti.appendChild(p);
+    } else {
+      const ul = document.createElement('ul');
+      ul.className = 'sn-wallet-invites';
+      for (const inv of suoi) ul.appendChild(inviteItem(inv, inv && inv.createdAt));
+      boxInviti.appendChild(ul);
+    }
+    wrap.appendChild(bloccoScheda('I suoi inviti', boxInviti));
+
+    wrap.appendChild(bloccoScheda('Ultime chiamate', tabellaChiamate(d.rows || [])));
+    return wrap;
+  }
+
+  function tabellaChiamate(rows) {
+    if (!rows.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessuna chiamata registrata.';
+      return p;
+    }
+    const tabella = document.createElement('table');
+    tabella.className = 'sn-wallet-table sn-wallet-chiamate';
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    for (const t of ['Quando', 'Per cosa', 'Modello', 'Chi ha servito', 'Costo']) {
+      const th = document.createElement('th');
+      th.textContent = t;
+      trh.appendChild(th);
+    }
+    thead.appendChild(trh);
+    const tbody = document.createElement('tbody');
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      const celle = [
+        formatDateTime(r.at) || '—',
+        r.action || '—',
+        r.model || '—',
+        r.servedBy || 'non detto',
+        fmtUsd(r.costUsd),
+      ];
+      celle.forEach((c) => {
+        const td = document.createElement('td');
+        td.textContent = c;
+        tr.appendChild(td);
+      });
+      tr.title = `${formatInt(r.promptTokens)} token in, ${formatInt(r.completionTokens)} fuori · ${formatCredits(r.credits)} crediti`;
+      tbody.appendChild(tr);
+    }
+    tabella.append(thead, tbody);
+    return tabella;
+  }
+
   // Un invito si dà come LINK (#651), qui come nella pagina Crediti: è da
   // questa pagina che escono i codici per i primi invitati, e un invito da tre
   // posti con uno occupato è ancora da dare. Un invito «usato» e basta faceva
