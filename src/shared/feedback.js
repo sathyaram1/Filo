@@ -732,6 +732,7 @@
       delete doc.fields.subSeq;
       delete doc.fields.parentId;
       delete doc.fields.clientIdHash; // S1.F2.2: rules vecchie potrebbero rifiutarlo
+      delete doc.fields.walletPseudonym; // #652: idem, finché le regole non sono deployate
       seq = null;
       res = await fetch(endpoint, {
         method: 'POST',
