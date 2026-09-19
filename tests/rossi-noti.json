@@ -62,6 +62,36 @@
         "caso": "renderer crashato: pagina d'errore \"scheda bloccata\" invece del bianco",
         "perche": "la prova ammazza il renderer della scheda e aspetta la pagina d'errore interna, che nel contenitore non compare entro 20 secondi. Solo Linux senza sandbox (ELECTRON_DISABLE_SANDBOX=1, xvfb): identico in due corse della suite in GitHub (35088361658 e 35101566321, tre tentativi ciascuna, 1,4 minuti l'uno), mentre le due sorelle dello stesso spec (dominio inesistente, server giù poi su) sono verdi e su Windows la prova è verde. Dopo ognuno dei tre tentativi il worker non riesce a chiudere l'app entro 60 secondi («Worker teardown timeout», tre volte, sempre con questo caso come ultimo): l'app resta appesa dopo il crash forzato. Ipotesi: senza sandbox la view ricreata dopo il crash (src/main/tabs.js, render-process-gone → _recreateView) muore di nuovo e l'anti-loop a 2 secondi ferma i tentativi, lasciando la scheda bianca. Non confermato: il trace del secondo tentativo porta solo i passi del runner, non lo stderr dell'app dove il main scrive render-process-gone. Da riprodurre nel contenitore leggendo lo stderr dell'app, poi correggere e togliere la voce.",
         "feedback": "da aprire: rossi del contenitore GitHub Actions (corse della suite #35088361658 e #35101566321)"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-manopole",
+        "caso": [
+          "le sette manopole nascono col valore in vigore, si salvano, e il server ubbidisce",
+          "un numero storto non arriva al server, e lo dice con parole di Filo",
+          "il tetto dei crediti elargibili ferma OGNI strada: ingresso, quota, regalo e premi"
+        ],
+        "perche": "stesso motivo di tests/wallet-owner-page: le prove del giro di verifica sulla pagina dell'owner dei crediti fingono di essere l'owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c'è, l'owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo. Queste prove la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-persone",
+        "caso": [
+          "i numeri che il server calcola si leggono in cima, e i crediti vivi scendono con la spesa",
+          "la riga di una persona apre la sua scheda di spesa, col clic e con la tastiera",
+          "manopole, numeri e scheda si leggono in tema chiaro e in tema scuro"
+        ],
+        "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-porte",
+        "caso": [
+          "gli inviti per persona sono una manopola: a zero chi entra non riceve codici",
+          "un nome ostile nel campo del regalo resta testo, e non diventa parte della pagina",
+          "col server giù la pagina lo dice, invece di restare muta"
+        ],
+        "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è. La quarta prova dello stesso spec (chi non è l'owner) non finge nessuna sessione e nel contenitore è verde: per questo non è elencata.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
       }
     ]
   },
