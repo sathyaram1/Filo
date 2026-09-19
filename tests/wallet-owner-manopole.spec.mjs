@@ -96,6 +96,9 @@ test.beforeAll(async () => {
       if (url.includes('/databases/(default)/documents/')) {
         const doc = url.split('/databases/(default)/documents/')[1];
         if (doc === 'config/credits') {
+          if (req.method === 'PATCH' && rifiutaPatch) {
+            return json(res, 403, { error: { code: 403, message: 'Missing or insufficient permissions.', status: 'PERMISSION_DENIED' } });
+          }
           if (req.method === 'PATCH') {
             const mask = [...new URL(req.url, 'http://x').searchParams.getAll('updateMask.fieldPaths')];
             const valori = fsRead(body.fields);
