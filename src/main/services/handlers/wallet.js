@@ -365,6 +365,17 @@ module.exports = function register(on, ctx) {
     return r;
   }
 
+  // Quale superficie non l'ha ancora visto. `where` è la stessa parola di
+  // WALLET_NOTICE_SEEN: chi l'ha già mostrato non se lo ritrova addosso alla
+  // prossima apertura.
+  on(MSG.WALLET_NOTICE_PENDING, filoOnly(async (msg) => {
+    const where = String((msg && msg.where) || '');
+    if (where !== 'home' && where !== 'credits') return { ok: false, error: 'bad_where' };
+    const r = await readNotice();
+    const visto = where === 'home' ? r && r.seenHome : r && r.seenCredits;
+    return { ok: true, notice: r && !visto ? { kind: r.kind, text: r.text } : null };
+  }));
+
   on(MSG.WALLET_NOTICE_SEEN, filoOnly(async (msg) => {
     const where = String((msg && msg.where) || '');
     let r = null;
