@@ -300,11 +300,28 @@ test('con un portafoglio i movimenti sono quelli del server, col più recente in
   await expect(page.locator('#balance')).toHaveText('4.990', { timeout: 15000 });
 
   const moves = page.locator('#moves li');
-  await expect(moves).toHaveCount(3, { timeout: 15000 });
-  // Più recenti in cima, col motivo scritto in italiano.
+  await expect(moves).toHaveCount(5, { timeout: 15000 });
+
+  // I cinque motivi, ciascuno con la sua frase, nell'ordine in cui il server
+  // li manda: dal più recente.
   await expect(moves.nth(0)).toContainText('Segnalazione risolta');
   await expect(moves.nth(0)).toContainText('+50');
-  await expect(moves.nth(1)).toContainText('Quota del giorno');
-  await expect(moves.nth(2)).toContainText('Invito riscattato');
-  await expect(moves.nth(2)).toContainText('+5.000');
+  await expect(moves.nth(1)).toContainText('Segnalazione inviata');
+  await expect(moves.nth(1)).toContainText('+10');
+  await expect(moves.nth(2)).toContainText('Regalo di Filo');
+  await expect(moves.nth(2)).toContainText('+300');
+  await expect(moves.nth(3)).toContainText('Quota del giorno');
+  await expect(moves.nth(3)).toContainText('+100');
+  await expect(moves.nth(4)).toContainText('Invito riscattato');
+  await expect(moves.nth(4)).toContainText('+5.000');
+
+  // L'ordine, detto senza passare dalle frasi: la data in cima è la più
+  // recente e quella in fondo la più vecchia.
+  const date = await moves.locator('.sn-credits-move-date').allTextContents();
+  expect(date[0]).toBe('12 set');
+  expect(date[date.length - 1]).toBe('8 set');
+
+  // Nessuna etichetta del conteggio locale si è infilata qui in mezzo.
+  await expect(page.locator('#moves')).not.toContainText('Ricompensa');
+  await expect(page.locator('#moves')).not.toContainText('Voto in Bacheca');
 });
