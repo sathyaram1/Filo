@@ -102,8 +102,7 @@ async function buildMessages(action, payload) {
       viewport: payload.viewport, siteKnowledge, knownPaths,
     }) };
     const parts = [];
-    const userText = payload.userMessage
-      || (payload.userAction ? `(Sistema: ${payload.userAction}. Stato pagina aggiornato — valuta lo screenshot e l'outline correnti, poi indica il passo successivo o status:"done" se l'obiettivo è completato.)` : '');
+    const userText = payload.userMessage || testoDelTurnoAutomatico(payload);
     if (userText) parts.push({ type: 'text', text: userText });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
     const userMsg = parts.length === 1 && parts[0].type === 'text'
