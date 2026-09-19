@@ -129,13 +129,15 @@
   // modo di riprovare, come per gli errori in chat. E le manopole senza i
   // numeri del server non si possono disegnare: il titolo se ne va con loro,
   // invece di restare lì ad annunciare il nulla.
+  // Senza punto in fondo: chi la usa la infila dove serve («Non salvato: …»).
   function fraseGuasto(raw) {
     const t = String(raw || '');
-    if (/not_admin/i.test(t)) return 'Questo computer non ti riconosce come proprietario: rientra col tuo account.';
-    if (/sessione scaduta/i.test(t)) return 'La sessione è scaduta: rifai l’accesso.';
-    if (/PERMISSION_DENIED|\bnon autorizzat|\b40[13]\b/i.test(t)) return 'Il server non ha accettato la richiesta: rientra col tuo account e riprova.';
-    return 'Il server dei crediti non risponde.';
+    if (/not_admin/i.test(t)) return 'questo computer non ti riconosce come proprietario, rientra col tuo account';
+    if (/sessione scaduta/i.test(t)) return 'la sessione è scaduta, rifai l’accesso';
+    if (/PERMISSION_DENIED|non autorizzat|\b40[13]\b/i.test(t)) return 'il server non ha accettato la richiesta, rientra col tuo account e riprova';
+    return 'il server dei crediti non risponde';
   }
+  function conMaiuscola(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
   function mostraManopole(visibili) {
     $('ownerKnobsTitle').hidden = !visibili;
