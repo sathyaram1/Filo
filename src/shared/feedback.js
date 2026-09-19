@@ -702,6 +702,9 @@
     if (parentId) {
       doc.fields.parentId = toFsValue(String(parentId));
     }
+    if (walletPseudonym) {
+      doc.fields.walletPseudonym = toFsValue(walletPseudonym);
+    }
     // F4 — auto-feedback: id strutturale del gap di capacità (per dedup F5).
     // Solo per feedback auto (`clientId` inizia con 'auto:'), non per quelli utente.
     if (capabilityGapId && String(clientId || '').startsWith('auto:')) {
