@@ -753,8 +753,11 @@
     // o un percorso depositato sotto `localhost` tornerebbe a chiunque apra
     // l'Aiuto su una pagina locale (src/shared/paths.js → segmentoDominio).
     sitoCondivisibile,
-    FENCE_START,
-    FENCE_END,
+    // Le due marcature le decide SN_ESTERNO, che è l'unico a sapere come è
+    // fatta una busta. Qui sono due finestre su quella tabella, lette quando
+    // servono: nessuna copia da tenere allineata a mano.
+    get FENCE_START() { return esterno().marcature(TIPO_ESTERNO).inizio; },
+    get FENCE_END() { return esterno().marcature(TIPO_ESTERNO).fine; },
     LIMITI: { MAX_STEPS, MAX_SELECTOR_LEN, MAX_INTENT_LEN, MAX_DOMAIN_LEN, MAX_URL_LEN, KNOWN_PATHS_BUDGET_CHARS, MAX_PATH_CHARS },
     // Esposti per i test e per chi riusa i singoli pezzi.
     _internal: {
