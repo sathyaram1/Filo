@@ -1905,10 +1905,23 @@ function capabilityDetailsForPrompt(actions) {
 
 // Re-immissione dei RISULTATI di una CERCA_WEB eseguita in un turno precedente
 // (#368): l'agente vede titoli, URL e snippet REALI e può rispondere con link
-// veri (o aprirne uno con NAVIGA usando l'URL esatto). Sono DATI di sistema
-// affidabili, non istruzioni dell'utente.
+// veri (o aprirne uno con NAVIGA usando l'URL esatto).
+//
+// #593 (secondo giro di verifica) — NON SONO DATI DI SISTEMA, e per un po' sono
+// stati trattati come tali. Titolo, indirizzo e riassunto li scrive chi possiede
+// la pagina trovata, e comparire fra i primi risultati per una query non è
+// difficile; la ricerca, senza chiave, passa dal motore pubblico. Arrivavano
+// nudi, sotto una riga che l'assistente legge come una comunicazione di Filo:
+// la stessa falla del feedback, sull'agente della nuova scheda invece che
+// sull'Aiuto — e questo ha in mano gli strumenti grossi (apre siti, cambia
+// impostazioni, chiede di eseguire comandi). Adesso passano dalla stessa busta
+// dell'Aiuto: `SN_CONST.PROMPTS.ricercaWebImbustata`, cioè intestazione che li
+// dichiara dati, due marcature e la pulizia che impedisce al contenuto di
+// scriversele da sé. Una funzione sola per i due agenti: due composizioni a
+// mano divergerebbero in silenzio, che è esattamente com'era nata questa.
 function webSearchResultsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
   const blocks = [];
   for (const a of actions) {
     if (!a || String(a.type || '').toUpperCase() !== 'CERCA_WEB') continue;
@@ -1917,17 +1930,14 @@ function webSearchResultsForPrompt(actions) {
     const query = String(out.search || a.query || '').trim();
     const results = Array.isArray(out.results) ? out.results : [];
     if (!results.length) {
+      // Anche qui niente testo di fuori nella riga di Filo: il motivo può
+      // essere il corpo della risposta di un servizio remoto, e la query la
+      // scrive il modello ricopiando spesso qualcosa che ha letto.
       const why = out.error || out.reason || 'nessun risultato';
-      blocks.push(`[Ricerca web "${query}" — nessun risultato (${why})]`);
+      blocks.push(`[Ricerca web "${E.perCanaleSistema(query)}": nessun risultato (${E.perCanaleSistema(why)})]`);
       continue;
     }
-    const lines = results.map((r, i) => {
-      const title = String(r.title || r.url || '').trim();
-      const url = String(r.url || '').trim();
-      const snippet = String(r.snippet || '').trim();
-      return `${i + 1}. ${title}\n   ${url}${snippet ? `\n   ${snippet}` : ''}`;
-    });
-    blocks.push(`[Risultati della ricerca web "${query}"]\n${lines.join('\n')}`);
+    blocks.push(PROMPTS.ricercaWebImbustata({ query, provider: out.provider || '', results }));
   }
   return blocks.join('\n\n').trim();
 }
