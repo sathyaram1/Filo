@@ -62,3 +62,21 @@ test('senza limiti dichiarati si controlla solo che sia un intero', () => {
   assert.deepEqual(C.leggi('-500', { intero: true }), { ok: true, valore: -500 });
   assert.equal(C.leggi('0,5', {}).motivo, C.MOTIVI.NON_INTERO, 'l’intero è la regola di default');
 });
+
+test('un campo numerico con dentro del testo dice «ci vuole un numero», non «scrivi un numero»', () => {
+  // Un <input type="number"> con dentro «ciao» risponde value === '': letto
+  // così sembrerebbe vuoto, e la frase manderebbe a scrivere qualcosa che c'è
+  // già. Il browser lo dice in validity.badInput.
+  const storto = { value: '', validity: { badInput: true } };
+  const esito = C.controllaCampo(storto, CREDITI);
+  assert.equal(esito.ok, false);
+  assert.equal(esito.motivo, C.MOTIVI.NON_NUMERO);
+  assert.equal(esito.testo, 'Crediti al giorno: ci vuole un numero.');
+
+  const vuoto = { value: '', validity: { badInput: false } };
+  assert.equal(C.controllaCampo(vuoto, CREDITI).motivo, C.MOTIVI.VUOTO);
+  assert.deepEqual(C.controllaCampo({ value: '12', validity: { badInput: false } }, CREDITI), { ok: true, valore: 12 });
+  // Un campo senza `validity` (non tutti i browser lo mettono su tutto) non
+  // deve far esplodere il controllo.
+  assert.deepEqual(C.controllaCampo({ value: '3' }, CREDITI), { ok: true, valore: 3 });
+});

@@ -144,7 +144,13 @@
 /* Le sette manopole (#652). Una colonna di righe: nome, campo coi due
    pulsanti, esito sotto. «Rimetti com'era» compare solo quando c'è qualcosa da
    rimettere, così la riga a riposo è pulita. */
-.sn-manopole { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+/* Sette righe in colonna lasciavano vuoti due terzi di finestra e spingevano
+   la tabella degli utenti sotto la piega: vanno in griglia, tante per riga
+   quante ce ne stanno. */
+.sn-manopole {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 14px 28px; margin-top: 10px;
+}
 .sn-manopola { display: flex; flex-direction: column; gap: 4px; }
 .sn-manopola > label { font-weight: 600; font-size: 14px; }
 .sn-manopola-riga { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

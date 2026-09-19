@@ -16,6 +16,8 @@
 // Firestore è scritto nel codice.
 
 import { createServer } from 'node:http';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
@@ -253,10 +255,11 @@ test('le sette manopole si salvano davvero, un numero storto non arriva al serve
   await expect(msg).toHaveText('Crediti al giorno: un numero intero, senza virgola.');
   expect(patch.length).toBe(0);
 
-  // Testo dentro un campo numerico: il campo risponde «vuoto» al codice, ma
-  // vuoto non è. La frase deve dire che ci vuole un numero.
+  // Un campo numerico con dentro qualcosa che numero non è («1e», mezzo
+  // esponente) risponde «vuoto» al codice, ma vuoto non è: la frase deve dire
+  // che ci vuole un numero, non mandare a scrivere qualcosa che c'è già.
   await page.fill('#knob-dailyCredits', '');
-  await page.locator('#knob-dailyCredits').pressSequentially('ciao');
+  await page.locator('#knob-dailyCredits').pressSequentially('1e');
   await page.click('#knob-dailyCredits-salva');
   await expect(msg).toHaveText('Crediti al giorno: ci vuole un numero.');
   expect(patch.length).toBe(0);
@@ -370,4 +373,33 @@ test('la riga di una persona apre la sua scheda: movimenti, suoi inviti e ultime
   await expect(scheda).toBeHidden();
   await page.keyboard.press('Enter');
   await expect(scheda).toBeVisible();
+});
+
+// Tema chiaro e tema scuro: le manopole e i riquadri dei numeri sono roba
+// nuova sulla pagina, e devono leggersi in tutti e due. Gli screenshot
+// finiscono in tests/.shots/ (non tracciati) e li guarda chi lavora.
+test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const cartella = join(process.cwd(), 'tests', '.shots', 'owner-manopole');
+  mkdirSync(cartella, { recursive: true });
+
+  const page = await apriOwner(app);
+  await page.setViewportSize({ width: 1200, height: 1000 }).catch(() => {});
+
+  for (const tema of ['light', 'dark']) {
+    await app.evaluate(async ({}, t) => {
+      const s = (await globalThis.__filoStorage.get('settings')).settings || {};
+      await globalThis.__filoStorage.set({ settings: { ...s, theme: t } });
+    }, tema);
+    await page.reload();
+    await page.waitForFunction(() => {
+      const s = document.getElementById('ownerSection');
+      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7;
+    }, null, { timeout: 15_000 });
+    // La pagina prende davvero il tema chiesto.
+    expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(cartella, `owner-${tema}.png`), fullPage: true });
+  }
 });
