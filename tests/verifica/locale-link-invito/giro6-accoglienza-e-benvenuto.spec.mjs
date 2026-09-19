@@ -153,13 +153,14 @@ test('entrato con l’invito, Filo si presenta', async ({ app, shell }) => {
   await expect.poll(() => siEPresentato(seconda), { timeout: 45000, intervals: [1000] }).toBe(true);
 });
 
-test('controllo: con una chiave scritta a mano Filo si presenta subito', async ({ app }) => {
+test('controllo: spenti i modelli predefiniti, Filo si presenta subito', async ({ app }) => {
   test.setTimeout(300000);
 
   const home = await giroDellInvitato(app);
 
-  // Stessa installazione, stesso invito appena riscattato: cambia solo che la
-  // chiave adesso è scritta nelle impostazioni come farebbe chi ne ha una sua.
+  // Stessa installazione, stesso invito appena riscattato. L'unica cosa che
+  // cambia è che i modelli non arrivano più dalla configurazione condivisa:
+  // basta questo perché Filo ritrovi la sua chiave e si presenti.
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
