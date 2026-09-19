@@ -172,6 +172,33 @@ test('col server irraggiungibile la bacheca lo dice a parole, e «Riprova» la r
   soloVetrina(dopo);
 });
 
+test('due clic di fila su «Riprova» non fanno partire due letture', async ({ openTab }) => {
+  const page = await bachecaPronta(openTab);
+
+  await fintaRete(page, { guasto: true });
+  await page.evaluate(() => {
+    window.__boardTest.setReleasedVersion('0.2.71');
+    return window.__boardTest.reload();
+  });
+  await expect(page.locator('#bdRetry')).toBeVisible();
+
+  // La rete torna, ma risponde con calma: è la finestra in cui un secondo clic
+  // farebbe partire una seconda lettura.
+  await cambiaRete(page, { righe: [scheda('Letto una volta sola', 'fb-4')], guasto: false });
+  await page.evaluate(() => { window.__lenta = true; });
+  await page.evaluate(() => {
+    const t = document.querySelector('#bdRetry');
+    t.click();
+    t.click();
+    t.click();
+  });
+
+  await expect(page.locator('.bd-card-title')).toHaveText('Letto una volta sola');
+  const dopo = await chieste(page);
+  expect(dopo.length).toBe(1);
+  soloVetrina(dopo);
+});
+
 test('da una pagina web non si raggiunge la leva della bacheca né la memoria delle segnalazioni', async ({ openTab, testServer }) => {
   const web = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Pagina qualunque</title><p>Ciao</p>');
 
