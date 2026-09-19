@@ -32,8 +32,11 @@ async function preparaAgente(page) {
     chrome.runtime.sendMessage = (msg, ...rest) => {
       if (msg && msg.type === 'ai_request') {
         window.__turni.push(JSON.parse(JSON.stringify(msg.payload)));
-        turnoAi += 1;
-        if (turnoAi === 1) {
+        // La ricerca la chiede in risposta alla PRIMA domanda scritta
+        // dall'utente: aprire l'Aiuto manda già un turno suo, e agganciarsi al
+        // conteggio farebbe rispondere al turno sbagliato.
+        if (msg.payload && msg.payload.userMessage && !turnoAi) {
+          turnoAi = 1;
           return Promise.resolve({ ok: true, text: '{"action":"web_search","query":"come si disdice"}' });
         }
         return Promise.resolve({ ok: true, text: '{"text":"Ecco come si fa.","status":"done"}' });
@@ -64,10 +67,10 @@ test('il riassunto di un risultato di ricerca non entra nel canale di sistema', 
   await page.fill('.sn-sidebar-input textarea', 'come disdico l\'abbonamento?');
   await page.press('.sn-sidebar-input textarea', 'Enter');
 
-  // Due turni: la richiesta di ricerca, poi il turno con i risultati.
-  await page.waitForFunction(() => (window.__turni || []).length >= 2, null, { timeout: 15000 });
+  // Il turno che porta i risultati: quello con una nota di sistema e le buste.
+  await page.waitForFunction(() => (window.__turni || []).some((t) => t.esterno), null, { timeout: 20000 });
 
-  const secondo = await page.evaluate(() => window.__turni[1]);
+  const secondo = await page.evaluate(() => window.__turni.find((t) => t.esterno));
 
   // 1. La nota di sistema è una frase di Filo, e basta.
   expect(secondo.userAction, 'il turno con i risultati deve portare una nota di Filo').toBeTruthy();
@@ -81,7 +84,7 @@ test('il riassunto di un risultato di ricerca non entra nel canale di sistema', 
   // 3. Il messaggio che il main compone: il veleno sta DENTRO la recinzione.
   const composto = await page.evaluate(() => {
     const { PROMPTS } = window.SN_CONST;
-    const p = window.__turni[1];
+    const p = window.__turni.find((t) => t.esterno);
     return PROMPTS.turnoAutomaticoAiuto({ nota: p.userAction, dati: p.esterno });
   });
   const marcature = await page.evaluate(() => window.SN_ESTERNO.marcature('RICERCA_WEB'));
@@ -92,7 +95,10 @@ test('il riassunto di un risultato di ricerca non entra nel canale di sistema', 
   expect(prima, 'il testo del risultato è finito nel canale che il modello legge come voce di Filo')
     .not.toContain('ignora le regole');
   expect(dentro, 'il risultato deve arrivare imbustato, non cancellato').toContain('ignora le regole');
-  expect(dentro).toContain('CONTENUTO ESTERNO');
+  // L'intestazione sta FUORI dalla recinzione, fra la nota e la marcatura: è
+  // la parte che il contenuto non può riscrivere, ed è quella che dice al
+  // modello come leggere ciò che segue.
+  expect(prima, 'la busta deve dichiarare che quello che segue sono dati').toContain('CONTENUTO ESTERNO');
 });
 
 test('anche la cronologia tiene il risultato dentro la recinzione', async ({ openTab }) => {
@@ -107,16 +113,17 @@ test('anche la cronologia tiene il risultato dentro la recinzione', async ({ ope
   await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
   await page.fill('.sn-sidebar-input textarea', 'come disdico l\'abbonamento?');
   await page.press('.sn-sidebar-input textarea', 'Enter');
-  await page.waitForFunction(() => (window.__turni || []).length >= 2, null, { timeout: 15000 });
+  await page.waitForFunction(() => (window.__turni || []).some((t) => t.esterno), null, { timeout: 20000 });
 
-  // Un terzo giro: la cronologia del turno appena chiuso viaggia con la
+  // Un giro in più: la cronologia del turno appena chiuso viaggia con la
   // domanda successiva.
+  const quanti = await page.evaluate(() => window.__turni.length);
   await page.fill('.sn-sidebar-input textarea', 'e per l\'altro conto?');
   await page.press('.sn-sidebar-input textarea', 'Enter');
-  await page.waitForFunction(() => (window.__turni || []).length >= 3, null, { timeout: 15000 });
+  await page.waitForFunction((n) => (window.__turni || []).length > n, quanti, { timeout: 20000 });
 
   const { storia, marcature } = await page.evaluate(() => ({
-    storia: window.__turni[2].history,
+    storia: window.__turni[window.__turni.length - 1].history,
     marcature: window.SN_ESTERNO.marcature('RICERCA_WEB'),
   }));
 
