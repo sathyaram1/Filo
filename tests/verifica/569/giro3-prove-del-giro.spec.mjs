@@ -18,6 +18,7 @@ const ROOT = join(QUI, '..', '..', '..');
 const PROVE = [
   'tests/verifica/569/giro3-il-checkout-di-windows-da-lf.test.mjs',
   'tests/verifica/569/giro3-il-modulo-vero-senza-binario.test.mjs',
+  'tests/verifica/569/giro3-le-porte-accanto-della-sentinella.test.mjs',
 ];
 
 // La prima prova scrive tutti i file del repo in una cartella usa-e-getta: dura
