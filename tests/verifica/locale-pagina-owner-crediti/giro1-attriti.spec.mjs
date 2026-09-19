@@ -169,6 +169,15 @@ test('il tasto destro su una persona offre qualcosa di quella persona', async ()
       return menu ? menu.innerText : '';
     });
     expect(voci).toMatch(/pseudonimo|regala|crediti|scheda|spesa|invit/i);
+    // Guardato a occhio, in tutti e due i temi: il menu e il campo con un
+    // numero non ancora partito.
+    mkdirSync(join(APP_ROOT, 'tests', '.shots'), { recursive: true });
+    for (const tema of ['light', 'dark']) {
+      await page.evaluate((t) => { document.documentElement.dataset.snTheme = t; }, tema);
+      await page.fill('#knob-dailyCredits', '123');
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: join(APP_ROOT, 'tests', '.shots', `verifica-owner-menu-${tema}.png`) });
+    }
   } finally {
     try { await filo.app.close(); } catch (_) {}
   }
