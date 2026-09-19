@@ -221,8 +221,10 @@
   // Adesso si spegne un TOKEN con la forma di una marcatura: tre o più aperte,
   // il nome più corto che ci sta senza andare a capo, tre o più chiuse. Una fila
   // che non chiude niente resta com'è, perché da sola non recinta niente. Il
-  // giro si ripete finché il testo non si muove più: `<<<X<<<Y>>>Z>>>` non
-  // deve lasciare fuori la coppia esterna.
+  // nome è il più corto possibile, così `<<<X<<<RICERCA_WEB>>>` spegne la
+  // coppia interna invece di inghiottirla, e il giro si ripete finché il testo
+  // non si muove più: quello che avanza sono file spaiate, che non sono una
+  // marcatura di niente.
   const TOKEN_MARCATURA_RE = new RegExp(
     `<(?:${ORTO}*<){2,}[^\\n]{0,120}?>(?:${ORTO}*>){2,}`,
     'g',

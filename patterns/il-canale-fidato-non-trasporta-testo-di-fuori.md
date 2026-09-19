@@ -180,3 +180,40 @@ di fermarsi.
 Sentinelle: `tests/chat-filo-contenuto-esterno.spec.mjs` (documento, comando,
 pulizia delle schede) e `tests/unit/geoBlockClassifier.test.mjs` (la pagina non
 chiude la recinzione in cui sta).
+
+## La recinzione non riscrive il testo che recinta
+
+Quarto giro di verifica del #593. La busta reggeva: nessuna combinazione di
+parentesi, nomi di marcatura e caratteri invisibili riusciva a forgiarne una.
+Il prezzo lo pagava chi scrive. Dentro la busta si schiacciava ogni fila di
+parentesi angolari (da tre in su nei blocchi, da due in su nei campi), e quelle
+file sono anche scrittura vera: tre chiuse sono il prompt della console Python
+su mezza documentazione tecnica, il terzo livello di citazione in una risposta,
+la forma dei marcatori di conflitto di git; due sono gli operatori di flusso e
+di scorrimento in C, C++ e Java.
+
+Dove il testo torna all'utente il danno si vede. «Modifica testo» gli rimetteva
+nel campo una parentesi in meno di quelle che ci aveva scritto lui, e «Traduci
+la pagina» le toglieva dal testo che sostituisce alla pagina. Dove serve solo a
+rispondere è peggio, perché non lo vede nessuno: «Spiega» riceveva una riga di
+codice diversa da quella selezionata, e il correttore contestuale, che ritrova
+nel testo ORIGINALE le porzioni segnate dal modello, su un testo alterato non
+le ritrova e la correzione sparisce invece di comparire.
+
+**Una pulizia che tocca scrittura vera è un difetto, non una precauzione.** Se
+il testo di chi scrive è anche il testo che gli tornerà indietro, ogni
+carattere cambiato è una promessa rotta, e chi la scopre lo fa settimane dopo.
+La regola si stringe sulla FORMA che si vuole impedire, non sui caratteri che
+la compongono: si spegne un token che ha la forma di una marcatura (parentesi
+aperte, nome, parentesi chiuse, sulla stessa riga), non una fila di parentesi
+che non chiude niente. La seconda serratura resta dov'era, sui nomi delle
+marcature, che nessun contenuto può scrivere.
+
+Corollario sul canale di Filo: un pezzo di testo scritto da un servizio remoto
+non è una frase di Filo nemmeno quando è un messaggio d'errore. Se serve al
+modello, viaggia imbustato come tutto il resto; se sta in una riga di Filo, ha
+una forma sola e la si pretende (una data è una data, o non si scrive).
+
+Sentinelle: `tests/unit/contenutoEsterno.test.mjs` (il testo di chi scrive
+arriva intatto, e ventimila combinazioni non forgiano una marcatura) e
+`tests/unit/fxPromptLine.test.mjs` (la riga dei cambi resta una frase di Filo).
