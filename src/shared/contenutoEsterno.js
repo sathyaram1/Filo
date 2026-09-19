@@ -131,7 +131,14 @@
   // I nomi delle marcature, tutti, in un'alternativa sola. Con il `FINE_`
   // davanti o senza: `FINE_RICERCA_WEB` contiene già `RICERCA_WEB`, quindi
   // basta cercare i nomi nudi.
-  const NOMI_RE = new RegExp(Object.keys(TIPI).join('|'), 'gi');
+  //
+  // Ogni nome ha dentro un trattino basso, e non per bellezza: un tipo che si
+  // chiamasse `PAGINA` o `LINK` farebbe di questa regola un correttore
+  // automatico sul testo di chiunque scriva quelle parole — e il testo di
+  // qualcuno, quando torna dal modello, deve poter essere ritrovato identico
+  // (il correttore semantico ci ripesca dentro le porzioni segnate). Con il
+  // trattino basso il nome non è più una parola di nessuna lingua.
+  const NOMI_RE = new RegExp(`\\b(?:${Object.keys(TIPI).join('|')})\\b`, 'gi');
 
   // Ripulisce un testo esterno di tutto ciò che, dentro un prompt, servirebbe
   // solo a fingersi la struttura del prompt.
