@@ -465,5 +465,7 @@
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
     normalizeCode, formatCode, inviteLink, codeFromInput, isInviteDeepLink, inviteCodeFromDeepLink, filoUrlFromArgv,
     inviteView, inviteStateLine, entryNoticeText,
+    // Manopole e movimenti della pagina dell'owner (#652)
+    OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
