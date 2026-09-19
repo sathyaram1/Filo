@@ -79,20 +79,18 @@ test('sonda 2: la chiave personale arriva davvero alle impostazioni effettive?',
   });
   console.log('SONDA2:', JSON.stringify(r));
 
+  // Cosa dice la home all'invitato, con parole sue.
+  const testoHome = await home.evaluate(() => {
+    const n = document.querySelector('.dash-message, #message, .dash-home-message');
+    const b = document.body;
+    return { stato: b.dataset.state, testo: (n ? n.innerText : b.innerText || '').slice(0, 400) };
+  });
+  console.log('SONDA2 home:', JSON.stringify(testoHome));
+
   const s = await app.evaluate(async () => {
-    const eff = { };
-    const req = (p) => process.mainModule.require(p);
-    try {
-      eff.personale = req('./src/main/auth/wallet-store').personalKey() ? 'c’è' : '(vuota)';
-    } catch (e) { eff.personale = 'ERR ' + e.message; }
-    try {
-      const h = req('./src/main/services/handlers.js');
-      const s2 = await h.getEffectiveSettings();
-      eff.provider = s2.provider;
-      eff.effOpenrouter = s2.apiKeys?.openrouter ? 'c’è' : '(vuota)';
-      eff.chiavi = Object.keys(s2.apiKeys || {});
-      eff.useDefault = s2.useDefaultModels;
-    } catch (e) { eff.eff = 'ERR ' + e.message; }
+    const eff = {};
+    eff.globals = Object.keys(globalThis).filter((k) => /^SN_/.test(k)).join(',');
+    try { eff.personale = globalThis.SN_WALLET_MAIN ? Object.keys(globalThis.SN_WALLET_MAIN).join(',') : '(assente)'; } catch (e) { eff.personale = 'ERR'; }
     return eff;
   });
   console.log('SONDA2 main:', JSON.stringify(s));
