@@ -228,9 +228,15 @@ service cloud.firestore {
           ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'clientIdHash', 'images',
            'files', 'createdAt', 'seq', 'subSeq', 'parentId',
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
-           'capabilityGapId' // F4: id gap capacità per dedup auto-feedback (F5)
+           'capabilityGapId', // F4: id gap capacità per dedup auto-feedback (F5)
+           'walletPseudonym' // #652: pseudonimo del portafoglio — a chi accreditare il premio
           ]
         )
+        // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
+        // chi non ha un portafoglio manda il feedback e basta.
+        && request.resource.data.get('walletPseudonym', '') is string
+        && (request.resource.data.get('walletPseudonym', '') == ''
+            || request.resource.data.walletPseudonym.size() == 16)
         // S1.F2.1: se presente, statusPublic deve essere un valore valido.
         && request.resource.data.get('statusPublic', 'open') in ['open', 'closed', 'pending-approval']
         && request.resource.data.text is string
