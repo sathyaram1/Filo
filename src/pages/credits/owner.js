@@ -123,6 +123,44 @@
     $('ownerRuns').textContent = runs.length ? `Ultime: ${runs.join(' · ')}` : 'Giornaliera e riconciliazione non hanno ancora girato.';
   }
 
+  // ── Quando il server non risponde ──────────────────────────────────────────
+  // Il messaggio grezzo (nome della chiamata, numero dell'errore, risposta del
+  // server) va nella console, non addosso a chi legge: qui resta una frase e un
+  // modo di riprovare, come per gli errori in chat. E le manopole senza i
+  // numeri del server non si possono disegnare: il titolo se ne va con loro,
+  // invece di restare lì ad annunciare il nulla.
+  function fraseGuasto(raw) {
+    const t = String(raw || '');
+    if (/not_admin/i.test(t)) return 'Questo computer non ti riconosce come proprietario: rientra col tuo account.';
+    if (/sessione scaduta/i.test(t)) return 'La sessione è scaduta: rifai l’accesso.';
+    if (/PERMISSION_DENIED|\bnon autorizzat|\b40[13]\b/i.test(t)) return 'Il server non ha accettato la richiesta: rientra col tuo account e riprova.';
+    return 'Il server dei crediti non risponde.';
+  }
+
+  function mostraManopole(visibili) {
+    $('ownerKnobsTitle').hidden = !visibili;
+    $('ownerKnobs').hidden = !visibili;
+  }
+
+  function guastoVista(errore) {
+    if (errore) console.warn('[credits/owner] vista non arrivata:', errore);
+    const p = $('ownerTotals');
+    p.textContent = `${fraseGuasto(errore)} `;
+    const riprova = document.createElement('button');
+    riprova.type = 'button';
+    riprova.className = 'sn-btn sn-btn-secondary';
+    riprova.textContent = 'Riprova';
+    riprova.title = 'Richiedi la vista al server';
+    riprova.addEventListener('click', () => {
+      riprova.disabled = true;
+      p.textContent = 'Chiedo al server…';
+      loadOverview().catch(() => {});
+    });
+    p.appendChild(riprova);
+    // Senza i numeri del server non c'è niente da mettere nei campi.
+    if (!campi.size) mostraManopole(false);
+  }
+
   // ── I numeri che il server calcola ─────────────────────────────────────────
   // Sola lettura: qui si guarda quanto è già uscito, quanto resta da dare e
   // quanto è ancora in mano alle persone. Un riquadro che non si può toccare
