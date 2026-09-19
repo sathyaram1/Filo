@@ -311,7 +311,13 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
   const base = `http://127.0.0.1:${port}`;
 
   return {
-    base, server, store, keys, flags, clock, log, sessions, counters, service, credits,
+    base, server, store, keys, flags, clock, log, sessions, counters, service, credits, rewards,
+    // Un premio per un feedback, come lo paga il server vero.
+    async premio({ feedbackId, pseudonym, kind }) {
+      return rewards.reward({ feedbackId, pseudonym, kind }, { walletDeps: deps, service, log });
+    },
+    // La configurazione come la legge il server (predefiniti compresi).
+    async configEffettiva() { return credits.normalizeConfig(await store.readConfigRaw()); },
     env: {
       FILO_FUNCTIONS_BASE: base,
       FILO_IDENTITY_ENDPOINT: `${base}/signUp`,
