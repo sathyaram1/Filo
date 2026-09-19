@@ -1869,18 +1869,29 @@ function commandOutputsForPrompt(actions) {
     if (!a || String(a.type || '').toUpperCase() !== 'ESEGUI_COMANDO') continue;
     const out = a._output;
     if (!out || out.blocked) continue; // comando bloccato (terminale spento): niente output reale
+    const E = globalThis.SN_ESTERNO;
     const cmd = String(out.command || a.comando || a.command || a.cmd || '').trim();
     let body = String(out.stdout || '');
     if (out.stderr) body += (body ? '\n' : '') + out.stderr;
     body = body.trim();
-    if (body.length > 4000) body = body.slice(0, 4000) + '\n…(output troncato)';
     const meta = [];
     if (typeof out.code === 'number') meta.push(`uscita ${out.code}`);
     if (out.cwd) meta.push(`cartella ${out.cwd}`);
     if (out.timedOut) meta.push('interrotto per timeout');
+    // #593 (terzo giro di verifica) — IL COMANDO È DI FILO, QUELLO CHE STAMPA
+    // NO. Un `curl`, un `cat` di un file appena scaricato, la risposta di un
+    // servizio: dentro l'output ci finisce testo scritto da chi sta dall'altra
+    // parte. Arrivava nudo, sotto etichette fra parentesi quadre che l'output
+    // stesso poteva riscrivere riga per riga, e proprio mentre le istruzioni
+    // insegnavano all'assistente che quello che viene da fuori arriva sempre
+    // fra due marcature. La riga del comando e l'esito restano fuori: quelli
+    // li scrive Filo, e il comando passa comunque dalla rete del canale di
+    // sistema perché non apra una riga per conto suo.
     blocks.push(
-      `[Ho eseguito nel terminale: ${cmd}]\n` +
-      (body ? `[Output]\n${body}` : '[Nessun output]') +
+      `[Ho eseguito nel terminale: ${E.perCanaleSistema(cmd)}]\n` +
+      (body
+        ? E.imbusta({ tipo: 'ESITO_COMANDO', testo: body, conIntestazione: true, max: 4000 })
+        : '[Nessun output]') +
       (meta.length ? `\n[Esito] ${meta.join(' · ')}` : ''),
     );
   }
