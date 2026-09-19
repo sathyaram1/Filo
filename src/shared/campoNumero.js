@@ -243,6 +243,21 @@
       dillo('', null);
       aggiornaRimetti();
     });
+    // Quando il cursore lascia il campo, quello che c'è scritto parte da solo.
+    // È il pattern «un testo scritto in una casella si salva da solo, o lo
+    // perdi»: finché l'unica strada era il tasto Salva, cambiare campo o
+    // lasciare la pagina buttava via il numero in silenzio, e intanto il campo
+    // continuava a mostrarlo come se fosse in vigore.
+    //
+    // Unica eccezione, e serve: se il cursore sta andando proprio sui pulsanti
+    // di questa manopola, il salvataggio lo fa il pulsante. Senza, il salvataggio
+    // del blur e quello del clic si accavallerebbero.
+    input.addEventListener('blur', (ev) => {
+      const verso = ev && ev.relatedTarget;
+      if (verso && (verso === o.salvaBtn || verso === rimetti)) return;
+      if (String(input.value) === attuale) return;
+      salvaOra().catch(() => {});
+    });
     // Invio dentro il campo salva: è quello che fa chiunque dopo aver scritto
     // un numero, e senza sarebbe l'unica strada che non funziona.
     input.addEventListener('keydown', (ev) => {
