@@ -286,7 +286,12 @@
     const r = await chrome.runtime
       .sendMessage({ type: MSG.WALLET_OWNER_KNOBS_SET, patch: { [chiave]: valore } })
       .catch(() => null);
-    if (!(r && r.ok)) return { ok: false, errore: (r && r.error) || 'il server non ha risposto' };
+    if (!(r && r.ok)) {
+      // Il testo del server (numero dell'errore, risposta per intero) resta
+      // nella console: davanti agli occhi va una frase.
+      if (r && r.error) console.warn('[credits/owner] manopola non salvata:', chiave, r.error);
+      return { ok: false, errore: fraseGuasto(r && r.error) };
+    }
     const letto = r.knobs ? r.knobs[chiave] : null;
     return { ok: true, valore: letto == null ? valore : letto };
   }
