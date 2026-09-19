@@ -666,6 +666,17 @@
     // Con gate dormiente, clientId rimane in chiaro (retrocompat).
     const encClientId = await maybeEncrypt(clientId || '');
 
+    // #652 — lo pseudonimo del portafoglio, se questa copia di Filo ne ha uno:
+    // è l'unico modo che ha il server di sapere a chi accreditare il premio per
+    // la segnalazione (all'invio e alla risoluzione). Non dice CHI è: lo
+    // pseudonimo è già il nome con cui questa installazione esiste sul server
+    // dei crediti. Senza portafoglio il campo non si scrive e non si premia.
+    let walletPseudonym = '';
+    try {
+      const raw = String((global.SN_WALLET_MAIN && global.SN_WALLET_MAIN.pseudonym && global.SN_WALLET_MAIN.pseudonym()) || '');
+      if (/^[0-9a-f]{16}$/.test(raw)) walletPseudonym = raw;
+    } catch (_) {}
+
     const doc = {
       fields: {
         text: toFsValue(encText),
