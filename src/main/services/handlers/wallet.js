@@ -24,6 +24,7 @@
 const auth = require('../../auth/google-auth');
 const identity = require('../../auth/anon-auth');
 const walletStore = require('../../auth/wallet-store');
+const Defaults = require('../defaultsStore');
 
 const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
