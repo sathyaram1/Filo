@@ -527,9 +527,12 @@
     list.innerHTML = '';
     const server = w && w.server;
     const conPortafoglio = Boolean(server && server.hasWallet);
+    // Il server manda i movimenti già dal più recente (al più gli ultimi 200):
+    // rovesciarli li metterebbe dal più vecchio, cioè al contrario di come si
+    // legge un elenco di movimenti. Il conteggio locale è un'altra lista, e
+    // quella arriva in ordine di scrittura: lì il rovesciamento serve.
     const items = conPortafoglio
       ? (Array.isArray(server.grants) ? server.grants : [])
-        .slice().reverse()
         .filter((g) => (g && g.credits) > 0)
         .map((g) => ({ credits: g.credits, testo: W.grantLabel(g.why), ts: g.at }))
       : rewards.slice().reverse()
