@@ -52,6 +52,24 @@ test('un numero scritto non si perde se la pagina viene ricaricata col cursore a
   }
 });
 
+// Quanto è stretta la porta che resta aperta: se basta un clic qualunque
+// sulla pagina a far partire il numero, per perderlo bisogna scrivere e
+// andarsene senza toccare più niente.
+test('un numero scritto parte anche cliccando in un punto qualsiasi della pagina', async () => {
+  test.setTimeout(240_000);
+  const filo = await ownerPronto();
+  try {
+    const page = await apriOwner(filo);
+    await expect.poll(() => page.inputValue('#knob-dailyCredits'), { timeout: 20_000 }).toBe('100');
+    await scriviRestandoDentro(page, 'dailyCredits', 500);
+    // Il titolo della pagina: non è un campo, non è un pulsante.
+    await page.locator('#title').click();
+    await expect.poll(async () => (await server.configEffettiva()).dailyCredits, { timeout: 20_000 }).toBe(500);
+  } finally {
+    try { await filo.app.close(); } catch (_) {}
+  }
+});
+
 test('un numero scritto parte anche seguendo il collegamento alla pagina Crediti', async () => {
   test.setTimeout(240_000);
   const filo = await ownerPronto();
