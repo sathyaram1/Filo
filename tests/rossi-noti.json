@@ -111,6 +111,7 @@
         "spec": "tests/verifica/locale-pagina-owner-crediti/giro2-uscite",
         "caso": [
           "un numero scritto non si perde se la pagina viene ricaricata col cursore ancora dentro",
+          "un numero scritto parte anche cliccando in un punto qualsiasi della pagina",
           "un numero scritto parte anche seguendo il collegamento alla pagina Crediti",
           "un numero scritto non si perde chiudendo la scheda",
           "il numero partito da solo si può rimettere com’era, senza aver premuto Salva",
