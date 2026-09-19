@@ -207,6 +207,16 @@
     WALLET_OWNER_GRANT: 'wallet_owner_grant',
     // WALLET_OWNER_INVITES: genera codici d'invito dell'owner. { count } → { ok, codes }
     WALLET_OWNER_INVITES: 'wallet_owner_invites',
+    // WALLET_OWNER_KNOBS_SET (#652): cambia le manopole dei crediti in
+    //   config/credits (crediti a chi entra, quota del giorno, inviti, tetto,
+    //   premi). Tocca SOLO i campi ricevuti, rifiuta i numeri storti PRIMA di
+    //   scrivere e rilegge dal server. { patch } → { ok, knobs } | { ok:false, error }
+    WALLET_OWNER_KNOBS_SET: 'wallet_owner_knobs_set',
+    // WALLET_OWNER_USER_DETAIL (#652): la scheda di UNA persona — movimenti,
+    //   suoi inviti con chi è entrato, ultime chiamate con modello, chi ha
+    //   servito e costo. { pseudonym } → { ok, detail } (detail.found false se
+    //   lo pseudonimo non esiste).
+    WALLET_OWNER_USER_DETAIL: 'wallet_owner_user_detail',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
     // (session download + will-download) perché l'attributo `download` di un
