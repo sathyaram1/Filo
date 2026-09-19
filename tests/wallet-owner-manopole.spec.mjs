@@ -30,6 +30,9 @@ let base = '';
 let configDoc = {};
 // Le PATCH arrivate: { mask: [...], fields: {...} }.
 const patch = [];
+// Acceso, il documento delle manopole risponde «non autorizzato»: è come si
+// comporta Firestore quando le regole non lasciano scrivere.
+let rifiutaPatch = false;
 const detailChiesti = [];
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
