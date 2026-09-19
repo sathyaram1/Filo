@@ -46,6 +46,31 @@ const TESTO = ['.mjs', '.js', '.cjs', '.md', '.json', '.html', '.css', '.yml',
 
 const diTesto = (f) => TESTO.some((e) => f.endsWith(e)) || f.split('/').pop().startsWith('.git');
 
+// La cura per una copia di lavoro che è GIÀ storta.
+//
+// `.gitattributes` decide come nasce un file al checkout, quindi vale su un
+// clone nuovo. Su una copia che esiste già non succede niente: una fusione
+// riscrive solo i file che cambiano, e tutti gli altri — gli hook compresi —
+// restano com'erano. Le due strade che vengono in mente per prime non
+// funzionano, provate tutte e due: `git checkout -- .` non riscrive un file che
+// per git è a posto, e `git add --renormalize .` sistema l'indice, non il disco.
+// Quella che funziona è svuotare l'indice e ripristinare dai byte che stanno in
+// git. Senza questa riga chi legge il rosso qui sotto non sa come uscirne.
+const CURA = 'Una copia di lavoro che è già storta non si raddrizza da sola: '
+  + '`.gitattributes` vale al prossimo checkout di quel file, e una fusione tocca solo ciò '
+  + 'che cambia. Per rimetterla a posto tutta: `git rm --cached -r .` e poi `git reset --hard` '
+  + '(attenzione: `--hard` butta le modifiche non committate), oppure riclona il repo. '
+  + '`git checkout -- .` e `git add --renormalize .` NON bastano: provati, lasciano i file come sono.';
+
+// Il nome dei colpevoli senza scaricare mille righe addosso a chi legge: i
+// primi otto e il numero VERO di tutti gli altri. Un elenco tagliato in
+// silenzio farebbe credere che i file rotti siano otto.
+function elenco(nomi) {
+  const primi = nomi.slice(0, 8).join(', ');
+  if (nomi.length <= 8) return primi;
+  return `${primi} … e altri ${nomi.length - 8} (${nomi.length} in tutto)`;
+}
+
 describe('fine riga: LF in ogni copia di lavoro', () => {
   test('.gitattributes impone LF a tutto, e agli .sh per nome', () => {
     assert.ok(existsSync(ATTRIBUTI),
