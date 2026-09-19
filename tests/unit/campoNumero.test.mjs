@@ -11,12 +11,12 @@ const require = createRequire(import.meta.url);
 require('../../src/shared/campoNumero.js');
 const C = globalThis.SN_CAMPO_NUMERO;
 
-const CREDITI = { min: 0, max: 1000, intero: true, etichetta: 'Crediti al giorno' };
+const CREDITI = { min: 0, max: 500, intero: true, etichetta: 'Crediti al giorno' };
 
 test('un intero dentro i limiti passa, e passano anche gli estremi', () => {
   assert.deepEqual(C.leggi('100', CREDITI), { ok: true, valore: 100 });
   assert.deepEqual(C.leggi('0', CREDITI), { ok: true, valore: 0 }, 'zero è un valore, non un campo vuoto');
-  assert.deepEqual(C.leggi('1000', CREDITI), { ok: true, valore: 1000 });
+  assert.deepEqual(C.leggi('500', CREDITI), { ok: true, valore: 500 });
   assert.deepEqual(C.leggi(' 42 ', CREDITI), { ok: true, valore: 42 }, 'gli spazi intorno non contano');
   assert.deepEqual(C.leggi(7, CREDITI), { ok: true, valore: 7 }, 'anche un numero già numero');
 });
@@ -31,7 +31,7 @@ test('vuoto, testo, decimali, negativi e fuori scala si rifiutano, ciascuno per 
   assert.equal(C.leggi('10.7', CREDITI).motivo, C.MOTIVI.NON_INTERO);
   assert.equal(C.leggi('10,7', CREDITI).motivo, C.MOTIVI.NON_INTERO, 'la virgola è un decimale, non si butta via');
   assert.equal(C.leggi('-1', CREDITI).motivo, C.MOTIVI.SOTTO);
-  assert.equal(C.leggi('1001', CREDITI).motivo, C.MOTIVI.SOPRA);
+  assert.equal(C.leggi('501', CREDITI).motivo, C.MOTIVI.SOPRA);
 });
 
 test('«10,5» non diventa «105»: la virgola si legge come decimale', () => {
@@ -46,7 +46,7 @@ test('le frasi di rifiuto dicono cosa fare, col nome della manopola davanti', ()
   assert.equal(C.frase(C.MOTIVI.SOTTO, CREDITI), 'Crediti al giorno: non può essere negativo.',
     'con minimo zero si dice «negativo», non «almeno 0»: è quello che è successo');
   assert.equal(C.frase(C.MOTIVI.SOTTO, { min: 1, etichetta: 'Persone per invito' }), 'Persone per invito: almeno 1.');
-  assert.equal(C.frase(C.MOTIVI.SOPRA, CREDITI), 'Crediti al giorno: al massimo 1.000.');
+  assert.equal(C.frase(C.MOTIVI.SOPRA, CREDITI), 'Crediti al giorno: al massimo 500.');
   assert.equal(C.frase(C.MOTIVI.VUOTO, {}), 'scrivi un numero.', 'senza etichetta resta una frase sensata');
 });
 
