@@ -453,6 +453,15 @@ export async function fintoOpenRouter(app, opts = {}) {
         }
         return new Response(JSON.stringify({ id: 'x', provider: 'FintoHost', choices: [{ index: 0, message: { role: 'assistant', content: o.text }, finish_reason: 'stop' }], usage }), { status: 200, headers: H });
       }
+      // I documenti `config/*` (fra cui le manopole dell'owner) vanno al
+      // Firestore finto del banco, che è lo stesso archivio del servizio.
+      if (u.includes('firestore.googleapis.com') && u.includes('/documents/') && !u.includes(':commit')) {
+        const parsed = new URL(u);
+        const docPath = parsed.pathname.split('/documents/')[1] || '';
+        const dest = `${g.__fsBase}/fsdoc/${docPath}${parsed.search}`;
+        g.__fsDocCalls.push({ method: (init && init.method) || 'GET', docPath, at: Date.now() });
+        return g.__orOrig(dest, init);
+      }
       if (u.includes('firestore.googleapis.com') && u.includes(':commit')) {
         let b = null; try { b = JSON.parse(init.body); } catch (_) {}
         g.__fsCommits.push({ auth: headerOf(init && init.headers, 'authorization'), body: b });
