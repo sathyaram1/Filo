@@ -159,6 +159,9 @@ test.beforeAll(async () => {
             rows: [
               { at: '2026-09-18T10:00:00.000Z', action: 'chat', model: 'deepseek-flash', servedBy: 'Fireworks', promptTokens: 1200, completionTokens: 300, costUsd: 0.2, credits: 244 },
               { at: '2026-09-17T09:00:00.000Z', action: 'traduci', model: 'glm-5', servedBy: 'Baseten', promptTokens: 60, completionTokens: 20, costUsd: 0.01, credits: 12 },
+              // Quanto costa davvero una chiamata corta: meno di mezzo
+              // centesimo. Arrotondata ai centesimi si leggeva «0 $».
+              { at: '2026-09-16T08:00:00.000Z', action: 'spiega', model: 'glm-5', servedBy: 'Baseten', promptTokens: 40, completionTokens: 10, costUsd: 0.0031, credits: 4 },
             ],
           },
         });
