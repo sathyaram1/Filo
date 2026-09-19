@@ -1083,10 +1083,17 @@
 
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
+    // #593 — selezione e frase sono testo di una pagina web: chi possiede il
+    // sito le scrive come vuole, e prima entravano nella prima riga del prompt
+    // fra virgolette, che non recintano niente. Adesso stanno in una busta,
+    // come ogni altro contenuto esterno.
     explain: ({ selection, sentence, fxLine }) =>
-      `Il testo "${selection}" è stato selezionato dall'utente durante la navigazione di una pagina web. ` +
-      `La frase intera in cui era contenuto è: "${sentence}". ` +
-      `\n\nDevi decidere fra tre risposte:\n` +
+      `L'utente ha selezionato un testo durante la navigazione di una pagina web. Testo e frase che lo conteneva sono qui sotto.\n\n` +
+      esterno().imbustaCampi({
+        tipo: 'TESTO_IN_PAGINA',
+        campi: { 'Testo selezionato': selection, 'Frase intera': sentence },
+      }) +
+      `\n\nDevi decidere fra tre risposte (la selezione è il "testo selezionato" qui sopra):\n` +
       `1. TRADUZIONE — se il testo è prevalentemente in una lingua diversa dall'italiano (inglese, francese, spagnolo, tedesco, ecc.), traducilo in italiano. ` +
       `Rispondi SOLO con la traduzione, massimo ~150 caratteri. La traduzione è la spiegazione: non aggiungere etichette tipo "Traduzione:" e non spiegare il testo.\n` +
       `2. SPIEGAZIONE — se il testo è in italiano ma è un termine non ovvio (nome proprio di persona/luogo/azienda/organizzazione, termine tecnico, gergo, sigla, parola straniera d'uso settoriale), scrivi una brevissima spiegazione (massimo 100 caratteri).\n` +
