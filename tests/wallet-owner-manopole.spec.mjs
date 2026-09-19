@@ -395,6 +395,86 @@ test('la riga di una persona apre la sua scheda: movimenti, suoi inviti e ultime
   await expect(scheda).toBeVisible();
 });
 
+// Un numero scritto e non salvato spariva in silenzio appena il cursore
+// lasciava il campo, e fino a quel momento la pagina lo mostrava come se fosse
+// in vigore (pattern «un testo scritto in una casella si salva da solo, o lo
+// perdi»). Adesso: finché è solo digitato si VEDE che non è quello del server,
+// e quando il cursore se ne va parte da solo.
+test('un numero lasciato a metà parte da solo, si vede finché non è partito, e un rifiuto del server si spiega a parole', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+
+  const scatola = page.locator('.sn-manopola[data-chiave="dailyCredits"]');
+  const msg = page.locator('#knob-dailyCredits-msg');
+  const rimetti = page.locator('#knob-dailyCredits-rimetti');
+
+  // Senza un salvataggio da disfare, «rimetti com'era» non c'è: prometteva di
+  // riportare indietro una cosa che non era successa.
+  await expect(rimetti).toBeHidden();
+
+  await page.fill('#knob-dailyCredits', '250');
+  await expect(scatola).toHaveClass(/is-sporco/);
+  await expect(rimetti).toBeHidden();
+  expect(patch.length).toBe(0);
+
+  // Il cursore va su un altro campo: il numero parte senza che nessuno prema
+  // niente.
+  await page.locator('#knob-entryCredits').click();
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(patch.length).toBe(1);
+  expect(patch[0].valori).toEqual({ dailyCredits: 250 });
+  await expect(scatola).not.toHaveClass(/is-sporco/);
+  await expect(page.locator('#knob-dailyCredits')).toHaveValue('250');
+  // Adesso sì che c'è qualcosa da disfare.
+  await expect(rimetti).toBeVisible();
+
+  // Il server rifiuta la scrittura: quello che compare è una frase, non la sua
+  // risposta per intero.
+  rifiutaPatch = true;
+  await page.fill('#knob-dailyCredits', '300');
+  await page.click('#knob-dailyCredits-salva');
+  await expect(msg).toHaveClass(/is-error/, { timeout: 15_000 });
+  const testo = await msg.innerText();
+  expect(testo).toMatch(/^Non salvato: /);
+  expect(testo).not.toMatch(/[{}]|403|PERMISSION_DENIED|config update|fetch/i);
+  expect(configDoc.dailyCredits).toBe(250);
+});
+
+// Il tasto destro è centrale in Filo: su una riga della tabella deve offrire
+// quello che si vuole fare a QUELLA persona. Prima si apriva il menu generale
+// della pagina, che della riga non sa niente.
+test('il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regalo', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  const riga = page.locator('#ownerUsers tr.sn-wallet-user').first();
+  await expect(riga).toBeVisible({ timeout: 15_000 });
+
+  await riga.click({ button: 'right' });
+  const menu = page.locator('.sn-wallet-ctxmenu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('Apri la scheda');
+  await expect(menu).toContainText('Copia lo pseudonimo');
+
+  // Dal menu si regala a questa persona senza copiare niente a mano.
+  await menu.getByText('Regala crediti a questa persona').click();
+  await expect(menu).toHaveCount(0);
+  await expect(page.locator('#ownerGrantPseudonym')).toHaveValue(PSEUDONIMO);
+
+  // E la scheda si apre anche da lì.
+  await riga.click({ button: 'right' });
+  await page.locator('.sn-wallet-ctxmenu').getByText('Apri la scheda').click();
+  await expect(page.locator('#ownerUsers .sn-wallet-scheda')).toBeVisible({ timeout: 15_000 });
+
+  // Esc lo chiude, e il menu non resta appeso.
+  await riga.click({ button: 'right' });
+  await expect(page.locator('.sn-wallet-ctxmenu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sn-wallet-ctxmenu')).toHaveCount(0);
+});
+
 // Tema chiaro e tema scuro: le manopole e i riquadri dei numeri sono roba
 // nuova sulla pagina, e devono leggersi in tutti e due. Gli screenshot
 // finiscono in tests/.shots/ (non tracciati) e li guarda chi lavora.
