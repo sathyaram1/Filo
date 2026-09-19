@@ -544,6 +544,55 @@ async function setRoutineCaps(patch, idToken) {
 }
 
 
+// ── Manopole dei crediti (#652) ──────────────────────────────────────────────
+// Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
+// pagina. La tabella di cosa sono e quanto possono valere sta in
+// src/shared/wallet.js: qui si applica, non si ridichiara.
+//
+// Si scrivono SOLO i campi ricevuti (mask sui campi foglia): il documento porta
+// anche i contatori del server (inviti rimasti, somma dei tetti, cambio del
+// giorno) e riscriverlo intero li cancellerebbe.
+
+function knobRules(chiave) {
+  const W = globalThis.SN_WALLET;
+  const k = W && W.knobOf ? W.knobOf(chiave) : null;
+  return k ? { min: k.min, max: k.max, intero: true, etichetta: k.etichetta } : null;
+}
+
+async function getCreditsKnobs(idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per leggere le impostazioni dei crediti.');
+  const doc = await fetchDoc(CREDITS_DOC, idToken);
+  // `null` = non ho potuto leggere (rete giù): è diverso da «mai scritto».
+  if (doc === null) throw new Error('Impostazioni dei crediti non raggiungibili.');
+  const W = globalThis.SN_WALLET;
+  const keys = (W && W.OWNER_KNOB_KEYS) || [];
+  const out = {};
+  for (const k of keys) out[k] = doc[k] == null ? null : Number(doc[k]);
+  return out;
+}
+
+async function setCreditsKnobs(patch, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare le impostazioni dei crediti.');
+  const CN = globalThis.SN_CAMPO_NUMERO;
+  const p = patch && typeof patch === 'object' ? patch : {};
+  const fields = {};
+  const mask = [];
+  const W = globalThis.SN_WALLET;
+  for (const chiave of (W && W.OWNER_KNOB_KEYS) || []) {
+    if (p[chiave] == null) continue;
+    const regole = knobRules(chiave);
+    // Lo stesso controllo della pagina, rifatto qui: un numero storto non deve
+    // arrivare al documento da cui il server legge quanto regalare.
+    const esito = CN.controlla(p[chiave], regole);
+    if (!esito.ok) throw new Error(esito.testo);
+    fields[chiave] = toFsValue(esito.valore);
+    mask.push(chiave);
+  }
+  if (!mask.length) throw new Error('Non c’è niente da salvare.');
+  await patchDoc(CREDITS_DOC, fields, mask, idToken);
+  return getCreditsKnobs(idToken);
+}
+
 // Log dei worker delle routine (config/automation, campo `workerLog`): elenco
 // delle ultime esecuzioni di scripts/dispatch.mjs, ciascuna { role, startedAt,
 // num }. Lo scrive dispatch a ogni worker spawnato; qui lo LEGGIAMO soltanto
