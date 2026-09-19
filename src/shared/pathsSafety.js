@@ -12,7 +12,9 @@
 //     deploy: una copia a mano dall'altra parte divergerebbe in silenzio.
 //
 //   • in LETTURA — `formatKnownPathsForPrompt()` impacchetta i percorsi fra due
-//     marcature e li ripulisce di nuovo. La seconda pulizia non è un doppione:
+//     marcature, chiedendo la busta a SN_ESTERNO (`src/shared/contenutoEsterno.js`),
+//     che dal #593 è la porta unica di tutto ciò che entra in un prompt venendo
+//     da fuori, e li ripulisce di nuovo. La seconda pulizia non è un doppione:
 //     nella raccolta restano i documenti scritti quando chiunque poteva
 //     scriverli, e un percorso inviato in buona fede può comunque contenere il
 //     testo di una pagina ostile. Il prompt (`SN_CONST.PROMPTS.helpContext`)
