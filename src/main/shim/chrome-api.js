@@ -73,7 +73,27 @@ const chromeShim = {
       }
       return null;
     },
-    async query() { return []; },
+    // #593 (secondo giro di verifica) — questa rispondeva sempre «nessuna
+    // scheda», e l'unico a chiederglielo è lo stato che l'assistente della
+    // nuova scheda riceve a ogni messaggio (src/shared/filoState.js). Risultato:
+    // «che schede ho aperte?» si sentiva rispondere nessuna con dieci pagine
+    // davanti, e il suggerimento di fare pulizia, che nasce dal loro numero,
+    // non compariva mai. Le schede le possiede il TabManager della finestra:
+    // qui se ne espone la vista piatta che il chiamante si aspetta.
+    async query() {
+      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const tm = win && win._filoTabs;
+      if (!tm || !Array.isArray(tm.tabs)) return [];
+      return tm.tabs.map((t) => ({
+        id: t.id,
+        url: t.url || '',
+        title: t.title || '',
+        active: t.id === tm.activeId,
+        // Il nome del campo è quello di chrome.tabs: chi legge ordina per
+        // ultima attività e ripiega sull'id quando manca.
+        lastAccessed: t.lastActiveAt || null,
+      }));
+    },
     async remove(id) {
       const win = require('electron').BrowserWindow.getAllWindows()[0];
       if (win && win._filoTabs) win._filoTabs.closeTab(id);
