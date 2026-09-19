@@ -402,7 +402,10 @@
     } else {
       const ul = document.createElement('ul');
       ul.className = 'sn-wallet-invites';
-      for (const inv of suoi) ul.appendChild(inviteItem(inv, inv && inv.createdAt));
+      // Sempre attraverso la vista: il link si ricostruisce dal codice anche se
+      // il server non lo manda, e i posti si contano allo stesso modo qui e
+      // nella pagina Crediti.
+      for (const inv of suoi) ul.appendChild(inviteItem(W.inviteView(inv), inv && inv.createdAt));
       boxInviti.appendChild(ul);
     }
     wrap.appendChild(bloccoScheda('I suoi inviti', boxInviti));
