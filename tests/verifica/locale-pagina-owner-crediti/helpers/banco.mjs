@@ -50,6 +50,37 @@ function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '')
 function jwt(uid, extra = {}) {
   return `${b64url(JSON.stringify({ alg: 'none' }))}.${b64url(JSON.stringify({ user_id: uid, sub: uid, ...extra }))}.firma`;
 }
+// Le due conversioni del formato Firestore (valore → busta e ritorno), le
+// stesse che fa l'app dall'altra parte.
+export function toFs(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'string') return { stringValue: v };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFs) } };
+  if (typeof v === 'object') {
+    const fields = {};
+    for (const [k, vv] of Object.entries(v)) fields[k] = toFs(vv);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(v) };
+}
+export function fromFs(val) {
+  if (!val) return null;
+  if ('stringValue' in val) return val.stringValue;
+  if ('integerValue' in val) return Number(val.integerValue);
+  if ('doubleValue' in val) return val.doubleValue;
+  if ('booleanValue' in val) return val.booleanValue;
+  if ('nullValue' in val) return null;
+  if ('arrayValue' in val) return (val.arrayValue.values || []).map(fromFs);
+  if ('mapValue' in val) {
+    const out = {};
+    for (const [k, v] of Object.entries(val.mapValue.fields || {})) out[k] = fromFs(v);
+    return out;
+  }
+  return null;
+}
+
 function payloadOf(tok) {
   try { return JSON.parse(Buffer.from(String(tok).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')); } catch (_) { return {}; }
 }
