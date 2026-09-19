@@ -389,7 +389,15 @@
 
     // I movimenti: da dove vengono i crediti che ha ricevuto. È qui che si
     // vedono i premi per le segnalazioni.
-    const movimenti = (d.grants || []).slice().reverse().slice(0, 50)
+    //
+    // L'ordine si decide qui, sulla data, invece di fidarsi di come arriva la
+    // lista: le due funzioni del server non la mandano allo stesso modo (la
+    // scheda della persona la dà com'è scritta nel documento, dal più vecchio;
+    // lo stato del portafoglio la ordina lui dal più recente). Chi legge vuole
+    // in cima l'ultima cosa successa, da qualunque parte arrivi.
+    const movimenti = (d.grants || []).slice()
+      .sort((a, b) => String(b && b.at || '').localeCompare(String(a && a.at || '')))
+      .slice(0, 50)
       .map((g) => [`${W.grantLabel(g.why)} · ${formatDate(g.at)}`, `+${formatInt(g.credits)}`]);
     wrap.appendChild(bloccoScheda('Movimenti', elencoSemplice(movimenti, 'Nessun movimento.')));
 
