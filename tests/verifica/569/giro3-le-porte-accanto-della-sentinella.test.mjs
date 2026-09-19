@@ -89,7 +89,7 @@ test('#569 giro 3: una ricerca con un «a capo» dentro, scritta come regex o co
 const regole = await readFile('${REGOLE}', 'utf8');
 export const a = /allow update: if\\n        isAdmin\\(\\)/.test(regole);
 export const b = regole.replace('allow update: if\\n        isAdmin()', 'x');
-export const c = regole.match(/^ *allow read: if true;$/m);
+export const c = regole.match(/^ *allow read: if true;$/m); // esempio del #569
 `);
   assert.match(
     detto,

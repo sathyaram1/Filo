@@ -22,6 +22,17 @@
 //   Servono tutte e due: la prima senza la seconda lascia rossa la macchina di
 //   casa, la seconda senza la prima lascia il problema a chiunque legga un file
 //   del repo senza passare dalla porta.
+//
+// LE DUE RETI GUARDANO LA FORMA, NON IL NOME
+//   Questo difetto è già rientrato due volte dalla porta accanto, e le due reti
+//   qui sotto lo hanno imparato: non sorvegliano `readFileSync` e `indexOf`,
+//   sorvegliano LEGGERE UN FILE DEL REPO SENZA NORMALIZZARLO e CERCARCI DENTRO
+//   UNA COSA CHE UN `\r` DI TROPPO FA SPARIRE. Quindi la lettura vale anche
+//   asincrona (`readFile` di node:fs/promises è la stessa lettura grezza con un
+//   `await` davanti), e la ricerca vale anche scritta come regex con un «a
+//   capo» dentro, come `replace`/`match`/`search`, o come `$` di fine riga in
+//   una regex multiriga (era il #565: `\r` sta prima della fine riga, e il `$`
+//   non ci arriva mai).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,6 +60,11 @@ const ESEMPIO_VOLUTO = /esempio del #569/;
 // file gira fuori dal repo, dove la porta comune non si può importare).
 // Un'esenzione scritta si vede in revisione; una cartella esclusa in silenzio no.
 const NON_ANALIZZATO = /fini riga: non analizzato/;
+
+// Leggere il file dal disco, in tutte le forme che lo fanno davvero: sincrona e
+// asincrona. `readFile` di node:fs/promises non è un'altra cosa — è la stessa
+// lettura grezza, e lasciarla fuori era la porta accanto.
+const LETTURA_GREZZA = /\b(?:readFileSync|readFile)\s*\(/;
 
 // Tutti i file di test, a QUALUNQUE profondità sotto tests/.
 //
@@ -82,6 +98,57 @@ function variabiliColPercorso(sorgente) {
   return nomi;
 }
 
+// --- La rete sulle RICERCHE -------------------------------------------------
+//
+// Tutti i modi di cercare dentro un testo che un `\r` di troppo fa fallire.
+// Sono tre forme, e sono tre solo perché è così che il difetto si è presentato:
+// la regola vera è «fra due pezzi di testo che stanno su righe diverse non si
+// scrive un `\n` nudo, e la fine riga non si àncora con `$`».
+
+const METODI_DI_RICERCA = 'indexOf|lastIndexOf|includes|startsWith|endsWith|split|replace|replaceAll|match|matchAll|search';
+
+// 1. La stringa cercata con un «a capo» IN MEZZO: `indexOf('…if\n        isAdmin()')`.
+//    Un «a capo» in testa regge (il `\r` sta prima), quindi si guarda il mezzo.
+const STRINGA_CON_A_CAPO = new RegExp(`\\.(?:${METODI_DI_RICERCA})\\(\\s*(['"\`])(?:(?!\\1)[^\\\\])+\\\\n`);
+
+// 2 e 3 vivono dentro i letterali di regex, che vanno prima ritagliati dalla
+//    riga. Il ritaglio è volutamente prudente: meglio lasciarsi sfuggire una
+//    forma esotica che accusare una divisione.
+const LETTERALE_REGEX = /\/(?![/*])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g;
+
+// Cosa può stare prima di un «a capo» (o di un `$`) perché quello sia davvero
+// un problema: del TESTO. Se prima c'è un quantificatore o una classe — `\s*`,
+// `[\s\S]*?`, `\r?` — il `\r` se lo mangia quella, e la ricerca regge.
+const TESTO_PRIMA = /[\w \t;:,.'"=<>!&%@#~`-]$/;
+
+/** Il carattere in posizione `i` è sfuggito da una barra rovescia? */
+function sfuggito(corpo, i) {
+  let barre = 0;
+  for (let j = i - 1; j >= 0 && corpo[j] === '\\'; j -= 1) barre += 1;
+  return barre % 2 === 1;
+}
+
+/** I motivi per cui le ricerche di questa riga non reggono un CRLF. */
+function ricercheFragili(riga) {
+  const motivi = new Set();
+  if (STRINGA_CON_A_CAPO.test(riga)) motivi.add('una stringa da cercare con un «a capo» in mezzo');
+  for (const letterale of riga.match(LETTERALE_REGEX) || []) {
+    const fine = letterale.lastIndexOf('/');
+    const corpo = letterale.slice(1, fine);
+    const opzioni = letterale.slice(fine + 1);
+    for (let i = 0; i < corpo.length - 1; i += 1) {
+      if (corpo[i] !== '\\' || corpo[i + 1] !== 'n' || sfuggito(corpo, i)) continue;
+      if (TESTO_PRIMA.test(corpo.slice(0, i))) motivi.add('una regex con un «a capo» in mezzo (usa `\\s+`, o `\\r?\\n`)');
+    }
+    if (!opzioni.includes('m')) continue;
+    for (let i = 0; i < corpo.length; i += 1) {
+      if (corpo[i] !== '$' || sfuggito(corpo, i)) continue;
+      if (TESTO_PRIMA.test(corpo.slice(0, i))) motivi.add('un `$` di fine riga in una regex multiriga (il `\\r` sta prima: era il #565)');
+    }
+  }
+  return [...motivi];
+}
+
 test('il repo pretende LF da qualunque checkout (.gitattributes)', () => {
   const percorso = join(ROOT, '.gitattributes');
   assert.ok(existsSync(percorso), 'manca .gitattributes: senza, i fini riga dei file tracciati li decide la macchina che scarica il repo (e su Windows diventano CRLF)');
@@ -102,23 +169,40 @@ test('il lettore normalizza davvero CRLF e CR soli', () => {
   assert.ok(!leggiTestoRepo(join(ROOT, 'firestore.rules')).includes('\r'));
 });
 
-test('un file del repo che una sentinella analizza si legge dalla porta, non con readFileSync', () => {
+test('la rete sulle ricerche riconosce tutte e tre le forme che un CRLF rompe', () => {
+  // Taratura: senza questa prova la rete potrebbe non riconoscere più niente e
+  // la sentinella resterebbe verde per sempre. Sono le tre forme con cui il
+  // difetto si è presentato davvero (#565 e #569).
+  assert.deepEqual(ricercheFragili("RULES.indexOf('allow update: if\\n        isAdmin()')").length, 1);
+  assert.deepEqual(ricercheFragili("RULES.replace('if\\n   isAdmin()', 'x')").length, 1);
+  assert.deepEqual(ricercheFragili('/allow update: if\\n        isAdmin\\(\\)/.test(RULES)').length, 1);
+  assert.deepEqual(ricercheFragili('RULES.match(/^ *allow read: if true;$/m)').length, 1);
+  // E quello che invece regge un CRLF non va segnalato, o la sentinella diventa
+  // rumore e la si spegne.
+  assert.deepEqual(ricercheFragili('testo.split(/\\r?\\n/)'), []);
+  assert.deepEqual(ricercheFragili('testo.replace(/\\n/g, "\\r\\n")'), []);
+  assert.deepEqual(ricercheFragili('/\\n\\s*allow /.exec(resto)'), []);
+  assert.deepEqual(ricercheFragili('/function\\s+tipoPassivo\\(\\)\\s*\\{([\\s\\S]*?)\\n\\s*\\}/'), []);
+  assert.deepEqual(ricercheFragili('/^\\s*Giudici\\s*$/m'), []);
+});
+
+test('un file del repo che una sentinella analizza si legge dalla porta, non a mano', () => {
   // Le prove dei giri di verifica passati sono memoria congelata: non si
   // riscrivono, quindi questa regola di stile non le riguarda. Il difetto vero
-  // (la ricerca con un «a capo» in mezzo) le riguarda eccome, ed è il controllo
+  // (la ricerca che un CRLF rompe) le riguarda eccome, ed è il controllo
   // qui sotto, che infatti scende anche lì.
   const colpevoli = [];
   for (const percorso of tuttiIFileDiTest(CARTELLA_TEST)) {
     const rel = relative(ROOT, percorso).replace(/\\/g, '/');
-    if (rel === 'tests/unit/finiDiRiga.test.mjs') continue; // qui readFileSync serve a leggere i test stessi
+    if (rel === 'tests/unit/finiDiRiga.test.mjs') continue; // qui la lettura grezza serve a leggere i test stessi
     if (rel.startsWith('tests/verifica/')) continue;
     const sorgente = readFileSync(percorso, 'utf8');
     const variabili = variabiliColPercorso(sorgente);
     sorgente.split(/\r?\n/).forEach((riga, i) => {
-      if (!/readFileSync\s*\(/.test(riga)) return;
+      if (!LETTURA_GREZZA.test(riga)) return;
       if (ESEMPIO_VOLUTO.test(riga) || NON_ANALIZZATO.test(riga)) return;
       const nominaIlFile = FILE_ANALIZZATI.test(riga);
-      const passaPerVariabile = [...variabili].some((v) => new RegExp(`readFileSync\\s*\\(\\s*${v}\\b`).test(riga));
+      const passaPerVariabile = [...variabili].some((v) => new RegExp(`readFile(?:Sync)?\\s*\\(\\s*${v}\\b`).test(riga));
       if (!nominaIlFile && !passaPerVariabile) return;
       colpevoli.push(`${rel}:${i + 1}: ${riga.trim().slice(0, 100)}`);
     });
@@ -131,31 +215,33 @@ test('un file del repo che una sentinella analizza si legge dalla porta, non con
   );
 });
 
-test('nessuna ricerca su un file del repo contiene un «a capo» in mezzo', () => {
-  // `indexOf('…if\n        isAdmin()')` è la forma che si è rotta: con CRLF non
-  // trova niente e il test accusa il file. Un «a capo» in TESTA alla stringa
-  // cercata regge (il \r sta prima), quindi si guarda solo quello in mezzo.
+test('nessuna ricerca su un file del repo si rompe con i fini riga di Windows', () => {
+  // `indexOf('…if\n        isAdmin()')` è la forma che si è rotta per prima, ma
+  // la stessa ricerca scritta come regex, come `replace` o con un `$` di fine
+  // riga in modalità multiriga si rompe uguale: chiuderne una sola sarebbe
+  // chiudere la porta e lasciare aperta quella accanto, che è come questo
+  // difetto è già tornato due volte.
   //
   // Si guardano SOLO i test che leggono uno di quei file. Altrove una stringa
   // con un «a capo» dentro è di solito un testo che il test si è costruito da
   // sé (una critica, un prompt), dove i fini riga li decide il codice e non il
   // checkout: segnalarla sarebbe rumore, e il rumore fa spegnere le sentinelle.
-  const conACapoInMezzo = /\.(indexOf|lastIndexOf|includes|startsWith|endsWith|split)\(\s*(['"`])(?:(?!\2)[^\\])+\\n/;
   const colpevoli = [];
   for (const percorso of tuttiIFileDiTest(CARTELLA_TEST)) {
     const rel = relative(ROOT, percorso).replace(/\\/g, '/');
-    if (rel === 'tests/unit/finiDiRiga.test.mjs') continue; // la regex qui sopra si nomina da sé
+    if (rel === 'tests/unit/finiDiRiga.test.mjs') continue; // le forme qui sopra si nominano da sé
     const sorgente = leggiTestoRepo(percorso);
     if (!FILE_ANALIZZATI.test(sorgente)) continue;
     sorgente.split('\n').forEach((riga, i) => {
       if (ESEMPIO_VOLUTO.test(riga)) return;
-      if (conACapoInMezzo.test(riga)) colpevoli.push(`${rel}:${i + 1}: ${riga.trim().slice(0, 100)}`);
+      const motivi = ricercheFragili(riga);
+      if (motivi.length) colpevoli.push(`${rel}:${i + 1}: ${motivi.join(' + ')} → ${riga.trim().slice(0, 100)}`);
     });
   }
   assert.deepEqual(
     colpevoli,
     [],
-    'una stringa da cercare con un «a capo» in mezzo non regge un checkout con CRLF: usa una regex con \\s+ '
-    + '(o normalizza il testo con leggiTestoRepo) — è il difetto del #569',
+    'una ricerca così non regge un checkout con CRLF: usa `\\s+` (o `\\r?\\n`) al posto di un «a capo» nudo, '
+    + 'e normalizza il testo con leggiTestoRepo() — è il difetto del #569, e il `$` multiriga era il #565',
   );
 });
