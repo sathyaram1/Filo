@@ -41,11 +41,11 @@
     }
     const cfg = o.config || {};
     const tot = o.totals || {};
-    const nUsers = Number(tot.users) || 0;
-    $('ownerTotals').textContent =
-      `${formatInt(nUsers)} ${nUsers === 1 ? 'utente' : 'utenti'} · tetti ${fmtUsd(tot.totalLimitUsd)} su ${fmtUsd(tot.maxGrantUsd)} elargibili · `
-      + `inviti riscattabili rimasti ${formatInt(cfg.invitesRemaining || 0)} · ingresso ${formatInt(cfg.entryCredits || 0)}, +${formatInt(cfg.dailyCredits || 0)}/giorno`
-      + (cfg.eurUsd ? ` · cambio ${cfg.eurUsd} (${cfg.eurUsdAt || ''})` : ' · cambio mancante');
+    renderNumeri(cfg, tot, o.ownerInvites || []);
+    $('ownerTotals').textContent = cfg.eurUsd
+      ? `Un credito vale ${fmtUsd((Number(cfg.eurPerCredit) || 0) * cfg.eurUsd)} al cambio di oggi, ${cfg.eurUsd} (${cfg.eurUsdAt || 'data ignota'}).`
+      : 'Manca il cambio del giorno: finché non arriva, nessuna elargizione parte.';
+    riempiManopole(cfg, tot);
     // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
     // con quelli usati barrati, così chi ne genera cinque e chiude la pagina sa
     // ancora quali ha già dato.
