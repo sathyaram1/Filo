@@ -189,6 +189,7 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
   if (!dirSec) throw new Error('filo-security non trovato accanto al repo (o FILO_SECURITY_DIR)');
   const service = require(join(dirSec, 'src', 'wallet', 'service.js'));
   const credits = require(join(dirSec, 'src', 'wallet', 'credits.js'));
+  const rewards = require(join(dirSec, 'src', 'wallet', 'rewards.js'));
 
   const store = archivioInMemoria();
   const keys = chiaviFinte();
