@@ -43,6 +43,9 @@ const AUTOMATION_DOC = 'config/automation';
 // Le impostazioni che le ROUTINE leggono, in un documento a lettura pubblica:
 // le loro macchine non hanno credenziali (vedi getRoutinesEnabled).
 const ROUTINES_DOC = 'config/routines';
+// Le manopole dei crediti (#652). Il documento lo legge il server dei crediti a
+// ogni riscatto, quota e premio; da qui lo scrive l'owner dalla sua pagina.
+const CREDITS_DOC = 'config/credits';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
