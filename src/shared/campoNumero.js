@@ -227,15 +227,20 @@
     }
 
     function rimettiOra() {
-      if (String(input.value) !== attuale) {
-        // Solo digitato: basta rimettere il campo com'è sul server.
+      if (precedente == null) {
+        // Niente da disfare sul server: al massimo si butta via quello che è
+        // stato digitato e non è ancora partito.
+        if (String(input.value) === attuale) return Promise.resolve();
         input.value = attuale;
         aggiornaRimetti();
         dillo('Rimesso com’era.', 'is-ok');
         try { input.focus(); } catch (_) {}
         return Promise.resolve();
       }
-      if (precedente == null) return Promise.resolve();
+      // C'è un salvataggio da disfare: quello che è stato digitato dopo non
+      // c'entra e se ne va con lui.
+      input.value = attuale;
+      aggiornaSporco();
       return scrivi(Number(precedente), { comeRipristino: true });
     }
 
