@@ -150,14 +150,24 @@
       if (testo && classe) msg.classList.add(classe);
     }
 
-    function aggiornaRimetti() {
-      if (!rimetti) return;
+    // Il campo mostra qualcosa di diverso da quello che il server ha: finché
+    // dura, si vede. Un numero che sembra in vigore e non lo è è peggio di un
+    // numero sbagliato.
+    function aggiornaSporco() {
       const sporco = String(input.value) !== attuale;
-      const disfabile = sporco || precedente != null;
-      rimetti.hidden = !disfabile;
-      rimetti.title = sporco
-        ? 'Rimetti il valore che c’è sul server'
-        : 'Rimetti il valore di prima del salvataggio';
+      const scatola = input.closest ? input.closest('.sn-manopola') : null;
+      if (scatola) scatola.classList.toggle('is-sporco', sporco);
+      return sporco;
+    }
+
+    // «Rimetti com'era» disfa un SALVATAGGIO. Mentre si digita non c'è ancora
+    // niente da disfare, e mostrarlo lì prometteva di riportare indietro una
+    // cosa che non era successa.
+    function aggiornaRimetti() {
+      aggiornaSporco();
+      if (!rimetti) return;
+      rimetti.hidden = precedente == null;
+      rimetti.title = 'Rimetti il valore di prima del salvataggio';
     }
 
     // Scrive nel campo il valore che il server ha adesso. `daCapo` azzera
