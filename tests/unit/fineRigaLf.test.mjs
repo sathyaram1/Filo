@@ -113,8 +113,9 @@ describe('fine riga: LF in ogni copia di lavoro', () => {
       const prima = readFileSync(join(ROOT, f), 'utf8').split('\n')[0];
       return !prima.startsWith('#!') || prima.includes('\r');
     });
-    assert.deepEqual(rotti, [],
-      'hook con lo shebang sporco: bash ci passa sopra, non committa e non spedisce, ed esce 0');
+    assert.equal(rotti.length, 0,
+      `hook con lo shebang sporco: ${elenco(rotti)}. Bash ci passa sopra, non committa e `
+      + 'non spedisce, ed esce 0: il salvataggio automatico è fermo e non lo dice. ' + CURA);
   });
 
   test('nessun sorgente tracciato contiene un NUL scritto grezzo', () => {
