@@ -209,14 +209,23 @@
   // insegna al modello che quel dato manca, che è un'informazione in più senza
   // costo, ma una riga per ogni campo mai valorizzato è rumore. Chi vuole il
   // segnaposto lo passa lui (`'-'`).
-  function imbustaCampi({ tipo, campi, conIntestazione = true, max } = {}) {
+  function imbustaCampi({ tipo, campi, corpo = '', conIntestazione = true, max } = {}) {
     const righe = [];
     for (const [nome, valore] of Object.entries(campi || {})) {
       if (valore === undefined || valore === null || valore === '') continue;
       righe.push(`${nome}: ${neutralizza(valore, { unaRiga: true })}`);
     }
-    if (!righe.length) return '';
-    return imbusta({ tipo, testo: righe.join('\n'), conIntestazione, max });
+    // `corpo` è la parte che NON è un campo: un estratto di pagina, il testo di
+    // un paragrafo. Lì gli a capo sono contenuto, quindi si ripulisce da
+    // blocco. Le due parti finiscono nella stessa busta perché vengono dalla
+    // stessa fonte: dividerle in due buste dello stesso tipo non aggiunge
+    // nessuna difesa e raddoppia l'intestazione.
+    const testoCorpo = corpo ? neutralizza(corpo, { unaRiga: false }) : '';
+    if (!righe.length && !testoCorpo) return '';
+    const dentro = righe.length && testoCorpo
+      ? `${righe.join('\n')}\n\n${testoCorpo}`
+      : (testoCorpo || righe.join('\n'));
+    return imbusta({ tipo, testo: dentro, conIntestazione, max });
   }
 
   // L'ultima rete sul canale «(Sistema: …)»: una nota di Filo è una frase di
