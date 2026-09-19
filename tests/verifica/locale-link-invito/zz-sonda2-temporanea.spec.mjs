@@ -81,19 +81,18 @@ test('sonda 2: la chiave personale arriva davvero alle impostazioni effettive?',
 
   const s = await app.evaluate(async () => {
     const eff = { };
+    const req = (p) => process.mainModule.require(p);
     try {
-      const ws = require('./src/main/auth/wallet-store');
-      eff.personale = ws.personalKey() ? 'c’è' : '(vuota)';
-    } catch (e) {
-      try {
-        const ws2 = require(require('node:path').join(process.cwd(), 'src/main/auth/wallet-store.js'));
-        eff.personale = ws2.personalKey() ? 'c’è' : '(vuota)';
-      } catch (e2) { eff.personale = 'ERR ' + e2.message; }
-    }
+      eff.personale = req('./src/main/auth/wallet-store').personalKey() ? 'c’è' : '(vuota)';
+    } catch (e) { eff.personale = 'ERR ' + e.message; }
     try {
-      const st = await globalThis.SN_STORAGE.getSettings();
-      eff.userOpenrouter = st.apiKeys?.openrouter ? 'c’è' : '(vuota)';
-    } catch (e) { eff.userOpenrouter = 'ERR'; }
+      const h = req('./src/main/services/handlers.js');
+      const s2 = await h.getEffectiveSettings();
+      eff.provider = s2.provider;
+      eff.effOpenrouter = s2.apiKeys?.openrouter ? 'c’è' : '(vuota)';
+      eff.chiavi = Object.keys(s2.apiKeys || {});
+      eff.useDefault = s2.useDefaultModels;
+    } catch (e) { eff.eff = 'ERR ' + e.message; }
     return eff;
   });
   console.log('SONDA2 main:', JSON.stringify(s));
