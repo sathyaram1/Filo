@@ -1365,15 +1365,25 @@
 
     // Spiega link: usa metadati Open Graph + dominio per descrivere brevemente
     // dove porta un link senza aprirlo. Riceve URL, anchor text, og:title, og:description.
+    // #593 — indirizzo, testo del link e metadati Open Graph li scrive il sito
+    // di destinazione, cioè esattamente chi ha interesse a farsi descrivere
+    // bene da chi avvisa l'utente che il link è sospetto. Vanno in una busta.
+    // Gli avvisi automatici invece li calcola Filo: restano fuori, ed è il
+    // punto — il modello deve poter distinguere chi glieli sta dicendo.
     explainLink: ({ url, anchorText, ogTitle, ogDescription, suspiciousFlags }) =>
       `Un utente sta passando il mouse su un link in una pagina web. ` +
-      `Riassumi in 1-2 frasi (max 200 caratteri) dove porta e di cosa parla, in italiano. ` +
-      `URL: ${url}\n` +
-      `Testo del link: "${anchorText || '-'}"\n` +
-      `Titolo (og:title): "${ogTitle || '-'}"\n` +
-      `Descrizione (og:description): "${ogDescription || '-'}"\n` +
-      (suspiciousFlags?.length ? `Avvisi automatici sul link: ${suspiciousFlags.join('; ')}.\n` : '') +
-      `Non aggiungere preamboli. Se il link è sospetto (typosquatting, pattern di unsubscribe/logout/delete) menzionalo brevemente. ` +
+      `Riassumi in 1-2 frasi (max 200 caratteri) dove porta e di cosa parla, in italiano.\n\n` +
+      esterno().imbustaCampi({
+        tipo: 'DATI_LINK',
+        campi: {
+          URL: url,
+          'Testo del link': anchorText || '-',
+          'Titolo (og:title)': ogTitle || '-',
+          'Descrizione (og:description)': ogDescription || '-',
+        },
+      }) + '\n' +
+      (suspiciousFlags?.length ? `\nAvvisi automatici di Filo sul link (questi NON vengono dal sito): ${suspiciousFlags.join('; ')}.\n` : '') +
+      `\nNon aggiungere preamboli. Se il link è sospetto (typosquatting, pattern di unsubscribe/logout/delete) menzionalo brevemente. ` +
       `Se non hai informazioni utili, scrivi solo il dominio e l'eventuale contesto del testo del link.`,
 
     describeImage: () =>
