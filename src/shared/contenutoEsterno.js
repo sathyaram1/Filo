@@ -208,12 +208,12 @@
   // ritrovava più nel testo originale le porzioni segnate dal modello.
   //
   // Adesso si spegne un TOKEN con la forma di una marcatura: tre o più aperte,
-  // un nome senza a capo e senza altre parentesi, tre o più chiuse. Una fila
+  // il nome più corto che ci sta senza andare a capo, tre o più chiuse. Una fila
   // che non chiude niente resta com'è, perché da sola non recinta niente. Il
   // giro si ripete finché il testo non si muove più: `<<<X<<<Y>>>Z>>>` non
   // deve lasciare fuori la coppia esterna.
   const TOKEN_MARCATURA_RE = new RegExp(
-    `<(?:${ORTO}*<){2,}[^\\n<>]{0,120}>(?:${ORTO}*>){2,}`,
+    `<(?:${ORTO}*<){2,}[^\\n]{0,120}?>(?:${ORTO}*>){2,}`,
     'g',
   );
   // Dentro il token: le file di parentesi, invisibili compresi. Restano due
@@ -272,21 +272,13 @@
       // e in modalità campo li toglie la riga qui sotto.
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
       .replace(FORMATTAZIONE_RE, '');
-    if (unaRiga) {
-      s = s.replace(/[\t\r\n\u2028\u2029]+/g, ' ')
-        // In un campo due parentesi angolari di fila non servono a niente di
-        // legittimo: si schiacciano, come faceva già la pulizia dei percorsi.
-        .replace(ANGOLARI_CAMPO_RE, '<')
-        .replace(CHIUSE_CAMPO_RE, '>');
-    } else {
-      s = s.replace(/[\u2028\u2029]/g, '\n')
-        // In un blocco `<<` può essere codice vero (l'operatore di scorrimento
-        // in C++, un heredoc di shell): si schiacciano solo le sequenze da tre
-        // in su, cioè quelle che possono comporre una marcatura. `<<<X>>>`
-        // diventa `<<X>>`, che non apre e non chiude niente.
-        .replace(ANGOLARI_BLOCCO_RE, '<<')
-        .replace(CHIUSE_BLOCCO_RE, '>>');
-    }
+    // Gli a capo si sistemano PRIMA delle parentesi: un campo sta su una riga
+    // sola, e una marcatura che qualcuno avesse spezzato su due righe qui
+    // torna intera, dove la regola la vede.
+    s = unaRiga
+      ? s.replace(/[\t\r\n\u2028\u2029]+/g, ' ')
+      : s.replace(/[\u2028\u2029]/g, '\n');
+    s = spegniMarcature(s);
     // E comunque i nomi delle marcature non si scrivono: è la seconda serratura
     // sulla stessa porta, per il caso in cui un domani la forma della marcatura
     // cambi e le parentesi angolari non bastino più.
