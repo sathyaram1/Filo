@@ -109,6 +109,14 @@
         if (!detail.hidden) caricaScheda(u, td).catch(() => {});
       };
       tr.addEventListener('click', apriChiudi);
+      // Il tasto destro su una persona: quello che si vorrebbe fare proprio a
+      // lei. Senza, si apriva il menu generale della pagina, che di questa
+      // riga non sa niente. Vale anche dal tasto menu della tastiera, che
+      // manda lo stesso evento sulla riga col fuoco.
+      tr.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        apriMenuPersona(u, detail, apriChiudi, ev.clientX, ev.clientY);
+      });
       // Stessa strada da tastiera: una riga che si apre solo col mouse è una
       // riga che per metà delle persone non si apre.
       tr.addEventListener('keydown', (ev) => {
