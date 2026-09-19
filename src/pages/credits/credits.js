@@ -59,7 +59,7 @@
 
     renderWallet(w);
     renderUsage(credits.byUsage || {});
-    renderMoves(credits.rewards || []);
+    renderMoves(credits.rewards || [], w);
   }
 
   // ── Crediti sul server (#598) ──────────────────────────────────────────────
