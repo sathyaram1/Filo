@@ -366,7 +366,7 @@ test('#509 — input limite: niente XSS, niente sezioni sbagliate', async ({ ope
   const coda = [
     { _id: 'z1', seq: 1, status: 'unlabeled', name: '<img src=x onerror="window.__xss=1">', text: '<script>window.__xss=2</script>', createdAt: '2026-08-01T10:00:00Z' },
     { _id: 'z2', seq: 2, status: 'todo', name: '🚀🎉 emoji', text: lungo, url: 'javascript:window.__xss=3', createdAt: '2026-08-02T10:00:00Z' },
-    { _id: 'z3', seq: 3, status: 'archived', name: 'null byte', text: '   ', notes: '"><svg onload="window.__xss=4">', createdAt: '2026-08-03T10:00:00Z' },
+    { _id: 'z3', seq: 3, status: 'archived', name: 'null\u0000byte', text: '   ', notes: '"><svg onload="window.__xss=4">', createdAt: '2026-08-03T10:00:00Z' },
   ];
   const page = await apriFeedback(openTab, coda);
   await expect(page.locator('#tabs [data-tab="inbox"]')).toHaveText('Ricevuti (1)');
