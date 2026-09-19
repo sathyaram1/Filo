@@ -54,6 +54,16 @@ test.beforeAll(async () => {
             hasWallet: true, pseudonym: 'abcdef0123456789',
             balance: { credits: 4990, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0.0084, remainingUsd: 4.1916, eurUsd: 1.2, eurPerCredit: 0.0007 },
             stale: false, dailyCredits: 100,
+            // #652 — i movimenti del portafoglio: da dove vengono i crediti.
+            // Il server li manda DAL PIÙ RECENTE (al più gli ultimi 200), ed è
+            // l'ordine in cui vanno letti: qui stanno come arrivano davvero.
+            grants: [
+              { at: '2026-09-12T09:00:00.000Z', credits: 50, why: 'feedback_closed:Zz99' },
+              { at: '2026-09-11T18:00:00.000Z', credits: 10, why: 'feedback_sent:Zz99' },
+              { at: '2026-09-10T12:00:00.000Z', credits: 300, why: 'owner' },
+              { at: '2026-09-09T03:10:00.000Z', credits: 100, why: 'daily' },
+              { at: '2026-09-08T10:00:00.000Z', credits: 5000, why: 'entry' },
+            ],
             invites: [
               { code: 'AAAA-2222', used: false, usedAt: null },
               { code: 'BBBB-3333', used: true, usedAt: '2026-09-08T10:00:00.000Z' },
@@ -267,4 +277,51 @@ test('riscattato l’invito, la home aperta smette di mandare a riscattarlo', as
     .not.toContain('serve un codice d\'invito');
   const testo = await home.evaluate(() => document.body.innerText);
   expect(testo).not.toContain('riscatta l\'invito');
+});
+
+// #652 — con un portafoglio i crediti li tiene il server, e i movimenti veri
+// sono i suoi: invito riscattato, quota del giorno, regali, premi per le
+// segnalazioni. Il conteggio locale delle ricompense, che con quel saldo non
+// c'entra niente, non si mostra più accanto.
+//
+// L'ORDINE è la metà del test: il server li manda dal più recente, e il più
+// recente deve stare in cima. Rovesciarli (la pagina lo faceva, quando si
+// aspettava l'ordine del documento) mette in cima il giorno dell'ingresso e
+// l'ultima cosa successa in fondo: questo test diventa rosso.
+test('con un portafoglio i movimenti sono quelli del server, col più recente in cima', async ({ app, openTab }) => {
+  const page = await openTab('filo://credits/credits.html');
+  await page.waitForFunction(() => { const w = document.getElementById('wallet'); return w && !w.hidden; }, null, { timeout: 15000 });
+  // Il portafoglio può esserci già (il finto server lo ricorda fra una prova e
+  // l'altra): in quel caso non c'è niente da riscattare.
+  if (await page.locator('#redeemForm').isVisible()) {
+    await page.fill('#inviteCode', 'abcd-efgh');
+    await page.click('#redeemBtn');
+  }
+  await expect(page.locator('#balance')).toHaveText('4.990', { timeout: 15000 });
+
+  const moves = page.locator('#moves li');
+  await expect(moves).toHaveCount(5, { timeout: 15000 });
+
+  // I cinque motivi, ciascuno con la sua frase, nell'ordine in cui il server
+  // li manda: dal più recente.
+  await expect(moves.nth(0)).toContainText('Segnalazione risolta');
+  await expect(moves.nth(0)).toContainText('+50');
+  await expect(moves.nth(1)).toContainText('Segnalazione inviata');
+  await expect(moves.nth(1)).toContainText('+10');
+  await expect(moves.nth(2)).toContainText('Regalo di Filo');
+  await expect(moves.nth(2)).toContainText('+300');
+  await expect(moves.nth(3)).toContainText('Quota del giorno');
+  await expect(moves.nth(3)).toContainText('+100');
+  await expect(moves.nth(4)).toContainText('Invito riscattato');
+  await expect(moves.nth(4)).toContainText('+5.000');
+
+  // L'ordine, detto senza passare dalle frasi: la data in cima è la più
+  // recente e quella in fondo la più vecchia.
+  const date = await moves.locator('.sn-credits-move-date').allTextContents();
+  expect(date[0]).toMatch(/^12\b/);
+  expect(date[date.length - 1]).toMatch(/^8\b/);
+
+  // Nessuna etichetta del conteggio locale si è infilata qui in mezzo.
+  await expect(page.locator('#moves')).not.toContainText('Ricompensa');
+  await expect(page.locator('#moves')).not.toContainText('Voto in Bacheca');
 });

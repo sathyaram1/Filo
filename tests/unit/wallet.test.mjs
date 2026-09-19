@@ -290,3 +290,39 @@ test('un codice storto non arriva nemmeno al server: lo dice la frase', () => {
   assert.match(W.entryNoticeText({ credits: 5000 }), /5\.000 crediti/);
   assert.match(W.entryNoticeText({}), /crediti sono pronti/);
 });
+
+// #652 — i movimenti del portafoglio. Il `why` che arriva dal server è un
+// codice, a volte con l'id del feedback attaccato: chi legge la pagina Crediti
+// deve trovarci una frase.
+test('un movimento del portafoglio si legge in italiano, anche con l’id attaccato', () => {
+  assert.equal(W.grantLabel('entry'), 'Invito riscattato');
+  assert.equal(W.grantLabel('daily'), 'Quota del giorno');
+  assert.equal(W.grantLabel('owner'), 'Regalo di Filo');
+  assert.equal(W.grantLabel('gift'), 'Regalo di Filo');
+  assert.equal(W.grantLabel('feedback_sent:aBc123'), 'Segnalazione inviata');
+  assert.equal(W.grantLabel('feedback_closed:aBc123'), 'Segnalazione risolta');
+  assert.equal(W.grantLabel('qualcosa_di_nuovo'), 'Crediti ricevuti', 'un motivo sconosciuto non lascia la riga vuota');
+  assert.equal(W.grantLabel(''), 'Crediti ricevuti');
+  assert.equal(W.grantLabel(null), 'Crediti ricevuti');
+});
+
+// #652 — le sette manopole della pagina dell'owner. La tabella sta qui perché
+// la usano sia la pagina (per disegnare i campi) sia il main (per rifiutare un
+// numero storto prima di scriverlo): se divergessero, il main accetterebbe
+// quello che la pagina rifiuta.
+test('le manopole dei crediti sono sette, hanno un nome e limiti sensati', () => {
+  assert.equal(W.OWNER_KNOBS.length, 7);
+  assert.deepEqual(W.OWNER_KNOB_KEYS, [
+    'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses',
+    'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackClosed',
+  ]);
+  for (const k of W.OWNER_KNOBS) {
+    assert.ok(k.etichetta && k.etichetta.length > 2, `${k.chiave}: serve un nome leggibile`);
+    assert.ok(k.aiuto && k.aiuto.length > 10, `${k.chiave}: serve una spiegazione`);
+    assert.ok(Number.isInteger(k.min) && k.min >= 0, `${k.chiave}: niente valori negativi`);
+    assert.ok(k.max > k.min, `${k.chiave}: il tetto deve stare sopra il minimo`);
+  }
+  // Un invito per zero persone non è un invito: quella manopola parte da 1.
+  assert.equal(W.knobOf('invitesMaxUses').min, 1);
+  assert.equal(W.knobOf('non-esiste'), null);
+});

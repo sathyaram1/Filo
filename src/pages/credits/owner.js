@@ -15,6 +15,9 @@
 
   // ── Owner: codici, regali, chi ha cosa ─────────────────────────────────────
   let overviewLoaded = false;
+  // La prima lettura riempie i campi delle manopole; quelle dopo rispettano
+  // quello che l'owner sta scrivendo.
+  let primaLettura = true;
   function renderOwner(w) {
     const owner = Boolean(w && w.ok && w.isOwner);
     $('ownerSection').hidden = !owner;
@@ -36,16 +39,19 @@
     const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OVERVIEW });
     const o = r && r.ok && r.overview;
     if (!o) {
-      $('ownerTotals').textContent = r && r.error ? `Vista non disponibile (${r.error}).` : 'Vista non disponibile.';
+      guastoVista(r && r.error);
       return;
     }
+    mostraManopole(true);
     const cfg = o.config || {};
     const tot = o.totals || {};
-    const nUsers = Number(tot.users) || 0;
-    $('ownerTotals').textContent =
-      `${formatInt(nUsers)} ${nUsers === 1 ? 'utente' : 'utenti'} · tetti ${fmtUsd(tot.totalLimitUsd)} su ${fmtUsd(tot.maxGrantUsd)} elargibili · `
-      + `inviti riscattabili rimasti ${formatInt(cfg.invitesRemaining || 0)} · ingresso ${formatInt(cfg.entryCredits || 0)}, +${formatInt(cfg.dailyCredits || 0)}/giorno`
-      + (cfg.eurUsd ? ` · cambio ${cfg.eurUsd} (${cfg.eurUsdAt || ''})` : ' · cambio mancante');
+    renderNumeri(cfg, tot, o.ownerInvites || []);
+    const quando = formatDate(cfg.eurUsdAt);
+    $('ownerTotals').textContent = cfg.eurUsd
+      ? `Un credito vale ${formatDecimale(cfg.eurPerCredit, 6)} €, e un euro ${formatDecimale(cfg.eurUsd, 4)} $`
+        + `${quando ? ` (cambio del ${quando})` : ''}.`
+      : 'Manca il cambio del giorno: finché non arriva, Filo non regala crediti a nessuno.';
+    riempiManopole(cfg, tot);
     // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
     // con quelli usati barrati, così chi ne genera cinque e chiude la pagina sa
     // ancora quali ha già dato.
@@ -53,7 +59,12 @@
 
     const table = $('ownerUsers');
     const tbody = table.querySelector('tbody');
+    // Le righe si rifanno: un menu aperto su una riga che non esiste più
+    // resterebbe appeso sopra la pagina.
+    chiudiMenuPersona();
     tbody.innerHTML = '';
+    // Le righe si rifanno da zero: le schede già chieste vanno richieste.
+    schedeChieste.clear();
     const users = (o.users || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
     table.hidden = users.length === 0;
     for (const u of users) {
@@ -74,25 +85,254 @@
       });
       if (u.disabled) tr.className = 'is-used';
       tr.classList.add('sn-wallet-user');
-      tr.title = 'Dettaglio per azione e per giorno';
+      tr.title = 'Apri la scheda di questa persona';
+      tr.tabIndex = 0;
+      tr.setAttribute('role', 'button');
+      tr.setAttribute('aria-expanded', 'false');
       tbody.appendChild(tr);
 
-      // Il dettaglio d'uso (per azione, per giorno) sta in una riga sotto, che
-      // si apre al clic sulla riga dell'utente.
+      // La scheda della persona sta in una riga sotto, che si apre al clic
+      // sulla riga. Il contenuto è una chiamata a parte (movimenti, inviti,
+      // ultime chiamate): si chiede alla prima apertura, non prima.
       const detail = document.createElement('tr');
       detail.className = 'sn-wallet-user-detail';
       detail.hidden = true;
       const td = document.createElement('td');
       td.colSpan = cells.length;
+      // Finché la scheda non arriva si mostra quello che la vista generale sa
+      // già (per azione, per giorno): qualcosa da leggere c'è subito.
       td.appendChild(usageDetail(u.usage));
       detail.appendChild(td);
       tbody.appendChild(detail);
-      tr.addEventListener('click', () => { detail.hidden = !detail.hidden; tr.classList.toggle('is-open', !detail.hidden); });
+
+      const apriChiudi = () => {
+        detail.hidden = !detail.hidden;
+        tr.classList.toggle('is-open', !detail.hidden);
+        tr.setAttribute('aria-expanded', detail.hidden ? 'false' : 'true');
+        if (!detail.hidden) caricaScheda(u, td).catch(() => {});
+      };
+      tr.addEventListener('click', apriChiudi);
+      // Il tasto destro su una persona: quello che si vorrebbe fare proprio a
+      // lei. Senza, si apriva il menu generale della pagina, che di questa
+      // riga non sa niente. Vale anche dal tasto menu della tastiera, che
+      // manda lo stesso evento sulla riga col fuoco.
+      tr.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        apriMenuPersona(u, detail, apriChiudi, ev.clientX, ev.clientY);
+      });
+      // Stessa strada da tastiera: una riga che si apre solo col mouse è una
+      // riga che per metà delle persone non si apre.
+      tr.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        apriChiudi();
+      });
     }
     const runs = [];
     if (o.daily && o.daily.lastRunAt) runs.push(`giornaliera ${formatDateTime(o.daily.lastRunAt)}${summ(o.daily.summary)}`);
     if (o.reconcile && o.reconcile.lastRunAt) runs.push(`riconciliazione ${formatDateTime(o.reconcile.lastRunAt)}${summ(o.reconcile.summary)}`);
     $('ownerRuns').textContent = runs.length ? `Ultime: ${runs.join(' · ')}` : 'Giornaliera e riconciliazione non hanno ancora girato.';
+  }
+
+  // ── Quando il server non risponde ──────────────────────────────────────────
+  // Il messaggio grezzo (nome della chiamata, numero dell'errore, risposta del
+  // server) va nella console, non addosso a chi legge: qui resta una frase e un
+  // modo di riprovare, come per gli errori in chat. E le manopole senza i
+  // numeri del server non si possono disegnare: il titolo se ne va con loro,
+  // invece di restare lì ad annunciare il nulla.
+  // Senza punto in fondo: chi la usa la infila dove serve («Non salvato: …»).
+  function fraseGuasto(raw) {
+    const t = String(raw || '');
+    if (/not_admin/i.test(t)) return 'questo computer non ti riconosce come proprietario, rientra col tuo account';
+    if (/sessione scaduta/i.test(t)) return 'la sessione è scaduta, rifai l’accesso';
+    if (/PERMISSION_DENIED|non autorizzat|\b40[13]\b/i.test(t)) return 'il server non ha accettato la richiesta, rientra col tuo account e riprova';
+    return 'il server dei crediti non risponde';
+  }
+  function conMaiuscola(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  function mostraManopole(visibili) {
+    $('ownerKnobsTitle').hidden = !visibili;
+    $('ownerKnobs').hidden = !visibili;
+  }
+
+  function guastoVista(errore) {
+    if (errore) console.warn('[credits/owner] vista non arrivata:', errore);
+    const p = $('ownerTotals');
+    p.textContent = `${conMaiuscola(fraseGuasto(errore))}. `;
+    const riprova = document.createElement('button');
+    riprova.type = 'button';
+    riprova.className = 'sn-btn sn-btn-secondary';
+    riprova.textContent = 'Riprova';
+    riprova.title = 'Richiedi la vista al server';
+    riprova.addEventListener('click', () => {
+      riprova.disabled = true;
+      p.textContent = 'Chiedo al server…';
+      loadOverview().catch(() => {});
+    });
+    p.appendChild(riprova);
+    // Senza i numeri del server non c'è niente da mettere nei campi.
+    if (!campi.size) mostraManopole(false);
+  }
+
+  // ── I numeri che il server calcola ─────────────────────────────────────────
+  // Sola lettura: qui si guarda quanto è già uscito, quanto resta da dare e
+  // quanto è ancora in mano alle persone. Un riquadro che non si può toccare
+  // accanto a uno che si può toccare deve VEDERSI diverso: il valore grande,
+  // il nome sotto, nessun campo.
+  function riquadro(valore, nome, spiega, { barra = null } = {}) {
+    const li = document.createElement('li');
+    li.className = 'sn-wallet-numero';
+    if (spiega) li.title = spiega;
+    const v = document.createElement('span');
+    v.className = 'sn-wallet-numero-valore';
+    v.textContent = valore;
+    const n = document.createElement('span');
+    n.className = 'sn-wallet-numero-nome';
+    n.textContent = nome;
+    li.append(v, n);
+    if (barra != null && Number.isFinite(barra)) {
+      const b = document.createElement('span');
+      b.className = 'sn-wallet-numero-barra';
+      const dentro = document.createElement('span');
+      dentro.style.width = `${Math.max(0, Math.min(100, barra * 100))}%`;
+      b.appendChild(dentro);
+      li.appendChild(b);
+    }
+    return li;
+  }
+
+  function renderNumeri(cfg, tot, ownerInvites) {
+    const lista = $('ownerNumeri');
+    lista.innerHTML = '';
+    const nUsers = Number(tot.users) || 0;
+    const tetto = Number(tot.maxGrantCredits);
+    const dati = Number(tot.grantedCredits);
+    const restano = Number.isFinite(tetto) && Number.isFinite(dati) ? Math.max(0, tetto - dati) : null;
+    const vivi = tot.liveCredits;
+
+    lista.appendChild(riquadro(formatInt(nUsers), nUsers === 1 ? 'utente' : 'utenti',
+      'Quante persone hanno un portafoglio su questo server.'));
+    lista.appendChild(riquadro(
+      Number.isFinite(dati) ? formatInt(dati) : '—',
+      Number.isFinite(tetto) ? `crediti elargiti su ${formatInt(tetto)}` : 'crediti elargiti',
+      'Quanto hai dato finora, contro il tetto che hai messo.',
+      { barra: Number.isFinite(tetto) && tetto > 0 && Number.isFinite(dati) ? dati / tetto : null },
+    ));
+    lista.appendChild(riquadro(restano == null ? '—' : formatInt(restano), 'ancora elargibili',
+      'Quanto puoi ancora dare prima di sbattere sul tetto. A zero si fermano ingressi, quote e premi.'));
+    lista.appendChild(riquadro(vivi == null ? '—' : formatCredits(vivi), 'crediti vivi',
+      'La somma dei saldi di tutti: quello che le persone hanno ancora da spendere.'));
+
+    // «In circolazione» sono i codici che questa pagina ha generato e che
+    // hanno ancora un posto libero: sono gli unici che il server manda qui.
+    const buoni = (ownerInvites || []).map((i) => W.inviteView(i)).filter((v) => !v.exhausted && !v.revoked);
+    const posti = buoni.reduce((a, v) => a + Math.max(0, (Number(v.max) || 0) - (Number(v.used) || 0)), 0);
+    lista.appendChild(riquadro(formatInt(buoni.length), buoni.length === 1 ? 'tuo invito da dare' : 'tuoi inviti da dare',
+      `Codici usciti da qui con ancora un posto libero: ${formatInt(posti)} ${posti === 1 ? 'persona può entrare' : 'persone possono entrare'}.`));
+    lista.appendChild(riquadro(formatInt(cfg.invitesRemaining || 0), 'riscatti rimasti',
+      'Quante volte si può ancora entrare con un invito, in tutto.'));
+  }
+
+  // ── Le manopole ────────────────────────────────────────────────────────────
+  // Sette campi identici: nome, limiti e spiegazione stanno nella tabella di
+  // src/shared/wallet.js, il comportamento in src/shared/campoNumero.js. Qui
+  // resta solo il cucito.
+  const campi = new Map();
+
+  function costruisciManopole() {
+    if (campi.size) return;
+    const CN = window.SN_CAMPO_NUMERO;
+    const scatola = $('ownerKnobs');
+    for (const k of W.OWNER_KNOBS) {
+      const riga = document.createElement('div');
+      riga.className = 'sn-manopola';
+      riga.dataset.chiave = k.chiave;
+
+      const label = document.createElement('label');
+      label.setAttribute('for', `knob-${k.chiave}`);
+      label.textContent = k.etichetta;
+      label.title = k.aiuto;
+
+      const controlli = document.createElement('div');
+      controlli.className = 'sn-manopola-riga';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.id = `knob-${k.chiave}`;
+      input.inputMode = 'numeric';
+      input.autocomplete = 'off';
+      input.title = k.aiuto;
+
+      const salva = document.createElement('button');
+      salva.type = 'button';
+      salva.className = 'sn-btn';
+      salva.id = `knob-${k.chiave}-salva`;
+      salva.textContent = 'Salva';
+
+      const rimetti = document.createElement('button');
+      rimetti.type = 'button';
+      rimetti.className = 'sn-btn sn-btn-secondary';
+      rimetti.id = `knob-${k.chiave}-rimetti`;
+      rimetti.textContent = 'Rimetti com’era';
+
+      const msg = document.createElement('p');
+      msg.className = 'sn-wallet-msg sn-manopola-msg';
+      msg.id = `knob-${k.chiave}-msg`;
+      msg.setAttribute('role', 'status');
+      msg.hidden = true;
+
+      controlli.append(input, salva, rimetti);
+      riga.append(label, controlli, msg);
+      scatola.appendChild(riga);
+
+      campi.set(k.chiave, CN.collega({
+        input, salvaBtn: salva, rimetti, msg,
+        regole: { min: k.min, max: k.max, intero: true, etichetta: k.etichetta },
+        salva: (valore) => salvaManopola(k.chiave, valore),
+        // Cambiata una manopola, i numeri calcolati accanto non valgono più.
+        onSalva: () => { loadOverview().catch(() => {}); },
+      }));
+    }
+  }
+
+  async function salvaManopola(chiave, valore) {
+    const r = await chrome.runtime
+      .sendMessage({ type: MSG.WALLET_OWNER_KNOBS_SET, patch: { [chiave]: valore } })
+      .catch(() => null);
+    if (!(r && r.ok)) {
+      // Il testo del server (numero dell'errore, risposta per intero) resta
+      // nella console: davanti agli occhi va una frase.
+      if (r && r.error) console.warn('[credits/owner] manopola non salvata:', chiave, r.error);
+      return { ok: false, errore: fraseGuasto(r && r.error) };
+    }
+    const letto = r.knobs ? r.knobs[chiave] : null;
+    return { ok: true, valore: letto == null ? valore : letto };
+  }
+
+  // Il tetto in crediti può non essere scritto: allora vale quello in dollari,
+  // e il numero da mostrare è quello che il server ha calcolato (totals).
+  function valoreManopola(chiave, cfg, tot) {
+    if (chiave === 'maxGrantCredits') {
+      const scritto = cfg.maxGrantCredits;
+      return scritto == null ? tot.maxGrantCredits : scritto;
+    }
+    return cfg[chiave];
+  }
+
+  function riempiManopole(cfg, tot) {
+    costruisciManopole();
+    for (const k of W.OWNER_KNOBS) {
+      const campo = campi.get(k.chiave);
+      if (!campo) continue;
+      // Non si riscrive un campo che qualcuno sta usando, né uno che ha ancora
+      // un salvataggio da poter rimettere com'era: la rilettura arriva anche
+      // mentre si digita (il server avvisa a ogni cambio di crediti).
+      const st = campo.stato();
+      if (!primaLettura && (!st.pulito || st.disfabile)) continue;
+      const v = valoreManopola(k.chiave, cfg, tot);
+      campo.mostra(v == null ? '' : v, { daCapo: true });
+    }
+    primaLettura = false;
   }
 
   function usageDetail(usage) {
@@ -121,6 +361,239 @@
     wrap.appendChild(col(`Per azione (${formatInt(usage.rows)} chiamate)`, byAction, (k) => k));
     wrap.appendChild(col('Per giorno', byDay, (k) => formatDate(k)));
     return wrap;
+  }
+
+  // ── Il tasto destro su una persona ─────────────────────────────────────────
+  // Il menu proprio di una pagina filo:// si apre con preventDefault sulla
+  // riga, e quello generale si fa da parte da solo (pattern «menu contestuale
+  // proprio nelle pagine filo://»). Le voci sono le cose che si vogliono fare
+  // a QUELLA persona: aprire la sua scheda, prendere il suo pseudonimo,
+  // regalarle crediti.
+  let menuAperto = null;
+
+  function chiudiMenuPersona() {
+    if (!menuAperto) return;
+    menuAperto.remove();
+    menuAperto = null;
+    document.removeEventListener('mousedown', fuoriDalMenu, true);
+    document.removeEventListener('keydown', tastoSulMenu, true);
+    window.removeEventListener('wheel', fuoriDalMenu, true);
+    window.removeEventListener('resize', chiudiMenuPersona);
+  }
+  // Il menu si chiude a un clic o a una rotella fuori da lui. Non si chiude a
+  // ogni evento di scorrimento: il menu sta in coordinate fisse e non scappa
+  // via, e uno scorrimento lo fa anche il browser da solo quando porta in
+  // vista quello su cui si sta per cliccare — chiudendo il menu proprio mentre
+  // lo si usa.
+  function fuoriDalMenu(ev) { if (menuAperto && !menuAperto.contains(ev.target)) chiudiMenuPersona(); }
+  function tastoSulMenu(ev) { if (ev.key === 'Escape') { ev.preventDefault(); chiudiMenuPersona(); } }
+
+  function copia(testo) { try { navigator.clipboard.writeText(testo); } catch (_) {} }
+
+  function apriMenuPersona(u, detail, apriChiudi, x, y) {
+    chiudiMenuPersona();
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
+    menu.setAttribute('role', 'menu');
+    const voci = [
+      [detail.hidden ? 'Apri la scheda' : 'Chiudi la scheda', () => apriChiudi()],
+      ['Copia lo pseudonimo', () => copia(u.pseudonym)],
+      ['Regala crediti a questa persona', () => {
+        $('ownerGrantPseudonym').value = u.pseudonym;
+        const quanti = $('ownerGrantCredits');
+        quanti.focus();
+        quanti.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }],
+    ];
+    for (const [testo, azione] of voci) {
+      const voce = document.createElement('div');
+      voce.className = 'sn-select-option';
+      voce.setAttribute('role', 'menuitem');
+      voce.tabIndex = 0;
+      voce.textContent = testo;
+      const fai = () => { chiudiMenuPersona(); azione(); };
+      voce.addEventListener('click', fai);
+      voce.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        fai();
+      });
+      menu.appendChild(voce);
+    }
+    document.body.appendChild(menu);
+    // Il menu rientra sempre nella finestra, anche se il clic è in fondo.
+    const w = menu.offsetWidth; const h = menu.offsetHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - w - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
+    menuAperto = menu;
+    setTimeout(() => {
+      document.addEventListener('mousedown', fuoriDalMenu, true);
+      document.addEventListener('keydown', tastoSulMenu, true);
+      window.addEventListener('wheel', fuoriDalMenu, true);
+      window.addEventListener('resize', chiudiMenuPersona);
+    }, 0);
+  }
+
+  // ── La scheda di una persona ───────────────────────────────────────────────
+  // Tutto quello che si può sapere di chi usa Filo con un portafoglio, senza
+  // mai un nome: saldo, quanto ha ricevuto e quanto ha speso, dove sono andati
+  // i crediti, i movimenti, chi l'ha invitata, i suoi inviti e le ultime
+  // chiamate che ha fatto. Si chiede alla prima apertura della riga.
+  const schedeChieste = new Set();
+
+  async function caricaScheda(u, td) {
+    if (schedeChieste.has(u.pseudonym)) return;
+    schedeChieste.add(u.pseudonym);
+    const attesa = document.createElement('p');
+    attesa.className = 'sn-muted sn-wallet-scheda-attesa';
+    attesa.textContent = 'Apro la scheda…';
+    td.appendChild(attesa);
+    const r = await chrome.runtime
+      .sendMessage({ type: MSG.WALLET_OWNER_USER_DETAIL, pseudonym: u.pseudonym })
+      .catch(() => null);
+    attesa.remove();
+    const d = r && r.ok && r.detail;
+    if (!d || d.found === false) {
+      // Riprovabile: la prossima apertura la richiede.
+      schedeChieste.delete(u.pseudonym);
+      const err = document.createElement('p');
+      err.className = 'sn-wallet-msg is-error';
+      if (r && r.error) console.warn('[credits/owner] scheda non arrivata:', r.error);
+      err.textContent = d && d.found === false
+        ? 'Questa persona non risulta più al server.'
+        : `Scheda non arrivata: ${fraseGuasto(r && r.error)}. Richiudi e riapri per riprovare.`;
+      td.appendChild(err);
+      return;
+    }
+    td.innerHTML = '';
+    td.appendChild(schedaPersona(u, d));
+  }
+
+  function bloccoScheda(titolo, corpo) {
+    const box = document.createElement('div');
+    box.className = 'sn-wallet-scheda-blocco';
+    const h = document.createElement('h4');
+    h.textContent = titolo;
+    box.append(h, corpo);
+    return box;
+  }
+
+  function elencoSemplice(voci, vuoto) {
+    if (!voci.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = vuoto;
+      return p;
+    }
+    const ul = document.createElement('ul');
+    ul.className = 'sn-wallet-scheda-elenco';
+    for (const [sinistra, destra] of voci) {
+      const li = document.createElement('li');
+      const a = document.createElement('span'); a.textContent = sinistra;
+      const b = document.createElement('span'); b.textContent = destra;
+      li.append(a, b);
+      ul.appendChild(li);
+    }
+    return ul;
+  }
+
+  function schedaPersona(u, d) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-wallet-scheda';
+
+    const b = d.balance || u.balance || {};
+    const rec = d.reconcile || u.reconcile;
+    const invitata = (d.invitedBy || u.invitedBy) === 'owner' ? 'te' : (d.invitedBy || u.invitedBy || 'nessuno');
+    wrap.appendChild(bloccoScheda('In due parole', elencoSemplice([
+      ['Saldo', `${formatCredits(b.credits)} crediti`],
+      ['Ricevuti in tutto', `${formatInt(b.creditsGranted)} crediti`],
+      ['Speso', fmtUsd(b.usageUsd)],
+      ['Tetto della sua chiave', fmtUsd(b.limitUsd)],
+      ['Riconciliazione', !rec ? 'mai fatta' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'torna')],
+      ['Invitato da', invitata],
+      ['Con Filo dal', formatDate(d.createdAt || u.createdAt) || '—'],
+    ], '')));
+
+    wrap.appendChild(bloccoScheda('Dove sono andati i crediti', usageDetail(d.usage || u.usage)));
+
+    // I movimenti: da dove vengono i crediti che ha ricevuto. È qui che si
+    // vedono i premi per le segnalazioni.
+    //
+    // L'ordine si decide qui, sulla data, invece di fidarsi di come arriva la
+    // lista: le due funzioni del server non la mandano allo stesso modo (la
+    // scheda della persona la dà com'è scritta nel documento, dal più vecchio;
+    // lo stato del portafoglio la ordina lui dal più recente). Chi legge vuole
+    // in cima l'ultima cosa successa, da qualunque parte arrivi.
+    const movimenti = (d.grants || []).slice()
+      .sort((a, b) => String(b && b.at || '').localeCompare(String(a && a.at || '')))
+      .slice(0, 50)
+      .map((g) => [`${W.grantLabel(g.why)} · ${formatDate(g.at)}`, `+${formatInt(g.credits)}`]);
+    wrap.appendChild(bloccoScheda('Movimenti', elencoSemplice(movimenti, 'Nessun movimento.')));
+
+    // I suoi inviti, con chi è entrato: stessa forma dei propri codici.
+    const suoi = d.invites || [];
+    const boxInviti = document.createElement('div');
+    if (!suoi.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Non ha inviti da dare.';
+      boxInviti.appendChild(p);
+    } else {
+      const ul = document.createElement('ul');
+      ul.className = 'sn-wallet-invites';
+      // Sempre attraverso la vista: il link si ricostruisce dal codice anche se
+      // il server non lo manda, e i posti si contano allo stesso modo qui e
+      // nella pagina Crediti.
+      for (const inv of suoi) ul.appendChild(inviteItem(W.inviteView(inv), inv && inv.createdAt));
+      boxInviti.appendChild(ul);
+    }
+    wrap.appendChild(bloccoScheda('I suoi inviti', boxInviti));
+
+    wrap.appendChild(bloccoScheda('Ultime chiamate', tabellaChiamate(d.rows || [])));
+    return wrap;
+  }
+
+  function tabellaChiamate(rows) {
+    if (!rows.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessuna chiamata registrata.';
+      return p;
+    }
+    const tabella = document.createElement('table');
+    tabella.className = 'sn-wallet-table sn-wallet-chiamate';
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    // I crediti accanto al costo: sono quelli che la persona si è vista
+    // scalare, e sono numeri interi che si leggono. Il costo in dollari da
+    // solo, per una chiamata sola, è un numero con quattro zeri davanti.
+    for (const t of ['Quando', 'Per cosa', 'Modello', 'Chi ha servito', 'Crediti', 'Costo']) {
+      const th = document.createElement('th');
+      th.textContent = t;
+      trh.appendChild(th);
+    }
+    thead.appendChild(trh);
+    const tbody = document.createElement('tbody');
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      const celle = [
+        formatDateTime(r.at) || '—',
+        r.action || '—',
+        r.model || '—',
+        r.servedBy || 'non detto',
+        formatCredits(r.credits),
+        fmtUsd(r.costUsd),
+      ];
+      celle.forEach((c) => {
+        const td = document.createElement('td');
+        td.textContent = c;
+        tr.appendChild(td);
+      });
+      tr.title = `${formatInt(r.promptTokens)} token in, ${formatInt(r.completionTokens)} fuori · ${formatCredits(r.credits)} crediti`;
+      tbody.appendChild(tr);
+    }
+    tabella.append(thead, tbody);
+    return tabella;
   }
 
   // Un invito si dà come LINK (#651), qui come nella pagina Crediti: è da
@@ -312,10 +785,19 @@
     if (input) { input.focus(); if (typeof input.select === 'function') input.select(); }
   }
 
+  // I dollari, con tante cifre quante ne servono perché un numero diverso da
+  // zero non finisca scritto «0 $». Una chiamata vera costa qualche millesimo
+  // di dollaro: arrotondata ai centesimi spariva, e la spesa di una persona si
+  // leggeva tutta a zeri. Sopra il centesimo restano due decimali, come prima.
   function fmtUsd(n) {
     const v = Number(n);
     if (!Number.isFinite(v)) return '—';
-    return `${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 }).format(v)} $`;
+    if (v === 0) return '0 $';
+    for (const dec of [2, 4, 6, 8]) {
+      const s = new Intl.NumberFormat('it-IT', { maximumFractionDigits: dec }).format(v);
+      if (Number(s.replace(/\./g, '').replace(',', '.')) !== 0) return `${s} $`;
+    }
+    return v > 0 ? 'meno di 0,00000001 $' : '—';
   }
   function formatDateTime(ts) {
     if (!ts) return '';
@@ -331,6 +813,13 @@
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
     return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+  }
+  // Un numero con la virgola come si scrive in italiano, senza zeri finti in
+  // coda (0,0007 resta 0,0007, 1,17 resta 1,17).
+  function formatDecimale(n, decimali) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '—';
+    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: decimali }).format(v);
   }
   function formatDate(ts) {
     if (!ts) return '';

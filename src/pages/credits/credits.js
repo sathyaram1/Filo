@@ -59,7 +59,7 @@
 
     renderWallet(w);
     renderUsage(credits.byUsage || {});
-    renderMoves(credits.rewards || []);
+    renderMoves(credits.rewards || [], w);
   }
 
   // ── Crediti sul server (#598) ──────────────────────────────────────────────
@@ -517,11 +517,27 @@
     auto_feedback_bonus: 'Bonus segnalazione automatica',
   };
 
-  function renderMoves(rewards) {
+  // I movimenti (#652). Con un portafoglio i crediti li tiene il server, e i
+  // movimenti veri sono i suoi: ingresso, quota del giorno, regali, premi per
+  // le segnalazioni. Il conteggio locale delle ricompense resta solo per chi il
+  // portafoglio non ce l'ha: mostrarlo accanto a un saldo che arriva da
+  // un'altra parte era un elenco di numeri che con quel saldo non c'entravano.
+  function renderMoves(rewards, w) {
     const list = $('moves');
     list.innerHTML = '';
-    // Più recenti in cima.
-    const items = rewards.slice().reverse().filter((m) => (m && m.credits) > 0);
+    const server = w && w.server;
+    const conPortafoglio = Boolean(server && server.hasWallet);
+    // Il server manda i movimenti già dal più recente (al più gli ultimi 200):
+    // rovesciarli li metterebbe dal più vecchio, cioè al contrario di come si
+    // legge un elenco di movimenti. Il conteggio locale è un'altra lista, e
+    // quella arriva in ordine di scrittura: lì il rovesciamento serve.
+    const items = conPortafoglio
+      ? (Array.isArray(server.grants) ? server.grants : [])
+        .filter((g) => (g && g.credits) > 0)
+        .map((g) => ({ credits: g.credits, testo: W.grantLabel(g.why), ts: g.at }))
+      : rewards.slice().reverse()
+        .filter((m) => (m && m.credits) > 0)
+        .map((m) => ({ credits: m.credits, testo: REWARD_LABELS[m.kind] || 'Ricompensa', ts: m.ts }));
     $('movesSection').hidden = items.length === 0;
     if (!items.length) return;
 
@@ -534,7 +550,7 @@
 
       const label = document.createElement('span');
       label.className = 'sn-credits-move-label';
-      label.textContent = REWARD_LABELS[m.kind] || 'Ricompensa';
+      label.textContent = m.testo;
 
       const date = document.createElement('span');
       date.className = 'sn-credits-move-date';

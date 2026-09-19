@@ -409,6 +409,45 @@
     return `entrati ${view.used} su ${view.max}`;
   }
 
+  // ── Le manopole dei crediti (#652) ─────────────────────────────────────────
+  // Le sette impostazioni che l'owner può cambiare in `config/credits`: come si
+  // chiamano nella pagina e quanto possono valere. Stanno qui perché le usano
+  // in due — la pagina per disegnare i campi, il main per rifiutare un numero
+  // storto prima di scriverlo sul server. I tetti sono larghi di proposito: il
+  // controllo serve a fermare un errore di battitura, non a decidere al posto
+  // dell'owner.
+  const OWNER_KNOBS = Object.freeze([
+    { chiave: 'entryCredits', etichetta: 'Crediti a chi entra', min: 0, max: 10000000, aiuto: 'Quanti crediti riceve chi riscatta un invito.' },
+    { chiave: 'dailyCredits', etichetta: 'Crediti al giorno', min: 0, max: 1000000, aiuto: 'La quota che arriva ogni notte a chi ha un portafoglio.' },
+    { chiave: 'invitesPerUser', etichetta: 'Inviti per persona', min: 0, max: 1000, aiuto: 'Quanti codici riceve chi entra, da dare ad altri.' },
+    { chiave: 'invitesMaxUses', etichetta: 'Persone per invito', min: 1, max: 1000, aiuto: 'Quante persone possono entrare con lo stesso codice. Vale anche per i link già in giro.' },
+    { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
+    { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
+    { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
+  ]);
+  const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
+  function knobOf(chiave) { return OWNER_KNOBS.find((k) => k.chiave === chiave) || null; }
+
+  // ── I movimenti del portafoglio (#652) ─────────────────────────────────────
+  // Una voce di `grants[]` porta un `why` che è un codice, a volte con l'id del
+  // feedback attaccato (`feedback_closed:abc123`). Qui diventa una riga che una
+  // persona legge.
+  const GRANT_LABELS = Object.freeze({
+    entry: 'Invito riscattato',
+    daily: 'Quota del giorno',
+    owner: 'Regalo di Filo',
+    gift: 'Regalo di Filo',
+    feedback_sent: 'Segnalazione inviata',
+    feedback_closed: 'Segnalazione risolta',
+  });
+  function grantLabel(why) {
+    const raw = String(why || '').trim();
+    if (!raw) return 'Crediti ricevuti';
+    const i = raw.indexOf(':');
+    const capo = i === -1 ? raw : raw.slice(0, i);
+    return GRANT_LABELS[capo] || GRANT_LABELS[raw] || 'Crediti ricevuti';
+  }
+
   // Si è appena entrati con un invito: la frase che lo dice, in home e nella
   // pagina Crediti. Chi ha invitato non si può nominare — il server non manda
   // il suo pseudonimo con lo stato del portafoglio.
@@ -426,5 +465,7 @@
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
     normalizeCode, formatCode, inviteLink, codeFromInput, isInviteDeepLink, inviteCodeFromDeepLink, filoUrlFromArgv,
     inviteView, inviteStateLine, entryNoticeText,
+    // Manopole e movimenti della pagina dell'owner (#652)
+    OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

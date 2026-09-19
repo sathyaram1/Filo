@@ -34,6 +34,17 @@
         "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
       },
       {
+        "spec": "tests/wallet-owner-manopole",
+        "caso": [
+          "le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima",
+          "i numeri che il server calcola si leggono in cima, e non si possono toccare",
+          "la riga di una persona apre la sua scheda: movimenti, suoi inviti e ultime chiamate",
+          "manopole e numeri si leggono in tema chiaro e in tema scuro"
+        ],
+        "perche": "stesso motivo di tests/wallet-owner-page: la prova finge di essere l’owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c’è, l’owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
         "spec": "tests/verify-514-g11",
         "caso": "home: quattro riquadri impilati — nessuno dei quattro Esc porta via la modalità",
         "perche": "stesso caso già elencato fra i rossi della macchina di chi sviluppa Filo, ma è rosso anche qui, e i due elenchi sono separati apposta: tenuto solo di là, questo file mentiva a chi verifica dal contenitore (secondo giro di verifica del #581). Con tre riquadri impilati la prova passa, col quarto no: è il tetto che il main si dà sulle rivendicazioni dell’Esc. Da risolvere o spiegare meglio, poi togliere la voce da entrambi gli elenchi.",
@@ -51,6 +62,86 @@
         "caso": "renderer crashato: pagina d'errore \"scheda bloccata\" invece del bianco",
         "perche": "la prova ammazza il renderer della scheda e aspetta la pagina d'errore interna, che nel contenitore non compare entro 20 secondi. Solo Linux senza sandbox (ELECTRON_DISABLE_SANDBOX=1, xvfb): identico in due corse della suite in GitHub (35088361658 e 35101566321, tre tentativi ciascuna, 1,4 minuti l'uno), mentre le due sorelle dello stesso spec (dominio inesistente, server giù poi su) sono verdi e su Windows la prova è verde. Dopo ognuno dei tre tentativi il worker non riesce a chiudere l'app entro 60 secondi («Worker teardown timeout», tre volte, sempre con questo caso come ultimo): l'app resta appesa dopo il crash forzato. Ipotesi: senza sandbox la view ricreata dopo il crash (src/main/tabs.js, render-process-gone → _recreateView) muore di nuovo e l'anti-loop a 2 secondi ferma i tentativi, lasciando la scheda bianca. Non confermato: il trace del secondo tentativo porta solo i passi del runner, non lo stderr dell'app dove il main scrive render-process-gone. Da riprodurre nel contenitore leggendo lo stderr dell'app, poi correggere e togliere la voce.",
         "feedback": "da aprire: rossi del contenitore GitHub Actions (corse della suite #35088361658 e #35101566321)"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-attriti",
+        "caso": [
+          "un numero scritto e non salvato si vede che non è in vigore",
+          "un numero scritto e non salvato non sparisce senza dirlo quando si torna sulla pagina",
+          "un salvataggio rifiutato dal server si spiega a parole, non col codice dell’errore",
+          "col server irraggiungibile l’avviso è una frase, e «Quanto vale cosa» non resta un titolo vuoto",
+          "dopo un salvataggio rifiutato non compare «Rimetti com’era»: non c’è niente da rimettere",
+          "il costo di una chiamata vera non si legge «0 $»",
+          "il tasto destro su una persona offre qualcosa di quella persona"
+        ],
+        "perche": "stesso motivo delle voci qui sotto: l'owner si finge salvando una sessione su disco, e nel contenitore delle routine safeStorage non c'è. Queste prove la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-manopole",
+        "caso": [
+          "le sette manopole nascono col valore in vigore, si salvano, e il server ubbidisce",
+          "un numero storto non arriva al server, e lo dice con parole di Filo",
+          "il tetto dei crediti elargibili ferma OGNI strada: ingresso, quota, regalo e premi"
+        ],
+        "perche": "stesso motivo di tests/wallet-owner-page: le prove del giro di verifica sulla pagina dell'owner dei crediti fingono di essere l'owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c'è, l'owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo. Queste prove la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-persone",
+        "caso": [
+          "i numeri che il server calcola si leggono in cima, e i crediti vivi scendono con la spesa",
+          "la riga di una persona apre la sua scheda di spesa, col clic e con la tastiera",
+          "manopole, numeri e scheda si leggono in tema chiaro e in tema scuro"
+        ],
+        "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-porte",
+        "caso": [
+          "gli inviti per persona sono una manopola: a zero chi entra non riceve codici",
+          "un nome ostile nel campo del regalo resta testo, e non diventa parte della pagina",
+          "col server giù la pagina lo dice, invece di restare muta"
+        ],
+        "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è. La quarta prova dello stesso spec (chi non è l'owner) non finge nessuna sessione e nel contenitore è verde: per questo non è elencata.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro2-uscite",
+        "caso": [
+          "un numero scritto non si perde se la pagina viene ricaricata col cursore ancora dentro",
+          "un numero scritto parte anche cliccando in un punto qualsiasi della pagina",
+          "un numero scritto parte anche seguendo il collegamento alla pagina Crediti",
+          "un numero scritto non si perde chiudendo la scheda",
+          "il numero partito da solo si può rimettere com’era, senza aver premuto Salva",
+          "un numero storto lasciato nel campo non arriva al server, e la pagina lo dice"
+        ],
+        "perche": "stesso motivo delle voci qui sopra: le prove del secondo giro di verifica sulla pagina dell'owner dei crediti fingono di essere l'owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c'è, l'owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo. Queste prove la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro2-errori",
+        "caso": [
+          "se il server non risponde, «Genera» lo dice con una frase e non con la risposta del server",
+          "se il server non risponde, «Regala» lo dice con una frase e non con la risposta del server",
+          "se la scheda di una persona non arriva, lo dice a parole e si può riprovare",
+          "col server giù il «Riprova» in cima rimette in piedi la pagina quando torna",
+          "un pseudonimo che non esiste non è un guasto: lo dice in italiano"
+        ],
+        "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è. Le prime due sono anche attese rosse sulla macchina di chi sviluppa Filo, finché i due moduli in mezzo alla pagina mostrano la risposta tecnica del server: sono segnate come tali nello spec.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro2-menu-e-costi",
+        "caso": [
+          "le voci del menu di una persona fanno quello che dicono",
+          "due tasti destri di fila lasciano un menu solo",
+          "il tasto destro fuori dalla tabella apre ancora il menu della pagina",
+          "un costo di qualche milionesimo di dollaro si legge, in tutti e quattro i posti"
+        ],
+        "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
       }
     ]
   },
