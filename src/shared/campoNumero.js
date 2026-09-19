@@ -200,7 +200,7 @@
     }
 
     async function salvaOra() {
-      const esito = controlla(input.value, reg);
+      const esito = controllaCampo(input, reg);
       if (!esito.ok) {
         dillo(esito.testo, 'is-error');
         try { input.focus(); input.select(); } catch (_) {}
