@@ -125,10 +125,9 @@ test('un costo di qualche milionesimo di dollaro si legge, in tutti e quattro i 
       { at: '2026-09-18T10:00:00.000Z', action: 'traduci', model: 'glm-5', servedBy: 'Baseten', promptTokens: 40, completionTokens: 8, costUsd: 0.0000004, credits: 0.1 },
       { at: '2026-09-19T10:00:00.000Z', action: 'spiega', model: 'glm-5', servedBy: 'Baseten', promptTokens: 60, completionTokens: 9, costUsd: 0.0000007, credits: 0.1 },
     ]);
-    // Quello che la chiave ha davvero speso: la riga «Speso» della scheda
-    // viene da lì, non dalla somma delle righe del registro.
-    const w = server.store.docs.wallets.get('anon-a');
-    server.keys.keys.get(w.keyHash).usageUsd = 0.0000011;
+    // Quello che la chiave di quella persona ha speso: la riga «Speso» della
+    // scheda viene da lì, non dalla somma delle righe del registro.
+    server.store.docs.wallets.get('anon-a').usageUsd = 0.0000011;
 
     const page = await apriOwner(filo);
     const riga = page.locator('tr.sn-wallet-user', { hasText: pa });
