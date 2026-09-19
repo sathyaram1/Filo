@@ -213,7 +213,7 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
 
   // Identità: refreshToken → { uid, revoked }
   const sessions = new Map([[OWNER_REFRESH, { uid: OWNER_UID, revoked: false }]]);
-  const counters = { signUps: 0, refreshes: 0, calls: [] };
+  const counters = { signUps: 0, refreshes: 0, calls: [], fsCalls: [] };
   let anonN = 0;
 
   const readBody = (req) => new Promise((res) => { let b = ''; req.on('data', (c) => { b += c; }); req.on('end', () => res(b)); });
