@@ -217,7 +217,7 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
       if (flags.walletHang) { req.socket.destroy(); return; }
       if (flags.walletDown) return json(res, 500, { error: { message: 'boom', status: 'INTERNAL' } });
       if (!uid) return json(res, 401, { error: { message: 'Accesso richiesto.', status: 'UNAUTHENTICATED' } });
-      const ownerOnly = ['walletGrant', 'walletCreateInvites', 'walletOverview'];
+      const ownerOnly = ['walletGrant', 'walletCreateInvites', 'walletOverview', 'walletUserDetail'];
       if (ownerOnly.includes(name) && uid !== OWNER_UID) return json(res, 403, { error: { message: 'Riservato al proprietario.', status: 'PERMISSION_DENIED' } });
       try {
         let result;
