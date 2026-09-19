@@ -323,6 +323,10 @@
     while ((m = BLOCCO_OTTO.exec(s))) {
       const c = normalizeCode(m[1] + m[2]);
       if (c) { BLOCCO_OTTO.lastIndex = 0; return c; }
+      // Il blocco scartato può aver mangiato metà di quello buono: «ecco ABCD
+      // EFGH» si legge prima come «ECCO ABCD», e «ABCD EFGH» non verrebbe più
+      // guardato. Si riparte dal carattere dopo, non dalla fine del blocco.
+      BLOCCO_OTTO.lastIndex = m.index + 1;
     }
     return null;
   }
