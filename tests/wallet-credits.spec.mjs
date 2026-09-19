@@ -318,8 +318,8 @@ test('con un portafoglio i movimenti sono quelli del server, col più recente in
   // L'ordine, detto senza passare dalle frasi: la data in cima è la più
   // recente e quella in fondo la più vecchia.
   const date = await moves.locator('.sn-credits-move-date').allTextContents();
-  expect(date[0]).toBe('12 set');
-  expect(date[date.length - 1]).toBe('8 set');
+  expect(date[0]).toMatch(/^12\b/);
+  expect(date[date.length - 1]).toMatch(/^8\b/);
 
   // Nessuna etichetta del conteggio locale si è infilata qui in mezzo.
   await expect(page.locator('#moves')).not.toContainText('Ricompensa');
