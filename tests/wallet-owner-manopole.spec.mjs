@@ -501,7 +501,9 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);
     // Nello scatto ci deve stare anche quello che compare solo quando si usa
     // la pagina: il pulsante «Rimetti com'era» e la scheda di una persona.
-    await page.fill('#knob-entryCredits', '6000');
+    // Un valore diverso per ogni tema: il secondo giro trova sul server quello
+    // che ha salvato il primo, e risalvarlo darebbe «È già così».
+    await page.fill('#knob-entryCredits', tema === 'dark' ? '6100' : '6000');
     await page.click('#knob-entryCredits-salva');
     await expect(page.locator('#knob-entryCredits-msg')).toHaveText('Salvato.', { timeout: 15_000 });
     await expect(page.locator('#knob-entryCredits-rimetti')).toBeVisible();
