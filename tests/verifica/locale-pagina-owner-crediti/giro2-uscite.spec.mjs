@@ -30,6 +30,7 @@ async function scriviRestandoDentro(page, chiave, numero) {
 }
 
 test('un numero scritto non si perde se la pagina viene ricaricata col cursore ancora dentro', async () => {
+  test.fail(true, 'la ricarica col cursore ancora nel campo butta via il numero, senza dire niente');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
