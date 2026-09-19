@@ -2,9 +2,17 @@
 //
 // La pista che nessuno dei cinque giri passati aveva battuto: al primo avvio
 // di chi arriva da un link d'invito succedono DUE cose insieme — i crediti
-// arrivano da soli (questo lavoro) e Filo si presenta con la sua intervista di
-// accoglienza (la conversazione del primo avvio). Qui si guarda cosa resta a
-// schermo quando capitano nello stesso momento.
+// arrivano da soli (questo lavoro) e Filo si presenta con la conversazione di
+// accoglienza del primo avvio. Qui si guarda cosa resta a schermo quando
+// capitano nello stesso momento.
+//
+// Due prove, e vanno lette in coppia:
+//   1. l'invitato non tocca niente e resta sulla home che si è aperta da sola
+//      → Filo non si presenta mai;
+//   2. lo stesso identico giro, ma l'invitato apre una scheda nuova → Filo si
+//      presenta. La seconda è il controllo: dice che l'accoglienza in questo
+//      ambiente funziona, e che a mancare è solo l'aggancio sulla home già
+//      aperta.
 //
 // Scritto da chi verifica, non da chi ha fatto il lavoro. Server finto: un
 // codice vero a usi contati non si brucia per una prova.
@@ -16,7 +24,6 @@ import { confirmText, clickConfirm, CONFIRM_HOST } from '../../helpers/confirm.m
 const CODICE = 'ABCDEFGH';
 
 let server;
-let ritardoRiscatto = 0;
 const visto = { redeems: [] };
 let riscattato = false;
 
@@ -50,14 +57,10 @@ test.beforeAll(async () => {
       if (url === '/walletPendingInvite') return json(res, 200, { result: { status: 'ok', code: CODICE } });
       if (url === '/walletRedeem') {
         const code = String((body.data && body.data.code) || '');
-        const rispondi = () => {
-          visto.redeems.push(code);
-          if (code !== CODICE) return json(res, 200, { result: { status: 'invalid_code' } });
-          riscattato = true;
-          return json(res, 200, { result: { status: 'ok', key: 'sk-or-v1-test-personal', pseudonym: 'abcdef0123456789', credits: 5000, entryCredits: 5000, migrated: 0, localRequested: 0, cutReason: null } });
-        };
-        if (ritardoRiscatto > 0) return void setTimeout(rispondi, ritardoRiscatto);
-        return rispondi();
+        visto.redeems.push(code);
+        if (code !== CODICE) return json(res, 200, { result: { status: 'invalid_code' } });
+        riscattato = true;
+        return json(res, 200, { result: { status: 'ok', key: 'sk-or-v1-test-personal', pseudonym: 'abcdef0123456789', credits: 5000, entryCredits: 5000, migrated: 0, localRequested: 0, cutReason: null } });
       }
       json(res, 404, { error: { message: 'not found ' + url } });
     });
@@ -99,40 +102,57 @@ async function siEPresentato(home) {
   } catch (_) { return false; }
 }
 
-test('il primo avvio dell’invitato: i crediti arrivano E Filo si presenta', async ({ app }) => {
-  test.setTimeout(300000);
-  ritardoRiscatto = 0;
-
-  // 1. Nessuno scrive niente: il riscatto parte da solo.
+// Il giro dell'invitato fino al benvenuto chiuso: identico nelle due prove.
+async function giroDellInvitato(app) {
   await expect.poll(() => visto.redeems.length, { timeout: 90000, intervals: [400] }).toBeGreaterThan(0);
   expect(visto.redeems[0]).toBe(CODICE);
 
   const home = await attendiHome(app);
   expect(home, 'la home non si è aperta all’avvio').toBeTruthy();
 
-  // 2. Il benvenuto coi crediti arriva, e si chiude.
   await expect(home.locator(CONFIRM_HOST)).toBeVisible({ timeout: 90000 });
   await expect.poll(() => confirmText(home), { timeout: 30000 }).toContain('Benvenuto in Filo');
   await clickConfirm(home, 'ok');
   await expect(home.locator(CONFIRM_HOST)).toBeHidden({ timeout: 15000 });
+  return home;
+}
 
-  // 3. Adesso i crediti ci sono e Filo può parlare: la prima cosa che
-  //    l'invitato deve vedere è Filo che si presenta, nella stessa sessione.
-  //    È il momento in cui decide se Filo ha funzionato.
-  await expect.poll(() => siEPresentato(home), { timeout: 45000, intervals: [1000] }).toBe(true);
+test('il primo avvio dell’invitato: i crediti arrivano E Filo si presenta', async ({ app }) => {
+  test.setTimeout(300000);
+
+  const home = await giroDellInvitato(app);
+
+  // Adesso i crediti ci sono e Filo può parlare. La prima cosa che l'invitato
+  // deve vedere è Filo che si presenta, nella sessione in cui è entrato: è il
+  // momento in cui decide se Filo ha funzionato, e non tocca niente.
+  await expect
+    .poll(() => siEPresentato(home), { timeout: 60000, intervals: [1000] })
+    .toBe(true);
 });
 
-test('col server lento, dopo il benvenuto Filo si presenta lo stesso', async ({ app }) => {
+test('controllo: aperta una scheda nuova, Filo si presenta — l’accoglienza funziona', async ({ app, shell }) => {
   test.setTimeout(300000);
-  ritardoRiscatto = 12000;
 
-  const home = await attendiHome(app);
-  expect(home, 'la home non si è aperta all’avvio').toBeTruthy();
+  const home = await giroDellInvitato(app);
 
-  await expect(home.locator(CONFIRM_HOST)).toBeVisible({ timeout: 120000 });
-  await expect.poll(() => confirmText(home), { timeout: 30000 }).toContain('Benvenuto in Filo');
-  await clickConfirm(home, 'ok');
-  await expect(home.locator(CONFIRM_HOST)).toBeHidden({ timeout: 15000 });
+  const primaDi = new Set(app.windows());
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  let seconda = null;
+  const scadenza = Date.now() + 30000;
+  while (Date.now() < scadenza && !seconda) {
+    seconda = app.windows().find((w) => {
+      if (primaDi.has(w)) return false;
+      try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; }
+    }) || null;
+    if (!seconda) await new Promise((r) => setTimeout(r, 150));
+  }
+  expect(seconda, 'la seconda scheda della home non si è aperta').toBeTruthy();
 
-  await expect.poll(() => siEPresentato(home), { timeout: 45000, intervals: [1000] }).toBe(true);
+  await expect
+    .poll(() => siEPresentato(seconda), { timeout: 60000, intervals: [1000] })
+    .toBe(true);
+
+  // E la home di prima, quella dell'avvio, è rimasta indietro: lì Filo non si
+  // è mai presentato.
+  expect(await siEPresentato(home)).toBe(false);
 });
