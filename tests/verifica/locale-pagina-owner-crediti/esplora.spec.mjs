@@ -7,52 +7,58 @@ import {
 } from './helpers/banco.mjs';
 
 test.skip(!cartellaFiloSecurity(), 'filo-security non è accanto al repo');
+const OUT = join(APP_ROOT, 'tests', '.shots', 'owner-esplora.json');
 
 test('esplora la pagina dell’owner', async () => {
   test.setTimeout(240_000);
   const server = await avviaServer();
   const filo = await avviaFilo({ env: server.env });
+  const rapporto = {};
   try {
     await fintoOpenRouter(filo.app, { fsBase: server.base });
     expect((await simulaOwner(filo.app, server)).isAdmin).toBe(true);
 
     const codes = await server.codiciOwner(3);
     await server.service.redeem('anon-a', codes[0], server.deps);
-    await server.service.redeem('anon-b', codes[1], server.deps);
-    const pa = server.store.docs.wallets.get('anon-a').pseudonym;
-    server.store.docs.usage.push(
-      { pseudonym: pa, at: '2026-09-18T10:00:00.000Z', action: 'chat', model: 'glm', servedBy: 'Baseten', promptTokens: 100, completionTokens: 20, costUsd: 0.0031, credits: 4 },
-      { pseudonym: pa, at: '2026-09-19T11:00:00.000Z', action: 'traduci', model: 'glm', servedBy: 'Baseten', promptTokens: 30, completionTokens: 8, costUsd: 3.75, credits: 4600 },
-    );
 
     const page = await apriOwner(filo);
     await page.waitForTimeout(2500);
 
-    const valori = await page.evaluate(() => {
+    const leggi = () => page.evaluate(() => {
       const out = {};
-      for (const i of document.querySelectorAll('#ownerKnobs input')) out[i.id] = i.value;
+      for (const i of document.querySelectorAll('#ownerKnobs input')) out[i.id.replace('knob-', '')] = i.value;
       return out;
     });
-    console.log('VALORI MANOPOLE', JSON.stringify(valori));
+    rapporto.valoriIniziali = await leggi();
+    rapporto.configPrima = { ...server.store.docs.config };
 
-    // La riga della persona con consumo: la apro.
-    const riga = page.locator('tr.sn-wallet-user', { hasText: pa });
-    await riga.click();
-    await page.waitForTimeout(2500);
-    const dett = await page.evaluate(() => {
-      const r = [...document.querySelectorAll('tr.sn-wallet-user-detail')].find((x) => !x.hidden);
-      return r ? r.innerText : '(nessun dettaglio aperto)';
-    });
-    console.log('DETTAGLIO >>>\n' + dett + '\n<<<');
-    const tabella = await page.evaluate(() => document.querySelector('#ownerUsers').innerText);
-    console.log('TABELLA >>>\n' + tabella + '\n<<<');
+    // Cambio «crediti a chi entra» e salvo.
+    await page.fill('#knob-entryCredits', '777');
+    await page.click('#knob-entryCredits-salva');
+    await page.waitForTimeout(3000);
+    rapporto.msgSalva = await page.locator('#knob-entryCredits-msg').innerText().catch(() => '');
+    rapporto.configDopo = { ...server.store.docs.config };
+    rapporto.fs = server.counters.fsCalls.map((c) => [c.method, c.docPath, c.mask.join(',')]);
 
+    // Il server ubbidisce?
+    const r = await server.service.redeem('anon-c', codes[1], server.deps);
+    rapporto.redeemDopo = { status: r.status, credits: r.credits };
+
+    // Numeri storti.
+    for (const [chiave, valore] of [['dailyCredits', ''], ['dailyCredits', '   '], ['dailyCredits', '-5'], ['dailyCredits', '3,5'], ['dailyCredits', '2000000'], ['invitesMaxUses', '0']]) {
+      await page.fill(`#knob-${chiave}`, valore);
+      await page.click(`#knob-${chiave}-salva`);
+      await page.waitForTimeout(900);
+      rapporto[`storto_${chiave}_${JSON.stringify(valore)}`] = {
+        msg: await page.locator(`#knob-${chiave}-msg`).innerText().catch(() => ''),
+        config: server.store.docs.config[chiave] ?? null,
+      };
+    }
+    rapporto.valoriFinali = await leggi();
     mkdirSync(join(APP_ROOT, 'tests', '.shots'), { recursive: true });
-    writeFileSync(join(APP_ROOT, 'tests', '.shots', 'owner-dump2.html'), await page.evaluate(() => document.querySelector('main').outerHTML));
     await page.screenshot({ path: join(APP_ROOT, 'tests', '.shots', 'owner-esplora.png'), fullPage: true });
-    console.log('CONFIG', JSON.stringify(server.store.docs.config));
-    console.log('CHIAMATE FS', JSON.stringify(server.counters.fsCalls.map((c) => [c.method, c.docPath, c.mask])));
   } finally {
+    writeFileSync(OUT, JSON.stringify(rapporto, null, 2));
     try { await filo.app.close(); } catch (_) {}
     await server.chiudi();
   }
