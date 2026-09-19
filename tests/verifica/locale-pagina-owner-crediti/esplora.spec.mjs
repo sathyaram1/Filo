@@ -56,6 +56,22 @@ test('esplora la pagina dell’owner', async () => {
       };
     }
     rapporto.valoriFinali = await leggi();
+    // Il tetto a 1 credito: nessuna strada deve più elargire.
+    await page.fill('#knob-maxGrantCredits', '1');
+    await page.click('#knob-maxGrantCredits-salva');
+    await page.waitForTimeout(2500);
+    rapporto.tettoMsg = await page.locator('#knob-maxGrantCredits-msg').innerText().catch(() => '');
+    rapporto.tettoConfig = server.store.docs.config.maxGrantCredits ?? null;
+    const r2 = await server.service.redeem('anon-d', codes[2], server.deps);
+    rapporto.redeemSottoTetto = { status: r2.status, credits: r2.credits, reason: r2.reason };
+    const ps = server.store.docs.wallets.get('anon-a').pseudonym;
+    await page.fill('#ownerGrantPseudonym', ps);
+    await page.fill('#ownerGrantCredits', '10');
+    await page.click('#ownerGrantBtn');
+    await page.waitForTimeout(2500);
+    rapporto.regaloSottoTetto = await page.locator('#ownerMsg').innerText().catch(() => '');
+    rapporto.saldoDopoRegalo = server.store.docs.wallets.get('anon-a').credits;
+    rapporto.dailySottoTetto = await server.daily(Date.now() + 86_400_000);
     mkdirSync(join(APP_ROOT, 'tests', '.shots'), { recursive: true });
     await page.screenshot({ path: join(APP_ROOT, 'tests', '.shots', 'owner-esplora.png'), fullPage: true });
   } finally {
