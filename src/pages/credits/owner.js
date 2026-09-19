@@ -15,6 +15,9 @@
 
   // ── Owner: codici, regali, chi ha cosa ─────────────────────────────────────
   let overviewLoaded = false;
+  // La prima lettura riempie i campi delle manopole; quelle dopo rispettano
+  // quello che l'owner sta scrivendo.
+  let primaLettura = true;
   function renderOwner(w) {
     const owner = Boolean(w && w.ok && w.isOwner);
     $('ownerSection').hidden = !owner;
