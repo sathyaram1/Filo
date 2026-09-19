@@ -360,6 +360,72 @@
     return wrap;
   }
 
+  // ── Il tasto destro su una persona ─────────────────────────────────────────
+  // Il menu proprio di una pagina filo:// si apre con preventDefault sulla
+  // riga, e quello generale si fa da parte da solo (pattern «menu contestuale
+  // proprio nelle pagine filo://»). Le voci sono le cose che si vogliono fare
+  // a QUELLA persona: aprire la sua scheda, prendere il suo pseudonimo,
+  // regalarle crediti.
+  let menuAperto = null;
+
+  function chiudiMenuPersona() {
+    if (!menuAperto) return;
+    menuAperto.remove();
+    menuAperto = null;
+    document.removeEventListener('mousedown', fuoriDalMenu, true);
+    document.removeEventListener('keydown', tastoSulMenu, true);
+    window.removeEventListener('scroll', chiudiMenuPersona, true);
+    window.removeEventListener('resize', chiudiMenuPersona);
+  }
+  function fuoriDalMenu(ev) { if (menuAperto && !menuAperto.contains(ev.target)) chiudiMenuPersona(); }
+  function tastoSulMenu(ev) { if (ev.key === 'Escape') { ev.preventDefault(); chiudiMenuPersona(); } }
+
+  function copia(testo) { try { navigator.clipboard.writeText(testo); } catch (_) {} }
+
+  function apriMenuPersona(u, detail, apriChiudi, x, y) {
+    chiudiMenuPersona();
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
+    menu.setAttribute('role', 'menu');
+    const voci = [
+      [detail.hidden ? 'Apri la scheda' : 'Chiudi la scheda', () => apriChiudi()],
+      ['Copia lo pseudonimo', () => copia(u.pseudonym)],
+      ['Regala crediti a questa persona', () => {
+        $('ownerGrantPseudonym').value = u.pseudonym;
+        const quanti = $('ownerGrantCredits');
+        quanti.focus();
+        quanti.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }],
+    ];
+    for (const [testo, azione] of voci) {
+      const voce = document.createElement('div');
+      voce.className = 'sn-select-option';
+      voce.setAttribute('role', 'menuitem');
+      voce.tabIndex = 0;
+      voce.textContent = testo;
+      const fai = () => { chiudiMenuPersona(); azione(); };
+      voce.addEventListener('click', fai);
+      voce.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        fai();
+      });
+      menu.appendChild(voce);
+    }
+    document.body.appendChild(menu);
+    // Il menu rientra sempre nella finestra, anche se il clic è in fondo.
+    const w = menu.offsetWidth; const h = menu.offsetHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - w - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
+    menuAperto = menu;
+    setTimeout(() => {
+      document.addEventListener('mousedown', fuoriDalMenu, true);
+      document.addEventListener('keydown', tastoSulMenu, true);
+      window.addEventListener('scroll', chiudiMenuPersona, true);
+      window.addEventListener('resize', chiudiMenuPersona);
+    }, 0);
+  }
+
   // ── La scheda di una persona ───────────────────────────────────────────────
   // Tutto quello che si può sapere di chi usa Filo con un portafoglio, senza
   // mai un nome: saldo, quanto ha ricevuto e quanto ha speso, dove sono andati
