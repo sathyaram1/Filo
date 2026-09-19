@@ -422,6 +422,8 @@ export async function fintoOpenRouter(app, opts = {}) {
     if (!g.__orOrig) g.__orOrig = g.fetch;
     g.__orCalls = [];
     g.__fsCommits = [];
+    g.__fsDocCalls = [];
+    g.__fsBase = o.fsBase || '';
     g.__orOpts = { status: 200, text: 'Ciao dal modello finto.', costUsd: 0.0021, ...o };
     const headerOf = (h, name) => {
       if (!h) return '';
