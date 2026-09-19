@@ -2037,8 +2037,11 @@ function documentReadsForPrompt(actions) {
 
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
-// documenti letti, documenti di trasparenza. Sono DATI di sistema (o, per i
-// documenti, materiale da leggere): mai istruzioni.
+// documenti letti, documenti di trasparenza. Mai istruzioni — ma non tutti
+// nello stesso modo: le capacità e i documenti di trasparenza li scrive Filo,
+// i file e i documenti li scrive l'utente (e arrivano con la loro cornice), i
+// risultati di una ricerca li scrive chi possiede la pagina trovata e arrivano
+// imbustati come ogni altro contenuto esterno (#593).
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
