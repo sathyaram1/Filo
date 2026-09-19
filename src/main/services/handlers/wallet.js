@@ -469,6 +469,27 @@ module.exports = function register(on, ctx) {
     codes: (await callable('walletCreateInvites', { count: msg.count || 1 }, { asOwner: true }))?.codes || [],
   })));
 
+  // La scheda di una persona (#652). Il server la dà già pronta: qui si passa
+  // solo lo pseudonimo, che è l'unico nome con cui una persona esiste da questa
+  // parte (gli uid non escono mai dal server).
+  on(MSG.WALLET_OWNER_USER_DETAIL, ownerOnly(async (msg) => ({
+    detail: await callable('walletUserDetail', { pseudonym: String((msg && msg.pseudonym) || '') }, { asOwner: true }),
+  })));
+
+  // Le manopole dei crediti (#652). Non passano da una callable: `config/credits`
+  // è un documento che l'account admin scrive direttamente, come già fa per i
+  // modelli predefiniti e per i bilanci delle routine. Il token è quello
+  // dell'account Google, non quello dell'installazione.
+  on(MSG.WALLET_OWNER_KNOBS_SET, ownerOnly(async (msg) => {
+    const idToken = await auth.getIdToken();
+    if (!idToken) throw new Error('Sessione scaduta: rifai l’accesso.');
+    const knobs = await Defaults.setCreditsKnobs((msg && msg.patch) || {}, idToken);
+    // Le manopole cambiano quota e premi: chi guarda i crediti in un'altra
+    // pagina deve rileggere.
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    return { knobs };
+  }));
+
   // ── Registro d'uso ────────────────────────────────────────────────────────
   // Le righe si accodano e si scrivono a gruppi (una commit Firestore ogni
   // pochi secondi): una chat con strumenti fa più chiamate al turno, e una
