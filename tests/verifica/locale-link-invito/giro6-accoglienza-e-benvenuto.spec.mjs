@@ -124,13 +124,12 @@ async function giroDellInvitato(app) {
 }
 
 test('entrato con l’invito, Filo si presenta', async ({ app, shell }) => {
-  test.fail(true, 'i crediti dell’invito non accendono l’accoglienza: Filo non si presenta mai');
+  test.fail(true, 'con i modelli predefiniti Filo crede di non avere nessuna chiave: l’accoglienza non parte mai');
   test.setTimeout(300000);
 
   const home = await giroDellInvitato(app);
 
-  // La home si comporta già da Filo attivo: il saluto è quello di chi ha di
-  // che far girare i modelli, non quello di chi deve ancora riscattare.
+  // I crediti ci sono e la home saluta come se tutto fosse a posto.
   await expect
     .poll(async () => (await home.innerText('body')).slice(0, 200), { timeout: 30000, intervals: [1000] })
     .toContain('Filo è qui');
