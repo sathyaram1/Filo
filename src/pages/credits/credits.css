@@ -126,6 +126,35 @@
 .sn-wallet-invite-uses li { display: flex; align-items: baseline; gap: 10px; font-size: 12px; color: var(--sn-muted); }
 .sn-wallet-invite-who { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
+/* I numeri che il server calcola (#652): si guardano, non si toccano. Valore
+   grande, nome sotto, nessun bordo che li faccia sembrare campi. */
+.sn-wallet-numeri {
+  list-style: none; margin: 4px 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 8px 36px;
+}
+.sn-wallet-numero { display: flex; flex-direction: column; gap: 1px; min-width: 7em; }
+.sn-wallet-numero-valore { font-size: 26px; line-height: 1.1; color: var(--sn-fg); }
+.sn-wallet-numero-nome { font-size: 13px; color: var(--sn-muted); }
+.sn-wallet-numero-barra {
+  display: block; height: 3px; margin-top: 5px; border-radius: 2px;
+  background: var(--sn-hover, rgba(0,0,0,.08)); overflow: hidden;
+}
+.sn-wallet-numero-barra > span { display: block; height: 100%; background: var(--sn-accent); }
+
+/* Le sette manopole (#652). Una colonna di righe: nome, campo coi due
+   pulsanti, esito sotto. «Rimetti com'era» compare solo quando c'è qualcosa da
+   rimettere, così la riga a riposo è pulita. */
+.sn-manopole { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.sn-manopola { display: flex; flex-direction: column; gap: 4px; }
+.sn-manopola > label { font-weight: 600; font-size: 14px; }
+.sn-manopola-riga { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sn-page .sn-manopola-riga input[type="number"] {
+  padding: 6px 10px; border: 1px solid var(--sn-border); border-radius: 8px;
+  background: var(--sn-bg-elev, var(--sn-bg)); color: var(--sn-fg); width: 9em;
+}
+.sn-manopola-riga input:focus { outline: none; border-color: var(--sn-accent); }
+.sn-manopola-msg { margin: 0; font-size: 13px; }
+
 .sn-wallet-section { margin-top: 24px; }
 .sn-wallet-owner-row { display: flex; flex-wrap: wrap; gap: 18px 32px; margin-top: 10px; }
 .sn-wallet-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
