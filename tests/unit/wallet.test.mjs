@@ -184,6 +184,28 @@ test('codeFromInput: il link dentro un messaggio intero vince sulle parole intor
   assert.equal(W.codeFromInput('Ciao Anna, ecco: https://filo.red/i/ fammi sapere'), null);
 });
 
+// Lo stesso messaggio, ma col CODICE nudo al posto del link: capita perché
+// accanto a ogni invito c'è un pulsante che copia il solo codice, e perché la
+// pagina del link, a chi arriva da un telefono, dice di segnarselo. Il saluto
+// davanti non deve mangiarsi il codice: si guardano tutti i blocchi di otto
+// caratteri, non solo il primo (quarto giro di verifica del #651).
+test('codeFromInput: il codice nudo si trova anche col saluto davanti', () => {
+  const messaggi = [
+    'Ciao Anna, ecco il codice: ABCD-EFGH',
+    'Ciao Anna, il tuo codice è ABCDEFGH',
+    'Anna ecco ABCD-EFGH',
+    'Ciao Sara, ecco: ABCD-EFGH a dopo',
+    // Il blocco scartato si mangia metà di quello buono: «ecco ABCD» prima,
+    // e «ABCD EFGH» non veniva più guardato.
+    'Ciao Luca, ecco ABCD EFGH a dopo',
+  ];
+  for (const m of messaggi) assert.equal(W.codeFromInput(m), 'ABCDEFGH', m);
+  // Le parole di una frase qualsiasi non diventano un codice: l'alfabeto dei
+  // codici non ha I, L, O, zero e uno.
+  assert.equal(W.codeFromInput('Ciao Anna, come stai?'), null);
+  assert.equal(W.codeFromInput('buon giro a tutti quanti'), null);
+});
+
 test('filo://invito/<codice>: si accetta il solo host invito, il resto non apre niente', () => {
   assert.equal(W.inviteCodeFromDeepLink('filo://invito/ABCDEFGH'), 'ABCDEFGH');
   assert.equal(W.inviteCodeFromDeepLink('filo://invito/abcd-efgh'), 'ABCDEFGH');
