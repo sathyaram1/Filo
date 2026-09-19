@@ -1296,6 +1296,52 @@
 
     help: (payload) => PROMPTS.helpStatic() + PROMPTS.helpContext(payload || {}),
 
+    // #593 — la busta dei risultati di una ricerca web.
+    //
+    // Titolo, indirizzo e riassunto di un risultato li scrive chi possiede
+    // quella pagina, e comparire fra i primi risultati per una query non è
+    // difficile. Prima questi tre campi venivano impastati in una frase e
+    // rimandati al modello dentro «(Sistema: …)», cioè col timbro di Filo: chi
+    // controllava una pagina fra i risultati parlava all'agente con l'autorità
+    // del canale fidato, e senza bisogno di nessuna chiave (il ripiego di
+    // ricerca è pubblico).
+    //
+    // La compongono in due — il main per il messaggio che parte, la sidebar per
+    // la propria cronologia, che tornerà al modello nei turni dopo — e per
+    // questo la funzione è UNA: la cronologia è proprio il posto dove un testo
+    // avvelenato resterebbe per tutta la sessione.
+    //
+    // Anche la query sta dentro la busta: la scrive il modello, ma spesso
+    // ricopiando qualcosa che ha letto sulla pagina.
+    ricercaWebImbustata: ({ query = '', provider = '', results = [] } = {}) => {
+      const righe = [
+        `Richiesta di ricerca: "${query}"`,
+        `Motore: ${provider || 'non dichiarato'}`,
+        '',
+      ];
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i] || {};
+        righe.push(`${i + 1}. ${r.title || '(senza titolo)'}`);
+        righe.push(`   ${r.url || '(senza indirizzo)'}`);
+        if (r.snippet) righe.push(`   ${r.snippet}`);
+      }
+      return esterno().imbusta({
+        tipo: 'RICERCA_WEB',
+        testo: righe.join('\n'),
+        conIntestazione: true,
+      });
+    },
+
+    // #593 — la busta di un elemento della pagina nominato da una nota di
+    // sistema. L'etichetta la scrive il sito, il selettore lo propone il
+    // modello leggendo il sito: nessuno dei due è una frase di Filo, quindi
+    // nessuno dei due sta nel canale «(Sistema: …)».
+    elementoPaginaImbustato: ({ etichetta = '', selettore = '' } = {}) =>
+      esterno().imbustaCampi({
+        tipo: 'ELEMENTO_PAGINA',
+        campi: { Etichetta: etichetta, Selettore: selettore },
+      }),
+
     // Modifica testo: l'utente seleziona un testo in una casella di input e dà
     // un'istruzione su come modificarlo. L'AI restituisce SOLO il testo modificato,
     // niente preamboli/virgolette.
