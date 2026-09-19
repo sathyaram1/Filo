@@ -374,13 +374,19 @@ test('la riga di una persona apre la sua scheda: movimenti, suoi inviti e ultime
   await expect(scheda).toContainText('entrati 1 su 3');
   await expect(scheda).toContainText('0f0f0f0f');
 
-  // Le ultime chiamate: modello, chi ha servito, costo.
+  // Le ultime chiamate: modello, chi ha servito, crediti e costo.
   const chiamate = scheda.locator('.sn-wallet-chiamate tbody tr');
-  await expect(chiamate).toHaveCount(2);
+  await expect(chiamate).toHaveCount(3);
   await expect(chiamate.nth(0)).toContainText('deepseek-flash');
   await expect(chiamate.nth(0)).toContainText('Fireworks');
   await expect(chiamate.nth(0)).toContainText('0,2 $');
+  await expect(chiamate.nth(0)).toContainText('244');
   await expect(chiamate.nth(1)).toContainText('Baseten');
+  // Una chiamata corta costa meno di mezzo centesimo: il costo si legge lo
+  // stesso, e accanto ci sono i crediti, che sono numeri interi.
+  await expect(chiamate.nth(2)).toContainText('0,0031 $');
+  await expect(chiamate.nth(2)).toContainText('4');
+  await expect(scheda.locator('.sn-wallet-scheda-blocco', { hasText: 'Dove sono andati i crediti' })).toContainText('0,0031 $');
 
   // Da tastiera la riga si apre come col mouse: si richiude e si riapre.
   await page.keyboard.press('Enter');
