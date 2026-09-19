@@ -39,9 +39,10 @@
     const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OVERVIEW });
     const o = r && r.ok && r.overview;
     if (!o) {
-      $('ownerTotals').textContent = r && r.error ? `Vista non disponibile (${r.error}).` : 'Vista non disponibile.';
+      guastoVista(r && r.error);
       return;
     }
+    mostraManopole(true);
     const cfg = o.config || {};
     const tot = o.totals || {};
     renderNumeri(cfg, tot, o.ownerInvites || []);
