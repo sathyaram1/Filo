@@ -247,10 +247,18 @@ test('le sette manopole si salvano davvero, un numero storto non arriva al serve
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
   expect(patch.length).toBe(0);
 
-  // Con la virgola: niente arrotondamenti muti.
-  await page.fill('#knob-dailyCredits', '10,5');
+  // Con i decimali: niente arrotondamenti muti.
+  await page.fill('#knob-dailyCredits', '10.5');
   await page.click('#knob-dailyCredits-salva');
   await expect(msg).toHaveText('Crediti al giorno: un numero intero, senza virgola.');
+  expect(patch.length).toBe(0);
+
+  // Testo dentro un campo numerico: il campo risponde «vuoto» al codice, ma
+  // vuoto non è. La frase deve dire che ci vuole un numero.
+  await page.fill('#knob-dailyCredits', '');
+  await page.locator('#knob-dailyCredits').pressSequentially('ciao');
+  await page.click('#knob-dailyCredits-salva');
+  await expect(msg).toHaveText('Crediti al giorno: ci vuole un numero.');
   expect(patch.length).toBe(0);
 
   // Vuoto: non vuol dire zero.
