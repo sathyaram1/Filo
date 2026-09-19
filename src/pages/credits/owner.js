@@ -699,10 +699,19 @@
     if (input) { input.focus(); if (typeof input.select === 'function') input.select(); }
   }
 
+  // I dollari, con tante cifre quante ne servono perché un numero diverso da
+  // zero non finisca scritto «0 $». Una chiamata vera costa qualche millesimo
+  // di dollaro: arrotondata ai centesimi spariva, e la spesa di una persona si
+  // leggeva tutta a zeri. Sopra il centesimo restano due decimali, come prima.
   function fmtUsd(n) {
     const v = Number(n);
     if (!Number.isFinite(v)) return '—';
-    return `${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 }).format(v)} $`;
+    if (v === 0) return '0 $';
+    for (const dec of [2, 4, 6, 8]) {
+      const s = new Intl.NumberFormat('it-IT', { maximumFractionDigits: dec }).format(v);
+      if (Number(s.replace(/\./g, '').replace(',', '.')) !== 0) return `${s} $`;
+    }
+    return v > 0 ? 'meno di 0,00000001 $' : '—';
   }
   function formatDateTime(ts) {
     if (!ts) return '';
