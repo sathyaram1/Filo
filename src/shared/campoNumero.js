@@ -212,11 +212,15 @@
       if (typeof onSalva === 'function') { try { onSalva(); } catch (_) {} }
     }
 
-    async function salvaOra() {
+    // `riprendiIlFuoco`: chi ha premuto Salva vuole il cursore nel campo da
+    // correggere. Chi invece se ne stava andando no — riprendersi il fuoco da
+    // un campo lasciato con un numero storto vuol dire non poterlo più
+    // lasciare.
+    async function salvaOra({ riprendiIlFuoco = true } = {}) {
       const esito = controllaCampo(input, reg);
       if (!esito.ok) {
         dillo(esito.testo, 'is-error');
-        try { input.focus(); input.select(); } catch (_) {}
+        if (riprendiIlFuoco) { try { input.focus(); input.select(); } catch (_) {} }
         return;
       }
       if (String(esito.valore) === attuale) {
