@@ -182,10 +182,9 @@ test('due clic di fila su «Riprova» non fanno partire due letture', async ({ o
   });
   await expect(page.locator('#bdRetry')).toBeVisible();
 
-  // La rete torna, ma risponde con calma: è la finestra in cui un secondo clic
-  // farebbe partire una seconda lettura.
+  // La rete torna. Tre clic in fila, senza aspettare in mezzo: è la finestra
+  // in cui una lettura sola può diventarne tre.
   await cambiaRete(page, { righe: [scheda('Letto una volta sola', 'fb-4')], guasto: false });
-  await page.evaluate(() => { window.__lenta = true; });
   await page.evaluate(() => {
     const t = document.querySelector('#bdRetry');
     t.click();
