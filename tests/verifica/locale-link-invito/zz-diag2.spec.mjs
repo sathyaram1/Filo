@@ -1,13 +1,15 @@
-// DIAGNOSTICA TEMPORANEA del giro 4 — da cancellare. Non asserisce niente:
-// guarda solo cosa c'è nella home e nella pagina Crediti dopo il riscatto
-// automatico del primo avvio.
+// DIAGNOSTICA TEMPORANEA del giro 4 — da cancellare.
+// Stesso primo avvio, ma il riscatto arriva TARDI (il finto server risponde
+// dopo dodici secondi): a quel punto la home è viva e caricata da un pezzo.
+// Se il benvenuto compare adesso e non quando il riscatto è rapido, la corsa
+// è fra l'avviso e la home che si sta ancora aprendo.
 
 import { createServer } from 'node:http';
 import { test } from '../../fixtures/electron.mjs';
 
 const CODICE = 'ABCDEFGH';
 let server;
-const visto = { redeems: [], pending: 0, states: 0 };
+const visto = { redeems: [] };
 let riscattato = false;
 
 function json(res, status, body) {
@@ -28,16 +30,18 @@ test.beforeAll(async () => {
       if (url === '/token') return json(res, 200, { id_token: 'anon-id-token', refresh_token: 'anon-refresh', expires_in: '3600', user_id: 'anon-uid-1' });
       if (auth !== 'Bearer anon-id-token') return json(res, 401, { error: { message: 'no auth' } });
       if (url === '/walletState') {
-        visto.states += 1;
         if (!riscattato) return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
         return json(res, 200, { result: { hasWallet: true, pseudonym: 'abcdef0123456789', balance: { credits: 5000, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0, remainingUsd: 4.2, eurUsd: 1.2, eurPerCredit: 0.0007 }, stale: false, dailyCredits: 100, invites: [{ code: 'AAAA2222', max: 3, used: 0, uses: [] }] } });
       }
-      if (url === '/walletPendingInvite') { visto.pending += 1; return json(res, 200, { result: { status: 'ok', code: CODICE } }); }
+      if (url === '/walletPendingInvite') return json(res, 200, { result: { status: 'ok', code: CODICE } });
       if (url === '/walletRedeem') {
-        const code = String((body.data && body.data.code) || '');
-        visto.redeems.push(code);
-        riscattato = true;
-        return json(res, 200, { result: { status: 'ok', key: 'sk-or-v1-test-personal', pseudonym: 'abcdef0123456789', credits: 5000, entryCredits: 5000, migrated: 0, localRequested: 0, cutReason: null } });
+        // La risposta arriva tardi: la home ha avuto tutto il tempo di aprirsi.
+        setTimeout(() => {
+          visto.redeems.push(String((body.data && body.data.code) || ''));
+          riscattato = true;
+          json(res, 200, { result: { status: 'ok', key: 'sk-or-v1-test-personal', pseudonym: 'abcdef0123456789', credits: 5000, entryCredits: 5000, migrated: 0, localRequested: 0, cutReason: null } });
+        }, 12000);
+        return;
       }
       json(res, 404, { error: { message: 'not found ' + url } });
     });
@@ -54,34 +58,17 @@ test.afterAll(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test('diagnostica: cosa c’è nella home dopo il riscatto automatico', async ({ app }) => {
+test('diagnostica: riscatto tardivo, la home lo dice?', async ({ app }) => {
   test.setTimeout(180000);
-  const t0 = Date.now();
-  for (let i = 0; i < 60 && !visto.redeems.length; i++) await new Promise((r) => setTimeout(r, 500));
-  console.log('[diag] riscatti:', JSON.stringify(visto), 'dopo ms', Date.now() - t0);
-
-  await new Promise((r) => setTimeout(r, 12000));
-  const finestre = app.windows().map((w) => { try { return w.url(); } catch (_) { return '?'; } });
-  console.log('[diag] finestre:', JSON.stringify(finestre, null, 1));
-
+  for (let i = 0; i < 80 && !visto.redeems.length; i++) await new Promise((r) => setTimeout(r, 500));
+  console.log('[diag2] riscatti:', JSON.stringify(visto));
+  await new Promise((r) => setTimeout(r, 10000));
   const home = app.windows().find((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } });
-  if (!home) { console.log('[diag] nessuna home'); return; }
+  if (!home) { console.log('[diag2] nessuna home'); return; }
   const info = await home.evaluate(() => ({
     host: Boolean(document.querySelector('.sn-confirm-host')),
-    ui: Boolean(window.SN_CONFIRM_UI),
     stato: (window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test && window.SN_CONFIRM_UI._test.state()) || null,
-    testo: (document.body.innerText || '').slice(0, 900),
+    testo: (document.body.innerText || '').slice(0, 500),
   })).catch((e) => ({ errore: String(e) }));
-  console.log('[diag] home:', JSON.stringify(info, null, 1));
-
-  // L'avviso è ancora lì ad aspettare? Si ricarica la home: se il benvenuto
-  // compare adesso, l'avviso c'era e la home non l'aveva raccolto da viva.
-  await home.reload().catch(() => {});
-  await new Promise((r) => setTimeout(r, 8000));
-  const dopo = await home.evaluate(() => ({
-    host: Boolean(document.querySelector('.sn-confirm-host')),
-    stato: (window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test && window.SN_CONFIRM_UI._test.state()) || null,
-    testo: (document.body.innerText || '').slice(0, 600),
-  })).catch((e) => ({ errore: String(e) }));
-  console.log('[diag] home dopo ricarica:', JSON.stringify(dopo, null, 1));
+  console.log('[diag2] home:', JSON.stringify(info, null, 1));
 });
