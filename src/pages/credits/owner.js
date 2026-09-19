@@ -147,7 +147,7 @@
   function guastoVista(errore) {
     if (errore) console.warn('[credits/owner] vista non arrivata:', errore);
     const p = $('ownerTotals');
-    p.textContent = `${fraseGuasto(errore)} `;
+    p.textContent = `${conMaiuscola(fraseGuasto(errore))}. `;
     const riprova = document.createElement('button');
     riprova.type = 'button';
     riprova.className = 'sn-btn sn-btn-secondary';
