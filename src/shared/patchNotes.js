@@ -20,6 +20,7 @@
       features: [
         'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta. La pagina Crediti ricorda l’ultimo rifiuto finché la chiave non torna a funzionare.',
         'Un invito adesso è un link. Chi lo apre scarica Filo e al primo avvio si ritrova i crediti già dentro, senza ricopiare il codice. Ogni tuo link vale per tre persone, e nella pagina Crediti vedi quanti sono entrati e quanti posti restano.',
+        'Mandare una segnalazione dà crediti, e se viene risolta ne dà altri: li trovi nei movimenti della pagina Crediti, insieme all\'ingresso, alla quota di ogni giorno e ai regali.',
       ],
       fixes: [
         'Appena l\'invito è riscattato la home lo sa. Prima continuava a dire che per attivare Filo serve un codice, e il suo primo suggerimento portava a riscattare un invito già riscattato: il messaggio giusto arrivava solo aprendo una scheda nuova.',
