@@ -66,6 +66,50 @@ function formatKnownPathsForPrompt(rawPaths) {
   return globalThis.SN_PATHS_SAFETY.formatKnownPathsForPrompt(rawPaths);
 }
 
+// #593 — IL TURNO AUTOMATICO DELL'AGENTE AIUTO, E LE DUE COSE CHE CI STANNO
+// DENTRO.
+//
+// Dopo un'azione (un click dell'utente, una ricerca web, un comando eseguito)
+// l'agente riparte da solo, e il turno che gli arriva ha due parti che non
+// vanno confuse:
+//
+//   • LA NOTA DI FILO — «l'utente ha cliccato», «ho eseguito la ricerca che
+//     avevi chiesto». È la voce di Filo, e il modello la legge come tale:
+//     arriva come «(Sistema: …)», e le istruzioni gli dicono che quello è il
+//     canale fidato. Ci passa SOLO testo che nasce qui dentro. Non lo dà per
+//     scontato: `perCanaleSistema` la riduce a una riga sola e le toglie
+//     qualunque marcatura, così una nota scritta domani interpolandoci
+//     qualcosa non può forgiare una recinzione.
+//
+//   • IL CONTENUTO ESTERNO — i risultati della ricerca, l'etichetta di un
+//     elemento. Prima veniva impastato dentro la nota, e chi controllava una
+//     pagina fra i primi risultati parlava all'agente con l'autorità del canale
+//     di Filo, senza bisogno di nessuna chiave. Adesso viaggia a parte e entra
+//     imbustato: intestazione che lo dichiara dati, due marcature, e la
+//     pulizia che gli impedisce di scriversele da sé.
+//
+// La cronologia che la sidebar si tiene e rimanda nei turni dopo è composta
+// dalle STESSE funzioni (`SN_CONST.PROMPTS.ricercaWebImbustata` e sorelle):
+// una busta rifatta a mano dall'altra parte divergerebbe in silenzio, e la
+// cronologia è proprio il posto dove un testo avvelenato resterebbe per tutta
+// la sessione.
+function bustePerAiuto(payload) {
+  const est = payload && payload.esterno;
+  if (!est || typeof est !== 'object') return [];
+  const out = [];
+  if (est.ricercaWeb) out.push(PROMPTS.ricercaWebImbustata(est.ricercaWeb));
+  if (est.elementoPagina) out.push(PROMPTS.elementoPaginaImbustato(est.elementoPagina));
+  return out.filter(Boolean);
+}
+
+function testoDelTurnoAutomatico(payload) {
+  const buste = bustePerAiuto(payload);
+  if (!payload.userAction) return buste.join('\n\n');
+  const nota = globalThis.SN_ESTERNO.perCanaleSistema(payload.userAction);
+  const sistema = `(Sistema: ${nota}. Stato pagina aggiornato — valuta lo screenshot e l'outline correnti, poi indica il passo successivo o status:"done" se l'obiettivo è completato.)`;
+  return [sistema, ...buste].join('\n\n');
+}
+
 async function buildMessages(action, payload) {
   if (payload && Array.isArray(payload.messages) && payload.messages.length) {
     return payload.messages;
