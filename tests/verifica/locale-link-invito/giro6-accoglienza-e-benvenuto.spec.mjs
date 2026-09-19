@@ -1,18 +1,18 @@
 // Giro di verifica locale del ramo claude/link-invito — giro 6.
 //
 // La pista che nessuno dei cinque giri passati aveva battuto: al primo avvio
-// di chi arriva da un link d'invito succedono DUE cose insieme — i crediti
-// arrivano da soli (questo lavoro) e Filo si presenta con la conversazione di
-// accoglienza del primo avvio. Qui si guarda cosa resta a schermo quando
-// capitano nello stesso momento.
+// di chi arriva da un link d'invito succedono DUE cose — i crediti arrivano da
+// soli, e Filo si presenta con la conversazione di accoglienza del primo
+// avvio. Qui si guarda la seconda.
 //
-// Due prove, e vanno lette in coppia:
-//   1. l'invitato non tocca niente e resta sulla home che si è aperta da sola
-//      → Filo non si presenta mai;
-//   2. lo stesso identico giro, ma l'invitato apre una scheda nuova → Filo si
-//      presenta. La seconda è il controllo: dice che l'accoglienza in questo
-//      ambiente funziona, e che a mancare è solo l'aggancio sulla home già
-//      aperta.
+// Le due prove vanno lette in coppia:
+//   1. l'invitato riceve i crediti dall'invito e aspetta: Filo non si presenta
+//      mai, né sulla home aperta né su una scheda nuova, benché la home si
+//      comporti come se Filo fosse attivo;
+//   2. sulla STESSA installazione, appena si scrive a mano una chiave nelle
+//      impostazioni, Filo si presenta subito. È il controllo: dice che
+//      l'accoglienza in questo ambiente funziona, e che a non accenderla è la
+//      chiave che arriva dall'invito.
 //
 // Scritto da chi verifica, non da chi ha fatto il lavoro. Server finto: un
 // codice vero a usi contati non si brucia per una prova.
@@ -93,11 +93,11 @@ async function attendiHome(app, tetto = 30000) {
 
 // Filo si è presentato? La conversazione di accoglienza non è un riquadro:
 // prende il posto della home, e la prima bolla è il testo fisso di Filo.
-async function siEPresentato(home) {
+async function siEPresentato(page) {
   try {
-    const stato = await home.getAttribute('body', 'data-state');
+    const stato = await page.getAttribute('body', 'data-state');
     if (stato !== 'thread') return false;
-    const t = await home.locator('.dash-bubble-filo').first().innerText({ timeout: 2000 });
+    const t = await page.locator('.dash-bubble-filo').first().innerText({ timeout: 2000 });
     return /Ciao, sono Filo/.test(t || '');
   } catch (_) { return false; }
 }
@@ -117,24 +117,22 @@ async function giroDellInvitato(app) {
   return home;
 }
 
-test('il primo avvio dell’invitato: i crediti arrivano E Filo si presenta', async ({ app }) => {
+test('entrato con l’invito, Filo si presenta', async ({ app, shell }) => {
+  test.fail(true, 'i crediti dell’invito non accendono l’accoglienza: Filo non si presenta mai');
   test.setTimeout(300000);
 
   const home = await giroDellInvitato(app);
 
-  // Adesso i crediti ci sono e Filo può parlare. La prima cosa che l'invitato
-  // deve vedere è Filo che si presenta, nella sessione in cui è entrato: è il
-  // momento in cui decide se Filo ha funzionato, e non tocca niente.
+  // La home si comporta già da Filo attivo: il saluto è quello di chi ha di
+  // che far girare i modelli, non quello di chi deve ancora riscattare.
   await expect
-    .poll(() => siEPresentato(home), { timeout: 60000, intervals: [1000] })
-    .toBe(true);
-});
+    .poll(async () => (await home.innerText('body')).slice(0, 200), { timeout: 30000, intervals: [1000] })
+    .toContain('Filo è qui');
 
-test('controllo: aperta una scheda nuova, Filo si presenta — l’accoglienza funziona', async ({ app, shell }) => {
-  test.setTimeout(300000);
+  // Ma la conversazione con cui Filo si presenta non parte: né lì…
+  await expect.poll(() => siEPresentato(home), { timeout: 45000, intervals: [1000] }).toBe(true);
 
-  const home = await giroDellInvitato(app);
-
+  // …né su una scheda nuova, che è l'unica strada che restava.
   const primaDi = new Set(app.windows());
   await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
   let seconda = null;
@@ -147,12 +145,31 @@ test('controllo: aperta una scheda nuova, Filo si presenta — l’accoglienza f
     if (!seconda) await new Promise((r) => setTimeout(r, 150));
   }
   expect(seconda, 'la seconda scheda della home non si è aperta').toBeTruthy();
+  await expect.poll(() => siEPresentato(seconda), { timeout: 45000, intervals: [1000] }).toBe(true);
+});
 
-  await expect
-    .poll(() => siEPresentato(seconda), { timeout: 60000, intervals: [1000] })
-    .toBe(true);
+test('controllo: con una chiave scritta a mano Filo si presenta subito', async ({ app }) => {
+  test.setTimeout(300000);
 
-  // E la home di prima, quella dell'avvio, è rimasta indietro: lì Filo non si
-  // è mai presentato.
-  expect(await siEPresentato(home)).toBe(false);
+  const home = await giroDellInvitato(app);
+
+  // Stessa installazione, stesso invito appena riscattato: cambia solo che la
+  // chiave adesso è scritta nelle impostazioni come farebbe chi ne ha una sua.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: {
+        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_LESSON]: 'deepseek-flash',
+        [C.ACTIONS.FILO_COMPACT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
+      },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  await home.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+
+  await expect.poll(() => siEPresentato(home), { timeout: 60000, intervals: [1000] }).toBe(true);
 });
