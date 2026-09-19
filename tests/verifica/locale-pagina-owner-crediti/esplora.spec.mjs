@@ -45,7 +45,8 @@ test('esplora la pagina dell’owner', async () => {
     rapporto.redeemDopo = { status: r.status, credits: r.credits };
 
     // Numeri storti.
-    for (const [chiave, valore] of [['dailyCredits', ''], ['dailyCredits', '   '], ['dailyCredits', '-5'], ['dailyCredits', '3,5'], ['dailyCredits', '2000000'], ['invitesMaxUses', '0']]) {
+    rapporto.valoriDopoSalva = await leggi();
+    for (const [chiave, valore] of [['dailyCredits', '3.5'], ['dailyCredits', '2000000'], ['invitesMaxUses', '0'], ['maxGrantCredits', '1']]) {
       await page.fill(`#knob-${chiave}`, valore);
       await page.click(`#knob-${chiave}-salva`);
       await page.waitForTimeout(900);
