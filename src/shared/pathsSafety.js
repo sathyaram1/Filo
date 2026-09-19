@@ -736,7 +736,14 @@
       chars += block.length + 2;
     }
     if (!blocchi.length) return '';
-    return `${FENCE_START}\n${blocchi.join('\n\n')}\n${FENCE_END}`;
+    // L'intestazione qui non si chiede: la scrive per esteso il prompt
+    // dell'Aiuto, che ha spazio per dire anche a cosa servono i percorsi e
+    // perché vanno verificati nell'outline.
+    return esterno().imbusta({
+      tipo: TIPO_ESTERNO,
+      testo: blocchi.join('\n\n'),
+      max: KNOWN_PATHS_BUDGET_CHARS,
+    });
   }
 
   global.SN_PATHS_SAFETY = {
