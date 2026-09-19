@@ -109,3 +109,33 @@ ricerca avvelenata, turno successivo, cronologia.
 Il pattern che viene prima di questo, e che resta valido per il lato scrittura,
 è [Contenuto di un utente nel prompt di un
 altro](contenuto-di-un-utente-nel-prompt-di-un-altro.md).
+
+## La porta unica va usata da tutti gli agenti, non solo da quello del caso
+
+Secondo giro di verifica del #593. Chiusa la falla sull'Aiuto, la stessa
+rientrava dall'assistente della nuova scheda: i risultati di una sua
+`CERCA_WEB` gli rientravano nel contesto al turno dopo sotto la riga
+`[Risultati della ricerca web "…"]`, nudi, e il commento nel codice li
+chiamava «DATI di sistema affidabili». Nessuna chiave, di nuovo, e quello è
+l'agente che apre siti, cambia impostazioni e chiede di eseguire comandi.
+
+Due lezioni, tutte e due generali.
+
+La prima: dopo aver costruito la porta unica, cercare **tutti** i posti che
+compongono lo stesso dato a mano, non solo quello nominato nella
+segnalazione. Il modo veloce è partire dal DATO (un risultato di ricerca, il
+titolo di una pagina) e seguirlo fino a ogni prompt in cui finisce, invece di
+partire dall'agente.
+
+La seconda: **una busta senza la regola di lettura è una decorazione**.
+`helpStatic` insegnava all'Aiuto che fuori dalle marcature parla Filo;
+l'assistente della nuova scheda quella regola non ce l'aveva, quindi la busta
+gli sarebbe arrivata come un ornamento. Chi imbusta per un agente nuovo scrive
+anche il paragrafo che gli dice cosa vuol dire.
+
+Gli altri due posti, nello stesso giro: i titoli delle pagine salvate per dopo
+(che dal generatore della nuova scheda escono come messaggio e come bottoni che
+aprono un indirizzo) e i titoli delle schede aperte in `FILO STATE`
+(`src/shared/filoState.js`). Sentinella:
+`tests/chat-filo-contenuto-esterno.spec.mjs`, che per ognuno dei tre asserisce
+le due cose insieme, che il dato arriva e che arriva dentro la recinzione.
