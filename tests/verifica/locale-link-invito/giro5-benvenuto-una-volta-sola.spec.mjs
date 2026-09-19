@@ -61,22 +61,21 @@ test.afterAll(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test('quante volte compare con due home aperte', async ({ app, shell }) => {
+test('il benvenuto si racconta una volta sola, anche con più schede della home aperte', async ({ app, shell }) => {
   test.setTimeout(180000);
-  // Due schede della home aperte, come capita a chiunque.
+  // Qualche scheda nuova aperta, come capita a chiunque usi un browser.
   await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
   await new Promise((r) => setTimeout(r, 3000));
   await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
   await new Promise((r) => setTimeout(r, 5000));
   const home = app.windows().filter((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } });
-  console.log('HOME APERTE:', home.length);
+  expect(home.length, 'servono più schede della home per questa prova').toBeGreaterThan(1);
 
+  // Il collegamento d'invito cliccato da fuori, con Filo già acceso.
   await app.evaluate(({ app: a }, argv) => { a.emit('second-instance', {}, argv); }, ['electron.exe', '.', 'filo://invito/ABCD-EFGH']);
   await new Promise((r) => setTimeout(r, 12000));
   const stati = [];
-  for (const h of home) stati.push(await confirmText(h).catch(() => 'ERR'));
-  console.log('DIALOGHI:', JSON.stringify(stati));
+  for (const h of home) stati.push(await confirmText(h).catch(() => ''));
   const conBenvenuto = stati.filter((s) => String(s).includes('Sei entrato con un invito')).length;
-  console.log('QUANTE VOLTE COMPARE:', conBenvenuto);
-  expect(conBenvenuto).toBeLessThan(2);
+  expect(conBenvenuto, `il benvenuto è comparso in ${conBenvenuto} schede della home`).toBeLessThan(2);
 });
