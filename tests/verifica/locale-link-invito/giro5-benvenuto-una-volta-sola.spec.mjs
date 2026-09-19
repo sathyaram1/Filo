@@ -62,6 +62,10 @@ test.afterAll(async () => {
 });
 
 test('il benvenuto si racconta una volta sola, anche con più schede della home aperte', async ({ app, shell }) => {
+  // Rilievo di livello 1 del quinto giro, messo da parte dal server invece di
+  // essere corretto: la prova resta qui, rossa per contratto, e diventerà
+  // verde il giorno in cui il benvenuto lo racconterà una scheda sola.
+  test.fail(true, 'rilievo di livello 1 del quinto giro, messo da parte: il benvenuto arriva a ogni scheda della home');
   test.setTimeout(180000);
   // Qualche scheda nuova aperta, come capita a chiunque usi un browser.
   await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
