@@ -1455,13 +1455,23 @@
 
     // Correttore "rosso" — check on-demand di una singola parola al click destro.
     // Lo zigzag rosso è quello nativo del browser; qui generiamo solo il suggerimento.
+    // #593 — parola e frasi vengono da una pagina web: imbustate come tutto il
+    // resto. La parola viene nominata anche fuori dalla busta, nelle domande
+    // che il prompt pone: lì passa per `unaRigaDiDati`, che le toglie gli a
+    // capo e la accorcia, così non può aprire una riga per conto suo.
     spellcheckWord: ({ word, sentence, prev, next }) =>
-      `L'utente ha cliccato col tasto destro sulla parola "${word}" in un campo editabile.\n\n` +
-      `Frase in cui compare:\n"""${sentence}"""\n` +
-      (prev ? `\nFrase precedente: "${prev}"` : '') +
-      (next ? `\nFrase successiva: "${next}"` : '') +
+      `L'utente ha cliccato col tasto destro su una parola in un campo editabile di una pagina web. Parola, frase e contesto sono qui sotto.\n\n` +
+      esterno().imbustaCampi({
+        tipo: 'TESTO_IN_PAGINA',
+        campi: {
+          'Parola su cui ha cliccato': word,
+          'Frase in cui compare': sentence,
+          'Frase precedente': prev,
+          'Frase successiva': next,
+        },
+      }) +
       `\n\nLa parola è ortograficamente sbagliata (refuso, errore di battitura, parola inesistente)? ` +
-      `Considera anche se "${word}" potrebbe essere un nome proprio, marca, termine tecnico o parola straniera legittima — in quei casi non è un errore.\n\n` +
+      `Considera anche se "${unaRigaDiDati(word, 200)}" potrebbe essere un nome proprio, marca, termine tecnico o parola straniera legittima — in quei casi non è un errore.\n\n` +
       `IMPORTANTISSIMO sulla lingua: la correzione DEVE essere nella STESSA lingua della frase in cui compare la parola. ` +
       `Deduci la lingua dal contesto (frase corrente e frasi vicine): se la frase è in italiano la correzione è una parola italiana, se è in inglese è una parola inglese, e così via. ` +
       `Non tradurre MAI la parola in un'altra lingua e non sostituirla con un termine inglese se il testo è in italiano.\n\n` +
