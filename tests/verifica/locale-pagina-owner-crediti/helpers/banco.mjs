@@ -232,6 +232,7 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
           result = target ? await service.grant(target, Math.floor(Number(data.credits) || 0), String(data.why || 'owner'), deps) : { ok: false, reason: 'no_wallet' };
         } else if (name === 'walletCreateInvites') result = { codes: await service.createOwnerInvites(data.count, uid, deps) };
         else if (name === 'walletOverview') result = await service.overview(deps);
+        else if (name === 'walletUserDetail') result = await service.userDetail(String(data.pseudonym || ''), deps);
         else return json(res, 404, { error: { message: 'not found' } });
         return json(res, 200, { result });
       } catch (e) {
