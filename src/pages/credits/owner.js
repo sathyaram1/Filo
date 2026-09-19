@@ -376,9 +376,10 @@
       schedeChieste.delete(u.pseudonym);
       const err = document.createElement('p');
       err.className = 'sn-wallet-msg is-error';
+      if (r && r.error) console.warn('[credits/owner] scheda non arrivata:', r.error);
       err.textContent = d && d.found === false
         ? 'Questa persona non risulta più al server.'
-        : `Scheda non arrivata${r && r.error ? ` (${r.error})` : ''}. Richiudi e riapri per riprovare.`;
+        : `Scheda non arrivata: ${fraseGuasto(r && r.error)}. Richiudi e riapri per riprovare.`;
       td.appendChild(err);
       return;
     }
