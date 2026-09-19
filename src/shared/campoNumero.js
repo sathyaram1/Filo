@@ -193,7 +193,10 @@
       // Il campo mostra quello che il server ha, non quello che era stato
       // digitato.
       mostra(r.valore == null ? valore : r.valore);
-      precedente = comeRipristino ? null : prima;
+      // Se prima non c'era niente sul server, non c'è un «com'era» a cui
+      // tornare: rimetterlo vorrebbe dire scrivere uno zero che nessuno ha mai
+      // messo.
+      precedente = (comeRipristino || prima === '') ? null : prima;
       aggiornaRimetti();
       dillo(comeRipristino ? 'Rimesso com’era.' : 'Salvato.', 'is-ok');
       if (typeof onSalva === 'function') { try { onSalva(); } catch (_) {} }

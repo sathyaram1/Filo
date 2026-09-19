@@ -49,7 +49,7 @@
     $('ownerTotals').textContent = cfg.eurUsd
       ? `Un credito vale ${formatDecimale(cfg.eurPerCredit, 6)} €, e un euro ${formatDecimale(cfg.eurUsd, 4)} $`
         + `${quando ? ` (cambio del ${quando})` : ''}.`
-      : 'Manca il cambio del giorno: finché non arriva, nessuna elargizione parte.';
+      : 'Manca il cambio del giorno: finché non arriva, Filo non regala crediti a nessuno.';
     riempiManopole(cfg, tot);
     // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
     // con quelli usati barrati, così chi ne genera cinque e chiude la pagina sa
@@ -163,7 +163,7 @@
     lista.appendChild(riquadro(
       Number.isFinite(dati) ? formatInt(dati) : '—',
       Number.isFinite(tetto) ? `crediti elargiti su ${formatInt(tetto)}` : 'crediti elargiti',
-      'Tutto quello che è stato dato finora, contro il tetto che hai messo.',
+      'Quanto hai dato finora, contro il tetto che hai messo.',
       { barra: Number.isFinite(tetto) && tetto > 0 && Number.isFinite(dati) ? dati / tetto : null },
     ));
     lista.appendChild(riquadro(restano == null ? '—' : formatInt(restano), 'ancora elargibili',
@@ -178,7 +178,7 @@
     lista.appendChild(riquadro(formatInt(buoni.length), buoni.length === 1 ? 'tuo invito da dare' : 'tuoi inviti da dare',
       `Codici usciti da qui con ancora un posto libero: ${formatInt(posti)} ${posti === 1 ? 'persona può entrare' : 'persone possono entrare'}.`));
     lista.appendChild(riquadro(formatInt(cfg.invitesRemaining || 0), 'riscatti rimasti',
-      'Quante volte in tutto si può ancora entrare con un invito, su questo server.'));
+      'Quante volte si può ancora entrare con un invito, in tutto.'));
   }
 
   // ── Le manopole ────────────────────────────────────────────────────────────
@@ -381,7 +381,7 @@
       ['Speso', fmtUsd(b.usageUsd)],
       ['Tetto della sua chiave', fmtUsd(b.limitUsd)],
       ['Riconciliazione', !rec ? 'mai fatta' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'torna')],
-      ['Invitata da', invitata],
+      ['Invitato da', invitata],
       ['Con Filo dal', formatDate(d.createdAt || u.createdAt) || '—'],
     ], '')));
 

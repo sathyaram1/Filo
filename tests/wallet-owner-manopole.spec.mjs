@@ -352,7 +352,7 @@ test('la riga di una persona apre la sua scheda: movimenti, suoi inviti e ultime
   // I movimenti, col premio per la segnalazione risolta scritto in italiano.
   await expect(scheda).toContainText('Segnalazione risolta');
   await expect(scheda).toContainText('+28');
-  await expect(scheda).toContainText('Sei entrato con un invito');
+  await expect(scheda).toContainText('Invito riscattato');
   await expect(scheda).toContainText('Quota del giorno');
 
   // I suoi inviti, con chi è entrato.

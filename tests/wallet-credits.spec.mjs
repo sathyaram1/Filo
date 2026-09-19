@@ -296,6 +296,6 @@ test('con un portafoglio i movimenti sono quelli del server, non il conteggio lo
   await expect(moves.nth(0)).toContainText('Segnalazione risolta');
   await expect(moves.nth(0)).toContainText('+50');
   await expect(moves.nth(1)).toContainText('Quota del giorno');
-  await expect(moves.nth(2)).toContainText('Sei entrato con un invito');
+  await expect(moves.nth(2)).toContainText('Invito riscattato');
   await expect(moves.nth(2)).toContainText('+5.000');
 });

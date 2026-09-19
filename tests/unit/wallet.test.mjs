@@ -295,7 +295,7 @@ test('un codice storto non arriva nemmeno al server: lo dice la frase', () => {
 // codice, a volte con l'id del feedback attaccato: chi legge la pagina Crediti
 // deve trovarci una frase.
 test('un movimento del portafoglio si legge in italiano, anche con l’id attaccato', () => {
-  assert.equal(W.grantLabel('entry'), 'Sei entrato con un invito');
+  assert.equal(W.grantLabel('entry'), 'Invito riscattato');
   assert.equal(W.grantLabel('daily'), 'Quota del giorno');
   assert.equal(W.grantLabel('owner'), 'Regalo di Filo');
   assert.equal(W.grantLabel('gift'), 'Regalo di Filo');
