@@ -106,6 +106,41 @@
         ],
         "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è. La quarta prova dello stesso spec (chi non è l'owner) non finge nessuna sessione e nel contenitore è verde: per questo non è elencata.",
         "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro2-uscite",
+        "caso": [
+          "un numero scritto non si perde se la pagina viene ricaricata col cursore ancora dentro",
+          "un numero scritto parte anche seguendo il collegamento alla pagina Crediti",
+          "un numero scritto non si perde chiudendo la scheda",
+          "il numero partito da solo si può rimettere com’era, senza aver premuto Salva",
+          "un numero storto lasciato nel campo non arriva al server, e la pagina lo dice"
+        ],
+        "perche": "stesso motivo delle voci qui sopra: le prove del secondo giro di verifica sulla pagina dell'owner dei crediti fingono di essere l'owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c'è, l'owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo. Queste prove la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro2-errori",
+        "caso": [
+          "se il server non risponde, «Genera» lo dice con una frase e non con la risposta del server",
+          "se il server non risponde, «Regala» lo dice con una frase e non con la risposta del server",
+          "se la scheda di una persona non arriva, lo dice a parole e si può riprovare",
+          "col server giù il «Riprova» in cima rimette in piedi la pagina quando torna",
+          "un pseudonimo che non esiste non è un guasto: lo dice in italiano"
+        ],
+        "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è. Le prime due sono anche attese rosse sulla macchina di chi sviluppa Filo, finché i due moduli in mezzo alla pagina mostrano la risposta tecnica del server: sono segnate come tali nello spec.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verifica/locale-pagina-owner-crediti/giro2-menu-e-costi",
+        "caso": [
+          "le voci del menu di una persona fanno quello che dicono",
+          "due tasti destri di fila lasciano un menu solo",
+          "il tasto destro fuori dalla tabella apre ancora il menu della pagina",
+          "un costo di qualche milionesimo di dollaro si legge, in tutti e quattro i posti"
+        ],
+        "perche": "stesso motivo della voce qui sopra: l'owner si finge salvando una sessione su disco, e nel contenitore safeStorage non c'è.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
       }
     ]
   },
