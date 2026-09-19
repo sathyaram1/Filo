@@ -191,14 +191,49 @@
   const ORTO = '[\\u200B-\\u200D]';
   const ORTO_RE = /[\u200B-\u200D]/g;
 
-  // Le parentesi angolari che compongono una marcatura, anche se qualcuno le
-  // ha separate con un invisibile ortografico. La sostituzione butta via tutto
-  // ciò che ha trovato in mezzo: fra due parentesi angolari un invisibile non
-  // è ortografia di nessuno.
-  const ANGOLARI_CAMPO_RE = new RegExp(`<(?:${ORTO}*<)+`, 'g');
-  const CHIUSE_CAMPO_RE = new RegExp(`>(?:${ORTO}*>)+`, 'g');
-  const ANGOLARI_BLOCCO_RE = new RegExp(`<(?:${ORTO}*<){2,}`, 'g');
-  const CHIUSE_BLOCCO_RE = new RegExp(`>(?:${ORTO}*>){2,}`, 'g');
+  // LE PARENTESI SI SPENGONO SOLO DOVE COMPONGONO UNA MARCATURA (#593, quarto
+  // giro di verifica).
+  //
+  // Prima si schiacciava ogni fila di parentesi angolari: da tre in su nei
+  // blocchi, da due in su nei campi. Ma quelle file sono anche scrittura vera,
+  // e la busta le riscriveva. Tre chiuse di fila sono il prompt della console
+  // Python su mezza documentazione tecnica, il terzo livello di citazione in
+  // una risposta e la forma dei marcatori di conflitto di git; due sono gli
+  // operatori di flusso e di scorrimento in C, C++ e Java, e in italiano sono
+  // le virgolette basse di chi non sa dove stiano sulla tastiera. Il danno si
+  // vedeva: «Modifica testo» rimetteva nel campo dell'utente una parentesi in
+  // meno di quelle che ci aveva scritto lui, «Traduci la pagina» le toglieva
+  // dal testo che sostituisce la pagina, «Spiega» mandava al modello una riga
+  // di codice diversa da quella selezionata, e il correttore contestuale non
+  // ritrovava più nel testo originale le porzioni segnate dal modello.
+  //
+  // Adesso si spegne un TOKEN con la forma di una marcatura: tre o più aperte,
+  // un nome senza a capo e senza altre parentesi, tre o più chiuse. Una fila
+  // che non chiude niente resta com'è, perché da sola non recinta niente. Il
+  // giro si ripete finché il testo non si muove più: `<<<X<<<Y>>>Z>>>` non
+  // deve lasciare fuori la coppia esterna.
+  const TOKEN_MARCATURA_RE = new RegExp(
+    `<(?:${ORTO}*<){2,}[^\\n<>]{0,120}>(?:${ORTO}*>){2,}`,
+    'g',
+  );
+  // Dentro il token: le file di parentesi, invisibili compresi. Restano due
+  // per parte, che non aprono e non chiudono nessuna busta.
+  const APERTE_RUN_RE = new RegExp(`<(?:${ORTO}*<){2,}`, 'g');
+  const CHIUSE_RUN_RE = new RegExp(`>(?:${ORTO}*>){2,}`, 'g');
+
+  function spegniMarcature(s) {
+    let out = s;
+    // Un tetto ai giri: la sostituzione accorcia sempre, quindi si ferma da
+    // sé, ma un ciclo senza fondo dentro una pulizia di sicurezza no.
+    for (let i = 0; i < 4; i++) {
+      const prima = out;
+      out = out.replace(TOKEN_MARCATURA_RE, (tok) => tok
+        .replace(APERTE_RUN_RE, '<<')
+        .replace(CHIUSE_RUN_RE, '>>'));
+      if (out === prima) break;
+    }
+    return out;
+  }
 
   // I nomi delle marcature, tutti, in un'alternativa sola. Con il `FINE_`
   // davanti o senza: `FINE_RICERCA_WEB` contiene già `RICERCA_WEB`, quindi
