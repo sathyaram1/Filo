@@ -95,6 +95,18 @@ costano dieci riletture, in un turno solo una. Quindi:
 - **Mai committare artefatti dei test** (`tests/.shots/`, `tests/.smoke/`,
   `tests/agent/.out/`, ecc.: output rigenerato, gitignorato). Se un PNG risulta
   tracciato: `git rm --cached <file>`.
+- **Fine riga: LF ovunque, e non si tratta.** `.gitattributes` impone
+  `* text=auto eol=lf`, e vince su `core.autocrlf` — che su Windows, e nei
+  contenitori `windows-latest` dove gira il cancello che pubblica, è acceso di
+  serie. Su un checkout a CRLF gli hook di `.claude/hooks/*.sh` non partono
+  (bash legge `cd /percorso\r`, non trova la cartella ed **esce 0**: il
+  salvataggio automatico smette di funzionare in silenzio) e ogni regex
+  ancorata a fine riga smette di riconoscere i file del repo, perché per una
+  regex `\r` è già un fine riga. Conseguenze pratiche: non togliere quella
+  regola; un NUL dentro un sorgente si scrive come escape (`\u0000`), perché il
+  carattere vero fa considerare il file BINARIO a git e lo lascia fuori dalla
+  normalizzazione. La sentinella è `tests/unit/fineRigaLf.test.mjs`; il racconto
+  sta in `patterns/la-fine-riga-la-decide-il-repo-non-la-macchina-che-clona.md`.
 
 ## Filo gira anche su Mac
 
