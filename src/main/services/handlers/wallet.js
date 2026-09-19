@@ -333,10 +333,15 @@ module.exports = function register(on, ctx) {
   const NOTICE_KEY = 'walletNotice';
   const NOTICE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-  // L'avviso si SPINGE, non si aspetta che qualcuno lo chieda: la home è già
-  // aperta quando l'invito viene riscattato (quattro secondi dopo l'avvio, o
-  // a Filo acceso), e farle chiedere lo stato del portafoglio a ogni apertura
-  // costerebbe un giro dal server per ogni scheda nuova.
+  // L'avviso si SPINGE appena il riscatto è andato. Non basta: al PRIMO
+  // avvio il riscatto si chiude in pochi secondi, mentre la home si sta
+  // ancora aprendo, e la spinta non trova nessuno in ascolto — l'invitato si
+  // ritrova i crediti senza che niente glielo dica, che è indistinguibile da
+  // un invito perso (quarto giro di verifica del #651: col server rallentato
+  // apposta l'avviso arrivava, con un server svelto mai). Quindi chi apre lo
+  // CHIEDE anche, con WALLET_NOTICE_PENDING: l'avviso è scritto in locale e
+  // chiederlo non costa un giro dal server, a differenza dello stato del
+  // portafoglio.
   async function setNotice(kind, text) {
     const rec = { kind, text: String(text || ''), at: new Date().toISOString(), seenHome: false, seenCredits: false };
     try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {}
