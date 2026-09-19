@@ -88,26 +88,16 @@ function formatKnownPathsForPrompt(rawPaths) {
 //     imbustato: intestazione che lo dichiara dati, due marcature, e la
 //     pulizia che gli impedisce di scriversele da sé.
 //
-// La cronologia che la sidebar si tiene e rimanda nei turni dopo è composta
-// dalle STESSE funzioni (`SN_CONST.PROMPTS.ricercaWebImbustata` e sorelle):
-// una busta rifatta a mano dall'altra parte divergerebbe in silenzio, e la
-// cronologia è proprio il posto dove un testo avvelenato resterebbe per tutta
-// la sessione.
-function bustePerAiuto(payload) {
-  const est = payload && payload.esterno;
-  if (!est || typeof est !== 'object') return [];
-  const out = [];
-  if (est.ricercaWeb) out.push(PROMPTS.ricercaWebImbustata(est.ricercaWeb));
-  if (est.elementoPagina) out.push(PROMPTS.elementoPaginaImbustato(est.elementoPagina));
-  return out.filter(Boolean);
-}
-
+// A comporre il testo è `SN_CONST.PROMPTS.turnoAutomaticoAiuto`, e non questo
+// file: la sidebar scrive la stessa cosa nella propria cronologia, che tornerà
+// al modello nei turni dopo, e due composizioni a mano divergerebbero in
+// silenzio. La cronologia è proprio il posto dove un testo avvelenato
+// resterebbe per tutta la sessione.
 function testoDelTurnoAutomatico(payload) {
-  const buste = bustePerAiuto(payload);
-  if (!payload.userAction) return buste.join('\n\n');
-  const nota = globalThis.SN_ESTERNO.perCanaleSistema(payload.userAction);
-  const sistema = `(Sistema: ${nota}. Stato pagina aggiornato — valuta lo screenshot e l'outline correnti, poi indica il passo successivo o status:"done" se l'obiettivo è completato.)`;
-  return [sistema, ...buste].join('\n\n');
+  return PROMPTS.turnoAutomaticoAiuto({
+    nota: payload.userAction || '',
+    dati: payload.esterno || null,
+  });
 }
 
 async function buildMessages(action, payload) {
