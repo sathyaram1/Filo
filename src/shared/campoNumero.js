@@ -95,6 +95,20 @@
     return { ok: false, motivo: esito.motivo, testo: frase(esito.motivo, regole) };
   }
 
+  /**
+   * Come `controlla`, ma su un campo `<input type="number">`. Ci vuole una
+   * funzione a parte perché un campo numerico che contiene qualcosa che numero
+   * non è («ciao», «1..2») risponde `value === ''`: letto com'è sembrerebbe un
+   * campo VUOTO, e la frase sarebbe quella sbagliata. Il browser lo dice in
+   * `validity.badInput`.
+   */
+  function controllaCampo(input, regole) {
+    if (input && input.validity && input.validity.badInput) {
+      return { ok: false, motivo: MOTIVI.NON_NUMERO, testo: frase(MOTIVI.NON_NUMERO, regole) };
+    }
+    return controlla(input ? input.value : '', regole);
+  }
+
   // ── La parte con il DOM ────────────────────────────────────────────────────
 
   /**
