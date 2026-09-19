@@ -1395,10 +1395,7 @@
       esterno().imbustaCampi({
         tipo: 'DATI_PAGINA',
         campi: { URL: url, Titolo: title, Descrizione: description || '-' },
-      }) + '\n\n' +
-      esterno().imbusta({
-        tipo: 'DATI_PAGINA',
-        testo: `Estratto:\n${excerpt || '-'}`,
+        corpo: `Estratto:\n${excerpt || '-'}`,
       }) + '\n\n' +
       // Le categorie che l'utente ha già in casa sono roba sua, non del sito:
       // restano fuori dalla busta, perché è su quelle che deve scegliere.
