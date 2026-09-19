@@ -52,8 +52,14 @@ async function stubTranslationProvider(app) {
       if (prompt.indexOf('@@@SN_SEP@@@') < 0) return origComplete(args);
       globalThis.__filoTranslateCalls++;
       globalThis.__filoTranslatePrompts.push(prompt);
-      const i = prompt.indexOf('Testo:\n\n');
-      const chunk = i >= 0 ? prompt.slice(i + 'Testo:\n\n'.length) : '';
+      // #593 — il testo da tradurre arriva al modello dentro una busta, come
+      // ogni altro contenuto che scrive il sito: qui si finge di leggerla
+      // come la leggerebbe lui.
+      const APRE = '<<<TESTO_IN_PAGINA>>>\n';
+      const CHIUDE = '\n<<<FINE_TESTO_IN_PAGINA>>>';
+      const i = prompt.indexOf(APRE);
+      const fine = prompt.lastIndexOf(CHIUDE);
+      const chunk = i >= 0 && fine > i ? prompt.slice(i + APRE.length, fine) : '';
       const SEP = '\n@@@SN_SEP@@@\n';
       const out = chunk.split(/\n?@@@SN_SEP@@@\n?/).map((p) => `IT ${p}`).join(SEP);
       return { text: out, provider: 'test', model: 'test-translate', usage: {} };

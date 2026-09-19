@@ -82,8 +82,14 @@ async function stubTranslationProvider(app, delayMs = 0) {
       if (prompt.indexOf('ZULU') >= 0) {
         return { text: '', provider: 'test', model: 'test-translate', usage: {} };
       }
-      const i = prompt.indexOf('Testo:\n\n');
-      const chunk = i >= 0 ? prompt.slice(i + 'Testo:\n\n'.length) : '';
+      // #593 — il testo da tradurre arriva al modello dentro una busta, come
+      // ogni altro contenuto che scrive il sito: qui si finge di leggerla
+      // come la leggerebbe lui.
+      const APRE = '<<<TESTO_IN_PAGINA>>>\n';
+      const CHIUDE = '\n<<<FINE_TESTO_IN_PAGINA>>>';
+      const i = prompt.indexOf(APRE);
+      const fine = prompt.lastIndexOf(CHIUDE);
+      const chunk = i >= 0 && fine > i ? prompt.slice(i + APRE.length, fine) : '';
       const SEP = '\n@@@SN_SEP@@@\n';
       const parts = chunk.split(/\n?@@@SN_SEP@@@\n?/);
       globalThis.__filoTranslateBlocks += parts.length;
@@ -235,8 +241,14 @@ async function stubFlakyTranslationProvider(app, failAfter) {
         // Guasto di rete "vero": è la forma che arriva dal fetch di Node.
         throw new Error('fetch failed');
       }
-      const i = prompt.indexOf('Testo:\n\n');
-      const chunk = i >= 0 ? prompt.slice(i + 'Testo:\n\n'.length) : '';
+      // #593 — il testo da tradurre arriva al modello dentro una busta, come
+      // ogni altro contenuto che scrive il sito: qui si finge di leggerla
+      // come la leggerebbe lui.
+      const APRE = '<<<TESTO_IN_PAGINA>>>\n';
+      const CHIUDE = '\n<<<FINE_TESTO_IN_PAGINA>>>';
+      const i = prompt.indexOf(APRE);
+      const fine = prompt.lastIndexOf(CHIUDE);
+      const chunk = i >= 0 && fine > i ? prompt.slice(i + APRE.length, fine) : '';
       const SEP = '\n@@@SN_SEP@@@\n';
       return {
         text: chunk.split(/\n?@@@SN_SEP@@@\n?/).map((p) => `IT ${p}`).join(SEP),
