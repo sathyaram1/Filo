@@ -1412,13 +1412,27 @@
     // chiediamo al modello di riemettere il testo con le porzioni errate avvolte in **...**.
     // Il client ritrova le porzioni nel testo originale in ordine, gestendo automaticamente
     // le parole ripetute (la prima `**…**` si lega alla prima occorrenza non ancora consumata).
+    // #593 — il testo sta dentro un campo di una pagina web, e il sito può
+    // avercelo messo lui già pronto; le frasi intorno sono contenuto della
+    // pagina e basta. Prima entravano fra tre virgolette, che non sono una
+    // recinzione: si chiudono scrivendone altre tre. Adesso è una busta, come
+    // per ogni altro contenuto esterno.
+    //
+    // La pulizia della busta è pensata per non alterare il testo di chi
+    // scrive: tocca i caratteri di controllo, gli invisibili e le sequenze di
+    // tre parentesi angolari, cioè cose che in una frase non ci sono. Serve
+    // che resti intatto perché il client ritrova nel testo ORIGINALE le
+    // porzioni che il modello ha segnato con **…**.
     spellcheckSemantic: ({ text, context }) =>
-      `Analizza il testo seguente, scritto da un utente in un campo editabile, e segnala SOLO errori che un correttore ortografico tradizionale non rileverebbe (perché le parole, prese singolarmente, esistono e sono scritte correttamente).\n\n` +
-      `Testo da analizzare:\n"""${text}"""\n` +
+      `Analizza il testo qui sotto, scritto in un campo editabile di una pagina web, e segnala SOLO errori che un correttore ortografico tradizionale non rileverebbe (perché le parole, prese singolarmente, esistono e sono scritte correttamente).\n\n` +
+      esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: text, conIntestazione: true }) + '\n' +
       ((context && (context.prev || context.next))
-        ? `\nContesto circostante (NON da analizzare, solo per capire il senso):\n` +
-          (context.prev ? `Frase precedente: "${context.prev}"\n` : '') +
-          (context.next ? `Frase successiva: "${context.next}"\n` : '')
+        ? `\nContesto circostante (NON da analizzare, solo per capire il senso; stessa provenienza, stesso trattamento):\n` +
+          esterno().imbustaCampi({
+            tipo: 'TESTO_IN_PAGINA',
+            campi: { 'Frase precedente': context.prev, 'Frase successiva': context.next },
+            conIntestazione: false,
+          }) + '\n'
         : '') +
       `\nTipi di problema da rilevare:\n` +
       `1. semantic — parola di senso compiuto ma SBAGLIATA nel contesto (es: "sonno andato al mare" invece di "sono"; calchi non sensati).\n` +
