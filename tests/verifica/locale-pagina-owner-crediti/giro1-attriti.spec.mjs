@@ -167,7 +167,7 @@ test('il tasto destro su una persona offre qualcosa di quella persona', async ()
     await riga.click({ button: 'right' });
     await page.waitForTimeout(1500);
     const voci = await page.evaluate(() => {
-      const menu = document.querySelector('.sn-ctx, .sn-context-menu, [class*="ctx-menu"], [class*="context-menu"]');
+      const menu = document.querySelector('.sn-wallet-ctxmenu, .sn-ctx, .sn-context-menu, [class*="ctx-menu"], [class*="context-menu"]');
       return menu ? menu.innerText : '';
     });
     expect(voci).toMatch(/pseudonimo|regala|crediti|scheda|spesa|invit/i);
