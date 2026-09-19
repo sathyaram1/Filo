@@ -9,31 +9,49 @@ import {
 test.skip(!cartellaFiloSecurity(), 'filo-security non è accanto al repo');
 
 test('esplora la pagina dell’owner', async () => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const server = await avviaServer();
   const filo = await avviaFilo({ env: server.env });
   try {
     await fintoOpenRouter(filo.app, { fsBase: server.base });
     expect((await simulaOwner(filo.app, server)).isAdmin).toBe(true);
 
-    // Due persone dentro, con del consumo.
     const codes = await server.codiciOwner(3);
     await server.service.redeem('anon-a', codes[0], server.deps);
     await server.service.redeem('anon-b', codes[1], server.deps);
     const pa = server.store.docs.wallets.get('anon-a').pseudonym;
     server.store.docs.usage.push(
       { pseudonym: pa, at: '2026-09-18T10:00:00.000Z', action: 'chat', model: 'glm', servedBy: 'Baseten', promptTokens: 100, completionTokens: 20, costUsd: 0.0031, credits: 4 },
-      { pseudonym: pa, at: '2026-09-19T11:00:00.000Z', action: 'traduci', model: 'glm', servedBy: 'Baseten', promptTokens: 30, completionTokens: 8, costUsd: 0.0009, credits: 1 },
+      { pseudonym: pa, at: '2026-09-19T11:00:00.000Z', action: 'traduci', model: 'glm', servedBy: 'Baseten', promptTokens: 30, completionTokens: 8, costUsd: 3.75, credits: 4600 },
     );
 
     const page = await apriOwner(filo);
-    await page.waitForTimeout(3000);
-    const dump = await page.evaluate(() => document.querySelector('main').outerHTML);
+    await page.waitForTimeout(2500);
+
+    const valori = await page.evaluate(() => {
+      const out = {};
+      for (const i of document.querySelectorAll('#ownerKnobs input')) out[i.id] = i.value;
+      return out;
+    });
+    console.log('VALORI MANOPOLE', JSON.stringify(valori));
+
+    // La riga della persona con consumo: la apro.
+    const riga = page.locator('tr.sn-wallet-user', { hasText: pa });
+    await riga.click();
+    await page.waitForTimeout(2500);
+    const dett = await page.evaluate(() => {
+      const r = [...document.querySelectorAll('tr.sn-wallet-user-detail')].find((x) => !x.hidden);
+      return r ? r.innerText : '(nessun dettaglio aperto)';
+    });
+    console.log('DETTAGLIO >>>\n' + dett + '\n<<<');
+    const tabella = await page.evaluate(() => document.querySelector('#ownerUsers').innerText);
+    console.log('TABELLA >>>\n' + tabella + '\n<<<');
+
     mkdirSync(join(APP_ROOT, 'tests', '.shots'), { recursive: true });
-    writeFileSync(join(APP_ROOT, 'tests', '.shots', 'owner-dump.html'), dump);
+    writeFileSync(join(APP_ROOT, 'tests', '.shots', 'owner-dump2.html'), await page.evaluate(() => document.querySelector('main').outerHTML));
     await page.screenshot({ path: join(APP_ROOT, 'tests', '.shots', 'owner-esplora.png'), fullPage: true });
-    console.log('PSEUDONIMI', pa, server.store.docs.wallets.get('anon-b').pseudonym);
     console.log('CONFIG', JSON.stringify(server.store.docs.config));
+    console.log('CHIAMATE FS', JSON.stringify(server.counters.fsCalls.map((c) => [c.method, c.docPath, c.mask])));
   } finally {
     try { await filo.app.close(); } catch (_) {}
     await server.chiudi();
