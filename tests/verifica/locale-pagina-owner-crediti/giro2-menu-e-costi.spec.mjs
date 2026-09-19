@@ -117,7 +117,7 @@ test('il tasto destro fuori dalla tabella apre ancora il menu della pagina', asy
   }
 });
 
-test('un costo di qualche milionesimo di dollaro si legge, in tutti e tre i posti', async () => {
+test('un costo di qualche milionesimo di dollaro si legge, in tutti e quattro i posti', async () => {
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
@@ -125,6 +125,11 @@ test('un costo di qualche milionesimo di dollaro si legge, in tutti e tre i post
       { at: '2026-09-18T10:00:00.000Z', action: 'traduci', model: 'glm-5', servedBy: 'Baseten', promptTokens: 40, completionTokens: 8, costUsd: 0.0000004, credits: 0.1 },
       { at: '2026-09-19T10:00:00.000Z', action: 'spiega', model: 'glm-5', servedBy: 'Baseten', promptTokens: 60, completionTokens: 9, costUsd: 0.0000007, credits: 0.1 },
     ]);
+    // Quello che la chiave ha davvero speso: la riga «Speso» della scheda
+    // viene da lì, non dalla somma delle righe del registro.
+    const w = server.store.docs.wallets.get('anon-a');
+    server.keys.keys.get(w.keyHash).usageUsd = 0.0000011;
+
     const page = await apriOwner(filo);
     const riga = page.locator('tr.sn-wallet-user', { hasText: pa });
     await expect(riga).toBeVisible({ timeout: 20_000 });
@@ -132,9 +137,11 @@ test('un costo di qualche milionesimo di dollaro si legge, in tutti e tre i post
     const scheda = page.locator('tr.sn-wallet-user-detail:not([hidden])');
     await expect(scheda).toContainText('traduci', { timeout: 20_000 });
     const testo = await scheda.innerText();
-    // Da nessuna parte un costo che c'è stato si legge «0 $».
-    expect(testo).not.toMatch(/(^|\s)0 \$/m);
-    // E i tre posti ci sono tutti.
+    // Dove si parla di soldi spesi davvero, il costo non si legge «0 $»:
+    // in due parole, per azione, per giorno e nelle ultime chiamate.
+    const speso = (await scheda.innerText()).split('Dove sono andati')[0];
+    expect(speso).toMatch(/Speso\s+0,0000011 \$/);
+    expect(testo.split('Dove sono andati')[1] || '').not.toMatch(/(^|\s)0 \$/m);
     expect(testo).toMatch(/traduci/);
     expect(testo).toMatch(/spiega/);
   } finally {
