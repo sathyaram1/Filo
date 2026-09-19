@@ -27,7 +27,16 @@
     <p class="sn-muted"><a href="credits.html">← Crediti</a></p>
     <p class="sn-muted" id="ownerDenied" hidden>Questa pagina è del proprietario di Filo.</p>
     <section id="ownerSection" class="sn-wallet-owner" hidden>
+      <!-- I numeri che il server calcola: non si toccano, si guardano. -->
+      <ul class="sn-wallet-numeri" id="ownerNumeri"></ul>
       <p class="sn-muted" id="ownerTotals"></p>
+
+      <!-- Le manopole (#652): i campi li disegna il JS dalla tabella in
+           src/shared/wallet.js, così nome e limiti stanno in un posto solo. -->
+      <h3 class="sn-wallet-sub" id="ownerKnobsTitle">Quanto vale cosa</h3>
+      <div class="sn-manopole" id="ownerKnobs"></div>
+      <p class="sn-wallet-msg" id="ownerKnobsMsg" role="status" hidden></p>
+
       <div class="sn-wallet-owner-row">
         <!-- novalidate: i controlli sui numeri li fa la pagina, con una frase
              di Filo, non la bolla del browser. -->
