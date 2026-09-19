@@ -229,7 +229,14 @@
       rimetti.addEventListener('click', () => { rimettiOra().catch(() => {}); });
     }
 
-    return { mostra, salvaOra, rimettiOra, dillo };
+    // `pulito`: il campo mostra quello che c'è sul server. `disfabile`: c'è un
+    // salvataggio da poter rimettere com'era. Chi rilegge i valori dal server
+    // li guarda prima di riscrivere un campo sotto le dita di chi lo sta usando.
+    function stato() {
+      return { pulito: String(input.value) === attuale, disfabile: precedente != null };
+    }
+
+    return { mostra, salvaOra, rimettiOra, dillo, stato };
   }
 
   global.SN_CAMPO_NUMERO = { MOTIVI, leggi, frase, controlla, collega };
