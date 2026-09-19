@@ -97,10 +97,10 @@ describe('fine riga: LF in ogni copia di lavoro', () => {
       if (!existsSync(p)) continue; // cancellato ma ancora in indice: non è affar nostro
       if (readFileSync(p).includes(0x0d)) colpevoli.push(f);
     }
-    assert.deepEqual(colpevoli, [],
-      'questi file hanno un ritorno carrello dentro. Se li hai scritti su Windows, '
-      + 'convertili a LF (`* text=auto eol=lf` lo fa da solo al prossimo checkout pulito): '
-      + 'una regex ancorata a fine riga non li riconosce più, e un .sh così non parte');
+    assert.equal(colpevoli.length, 0,
+      `file di testo con un ritorno carrello dentro: ${elenco(colpevoli)}. `
+      + 'Una regex ancorata a fine riga non li riconosce più, e un .sh così non parte. '
+      + CURA);
   });
 
   test('gli hook che bash esegue cominciano con uno shebang pulito', () => {
