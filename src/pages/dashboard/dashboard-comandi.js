@@ -22,6 +22,9 @@
   let goThread = null;
   let autoGrowInput = null;
   let refreshLive = null;
+  // #525 — mette una riga di Filo nell'archivio della chat in corso (la targa
+  // la sa la pagina, che è la stessa che la manda coi turni normali).
+  let archiviaRiga = () => {};
   // Il terminale: stato e esecuzione stanno nel suo modulo, qui si chiedono.
   let isTerminalMode = () => false;
   let getShell = () => 'powershell';
