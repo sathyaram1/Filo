@@ -155,6 +155,37 @@ test('il taglio di un documento lungo non lascia mezzo carattere in fondo', asyn
   }
 });
 
+test('un nome con i segni di direzione arriva intero al modello', async ({ app, openTab }) => {
+  // I nomi scritti in arabo o ebraico si portano dietro dei segni invisibili che
+  // dicono da che parte si legge la riga. La rete che ripulisce tutto ciò che
+  // entra nel prompt li toglie: il nome che il modello legge non è più quello
+  // sul disco, e da lì in poi non riapre niente — né col terminale né col
+  // lettore, che quei segni non li perdona.
+  const base = cartellaTemporanea('filo-551-direzione-');
+  const nome = 'RELAZIONE ‫تقرير‬.txt';
+  try {
+    writeFileSync(join(base, nome), 'contenuto\n', 'utf8');
+    const page = await openTab(HOME);
+    await accendiTerminale(page);
+    await eseguiComando(page, `cd '${base}'`);
+    const elenco = await eseguiComando(page, 'ls');
+    const stampato = String(elenco.output?.stdout || '');
+    expect(stampato, 'l’elenco non ha stampato il file').toContain('تقرير');
+
+    // Com'è fatto il testo che arriva davvero al modello.
+    const perIlModello = await app.evaluate((_e, testo) => globalThis.SN_ESTERNO.imbusta({
+      tipo: 'ESITO_COMANDO', testo, conIntestazione: true, max: 4000,
+    }), stampato);
+
+    expect(
+      perIlModello.includes(nome),
+      'il nome arriva al modello senza i segni di direzione: da lì non riapre più il file',
+    ).toBe(true);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test('un documento salvato in ANSI conserva trattino lungo, apostrofo ed euro', async ({ openTab }) => {
   const base = cartellaTemporanea('filo-551-ansi-');
   try {
