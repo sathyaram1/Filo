@@ -197,6 +197,71 @@ test('le chiavi del server continuano a passare, con o senza il campo ok', async
   }
 });
 
+// Le righe in evidenza sono quelle che il registro della costruzione mostra
+// come avvisi: una riga qualsiasi in fondo al log non la legge nessuno.
+function inEvidenza(registro) {
+  return registro.split('\n').filter((r) => r.startsWith('::warning::')).join('\n');
+}
+
+test('un rifiuto del server non passa in sordina solo perché i segreti del job reggono', async () => {
+  // La pubblicazione esce verde, ma la chiave appena cambiata dall'owner non è
+  // arrivata a nessuno: senza un avviso in evidenza lo si scopre settimane dopo.
+  const srv = await serverFinto({ '/buildKeys': { stato: 200, json: { ok: false, reason: 'bad_passphrase' } } });
+  try {
+    const r = await costruisci({
+      FILO_ROUTINE_API: srv.base,
+      FILO_BUILD_PASSPHRASE: 'sbagliata',
+      FILO_DEFAULT_TAVILY_KEY: 'di-riserva',
+      FILO_DEFAULT_SAFEBROWSING_KEY: 'di-riserva',
+    });
+    assert.equal(r.uscita, 0, `coi segreti del job la versione esce: ${r.registro}`);
+    const avvisi = inEvidenza(r.registro);
+    assert.match(avvisi, /bad_passphrase/,
+      'il rifiuto deve stare fra gli avvisi, non solo in coda al registro');
+    assert.match(avvisi, /Modelli predefiniti/,
+      'chi legge deve capire che una chiave cambiata di recente non è arrivata');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('quando il server dà le chiavi non si grida al lupo', async () => {
+  const srv = await serverFinto({
+    '/buildKeys': { stato: 200, json: { ok: true, apiKeys: { tavily: 't' }, safeBrowsingKey: 'g' } },
+  });
+  try {
+    const r = await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: 'giusta' });
+    assert.equal(r.uscita, 0);
+    assert.equal(inEvidenza(r.registro), '',
+      'un avviso che compare anche quando è tutto a posto smette di significare qualcosa');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('se il feedback dell’allarme non viene consegnato, lo si viene a sapere', async () => {
+  const srv = await serverFinto({
+    '/buildKeys': { stato: 200, json: { ok: false, reason: 'bad_passphrase' } },
+    '/buildAlarm': { stato: 200, json: { ok: false, reason: 'bad_passphrase' } },
+  });
+  try {
+    const r = await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: 'sbagliata' });
+    assert.notEqual(r.uscita, 0);
+    assert.match(inEvidenza(r.registro), /non consegnato/,
+      'una pubblicazione ferma di cui nessun feedback parla non deve restare invisibile');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('senza parola d’ordine l’allarme non parte, e il registro lo dice', async () => {
+  // È il caso peggiore: la pubblicazione si ferma e il feedback non può nemmeno
+  // essere tentato. Tacerlo fa credere che qualcuno sia stato avvisato.
+  const r = await costruisci({});
+  assert.notEqual(r.uscita, 0);
+  assert.match(inEvidenza(r.registro), /Nessun feedback aperto/);
+});
+
 test('l’allarme porta le stesse informazioni del registro', async () => {
   const srv = await serverFinto({
     '/buildKeys': { stato: 200, json: { ok: false, reason: 'bad_passphrase' } },
