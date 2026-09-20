@@ -26,7 +26,8 @@
 //                                    ne accorgerebbe finché non prova a usarla
 //
 // Quando si ferma dice QUALE chiave manca, da quali fonti l'ha cercata e dove
-// si mette: la sentinella tests/unit/bakeGuastoParlante.test.mjs lo tiene fermo.
+// si mette; e ciò che cambia quel che arriva agli utenti va in EVIDENZA, non in
+// coda al registro: la sentinella tests/unit/bakeGuastoParlante.test.mjs lo tiene fermo.
 //
 // SICUREZZA
 //   - Lo script NON stampa mai i valori delle chiavi (solo "presente/assente").
