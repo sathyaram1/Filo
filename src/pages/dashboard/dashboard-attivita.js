@@ -469,6 +469,13 @@
       return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
     }
     const type = String(a.type || '').toUpperCase();
+    // Proposta all'utente (l'evento di calendario): il main non l'ha eseguita
+    // perché non tocca a lui — tocca al bottone qui sotto. Non è un fallimento
+    // e non va raccontata come tale.
+    if (a._output && a._output.proposta) {
+      const fn = ACTIVITY_ROWS[type];
+      return fn ? fn(a) : { icon: '•', text: `Proposto · ${type.toLowerCase().replace(/_/g, ' ')}` };
+    }
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
