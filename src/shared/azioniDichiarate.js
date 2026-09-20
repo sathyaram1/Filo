@@ -1549,6 +1549,7 @@
     rileva,
     statoDaTimerEFile,
     domandaSuCosaFatta,
+    richiestaDiAzione,
     insiemeDiTipi,
     tipiInAttesa,
     tipiDallaCronologia,
