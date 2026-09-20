@@ -2713,7 +2713,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // in poi «sì, te l'ho già messa» diventava un'accusa.
       const coperti = Dichiarate.tipiDallaCronologia(threadHistory);
       for (const t of tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini)) coperti.add(t);
-      azioniMancate = Dichiarate.rileva(textReply, coperti, statoSveglie);
+      azioniMancate = Dichiarate.rileva(textReply, coperti, await statoDichiarazioni());
       avvisoAzioni = Dichiarate.avvisoPerUtente(azioniMancate);
       if (avvisoAzioni) {
         console.warn('[Filo] #517 azione dichiarata e mai eseguita:',
