@@ -1178,6 +1178,23 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
+      // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
+      // sta ancora qui a schermo. Continuare a scriverci dentro la farebbe
+      // rinascere con la stessa targa e i messaggi di prima persi: l'opposto
+      // di quello che l'utente ha chiesto. Da qui in poi è una chat nuova — e
+      // lo diciamo, perché una cosa cancellata altrove non deve succedere di
+      // nascosto.
+      if (msg.cancellata === chatId) {
+        chatId = null;
+        if (body.dataset.state === 'thread') {
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          nota.textContent = 'Questa conversazione è stata cancellata dalla Cronologia. Quello che scrivi da adesso apre una chat nuova.';
+          bubblesEl.appendChild(nota);
+          bubblesEl.scrollTop = bubblesEl.scrollHeight;
+        }
+      }
     } else if (msg?.type === MSG.FILO_ONBOARDING_UPDATED) {
       // #524 — un'altra scheda ha fatto avanzare la stessa intervista: qui la
       // conversazione si riallinea invece di restare ferma a com'era.
