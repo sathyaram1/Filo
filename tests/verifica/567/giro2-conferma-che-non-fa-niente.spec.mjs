@@ -45,7 +45,7 @@ test('confermata un\'impostazione che non si può applicare, l\'utente deve capi
   const testoBtn = (await btn.textContent()) || '';
   const spiega = /non applicat|non riuscit|non valid|non sa|non è partit/i.test(`${righe.join(' | ')} ${testoBtn}`)
     && !/^\s*✗ Non eseguita\s*$/.test(testoBtn.trim());
-  expect(spiega, `bottone: ${JSON.stringify(testoBtn)} — diario: ${JSON.stringify(righe)}`).toBe(true);
+  expect(spiega, `popup: ${JSON.stringify(testoPopup)} — bottone: ${JSON.stringify(testoBtn)} — diario: ${JSON.stringify(righe)}`).toBe(true);
 
   await restore(app, '__v567g2p');
 });
