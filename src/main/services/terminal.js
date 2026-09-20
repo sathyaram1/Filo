@@ -208,6 +208,23 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     // accenti e trattini lunghi tornano storpiati.
     const toRun = encodingPrelude(usedShell) + (trackCwd ? withCwdProbe(usedShell, cmd) : cmd);
     const { file, args } = shellInvocation(usedShell, toRun);
+    // La cartella può non esistere più: rinominata, cancellata, su una
+    // chiavetta staccata (#551, quarto giro). Lì dentro non fallisce il
+    // comando, fallisce la shell prima di leggerlo, e la cartella appuntata
+    // resta quella morta: ogni comando dopo cade allo stesso modo, compreso
+    // quello per andarsene. Si ripiega sulla home e lo si DICE, perché il
+    // modello possa riferirlo invece di raccontare che manca PowerShell.
+    // Il controllo vive in shell.js, accanto a quello che la shell persistente
+    // del terminale usa da sempre: una copia qui divergerebbe.
+    let cartella = cwd || undefined;
+    let cartellaPersa = false;
+    if (cwd) {
+      try {
+        const scelta = require('./shell').cartellaPerComando(cwd);
+        cartella = scelta.cwd;
+        cartellaPersa = scelta.persa;
+      } catch (_) {}
+    }
     let stdout = '';
     let codaOut = ''; // ultimi caratteri dello stdout, anche oltre il tetto
     let stderr = '';
