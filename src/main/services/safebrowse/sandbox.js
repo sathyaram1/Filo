@@ -278,88 +278,14 @@ function creaFinestra(el, ses) {
       // niente preload: la pagina gira nuda, isolata dall'app.
     },
   });
-
-  const wc = win.webContents;
-  const redirects = [];
-  let finalUrl = url;
-  let finished = false;
-
-  const cleanup = () => {
-    try { if (!win.isDestroyed()) win.destroy(); } catch (_) {}
-    // Svuota i dati effimeri della sessione.
-    try { ses.clearStorageData().catch(() => {}); } catch (_) {}
-  };
-
-  return await new Promise((resolve) => {
-    let timer = null;
-    let hardTimer = null;
-
-    const done = (verdict, extra = {}) => {
-      if (finished) return;
-      finished = true;
-      if (timer) { clearTimeout(timer); timer = null; }
-      if (hardTimer) { clearTimeout(hardTimer); hardTimer = null; }
-      cleanup();
-      resolve({ verdict, finalUrl, redirects, download: downloadStarted ? (downloadName || true) : false, ...extra });
-    };
-
-    timer = setTimeout(() => done(downloadStarted ? 'dangerous' : 'clean'), timeoutMs);
-    // Il tetto di vita: nessun cammino lo annulla, solo `done`. Prima, appena la
-    // pagina finiva di caricare il timer di attesa veniva annullato e una
-    // valutazione dell'URL finale che non tornava mai lasciava la finestra
-    // viva, con JavaScript attivo, per tutta la sessione.
-    // Scaduto il tetto: se un download era già partito il verdetto è certo e
-    // vale; altrimenti si esce senza verdetto (null), che index.js NON mette in
-    // cache — al prossimo passaggio si riprova, invece di ricordarsi per mezz'ora
-    // un "pulito" che nessuno ha mai stabilito.
-    hardTimer = setTimeout(() => {
-      if (downloadStarted) return done('dangerous', { timedOut: true });
-      if (finished) return;
-      finished = true;
-      if (timer) { clearTimeout(timer); timer = null; }
-      hardTimer = null;
-      cleanup();
-      resolve(null);
-    }, lifetimeMs);
-
-    try {
-      wc.on('did-redirect-navigation', (_e, u) => { if (u) { redirects.push(u); finalUrl = u; } });
-      wc.on('did-navigate', (_e, u) => { if (u) finalUrl = u; });
-      wc.on('did-create-window', (child) => { try { child.destroy(); } catch (_) {} }); // niente popup
-      wc.setWindowOpenHandler(() => ({ action: 'deny' }));
-
-      wc.on('did-stop-loading', async () => {
-        if (timer) { clearTimeout(timer); timer = null; }
-        // Verdetto: download forzato → pericoloso. Altrimenti valuta l'URL
-        // finale: se la destinazione vera è impersonazione/blacklist → pericoloso.
-        if (downloadStarted) return done('dangerous');
-        let verdict = 'clean';
-        if (typeof evaluateFinal === 'function' && finalUrl && finalUrl !== url) {
-          try {
-            const v = await evaluateFinal(finalUrl);
-            if (v && v.level === 'pericoloso') verdict = 'dangerous';
-            else if (v && v.level === 'sospetto') verdict = 'suspicious';
-          } catch (_) {}
-        }
-        done(verdict);
-      });
-
-      wc.on('did-fail-load', (_e, code) => {
-        // -3 = ABORTED (spesso per un download intercettato): non è un errore.
-        if (code === -3 && downloadStarted) return; // lascia decidere will-download/timer
-      });
-
-      wc.loadURL(url).catch(() => done(downloadStarted ? 'dangerous' : 'clean'));
-    } catch (_) {
-      done(null);
-    }
-  });
 }
 
 module.exports = {
   detonate,
   createConcurrencyGate,
   LIMITS: { MAX_CONCURRENT, MAX_QUEUE, MAX_QUEUE_WAIT_MS, HARD_LIFETIME_MS, DETONATE_TIMEOUT_MS },
-  // Quante finestre nascoste ci sono adesso e quante aspettano (diagnostica e test).
-  stats() { return { active: gate.active, queued: gate.queued }; },
+  // Quante finestre nascoste ci sono adesso, quante aspettano e quante memorie
+  // isolate sono state fabbricate in tutto (diagnostica e test): quest'ultima
+  // non deve crescere col numero di siti controllati, ma fermarsi al tetto.
+  stats() { return { active: gate.active, queued: gate.queued, partizioni: partizioniFatte }; },
 };
