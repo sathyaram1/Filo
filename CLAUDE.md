@@ -334,7 +334,12 @@ solo) o per intero dalla radice del disco, la risposta è «No tests found» anc
 a cartella piena — la stessa che dà una cartella che non c'è. Prima di
 concludere che non c'era niente da rilanciare, guarda la cartella. La
 suite completa non le raccoglie (quelle di un solo feedback costano otto
-minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte.
+minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte. In quella cartella ci
+vanno **davvero**: una prova di giro lasciata nella radice di `tests/` entra
+nella suite per sempre, e ogni spec riapre Filo — sessantadue erano già
+entrate così. La sentinella `tests/unit/proveDeiGiri.test.mjs` diventa rossa
+finché non è al suo posto, e tiene anche il resto di quella cartella (nessun
+byte NUL crudo nei sorgenti, ogni import relativo che risolve).
 
 Com'è fatto un test che vale: asserisce il **successo dal punto di vista
 dell'utente** (l'immagine arriva al destinatario), non l'assenza di un errore
