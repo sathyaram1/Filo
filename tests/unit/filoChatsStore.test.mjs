@@ -21,15 +21,19 @@ const require = createRequire(import.meta.url);
 globalThis.SN_CONST = { STORAGE_KEYS: { FILO_CHATS: 'filo_chats' } };
 
 let disco = {};
-let ritardoLettura = 0;
+let ritardoScrittura = 0;
 globalThis.chrome = {
   storage: {
     local: {
+      // Lettura immediata, come il magazzino vero (i dati stanno già in
+      // memoria); la SCRITTURA invece ci mette un attimo. È in quell'attimo
+      // che una seconda scrittura rilegge una lista vecchia e poi ci scrive
+      // sopra: la finestra del guasto, resa larga abbastanza da vedersi.
       async get(key) {
-        if (ritardoLettura) await new Promise((r) => setTimeout(r, ritardoLettura));
         return { [key]: disco[key] };
       },
       async set(obj) {
+        if (ritardoScrittura) await new Promise((r) => setTimeout(r, ritardoScrittura));
         Object.assign(disco, obj);
       },
     },
