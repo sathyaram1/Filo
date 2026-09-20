@@ -70,8 +70,14 @@ function pickSafeBrowsing(json) {
   return '';
 }
 
+// Chiede al server le chiavi di default. Ritorna `{ apiKeys, esito }`: le
+// chiavi trovate (vuote se non disponibili) e PERCHÉ, che è l'informazione che
+// serve a chi legge il guasto — degradare in silenzio non è degradare (#642).
+// Non lancia: in caso di problemi si ripiega sui segreti del job, perché una
+// versione con quelle chiavi è meglio di nessuna versione. Se non resta nemmeno
+// quello, decide main — e si ferma.
 async function fetchRemoteKeys(passphrase) {
-  if (!passphrase) return {};
+  if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
   try {
     const res = await fetch(`${CANALE}/buildKeys`, {
       method: 'POST',
@@ -79,17 +85,33 @@ async function fetchRemoteKeys(passphrase) {
       body: JSON.stringify({ passphrase }),
     });
     if (!res.ok) {
-      console.warn(`[bake] chiavi dal server non disponibili (${res.status}); uso i secret d'ambiente.`);
-      return {};
+      const esito = { stato: 'http', status: res.status };
+      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+      return { apiKeys: {}, esito };
     }
-    const j = await res.json();
+    const j = await res.json().catch(() => null);
+    // Una risposta di rifiuto arriva con HTTP 200 e `ok:false`: finiva in `{}`
+    // indistinguibile da «il documento non ha quella chiave», e la parola
+    // d'ordine sbagliata restava invisibile per giorni (#642).
+    if (j && j.ok === false) {
+      const esito = { stato: 'rifiutato', reason: j.reason || '' };
+      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+      return { apiKeys: {}, esito };
+    }
     const apiKeys = (j && j.apiKeys && typeof j.apiKeys === 'object') ? { ...j.apiKeys } : {};
     const sb = pickSafeBrowsing(j);
     if (sb) apiKeys.safeBrowsing = sb;
-    return apiKeys;
+    const esito = Object.values(apiKeys).some((v) => typeof v === 'string' && v.trim())
+      ? { stato: 'ok' }
+      : { stato: 'senza-chiavi' };
+    if (esito.stato === 'senza-chiavi') {
+      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+    }
+    return { apiKeys, esito };
   } catch (e) {
-    console.warn(`[bake] server non raggiungibile (${e.message}); uso i secret d'ambiente.`);
-    return {};
+    const esito = { stato: 'rete', messaggio: e.message };
+    console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+    return { apiKeys: {}, esito };
   }
 }
 
