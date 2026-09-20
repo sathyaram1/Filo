@@ -287,8 +287,8 @@ Come si verifica, dato che un Linux desktop non ce l'abbiamo:
 - Il lavoro **«Verifica build Linux»**
   (`.github/workflows/verifica-linux.yml`) costruisce davvero l'AppImage e non
   pubblica niente. Guarda dentro il pacchetto, nella voce di menu, e poi lo
-  AVVIA togliendogli il permesso del kernel che Ubuntu gli nega: se Filo non
-  resta aperto, il lavoro è rosso lì invece che dal tester.
+  AVVIA con la manopola del kernel messa a zero, come su Ubuntu 24.04: se Filo
+  non resta aperto, il rosso arriva lì invece che dal tester.
 - L'AppImage si costruisce anche **nel contenitore delle routine**:
   `npm run build:linux` mette `dist/Filo-Linux.AppImage` e
   `dist/latest-linux.yml`. Per aprirla lì serve estrarla
