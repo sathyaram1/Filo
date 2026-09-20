@@ -323,8 +323,8 @@
   // i casi la cosa vera da dire è la stessa: non è arrivato niente da nessuna
   // parte, e il motivo.
   function encryptionBlockedMessage(motivo) {
-    return `Non è partito niente: ${motivo || 'la cifratura non è disponibile'}. `
-      + 'In chiaro quel contenuto non sarebbe protetto da niente, quindi mi fermo.';
+    return `Non ho mandato niente: ${motivo || 'non riesco a cifrare'}. `
+      + 'Senza cifratura quel contenuto lo può leggere chiunque.';
   }
 
   // Cifra un campo testo. Se non si può cifrare, LANCIA: il chiamante decide se

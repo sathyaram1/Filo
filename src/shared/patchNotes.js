@@ -41,7 +41,7 @@
         'Nell\'elenco dei feedback si aprono solo gli allegati veri, e Filo non dichiara arrivato niente che non abbia visto. Prima una segnalazione poteva dichiarare un finto allegato, mandarti sul sito scelto da chi l\'aveva scritta e farselo pure presentare da Filo come consegnato.',
         'Nell\'elenco dei feedback l\'indirizzo della pagina segnalata dice su che sito porta, anche quando è lungo. Prima si leggevano i primi caratteri e basta, e un indirizzo scritto apposta poteva sembrare di Filo e portare altrove.',
         'Allegare un .tsv o un .yaml a una segnalazione funziona sempre: prima, a seconda di come il computer riconosceva quel file, poteva venire rifiutato senza motivo.',
-        'Gli allegati di una segnalazione partono solo se Filo riesce a proteggerli. Se non ci riesce non parte niente e te lo scrive: prima li caricava lo stesso in chiaro, dove li leggeva chiunque avesse il link. Vale anche per le schermate e i file aggiunti mentre una segnalazione viene lavorata, che fino a ora salivano sempre in chiaro.',
+        'Le schermate e i file che alleghi a una segnalazione partono sempre cifrati. Se Filo non riesce a cifrarli non manda niente e te lo dice: prima li caricava lo stesso in chiaro, e li leggeva chiunque avesse il link. Vale anche per gli allegati che chi lavora la segnalazione aggiunge ai commenti, che finora salivano sempre in chiaro.',
       ],
     },
     {

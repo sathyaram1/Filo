@@ -128,7 +128,7 @@ for (const modo of ['senza-chiave', 'senza-modulo']) {
           (e) => {
             // La frase deve dire DUE cose: che non è partito niente e perché.
             // Senza il perché, chi la legge non sa se riprovare serve a qualcosa.
-            assert.match(String(e.message), /non è partito niente/i, `frase: ${e.message}`);
+            assert.match(String(e.message), /non ho mandato niente/i, `frase: ${e.message}`);
             assert.match(String(e.message), /chiave|cifra/i, `frase: ${e.message}`);
             assert.equal(FB.isEncryptionError(e), true, 'deve essere riconoscibile come errore di cifratura');
             return true;
@@ -149,7 +149,7 @@ test("cifratura indisponibile: nemmeno un allegato di commento sale", async () =
       await assert.rejects(
         () => FB.uploadAttachment(blobDiTesto('log del guasto'), 'log.txt'),
         (e) => {
-          assert.match(String(e.message), /non è partito niente/i);
+          assert.match(String(e.message), /non ho mandato niente/i);
           assert.equal(FB.isEncryptionError(e), true);
           return true;
         },
@@ -204,7 +204,7 @@ test('uploadImage rifiuta byte non cifrati: il controllo sta all’imbocco, non 
       () => FB.uploadImage(blobDiTesto('ciao', 'image/png')),
       (e) => {
         assert.equal(FB.isEncryptionError(e), true);
-        assert.match(String(e.message), /non è partito niente/i);
+        assert.match(String(e.message), /non ho mandato niente/i);
         return true;
       },
     );

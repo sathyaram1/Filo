@@ -162,7 +162,7 @@ test('senza cifratura lo stato NON si scrive in chiaro: la scrittura si ferma (#
       () => FB.updateStatus('doc-gate-off', { status: 'blocked' }),
       (e) => {
         assert.equal(FB.isEncryptionError(e), true, 'va riconosciuto come errore di cifratura');
-        assert.match(String(e.message), /non è partito niente/i);
+        assert.match(String(e.message), /non ho mandato niente/i);
         return true;
       },
     );
@@ -299,7 +299,7 @@ test('S1.F2.2: senza cifratura il clientId non parte affatto (#602)', async () =
       () => FB.submit({ text: 'ciao', clientId: 'install-xyz' }),
       (e) => {
         assert.equal(FB.isEncryptionError(e), true);
-        assert.match(String(e.message), /non è partito niente/i);
+        assert.match(String(e.message), /non ho mandato niente/i);
         return true;
       },
     );
