@@ -298,15 +298,26 @@ async function main() {
   })();
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
-    console.error(testoEsitiDecaduti(decaduti, punta, source));
+    // I comandi del rimedio con gli attrezzi del GIRO, non con quelli che il
+    // ramo si porta dietro: `scripts/…` qui dentro è la copia del ramo, che può
+    // essere vecchia di giorni e non fare quello che chi legge crede.
+    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source), TOOLS_ROOT, ROOT));
     process.exit(1);
   }
-  // Astenersi si dice: se da qui non risulta nessun via libera con il suo
-  // commit, il controllo non l'ho fatto, e chi legge il registro non deve
-  // credere il contrario.
-  const nessunCommitScritto = !String((statoRamo || {}).verifierSha || '') && !String((statoRamo || {}).secauditSha || '');
-  if (nessunCommitScritto) {
-    console.error('[merge-gate] nota: da questa macchina non risulta su quale commit sono stati dati i via libera, quindi non ho potuto controllare che parlino di questo contenuto. Decide il server.');
+  // Astenersi si dice, e si dice PER CIASCUNO dei due: se di uno non risulta il
+  // commit, quel via libera non l'ho controllato, e chi legge il registro non
+  // deve credere il contrario perché l'altro tornava.
+  const senzaCommit = testoEsitiSenzaCommit(esitiSenzaCommit(statoRamo));
+  if (senzaCommit) console.error(senzaCommit);
+
+  // Il contenuto esaminato deve stare dove chi fonde andrà a prenderlo.
+  const pubblicazione = statoPubblicazione(gitIn(ROOT), source, punta);
+  if (pubblicazione.stato === 'assente') {
+    console.error(testoNonPubblicato(punta, pubblicazione.suOrigin, source));
+    process.exit(1);
+  }
+  if (pubblicazione.stato === 'sconosciuto') {
+    console.error(`[merge-gate] nota: non ho potuto controllare che il contenuto esaminato sia arrivato su origin (${pubblicazione.motivo}), e chi fonde prende il ramo da lì. Decide il server.`);
   }
 
   const reply = await merge(ticket, source, { sha: punta });
