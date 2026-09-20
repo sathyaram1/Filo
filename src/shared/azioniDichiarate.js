@@ -1117,7 +1117,7 @@
           continue;
         }
         if (ora === false) {
-          out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
+          out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase, verbo: d.verbo || '' });
           continue;
         }
         if (disponibili > 0) {
@@ -1137,7 +1137,7 @@
           if (d.verbo) radiciRette.add(d.verbo);
           continue;
         }
-        out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
+        out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase, verbo: d.verbo || '' });
       }
     }
     // Il pronome parla solo se nessuna famiglia ha già saputo dire di cosa si
@@ -1152,7 +1152,10 @@
     // più guardato affatto, ed è il turno di prosecuzione della segnalazione.
     if (pronome && !out.length && !(ammesse && !ammesse.has('senza-nome'))) {
       const PRONOME = FAMIGLIE[FAMIGLIE.length - 1];
-      const manca = { id: 'senza-nome', avviso: 'non è partito niente', tipi: [], frase: pronome.frase };
+      const manca = {
+        id: 'senza-nome', avviso: 'non è partito niente', tipi: [],
+        frase: pronome.frase, verbo: pronome.verbo || '',
+      };
       // Anche qui l'ora decide, quando c'è e quando il verbo crea qualcosa:
       // «te l'ho messa alle 19», con la sveglia delle 19 che non esiste, è
       // falsa anche se in questa conversazione una sveglia era già partita.
