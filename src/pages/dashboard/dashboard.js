@@ -873,6 +873,13 @@
       const turn = pending.endTurn();
       if (ownsActivity) pending.finish();
       const entry = { role: 'filo', text: r.text || '', actions: r.actions || [] };
+      // #517 (giro 8) — la dichiarazione smentita resta scritta nel turno.
+      // Serve al turno dopo: premendo «Fallo adesso» il modello ripete la
+      // stessa cosa con un «già» davanti, e senza questa traccia un'azione
+      // fatta prima nella conversazione tornava a coprirla.
+      if (Array.isArray(r.azioniMancate) && r.azioniMancate.length) {
+        entry.azioniMancate = r.azioniMancate.map((f) => ({ id: f.id, frase: f.frase }));
+      }
       if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
