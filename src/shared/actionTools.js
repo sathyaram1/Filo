@@ -37,6 +37,18 @@
     return { shellPref: '"powershell" | "cmd" | "bash" | "zsh"', esempioPercorso: '~/Documenti/bolletta.pdf' };
   }
 
+  // Le famiglie di uscita le tiene compiti.js: qui si leggono al momento della
+  // chiamata, così l'ordine di caricamento non conta e l'elenco non si sdoppia.
+  function usciteDichiarabili() {
+    const C = global.SN_COMPITI;
+    return C ? C.USCITE_DICHIARABILI.slice() : [];
+  }
+  function elencoUscite() {
+    const C = global.SN_COMPITI;
+    if (!C) return '';
+    return C.USCITE_DICHIARABILI.map((u) => `• ${u}: ${C.USCITE[u].label}`).join('\n');
+  }
+
   const RIPETI = {
     description: 'Ricorrenza: un array di giorni ["lun","mer"] (token: lun mar mer gio ven sab dom) oppure una scorciatoia "feriali" | "weekend" | "ogni giorno".',
     anyOf: [
