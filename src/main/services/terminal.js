@@ -315,15 +315,18 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
       let resultCwd = trackCwd ? (cartella || undefined) : undefined;
       if (trackCwd) {
         // La sonda è l'ULTIMO comando eseguito: l'exit code del processo è il
-        // suo (0), non quello del comando. Prendiamo entrambi dal marcatore.
-        const parsed = extractCwdMark(rawOut);
+        // suo (0), non quello del comando. Cartella ed esito si leggono dalla
+        // CODA, che è l'unico pezzo di uscita tenuto per intero fino alla fine:
+        // `rawOut` smette di accumulare al tetto, quindi proprio sui comandi che
+        // stampano tanto la riga vera lì non c'è più. Prima si guardava `rawOut`
+        // per primo, e bastava che dentro l'uscita ce ne fosse un'altra perché
+        // vincesse quella (#551, ottavo giro di verifica).
+        const inCoda = extractCwdMark(codaOut, mark);
+        const parsed = extractCwdMark(rawOut, mark);
         rawOut = parsed.stdout;
-        // Se l'output ha sfondato il tetto il marcatore non è in `rawOut`: sta
-        // nella coda, che teniamo apposta. Lì non c'è niente da ripulire —
-        // quella coda non si mostra a nessuno.
-        const mark = parsed.code !== null ? parsed : extractCwdMark(codaOut);
-        if (mark.code !== null) realCode = mark.code;
-        if (mark.cwd) resultCwd = mark.cwd;
+        const letto = inCoda.code !== null ? inCoda : parsed;
+        if (letto.code !== null) realCode = letto.code;
+        if (letto.cwd) resultCwd = letto.cwd;
       }
       const out = truncate(rawOut);
       const err = truncate(stderr);
