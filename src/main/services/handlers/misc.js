@@ -480,6 +480,32 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // #602 — un avviso che DEVE essere visto: va nella cornice della finestra
+  // (la stessa striscia di notifiche che annuncia la fine di uno scaricamento),
+  // non nella pagina davanti. Resta lì finché non lo si chiude, perché dice che
+  // una segnalazione non è mai partita e va rimandata.
+  //
+  // Ritorna `false` se non c'era nessuna finestra pronta a mostrarlo: chi
+  // chiama tiene allora da parte l'avviso e riprova più tardi, invece di
+  // parlare al vuoto. Una finestra che sta ancora caricando non conta: la sua
+  // cornice non ascolta ancora.
+  function avvisoNellaFinestra(testo) {
+    let dette = 0;
+    try {
+      const { BrowserWindow } = require('electron');
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
+        const wc = win.webContents;
+        if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
+        try {
+          wc.send('shell:toast', { text: testo, opts: { durationSec: 0 } });
+          dette++;
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return dette > 0;
+  }
+
   // Coda d'invio del feedback (#341): "Invia" NON aspetta più la rete. Il box
   // sparisce subito e il main si fa carico di consegnare il feedback in
   // background, ritentando da solo finché la connessione torna. L'invio è
