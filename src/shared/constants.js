@@ -1202,6 +1202,11 @@
       `{ "action": "web_search", "query": "<query in inglese o italiano, max 200 caratteri>" }\n` +
       `Il sistema farà la ricerca e ti rimanderà i primi risultati come messaggio system nel turno successivo. Allora potrai produrre il JSON normale.\n` +
       `Regole d'uso: massimo 2 ricerche per sessione. NON usare web_search per cose che si vedono già nell'outline. NON includere dati dell'utente nella query.\n\n` +
+      `# Output alternativo: leggi una pagina web\n` +
+      `Dei risultati di una ricerca vedi titolo, indirizzo e un riassunto di 240 caratteri: quasi mai basta per un prezzo, un orario, un passaggio di una procedura. Quando il dato che ti serve sta DENTRO una di quelle pagine, invece del JSON normale chiedi di leggerla:\n` +
+      `{ "action": "read_page", "url": "<indirizzo completo, preso ESATTO dai risultati>" }\n` +
+      `Il sistema scarica la pagina e ti rimanda il testo nel turno successivo, fra le marcature: allora produci il JSON normale. Serve a LEGGERE: non apre niente all'utente e non lo porta via dalla pagina dove si trova.\n` +
+      `Regole d'uso: massimo 3 letture per sessione, una alla volta. Non usarlo sulla pagina che stai già guardando (ce l'hai nell'outline) né su un indirizzo che ti sei inventato.\n\n` +
       `# Output alternativo: comandi rapidi di Filo (barra in alto)\n` +
       `Oltre alla pagina, puoi azionare le icone della barra in alto di Filo (il browser stesso). Servono quando l'utente chiede di comandare Filo, non il sito — es. "vai alla home", "metti a schermo intero", "apri le impostazioni", "apri le app", "riduci a icona", "apri l'account". Output speciale (al posto del JSON normale):\n` +
       `{ "action": "shell", "command": "home" | "fullscreen" | "minimize" | "settings" | "apps" | "account", "text": "<opzionale: breve conferma per l'utente>", "status": "done" | "continue" }\n` +
@@ -1395,6 +1400,25 @@
       });
     },
 
+    // Il testo di una pagina che l'Aiuto ha chiesto di leggere. Stessa busta e
+    // stesso avviso della chat: lo scrive chi possiede quel sito, e ci arriva
+    // perché un motore di ricerca l'ha messo in cima.
+    paginaLettaImbustata: ({ url = '', title = '', text = '', truncated = false, partial = false, error = '', detail = '' } = {}) => {
+      const riga = (v) => esterno().perCanaleSistema(v);
+      const dove = riga(url) || 'la pagina';
+      if (!String(text || '').trim()) {
+        const perche = riga(detail || error) || 'non è stato possibile leggerla';
+        return `[Pagina "${dove}" non letta: ${perche}. Dillo all'utente così com'è, senza inventare il contenuto.]`;
+      }
+      const titolo = riga(title);
+      const coda = partial
+        ? '\n…(pagina troppo grande: Filo ne ha letta solo la prima parte, il resto non l\'ha visto.)'
+        : (truncated ? '\n…(pagina troncata: letto fino a qui.)' : '');
+      return `[Pagina "${dove}"${titolo ? ` — ${titolo}` : ''}]\n`
+        + esterno().imbusta({ tipo: 'PAGINA_WEB', testo: text, conIntestazione: true })
+        + coda;
+    },
+
     // #593 — la busta di un elemento della pagina nominato da una nota di
     // sistema. L'etichetta la scrive il sito, il selettore lo propone il
     // modello leggendo il sito: nessuno dei due è una frase di Filo, quindi
@@ -1442,6 +1466,7 @@
     turnoAutomaticoAiuto: ({ nota = '', dati = null, perCronologia = false } = {}) => {
       const buste = [];
       if (dati && dati.ricercaWeb) buste.push(PROMPTS.ricercaWebImbustata(dati.ricercaWeb));
+      if (dati && dati.paginaLetta) buste.push(PROMPTS.paginaLettaImbustata(dati.paginaLetta));
       if (dati && dati.elementoPagina) buste.push(PROMPTS.elementoPaginaImbustato(dati.elementoPagina));
       if (dati && dati.scheda) buste.push(PROMPTS.schedaImbustata(dati.scheda));
       const pulite = buste.filter(Boolean);

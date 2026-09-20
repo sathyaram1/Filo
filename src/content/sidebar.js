@@ -49,11 +49,13 @@
       rawUserMessages: [],
       feedbackShown: false,
       webSearchCount: 0,
+      pageReadCount: 0,
     };
   }
   // Cap difensivo: anche se il prompt dice "max 2", l'AI potrebbe insistere.
   // Ignoriamo silenziosamente le ricerche oltre questo limite.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
+  const MAX_PAGE_READS_PER_SESSION = 3;
 
   function isOpen() { return !!root; }
 
@@ -535,6 +537,11 @@
       if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
         return { kind: 'web_search', query: obj.query.trim().slice(0, 300) };
       }
+      // Output speciale: lettura di una pagina web trovata con la ricerca.
+      // Stesso bypass del flusso normale della ricerca.
+      if (obj.action === 'read_page' && typeof obj.url === 'string' && obj.url.trim()) {
+        return { kind: 'read_page', url: obj.url.trim().slice(0, 2000) };
+      }
       // Output speciale: comando della shell di Filo (icone della barra in alto).
       // Eseguito in autonomia, senza coinvolgere l'utente. "close" è escluso.
       if (obj.action === 'shell' && typeof obj.command === 'string') {
@@ -990,6 +997,41 @@
         setTimeout(() => submit({
           userAction: note,
           esterno: ricercaWeb ? { ricercaWeb } : null,
+          preActionUrl: location.href,
+        }), 50);
+        return;
+      }
+
+      // Caso speciale: l'AI ha chiesto di leggere una pagina trovata prima.
+      // Dei risultati di una ricerca vede 240 caratteri per ognuno: il prezzo,
+      // l'orario o il passaggio che gli serve sta quasi sempre dentro la
+      // pagina, e senza questo poteva solo tirare a indovinare.
+      if (parsed.kind === 'read_page') {
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        if (session && session.pageReadCount >= MAX_PAGE_READS_PER_SESSION) {
+          appendActionLog('lettura pagina: limite raggiunto, ignorata');
+          setTimeout(() => submit({
+            userAction: 'limite di letture raggiunto per questa sessione. Rispondi ora con il JSON normale usando solo ciò che già sai (pagina, llms.txt, percorsi noti).',
+            preActionUrl: location.href,
+          }), 50);
+          return;
+        }
+        if (session) session.pageReadCount += 1;
+        appendActionLog(`leggo la pagina: ${Esterno.perCanaleSistema(parsed.url)}`);
+        let paginaLetta = null;
+        try {
+          const r = await chrome.runtime.sendMessage({ type: MSG.READ_PAGE, url: parsed.url });
+          paginaLetta = { ...(r || {}), url: (r && r.url) || parsed.url };
+        } catch (_) {
+          paginaLetta = { url: parsed.url, text: '', detail: 'la lettura è fallita per un errore di rete' };
+        }
+        // Il testo della pagina NON passa dal canale di sistema: la nota dice
+        // soltanto che Filo è andato a leggere, e il testo viaggia a parte per
+        // essere imbustato (#593).
+        history.push({ role: 'assistant', content: `(ho chiesto di leggere una pagina: "${Esterno.perCanaleSistema(parsed.url)}")` });
+        setTimeout(() => submit({
+          userAction: 'ho letto la pagina che avevi chiesto; il testo te lo rimando qui sotto come contenuto esterno, fra le marcature. Procedi ora con il JSON normale (highlight / choices / text / status)',
+          esterno: { paginaLetta },
           preActionUrl: location.href,
         }), 50);
         return;

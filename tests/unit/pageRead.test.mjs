@@ -333,3 +333,86 @@ test('leggere una pagina dal web e leggerla dal disco hanno lo stesso tetto', ()
   const DR = require(join(ROOT, 'src', 'main', 'services', 'documentRead.js'));
   assert.equal(PR.MAX_BYTES, DR.MAX_FILE_BYTES);
 });
+
+// ── quello che una pagina scritta apposta non deve poter fare (#553, giro 2) ──
+
+test('una coda di tag mai chiusi non blocca l\'estrazione, e non arriva al modello', () => {
+  // Con la scansione a regex ogni tag senza il suo «>» faceva riscandire tutto
+  // il resto: 256 KB costavano 52 secondi col processo main fermo.
+  const html = `<html><body><p>Lo sportello apre alle 9:30.</p>${'<a'.repeat(128 * 1024)}`;
+  const t0 = Date.now();
+  const { testo } = PR.estraiContenuto(html);
+  assert.ok(Date.now() - t0 < 2000, `estrazione troppo lenta: ${Date.now() - t0} ms`);
+  assert.match(testo, /9:30/);
+  // Un tag che non chiude mai si porta dietro il resto, come per un browser:
+  // non è testo, e non deve mangiarsi lo spazio che il modello dedica alla pagina.
+  assert.doesNotMatch(testo, /<a<a/);
+});
+
+test('un commento che non si chiude mai non costa la pagina al quadrato', () => {
+  const html = `<html><body><p>Il totale è 42.</p>${'<!--'.repeat(64 * 1024)}`;
+  const t0 = Date.now();
+  const { testo } = PR.estraiContenuto(html);
+  assert.ok(Date.now() - t0 < 2000, `estrazione troppo lenta: ${Date.now() - t0} ms`);
+  assert.match(testo, /42/);
+});
+
+test('oltre il tetto sull\'HTML da attraversare si taglia, e lo si dichiara', async () => {
+  const zavorra = '<p>riga di riempimento che non dice niente</p>'.repeat(220_000);
+  const html = `<html><body><main><p>In cima c'è 19,90.</p>${zavorra}<p>In fondo le 9:30.</p></main></body></html>`;
+  assert.ok(html.length > PR.MAX_HTML_CHARS);
+  const r = await PR.daContenuto({ url: 'https://esempio.test/lunga', contentType: 'text/html', buffer: buf(html) });
+  assert.equal(r.ok, true);
+  assert.equal(r.partial, true);
+  assert.match(r.text, /19,90/);
+});
+
+// ── l'intestazione dell'articolo su una pagina senza main né article ─────────
+
+const CRONACA_DI_SOLI_DIV = `<!DOCTYPE html>
+<html lang="it"><head><title>Il Giornale del Paese</title></head><body>
+  <header class="site-header"><a href="/">Il Giornale del Paese</a></header>
+  <nav><ul><li>Cronaca</li></ul></nav>
+  <div class="post">
+    <header class="entry-header">
+      <h1>Sciopero dei treni</h1>
+      <p class="byline">Pubblicato il 12 marzo 2026 alle 14:30 da Anna Bianchi</p>
+    </header>
+    <div class="entry-content"><p>I convogli si fermano dalle 9 alle 17.</p></div>
+  </div>
+  <footer class="site-footer">© 2026</footer>
+</body></html>`;
+
+test('data, ora, firma e titolo del pezzo arrivano anche senza <main> né <article>', () => {
+  const { testo } = PR.estraiContenuto(CRONACA_DI_SOLI_DIV);
+  assert.match(testo, /12 marzo 2026/);
+  assert.match(testo, /14:30/);
+  assert.match(testo, /Anna Bianchi/);
+  assert.match(testo, /Sciopero dei treni/);
+  assert.match(testo, /dalle 9 alle 17/);
+});
+
+test('la cornice del sito resta fuori anche su una pagina di soli div', () => {
+  const { testo } = PR.estraiContenuto(CRONACA_DI_SOLI_DIV);
+  assert.doesNotMatch(testo, /Il Giornale del Paese/);
+  assert.doesNotMatch(testo, /Cronaca/);
+  assert.doesNotMatch(testo, /© 2026/);
+});
+
+// ── la codifica dichiarata dentro la pagina ─────────────────────────────────
+
+test('un vecchio sito che dichiara la codifica nel <meta> si legge senza rombi', async () => {
+  const pagina = '<!DOCTYPE html><html><head><meta charset="ISO-8859-1"><title>Trattoria</title>'
+    + '</head><body><main><p>Il caffè costa 1,20 €, il menù 18 €.</p></main></body></html>';
+  const byte = Buffer.from([...pagina].map((c) => {
+    const n = c.codePointAt(0);
+    if (n === 0x20ac) return 0x80;
+    return n < 256 ? n : 0x3f;
+  }));
+  // Nessun charset nell'intestazione: è il caso comune di quei siti.
+  const r = await PR.daContenuto({ url: 'https://esempio.test/menu', contentType: 'text/html', buffer: byte });
+  assert.equal(r.ok, true);
+  assert.match(r.text, /caffè/);
+  assert.match(r.text, /1,20 €/);
+  assert.doesNotMatch(r.text, /�/);
+});

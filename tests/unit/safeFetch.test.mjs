@@ -52,3 +52,28 @@ test('safeFetch rifiuta destinazioni private prima di connettersi', async () => 
   await assert.rejects(() => safeFetch('http://169.254.169.254/latest/meta-data/'), /blocked-private-address/);
   await assert.rejects(() => safeFetch('http://localhost/'), /blocked-private-address/);
 });
+
+test('il controllo su un indirizzo vede OGNI passaggio, non solo il primo', async () => {
+  // Un sito che rimanda altrove sceglie lui dove: un giudizio dato una volta
+  // all'inizio non dice niente sulla pagina che si finisce per leggere (#553).
+  const visti = [];
+  const orig = globalThis.fetch;
+  globalThis.fetch = async (u) => (String(u).includes('/tappa')
+    ? new Response('', { status: 302, headers: { location: 'https://93.184.216.34/arrivo' } })
+    : new Response('ok', { status: 200 }));
+  try {
+    await assert.rejects(
+      () => safeFetch('https://93.184.216.34/tappa', {
+        controllaHop: (u) => {
+          visti.push(u);
+          if (u.includes('/arrivo')) throw new Error('blocked-dangerous');
+        },
+      }),
+      /blocked-dangerous/,
+    );
+  } finally {
+    globalThis.fetch = orig;
+  }
+  assert.equal(visti.length, 2);
+  assert.match(visti[1], /\/arrivo$/);
+});

@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, auditServedByLater, applyLimitToChain,
-    Defaults, isAdmin, broadcastToTabs,
+    Defaults, isAdmin, broadcastToTabs, testoDaSchedaAperta,
   } = ctx;
   const { SN_CONST } = globalThis;
   const Providers = globalThis.SN_PROVIDERS;
@@ -603,6 +603,24 @@ module.exports = function register(on, ctx) {
       return { ok: true, ...r };
     } catch (e) {
       return { ok: false, error: e.message || String(e), results: [] };
+    }
+  });
+
+  // Il TESTO di una pagina web per l'Aiuto laterale. Stessa lettura della chat
+  // (scheda già aperta se c'è, altrimenti scaricamento con le guardie
+  // anti-SSRF e il controllo sui siti pericolosi): dei due assistenti che
+  // cercano sul web, uno solo che sappia aprire un risultato è mezzo lavoro.
+  on(MSG.READ_PAGE, async (msg) => {
+    try {
+      const PR = require('../pageRead');
+      const r = await PR.readPage(msg && msg.url, { leggiScheda: testoDaSchedaAperta });
+      return {
+        ok: !!r.ok, url: r.url || '', title: r.title || '', text: r.text || '',
+        truncated: !!r.truncated, partial: !!r.partial, empty: !!r.empty,
+        error: r.error || null, detail: r.detail || '',
+      };
+    } catch (e) {
+      return { ok: false, text: '', error: 'network', detail: e?.message || String(e) };
     }
   });
 
