@@ -2598,6 +2598,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   }
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
+  // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
+  // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
+  // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
+  if (chatId) {
+    await appendToChatArchive(
+      chatId,
+      { role: 'filo', text: textReply, actions: actionsToRun },
+      { onboarding: onbActive },
+    );
+  }
   // #524 — chiusura dell'intervista di benvenuto: la sequenza sta in
   // `finishOnboarding`. Se invece l'intervista prosegue, il turno di Filo viene
   // messo da parte per la ripresa.
