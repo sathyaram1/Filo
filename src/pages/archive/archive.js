@@ -281,7 +281,7 @@
       } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const r = row.getBoundingClientRect();
-        openChatCtxMenu(r.left, r.bottom, c);
+        openChatCtxMenu(r.left, r.bottom, c, row);
       }
     });
     return row;
