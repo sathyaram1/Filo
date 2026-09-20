@@ -1174,9 +1174,60 @@ function cleanLabel(v) {
   return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
 }
 
-async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
+// ── il perimetro delle uscite: i compiti vivi (#533) ────────────────────────
+// Un compito è UNA richiesta dell'utente, e il suo perimetro muore con lei.
+// Resta in mappa oltre la risposta per un motivo solo: la conferma di un
+// allargamento arriva dopo, quando l'utente clicca il popup.
+const COMPITO_TTL = 30 * 60 * 1000;
+const compitiVivi = new Map();
+
+function purgaCompiti() {
+  const now = Date.now();
+  for (const [k, v] of compitiVivi) if (now - v.ts > COMPITO_TTL) compitiVivi.delete(k);
+}
+function ricordaCompito(compito, chiaveExtra) {
+  if (!compito) return compito;
+  purgaCompiti();
+  const v = { ts: Date.now(), compito };
+  compitiVivi.set(compito.id, v);
+  if (chiaveExtra) compitiVivi.set(chiaveExtra, v);
+  return compito;
+}
+function compitoPerChiave(chiave) {
+  const v = compitiVivi.get(String(chiave || ''));
+  if (!v) return null;
+  v.ts = Date.now();
+  return v.compito;
+}
+
+// L'assistente di pagina vive DENTRO il sito che sta leggendo: nasce già
+// contaminato, e il suo perimetro non lo dichiara il modello (non ha un passo
+// per farlo) ma la superficie, che di uscite ne offre una sola.
+const PERIMETRO_PAGINA = ['segnalazioni'];
+function compitoDiPagina(sender) {
+  const Compiti = globalThis.SN_COMPITI;
+  const origin = String(sender?.tab?.url || sender?.url || '');
+  if (!Compiti || !/^https?:/i.test(origin)) return null;
+  const chiave = `pagina::${sender?.tab?.id ?? origin}`;
+  const gia = compitoPerChiave(chiave);
+  if (gia) return gia;
+  const c = Compiti.nuovo({ origine: 'chat', dichiarazione: 'fissa', perimetro: PERIMETRO_PAGINA });
+  Compiti.registraLettura(c, { type: 'PAGINA', fonte: 'esterno', dettaglio: origin });
+  return ricordaCompito(c, chiave);
+}
+
+// Il compito di questa azione: quello del turno che la sta eseguendo, quello
+// citato dall'azione che torna da un popup, o quello della pagina da cui arriva.
+function compitoDi(action, sender, compito) {
+  if (compito) return compito;
+  return compitoPerChiave(action && action._compito) || compitoDiPagina(sender);
+}
+
+async function executeFiloAction(action, { confirmed = false, sender = null, compito = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
+  const Compiti = globalThis.SN_COMPITI;
+  const task = Compiti ? compitoDi(action, sender, compito) : null;
 
   // IMPOSTA_ESTETICA: il livello (1 normale, 2 se rende il testo illeggibile)
   // dipende dallo stato risultante, che solo il main conosce (ha i token
