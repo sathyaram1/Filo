@@ -33,6 +33,11 @@
   let showHomeMessage = true; // commento centrale (disattivabile da Preferenze)
   let expanded = false;
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
+  // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
+  // a scrivere la conversazione su disco, turno per turno, così una chat
+  // sopravvive anche se questa scheda muore a metà. Torna null quando la chat
+  // si chiude (ritorno alla home, chat nuova), e il messaggio dopo ne apre una.
+  let chatId = null;
   let sending = false;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
