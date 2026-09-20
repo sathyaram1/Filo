@@ -25,6 +25,9 @@
 //                                    chiavi arriva agli utenti muta, e nessuno se
 //                                    ne accorgerebbe finché non prova a usarla
 //
+// Quando si ferma dice QUALE chiave manca, da quali fonti l'ha cercata e dove
+// si mette: la sentinella tests/unit/bakeGuastoParlante.test.mjs lo tiene fermo.
+//
 // SICUREZZA
 //   - Lo script NON stampa mai i valori delle chiavi (solo "presente/assente").
 //   - Il file generato è gitignorato: non torna mai nel repo pubblico.
