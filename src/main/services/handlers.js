@@ -2071,6 +2071,21 @@ function webSearchResultsForPrompt(actions) {
 // dall'owner invece di ricostruirlo a memoria — che su queste cose è il modo
 // tipico di attribuire a Filo posizioni che non ha. Sono DATI di sistema
 // affidabili, non istruzioni dell'utente.
+// Taglia un testo al tetto senza spezzare un carattere. Un'emoji occupa DUE
+// unità di testo: tagliando per numero di unità si resta con la prima metà, che
+// da sola non è nessun carattere e arriva al modello come un rombo. Le stesse
+// due righe stanno dove il terminale tiene l'uscita di un comando, dove il
+// lettore tiene il testo di un documento e nella busta con cui entra ogni
+// contenuto esterno; qui coprono gli ultimi due tagli rimasti a fette secche
+// (#551, sesto giro di verifica).
+function tagliaInteri(s, max) {
+  if (s.length <= max) return s;
+  let n = max;
+  const ultimo = s.charCodeAt(n - 1);
+  if (ultimo >= 0xD800 && ultimo <= 0xDBFF) n -= 1;
+  return s.slice(0, n);
+}
+
 function transparencyDocsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
