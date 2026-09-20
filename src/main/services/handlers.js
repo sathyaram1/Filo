@@ -2334,6 +2334,12 @@ function toolResultText({ action, res, rendered }) {
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
+  // La home chiesta da chi è già nella home: non è stato ricaricato niente, e
+  // il modello non deve dire di averlo portato da qualche parte.
+  if (type === 'COMANDO_FINESTRA' && res.output && res.output.already) {
+    return 'La home È la pagina da cui l\'utente ti sta scrivendo: non ho ricaricato niente, perché ricaricarla '
+      + 'cancellerebbe questa conversazione. Diglielo in una riga; sotto la tua risposta trova un bottone per svuotarla lui.';
+  }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
     // applicata: Tema → Scuro»), non quella del popup di conferma («Filo vuole
