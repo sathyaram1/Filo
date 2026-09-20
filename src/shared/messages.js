@@ -618,11 +618,19 @@
     // cancellata: la scheda che quella conversazione la sta ancora vivendo
     // smette di scriverci dentro, invece di farla rinascere al messaggio dopo.
     FILO_CHATS_UPDATED: 'filo_chats_updated',
-    // Una riga che Filo scrive in chat senza passare da un modello (la risposta
-    // a un comando con lo slash: l'elenco dei comandi, la conferma di un timer,
-    // il resoconto del riordino). L'utente la legge sullo schermo, quindi la
-    // deve ritrovare rileggendo la chat. { id, text } → { ok }
+    // Una riga scritta in chat senza passare da un modello: la risposta a un
+    // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
+    // resoconto del riordino), il comando di terminale che l'utente ha digitato
+    // e l'esito che la shell gli ha risposto. L'utente le legge sullo schermo,
+    // dentro quella conversazione, quindi le deve ritrovare rileggendola.
+    // `role` dice chi l'ha scritta ('filo', il valore di serie, oppure 'user'
+    // per il comando digitato). { id, text, role? } → { ok }
     FILO_CHAT_NOTE: 'filo_chat_note',
+    // Titolo e tipo scelti a mano dall'utente, dal menu del tasto destro in
+    // Cronologia: il titolo generato può essere sbagliato, e una discussione
+    // può essere finita fra i comandi. Quello che sceglie l'utente vince e non
+    // viene più riscritto dal classificatore. { id, title?, kind? } → { ok, chats }
+    FILO_CHAT_UPDATE: 'filo_chat_update',
     // Porta l'utente alla scheda dove una conversazione è ANCORA APERTA, invece
     // di aprirgliene una seconda copia. { id } → { ok, portato }
     FILO_CHAT_FOCUS: 'filo_chat_focus',
