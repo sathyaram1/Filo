@@ -365,6 +365,12 @@
       const dove = String(a.contesto || a.context || a.argomento || '').trim();
       return { icon: '📝', text: `Appunto salvato${dove ? ` · ${dove}` : ''}` };
     },
+    // #530 — a livello normale, con un compito pulito, la segnalazione parte
+    // senza popup: il diario deve dire che è PARTITA, e cosa è partito.
+    INVIA_FEEDBACK: (a) => {
+      const t = String(a.testo || a.text || a.messaggio || '').trim();
+      return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t.length > 60 ? `${t.slice(0, 57)}…` : t}` : ''}` };
+    },
     SALVA_LEZIONE: (a) => {
       const t = String(a.testo || a.text || a.lezione || '').trim();
       return { icon: '🧠', text: `Memorizzato · ${t.length > 60 ? `${t.slice(0, 57)}…` : t}` };
