@@ -153,13 +153,83 @@ test('l\'avviso per l\'utente dice cosa NON è successo', () => {
   assert.equal(AD.avvisoPerUtente([]), '');
 });
 
-test('sentinella: ogni tipo citato dalle famiglie è uno strumento vero', () => {
+test('sentinella: ogni tipo citato dalle famiglie è uno strumento vero (o un segno di contesto dichiarato)', () => {
   const veri = new Set(Tools.NAMES);
+  const contesto = new Set(AD.TIPI_DI_CONTESTO);
+  for (const c of contesto) {
+    assert.ok(!veri.has(c), `${c} è dichiarato come segno di contesto ma è anche uno strumento vero: sceglierne uno`);
+  }
   for (const fam of AD.FAMIGLIE) {
     for (const t of fam.tipi) {
-      assert.ok(veri.has(t), `la famiglia ${fam.id} cita ${t}, che non è uno strumento del modello`);
+      assert.ok(veri.has(t) || contesto.has(t),
+        `la famiglia ${fam.id} cita ${t}, che non è né uno strumento del modello né un segno di contesto dichiarato`);
     }
   }
+});
+
+// Il presidio è fatto di espressioni regolari, e in JavaScript `\b` guarda solo
+// l'alfabeto ASCII: dopo la à di «modalità» non c'è nessun confine di parola,
+// quindi una regola scritta `modalità\b` non può fare match su NIENTE. Tre
+// regole erano nate così — spente, verdi, e inutili — e nessuno poteva
+// accorgersene leggendole. Questa sentinella lo impedisce per sempre.
+test('sentinella: nessuna regola è nata spenta (accento subito prima di \\b)', () => {
+  const sorgenti = [];
+  for (const fam of AD.FAMIGLIE) for (const re of fam.frasi) sorgenti.push([fam.id, re.source]);
+  for (const [id, src] of sorgenti) {
+    assert.ok(!/[àèéìíòóùúÀÈÉÌÍÒÓÙÚ]\\b/.test(src),
+      `la famiglia ${id} ha una regola con un accento subito prima di \\b: non potrà mai scattare`);
+  }
+  // E la prova che le tre regole rifatte scattano davvero.
+  assert.deepEqual(ids(AD.rileva('Ho attivato la modalità scura.', [])), ['impostazione']);
+  assert.deepEqual(
+    ids(AD.rileva('Non ho trovato l\'evento però ti ho messo una sveglia alle 19.', [])),
+    ids(AD.rileva('Non ho trovato l\'evento ma ti ho messo una sveglia alle 19.', [])),
+  );
+});
+
+// La conferma col PRONOME: quando la cosa l'ha appena nominata l'utente, in
+// italiano si risponde «l'ho messa alle 19». Era la forma più probabile subito
+// dopo la richiesta, ed era anche l'unica che passava intera.
+test('la conferma col pronome viene vista, e tace appena un\'azione c\'è', () => {
+  for (const frase of [
+    'L\'ho messa alle 19.',
+    'Te l\'ho messa alle 19, buonanotte.',
+    'Le ho impostate tutte e tre.',
+    'Te l’ho messa alle 19.',
+  ]) {
+    assert.deepEqual(ids(AD.rileva(frase, [])), ['senza-nome'], frase);
+    assert.deepEqual(AD.rileva(frase, [{ type: 'SVEGLIA' }]), [], `${frase} (con un'azione nel turno)`);
+  }
+  // Una famiglia che sa dire DI COSA si tratta vince: niente doppio avviso.
+  assert.deepEqual(ids(AD.rileva('L\'ho aggiunta al calendario.', [])), ['calendario']);
+  assert.deepEqual(ids(AD.rileva('Fatto! L\'ho salvata fra gli appunti.', [])), ['appunto']);
+});
+
+// L'avviso che accusa Filo di non aver fatto una cosa che HA fatto è il modo
+// più rapido di rendere il presidio inutile: lo si smette di leggere.
+test('niente falsi allarmi su quello che Filo fa per altre strade', () => {
+  // Un programma o una cartella si aprono con un comando di shell.
+  assert.deepEqual(AD.rileva('Ho aperto il blocco note.', [{ type: 'ESEGUI_COMANDO' }]), []);
+  // I riassunti dei file dell'editor sono già in contesto a ogni turno.
+  assert.deepEqual(AD.rileva('Ho letto il file bolletta.pdf: sono 84 euro.', [{ type: 'CONTESTO_FILE' }]), []);
+  // Quello che Filo impara lo scrive in memoria un passaggio che parte da solo
+  // dopo il turno: «l'ho memorizzato» è vero, e non ha più una famiglia.
+  assert.deepEqual(AD.rileva('L\'ho memorizzato: preferisci le risposte brevi.', []), []);
+  assert.deepEqual(AD.rileva('D\'ora in poi me lo ricorderò.', []), []);
+});
+
+// «Scrive la risposta buona come preambolo e chiude con un oggetto»: la metà
+// del guasto che passava intera, perché si guardava solo l'inizio del testo.
+test('il formato macchina si riconosce anche in coda alla risposta', () => {
+  assert.equal(AD.formatoSospetto('Ti metto la sveglia alle 19.\n\nSVEGLIA{"time":"19:00"}'), true);
+  assert.equal(AD.formatoSospetto('Ecco fatto.\n\n{}'), true);
+  assert.equal(AD.formatoSospetto('[{"type":"SVEGLIA","time":"19:00"}]'), true);
+  assert.equal(AD.formatoSospetto('Ecco.\n\n{"text":"","actions":[]}'), true);
+  // Un esempio dentro un blocco recintato è una risposta, non un guasto.
+  assert.equal(AD.formatoSospetto('Un esempio:\n\n```json\n{"text":"x","actions":[]}\n```\n\nChiaro?'), false);
+  // E una parola maiuscola con una parentesi dietro non è una chiamata.
+  assert.equal(AD.formatoSospetto('Ho scritto TODO{ sistemare } nel file.'), false);
+  assert.equal(AD.formatoSospetto('Poi ho messo NOTA{da rivedere} in fondo.'), false);
 });
 
 test('input limite: vuoto, spazi, testo lunghissimo, caratteri strani', () => {
