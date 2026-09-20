@@ -2569,6 +2569,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // prima nella conversazione copriva quello che veniva raccontato adesso, e
   // il presidio tornava muto proprio nel caso del feedback.
   const domandaUtente = !!(Dichiarate && Dichiarate.domandaSuCosaFatta(userMessage));
+  // #517 (giro 9) — l'utente ha chiesto una cosa che passa da uno strumento,
+  // oppure ha chiesto di sistemare un testo? La conferma fatta col solo
+  // pronome («te l'ho tolta») non dice di cosa parla, e la differenza fra una
+  // promessa e la consegna di un testo sta nella richiesta. Serve anche a non
+  // far reggere da un appunto vecchio quello che l'utente ha appena dettato.
+  const richiestaAzione = !!(Dichiarate && Dichiarate.richiestaDiAzione(userMessage));
   const statoDichiarazioni = async (azioniDelTurno) => ({
     ...(await provePerIlPresidio(Dichiarate, fileList)),
     // Quante azioni di ciascun tipo sono partite adesso: due dichiarazioni
