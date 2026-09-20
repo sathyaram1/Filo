@@ -2416,6 +2416,23 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // `SN_ONBOARDING.isExitRequest`.
   let onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
   const onbActive = !!(Onboarding && !onbBefore.done);
+
+  // #525 — la chat si scrive su disco ADESSO, non alla chiusura: se l'app
+  // muore a metà discussione, la discussione c'è lo stesso. I turni interni
+  // (i nudge di prosecuzione automatica) non sono parole dell'utente e non
+  // entrano nell'archivio, come non entrano nell'intervista. Durante
+  // l'intervista di benvenuto, prima del primo messaggio dell'utente va
+  // archiviata la domanda con cui Filo l'ha aperta: è per questo che il
+  // salvataggio sta qui sotto e non in cima, dove lo stato dell'intervista
+  // non si era ancora letto.
+  if (chatId && !internal) {
+    if (onbActive) await archiviaAperturaAccoglienza(chatId, onbBefore);
+    await appendToChatArchive(chatId, {
+      role: 'user',
+      text: String(userMessage || ''),
+      images: Array.isArray(images) ? images.length : (image ? 1 : 0),
+    }, { onboarding: onbActive });
+  }
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
   // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
   // nudge di prosecuzione automatica) non sono parole dell'utente e non entrano;
