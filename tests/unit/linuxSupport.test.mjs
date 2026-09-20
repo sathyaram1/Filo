@@ -109,15 +109,15 @@ test("l'invito filo:// arriva a Filo anche su Linux", () => {
 // niente su metà delle macchine Linux, in silenzio.
 
 test('il doppio clic sul pacchetto Linux avvia Filo senza la gabbia di sicurezza', async () => {
-  const { mkdtempSync, writeFileSync, readFileSync: leggi, existsSync: c_e } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { writeFileSync, readFileSync: leggi, existsSync: c_e } = await import('node:fs');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
 
   const hook = pkg.build?.afterPack;
   assert.ok(hook, 'build.afterPack sparito: nessuno mette più il lanciatore nel pacchetto Linux');
   const { default: afterPack } = require(join(ROOT, hook));
 
   // Una finta cartella impacchettata: dentro c'è solo il "programma".
-  const dove = mkdtempSync(join(tmpdir(), 'filo linux afterpack '));
+  const dove = cartellaTemporanea('filo-linux-lanciatore-');
   writeFileSync(join(dove, 'filo'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
 
   await afterPack({
