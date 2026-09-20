@@ -477,13 +477,16 @@ test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comun
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, 'resolver.md'), '# ruolo resolver\ncorpo del ruolo\n');
+  writeFileSync(resolve(dir, 'resolver-rebase.md'), '# ruolo rebase\n<!-- includi: _pezzo.md -->\n');
+  writeFileSync(resolve(dir, '_pezzo.md'), 'pezzo condiviso\n');
   writeFileSync(resolve(dir, 'halt.md'), '# guasto\nfermati\n');
   writeFileSync(resolve(dir, '_contratto-worker.md'), '# Contratto comune dei worker\nregole\n');
   const nw = readRoleInstructions('new-work');
   assert.ok(nw.includes('# ruolo resolver'), 'new-work riceve le istruzioni del resolver');
   assert.ok(nw.includes('# Contratto comune dei worker'), 'col contratto accodato in fondo');
   const fx = readRoleInstructions('fixer');
-  assert.ok(fx.includes('# ruolo resolver'), 'fixer riceve le STESSE istruzioni (caso nel payload)');
+  assert.ok(fx.includes('# ruolo rebase') && !fx.includes('# ruolo resolver'), 'fixer riceve SOLO il testo del suo caso');
+  assert.ok(fx.includes('pezzo condiviso') && !fx.includes('includi:'), 'i pezzi condivisi vengono espansi');
   assert.ok(fx.includes('# Contratto comune dei worker'));
   // Il guasto non è un ruolo lavorante: niente contratto.
   const halt = readRoleInstructions('halt');
