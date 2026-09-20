@@ -1436,9 +1436,12 @@
       const C = global.SN_FEEDBACK_CRYPTO;
       let value = capped;
       if (capped && !(C && C.isEncrypted && C.isEncrypted(capped))) {
-        // Fail-safe: se la cifratura non riesce NON si scrive il report in
-        // chiaro. Si lascia la conversazione com'era.
-        try { value = await maybeEncrypt(capped); } catch (_) { value = undefined; }
+        // Se la cifratura non riesce NON si scrive il report in chiaro. E non
+        // si tace nemmeno: fino al #602 il campo veniva lasciato cadere in
+        // silenzio, cioè chi aveva appena scritto il report vedeva la scheda
+        // salvarsi e il testo sparire senza una parola. L'errore risale e la
+        // dashboard lo mostra; niente di questa scrittura parte.
+        value = await maybeEncrypt(capped);
       }
       if (value !== undefined) { fields.notes = toFsValue(value); mask.push('notes'); }
     }
