@@ -48,15 +48,18 @@ async function chiaveNelleImpostazioni(app, chiave) {
   }, chiave);
 }
 
-// Il riscatto dell'invito visto da dentro: la chiave compare nel portafoglio.
-// `require` nudo non esiste dentro app.evaluate (il codice ci arriva come
-// eval): serve il createRequire ancorato al main, come fa tests/wallet-credits.
+// Il riscatto dell'invito visto da dentro: la chiave si DEPOSITA nel
+// portafoglio come fa il riscatto vero, e una stringa vuota la toglie.
+// Sostituire la funzione che la legge salterebbe proprio il momento in cui
+// Filo diventa capace di rispondere. `require` nudo non esiste dentro
+// app.evaluate (il codice ci arriva come eval): serve il createRequire.
 async function chiaveNelPortafoglio(app, chiave = CHIAVE_DELL_INVITO) {
   await app.evaluate((_e, k) => {
     const Module = process.getBuiltinModule('module');
     const path = process.getBuiltinModule('path');
     const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
-    req('./auth/wallet-store').personalKey = () => k;
+    const w = req('./auth/wallet-store');
+    if (k) w.save({ key: k, pseudonym: 'prova' }); else w.clear();
   }, chiave);
 }
 
