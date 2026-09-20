@@ -26,10 +26,9 @@ test('la richiesta si presenta come un browser, non come uno script', async ({ a
     let visti = {};
     globalThis.fetch = async (u, opts) => {
       visti = {};
-      // Gli header passati a fetch, più quelli che mette lui di suo.
-      const h = new Headers((opts && opts.headers) || {});
-      const req = new Request(String(u), { headers: h });
-      req.headers.forEach((v, k) => { visti[k.toLowerCase()] = v; });
+      // Solo gli header che Filo sceglie: quello che non c'è qui lo riempie
+      // node con il suo valore di serie, che è la stringa «node».
+      new Headers((opts && opts.headers) || {}).forEach((v, k) => { visti[k.toLowerCase()] = v; });
       return new Response('<html><body><main><p>ok</p></main></body></html>', {
         status: 200, headers: { 'content-type': 'text/html; charset=utf-8' },
       });
