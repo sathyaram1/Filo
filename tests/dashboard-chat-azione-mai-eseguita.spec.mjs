@@ -129,3 +129,84 @@ test('una risposta onesta non fa comparire nessun avviso', async ({ app, shell }
   const giri = await app.evaluate(() => globalThis.__captured.length);
   expect(giri).toBe(1);
 });
+
+// Il formato macchina in CODA alla risposta: la frase per l'utente davanti, la
+// chiamata lasciata scritta sotto invece che fatta. Guardando solo l'inizio del
+// testo il turno passava intero — niente ritentativo, niente avviso, e la
+// sveglia che non suona. Senza il fix questo test è rosso su tutte e tre le
+// asserzioni: una sola chiamata al modello, nessuna sveglia, nessuna riga.
+test('la chiamata lasciata scritta DOPO la frase torna indietro come le altre', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: 'Ti metto una sveglia alle 19:00 per stasera.\n\nSVEGLIA{"time":"19:00","label":"sera"}' },
+    { text: '', toolCalls: [{ id: 'm1', name: 'SVEGLIA', arguments: '{"time":"19:00","label":"sera"}' }] },
+    { text: 'Ecco, la sveglia delle 19:00 adesso c\'è.' },
+  ]);
+  await page.locator('#input').fill('mettimi una sveglia alle 19 per stasera');
+  await page.locator('#sendBtn').click();
+
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
+  expect(timers.map((t) => t.label)).toEqual(['sera']);
+  await expect(page.locator('.dash-bubble-filo').last()).not.toContainText('SVEGLIA{');
+  // La risposta cancellata a metà non sparisce senza una parola: nel blocco di
+  // lavoro resta scritto che è stata rifatta.
+  await expect(page.locator('.dash-activity-row')).toContainText(['Risposta rifatta']);
+});
+
+// Quando il ritentativo sul formato non basta, l'utente deve sapere che lì
+// dentro non è successo niente: prima era l'unico dei due guasti a finire in
+// silenzio, con un blocco di codice in chat e nient'altro.
+test('il formato macchina ripetuto lascia all\'utente una riga e un tasto', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [{ text: 'SVEGLIA{"time":"19:00","label":"sera"}' }]);
+  await page.locator('#input').fill('mettimi una sveglia alle 19 per stasera');
+  await page.locator('#sendBtn').click();
+
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  const avviso = page.locator('.dash-bubble-avviso');
+  await expect(avviso).toBeVisible({ timeout: 10_000 });
+  await expect(avviso).toContainText('non è stato fatto');
+  expect(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers())).toHaveLength(0);
+  // E il tasto che rifà la richiesta al posto dell'utente.
+  await expect(page.locator('.dash-bubble-actions button')).toContainText(['Fallo adesso']);
+});
+
+// Filo apre un programma con un comando di shell — è la strada vera — e poi lo
+// racconta. L'avviso non deve smentirlo: un avviso che sbaglia si smette di
+// leggere, e il presidio torna muto.
+test('un\'apertura fatta con un comando non viene smentita all\'utente', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      terminal: { enabled: true },
+    });
+  });
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: '{"comando":"echo apro il blocco note"}' }] },
+    { text: 'Ho aperto il blocco note.' },
+  ]);
+  await page.locator('#input').fill('aprimi il blocco note');
+  await page.locator('#sendBtn').click();
+
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  // Due chiamate e basta: nessun rimbalzo su una frase che era vera.
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(2);
+});

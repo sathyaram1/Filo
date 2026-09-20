@@ -43,6 +43,42 @@ plausibilmente collegata nel turno perché la frase sia coperta. Quando
 un'azione c'è, l'utente la vede nel diario del lavoro e giudica da sé; il
 presidio serve al caso in cui nel turno non c'è NIENTE.
 
+**Generosi non basta: devono essere COMPLETI.** Un avviso che accusa Filo di
+non aver fatto una cosa che ha fatto si smette di leggere, e il presidio torna
+muto — solo più caro, perché ogni falso allarme costa anche il rimbalzo. Quindi
+ogni famiglia elenca tutte le strade vere, comprese quelle che non sembrano:
+un programma o una cartella si aprono con un comando di shell, non esiste uno
+strumento «apri un programma». E ciò che Filo fa SENZA azioni non ha famiglia:
+i riassunti dei file dell'editor sono già in contesto a ogni turno (per dire
+cosa c'è scritto in un file non serve aprirlo), e quello che impara lo scrive
+in memoria un passaggio che parte da solo a turno finito, quindi «l'ho
+memorizzato» è vero. Per lo stesso motivo la cronologia si guarda intera, non
+solo i venti messaggi che vanno al modello.
+
+Tre cose imparate dal primo giro di verifica:
+
+- **il formato macchina arriva anche in CODA.** «Scrive la risposta buona come
+  preambolo e chiude con un oggetto» era il secondo sintomo della segnalazione,
+  e guardando solo l'inizio del testo bastava una frase davanti perché il turno
+  passasse intero. Si guarda ogni riga che potrebbe aprirlo, fuori dai blocchi
+  recintati coi tre apici (lì dentro è un esempio per l'utente, non un guasto);
+- **una regola con una vocale accentata davanti a `\b` non scatta mai.** In
+  JavaScript `\b` guarda solo l'ASCII: dopo la à di «modalità» non c'è nessun
+  confine, e la regola nasce spenta, verde e inutile. Tre erano scritte così.
+  Adesso lo impedisce una sentinella negli unit test;
+- **la conferma col pronome è la forma normale.** Quando la cosa l'ha appena
+  nominata l'utente si risponde «l'ho messa alle 19», non «ho messo la
+  sveglia»: era la forma più probabile, ed era l'unica che passava intera. Il
+  pronome però non dice DI COSA si tratta, e scrivere «la sveglia non c'è» su
+  un appunto sarebbe peggio di tacere: la regge qualunque azione del turno,
+  scatta solo nel caso muto, e l'avviso lì resta generico.
+
+Il rimbalzo non è invisibile per l'utente quanto sembra: la risposta già
+comparsa a schermo viene cancellata, e una risposta che si cancella da sola
+senza una parola sembra un guasto. Nel blocco di attività resta la riga che
+dice perché. E l'avviso non è un vicolo cieco: ha il tasto che rifà la
+richiesta, come la bolla d'errore, invece di far riscrivere tutto all'utente.
+
 Il cugino di questa regola è [Una promessa fatta all'utente non può dipendere
 dal modello](una-promessa-fatta-allutente-non-puo-dipendere-dal-modello.md):
 lì è l'app che promette e il codice che deve mantenere, qui è il modello che

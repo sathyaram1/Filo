@@ -1,15 +1,14 @@
 // Verifica #517 — giro 1, dal punto di vista dell'utente, con Filo aperto.
 //
-// Tre porte:
-//   1. la risposta buona scritta come PREAMBOLO e chiusa con la chiamata in
-//      chiaro: il turno passa intero, la sveglia non c'è e in chat compare il
-//      formato interno. Nessun ritentativo, nessun avviso: è il fallimento
-//      muto del feedback, sull'altra metà del sintomo.
-//   2. il formato interno riconosciuto ma ripetuto: il rimbalzo c'è, e quando
-//      fallisce l'utente resta senza una riga che gli dica cos'è successo,
-//      mentre la dichiarazione a parole l'avviso ce l'ha.
+// Tre porte trovate aperte al primo giro, e chiuse:
+//   1. la risposta buona scritta come PREAMBOLO e la chiamata lasciata scritta
+//      sotto: il turno passava intero, senza nemmeno un ritentativo, e la
+//      sveglia non esisteva. È l'altra metà del sintomo della segnalazione.
+//   2. il formato interno ripetuto anche dopo il ritentativo: all'utente
+//      restava un blocco di codice e nessuna riga che dicesse cosa non era
+//      successo, mentre la dichiarazione a parole l'avviso ce l'aveva.
 //   3. Filo apre una cosa con un comando di shell e poi lo racconta: l'utente
-//      legge che «non si è aperto niente», e invece il comando è partito.
+//      leggeva che «non si è aperto niente», e invece il comando era partito.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -67,19 +66,29 @@ test('la risposta buona come preambolo, e la chiamata in chiaro in coda', async 
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
   await installScript(app, [
+    // La frase per l'utente, e sotto la chiamata SCRITTA invece che fatta.
     { text: 'Ti metto una sveglia alle 19:00 per stasera.\n\nSVEGLIA{"time":"19:00","label":"sera"}' },
+    // Rimandato indietro, il modello la chiama per davvero.
+    { text: '', toolCalls: [{ id: 'm1', name: 'SVEGLIA', arguments: '{"time":"19:00","label":"sera"}' }] },
+    { text: 'Ecco, la sveglia delle 19:00 adesso c\'è.' },
   ]);
   await chiedi(page, 'mettimi una sveglia alle 19 per stasera');
 
-  // La sveglia non esiste: la chiamata era testo, non una chiamata.
+  // SUCCESSO dal punto di vista dell'utente: la sveglia esiste davvero.
   const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
-  expect(timers).toHaveLength(0);
+  expect(timers.map((t) => t.label)).toEqual(['sera']);
 
-  // Il turno è stato rimandato indietro almeno una volta.
+  // Il turno è stato rimandato indietro: prima bastava una frase davanti alla
+  // chiamata scritta perché passasse tutto intero, senza un secondo tentativo.
   expect(await app.evaluate(() => globalThis.__captured.length)).toBeGreaterThan(1);
 
-  // E all'utente non resta il formato interno scritto in chat.
+  // All'utente non resta il formato interno scritto in chat, e nessun avviso:
+  // la cosa è stata fatta.
   await expect(page.locator('.dash-bubble-filo').last()).not.toContainText('SVEGLIA{');
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  // E del giro rimandato indietro resta scritta una riga nel blocco di lavoro:
+  // una risposta che si cancella da sola, senza una parola, sembra un guasto.
+  await expect(page.locator('.dash-activity-row')).toContainText(['Risposta rifatta']);
 });
 
 test('quando il rimbalzo sul formato fallisce, l\'utente sa comunque che non è successo niente', async ({ app, shell }) => {
@@ -97,9 +106,13 @@ test('quando il rimbalzo sul formato fallisce, l\'utente sa comunque che non è 
   const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
   expect(timers).toHaveLength(0);
 
-  // La dichiarazione a parole, in questa stessa situazione, l'avviso ce l'ha.
-  // Qui l'utente legge un blocco di codice e nient'altro.
-  await expect(page.locator('.dash-bubble-avviso')).toBeVisible({ timeout: 10_000 });
+  // La dichiarazione a parole, in questa stessa situazione, l'avviso ce l'ha:
+  // adesso ce l'ha anche questa, e dice che lì dentro non è successo niente.
+  const avviso = page.locator('.dash-bubble-avviso');
+  await expect(avviso).toBeVisible({ timeout: 10_000 });
+  await expect(avviso).toContainText('non è stato fatto');
+  // E l'utente non deve riscrivere la richiesta a mano per riprovare.
+  await expect(page.locator('.dash-bubble-actions button')).toContainText(['Fallo adesso']);
 });
 
 test('un\'apertura fatta con un comando non viene smentita all\'utente', async ({ app, shell }) => {

@@ -26,8 +26,9 @@ test('il presidio non accusa Filo di non aver fatto ciò che ha fatto', async ()
   expect(ids('Ho aperto la cartella Documenti.', [{ type: 'ESEGUI_COMANDO' }])).toEqual([]);
 
   // I file dell'editor arrivano al modello già RIASSUNTI, in contesto, a ogni
-  // turno: per dire cosa c'è scritto in un file non serve nessuno strumento.
-  expect(ids('Ho letto il file bolletta.pdf: sono 84 euro, scadenza il 12.')).toEqual([]);
+  // turno: per dire cosa c'è scritto in un file non serve nessuno strumento,
+  // e il turno lo dichiara col suo segno di contesto.
+  expect(ids('Ho letto il file bolletta.pdf: sono 84 euro, scadenza il 12.', [{ type: 'CONTESTO_FILE' }])).toEqual([]);
 
   // Quello che Filo impara lo scrive in memoria l'agente delle lezioni, dopo
   // il turno e senza nessuna azione: «l'ho memorizzato» non è una bugia.
@@ -36,24 +37,32 @@ test('il presidio non accusa Filo di non aver fatto ciò che ha fatto', async ()
 
 test('le frasi con cui un assistente conferma davvero in italiano vengono viste', async () => {
   // Quando la cosa l'ha appena nominata l'utente, si risponde col pronome:
-  // è la forma NORMALE, non un caso di scuola. Nessuna di queste è coperta.
-  expect(ids("L'ho messa alle 19.")).toContain('sveglia');
-  expect(ids("Te l'ho messa alle 19, buonanotte.")).toContain('sveglia');
-  expect(ids('Le ho impostate tutte e tre.')).toContain('sveglia');
-  expect(ids("L'ho aggiunta al calendario.")).toContain('calendario');
-  expect(ids("Fatto! L'ho salvata fra gli appunti.")).toContain('appunto');
+  // è la forma NORMALE, non un caso di scuola. Il pronome non dice COSA, e
+  // scrivere «la sveglia non c'è» su un appunto sarebbe peggio di tacere:
+  // quando non si può dire di cosa si tratta, l'avviso resta generico.
+  expect(ids("L'ho messa alle 19.")).toEqual(['senza-nome']);
+  expect(ids("Te l'ho messa alle 19, buonanotte.")).toEqual(['senza-nome']);
+  expect(ids('Le ho impostate tutte e tre.')).toEqual(['senza-nome']);
+  expect(ids("Te l\u2019ho messa alle 19.")).toEqual(['senza-nome']);
+  // Quando invece la frase dice anche di cosa si tratta, lo dice anche l'avviso.
+  expect(ids("L'ho aggiunta al calendario.")).toEqual(['calendario']);
+  expect(ids("Fatto! L'ho salvata fra gli appunti.")).toEqual(['appunto']);
+  // E appena nel turno un'azione c'è, il pronome non accusa nessuno.
+  expect(ids("L'ho messa alle 19.", [{ type: 'SVEGLIA' }])).toEqual([]);
 });
 
 test('nessuna regola del presidio è scritta in modo da non poter mai scattare', async () => {
   // `\b` dopo una vocale accentata non è un confine di parola in JavaScript:
-  // le regole scritte con «modalità», «ricorderò», «però», «perché», «così»
-  // non possono fare match su NIENTE. Sono guardie nate spente.
-  expect(/modalità\b/.test('modalità scura')).toBe(true);
-  expect(/ricorderò\b/.test('ricorderò.')).toBe(true);
-  expect(/però\b/.test('però ti')).toBe(true);
+  // una regola scritta «modalità\b» non può fare match su niente, e nasce
+  // spenta senza che nessuno possa accorgersene leggendola.
+  for (const fam of D.FAMIGLIE) {
+    for (const re of fam.frasi) {
+      expect(re.source, `famiglia ${fam.id}`).not.toMatch(/[àèéìíòóùú]\\b/i);
+    }
+  }
 
-  // Conseguenza sul comportamento: la stessa identica frase viene vista o no
-  // a seconda della congiunzione, perché «però» non separa e «ma» sì.
+  // Conseguenza sul comportamento: la stessa identica frase veniva vista o no
+  // a seconda della congiunzione, perché «però» non separava e «ma» sì.
   expect(ids('Non ho trovato l\'evento ma ti ho messo una sveglia alle 19.')).toContain('sveglia');
   expect(ids('Non ho trovato l\'evento però ti ho messo una sveglia alle 19.')).toContain('sveglia');
 
