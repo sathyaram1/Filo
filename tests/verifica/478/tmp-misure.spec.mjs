@@ -58,9 +58,9 @@ test('misure', async ({ openTab }) => {
     await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
     await page.waitForTimeout(150);
     for (const [nome, sel] of [
-      ['conteggio funziona (votato)', '[data-id="w"] .bd-vote-works .bd-vote-count'],
-      ['conteggio non funziona (votato)', '[data-id="k"] .bd-vote-broken .bd-vote-count'],
-      ['conteggio non votato', '[data-id="w"] .bd-vote-broken .bd-vote-count'],
+      ['pillola funziona (votata)', '[data-id="w"] .bd-vote-works'],
+      ['pillola non funziona (votata)', '[data-id="k"] .bd-vote-broken'],
+      ['pillola non votata', '[data-id="w"] .bd-vote-broken'],
       ['errore Ancora rotto', '[data-id="w"] .bd-reopen-err'],
       ['titolo scheda', '[data-id="w"] .bd-card-title'],
       ['sottotitolo numero', '[data-id="w"] .bd-card-sub'],
