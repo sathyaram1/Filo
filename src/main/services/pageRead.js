@@ -128,12 +128,21 @@ function attributi(raw) {
   return out;
 }
 
-/** Questo elemento è cornice del sito, non contenuto? PURA. */
-function daScartare(nome, attrs, inZona = false) {
+/**
+ * Questo elemento è cornice del sito, non contenuto? PURA.
+ *
+ * `inZona` (dentro `main`/`article`) e le tabelle salvano intestazione e coda:
+ * lì sono la data del pezzo o i nomi delle colonne. Fuori si butta solo ciò
+ * che si dichiara cornice del sito o che sta in cima al corpo: più in dentro,
+ * un `header` è l'intestazione dell'articolo anche senza `main` attorno.
+ */
+function daScartare(nome, attrs, { inZona = false, primoLivello = false } = {}) {
   if ('hidden' in attrs) return true;
   if (attrs['aria-hidden'] === 'true') return true;
   if (/display\s*:\s*none/i.test(attrs.style || '')) return true;
-  const esente = (t) => (inZona || TAG_TABELLA.has(nome)) && CORNICE_SITO.test(t);
+  const esente = (t) => CORNICE_SITO.test(t)
+    && !CORNICE_DICHIARATA.test(t)
+    && (inZona || TAG_TABELLA.has(nome) || !primoLivello);
   if (TAG_FUORI.has(nome) && !esente(nome)) return true;
   if (attrs.role && ROLE_RUMORE.test(attrs.role) && !esente(attrs.role)) return true;
   const token = `${attrs.class || ''} ${attrs.id || ''}`.split(/[\s]+/).filter(Boolean);
