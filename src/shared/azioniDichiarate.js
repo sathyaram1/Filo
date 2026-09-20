@@ -294,13 +294,19 @@
 
   // Negazioni e ipotesi: se stanno nella stessa proposizione, PRIMA della
   // dichiarazione, non c'è nessuna rivendicazione da verificare.
-  const SMENTITE = /\b(?:non|senza|nessun\w*|mai|invece|prima|se|quando|appena|vuoi|vorresti|posso|potrei|dovrei|devo|volevo|avrei|potevo)\b/i;
+  // Giro 4: «invece», «prima», «quando» e «appena» stavano qui dentro e sono
+  // congiunzioni, non negazioni. Davanti a una dichiarazione già al passato
+  // raccontano quando la cosa è stata fatta, non che non è stata fatta, e
+  // zittivano il presidio su frasi vere come «non ho trovato l'evento, invece
+  // ti ho messo la sveglia alle 19». «Se» resta: introduce un'ipotesi.
+  const SMENTITE = /\b(?:non|senza|nessun\w*|mai|se|vuoi|vorresti|posso|potrei|dovrei|devo|volevo|avrei|potevo)\b/i;
   // Dove finisce la proposizione che precede un punto del testo. Le
   // congiunzioni accentate («però», «perché», «così») vogliono i confini
   // scritti a mano: con `\b` non avrebbero mai staccato niente, e «non ho
   // trovato l'evento però ti ho messo la sveglia» restava coperta dal «non»,
-  // mentre la stessa frase con «ma» veniva vista.
-  const STACCHI = new RegExp(`[.!?;:,\\n—]|${INIZIO}(?:ma|però|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
+  // mentre la stessa frase con «ma» veniva vista. «Invece» sta qui per lo
+  // stesso motivo di «però»: stacca, non nega.
+  const STACCHI = new RegExp(`[.!?;:,\\n—]|${INIZIO}(?:ma|però|invece|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
   // «Eccola qui sotto»: la cosa dichiarata è dentro la risposta, non da
   // un'altra parte. Non c'è nessuno strumento che possa averla fatta, quindi
   // non c'è niente da avvisare.
