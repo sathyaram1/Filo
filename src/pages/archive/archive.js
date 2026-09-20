@@ -516,6 +516,7 @@
       const opt = document.createElement('div');
       opt.className = 'sn-select-option';
       opt.setAttribute('role', 'menuitem');
+      opt.tabIndex = -1;
       opt.textContent = it.label;
       opt.addEventListener('click', () => { closeCtxMenu(); it.run(); });
       menu.appendChild(opt);
