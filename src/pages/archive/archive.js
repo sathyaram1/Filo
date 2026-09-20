@@ -140,6 +140,8 @@
   // giusto: nel dubbio "conversazione", cioè visibile.
   let chatsTotal = 0;      // quante ce ne sono in tutto (la sezione esiste?)
   let chatSearchToken = 0; // l'ultima ricerca partita vince, non l'ultima arrivata
+  let ricercaAllargata = false; // i risultati rispondono a meno parole di quelle scritte
+  let terminiUsati = [];        // e queste sono le parole con cui sono stati trovati
 
   function chatDateLabel(iso) {
     if (!iso) return '';
