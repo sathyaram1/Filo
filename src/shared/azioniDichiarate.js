@@ -193,6 +193,7 @@
       frasi: [
         new RegExp(`${HO}(?:messo|salvato|scritto|creato|aggiunto|annotato|impostato|segnato|preso|fissato)\\b${PONTE(72)}\\bpromemoria\\b`, 'i'),
         new RegExp(`\\b${PRON}(?:mess|salvat|scritt|annotat|segnat)[oa]\\b${PONTE(32)}\\bpromemoria\\b`, 'i'),
+        { re: participio('promemoria', 'creato|impostato|salvato|messo|pronto|segnato'), senzaHo: true },
       ],
     },
     {
@@ -206,8 +207,12 @@
       frasi: [
         new RegExp(`${HO}(?:salvato|scritto|creato|aggiunto|annotato|segnato|messo|preso|buttato\\s+giù)\\b${PONTE(72)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
         new RegExp(`${PERIFRASI}${PONTE(48)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
-        /\bme (?:lo|la|ne) sono (?:segnat|appuntat|annotat)[oa]\b/i,
+        // «Me lo sono segnato» stava qui e accusava Filo di non aver fatto una
+        // cosa che fa: quello che impara lo scrive in memoria un passaggio che
+        // parte da solo dopo il turno, ed è per questo che «l'ho memorizzato»
+        // non ha famiglia. Detto con l'altro verbo è la stessa cosa vera.
         new RegExp(`\\b${PRON}(?:salvat|scritt|annotat|segnat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
+        { re: participio('(?:appunt[oi]|not[ae])', 'salvat[oaie]|scritt[oaie]|creat[oaie]|aggiunt[oaie]|annotat[oaie]|pront[oaie]'), senzaHo: true },
         // «Ti ho segnato la spesa»: il verbo del prendere nota, col pronome di
         // chi lo riceve e senza la parola «appunto». Accanto a una sveglia
         // partita davvero questa restava l'unica cosa mai fatta, e nessuno lo
