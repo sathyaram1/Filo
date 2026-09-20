@@ -71,17 +71,15 @@ test('bash e sh non hanno preludio: lo stdout è già UTF-8', () => {
 });
 
 test('il preludio precede il comando dell\'utente, non lo segue', () => {
-  // Su Linux la shell risolta è sempre sh: il preludio è vuoto e il comando
-  // resta in testa. Su Windows il preludio deve venire PRIMA, altrimenti la
-  // console ha già scritto l'output con la codifica sbagliata.
-  const sh = T.encodingPrelude('sh');
-  assert.equal(sh, '');
-  for (const nome of ['cmd', 'powershell']) {
-    const pre = T.PRELUDI_CODIFICA[nome];
-    const sonda = T.withCwdProbe(nome, 'echo ciao');
-    assert.ok(!sonda.startsWith(pre), 'la sonda non contiene il preludio: lo antepone runCommand');
-    assert.ok(pre.length > 0);
-  }
+  // Su Linux `resolveShell` risolve tutto in sh, quindi il preludio di Windows
+  // da qui non si vede mai girare: l'ORDINE si controlla sul codice. Se il
+  // preludio finisse dopo il comando, la console avrebbe già scritto l'output
+  // con la codifica sbagliata e il nome sarebbe perso.
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'terminal.js'), 'utf8');
+  assert.match(src, /const toRun = encodingPrelude\(usedShell\) \+ \(/);
+  // Fuori da Windows non si tocca niente.
+  assert.equal(T.encodingPrelude('sh'), '');
+  assert.equal(T.encodingPrelude('bash'), '');
 });
 
 // ───────────── la shell persistente della dashboard usa lo stesso ────────────
