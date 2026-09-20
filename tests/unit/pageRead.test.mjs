@@ -94,11 +94,38 @@ test('un <main> che non contiene niente non fa sparire la pagina', () => {
   assert.match(testo, /42 euro/);
 });
 
-test('<article> vince sul resto quando non c\'è <main>', () => {
-  const html = '<html><body><p>Fuori</p><article><p>La sentenza è del 12 marzo.</p></article></body></html>';
+test('di una discussione arrivano tutti i messaggi, non solo il primo', () => {
+  // Ogni messaggio è un <article>: tenere il primo come fosse la zona di
+  // contenuto buttava via la risposta, che è il dato che l'utente cerca (#553).
+  const html = '<html><body><div class="wrap">'
+    + '<article><h1>Quanto costa il bollo?</h1><p>Ho una utilitaria del 2015.</p></article>'
+    + '<article><p>Per quella cilindrata sono 128,40 euro all\'anno.</p></article>'
+    + '</div></body></html>';
   const { testo } = PR.estraiContenuto(html);
-  assert.match(testo, /12 marzo/);
-  assert.ok(!testo.includes('Fuori'));
+  assert.match(testo, /utilitaria/);
+  assert.match(testo, /128,40/);
+});
+
+test('quello che sta accanto all\'articolo non sparisce', () => {
+  const html = '<html><body>'
+    + '<article><h1>Quanto costa il bollo?</h1><p>Non trovo il dato.</p></article>'
+    + '<div class="risposte"><p>Sono 128,40 euro all\'anno.</p></div>'
+    + '</body></html>';
+  const { testo } = PR.estraiContenuto(html);
+  assert.match(testo, /128,40/);
+});
+
+test('il codice della pagina non esce mai come se fosse il suo testo', () => {
+  // Un sito che si costruisce nel browser ha il corpo vuoto: la potatura non
+  // lascia niente, e il ripiego rimetteva dentro script e blocchi nascosti. Il
+  // modello rispondeva sul codice invece di dire che non c'è niente (#553).
+  const html = '<html><body><div id="root"></div>'
+    + '<script>window.__DATI__={a:1};function avvia(){}</script>'
+    + '<script type="application/json">{"props":{"p":19.9}}</script>'
+    + '<div style="display:none">Il caffè costa 1 euro.</div>'
+    + '</body></html>';
+  const { testo } = PR.estraiContenuto(html);
+  assert.equal(testo, '');
 });
 
 test('una classe che CONTIENE una parola di rumore non viene buttata via', () => {
