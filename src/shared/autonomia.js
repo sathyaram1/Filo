@@ -510,7 +510,7 @@
     livello, livelloNoto, livelloValido, livelliSelezionabili, indiceLivello, alzaLivello,
     classeFonte, fraseFonte, campoFonte, campoValido, manopolaAccesa, classeConManopole,
     costoConManopole, costoValido, origineValida, risolviGuardiano, vocefissa,
-    statoPerFonti, manopoleDiSerie, piuStretta,
+    statoPerFonti, manopoleDiSerie, piuStretta, uscitaPer,
     // decisione
     valuta, decide,
   };
