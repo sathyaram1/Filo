@@ -575,33 +575,41 @@ function daCp1252(buf) {
  *   1. il file DICHIARA in testa di essere a due byte per carattere;
  *   2. non lo dichiara ma ne ha la forma (metà byte nulli, tutti dalla stessa
  *      parte delle coppie);
- *   3. i byte sono UTF-8 VALIDO → è UTF-8, e i rombi che contiene sono roba
- *      sua, non un errore di lettura;
- *   4. non lo sono → la tabella di Windows, che è come Windows ha sempre
- *      salvato i testi e come il foglio di calcolo esporta un CSV.
- * Nessuna percentuale: ogni passo è una domanda con una risposta esatta
- * (#551, quinto giro di verifica).
+ *   3. le sequenze a più byte sono scritte bene → è UTF-8. Se qualche byte è
+ *      rotto, è un documento UTF-8 DANNEGGIATO: si tiene la sua tabella e si
+ *      perde il byte guasto, invece di storpiare tutto il resto (#551, sesto
+ *      giro di verifica);
+ *   4. di sequenze scritte bene non ce n'è nemmeno una → la tabella di Windows,
+ *      che è come Windows ha sempre salvato i testi e come il foglio di calcolo
+ *      esporta un CSV.
+ * Nessuna percentuale da tarare: ogni passo è un confronto fra conteggi o una
+ * domanda con una risposta esatta.
+ *
+ * Torna { text, codifica, bytesPersi }: chi legge deve poter DIRE con quale
+ * tabella ha letto e quanti byte non ha saputo ricostruire, invece di
+ * consegnare un testo bucato senza dirlo a nessuno.
  */
-function decodeText(buf) {
+function decodeTextDettaglio(buf) {
   let b = buf;
   const dichiarato = bomDueByte(b);
   const due = dichiarato || pareDueByte(b);
   if (due) {
-    // Via la firma, se c'è. E un byte spaiato in fondo (file troncato) non deve
-    // far morire la lettura: si scarta, come si scarta mezza coppia in coda.
-    let corpo = dichiarato ? b.subarray(2) : b;
-    if (corpo.length % 2) corpo = corpo.subarray(0, corpo.length - 1);
-    if (due === 'be') {
-      // Node sa leggere solo il verso piccolo: si scambiano i byte a coppie.
-      const girato = Buffer.from(corpo);
-      try { girato.swap16(); } catch (_) { return corpo.toString('utf8'); }
-      corpo = girato;
-    }
-    return corpo.toString('utf16le');
+    return { text: leggiDueByte(b, due, !!dichiarato), codifica: 'due-byte', bytesPersi: 0 };
   }
   if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) b = b.subarray(3);
-  if (eUtf8Valido(b)) return b.toString('utf8');
-  return daCp1252(b);
+  const { valide, rotte } = bilancioUtf8(b);
+  if (!rotte) return { text: b.toString('utf8'), codifica: 'utf8', bytesPersi: 0 };
+  if (valide > rotte) {
+    // UTF-8 danneggiato: al posto dei byte rotti resta un rombo, e tutto il
+    // resto del documento arriva com'è scritto.
+    return { text: b.toString('utf8'), codifica: 'utf8-danneggiato', bytesPersi: rotte };
+  }
+  return { text: daCp1252(b), codifica: 'windows', bytesPersi: 0 };
+}
+
+/** Solo il testo, per chi la tabella non gliene importa. PURA. */
+function decodeText(buf) {
+  return decodeTextDettaglio(buf).text;
 }
 
 /** Taglia al tetto dichiarando il troncamento. PURA. */
