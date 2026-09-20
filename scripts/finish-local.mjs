@@ -287,7 +287,11 @@ export function specsForChangedFiles(changed, tracked) {
     // (giro 4 di suite-locale). Il nome di un file è l'area che prova.
     const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
     if (n) aggiungi(n[1]);
-    if (f.startsWith('tests/') && f.endsWith('.spec.mjs')) specs.add(f.replace(/\.spec\.mjs$/, ''));
+    // Uno spec toccato si lancia; una prova di un giro no, si lancia per numero
+    // (un ramo che ne sposta o ne ritocca qualcuna ne trascinerebbe centinaia).
+    if (f.startsWith('tests/') && !f.startsWith('tests/verifica/') && f.endsWith('.spec.mjs')) {
+      specs.add(f.replace(/\.spec\.mjs$/, ''));
+    }
   }
   const elenco = Array.isArray(tracked) ? tracked : [];
   const tracciati = new Set(elenco.map((t) => String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '')));
