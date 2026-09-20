@@ -288,3 +288,52 @@ test('D — una scheda che non risponde non tiene appeso il turno: si scarica', 
   expect(out.output).toBeTruthy();
   expect(String(out.output.detail || out.output.error)).not.toBe('');
 });
+
+// La scheda già aperta è la strada preferita, e proprio per questo va chiesta
+// da chi ha diritto di chiederla: l'assistente laterale vive DENTRO una pagina
+// web e l'indirizzo lo sceglie un modello che ha appena letto parole di altri.
+// Di lì si arrivava al contenuto di qualsiasi altra scheda (#553, terzo giro).
+test('E — da una pagina web non si legge il contenuto di un\'altra scheda', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const url = testServer.html('<!DOCTYPE html><html><head><title>Pannello</title></head><body>'
+    + '<main><p>Chiave della rete di casa: 7781-SEGRETO-9920</p></main></body></html>');
+  await openTab(url);
+
+  const leggi = (origine) => app.evaluate(
+    (_e, [u, o]) => globalThis.SN_HANDLE_MESSAGE(
+      { type: 'filo_run_action', action: { type: 'LEGGI_PAGINA', url: u } },
+      { url: o },
+    ),
+    [url, origine],
+  );
+
+  // L'assistente di un altro sito: la scheda non gliela dà nessuno, e lo
+  // scaricamento si ferma perché quell'indirizzo non è un sito pubblico.
+  const daFuori = await leggi('https://ostile.example/articolo');
+  expect(String(daFuori.output.text || '')).not.toContain('7781-SEGRETO-9920');
+  expect(daFuori.output.ok).toBe(false);
+
+  // La chat di Filo, che è la richiesta dell'utente, continua a leggerla.
+  const daFilo = await leggi('filo://dashboard/dashboard.html');
+  expect(String(daFilo.output.text || '')).toContain('7781-SEGRETO-9920');
+});
+
+// L'assistente laterale la sua pagina la legge: è quella che l'utente ha
+// davanti, e senza questa strada sui siti costruiti in JavaScript non legge
+// niente.
+test('F — l\'assistente di una pagina legge la pagina su cui sta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const url = testServer.html('<!DOCTYPE html><html><head><title>Orari</title></head><body>'
+    + '<main><p>Lo sportello apre alle 9:30.</p></main></body></html>');
+  await openTab(url);
+
+  const r = await app.evaluate(
+    (_e, u) => globalThis.SN_HANDLE_MESSAGE(
+      { type: 'filo_run_action', action: { type: 'LEGGI_PAGINA', url: u } },
+      { url: u },
+    ),
+    url,
+  );
+  expect(r.output.ok).toBe(true);
+  expect(String(r.output.text)).toContain('9:30');
+});

@@ -416,3 +416,46 @@ test('un vecchio sito che dichiara la codifica nel <meta> si legge senza rombi',
   assert.match(r.text, /1,20 €/);
   assert.doesNotMatch(r.text, /�/);
 });
+
+// ── quello che stava nella pagina e non arrivava (#553, terzo giro) ──────────
+
+test('le risposte sotto una domanda sono contenuto, non rumore', () => {
+  const { testo } = PR.estraiContenuto('<!DOCTYPE html><html><head><title>Bollo</title></head><body>'
+    + '<nav>Home Forum</nav>'
+    + '<main><article><h1>Quanto costa il bollo?</h1><p>Qualcuno lo sa?</p></article>'
+    + '<section id="comments"><h2>3 risposte</h2>'
+    + '<div class="comment"><p>Per quella cilindrata sono 128,40 euro all\'anno.</p></div>'
+    + '</section></main><footer class="site-footer">2026</footer></body></html>');
+  // Il numero esiste solo nella risposta: buttarla via è lo stesso buco che
+  // LEGGI_PAGINA doveva chiudere.
+  assert.match(testo, /128,40/);
+  assert.doesNotMatch(testo, /Home Forum/);
+});
+
+test('gli accenti scritti come entità arrivano come lettere', () => {
+  const { testo } = PR.estraiContenuto('<html><body><main><p>'
+    + 'Men&uacute;: cr&egrave;me br&ucirc;l&eacute;e, ni&ntilde;o, Fran&ccedil;ois, Stra&szlig;e, &Eacute;lodie.'
+    + '</p></main></body></html>');
+  assert.match(testo, /Menú/);
+  assert.match(testo, /crème brûlée/);
+  assert.match(testo, /niño/);
+  assert.match(testo, /François/);
+  assert.match(testo, /Straße/);
+  assert.match(testo, /Élodie/);
+  assert.doesNotMatch(testo, /&/);
+});
+
+test('un maggiore dentro un attributo non fa sbucare il codice fra il testo', () => {
+  const { testo } = PR.estraiContenuto('<html><body><main>'
+    + '<p>Il modello <a href="/cerca?q=a>b" title="confronto">XZ</a> costa 42 euro.</p>'
+    + '</main></body></html>');
+  assert.equal(testo, 'Il modello XZ costa 42 euro.');
+});
+
+test('una virgoletta che non si chiude non porta via il resto della pagina', () => {
+  const { testo } = PR.estraiContenuto('<html><body><main>'
+    + '<p class="x>Il canone è 19,90 euro.</p><p>Attivazione gratis.</p>'
+    + '</main></body></html>');
+  assert.match(testo, /19,90/);
+  assert.match(testo, /Attivazione gratis/);
+});
