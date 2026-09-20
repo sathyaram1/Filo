@@ -112,10 +112,29 @@ function normalizePath(input) {
 // Trattini di ogni foggia (breve, unicode, cifre, medio, lungo, barra, meno
 // matematico, le forme larghe/compatte del giapponese) → tutti «-».
 const TRATTINI = /[‐‑‒–—―−⁃﹘﹣－]/g;
-// Il carattere di sostituzione: è quello che compare al posto di un byte che in
-// UTF-8 non vuol dire niente. Nel confronto vale come jolly, perché sotto ci
-// stava un carattere vero che nessuno può più ricostruire.
-const IGNOTO = '�';
+// I due modi in cui un carattere arriva qui PERSO. Nel confronto valgono come
+// jolly, perché sotto ci stava un carattere vero che nessuno può ricostruire:
+//   • il rombo di sostituzione, al posto di un byte che in UTF-8 non vuol dire
+//     niente (la «à» scritta nella tabella OEM);
+//   • il punto interrogativo, che è quello che Windows mette da sé quando nella
+//     tabella di codici un carattere non ha proprio dove andare (il simbolo
+//     dell'euro, un alfabeto non latino). Su Windows un nome di file non può
+//     contenerlo, quindi un «?» arrivato fin qui è sempre un carattere perso.
+//     Altrove il file col «?» nel nome esiste per davvero, e allora il percorso
+//     c'è e a questa strada non ci si arriva nemmeno.
+const IGNOTI = /[�?]/;
+const IGNOTI_RUN = /[�?]+/g;
+
+/**
+ * Il nome VERO che resta sotto i caratteri persi, senza l'estensione. PURA.
+ * L'estensione va tolta prima di contare: «.txt» da sola sono già quattro
+ * caratteri, e basterebbe a far passare per nome un nome che non c'è più.
+ */
+function parteRiconosciuta(chiave) {
+  const punto = chiave.lastIndexOf('.');
+  const gambo = punto > 0 ? chiave.slice(0, punto) : chiave;
+  return gambo.replace(IGNOTI_RUN, '').trim();
+}
 
 /**
  * Chiave con cui due nomi di file si confrontano «a meno delle sviste». PURA.
