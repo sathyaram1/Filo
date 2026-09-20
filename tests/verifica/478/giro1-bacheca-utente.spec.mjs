@@ -261,14 +261,22 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
       const misto = [0, 1, 2].map((i) => Math.round(suo[i] * a + sotto[i] * (1 - a)));
       return { testo: num(getComputedStyle(el).color).slice(0, 3), fondo: misto };
     });
+    misure[tema] = {
+      'funziona': await leggi('[data-id="fb-works"] .bd-vote-works'),
+      'non funziona': await leggi('[data-id="fb-broken"] .bd-vote-broken'),
+    };
     await page.screenshot({ path: `tests/.shots/verifica-478-bacheca-${tema}.png` });
   }
   expect(fondi[0], 'i due temi devono dare fondi diversi').not.toBe(fondi[1]);
 
+  // Il conteggio del voto che hai dato deve restare leggibile. Oggi nel tema
+  // scuro NON lo è (≈2,9:1, sotto il minimo): questo assert è il rilievo del
+  // giro, ed è rosso finché quei due colori restano scritti a mano.
   for (const tema of ['dark', 'light']) {
-    const { testo, fondo } = misure[tema];
-    const r = contrasto(testo, fondo);
-    expect(r, `voto già dato, tema ${tema}: contrasto ${r.toFixed(2)} (testo ${testo}, fondo ${fondo})`)
-      .toBeGreaterThan(3);
+    for (const [verso, { testo, fondo }] of Object.entries(misure[tema])) {
+      const r = contrasto(testo, fondo);
+      expect(r, `voto «${verso}» già dato, tema ${tema}: contrasto ${r.toFixed(2)}`)
+        .toBeGreaterThan(3);
+    }
   }
 });
