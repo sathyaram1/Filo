@@ -510,11 +510,14 @@
     // appunto che c'è. Prima valeva solo per la sveglia, e solo se la frase
     // ripeteva la parola «sveglia» con l'ora in cifre.
     const esisteGia = (fam, d) => {
-      if (fam.orari && orari.size) {
-        const nominati = orariNelTesto(d.frase);
-        if ([...nominati].some((o) => orari.has(o))) return true;
-      }
-      if (fam.appunti && titoli.length && nominaUnAppunto(d.frase, titoli)) return true;
+      const nominati = orariNelTesto(d.frase);
+      if (fam.orari && orari.size && [...nominati].some((o) => orari.has(o))) return true;
+      // Il titolo di un appunto che esiste regge la frase che lo nomina, ma
+      // non una frase che promette un'ORA: un'ora è una sveglia, e un appunto
+      // non la prova. Senza questa riga bastava tenere un appunto intitolato
+      // «spesa» perché «ti ho messo il promemoria per la spesa alle 18»
+      // passasse senza una parola, con nessun promemoria da nessuna parte.
+      if (fam.appunti && titoli.length && !nominati.size && nominaUnAppunto(d.frase, titoli)) return true;
       return false;
     };
     const out = [];
