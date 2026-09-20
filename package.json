@@ -31,6 +31,8 @@
     "release": "electron-builder --win --publish always",
     "build:mac": "electron-builder --mac --publish never",
     "release:mac": "electron-builder --mac --publish always",
+    "build:linux": "electron-builder --linux --publish never",
+    "release:linux": "electron-builder --linux --publish always",
     "feedback": "node scripts/owner-feedback.mjs",
     "feedback:apri": "node scripts/claude-feedback.mjs"
   },
