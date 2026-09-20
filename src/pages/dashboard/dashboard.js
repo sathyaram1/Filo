@@ -73,12 +73,23 @@
   // conversazione, e rileggendola deve ritrovarla. Una sola strada per tutti:
   // due copie della stessa cosa sono due modi di farla divergere, ed è così che
   // il terminale era rimasto fuori.
-  const archiviaRiga = (text, role) => {
+  //
+  // La riga appartiene alla conversazione in cui l'utente l'ha PROVOCATA, non a
+  // quella aperta quando è pronta: chi la produce prende la targa (`chatDellaRiga`)
+  // al momento del comando e la passa qui. Un comando lento più un ritorno alla
+  // home la mettevano nella chat sbagliata, o in una chat nuova mai fatta.
+  const archiviaRiga = (text, role, chat) => {
     // L'intervista di benvenuto ha una conversazione sua e un modo suo di
     // finire: le sue righe le archivia lei.
-    if (Accoglienza.isActive()) return;
-    try { send({ type: MSG.FILO_CHAT_NOTE, id: ensureChatId(), text, role }); } catch (_) {}
+    if (Accoglienza.isActive()) return null;
+    const id = chat || ensureChatId();
+    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role }); } catch (_) {}
+    return id;
   };
+  const chatDellaRiga = () => (Accoglienza.isActive() ? null : ensureChatId());
+  // Una riga di una conversazione che qui non è più a schermo si archivia e
+  // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
+  const inChatAperta = (chat) => !chat || chat === chatId;
 
   Term.init({
     dashDir,
