@@ -536,7 +536,15 @@
   // La prima dichiarazione VALIDA di una famiglia, o null. Ritorna la frase
   // così com'è scritta (serve sia al modello, per sapere cosa rimangiarsi, sia
   // all'utente): tagliata a 160 caratteri, che è già una frase lunga.
-  function dichiarazione(testo, famiglia) {
+  // Giro 6: TUTTE le dichiarazioni valide di una famiglia, non solo la prima.
+  // «Ti ho salvato l'appunto della spesa e ti ho segnato anche quello del
+  // lavoro», con una sola scrittura partita, contava per una dichiarazione
+  // sola: il secondo appunto non nasceva e nessuno lo diceva. Due
+  // dichiarazioni che cadono nella stessa proposizione sono la stessa cosa
+  // detta da due regole diverse, e contano per una.
+  function dichiarazioni(testo, famiglia) {
+    const out = [];
+    const viste = new Set();
     for (const re of famiglia.frasi) {
       const rx = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
       let m;
@@ -550,14 +558,22 @@
         // sotto», «te l'ho messa in ordine alfabetico»), non esiste nessuno
         // strumento che possa averla fatta e non c'è niente da smentire.
         if (puntaAllaRisposta(testo, fine)) continue;
-        return {
+        const clausola = clausolaDi(testo, m.index, fine);
+        if (viste.has(clausola)) continue;
+        viste.add(clausola);
+        out.push({
           frase: frasePiena(testo, m.index, fine),
-          clausola: clausolaDi(testo, m.index, fine),
+          clausola,
           verbo: verboDi(m[0]),
-        };
+        });
       }
     }
-    return null;
+    return out;
+  }
+
+  function dichiarazione(testo, famiglia) {
+    const tutte = dichiarazioni(testo, famiglia);
+    return tutte.length ? tutte[0] : null;
   }
 
   // La sola PROPOSIZIONE in cui sta la dichiarazione. La frase intera serve a
