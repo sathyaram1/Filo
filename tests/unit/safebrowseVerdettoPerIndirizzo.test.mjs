@@ -26,6 +26,20 @@ const require_ = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SB = require_(join(ROOT, 'src/main/services/safebrowse/index.js'));
 const engine = require_(join(ROOT, 'src/main/services/safebrowse/engine.js'));
+const { installSafebrowse } = require_(join(ROOT, 'src/main/tabs/tabSafebrowse.js'));
+
+// Una scheda finta con i metodi veri di Filo installati sopra: serve a provare
+// il rinvio della verifica profonda, che vive nella scheda perché solo lei sa
+// se l'utente è rimasto su quella pagina.
+function schedaSu(url) {
+  class FintoTabManager {
+    constructor() {
+      this.tabs = [{ id: 1, view: { webContents: { getURL: () => url, send() {} } } }];
+    }
+  }
+  installSafebrowse(FintoTabManager);
+  return new FintoTabManager();
+}
 
 const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
 const DA_EMAIL = { linkOrigin: 'email', hasPassword: true };
@@ -180,7 +194,7 @@ test('i siti-esca di un vicino non spengono il controllo di una truffa', async (
   assert.notDeepEqual(profonde, [], 'il conto dei vicini non è il suo: il controllo deve partire');
 });
 
-test('il tetto complessivo ferma comunque una spruzzata su tanti proprietari', async () => {
+test('il conto comune strozza comunque una spruzzata su tanti proprietari', async () => {
   pulisci();
   let giudizi = 0;
   SB.setProviders({
@@ -189,13 +203,66 @@ test('il tetto complessivo ferma comunque una spruzzata su tanti proprietari', a
     sandbox: null,
   });
   // Piattaforma di hosting: ogni sotto-indirizzo è un proprietario diverso,
-  // quindi il conto per proprietario non lo ferma. Lo ferma il tetto di tutti.
-  for (let i = 0; i < SB.DEEP_MAX_TOTAL + 40; i++) {
+  // quindi il conto per proprietario non lo ferma. Lo strozza il conto comune,
+  // che nella sua finestra di pochi secondi ne lascia passare DEEP_MAX_RAFFICA.
+  for (let i = 0; i < SB.DEEP_MAX_RAFFICA + 40; i++) {
     SB.analyze(`http://paypa1-accedi-${i}.pages.dev/login`, DA_EMAIL, () => {});
     await attendi(1);
   }
-  assert.ok(giudizi <= SB.DEEP_MAX_TOTAL,
-    `cento sotto-indirizzi non devono fare cento giudizi: ne ho contati ${giudizi}`);
+  assert.ok(giudizi <= SB.DEEP_MAX_RAFFICA,
+    `una spruzzata non deve fare un giudizio per indirizzo: ne ho contati ${giudizi}`);
   assert.ok(giudizi >= SB.DEEP_MAX_PER_OWNER,
-    'il tetto complessivo deve essere largo, non spegnere tutto al primo giro');
+    'il conto comune deve essere largo, non spegnere tutto al primo giro');
+});
+
+// #591, quarto giro. Il conto comune era un fondo da sessanta: chi lo spendeva
+// lo spendeva per tutti, e il sito di truffa che arrivava dopo restava senza
+// controllo per mezz'ora. Adesso è una raffica che si riapre in pochi secondi,
+// e la verifica rinunciata per colpa di quel conto viene RIMANDATA, non persa:
+// la pagina su cui l'utente è rimasto riceve il suo controllo poco dopo.
+test('dopo una raffica il sito di un altro riceve comunque il suo controllo', async () => {
+  pulisci();
+  const profonde = [];
+  SB.setProviders({
+    gsb: null, rdap: null, ct: null,
+    llm: async (meta) => { profonde.push('giudizio:' + meta.host); return { suspicious: false }; },
+    sandbox: null,
+  });
+  // La pagina ostile si porta da sola su un indirizzo dopo l'altro: la scheda
+  // le lascia tutte, quindi nessuna di loro torna in fila.
+  for (let i = 0; i < SB.DEEP_MAX_RAFFICA + 20; i++) {
+    SB.analyze(`http://accesso-sicuro-${i}.pages.dev/login`, DA_EMAIL, () => {});
+    await attendi(1);
+  }
+  // La truffa vera, su un dominio che con le esche non c'entra niente, ed è
+  // dove l'utente resta.
+  profonde.length = 0;
+  const truffa = 'http://paypa1-verifica-conto.esempio-591-raffica.tk/login';
+  const tm = schedaSu(truffa);
+  tm.safebrowseGet(1, truffa, { hasPassword: true });
+  await attendi(SB.RAFFICA_MS + 900);
+  assert.notDeepEqual(profonde, [],
+    'il conto speso da chi attacca non è quello della truffa: il controllo deve arrivare');
+});
+
+test('la pagina che l\'utente ha lasciato non fa tornare in fila la sua verifica', async () => {
+  pulisci();
+  const profonde = [];
+  SB.setProviders({
+    gsb: null, rdap: null, ct: null,
+    llm: async (meta) => { profonde.push('giudizio:' + meta.host); return { suspicious: false }; },
+    sandbox: null,
+  });
+  for (let i = 0; i < SB.DEEP_MAX_RAFFICA + 5; i++) {
+    SB.analyze(`http://accesso-sicuro-b${i}.pages.dev/login`, DA_EMAIL, () => {});
+    await attendi(1);
+  }
+  const lasciata = 'http://paypa1-esca.esempio-591-lasciata.tk/login';
+  // La scheda è già altrove quando la verifica rimandata scade.
+  const tm = schedaSu('https://altro-sito-qualunque.it/');
+  tm.safebrowseGet(1, lasciata, { hasPassword: true });
+  profonde.length = 0;
+  await attendi(SB.RAFFICA_MS + 900);
+  assert.deepEqual(profonde.filter((p) => p.includes('esempio-591-lasciata')), [],
+    'una pagina che la scheda ha lasciato non deve rubare il posto a quella dove l\'utente è');
 });

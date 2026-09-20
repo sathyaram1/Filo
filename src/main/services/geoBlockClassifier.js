@@ -254,9 +254,19 @@ function cacheKey(host, url) {
 // far partire chi possiede un sito, e quante se ne possono fare in tutto nella
 // stessa finestra di tempo. Navigando non ci si arriva (questo livello parte
 // solo sulle risposte ambigue); ci arriva chi lo fa apposta.
+//
+// #591 (quarto giro) — il conto comune a tutti i siti era un FONDO da sessanta
+// per un'ora: una sola pagina ostile, portandosi da sola su sessanta percorsi,
+// lo svuotava per tutti, e da lì in poi il sito legittimo bloccato nel paese
+// dell'utente non veniva più riconosciuto e la proposta di riaprirlo da un
+// altro paese non arrivava. Adesso il conto comune è una RAFFICA corta: poche
+// chiamate in pochi secondi, e la finestra si riapre subito. Chi rinuncia per
+// il conto comune lo dice (`rimandato`), e la scheda riprova finché l'utente è
+// rimasto su quella pagina.
 const FRENO_PER_SITO = 8;
-const FRENO_TOTALE = 60;
+const FRENO_RAFFICA = 8;
 const FRENO_FINESTRA_MS = 60 * 60 * 1000;
+const FRENO_RAFFICA_MS = 5 * 1000;
 const CHIAVE_TUTTI = '\u0000tutti';
 
 // Finestra FISSA: parte al primo gettone e scade da sola. Rimandare la
@@ -264,26 +274,32 @@ const CHIAVE_TUTTI = '\u0000tutti';
 // chi tiene caldo il contatore.
 function createFreno({
   maxPerSito = FRENO_PER_SITO,
-  maxTotale = FRENO_TOTALE,
+  maxTotale = FRENO_RAFFICA,
   finestraMs = FRENO_FINESTRA_MS,
+  finestraRafficaMs = FRENO_RAFFICA_MS,
   now = Date.now,
 } = {}) {
   const m = new Map();
   const vivo = (e, ora) => e && ora < e.fino;
   return {
-    prendi(host) {
+    // 'ok', 'suo' (questo sito ne ha già fatte partire troppe: si rinuncia e
+    // basta) o 'raffica' (in questo momento se ne stanno facendo troppe in
+    // tutto: la rinuncia non è colpa di questo sito, e si riprova fra poco).
+    chiedi(host) {
       const chiave = proprietario(host) || String(host || '');
       const ora = now();
       const suo = m.get(chiave);
       const tutti = m.get(CHIAVE_TUTTI);
       const nSuo = vivo(suo, ora) ? suo.n : 0;
       const nTutti = vivo(tutti, ora) ? tutti.n : 0;
-      if (nSuo >= maxPerSito || nTutti >= maxTotale) return false;
+      if (nTutti >= maxTotale) return 'raffica';
+      if (nSuo >= maxPerSito) return 'suo';
       if (vivo(suo, ora)) suo.n = nSuo + 1; else m.set(chiave, { n: 1, fino: ora + finestraMs });
-      if (vivo(tutti, ora)) tutti.n = nTutti + 1; else m.set(CHIAVE_TUTTI, { n: 1, fino: ora + finestraMs });
+      if (vivo(tutti, ora)) tutti.n = nTutti + 1; else m.set(CHIAVE_TUTTI, { n: 1, fino: ora + finestraRafficaMs });
       if (m.size > 256) for (const [k, e] of m) if (!vivo(e, ora)) m.delete(k);
-      return true;
+      return 'ok';
     },
+    prendi(host) { return this.chiedi(host) === 'ok'; },
     valore(host) {
       const e = m.get(proprietario(host) || String(host || ''));
       return vivo(e, now()) ? e.n : 0;
@@ -362,7 +378,20 @@ async function classify(input = {}, opts = {}) {
   // 2c) Il freno: quante chiamate chi possiede questo sito può far partire.
   // Rinunciare NON si ricorda: al prossimo giro di orologio si riprova.
   const freno = opts.freno || (cache && cache.freno) || null;
-  if (freno && typeof freno.prendi === 'function' && !freno.prendi(host)) {
+  if (freno && typeof freno.chiedi === 'function') {
+    const esito = freno.chiedi(host);
+    if (esito !== 'ok') {
+      return {
+        class: CLASSES.ERRORE_GENERICO,
+        route: routeForClass(CLASSES.ERRORE_GENERICO),
+        cached: false,
+        rinunciato: true,
+        // Il conto comune era pieno: non è un no di questo sito, e chi chiama
+        // riprova se l'utente è rimasto lì.
+        ...(esito === 'raffica' ? { rimandato: true } : {}),
+      };
+    }
+  } else if (freno && typeof freno.prendi === 'function' && !freno.prendi(host)) {
     return {
       class: CLASSES.ERRORE_GENERICO,
       route: routeForClass(CLASSES.ERRORE_GENERICO),
@@ -414,7 +443,8 @@ const api = {
   createCache,
   createFreno,
   FRENO_PER_SITO,
-  FRENO_TOTALE,
+  FRENO_RAFFICA,
+  FRENO_RAFFICA_MS,
   classify,
 };
 

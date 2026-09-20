@@ -10,18 +10,45 @@
 // funzionano identici a quando vivevano inline in tabs.js. Le dipendenze sono
 // solo i globali SN_SAFEBROWSE / SN_MSG (caricati dal loader), come prima.
 
+// #591, quarto giro. Il conto comune delle verifiche profonde è una raffica
+// corta: quando è pieno, `analyze` rinuncia e lo dice (`rimandato`). La
+// rinuncia non è colpa del sito che si sta guardando, quindi non deve costargli
+// il controllo: finché l'utente è rimasto su quella pagina, la si richiede.
+// Le pagine della raffica, che la scheda ha già lasciato, non tornano in fila.
+const SB_RINVII_MAX = 3;
+const SB_RINVIO_MS = 5250;
+
 const safebrowseMethods = {
   _sbState(tab) {
-    if (!tab.sbBypass) tab.sbBypass = new Set();      // domini confermati su "pericoloso"
+    if (!tab.sbBypass) tab.sbBypass = new Set();      // siti confermati su "pericoloso"
     if (!tab.sbDismissed) tab.sbDismissed = new Set(); // banner "sospetto" già chiuso
     return tab;
+  },
+
+  // Chi possiede il sito: è la chiave con cui si ricordano il «confermo» e
+  // l'avviso chiuso (#591, giro 4). Prima era il dominio principale, e sulle
+  // piattaforme dove ogni utente riceve un sotto-indirizzo gratuito quel
+  // dominio è la PIATTAFORMA: chi aveva proseguito una volta su un sito di
+  // truffa ospitato lì non vedeva più la pagina rossa su nessun altro sito
+  // ospitato lì, nemmeno su una truffa diversa e di un altro proprietario.
+  // Per un dominio normale le due chiavi coincidono, quindi il «confermo» vale
+  // come prima per tutti i sottodomini del sito.
+  _sbChi(norm) {
+    if (!norm) return '';
+    const SB = globalThis.SN_SAFEBROWSE;
+    const host = norm.host || '';
+    if (SB && typeof SB.proprietario === 'function' && host) {
+      const chi = SB.proprietario(host);
+      if (chi) return chi;
+    }
+    return norm.registrable || host;
   },
 
   // Abbassa il verdetto a "safe" se l'utente ha già confermato/chiuso l'avviso
   // per questo dominio in questo tab.
   _sbApplyState(tab, verdict) {
     if (!verdict || verdict.level === 'safe') return verdict;
-    const reg = verdict.norm && verdict.norm.registrable;
+    const reg = this._sbChi(verdict.norm);
     if (!reg) return verdict;
     this._sbState(tab);
     if (verdict.level === 'pericoloso' && tab.sbBypass.has(reg)) {
@@ -50,6 +77,36 @@ const safebrowseMethods = {
     } catch (_) {}
   },
 
+  // La verifica profonda ha rinunciato per il conto comune: si riprova fra
+  // qualche secondo, ma solo se la scheda è ancora su quella pagina.
+  _sbRimanda(tab, url, ctx) {
+    if (!tab.sbRinvii || tab.sbRinvii.url !== url) {
+      if (tab.sbRinvii && tab.sbRinvii.timer) clearTimeout(tab.sbRinvii.timer);
+      tab.sbRinvii = { url, n: 0, timer: null };
+    }
+    const r = tab.sbRinvii;
+    if (r.timer || r.n >= SB_RINVII_MAX) return;
+    r.n += 1;
+    r.timer = setTimeout(() => {
+      r.timer = null;
+      const SB = globalThis.SN_SAFEBROWSE;
+      const wc = tab.view && tab.view.webContents;
+      if (!SB || !wc || (wc.isDestroyed && wc.isDestroyed())) return;
+      let current = '';
+      try { current = wc.getURL() || ''; } catch (_) { return; }
+      if (current !== url) return; // l'utente è andato altrove: non è più affar suo
+      let verdict;
+      try {
+        verdict = SB.analyze(url, ctx, (next) => {
+          this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
+        });
+      } catch (_) { return; }
+      this._sbBroadcast(tab, url, this._sbApplyState(tab, verdict));
+      if (verdict && verdict.rimandato) this._sbRimanda(tab, url, ctx);
+    }, SB_RINVIO_MS);
+    if (r.timer && typeof r.timer.unref === 'function') r.timer.unref();
+  },
+
   // Richiesto dal content script (SAFEBROWSE_GET) quando la pagina parte. Ritorna
   // SUBITO il verdetto sincrono (rispettando bypass/dismiss) e, se ci sono
   // segnali di rete da approfondire, li avvia: a verdetto cambiato fa broadcast.
@@ -65,6 +122,7 @@ const safebrowseMethods = {
     } catch (_) {
       return { ok: true, level: 'safe', message: null };
     }
+    if (verdict && verdict.rimandato) this._sbRimanda(tab, url, ctx);
     const applied = this._sbApplyState(tab, verdict);
     return {
       ok: true,
@@ -84,6 +142,7 @@ const safebrowseMethods = {
         this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
       });
       this._sbBroadcast(tab, url, this._sbApplyState(tab, verdict));
+      if (verdict && verdict.rimandato) this._sbRimanda(tab, url, {});
     } catch (_) {}
   },
 
@@ -96,7 +155,8 @@ const safebrowseMethods = {
     this._sbState(tab);
     try {
       const norm = SB && SB.normalize(url);
-      if (norm && norm.registrable) tab.sbBypass.add(norm.registrable);
+      const chi = this._sbChi(norm);
+      if (chi) tab.sbBypass.add(chi);
     } catch (_) {}
     this._sbBroadcast(tab, url, { level: 'safe', message: null });
     return { ok: true };
@@ -111,7 +171,8 @@ const safebrowseMethods = {
     this._sbState(tab);
     try {
       const norm = SB && SB.normalize(url);
-      if (norm && norm.registrable) tab.sbDismissed.add(norm.registrable);
+      const chi = this._sbChi(norm);
+      if (chi) tab.sbDismissed.add(chi);
     } catch (_) {}
     this._sbBroadcast(tab, url, { level: 'safe', message: null });
     return { ok: true };

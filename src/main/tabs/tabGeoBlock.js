@@ -15,6 +15,12 @@ const ProxyTab = require('../services/proxyTab');
 const GeoBlock = require('../services/geoBlock');
 const GeoBlockRules = require('../services/geoBlockRules');
 
+// #591, quarto giro. Quando il conto comune del livello 2 è pieno, la
+// classificazione rinuncia e lo dice: si riprova poco dopo, finché l'utente è
+// rimasto su quella pagina.
+const GEO_RINVII_MAX = 3;
+const GEO_RINVIO_MS = 5250;
+
 const geoBlockMethods = {
   // ─── rilevamento geo-block (livello 1 deterministico) ────────────────────
   // Qui SOLO rilevamento + segnale interno + azione (#151). Un solo segnale per
@@ -200,7 +206,7 @@ const geoBlockMethods = {
   // quindi nella stragrande maggioranza delle pagine NON si chiama il modello.
   // Solo `geo_block` emette il segnale (con SOURCES.LLM); le altre classi
   // (paywall/login_wall/bot_block/errore_generico) non attivano nulla.
-  _geoLevel2Check(tab, url, text) {
+  _geoLevel2Check(tab, url, text, rinvio = 0) {
     const classify = globalThis.SN_GEO_CLASSIFY;
     if (typeof classify !== 'function') return;
     if (tab.geoBlock) return; // già rilevato (livello 1)
@@ -211,6 +217,22 @@ const geoBlockMethods = {
       .then(() => classify(input))
       .then((res) => {
         if (!res || res.skipped) return;
+        // #591, quarto giro — il conto comune era pieno: la rinuncia non è di
+        // questo sito, quindi non deve costargli il riconoscimento. Si riprova
+        // fra qualche secondo, ma solo finché l'utente è rimasto su questa
+        // pagina: le pagine di una raffica la scheda le ha già lasciate.
+        if (res.rimandato && rinvio < GEO_RINVII_MAX) {
+          const t = setTimeout(() => {
+            const wc2 = tab.view && tab.view.webContents;
+            if (!wc2 || (wc2.isDestroyed && wc2.isDestroyed())) return;
+            let dove = '';
+            try { dove = wc2.getURL() || ''; } catch (_) { return; }
+            if (dove !== url || tab.geoBlock) return;
+            this._geoLevel2Check(tab, url, text, rinvio + 1);
+          }, GEO_RINVIO_MS);
+          if (t && typeof t.unref === 'function') t.unref();
+          return;
+        }
         if (!res.route || !res.route.proxy) return; // solo geo_block agisce
         const wc = tab.view && tab.view.webContents;
         if (!wc || (wc.isDestroyed && wc.isDestroyed())) return;

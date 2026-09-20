@@ -87,11 +87,30 @@ const certCache = new TtlCache(HOUR);
 const sandboxCache = new TtlCache(30 * MIN);
 const llmCache = new TtlCache(HOUR);
 const DEEP_MAX_PER_OWNER = 4;
-// Quante verifiche profonde in tutto nella finestra di tempo. Navigando non ci
-// si arriva mai (si conta solo quello che è già risultato sospetto); ci arriva
-// una pagina che si porta da sola su decine di indirizzi diversi, ed è proprio
-// quello che il tetto deve fermare.
-const DEEP_MAX_TOTAL = 60;
+// #591, quarto giro — il conto comune a tutti i siti era un FONDO: sessanta
+// verifiche, e chi le aveva spese le aveva spese per tutti fino allo scadere
+// della finestra. Una pagina ostile si portava da sola su sessanta indirizzi
+// di seguito (sui servizi che regalano un sotto-indirizzo a testa ogni
+// indirizzo è un proprietario diverso, quindi ognuno aveva il suo gettone da
+// spendere sul fondo comune) e da lì in poi, per mezz'ora, nessun ALTRO sito
+// riceveva più né il giudizio del modello né la finestra nascosta: la truffa
+// vera arrivava a fondo vuoto.
+//
+// Adesso il conto comune è una RAFFICA, non un fondo: poche verifiche in
+// pochi secondi, e la finestra si riapre subito. Una raffica di sessanta
+// navigazioni viene strozzata mentre avviene, e chi vuole tenere il conto
+// vuoto deve continuare a navigare per sempre — cioè tenere l'utente su
+// pagine sue, che è l'opposto di quello che gli serve. Il tetto vero alla
+// spesa è il limite mensile, che da questo lavoro in poi vale anche per
+// queste chiamate.
+const DEEP_MAX_RAFFICA = 8;
+const RAFFICA_MS = 5 * 1000;
+// Una verifica rinunciata per il conto comune non si butta: `analyze` lo dice
+// a chi chiama (`rimandato: true`) e la scheda riprova finché l'utente è
+// rimasto su quella pagina (src/main/tabs/tabSafebrowse.js). Il rinvio sta lì
+// e non qui di proposito: le pagine della raffica la scheda le ha già
+// lasciate, e riprovarle da qui le farebbe tornare in fila proprio quando
+// tocca alla pagina dove l'utente è davvero.
 const CHIAVE_TUTTI = '\u0000tutti';
 
 // Conto a finestra FISSA: la finestra parte al primo gettone e scade da sola.
@@ -125,13 +144,22 @@ function creaConto(finestraMs) {
 
 const llmSpesa = creaConto(HOUR);
 const sandboxSpesa = creaConto(30 * MIN);
+// Il conto comune vive a parte, con la sua finestra corta.
+const llmRaffica = creaConto(RAFFICA_MS);
+const sandboxRaffica = creaConto(RAFFICA_MS);
 
-// Prende un gettone dal conto di chi possiede il sito. Falso = quel sito (o
-// tutti insieme) ne ha già fatte partire troppe di recente, e si rinuncia
-// (senza ricordare niente: al prossimo giro di orologio si riprova).
-function prendiGettone(conto, chi, max = DEEP_MAX_PER_OWNER, maxTotale = DEEP_MAX_TOTAL) {
-  return conto.prendi(chi, max, maxTotale);
+// Prende un gettone dal conto di chi possiede il sito E dal conto comune.
+// Ritorna 'ok', 'suo' (questo sito ne ha già fatte partire troppe: si
+// rinuncia e basta) o 'raffica' (in questo momento se ne stanno facendo
+// troppe in tutto: si riprova fra poco, perché la rinuncia non è colpa di
+// questo sito). Niente si ricorda in nessuno dei due casi.
+function prendiGettone(conto, raffica, chi, max = DEEP_MAX_PER_OWNER) {
+  if (raffica.valore(CHIAVE_TUTTI) >= DEEP_MAX_RAFFICA) return 'raffica';
+  if (!conto.prendi(chi, max)) return 'suo';
+  raffica.prendi(CHIAVE_TUTTI, DEEP_MAX_RAFFICA);
+  return 'ok';
 }
+
 
 // Chiamate già in volo, per proprietario del sito. La cache si riempie solo
 // quando la risposta arriva: senza questo, cinquanta sottodomini aperti insieme
@@ -160,8 +188,14 @@ function configure(opts = {}) {
 }
 
 // Esito certificato osservato dalla webview reale (la fonte più affidabile).
-function recordCert(registrable, status) {
-  if (registrable && status) certCache.set(registrable, { status });
+// #591, quarto giro — si ricorda per CHI POSSIEDE il sito, non per il dominio
+// principale: su una piattaforma di hosting il dominio principale è la
+// piattaforma, e il certificato scaduto di un sito ospitato metteva l'avviso
+// «connessione non protetta» su tutti i siti vicini, col nome della
+// piattaforma al posto del nome del sito. Accetta sia un host sia un dominio:
+// per un dominio normale le due cose coincidono.
+function recordCert(host, status) {
+  if (host && status) certCache.set(psl.proprietario(host) || host, { status });
 }
 
 // Assembla i dati di rete già noti (da cache) per il dominio.
@@ -171,7 +205,7 @@ function assembleCached(norm) {
   return {
     gsb: gsbCache.get('u:' + norm.host) || gsbCache.get(reg),
     ageDays: ageCache.get(reg),
-    cert: certCache.get(reg),
+    cert: certCache.get(psl.proprietario(norm.host) || reg),
     // Il verdetto è di QUESTO indirizzo, non del dominio: vedi il commento
     // sulle cache qui sopra.
     sandbox: sandboxCache.get(norm.host),
@@ -240,15 +274,24 @@ function analyze(url, ctx = {}, onUpdate) {
     })());
   };
   // `prendiGettone` va per ultimo: è l'unico con un effetto: il gettone si
-  // consuma solo quando la chiamata parte davvero.
-  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(prop)
-      && prendiGettone(llmSpesa, prop)) {
-    inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first)), (r) => llmCache.set(norm.host, r));
+  // consuma solo quando la chiamata parte davvero. Se a dire di no è il conto
+  // comune, la verifica si rimanda invece di perderla.
+  let rimandare = false;
+  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(prop)) {
+    const g = prendiGettone(llmSpesa, llmRaffica, prop);
+    if (g === 'ok') {
+      inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first)), (r) => llmCache.set(norm.host, r));
+    } else if (g === 'raffica') rimandare = true;
   }
-  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(prop)
-      && prendiGettone(sandboxSpesa, prop)) {
-    inVolo(sandboxInFlight, () => providers.sandbox(url, norm), (r) => sandboxCache.set(norm.host, r));
+  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(prop)) {
+    const g = prendiGettone(sandboxSpesa, sandboxRaffica, prop);
+    if (g === 'ok') {
+      inVolo(sandboxInFlight, () => providers.sandbox(url, norm), (r) => sandboxCache.set(norm.host, r));
+    } else if (g === 'raffica') rimandare = true;
   }
+  // Il conto comune era pieno: chi ha chiesto il verdetto lo saprà e riproverà
+  // se l'utente è rimasto lì.
+  if (rimandare) first.rimandato = true;
 
   if (tasks.length && typeof onUpdate === 'function') {
     Promise.allSettled(tasks).then(() => {
@@ -303,11 +346,16 @@ const API = {
     };
   },
   // cache (per test / invalidazione)
-  _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache, llmSpesa, sandboxSpesa },
-  // Quante verifiche profonde può far partire chi possiede un sito, e quante se
-  // ne possono fare in tutto, prima che si rinunci (test e diagnostica).
+  _caches: {
+    gsbCache, ageCache, certCache, sandboxCache, llmCache,
+    llmSpesa, sandboxSpesa, llmRaffica, sandboxRaffica,
+  },
+  // Quante verifiche profonde può far partire chi possiede un sito, quante se
+  // ne possono fare in tutto in pochi secondi, e quanto dura quella finestra
+  // (test e diagnostica).
   DEEP_MAX_PER_OWNER,
-  DEEP_MAX_TOTAL,
+  DEEP_MAX_RAFFICA,
+  RAFFICA_MS,
   // Chi possiede il sito (test e diagnostica).
   proprietario: psl.proprietario,
   // Chiamate in volo per proprietario del sito (test e diagnostica).

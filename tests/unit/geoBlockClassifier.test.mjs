@@ -320,13 +320,40 @@ test('anche una spruzzata su piattaforme diverse trova un tetto', async () => {
   const cache = C.createCache();
   let chiamate = 0;
   const complete = async () => { chiamate++; return 'errore_generico'; };
-  for (let i = 0; i < C.FRENO_TOTALE + 60; i++) {
+  for (let i = 0; i < C.FRENO_RAFFICA + 60; i++) {
     await C.classify(
       { statusCode: 403, text: 'x', host: `sito${i}.pages.dev`, url: `https://sito${i}.pages.dev/` },
       { complete, cache },
     );
   }
-  assert.ok(chiamate <= C.FRENO_TOTALE, `spruzzata: ${chiamate} chiamate al modello`);
+  assert.ok(chiamate <= C.FRENO_RAFFICA, `spruzzata: ${chiamate} chiamate al modello`);
+});
+
+// #591, quarto giro. Il conto comune era un fondo da sessanta per un'ora: una
+// pagina ostile lo svuotava per tutti, e il sito legittimo bloccato nel paese
+// dell'utente non veniva più riconosciuto fino all'ora dopo. Adesso è una
+// raffica corta, e chi rinuncia per colpa sua lo dichiara, così la scheda può
+// riprovare finché l'utente è rimasto lì.
+test('la raffica di un sito ostile non spegne il riconoscimento per gli altri', async () => {
+  const cache = C.createCache({ freno: C.createFreno({ finestraRafficaMs: 120 }) });
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'geo_block'; };
+  for (let i = 0; i < C.FRENO_RAFFICA + 40; i++) {
+    await C.classify(
+      { statusCode: 403, text: 'x', host: `esca${i}.pages.dev`, url: `https://esca${i}.pages.dev/p${i}` },
+      { complete, cache },
+    );
+  }
+  const legittimo = {
+    statusCode: 403, text: 'non disponibile nel tuo paese',
+    host: 'esempio-tv.it', url: 'https://esempio-tv.it/diretta',
+  };
+  const subito = await C.classify(legittimo, { complete, cache });
+  assert.equal(subito.rimandato, true, 'chi rinuncia per il conto comune deve dirlo');
+  await new Promise((r) => setTimeout(r, 160));
+  const dopo = await C.classify(legittimo, { complete, cache });
+  assert.equal(dopo.class, 'geo_block', 'riprovando, il sito legittimo viene riconosciuto');
+  assert.equal(dopo.route.proxy, true);
 });
 
 test('i due campioni della stessa pagina costano una chiamata sola', async () => {

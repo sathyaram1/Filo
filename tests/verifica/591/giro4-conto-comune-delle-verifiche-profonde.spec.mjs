@@ -26,6 +26,18 @@ import { createRequire } from 'node:module';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const require_ = createRequire(join(REPO, 'package.json'));
 const SB = require_(join(REPO, 'src/main/services/safebrowse/index.js'));
+const { installSafebrowse } = require_(join(REPO, 'src/main/tabs/tabSafebrowse.js'));
+
+// La scheda dove l'utente è rimasto: i metodi sono quelli veri di Filo.
+function schedaSu(url) {
+  class FintoTabManager {
+    constructor() {
+      this.tabs = [{ id: 1, view: { webContents: { getURL: () => url, send() {} } } }];
+    }
+  }
+  installSafebrowse(FintoTabManager);
+  return new FintoTabManager();
+}
 
 const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
 const DA_EMAIL = { linkOrigin: 'email', hasPassword: true };
@@ -49,39 +61,44 @@ function banco() {
 }
 
 // La pagina ostile si porta da sola su un indirizzo dopo l'altro: ogni
-// navigazione è un'analisi, e ogni analisi spende un gettone del conto comune.
-async function raffica(profonde, quanti) {
+// navigazione è un'analisi, e ogni analisi vorrebbe un gettone del conto comune.
+async function raffica(quanti) {
   for (let i = 1; i <= quanti; i++) {
     SB.analyze(`http://accesso-sicuro-${i}.pages.dev/login`, DA_EMAIL, () => {});
     await attendi(8);
   }
-  return profonde.length;
 }
 
 const TRUFFA = 'http://paypa1-verifica-conto.esempio-591-g4.tk/login';
 
-test('la raffica di chi attacca consuma il conto comune e spegne la verifica del sito di un altro', async () => {
+test('la raffica di chi attacca non spegne la verifica del sito di un altro', async () => {
   pulisci();
   const profonde = banco();
 
-  const spese = await raffica(profonde, SB.DEEP_MAX_TOTAL);
-  expect(spese, 'le esche devono consumare davvero il conto comune').toBeGreaterThan(0);
+  // Sessanta navigazioni di fila: quello che chi attacca può fare senza un
+  // solo clic dell'utente.
+  await raffica(60);
+  expect(profonde.length, 'le esche devono far partire qualche verifica').toBeGreaterThan(0);
+  expect(profonde.length,
+    'la raffica va strozzata mentre avviene, non lasciata correre per sessanta indirizzi')
+    .toBeLessThan(60);
 
   // Adesso la truffa vera, su un dominio che non c'entra niente con le esche:
-  // primo incontro, nessun ricordo, nessun gettone suo già speso.
+  // primo incontro, nessun ricordo, nessun gettone suo già speso. È qui che
+  // l'utente resta.
   profonde.length = 0;
-  SB.analyze(TRUFFA, DA_EMAIL, () => {});
-  await attendi(300);
+  schedaSu(TRUFFA).safebrowseGet(1, TRUFFA, { hasPassword: true });
+  await attendi(SB.RAFFICA_MS + 900);
 
   expect(profonde,
     'il sito di truffa deve ricevere il suo controllo profondo: il conto di chi attacca non è il suo')
     .not.toEqual([]);
 });
 
-test('caso di riscontro: col conto intatto la stessa truffa riceve il controllo profondo', async () => {
+test('caso di riscontro: col conto intatto la stessa truffa riceve subito il controllo profondo', async () => {
   pulisci();
   const profonde = banco();
-  SB.analyze(TRUFFA, DA_EMAIL, () => {});
+  schedaSu(TRUFFA).safebrowseGet(1, TRUFFA, { hasPassword: true });
   await attendi(300);
-  expect(profonde.length, 'senza raffica il controllo profondo parte').toBeGreaterThan(0);
+  expect(profonde.length, 'senza raffica il controllo profondo parte subito').toBeGreaterThan(0);
 });

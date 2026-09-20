@@ -2108,7 +2108,11 @@ class TabManager {
       try {
         const SB = globalThis.SN_SAFEBROWSE;
         const norm = SB && SB.normalize(url);
-        if (norm && norm.registrable) SB.recordCert(norm.registrable, mapCertError(error));
+        // L'esito del certificato si registra per CHI POSSIEDE il sito, non per
+        // il dominio principale (#591, giro 4): su una piattaforma di hosting
+        // il dominio principale è la piattaforma, e il certificato rotto di un
+        // sito ospitato dichiarava «connessione non protetta» su tutti i vicini.
+        if (norm && norm.host) SB.recordCert(norm.host, mapCertError(error));
       } catch (_) {}
       try { callback(false); } catch (_) {}
     });
