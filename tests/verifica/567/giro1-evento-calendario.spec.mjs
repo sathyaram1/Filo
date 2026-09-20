@@ -21,6 +21,10 @@ async function fingiApertura(app, esito = '') {
   }, esito);
 }
 const cartellaEventi = async (app) => join(await app.evaluate(({ app: a }) => a.getPath('temp')), 'filo-eventi');
+// La cartella degli eventi sta nel temporaneo del sistema, condiviso con le
+// altre corse: interessano solo i file nati durante QUESTA prova.
+const elencoIcs = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.ics')) : []);
+const nuoviIcs = (dir, prima) => elencoIcs(dir).filter((f) => !prima.includes(f));
 
 const EVENTO = '{"titolo":"Riunione col dentista","data":"2026-09-21","ora":"10:00","durata_min":45,"luogo":"Studio Rossi"}';
 
