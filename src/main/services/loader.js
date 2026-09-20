@@ -75,6 +75,7 @@ require(path.join(SHARED, 'campoNumero.js'));
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
+require(path.join(SHARED, 'azioniDichiarate.js'));  // #517 — un'azione raccontata a parole e mai chiamata (dipende dai tipi di actionTools)
 require(path.join(SHARED, 'pageRestyle.js'));
 require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
