@@ -3355,8 +3355,31 @@ async function triageChat(chat) {
 // Chiude una chat e le dà titolo e tipo. Chiamata al ritorno alla home, a chat
 // nuova, alla chiusura dell'app e — per le chat rimaste appese — alla partenza
 // successiva.
-async function closeAndTriageChat(chatId) {
+// Due chiusure della stessa chat possono partire insieme: la scheda che
+// sparisce e il messaggio che era riuscito a partire prima, oppure la risposta
+// in ritardo che richiude la chat mentre la chiusura di prima sta ancora
+// leggendo. Messe in fila, la seconda parte quando la prima ha finito e trova
+// la conversazione completa; sovrapposte, pagavano due volte il modello per
+// scrivere lo stesso titolo.
+const codeDiChiusura = new Map();      // chatId → chiusura in corso
+function closeAndTriageChat(chatId) {
+  if (!chatId || !FiloChats) return Promise.resolve(null);
+  const prima = codeDiChiusura.get(chatId) || Promise.resolve();
+  const ora = prima.then(() => chiudiEClassifica(chatId), () => chiudiEClassifica(chatId));
+  const muta = ora.then(() => {}, () => {});
+  codeDiChiusura.set(chatId, muta);
+  muta.then(() => {
+    // Ultimo della fila: si toglie di mezzo invece di restare in memoria per
+    // tutte le chat mai chiuse in questa sessione.
+    if (codeDiChiusura.get(chatId) === muta) codeDiChiusura.delete(chatId);
+  });
+  return ora;
+}
+
+async function chiudiEClassifica(chatId) {
   if (!chatId || !FiloChats) return null;
+  // La chat è finita: nessuna pagina la sta più vivendo.
+  proprietariDiChat.delete(chatId);
   const chat = await FiloChats.close(chatId);
   if (!chat) return null;                        // chat vuota o inesistente
   // Già classificata e da allora non è successo niente: non si ripaga.
