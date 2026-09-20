@@ -282,6 +282,11 @@
     // Catalogo modelli di un provider recuperato dal main con le chiavi
     // predefinite (solo admin). { provider } → { ok, items: [{ id, label }] }
     DEFAULT_MODELS_LIST: 'default_models_list',
+    // Catalogo modelli con la chiave dell'UTENTE, per le tendine delle Opzioni.
+    // La pagina non parla più da sola col fornitore (#591, secondo giro): la
+    // richiesta la fa il main, dal cancello unico.
+    // { provider, apiKey? } → { ok, items: [{ id, meta }] }
+    MODELS_CATALOG: 'models_catalog',
 
     OPEN_HOME: 'open_home',
     GO_HOME: 'go_home',                             // naviga la scheda corrente alla home (filo://newtab/)
