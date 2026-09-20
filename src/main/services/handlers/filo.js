@@ -19,6 +19,11 @@ module.exports = function register(on, ctx) {
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
+  // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
+  const annunciaChat = () => {
+    try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
+  };
+
   on(MSG.FILO_CHAT, async (msg, sender, origin) => {
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
