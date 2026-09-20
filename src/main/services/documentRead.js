@@ -726,8 +726,30 @@ async function readDocument(input, { cwd } = {}) {
     return { ...base, error: 'unsupported', detail: 'è un file binario, non testo' };
   }
   base.kind = 'text';
-  const capped = capText(decodeText(buf));
-  return { ...base, ok: true, kind: 'text', text: capped.text, truncated: capped.truncated };
+  const letto = decodeTextDettaglio(buf);
+  // Ultima rete: se quello che è venuto fuori non è testo — byte nulli,
+  // caratteri di controllo a raffica — non lo si dichiara letto. Un file in una
+  // codifica che Filo non sa riconoscere arrivava al modello come una fila di
+  // caratteri nulli, e Filo diceva di averlo letto: il modello rispondeva sul
+  // nulla senza che nessuno potesse accorgersene (#551, sesto giro).
+  if (quotaNonTesto(letto.text) >= QUOTA_NON_TESTO) {
+    return {
+      ...base,
+      error: 'unreadable',
+      detail: 'è scritto in una codifica che Filo non riconosce: il testo che ne viene fuori '
+        + 'non vuol dire niente. Riaprilo e risalvalo in UTF-8',
+    };
+  }
+  const capped = capText(letto.text);
+  return {
+    ...base,
+    ok: true,
+    kind: 'text',
+    text: capped.text,
+    truncated: capped.truncated,
+    codifica: letto.codifica,
+    bytesPersi: letto.bytesPersi,
+  };
 }
 
 module.exports = {
