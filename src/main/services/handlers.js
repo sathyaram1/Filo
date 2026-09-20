@@ -1634,6 +1634,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             output: { pageRead: String(url == null ? '' : url), ok: false, error: 'network', detail: 'lettura non disponibile' },
           };
         }
+        ricordaLetto(r.text);
         return {
           executed: !!r.ok,
           kept: true,
