@@ -815,7 +815,9 @@
     const conta = () => {
       try { azioniDelTurno.add(String(action && action.type || '').toUpperCase()); } catch (_) {}
     };
-    if (res.executed || res.kept || res.output) conta();
+    // In attesa dell'OK dell'utente non è ancora successo niente: si conta
+    // dopo, se l'OK arriva.
+    if (!res.needsConfirm && (res.executed || res.kept || res.output)) conta();
 
     // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
     // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
