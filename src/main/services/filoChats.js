@@ -153,7 +153,15 @@
     // Riaprire una chat chiusa e continuare a scrivere la rimette in vita: non
     // resta «chiusa ieri» con dentro un messaggio di oggi. La riclassificazione
     // avverrà alla prossima chiusura.
-    chat.closedAt = null;
+    //
+    // A rimetterla in vita è però SOLO l'utente. Una risposta di Filo che
+    // arriva dopo la chiusura (l'utente ha chiesto qualcosa e se n'è andato
+    // prima che Filo finisse) non è una conversazione ripresa: è la coda di
+    // quella di prima. Riaprendo la chat anche per lei, la chat restava «in
+    // corso» per sempre — senza titolo generato, e invisibile a Filo, che
+    // quando gli si chiede «riprendi la discussione di ieri» guarda solo le
+    // chat finite.
+    if (daAggiungere.some((m) => m && m.role === 'user')) chat.closedAt = null;
     // L'intervista di benvenuto è SEMPRE una conversazione: lo dice il
     // feedback, e non dipende da come è andata. Il marchio si può solo
     // accendere (un turno normale dopo l'intervista non la declassa).
