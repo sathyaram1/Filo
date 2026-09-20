@@ -1009,9 +1009,8 @@
 
   const DEFAULT_PROVIDER = 'openrouter';
 
-  // L'ordine dei fornitori che una richiesta prova DAVVERO. Ogni voce del
-  // registry porta il proprio fornitore, quindi conta solo per i ref legacy
-  // (id grezzi senza nickname): oggi il fornitore è uno solo, il router.
+  // I fornitori che una richiesta prova DAVVERO, in ordine. Conta solo per i
+  // ref legacy: ogni voce del registry porta già il proprio fornitore.
   const PROVIDER_ORDER = [DEFAULT_PROVIDER];
 
   // I fornitori di modelli per cui esiste una chiave. La chiave della ricerca
@@ -1020,12 +1019,8 @@
     return PROVIDER_ORDER.filter((p) => (apiKeys || {})[p]);
   }
 
-  // Filo ha davvero modo di servire questa funzione? Guarda quello che la
-  // richiesta userà — i nickname della funzione risolti sul registry, col
-  // fornitore che ogni voce dichiara e la chiave di QUEL fornitore — e non il
-  // campo `provider` dei settings, che è una dichiarazione a parte: quando
-  // nominava un fornitore ritirato, accoglienza e home si spegnevano mentre
-  // ogni chiamata funzionava (#663). PURA.
+  // Filo può servire questa funzione? Si guarda quello che la chiamata userà,
+  // mai `settings.provider`: se nomina un fornitore ritirato, mente (#663). PURA.
   function canServeAction(settings, action) {
     const s = settings || {};
     const registry = s.modelRegistry || {};
