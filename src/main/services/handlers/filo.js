@@ -95,6 +95,33 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // L'evento che Filo ha proposto in chat finisce nel calendario dell'utente:
+  // scriviamo un .ics e lo apriamo col programma che il sistema usa per il
+  // calendario. Filo non ha un calendario suo e non conosce quello dell'utente:
+  // il file è la porta che tutti i calendari sanno aprire, su Windows come su
+  // Mac. Se il sistema non sa aprirlo, il percorso torna indietro: l'utente ha
+  // comunque il file, invece di un bottone che non fa niente.
+  on(MSG.CALENDAR_ADD, soloFilo(async (msg) => {
+    const C = globalThis.SN_CALENDAR;
+    const ev = C && C.normalize(msg && msg.evento);
+    if (!ev) return { ok: false, error: 'evento incompleto' };
+    const path = require('node:path');
+    const fs = require('node:fs');
+    const { app, shell } = require('electron');
+    let file = '';
+    try {
+      const dir = path.join(app.getPath('temp'), 'filo-eventi');
+      await fs.promises.mkdir(dir, { recursive: true });
+      file = path.join(dir, `${Date.now().toString(36)}-${C.fileName(ev)}`);
+      await fs.promises.writeFile(file, C.buildIcs(ev), 'utf8');
+    } catch (e) {
+      return { ok: false, error: e?.message || 'file non scritto' };
+    }
+    let apertura = '';
+    try { apertura = await shell.openPath(file); } catch (e) { apertura = e?.message || 'apertura non riuscita'; }
+    return { ok: true, file, aperto: !apertura, error: apertura || '', quando: ev.quando, titolo: ev.titolo };
+  }));
+
   on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
 
   // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
