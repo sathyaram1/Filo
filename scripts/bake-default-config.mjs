@@ -108,9 +108,8 @@ async function fetchRemoteKeys(passphrase) {
       console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
       return { apiKeys: {}, esito };
     }
-    // Una risposta di rifiuto arriva con HTTP 200 e `ok:false`: finiva in `{}`
-    // indistinguibile da «il documento non ha quella chiave», e la parola
-    // d'ordine sbagliata restava invisibile per giorni (#642).
+    // Il rifiuto arriva con HTTP 200 e `ok:false`: finiva in un `{}`
+    // indistinguibile da «il documento non ha quella chiave», e non diceva niente.
     if (j.ok === false) {
       const esito = { stato: 'rifiutato', reason: primaStringa(j.reason, j.error, j.message) };
       console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
