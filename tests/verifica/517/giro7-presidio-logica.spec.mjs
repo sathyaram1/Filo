@@ -108,6 +108,38 @@ test('la busta «function=» dei Llama è formato interno', () => {
   expect(D.formatoSospetto('Fatto.\n<function=SVEGLIA>{"time":"19:00"}</function>', nomi)).toBe(true);
 });
 
+test('un testo incollato in chat non fa accusare Filo di non averlo letto', () => {
+  // L'utente incolla il testo del contratto dentro il messaggio e chiede un
+  // riassunto: a Filo non serve nessuno strumento per leggerlo, come per la
+  // foto della bolletta (chiusa al giro 2). Qui l'accusa compare.
+  expect(D.rileva('Ho letto il documento che mi hai incollato: sono 84 euro.',
+    [], STATO()).length).toBe(0);
+});
+
+test('quello che Filo impara da sé non è un\'azione mancata', () => {
+  // «L'ho memorizzato» è vero e non ha famiglia, perché la memoria la scrive
+  // un passaggio che parte da solo dopo il turno. «Me lo sono segnato» dice
+  // la stessa cosa e viene smentito.
+  expect(D.rileva('Me lo sono segnato per la prossima volta.', [], STATO()).length).toBe(0);
+  expect(D.rileva('Ti ho salvato un po\' di tempo.', [], STATO()).length).toBe(0);
+  expect(D.rileva('Ti ho aperto gli occhi su una cosa.', [], STATO()).length).toBe(0);
+});
+
+test('la conferma scritta senza «ho» non resta muta', () => {
+  // È il modo più corto con cui un modello conferma, e nelle famiglie che
+  // hanno la prova dello stato non c'è più il rischio di smentire un dato
+  // vero: se la sveglia c'è, l'ora la regge comunque.
+  for (const frase of [
+    'Sveglia impostata per le 19.',
+    'Appunto salvato.',
+    'Evento aggiunto al calendario.',
+    'La segnalazione è partita.',
+  ]) expect(D.rileva(frase, [], STATO()).length).toBeGreaterThan(0);
+  // …e la stessa frase resta muta quando la sveglia c'è davvero.
+  expect(D.rileva('Sveglia impostata per le 19.',
+    [], STATO({ orariSveglie: ['19:00'] })).length).toBe(0);
+});
+
 test('una risposta normale non viene scambiata per formato interno', () => {
   // La controprova delle due sopra: niente di quello che scrive un assistente
   // deve diventare un turno buttato.
