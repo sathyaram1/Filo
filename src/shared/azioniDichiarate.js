@@ -408,14 +408,20 @@
     // I tipi che stanno già reggendo una dichiarazione: un'azione sola non può
     // reggerne due diverse.
     const impegnati = new Set();
-    const radici = radiciDichiarate(t);
+    // I verbi delle dichiarazioni già rette: servono a capire se il pronome
+    // sta ripetendo la stessa cosa o ne sta nominando un'altra.
+    const radiciRette = new Set();
     let pronome = null;
     for (const fam of FAMIGLIE) {
       const d = dichiarazione(t, fam);
       if (!d) continue;
       if (fam.pronome) { pronome = d; continue; }
       const retta = fam.tipi.filter((x) => presenti.has(x));
-      if (retta.length) { for (const x of retta) impegnati.add(x); continue; }
+      if (retta.length) {
+        for (const x of retta) impegnati.add(x);
+        if (d.verbo) radiciRette.add(d.verbo);
+        continue;
+      }
       // Nessuna azione: la cosa può esistere lo stesso, se l'ora nominata nella
       // frase è quella di una sveglia che c'è davvero.
       if (fam.orari && orari.size) {
