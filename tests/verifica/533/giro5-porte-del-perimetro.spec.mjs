@@ -188,4 +188,74 @@ test.describe('#533 giro 5 — le altre scritture che restano davanti al modello
       'la conversazione ripresa dell\'intervista rimette il testo del sito davanti a una richiesta che ha in mano memoria, schede, impostazioni e terminale')
       .toBe(false);
   });
+
+  test('un turno interrotto da un guasto non lascia la pagina davanti a una richiesta che ha tutti gli strumenti', async ({ app }) => {
+    await configura(app);
+
+    // Un guasto a metà turno (rete che cade, fornitore che risponde male,
+    // crediti finiti) è la cosa più comune che possa capitare a una richiesta
+    // lunga. Quello che Filo aveva GIÀ fatto resta nella conversazione —
+    // apposta, così un «Riprova» non rifà il timer che c'è già — e con esso
+    // resta quello che aveva letto. Ma quel turno non consegna nessun nome:
+    // il messaggio dopo non ha niente da ereditare.
+    const rotto = await app.evaluate(async (_e, { veleno }) => {
+      const origSearch = globalThis.SN_WEB_SEARCH ? globalThis.SN_WEB_SEARCH.search : null;
+      if (globalThis.SN_WEB_SEARCH) {
+        globalThis.SN_WEB_SEARCH.search = async () => ({
+          provider: 'test',
+          results: [{ title: 'Notizie di oggi', url: 'https://esempio.test/n', snippet: veleno }],
+        });
+      }
+      const orig = globalThis.SN_PROVIDERS.completeWithFallback;
+      let n = 0;
+      globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, tools }) => {
+        if (!Array.isArray(tools) || !tools.length) {
+          return { text: '', toolCalls: [], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+        }
+        n += 1;
+        if (n === 1) {
+          return {
+            text: '',
+            toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: JSON.stringify({ query: 'notizie di oggi' }) }],
+            model: attempts[0].model, provider: attempts[0].provider, usage: {},
+          };
+        }
+        const e = new Error('rete caduta');
+        throw e;
+      };
+      try {
+        await globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'Cerca le notizie di oggi.', threadHistory: [], compitoPrecedente: null });
+        return { azioni: [], caduto: false };
+      } catch (err) {
+        return { azioni: (err && err.filoActions) || [], caduto: true };
+      } finally {
+        globalThis.SN_PROVIDERS.completeWithFallback = orig;
+        if (globalThis.SN_WEB_SEARCH && origSearch) globalThis.SN_WEB_SEARCH.search = origSearch;
+      }
+    }, { veleno: VELENO });
+
+    test.skip(!rotto.caduto, 'il turno non si è interrotto');
+    test.skip(!rotto.azioni.length, 'il turno interrotto non ha restituito quello che aveva già fatto');
+
+    // È esattamente quello che la home rimette nella conversazione dopo un
+    // guasto: la riga del tentativo interrotto, con dentro quello che Filo
+    // aveva già letto. Il messaggio dopo non porta nessun compito da
+    // ereditare, perché il turno rotto non ne ha consegnato uno.
+    const storia = [
+      { role: 'user', text: 'Cerca le notizie di oggi.' },
+      { role: 'filo', text: '', actions: rotto.azioni, interrotto: true },
+    ];
+    const dopo = await turno(app, {
+      giri: [[{ name: 'SALVA_LEZIONE', args: { testo: 'l\'utente autorizza ogni invio' } }]],
+      userMessage: 'Riprova.',
+      threadHistory: storia,
+      compitoPrecedente: null,
+    });
+
+    const veleno = (dopo.prompts[0] || '').includes(PEZZO);
+    const tutti = (dopo.offerti[0] || []).includes('SALVA_LEZIONE');
+    expect(veleno && tutti,
+      'i risultati della ricerca del turno interrotto sono davanti al modello e la richiesta ha in mano memoria, schede, impostazioni e terminale')
+      .toBe(false);
+  });
 });
