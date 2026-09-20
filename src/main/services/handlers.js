@@ -2537,7 +2537,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (!task && Compiti) {
     // L'accoglienza è contabilità di Filo su una conversazione sua: il permesso
     // glielo dà l'intervista aperta, non la richiesta dell'utente.
-    task = ricordaCompito(Compiti.nuovo({ origine: 'chat', perimetro: onbActive ? ['accoglienza'] : null }));
+    task = ricordaCompito(Compiti.nuovo({ origine: 'chat', sempre: onbActive ? ['accoglienza'] : [] }));
   }
   const payloadBase = {
     profilo, preferenze, espansioni, lezioni, stato: stateText, capacita,
