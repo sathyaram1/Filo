@@ -209,6 +209,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     const toRun = encodingPrelude(usedShell) + (trackCwd ? withCwdProbe(usedShell, cmd) : cmd);
     const { file, args } = shellInvocation(usedShell, toRun);
     let stdout = '';
+    let codaOut = ''; // ultimi caratteri dello stdout, anche oltre il tetto
     let stderr = '';
     let timedOut = false;
     let child;
