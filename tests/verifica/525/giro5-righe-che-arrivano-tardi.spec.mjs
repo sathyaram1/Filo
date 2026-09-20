@@ -113,18 +113,19 @@ test('«/pulisci»: il resoconto arriva quando sei già tornato alla home', asyn
   test.setTimeout(180_000);
   await configura(app);
   await stubProvider(app);
-  // Il riordino delle schede è un giro che legge tutte le schede aperte e le
-  // fa valutare a un modello: qualche secondo è la norma.
-  await app.evaluate(() => {
-    const MSG = globalThis.SN_MSG || globalThis.SN_CONST.MSG;
-    globalThis.__riordinoRitardo = 6000;
-    void MSG;
-  });
-
   const dash = await openTab(DASH);
-  // La conferma del riordino: rispondo di sì senza popup.
+  // Il riordino delle schede è un giro che legge tutte le schede aperte e le
+  // fa valutare a un modello: qualche secondo è la norma. Qui lo rallentiamo
+  // dalla pagina, senza toccare il codice che stiamo provando.
   await dash.evaluate(() => {
     window.SN_CONFIRM_UI = { confirm: async () => true };
+    const vero = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, ...resto) => {
+      if (msg && msg.type === 'run_tab_triage') {
+        return new Promise((res) => setTimeout(() => res({ ok: true, archived: 2 }), 6000));
+      }
+      return vero(msg, ...resto);
+    };
   });
   await dash.locator('#input').fill('Parlami di Epicuro');
   await dash.locator('#input').press('Enter');
