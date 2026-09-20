@@ -198,3 +198,16 @@ test('un documento previsto ma non scritto: asText lo dice, e lo dice col suo no
   // L'indice (nessun id chiesto) resta un esito legittimo, non un errore.
   assert.doesNotMatch(T.asText(''), /NON esiste/);
 });
+
+test('i documenti citati per nome nel prompt di accoglienza esistono', () => {
+  // Stessa classe di bug da un'altra porta: l'accoglienza dice all'agente di
+  // leggere il documento "models" prima di rispondere. Un documento rinominato
+  // lascerebbe l'istruzione a puntare nel vuoto, in silenzio.
+  const { T } = loadModules();
+  const src = readFileSync(join(ROOT, 'src', 'shared', 'onboarding.js'), 'utf8');
+  const citati = [...src.matchAll(/LEGGI_TRASPARENZA\s+doc\s+"([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(citati.length, 'l\'accoglienza non cita più nessun documento: aggiorna questo test');
+  for (const id of citati) {
+    assert.ok(T.ids().includes(id), `l'accoglienza manda l'agente a leggere "${id}", che non esiste`);
+  }
+});
