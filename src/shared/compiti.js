@@ -102,7 +102,7 @@
    * perimetro lo scrive la superficie (l'assistente di pagina) e a chiedere per
    * conto suo è il motore.
    */
-  function nuovo({ id, origine = 'chat', dichiarazione = 'modello', perimetro = null, livello } = {}) {
+  function nuovo({ id, origine = 'chat', dichiarazione = 'modello', perimetro = null, sempre = null, livello } = {}) {
     const dich = dichiarazione === 'fissa' ? 'fissa' : 'modello';
     const fissato = dich === 'fissa';
     return {
@@ -111,6 +111,9 @@
       dichiarazione: dich,
       livello: livello || null,
       perimetro: Array.isArray(perimetro) ? perimetro.filter((u) => u in USCITE) : (fissato ? [] : null),
+      // Uscite che il compito ha per NASCITA, dall'autorità che l'ha aperto e
+      // non dalla richiesta: restano anche se il modello non dichiara nulla.
+      sempre: (Array.isArray(sempre) ? sempre : []).filter((u) => u in USCITE),
       dichiarato: fissato || Array.isArray(perimetro),
       fonte: 'filo',
       contaminato: false,
