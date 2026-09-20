@@ -447,6 +447,20 @@
     }, 0);
   }
 
+  function openCtxMenu(x, y, t) {
+    openMenuAt(x, y, [
+      { label: 'Riapri', run: () => reopenTab(t) },
+      { label: 'Elimina', run: () => removeTab(t) },
+    ]);
+  }
+
+  function openChatCtxMenu(x, y, c) {
+    openMenuAt(x, y, [
+      { label: 'Riapri la chat', run: () => reopenChat(c) },
+      { label: 'Elimina la chat', run: () => removeChat(c) },
+    ]);
+  }
+
   function renderTab(t, { showScore = false } = {}) {
     const row = document.createElement('div');
     row.className = 'arc-tab';
