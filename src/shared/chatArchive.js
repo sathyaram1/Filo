@@ -219,6 +219,88 @@
     return limit ? filtered.slice(0, limit) : filtered;
   }
 
+  // ── Quando pretendere tutte le parole significa non trovare niente ────────
+  //
+  // «Riprendi la discussione di ieri sulla coscienza» è il modo in cui il
+  // feedback stesso descrive la richiesta, ed è la frase che arriva qui dentro
+  // quando Filo cerca con le parole dell'utente. Pretendendo che compaiano
+  // TUTTE, quella frase non trova la chat sulla coscienza: bastano «di ieri» o
+  // «discussione» a farla sparire, e Filo risponde che quella discussione non
+  // esiste. Vale anche per chi scrive una frase nel campo di ricerca di
+  // Cronologia.
+  //
+  // Queste sono le parole che non distinguono una chat dall'altra: articoli,
+  // preposizioni, i modi di dire «quella volta che ne abbiamo parlato». Non si
+  // buttano mai a priori: si tolgono solo quando pretenderle tutte non ha
+  // trovato niente, e chi chiama SA che la ricerca si è allargata (lo dice a
+  // chi guarda, invece di far finta che la richiesta fosse quella).
+  const PAROLE_CHE_NON_DISTINGUONO = new Set([
+    'di', 'a', 'da', 'in', 'con', 'su', 'per', 'tra', 'fra', 'il', 'lo', 'la', 'i', 'gli', 'le',
+    'un', 'uno', 'una', 'del', 'dello', 'della', 'dei', 'degli', 'delle', 'al', 'allo', 'alla',
+    'ai', 'agli', 'alle', 'dal', 'dalla', 'nel', 'nella', 'sul', 'sulla', 'sullo', 'sui', 'sulle',
+    'che', 'chi', 'cosa', 'come', 'quando', 'dove', 'perche', 'non', 'piu', 'mi', 'ti', 'si',
+    'ci', 'vi', 'ne', 'e', 'ed', 'o', 'ma', 'se', 'ho', 'hai', 'ha', 'era', 'erano', 'sono',
+    'ieri', 'oggi', 'altro', 'altra', 'volta', 'quella', 'quello', 'questa', 'questo', 'mio',
+    'mia', 'tuo', 'tua', 'chat', 'discussione', 'discussioni', 'conversazione', 'conversazioni',
+    'parlato', 'parlare', 'parlavamo', 'detto', 'dire', 'riprendi', 'riprendere', 'ricordi',
+    'avevamo', 'avevo', 'avevi', 'scorsa', 'scorso', 'settimana', 'fa',
+  ]);
+
+  // Le parole della richiesta che davvero restringono il campo. Se non ne resta
+  // nessuna (l'utente ha cercato solo «di ieri») si tengono quelle che c'erano:
+  // meglio la ricerca stretta che una ricerca su niente.
+  function terminiCheDistinguono(terms) {
+    const forti = terms.filter((t) => t.length > 3 && !PAROLE_CHE_NON_DISTINGUONO.has(t));
+    return forti.length ? forti : terms;
+  }
+
+  function filtraPerTipo(chats, o) {
+    const kind = normalizeKindOrNull(o.kind);
+    return (Array.isArray(chats) ? chats : []).filter((c) => {
+      if (!c || !c.id) return false;
+      if (kind && normalizeKindOrNull(c.kind) !== kind) return false;
+      if (o.onlyVisible && !isVisibleByDefault(c)) return false;
+      return true;
+    });
+  }
+
+  // Ritorna { results, termini, allargata }:
+  //  • `results` le chat trovate;
+  //  • `termini` le parole con cui sono state trovate davvero;
+  //  • `allargata` vero se pretendere tutte le parole non aveva trovato niente.
+  //
+  // Tre passi, dal più stretto al più largo, e ci si ferma al primo che trova
+  // qualcosa: tutte le parole; poi le sole parole che distinguono; poi almeno
+  // una di quelle, con in testa le chat che ne contengono di più.
+  function searchWide(chats, query, opts) {
+    const o = opts || {};
+    const limit = Number(o.limit) > 0 ? Number(o.limit) : 0;
+    const taglia = (list) => (limit ? list.slice(0, limit) : list);
+    const candidate = filtraPerTipo(chats, o);
+    const tutte = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    if (!tutte.length) return { results: taglia(candidate), termini: [], allargata: false };
+
+    const hays = new Map(candidate.map((c) => [c.id, haystackOf(c)]));
+    const conTutte = candidate.filter((c) => tutte.every((t) => hays.get(c.id).includes(t)));
+    if (conTutte.length) return { results: taglia(conTutte), termini: tutte, allargata: false };
+
+    const forti = terminiCheDistinguono(tutte);
+    const stessaCosa = forti.length === tutte.length;
+    const conForti = stessaCosa
+      ? []
+      : candidate.filter((c) => forti.every((t) => hays.get(c.id).includes(t)));
+    if (conForti.length) return { results: taglia(conForti), termini: forti, allargata: true };
+
+    // Ultimo passo: almeno una parola che distingue. Ordinate per quante ne
+    // combaciano, così la chat più pertinente resta in cima.
+    const punteggi = candidate
+      .map((c) => ({ c, n: forti.filter((t) => hays.get(c.id).includes(t)).length }))
+      .filter((x) => x.n > 0)
+      .sort((a, b) => b.n - a.n);
+    if (!punteggi.length) return { results: [], termini: forti, allargata: !stessaCosa };
+    return { results: taglia(punteggi.map((x) => x.c)), termini: forti, allargata: true };
+  }
+
   // Un frammento della chat attorno alla prima occorrenza della ricerca: è
   // quello che fa capire PERCHÉ una chat è nel risultato. Senza, un elenco di
   // titoli obbliga ad aprirle una per una.
