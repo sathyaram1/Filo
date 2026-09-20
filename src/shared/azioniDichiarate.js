@@ -674,6 +674,7 @@
   global.SN_AZIONI_DICHIARATE = {
     FAMIGLIE,
     TIPI_DI_CONTESTO,
+    TIPI_DI_SOLA_LETTURA,
     rileva,
     insiemeDiTipi,
     tipiDallaCronologia,
