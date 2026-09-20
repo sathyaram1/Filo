@@ -299,7 +299,10 @@ async function main() {
 // con le STESSE righe del registro: da lì si deve poter agire senza cercare i log.
 async function avvisa(mancanti, righe) {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
-  if (!passphrase) return;
+  if (!passphrase) {
+    console.warn('::warning::Nessun feedback aperto per questa pubblicazione ferma: l\'allarme si apre con FILO_BUILD_PASSPHRASE, che qui manca. Resta solo il guasto qui sopra.');
+    return;
+  }
   const nomi = (mancanti || []).map((c) => c.nome).join(', ');
   const testo = testoEntroIlTetto([
     'La costruzione non ha trovato nessuna chiave di default e ha fermato la pubblicazione: meglio nessuna versione nuova che una che arriva agli utenti senza niente di preimpostato.',
