@@ -2563,10 +2563,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // «sì, l'ho mandata»). Detta come una cosa appena fatta, un'azione vecchia
   // non prova niente: era così che un appunto scritto all'inizio assolveva
   // ogni appunto raccontato dopo.
-  const domandaUtente = /\?/.test(String(userMessage || ''));
+  // #517 (giro 7) — «l'hai già fatto?» non è «me lo fai?». Prima bastava un
+  // punto interrogativo qualunque nel messaggio, e in italiano una richiesta
+  // si scrive quasi sempre così: da lì in poi tutto quello che era stato fatto
+  // prima nella conversazione copriva quello che veniva raccontato adesso, e
+  // il presidio tornava muto proprio nel caso del feedback.
+  const domandaUtente = !!(Dichiarate && Dichiarate.domandaSuCosaFatta(userMessage));
   const statoDichiarazioni = async (azioniDelTurno) => ({
-    orariSveglie: Dichiarate ? await orariDelleSveglie() : [],
-    titoliAppunti: Dichiarate ? (fileList || []).map((f) => f && f.title).filter(Boolean) : [],
+    ...(await provePerIlPresidio(Dichiarate, fileList)),
     // Quante azioni di ciascun tipo sono partite adesso: due dichiarazioni
     // della stessa specie vogliono due azioni, non una che le copre tutte.
     contiAzioni: contaTipi(azioniDelTurno),
