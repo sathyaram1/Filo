@@ -1012,9 +1012,21 @@
     // conversazione. Lì un'azione vecchia non copre più niente: è la strada
     // in cui finisce chi preme «Fallo adesso» e si sente ripetere la stessa
     // cosa, stavolta in silenzio.
-    const giaMancate = new Set(stato && stato.famiglieGiaMancate
-      ? (stato.famiglieGiaMancate instanceof Set ? [...stato.famiglieGiaMancate] : stato.famiglieGiaMancate)
-      : []);
+    // Ogni voce è il nome di una famiglia, oppure {id, verbo}: il verbo serve
+    // alla conferma col pronome, che di suo non dice di cosa parla. «Te l'ho
+    // già mandata» dopo un «la segnalazione non è partita» è la stessa cosa
+    // mai fatta, e senza il verbo non c'era modo di riconoscerla.
+    const giaMancate = new Set();
+    const verbiMancati = new Set();
+    {
+      const lista = stato && stato.famiglieGiaMancate;
+      for (const x of (lista instanceof Set ? [...lista] : (Array.isArray(lista) ? lista : []))) {
+        if (typeof x === 'string') { if (x) giaMancate.add(x); continue; }
+        if (!x || typeof x !== 'object') continue;
+        if (x.id) giaMancate.add(String(x.id));
+        if (x.verbo) verbiMancati.add(String(x.verbo));
+      }
+    }
     const quanteAzioni = (fam) => {
       let n = 0;
       for (const x of fam.tipi) {
