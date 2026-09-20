@@ -94,6 +94,42 @@ test('il preludio precede il comando dell\'utente, non lo segue', () => {
 // ai rami di Windows: una copia a mano del preludio, o un ramo che se lo
 // dimentica, diventa rossa subito invece che dal vivo.
 
+test('il comando digitato dall\'utente non arriva a PowerShell con byte fuori dall\'ASCII', () => {
+  // #551, primo giro di verifica, l'altro verso. Il preludio mette la shell in
+  // UTF-8 quando SCRIVE. Quando LEGGE no: Windows PowerShell decodifica lo
+  // stdin con la tabella di codici della console, mentre Node gli scrive UTF-8.
+  // Così un comando che contiene «attività» arrivava storpiato e la shell
+  // rispondeva che il file non esiste: lo stesso guasto della segnalazione,
+  // dalla parte opposta. La cura è non far viaggiare caratteri non ASCII.
+  const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
+
+  // Un comando di soli caratteri ASCII parte identico a prima: `exit`, `cd`,
+  // le variabili e tutto quello che un utente digita di solito non cambiano.
+  for (const c of ['exit', 'cd ..', '$x = 5', 'Get-ChildItem -Name', '']) {
+    assert.equal(S.comandoPerPowerShell(c), c);
+  }
+
+  // Un comando accentato parte in una forma che sul filo è solo ASCII…
+  const comando = 'Get-Content "RELAZIONE — attività finale.txt"';
+  const sulFilo = S.comandoPerPowerShell(comando);
+  assert.ok(sulFilo !== comando, 'un comando accentato non può partire così com\'è');
+  assert.ok(
+    // eslint-disable-next-line no-control-regex
+    /^[\x00-\x7F]*$/.test(sulFilo),
+    `sul filo ci sono ancora byte fuori dall'ASCII: ${sulFilo}`,
+  );
+
+  // …e PowerShell lo rimette insieme IDENTICO a quello che l'utente ha
+  // digitato. Qui si rifà il giro che farebbe lui: si ripesca il testo
+  // codificato e lo si riporta a caratteri.
+  const b64 = (sulFilo.match(/FromBase64String\('([A-Za-z0-9+/=]+)'\)/) || [])[1];
+  assert.ok(b64, 'il comando deve viaggiare codificato, non interpolato');
+  assert.equal(Buffer.from(b64, 'base64').toString('utf8'), comando);
+  // Niente del comando dell'utente finisce dritto nella riga: se ci finisse,
+  // una virgoletta basterebbe a uscire dalla stringa e a farsi eseguire altro.
+  assert.ok(!sulFilo.includes('attività'));
+});
+
 test('la shell persistente antepone gli stessi preludi (nessuna copia a mano)', () => {
   const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'shell.js'), 'utf8');
   assert.match(src, /PRELUDI_CODIFICA\.cmd\}prompt FILO_RDY_/);
