@@ -264,6 +264,26 @@
     return (typeof v === 'string' && v.trim()) ? v.trim() : null;
   }
 
+  // Catalogo completo per le tendine dei modelli (#591, secondo giro). Il
+  // catalogo semplice elenca i soli modelli di testo: voce, dettatura e
+  // indicizzazione stanno in liste a parte, per modalità, e si chiedono tutte
+  // insieme. Solo metadati, nessuna inferenza: non costa niente e la chiave è
+  // facoltativa. Vive qui perché la richiesta di rete al fornitore deve partire
+  // da un posto solo: era scritta a mano in due punti fuori di qui, ed era la
+  // riga da copiare per una chiamata che invece si paga.
+  const CATALOG_MODALITIES = ['', 'speech', 'transcription', 'embeddings'];
+
+  async function listCatalog({ apiKey } = {}) {
+    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    const lists = await Promise.all(CATALOG_MODALITIES.map(async (m) => {
+      const res = await fetch(MODELS_ENDPOINT + (m ? `?output_modalities=${m}` : ''), { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return (data.data || []).map((x) => ({ id: x.id, meta: x })).filter((it) => it.id);
+    }));
+    return lists.flat();
+  }
+
   async function listModels(apiKey) {
     const res = await fetch(MODELS_ENDPOINT, {
       headers: { Authorization: `Bearer ${apiKey}` },
