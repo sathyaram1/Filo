@@ -263,10 +263,14 @@
       inCorso ? 'Clic per tornare dov’è aperta' : 'Clic per riaprirla e continuare a scrivere',
     ].filter(Boolean).join('\n');
 
-    row.addEventListener('click', () => reopenChat(c));
+    row.addEventListener('click', (e) => {
+      // Mentre si rinomina, il clic appartiene al campo, non alla riga.
+      if (e.target.closest('.arc-chat-rename')) return;
+      reopenChat(c);
+    });
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      openChatCtxMenu(e.clientX, e.clientY, c);
+      openChatCtxMenu(e.clientX, e.clientY, c, row);
     });
     // Parità con il mouse: Invio/Spazio riapre, Shift+F10 o il tasto Menu
     // aprono lo stesso menu contestuale del tasto destro.
