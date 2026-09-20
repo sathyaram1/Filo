@@ -184,6 +184,7 @@
       avviso: 'l\'appunto non c\'è',
       frasi: [
         new RegExp(`${HO}(?:salvato|scritto|creato|aggiunto|annotato|segnato|messo|preso|buttato\\s+giù)\\b${PONTE(72)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
+        new RegExp(`${PERIFRASI}${PONTE(48)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
         /\bme (?:lo|la|ne) sono (?:segnat|appuntat|annotat)[oa]\b/i,
         new RegExp(`\\b${PRON}(?:salvat|scritt|annotat|segnat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
         // «Ti ho segnato la spesa»: il verbo del prendere nota, col pronome di
