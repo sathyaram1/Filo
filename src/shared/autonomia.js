@@ -148,6 +148,13 @@
     capacita: { classe: 1, frase: 'il mio manifesto' },
     trasparenza: { classe: 1, frase: 'i miei documenti di trasparenza' },
     editor: { classe: 2, frase: 'un documento del tuo editor', campo: 'file' },
+    // Le schede aperte e le immagini che l'utente passa sono classe 2 per lo
+    // stesso motivo dei file dell'editor: il testo dentro l'ha scritto un
+    // altro, ma è roba che l'utente ha scelto e ha sotto mano. A classe 5
+    // («pagine web») un browser con una scheda aperta sarebbe contaminato
+    // sempre, e il livello normale non varrebbe mai per nessuno.
+    schede: { classe: 2, frase: 'i titoli delle schede che hai aperto', campo: 'web' },
+    immagine: { classe: 2, frase: 'un\'immagine che mi hai passato' },
     documento: { classe: 4, frase: 'un documento dal tuo computer', campo: 'file' },
     comando: { classe: 5, frase: 'quello che ha stampato un comando', campo: 'terminale' },
     ricerca: { classe: 5, frase: 'una ricerca sul web', campo: 'web' },
