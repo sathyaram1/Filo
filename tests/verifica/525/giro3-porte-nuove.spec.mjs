@@ -142,17 +142,30 @@ test('la chat ancora in corso, vista da Cronologia', async ({ app, openTab, shel
   await expect(righe.first()).toBeVisible({ timeout: 20_000 });
   const testo = await righe.first().textContent();
   console.log('RIGA DELLA CHAT IN CORSO:', JSON.stringify(testo));
+  // Si vede per quello che è: non una chat finita con una data, ma una
+  // conversazione aperta adesso.
+  expect(testo).toContain('In corso');
 
-  // Cliccandola si apre una SECONDA vista della stessa conversazione viva.
-  await righe.first().click();
-  await page.waitForTimeout(1500);
-  const schede = await shell.evaluate(async () => {
+  const prima = await shell.evaluate(async () => {
     const snap = await window.filoShell.tabs.snapshot();
     return (snap.tabs || snap).map((t) => String(t.url || ''));
   });
-  console.log('SCHEDE:', JSON.stringify(schede));
-  const viste = schede.filter((u) => u.includes('dashboard') || u.includes('newtab'));
-  expect(viste.length).toBe(1);
+
+  // Cliccandola NON si apre una seconda vista della stessa conversazione viva:
+  // si torna dov'è aperta.
+  await righe.first().click();
+  await page.waitForTimeout(1500);
+  const dopo = await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    const lista = snap.tabs || snap;
+    return {
+      urls: lista.map((t) => String(t.url || '')),
+      attiva: String((lista.find((t) => t.active) || {}).url || ''),
+    };
+  });
+  console.log('SCHEDE PRIMA:', JSON.stringify(prima), 'DOPO:', JSON.stringify(dopo));
+  expect(dopo.urls).toEqual(prima);                       // nessuna scheda in più
+  expect(dopo.attiva).toContain('dashboard');             // e siamo dove la chat è aperta
 });
 
 test('senza nemmeno una chat di comando, l’interruttore dei comandi non si mostra', async ({ app, openTab }) => {
