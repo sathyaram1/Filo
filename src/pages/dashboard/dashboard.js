@@ -849,6 +849,22 @@
         avviso.dataset.azioniMancate = (r.azioniMancate || []).map((f) => f.id).join(',');
         avviso.textContent = r.avvisoAzioni;
         bubblesEl.appendChild(avviso);
+        // «Chiediglielo di nuovo» lasciava all'utente il lavoro di riscrivere
+        // la richiesta — e Filo sa già qual era. Stesso tasto della bolla
+        // d'errore, che rimanda il messaggio da sé.
+        const row = document.createElement('div');
+        row.className = 'dash-bubble-actions';
+        const rifallo = document.createElement('button');
+        rifallo.type = 'button';
+        rifallo.className = 'dash-action-btn dash-action-btn-primary';
+        rifallo.textContent = '↻ Fallo adesso';
+        rifallo.title = 'Chiede a Filo di farlo davvero';
+        rifallo.addEventListener('click', () => {
+          if (sending) return;
+          submitMessage('Non l\'hai fatto davvero: fallo adesso.');
+        });
+        row.appendChild(rifallo);
+        bubblesEl.appendChild(row);
       }
       // Il ragionamento del turno entra nello storico del thread insieme al
       // messaggio. Il testo resta con la conversazione; i blocchi strutturati
