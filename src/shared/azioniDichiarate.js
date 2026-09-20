@@ -1001,6 +1001,18 @@
     // dichiarazioni della stessa specie vogliono due azioni.
     const conti = (stato && stato.contiAzioni && typeof stato.contiAzioni === 'object')
       ? stato.contiAzioni : null;
+    // Giro 8: lo stesso conto per i turni PRECEDENTI. Senza, un appunto
+    // scritto una volta all'inizio reggeva ogni appunto raccontato dopo,
+    // all'infinito.
+    const contiPrec = (stato && stato.contiPrecedenti && typeof stato.contiPrecedenti === 'object')
+      ? stato.contiPrecedenti : null;
+    // Giro 8: le famiglie su cui il presidio ha già avvisato in questa
+    // conversazione. Lì un'azione vecchia non copre più niente: è la strada
+    // in cui finisce chi preme «Fallo adesso» e si sente ripetere la stessa
+    // cosa, stavolta in silenzio.
+    const giaMancate = new Set(stato && stato.famiglieGiaMancate
+      ? (stato.famiglieGiaMancate instanceof Set ? [...stato.famiglieGiaMancate] : stato.famiglieGiaMancate)
+      : []);
     const quanteAzioni = (fam) => {
       let n = 0;
       for (const x of fam.tipi) {
