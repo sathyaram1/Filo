@@ -425,6 +425,27 @@ function quotaNonTesto(s) {
   return rumore / n;
 }
 
+/**
+ * La stessa domanda sui BYTE grezzi, byte nulli compresi. PURA.
+ *
+ * È il conto che riconosce un file binario (`looksLikeText`), scritto qui una
+ * volta sola perché serve anche a distinguere un testo a 8 bit con qualche byte
+ * guasto da un testo scritto a due byte per carattere (#551, settimo giro): in
+ * un file a due byte metà dei byte sono il byte ALTO delle coppie, che non è un
+ * carattere, e questo conto lo vede in qualunque alfabeto.
+ */
+function quotaNonTestoByte(buf, fino) {
+  const n = Math.min(buf.length, fino || 8192);
+  if (!n) return 1;
+  let rumore = 0;
+  for (let i = 0; i < n; i++) {
+    const b = buf[i];
+    if (b >= 32 || b === 9 || b === 10 || b === 13 || b === 12 || b === 27) continue;
+    rumore++;
+  }
+  return rumore / n;
+}
+
 /** Legge il buffer come testo a due byte nel verso dato. PURA. */
 function leggiDueByte(buf, verso, conFirma) {
   let corpo = conFirma ? buf.subarray(2) : buf;
