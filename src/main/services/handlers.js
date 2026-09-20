@@ -3270,8 +3270,9 @@ async function triageChat(chat) {
 async function closeAndTriageChat(chatId) {
   if (!chatId || !FiloChats) return null;
   const chat = await FiloChats.close(chatId);
-  if (!chat) return null;                       // chat vuota o inesistente
-  if (chat.kind && chat.title) return chat;      // già classificata: non si ripaga
+  if (!chat) return null;                        // chat vuota o inesistente
+  // Già classificata e da allora non è successo niente: non si ripaga.
+  if (!FiloChats.needsTriage(chat)) return chat;
   const triage = await triageChat(chat);
   if (!triage) {
     // Il modello non ha risposto: il titolo di ripiego c'è lo stesso, il tipo
