@@ -82,12 +82,15 @@ test('un promemoria corto con un byte nullo non diventa una fila di ideogrammi',
 test('la posizione del nullo in un file corto non cambia l’esito', async ({ openTab }) => {
   const dir = cartellaTemporanea('filo-551-g8-corto-pos-');
   try {
-    const testo = 'Appuntamento dal notaio: giovedì alle 9, via Città 12.\n';
+    // Il byte guastato cade sempre nella prima metà della nota: la seconda
+    // resta intatta, quindi è quella che deve arrivare al modello. Il carattere
+    // guasto è perso davvero e non si pretende di riaverlo.
+    const testo = 'Appuntamento dal notaio: giovedì alle 9, via Roma 12.\n';
     const page = await openTab(HOME);
-    for (const dove of [3, 8, 17, 30, 44]) {
+    for (const dove of [2, 7, 13, 18, 22]) {
       const f = join(dir, `nota-${dove}.txt`);
       writeFileSync(f, conNullo(Buffer.from(testo, 'utf8'), dove));
-      letto_o_rifiutato(await leggiDocumento(page, f), 'notaio', `nullo in posizione ${dove}`);
+      letto_o_rifiutato(await leggiDocumento(page, f), 'giovedì alle 9, via Roma 12.', `nullo in posizione ${dove}`);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });

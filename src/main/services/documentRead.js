@@ -849,6 +849,8 @@ module.exports = {
   eUtf8Valido,
   bilancioUtf8,
   quotaNonTesto,
+  senzaRumore,
+  RUMORE_TOLLERATO,
   capText,
   MAX_TEXT_CHARS,
   MAX_FILE_BYTES,
