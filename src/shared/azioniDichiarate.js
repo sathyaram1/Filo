@@ -402,7 +402,7 @@
   // nella stessa proposizione, o una domanda alternativa di là dalla virgola.
   function dentroUnaDomanda(testo, indice) {
     const dopo = testo.slice(indice);
-    const fine = dopo.search(/[.!?\n]/);
+    const fine = dopo.search(FINE_FRASE);
     if (fine < 0 || dopo[fine] !== '?') return false;
     const corpo = dopo.slice(0, fine);
     const stacco = corpo.search(/[,;:—]/);
