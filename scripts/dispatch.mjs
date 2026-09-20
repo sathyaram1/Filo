@@ -996,7 +996,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   // il biglietto» anche con un rilievo di livello 2 nella critica (verifica
   // del giro 3 su questo lavoro).
   const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'non comunicato';
-  const next = applyVerifierVerdict(base, outcome, critiqueText);
+  const next = applyVerifierVerdict(base, outcome, critiqueText, shaProvato);
   next.id = id;
   sealTransition(next, `verifier:${outcome}`);
   next.reply = reply;
