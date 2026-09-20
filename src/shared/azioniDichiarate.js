@@ -426,7 +426,10 @@
       // frase è quella di una sveglia che c'è davvero.
       if (fam.orari && orari.size) {
         const nominati = orariNelTesto(d.frase);
-        if ([...nominati].some((o) => orari.has(o))) continue;
+        if ([...nominati].some((o) => orari.has(o))) {
+          if (d.verbo) radiciRette.add(d.verbo);
+          continue;
+        }
       }
       out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
     }
