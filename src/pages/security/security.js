@@ -451,8 +451,58 @@
     save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
+  // #533 — la riga di un compito dice il PERIMETRO, cioè cosa gli era
+  // permesso: cosa ha poi fatto si legge già nel diario della chat.
+  function rigaCompito(c) {
+    const riga = document.createElement('div');
+    riga.className = 'sn-toggle-row';
+    riga.style.display = 'block';
+    const quando = document.createElement('div');
+    quando.textContent = new Date(c.ts).toLocaleString();
+    const cosa = document.createElement('div');
+    cosa.className = 'sn-muted';
+    if (!c.contaminato) {
+      cosa.textContent = I18n.t('security_perimetro_pulito');
+    } else {
+      const C = window.SN_COMPITI;
+      const uscite = (c.perimetro || []).concat(c.sempre || []);
+      const voci = C ? uscite.map((u) => C.etichettaUscita(u)) : uscite;
+      const dove = c.origine === 'chat' && c.dichiarato && !voci.length
+        ? I18n.t('security_perimetro_nulla') : (voci.join('; ') || I18n.t('security_perimetro_nulla'));
+      cosa.textContent = `${I18n.t('security_perimetro_letto')} → ${dove}`;
+    }
+    riga.append(quando, cosa);
+    if (c.allargamenti && c.allargamenti.length) {
+      const piu = document.createElement('div');
+      piu.className = 'sn-muted';
+      const C = window.SN_COMPITI;
+      piu.textContent = `${I18n.t('security_perimetro_allargato')}: `
+        + c.allargamenti.map((a) => (C ? C.etichettaUscita(a.uscita) : a.uscita)).join('; ');
+      riga.append(piu);
+    }
+    return riga;
+  }
+
+  async function loadCompiti() {
+    const box = $('sec-perimetro-list');
+    if (!box) return;
+    let res = null;
+    try { res = await chrome.runtime.sendMessage({ type: MSG.FILO_GET_COMPITI }); } catch (_) {}
+    box.textContent = '';
+    const lista = (res && res.ok && Array.isArray(res.compiti)) ? res.compiti : [];
+    if (!lista.length) {
+      const vuoto = document.createElement('div');
+      vuoto.className = 'sn-muted';
+      vuoto.textContent = I18n.t('security_perimetro_empty');
+      box.append(vuoto);
+      return;
+    }
+    for (const c of lista) box.append(rigaCompito(c));
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    loadCompiti();
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);
