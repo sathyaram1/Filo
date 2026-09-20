@@ -2823,7 +2823,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
 // è la parte "economica" che si può fare a ogni apertura di scheda.
 async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const settings = await getEffectiveSettings();
-  const hasKey = !!(settings.apiKeys?.[settings.provider]);
+  const canServe = SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD);
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
