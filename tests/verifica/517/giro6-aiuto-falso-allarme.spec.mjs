@@ -117,7 +117,7 @@ test('nell\'Aiuto l\'avviso offre lo stesso tasto della chat della home', async 
   await page.waitForSelector('.sn-sidebar-msg-avviso', { timeout: 10_000 });
 
   const tasti = await page.evaluate(() => Array.from(
-    document.querySelectorAll('.sn-sidebar-chat button'),
+    document.querySelectorAll('.sn-sidebar-conv button'),
   ).map((b) => (b.textContent || '').trim()).filter(Boolean));
   expect(tasti.some((t) => /fallo adesso|rifallo|riprova/i.test(t))).toBe(true);
 });
