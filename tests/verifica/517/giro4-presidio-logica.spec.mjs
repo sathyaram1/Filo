@@ -38,6 +38,15 @@ test('il formato interno recintato dopo un preambolo è comunque un turno buttat
   expect(D.formatoSospetto('Fatto! Ecco:\n```json\n[{"type":"SVEGLIA","time":"19:00"}]\n```')).toBe(true);
   expect(D.formatoSospetto('Ti metto la sveglia.\n```json\n{"text":"ok","actions":[{"type":"SVEGLIA"}]}\n```')).toBe(true);
   expect(D.formatoSospetto('Ok.\n```\n<tool_call>{"name":"SVEGLIA","arguments":{}}</tool_call>\n```')).toBe(true);
+  // Sulla stessa riga della prosa è lo stesso guasto.
+  expect(D.formatoSospetto('Ok. <tool_call>{"name":"SVEGLIA","arguments":{}}</tool_call>')).toBe(true);
+});
+
+test('la busta a parentesi quadre dei modelli aperti è formato interno', () => {
+  // La forma documentata dei modelli Mistral. Da sola non viene riconosciuta,
+  // e in chat resta un blocco di codice con dentro la sveglia che non c'è.
+  expect(D.formatoSospetto('[TOOL_CALLS][{"name":"SVEGLIA","arguments":{"ora":"19:00"}}]')).toBe(true);
+  expect(D.formatoSospetto('Ok.\n[TOOL_CALLS][{"name":"SVEGLIA","arguments":{"ora":"19:00"}}]')).toBe(true);
 });
 
 test('un esempio annunciato resta un esempio, anche recintato', () => {
