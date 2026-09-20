@@ -806,7 +806,9 @@
           if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
         }
-        btn.textContent = (r && r.executed) ? `✓ ${shortLabel}` : '✗ Non eseguita';
+        // A cosa fatta il bottone è una ricevuta: la spunta davanti a «Filo vuole
+        // impostare…» diceva insieme che è fatto e che deve ancora succedere.
+        btn.textContent = (r && r.executed) ? `✓ ${fatto || 'Fatto'}` : '✗ Non eseguita';
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
         if (r && r.executed && type === 'IMPOSTA_ESTETICA') {
