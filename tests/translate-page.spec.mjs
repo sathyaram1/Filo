@@ -1469,3 +1469,126 @@ test('"Mostra originale" rimette a posto anche le etichette copiate dal testo', 
   expect(back.wrappedTitle).toBe('Open the gallery');
   expect(back.differentTitle).toBe('Opens in a new window');
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// #505 — come il sito RIPIEGA una sezione non può decidere né cosa vede
+// l'utente né quanto paga. Qui la stessa sezione è ripiegata in sette modi
+// diversi: nessuno dei sette deve partire verso il modello prima che l'utente
+// apra, e ognuno dei sette, una volta aperto, deve far offrire la traduzione.
+// ───────────────────────────────────────────────────────────────────────────
+
+const RIPIEGATE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <p id="vis">A visible paragraph that every reader sees without clicking anything at all.</p>
+  <details id="dWrap"><summary id="sWrap">Question with a wrapper</summary>
+    <div id="pWrap">ZZWRAP answer kept inside a block element of its own.</div>
+  </details>
+  <details id="dBare"><summary id="sBare">Question without a wrapper</summary>
+    ZZBARE answer written straight under the question, with no block around it.
+  </details>
+  <div id="pMax" style="max-height:0;overflow:hidden">ZZMAX answer in a panel squashed to zero height.</div>
+  <div id="pNone" style="display:none">ZZNONE answer in a panel switched off entirely.</div>
+  <div id="pScale" style="transform:scaleY(0)">ZZSCALE answer in a panel squashed by a transform.</div>
+  <div id="pOff" style="position:absolute;left:-9999px;top:0">ZZOFF answer in a panel parked off the page.</div>
+  <div id="pFade" style="opacity:0">ZZFADE answer in a panel left fully transparent.</div>
+</body></html>`;
+
+const TOKEN = ['ZZWRAP', 'ZZBARE', 'ZZMAX', 'ZZNONE', 'ZZSCALE', 'ZZOFF', 'ZZFADE'];
+
+test('le sezioni ripiegate non si pagano in anticipo, comunque il sito le abbia chiuse', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RIPIEGATE);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#vis');
+
+  await expect(page.locator('#vis')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#sBare')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+
+  const sent = await app.evaluate(() => (globalThis.__filoTranslatePrompts || []).join('\n'));
+  const pagate = TOKEN.filter((t) => sent.includes(t));
+  expect(pagate, `ripiegature spedite al modello: ${pagate.join(', ')}`).toEqual([]);
+});
+
+test('aperta una sezione ripiegata, il tasto destro offre di tradurre il testo scoperto', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RIPIEGATE);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#vis');
+  await expect(page.locator('#vis')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+
+  const label = async (apri, chiudi) => {
+    await page.evaluate(apri);
+    await page.waitForTimeout(120);
+    await page.locator('#vis').click({ button: 'right', position: { x: 5, y: 5 } });
+    const btn = page.locator('[data-sn-icon-id="translate"]');
+    await expect(btn).toBeVisible();
+    const l = await btn.getAttribute('aria-label');
+    await page.keyboard.press('Escape');
+    await page.evaluate(chiudi);
+    await page.waitForTimeout(120);
+    return l;
+  };
+
+  // Prima di toccare niente l'icona torna all'originale: è il metro degli altri.
+  await page.locator('#vis').click({ button: 'right', position: { x: 5, y: 5 } });
+  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Mostra originale');
+  await page.keyboard.press('Escape');
+
+  const casi = [
+    ['fisarmonica con riquadro', () => { document.getElementById('dWrap').open = true; }, () => { document.getElementById('dWrap').open = false; }],
+    ['fisarmonica senza riquadro', () => { document.getElementById('dBare').open = true; }, () => { document.getElementById('dBare').open = false; }],
+    ['pannello schiacciato', () => { document.getElementById('pMax').style.maxHeight = 'none'; }, () => { document.getElementById('pMax').style.maxHeight = '0'; }],
+    ['pannello spento', () => { document.getElementById('pNone').style.display = 'block'; }, () => { document.getElementById('pNone').style.display = 'none'; }],
+    ['pannello trasformato', () => { document.getElementById('pScale').style.transform = 'none'; }, () => { document.getElementById('pScale').style.transform = 'scaleY(0)'; }],
+    ['pannello fuori pagina', () => { document.getElementById('pOff').style.left = '0'; }, () => { document.getElementById('pOff').style.left = '-9999px'; }],
+    ['pannello trasparente', () => { document.getElementById('pFade').style.opacity = '1'; }, () => { document.getElementById('pFade').style.opacity = '0'; }],
+  ];
+  const muti = [];
+  for (const [nome, apri, chiudi] of casi) {
+    if (await label(apri, chiudi) !== 'Traduci il testo nuovo') muti.push(nome);
+  }
+  expect(muti, `ripiegature che, aperte, non fanno offrire niente: ${muti.join(', ')}`).toEqual([]);
+});
+
+test('il testo scoperto si traduce senza rispedire al modello la pagina già tradotta', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RIPIEGATE);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#vis');
+  await expect(page.locator('#vis')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  const primo = await app.evaluate(() => (globalThis.__filoTranslatePrompts || []).join('\n'));
+
+  await page.evaluate(() => { document.getElementById('dBare').open = true; });
+  await page.waitForTimeout(150);
+  await clickTranslateIcon(page, '#vis');
+
+  // SUCCESSO: la risposta appena scoperta è passata dal traduttore. Si guarda il
+  // solo testo PROPRIO della sezione: quello della domanda era già tradotto dal
+  // primo giro, e sommarli confonderebbe i due.
+  const rispostaPropria = () => page.evaluate(() => Array.from(document.getElementById('dBare').childNodes)
+    .filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join('').trim());
+  await expect.poll(rispostaPropria, { timeout: 30000 }).toMatch(/^IT /);
+  const dopo = (await app.evaluate(() => (globalThis.__filoTranslatePrompts || []).join('\n'))).slice(primo.length);
+  expect(dopo).toContain('ZZBARE');
+  // …e il resto della pagina non è tornato al modello una seconda volta.
+  expect(dopo).not.toContain('visible paragraph');
+});
+
+test('quel che si vede continua a tradursi: scorrimento, pannelli aperti, testo che sborda', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+    <p id="vis">A visible paragraph that every reader sees without clicking anything at all.</p>
+    <div style="max-height:40px;overflow:auto"><p id="inScroll">Text inside a scrollable box, clipped but readable by scrolling.</p></div>
+    <div style="max-height:500px;overflow:hidden"><p id="inOpen">Text inside an accordion panel that is currently open.</p></div>
+    <div style="width:80px;overflow-x:hidden;white-space:nowrap"><span id="inWide">A long single line of text that overflows sideways.</span></div>
+    <div style="position:absolute;left:20px;top:2000px"><p id="inLow">Text parked far below the fold but still inside the page.</p></div>
+  </body></html>`);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#vis');
+
+  for (const id of ['#vis', '#inScroll', '#inOpen', '#inWide', '#inLow']) {
+    await expect(page.locator(id)).toHaveText(/^IT /, { timeout: 30000 });
+  }
+});
