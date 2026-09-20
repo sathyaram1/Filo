@@ -128,6 +128,159 @@
     el.hidden = false;
   }
 
+  // ── #525 — le chat con Filo ───────────────────────────────────────────────
+  //
+  // Prima una chat viveva solo nella pagina aperta: tornando alla home
+  // spariva. Adesso si salvano tutte, per intero, e qui si ritrovano. Le
+  // CONVERSAZIONI (discussioni, spiegazioni, l'intervista di benvenuto) stanno
+  // in vista; i COMANDI ("metti una sveglia") ci sono sempre, sotto
+  // l'interruttore. Chi classifica è un modello economico, e sbaglia nel verso
+  // giusto: nel dubbio "conversazione", cioè visibile.
+  let chatsTotal = 0;      // quante ce ne sono in tutto (la sezione esiste?)
+  let chatSearchToken = 0; // l'ultima ricerca partita vince, non l'ultima arrivata
+
+  function chatDateLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const k = dayKey(iso);
+    const today = new Date();
+    const yest = new Date(); yest.setDate(today.getDate() - 1);
+    const hm = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    if (k === dayKey(today.toISOString())) return `Oggi ${hm}`;
+    if (k === dayKey(yest.toISOString())) return `Ieri ${hm}`;
+    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // Ricarica l'elenco delle chat secondo la ricerca corrente. Con una query
+  // cerca nel TESTO di tutte le chat (lato main, dove i messaggi stanno già in
+  // memoria): "coscienza" trova la discussione anche se quella parola sta a
+  // metà conversazione e non nel titolo.
+  async function refreshChats() {
+    const q = ($('search').value || '').trim();
+    const token = ++chatSearchToken;
+    let r = null;
+    try {
+      r = q
+        ? await chrome.runtime.sendMessage({ type: MSG.FILO_CHATS_SEARCH, query: q })
+        : await chrome.runtime.sendMessage({ type: MSG.FILO_CHATS_LIST });
+    } catch (_) { r = null; }
+    if (token !== chatSearchToken) return; // una ricerca più recente ha già vinto
+    chats = (r && r.chats) || [];
+    if (!q) chatsTotal = chats.length;
+    renderChats();
+  }
+
+  function renderChats() {
+    const section = $('chatsSection');
+    const list = $('chatList');
+    const empty = $('chatEmpty');
+    const q = ($('search').value || '').trim();
+
+    // Nessuna chat mai fatta: la sezione non c'è. Una sezione vuota che
+    // annuncia se stessa è rumore su una pagina che si consulta.
+    if (!chatsTotal) { section.hidden = true; return; }
+    section.hidden = false;
+
+    const commands = chats.filter((c) => c && c.kind === 'comando');
+    const visible = showCommands ? chats : chats.filter((c) => !c || c.kind !== 'comando');
+
+    // L'interruttore dei comandi compare solo quando c'è qualcosa da mostrare.
+    const label = $('showCommandsLabel');
+    label.hidden = !commands.length;
+    $('showCommandsText').textContent = showCommands
+      ? `Nascondi i comandi (${commands.length})`
+      : `Mostra anche i comandi (${commands.length})`;
+    $('chatsCount').textContent = visible.length
+      ? `${visible.length} ${visible.length === 1 ? 'chat' : 'chat'}`
+      : '';
+
+    list.innerHTML = '';
+    if (!visible.length) {
+      // Tre vuoti diversi, tre frasi diverse: dire "nessuna chat" mentre una
+      // ricerca è attiva fa credere che l'archivio sia stato cancellato.
+      empty.hidden = false;
+      if (q) empty.textContent = `Nessuna chat per "${q}".`;
+      else if (commands.length) empty.textContent = 'Solo chat di comando: accendi l’interruttore per vederle.';
+      else empty.textContent = 'Nessuna chat, per ora.';
+      return;
+    }
+    empty.hidden = true;
+    for (const c of visible) list.appendChild(renderChat(c));
+  }
+
+  function renderChat(c) {
+    const row = document.createElement('div');
+    row.className = 'arc-chat';
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    row.dataset.chatId = c.id;
+    if (c.kind) row.dataset.kind = c.kind;
+
+    const title = document.createElement('div');
+    title.className = 'arc-chat-title';
+    title.textContent = c.title || 'Chat senza titolo';
+    row.appendChild(title);
+
+    const excerpt = document.createElement('div');
+    excerpt.className = 'arc-chat-excerpt';
+    excerpt.textContent = c.excerpt || '';
+    row.appendChild(excerpt);
+
+    const date = document.createElement('div');
+    date.className = 'arc-chat-date';
+    date.textContent = chatDateLabel(c.closedAt || c.updatedAt || c.startedAt);
+    row.appendChild(date);
+
+    row.title = [
+      c.title || '',
+      `${c.messageCount || 0} messaggi`,
+      c.kind === 'comando' ? 'Comando' : 'Conversazione',
+      'Clic per riaprirla e continuare a scrivere',
+    ].filter(Boolean).join('\n');
+
+    row.addEventListener('click', () => reopenChat(c));
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openChatCtxMenu(e.clientX, e.clientY, c);
+    });
+    // Parità con il mouse: Invio/Spazio riapre, Shift+F10 o il tasto Menu
+    // aprono lo stesso menu contestuale del tasto destro.
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        reopenChat(c);
+      } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const r = row.getBoundingClientRect();
+        openChatCtxMenu(r.left, r.bottom, c);
+      }
+    });
+    return row;
+  }
+
+  // Riaprire una chat = aprirla nella home di Filo, per intero, pronta a
+  // ricevere il messaggio successivo dentro la stessa conversazione.
+  function reopenChat(c) {
+    try { chrome.tabs.create({ url: `filo://dashboard/dashboard.html?chat=${encodeURIComponent(c.id)}` }); }
+    catch (_) {}
+  }
+
+  // Cancellazione manuale, con la conferma prevista per le azioni
+  // irreversibili: una chat cancellata non torna da nessuna parte.
+  async function removeChat(c) {
+    const text = `Cancella per sempre la chat «${c.title || 'senza titolo'}». `
+      + 'L’operazione non si può annullare.';
+    const ok = window.SN_CONFIRM_UI
+      ? await window.SN_CONFIRM_UI.confirm({ title: 'Elimina la chat', text, okLabel: 'Elimina' })
+      : window.confirm(`${text} Procedo?`); // fallback se il modulo non è caricato
+    if (!ok) return;
+    try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_DELETE, id: c.id }); } catch (_) {}
+    chats = chats.filter((x) => x.id !== c.id);
+    chatsTotal = Math.max(0, chatsTotal - 1);
+    renderChats();
+  }
+
   // Ricerca semantica: embeddizza la query e ordina per pertinenza (lato main).
   async function runSemanticSearch() {
     const q = ($('search').value || '').trim();
