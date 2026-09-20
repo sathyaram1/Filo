@@ -111,6 +111,8 @@
     autoGrowInput: () => autoGrowInput(),
     refreshLive: () => refreshLive(),
     archiviaRiga,
+    chatDellaRiga,
+    inChatAperta,
     isTerminalMode: () => Term.isEnabled(),
     getShell: () => Term.getShell(),
     getCwd: () => Term.getCwd(),
