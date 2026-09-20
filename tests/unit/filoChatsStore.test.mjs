@@ -143,3 +143,35 @@ test('la targa dell’intervista la dice un posto solo, e non cambia a ogni lett
   assert.equal(O.chatId(null), 'onb-prima');
   assert.notEqual(O.chatId(stato), O.chatId({ startedAt: '2026-09-21T09:00:00.000Z' }));
 });
+
+// ── Una chat chiusa la riapre solo l'utente ─────────────────────────────────
+//
+// Se l'utente chiede qualcosa e se ne va prima di leggere (torna alla home,
+// chiude la scheda), la risposta arriva quando la chat è già chiusa. Quella
+// risposta si salva, ma non è una conversazione ripresa: rimettendo la chat
+// «in corso» restava aperta per sempre, senza titolo generato e invisibile a
+// Filo, che quando gli si chiede di riprendere una discussione guarda solo le
+// chat finite.
+
+test('la risposta che arriva a chat chiusa si salva e la chat resta chiusa', async () => {
+  azzera();
+  await Store.append('t', turno('user', 'Domanda lunga', '2026-09-20T10:00:00.000Z'));
+  const chiusa = await Store.close('t');
+  assert.ok(chiusa.closedAt);
+
+  await Store.append('t', turno('filo', 'Risposta in ritardo', '2026-09-20T10:00:09.000Z'));
+  const dopo = await Store.get('t');
+  assert.deepEqual(dopo.messages.map((m) => m.text), ['Domanda lunga', 'Risposta in ritardo']);
+  assert.equal(dopo.closedAt, chiusa.closedAt);
+  // E va riclassificata: il titolo di mezza conversazione non vale per tutta.
+  assert.equal(Store.needsTriage(dopo), true);
+});
+
+test('l’utente che scrive di nuovo in una chat chiusa la riapre', async () => {
+  azzera();
+  await Store.append('t', turno('user', 'Prima', '2026-09-20T10:00:00.000Z'));
+  await Store.close('t');
+  await Store.append('t', turno('user', 'Ci ripenso', '2026-09-20T11:00:00.000Z'));
+  const dopo = await Store.get('t');
+  assert.equal(dopo.closedAt, null);
+});
