@@ -182,3 +182,90 @@ test('#602 un guasto di rete invece resta in coda e si riprova', async () => {
   assert.equal((store.get('feedbackOutbox') || []).length, 1);
   assert.equal(avvisi.length, 0, 'e non si dice a nessuno che è andata persa');
 });
+
+// #602, giro 2 — DIRLO È PARTE DEL BUTTARE VIA.
+//
+// L'avviso «quella segnalazione non è partita» era un colpo solo, verso chi
+// guardava in quel momento: all'avvio di Filo, o con la finestra in secondo
+// piano, non lo vedeva nessuno e la segnalazione spariva in silenzio lo stesso
+// — cioè il guaio che l'avviso doveva chiudere. Adesso chi non riesce a dirlo
+// risponde `false`, e la voce resta in coda finché l'avviso arriva.
+//
+// Senza il fix questi controlli sono ROSSI: la voce viene tolta al primo
+// tentativo, avviso o non avviso.
+test('#602 se non c’è nessuno a cui dirlo, la segnalazione resta in coda e si riprova', async () => {
+  const { OB, state, store } = setup();
+  const avvisi = [];
+  let qualcunoAscolta = false;
+  OB._reset();
+  OB._setAuto(false);
+  OB.init({
+    prepare: (p) => globalThis.SN_FEEDBACK.fallbackName(p && p.text),
+    onGiveUp: (item, motivo) => { avvisi.push(motivo); return qualcunoAscolta; },
+    backoffMin: 999999,
+  });
+
+  globalThis.SN_FEEDBACK.isEncryptionError = (e) => !!(e && e.cifratura === true);
+  globalThis.SN_FEEDBACK.submit = async () => {
+    state.calls.push('tentativo');
+    throw erroreCifratura('Non ho mandato niente: manca la chiave con cui si cifra.');
+  };
+
+  await OB.enqueue({ submissionId: 'c3', text: 'il pulsante non risponde' });
+  await OB.flush();
+
+  assert.equal(OB.size(), 1, 'nessuno ha sentito l’avviso: la segnalazione non si butta');
+  assert.equal((store.get('feedbackOutbox') || []).length, 1,
+    'e resta scritta sul disco, così regge anche un riavvio');
+  assert.equal(avvisi.length, 1);
+
+  // Un secondo giro a vuoto non ritenta l'invio (riprovare non cambierebbe
+  // niente) e non butta niente: prova solo a dirlo di nuovo.
+  await OB.flush();
+  assert.equal(state.calls.length, 1, 'un tentativo d’invio solo, in tutto');
+  assert.equal(avvisi.length, 2, 'ma l’avviso si riprova');
+  assert.equal(OB.size(), 1);
+
+  // Arriva qualcuno che può mostrarlo: detto, la voce esce dalla coda.
+  qualcunoAscolta = true;
+  const drained = await OB.flush();
+  assert.equal(drained, true);
+  assert.equal(OB.size(), 0, 'detto a qualcuno, la voce esce dalla coda');
+  assert.equal((store.get('feedbackOutbox') || []).length, 0);
+  assert.equal(state.calls.length, 1, 'e non si è mai ritentato l’invio');
+  assert.match(avvisi[avvisi.length - 1], /non ho mandato niente/i);
+});
+
+test('#602 la voce che aspetta l’avviso non scade dopo 24 ore', async () => {
+  const { OB, state, store } = setup();
+  const avvisi = [];
+  // Come dopo un riavvio: sul disco c'è una voce già rinunciata e vecchia di
+  // due giorni. Non deve sparire per anzianità senza che nessuno l'abbia letta.
+  store.set('feedbackOutbox', [{
+    id: 'c4',
+    payload: { submissionId: 'c4', text: 'il pulsante non risponde' },
+    prepared: true,
+    queuedAt: Date.now() - 48 * 60 * 60 * 1000,
+    attempts: 1,
+    rinuncia: true,
+    motivoRinuncia: 'Non ho mandato niente: manca la chiave con cui si cifra.',
+  }]);
+  let qualcunoAscolta = false;
+  OB._reset();
+  OB._setAuto(false);
+  OB.init({
+    prepare: (p) => globalThis.SN_FEEDBACK.fallbackName(p && p.text),
+    onGiveUp: (item, motivo) => { avvisi.push(motivo); return qualcunoAscolta; },
+    backoffMin: 999999,
+  });
+
+  await OB.flush();
+  assert.equal(OB.size(), 1, 'vecchia di due giorni, ma nessuno l’ha ancora letta');
+  assert.equal(state.calls.length, 0, 'e non si prova a spedirla: non partirà mai');
+  assert.equal(avvisi.length, 1);
+
+  qualcunoAscolta = true;
+  await OB.flush();
+  assert.equal(OB.size(), 0);
+  assert.match(avvisi[avvisi.length - 1], /manca la chiave/i);
+});

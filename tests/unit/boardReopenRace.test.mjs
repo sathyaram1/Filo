@@ -73,13 +73,26 @@ globalThis.SN_FEEDBACK = {
     server.reopenRequests[uid] = { at: new Date().toISOString() };
     return server.reopenRequests[uid];
   },
-  // Scrittura B: crea il feedback figlio collegato.
+  // Scrittura B: crea il feedback figlio collegato. Come il server vero
+  // (#370), un id d'invio gia' visto NON crea un secondo documento: torna
+  // quello di prima.
   submit: async (fb) => {
+    if (failSubmit === 'dopo-aver-scritto') {
+      // Il caso cattivo: il documento nasce, la risposta si perde per strada.
+      server.feedbacks.push({ id: `fb-child-${++seq}`, ...fb });
+      throw new Error('firestore submit fallito (503): risposta persa');
+    }
     if (failSubmit) throw new Error('firestore submit fallito (503): network hiccup');
+    const gia = fb.submissionId
+      && server.feedbacks.find((f) => f.submissionId === fb.submissionId);
+    if (gia) return { id: gia.id, deduped: true };
     const id = `fb-child-${++seq}`;
     server.feedbacks.push({ id, ...fb });
     return { id };
   },
+  // Toglie la propria richiesta di riapertura: l'handler la usa per rimettere
+  // la porta com'era quando la creazione non e' andata in porto.
+  clearReopenRequest: async (id, uid) => { delete server.reopenRequests[uid]; return true; },
   // #583: l'idoneità si legge dalla SCHEDA PUBBLICA del fix — il documento
   // feedback, da quando la collezione non è più pubblica, questa macchina non
   // lo può nemmeno aprire. Copia viva del guard: se una scrittura precedente
@@ -159,27 +172,58 @@ test('rete instabile sul guard, ripetuta: MAI un feedback figlio orfano, MAI dup
   assert.ok(refunds.length >= 1, 'la compensazione crediti è scattata');
 });
 
-test('guard riuscito ma creazione feedback fallita: il ritentativo è bloccato (niente secondo figlio)', async () => {
-  // Il guard (scrittura A) riesce, la creazione del feedback (scrittura B)
-  // fallisce. Il guard resta marcato: un ritentativo deve essere respinto da
-  // canReopen, così non si accumulano duplicati.
+// #602, giro 2 — LA SPIEGAZIONE DI CHI RIAPRE NON SI PERDE.
+//
+// Il guard si scrive per primo (sopra, #269) e questo resta giusto: senza, una
+// rete che cade fra le due scritture lasciava figli orfani e duplicati gratis.
+// Ma quando e' la CREAZIONE a fallire, di duplicati non ce n'e' nessuno da
+// temere: c'e' solo chi ha appena scritto cosa non funziona ancora e si sente
+// rispondere che il fix e' «gia' stato segnalato». I crediti tornavano, la
+// spiegazione no, e non c'era modo di rimandarla.
+//
+// Adesso il guard torna indietro insieme ai crediti, e l'id d'invio stabile
+// tiene chiusa la porta ai duplicati anche se il primo tentativo era in realta'
+// arrivato. Senza il fix il primo di questi due test e' rosso.
+test('creazione fallita: il segnale torna indietro e si puo\' riprovare — il figlio resta UNO', async () => {
   failSubmit = true;
 
   const r1 = await reopen(msgFor());
   assert.equal(r1.ok, false, 'la creazione del feedback fallisce');
-  assert.ok(server.reopenRequests[UID], 'ma il guard è comunque marcato');
   assert.equal(server.feedbacks.length, 0, 'nessun feedback figlio creato');
   assert.equal(refunds.length, 1, 'crediti rimborsati dopo il fallimento');
+  assert.deepEqual(server.reopenRequests, {},
+    'e il segnale torna indietro: chi ha scritto puo\' rimandare la sua spiegazione');
 
-  // Ritentativo: ora il guard blocca. Anche se la rete tornasse buona, non deve
-  // nascere un secondo feedback né essere riscalato credito.
+  // Ritentativo con la rete tornata: adesso passa, e nasce UN figlio solo.
   failSubmit = false;
-  const spendsBefore = spends.length;
   const r2 = await reopen(msgFor());
-  assert.equal(r2.ok, false, 'il ritentativo è respinto dal guard');
-  assert.match(r2.error, /gi[àa].*segnalato|segnalato.*rotto/i, 'messaggio "già segnalato"');
-  assert.equal(server.feedbacks.length, 0, 'ancora nessun feedback figlio');
-  assert.equal(spends.length, spendsBefore, 'nessun credito scalato al ritentativo bloccato');
+  assert.equal(r2.ok, true, 'il ritentativo va a buon fine');
+  assert.equal(server.feedbacks.length, 1, 'un solo feedback figlio');
+  assert.ok(server.reopenRequests[UID], 'e ora il guard e\' marcato');
+
+  // Da qui in poi il guard fa il suo mestiere: niente secondo figlio.
+  const r3 = await reopen(msgFor());
+  assert.equal(r3.ok, false, 'un terzo tentativo e\' respinto dal guard');
+  assert.equal(server.feedbacks.length, 1, 'ancora un solo feedback figlio');
+});
+
+test('la creazione era riuscita ma la risposta si e\' persa: il ritentativo non crea un doppione', async () => {
+  // Il caso che il guard-per-primo proteggeva: il documento e' nato, il
+  // chiamante ha visto un errore. Il segnale torna indietro, quindi si puo'
+  // riprovare — e il ritentativo NON deve creare un secondo figlio.
+  failSubmit = 'dopo-aver-scritto';
+
+  const r1 = await reopen(msgFor());
+  assert.equal(r1.ok, false, 'chi ha riaperto vede un errore');
+  assert.equal(server.feedbacks.length, 1, 'ma il documento era nato');
+  assert.deepEqual(server.reopenRequests, {}, 'il segnale e\' tornato indietro');
+
+  failSubmit = false;
+  const r2 = await reopen(msgFor());
+  assert.equal(r2.ok, true);
+  assert.equal(server.feedbacks.length, 1,
+    'il ritentativo riconosce l\'invio gia\' fatto: nessun doppione');
+  assert.ok(server.reopenRequests[UID], 'e il guard resta marcato');
 });
 
 // #583 — la stessa riapertura chiesta da una pagina di un SITO VISITATO.
