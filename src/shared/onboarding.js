@@ -401,6 +401,17 @@
     return { ...cur, thread, startedAt: cur.startedAt || new Date().toISOString() };
   }
 
+  // #533 (quinto giro di verifica) — segna a quale richiesta apparteneva
+  // l'ultima risposta dell'intervista, così la conversazione, quando riprende,
+  // riparte con i limiti che aveva. Un id vuoto non cancella quello di prima:
+  // le risposte scritte a mano da Filo (il benvenuto, il congedo) non hanno
+  // una richiesta dietro e non devono far dimenticare quella che c'era.
+  function rememberCompito(state, id) {
+    const cur = normalize(state);
+    const nuovo = String(id || '').trim();
+    return nuovo ? { ...cur, compito: nuovo } : cur;
+  }
+
   // Quanti messaggi ha scritto l'utente: è il conto degli "scambi" del tetto.
   function userTurns(state) {
     return normalize(state).thread.filter((m) => m.role === 'user').length;
