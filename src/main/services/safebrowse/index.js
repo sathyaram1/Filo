@@ -59,14 +59,37 @@ const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 const gsbCache = new TtlCache(30 * MIN);
 const ageCache = new TtlCache(7 * DAY);
 const certCache = new TtlCache(HOUR);
-// #591 — giudizio del modello e finestra nascosta si ricordano per DOMINIO
-// REGISTRABILE, non per host completo: con la chiave sull'host bastavano
-// sottodomini sempre nuovi sullo stesso dominio per far ripartire ogni volta
-// una chiamata al modello e una finestra nascosta, aggirando l'unico freno che
-// c'era. Sono i due stadi che costano (soldi l'uno, una finestra con
-// JavaScript attivo l'altro); gli altri restano come stavano.
+// #591 — giudizio del modello e finestra nascosta sono i due stadi che costano
+// (soldi l'uno, una finestra con JavaScript attivo l'altro), e bastavano
+// sottodomini sempre nuovi sullo stesso dominio per farli ripartire all'infinito.
+//
+// #591, secondo giro — il freno va sul DOMINIO, il verdetto resta
+// dell'INDIRIZZO. Spostare anche il verdetto sul dominio registrabile fermava
+// sì la spruzzata, ma sulle piattaforme dove ogni utente riceve un suo
+// sotto-indirizzo (pages.dev, github.io, vercel.app, i blog ospitati) il
+// dominio registrabile è la PIATTAFORMA: il verdetto di un sito di truffa
+// sbarrava con la pagina rossa tutti i siti innocenti ospitati lì, e al
+// contrario il «pulito» di un sito innocente impediva del tutto il controllo
+// del sito di truffa vicino. Quindi il verdetto torna sull'host completo, e a
+// fermare la spruzzata resta un CONTO per dominio registrabile: quante
+// verifiche profonde quel dominio può far partire nella finestra di tempo
+// della sua cache. Duecento sottodomini non fanno duecento chiamate, e due
+// siti diversi sulla stessa piattaforma hanno ciascuno il suo verdetto.
 const sandboxCache = new TtlCache(30 * MIN);
 const llmCache = new TtlCache(HOUR);
+const DEEP_MAX_PER_DOMAIN = 4;
+const llmSpesa = new TtlCache(HOUR);
+const sandboxSpesa = new TtlCache(30 * MIN);
+
+// Prende un gettone dal conto del dominio. Falso = quel dominio ne ha già fatte
+// partire troppe di recente, e si rinuncia (senza ricordare niente: al prossimo
+// giro di orologio si riprova).
+function prendiGettone(conto, reg, max = DEEP_MAX_PER_DOMAIN) {
+  const n = conto.get(reg) || 0;
+  if (n >= max) return false;
+  conto.set(reg, n + 1);
+  return true;
+}
 
 // Chiamate già in volo, per dominio registrabile. La cache si riempie solo
 // quando la risposta arriva: senza questo, cinquanta sottodomini aperti insieme
