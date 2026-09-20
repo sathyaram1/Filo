@@ -311,7 +311,7 @@ function passaggio(html, modo, dentroZona = false) {
       }
       pila.push(nome);
       const attrs = attributi(t.attrsRaw);
-      const dove = { inZona: dentroZona || zone.length > 0, primoLivello: pila.length === 1, soloIlleggibile };
+      const dove = { inZona: dentroZona || zone.length > 0, soloIlleggibile };
       const verdetto = daScartare(nome, attrs, dove);
       const contornoQui = tieniCornice && verdetto === 'cornice';
       if (!fuori.length && verdetto && !contornoQui) { fuori.push(pila.length); continue; }
