@@ -868,8 +868,27 @@
     // pagina) non sta dicendo che di sveglie non ce ne sono: lì l'ora non può
     // decidere niente, o ogni frase con un'ora diventa un'accusa — anche
     // quella che racconta la sveglia appena messa da quel pannello.
-    const sveglieNote = Array.isArray(stato?.orariSveglie);
-    const orari = new Set(sveglieNote ? stato.orariSveglie : []);
+    const elenco = Array.isArray(stato?.sveglie) ? stato.sveglie : null;
+    const sveglieNote = !!elenco || Array.isArray(stato?.orariSveglie);
+    const orari = new Set(elenco ? elenco.map((s) => s && s.ora).filter(Boolean)
+      : (Array.isArray(stato?.orariSveglie) ? stato.orariSveglie : []));
+    const oggi = Number.isFinite(stato?.oggi) ? stato.oggi : Date.now();
+    // Le ore che possono reggere QUESTA famiglia in QUESTA frase: il genere
+    // giusto (una sveglia non è un conto alla rovescia) e, se la frase nomina
+    // un giorno, quel giorno.
+    const oreCheReggono = (fam, clausola) => {
+      if (!elenco) return orari;
+      const generi = tipiSveglia(fam);
+      const giorno = giornoNominato(clausola, oggi);
+      const out = new Set();
+      for (const s of elenco) {
+        if (!s || !s.ora) continue;
+        if (generi && !generi.has(s.tipo)) continue;
+        if (giorno && s.giorno && s.giorno !== giorno) continue;
+        out.add(s.ora);
+      }
+      return out;
+    };
     const attesaDaStato = stato && stato.tipiInAttesa;
     const attesa = new Set(attesaDaStato
       ? (attesaDaStato instanceof Set ? [...attesaDaStato] : attesaDaStato)
