@@ -1275,6 +1275,8 @@
     TIPI_DI_CONTESTO,
     TIPI_DI_SOLA_LETTURA,
     rileva,
+    statoDaTimerEFile,
+    domandaSuCosaFatta,
     insiemeDiTipi,
     tipiInAttesa,
     tipiDallaCronologia,
