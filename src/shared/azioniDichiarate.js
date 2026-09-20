@@ -256,8 +256,9 @@
         // Giro 9: «ho trascritto la lista della spesa» e «ho messo per
         // iscritto la lista della spesa» non nominano né l'appunto né chi lo
         // riceve, e restavano muti. I due verbi vogliono dire scrivere
-        // qualcosa da qualche parte e basta.
-        new RegExp(`${HO}(?:trascritto|messo\\s+per\\s+iscritto|buttato\\s+giù)\\b`, 'i'),
+        // qualcosa da qualche parte e basta. «Buttare giù» resta fuori: una
+        // bozza buttata giù è quasi sempre dentro la risposta.
+        new RegExp(`${HO}(?:trascritto|messo\\s+per\\s+iscritto)\\b`, 'i'),
       ],
     },
     {
