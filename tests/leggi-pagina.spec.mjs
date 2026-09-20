@@ -337,3 +337,26 @@ test('F — l\'assistente di una pagina legge la pagina su cui sta', async ({ ap
   expect(r.output.ok).toBe(true);
   expect(String(r.output.text)).toContain('9:30');
 });
+
+// Un allarme che suona su ogni lettura non è un allarme: l'indirizzo di un
+// articolo vero è lungo e illeggibile quasi sempre, e dopo una ricerca è
+// l'assistente che apre i risultati. Il freno resta sui DATI dell'utente.
+test('G — un indirizzo lungo qualunque non fa scattare la conferma, i tuoi dati sì', async ({ app }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Mario Rossi, vive a Bologna.' });
+  });
+  const daPagina = (u) => app.evaluate(
+    (_e, url) => globalThis.SN_HANDLE_MESSAGE(
+      { type: 'filo_run_action', action: { type: 'LEGGI_PAGINA', url } },
+      { url: 'https://un-sito.example/articolo' },
+    ),
+    u,
+  );
+
+  const normale = await daPagina('https://www.esempio.it/cronaca/26_marzo_12/sciopero-treni-nord-italia-a1b2c3d4-e5f6-7890-abcd-ef1234567890.shtml');
+  expect(normale.needsConfirm).toBeFalsy();
+
+  const conDati = await daPagina('https://example.com/collect?d=Mario_Rossi_Bologna');
+  expect(conDati.needsConfirm).toBe(2);
+});

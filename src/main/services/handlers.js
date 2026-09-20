@@ -1258,7 +1258,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       const url = globalThis.SN_URL_NAV.indirizzoAzione(action);
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
-        const fromUntrusted = /^https?:/i.test(origin);
+        // L'allarme STRUTTURALE (payload lungo, blocco opaco) solo per NAVIGA:
+        // una lettura segue una ricerca, e l'indirizzo di un articolo vero è
+        // lungo e illeggibile quasi sempre. Un allarme che suona sette volte su
+        // dieci insegna a cliccare OK. Il freno sui DATI dell'utente resta su
+        // tutte e due le strade (#553).
+        const fromUntrusted = type === 'NAVIGA' && /^https?:/i.test(origin);
         const corpus = await navExfilCorpus();
         const v = Exfil.assess(url, { corpus, fromUntrusted });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
