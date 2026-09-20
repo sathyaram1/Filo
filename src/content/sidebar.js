@@ -1240,6 +1240,7 @@
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
+          mostraAzioniMancate(azioniMancate);
         }
         const ok = await runPageAction(parsed.page);
         // Se l'agente vuole concatenare passi (status:"continue") e l'azione è
