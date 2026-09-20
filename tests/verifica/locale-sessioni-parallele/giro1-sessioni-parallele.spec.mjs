@@ -95,7 +95,7 @@ test('il cammino dell\'owner: scelgo le sessioni, l\'account prioritario, esclud
   await expect.poll(() => page.evaluate(() => window.__sessionsDoc.maxSessions)).toBe(5);
 
   // 2) Prima l'account B.
-  await page.locator('input[name="mgPriorityAccount"][value="B"]').check();
+  await pillola(page, 'B').click();
   await expect.poll(() => page.evaluate(() => window.__sessionsDoc.priorityAccount)).toBe('B');
   await expect(page.locator('#mgPriorityAccountMsg')).toHaveText('Salvato.');
 
