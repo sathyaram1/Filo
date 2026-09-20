@@ -726,6 +726,10 @@
   }
 
   let sessionsState = RS ? RS.leggiDoc({}) : null;
+  // Finché non si è letto dal server, quello che si vede non è quello che c'è:
+  // la pagina lo dice invece di far passare i valori di partenza per veri.
+  let sessionsLetto = false;
+  const SESSIONS_NON_LETTO = 'Non ho potuto leggere dal server: quello che vedi qui non viene da lì.';
 
   function setSessionsMsg(el, text, kind) {
     if (!el) return;
