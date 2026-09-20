@@ -2910,7 +2910,7 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     openTabsCount, partOfDay, dayType, dateKey,
   });
 
-  return { settings, hasKey, payload, signature, saved };
+  return { settings, canServe, payload, signature, saved };
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
