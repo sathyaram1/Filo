@@ -279,6 +279,12 @@ const VIE = {
     run: (P) => P.streamComplete({}),
   }),
   chain: (s) => Gate.chain({ settings: s, action: 'azione_x' }),
+  // La porta dei servizi a pagamento che non sono modelli (la ricerca sul web):
+  // stessa chiave condivisa, stesso tetto mensile, stesso conto.
+  service: (s) => Gate.service({
+    settings: s, action: 'ricerca_web', provider: 'tavily', costoUsd: 0.008,
+    run: async () => { globalThis.SN_PROVIDERS.completeWithFallback({}); return { ok: true }; },
+  }),
 };
 
 for (const [nome, via] of Object.entries(VIE)) {
@@ -376,4 +382,40 @@ test('un problema di configurazione resta leggibile anche a limite esaurito', as
     (e) => e.code === 'NO_MODEL_FOR_ACTION',
     'chi ha una funzione scoperta deve leggere quello, non "limite raggiunto"',
   );
+});
+
+
+// La ricerca sul web si paga sulla chiave condivisa dell'owner come una
+// chiamata a un modello: se non passa di qui, non c'è tetto che la fermi e non
+// compare in nessun conto — che è esattamente il difetto di classe della
+// segnalazione, un fornitore più in là.
+test('un servizio a pagamento che non è un modello finisce nel conto del mese', async () => {
+  const b = banco();
+  const r = await Gate.service({
+    settings: SETTINGS, action: 'ricerca_web', provider: 'tavily',
+    costoUsd: (out) => (out.provider === 'tavily' ? 0.008 : 0),
+    run: async () => ({ ok: true, provider: 'tavily', results: [] }),
+  });
+  assert.equal(r.ok, true);
+  assert.equal(b.registrate.length, 1);
+  assert.equal(b.registrate[0].action, 'ricerca_web');
+  assert.equal(b.registrate[0].usage.costUsd, 0.008);
+});
+
+test('un ripiego gratuito non scrive una riga di spesa', async () => {
+  const b = banco();
+  await Gate.service({
+    settings: SETTINGS, action: 'ricerca_web', provider: 'tavily',
+    costoUsd: (out) => (out.provider === 'tavily' ? 0.008 : 0),
+    run: async () => ({ ok: true, provider: 'duckduckgo', results: [] }),
+  });
+  assert.deepEqual(b.registrate, []);
+});
+
+test('il nome del servizio è leggibile nella pagina dei costi', async () => {
+  require_(join(REPO, 'src/shared/constants.js'));
+  const C = globalThis.SN_CONST;
+  const id = C.SERVIZI.WEB_SEARCH;
+  assert.notEqual(C.actionLabel(id), id, 'la ricerca sul web mostrerebbe il suo codice grezzo');
+  assert.equal(C.creditUsageGroup(id), 'Ricerca sul web');
 });

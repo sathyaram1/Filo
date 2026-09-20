@@ -209,6 +209,15 @@ const geoBlockMethods = {
   _geoLevel2Check(tab, url, text, rinvio = 0) {
     const classify = globalThis.SN_GEO_CLASSIFY;
     if (typeof classify !== 'function') return;
+    // #591, quinto giro — in incognito no. Questo livello è l'unica cosa che
+    // Filo fa partire da solo portandosi dietro il CONTENUTO della pagina
+    // (titolo e primi caratteri del testo), e in incognito Filo si astiene da
+    // tutto il resto: niente sessione salvata, niente archivio, niente
+    // cronologia, niente riordino automatico. Una pagina guardata in una
+    // finestra che promette di non lasciare traccia non deve finire dentro la
+    // richiesta a un fornitore. Il livello 1, che è locale e non manda niente
+    // a nessuno, continua a lavorare anche qui.
+    if (this.incognito) return;
     if (tab.geoBlock) return; // già rilevato (livello 1)
     let host = '';
     try { host = new URL(url).hostname; } catch (_) { return; }

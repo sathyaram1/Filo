@@ -14,6 +14,12 @@
   const TAVILY_URL = 'https://api.tavily.com/search';
   const DDG_URL = 'https://html.duckduckgo.com/html/';
   const TIMEOUT_MS = 6000;
+  // #591 — quanto costa una ricerca. Tavily conta una ricerca "basic" come un
+  // credito, e un credito a consumo costa 0,008 $. Il numero serve a una cosa
+  // sola: far comparire questa spesa nel conto del mese come tutte le altre,
+  // invece di lasciarla invisibile sulla chiave condivisa dell'owner. Il
+  // ripiego su DuckDuckGo non costa niente e infatti non scrive niente.
+  const PREZZO_RICERCA_USD = 0.008;
   const MAX_QUERY_LEN = 300;
   const SNIPPET_MAX = 240;
 
@@ -117,5 +123,11 @@
     }
   }
 
-  global.SN_WEB_SEARCH = { search };
+  // Quanto è costata questa ricerca, dal risultato: serve a chi la registra nel
+  // conto del mese (il ripiego gratuito non si paga).
+  function costoUsd(r) {
+    return r && r.ok && r.provider === 'tavily' ? PREZZO_RICERCA_USD : 0;
+  }
+
+  global.SN_WEB_SEARCH = { search, costoUsd, PREZZO_RICERCA_USD };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

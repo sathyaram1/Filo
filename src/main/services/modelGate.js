@@ -181,6 +181,36 @@
     throw none;
   }
 
+  // ─── Servizi a pagamento che non sono modelli ─────────────────────────────
+  // #591, quinto giro. La ricerca sul web che Filo fa da solo dentro una
+  // conversazione è un fornitore come gli altri: si paga sulla stessa chiave
+  // condivisa, e non passava né dal tetto mensile né dal conteggio. Non ha una
+  // catena di modelli da costruire (non c'è niente da scegliere, quindi non
+  // compare nell'editor dei modelli), ma il limite e il conto sono gli stessi e
+  // stanno qui, dove stanno per tutti.
+  // `costoUsd` può essere un numero o una funzione del risultato: quanto è
+  // costata davvero quella chiamata (zero per un ripiego gratuito).
+  async function service({ settings, action, provider, run, costoUsd }) {
+    await ensureUnderLimit(settings);
+    const result = await run();
+    let usd = typeof costoUsd === 'function' ? costoUsd(result) : costoUsd;
+    usd = Number(usd);
+    if (Number.isFinite(usd) && usd > 0) {
+      const C = costs();
+      if (C) {
+        try {
+          await C.record({
+            action, provider, model: '',
+            usage: { costUsd: usd },
+            pricing: null,
+            usdToEur: settings && settings.usdToEur,
+          });
+        } catch (_) {}
+      }
+    }
+    return result;
+  }
+
   // ─── Prove dalle Opzioni e dalla pagina di amministrazione ────────────────
   // Un pulsante «Prova» manda una richiesta VERA, pagata con le chiavi vere —
   // il codice lo diceva già nei commenti, ma quelle chiamate non passavano dal
@@ -272,6 +302,7 @@
     complete,
     stream,
     capability,
+    service,
     probe,
     canLookupServedBy,
     lookupServedBy,

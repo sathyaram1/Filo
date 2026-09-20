@@ -329,6 +329,16 @@
     return NOTIONAL_PRICING[model] || null;
   }
 
+  // ─── Servizi a pagamento che NON sono modelli ───────────────────────────────
+  // #591, quinto giro. La ricerca sul web si paga sulla chiave condivisa
+  // dell'owner come una chiamata a un modello, ma non è un modello: non ha uno
+  // slot nell'editor (non c'è niente da scegliere) e quindi non sta in ACTIONS.
+  // Ha però bisogno di un nome suo, perché la sua spesa deve comparire nel
+  // conto del mese invece di restare invisibile.
+  const SERVIZI = {
+    WEB_SEARCH: 'web_search',
+  };
+
   // Raggruppamento azione → "tipo d'uso" mostrato nel grafico a torta dei crediti
   // (per UTILIZZO, non per modello). Le azioni non mappate ricadono in "Altro".
   const CREDIT_USAGE_GROUPS = {
@@ -355,6 +365,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
+    [SERVIZI.WEB_SEARCH]: 'Ricerca sul web',
   };
 
   function creditUsageGroup(action) {
@@ -404,6 +415,7 @@
     [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
     [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
     [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
+    [SERVIZI.WEB_SEARCH]: 'Ricerca sul web',
   };
 
   function actionLabel(action) {
@@ -2352,6 +2364,7 @@
     CREDIT_USAGE_GROUPS,
     creditUsageGroup,
     ACTION_LABELS,
+    SERVIZI,
     actionLabel,
     DEFAULT_MODELS,
     DEFAULT_MODEL_REGISTRY,

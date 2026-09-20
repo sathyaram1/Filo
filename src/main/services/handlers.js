@@ -1507,10 +1507,20 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         try {
           const settings = await getEffectiveSettings();
           const tavilyKey = settings.apiKeys?.tavily || '';
-          const r = await WS.search({ query, tavilyKey, maxResults: 5 });
+          // #591, quinto giro — la ricerca sul web è un fornitore che si paga
+          // sulla chiave condivisa: dal cancello, come tutto il resto, così il
+          // tetto mensile vale anche qui e la spesa compare nel conto.
+          const r = await Gate.service({
+            settings, action: SN_CONST.SERVIZI.WEB_SEARCH, provider: 'tavily',
+            costoUsd: WS.costoUsd,
+            run: () => WS.search({ query, tavilyKey, maxResults: 5 }),
+          });
           const results = Array.isArray(r?.results) ? r.results : [];
           return { executed: results.length > 0, kept: true, output: { search: query, results, provider: r?.provider || '', reason: r?.reason || '' } };
         } catch (e) {
+          if (e && e.code === 'LIMIT_REACHED') {
+            return { executed: false, kept: true, output: { search: query, results: [], error: e.message } };
+          }
           return { executed: false, kept: true, output: { search: query, results: [], error: e?.message || String(e) } };
         }
       }

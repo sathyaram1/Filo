@@ -188,4 +188,43 @@ function proprietario(host) {
   return ultima ? `${ultima}.${reg}` : reg;
 }
 
-module.exports = { getDomainInfo, isIpAddress, proprietario, PIATTAFORME_MULTI_UTENTE };
+// ─── Gli indirizzi della rete di casa ────────────────────────────────────────
+// #591. Il router, il NAS, una stampante, un'applicazione in prova sulla
+// propria macchina: da fuori non li raggiunge nessuno, quindi non possono
+// essere la truffa che arriva da una mail e non c'è nessun paese che li
+// blocchi. Ogni controllo che Filo fa partire DA SOLO mentre si naviga — il
+// giudizio sui siti pericolosi, la finestra nascosta, il riconoscimento del
+// blocco geografico — deve lasciarli stare: costano una chiamata pagata sulla
+// chiave condivisa e, dove il controllo si porta dietro il contenuto della
+// pagina, mandano fuori casa quello che c'è scritto sul pannello del router.
+//
+// Sta qui, accanto alle altre risposte su «che cos'è questo indirizzo», perché
+// la risposta deve essere UNA: al secondo giro viveva dentro il rilevatore dei
+// siti pericolosi, e il riconoscimento del blocco geografico — che nella
+// segnalazione sta nella stessa fila — non la vedeva.
+const SUFFISSI_LOCALI = ['.local', '.localhost', '.home.arpa', '.internal', '.lan', '.intranet'];
+
+function isHostPrivato(host) {
+  const h = String(host == null ? '' : host).toLowerCase().replace(/\.$/, '').trim();
+  if (!h) return false;
+  // Nome senza punti (localhost, il nome NetBIOS di una macchina in ufficio):
+  // non è un indirizzo pubblico, non ha un dominio registrabile.
+  if (!h.includes('.') && !h.includes(':')) return true;
+  if (SUFFISSI_LOCALI.some((s) => h.endsWith(s))) return true;
+  // IPv6: ::1 (loopback), fc00::/7 (locali), fe80::/10 (link-local).
+  if (h.includes(':')) {
+    const v6 = h.replace(/^\[|\]$/g, '');
+    return v6 === '::1' || /^f[cd][0-9a-f]{0,2}:/.test(v6) || /^fe[89ab][0-9a-f]?:/.test(v6);
+  }
+  const q = h.split('.');
+  if (q.length !== 4 || !q.every((n) => /^\d{1,3}$/.test(n) && Number(n) <= 255)) return false;
+  const [a, b] = q.map(Number);
+  if (a === 10 || a === 127 || a === 0) return true;          // privata, loopback, «questa rete»
+  if (a === 192 && b === 168) return true;                     // privata
+  if (a === 172 && b >= 16 && b <= 31) return true;            // privata
+  if (a === 169 && b === 254) return true;                     // link-local
+  if (a === 100 && b >= 64 && b <= 127) return true;           // rete dell'operatore
+  return false;
+}
+
+module.exports = { getDomainInfo, isIpAddress, proprietario, isHostPrivato, SUFFISSI_LOCALI, PIATTAFORME_MULTI_UTENTE };

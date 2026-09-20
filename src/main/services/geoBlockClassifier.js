@@ -45,7 +45,7 @@ require('../../shared/contenutoEsterno.js');
 // #591 (terzo giro) — «chi possiede il sito», per contare le chiamate dove sta
 // chi scrive la pagina e non dove sta chi ha comprato il dominio. Logica pura
 // come questo file: nessun Electron, nessuna rete.
-const { proprietario } = require('./safebrowse/psl.js');
+const { proprietario, isHostPrivato } = require('./safebrowse/psl.js');
 
 // Classi chiuse dell'output. Qualsiasi cosa fuori da qui è invalida.
 const CLASSES = {
@@ -69,12 +69,32 @@ const TITLE_BUDGET = 200;
 // livello 2 cosa sia successo (spesso un blocco che ha svuotato il body).
 const EMPTY_PAGE_MAX_CHARS = 40;
 
+// L'indirizzo arriva già senza porta da chi chiama, ma una porta attaccata non
+// deve poter far saltare l'esclusione della rete di casa.
+function hostSenzaPorta(host) {
+  const h = String(host == null ? '' : host).trim();
+  if (!h) return '';
+  if (h.startsWith('[')) return h.slice(0, h.indexOf(']') + 1 || undefined);
+  const i = h.lastIndexOf(':');
+  return i > 0 && !h.includes('::') && /^\d+$/.test(h.slice(i + 1)) ? h.slice(0, i) : h;
+}
+
 // ─── Gate: vale la pena chiamare il livello 2? ───────────────────────────────
 // La coda ambigua, e SOLO quella. Se il livello 1 ha già concluso
 // (`deterministicHit`), non si chiama l'LLM: è già deciso. Stati di
 // successo/insuccesso ovvi (2xx pieno, 404, 5xx) non sono geo-block ambiguo.
-function shouldClassify({ statusCode, text, deterministicHit } = {}) {
+function shouldClassify({ statusCode, text, deterministicHit, host } = {}) {
   if (deterministicHit) return false; // livello 1 ha già vinto
+  // #591 (quinto giro) — gli indirizzi della rete di casa. Il pannello del
+  // router, il NAS, una stampante, un'applicazione in prova sulla propria
+  // macchina: nessun paese li blocca, quindi non c'è niente da riconoscere. E
+  // qui non partirebbe solo una chiamata pagata sulla chiave condivisa: questo
+  // livello manda al modello il TITOLO e il TESTO della pagina, cioè farebbe
+  // uscire di casa quello che c'è scritto sul pannello del router. Il giudizio
+  // sui siti pericolosi, che nella segnalazione sta nella stessa fila, questa
+  // esclusione ce l'ha dal secondo giro; adesso la domanda è una sola e la
+  // leggono tutti e due.
+  if (isHostPrivato(hostSenzaPorta(host))) return false;
   const code = Number(statusCode);
   const t = String(text || '').replace(/\s+/g, ' ').trim();
 
@@ -357,7 +377,7 @@ async function classify(input = {}, opts = {}) {
   const { title, text, statusCode, host, url } = input;
 
   // 1) Gate: se non è un caso ambiguo, non chiamare il modello.
-  if (!shouldClassify({ statusCode, text, deterministicHit: input.deterministicHit })) {
+  if (!shouldClassify({ statusCode, text, host, deterministicHit: input.deterministicHit })) {
     return { class: null, route: routeForClass(null), cached: false, skipped: true };
   }
 
@@ -435,6 +455,7 @@ const api = {
   VALID,
   TEXT_BUDGET,
   shouldClassify,
+  hostSenzaPorta,
   buildPrompt,
   parseClassification,
   routeForClass,
