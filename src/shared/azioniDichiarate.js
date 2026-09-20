@@ -433,12 +433,18 @@
   // frase che la dà per fatta: la sveglia con l'orario che Filo non sa leggere
   // lasciava l'utente senza sveglia e senza avviso, che è esattamente la
   // lamentela del feedback. Restano buone le azioni che hanno prodotto
-  // qualcosa (`_output`: una ricerca senza risultati è comunque partita) e
-  // quelle in attesa di un OK dell'utente, che in chat si vedono.
+  // qualcosa (`_output`: una ricerca senza risultati è comunque partita), quelle
+  // in attesa di un OK dell'utente e quelle che il main ha TENUTO (`_kept`):
+  // l'evento di calendario, la pulizia delle schede e la cancellazione
+  // dell'archivio non si eseguono da sole, mettono in chat un bottone che
+  // l'utente preme. Filo ha fatto tutto quello che poteva fare, e senza questo
+  // la sua risposta veniva buttata, rifatta e poi smentita.
+  // Una sveglia CHIAMATA e non riuscita resta fuori: lì il main non tiene
+  // niente (né bottone né riga), ed è la porta del giro 2.
   function haFattoQualcosa(a) {
     if (!a || typeof a !== 'object') return true;
     if (a._executed !== false) return true;
-    return !!(a._output || a._confirm);
+    return !!(a._output || a._confirm || a._kept);
   }
 
   function insiemeDiTipi(azioni) {
