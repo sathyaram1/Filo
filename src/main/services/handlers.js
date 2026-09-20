@@ -2652,6 +2652,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // scritto nei log come anomalia.
   let azioniMancate = [];
   let avvisoAzioni = '';
+  // La risposta è rimasta in formato macchina: traccia da tenere accanto al
+  // turno, come per l'azione dichiarata e mai partita.
+  let formatoMancato = false;
   if (Dichiarate) {
     try {
       // La cronologia si guarda INTERA, non solo i venti messaggi che vanno al
@@ -2671,7 +2674,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // l'avviso ce l'aveva. Stesso danno, stessa riga, stessa traccia.
         avvisoAzioni = Dichiarate.avvisoFormatoPerUtente();
         console.warn('[Filo] #517 risposta in formato macchina, azioni mai emesse:',
-          `${rimandatoIndietro ? 'dopo il ritentativo' : 'senza ritentativo'} · ${textReply.slice(0, 200)}`);
+          `${rimandatoIndietro ? `dopo il ritentativo (${motivoRimbalzo})` : 'senza ritentativo'} · ${textReply.slice(0, 200)}`);
+        formatoMancato = true;
       }
     } catch (e) { console.warn('[Filo] controllo azioni dichiarate fallito', e); }
   }
@@ -2697,9 +2701,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     summary: textReply.slice(0, 200),
     // #517 — la traccia dell'anomalia sta accanto al turno che l'ha prodotta:
     // «ha detto di aver fatto X, e X non è mai stata chiamata».
-    extra: azioniMancate.length
-      ? { actions: actionsToRun, azioniMancate: azioniMancate.map((f) => ({ id: f.id, frase: f.frase })) }
-      : { actions: actionsToRun },
+    extra: (() => {
+      const extra = { actions: actionsToRun };
+      if (azioniMancate.length) extra.azioniMancate = azioniMancate.map((f) => ({ id: f.id, frase: f.frase }));
+      if (formatoMancato) extra.formatoMancato = true;
+      return extra;
+    })(),
   });
   // #524 — chiusura dell'intervista di benvenuto: la sequenza sta in
   // `finishOnboarding`. Se invece l'intervista prosegue, il turno di Filo viene

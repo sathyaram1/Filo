@@ -704,6 +704,15 @@
         } else if (data.kind === 'done') {
           const a = data.action;
           if (a && data.kept !== false && Att.tellActionInActivity(pending, a) && a._callId) shown.add(a._callId);
+        } else if (data.kind === 'rilettura') {
+          // #517 — la risposta già scritta è stata rimandata al modello: a
+          // schermo sparisce di colpo, e senza una riga qui l'utente vede solo
+          // una risposta che si cancella da sola. La riga resta come traccia
+          // («failed»), non conta come azione fatta.
+          if (streamBubble) { streamBubble.textContent = ''; }
+          pending.addRow('', '↻', data.motivo === 'formato'
+            ? 'Risposta rifatta: era arrivata nel formato interno'
+            : 'Risposta rifatta: diceva fatta una cosa che non era partita', true);
         } else if (data.kind === 'round') {
           if (streamBubble) {
             if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
