@@ -44,7 +44,7 @@
         // darebbe l'impressione che Filo non abbia niente da dire su privacy o
         // sicurezza, che è il contrario di quello che questa pagina promette.
         const span = document.createElement('span');
-        span.className = 'sn-nav-item is-soon';
+        span.className = 'sn-nav-item is-soon' + (item.id === activeId ? ' is-active' : '');
         span.textContent = item.label;
         span.title = 'in arrivo';
         nav.appendChild(span);
