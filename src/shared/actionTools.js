@@ -168,7 +168,7 @@
         titolo: S('Titolo dell\'evento.'),
         dettagli: S('Dettagli o note.'),
         luogo: S('Dove si tiene, se lo sai.'),
-        durata_min: S('Quanto dura, in minuti. Senza, un\'ora.'),
+        durata_min: I('Quanto dura, in minuti. Senza, un\'ora.'),
       },
       required: ['data', 'ora', 'titolo'],
     },
