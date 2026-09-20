@@ -23,19 +23,18 @@
   // uno spazio in testa. Si conta in byte, non in caratteri: un titolo con gli
   // accenti supera il limite prima di quanto sembri.
   function piega(riga) {
-    const buf = Buffer.isBuffer ? null : null; // no Buffer: il modulo gira anche in pagina
+    const enc = new TextEncoder();
     const out = [];
     let cur = '';
     let byte = 0;
     for (const ch of String(riga)) {
-      const n = new TextEncoder().encode(ch).length;
+      const n = enc.encode(ch).length;
       const max = out.length ? 74 : 75; // le righe di continuazione perdono un ottetto per lo spazio
       if (byte + n > max) { out.push(cur); cur = ''; byte = 0; }
       cur += ch;
       byte += n;
     }
     out.push(cur);
-    void buf;
     return out.map((r, i) => (i ? ` ${r}` : r)).join('\r\n');
   }
 
