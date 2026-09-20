@@ -629,6 +629,65 @@ export async function merge(t, branch, opts) {
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
 }
 
+// ─── L'impronta dichiarata a mano ────────────────────────────────────────────
+//
+// L'impronta del contenuto la timbra lo strumento. Una dichiarata sulla riga di
+// comando può solo CONFERMARE quella vera, mai sostituirla: è la stessa regola
+// che questo canale applica al nome del ramo (feedback #485).
+//
+// Confermare però vuol dire riconoscere la STESSA versione, non ricopiarla
+// lettera per lettera nella forma lunga. Gli strumenti stampano le impronte
+// accorciate a dodici lettere dappertutto, e git stesso tratta la forma corta
+// come il commit intero: rifiutare chi conferma con quello che ha appena letto
+// a schermo è attrito, e il rifiuto arrivava con un messaggio che si
+// contraddiceva («hai dichiarato 1774f56387b9, ma la directory è su
+// 1774f56387b9»: le stesse dodici lettere due volte, con dentro scritto che
+// sono diverse).
+
+/** Sotto questo numero di lettere un pezzo di impronta non conferma niente. */
+export const MIN_IMPRONTA_CHARS = 7;
+
+/**
+ * L'impronta dichiarata conferma quella vera? PURA.
+ *
+ * Confermano: la stessa impronta, scritta in maiuscolo o minuscolo (sono
+ * lettere esadecimali, la forma non cambia il commit), e una sua forma
+ * abbreviata di almeno `MIN_IMPRONTA_CHARS` lettere. Non conferma un pezzo più
+ * corto di così, che combacerebbe anche con commit diversi, né un'impronta che
+ * non è un inizio di quella vera.
+ *
+ * `motivo`: 'punta_sconosciuta' | 'troppo_corta' | 'altro_commit'.
+ */
+export function confermaImpronta(dichiarato, punta) {
+  const d = String(dichiarato || '').trim().toLowerCase();
+  const p = String(punta || '').trim().toLowerCase();
+  if (!d) return { ok: true, motivo: '' };
+  if (!p) return { ok: false, motivo: 'punta_sconosciuta' };
+  if (d === p) return { ok: true, motivo: '' };
+  if (p.startsWith(d)) return d.length >= MIN_IMPRONTA_CHARS ? { ok: true, motivo: '' } : { ok: false, motivo: 'troppo_corta' };
+  return { ok: false, motivo: 'altro_commit' };
+}
+
+/**
+ * Il rifiuto per un'impronta che non conferma la punta vera. PURA.
+ *
+ * Le impronte si stampano accorciate, come ovunque, TRANNE quando le due forme
+ * corte coincidono: lì mostrarle accorciate direbbe due volte la stessa cosa e
+ * manderebbe chi legge a cercare una differenza che sullo schermo non c'è.
+ */
+export function testoImprontaDiversa(quale, dichiarato, punta, motivo = 'altro_commit') {
+  const d = String(dichiarato || '');
+  const p = String(punta || '');
+  if (motivo === 'troppo_corta') {
+    return `${quale}: hai dichiarato ${d}, che è più corto di ${MIN_IMPRONTA_CHARS} lettere, e la directory è su ${p.slice(0, 12)}. Un pezzo così corto combacia anche con commit diversi, quindi non conferma niente.\n`
+      + 'Niente è stato consegnato: togli --sha e rilancia, che l\'impronta la timbra lo strumento, oppure scrivila per intero.';
+  }
+  const stessoCorto = d.slice(0, 12).toLowerCase() === p.slice(0, 12).toLowerCase();
+  const mostra = (s) => (stessoCorto ? s : s.slice(0, 12));
+  return `${quale}: hai dichiarato il commit ${mostra(d)}, ma la directory è su ${mostra(p)}.\n`
+    + 'Niente è stato consegnato: un esito vale per il contenuto che hai davvero davanti, e l\'impronta la timbra lo strumento. Togli --sha e rilancia, oppure posizionati sul commit che hai esaminato.';
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
