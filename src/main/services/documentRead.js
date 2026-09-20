@@ -399,11 +399,18 @@ function bomDueByte(buf) {
   return '';
 }
 
-// Quanta parte di un testo NON è testo: byte nulli, caratteri di controllo non
-// stampabili, caratteri persi. PURA. Tabulazione, a capo, ritorno a capo,
-// avanzamento pagina ed escape restano fuori dal conto: in un registro o in un
-// testo formattato sono contenuto vero. È la stessa domanda che `looksLikeText`
-// fa sui byte, e qui serve sul testo già decodificato.
+// Quanta parte di un testo NON è testo: byte nulli e caratteri di controllo non
+// stampabili. PURA. Tabulazione, a capo, ritorno a capo, avanzamento pagina ed
+// escape restano fuori dal conto: in un registro o in un testo formattato sono
+// contenuto vero. È la stessa domanda che `looksLikeText` fa sui byte, e qui
+// serve sul testo già decodificato.
+//
+// I ROMBI NON SI CONTANO, di proposito. Un documento può contenerne di suoi:
+// gli appunti in cui l'utente ha ricopiato i nomi storpiati che il terminale
+// gli mostrava ne hanno uno ogni poche parole, e sono il suo contenuto. Contarli
+// qui vorrebbe dire rifiutare proprio quel documento, che è il caso chiuso nel
+// quinto giro. Quanti byte del file fossero rotti lo dice `bilancioUtf8`, che
+// è una domanda diversa e ha già la sua risposta.
 const QUOTA_NON_TESTO = 0.02;
 
 function quotaNonTesto(s) {
@@ -412,7 +419,6 @@ function quotaNonTesto(s) {
   let rumore = 0;
   for (let i = 0; i < n; i++) {
     const c = s.charCodeAt(i);
-    if (c === 0xFFFD) { rumore++; continue; }
     if (c >= 32 || c === 9 || c === 10 || c === 13 || c === 12 || c === 27) continue;
     rumore++;
   }
