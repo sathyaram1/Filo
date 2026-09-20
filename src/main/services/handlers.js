@@ -1052,10 +1052,16 @@ async function testoDaSchedaAperta(url) {
         // nemmeno attraversare il canale, e chi la scrive può decidere lei
         // quanto è grande il proprio HTML.
         const tetto = PR.MAX_HTML_CHARS;
-        const html = await t.view.webContents.executeJavaScript(
-          `(function(){try{return String(document.documentElement.outerHTML||"").slice(0, ${tetto + 1});}catch(e){return "";}})()`,
-          true,
-        );
+        // Con un tempo massimo: se il JavaScript della pagina è inchiodato la
+        // risposta non arriva mai, e senza questo il turno della chat restava
+        // appeso in silenzio invece di ripiegare sullo scaricamento.
+        const html = await Promise.race([
+          t.view.webContents.executeJavaScript(
+            `(function(){try{return String(document.documentElement.outerHTML||"").slice(0, ${tetto + 1});}catch(e){return "";}})()`,
+            true,
+          ),
+          new Promise((ok) => setTimeout(() => ok(''), PR.MAX_ATTESA_SCHEDA_MS)),
+        ]);
         if (typeof html === 'string' && html.trim()) {
           return { html: html.slice(0, tetto), title: t.title || '', partial: html.length > tetto };
         }
