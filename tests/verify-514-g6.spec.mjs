@@ -213,7 +213,7 @@ test('sito ladro: si riprende un pezzo di Filo e nega l\'uscita a ripetizione', 
   const page = await testServer.openReady(openTab, paginaLadra(true));
   await preparaLadra({ page });
   await entra(app);
-  const esiti = await quantiEsc(app, 6);
+  const esiti = await quantiEsc(app, 14);
   expect(await schermoIntero(app), `Esc ripetuto e non si esce mai: ${JSON.stringify(esiti)}`).toBe(false);
 });
 
@@ -222,7 +222,7 @@ test('sito ladro senza eventi finti: il tetto delle rivendicazioni regge', async
   const page = await testServer.openReady(openTab, paginaLadra(false));
   await preparaLadra({ page });
   await entra(app);
-  const esiti = await quantiEsc(app, 6);
+  const esiti = await quantiEsc(app, 14);
   expect(await schermoIntero(app), `Esc ripetuto e non si esce mai: ${JSON.stringify(esiti)}`).toBe(false);
 });
 
