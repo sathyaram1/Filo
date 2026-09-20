@@ -71,7 +71,7 @@ test('un documento arrivato a metà non viene dichiarato danneggiato', async ({ 
       intero: await PR.daContenuto({ url: 'https://example.com/a.pdf', contentType: 'application/pdf', buffer: intero, status: 200 }),
       mezzo: await PR.daContenuto({ url: 'https://example.com/a.pdf', contentType: 'application/pdf', buffer: mezzo, status: 200 }),
     };
-  }, PDF);
+  }, { b64: PDF, modulo: PAGE_READ });
 
   // Controllo: intero si legge.
   expect(out.intero.ok).toBe(true);
