@@ -3609,6 +3609,10 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
 // Idem per la chat della home: i test ne ispezionano il prompt costruito (#158).
 globalThis.SN_HANDLE_FILO_CHAT = handleFiloChat;
+// #525 — chiusura + classificazione di una chat archiviata: gli spec devono
+// poter chiudere una chat come fa la home, senza reinventare la sequenza.
+globalThis.SN_CLOSE_FILO_CHAT = closeAndTriageChat;
+globalThis.SN_SWEEP_FILO_CHATS = sweepPendingChats;
 // Dispatch grezzo (msg, sender) per i test che verificano il gate d'origine sui
 // canali privilegiati (storage/settings): permette di simulare un mittente con
 // origine web e asserire che le chiavi API non trapelano. Vedi handlers/storage.js.
