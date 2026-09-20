@@ -1,5 +1,5 @@
 // Dove stanno le prove dei giri di verifica, e cosa non devono contenere.
-// Non deve fermare: gira sui file tracciati, senza aprire Filo.
+// Non deve fermare: guarda i file del repo, senza aprire Filo.
 // La regola narrata: CLAUDE.md § Verifica, e patterns/prove-di-un-giro-fuori-dalla-suite.md
 
 import { test } from 'node:test';
@@ -26,7 +26,7 @@ function nelRepo(sotto = '') {
 const MARCATORI = ['verify-', 'verifier-', 'vcheck-', 'vfx-', 'vtmp-', 'tmp-', 'giro', '_verify', '_vcheck'];
 
 test('una prova di un giro di verifica non sta nella suite: sta in tests/verifica/<numero>/', () => {
-  const fuoriposto = tracciati('tests').filter((f) => {
+  const fuoriposto = nelRepo('tests').filter((f) => {
     if (!f.endsWith('.spec.mjs')) return false;
     if (f.startsWith('tests/verifica/')) return false;
     const nome = posix.basename(f);
@@ -56,9 +56,9 @@ test('la suite di default non raccoglie le prove dei giri', async () => {
 
 // Un byte NUL crudo dentro un sorgente fa trattare il file come BINARIO a git:
 // niente diff leggibile, niente revisione. Il carattere si prova lo stesso.
-test('nessun sorgente tracciato contiene un byte NUL crudo', () => {
+test('nessun sorgente del repo contiene un byte NUL crudo', () => {
   const SORGENTI = /\.(mjs|js|cjs|json|md|html|css|txt|sh|yml|yaml)$/;
-  const colpevoli = tracciati().filter((f) => SORGENTI.test(f) && readFileSync(resolve(ROOT, f)).includes(0));
+  const colpevoli = nelRepo().filter((f) => SORGENTI.test(f) && readFileSync(resolve(ROOT, f)).includes(0));
   assert.deepEqual(colpevoli, [],
     'scrivilo come sequenza di escape (\'\\u0000\') invece che come byte: per JavaScript è lo stesso'
     + ' carattere, e il file resta testo.');
@@ -69,7 +69,7 @@ test('nessun sorgente tracciato contiene un byte NUL crudo', () => {
 // sottocartella dove quel percorso non esiste, e non se n'era accorto nessuno.
 test('ogni import relativo di uno spec o di un unit test punta a un file che esiste', () => {
   const rotti = [];
-  for (const f of tracciati('tests')) {
+  for (const f of nelRepo('tests')) {
     if (!/\.(spec|test)\.mjs$/.test(f)) continue;
     const src = readFileSync(resolve(ROOT, f), 'utf8');
     for (const m of src.matchAll(/(?:\bfrom|\bimport)\s*\(?\s*['"](\.[^'"]*)['"]/g)) {
