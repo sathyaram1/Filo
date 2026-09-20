@@ -1029,6 +1029,23 @@
       // turno sbagliato, non uno per sessione.
       if (!parsed.fuoriFormato) rimandiFuoriFormato = 0;
 
+      // #517 — la risposta è nel formato giusto ma racconta un'azione che non
+      // ha emesso. Stesso guasto della prosa, stesso rimedio: torna indietro
+      // una volta, e se il modello insiste l'utente lo legge sotto la
+      // risposta invece di credere che sia fatto.
+      const azioniMancate = azioniRaccontate(parsed);
+      if (azioniMancate.length && rimandiAzioneRaccontata < 1) {
+        rimandiAzioneRaccontata += 1;
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        history.push({ role: 'assistant', content: String(parsed.display || res.text || '').slice(0, 4000) });
+        appendActionLog('risposta rifatta: diceva di aver già fatto una cosa mai eseguita');
+        setTimeout(() => submit({
+          userAction: nudgeAzioniRaccontate(azioniMancate), preActionUrl: location.href,
+        }), 50);
+        return;
+      }
+      if (!azioniMancate.length) rimandiAzioneRaccontata = 0;
+
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
       // mostra il log in chat, poi rilancia un turno con i risultati come
       // nota di sistema così l'AI può produrre il JSON normale.
