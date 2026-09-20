@@ -46,6 +46,11 @@ module.exports = function register(on, ctx) {
       // Le azioni già eseguite prima del guasto: la chat le tiene nello
       // storico, così il tentativo successivo sa cosa era già stato fatto.
       const actions = Array.isArray(e && e.filoActions) ? e.filoActions : [];
+      // #533 (quinto giro di verifica) — insieme alle azioni torna il nome
+      // della richiesta che si è interrotta: quello che aveva letto resta
+      // nella conversazione, e il messaggio dopo deve poterlo ereditare invece
+      // di ripartire come se non fosse successo niente.
+      const compito = (e && e.filoCompito) || null;
       // Lo status HTTP del provider e se è un rifiuto della CHIAVE (#629: un
       // 403 di moderazione non lo è): la scheda ci mette accanto la strada
       // per la pagina Crediti solo quando è lì che si sistema.
