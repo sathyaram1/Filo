@@ -2484,6 +2484,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // già stretto, e due rimbalzi di fila vogliono dire che il modello insiste).
   const Dichiarate = globalThis.SN_AZIONI_DICHIARATE;
   let rimandatoIndietro = false;
+  // Su cosa è stato rimandato indietro: una dichiarazione a parole, o una
+  // risposta arrivata in formato macchina. Serve a fine turno per dire
+  // all'utente la cosa giusta anche quando il ritentativo non è bastato.
+  let motivoRimbalzo = '';
   // Il testo rimandato indietro: se dopo il rimbalzo il modello non scrive più
   // niente, questo resta l'unica risposta che c'era — meglio mostrarla con
   // l'avviso che lasciare la bolla vuota.
