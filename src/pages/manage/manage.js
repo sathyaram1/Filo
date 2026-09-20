@@ -704,6 +704,108 @@
   if (mgFixInstructionsSave) mgFixInstructionsSave.addEventListener('click', saveFixInstructions);
   if (mgFixInstructions) mgFixInstructions.addEventListener('input', () => setCapMsg('fixInstructions', '', null));
 
+  // ── Come partono le sessioni delle routine ────────────────────────────────
+  // Quattro campi su config/routines che legge il server quando accende le
+  // sessioni. Restano manovrabili a routine spente: escludere un account è una
+  // cosa che si decide PRIMA di riaccendere.
+  const SESSIONS_GET = (window.SN_MSG?.MSG?.AUTOMATION_SESSIONS_GET) || 'automation_sessions_get';
+  const SESSIONS_SET = (window.SN_MSG?.MSG?.AUTOMATION_SESSIONS_SET) || 'automation_sessions_set';
+  const RS = window.SN_ROUTINE_SESSIONI;
+  // I limiti del campo vengono dal registro, non dall'HTML: scritti in due
+  // posti divergono e vince quello sbagliato.
+  if (mgMaxSessions && RS) {
+    const { min, max } = RS.limiti();
+    mgMaxSessions.min = String(min);
+    mgMaxSessions.max = String(max);
+  }
+
+  let sessionsState = RS ? RS.leggiDoc({}) : null;
+
+  function setSessionsMsg(el, text, kind) {
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('mg-ok', kind === 'ok');
+    el.classList.toggle('mg-err', kind === 'err');
+  }
+
+  function reflectSessions(raw) {
+    if (!RS) return;
+    sessionsState = RS.leggiDoc(raw);
+    if (mgMaxSessions) mgMaxSessions.value = String(sessionsState.maxSessions);
+    for (const r of mgPriorityRadios) r.checked = r.value === sessionsState.priorityAccount;
+    if (mgAccountA) mgAccountA.checked = !sessionsState.accountAOff;
+    if (mgAccountB) mgAccountB.checked = !sessionsState.accountBOff;
+    // Escludere il prioritario va bene (il server passa all'altro); escluderli
+    // tutti e due ferma tutto, ed è l'unico caso che va detto.
+    if (mgAccountsWarn) mgAccountsWarn.hidden = !RS.nessunAccount(sessionsState);
+  }
+
+  async function loadSessions() {
+    if (!RS) return;
+    try {
+      const r = await sendToMain({ type: SESSIONS_GET });
+      reflectSessions(r && r.ok ? r : {});
+    } catch (_) {
+      reflectSessions({});
+    }
+  }
+
+  async function saveSessions(patch, msgEl) {
+    const esito = RS.valida(patch);
+    if (!esito.ok) {
+      setSessionsMsg(msgEl, esito.testo, 'err');
+      return false;
+    }
+    try {
+      const r = await sendToMain(Object.assign({ type: SESSIONS_SET }, esito.valori));
+      if (!r || !r.ok) {
+        // Non scritto = non cambiato: la pagina rimette quello che c'è sul
+        // server invece di mostrare una scelta che non è mai arrivata.
+        reflectSessions(sessionsState);
+        setSessionsMsg(msgEl, 'Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
+        if (r?.error) console.error('[manage] salvataggio sessioni:', r.error);
+        return false;
+      }
+      reflectSessions(r);
+      setSessionsMsg(msgEl, 'Salvato.', 'ok');
+      return true;
+    } catch (err) {
+      reflectSessions(sessionsState);
+      setSessionsMsg(msgEl, 'Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
+      console.error('[manage] salvataggio sessioni fallito:', err);
+      return false;
+    }
+  }
+
+  if (mgMaxSessions) {
+    // Un campo numerico che contiene qualcosa che numero non è risponde
+    // `value === ''`: senza `badInput` si direbbe «vuoto» a chi ha scritto «tre».
+    const letto = () => (mgMaxSessions.validity && mgMaxSessions.validity.badInput ? 'NaN' : mgMaxSessions.value);
+    const salva = () => saveSessions({ maxSessions: letto() }, mgMaxSessionsMsg);
+    if (mgMaxSessionsSave) mgMaxSessionsSave.addEventListener('click', salva);
+    mgMaxSessions.addEventListener('input', () => setSessionsMsg(mgMaxSessionsMsg, '', null));
+    mgMaxSessions.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || mgMaxSessions.disabled) return;
+      e.preventDefault();
+      salva();
+    });
+  }
+
+  for (const radio of mgPriorityRadios) {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      saveSessions({ priorityAccount: radio.value }, mgPriorityAccountMsg);
+    });
+  }
+
+  for (const [el, campo] of [[mgAccountA, 'accountAOff'], [mgAccountB, 'accountBOff']]) {
+    if (!el) continue;
+    el.addEventListener('change', () => {
+      // Acceso = in uso, quindi l'interruttore e il campo dicono l'opposto.
+      saveSessions({ [campo]: !el.checked }, mgAccountsMsg);
+    });
+  }
+
 
   // ── Timeout dei giudici ────────────────────────────────────────────────────
   // Fonte di verità: config/supportModels (campo `judgeTimeoutMs`, in MS), che il
