@@ -2410,18 +2410,6 @@ async function editorFileSummaries() {
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
-  // #525 — la chat si scrive su disco ADESSO, non alla chiusura: se l'app
-  // muore a metà discussione, la discussione c'è lo stesso. I turni interni
-  // (i nudge di prosecuzione automatica) non sono parole dell'utente e non
-  // entrano nell'archivio, come non entrano nell'intervista.
-  if (chatId && !internal) {
-    await appendToChatArchive(chatId, {
-      role: 'user',
-      text: String(userMessage || ''),
-      images: Array.isArray(images) ? images.length : (image ? 1 : 0),
-    });
-  }
-
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
   // perché la parola di stop deve funzionare anche quando il resto non
   // funziona: nessuna chiamata al modello, nessuna rete. Vedi
