@@ -452,7 +452,7 @@
     MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP, PAST_CAP,
     ITEMS, ITEM_IDS, STOP_PHRASES, DECLINE_PHRASES,
     emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
-    remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
+    remaining, isComplete, appendTurn, rememberCompito, userTurns, hasPendingTurn, shouldForceClose,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
