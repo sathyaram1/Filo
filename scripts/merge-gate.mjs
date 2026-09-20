@@ -224,7 +224,7 @@ async function main() {
   })();
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
-    console.error(testoEsitiDecaduti(decaduti, punta));
+    console.error(testoEsitiDecaduti(decaduti, punta, source));
     process.exit(1);
   }
   // Astenersi si dice: se da qui non risulta nessun via libera con il suo
