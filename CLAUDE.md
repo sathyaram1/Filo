@@ -269,11 +269,11 @@ collegamento solo e non sa che numero di versione sia uscito.
   Ubuntu li nega di serie dalla 23.10. La voce di menu del pacchetto chiede
   `--no-sandbox` da sé, ma vale solo per chi ha integrato l'applicazione: il
   doppio clic passa da `AppRun`. Quindi `scripts/after-pack-linux.js` mette al
-  posto del programma un lanciatore che lo avvia con `--no-sandbox`, e usa
-  `exec -a` per non cambiare il nome del processo (da lì viene l'aggancio
-  dell'icona nella barra). Se il file si aggiungesse una scelta furba — tenere
-  la gabbia dove sembra reggere — il costo di indovinare male è un'app che non
-  si apre: il primo avvio deve riuscire sempre.
+  posto del programma un lanciatore che guarda le tre manopole del kernel che
+  decidono la faccenda e aggiunge `--no-sandbox` SOLO dove dicono di no: Filo è
+  un browser, e dove la gabbia regge deve restare. Il lanciatore usa `exec -a`
+  per non cambiare il nome del processo, da cui viene l'aggancio dell'icona
+  nella barra.
 - **La ricetta si tocca con cautela**: `build.linux` in `package.json`,
   `scripts/after-pack-linux.js` e il lavoro `release-linux`. `artifactName`,
   `category` e `desktop` non sono decorazioni: senza il primo il collegamento
