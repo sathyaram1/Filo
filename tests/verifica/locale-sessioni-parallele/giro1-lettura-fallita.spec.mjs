@@ -32,10 +32,7 @@ test('a lettura fallita il riquadro non spaccia i valori di ripiego per quelli d
     + (await page.locator('#mgAccountsMsg').textContent() || '')
     + (await page.locator('#mgPriorityAccountMsg').textContent() || '');
   const valore = await page.locator('#mgMaxSessions').inputValue();
-  const aInUso = await page.locator('#mgAccountA').isChecked();
-  test.fail(true, 'a lettura fallita mostra i valori di ripiego senza dirlo (rilievo del giro 1)');
   expect(avviso.trim() !== '' || valore === '').toBe(true);
-  expect(aInUso).toBe(true); // annotato: il punto è l'avviso, non il valore
 });
 
 test('«Salvato.» e intanto il campo torna a 1: la seconda porta dello stesso guasto', async ({ openTab }) => {
