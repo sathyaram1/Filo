@@ -173,18 +173,31 @@ export function testoEsitiSenzaCommit(quali) {
 }
 
 /**
- * Il contenuto esaminato è arrivato DOVE CHI FONDE ANDRÀ A PRENDERLO? PURA
+ * Quello che chi fonde troverà in cima al ramo È il contenuto esaminato? PURA
  * rispetto a git (`g` è l'esecutore, iniettabile dai test).
  *
  * Il server non fonde quello che c'è in questa directory: scarica il ramo da
- * GitHub e fonde quello. Se un commit è rimasto solo qui — il salvataggio
- * automatico prova a spedire e, quando non ci riesce, per costruzione lo scrive
- * nei log e prosegue — i via libera parlano di un contenuto che non atterrerà
- * mai, e ad atterrare sarà quello vecchio, che nessuno ha esaminato. È il
- * gemello del rifiuto per le modifiche non salvate: lì la punta si sposta in
- * avanti dopo l'ok, qui non si è mai mossa dove conta (feedback #485, giro 3).
+ * GitHub e fonde la sua PUNTA. Quindi la domanda ha una risposta sola, ed è
+ * un'uguaglianza. «Il contenuto esaminato è arrivato là» non basta: un commit
+ * può essere nella storia del ramo senza essere quello che atterra, e allora
+ * ad atterrare è il commit in cima, che nessuno ha guardato (feedback #485,
+ * giro 4). È la stessa uguaglianza che il cammino locale pretende da sempre
+ * («su origin il ramo è a X, qui siamo a Y: il server fonderebbe una versione
+ * diversa da quella controllata»), e che qui era diventata un contenimento.
  *
- * @returns {{ stato:'pubblicato'|'assente'|'sconosciuto'|'senza_origine', suOrigin?:string, motivo?:string }}
+ * Le due direzioni sono danni diversi e vogliono rimedi opposti:
+ *   `indietro` — il contenuto esaminato non è mai arrivato là (il salvataggio
+ *     automatico prova a spedire e, quando non ci riesce, per costruzione lo
+ *     scrive nei log e prosegue): si spedisce il ramo;
+ *   `piu_avanti` — là il ramo è andato oltre il contenuto esaminato: spedire
+ *     non c'entra, gli esiti sono decaduti e il giro va rifatto su quel
+ *     contenuto.
+ *
+ * La punta vera la dice `ls-remote`, che parla col posto giusto: il riferimento
+ * locale a origin dice dov'ERA il ramo l'ultima volta che si è guardato, e
+ * concludere da lì è rispondere a memoria a una domanda sul presente.
+ *
+ * @returns {{ stato:'pubblicato'|'indietro'|'piu_avanti'|'sconosciuto'|'senza_origine', suOrigin?:string, motivo?:string }}
  */
 export function statoPubblicazione(g, branch, punta) {
   const b = String(branch || '');
@@ -193,14 +206,26 @@ export function statoPubblicazione(g, branch, punta) {
   const remoti = g(['remote']);
   if (!remoti.ok) return { stato: 'sconosciuto', motivo: 'non riesco a farmi dire se c\'è un origin' };
   if (!String(remoti.out || '').split(/\r?\n/).map((r) => r.trim()).includes('origin')) return { stato: 'senza_origine' };
-  // Il riferimento locale a origin può essere vecchio: si aggiorna quello solo,
-  // e se la rete non risponde si prosegue con quello che c'è (dirlo, più sotto,
-  // è meglio che fermare un giro per una rete lenta).
-  g(['fetch', '--quiet', 'origin', `refs/heads/${b}:refs/remotes/origin/${b}`]);
-  const ref = g(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${b}`]);
-  if (!ref.ok || !ref.out) return { stato: 'sconosciuto', motivo: `su origin il ramo ${b} non si legge` };
-  const dentro = g(['merge-base', '--is-ancestor', p, ref.out]);
-  return dentro.ok ? { stato: 'pubblicato', suOrigin: ref.out } : { stato: 'assente', suOrigin: ref.out };
+  // La punta vera, chiesta a origin. Se non risponde ci si astiene e lo si
+  // dice: un controllo che conclude su un ricordo vecchio è peggio di uno
+  // assente, perché chi legge crede di essere protetto.
+  const ls = g(['ls-remote', '--heads', 'origin', `refs/heads/${b}`]);
+  if (!ls.ok) return { stato: 'sconosciuto', motivo: `non riesco a farmi dire da origin dov'è il ramo ${b} (${String(ls.out || '').split(/\r?\n/)[0] || 'nessuna risposta'})` };
+  const riga = String(ls.out || '').split(/\r?\n/).map((r) => r.trim()).filter(Boolean)[0] || '';
+  const suOrigin = riga.split(/\s+/)[0] || '';
+  // Il ramo su origin non c'è: non è «non lo so», è «là non c'è niente da
+  // fondere», e il rimedio è lo stesso del contenuto rimasto qui.
+  if (!suOrigin) return { stato: 'indietro', suOrigin: '' };
+  if (suOrigin === p) return { stato: 'pubblicato', suOrigin };
+  // Le due versioni sono diverse: per dire in che senso serve l'oggetto, e per
+  // averlo si aggiorna il riferimento locale (col `+`, o un ramo riportato
+  // indietro su origin farebbe fallire l'aggiornamento invece di seguirlo).
+  g(['fetch', '--quiet', 'origin', `+refs/heads/${b}:refs/remotes/origin/${b}`]);
+  if (!g(['cat-file', '-e', `${suOrigin}^{commit}`]).ok) {
+    return { stato: 'sconosciuto', suOrigin, motivo: `su origin il ramo ${b} è su un contenuto che qui non ho, e non riesco a scaricarlo` };
+  }
+  const dentro = g(['merge-base', '--is-ancestor', p, suOrigin]);
+  return dentro.ok ? { stato: 'piu_avanti', suOrigin } : { stato: 'indietro', suOrigin };
 }
 
 /**
