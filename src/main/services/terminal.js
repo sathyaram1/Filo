@@ -110,11 +110,13 @@ const PRELUDI_CODIFICA = {
   //   $OutputEncoding           → con cosa PowerShell scrive quando passa
   //     testo in pipe a un programma esterno.
   // UTF8Encoding($false) = senza BOM: il BOM comparirebbe come «ï»¿» in testa
-  // alla prima riga. In try/catch perché il setter di [Console] può rifiutare
-  // quando non c'è una console vera attaccata: in quel caso il comando deve
-  // girare lo stesso, non morire sul preludio.
+  // alla prima riga. Tutte e due in try/catch: il setter di [Console] può
+  // rifiutare quando non c'è una console vera attaccata, e `New-Object` è
+  // vietato dove PowerShell gira in modalità ristretta. In quei casi il
+  // comando dell'utente deve girare lo stesso — con i nomi storpiati, come
+  // prima — non morire sul preludio né sporcare stderr con un errore suo.
   powershell: 'try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n'
-    + '$OutputEncoding = New-Object System.Text.UTF8Encoding $false\n',
+    + 'try { $OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n',
   // bash / sh: nessun preludio. Su Linux e macOS lo stdout è già UTF-8 e
   // forzare una locale che sulla macchina può non esistere farebbe solo danno.
   bash: '',
