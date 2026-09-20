@@ -126,6 +126,9 @@
           repeat: Array.isArray(t.repeat) && t.repeat.length ? t.repeat : null,
           endsAt: t.endsAt,
           paused: !!t.paused,
+          // #533 (terzo giro) — etichetta scritta da Filo dopo aver letto una
+          // pagina: è testo di altri e viaggia con la riga.
+          esterno: !!t.esterno,
           remainingSec: Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000)),
         }))
         .filter((t) => t.paused || t.remainingSec > 0),
@@ -225,6 +228,18 @@
     if (!state.timers.length) lines.push('(nessuno)');
     else {
       state.timers.forEach((t) => {
+        // #533 (terzo giro di verifica) — l'etichetta di una sveglia messa
+        // leggendo una pagina l'ha scritta la pagina. Nel testo che il modello
+        // riceve a ogni messaggio non ci torna: resta il fatto che la sveglia
+        // c'è e quando suona, che è quello che serve per rispondere «a che ora
+        // suona la sveglia?». Il nome resta dove l'utente lo legge, nella
+        // colonna di destra.
+        if (!conEsterno && t.esterno) {
+          const quando = new Date(t.endsAt);
+          const hhmm = `${String(quando.getHours()).padStart(2, '0')}:${String(quando.getMinutes()).padStart(2, '0')}`;
+          lines.push(`- ${t.kind === 'alarm' ? 'Sveglia' : 'Timer'} (nome scritto da una pagina, non riportato qui): ${t.kind === 'alarm' ? `suona alle ${hhmm}` : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`}`);
+          return;
+        }
         if (t.kind === 'alarm') {
           // #322 — le sveglie si descrivono con l'orario assoluto, non col
           // countdown (che per una sveglia a ore di distanza confonderebbe).
@@ -252,6 +267,16 @@
     if (!state.recentActions.length) lines.push('(nessuna)');
     else {
       state.recentActions.slice(0, 30).forEach((a) => {
+        // #533 (terzo giro di verifica) — la risposta di un turno in cui Filo
+        // aveva letto una pagina riporta le parole della pagina. Rimetterla
+        // qui la riportava davanti a OGNI richiesta successiva, per
+        // ventiquattr'ore e anche dopo un riavvio, mentre quella richiesta
+        // risultava «non ha letto niente» e teneva in mano tutti gli
+        // strumenti. Resta che è successo, senza il testo.
+        if (!conEsterno && a.esterno) {
+          lines.push(`- [${formatRelativeTime(a.ts)}] ${a.type}: (risposta dopo una lettura: il testo non sta qui)`);
+          return;
+        }
         lines.push(`- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`);
       });
     }

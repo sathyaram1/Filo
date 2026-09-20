@@ -261,7 +261,7 @@
     return getRaw(KEYS.FILO_TIMERS, []);
   }
 
-  async function addTimer({ label, seconds }) {
+  async function addTimer({ label, seconds, esterno = false }) {
     // Una durata non interpretabile o non positiva (0, negativa, NaN) NON crea un
     // timer: torniamo null e i chiamanti non lo trasmettono né lo segnano eseguito
     // (`if (t) broadcastLiveUpdate()`, `executed: !!entry`). Stessa filosofia di
@@ -277,6 +277,10 @@
       startedAt: new Date().toISOString(),
       endsAt: new Date(Date.now() + sec * 1000).toISOString(),
       paused: false,
+      // #533 (terzo giro) — l'etichetta l'ha scritta Filo dopo aver letto una
+      // pagina: è testo di altri, e nel contesto di una richiesta nuova non ci
+      // torna.
+      ...(esterno ? { esterno: true } : {}),
     };
     list.unshift(entry);
     await setRaw(KEYS.FILO_TIMERS, list);
@@ -500,7 +504,7 @@
     return d.join('+');
   }
 
-  async function addAlarm({ label, time, repeat, nowMs }) {
+  async function addAlarm({ label, time, repeat, nowMs, esterno = false }) {
     const now = Number.isFinite(nowMs) ? nowMs : Date.now();
     const days = normalizeRepeat(repeat);
     const clock = days.length ? parseClock(time) : null;
@@ -514,6 +518,8 @@
       startedAt: new Date(now).toISOString(),
       endsAt: new Date(at).toISOString(),
       paused: false,
+      // Come per il timer: etichetta scritta dopo una lettura = testo di altri.
+      ...(esterno ? { esterno: true } : {}),
     };
     if (days.length) {
       entry.repeat = days;
