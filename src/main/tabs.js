@@ -467,7 +467,10 @@ class TabManager {
     const nostro = this.pageFullscreen && tabId === this.pageFullscreenTabId
       ? this._inoltraEscAllaPagina(tabId)
       : false;
-    this.armaUscitaSchermoIntero(tabId);
+    // Al tetto si esce, ma il tasto resta della pagina: prendercelo lasciava
+    // aperto il riquadro in cima e portava via la modalità (#514 fatto da noi).
+    if (sfiduciata) this.setContentFullscreen(false);
+    else this.armaUscitaSchermoIntero(tabId);
     return nostro;
   }
 
