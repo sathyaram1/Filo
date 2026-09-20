@@ -1673,6 +1673,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           output: {
             documentRead: String(percorso == null ? '' : percorso),
             ok: !!r.ok,
+            // Il percorso chiesto, quando NON è quello aperto davvero: il nome
+            // era quasi giusto (accenti, trattino lungo) e il file è stato
+            // ritrovato lo stesso. Va detto, non taciuto (#551).
+            requested: r.requested || '',
             name: r.name || '',
             kind: r.kind || '',
             pages: r.pages || 0,
