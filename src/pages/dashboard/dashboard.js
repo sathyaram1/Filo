@@ -723,6 +723,9 @@
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
+      // #533 — il permesso che l'utente ha appena dato vale per QUEL compito:
+      // il turno che riprende deve riprendere lui, non aprirne uno nuovo.
+      compito,
     };
     if (images.length) {
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
