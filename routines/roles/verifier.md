@@ -35,42 +35,22 @@ caso hai davanti; se è l'ultimo, dillo nella critica.
    `ls tests/verifica`, non dal messaggio. Una porta di un giro passato che si
    riapre è un rilievo di livello 2; le porte già chiuse si ri-provano, non si
    riscoprono come nuove.
-4. **Riproduci la lamentela** coi passi dell'utente e asserisci il
-   **successo** (la cosa voluta accade), non l'assenza di un errore.
-5. **Stress**: inserimenti insoliti (vuoto, soli spazi, testi lunghissimi,
-   emoji, HTML), attese, sequenze particolari di clic e azioni (in fretta,
-   durante un caricamento, apri e chiudi, annulla e ripeti), nessun dato.
-6. **Sicurezza funzionale** di ciò che il lavoro ha aggiunto: input
-   dell'utente mostrato come markup, provenienza non controllata nei canali
-   interni nuovi, URL non validati.
-7. **Aspetto**: ogni elemento grafico segue lo stile di Filo, si comporta
-   bene con tutte le impostazioni (tema chiaro e scuro) e sta nella posizione
-   migliore. Guardalo davvero: in cloud `page.screenshot()` in
-   `tests/.shots/`, in locale `npm run test:shoot`.
-8. **Completezza.** Un'invariante ovvia che manca (si aggiunge ma non si
-   toglie; se ne salvano N e non si vedono tutte; due strade equivalenti che
-   si comportano diversamente; una strada naturale non supportata senza
-   ragione) è lavoro incompleto: è un rilievo.
-9. **Pattern.** Una violazione di `PATTERNS.md` nella UI toccata è un rilievo,
-   citando il pattern.
-10. **Miglioramenti.** Uno **senza trade-off** che manca è un rilievo. Uno
-    **con trade-off** (costi, complessità, gusto) chiede una decisione
-    dell'owner: si scrive col segno `?` dopo il livello (`[1?] …`). Non apri
-    feedback: i rilievi che restano aperti li raccoglie il server dalla
-    critica.
+4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
+   rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo il
+   livello (`[1?] …`). Non apri feedback: i rilievi che restano aperti li
+   raccoglie il server dalla critica.
+
+<!-- includi: _criteri-verifica.md -->
 
 Se gli strumenti per aprire Filo mancano davvero nell'ambiente, giudica su
 codice e `npm run test:unit` e dichiaralo nella critica: non è un rilievo.
 
-## Un difetto, una causa, tutte le porte
+## Una famiglia di difetti si scrive insieme
 
-Quando qualcosa si rompe, prima di scrivere fermati sulla **causa**: quale
-stato sbagliato produce il danno, e quante strade portano a quello stato? Prova
-ogni strada che ti viene in mente e metti nella **stessa critica** tutte quelle
-che si rompono, ciascuna coi suoi passi. Sopra i rilievi di una stessa famiglia
-scrivi **una riga con la causa comune**, in parole da utente: chi corregge deve
-poter curare il meccanismo, non l'ultima porta. Una porta per giro costa un
-giro per porta.
+Tutte le porte che trovi per la stessa causa (criterio 9) vanno nella **stessa
+critica**, ciascuna coi suoi passi, e sopra di loro **una riga con la causa
+comune**, in parole da utente: chi corregge deve poter curare il meccanismo,
+non l'ultima porta. Una porta per giro costa un giro per porta.
 
 Se lo storico mostra che la stessa famiglia è già rientrata in giri passati,
 dillo nel riassunto: quante volte, e cosa hanno in comune le porte. Una strada

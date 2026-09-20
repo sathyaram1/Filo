@@ -959,8 +959,9 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
 }
 
 export function readRecipe(root = ROOT) {
-  const f = resolve(root, 'routines', 'roles', 'verifier.md');
-  return existsSync(f) ? readFileSync(f, 'utf8') : '';
+  const dir = resolve(root, 'routines', 'roles');
+  const f = resolve(dir, 'verifier.md');
+  return existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), dir) : '';
 }
 
 // ─── CLI ────────────────────────────────────────────────────────────────────

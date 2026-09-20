@@ -77,6 +77,7 @@ import {
   writeExpectation, clearExpectation, stateDir,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
+import { espandiInclusioni } from './lib/role-text.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
@@ -463,10 +464,9 @@ export function clearState(id) {
 const ROLE_FILE = {
   secaudit: 'secaudit.md',
   verifier: 'verifier.md',
-  // new-work e fixer sono lo stesso mestiere con un punto di partenza diverso
-  // (SPEC-RIDISEGNO-MAX.md §12): il server distingue ancora i due nomi nel
-  // protocollo, il worker riceve UN ruolo (resolver) e il caso nel payload.
-  fixer: 'resolver.md',
+  // Ogni caso riceve solo il suo testo: il riallineamento dopo un conflitto
+  // (fixer) non si porta dietro le istruzioni del primo passaggio.
+  fixer: 'resolver-rebase.md',
   'new-work': 'resolver.md',
   resolver: 'resolver.md',
   prober: 'prober.md',
@@ -639,7 +639,7 @@ export function readRoleInstructions(role) {
   const name = ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
-  const base = existsSync(f) ? readFileSync(f, 'utf8') : '';
+  const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
   if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
   const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
   const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
