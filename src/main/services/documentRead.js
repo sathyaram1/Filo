@@ -81,8 +81,17 @@ const KNOWN_BINARY = {
 /**
  * Normalizza il percorso che arriva dall'LLM: toglie virgolette e spazi, espande
  * `~` nella home dell'utente, e restituisce un assoluto. PURA.
+ *
+ * `base` è la cartella in cui Filo sta guardando col terminale, e serve ai nomi
+ * SENZA percorso. Un elenco stampa i nomi, non i percorsi: è in quella forma che
+ * il nome arriva al passo dopo. Senza `base` un nome nudo finiva risolto contro
+ * la cartella del PROGRAMMA Filo — il file dell'utente non si trovava, e da
+ * quando un nome quasi giusto viene perdonato poteva perfino aprirsi un file di
+ * Filo e finire nella risposta al posto del documento chiesto (#551, terzo giro
+ * di verifica). Senza cartella nota si ripiega sulla home, che è da dove il
+ * terminale parte, mai sulla cartella del programma.
  */
-function normalizePath(input) {
+function normalizePath(input, base) {
   let p = String(input == null ? '' : input).trim();
   if (!p) return '';
   // Gli LLM incartano volentieri i percorsi tra virgolette o apici.
@@ -92,7 +101,9 @@ function normalizePath(input) {
   if (p === '~') p = os.homedir();
   else if (p.startsWith('~/') || p.startsWith('~\\')) p = path.join(os.homedir(), p.slice(2));
   if (!p) return '';
-  return path.resolve(p);
+  if (path.isAbsolute(p)) return path.resolve(p);
+  const dove = String(base || '').trim();
+  return path.resolve(path.isAbsolute(dove) ? dove : os.homedir(), p);
 }
 
 // ── Quando il nome è QUASI giusto ────────────────────────────────────────────
