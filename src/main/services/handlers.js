@@ -1386,6 +1386,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
 
   try {
     switch (type) {
+      // ── il perimetro delle uscite (#533) ──────────────────────────────────
+      case 'DICHIARA_USCITE': {
+        if (!Compiti || !task) return { executed: false, kept: false };
+        const r = Compiti.dichiara(task, action.uscite);
+        Compiti.registraAzione(task, { type, esito: r.ok ? 'perimetro fissato' : r.motivo });
+        return { executed: !!r.ok, kept: false, perimetro: r };
+      }
+      case 'CHIEDI_USCITA': {
+        // Ci si arriva solo col sì dell'utente: il livello 2 tiene il resto.
+        if (!Compiti || !task) return { executed: false, kept: false };
+        const r = Compiti.allarga(task, action.uscita, action.motivo);
+        return { executed: !!r.ok, kept: false, riprendi: r.ok ? task.id : null };
+      }
       case 'NAVIGA': {
         // #162 — Filo apre il link DIRETTAMENTE in una nuova scheda, invece di
         // limitarsi a mostrare un bottone che l'utente deve cliccare. La chat di
