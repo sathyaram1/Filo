@@ -135,4 +135,29 @@ test('una chat finita: cosa si può farle dal suo menu del tasto destro', async 
   // rigenera dallo stesso menu.
   const puoCorreggere = voci.some((v) => /rinomin|titolo|conversazion|sposta|tipo/i.test(v));
   expect(puoCorreggere, `menu: ${JSON.stringify(voci)}`).toBeTruthy();
+
+  // Rimessa fra le conversazioni, ci resta: il classificatore non la rimanda
+  // indietro alla prossima chiusura.
+  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Sposta fra le conversazioni' }).click();
+  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).kind || '', { timeout: 20_000 }).toBe('conversazione');
+
+  // E il titolo si corregge sul posto.
+  await riga.click({ button: 'right' });
+  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
+  const campo = page.locator('.arc-chat-rename');
+  await expect(campo).toBeVisible({ timeout: 10_000 });
+  await campo.fill('Spinoza e la sostanza');
+  await campo.press('Enter');
+  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).title || '', { timeout: 20_000 })
+    .toBe('Spinoza e la sostanza');
+
+  // Quello che ha scelto l'utente vince anche dopo che la conversazione va
+  // avanti e viene riclassificata.
+  await turno(app, 'c-malclassificata', 'Un altro pezzo di discussione');
+  await app.evaluate(() => globalThis.SN_CLOSE_FILO_CHAT('c-malclassificata'));
+  await page.waitForTimeout(2500);
+  const dopo = (await leggiArchivio(app)).find((c) => c.id === 'c-malclassificata');
+  console.log('DOPO LA RICLASSIFICAZIONE:', JSON.stringify({ title: dopo.title, kind: dopo.kind }));
+  expect(dopo.title).toBe('Spinoza e la sostanza');
+  expect(dopo.kind).toBe('conversazione');
 });
