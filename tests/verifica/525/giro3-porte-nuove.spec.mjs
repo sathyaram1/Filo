@@ -77,7 +77,7 @@ test('Filo chiuso di colpo: alla partenza dopo la chat appesa prende nome e tipo
   expect(prima.closedAt).toBeFalsy();
 
   // La partenza successiva la raccoglie.
-  await app.evaluate(() => require('./services/handlers').sweepPendingChats());
+  await app.evaluate(() => globalThis.SN_SWEEP_FILO_CHATS());
 
   await expect.poll(async () => {
     const c = (await leggiArchivio(app)).find((x) => x.id === 'c-appesa');
