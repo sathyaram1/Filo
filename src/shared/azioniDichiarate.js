@@ -26,9 +26,27 @@
 //  2. una dichiarazione preceduta, nella stessa proposizione, da una negazione o
 //     da un'ipotesi («non ho messo…», «se ho aperto la pagina sbagliata…»),
 //     o che sta dentro una domanda, non conta.
+//
+// Un avviso che accusa Filo di non aver fatto una cosa che ha fatto è peggio
+// del silenzio: si smette di leggerlo, e il presidio torna muto. Quindi ogni
+// famiglia elenca TUTTI i modi che Filo ha davvero di fare quella cosa (aprire
+// un programma, per esempio, passa da un comando di shell: non esiste uno
+// strumento «apri un programma»), e quello che Filo fa SENZA azioni non ha
+// famiglia del tutto: quello che impara lo scrive in memoria un passaggio che
+// parte da solo dopo il turno, quindi «l'ho memorizzato» è vero e non si tocca.
 
 (function (global) {
   'use strict';
+
+  // Fine di parola SICURA anche dopo una vocale accentata. `\b` in JavaScript
+  // guarda `\w`, che è solo ASCII: dopo la à di «modalità» non c'è nessun
+  // confine, e una regola scritta `modalità\b` non può fare match su niente —
+  // nasce spenta e nessuno se ne accorge. Una sentinella negli unit test
+  // impedisce che ne ricompaia una (tests/unit/azioniDichiarate.test.mjs).
+  const FINE = '(?![\\wàèéìíòóùú])';
+  const INIZIO = '(?<![\\wàèéìíòóùú])';
+  // L'apostrofo si scrive in due modi e il modello usa tutti e due.
+  const AP = "['’]";
 
   // Ogni famiglia: come il modello DICE di aver fatto la cosa (`frasi`), quali
   // azioni la reggono davvero (`tipi`) e cosa va detto all'utente quando la
