@@ -18,6 +18,7 @@
     {
       version: '0.2.228', date: '2026-09-11',
       features: [
+        'Le chat con Filo non spariscono più tornando alla home: restano tutte sul tuo computer, per intero. Le ritrovi in Cronologia, sopra le schede chiuse — le discussioni in vista, i comandi sotto un interruttore. Cerca una parola e ti trova la chat che ne parlava; clicca una chat per riaprirla e continuare a scrivere. Puoi anche dire a Filo "riprendi la discussione di ieri su…" e ci arriva da solo.',
         'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta. La pagina Crediti ricorda l’ultimo rifiuto finché la chiave non torna a funzionare.',
         'Un invito adesso è un link. Chi lo apre scarica Filo e al primo avvio si ritrova i crediti già dentro, senza ricopiare il codice. Ogni tuo link vale per tre persone, e nella pagina Crediti vedi quanti sono entrati e quanti posti restano.',
         'Mandare una segnalazione dà crediti, e se viene risolta ne dà altri. Li trovi nei movimenti della pagina Crediti, insieme all\'invito riscattato, alla quota di ogni giorno e ai regali.',
