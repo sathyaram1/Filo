@@ -961,7 +961,10 @@
         const r = await send({ type: MSG.CALENDAR_ADD, evento: ev });
         if (r && r.ok && r.aperto) {
           btn.textContent = '✓ Aperto nel calendario';
-          btn.title = 'Il calendario ha l’evento davanti: salvalo lì per tenerlo.';
+          // Riapribile: chi chiude per sbaglio la finestra del calendario deve
+          // poterlo rimandare, non ritrovarsi un bottone spento.
+          btn.disabled = false;
+          btn.title = 'Il calendario ha l’evento davanti: salvalo lì. Un altro click lo riapre.';
           return;
         }
         if (r && r.ok) {
