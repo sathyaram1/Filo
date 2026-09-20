@@ -446,6 +446,12 @@ function charsetDaHtml(buffer) {
   return m ? m[1] : '';
 }
 
+// I 32 caratteri che windows-1252 mette dove ISO-8859-1 ha dei comandi di
+// controllo: l'euro, le virgolette curve, il trattino lungo.
+const C1_1252 = '€\u0081‚ƒ„…†‡ˆ‰Š‹Œ'
+  + '\u008DŽ\u008F\u0090‘’“”•–—˜™š'
+  + '›œ\u009DžŸ';
+
 /** Byte → stringa, rispettando il charset dichiarato quando lo sappiamo fare. */
 function decodifica(buffer, contentType) {
   if (!buffer || !buffer.length) return '';
