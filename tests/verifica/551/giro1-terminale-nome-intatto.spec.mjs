@@ -46,7 +46,7 @@ test('il nome che torna dal terminale apre il file senza bisogno di indovinare',
     const page = await openTab(HOME);
     await accendiTerminale(page);
 
-    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'ls', cwd: dir }, { cwd: dir });
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `ls "${dir}"` });
     expect(r.executed, `il comando non è partito: ${JSON.stringify(r).slice(0, 400)}`).toBe(true);
     const stdout = String(r.output?.stdout || '');
 
