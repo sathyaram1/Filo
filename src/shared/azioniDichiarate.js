@@ -1027,9 +1027,24 @@
     // cosa appena fatta, un'azione vecchia non la prova.
     const domanda = !!(stato && stato.domandaUtente);
     const copertaDalPassato = (fam, d) => {
+      // Giro 8: su questa famiglia l'avviso è già comparso in questa
+      // conversazione. Quella cosa non è stata fatta, e nessuna azione
+      // vecchia può tornare a coprirla: senza questa riga bastava che il
+      // modello la ripetesse con un «già» davanti — cioè la parola che scrive
+      // quando gli si dice di rifarla — perché il presidio tacesse.
+      if (giaMancate.has(fam.id)) return false;
       if (!fam.tipi.some((x) => precedenti.has(x))) return false;
       if (d.senzaHo) return true;
       return domanda || GUARDA_INDIETRO.test(d.frase || '');
+    };
+    // Quante cose di questa famiglia i turni precedenti possono reggere.
+    const quantePassate = (fam) => {
+      let n = 0;
+      for (const x of fam.tipi) {
+        if (!precedenti.has(x)) continue;
+        n += contiPrec ? Math.max(1, Number(contiPrec[x]) || 1) : 1;
+      }
+      return n;
     };
     // La cosa dichiarata ESISTE già, anche se in questo turno non è partito
     // niente? Vale per l'ora di una sveglia che c'è e per il titolo di un
