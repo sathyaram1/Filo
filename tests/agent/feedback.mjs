@@ -16,6 +16,20 @@
 
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+// #602 — anche questa strada carica nel deposito, e finché non passava dalla
+// cifratura le schermate dello schermo dell'owner ci finivano in chiaro: un
+// punto che carica in chiaro vale tutti gli altri messi insieme, perché il
+// deposito è lo stesso e il link col codice di scarico gira allo stesso modo.
+// Il modulo di cifratura è lo stesso dell'app (gira in Node come nel browser).
+const __agentDir = dirname(fileURLToPath(import.meta.url));
+const __repoRoot = join(__agentDir, '..', '..');
+const __require = createRequire(import.meta.url);
+__require(join(__repoRoot, 'src', 'shared', 'feedbackPublicKey.js'));
+const CRYPTO = __require(join(__repoRoot, 'src', 'shared', 'feedbackCrypto.js'));
 
 // Stessi valori (pubblici) di src/shared/feedback.js.
 const PROJECT_ID = 'filo-8b9cb';
