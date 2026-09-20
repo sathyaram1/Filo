@@ -86,9 +86,7 @@
           '/gift NUMERO EMAIL — regala crediti a un utente (proprietario)',
         );
       }
-      const bubble = makeBubble({ role: 'filo', text: lines.join('\n') });
-      bubblesEl.appendChild(bubble);
-      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+      showFiloLine(lines.join('\n'));
     },
   };
 
