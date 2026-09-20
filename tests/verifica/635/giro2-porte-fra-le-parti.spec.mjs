@@ -212,19 +212,13 @@ test('quello che disegnano le parti si legge, in chiaro e in scuro', async ({ ap
         const s = getComputedStyle(el);
         return { colore: s.color, sfondo: s.backgroundColor };
       };
-      const cmd = document.querySelector('#bubbles .dash-term-cmd');
-      const r = cmd.getBoundingClientRect();
       return {
         terminale: cs(out),
         attivita: cs(att),
-        comando: cs(cmd),
-        rettangoloComando: { x: Math.round(r.x), larghezza: Math.round(r.width), altezza: Math.round(r.height) },
-        dietroIlComando: getComputedStyle(cmd.parentElement).backgroundColor,
         altezzaTerminale: out.getBoundingClientRect().height,
         altezzaAttivita: att.getBoundingClientRect().height,
       };
     });
-    console.log(tema, JSON.stringify(colori.comando), JSON.stringify(colori.rettangoloComando), colori.dietroIlComando);
     // Niente scritte invisibili, niente blocchi schiacciati a zero.
     expect(colori.terminale.colore).not.toBe(colori.terminale.sfondo);
     expect(colori.attivita.colore).not.toBe(colori.attivita.sfondo);
