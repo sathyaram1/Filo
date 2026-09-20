@@ -77,6 +77,16 @@ il timer di attesa c'era già, ma un evento lo annullava (la pagina aveva finito
 di caricare) e da lì in poi niente chiudeva più la finestra. Un tetto di vita
 si scrive come un secondo timer che solo la chiusura vera può spegnere.
 
+**Il tetto vale anche per quello che la risorsa si porta dietro.** Una finestra
+nascosta ha bisogno di una memoria di navigazione isolata. Fabbricarne una
+nuova a ogni controllo, con un nome che non si ripete mai, sopravvive alla
+finestra: la finestra muore col suo tetto di vita, la memoria resta registrata
+finché il programma è aperto, una per ogni sito controllato. Il tetto di
+concorrenza rende la chiusura gratis — se insieme ne girano al massimo due,
+bastano due nomi riusati a turno, svuotati prima e dopo ogni giro. Svuotare
+PRIMA e non solo dopo: l'isolamento non deve dipendere da quando è arrivato lo
+svuotamento del turno precedente.
+
 **Una memoria che frena si tiene sulla chiave giusta.** Ricordare un verdetto
 per host completo non frena nulla: chi controlla un dominio fa comparire
 sottodomini nuovi a volontà. La chiave è il dominio registrabile, e accanto
