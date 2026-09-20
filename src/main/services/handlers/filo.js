@@ -194,20 +194,24 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_CHATS_SEARCH, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const all = await FiloChats.list();
-    const found = ChatArchive.search(all, msg.query, {
+    // Una frase intera ("discussione sulla coscienza") non deve dare zero
+    // risultati quando la chat c'è: se pretendere tutte le parole non trova
+    // niente, la ricerca si allarga alle parole che distinguono e lo DICE
+    // (`termini`), così la pagina può scrivere con che cosa ha trovato.
+    const { results, termini, allargata } = ChatArchive.searchWide(all, msg.query, {
       kind: msg.kind || null,
       onlyVisible: !!msg.onlyVisible,
       limit: Number(msg.limit) || 0,
     });
     // L'estratto diventa il frammento attorno a ciò che si cercava: è quello
     // che spiega perché la chat è nel risultato.
-    const q = String(msg.query || '').trim();
-    const chats = found.map((c) => {
+    const q = termini.join(' ');
+    const chats = results.map((c) => {
       const entry = ChatArchive.toIndexEntry(c);
       if (entry && q) entry.excerpt = ChatArchive.snippetFor(c, q);
       return entry;
     }).filter(Boolean);
-    return { ok: true, chats };
+    return { ok: true, chats, termini, allargata };
   });
 
   // ── Micro-intervista di benvenuto (#524) ─────────────────────────────────
