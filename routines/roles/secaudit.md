@@ -77,6 +77,12 @@ server un verdetto raccontato non lo legge).
    ```bash
    node scripts/merge-gate.mjs <branch>
    ```
+   Anche la richiesta di fusione parla del commit, non del ramo: dichiara la
+   punta della directory, e prima di partire rifà i due controlli del passo 1.
+   Se ti risponde che il ramo si è mosso dopo i via libera, non insistere e
+   non ricontrollare da solo il pezzo nuovo: l'esito è decaduto, il giro va
+   rifatto da capo su quel contenuto, e chi ha cambiato il ramo lo rimette in
+   verifica.
    Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
    verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
    sul diff che scarica da GitHub, e fonde con la sua identità. Qui non gira
