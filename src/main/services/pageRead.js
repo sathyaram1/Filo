@@ -468,7 +468,10 @@ async function daContenuto({ url = '', contentType = '', buffer = null, status =
   if (status >= 400) {
     return { ...base, error: 'http_error', detail: `il sito ha risposto ${status}` };
   }
-  const tipo = tipoDaContentType(contentType);
+  // I primi byte valgono più dell'etichetta: moltissimi siti servono un PDF
+  // come file generico da scaricare, e lì Filo rispondeva che quell'indirizzo
+  // non è una pagina di testo invece di leggerlo (#553).
+  const tipo = sembraPdf(buffer) ? 'pdf' : tipoDaContentType(contentType);
   if (!tipo) {
     const famiglia = String(contentType || '').toLowerCase().split('/')[0];
     return { ...base, error: 'unsupported', detail: SPIEGA_TIPO[famiglia] || 'non è una pagina di testo' };
