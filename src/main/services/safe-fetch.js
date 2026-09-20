@@ -72,12 +72,16 @@ async function assertPublicHost(hostname) {
 
 // GET con validazione anti-SSRF. Ritorna la Response (con body leggibile) come
 // fetch. Lancia su schema non http/https, host privato o troppi redirect.
-async function safeFetch(rawUrl, { signal, maxRedirects = 5, headers } = {}) {
+// `controllaHop` vede OGNI indirizzo della catena, non solo il primo, e ferma
+// la richiesta lanciando: un sito che rimanda altrove sceglie lui dove, quindi
+// un controllo fatto una volta sola all'inizio non controlla niente.
+async function safeFetch(rawUrl, { signal, maxRedirects = 5, headers, controllaHop } = {}) {
   let current = String(rawUrl || '');
   for (let i = 0; i <= maxRedirects; i++) {
     let u;
     try { u = new URL(current); } catch (_) { throw new Error('bad-url'); }
     if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('blocked-scheme');
+    if (typeof controllaHop === 'function') await controllaHop(current);
     await assertPublicHost(u.hostname);
     const res = await fetch(current, { method: 'GET', redirect: 'manual', signal, headers });
     const loc = (res.status >= 300 && res.status < 400) ? res.headers.get('location') : null;
