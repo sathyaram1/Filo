@@ -1831,6 +1831,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         }
         const win = winOf(sender);
         if (!win) return { executed: false, kept: false };
+        // «Portami alla home» chiesto DALLA home ricaricava la pagina, e la
+        // ricarica buttava via il blocco di lavoro e la risposta prima che
+        // l'utente potesse leggerli. Chi è già a casa non ci si porta: lo
+        // diciamo, e la chat offre il bottone per svuotare la conversazione
+        // quando l'utente ha finito di leggere.
+        if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
+          return { executed: true, kept: true, output: { window: 'home', already: true } };
+        }
         if (cmd === 'fullscreen') {
           // Schermo intero "immersivo": la view attiva copre l'intera finestra e
           // le barre (schede + indirizzo) spariscono — è ciò che l'utente intende
