@@ -2912,10 +2912,8 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   return { settings, canServe, payload, signature, saved };
 }
 
-// Home senza AI: istantanea, dalle pagine salvate. Niente LLM. Il messaggio
-// dice PERCHÉ Filo non parla e dove si sistema: un'assenza muta è
-// indistinguibile da un guasto, e per giorni ha fatto sembrare senza crediti
-// chi i crediti li aveva (#663).
+// Home senza AI: istantanea, dalle pagine salvate. Dice PERCHÉ Filo non parla,
+// perché un'assenza muta faceva credere senza crediti chi li aveva (#663).
 function buildNoKeyDashboard(settings, saved) {
   const suggestions = saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
