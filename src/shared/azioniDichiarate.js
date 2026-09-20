@@ -1181,6 +1181,7 @@
       // Giro 8: e solo se su questa strada l'avviso non è già comparso in
       // questa conversazione.
       const daPrima = !giaMancate.has('senza-nome')
+        && !(pronome.verbo && verbiMancati.has(pronome.verbo))
         && [...precedenti].some((x) => !NON_REGGONO_IL_PRONOME.has(x))
         && (domanda || GUARDA_INDIETRO.test(pronome.frase || ''));
       if (!libere && !ripete && !daPrima && !esisteGia(PRONOME, pronome)) out.push(manca);
