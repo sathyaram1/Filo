@@ -2473,8 +2473,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
   // #530 — lo stato del compito riparte da quello che i turni PASSATI di questa
   // conversazione hanno letto: una pagina web letta due turni fa è ancora nel
-  // contesto che il modello sta per rileggere, e conta ancora.
-  setTaskFonti(sender, fontiDaStorico(cleanHistory));
+  // contesto che il modello sta per rileggere, e conta ancora. Più quello che
+  // QUESTO turno ci sta mettendo dentro senza passare da un'azione: i titoli
+  // delle schede aperte (li scrivono i siti) e le immagini passate in chat.
+  const immagini = image || (Array.isArray(images) && images.length);
+  setTaskFonti(sender, [
+    ...fontiDaStorico(cleanHistory),
+    ...(Array.isArray(fontiDiStato) ? fontiDiStato : []),
+    ...(immagini ? ['immagine'] : []),
+  ]);
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
   // messaggio dell'assistente, così nei turni successivi il modello SA davvero
