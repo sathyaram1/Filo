@@ -25,11 +25,14 @@
 //      e la risposta restano da leggere;
 //  (G) l'evento proposto si aggiunge davvero al calendario, e finché non lo si
 //      aggiunge il diario lo chiama proposta.
+//  (H) l'azione confermata nel popup lascia la sua riga anche quando non è
+//      un'impostazione, e il bottone diventa una ricevuta invece di ripetere
+//      «Filo vuole…» con la spunta davanti.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, fillConfirmInput, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -418,4 +421,50 @@ test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app,
   await page.screenshot({ path: 'tests/agent/.out/diario-evento-calendario.png' });
 
   await restore(app, '__fakeG');
+});
+
+test('H — l\'azione confermata lascia la sua riga, e il bottone diventa una ricevuta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Ada.', PREFERENZE: 'Risposte brevi.' });
+  });
+
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'h1', name: 'CANCELLA_MEMORIA', arguments: '{}' }] },
+    { text: 'Dimmi di sì e dimentico tutto.' },
+  ], '__fakeH');
+
+  await page.locator('#input').fill('dimentica tutto quello che sai di me');
+  await page.locator('#sendBtn').click();
+  const btn = page.locator('.dash-action-btn').first();
+  await expect(btn).toBeVisible({ timeout: 10_000 });
+  await btn.click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await fillConfirmInput(page, 'conferma');
+  await clickConfirm(page, 'danger');
+
+  // È successo davvero: il profilo è vuoto.
+  await expect.poll(
+    () => app.evaluate(async () => String(((await globalThis.SN_FILO_MEMORY.getMemory()) || {}).PROFILO || '')),
+    { timeout: 10_000 },
+  ).toBe('');
+
+  // Il diario lo dice in cima e nella riga: prima restava «Conferma chiesta»
+  // sotto un titolo «Come ha lavorato», e della cancellazione nessuna traccia.
+  const activity = page.locator('.dash-activity');
+  await expect(activity.locator('.dash-activity-label')).toContainText('cancellato la memoria');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Memoria cancellata' })).toHaveCount(1);
+
+  // Il bottone è la ricevuta di cosa è successo, non la frase al futuro.
+  const testoBtn = await btn.textContent();
+  expect(testoBtn).toContain('✓');
+  expect(testoBtn).not.toContain('vuole');
+  expect(testoBtn).not.toContain('Eliminare DEFINITIVAMENTE');
+
+  await restore(app, '__fakeH');
 });

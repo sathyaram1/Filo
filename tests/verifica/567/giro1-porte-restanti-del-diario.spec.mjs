@@ -53,11 +53,19 @@ test('la memoria cancellata dalla chat: cosa ne resta nel diario', async ({ app,
   const righe = activity.locator('.dash-activity-body .dash-activity-row');
   const testi = (await righe.allTextContents()).join(' | ');
 
-  // Il diario non deve nominare l'azione col suo nome interno…
+  // Il diario non nomina l'azione col suo nome interno…
   expect(testi, `righe del diario: ${testi}`).not.toContain('cancella memoria');
-  // …e il titolo del blocco deve dire che la memoria è stata cancellata,
-  // non restare su «Come ha lavorato».
-  expect(await label.textContent()).not.toContain('Come ha lavorato');
+  // …dice che la memoria è stata cancellata…
+  expect(testi).toContain('Memoria cancellata');
+  // …e il titolo del blocco lo conta, invece di restare su «Come ha lavorato».
+  const titolo = await label.textContent();
+  expect(titolo).not.toContain('Come ha lavorato');
+  expect(titolo).toContain('cancellato la memoria');
+
+  // Il bottone è una ricevuta, non più «Filo vuole…» con la spunta davanti.
+  const testoBtn = await btn.textContent();
+  expect(testoBtn).toContain('✓');
+  expect(testoBtn).not.toContain('Eliminare DEFINITIVAMENTE');
 
   await restore(app, '__v567q');
 });
