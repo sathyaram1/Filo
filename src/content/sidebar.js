@@ -625,12 +625,17 @@
           .slice(0, 5)
           .map((c) => ({ label: c.label.trim(), prompt: c.prompt.trim() }));
       }
+      const display = typeof obj.text === 'string' ? obj.text : '';
       return {
-        display: typeof obj.text === 'string' ? obj.text : '',
+        display,
         highlight,
         choices,
         status,
         collapse: collapseFlag,
+        // Un oggetto senza testo, senza passo da evidenziare e senza bottoni
+        // è la seconda forma della segnalazione: «chiude con un oggetto
+        // vuoto». Non c'è niente da mostrare e niente da fare.
+        fuoriFormato: !display.trim() && !highlight && !choices.length,
       };
     } catch (_) {
       return fallback;
