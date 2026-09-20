@@ -89,6 +89,13 @@
   // I pronomi con cui si risponde quando la cosa l'ha appena nominata
   // l'utente. «Gliel'ho messa» mancava: c'erano solo prima e seconda persona.
   const PRON = `(?:te |ve |me |glie)?l${AP}(?:ho|avevo)\\s+${AVV}`;
+  // Giro 6: la perifrasi con l'infinito. «Ho provveduto a metterti la sveglia
+  // alle 19» dice la stessa cosa di «ti ho messo la sveglia alle 19», e
+  // passava intera perché il verbo che conta lì non è un participio.
+  const INF = '(?:mett|impostar|programmar|fissar|crear|aggiunger|attivar|settar|puntar'
+    + '|salvar|scriver|annotar|segnar|mandar|inviar|inoltrar|aprir|avviar)[a-zàèéìíòóùú]*';
+  const PERIFRASI = `\\b(?:ho\\s+${AVV}provveduto\\s+a|sono\\s+${AVV}riuscit[oa]\\s+a`
+    + `|ho\\s+${AVV}fatto\\s+in\\s+modo\\s+di|mi\\s+sono\\s+${AVV}occupat[oa]\\s+di)\\s+${INF}\\b`;
 
   // Ogni famiglia: come il modello DICE di aver fatto la cosa (`frasi`), quali
   // azioni la reggono davvero (`tipi`) e cosa va detto all'utente quando la
@@ -245,7 +252,7 @@
       tipi: ['INVIA_FEEDBACK'],
       avviso: 'la segnalazione non è partita',
       frasi: [
-        new RegExp(`${HO}(?:inviato|mandato|spedito|girato)\\b${PONTE(32)}\\b(?:segnalazione|feedback)\\b`, 'i'),
+        new RegExp(`${HO}(?:inviato|mandato|spedito|girato|inoltrato|trasmesso)\\b${PONTE(32)}\\b(?:segnalazione|feedback)\\b`, 'i'),
         new RegExp(`${HO}segnalato\\b${PONTE(32)}\\b(?:agli sviluppatori|al team|a chi sviluppa)\\b`, 'i'),
       ],
     },
@@ -254,7 +261,9 @@
       tipi: ['EVENTO_CALENDARIO'],
       avviso: 'l\'evento non è in calendario',
       frasi: [
-        new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito)\\b${PONTE(32)}\\b(?:in calendario|nel calendario|l${AP}evento|un evento)\\b`, 'i'),
+        // Giro 6: «fissare» e «prendere» sono i verbi dell'appuntamento in
+        // italiano, e «al calendario» si dice quanto «in calendario».
+        new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito|fissato|preso|programmato)\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario|sul calendario|l${AP}evento|un evento|l${AP}appuntamento|un appuntamento)\\b`, 'i'),
         new RegExp(`\\b${PRON}(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
       ],
     },
