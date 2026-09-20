@@ -55,7 +55,15 @@
     CANCELLA_SVEGLIA: { classe: 'uscita', uscita: 'sveglie' },
     MODIFICA_SVEGLIA: { classe: 'uscita', uscita: 'sveglie' },
     SALVA_APPUNTO: { classe: 'uscita', uscita: 'appunti' },
-    SALVA_LEZIONE: { classe: 'uscita', uscita: 'memoria' },
+    // Una LEZIONE non è un contenuto: è una regola su come Filo deve
+    // comportarsi d'ora in poi, che entra in ogni conversazione futura come
+    // roba dell'utente e che la compattazione porta dentro il suo profilo per
+    // sempre. Una regola ricavata da testo scritto da altri è l'attacco, non
+    // un caso d'uso: nessun permesso la rende buona, nemmeno un sì dell'utente
+    // (#533, quarto giro di verifica). Quindi da un compito che ha letto roba
+    // esterna questo strumento non esiste, punto; il contenuto trovato
+    // leggendo si salva con SALVA_APPUNTO, che ha la sua cura.
+    SALVA_LEZIONE: { classe: 'uscita', uscita: 'memoria', maiDaEsterno: true },
     CANCELLA_MEMORIA: { classe: 'uscita', uscita: 'oblio' },
     NAVIGA: { classe: 'uscita', uscita: 'schede' },
     PULISCI_TAB: { classe: 'uscita', uscita: 'schede' },
