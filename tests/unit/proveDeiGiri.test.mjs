@@ -20,9 +20,8 @@ function nelRepo(sotto = '') {
   return [...new Set(out.split('\0').filter(Boolean).map((f) => f.replace(/\\/g, '/')))];
 }
 
-// I nomi con cui chi verifica ha battezzato le sue prove usa-e-getta, giro dopo
-// giro. È un elenco osservato, non una legge: se ne nasce uno nuovo si aggiunge
-// qui, e il messaggio sotto dice a chi lo incontra che cosa farne.
+// I nomi con cui chi verifica ha battezzato le sue prove, giro dopo giro: un
+// elenco osservato, non una legge. Se ne nasce uno nuovo si aggiunge qui.
 const MARCATORI = ['verify-', 'verifier-', 'vcheck-', 'vfx-', 'vtmp-', 'tmp-', 'giro', '_verify', '_vcheck'];
 
 test('una prova di un giro di verifica non sta nella suite: sta in tests/verifica/<numero>/', () => {
