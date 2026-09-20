@@ -2498,6 +2498,25 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         }));
       }
       if (!actions.length) {
+        // #517 — prima di consegnare questo testo all'utente: dichiara di aver
+        // fatto qualcosa che in questo turno non è stato chiamato? È arrivato
+        // in formato macchina invece che in prosa (e il recupero del formato
+        // vecchio ha già fallito)? Allora il turno non è finito: si rimanda
+        // indietro, con dentro il motivo. Serve almeno un giro libero: al tetto
+        // dei giri l'ultimo testo vale come risposta, non come tentativo.
+        const spinta = (Dichiarate && Tools && !rimandatoIndietro && round < MAX_ROUNDS)
+          ? spintaDiRimedio(Dichiarate, text, renderedActions)
+          : null;
+        if (spinta) {
+          rimandatoIndietro = true;
+          testoScartato = text;
+          // La scheda butta il testo già scritto in diretta: al suo posto
+          // arriva la risposta rifatta, non due risposte in fila.
+          push('filo:answer', { reset: true });
+          threadMessages.push(Tools.assistantMessage({ text, toolCalls: [], reasoningDetails: r.reasoningDetails }));
+          threadMessages.push({ role: 'user', content: spinta });
+          continue;
+        }
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
         exhausted = false;
