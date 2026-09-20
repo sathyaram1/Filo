@@ -449,6 +449,9 @@
     // #533 — l'azione c'era, il motore non l'ha consegnata: Filo aveva letto
     // roba scritta da altri e quella non era fra le cose che l'utente gli
     // aveva chiesto.
+    // Il rifiuto secco: una regola in memoria non può venire da una pagina,
+    // e non c'è permesso che la renda buona (#533, quarto giro di verifica).
+    if (o.perimetroSecco) return 'una regola in memoria non può venire da quello che ha letto';
     if (o.fuoriPerimetro) return 'non gliel’avevi chiesto, e aveva letto testo scritto da altri';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
