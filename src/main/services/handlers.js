@@ -967,11 +967,13 @@ async function avvisaSeLaProntezzaCambia() {
       || SN_CONST.canServeAction(s, ACTIONS.FILO_DASHBOARD);
   } catch (_) { return; }
   if (_potevaRispondere === ora) return;
-  const primaVolta = _potevaRispondere === null;
   _potevaRispondere = ora;
-  if (primaVolta && !ora) return; // all'avvio nessuno aspetta un avviso di «no»
   broadcastToTabs({ type: MSG.FILO_READY_CHANGED, ready: ora });
 }
+
+// La configurazione condivisa è una delle due sorgenti: si ascolta da subito,
+// perché arriva mentre la prima home è già aperta.
+try { Defaults.onChanged(() => { avvisaSeLaProntezzaCambia().catch(() => {}); }); } catch (_) {}
 
 async function applySettingsUpdate(partial) {
   // Gli override dei token estetici finiscono dentro <style> iniettati in
