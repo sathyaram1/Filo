@@ -956,27 +956,11 @@ if (isMain) {
     // chi consegna è la scommessa già persa sul biglietto e sulla firma dei
     // feedback — e un esito senza commit torna a essere una firma su una
     // cartella, buona anche dopo che il foglio è stato sostituito (#485).
-    // E uno dichiarato può solo CONFERMARE la punta vera, mai sostituirla:
-    // è la stessa regola che questo canale applica già al nome del ramo
-    // (nominarne un altro è un rifiuto messo a registro, non una correzione
-    // silenziosa). Senza, la difesa si spegneva scrivendo un argomento in più:
-    // bastava dichiarare l'impronta di un commit che qui non c'è perché
-    // l'esito nascesse intestato a un contenuto mai esaminato (verifica del
-    // giro 1 su questo lavoro).
-    if (intento === 'verdict' || intento === 'secaudit') {
-      const punta = headSha(ROOT);
-      if (!punta) {
-        console.error(`${intento === 'verdict' ? 'critica' : 'verdetto'} non registrato: non riesco a farmi dire su quale commit è la directory, e un esito vale per il contenuto esaminato, non per il nome del ramo.`);
-        console.error('Niente è stato consegnato: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia lo stesso comando.');
-        process.exit(1);
-      }
-      if (data.sha && String(data.sha) !== punta) {
-        console.error(`${intento === 'verdict' ? 'critica' : 'verdetto'} non registrato: hai dichiarato il commit ${String(data.sha).slice(0, 12)}, ma la directory è su ${punta.slice(0, 12)}.`);
-        console.error('Un esito vale per il contenuto che hai davvero davanti: l\'impronta la timbra lo strumento, non si detta. Togli --sha e rilancia, oppure posizionati sul commit che hai esaminato.');
-        process.exit(1);
-      }
-      data.sha = punta;
-    }
+    // E uno dichiarato può solo CONFERMARE la punta vera, mai sostituirla
+    // (più sotto): è la stessa regola che questo canale applica già al nome
+    // del ramo, dove nominarne un altro è un rifiuto messo a registro e non
+    // una correzione silenziosa.
+    //
     // Le consegne che valgono per UN COMMIT: la messa in revisione, la
     // correzione, la critica e il verdetto del controllo di sicurezza. Con
     // modifiche non salvate la punta si sposta dopo la registrazione e l'esito
