@@ -89,3 +89,17 @@ test('esclusi tutti e due: nessuna sessione parte, e si può sapere', () => {
   // Escludere il prioritario non è un caso da segnalare: il server passa all'altro.
   assert.equal(RS.nessunAccount(RS.leggiDoc({ priorityAccount: 'A', accountAOff: true })), false);
 });
+
+test('escluso il prioritario, si sa quale account resta (verifica giro 1)', () => {
+  // Due controlli che dicono il contrario vanno spiegati: la pillola «Prima A»
+  // accesa e l'interruttore di A spento non si leggono insieme.
+  assert.equal(RS.prioritarioIgnorato({ priorityAccount: 'A', accountAOff: true }), 'B');
+  assert.equal(RS.prioritarioIgnorato({ priorityAccount: 'B', accountBOff: true }), 'A');
+  // La priorità vale ancora: niente da dire.
+  assert.equal(RS.prioritarioIgnorato({ priorityAccount: 'A', accountBOff: true }), '');
+  assert.equal(RS.prioritarioIgnorato({ priorityAccount: 'A' }), '');
+  assert.equal(RS.prioritarioIgnorato({ accountAOff: true }), '', 'senza priorità non c\'è niente da ignorare');
+  assert.equal(RS.prioritarioIgnorato({}), '');
+  // Esclusi tutti e due non «resta» nessuno: lo dice l'altro avviso.
+  assert.equal(RS.prioritarioIgnorato({ priorityAccount: 'A', accountAOff: true, accountBOff: true }), '');
+});
