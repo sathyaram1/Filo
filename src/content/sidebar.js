@@ -1124,8 +1124,19 @@
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
       // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
-      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : '(risposta vuota)');
+      // #517 — quando la risposta è fuori formato anche dopo il rimbalzo, il
+      // testo che il modello ha scritto NON si butta: era la risposta buona
+      // finita davanti a un oggetto vuoto, e l'utente si ritrovava
+      // «(risposta vuota)» al suo posto. Sotto ci va la riga che dice che in
+      // questo turno non è stato eseguito niente.
+      const grezzo = String(res.text || '').trim();
+      const displayText = parsed.display
+        || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (grezzo || '(risposta vuota)'));
       assistantEl = appendChatMessage('assistant', displayText);
+      if (parsed.fuoriFormato) {
+        appendChatMessage('avviso', AVVISO_FUORI_FORMATO);
+        console.warn('[Filo] #517 risposta fuori formato dell\'agente Aiuto, niente eseguito:', grezzo.slice(0, 200));
+      }
 
       // Aggiorna la storia AI
       if (userAction && !userMessage) {
