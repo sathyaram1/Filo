@@ -329,11 +329,35 @@ function bomDueByte(buf) {
   return '';
 }
 
+// I 32 caratteri in cui la tabella di Windows si discosta da latin1 (da 0x80 a
+// 0x9F). Non è una fascia qualunque: è proprio dove stanno i SEGNI TIPOGRAFICI
+// — trattino lungo e medio, virgolette e apostrofi curvi, il simbolo dell'euro,
+// i puntini di sospensione. Letta come latin1, quella fascia diventa caratteri
+// di controllo invisibili: gli accenti tornavano giusti e il resto spariva
+// senza lasciare traccia, nemmeno un rombo. Il modello leggeva «12 » al posto
+// di «12 €» e rispondeva su un testo bucato (#551, quarto giro di verifica). È
+// lo stesso danno della segnalazione, spostato dal nome del file al contenuto:
+// un documento salvato in «ANSI» — il modo normale di salvare un testo su
+// Windows fino a ieri, e quello che Excel usa esportando un CSV — perdeva i
+// segni di cui la segnalazione parla.
+const CP1252_ALTI = [
+  '€', '\u0081', '‚', 'ƒ', '„', '…', '†', '‡',
+  'ˆ', '‰', 'Š', '‹', 'Œ', '\u008D', 'Ž', '\u008F',
+  '\u0090', '‘', '’', '“', '”', '•', '–', '—',
+  '˜', '™', 'š', '›', 'œ', '\u009D', 'ž', 'Ÿ',
+];
+
+/** Da byte di Windows-1252 a testo. PURA. */
+function daCp1252(buf) {
+  return buf.toString('latin1')
+    .replace(/[\u0080-\u009F]/g, (c) => CP1252_ALTI[c.charCodeAt(0) - 0x80]);
+}
+
 /**
  * Decodifica un buffer di testo. Due byte per carattere se il file lo dichiara
  * in testa; altrimenti UTF-8 (BOM tolto); se il risultato è pieno di
- * caratteri di sostituzione ripiega su latin1 — il caso tipico degli export CSV
- * italiani, scritti in windows-1252, dove altrimenti spariscono tutti gli accenti.
+ * caratteri di sostituzione ripiega sulla tabella di Windows — il caso tipico
+ * degli export CSV italiani, dove altrimenti spariscono tutti gli accenti.
  * PURA.
  */
 function decodeText(buf) {
