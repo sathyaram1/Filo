@@ -1258,11 +1258,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       const url = globalThis.SN_URL_NAV.indirizzoAzione(action);
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
-        // L'allarme STRUTTURALE (payload lungo, blocco opaco) solo per NAVIGA:
-        // una lettura segue una ricerca, e l'indirizzo di un articolo vero è
-        // lungo e illeggibile quasi sempre. Un allarme che suona sette volte su
-        // dieci insegna a cliccare OK. Il freno sui DATI dell'utente resta su
-        // tutte e due le strade (#553).
+        // L'allarme STRUTTURALE (payload lungo, blocco opaco) vale per tutte e
+        // due le strade, ma per la lettura guarda solo la CODA dell'indirizzo:
+        // una lettura segue una ricerca, e il percorso di un articolo vero è
+        // lungo e illeggibile per conto suo. Un allarme che suona sette volte su
+        // dieci insegna a cliccare OK (#553).
         const fromUntrusted = /^https?:/i.test(origin);
         const corpus = await navExfilCorpus();
         // Quello che Filo ha letto su richiesta del modello (una scheda
