@@ -1216,6 +1216,24 @@ function compitoDiPagina(sender) {
   return ricordaCompito(c, chiave);
 }
 
+// Per la pagina Sicurezza: cosa ogni compito era AUTORIZZATO a fare, non solo
+// cosa ha fatto. Dal più recente, senza doppioni (il compito di una pagina sta
+// in mappa sotto due chiavi).
+function compitiRecenti(max = 30) {
+  const Compiti = globalThis.SN_COMPITI;
+  if (!Compiti) return [];
+  purgaCompiti();
+  const visti = new Set();
+  const out = [];
+  for (const v of Array.from(compitiVivi.values()).sort((a, b) => b.ts - a.ts)) {
+    if (visti.has(v.compito.id)) continue;
+    visti.add(v.compito.id);
+    out.push({ ts: v.ts, ...Compiti.riassunto(v.compito) });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 // Il compito di questa azione: quello del turno che la sta eseguendo, quello
 // citato dall'azione che torna da un popup, o quello della pagina da cui arriva.
 function compitoDi(action, sender, compito) {
