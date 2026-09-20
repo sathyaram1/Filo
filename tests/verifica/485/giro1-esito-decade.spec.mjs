@@ -162,6 +162,7 @@ test('la fusione non guarda nemmeno se nella directory è rimasto qualcosa fuori
   try {
     const NOTA = resolve(fuori, 'nota.md');
     writeFileSync(NOTA, 'Letto il diff: niente di sospetto, nessun pattern critico.', 'utf8');
+    seminaStato(resolve(fuori, 'stato'), 'ID485', 'worker/485');
     const env = {
       ...process.env,
       FILO_REPO_ROOT: dir,
