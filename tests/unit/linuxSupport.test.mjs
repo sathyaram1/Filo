@@ -132,6 +132,56 @@ test('il pacchetto Linux viene allegato alla release, non solo costruito', () =>
   }
 });
 
+// ── Il primo avvio, spiegato dove l'utente è bloccato ──────────────────────
+// Due muri certi, tutti e due prima che l'utente abbia visto Filo, quindi
+// impossibili da spiegare da dentro l'app. Un file scaricato da un browser
+// arriva senza il permesso di essere eseguito: il doppio clic non lo avvia. E
+// un AppImage, per montarsi, apre libfuse.so.2, che Ubuntu dalla 22.04,
+// Debian 12 e le Fedora recenti non installano più di serie: dove manca, il
+// doppio clic muore con un errore che a un utente non dice niente.
+//
+// È lo stesso caso del Mac senza certificato Apple, dove il foglietto sta
+// dentro il disco che l'utente ha appena aperto. Un AppImage è un file solo e
+// non ha un "dentro": il foglietto va allegato accanto, con un nome fisso, e
+// il sito lo mette vicino al bottone "Scarica per Linux".
+const FOGLIETTO = 'Se-Filo-non-si-apre-Linux.txt';
+
+test('il foglietto del primo avvio su Linux esiste e dice le due cose che servono', () => {
+  const path = join(ROOT, 'build', FOGLIETTO);
+  assert.ok(existsSync(path),
+    `sparito ${FOGLIETTO}: chi scarica Filo su Linux resta davanti a un file che non parte, senza sapere perché`);
+  const testo = readFileSync(path, 'utf8');
+  assert.match(testo, /chmod \+x|Consenti l'esecuzione/,
+    'il foglietto non spiega come dare al file il permesso di partire: è il muro che incontrano tutti');
+  assert.match(testo, /libfuse/,
+    'il foglietto non nomina libfuse2: su Ubuntu 22.04 e successive il doppio clic muore lì');
+});
+
+test('il foglietto sale nella release, con un nome fisso che il sito può linkare', () => {
+  const job = linuxJob();
+  assert.match(job, /gh release upload/,
+    'nessuno allega il foglietto alla release: resterebbe un file del repo che l\'utente non vede mai');
+  assert.ok(job.includes(FOGLIETTO),
+    `il lavoro di pubblicazione non nomina più ${FOGLIETTO}`);
+  // Deve stare anche nel controllo finale, altrimenti un allegato mancato
+  // passa inosservato esattamente come passerebbe per l'AppImage.
+  const controllo = job.slice(job.indexOf('gh release view'));
+  assert.ok(controllo.includes(FOGLIETTO),
+    'il controllo finale non pretende il foglietto: un giorno non salirebbe e nessuno se ne accorgerebbe');
+});
+
+test('il recap degli aggiornamenti non promette un doppio clic che non funziona', () => {
+  // La riga del changelog diceva «si apre con un doppio clic»: su un AppImage
+  // appena scaricato non è vero, e la prima cosa che l'utente prova è proprio
+  // quella.
+  const notes = readFileSync(join(ROOT, 'src', 'shared', 'patchNotes.js'), 'utf8');
+  for (const riga of notes.split(/\r?\n/)) {
+    if (!/Linux/i.test(riga) || !/doppio clic/i.test(riga)) continue;
+    assert.ok(/esegu|chmod|libfuse/i.test(riga),
+      `il recap promette il doppio clic senza dire cosa fare quando non basta: «${riga.trim().slice(0, 100)}»`);
+  }
+});
+
 test("l'aggiornamento automatico su Linux ha da dove partire", () => {
   // `latest-linux.yml` è il file che electron-updater legge su Linux: senza,
   // chi ha scaricato l'AppImage resta fermo a quella versione per sempre.
