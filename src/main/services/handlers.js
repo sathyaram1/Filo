@@ -1692,6 +1692,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         } catch (e) {
           console.warn('[Filo] lettura file editor fallita', e?.message || e);
         }
+        ricordaLetto(r && r.text);
         return {
           executed: !!(r && r.ok),
           kept: true,
