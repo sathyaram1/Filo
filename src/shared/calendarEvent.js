@@ -71,6 +71,10 @@
     const fine = new Date(inizio.getTime() + durata * 60_000);
     return {
       titolo: titolo.slice(0, 200),
+      // In forma canonica, così l'evento già normalizzato può tornare al main
+      // dal bottone della chat e ripassare di qui senza perdere niente.
+      data: `${inizio.getUTCFullYear()}-${DUE_CIFRE(inizio.getUTCMonth() + 1)}-${DUE_CIFRE(inizio.getUTCDate())}`,
+      ora: `${DUE_CIFRE(inizio.getUTCHours())}:${DUE_CIFRE(inizio.getUTCMinutes())}`,
       dettagli: String(o.dettagli ?? o.details ?? o.descrizione ?? o.description ?? o.note ?? '').trim().slice(0, 2000),
       luogo: String(o.luogo ?? o.location ?? o.dove ?? '').trim().slice(0, 200),
       inizio: stampaLocale(inizio),
