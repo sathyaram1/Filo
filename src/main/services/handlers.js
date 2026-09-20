@@ -1025,6 +1025,37 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
+// Il testo RESO di una pagina già aperta in una scheda di Filo, per
+// LEGGI_PAGINA. Si guarda in tutte le finestre, non solo in quella di chi
+// chiede: le schede sono dell'utente, e la chat vive in una finestra sua.
+//
+// SOLO schede WEB: una pagina filo:// (Crediti, Preferenze, la chat stessa)
+// mostra i dati e le chiavi dell'utente, e un modello convinto da una pagina
+// ostile a «leggere» filo://options se le porterebbe via. Il testo di una
+// scheda web invece è contenuto che l'utente ha già davanti, e che Filo estrae
+// già oggi per l'archivio e per il riordino delle schede.
+async function testoDaSchedaAperta(url) {
+  const PR = require('./pageRead');
+  let finestre = [];
+  try { finestre = BrowserWindow.getAllWindows(); } catch (_) { return null; }
+  for (const win of finestre) {
+    const tm = win && win._filoTabs;
+    if (!tm || !Array.isArray(tm.tabs)) continue;
+    for (const t of tm.tabs) {
+      if (!t || t.isInternal || !/^https?:\/\//i.test(t.url || '')) continue;
+      if (!PR.stessoIndirizzo(t.url, url)) continue;
+      try {
+        const text = await t.view.webContents.executeJavaScript(
+          '(function(){try{return (document.body&&document.body.innerText)||"";}catch(e){return "";}})()',
+          true,
+        );
+        if (typeof text === 'string' && text.trim()) return { text, title: t.title || '' };
+      } catch (_) {}
+    }
+  }
+  return null;
+}
+
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
 function refreshProxyRulesAllWindows() {
