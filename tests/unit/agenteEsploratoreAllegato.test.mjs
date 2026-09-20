@@ -22,6 +22,9 @@ import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const { pushIssue } = await import('../agent/feedback.mjs');
+// Il modulo di cifratura lo registra già l'import qui sopra (l'agente lo carica
+// come lo carica l'app): qui serve solo per rileggere cosa è finito nel deposito.
+const CRYPTO = globalThis.SN_FEEDBACK_CRYPTO;
 
 function screenshotFinto() {
   const dir = cartellaTemporanea('agente-allegato-');
@@ -31,10 +34,11 @@ function screenshotFinto() {
 }
 
 /** Finge il deposito e Firestore. `codice` vuoto = nessun codice di scarico. */
-function depositoFinto(codice) {
+function depositoFinto(codice, ricevuti = []) {
   const originale = globalThis.fetch;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, opts) => {
     if (String(url).includes('uploadType=media')) {
+      ricevuti.push({ tipo: (opts && opts.headers && opts.headers['Content-Type']) || '', corpo: opts && opts.body });
       return {
         ok: true,
         status: 200,
@@ -76,6 +80,50 @@ test('col codice di scarico l’allegato si registra e l’indirizzo lo porta', 
     assert.equal(esito.images.length, 1);
     assert.match(esito.images[0], /[?&]token=CODICE-1\b/, `indirizzo senza codice: ${esito.images[0]}`);
   } finally {
+    ripristina();
+  }
+});
+
+// #602 — lo screenshot dell'agente sale CIFRATO come tutti gli altri allegati.
+//
+// Questa strada caricava nel deposito senza passare dalla cifratura: schermate
+// dello schermo di chi lancia l'esplorazione, in chiaro, dietro un collegamento
+// che gira. Il deposito è lo stesso degli allegati dell'app, e un punto che
+// carica in chiaro vale tutti gli altri messi insieme.
+test('lo screenshot dell’agente sale cifrato, non in chiaro', async () => {
+  const ricevuti = [];
+  const ripristina = depositoFinto('CODICE-1', ricevuti);
+  try {
+    const esito = await pushIssue({ ...ISSUE, screenshotPath: screenshotFinto() });
+    assert.equal(esito.images.length, 1, 'l’allegato doveva registrarsi');
+    assert.equal(ricevuti.length, 1, 'un caricamento solo');
+    const byte = new Uint8Array(ricevuti[0].corpo);
+    assert.ok(CRYPTO.isEncryptedBytes(byte), 'i byte caricati devono essere un ciphertext');
+    // La firma del PNG non deve comparire: sarebbe l'immagine com'era.
+    assert.notDeepEqual(
+      Array.from(byte.slice(0, 4)),
+      [0x89, 0x50, 0x4e, 0x47],
+      'nel deposito non deve finire il PNG in chiaro',
+    );
+    assert.equal(ricevuti[0].tipo, 'application/octet-stream',
+      'il contenuto cifrato è opaco: è il tipo che le regole del deposito ammettono');
+  } finally {
+    ripristina();
+  }
+});
+
+test('senza cifratura non parte nessuno screenshot, e la segnalazione va lo stesso', async () => {
+  const ricevuti = [];
+  const ripristina = depositoFinto('CODICE-1', ricevuti);
+  const pub = globalThis.SN_FEEDBACK_PUBKEY;
+  globalThis.SN_FEEDBACK_PUBKEY = null;
+  try {
+    const esito = await pushIssue({ ...ISSUE, screenshotPath: screenshotFinto() });
+    assert.deepEqual(esito.images, [], 'niente allegato');
+    assert.equal(ricevuti.length, 0, 'il deposito non doveva ricevere niente');
+    assert.ok(esito.id, 'la segnalazione parte lo stesso, senza schermata');
+  } finally {
+    globalThis.SN_FEEDBACK_PUBKEY = pub;
     ripristina();
   }
 });

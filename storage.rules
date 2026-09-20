@@ -31,7 +31,12 @@ rules_version = '2';
 //   contenuto, senza sapere niente di nessun feedback. Il resto dell'audit ha
 //   chiuso la lettura dei documenti, che era l'altra strada per arrivarci: se
 //   il bucket resta elencabile, quella chiusura vale la metà. Gli allegati dal
-//   25 giugno 2026 sono cifrati, ma i più vecchi no.
+//   25 giugno 2026 sono cifrati, ma i più vecchi no — e fino al #602 non lo
+//   erano nemmeno quelli aggiunti ai COMMENTI di un feedback (schermate e log
+//   del lavoro), che salivano sempre in chiaro perché la pagina che li carica
+//   la cifratura non ce l'aveva caricata. Quelli già nel deposito restano in
+//   chiaro: la cura per un allegato vecchio è ruotarne il codice di scarico
+//   dalla console, come per gli altri.
 // - Get: NEGATO (#583, giro 8). Chi passa da queste regole non scarica niente.
 //   L'unica chiave è il download token nel link, che Firebase valuta PRIMA
 //   delle regole: `.../o/<path>?alt=media&token=<t>` continua a funzionare,
