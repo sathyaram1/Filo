@@ -9,19 +9,26 @@
 // quindi l'updater è disattivato: lì l'aggiornamento avviene via `git pull`
 // del `prestart`.
 //
-// SU MAC L'INSTALLAZIONE PUÒ NON RIUSCIRE, ED È PREVISTO
-//   Il controllo e lo scaricamento funzionano ovunque (nella release c'è
-//   `latest-mac.yml` accanto a `latest.yml`). L'INSTALLAZIONE su Mac la fa un
-//   meccanismo di sistema che pretende una firma vera, rilasciata da Apple:
-//   Filo per ora ha solo una firma locale, che cambia a ogni build, e quel
-//   meccanismo la rifiuta.
+// FUORI DA WINDOWS L'INSTALLAZIONE PUÒ NON RIUSCIRE, ED È PREVISTO
+//   Il controllo e lo scaricamento funzionano ovunque: nella release ci sono
+//   `latest-mac.yml` e `latest-linux.yml` accanto a `latest.yml`. È
+//   l'INSTALLAZIONE che può fermarsi, e per due motivi diversi.
+//
+//   Su Mac la fa un meccanismo di sistema che pretende una firma vera,
+//   rilasciata da Apple: Filo per ora ha solo una firma locale, che cambia a
+//   ogni build, e quel meccanismo la rifiuta.
+//
+//   Su Linux l'aggiornamento riscrive il file .AppImage da cui Filo sta
+//   girando: riesce se l'app è stata lanciata davvero come AppImage e se quel
+//   file è scrivibile. Chi lo tiene in una cartella di sistema, o chi ha
+//   estratto il contenuto invece di lanciare l'AppImage, resta fermo.
 //
 //   Il difetto grave non sarebbe il fallimento: sarebbe il SILENZIO. Un
 //   aggiornamento che non si installa e non lo dice lascia l'utente fermo su
 //   una versione vecchia per sempre, convinto di essere aggiornato. Quindi
-//   quando su Mac l'aggiornamento inciampa, lo scriviamo fra le notifiche: si
-//   scarica a mano, una volta, e si va avanti. Quando arriverà un certificato
-//   Apple questo ripiego diventa inutile e si toglie.
+//   quando l'aggiornamento inciampa lo scriviamo fra le notifiche: si scarica a
+//   mano, una volta, e si va avanti. Su Windows no: lì si installa da sé e
+//   l'avviso sarebbe solo rumore.
 
 const { app } = require('electron');
 
