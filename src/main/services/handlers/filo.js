@@ -21,7 +21,11 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_CHAT, async (msg, sender) => {
     try {
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, sender });
+      // #525 — `chatId` è la targa della conversazione in corso: il main ci
+      // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
+      // Solo dalle pagine di Filo: una pagina web non apre chat nell'archivio.
+      const chatId = isFilo(origin) ? (msg.chatId || null) : null;
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
       // #360 — la chat non è un log: se il turno fallisce (rete assente, provider
