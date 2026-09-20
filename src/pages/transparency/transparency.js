@@ -58,10 +58,44 @@
     }
   }
 
+  // La sezione chiesta non c'è: lo si dice, e si dice cosa c'è. Mostrare al suo
+  // posto un altro documento senza avvisare è la stessa promessa a vuoto che
+  // questa pagina esiste per non fare.
+  function renderMissing(chiesto) {
+    const voce = T.NAV.find((n) => n.id === chiesto);
+    const nome = voce ? voce.label : chiesto;
+    document.title = 'Filo — ' + (nome || 'Trasparenza');
+    $('title').textContent = nome || 'Sezione sconosciuta';
+    $('subtitle').textContent = voce
+      ? 'Questa sezione non è ancora scritta.'
+      : 'Questa sezione non esiste.';
+    $('meta').textContent = '';
+
+    const body = $('doc-body');
+    body.textContent = '';
+    const p = document.createElement('p');
+    const docs = T.all();
+    if (!docs.length) {
+      p.textContent = 'Non c’è ancora nessun documento di trasparenza.';
+    } else {
+      p.appendChild(document.createTextNode('Quello che c’è scritto: '));
+      docs.forEach((d, i) => {
+        if (i) p.appendChild(document.createTextNode(', '));
+        const a = document.createElement('a');
+        a.href = '?doc=' + encodeURIComponent(d.id);
+        a.textContent = d.title;
+        p.appendChild(a);
+      });
+      p.appendChild(document.createTextNode('.'));
+    }
+    body.appendChild(p);
+    renderNav(chiesto);
+  }
+
   function render() {
     const id = currentId();
-    const doc = T.get(id);
-    if (!doc) return;
+    const doc = id ? T.get(id) : null;
+    if (!doc) { renderMissing(requestedId()); return; }
 
     document.title = 'Filo — ' + doc.title;
     $('title').textContent = doc.title;
