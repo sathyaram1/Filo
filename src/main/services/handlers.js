@@ -2202,6 +2202,17 @@ function toolResultText({ action, res, rendered }) {
 // Un'immagine mandata in chat arriva al modello dentro il messaggio: per dire
 // cosa c'è scritto sulla bolletta fotografata non gli serve nessuno strumento,
 // e «il documento non l'ha letto» era un'accusa falsa.
+// #517 (giro 6) — quante azioni di ciascun tipo sono state eseguite in questo
+// turno. Una sola scrittura non regge due appunti raccontati.
+function contaTipi(azioni) {
+  const out = {};
+  for (const a of (Array.isArray(azioni) ? azioni : [])) {
+    const t = String((a && (a.type || a.tipo)) || '').toUpperCase();
+    if (t) out[t] = (out[t] || 0) + 1;
+  }
+  return out;
+}
+
 function tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini) {
   const tipi = Dichiarate.insiemeDiTipi(renderedActions);
   if (String(fileSummaries || '').trim()) tipi.add('CONTESTO_FILE');
