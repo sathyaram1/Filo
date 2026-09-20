@@ -180,6 +180,36 @@ test('aperta la sezione, il menu offre di tradurre solo quella — per ogni form
   expect(mancate, `forme che, una volta aperte, non fanno offrire la traduzione: ${mancate.join(' | ')}`).toEqual([]);
 });
 
+// Il rovescio del rimando: quello che si VEDE deve continuare a tradursi. Un
+// riquadro che scorre, uno alto ma non schiacciato, una riga che sborda: nessuno
+// di questi è ripiegato, e scambiarne uno per tale lascerebbe testo in inglese
+// davanti agli occhi dell'utente.
+const VISIBILI = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <p id="intro">A visible paragraph that every reader sees without clicking anything at all.</p>
+  <div id="scroller" style="max-height:40px;overflow:auto">
+    <p id="inScroll">Text inside a scrollable box, clipped but perfectly readable by scrolling.</p>
+  </div>
+  <div id="aperto" style="max-height:500px;overflow:hidden">
+    <p id="inAperto">Text inside an accordion panel that is currently open and on screen.</p>
+  </div>
+  <div id="sbordo" style="width:80px;overflow-x:hidden;white-space:nowrap">
+    <span id="inSbordo">A long single line of text that overflows its narrow container sideways.</span>
+  </div>
+</body></html>`;
+
+test('quel che si vede resta tradotto: riquadri a scorrimento, pannelli aperti, righe che sbordano', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, VISIBILI);
+  await watchToasts(page);
+  await traduci(page);
+
+  await expect(page.locator('#intro')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#inScroll')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#inAperto')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#inSbordo')).toHaveText(/^IT /, { timeout: 30000 });
+  await page.screenshot({ path: 'tests/.shots/verifica-505-visibili.png' }).catch(() => {});
+});
+
 test('tradurre il testo scoperto non ripaga la pagina intera', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
   const page = await testServer.openReady(openTab, PAGINA);
