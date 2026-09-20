@@ -416,8 +416,17 @@
     return `Filo ha scritto di averlo già fatto, ma non l'ha fatto: ${cose}. Se ti serve, chiediglielo di nuovo.`;
   }
 
+  // La riga che l'utente legge quando il turno si chiude col formato macchina
+  // anche dopo il ritentativo. Senza, quel guasto restava l'unico dei due a
+  // finire in silenzio: in chat un blocco di codice, e niente che dicesse che
+  // quello che c'era scritto lì dentro non è successo.
+  function avvisoFormatoPerUtente() {
+    return 'Filo ha risposto con un pezzo del suo formato interno: quello che c\'era scritto lì dentro non è stato fatto. Se ti serve, chiediglielo di nuovo.';
+  }
+
   global.SN_AZIONI_DICHIARATE = {
     FAMIGLIE,
+    TIPI_DI_CONTESTO,
     rileva,
     insiemeDiTipi,
     tipiDallaCronologia,
@@ -425,5 +434,6 @@
     spintaAzioniMancanti,
     spintaFormato,
     avvisoPerUtente,
+    avvisoFormatoPerUtente,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
