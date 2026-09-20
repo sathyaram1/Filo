@@ -16,6 +16,8 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { writeFileSync, rmSync } from 'node:fs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, 'fixtures', 'documenti');
