@@ -2080,9 +2080,29 @@ function chatSearchesForPrompt(actions) {
     if (!('chatSearch' in out)) continue;
     const cercato = E.perCanaleSistema(out.chatSearch);
     const results = Array.isArray(out.results) ? out.results : [];
+    const usati = Array.isArray(out.cercatoCon) ? out.cercatoCon : [];
     if (!results.length) {
-      blocks.push(`[Nessuna conversazione passata trovata per "${cercato}"]`);
+      // Zero risultati non vuol dire «quella conversazione non c'è»: vuol dire
+      // che nessuna chat contiene tutte quelle parole. Chi legge deve saperlo,
+      // altrimenti riferisce all'utente che la discussione non esiste invece di
+      // riprovare con la parola che conta.
+      blocks.push(
+        `[Nessuna conversazione passata contiene tutte queste parole: "${cercato}". `
+        + 'Non significa che non ci sia: riprova con la parola che identifica '
+        + 'l\'argomento (una o due, senza "ieri", "discussione", "di cui abbiamo parlato") '
+        + 'prima di dire all\'utente che non l\'hai trovata.]',
+      );
       continue;
+    }
+    // La ricerca si è allargata: il modello deve sapere che i risultati
+    // rispondono a MENO di quello che aveva chiesto, o presenterà come esatto
+    // un accostamento approssimativo.
+    if (out.allargata && usati.length) {
+      blocks.push(
+        `[Nessuna conversazione conteneva tutte le parole di "${cercato}": `
+        + `questi risultati arrivano cercando "${E.perCanaleSistema(usati.join(' '))}". `
+        + 'Controlla che siano davvero quello che l\'utente cercava.]',
+      );
     }
     // Gli id e le date le scrive Filo, titoli e frammenti no: la riga intera
     // entra comunque nella busta, perché spezzarla in due (metà fuori, metà
