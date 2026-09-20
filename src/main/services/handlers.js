@@ -2231,19 +2231,16 @@ function tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini, u
 // Gli orari delle sveglie e dei timer che ESISTONO adesso. Una sveglia messa in
 // una sessione precedente non lascia nessuna azione in questa conversazione:
 // senza questo, «sì, l'ho messa alle 19» diventava un'accusa a ogni riavvio.
-async function orariDelleSveglie() {
+// #517 (giro 7) — le sveglie non si riducono più alla sola ora: il genere
+// (sveglia o conto alla rovescia) e il giorno contano, e una sveglia in pausa
+// o che ha già suonato non prova niente. La riduzione la fa il modulo
+// condiviso, così le due chat di Filo guardano lo stesso stato.
+async function provePerIlPresidio(Dichiarate, fileList) {
+  const vuoto = { sveglie: [], orariSveglie: [], titoliAppunti: [], oggi: Date.now() };
+  if (!Dichiarate) return vuoto;
   try {
-    const lista = await FiloMem.listTimers();
-    const out = [];
-    for (const t of (Array.isArray(lista) ? lista : [])) {
-      if (t && t.atTime) { out.push(String(t.atTime)); continue; }
-      const d = t && t.endsAt ? new Date(t.endsAt) : null;
-      if (d && !Number.isNaN(d.getTime())) {
-        out.push(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
-      }
-    }
-    return out;
-  } catch (_) { return []; }
+    return Dichiarate.statoDaTimerEFile(await FiloMem.listTimers(), fileList || []);
+  } catch (_) { return vuoto; }
 }
 
 function spintaDiRimedio(Dichiarate, text, coperti, stato) {
