@@ -268,6 +268,39 @@ test('un carattere di sostituzione vale come jolly, non come lettera', () => {
   assert.equal(DR.nomiCombaciano('���', 'contratto.txt'), false);
 });
 
+test('un carattere perso sta per UN carattere, non per mezzo nome (#551, primo giro di verifica)', () => {
+  // Prima porta. Del nome è rimasta solo l'estensione, e l'estensione non è un
+  // nome: «.txt» da sola faceva passare il controllo del «nome vero sotto», e
+  // in una cartella con un file di testo solo Filo apriva quello dicendo di
+  // aver letto il documento chiesto.
+  assert.equal(DR.nomiCombaciano('��.txt', 'Estratto conto dicembre.txt'), false);
+  assert.equal(DR.nomiCombaciano('�.txt', 'Estratto conto dicembre.txt'), false);
+  assert.equal(DR.nomiCombaciano('�.pdf', 'Bolletta.pdf'), false);
+
+  // Seconda porta. Un carattere perso valeva «uno o più caratteri qualsiasi»:
+  // bastava perdere la «o» di «Bilancio» per farsi aprire il bilancio
+  // riservato, che con quel nome non c'entra niente.
+  assert.equal(DR.nomiCombaciano('Bilanci�.txt', 'Bilancio 2019 definitivo riservato.txt'), false);
+  assert.equal(DR.nomiCombaciano('Contratt��.pdf', 'Contratto affitto 2021.pdf'), false);
+  // E quello che il jolly deve continuare a ritrovare, lo ritrova: un
+  // carattere perso per un carattere vero, anche più d'uno nello stesso nome.
+  assert.equal(DR.nomiCombaciano('Bilanci�.txt', 'Bilancià.txt'), true);
+  assert.equal(DR.nomiCombaciano('Perch� citt�.txt', 'Perché città.txt'), true);
+});
+
+test('anche il punto interrogativo è un carattere perso, non una lettera (#551, primo giro)', () => {
+  // Quando nella tabella di codici un carattere non ha dove andare, Windows ci
+  // mette un «?». Su Windows un nome di file non può contenerlo, quindi un «?»
+  // arrivato qui è sempre un carattere perso: senza questo, un file con il
+  // simbolo dell'euro nel nome restava irraggiungibile.
+  assert.equal(DR.nomiCombaciano('Fattura 1.200?.pdf', 'Fattura 1.200€.pdf'), true);
+  assert.equal(DR.nomiCombaciano('Riepilogo ?.txt', 'Riepilogo Σ.txt'), true);
+  // Con gli stessi limiti degli altri caratteri persi: niente mezzo nome,
+  // niente nome fatto di soli jolly.
+  assert.equal(DR.nomiCombaciano('Fattura 1.200?.pdf', 'Fattura 1.200 di dicembre.pdf'), false);
+  assert.equal(DR.nomiCombaciano('??.txt', 'Estratto conto dicembre.txt'), false);
+});
+
 test('gli input limite non fanno inciampare la ricerca tollerante', () => {
   for (const v of ['', '   ', null, undefined]) {
     assert.equal(DR.nomiCombaciano(v, 'bolletta.pdf'), false);
