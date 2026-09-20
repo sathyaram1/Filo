@@ -2565,7 +2565,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // indietro, con dentro il motivo. Serve almeno un giro libero: al tetto
         // dei giri l'ultimo testo vale come risposta, non come tentativo.
         const rimedio = (Dichiarate && Tools && !rimandatoIndietro && round < MAX_ROUNDS)
-          ? spintaDiRimedio(Dichiarate, text, tipiDelTurno(Dichiarate, renderedActions, fileSummaries))
+          ? spintaDiRimedio(Dichiarate, text, tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini), statoSveglie)
           : null;
         if (rimedio) {
           rimandatoIndietro = true;
@@ -2687,8 +2687,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // modello: una sveglia messa trenta messaggi fa è comunque messa, e da lì
       // in poi «sì, te l'ho già messa» diventava un'accusa.
       const coperti = Dichiarate.tipiDallaCronologia(threadHistory);
-      for (const t of tipiDelTurno(Dichiarate, renderedActions, fileSummaries)) coperti.add(t);
-      azioniMancate = Dichiarate.rileva(textReply, coperti);
+      for (const t of tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini)) coperti.add(t);
+      azioniMancate = Dichiarate.rileva(textReply, coperti, statoSveglie);
       avvisoAzioni = Dichiarate.avvisoPerUtente(azioniMancate);
       if (avvisoAzioni) {
         console.warn('[Filo] #517 azione dichiarata e mai eseguita:',

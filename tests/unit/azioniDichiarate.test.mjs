@@ -232,6 +232,113 @@ test('il formato macchina si riconosce anche in coda alla risposta', () => {
   assert.equal(AD.formatoSospetto('Poi ho messo NOTA{da rivedere} in fondo.'), false);
 });
 
+// Giro 2 della verifica. Tutto quello che segue nasce dalla stessa domanda:
+// cosa vale come prova che la cosa è stata fatta davvero.
+
+test('un\'azione chiamata che non ha fatto nascere niente non copre la frase', () => {
+  // La sveglia viene chiesta con un orario che Filo non sa leggere: lo
+  // strumento parte, nessuna sveglia nasce, e il modello la dà per fatta.
+  // Prima bastava che il tipo comparisse nel turno perché il presidio tacesse.
+  const testo = 'Ti ho messo una sveglia alle 19:00 per stasera.';
+  const fallita = [{ type: 'SVEGLIA', _executed: false }];
+  assert.deepEqual(ids(AD.rileva(testo, fallita)), ['sveglia']);
+  // Ma un'azione che ha prodotto qualcosa resta buona: una ricerca senza
+  // risultati è comunque partita, e il comando che esce con un errore ha
+  // stampato il suo output.
+  assert.deepEqual(AD.rileva(testo, [{ type: 'SVEGLIA', _executed: true }]), []);
+  assert.deepEqual(
+    AD.rileva('Ho cercato sul web ma non ho trovato niente.', [{ type: 'CERCA_WEB', _executed: false, _output: { results: [] } }]),
+    [],
+  );
+  // E un'azione in attesa dell'OK dell'utente si vede in chat: non è muta.
+  assert.deepEqual(AD.rileva(testo, [{ type: 'SVEGLIA', _executed: false, _confirm: { level: 2 } }]), []);
+});
+
+test('un\'azione di una specie non copre le altre', () => {
+  // La sveglia parte, l'appunto no, e stanno nella stessa frase.
+  assert.deepEqual(
+    ids(AD.rileva('Ti ho messo la sveglia alle 19 e ti ho salvato l\'appunto con la lista della spesa.', [{ type: 'SVEGLIA' }])),
+    ['appunto'],
+  );
+  assert.deepEqual(
+    ids(AD.rileva('Ho messo la sveglia e te l\'ho segnata anche in calendario.', [{ type: 'SVEGLIA' }])),
+    ['calendario'],
+  );
+  // «Promemoria» invece in italiano è tutto: appunto, evento, sveglia. Lì i
+  // tipi restano larghi, altrimenti l'avviso sbaglierebbe.
+  assert.deepEqual(AD.rileva('Ho messo il promemoria per domani.', [{ type: 'SVEGLIA' }]), []);
+  assert.deepEqual(ids(AD.rileva('Ho messo il promemoria per domani.', [])), ['promemoria']);
+});
+
+test('un\'azione sola non regge due dichiarazioni diverse', () => {
+  // La sveglia parte; della spesa, dichiarata col pronome, non resta niente.
+  assert.deepEqual(
+    ids(AD.rileva('Ho messo la sveglia alle 19, e te l\'ho segnata.', [{ type: 'SVEGLIA' }])),
+    ['senza-nome'],
+  );
+  // Ma lo stesso fatto detto due volte resta un fatto solo: stesso verbo,
+  // nessun avviso.
+  assert.deepEqual(
+    AD.rileva('Ho messo la sveglia alle 19. Te l\'ho messa per tutte e tre le notti.', [{ type: 'SVEGLIA' }]),
+    [],
+  );
+});
+
+test('quello che Filo consegna DENTRO la risposta non è un\'azione mancata', () => {
+  // L'utente chiede una mail: la mail è la risposta, e non esiste nessuno
+  // strumento che possa averla scritta.
+  for (const frase of [
+    'Te l\'ho scritta qui sotto:\n\nGentile Marco, mi scuso per il ritardo.',
+    'L\'ho creata qui sotto, dimmi se ti piace.',
+    'Te l\'ho aggiunta alla lista qui sopra.',
+    'L\'ho scritta io, dimmi se va bene.',
+  ]) {
+    assert.deepEqual(AD.rileva(frase, []), [], frase);
+  }
+});
+
+test('un\'immagine mandata in chat si legge senza strumenti', () => {
+  const frase = 'Ho letto la bolletta: sono 84 euro, scadenza il 12.';
+  assert.deepEqual(AD.rileva(frase, [{ type: 'CONTESTO_IMMAGINE' }]), []);
+  // Senza l'immagine e senza azioni, la stessa frase resta una dichiarazione.
+  assert.deepEqual(ids(AD.rileva(frase, [])), ['lettura']);
+});
+
+test('una sveglia che ESISTE regge la frase che la racconta', () => {
+  // Messa ieri, in un'altra sessione: in questa conversazione non c'è nessuna
+  // azione, e senza guardare le sveglie vere l'avviso diventava un'accusa.
+  const stato = { orariSveglie: ['19:00'] };
+  assert.deepEqual(AD.rileva('Sì, ho messo la sveglia alle 19:00 come mi avevi chiesto.', [], stato), []);
+  assert.deepEqual(AD.rileva('Sì, ti ho messo la sveglia alle 19.', [], stato), []);
+  // Una sveglia a un'altra ora non copre niente: è il caso del feedback.
+  assert.deepEqual(
+    ids(AD.rileva('Ti ho messo una sveglia alle 7:00.', [], stato)),
+    ['sveglia'],
+  );
+  assert.deepEqual(ids(AD.rileva('Ti ho messo una sveglia alle 19:00.', [], { orariSveglie: [] })), ['sveglia']);
+});
+
+test('gli orari si leggono come li scrive il modello', () => {
+  assert.deepEqual([...AD.orariNelTesto('alle 19:00 e alle 7.30')].sort(), ['07:30', '19:00']);
+  assert.deepEqual([...AD.orariNelTesto('te la metto alle 19')], ['19:00']);
+  assert.deepEqual([...AD.orariNelTesto('nessun orario qui')], []);
+});
+
+test('spazi doppi e a capo non spengono il presidio', () => {
+  assert.deepEqual(ids(AD.rileva('Ho  messo  la  sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ti ho messo\nuna sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ho messo il promemoria per domani.', [])), ['promemoria']);
+});
+
+test('un esempio di formato annunciato come tale non è un turno buttato', () => {
+  assert.equal(AD.formatoSospetto('Ecco un esempio:\n{"type":"SVEGLIA","time":"19:00"}'), false);
+  assert.equal(AD.formatoSospetto('Com\'è fatta un\'azione:\n{"type":"TIMER","seconds":60}'), false);
+  // Ma una risposta che finisce col formato interno senza annunciarlo resta un
+  // turno buttato: è il caso del feedback.
+  assert.equal(AD.formatoSospetto('Ecco il riassunto.\n\n{"text":"","actions":[]}'), true);
+  assert.equal(AD.formatoSospetto('Ti metto la sveglia alle 19.\n\nSVEGLIA{"time":"19:00"}'), true);
+});
+
 test('input limite: vuoto, spazi, testo lunghissimo, caratteri strani', () => {
   assert.deepEqual(AD.rileva('', []), []);
   assert.deepEqual(AD.rileva('   \n\t  ', []), []);
