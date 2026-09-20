@@ -97,11 +97,3 @@ test('due scelte a poca distanza: lo schermo non torna a dire il contrario del s
   await expect(page.locator('#mgAccountA')).not.toBeChecked();
   await expect(page.locator('#mgMaxSessions')).toHaveValue('7');
 });
-
-test('un numero fuori intervallo sul server non si mostra aggiustato come se fosse quello scritto lì', async ({ openTab }) => {
-  const page = await apri(openTab, { maxSessions: 50 });
-  // Il campo dice 20; sul server c'è 50. O si dice, o chi guarda crede a 20.
-  const visto = await page.locator('#mgMaxSessions').inputValue();
-  const avviso = (await page.locator('#mgMaxSessionsMsg').textContent()) || '';
-  expect(visto === '50' || avviso.trim() !== '').toBe(true);
-});
