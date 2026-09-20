@@ -114,9 +114,7 @@ function shellConfig(shell, sid, startCwd) {
     file: 'powershell.exe',
     args: ['-NoLogo', '-NoProfile', '-Command', '-'],
     options: { cwd: startCwd || undefined, windowsHide: true },
-    ready: 'try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n'
-      + '$OutputEncoding = New-Object System.Text.UTF8Encoding $false\n'
-      + `"FILO_RDY_${sid}"\n`,
+    ready: `${PRELUDI_CODIFICA.powershell}"FILO_RDY_${sid}"\n`,
     wrap: (command) =>
       `$global:LASTEXITCODE=0\n${command}\n` +
       `"FILO_META_${sid}:$($LASTEXITCODE):$((Get-Location).Path)"\n`,
