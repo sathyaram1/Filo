@@ -37,3 +37,34 @@ test('a lettura fallita il riquadro non spaccia i valori di ripiego per quelli d
   expect(avviso.trim() !== '' || valore === '').toBe(true);
   expect(aInUso).toBe(true); // annotato: il punto è l'avviso, non il valore
 });
+
+test('«Salvato.» e intanto il campo torna a 1: la seconda porta dello stesso guasto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo && window.SN_ROUTINE_SESSIONI);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+
+  // La scrittura va a buon fine; la rilettura che la segue no, e al suo posto
+  // tornano i valori di ripiego — indistinguibili da un documento vuoto.
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_sessions_get') return { ok: true, maxSessions: 6, priorityAccount: '', accountAOff: false, accountBOff: false };
+      if (msg && msg.type === 'automation_sessions_set') return { ok: true, maxSessions: 1, priorityAccount: '', accountAOff: false, accountBOff: false };
+      return orig(msg);
+    };
+  });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('6');
+
+  await page.locator('#mgMaxSessions').click();
+  await page.keyboard.press('Control+a');
+  await page.keyboard.type('12');
+  await page.locator('#mgMaxSessionsSave').click();
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+
+  // Dice «Salvato.» e mostra 1: nessuna delle due cose è quella che è successa.
+  test.fail(true, 'la rilettura fallita si traveste da valore salvato (rilievo del giro 1)');
+  await expect(page.locator('#mgMaxSessions')).not.toHaveValue('1');
+});
