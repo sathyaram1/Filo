@@ -128,6 +128,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // nella stessa chat, e «torna dov'è aperta» è il clic su una chat ancora in
     // corso: due pezzi della stessa capacità, non due voci nuove.
     FILO_CHAT_NOTE: 'chat-archive',
+    FILO_CHAT_UPDATE: 'chat-archive',
     FILO_CHAT_FOCUS: 'chat-archive',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
