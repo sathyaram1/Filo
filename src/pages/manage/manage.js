@@ -3991,6 +3991,8 @@
     setAdmin(v) { setIsAdmin(!!v); applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
     loadCaps,
+    // Ri-legge le scelte sulle sessioni delle routine (IPC) — per i test.
+    loadSessions,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
