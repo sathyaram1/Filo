@@ -149,7 +149,21 @@ async function refresh() {
     remoteSecrets = null;
   }
   lastFetchTs = Date.now();
-  return get();
+  const dopo = get();
+  // La configurazione condivisa arriva dalla RETE, e la prima home è già a
+  // schermo quando arriva: chi decide se Filo può rispondere deve poterlo
+  // rifare adesso, invece di lasciare l'utente sul cartello «non posso
+  // rispondere» finché non ricarica (#663).
+  if (JSON.stringify(prima) !== JSON.stringify(dopo)) {
+    for (const fn of ascoltatori) { try { fn(dopo); } catch (_) {} }
+  }
+  return dopo;
+}
+
+// Chi vuole sapere che la configurazione condivisa è cambiata davvero.
+const ascoltatori = [];
+function onChanged(fn) {
+  if (typeof fn === 'function') ascoltatori.push(fn);
 }
 
 // Refresh "pigro": rinfresca al massimo una volta ogni `maxAgeMs`.
