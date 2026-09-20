@@ -119,7 +119,7 @@ function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
   });
 }
 
-test('merged → exit 0, e al server arrivano SOLO biglietto e branch', async () => {
+test('merged → exit 0, e al server arrivano biglietto, branch e il COMMIT da fondere', async () => {
   const { srv, richieste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'abc123def456' });
   try {
     const r = await gate(port, ['worker/7']);
@@ -129,9 +129,12 @@ test('merged → exit 0, e al server arrivano SOLO biglietto e branch', async ()
     assert.ok(richieste[0].url.endsWith('/routineMerge'));
     // Il contratto che chiude il buco: nessun verdetto viaggia nel corpo. Se
     // un giorno qualcuno reinfilasse un FILO_L4_VERDICT, questo diventa rosso.
-    assert.deepEqual(Object.keys(richieste[0].body).sort(), ['branch', 'ticket']);
+    // Lo `sha` invece c'è, e non è un verdetto: dice su quale contenuto
+    // giravano i controlli, come fa il cammino locale (#485).
+    assert.deepEqual(Object.keys(richieste[0].body).sort(), ['branch', 'sha', 'ticket']);
     assert.equal(richieste[0].body.ticket, 'biglietto-di-prova');
     assert.equal(richieste[0].body.branch, 'worker/7');
+    assert.match(String(richieste[0].body.sha), /^[0-9a-f]{40}$/);
   } finally { srv.close(); }
 });
 
