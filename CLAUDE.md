@@ -261,11 +261,24 @@ collegamento solo e non sa che numero di versione sia uscito.
   `x-scheme-handler/filo`, e quella riga la scrive electron-builder solo
   perché `build.protocols` è dichiarato. L'indirizzo poi arriva fra gli
   argomenti, come su Windows.
-- **La ricetta si tocca con cautela**: `build.linux` in `package.json` e il
-  lavoro `release-linux`. `artifactName`, `category` e `desktop` non sono
-  decorazioni: senza il primo il collegamento del sito si rompe, senza gli
-  altri due Filo non compare nel menu di sistema e la sua finestra non si
-  aggancia alla propria icona nella barra.
+- **Il doppio clic apre Filo solo grazie a un lanciatore dentro il pacchetto.**
+  Chromium all'avvio si chiude in una gabbia di sicurezza che vuole gli spazi
+  dei nomi utente non privilegiati; dove sono negati ripiega su
+  `chrome-sandbox`, che dentro un AppImage non può essere setuid, e allora non
+  parte affatto («No usable sandbox!», sul terminale, dove nessuno lo legge).
+  Ubuntu li nega di serie dalla 23.10. La voce di menu del pacchetto chiede
+  `--no-sandbox` da sé, ma vale solo per chi ha integrato l'applicazione: il
+  doppio clic passa da `AppRun`. Quindi `scripts/after-pack-linux.js` mette al
+  posto del programma un lanciatore che lo avvia con `--no-sandbox`, e usa
+  `exec -a` per non cambiare il nome del processo (da lì viene l'aggancio
+  dell'icona nella barra). Se il file si aggiungesse una scelta furba — tenere
+  la gabbia dove sembra reggere — il costo di indovinare male è un'app che non
+  si apre: il primo avvio deve riuscire sempre.
+- **La ricetta si tocca con cautela**: `build.linux` in `package.json`,
+  `scripts/after-pack-linux.js` e il lavoro `release-linux`. `artifactName`,
+  `category` e `desktop` non sono decorazioni: senza il primo il collegamento
+  del sito si rompe, senza gli altri due Filo non compare nel menu di sistema e
+  la sua finestra non si aggancia alla propria icona nella barra.
 
 Come si verifica, dato che un Linux desktop non ce l'abbiamo:
 
