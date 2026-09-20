@@ -715,22 +715,19 @@
     populateDatalist('openrouter', byProv.openrouter);
   }
 
-  // Il catalogo OpenRouter è PUBBLICO: la chiave non serve per elencarlo (è
-  // solo metadati, niente inferenza → gratis). La passiamo se c'è, ma funziona
-  // anche senza, così le categorie sono precise da subito.
-  // Il catalogo "semplice" del router elenca solo i modelli di testo: voce,
-  // dettatura e indicizzazione stanno in liste a parte, per modalità. Si
-  // chiedono tutte, così la tendina ha anche quei mestieri con le etichette giuste.
-  const OR_CATALOG_QUERIES = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
+  // Il catalogo è PUBBLICO: la chiave non serve per elencarlo (è solo metadati,
+  // niente inferenza → gratis). La passiamo se c'è, ma funziona anche senza,
+  // così le categorie sono precise da subito.
+  // #591, secondo giro — questa pagina non parla più da sola col fornitore: la
+  // richiesta la fa il main, dal cancello unico da cui passa ogni chiamata.
+  // Una riga di rete scritta qui, «tanto quella non costa», era l'esempio già
+  // pronto da copiare per la chiamata successiva, che invece si paga.
   async function fetchOpenRouterModels(key) {
-    const headers = key ? { Authorization: `Bearer ${key}` } : {};
-    const lists = await Promise.all(OR_CATALOG_QUERIES.map(async (q) => {
-      const res = await fetch('https://openrouter.ai/api/v1/models' + q, { headers });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
-    }));
-    return lists.flat();
+    const r = await chrome.runtime.sendMessage({
+      type: MSG.MODELS_CATALOG, provider: 'openrouter', apiKey: key || '',
+    });
+    if (!r || !r.ok) throw new Error((r && r.error) || 'catalogo non disponibile');
+    return r.items || [];
   }
 
   // Gli id del registro che il catalogo non conosce (modelli nuovi, o scritti a
