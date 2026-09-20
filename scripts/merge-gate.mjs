@@ -356,6 +356,15 @@ async function main() {
     process.exit(1);
   }
 
+  // Il ramo nominato dev'essere quello su cui sta la directory: tutti i
+  // controlli qui sotto la leggono da qui, e con due rami diversi parlerebbero
+  // di uno mentre la richiesta nomina l'altro (feedback #485, giro 4).
+  const corrente = currentBranch(ROOT);
+  if (corrente !== source) {
+    console.error(testoRamoDiverso(source, corrente));
+    process.exit(1);
+  }
+
   // Il CONTENUTO che si sta per far fondere. Da qui in poi il nome del ramo
   // serve solo a dire quale ramo è: a decidere è il commit (feedback #485).
   // Se git non risponde ci si ferma, come fa la registrazione di un verdetto:
