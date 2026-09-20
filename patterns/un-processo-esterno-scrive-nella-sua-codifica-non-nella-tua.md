@@ -148,3 +148,16 @@ alternati alle lettere: non un errore, un testo. Il lettore dichiara di aver
 letto, il modello riceve spazzatura e risponde sul nulla. Si guarda la firma in
 testa prima di decidere (`bomDueByte` in `src/main/services/documentRead.js`), e
 un file pieno di byte nulli che quella firma ce l'ha non è binario.
+
+## E la codifica «senza firma» di Windows tocca proprio i segni tipografici
+
+Un file salvato come «ANSI» (il Blocco note fino a ieri, Excel che esporta un
+CSV) non dichiara niente in testa. Se letto come UTF-8 fallisce e si ripiega,
+il ripiego non può essere latin1: le due tabelle coincidono ovunque tranne in
+una fascia di 32 caratteri, ed è ESATTAMENTE dove Windows tiene i segni
+tipografici — trattino lungo e medio, virgolette e apostrofi curvi, euro,
+puntini di sospensione. Con latin1 gli accenti tornano giusti e quei segni
+diventano caratteri di controllo invisibili: non resta nemmeno un rombo a dire
+che manca qualcosa. «12 €» arriva al modello come «12 », e la risposta è su un
+testo bucato. La tabella di 32 voci sta in `daCp1252`
+(`src/main/services/documentRead.js`).

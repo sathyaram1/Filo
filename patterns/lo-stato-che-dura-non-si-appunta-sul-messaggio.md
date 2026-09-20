@@ -80,3 +80,28 @@ l'hanno.
   volta.
 - `tests/terminal-mode.spec.mjs` — le due guardie: la cartella vale ancora al
   messaggio dopo, e un comando confermato scrive dove il popup aveva detto.
+
+## Uno stato che dura va ricontrollato prima di usarlo
+
+Farlo durare apre la porta gemella: il mondo, intanto, cambia. La cartella
+appuntata può essere stata rinominata, cancellata, o stare su una chiavetta che
+l'utente ha staccato. Avviare una shell lì dentro non fa fallire il comando: fa
+fallire la SHELL, prima ancora di leggerlo, e il motivo che ne esce parla del
+programma («spawn … ENOENT») invece che della cartella. Siccome l'appunto resta,
+il comando dopo cade uguale, compreso quello per andarsene: in quella scheda il
+terminale è finito finché l'utente non la chiude.
+
+Finché lo stato durava un messaggio il guasto si curava da solo al messaggio
+dopo. Facendolo durare quanto la scheda, si è fatto durare anche questo. Quindi
+un appunto che dura si CONTROLLA quando lo si usa, con un ripiego sicuro (la
+home, da dove il terminale parte), e il ripiego si DICHIARA a chi legge:
+altrimenti il modello continua a ragionare su una cartella che non esiste e
+all'utente racconta un guasto che non c'è.
+
+La misura di quanto due strade divergono: la shell persistente del terminale
+che l'utente digita a mano quel controllo ce l'aveva da sempre, e infatti
+davanti alla stessa cartella sparita riparte dalla home e continua a
+funzionare. La domanda adesso si fa in un posto solo, `cartellaPerComando` in
+`src/main/services/shell.js`, e la fanno tutti e tre quelli che la facevano
+per conto loro: la shell persistente, il comando one-shot dell'assistente e il
+popup che dice all'utente dove quel comando scriverà.
