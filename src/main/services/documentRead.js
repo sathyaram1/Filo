@@ -494,22 +494,12 @@ function daCp1252(buf) {
  */
 function decodeText(buf) {
   let b = buf;
-  const due = bomDueByte(b) || pareDueByte(b);
+  const dichiarato = bomDueByte(b);
+  const due = dichiarato || pareDueByte(b);
   if (due) {
-    if (!bomDueByte(b)) {
-      // Senza firma non c'è niente da togliere in testa: si riallinea il
-      // corpo così com'è.
-      let corpo = b.length % 2 ? b.subarray(0, b.length - 1) : b;
-      if (due === 'be') {
-        const girato = Buffer.from(corpo);
-        try { girato.swap16(); } catch (_) { return corpo.toString('utf8'); }
-        corpo = girato;
-      }
-      return corpo.toString('utf16le');
-    }
-    // Via la firma, e un byte spaiato in fondo (file troncato) non deve far
-    // morire la lettura: si scarta, come si scarta mezza coppia in coda.
-    let corpo = b.subarray(2);
+    // Via la firma, se c'è. E un byte spaiato in fondo (file troncato) non deve
+    // far morire la lettura: si scarta, come si scarta mezza coppia in coda.
+    let corpo = dichiarato ? b.subarray(2) : b;
     if (corpo.length % 2) corpo = corpo.subarray(0, corpo.length - 1);
     if (due === 'be') {
       // Node sa leggere solo il verso piccolo: si scambiano i byte a coppie.
@@ -520,10 +510,8 @@ function decodeText(buf) {
     return corpo.toString('utf16le');
   }
   if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) b = b.subarray(3);
-  const utf8 = b.toString('utf8');
-  const bad = (utf8.match(/�/g) || []).length;
-  if (bad > 0 && bad / Math.max(utf8.length, 1) > 0.001) return daCp1252(b);
-  return utf8;
+  if (eUtf8Valido(b)) return b.toString('utf8');
+  return daCp1252(b);
 }
 
 /** Taglia al tetto dichiarando il troncamento. PURA. */
