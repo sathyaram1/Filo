@@ -11,11 +11,13 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-function tracciati(sotto = '') {
-  const out = execFileSync('git', ['ls-files', '-z', ...(sotto ? [sotto] : [])], {
+// Anche i file non ancora committati: chi scrive una prova nel posto sbagliato
+// deve trovarla rossa subito, non al primo salvataggio automatico.
+function nelRepo(sotto = '') {
+  const out = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', ...(sotto ? [sotto] : [])], {
     cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26,
   });
-  return out.split('\0').filter(Boolean).map((f) => f.replace(/\\/g, '/'));
+  return [...new Set(out.split('\0').filter(Boolean).map((f) => f.replace(/\\/g, '/')))];
 }
 
 // I nomi con cui chi verifica ha battezzato le sue prove usa-e-getta, giro dopo
