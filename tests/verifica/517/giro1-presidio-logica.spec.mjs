@@ -17,7 +17,7 @@ test.beforeAll(async () => {
   D = globalThis.SN_AZIONI_DICHIARATE;
 });
 
-const ids = (testo, azioni = []) => D.rileva(testo, azioni).map((f) => f.id);
+const ids = (testo, azioni = [], stato) => D.rileva(testo, azioni, stato).map((f) => f.id);
 
 test('il presidio non accusa Filo di non aver fatto ciò che ha fatto', async () => {
   // Filo apre il blocco note con un comando di shell (è la strada vera: non
