@@ -163,6 +163,51 @@ test('«/pulisci»: il resoconto arriva quando sei già tornato alla home', asyn
   expect(chats.length, `chat in archivio: ${chats.length}`).toBe(1);
 });
 
+test('terminale: l’esito arriva quando hai già cominciato un’altra chat', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  await configura(app, { terminal: { enabled: true } });
+  await stubProvider(app);
+
+  const dash = await openTab(DASH);
+  await dash.locator('#input').fill('Parlami di Kant');
+  await dash.locator('#input').press('Enter');
+  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
+
+  await dash.locator('#input').fill('/sleep 5; echo "ESIT""O-DI-KANT"');
+  await dash.locator('#input').press('Enter');
+  await dash.waitForTimeout(900);
+
+  // Torno alla home e comincio una conversazione nuova, su un altro argomento.
+  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').press('Enter');
+  await dash.waitForTimeout(400);
+  await dash.locator('#input').fill('Ricetta della carbonara');
+  await dash.locator('#input').press('Enter');
+  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
+
+  await dash.waitForTimeout(12_000);
+  const chats = await leggiArchivio(app);
+  console.log('ARCHIVIO:', JSON.stringify(chats.map((c) => ({
+    id: c.id.slice(0, 8),
+    titolo: c.title,
+    chiusa: !!c.closedAt,
+    testi: (c.messages || []).map((m) => `${m.role}: ${String(m.text).replace(/\s+/g, ' ').slice(0, 45)}`),
+  })), null, 1));
+
+  const conEsito = chats.find((c) => (c.messages || []).some((m) => String(m.text).includes('ESITO-DI-KANT')));
+  const conCarbonara = chats.find((c) => (c.messages || []).some((m) => String(m.text).includes('carbonara')));
+  const conComando = chats.find((c) => (c.messages || []).some((m) => String(m.text).includes('sleep 5')));
+  console.log('L’ESITO È FINITO NELLA CHAT:', conEsito ? conEsito.id.slice(0, 8) : 'nessuna',
+    '· COMANDO:', conComando && conComando.id.slice(0, 8),
+    '· CARBONARA:', conCarbonara && conCarbonara.id.slice(0, 8));
+
+  // L'esito di un comando dato mentre si parlava di Kant non deve comparire
+  // dentro la conversazione sulla carbonara.
+  expect(conEsito && conEsito.id, 'l’esito è finito nella conversazione sbagliata')
+    .not.toBe(conCarbonara && conCarbonara.id);
+  expect(conEsito && conEsito.id).toBe(conComando && conComando.id);
+});
+
 test('rinomina: input limite e tastiera', async ({ app, openTab }) => {
   test.setTimeout(180_000);
   await configura(app);
