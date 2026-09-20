@@ -58,6 +58,17 @@
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
+  // Come partono le sessioni delle routine: quante insieme, da quale account
+  // per prima, quali account sono esclusi.
+  const mgMaxSessions     = document.getElementById('mgMaxSessions');
+  const mgMaxSessionsSave = document.getElementById('mgMaxSessionsSave');
+  const mgMaxSessionsMsg  = document.getElementById('mgMaxSessionsMsg');
+  const mgPriorityAccountMsg = document.getElementById('mgPriorityAccountMsg');
+  const mgPriorityRadios  = Array.from(document.querySelectorAll('input[name="mgPriorityAccount"]'));
+  const mgAccountA        = document.getElementById('mgAccountA');
+  const mgAccountB        = document.getElementById('mgAccountB');
+  const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
+  const mgAccountsWarn    = document.getElementById('mgAccountsWarn');
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
