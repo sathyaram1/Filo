@@ -194,8 +194,24 @@
     return raw;
   }
 
+  // Nomi con cui un modello scrive l'indirizzo di un'azione. Elenco UNICO:
+  // finché ogni punto teneva il suo, il freno anti-esfiltrazione ne conosceva
+  // uno in meno di chi eseguiva, e bastava chiamare il campo «pagina» per
+  // saltarlo (#553).
+  const CAMPI_INDIRIZZO = ['url', 'href', 'link', 'indirizzo', 'pagina'];
+
+  /** L'indirizzo che un'azione porta con sé, comunque il modello l'abbia scritto. */
+  function indirizzoAzione(a) {
+    if (!a || typeof a !== 'object') return '';
+    for (const campo of CAMPI_INDIRIZZO) {
+      const v = a[campo];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return '';
+  }
+
   global.SN_URL_NAV = {
     isLocalHost, isLocalNetworkName, isIpv4, normalizeUrl, looksLikeAddress,
-    canonicalizeFiloUrl, isShareableAddress,
+    canonicalizeFiloUrl, isShareableAddress, indirizzoAzione, CAMPI_INDIRIZZO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
