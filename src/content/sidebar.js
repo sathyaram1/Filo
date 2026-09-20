@@ -979,6 +979,22 @@
       if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
       const parsed = parseAssistantOutput(res.text);
 
+      // #517 — la risposta non è arrivata nel formato dell'agente: in prosa,
+      // oppure con un oggetto che non contiene niente. Scritta così non
+      // esegue niente. Si rimanda indietro una volta sola, e la riga nel log
+      // dice perché la risposta non è comparsa: una chat che salta un turno
+      // in silenzio fa credere che Filo si sia impallato.
+      if (parsed.fuoriFormato && rimandiFuoriFormato < 1) {
+        rimandiFuoriFormato += 1;
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        // Quello che il modello aveva scritto resta nella sua cronologia:
+        // senza, al giro dopo non saprebbe cosa rimangiarsi.
+        history.push({ role: 'assistant', content: String(res.text || '').slice(0, 4000) });
+        appendActionLog('risposta rifatta: non era arrivata nel formato interno');
+        setTimeout(() => submit({ userAction: NUDGE_FUORI_FORMATO, preActionUrl: location.href }), 50);
+        return;
+      }
+
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
       // mostra il log in chat, poi rilancia un turno con i risultati come
       // nota di sistema così l'AI può produrre il JSON normale.
