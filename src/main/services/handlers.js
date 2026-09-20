@@ -2654,13 +2654,24 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let avvisoAzioni = '';
   if (Dichiarate) {
     try {
-      const coperti = Dichiarate.tipiDallaCronologia(cleanHistory);
-      for (const t of Dichiarate.insiemeDiTipi(renderedActions)) coperti.add(t);
+      // La cronologia si guarda INTERA, non solo i venti messaggi che vanno al
+      // modello: una sveglia messa trenta messaggi fa è comunque messa, e da lì
+      // in poi «sì, te l'ho già messa» diventava un'accusa.
+      const coperti = Dichiarate.tipiDallaCronologia(threadHistory);
+      for (const t of tipiDelTurno(Dichiarate, renderedActions, fileSummaries)) coperti.add(t);
       azioniMancate = Dichiarate.rileva(textReply, coperti);
       avvisoAzioni = Dichiarate.avvisoPerUtente(azioniMancate);
       if (avvisoAzioni) {
         console.warn('[Filo] #517 azione dichiarata e mai eseguita:',
           azioniMancate.map((f) => `${f.id} ← «${f.frase}»`).join(' | '));
+      } else if (!rawActions.length && Dichiarate.formatoSospetto(textReply)) {
+        // L'altro guasto della segnalazione: la risposta è arrivata in formato
+        // macchina anche dopo il ritentativo. Finiva in silenzio — in chat un
+        // blocco di codice e niente altro — mentre la dichiarazione a parole
+        // l'avviso ce l'aveva. Stesso danno, stessa riga, stessa traccia.
+        avvisoAzioni = Dichiarate.avvisoFormatoPerUtente();
+        console.warn('[Filo] #517 risposta in formato macchina, azioni mai emesse:',
+          `${rimandatoIndietro ? 'dopo il ritentativo' : 'senza ritentativo'} · ${textReply.slice(0, 200)}`);
       }
     } catch (e) { console.warn('[Filo] controllo azioni dichiarate fallito', e); }
   }
