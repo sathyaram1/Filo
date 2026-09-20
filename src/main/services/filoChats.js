@@ -102,6 +102,24 @@
     return entry;
   }
 
+  // Un turno che fallisce (rete assente, provider giù) lascia nell'archivio la
+  // domanda senza risposta. Chi preme «Riprova» rimanda la STESSA domanda, e
+  // senza questo controllo si ritrova scritta due volte di fila, con una sola
+  // risposta in fondo: rileggendo la chat sembra di aver balbettato.
+  //
+  // Il controllo è stretto apposta: scatta solo se l'ultimo messaggio salvato
+  // è dell'utente ed è identico a quello che arriva. Se Filo aveva risposto,
+  // in mezzo c'è la sua risposta e la ripetizione è voluta («continua»,
+  // «continua»): quella si conserva.
+  function senzaRiprova(prima, msgs) {
+    const ultimo = prima[prima.length - 1];
+    const primo = msgs[0];
+    if (!ultimo || !primo) return msgs;
+    if (ultimo.role !== 'user' || primo.role !== 'user') return msgs;
+    if (String(ultimo.text || '') !== String(primo.text || '')) return msgs;
+    return msgs.slice(1);
+  }
+
   // Aggiunge messaggi a una chat, creandola se non c'è ancora (la dashboard
   // manda il suo id col primo messaggio: non serve aprirla prima).
   // `meta` può portare { onboarding: true } per marcare l'intervista.
