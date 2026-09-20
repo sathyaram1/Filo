@@ -138,7 +138,7 @@ test('gestione: col fuoco nella ricerca (barra aperta e poi chiusa), un solo Esc
 // Filo stanno comunque nel DOM del sito: quando il menu del tasto destro si
 // chiude, il nodo staccato resta a portata del sito, che se lo tiene, se lo
 // riattacca e se lo ristacca a ogni Esc. In più azzera con eventi finti il
-// contatore che dovrebbe fermarlo dopo tre rivendicazioni.
+// contatore che dovrebbe fermarlo al tetto delle rivendicazioni.
 const paginaLadra = (conEventiFinti) => `<!doctype html><html><body style="margin:0;height:1200px">
 <p id="t">parola dentro una frase</p>
 <script>
