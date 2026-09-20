@@ -295,6 +295,7 @@
       frasi: [
         new RegExp(`${HO}(?:inviato|mandato|spedito|girato|inoltrato|trasmesso)\\b${PONTE(32)}\\b(?:segnalazione|feedback)\\b`, 'i'),
         new RegExp(`${HO}segnalato\\b${PONTE(32)}\\b(?:agli sviluppatori|al team|a chi sviluppa)\\b`, 'i'),
+        { re: participio('(?:segnalazione|feedback)', 'inviat[oa]|mandat[oa]|spedit[oa]|partit[oa]|inoltrat[oa]|trasmess[oa]'), senzaHo: true },
       ],
     },
     {
