@@ -506,6 +506,21 @@ module.exports = function register(on, ctx) {
           });
         } catch (_) {}
       },
+      // #602 — la coda rinuncia perché non si può cifrare. Chi ha mandato la
+      // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
+      // glielo diciamo, quella segnalazione sparisce e non lo sa nessuno. Il
+      // motivo arriva già scritto per chi legge (dice cosa manca e che non è
+      // partito niente), e dura un po' di più di un avviso qualunque perché
+      // chiede di rimandarla.
+      onGiveUp: (_item, motivo) => {
+        try {
+          broadcastToTabs({
+            type: MSG.SHOW_TOAST,
+            text: String(motivo || 'La tua segnalazione non è partita.'),
+            duration: 9000,
+          });
+        } catch (_) {}
+      },
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }

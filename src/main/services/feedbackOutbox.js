@@ -22,7 +22,7 @@
 //   SN_CONST     STORAGE_KEYS.FEEDBACK_OUTBOX
 //
 // API
-//   init({ prepare, onDone, log, backoffMin, backoffMax })  — una volta all'avvio
+//   init({ prepare, onDone, onGiveUp, log, backoffMin, backoffMax })  — una volta all'avvio
 //   enqueue(payload) -> { id, queued:true }                 — accoda + prova subito
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   size()                                                  — voci in coda
@@ -47,6 +47,7 @@
   let auto = true;       // scheduling automatico (disattivabile nei test)
   let prepareFn = null;  // async (payload) -> name (titolo generato al momento dell'invio)
   let onDoneFn = null;   // (item, result) -> void  (es. avvisare di allegati non caricati)
+  let onGiveUpFn = null; // (item, motivo) -> void  (#602: rinuncia definitiva, va detta)
   let logFn = function () { try { console.log.apply(console, ['[feedback-outbox]'].concat([].slice.call(arguments))); } catch (_) {} };
   let backoffMin = 3000;
   let backoffMax = 30000;
@@ -85,6 +86,7 @@
     opts = opts || {};
     if (typeof opts.prepare === 'function') prepareFn = opts.prepare;
     if (typeof opts.onDone === 'function') onDoneFn = opts.onDone;
+    if (typeof opts.onGiveUp === 'function') onGiveUpFn = opts.onGiveUp;
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
@@ -190,7 +192,7 @@
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
       queue = []; loaded = false; flushing = false; auto = true;
-      prepareFn = null; onDoneFn = null; backoff = backoffMin;
+      prepareFn = null; onDoneFn = null; onGiveUpFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
     },
   };
