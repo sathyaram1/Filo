@@ -1347,21 +1347,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
     return { executed: false, kept: false, rejected: true };
   }
 
-  // ── gate del perimetro delle uscite (#533) ────────────────────────────────
-  // Finché il compito non ha letto niente scritto da altri l'unica autorità in
-  // gioco è chi ha scritto in chat, e qui non cambia nulla. Dopo, un'uscita non
-  // dichiarata non passa: dove il modello ha CHIEDI_USCITA viene rifiutata e
-  // deve chiedere; dove non ce l'ha (assistente di pagina) a chiedere è il
-  // motore, con la regola di autonomia.
+  // Un'uscita fuori perimetro su una superficie senza CHIEDI_USCITA (l'assistente
+  // di pagina): a chiedere per lei è il motore, con la regola di autonomia.
   let livelloEffettivo = level;
   let premessaPerimetro = '';
   let uscitaDaAllargare = null;
-  const verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type) : { ok: true };
   if (!verdettoPerimetro.ok) {
-    if (verdettoPerimetro.puoChiedere) {
-      Compiti.registraAzione(task, { type, esito: 'rifiutata: fuori perimetro' });
-      return { executed: false, kept: false, rejected: true, fuoriPerimetro: verdettoPerimetro };
-    }
     const Auto = globalThis.SN_AUTONOMIA;
     const scelta = Auto
       ? Auto.decidi({ livello: task.livello, perimetro: 'fuori', origine: task.origine })
