@@ -239,14 +239,16 @@ function decodeEntita(s) {
  * righe. PURA.
  */
 function htmlATesto(html, dentroZona = false) {
-  const potato = passaggio(html, true, dentroZona);
-  // SE POTARE NON LASCIA NIENTE, NON SI POTA. L'HTML vero è pieno di tag mai
-  // chiusi: un `<nav>` che non chiude si porta via tutta la pagina che viene
-  // dopo, e il modello riceve il vuoto senza sapere che c'era del testo.
-  return potato || passaggio(html, false, dentroZona);
+  const potato = passaggio(html, 'tutto', dentroZona);
+  // SE POTARE NON LASCIA NIENTE, SI RINUNCIA ALLA SOLA CORNICE. L'HTML vero è
+  // pieno di tag mai chiusi: un `<nav>` che non chiude si porta via tutta la
+  // pagina che viene dopo. Script, stili e blocchi nascosti restano fuori anche
+  // qui: senza testo la pagina va dichiarata vuota, non riempita di codice.
+  return potato || passaggio(html, 'minimo', dentroZona);
 }
 
-function passaggio(html, pota, dentroZona = false) {
+function passaggio(html, modo, dentroZona = false) {
+  const soloIlleggibile = modo === 'minimo';
   const src = String(html == null ? '' : html);
   const fuori = []; // pila degli elementi di cornice ancora aperti
   const zone = []; // pila delle zone di contenuto (article/main) ancora aperte
