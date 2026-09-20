@@ -157,6 +157,7 @@
       frasi: [
         new RegExp(`${HO}(?:avviato|fatto\\s+partire|messo|impostato|acceso|creato|lanciato|fatto\\s+scattare)\\b${PONTE(72)}\\b(?:timer|conto alla rovescia)\\b`, 'i'),
         new RegExp(`\\bfatto[,:!]?\\s+(?:il |un )?timer\\b${PONTE(24)}\\b(?:avviat|partit|impostat|in corso|acceso)`, 'i'),
+        { re: participio('timer', 'avviato|partito|impostato|acceso|lanciato|in corso'), senzaHo: true },
       ],
     },
     {
