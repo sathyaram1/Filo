@@ -2683,6 +2683,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
         results.push({ action: a, res, rendered });
       }
+      // #533 — quello che il giro ha letto vale dal giro DOPO: è lì che il testo
+      // di altri entra davvero nel contesto del modello, e da lì in poi il
+      // perimetro morde.
+      if (task && Compiti) {
+        for (const a of actions) {
+          if (Compiti.classeDi(a.type).classe === 'ingresso') Compiti.registraLettura(task, { type: a.type });
+        }
+      }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       if (text.trim()) notes.push(text.trim());
