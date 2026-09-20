@@ -249,12 +249,55 @@ test('dopo un messaggio che non ha letto niente di altri non si eredita nulla', 
   assert.equal(C.consentito(dopo, 'SALVA_LEZIONE').ok, true);
 });
 
-test('il permesso dato dall\'utente si eredita, non si perde a metà conversazione', () => {
-  const prima = contaminato([]);
+test('il permesso dato dall\'utente vale per quella richiesta, non per quelle dopo', () => {
+  // #533 (secondo giro di verifica) — il sì lo dà l'utente a un'azione sola,
+  // dentro una richiesta sola. Portarlo avanti per tutta la conversazione
+  // vuol dire che un «ok grazie» rinnova da solo un permesso che l'utente
+  // aveva dato una volta, col testo della pagina ancora lì davanti.
+  const prima = contaminato(['sveglie']);
   C.allarga(prima, 'memoria', 'l\'utente ha detto sì');
+  assert.equal(C.consentito(prima, 'SALVA_LEZIONE').ok, true, 'nella sua richiesta il sì vale');
   const dopo = C.erede(prima, { richiesta: 'e adesso segnati anche questo' });
-  assert.equal(C.consentito(dopo, 'SALVA_LEZIONE').ok, true);
+  assert.equal(C.consentito(dopo, 'SALVA_LEZIONE').ok, false, 'nella richiesta dopo va richiesto');
+  // Quello che la richiesta di partenza aveva DICHIARATO invece si eredita:
+  // quello non gliel'ha concesso un popup, lo comportava la richiesta.
+  assert.equal(C.consentito(dopo, 'SVEGLIA').ok, true);
   assert.equal(C.consentito(dopo, 'ESEGUI_COMANDO').ok, false);
+  // E la porta per richiederlo resta aperta.
+  assert.ok(C.strumentiPermessi(dopo, Tools.NAMES).includes('CHIEDI_USCITA'));
+});
+
+test('quello che stampa un comando è una lettura di testo scritto da altri', () => {
+  // Il contenuto di un file scaricato, la risposta di un sito: un comando le
+  // riporta dentro al contesto esattamente come una pagina web.
+  const k = C.classeDi('ESEGUI_COMANDO');
+  assert.equal(k.classe, 'uscita');
+  assert.equal(k.ritorna, 'esterno', 'un comando riporta indietro roba scritta da altri');
+  const c = C.nuovo({});
+  C.dichiara(c, ['terminale']);
+  C.registraLettura(c, { type: 'ESEGUI_COMANDO', fonte: k.ritorna });
+  assert.equal(c.contaminato, true);
+  assert.equal(C.consentito(c, 'SALVA_LEZIONE').ok, false);
+  assert.equal(C.consentito(c, 'ESEGUI_COMANDO').ok, true, 'il terminale era dichiarato');
+});
+
+test('cancellare tutta la memoria non è «scrivere nella memoria»', () => {
+  assert.equal(C.uscitaDi('SALVA_LEZIONE'), 'memoria');
+  assert.equal(C.uscitaDi('CANCELLA_MEMORIA'), 'oblio');
+  const c = contaminato(['memoria']);
+  assert.equal(C.consentito(c, 'SALVA_LEZIONE').ok, true);
+  assert.equal(C.consentito(c, 'CANCELLA_MEMORIA').ok, false,
+    'chi concede «scrivere» non sta concedendo di buttare via tutto');
+  assert.match(C.etichettaUscita('oblio'), /cancellare/);
+});
+
+test('il registro di un compito dice cosa ha letto e cosa gli è stato impedito', () => {
+  const c = contaminato(['sveglie']);
+  C.registraAzione(c, { type: 'SALVA_LEZIONE', esito: 'rifiutata: fuori perimetro' });
+  const r = C.riassunto(c);
+  assert.deepEqual(r.letture, ['CERCA_WEB']);
+  assert.deepEqual(r.rifiutate, ['SALVA_LEZIONE']);
+  assert.deepEqual(r.uscite, ['sveglie']);
 });
 
 test('leggere i titoli delle schede è una lettura di testo scritto da altri', () => {

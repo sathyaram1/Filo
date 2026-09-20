@@ -425,6 +425,8 @@
     security_perimetro_allargato: 'permesso che hai dato tu',
     security_perimetro_pagina: 'assistente dentro una pagina web',
     security_perimetro_senza_testo: '(richiesta senza testo)',
+    security_perimetro_letture: 'ha letto',
+    security_perimetro_rifiutate: 'gli è stato impedito di',
     options_h_security: 'Sicurezza',
     options_security_protect_ip: 'Proteggi l\'IP locale (WebRTC)',
     options_security_protect_ip_desc:

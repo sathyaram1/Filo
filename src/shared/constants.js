@@ -82,6 +82,11 @@
     // Cache dell'ultimo output del Generatore Dashboard:
     // { ts, message: string, suggestions: [{icon,text,action,importance}] }
     FILO_DASHBOARD_CACHE: 'filo_dashboard_cache',
+    // #533 — il registro dei perimetri: per ogni richiesta recente cosa Filo
+    // era autorizzato a fare, cosa ha letto e cosa gli è stato rifiutato.
+    // Array di riassunti, dal più recente. Sta su disco perché la domanda
+    // «cosa poteva fare Filo?» uno se la fa dopo, non entro mezz'ora.
+    FILO_COMPITI: 'filo_compiti',
     // STORICO: vecchio archivio appunti (array di {id, ts, text, context}),
     // usato prima che gli appunti diventassero file dell'editor. Nessuno ci
     // scrive più: la chiave sopravvive solo perché la migrazione una-tantum

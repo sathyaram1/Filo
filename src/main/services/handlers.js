@@ -1222,25 +1222,45 @@ function compitoDiPagina(sender) {
   if (gia) return gia;
   const c = Compiti.nuovo({ origine: 'chat', dichiarazione: 'fissa', perimetro: PERIMETRO_PAGINA, richiesta: sito });
   Compiti.registraLettura(c, { type: 'PAGINA', fonte: 'esterno', dettaglio: sito });
-  return ricordaCompito(c, chiave);
+  ricordaCompito(c, chiave);
+  salvaCompito(c);
+  return c;
+}
+
+// Il registro dei perimetri va su disco, non solo in memoria: la mappa dei
+// compiti vivi si svuota dopo mezz'ora e a ogni riavvio, e la domanda «cosa
+// era autorizzato a fare Filo?» uno se la fa quando si accorge di qualcosa di
+// strano, cioè quasi mai entro mezz'ora (#533, secondo giro di verifica).
+// Si scrive a ogni momento in cui il compito cambia davvero: quando nasce,
+// quando l'utente gli concede qualcosa, a fine turno.
+async function salvaCompito(task) {
+  const Compiti = globalThis.SN_COMPITI;
+  if (!Compiti || !task) return;
+  try { await FiloMem.saveCompito({ ts: Date.now(), ...Compiti.riassunto(task) }); } catch (_) {}
 }
 
 // Per la pagina Sicurezza: cosa ogni compito era AUTORIZZATO a fare, non solo
-// cosa ha fatto. Dal più recente, senza doppioni (il compito di una pagina sta
-// in mappa sotto due chiavi).
-function compitiRecenti(max = 30) {
+// cosa ha fatto. Dal più recente; quelli ancora vivi in memoria vincono sulla
+// copia su disco, che può essere di un istante prima.
+async function compitiRecenti(max = 30) {
   const Compiti = globalThis.SN_COMPITI;
   if (!Compiti) return [];
   purgaCompiti();
-  const visti = new Set();
-  const out = [];
+  const vivi = new Map();
   for (const v of Array.from(compitiVivi.values()).sort((a, b) => b.ts - a.ts)) {
-    if (visti.has(v.compito.id)) continue;
-    visti.add(v.compito.id);
-    out.push({ ts: v.ts, ...Compiti.riassunto(v.compito) });
-    if (out.length >= max) break;
+    if (!vivi.has(v.compito.id)) vivi.set(v.compito.id, { ts: v.ts, ...Compiti.riassunto(v.compito) });
   }
-  return out;
+  let salvati = [];
+  try { salvati = await FiloMem.listCompiti({ limit: max }); } catch (_) { salvati = []; }
+  const out = [];
+  const visti = new Set();
+  for (const c of [...vivi.values(), ...salvati]) {
+    if (!c || visti.has(c.id)) continue;
+    visti.add(c.id);
+    out.push(c);
+  }
+  out.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  return out.slice(0, max);
 }
 
 // Il compito di questa azione: quello del turno che la sta eseguendo, quello
@@ -1423,6 +1443,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // Dopo il controllo #250: una conferma forgiata non deve allargare niente.
   if (confirmed && uscitaDaAllargare && task && Compiti) {
     Compiti.allarga(task, uscitaDaAllargare, 'confermata dall’utente');
+    salvaCompito(task);
   }
 
   try {
@@ -1438,6 +1459,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
         // Ci si arriva solo col sì dell'utente: il livello 2 tiene il resto.
         if (!Compiti || !task) return { executed: false, kept: false };
         const r = Compiti.allarga(task, action.uscita, action.motivo);
+        salvaCompito(task);
         return { executed: !!r.ok, kept: false, riprendi: r.ok ? task.id : null };
       }
       case 'NAVIGA': {
@@ -2722,6 +2744,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         }
         const rendered = { ...a };
         delete rendered._argsError;
+        // #533 (secondo giro di verifica) — un'azione rifiutata perché non era
+        // fra quelle chieste è comunque una cosa che Filo ha provato a fare e
+        // non ha fatto: senza una riga, l'utente vede il blocco di attività
+        // annunciare la sveglia e poi niente, e resta convinto che ci sia.
+        // Un controllo che rifiuta non rifiuta mai in silenzio.
+        if (res.rejected && res.fuoriPerimetro) {
+          rendered._traccia = true;
+          rendered._executed = false;
+          rendered._output = { fuoriPerimetro: res.fuoriPerimetro.etichetta || '' };
+        }
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
         if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '' };
@@ -2736,12 +2768,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // proxy tolto). Nel diario ci va lo stesso, come riga: se Filo fa una
         // cosa, l'utente deve poter vedere che l'ha fatta. Un'azione rifiutata
         // dal registro invece non è successa: quella non entra.
-        if (!res.rejected) {
+        const raccontata = !res.rejected || !!res.fuoriPerimetro;
+        if (raccontata) {
           if (!res.kept) rendered._traccia = true;
           renderedActions.push(rendered);
           roundRendered.push(rendered);
         }
-        push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
+        push('filo:action', { kind: 'done', action: rendered, kept: raccontata, executed: !!res.executed });
         results.push({ action: a, res, rendered });
       }
       // #533 — quello che il giro ha letto vale dal giro DOPO: è lì che il testo
@@ -2749,7 +2782,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // perimetro morde.
       if (task && Compiti) {
         for (const a of actions) {
-          if (Compiti.classeDi(a.type).classe === 'ingresso') Compiti.registraLettura(task, { type: a.type });
+          const k = Compiti.classeDi(a.type);
+          if (k.classe === 'ingresso') Compiti.registraLettura(task, { type: a.type });
+          // Un'uscita che RIPORTA indietro del testo conta come lettura di quel
+          // testo: quello che stampa un comando è roba scritta da altri come una
+          // pagina web (#533, secondo giro di verifica).
+          else if (k.ritorna) Compiti.registraLettura(task, { type: a.type, fonte: k.ritorna });
         }
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
@@ -2816,6 +2854,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     }
   }
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
+  // #533 — il turno è finito: il compito con quello che ha letto, quello che
+  // gli era permesso e quello che gli è stato rifiutato va sul disco, così la
+  // pagina Sicurezza lo racconta anche domani.
+  await salvaCompito(task);
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
   // #524 — chiusura dell'intervista di benvenuto: la sequenza sta in
   // `finishOnboarding`. Se invece l'intervista prosegue, il turno di Filo viene

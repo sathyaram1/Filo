@@ -26,6 +26,10 @@
   // Limite difensivo sul raw log per non saturare chrome.storage (~10MB totali).
   // 5000 entry ≈ pochi MB con messaggi corti.
   const RAW_LOG_CAP = 5000;
+  // #533 — quante richieste restano nel registro dei perimetri. Un riassunto
+  // pesa poche centinaia di byte (niente registro riga per riga), quindi il
+  // tetto può stare largo: sono settimane d'uso normale.
+  const COMPITI_CAP = 300;
   // Quando il buffer di lezioni supera questa soglia in caratteri, il
   // Compattatore va eseguito (vedi spec sezione 4.2).
   const LESSONS_BUFFER_TRIGGER_CHARS = 3000;
@@ -94,6 +98,25 @@
       out = out.filter((e) => new Date(e.ts).getTime() >= cutoff);
     }
     return out.slice(0, limit);
+  }
+
+  // ===== Registro dei perimetri (#533) =====
+  // Un compito per riga, il più recente in testa. Riscrivere lo stesso id lo
+  // aggiorna e lo riporta in cima: un compito cresce mentre lavora (legge,
+  // gli viene concesso qualcosa) e in elenco deve restare uno solo.
+  async function saveCompito(riassunto) {
+    if (!riassunto || !riassunto.id) return null;
+    const list = await getRaw(KEYS.FILO_COMPITI, []);
+    const riga = { ts: riassunto.ts || Date.now(), ...riassunto };
+    delete riga.registro;
+    const out = [riga, ...list.filter((c) => c && c.id !== riga.id)];
+    if (out.length > COMPITI_CAP) out.length = COMPITI_CAP;
+    await setRaw(KEYS.FILO_COMPITI, out);
+    return riga;
+  }
+  async function listCompiti({ limit = 30 } = {}) {
+    const list = await getRaw(KEYS.FILO_COMPITI, []);
+    return (Array.isArray(list) ? list : []).slice(0, limit);
   }
 
   // ===== Lessons buffer =====
@@ -818,6 +841,7 @@
   global.SN_FILO_MEMORY = {
     // raw log
     appendRaw, listRaw,
+    saveCompito, listCompiti, COMPITI_CAP,
     // lessons
     getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer,
     LESSONS_BUFFER_TRIGGER_CHARS,

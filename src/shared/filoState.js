@@ -258,7 +258,19 @@
     lines.push('');
     // DASHBOARD CORRENTE
     lines.push('DASHBOARD ATTUALE');
-    if (state.dashboard) {
+    if (!state.dashboard) {
+      lines.push('(non ancora generata)');
+    } else if (!conEsterno) {
+      // #533 (secondo giro di verifica) — il messaggio della home e i suoi
+      // suggerimenti li scrive Filo LEGGENDO i titoli delle schede aperte e
+      // delle pagine salvate, cioè roba scritta dai siti. Toglierli dallo
+      // stato e lasciare i titoli fuori era mezza cura: il titolo tornava
+      // dentro passando di qui, a ogni messaggio, prima che ci fosse un
+      // perimetro da rispettare. Resta il fatto che la home c'è.
+      const quanti = state.dashboard.suggestions?.length || 0;
+      lines.push(`La home ha un messaggio e ${quanti} suggerimenti.`);
+      lines.push('Li scrive Filo leggendo anche i titoli dei siti aperti e salvati, quindi il testo non sta qui.');
+    } else {
       lines.push(`Messaggio: "${(state.dashboard.message || '').slice(0, 200)}"`);
       if (state.dashboard.suggestions?.length) {
         lines.push('Suggerimenti:');
@@ -266,8 +278,6 @@
           lines.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
         });
       }
-    } else {
-      lines.push('(non ancora generata)');
     }
     return lines.join('\n');
   }

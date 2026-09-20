@@ -451,6 +451,20 @@
     save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
+  // Come si chiama, per l'utente, ognuna delle cose che Filo può leggere.
+  // Nomi di strumenti in una pagina che legge chi non sa niente di codice non
+  // dicono niente (#533, secondo giro di verifica).
+  const LETTURE = {
+    CERCA_WEB: 'una ricerca sul web',
+    LEGGI_DOCUMENTO: 'un documento',
+    LEGGI_FILE: 'un tuo file',
+    LEGGI_SCHEDE: 'i titoli delle schede aperte',
+    LEGGI_TRASPARENZA: 'una pagina di Filo',
+    CAPACITA_DETTAGLIO: 'una pagina di Filo',
+    ESEGUI_COMANDO: 'quello che ha stampato un comando',
+    PAGINA: 'la pagina su cui stavi',
+  };
+
   // #533 — la riga di un compito dice il PERIMETRO, cioè cosa gli era
   // permesso: cosa ha poi fatto si legge già nel diario della chat.
   function rigaCompito(c) {
@@ -479,13 +493,30 @@
     } else {
       // La contabilità interna di Filo (l'intervista di benvenuto) non è un
       // permesso che l'utente ha dato: in un elenco di permessi mente.
-      const uscite = (c.perimetro || []).concat(c.sempre || [])
+      const uscite = (c.uscite || (c.perimetro || []).concat(c.sempre || []))
         .filter((u) => !(C && C.uscitaInterna(u)));
       const voci = C ? uscite.map((u) => C.etichettaUscita(u)) : uscite;
       const dove = voci.join('; ') || I18n.t('security_perimetro_nulla');
       cosa.textContent = `${I18n.t('security_perimetro_letto')} → ${dove}`;
     }
     riga.append(quando, quale, cosa);
+    // Cosa ha letto: senza, la riga dice che Filo era limitato ma non perché,
+    // e «ha letto roba scritta da altri» resta una frase senza appiglio.
+    const letto = (c.letture || []).map((t) => LETTURE[t]).filter(Boolean);
+    if (letto.length) {
+      const dove = document.createElement('div');
+      dove.className = 'sn-muted';
+      dove.textContent = `${I18n.t('security_perimetro_letture')}: ${Array.from(new Set(letto)).join('; ')}`;
+      riga.append(dove);
+    }
+    // E cosa si è fermato: è la riga che risponde a «perché non l'ha fatto?».
+    const fermate = (c.rifiutate || []).map((t) => (C ? C.etichettaUscita(C.uscitaDi(t)) : t)).filter(Boolean);
+    if (fermate.length) {
+      const stop = document.createElement('div');
+      stop.className = 'sn-muted';
+      stop.textContent = `${I18n.t('security_perimetro_rifiutate')}: ${Array.from(new Set(fermate)).join('; ')}`;
+      riga.append(stop);
+    }
     if (c.allargamenti && c.allargamenti.length) {
       const piu = document.createElement('div');
       piu.className = 'sn-muted';

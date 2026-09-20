@@ -56,7 +56,7 @@
     MODIFICA_SVEGLIA: { classe: 'uscita', uscita: 'sveglie' },
     SALVA_APPUNTO: { classe: 'uscita', uscita: 'appunti' },
     SALVA_LEZIONE: { classe: 'uscita', uscita: 'memoria' },
-    CANCELLA_MEMORIA: { classe: 'uscita', uscita: 'memoria' },
+    CANCELLA_MEMORIA: { classe: 'uscita', uscita: 'oblio' },
     NAVIGA: { classe: 'uscita', uscita: 'schede' },
     PULISCI_TAB: { classe: 'uscita', uscita: 'schede' },
     CANCELLA_ARCHIVIO: { classe: 'uscita', uscita: 'schede' },
@@ -70,7 +70,12 @@
     RIMUOVI_PROXY_TUTTE: { classe: 'uscita', uscita: 'rete' },
     REGOLA_PROXY_DOMINIO: { classe: 'uscita', uscita: 'rete' },
     RIMUOVI_REGOLA_PROXY: { classe: 'uscita', uscita: 'rete' },
-    ESEGUI_COMANDO: { classe: 'uscita', uscita: 'terminale' },
+    // Un comando è un'uscita, ma quello che STAMPA torna dentro al contesto:
+    // il contenuto di un file scaricato, la risposta di un sito. È testo
+    // scritto da altri come una pagina web, e da lì in poi il perimetro deve
+    // mordere (#533, secondo giro di verifica). `ritorna` dice proprio questo:
+    // l'azione riporta indietro roba di quella classe.
+    ESEGUI_COMANDO: { classe: 'uscita', uscita: 'terminale', ritorna: 'esterno' },
     INVIA_FEEDBACK: { classe: 'uscita', uscita: 'segnalazioni' },
     ONBOARDING: { classe: 'uscita', uscita: 'accoglienza' },
   };
@@ -155,8 +160,10 @@
    * aveva letto roba scritta da altri, quel testo è ancora davanti al modello
    * (Filo l'ha riportato nella sua risposta, che resta in chat): ricominciare a
    * mani libere vorrebbe dire che basta un messaggio qualunque dell'utente per
-   * riavere tutto. Il nuovo compito eredita la contaminazione e il perimetro
-   * già concesso, e per un'uscita in più passa dall'utente come sempre.
+   * riavere tutto. Il nuovo compito eredita la contaminazione e le uscite che
+   * la richiesta di partenza aveva DICHIARATO, non i permessi che l'utente
+   * aveva concesso uno per uno: quelli valevano per quella richiesta, e per
+   * riaverli si ripassa da lui.
    * Se il compito prima era pulito, questo nasce pulito: niente cambia.
    */
   function erede(prec, { richiesta = '', sempre = null, livello } = {}) {
@@ -164,6 +171,9 @@
     if (!prec || !prec.contaminato) return fresco;
     fresco.contaminato = true;
     fresco.fonte = prec.fonte || FONTE_PEGGIORE;
+    // SOLO il perimetro dichiarato, non i permessi che l'utente aveva dato:
+    // quel sì valeva per quella richiesta, e questa è un'altra (#533, secondo
+    // giro di verifica). Se al modello serve ancora, lo richiede.
     fresco.perimetro = Array.isArray(prec.perimetro) ? prec.perimetro.slice() : [];
     fresco.dichiarato = true;
     fresco.ereditato = true;
@@ -197,17 +207,31 @@
   }
 
   // Il perimetro si allarga di UNA uscita e solo per QUESTO compito: è la
-  // risposta a un sì dell'utente, non una preferenza che resta.
+  // risposta a un sì dell'utente, non una preferenza che resta. Il sì sta in
+  // `allargamenti`, non nel perimetro dichiarato: così il messaggio dopo
+  // eredita quello che la richiesta di partenza comportava e NON il permesso
+  // che l'utente aveva dato una volta sola (#533, secondo giro di verifica).
   function allarga(c, uscita, motivo) {
     if (!c) return { ok: false, motivo: 'nessun-compito' };
     const u = String(uscita || '').trim();
     if (!(u in USCITE)) return { ok: false, motivo: 'sconosciuta' };
     if (!Array.isArray(c.perimetro)) c.perimetro = [];
-    if (!c.perimetro.includes(u)) c.perimetro.push(u);
     c.dichiarato = true;
-    c.allargamenti.push({ uscita: u, motivo: String(motivo || '') });
+    if (!c.allargamenti.some((a) => a.uscita === u)) {
+      c.allargamenti.push({ uscita: u, motivo: String(motivo || '') });
+    }
     scrivi(c, { tipo: 'allargamento', uscita: u, motivo: String(motivo || '') });
-    return { ok: true, perimetro: c.perimetro.slice() };
+    return { ok: true, perimetro: usciteVive(c) };
+  }
+
+  // Tutto ciò che questo compito può fare adesso: quello che ha dichiarato,
+  // quello che ha per nascita, e i sì che l'utente gli ha dato durante.
+  function usciteVive(c) {
+    if (!c) return [];
+    const perimetro = Array.isArray(c.perimetro) ? c.perimetro : [];
+    const sempre = Array.isArray(c.sempre) ? c.sempre : [];
+    const concessi = (Array.isArray(c.allargamenti) ? c.allargamenti : []).map((a) => a.uscita);
+    return Array.from(new Set([...perimetro, ...sempre, ...concessi]));
   }
 
   function registraLettura(c, { type, fonte, dettaglio } = {}) {
@@ -238,9 +262,7 @@
     // Finché niente di esterno è entrato nel contesto, l'unica autorità in
     // gioco è l'utente che ha scritto: il perimetro non serve ancora.
     if (!c || !c.contaminato) return { ok: true, classe: 'uscita', uscita: k.uscita };
-    const perimetro = Array.isArray(c.perimetro) ? c.perimetro : [];
-    const sempre = Array.isArray(c.sempre) ? c.sempre : [];
-    if (perimetro.includes(k.uscita) || sempre.includes(k.uscita)) {
+    if (usciteVive(c).includes(k.uscita)) {
       return { ok: true, classe: 'uscita', uscita: k.uscita };
     }
     return {
@@ -266,6 +288,21 @@
     });
   }
 
+  // Cosa ha letto e cosa gli è stato rifiutato, ricavati dal registro: la
+  // pagina Sicurezza deve poter dire non solo cosa era permesso, ma anche
+  // perché quel compito era limitato e cosa si è fermato (#533, secondo giro
+  // di verifica). Nomi di strumenti, non frasi: le frasi le fa chi mostra.
+  function letture(c) {
+    if (!c || !Array.isArray(c.registro)) return [];
+    return Array.from(new Set(c.registro.filter((r) => r.tipo === 'lettura').map((r) => r.azione)));
+  }
+  function rifiutate(c) {
+    if (!c || !Array.isArray(c.registro)) return [];
+    return Array.from(new Set(c.registro
+      .filter((r) => r.tipo === 'azione' && String(r.esito || '').startsWith('rifiutata'))
+      .map((r) => r.azione)));
+  }
+
   function riassunto(c) {
     if (!c) return null;
     return {
@@ -274,12 +311,15 @@
       richiesta: c.richiesta || '',
       dichiarazione: c.dichiarazione,
       perimetro: Array.isArray(c.perimetro) ? c.perimetro.slice() : null,
+      uscite: usciteVive(c),
       sempre: c.sempre.slice(),
       dichiarato: !!c.dichiarato,
       contaminato: !!c.contaminato,
       ereditato: !!c.ereditato,
       fonte: c.fonte,
       allargamenti: c.allargamenti.slice(),
+      letture: letture(c),
+      rifiutate: rifiutate(c),
       registro: c.registro.slice(),
       omesse: c.omesse,
     };
@@ -287,8 +327,8 @@
 
   global.SN_COMPITI = {
     FONTI, USCITE, USCITE_DICHIARABILI, CLASSI, MAX_RIGHE,
-    classeDi, uscitaDi, etichettaUscita, uscitaInterna, etichettaRichiesta, MAX_RICHIESTA,
-    nuovo, erede, dichiara, allarga, registraLettura, registraAzione,
+    classeDi, uscitaDi, etichettaUscita, uscitaInterna, etichettaRichiesta, MAX_RICHIESTA, usciteVive,
+    nuovo, erede, dichiara, allarga, registraLettura, registraAzione, letture, rifiutate,
     consentito, strumentiPermessi, riassunto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

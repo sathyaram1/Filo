@@ -81,7 +81,7 @@ module.exports = function register(on, ctx) {
   // poteva fare: da una pagina web non si legge, come tutto ciò che ha potere.
   on(MSG.FILO_GET_COMPITI, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
-    return { ok: true, compiti: compitiRecenti() };
+    return { ok: true, compiti: await compitiRecenti() };
   });
 
   on(MSG.FILO_GET_STATE, async () => {

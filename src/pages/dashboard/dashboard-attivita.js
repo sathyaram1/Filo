@@ -446,6 +446,10 @@
   function motivoFallimento(a) {
     const o = a && a._output;
     if (!o) return '';
+    // #533 — l'azione c'era, il motore non l'ha consegnata: Filo aveva letto
+    // roba scritta da altri e quella non era fra le cose che l'utente gli
+    // aveva chiesto.
+    if (o.fuoriPerimetro) return 'non gliel’avevi chiesto, e aveva letto testo scritto da altri';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
