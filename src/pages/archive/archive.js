@@ -549,10 +549,22 @@
     load();
     $('list').addEventListener('wheel', onListWheel, { passive: false });
     // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
+    // Le schede si filtrano qui, in pagina; le chat le cerca il main, che ha i
+    // messaggi in memoria e può guardare dentro la conversazione, non solo il
+    // titolo. Una richiesta per tasto premuto: il giro è locale e la risposta
+    // che arriva in ritardo viene scartata (vedi chatSearchToken), così a
+    // digitare in fretta non compare mai il risultato di una ricerca vecchia.
     $('search').addEventListener('input', () => {
       semanticResults = null;
       $('searchNote').hidden = true;
       render();
+      refreshChats();
+    });
+    // L'interruttore dei comandi: mostra o nasconde le chat classificate come
+    // "comando". Nascoste non vuol dire cancellate — ci sono sempre.
+    $('showCommands').addEventListener('change', (e) => {
+      showCommands = !!e.target.checked;
+      renderChats();
     });
     // Invio o bottone = ricerca semantica nei contenuti.
     $('search').addEventListener('keydown', (e) => {
