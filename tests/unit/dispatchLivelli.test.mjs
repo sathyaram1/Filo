@@ -205,15 +205,26 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
     assert.match(String(monco.stderr), /--nota vuole il percorso/);
 
     // Un argomento in più resta un errore (#565), anche con la nota.
-    writeFileSync(resolve(sandbox, 'nota.md'), 'Letto il diff riga per riga: solo CSS e un test. Niente di sospetto.', 'utf8');
-    const avanzo = lancia(['--record-secaudit', 'ID1', 'pass', 'extra', '--nota', 'nota.md']);
+    writeFileSync(NOTA, 'Letto il diff riga per riga: solo CSS e un test. Niente di sospetto.', 'utf8');
+    const avanzo = lancia(['--record-secaudit', 'ID1', 'pass', 'extra', '--nota', NOTA]);
     assert.equal(avanzo.status, 1);
     assert.match(String(avanzo.stderr), /Argomento non capito: extra/);
 
     // Con la nota il pass supera i controlli locali e va verso il server (che
     // qui non c'è): l'esito non è più 1.
-    const buono = lancia(['--record-secaudit', 'ID1', 'pass', '--nota', 'nota.md']);
+    const buono = lancia(['--record-secaudit', 'ID1', 'pass', '--nota', NOTA]);
     assert.notEqual(buono.status, 1, `pass con la nota non è un errore d'uso: ${buono.stderr}`);
+
+    // Con qualcosa fuori dai commit il verdetto NON si registra: il
+    // salvataggio automatico lo committerebbe dopo, spostando la punta, e
+    // nella fusione finirebbero righe mai controllate (feedback #485).
+    writeFileSync(resolve(sandbox, 'avanzo.txt'), 'roba di un test\n', 'utf8');
+    const sporco = lancia(['--record-secaudit', 'ID1', 'pass', '--nota', NOTA]);
+    assert.equal(sporco.status, 1, `col deposito sporco il verdetto deve fermarsi: ${sporco.stderr}`);
+    assert.match(String(sporco.stderr), /verdetto non registrato/);
+    assert.match(String(sporco.stderr), /\n  avanzo\.txt/, 'elenca cosa c\'è fuori dai commit');
+    nienteScritto('verdetto con la directory sporca');
+    rmSync(resolve(sandbox, 'avanzo.txt'), { force: true });
 
     // --segnala su un file assente ferma la consegna della correzione, con la
     // frase giusta, prima di qualunque altra cosa.
