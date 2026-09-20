@@ -29,8 +29,67 @@ test('il caso del feedback: la sveglia raccontata e mai chiamata', () => {
 });
 
 test('con l\'azione nel turno non scatta niente', () => {
+  // Lo stato è quello di FINE turno: la sveglia che l'azione ha appena
+  // creato c'è già, ed è lei la prova (giro 5).
   const testo = 'Ti ho messo una sveglia alle 19:00, buonanotte!';
-  assert.deepEqual(AD.rileva(testo, [{ type: 'SVEGLIA', time: '19:00' }]), []);
+  assert.deepEqual(AD.rileva(testo, [{ type: 'SVEGLIA', time: '19:00' }], { orariSveglie: ['19:00'] }), []);
+});
+
+test('l\'ora nominata è la prova, non il fatto che una SVEGLIA sia partita', () => {
+  // Giro 5. Filo ha messo la sveglia delle 7 e racconta di averne messa una
+  // alle 19: l'azione c'è, la sveglia delle 19 no. Bastava un'azione di
+  // quella specie, ovunque nella conversazione, perché nessuno dicesse niente.
+  const stato = { orariSveglie: ['07:00'] };
+  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia alle 19:00 per stasera.', new Set(['SVEGLIA']), stato)), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Te l\'ho messa alle 19.', new Set(['SVEGLIA']), stato)), ['senza-nome']);
+  // E due sveglie raccontate non le regge una sola: servono tutte e due.
+  assert.deepEqual(
+    ids(AD.rileva('Ti ho messo la sveglia alle 19 e quella alle 21.', [{ type: 'SVEGLIA' }], { orariSveglie: ['19:00'] })),
+    ['sveglia'],
+  );
+  assert.deepEqual(
+    AD.rileva('Ti ho messo la sveglia alle 19 e quella alle 21.', [{ type: 'SVEGLIA' }], { orariSveglie: ['19:00', '21:00'] }),
+    [],
+  );
+  // Chi sposta o cancella resta fuori: dopo «te l'ho cancellata alle 19»
+  // quell'ora NON deve esistere, e pretenderla sarebbe l'accusa al contrario.
+  assert.deepEqual(AD.rileva('Te l\'ho cancellata alle 19.', [{ type: 'CANCELLA_SVEGLIA' }], { orariSveglie: [] }), []);
+});
+
+test('una parolina fra «ho» e il participio non nasconde la dichiarazione', () => {
+  // Giro 5: «ti ho GIÀ messo la sveglia alle 19» è la risposta tipica di un
+  // turno di prosecuzione, ed era muta.
+  for (const frase of [
+    'Ti ho già messo la sveglia alle 19.',
+    'Ho appena impostato la sveglia alle 19:00.',
+    'Ti ho anche messo la sveglia alle 19.',
+  ]) assert.deepEqual(ids(AD.rileva(frase, [])), ['sveglia'], frase);
+  assert.deepEqual(ids(AD.rileva('Ho già mandato la segnalazione agli sviluppatori.', [])), ['segnalazione']);
+  assert.deepEqual(ids(AD.rileva('Te l\'ho già messa alle 19.', [])), ['senza-nome']);
+  assert.deepEqual(ids(AD.rileva('Gliel\'ho messa alle 19.', [])), ['senza-nome']);
+});
+
+test('una dichiarazione chiusa da una domanda resta una dichiarazione', () => {
+  // Giro 5: la virgola staccava la proposizione prima, non quella dopo, e
+  // «va bene?» in coda zittiva tutto.
+  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia alle 19, va bene?', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ho mandato la segnalazione agli sviluppatori, ok?', [])), ['segnalazione']);
+  // Una domanda vera resta una domanda.
+  assert.deepEqual(AD.rileva('Ho aperto la pagina giusta?', []), []);
+  assert.deepEqual(AD.rileva('Ho aperto la pagina giusta, o mi sono sbagliato?', []), []);
+});
+
+test('l\'ora si legge anche quando non è scritta con «alle»', () => {
+  const stato = { orariSveglie: ['19:00', '07:30'] };
+  for (const frase of [
+    'Ti ho messo la sveglia per le 19.',
+    'Ti ho messo la sveglia per le ore 19.',
+    'La sveglia delle 19 te l\'ho messa ieri.',
+    'Ti ho messo la sveglia alle 7 e mezza.',
+    'Ti ho messo la sveglia alle sette e mezza.',
+  ]) assert.deepEqual(AD.rileva(frase, new Set(), stato), [], frase);
+  // Un'ora che non esiste resta una dichiarazione da verificare.
+  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia per le 22.', new Set(), stato)), ['sveglia']);
 });
 
 test('scatta anche quando l\'azione del turno è di un\'altra famiglia', () => {
@@ -115,7 +174,7 @@ test('la cronologia regge una dichiarazione su un turno precedente', () => {
   ];
   const tipi = AD.tipiDallaCronologia(cronologia);
   assert.ok(tipi.has('SVEGLIA'));
-  assert.deepEqual(AD.rileva('Sì, te l\'ho messa alle 7.', tipi), []);
+  assert.deepEqual(AD.rileva('Sì, te l\'ho messa alle 7.', tipi, { orariSveglie: ['07:00'] }), []);
   // Ma una cronologia senza azioni non regge niente.
   assert.deepEqual(
     ids(AD.rileva('Sì, ti ho messo la sveglia alle 7.', AD.tipiDallaCronologia([{ role: 'filo', text: 'ciao' }]))),
@@ -198,7 +257,10 @@ test('la conferma col pronome viene vista, e tace appena un\'azione c\'è', () =
     'Te l’ho messa alle 19.',
   ]) {
     assert.deepEqual(ids(AD.rileva(frase, [])), ['senza-nome'], frase);
-    assert.deepEqual(AD.rileva(frase, [{ type: 'SVEGLIA' }]), [], `${frase} (con un'azione nel turno)`);
+    assert.deepEqual(
+      AD.rileva(frase, [{ type: 'SVEGLIA' }], { orariSveglie: ['19:00'] }),
+      [], `${frase} (con l'azione nel turno e la sveglia che ne è nata)`,
+    );
   }
   // Una famiglia che sa dire DI COSA si tratta vince: niente doppio avviso.
   assert.deepEqual(ids(AD.rileva('L\'ho aggiunta al calendario.', [])), ['calendario']);
@@ -245,7 +307,7 @@ test('un\'azione chiamata che non ha fatto nascere niente non copre la frase', (
   // Ma un'azione che ha prodotto qualcosa resta buona: una ricerca senza
   // risultati è comunque partita, e il comando che esce con un errore ha
   // stampato il suo output.
-  assert.deepEqual(AD.rileva(testo, [{ type: 'SVEGLIA', _executed: true }]), []);
+  assert.deepEqual(AD.rileva(testo, [{ type: 'SVEGLIA', _executed: true }], { orariSveglie: ['19:00'] }), []);
   assert.deepEqual(
     AD.rileva('Ho cercato sul web ma non ho trovato niente.', [{ type: 'CERCA_WEB', _executed: false, _output: { results: [] } }]),
     [],
@@ -257,7 +319,7 @@ test('un\'azione chiamata che non ha fatto nascere niente non copre la frase', (
 test('un\'azione di una specie non copre le altre', () => {
   // La sveglia parte, l'appunto no, e stanno nella stessa frase.
   assert.deepEqual(
-    ids(AD.rileva('Ti ho messo la sveglia alle 19 e ti ho salvato l\'appunto con la lista della spesa.', [{ type: 'SVEGLIA' }])),
+    ids(AD.rileva('Ti ho messo la sveglia alle 19 e ti ho salvato l\'appunto con la lista della spesa.', [{ type: 'SVEGLIA' }], { orariSveglie: ['19:00'] })),
     ['appunto'],
   );
   assert.deepEqual(
@@ -273,13 +335,13 @@ test('un\'azione di una specie non copre le altre', () => {
 test('un\'azione sola non regge due dichiarazioni diverse', () => {
   // La sveglia parte; della spesa, dichiarata col pronome, non resta niente.
   assert.deepEqual(
-    ids(AD.rileva('Ho messo la sveglia alle 19, e te l\'ho segnata.', [{ type: 'SVEGLIA' }])),
+    ids(AD.rileva('Ho messo la sveglia alle 19, e te l\'ho segnata.', [{ type: 'SVEGLIA' }], { orariSveglie: ['19:00'] })),
     ['senza-nome'],
   );
   // Ma lo stesso fatto detto due volte resta un fatto solo: stesso verbo,
   // nessun avviso.
   assert.deepEqual(
-    AD.rileva('Ho messo la sveglia alle 19. Te l\'ho messa per tutte e tre le notti.', [{ type: 'SVEGLIA' }]),
+    AD.rileva('Ho messo la sveglia alle 19. Te l\'ho messa per tutte e tre le notti.', [{ type: 'SVEGLIA' }], { orariSveglie: ['19:00'] }),
     [],
   );
 });
@@ -473,7 +535,7 @@ test('il testo consegnato nella risposta non è un\'azione mancata', () => {
 
 test('una cosa dichiarata accanto a una fatta davvero non sparisce', () => {
   const sveglia = [{ type: 'SVEGLIA', _executed: true }];
-  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia alle 19 e ti ho segnato la spesa.', sveglia)), ['appunto']);
+  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia alle 19 e ti ho segnato la spesa.', sveglia, { orariSveglie: ['19:00'] })), ['appunto']);
   // «Segnare» in calendario è un'altra cosa, e ha la sua famiglia.
   assert.deepEqual(ids(AD.rileva('Ti ho segnato l\'evento in calendario per domani.', [])), ['calendario']);
 });

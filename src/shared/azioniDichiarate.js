@@ -554,6 +554,22 @@
     return !!(a._output || a._confirm || a._kept);
   }
 
+  // Le azioni CHIAMATE il cui effetto non c'è ancora: quelle in attesa
+  // dell'OK dell'utente e quelle che il main ha TENUTO come bottone da
+  // premere. Filo ha fatto tutto quello che poteva fare, ma la sveglia a
+  // quell'ora ancora non esiste: lì l'ora non può fare da prova, o l'avviso
+  // accuserebbe Filo di non aver fatto una cosa che sta aspettando l'utente.
+  function tipiInAttesa(azioni) {
+    const out = new Set();
+    for (const a of (Array.isArray(azioni) ? azioni : [])) {
+      if (!a || typeof a !== 'object') continue;
+      if (!(a._confirm || (a._kept && a._executed === false))) continue;
+      const t = String((a.type || a.tipo) || '').toUpperCase();
+      if (t) out.add(t);
+    }
+    return out;
+  }
+
   function insiemeDiTipi(azioni) {
     const out = new Set();
     for (const a of (Array.isArray(azioni) ? azioni : [])) {
@@ -593,6 +609,10 @@
       ? new Set(opzioni.famiglie instanceof Set ? [...opzioni.famiglie] : opzioni.famiglie)
       : null;
     const orari = new Set(Array.isArray(stato?.orariSveglie) ? stato.orariSveglie : []);
+    const attesaDaStato = stato && stato.tipiInAttesa;
+    const attesa = new Set(attesaDaStato
+      ? (attesaDaStato instanceof Set ? [...attesaDaStato] : attesaDaStato)
+      : tipiInAttesa(azioni));
     const titoli = Array.isArray(stato?.titoliAppunti) ? stato.titoliAppunti : [];
     // La cosa dichiarata ESISTE già, anche se in questo turno non è partito
     // niente? Vale per l'ora di una sveglia che c'è e per il titolo di un
@@ -619,6 +639,9 @@
     const oraDecide = (fam, d) => {
       const creazione = fam.oreProva || (fam.pronome && VERBI_CHE_CREANO.has(d.verbo));
       if (!fam.orari || !creazione) return null;
+      // Un'azione di questa famiglia sta aspettando l'utente: l'effetto non
+      // c'è ancora, e l'ora non può fare da prova.
+      if (attesa.size && (fam.pronome || fam.tipi.some((x) => attesa.has(x)))) return null;
       const nominati = orariNelTesto(d.frase);
       if (!nominati.size) return null;
       // TUTTE le ore nominate, non una: «ti ho messo la sveglia alle 19 e
@@ -640,7 +663,13 @@
       if (!d) continue;
       if (fam.pronome) { pronome = d; continue; }
       const ora = oraDecide(fam, d);
-      if (ora === true) { if (d.verbo) radiciRette.add(d.verbo); continue; }
+      if (ora === true) {
+        // L'azione che l'ha fatta, se c'è, resta impegnata qui: non può
+        // reggere anche la dichiarazione dopo, detta col pronome.
+        for (const x of fam.tipi) if (presenti.has(x)) impegnati.add(x);
+        if (d.verbo) radiciRette.add(d.verbo);
+        continue;
+      }
       if (ora === false) {
         out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
         continue;
@@ -887,6 +916,7 @@
     TIPI_DI_SOLA_LETTURA,
     rileva,
     insiemeDiTipi,
+    tipiInAttesa,
     tipiDallaCronologia,
     orariNelTesto,
     formatoSospetto,
