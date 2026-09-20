@@ -640,6 +640,23 @@
     return false;
   }
 
+  // Dove comincia, dentro una riga, un pezzo di formato macchina. Le buste
+  // esplicite valgono ovunque nella riga: «Ok. <tool_call>{…}</tool_call>»
+  // sulla stessa riga della prosa è lo stesso turno buttato. Una graffa o una
+  // quadra invece contano solo a inizio riga, perché in mezzo a una frase sono
+  // punteggiatura.
+  const BUSTE = /<\s*\/?\s*(?:tool_call|tool▁call|tool_use|function_call|function_calls|invoke|antml:invoke)\b|<\|[^|>]{0,32}tool[^|>]{0,32}\|>|\[TOOL_CALLS\]/i;
+
+  function inizioFormato(riga, primaRigaLibera) {
+    const busta = riga.search(BUSTE);
+    if (busta >= 0) return busta;
+    // Sulla prima riga, fuori da un recinto, l'inizio del testo l'ha già
+    // guardato `nudo`: qui cercheremmo la stessa cosa due volte.
+    if (primaRigaLibera) return -1;
+    const m = riga.match(/^\s*(?:[[{]|(?:functions?|tools?)\s*\.\s*[A-Z]|[A-Z][A-Z_]{3,}\s*[{(])/);
+    return m ? m[0].length - m[0].trimStart().length : -1;
+  }
+
   function formatoSospetto(testo, nomiStrumenti) {
     const grezzo = String(testo || '').trim();
     if (!grezzo) return false;
@@ -648,18 +665,24 @@
     const righe = grezzo.split('\n');
     // Tutta la risposta è formato macchina, anche se recintata coi tre apici:
     // una risposta che è SOLO un involucro non è mai un esempio per l'utente.
-    const nudo = grezzo.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    const nudo = grezzo.replace(/^```[a-z_]*\s*/i, '').replace(/```\s*$/, '').trim();
     if (involucro(nudo, nomi)) return true;
     // Il formato macchina in coda, dopo la risposta per l'utente. Si parte da
-    // ogni riga che potrebbe aprirlo e si guarda da lì alla fine.
+    // ogni riga che potrebbe aprirlo e si guarda da lì alla fine. Le righe
+    // dentro un recinto di tre apici si guardano come le altre: un modello
+    // abituato a recintare i blocchi di codice ci mette dentro anche la
+    // chiamata, e prima bastavano tre apici perché il turno passasse intero.
     let recinto = false;
+    let apertura = -1;
     for (let i = 0; i < righe.length; i++) {
-      if (/^\s*```/.test(righe[i])) { recinto = !recinto; continue; }
-      if (i === 0 || recinto) continue;
-      const riga = righe[i].trimStart();
-      if (!/^[[{<]|^(?:functions?|tools?)\s*\.\s*[A-Z]|^[A-Z][A-Z_]{3,}\s*[{(]/.test(riga)) continue;
-      if (annunciatoComeEsempio(righe, i)) continue;
-      const coda = righe.slice(i).join('\n').trim().replace(/```[\s\S]*$/, '').trim();
+      if (/^\s*```/.test(righe[i])) { recinto = !recinto; apertura = recinto ? i : -1; continue; }
+      // Un esempio annunciato resta un esempio. Fuori dal recinto conta la
+      // riga prima del pezzo; dentro, la riga prima dei tre apici.
+      if (annunciatoComeEsempio(righe, recinto ? apertura : i)) continue;
+      const da = inizioFormato(righe[i], i === 0 && !recinto);
+      if (da < 0) continue;
+      const coda = [righe[i].slice(da), ...righe.slice(i + 1)].join('\n')
+        .trim().replace(/```[\s\S]*$/, '').trim();
       if (involucro(coda, nomi)) return true;
     }
     return false;
