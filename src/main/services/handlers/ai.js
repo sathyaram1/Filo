@@ -600,7 +600,12 @@ module.exports = function register(on, ctx) {
   // chiede qui, e la richiesta parte dal cancello unico come ogni altra.
   // La chiave arriva nel messaggio perché in Opzioni la si sta ancora
   // digitando; è facoltativa, il catalogo è pubblico.
-  on(MSG.MODELS_CATALOG, async (msg) => {
+  // Solo le pagine di Filo: una pagina web non deve poter far partire una
+  // richiesta a un fornitore passando da qui.
+  on(MSG.MODELS_CATALOG, async (msg, sender, origin) => {
+    if (!String(origin || '').startsWith('filo://') && !sender?.isShell) {
+      return { ok: false, error: 'forbidden', items: [] };
+    }
     try {
       const provider = msg?.provider || 'openrouter';
       const items = await Gate.listCatalog({ provider, apiKey: String(msg?.apiKey || '').trim() });
