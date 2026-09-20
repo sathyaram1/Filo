@@ -1567,6 +1567,55 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const detail = Caps ? Caps.renderDetailForPrompt(ids) : '';
         return { executed: true, kept: true, output: { capabilities: ids, detail } };
       }
+      case 'CERCA_CHAT': {
+        // #525 — l'archivio delle chat passate, per «riprendi la discussione
+        // di ieri sulla coscienza». Due passi come LEGGI_FILE: prima l'elenco
+        // di cosa combacia, poi — se serve — una conversazione per intero.
+        // Sola lettura.
+        const query = String(action.query ?? action.testo ?? action.q ?? '').trim();
+        const id = String(action.id ?? action.chatId ?? '').trim();
+        try {
+          if (id) {
+            const chat = await FiloChats.get(id);
+            if (!chat) return { executed: false, kept: true, output: { chatRead: id, found: false } };
+            return {
+              executed: true,
+              kept: true,
+              output: {
+                chatRead: id,
+                found: true,
+                title: chat.title || ChatArchive.fallbackTitle(chat.messages),
+                date: chat.closedAt || chat.updatedAt || chat.startedAt || null,
+                // La trascrizione arriva già nella forma "Utente: … / Filo: …",
+                // con testa e coda se è lunghissima (mai un taglio muto).
+                transcript: ChatArchive.transcriptForTriage(chat.messages, 8000),
+              },
+            };
+          }
+          const all = await FiloChats.list();
+          // Solo le chat CHIUSE: quella in corso è già davanti al modello
+          // (è la conversazione di adesso) e ritrovarcela come "risultato"
+          // gliela farebbe raccontare all'utente come un ricordo.
+          const closed = all.filter((c) => c && c.closedAt);
+          const found = ChatArchive.search(closed, query, { limit: 8 });
+          return {
+            executed: true,
+            kept: true,
+            output: {
+              chatSearch: query,
+              results: found.map((c) => ({
+                id: c.id,
+                title: c.title || ChatArchive.fallbackTitle(c.messages),
+                date: c.closedAt || c.updatedAt || null,
+                kind: c.kind || null,
+                snippet: ChatArchive.snippetFor(c, query),
+              })),
+            },
+          };
+        } catch (e) {
+          return { executed: false, kept: true, output: { chatSearch: query, results: [], error: e?.message || String(e) } };
+        }
+      }
       case 'LEGGI_FILE': {
         // #379.5 — lettura ON-DEMAND del contenuto completo di un file
         // dell'editor. Filo vede solo i riassunti; quando decide che vale la pena
