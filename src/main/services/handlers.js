@@ -1719,6 +1719,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             pages: r.pages || 0,
             empty: !!r.empty,
             truncated: !!r.truncated,
+            // Con quale tabella il testo è stato letto e quanti byte il file
+            // aveva rotti: un documento bucato non deve arrivare al modello
+            // come se fosse intero (#551, sesto giro).
+            codifica: r.codifica || '',
+            bytesPersi: r.bytesPersi || 0,
             text: r.text || '',
             error: r.error || null,
             detail: r.detail || '',
