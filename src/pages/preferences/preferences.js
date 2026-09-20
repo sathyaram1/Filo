@@ -643,11 +643,8 @@
     synth.speak(u);
   }
 
-  // ── Suoneria timer (anteprima tramite WebAudio API) ─────────────────────
-  // Stesso catalogo della dashboard (RINGTONES): riproduce una sequenza di
-  // beep senza file audio. Usato dal pulsante "Prova" in questa pagina.
-  // I toni (sequenze di note + player AudioContext) vivono nel modulo condiviso
-  // SN_SOUNDS, riusato anche dalla shell per il suono delle notifiche (#170.1).
+  // I motivi stanno in SN_SOUNDS e basta: l'anteprima qui, le notifiche della
+  // shell e la suoneria di timer e sveglie devono suonare gli stessi.
   const Sounds = window.SN_SOUNDS;
 
   // Riempie il <select> dei suoni notifica con le stesse voci della suoneria.
