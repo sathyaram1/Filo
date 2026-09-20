@@ -88,6 +88,14 @@
     </form>
   </main>
 
+  <!-- Le parti della home, PRIMA di dashboard.js: si registrano su globalThis
+       e restano ferme finché dashboard.js non le inizializza con le sue
+       dipendenze. Nessuna tocca il DOM al caricamento, quindi l'ordine fra
+       loro non conta — conta solo che vengano prima. -->
+  <script src="dashboard-attivita.js"></script>
+  <script src="dashboard-onboarding.js"></script>
+  <script src="dashboard-comandi.js"></script>
+  <script src="dashboard-terminale.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -195,7 +195,16 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // devono avere una capacità che cita QUEL indirizzo: drift #387: il Red Team
   // era a un click dalla home ma non compariva affatto nel manifesto, così
   // l'agente diceva di non saperlo fare.
-  const dash = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard.js'), 'utf8');
+  // La home non è più un file solo: le icone stanno in dashboard.js, i comandi
+  // con lo slash (che aprono Preferenze, Sicurezza, l'Editor) in
+  // dashboard-comandi.js, i bottoni sotto le risposte in dashboard-attivita.js.
+  // Le leggiamo tutte: una strada per una pagina filo:// va coperta dal
+  // manifesto da qualunque parte della home parta, e un pezzo spostato in un
+  // file nuovo non deve uscire in silenzio da questo controllo.
+  const dash = readdirSync(join(ROOT, 'src', 'pages', 'dashboard'))
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => readFileSync(join(ROOT, 'src', 'pages', 'dashboard', f), 'utf8'))
+    .join('\n');
   // Le pagine dell'OWNER non stanno nel manifesto, e non devono starci: il
   // manifesto dice a un utente qualunque cosa sa fare Filo, e la posta delle
   // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
