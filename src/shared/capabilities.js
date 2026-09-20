@@ -397,6 +397,12 @@
       doesNot: 'Non suona se Filo è completamente chiuso: il browser deve restare in esecuzione (va bene anche ridotto a icona). Per svegliarti al mattino affidati anche a una sveglia vera. La ripetizione va a giorni della settimana: non sa fare "ogni due settimane" o "il primo del mese".',
     },
     {
+      id: 'filo-calendar-event', title: 'Eventi nel tuo calendario', category: 'assistant',
+      desc: 'Chiedi a Filo un appuntamento ("segna la riunione di giovedì alle 15") e lui te lo prepara: sotto la risposta compare il bottone «Aggiungi al calendario», che apre l’evento — con titolo, giorno, ora, durata e note — nel programma di calendario del tuo computer, dove lo salvi.',
+      invoke: 'Chiedilo a parole all’assistente della nuova scheda; poi clicca «Aggiungi al calendario».',
+      doesNot: 'Filo non ha un calendario suo e non entra nel tuo: prepara l’evento e lo passa al programma che usi. Non legge gli appuntamenti che hai già, quindi non sa dirti se sei libero, e non modifica né cancella quelli esistenti. Se il computer non ha nessun calendario, Filo ti dice dov’è il file dell’evento.',
+    },
+    {
       id: 'filo-notifications', title: 'Avvisi di Filo', category: 'assistant',
       desc: 'Filo può mostrarti dei brevi avvisi in alto nella nuova scheda (promemoria o segnalazioni discrete) che puoi chiudere quando li hai visti.',
       invoke: 'Compaiono in alto nella nuova scheda; chiudili con la loro "X".',
