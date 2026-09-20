@@ -63,8 +63,13 @@
   // della home. Prima era un mucchio solo, che valeva come «fatto adesso» per
   // sempre: la prima segnalazione mandata davvero copriva ogni segnalazione
   // raccontata dopo, e la seconda non partiva senza che nessuno lo dicesse.
-  const azioniFiloEmesse = new Set();
+  let azioniFiloEmesse = new Set();
   let azioniDelTurno = new Set();
+  // #517 (giro 8) — le famiglie su cui l'avviso è già comparso in questa
+  // conversazione. Da lì in poi un'azione emessa prima non le copre più:
+  // senza, bastava che il modello ripetesse la stessa cosa con un «già»
+  // davanti perché il pannello tacesse.
+  let famiglieMancate = new Set();
   // La domanda a cui il modello sta rispondendo: «l'hai mandata?» è un'altra
   // cosa da «me la mandi?», e solo la prima lascia che un'azione di prima
   // regga la risposta.
