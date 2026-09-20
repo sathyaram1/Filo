@@ -64,7 +64,7 @@ async function chiaveNelPortafoglio(app, chiave = CHIAVE_DELL_INVITO) {
 // spedisce quando l'invito va a buon fine.
 async function avvisoCreditiCambiati(app) {
   await app.evaluate(() => {
-    globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.CREDITS_CHANGED });
+    globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED });
   });
 }
 
