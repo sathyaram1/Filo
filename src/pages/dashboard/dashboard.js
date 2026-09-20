@@ -223,8 +223,37 @@
     } catch (_) {}
   }
 
+  // ===== Archivio delle chat (#525) =====
+  //
+  // La targa si crea al primo messaggio, non all'apertura della scheda: una
+  // home aperta e mai usata non è una conversazione e non deve comparire in
+  // Cronologia.
+  function ensureChatId() {
+    if (!chatId) {
+      chatId = (self.crypto && self.crypto.randomUUID)
+        ? self.crypto.randomUUID()
+        : `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    }
+    return chatId;
+  }
+
+  // Chiude la chat in corso: il main fissa la data di chiusura e fa partire la
+  // classificazione (titolo breve + conversazione/comando). Non si aspetta la
+  // risposta — chi è appena tornato alla home non deve stare fermo mentre un
+  // modello legge la chat di prima.
+  function closeCurrentChat() {
+    if (!chatId) return;
+    const id = chatId;
+    chatId = null;
+    try { send({ type: MSG.FILO_CHAT_CLOSE, id }); } catch (_) {}
+  }
+
   // ===== Stato UI =====
   function goHome() {
+    // Tornare alla home CHIUDE la chat: è il gesto che la finisce, insieme a
+    // "chat nuova" e alla chiusura dell'app. Prima di svuotare le bolle,
+    // perché da qui in poi la conversazione non esiste più in questa pagina.
+    closeCurrentChat();
     body.dataset.state = 'home';
     homeView.hidden = false;
     threadView.hidden = true;
