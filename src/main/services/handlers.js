@@ -3022,7 +3022,17 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   // Senza un modello servibile: messaggio istantaneo dalle pagine salvate.
   if (!inputs.canServe) {
     const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
+    await FiloMem.setDashboardCache({ ...payload, noAi: true, signature: inputs.signature });
+    return { ...payload, cached: false, ts: new Date().toISOString() };
+  }
+
+  // In cache c'è la home di quando Filo non poteva rispondere, ma adesso può:
+  // quel messaggio manderebbe a riscattare un invito già riscattato. Si serve
+  // subito il saluto neutro e la home vera arriva dal giro in background.
+  if (cached && cached.noAi && !force) {
+    const payload = buildWaitingDashboard(inputs.saved);
     await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature });
+    dashboardScheduler().request(openTabsCount);
     return { ...payload, cached: false, ts: new Date().toISOString() };
   }
 
