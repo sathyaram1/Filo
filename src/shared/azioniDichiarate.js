@@ -646,7 +646,7 @@
   // virgolette direbbe comunque la sua. Serve che davanti alla citazione ci
   // sia il verbo di chi riporta le parole di un altro.
   const APERTURE = { '«': '»', '"': '"', '“': '”', '‘': '’' };
-  const RIPORTA = /\b(?:scritt[oa]|dett[oa]|dice|dici|dire|scrivere|frase|frasi|esempi\w*|parole|risposta|risposte|suona|suonerebbe|tipo)\b[^«"“]{0,24}$/i;
+  const RIPORTA = /\b(?:scritt[oa]|dett[oa]|dice|dici|dire|scrivere|frase|frasi|esempi\w*|parole|risposta|risposte|risponde|rispondere)\b[^«"“]{0,24}$/i;
   function dentroUnaCitazione(testo, indice) {
     let apre = -1;
     let chiusura = '';
