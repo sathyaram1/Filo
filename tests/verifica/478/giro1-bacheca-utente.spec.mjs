@@ -275,7 +275,9 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
   for (const tema of ['dark', 'light']) {
     for (const [verso, { testo, fondo }] of Object.entries(misure[tema])) {
       const r = contrasto(testo, fondo);
-      expect(r, `voto «${verso}» già dato, tema ${tema}: contrasto ${r.toFixed(2)}`)
+      // `soft`: i quattro casi si vogliono TUTTI nel resoconto, non solo il
+      // primo che cade — il rilievo è «quali dei due versi, in quale tema».
+      expect.soft(r, `voto «${verso}» già dato, tema ${tema}: contrasto ${r.toFixed(2)}`)
         .toBeGreaterThan(3);
     }
   }
