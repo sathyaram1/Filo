@@ -287,9 +287,8 @@ async function main() {
   }
 }
 
-// Apre un feedback quando la costruzione sta per produrre una versione monca.
-// Porta le STESSE righe del registro: chi apre il feedback deve poter agire da
-// lì, senza risalire ai log della costruzione (#642).
+// Apre un feedback quando la costruzione sta per produrre una versione monca,
+// con le STESSE righe del registro: da lì si deve poter agire senza cercare i log.
 async function avvisa(mancanti, righe) {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
   if (!passphrase) return;
