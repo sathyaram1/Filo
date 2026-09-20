@@ -266,7 +266,7 @@
     SVEGLIA: (n) => (n > 1 ? `impostato ${n} sveglie` : 'impostato una sveglia'),
     CANCELLA_SVEGLIA: () => 'cancellato una sveglia',
     MODIFICA_SVEGLIA: () => 'spostato una sveglia',
-    EVENTO_CALENDARIO: (n) => (n > 1 ? `creato ${n} eventi` : 'creato un evento'),
+    EVENTO_CALENDARIO: (n) => (n > 1 ? `proposto ${n} eventi` : 'proposto un evento'),
     ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
     IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
     IMPOSTA_ESTETICA: (n) => (n > 1 ? `cambiato ${n} dettagli dell'aspetto` : 'cambiato l\'aspetto'),
