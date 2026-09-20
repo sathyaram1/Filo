@@ -309,8 +309,9 @@ test('leggere è sempre libero: le azioni di sola lettura hanno costo 0 e dichia
   assert.equal(AL.costoFor({ type: 'LEGGI_TRASPARENZA', doc: 'modelli' }), 0);
   // Quello che un comando stampa entra nel contesto come tutto il resto.
   assert.equal(AL.fonteFor({ type: 'ESEGUI_COMANDO', comando: 'ls' }), 'comando');
-  // Aprire un link non porta niente dentro: non è una fonte.
-  assert.equal(AL.fonteFor({ type: 'NAVIGA', url: 'https://x.it' }), null);
+  // Aprire un link lascia una scheda aperta, e il suo titolo — scritto dal
+  // sito — sta nel riepilogo di stato di ogni turno dopo.
+  assert.equal(AL.fonteFor({ type: 'NAVIGA', url: 'https://x.it' }), 'schede');
 });
 
 test('elenco fisso: cancellare la memoria non lo fa Filo, e dice dove si fa', () => {
