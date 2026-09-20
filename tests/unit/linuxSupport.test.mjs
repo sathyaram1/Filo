@@ -242,7 +242,7 @@ test('su Linux, un aggiornamento che non si installa diventa un avviso leggibile
   // Il file nuovo arriva dal browser senza il permesso di essere eseguito,
   // come il primo: se l'avviso non lo dice, l'utente sbatte contro lo stesso
   // muro una seconda volta, e stavolta senza il foglietto del download.
-  assert.match(n.text, /esegu/i,
+  assert.match(n.text, /esecuzione|esegui/i,
     'l\'avviso dice di sostituire il file ma non di ridargli il permesso di esecuzione: il doppio clic non partirà');
   // Il marcatore serve a noi, non all'utente: non deve finire nel testo.
   assert.ok(!/aggiornamento-linux/.test(n.text), 'un marcatore interno è finito sotto gli occhi dell\'utente');
