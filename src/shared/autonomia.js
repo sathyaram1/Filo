@@ -449,6 +449,7 @@
       livello: liv,
       fonte: peggiore,
       motivo: motivoPer({ regola, stato, fonte: peggiore, fissa, livello: liv }),
+      uscita: uscitaPer({ risposta, regola }),
     };
   }
 
