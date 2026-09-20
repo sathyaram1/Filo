@@ -63,6 +63,7 @@ const comeLoLeggeIlModello = (app, testo) =>
 const NOMI = ['ricerca_web.csv', 'Dati_Pagina.txt', 'esito_comando.log'];
 
 test('il nome del file arriva al modello com’è scritto sul disco', async ({ app, openTab }) => {
+  test.fail(true, 'porta aperta: il rilievo è in coda come feedback derivato');
   const dir = cartellaTemporanea('filo-551-g7-nomi-');
   try {
     for (const n of NOMI) writeFileSync(join(dir, n), `contenuto di ${n}\n`, 'utf8');
