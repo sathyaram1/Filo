@@ -107,3 +107,60 @@ test('nomi limite dal modello: niente vicoli ciechi e niente blocchi finti nel p
     expect(String(r.output.doc || '').length).toBeLessThanOrEqual(121);
   }
 });
+
+// Il documento non deve arrivare al modello tagliato: lo strumento gli ordina
+// di rispondere CITANDO il testo, e la prima cosa che un taglio porta via è
+// l'elenco delle fonti in fondo, cioè proprio quello che si cita. Il tetto era
+// a 16.000 caratteri su un documento di 20.001 (#515, giro 1).
+test('il documento rientra nel prompt intero, fonti comprese', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
+  const page = await (async () => {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+      if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('newtab non trovata');
+  })();
+  await expect(page.locator('#input')).toBeVisible();
+
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  await app.evaluate(() => {
+    globalThis.__calls = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
+      const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)) });
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      if (n === 1) {
+        try { onToolCall && onToolCall({ id: 't1', name: 'LEGGI_TRASPARENZA' }); } catch (_) {}
+        return {
+          ...base, text: '',
+          toolCalls: [{ id: 't1', name: 'LEGGI_TRASPARENZA', arguments: '{"doc":"models"}' }],
+          reasoningDetails: [], finishReason: 'tool_calls',
+        };
+      }
+      try { onDelta && onDelta('Ecco.'); } catch (_) {}
+      return { ...base, text: 'Ecco.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+
+  await page.locator('#input').fill('su cosa ti basi per dire queste cose sui laboratori?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco.' })).toBeVisible({ timeout: 20_000 });
+
+  const calls = await app.evaluate(() => globalThis.__calls);
+  const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
+  const intero = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('models'));
+  expect(tool.content, 'il documento arriva tagliato').not.toContain('documento troncato');
+  expect(tool.content.length).toBeGreaterThanOrEqual(intero.length);
+  expect(tool.content).toContain('Fonti:');
+});

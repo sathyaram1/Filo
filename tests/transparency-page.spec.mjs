@@ -102,3 +102,28 @@ test('un link a una fonte apre una scheda e non porta via la pagina interna', as
   // non ha navigato via la pagina interna.
   expect(page.url()).toBe(before);
 });
+
+// 5. una sezione chiesta nell'indirizzo ma non ancora scritta: la pagina lo
+//    dice. Prima mostrava il documento sui modelli lasciando nell'indirizzo il
+//    nome di quella chiesta, e chi arrivava da un link che prometteva la
+//    privacy leggeva la politica sui modelli credendo fosse quella (#515).
+test('una sezione non ancora scritta lo dice, invece di mostrarne un\'altra al suo posto', async ({ app, openTab }) => {
+  const esistenti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.ids());
+  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id));
+  const mancante = previsti.find((i) => !esistenti.includes(i));
+  test.skip(!mancante, 'tutte le sezioni hanno il loro documento');
+
+  const page = await openTab(`${URL}?doc=${mancante}`);
+  await expect(page.locator('#title')).not.toHaveText('Politica sui modelli');
+  await expect(page.locator('#subtitle')).toContainText('non è ancora scritta');
+  // E la via d'uscita: da qui si arriva a quello che invece c'è scritto.
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+  await expect(page.locator('.sn-nav-item.is-active')).toHaveCount(1);
+});
+
+test('un documento che non esiste per niente non diventa un altro documento', async ({ openTab }) => {
+  const page = await openTab(`${URL}?doc=pippo`);
+  await expect(page.locator('#title')).not.toHaveText('Politica sui modelli');
+  await expect(page.locator('#subtitle')).toContainText('non esiste');
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+});
