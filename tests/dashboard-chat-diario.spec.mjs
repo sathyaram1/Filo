@@ -29,10 +29,13 @@
 //      un'impostazione, e il bottone diventa una ricevuta invece di ripetere
 //      «Filo vuole…» con la spunta davanti.
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, fillConfirmInput, CONFIRM_HOST } from './helpers/confirm.mjs';
+
+// Un evento vecchio piantato nella cartella: serve a G per vedere la ripulita.
+const VECCHIO = 'vecchio-di-ieri.ics';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -359,6 +362,8 @@ test('F — «portami alla home» chiesto dalla home non ricarica niente: lavoro
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
   await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Sei già nella home' })).toHaveCount(1);
+  // E il titolo del blocco non conta un comando che non ha fatto niente.
+  await expect(activity.locator('.dash-activity-label')).not.toContainText('azionato un comando della finestra');
 
   // E la home vuota resta a un click, quando l'utente ha finito di leggere.
   const torna = page.locator('.dash-action-btn', { hasText: 'Torna alla home' });
@@ -401,6 +406,13 @@ test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app,
   await expect(riga).toContainText('24/09/2026 alle 15:00');
   await expect(riga).not.toContainText('Evento creato');
 
+  // Un evento di ieri, per vedere se la cartella si ripulisce.
+  const cartella = join(await app.evaluate(({ app: elApp }) => elApp.getPath('temp')), 'filo-eventi');
+  mkdirSync(cartella, { recursive: true });
+  writeFileSync(join(cartella, VECCHIO), 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n');
+  const ieri = Date.now() - 48 * 60 * 60 * 1000;
+  utimesSync(join(cartella, VECCHIO), ieri / 1000, ieri / 1000);
+
   // Il bottone è vivo (prima era spento: la proposta non portava da nessuna
   // parte) e all'utente consegna l'evento.
   const btn = page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' });
@@ -411,6 +423,9 @@ test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app,
   // L'evento è davvero uscito da Filo: il file che il calendario apre esiste e
   // contiene quello che l'utente ha chiesto.
   const dir = join(await app.evaluate(({ app: elApp }) => elApp.getPath('temp')), 'filo-eventi');
+  // Gli eventi di ieri non restano lì per sempre: la cartella si ripulisce
+  // da sola a ogni aggiunta, altrimenti cresce a ogni uso.
+  expect(existsSync(join(dir, VECCHIO))).toBe(false);
   const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.ics')) : [];
   expect(files.length).toBeGreaterThan(0);
   const ultimo = files.map((f) => ({ f, t: statSync(join(dir, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0].f;

@@ -41,6 +41,10 @@ test('la home chiesta a metà lavoro non ricarica la pagina: lavoro e risposta r
   await activity.locator('.dash-activity-head').click();
   await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Timer avviato' })).toHaveCount(1);
   await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Sei già nella home' })).toHaveCount(1);
+  // Il riassunto conta il timer, non un comando che non ha fatto niente.
+  const titolo = await activity.locator('.dash-activity-label').textContent();
+  expect(titolo).toContain('avviato un timer');
+  expect(titolo).not.toContain('azionato un comando della finestra');
 
   // E tornarci lo decide l'utente, dopo aver letto.
   const torna = page.locator('.dash-action-btn', { hasText: 'Torna alla home' });
