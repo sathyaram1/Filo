@@ -14,5 +14,5 @@ file, la consultazione del manifesto capacità — sono **tracce scritte**
   Restano visibili — la trasparenza sui passi (#368) è un valore — ma non
   competono col risultato.
 - **Regola pratica:** se cliccarlo non fa niente, non deve *sembrare* cliccabile.
-- **Dove:** `stepTrace()` in `src/pages/dashboard/dashboard.js`, stile in
+- **Dove:** `stepTrace()` in `src/pages/dashboard/dashboard-attivita.js`, stile in
   `dashboard.css`. Test `tests/filo-open-background-tab.spec.mjs`.
