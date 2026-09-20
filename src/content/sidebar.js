@@ -184,6 +184,16 @@
     collapsed = false;
     aiPrefersOpen = false;
     session = null;
+    // #517 (giro 8) — chiudendo il pannello la conversazione finisce, e con
+    // lei quello che il presidio sa. Le azioni emesse prima restavano in un
+    // insieme che non si azzerava mai: riaperto il pannello, la conversazione
+    // ripartiva da zero ma una cosa fatta nella chat di prima continuava a
+    // reggere le frasi di quella nuova.
+    azioniFiloEmesse = new Set();
+    azioniDelTurno = new Set();
+    famiglieMancate = new Set();
+    domandaSuCosaFatta = false;
+    rimandiFuoriFormato = 0;
   }
 
   function open(context) {
