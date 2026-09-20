@@ -142,7 +142,7 @@ test('un numero storto non si salva e lo dice, senza toccare quello che c\'era',
     expect(await page.evaluate(() => window.__sessionsDoc.maxSessions)).toBe(4);
   }
   // Un numero buono dopo tutti quelli storti passa lo stesso.
-  await page.locator('#mgMaxSessions').fill('20');
+  await scriviNumero(page, '20');
   await page.locator('#mgMaxSessionsSave').click();
   await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
   expect(await page.evaluate(() => window.__sessionsDoc.maxSessions)).toBe(20);
