@@ -63,8 +63,8 @@ test('un documento arrivato a metà non viene dichiarato danneggiato', async ({ 
   test.setTimeout(60_000);
   await openTab('filo://newtab/');
 
-  const out = await app.evaluate(async (_e, b64) => {
-    const PR = require('./src/main/services/pageRead.js');
+  const out = await app.evaluate(async (_e, { b64, modulo }) => {
+    const PR = require(modulo);
     const intero = Buffer.from(b64, 'base64');
     const mezzo = intero.subarray(0, Math.floor(intero.length * 0.6));
     return {
