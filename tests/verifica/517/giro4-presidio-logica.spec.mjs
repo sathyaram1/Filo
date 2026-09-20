@@ -72,6 +72,14 @@ test('una congiunzione non è una negazione: la dichiarazione dopo si guarda', (
   expect(ids('Appena ho potuto ti ho messo la sveglia alle 19.')).toEqual(['sveglia']);
 });
 
+test('un appunto che esiste non è la prova di un promemoria che non esiste', () => {
+  // Il titolo di un appunto vale come prova che la cosa c'è. Basta però che
+  // la parola del titolo compaia nella frase: chi tiene un appunto intitolato
+  // «spesa» non viene più avvisato di nessun promemoria che nomini la spesa.
+  const conAppunto = { orariSveglie: [], titoliAppunti: ['spesa'] };
+  expect(ids('Ti ho messo il promemoria per la spesa alle 18.', [], conAppunto)).not.toEqual([]);
+});
+
 // ── C. il pronome che accusa un testo consegnato nella risposta ─────────────
 
 test('il testo consegnato nella risposta non è un\'azione mancata, anche senza «qui sotto»', () => {
