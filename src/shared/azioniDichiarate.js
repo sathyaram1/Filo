@@ -1120,7 +1120,14 @@
       // quando gli si dice di rifarla — perché il presidio tacesse.
       if (giaMancate.has(fam.id)) return false;
       if (!fam.tipi.some((x) => precedenti.has(x))) return false;
-      if (d.senzaHo) return true;
+      // Giro 9: la conferma senza «ho» aveva qui una corsia preferenziale —
+      // un'azione qualunque della sua specie fatta prima nella conversazione
+      // la reggeva, senza pretendere che la frase guardasse indietro. Così
+      // «Appunto salvato.», dopo un appunto scritto all'inizio, passava muto
+      // mentre «ti ho salvato l'appunto della spesa» nella stessa identica
+      // situazione veniva visto. La constatazione dello stato («la sveglia
+      // delle 7 è già impostata») esce già prima, in `dichiarazioni`: qui
+      // restavano solo le conferme vere e proprie.
       return domanda || GUARDA_INDIETRO.test(d.frase || '');
     };
     // Quante cose di questa famiglia i turni precedenti possono reggere.
