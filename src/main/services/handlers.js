@@ -2542,9 +2542,19 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // non una volta prima del turno. Adesso l'ora nominata nella frase è la
   // prova che la sveglia c'è: letta prima delle azioni, la sveglia appena
   // messa non ci sarebbe e Filo verrebbe smentito su una cosa che ha fatto.
-  const statoDichiarazioni = async () => ({
+  // #517 (giro 6) — l'utente sta facendo una DOMANDA? Allora una cosa fatta in
+  // un turno precedente regge la risposta che la racconta («l'hai mandata?» →
+  // «sì, l'ho mandata»). Detta come una cosa appena fatta, un'azione vecchia
+  // non prova niente: era così che un appunto scritto all'inizio assolveva
+  // ogni appunto raccontato dopo.
+  const domandaUtente = /\?/.test(String(userMessage || ''));
+  const statoDichiarazioni = async (azioniDelTurno) => ({
     orariSveglie: Dichiarate ? await orariDelleSveglie() : [],
     titoliAppunti: Dichiarate ? (fileList || []).map((f) => f && f.title).filter(Boolean) : [],
+    // Quante azioni di ciascun tipo sono partite adesso: due dichiarazioni
+    // della stessa specie vogliono due azioni, non una che le copre tutte.
+    contiAzioni: contaTipi(azioniDelTurno),
+    domandaUtente,
   });
   const conImmagini = imageList.length > 0;
   try {
