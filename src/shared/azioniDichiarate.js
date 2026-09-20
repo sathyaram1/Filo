@@ -1161,7 +1161,10 @@
       const ripete = pronome.verbo && radiciRette.has(pronome.verbo);
       // Il pronome non dice di cosa si tratta, quindi qualunque azione dei
       // turni prima può reggerlo: ma solo se la frase guarda indietro.
-      const daPrima = [...precedenti].some((x) => !NON_REGGONO_IL_PRONOME.has(x))
+      // Giro 8: e solo se su questa strada l'avviso non è già comparso in
+      // questa conversazione.
+      const daPrima = !giaMancate.has('senza-nome')
+        && [...precedenti].some((x) => !NON_REGGONO_IL_PRONOME.has(x))
         && (domanda || GUARDA_INDIETRO.test(pronome.frase || ''));
       if (!libere && !ripete && !daPrima && !esisteGia(PRONOME, pronome)) out.push(manca);
     }
