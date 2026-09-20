@@ -427,3 +427,61 @@ test('le parole con cui si dichiara restano riconosciute anche nelle varianti', 
   assert.deepEqual(ids(AD.rileva('Ti ho messo l\'allarme alle 19.', [])), ['sveglia']);
   assert.deepEqual(ids(AD.rileva('Ho segnato la spesa fra gli appunti.', [])), ['appunto']);
 });
+
+// ── Giro 4 della verifica ────────────────────────────────────────────────────
+
+test('il formato interno vale anche dentro i tre apici e sulla riga della prosa', () => {
+  // La risposta buona come preambolo e sotto la chiamata: senza recinto era
+  // già riconosciuta, con il recinto passava intera. Un modello abituato a
+  // recintare i blocchi di codice ci mette dentro anche la chiamata.
+  assert.equal(AD.formatoSospetto('Fatto! Ecco:\n[{"type":"SVEGLIA","time":"19:00"}]'), true);
+  assert.equal(AD.formatoSospetto('Fatto! Ecco:\n```json\n[{"type":"SVEGLIA","time":"19:00"}]\n```'), true);
+  assert.equal(AD.formatoSospetto('Ti metto la sveglia.\n```json\n{"text":"ok","actions":[{"type":"SVEGLIA"}]}\n```'), true);
+  // Sulla stessa riga della prosa è lo stesso turno buttato.
+  assert.equal(AD.formatoSospetto('Ok. <tool_call>{"name":"SVEGLIA","arguments":{}}</tool_call>'), true);
+  // Le altre due buste dei modelli aperti.
+  assert.equal(AD.formatoSospetto('[TOOL_CALLS][{"name":"SVEGLIA","arguments":{"ora":"19:00"}}]'), true);
+  assert.equal(AD.formatoSospetto('Ok.\n<|tool_call|>{"name":"SVEGLIA"}'), true);
+});
+
+test('un esempio annunciato non è un turno buttato, neanche recintato', () => {
+  assert.equal(AD.formatoSospetto('Ecco un esempio di come si scrive:\n```json\n{"type":"SVEGLIA"}\n```'), false);
+  assert.equal(AD.formatoSospetto('Il formato è questo:\n```json\n{"type":"SVEGLIA"}\n```'), false);
+  // E un JSON qualunque chiesto dall'utente non è una chiamata: il nome dentro
+  // «type» si confronta con gli strumenti veri.
+  assert.equal(AD.formatoSospetto('Eccolo:\n```json\n{"type":"utente","nome":"Marco"}\n```'), false);
+});
+
+test('una congiunzione non conta come negazione', () => {
+  // «invece», «prima» e «appena» raccontano QUANDO, non che non è successo.
+  assert.deepEqual(ids(AD.rileva('Non ho trovato l\'evento, invece ti ho messo la sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Prima ti ho messo la sveglia alle 19, poi ti dico il resto.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Appena ho potuto ti ho messo la sveglia alle 19.', [])), ['sveglia']);
+  // L'ipotesi vera resta fuori.
+  assert.deepEqual(AD.rileva('Se ho aperto la pagina sbagliata dimmelo.', []), []);
+  assert.deepEqual(AD.rileva('Non ho messo nessuna sveglia.', []), []);
+});
+
+test('il testo consegnato nella risposta non è un\'azione mancata', () => {
+  // L'utente fa riordinare una lista che sta in chat: la lista è la risposta,
+  // non esiste nessuno strumento che la mette in ordine alfabetico.
+  assert.deepEqual(AD.rileva('Te l\'ho messa in ordine alfabetico.', []), []);
+  assert.deepEqual(AD.rileva('Te l\'ho aggiunta alla lista.', []), []);
+  // La conferma che parla di un'ora resta una dichiarazione da verificare.
+  assert.deepEqual(ids(AD.rileva('Te l\'ho messa alle 19.', [])), ['senza-nome']);
+});
+
+test('una cosa dichiarata accanto a una fatta davvero non sparisce', () => {
+  const sveglia = [{ type: 'SVEGLIA', _executed: true }];
+  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia alle 19 e ti ho segnato la spesa.', sveglia)), ['appunto']);
+  // «Segnare» in calendario è un'altra cosa, e ha la sua famiglia.
+  assert.deepEqual(ids(AD.rileva('Ti ho segnato l\'evento in calendario per domani.', [])), ['calendario']);
+});
+
+test('un appunto che esiste non prova un promemoria a un\'ora che non esiste', () => {
+  const conAppunto = { orariSveglie: [], titoliAppunti: ['spesa'] };
+  // Il titolo regge la frase che lo nomina…
+  assert.deepEqual(AD.rileva('L\'ho salvato fra gli appunti della spesa.', [], conAppunto), []);
+  // …ma non una frase che promette un'ora: un'ora è una sveglia.
+  assert.deepEqual(ids(AD.rileva('Ti ho messo il promemoria per la spesa alle 18.', [], conAppunto)), ['promemoria']);
+});
