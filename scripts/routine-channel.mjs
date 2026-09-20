@@ -599,11 +599,24 @@ export async function compare(t, mine, opts) {
  * l'owner. Va portata fin qui, o chi legge il registro crede che il ramo sia
  * perduto proprio nel caso in cui invece basta un via libera.
  *
+ * `opts.sha` è il CONTENUTO su cui i due esiti ragionati erano stati dati:
+ * viaggia con la richiesta come già fa il cammino locale (`ownerMerge`), dove
+ * il server pretende che combaci con la punta vera e altrimenti risponde
+ * `stale`. Senza, l'ultimo passo del giro continua a parlare del nome del ramo
+ * mentre tutti i passi prima parlano di un commit, e il via libera resta buono
+ * anche dopo che il foglio è stato sostituito (feedback #485). La sicurezza
+ * non dipende dal fatto che il chiamante lo dichiari: la punta vera il server
+ * se la chiede comunque. Questo è il controllo in più, e il posto dove
+ * l'informazione arriva.
+ *
  * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha?, approval? }
  *           | { ok:false, reason }}
  */
 export async function merge(t, branch, opts) {
-  const { status, body } = await call('routineMerge', { ticket: t, branch: String(branch || '') }, opts);
+  const { sha = '', ...rest } = opts && typeof opts === 'object' ? opts : {};
+  const payload = { ticket: t, branch: String(branch || '') };
+  if (String(sha || '')) payload.sha = String(sha);
+  const { status, body } = await call('routineMerge', payload, rest);
   if (status === 200 && body && body.ok && body.result) {
     return {
       ok: true,
