@@ -687,6 +687,16 @@
     renderSuggestions();
   }
 
+  // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è
+  // ciò che l'utente aspetta al primo avvio; se resta chiusa (già fatta, o
+  // c'è una conversazione in corso) si rifà almeno il messaggio della home,
+  // che altrimenti continua a spiegare un silenzio finito (#663).
+  async function risvegliaHome() {
+    await Accoglienza.maybeOpenOnboardingLater();
+    if (Accoglienza.isActive() || document.body.dataset.state !== 'home') return;
+    await loadDashboard({ force: true });
+  }
+
   // ===== Bolle conversazione =====
   function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
