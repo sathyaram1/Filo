@@ -230,7 +230,6 @@ function passaggio(html, pota, dentroZona = false) {
     if (fuori.length) continue;
     if (BLOCCHI.has(nome)) pezzi.push('\n');
   }
-  testo(src.slice(i));
   return normalizzaTesto(pezzi.join(''));
 }
 
