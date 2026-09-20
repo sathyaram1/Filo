@@ -118,3 +118,36 @@ raggiunge nessuno, quindi non possono essere la truffa che arriva da una mail,
 e ognuno costava un giudizio del modello più una finestra nascosta puntata
 sulla rete privata di chi naviga. Il nome `localhost` era già escluso; un
 indirizzo numerico privato o un nome in `.local` no.
+
+**Il conto è di chi possiede il sito, non di chi possiede il dominio.** Il
+paragrafo qui sopra si fermava a metà strada. Tolto il verdetto dal dominio
+registrabile restava il conto, e su una piattaforma di siti ospitati quel conto
+è di tutti insieme: quattro sotto-indirizzi presi da chi attacca (gratuiti e
+illimitati) lo esaurivano, e da lì in poi nessun altro sito di quella
+piattaforma riceveva la verifica profonda, truffa vera compresa. La porta era
+la stessa del giro prima, allargata da un vicino a quattro. Un tetto condiviso
+fra estranei è un'arma in mano a chi lo esaurisce per primo: la chiave del
+conto dev'essere la parte che il controllo protegge. In Filo la dà
+`proprietario()` (`src/main/services/safebrowse/psl.js`): il dominio
+registrabile, o il sotto-indirizzo quando il dominio registrabile è una
+piattaforma multi-utente.
+
+Quell'elenco di piattaforme invecchia, e dare a ogni sotto-indirizzo il suo
+conto rimetterebbe in piedi la spruzzata sulle piattaforme che non conosce
+ancora. Quindi accanto al conto per proprietario ne va tenuto uno COMPLESSIVO,
+largo: quante verifiche costose in tutto nella stessa finestra di tempo.
+Entrambi i conti vogliono una finestra FISSA, che parte al primo gettone e
+scade da sola. Una cache con TTL non va bene: rimanda la scadenza a ogni
+scrittura, e chi tiene caldo il contatore tiene spento il controllo per sempre.
+
+**Lo stesso freno vale per ogni chiamata che parte da sola.** Il giudizio sui
+siti pericolosi aveva i suoi freni; il riconoscimento del blocco geografico,
+che parte allo stesso modo a ogni caricamento di pagina e sulla stessa chiave,
+non ne aveva nessuno: duecento percorsi diversi sullo stesso sito facevano
+duecento chiamate, e l'unico fondo era il tetto di spesa mensile, che esaurito
+spegne tutta l'AI di Filo per il resto del mese. Se una chiamata parte senza
+che l'utente la chieda, chi visita la pagina decide quante ne partono: il conto
+per proprietario più il tetto complessivo vanno messi lì come altrove. E se la
+stessa cosa viene campionata due volte (una a fine caricamento, una qualche
+secondo dopo), serve l'elenco delle chiamate in volo: il ricordo si scrive
+quando la risposta arriva, e un modello ci mette più di due secondi.
