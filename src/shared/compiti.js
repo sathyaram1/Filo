@@ -16,6 +16,10 @@
     sveglie: { label: 'mettere e togliere sveglie e timer' },
     appunti: { label: 'scrivere appunti' },
     memoria: { label: 'scrivere nella memoria di Filo' },
+    // Cancellare tutta la memoria non è «scrivere nella memoria»: chi legge
+    // «scrivere» e dice sì non sta concedendo di buttare via il profilo di
+    // anni (#533, secondo giro di verifica). Famiglia sua, frase sua.
+    oblio: { label: 'cancellare tutta la memoria di Filo' },
     schede: { label: 'aprire, archiviare o eliminare schede' },
     impostazioni: { label: 'cambiare le impostazioni di Filo' },
     aspetto: { label: 'cambiare l’aspetto di Filo o della pagina' },
