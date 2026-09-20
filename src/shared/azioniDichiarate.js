@@ -1265,6 +1265,14 @@
       const ora = oraDecide(PRONOME, pronome);
       if (ora === false) { out.push(manca); return out; }
       if (ora === true) return out;
+      // Giro 9 — di cosa parla il pronome lo dice la RICHIESTA. Se l'utente
+      // non ha chiesto niente che passi da uno strumento, «te l'ho tolta» e
+      // «te l'ho messa al plurale» consegnano il testo che sta lì sopra:
+      // buttare quella risposta, rifarla e poi smentirla era l'accusa più
+      // frequente di tutte, su uno dei primi usi della chat. Un'ora in
+      // mezzo alla frase resta una promessa comunque, e infatti decide
+      // prima di arrivare qui.
+      if (chiesto === false) return out;
       const libere = [...presenti].some((x) => !impegnati.has(x) && !NON_REGGONO_IL_PRONOME.has(x));
       const ripete = pronome.verbo && radiciRette.has(pronome.verbo);
       // Il pronome non dice di cosa si tratta, quindi qualunque azione dei
