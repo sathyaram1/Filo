@@ -174,7 +174,7 @@ test('diecimila caratteri nel campo non salvano niente e non bloccano la pagina'
 
 test('Invio nel campo salva come il pulsante (strade equivalenti)', async ({ openTab }) => {
   const page = await apriAutomazioni(openTab);
-  await page.locator('#mgMaxSessions').fill('9');
+  await scriviNumero(page, '9');
   await page.locator('#mgMaxSessions').press('Enter');
   await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
   expect(await page.evaluate(() => window.__sessionsDoc.maxSessions)).toBe(9);
