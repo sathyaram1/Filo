@@ -143,3 +143,58 @@ test('la navigazione elenca tutte e quattro le aree, anche quelle non ancora scr
   for (const n of T.NAV) assert.ok(html.includes(n.label), `la navigazione non mostra "${n.label}"`);
   assert.match(html, /is-soon/, 'le aree non ancora scritte devono comparire spente');
 });
+
+// #515 — La bugia non stava nella pagina (che le quattro aree le mostra, e
+// spegne quelle non scritte) ma nel PROMPT: lo strumento LEGGI_TRASPARENZA
+// dichiarava al modello quattro documenti quando ne esisteva uno. A «che fine
+// fanno i miei dati?» l'agente chiedeva «privacy» e tornava a mani vuote.
+// L'elenco adesso lo deriva da qui, e questi due test sorvegliano la derivazione
+// nei due versi: niente di promesso in più, niente di scritto dimenticato.
+function loadTools() {
+  delete globalThis.SN_ACTION_TOOLS;
+  const src = readFileSync(join(ROOT, 'src', 'shared', 'actionTools.js'), 'utf8');
+  // eslint-disable-next-line no-new-func
+  new Function(src).call(globalThis);
+  return globalThis.SN_ACTION_TOOLS;
+}
+
+function toolTrasparenza() {
+  const Tools = loadTools();
+  const def = Tools.definitions({ sistema: 'win32' })
+    .find((d) => d.function.name === 'LEGGI_TRASPARENZA');
+  assert.ok(def, 'LEGGI_TRASPARENZA non è più uno strumento del modello');
+  return def.function;
+}
+
+test('lo strumento della chat promette esattamente i documenti che esistono', () => {
+  const { T } = loadModules();
+  const fn = toolTrasparenza();
+  const ids = T.ids();
+  assert.ok(ids.length, 'nessun documento di trasparenza: il test non prova niente');
+  assert.deepEqual(fn.parameters.properties.doc.enum, ids,
+    'i valori ammessi dello strumento non sono i documenti che esistono');
+
+  const promesso = `${fn.description} ${fn.parameters.properties.doc.description}`;
+  for (const n of T.NAV) {
+    const re = new RegExp(`(^|[^a-z0-9_-])${n.id}([^a-z0-9_-]|$)`, 'i');
+    if (ids.includes(n.id)) {
+      assert.match(promesso, re, `il documento "${n.id}" esiste ma il prompt non lo nomina`);
+    } else {
+      assert.doesNotMatch(promesso, re,
+        `il prompt promette il documento "${n.id}", che nessuno ha scritto: l'agente lo chiederà e tornerà a mani vuote`);
+    }
+  }
+});
+
+test('un documento previsto ma non scritto: asText lo dice, e lo dice col suo nome', () => {
+  const { T } = loadModules();
+  const mancanti = T.NAV.map((n) => n.id).filter((id) => !T.ids().includes(id));
+  for (const id of mancanti) {
+    const risposta = T.asText(id);
+    assert.match(risposta, new RegExp(id), `la risposta non nomina "${id}": l'agente non sa cosa è mancato`);
+    assert.match(risposta, /NON esiste/, `"${id}": la risposta non dice che il documento non c'è`);
+    assert.match(risposta, /memoria/, `"${id}": manca l'istruzione a non ricostruirlo a memoria`);
+  }
+  // L'indice (nessun id chiesto) resta un esito legittimo, non un errore.
+  assert.doesNotMatch(T.asText(''), /NON esiste/);
+});

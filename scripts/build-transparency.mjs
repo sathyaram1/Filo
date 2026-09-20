@@ -354,14 +354,21 @@ function emitModule({ docs, glossary }) {
   function ids() { return DOCS.map((d) => d.id); }
 
   // Testo per l'agente. Senza id torna l'indice dei documenti disponibili, così
-  // può scegliere quale leggere invece di indovinare.
+  // può scegliere quale leggere invece di indovinare. Con un id che NON esiste
+  // lo dice in chiaro, nominandolo: prima tornava l'elenco e basta, che a valle
+  // si legge come una risposta qualunque — l'agente chiedeva «privacy», riceveva
+  // «disponibili: models» e rispondeva lo stesso, a memoria (#515).
   function asText(id) {
-    const doc = get(id);
-    if (!doc) {
-      return 'Documenti di trasparenza disponibili: '
-        + DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ') + '.';
-    }
-    return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\\n\\n' + doc.text;
+    const key = String(id == null ? '' : id).trim().toLowerCase();
+    const doc = get(key);
+    if (doc) return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\\n\\n' + doc.text;
+    const elenco = DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ');
+    if (!key) return 'Documenti di trasparenza disponibili: ' + elenco + '.';
+    const previsto = NAV.some((n) => n.id === key);
+    return 'Il documento "' + key + '" NON esiste'
+      + (previsto ? ' ancora: è una sezione prevista, ma non è stata scritta' : '')
+      + '. Non c\\'è niente da citare, e non va ricostruito a memoria: dillo all\\'utente. '
+      + 'Documenti di trasparenza disponibili: ' + elenco + '.';
   }
 
   global.SN_TRANSPARENCY = { NAV, GLOSSARY, all, get, ids, asText };

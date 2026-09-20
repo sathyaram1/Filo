@@ -1581,7 +1581,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const T = globalThis.SN_TRANSPARENCY;
         const doc = String(action.doc ?? action.documento ?? action.id ?? '').trim();
         const text = T ? T.asText(doc) : '';
-        return { executed: true, kept: true, output: { doc: doc || null, text } };
+        // Un documento chiesto per nome che non esiste NON è una lettura
+        // riuscita: il testo torna lo stesso (dice all'agente che non c'è, così
+        // non lo ricostruisce a memoria), ma il diario non deve scrivere
+        // «riletto la trasparenza» per una cosa che nessuno ha letto (#515).
+        const trovato = !!(T && (!doc || T.get(doc)));
+        return { executed: trovato, kept: true, output: { doc: doc || null, text, missing: !trovato } };
       }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
