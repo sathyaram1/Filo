@@ -3224,9 +3224,42 @@ async function summarizeTab(title, content) {
 // la risposta che l'utente sta aspettando perché non si è potuta archiviare lo
 // è di più.
 async function appendToChatArchive(chatId, turn, meta) {
-  if (!chatId || !FiloChats) return;
-  try { await FiloChats.append(chatId, turn, meta); }
-  catch (e) { console.warn('[Filo] chat non archiviata:', e?.message || e); }
+  if (!chatId || !FiloChats) return null;
+  try { return await FiloChats.append(chatId, turn, meta); }
+  catch (e) { console.warn('[Filo] chat non archiviata:', e?.message || e); return null; }
+}
+
+// ── Chi tiene viva una chat è la pagina che la sta facendo ─────────────────
+//
+// Una chat finisce quando finisce la pagina che la ospita: si torna alla home,
+// si apre una chat nuova, si chiude la scheda, si chiude Filo. Le prime due le
+// dice la pagina stessa; la terza no. La scheda chiusa manda il suo avviso
+// mentre sta morendo, e quell'avviso non parte: la chat restava «in corso» per
+// sempre, senza il titolo breve (in elenco compariva la prima frase scritta
+// dall'utente) e invisibile a Filo, che quando gli si chiede «riprendi la
+// discussione di ieri» guarda solo le chat finite. Si rimetteva a posto solo
+// al riavvio dell'app, e chiudere la scheda è il modo più comune di andarsene.
+//
+// Qui la fine della chat la constata il MAIN, che la scheda la vede sparire
+// per davvero: nessun messaggio da consegnare, niente da spedire da una pagina
+// che non c'è più.
+const proprietariDiChat = new Map();   // chatId → webContents che la sta vivendo
+
+function affidaChat(chatId, wc) {
+  if (!chatId || !wc) return;
+  try { if (wc.isDestroyed()) return; } catch (_) { return; }
+  if (proprietariDiChat.get(chatId) === wc) return;
+  proprietariDiChat.set(chatId, wc);
+  const allaMorte = () => {
+    // La chat può essere passata a un'altra scheda (riaperta da Cronologia):
+    // in quel caso questa pagina non ha più niente da chiudere.
+    if (proprietariDiChat.get(chatId) !== wc) return;
+    proprietariDiChat.delete(chatId);
+    closeAndTriageChat(chatId)
+      .then(() => { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {} })
+      .catch((e) => console.warn('[Filo] chiusura chat a scheda sparita:', e?.message || e));
+  };
+  try { wc.once('destroyed', allaMorte); } catch (_) {}
 }
 
 // L'intervista di benvenuto comincia con una domanda di Filo, che nessun turno
