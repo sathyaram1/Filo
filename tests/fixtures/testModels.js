@@ -152,6 +152,9 @@
     [A.DECKS_SEARCH_FILTER]: 'deepseek-flash, gemma-lite',
     [A.FILO_TAB_TRIAGE]: 'deepseek-flash, gemma-lite',
     [A.FILO_TAB_SUMMARY]: 'deepseek-flash, gemma-lite',
+    // #525 — titolo e tipo di una chat finita: un modello economico basta
+    // (legge una trascrizione corta e risponde con due campi).
+    [A.FILO_CHAT_TRIAGE]: 'deepseek-flash, gemma-lite',
     [A.FILO_TAB_SEARCH]: 'deepseek-flash, gemma-lite',
     [A.TTS]: 'kokoro',
     [A.SAFEBROWSE_JUDGE]: 'deepseek-flash',

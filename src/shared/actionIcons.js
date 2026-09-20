@@ -31,6 +31,9 @@
     SALVA_LEZIONE: 'pin',
     INVIA_FEEDBACK: 'feedback',
     CERCA_WEB: 'searchWeb',
+    // #525 — rileggere le conversazioni di prima: l'icona è quella della
+    // cronologia, che è esattamente quello che sta facendo.
+    CERCA_CHAT: 'history',
     ONBOARDING: 'checklist',
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',
