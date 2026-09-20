@@ -607,6 +607,42 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Come partono le sessioni delle routine (config/routines): quante insieme,
+  // da quale account per prima, quali esclusi. Owner-only. Le legge il server
+  // quando accende le sessioni: cambiarle qui vale dalla prossima.
+  const sessionsReply = (s) => ({
+    ok: true,
+    maxSessions: s.maxSessions,
+    priorityAccount: s.priorityAccount,
+    accountAOff: s.accountAOff,
+    accountBOff: s.accountBOff,
+  });
+  on(MSG.AUTOMATION_SESSIONS_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return sessionsReply(await Defaults.getRoutineSessions(idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  // Tocca SOLO i campi che riceve (come AUTOMATION_CAPS_SET).
+  on(MSG.AUTOMATION_SESSIONS_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return sessionsReply(await Defaults.setRoutineSessions({
+        maxSessions: msg.maxSessions,
+        priorityAccount: msg.priorityAccount,
+        accountAOff: msg.accountAOff,
+        accountBOff: msg.accountBOff,
+      }, idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
   // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
   // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab
