@@ -307,6 +307,7 @@
     append: (...a) => inCoda(() => append(...a)),
     close: (...a) => inCoda(() => close(...a)),
     setTriage: (...a) => inCoda(() => setTriage(...a)),
+    setUserTriage: (...a) => inCoda(() => setUserTriage(...a)),
     remove: (...a) => inCoda(() => remove(...a)),
     clear: (...a) => inCoda(() => clear(...a)),
   };
