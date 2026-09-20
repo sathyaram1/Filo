@@ -57,37 +57,46 @@
   // segnalazioni non ne parte nessuna. Il riconoscimento è lo stesso della
   // chat della home (SN_AZIONI_DICHIARATE), ristretto alle famiglie che
   // l'Aiuto può fare solo emettendo un'azione di Filo.
-  // Le azioni di Filo già emesse da questo pannello: una cosa fatta due
-  // messaggi fa regge la frase che la racconta.
+  // #517 (giro 7) — le azioni di Filo emesse da questo pannello, tenute in
+  // due mucchi. Quelle di ADESSO reggono la frase che le racconta; quelle dei
+  // turni PRIMA la reggono solo se la frase guarda indietro, come nella chat
+  // della home. Prima era un mucchio solo, che valeva come «fatto adesso» per
+  // sempre: la prima segnalazione mandata davvero copriva ogni segnalazione
+  // raccontata dopo, e la seconda non partiva senza che nessuno lo dicesse.
   const azioniFiloEmesse = new Set();
+  let azioniDelTurno = new Set();
+  // La domanda a cui il modello sta rispondendo: «l'hai mandata?» è un'altra
+  // cosa da «me la mandi?», e solo la prima lascia che un'azione di prima
+  // regga la risposta.
+  let domandaSuCosaFatta = false;
 
-  // #517 (giro 6) — le sveglie che ESISTONO davvero. Senza, qui lo stato era
-  // vuoto e l'ora non trovava mai riscontro: ogni frase che nominava un'ora
-  // veniva smentita, anche quella che raccontava la sveglia appena messa da
-  // questo pannello. Se il main non risponde restano `null`, che vuol dire
-  // «non lo so» e non «non ce n'è nessuna».
-  async function orariDelleSveglie() {
-    try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.FILO_GET_TIMERS });
-      if (!res || !res.ok || !Array.isArray(res.timers)) return null;
-      return res.timers.map((t) => {
-        if (t && t.atTime) return String(t.atTime);
-        const d = t && t.endsAt ? new Date(t.endsAt) : null;
-        if (!d || Number.isNaN(d.getTime())) return '';
-        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-      }).filter(Boolean);
-    } catch (_) { return null; }
-  }
-
+  // #517 — il confronto con le sveglie e gli appunti che esistono davvero lo
+  // fa il MAIN, non questo pannello: quella è roba dell'utente e qui siamo
+  // dentro una pagina web. Di là passa il testo che il modello ha scritto, di
+  // qua tornano le righe da mostrare.
   async function azioniRaccontate(parsed) {
     const D = global.SN_AZIONI_DICHIARATE;
-    if (!D || !parsed || parsed.kind) return [];
+    // Un turno che emette un'azione va guardato come gli altri: il pannello
+    // ne emette UNA per turno, quindi se l'utente ne chiede due la seconda il
+    // modello la racconta e basta.
+    if (!D || !parsed || (parsed.kind && parsed.kind !== 'filo_action' && parsed.kind !== 'page_action')) return [];
     const testo = String(parsed.display || '');
     if (!testo.trim()) return [];
-    const orariSveglie = await orariDelleSveglie();
+    // L'azione che sta per partire in questo turno conta come partita: il
+    // controllo gira prima di eseguirla.
+    const emessi = new Set(azioniDelTurno);
+    if (parsed.kind === 'filo_action' && parsed.filoAction && parsed.filoAction.type) {
+      emessi.add(String(parsed.filoAction.type).toUpperCase());
+    }
     try {
-      const stato = orariSveglie ? { orariSveglie } : {};
-      return D.rileva(testo, azioniFiloEmesse, stato, { famiglie: D.FAMIGLIE_AIUTO });
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.FILO_AZIONI_RACCONTATE,
+        testo,
+        tipiEmessi: [...emessi],
+        tipiPrecedenti: [...azioniFiloEmesse].filter((t) => !emessi.has(t)),
+        domandaUtente: domandaSuCosaFatta,
+      });
+      return (res && res.ok && Array.isArray(res.fantasmi)) ? res.fantasmi : [];
     } catch (_) { return []; }
   }
 
