@@ -386,7 +386,9 @@
   // La spinta che torna al modello quando la risposta dichiara un'azione mai
   // chiamata. Non la vede l'utente: è un messaggio di sistema dentro il turno.
   function spintaAzioniMancanti(fantasmi) {
-    const righe = (Array.isArray(fantasmi) ? fantasmi : []).map((f) => `- «${f.frase}» (strumenti: ${f.tipi.join(', ')})`);
+    const righe = (Array.isArray(fantasmi) ? fantasmi : []).map((f) => (f.tipi && f.tipi.length
+      ? `- «${f.frase}» (strumenti: ${f.tipi.join(', ')})`
+      : `- «${f.frase}» (non hai chiamato niente in questo turno)`));
     return 'La tua risposta dice che hai già fatto questo:\n'
       + `${righe.join('\n')}\n`
       + 'In questo turno però non hai chiamato nessuno strumento che lo faccia: non è successo, '
