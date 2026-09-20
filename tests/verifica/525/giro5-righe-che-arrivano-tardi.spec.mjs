@@ -109,47 +109,66 @@ test('terminale: un comando che finisce dopo il ritorno alla home', async ({ app
   expect(conEsito && conEsito.id).toBe(conComando && conComando.id);
 });
 
-test('un comando con lo slash che risponde tardi: dove finisce la sua riga', async ({ app, openTab }) => {
+test('«/pulisci»: il resoconto arriva quando sei già tornato alla home', async ({ app, openTab }) => {
   test.setTimeout(180_000);
   await configura(app);
   await stubProvider(app);
-  // Il riordino delle schede ci mette qualche secondo: è un giro che legge
-  // tutte le schede aperte e ne parla con un modello.
+  // Il riordino delle schede è un giro che legge tutte le schede aperte e le
+  // fa valutare a un modello: qualche secondo è la norma.
   await app.evaluate(() => {
-    globalThis.__riordinoLento = true;
-    const H = globalThis.SN_TEST_HOOKS || {};
-    globalThis.SN_TEST_HOOKS = H;
+    const MSG = globalThis.SN_MSG || globalThis.SN_CONST.MSG;
+    globalThis.__riordinoRitardo = 6000;
+    void MSG;
   });
 
   const dash = await openTab(DASH);
+  // La conferma del riordino: rispondo di sì senza popup.
+  await dash.evaluate(() => {
+    window.SN_CONFIRM_UI = { confirm: async () => true };
+  });
   await dash.locator('#input').fill('Parlami di Epicuro');
   await dash.locator('#input').press('Enter');
   await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
 
-  // Una riga che Filo scriverà fra qualche secondo dentro QUESTA conversazione.
-  await dash.evaluate(() => {
-    const D = globalThis;
-    setTimeout(() => {
-      // La stessa strada dei comandi con lo slash: una riga scritta da Filo
-      // senza passare da un modello, archiviata quando è pronta.
-      const ev = new CustomEvent('filo-test-riga-tardiva');
-      document.dispatchEvent(ev);
-    }, 10);
-    void D;
-  });
+  await dash.locator('#input').fill('/pulisci');
+  await dash.locator('#input').press('Enter');
+  await expect.poll(async () => dash.evaluate(() => document.body.innerText), { timeout: 20_000 })
+    .toContain('Riordino in corso');
 
-  // Torno alla home: la conversazione di Epicuro è finita.
+  // Torno alla home mentre Filo sta ancora riordinando: la conversazione di
+  // Epicuro è finita.
+  await dash.evaluate(() => {
+    const b = document.getElementById('backHome') || document.querySelector('[data-action="home"]');
+    if (b) b.click();
+  });
   await dash.locator('#input').fill('/home');
   await dash.locator('#input').press('Enter');
-  await expect.poll(async () => {
-    const c = (await leggiArchivio(app))[0];
-    return c && c.closedAt ? 'chiusa' : 'aperta';
-  }, { timeout: 40_000 }).toBe('chiusa');
+  await dash.waitForTimeout(800);
+  const statoSubito = await dash.evaluate(() => document.body.dataset.state);
+  console.log('STATO SUBITO DOPO IL RITORNO ALLA HOME:', statoSubito);
+  expect(statoSubito).toBe('home');
 
-  // Adesso arriva la riga in ritardo: «/aiuto» eseguito con la pagina già sulla
-  // home è il caso pulito dello stesso meccanismo.
-  const statoPrima = await dash.evaluate(() => document.body.dataset.state);
-  console.log('STATO PRIMA DELLA RIGA TARDIVA:', statoPrima);
+  // Adesso arriva il resoconto.
+  await dash.waitForTimeout(12_000);
+  const statoDopo = await dash.evaluate(() => ({
+    stato: document.body.dataset.state,
+    bolle: [...document.querySelectorAll('.dash-bubble')].map((b) => b.textContent.trim().slice(0, 60)),
+  }));
+  console.log('STATO QUANDO ARRIVA IL RESOCONTO:', JSON.stringify(statoDopo, null, 1));
+
+  const chats = await leggiArchivio(app);
+  console.log('ARCHIVIO:', JSON.stringify(chats.map((c) => ({
+    id: c.id.slice(0, 8),
+    titolo: c.title,
+    chiusa: !!c.closedAt,
+    testi: (c.messages || []).map((m) => `${m.role}: ${String(m.text).replace(/\s+/g, ' ').slice(0, 50)}`),
+  })), null, 1));
+
+  // L'utente è tornato alla home: ci deve restare.
+  expect(statoDopo.stato).toBe('home');
+  // E il resoconto appartiene alla conversazione in cui il comando è stato
+  // dato, non a una chat nuova che l'utente non ha mai fatto.
+  expect(chats.length, `chat in archivio: ${chats.length}`).toBe(1);
 });
 
 test('rinomina: input limite e tastiera', async ({ app, openTab }) => {
