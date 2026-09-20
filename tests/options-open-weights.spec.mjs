@@ -109,6 +109,11 @@ test('Opzioni: la pagina non interroga i server di chi produce i modelli, acceso
   // all'apertura. Oggi l'API diretta di Google non è più in Filo: il catalogo
   // arriva dal router (pubblico, ammesso), e verso i produttori esclusi non
   // parte niente, con l'interruttore spento come acceso.
+  //
+  // #591, secondo giro — la pagina non manda più NESSUNA richiesta a un
+  // fornitore, nemmeno quella ammessa: il catalogo lo chiede al processo
+  // principale, che lo prende dal passaggio unico. La pre-condizione «il
+  // catalogo parte davvero» si guarda quindi da lì.
   const chiaveSalvata = (openWeightsOnly) => app.evaluate(async (_, on) => {
     await globalThis.SN_STORAGE.setSettings({
       apiKeys: { openrouter: 'sk-or-finta-per-il-test' },
