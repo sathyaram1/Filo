@@ -83,6 +83,8 @@
             prepared: !!x.prepared,
             queuedAt: Number(x.queuedAt) || Date.now(),
             attempts: Number(x.attempts) || 0,
+            rinuncia: !!x.rinuncia,
+            motivoRinuncia: x.motivoRinuncia || '',
           }));
       }
     } catch (e) { logFn('load fallito:', e?.message || e); }
