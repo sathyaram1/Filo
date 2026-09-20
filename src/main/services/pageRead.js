@@ -81,6 +81,20 @@ const BLOCCHI = new Set([
 
 const LETTERA = /[a-zA-Z]/;
 
+// I modi di nascondere un blocco scritti attaccati all'elemento. Quello che
+// l'utente non vede non è contenuto della pagina: su una pagina scritta per chi
+// legge con un agente è l'esca, e al modello arrivava come testo del sito
+// (#553). Quelli che stanno nel foglio di stile da qui non si vedono.
+const NASCOSTO = new RegExp([
+  'display\\s*:\\s*none',
+  'visibility\\s*:\\s*hidden',
+  'opacity\\s*:\\s*0(\\.0+)?\\s*(;|$)',
+  'font-size\\s*:\\s*0(\\.0+)?[a-z%]*\\s*(;|$)',
+  '(left|right|top|bottom|text-indent)\\s*:\\s*-\\s*\\d{3,}',
+  'clip-path\\s*:\\s*inset\\(\\s*100',
+  'clip\\s*:\\s*rect\\(\\s*0',
+].map((r) => `(?:^|;)\\s*(?:${r})`).join('|'), 'i');
+
 /**
  * Dove finisce il tag aperto in `da`. PURA. Torna -1 se non finisce mai.
  *
