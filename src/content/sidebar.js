@@ -74,6 +74,9 @@
   // cosa da «me la mandi?», e solo la prima lascia che un'azione di prima
   // regga la risposta.
   let domandaSuCosaFatta = false;
+  // #517 (giro 9) — e se ha chiesto una cosa che passa da un'azione di Filo.
+  // Senza, «te l'ho tolta» dopo «togli quella parola» diventava un'accusa.
+  let richiestaAzione = false;
 
   // #517 — il confronto con le sveglie e gli appunti che esistono davvero lo
   // fa il MAIN, non questo pannello: quella è roba dell'utente e qui siamo
