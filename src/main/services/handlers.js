@@ -1047,8 +1047,12 @@ function copiaVisibile(tetto) {
         try {
           if (typeof el.checkVisibility === 'function'
             && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })) return false;
+          // Coordinate del DOCUMENTO, non della finestra: a pagina scorsa tutto
+          // quello che sta sopra ha rettangolo negativo e sparirebbe.
           var r = el.getBoundingClientRect();
-          if (r.right <= -500 || r.bottom <= -500) return false;
+          var sx = window.scrollX || window.pageXOffset || 0;
+          var sy = window.scrollY || window.pageYOffset || 0;
+          if (r.right + sx <= -500 || r.bottom + sy <= -500) return false;
           if (haTesto(el)) {
             var s = window.getComputedStyle(el);
             if (!s) return true;

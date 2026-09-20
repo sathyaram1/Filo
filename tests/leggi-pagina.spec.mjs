@@ -442,3 +442,26 @@ test('L — il testo nascosto dal foglio di stile non arriva al modello', async 
     expect(String(out.text)).not.toContain(esca);
   }
 });
+
+// Il rettangolo di un elemento è relativo alla FINESTRA: a pagina scorsa tutto
+// quello che sta sopra ha coordinate negative, e senza rimettere lo
+// scorrimento la lettura si mangiava la metà alta della pagina.
+test('M — a pagina scorsa non sparisce quello che sta più in alto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const riempitivo = Array.from({ length: 200 }, (_, i) => `<p>Riga di riempimento numero ${i}</p>`).join('');
+  const url = testServer.html(`<!DOCTYPE html><html><head><title>Listino lungo</title></head><body><main>
+<p>In cima: il canone costa 19,90 euro</p>${riempitivo}<p>In fondo: apre alle 8:00</p></main></body></html>`);
+  const page = await openTab(url);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+  const out = await app.evaluate(
+    async (_e, u) => (await globalThis.SN_EXECUTE_FILO_ACTION(
+      { type: 'LEGGI_PAGINA', url: u },
+      { sender: { url: 'filo://dashboard/dashboard.html' } },
+    )).output,
+    url,
+  );
+  expect(out.source).toBe('scheda');
+  expect(String(out.text)).toContain('19,90');
+  expect(String(out.text)).toContain('8:00');
+});

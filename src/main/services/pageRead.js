@@ -272,25 +272,28 @@ function decodeEntita(s) {
  * righe. PURA.
  */
 function htmlATesto(html, dentroZona = false) {
-  const potato = passaggio(html, 'tutto', dentroZona);
+  const potato = passaggio(html, 'tutto', dentroZona).testo;
   // SE POTARE NON LASCIA NIENTE, SI RINUNCIA ALLA SOLA CORNICE: l'HTML vero è
   // pieno di tag mai chiusi, e un `<nav>` che non chiude si porta via tutto
   // quello che viene dopo. Senza testo la pagina si dichiara vuota.
-  return potato || passaggio(html, 'minimo', dentroZona);
+  return potato || passaggio(html, 'minimo', dentroZona).testo;
 }
 
 function passaggio(html, modo, dentroZona = false) {
   const soloIlleggibile = modo === 'minimo';
-  // Nel passaggio della coda il contorno resta: è lì che si va a cercare
-  // l'orario di apertura quando il corpo della pagina non ce l'ha.
+  // Nel passaggio della coda il contorno non si butta: si raccoglie a parte, in
+  // un giro solo, perché ripassare l'HTML raddoppia il tempo su una pagina enorme.
   const tieniCornice = modo === 'cornice';
   const src = String(html == null ? '' : html);
   const fuori = []; // pila degli elementi di cornice ancora aperti
   const zone = []; // pila delle zone di contenuto (article/main) ancora aperte
+  const contorno = []; // pila dei blocchi di contorno che finiscono in coda
   const pila = [];
   const pezzi = [];
+  const pezziCornice = [];
   let i = 0;
-  const testo = (s) => { if (!fuori.length && s) pezzi.push(decodeEntita(s)); };
+  const spingi = (s2) => { (contorno.length ? pezziCornice : pezzi).push(s2); };
+  const testo = (s2) => { if (!fuori.length && s2) spingi(decodeEntita(s2)); };
   for (;;) {
     const t = prossimoTag(src, i);
     if (!t) { testo(src.slice(i)); break; }
@@ -304,7 +307,7 @@ function passaggio(html, modo, dentroZona = false) {
     if (!chiusura) {
       if (autochiuso) {
         if (fuori.length) continue;
-        if (nome === 'br' || nome === 'hr') { pezzi.push('\n'); continue; }
+        if (nome === 'br' || nome === 'hr') { spingi('\n'); continue; }
         // Quello che sta scritto dentro un campo o sotto un'immagine l'utente lo
         // legge: l'orario già scelto, il totale, il prezzo disegnato (#553).
         if (nome !== 'input' && nome !== 'img') continue;
@@ -313,20 +316,21 @@ function passaggio(html, modo, dentroZona = false) {
         if (daScartare(nome, a, { soloIlleggibile: true })) continue;
         if (nome === 'input' && (tipo === 'hidden' || tipo === 'password')) continue;
         const v = decodeEntita(nome === 'img' ? (a.alt || '') : (a.value || '')).trim();
-        if (v) pezzi.push(`\n${v}\n`);
+        if (v) spingi(`\n${v}\n`);
         continue;
       }
       pila.push(nome);
       const attrs = attributi(t.attrsRaw);
       const dove = { inZona: dentroZona || zone.length > 0, primoLivello: pila.length === 1, soloIlleggibile };
       const verdetto = daScartare(nome, attrs, dove);
-      const scarta = verdetto && !(tieniCornice && verdetto === 'cornice');
-      if (!fuori.length && scarta) { fuori.push(pila.length); continue; }
+      const contornoQui = tieniCornice && verdetto === 'cornice';
+      if (!fuori.length && verdetto && !contornoQui) { fuori.push(pila.length); continue; }
+      if (!fuori.length && contornoQui) contorno.push(pila.length);
       if (!fuori.length && (TAG_ZONA.has(nome) || attrs.role === 'main')) zone.push(pila.length);
       if (fuori.length) continue;
-      if (nome === 'li') pezzi.push('\n• ');
-      else if (BLOCCHI.has(nome)) pezzi.push('\n');
-      else if (nome === 'td' || nome === 'th') pezzi.push('\t');
+      if (nome === 'li') spingi('\n• ');
+      else if (BLOCCHI.has(nome)) spingi('\n');
+      else if (nome === 'td' || nome === 'th') spingi('\t');
       continue;
     }
     // Chiusura: risale alla corrispondente aperta, se c'è (l'HTML vero è pieno
@@ -336,11 +340,12 @@ function passaggio(html, modo, dentroZona = false) {
       pila.length = dove;
       while (fuori.length && fuori[fuori.length - 1] > pila.length) fuori.pop();
       while (zone.length && zone[zone.length - 1] > pila.length) zone.pop();
+      while (contorno.length && contorno[contorno.length - 1] > pila.length) contorno.pop();
     }
     if (fuori.length) continue;
-    if (BLOCCHI.has(nome)) pezzi.push('\n');
+    if (BLOCCHI.has(nome)) spingi('\n');
   }
-  return normalizzaTesto(pezzi.join(''));
+  return { testo: normalizzaTesto(pezzi.join('')), cornice: normalizzaTesto(pezziCornice.join('')) };
 }
 
 /** Spazi, tabulazioni e righe vuote ridotti a qualcosa di leggibile. PURA. */
@@ -423,15 +428,15 @@ function estraiContenuto(html) {
   // Dentro la zona di contenuto già isolata l'intestazione è dell'articolo:
   // il tag che la racchiudeva non c'è più, e senza questo il filtro la
   // scambierebbe per quella del sito.
-  let testo = htmlATesto(zona ?? corpo, zona != null);
+  // Un giro solo sul corpo: da qui escono sia il contenuto sia il contorno.
+  const pieno = passaggio(corpo, 'cornice');
+  let testo = zona != null ? htmlATesto(zona, true) : (pieno.testo || passaggio(corpo, 'minimo').testo);
   // Sotto una ventina di caratteri la zona principale non è contenuto: è un
   // guscio che il JavaScript del sito riempirà. Il corpo intero contiene
   // comunque la zona, quindi ripiegare non perde niente: aggiunge rumore.
-  if (zona != null && testo.length < 20) {
-    const tutto = htmlATesto(corpo);
-    if (tutto.length > testo.length) testo = tutto;
-  }
-  const coda = testoDiCornice(corpo, testo);
+  if (zona != null && testo.length < 20 && pieno.testo.length > testo.length) testo = pieno.testo;
+  const avanzi = zona != null ? `${pieno.testo}\n${pieno.cornice}` : pieno.cornice;
+  const coda = testoDiCornice(avanzi, testo);
   return { titolo, testo: coda ? `${testo}\n\n${coda}`.trim() : testo };
 }
 
@@ -444,13 +449,12 @@ function estraiContenuto(html) {
  * cestino, con un tetto perché un elenco di link non mangi tutta la lettura.
  * Menu, pubblicità e banner dei cookie restano fuori anche da qui.
  */
-function testoDiCornice(corpo, principale) {
-  const pieno = passaggio(corpo, 'cornice');
-  if (!pieno) return '';
+function testoDiCornice(avanzi, principale) {
+  if (!avanzi) return '';
   const gia = new Set(String(principale || '').split('\n').map((r) => r.trim()).filter(Boolean));
   const righe = [];
   let lunghezza = 0;
-  for (const riga of pieno.split('\n')) {
+  for (const riga of String(avanzi).split('\n')) {
     const t = riga.trim();
     if (!t || gia.has(t)) continue;
     if (lunghezza + t.length + 1 > MAX_CODA_CHARS) break;
