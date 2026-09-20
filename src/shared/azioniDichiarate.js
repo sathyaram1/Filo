@@ -339,7 +339,9 @@
         // Giro 8: «notifiche» e «dimensione» mancavano fra le cose, e
         // «ridotto/aumentato» fra i verbi — «ho ridotto la dimensione del
         // testo» e «ho aumentato lo zoom» passavano mute.
-        new RegExp(`${HO}(?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo|ridotto|aumentato|alzato|abbassato|ingrandito|rimpicciolito)\\b${PONTE(72)}`
+        // Giro 9: «abilitato», «disabilitato» e «tolto» mancavano, e «ti ho
+        // tolto le notifiche» era il modo più normale di dirlo.
+        new RegExp(`${HO}(?:impostato|attivato|disattivato|abilitato|disabilitato|acceso|spento|cambiato|modificato|applicato|messo|tolto|ridotto|aumentato|alzato|abbassato|ingrandito|rimpicciolito|silenziato)\\b${PONTE(72)}`
           + `\\b(?:tema|impostazione|preferenza|modalità|opzione|carattere|font|zoom|limite di spesa|colore|sfondo|notifiche|dimensione|luminosità)${FINE}`, 'i'),
       ],
     },
