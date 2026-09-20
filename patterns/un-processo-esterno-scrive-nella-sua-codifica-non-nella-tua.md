@@ -59,8 +59,36 @@ guasto su un cammino equivalente, e due copie divergono.
 accenti, tipo di trattino e spazi doppi, segmento per segmento (la storpiatura
 non risparmia i nomi delle cartelle). Se il candidato è **uno solo** apre
 quello e DICE quale file ha aperto davvero; se sono due o più non indovina, li
-elenca e lascia scegliere. Un carattere di sostituzione nel nome vale come
-jolly: sotto ci stava un carattere vero che nessuno può più ricostruire.
+elenca e lascia scegliere. Un carattere perso nel nome vale come jolly, perché
+sotto ci stava un carattere vero che nessuno può ricostruire: il rombo di
+sostituzione, e anche il `?` che Windows scrive da sé quando nella tabella un
+carattere non ha proprio dove andare (su Windows un nome di file non può
+contenerlo, quindi lì un `?` è sempre un carattere perso).
+
+**Il jolly vale UN carattere, non un pezzo di nome.** Con «uno o più caratteri
+qualsiasi» bastava perdere la `o` di `Bilancio` per farsi aprire `Bilancio 2019
+definitivo riservato`; e il controllo che pretende «del nome vero sotto i
+jolly» va fatto sul nome SENZA estensione, altrimenti `.txt` da sola gli basta
+e un nome sparito del tutto apre l'unico file di testo della cartella. Trovati
+al primo giro di verifica di #551.
+
+## Vale anche nel verso opposto: quello che TU scrivi al processo
+
+Il preludio sistema la codifica in scrittura. In lettura no, e il guasto è
+identico: Windows PowerShell decodifica il suo stdin con la tabella della
+console, mentre Node gli scrive UTF-8. Il terminale della dashboard manda i
+comandi per lo stdin, quindi un comando che l'utente digita con un accento
+dentro arrivava storpiato e la shell rispondeva che il file non esiste. Con
+`cmd` non succede: `chcp 65001` vale in tutti e due i versi.
+
+`[Console]::InputEncoding` qui è peggio del male: il setter di .NET butta via
+il lettore dello stdin insieme a tutto quello che aveva già letto in avanti, e
+la riga di «pronto» parte nello stesso pezzo del preludio. La sessione
+resterebbe muta per sempre. La cura è **non far viaggiare caratteri non ASCII
+sul filo**: il comando parte codificato e lo rimette insieme PowerShell, che
+non passa da nessuna tabella. Solo quando serve, però: un comando di soli
+caratteri ASCII parte identico, così `exit`, `cd` e le variabili continuano a
+comportarsi come si sono sempre comportati.
 
 La seconda cura non è un cerotto sulla prima. La stessa svista la fa un utente
 che il nome lo scrive a mano, o a cui il nome è stato dettato al telefono, e la
