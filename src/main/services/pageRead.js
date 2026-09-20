@@ -64,7 +64,12 @@ const BLOCCHI = new Set([
   'tbody', 'tfoot', 'tr', 'form', 'fieldset', 'address', 'hr', 'details', 'summary',
 ]);
 
-const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9:_-]*)((?:"[^"]*"|'[^']*'|[^>])*?)(\/?)>/g;
+// `[^>]*` e non un'alternativa con le virgolette: il testo qui viene da
+// sconosciuti, e un gruppo ripetuto con rami che si sovrappongono può
+// impiegare un tempo esponenziale su una riga scritta apposta. Un valore di
+// attributo che contiene `>` chiude il tag un po' prima e il resto finisce
+// nel testo: un difetto di estrazione, non un processo bloccato.
+const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9:_-]*)([^>]*?)(\/?)>/g;
 
 function attributi(raw) {
   const out = {};
@@ -190,7 +195,7 @@ function sottoalbero(html, vale) {
     const nome = m[2].toLowerCase();
     if (VUOTI.has(nome) || !vale(nome, attributi(m[3]))) continue;
     // Trovato: cerca la chiusura corrispondente contando gli annidati.
-    const dentro = new RegExp(`<(/?)${nome}\\b((?:"[^"]*"|'[^']*'|[^>])*?)(/?)>`, 'gi');
+    const dentro = new RegExp(`<(/?)${nome}\\b([^>]*?)(/?)>`, 'gi');
     dentro.lastIndex = re.lastIndex;
     let livello = 1;
     let d;

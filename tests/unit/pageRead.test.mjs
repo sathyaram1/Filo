@@ -126,6 +126,16 @@ test('un tag non chiuso non manda via il resto della pagina', () => {
   assert.match(testo, /3-1/);
 });
 
+test('una pagina scritta per far esplodere l\'estrattore non lo blocca', () => {
+  // Il testo viene da sconosciuti: un tag con migliaia di virgolette spaiate e
+  // mai chiuso deve costare un istante, non un processo appeso.
+  const cattivo = `<html><body><div ${'"a" '.repeat(4000)}<p>Il totale è 99,90</p></body></html>`;
+  const t0 = Date.now();
+  const { testo } = PR.estraiContenuto(cattivo);
+  assert.ok(Date.now() - t0 < 2000, 'estrazione troppo lenta su input ostile');
+  assert.match(testo, /99,90/);
+});
+
 test('le voci di elenco diventano righe, non una parola sola', () => {
   const t = PR.htmlATesto('<ul><li>primo</li><li>secondo</li></ul>');
   assert.match(t, /•\s*primo\n•\s*secondo/);
