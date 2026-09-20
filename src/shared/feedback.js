@@ -725,10 +725,11 @@
       if (rawBlob.size > 4 * 1024 * 1024) { failed.push({ name: fname, reason: 'troppo grande (max 4 MB)' }); continue; }
       try {
         // S1.2: cifra anche gli allegati non-immagine.
-        const blobToUpload = await maybeEncryptBlob(rawBlob);
+        const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
         uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || rawBlob.type || '') });
       } catch (e) {
+        if (isEncryptionError(e)) throw e; // come sopra: si ferma tutto
         console.warn('[SN feedback] upload file fallito:', e);
         failed.push({ name: fname, reason: 'caricamento non riuscito' });
       }
