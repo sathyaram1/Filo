@@ -34,6 +34,18 @@
 // strumento «apri un programma»), e quello che Filo fa SENZA azioni non ha
 // famiglia del tutto: quello che impara lo scrive in memoria un passaggio che
 // parte da solo dopo il turno, quindi «l'ho memorizzato» è vero e non si tocca.
+//
+// Giro 2 della verifica: la stessa domanda mal risposta apriva porte dalle due
+// parti, e sono state richiuse insieme.
+//  - COSA VALE COME PROVA. Un'azione che è stata chiamata ma non ha fatto
+//    nascere niente (la sveglia con l'orario che Filo non sa leggere) non copre
+//    più la frase che la dà per fatta; e le famiglie non si coprono più a
+//    vicenda, perché una sveglia non scrive un appunto.
+//  - COSA NON HA BISOGNO DI PROVA. Quello che Filo consegna dentro la risposta
+//    («te l'ho scritta qui sotto») non è un'azione mancata; un'immagine mandata
+//    in chat la legge senza strumenti, come i file dell'editor; e una sveglia
+//    che ESISTE, messa in una sessione precedente, regge la frase che la
+//    racconta, se l'ora coincide.
 
 (function (global) {
   'use strict';
@@ -47,32 +59,43 @@
   const INIZIO = '(?<![\\wàèéìíòóùú])';
   // L'apostrofo si scrive in due modi e il modello usa tutti e due.
   const AP = "['’]";
+  // «Ho» e il participio: quanti spazi vuole il modello, e anche un a capo.
+  // Scritto con uno spazio solo, «Ho  messo  la  sveglia» passava intero, e
+  // così «Ti ho messo» con l'a capo prima di «una sveglia».
+  const HO = '\\bho\\s+';
+  // Il pezzo di frase fra il verbo e la cosa. Prima escludeva l'a capo: una
+  // dichiarazione spezzata su due righe non veniva vista.
+  const PONTE = (n) => `[^.!?]{0,${n}}`;
 
   // Ogni famiglia: come il modello DICE di aver fatto la cosa (`frasi`), quali
   // azioni la reggono davvero (`tipi`) e cosa va detto all'utente quando la
   // dichiarazione resta senza azione (`avviso`).
   //
-  // I `tipi` sono GENEROSI di proposito: basta che nel turno ci sia un'azione
-  // plausibilmente collegata perché la frase sia considerata coperta. Un'azione
-  // c'è o non c'è; quando c'è, l'utente la vede nel diario del lavoro e può
-  // giudicare da sé. Il presidio serve al caso muto: nel turno non c'è NIENTE.
+  // I `tipi` restano generosi DENTRO la famiglia (tutte le strade che Filo ha
+  // per fare quella cosa), ma non escono più dalla famiglia: prima una sveglia
+  // reggeva anche l'appunto e l'evento in calendario, quindi una cosa fatta ne
+  // assolveva tre mai fatte.
   const FAMIGLIE = [
     {
       id: 'sveglia',
       tipi: ['SVEGLIA', 'MODIFICA_SVEGLIA'],
+      // La sveglia può già esistere: se ne esiste una all'ora nominata nella
+      // frase, la frase è vera anche senza nessuna azione in questo turno.
+      orari: true,
       avviso: 'la sveglia non c\'è',
       frasi: [
-        /\bho (?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\b[^.!?\n]{0,48}\bsvegli[ae]\b/i,
-        /\bfatto[,:!]?\s+(?:la |una )?svegli[ae]\b[^.!?\n]{0,24}\b(?:impostat|programmat|messa|fissat|pronta)/i,
+        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(48)}\\bsvegli[ae]\\b`, 'i'),
+        new RegExp(`\\bfatto[,:!]?\\s+(?:la |una )?svegli[ae]\\b${PONTE(24)}\\b(?:impostat|programmat|messa|fissat|pronta)`, 'i'),
       ],
     },
     {
       id: 'timer',
-      tipi: ['TIMER', 'SVEGLIA'],
+      tipi: ['TIMER'],
+      orari: true,
       avviso: 'il timer non è partito',
       frasi: [
-        /\bho (?:avviato|fatto partire|messo|impostato|acceso|creato|lanciato|fatto scattare)\b[^.!?\n]{0,48}\b(?:timer|conto alla rovescia)\b/i,
-        /\bfatto[,:!]?\s+(?:il |un )?timer\b[^.!?\n]{0,24}\b(?:avviat|partit|impostat|in corso|acceso)/i,
+        new RegExp(`${HO}(?:avviato|fatto\\s+partire|messo|impostato|acceso|creato|lanciato|fatto\\s+scattare)\\b${PONTE(48)}\\b(?:timer|conto alla rovescia)\\b`, 'i'),
+        new RegExp(`\\bfatto[,:!]?\\s+(?:il |un )?timer\\b${PONTE(24)}\\b(?:avviat|partit|impostat|in corso|acceso)`, 'i'),
       ],
     },
     {
@@ -80,25 +103,38 @@
       tipi: ['CANCELLA_SVEGLIA', 'MODIFICA_SVEGLIA'],
       avviso: 'la sveglia (o il timer) c\'è ancora',
       frasi: [
-        /\bho (?:cancellato|tolto|rimosso|eliminato|annullato|disattivato|spento|levato)\b[^.!?\n]{0,48}\b(?:svegli[ae]|timer)\b/i,
+        new RegExp(`${HO}(?:cancellato|tolto|rimosso|eliminato|annullato|disattivato|spento|levato)\\b${PONTE(48)}\\b(?:svegli[ae]|timer)\\b`, 'i'),
       ],
     },
     {
       id: 'sveglia-spostata',
       tipi: ['MODIFICA_SVEGLIA', 'SVEGLIA', 'CANCELLA_SVEGLIA'],
+      orari: true,
       avviso: 'la sveglia è rimasta com\'era',
       frasi: [
-        /\bho (?:spostato|anticipato|posticipato|cambiato|modificato|rimandato)\b[^.!?\n]{0,48}\b(?:svegli[ae]|timer)\b/i,
+        new RegExp(`${HO}(?:spostato|anticipato|posticipato|cambiato|modificato|rimandato)\\b${PONTE(48)}\\b(?:svegli[ae]|timer)\\b`, 'i'),
+      ],
+    },
+    {
+      // «Promemoria» sta a parte perché in italiano lo è tutto: un appunto, un
+      // evento in calendario, una sveglia. Quindi qui i tipi restano larghi,
+      // mentre l'appunto vero vuole l'azione che scrive un appunto.
+      id: 'promemoria',
+      tipi: ['SALVA_APPUNTO', 'SALVA_LEZIONE', 'EVENTO_CALENDARIO', 'SVEGLIA', 'TIMER'],
+      avviso: 'il promemoria non c\'è',
+      frasi: [
+        new RegExp(`${HO}(?:messo|salvato|scritto|creato|aggiunto|annotato|impostato|segnato|preso|fissato)\\b${PONTE(48)}\\bpromemoria\\b`, 'i'),
+        new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:mess|salvat|scritt|annotat|segnat)[oa]\\b${PONTE(32)}\\bpromemoria\\b`, 'i'),
       ],
     },
     {
       id: 'appunto',
-      tipi: ['SALVA_APPUNTO', 'SALVA_LEZIONE', 'EVENTO_CALENDARIO', 'SVEGLIA', 'TIMER'],
+      tipi: ['SALVA_APPUNTO', 'SALVA_LEZIONE'],
       avviso: 'l\'appunto non c\'è',
       frasi: [
-        /\bho (?:salvato|scritto|creato|aggiunto|annotato|preso|buttato giù)\b[^.!?\n]{0,48}\b(?:appunt[oi]|not[ae]|promemoria)\b/i,
+        new RegExp(`${HO}(?:salvato|scritto|creato|aggiunto|annotato|preso|buttato\\s+giù)\\b${PONTE(48)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
         /\bme (?:lo|la|ne) sono (?:segnat|appuntat|annotat)[oa]\b/i,
-        new RegExp(`\\b(?:te |ve )?l${AP}ho (?:salvat|scritt|annotat|mess)[oa]\\b[^.!?\\n]{0,32}\\b(?:appunt[oi]|not[ae]|promemoria)\\b`, 'i'),
+        new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:salvat|scritt|annotat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
       ],
     },
     {
@@ -109,9 +145,9 @@
       tipi: ['NAVIGA', 'APRI_FILE', 'COMANDO_FINESTRA', 'ESEGUI_COMANDO', 'LEGGI_DOCUMENTO', 'LEGGI_FILE', 'PROXY_TAB', 'REGOLA_PROXY_DOMINIO'],
       avviso: 'non si è aperto niente',
       frasi: [
-        /\bho apert[oa]\b/i,
-        new RegExp(`\\bl${AP}ho apert[oa]\\b`, 'i'),
-        new RegExp(`\\bte (?:l${AP}|lo |la )ho apert[oa]\\b`, 'i'),
+        new RegExp(`${HO}apert[oa]\\b`, 'i'),
+        new RegExp(`\\bl${AP}ho\\s+apert[oa]\\b`, 'i'),
+        new RegExp(`\\bte (?:l${AP}|lo |la )ho\\s+apert[oa]\\b`, 'i'),
       ],
     },
     {
@@ -119,8 +155,8 @@
       tipi: ['CERCA_WEB', 'NAVIGA', 'ESEGUI_COMANDO', 'LEGGI_DOCUMENTO', 'CAPACITA_DETTAGLIO'],
       avviso: 'la ricerca non è partita',
       frasi: [
-        /\bho (?:cercato|guardato|controllato|verificato)\b[^.!?\n]{0,32}\b(?:sul web|su internet|online|in rete|su google)\b/i,
-        /\bho fatto una ricerca\b/i,
+        new RegExp(`${HO}(?:cercato|guardato|controllato|verificato)\\b${PONTE(32)}\\b(?:sul web|su internet|online|in rete|su google)\\b`, 'i'),
+        new RegExp(`${HO}fatto\\s+una\\s+ricerca\\b`, 'i'),
       ],
     },
     {
@@ -128,19 +164,20 @@
       tipi: ['ESEGUI_COMANDO'],
       avviso: 'il comando non è partito',
       frasi: [
-        /\bho (?:eseguito|lanciato|fatto girare|avviato)\b[^.!?\n]{0,32}\bcomand[oi]\b/i,
+        new RegExp(`${HO}(?:eseguito|lanciato|fatto\\s+girare|avviato)\\b${PONTE(32)}\\bcomand[oi]\\b`, 'i'),
         /\bcomando (?:eseguito|lanciato)\b/i,
       ],
     },
     {
       id: 'lettura',
-      // CONTESTO_FILE non è uno strumento: è il segno che in questo turno il
-      // modello aveva già in mano i riassunti dei file dell'editor. Con quelli
-      // davanti, «ho letto il file della bolletta» è vero senza nessuna azione.
-      tipi: ['LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'ESEGUI_COMANDO', 'CERCA_WEB', 'CONTESTO_FILE'],
+      // CONTESTO_FILE e CONTESTO_IMMAGINE non sono strumenti: sono il segno che
+      // in questo turno il modello aveva già in mano i riassunti dei file
+      // dell'editor, o l'immagine che l'utente ha mandato in chat. Con quelli
+      // davanti, «ho letto la bolletta» è vero senza nessuna azione.
+      tipi: ['LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'ESEGUI_COMANDO', 'CERCA_WEB', 'CONTESTO_FILE', 'CONTESTO_IMMAGINE'],
       avviso: 'il documento non l\'ha letto',
       frasi: [
-        /\bho lett[oa]\b[^.!?\n]{0,48}\b(?:documento|file|pdf|bolletta|contratto|estratto conto|fattura|appunto)\b/i,
+        new RegExp(`${HO}lett[oa]\\b${PONTE(48)}\\b(?:documento|file|pdf|bolletta|contratto|estratto conto|fattura|appunto)\\b`, 'i'),
       ],
     },
     {
@@ -148,7 +185,7 @@
       tipi: ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'COMANDO_FINESTRA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'],
       avviso: 'l\'impostazione è rimasta com\'era',
       frasi: [
-        new RegExp('\\bho (?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo)\\b[^.!?\\n]{0,48}'
+        new RegExp(`${HO}(?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo)\\b${PONTE(48)}`
           + `\\b(?:tema|impostazione|preferenza|modalità|opzione|carattere|font|zoom|limite di spesa|colore|sfondo)${FINE}`, 'i'),
       ],
     },
@@ -157,17 +194,17 @@
       tipi: ['INVIA_FEEDBACK'],
       avviso: 'la segnalazione non è partita',
       frasi: [
-        /\bho (?:inviato|mandato|spedito|girato)\b[^.!?\n]{0,32}\b(?:segnalazione|feedback)\b/i,
-        /\bho segnalato\b[^.!?\n]{0,32}\b(?:agli sviluppatori|al team|a chi sviluppa)\b/i,
+        new RegExp(`${HO}(?:inviato|mandato|spedito|girato)\\b${PONTE(32)}\\b(?:segnalazione|feedback)\\b`, 'i'),
+        new RegExp(`${HO}segnalato\\b${PONTE(32)}\\b(?:agli sviluppatori|al team|a chi sviluppa)\\b`, 'i'),
       ],
     },
     {
       id: 'calendario',
-      tipi: ['EVENTO_CALENDARIO', 'SVEGLIA'],
+      tipi: ['EVENTO_CALENDARIO'],
       avviso: 'l\'evento non è in calendario',
       frasi: [
-        new RegExp(`\\bho (?:aggiunto|messo|creato|segnato|inserito)\\b[^.!?\\n]{0,32}\\b(?:in calendario|nel calendario|l${AP}evento|un evento)\\b`, 'i'),
-        new RegExp(`\\b(?:te |ve )?l${AP}ho (?:aggiunt|mess|segnat|inserit)[oa]\\b[^.!?\\n]{0,32}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
+        new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito)\\b${PONTE(32)}\\b(?:in calendario|nel calendario|l${AP}evento|un evento)\\b`, 'i'),
+        new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
       ],
     },
     {
@@ -175,7 +212,7 @@
       tipi: ['PULISCI_TAB', 'CANCELLA_ARCHIVIO'],
       avviso: 'le schede sono rimaste com\'erano',
       frasi: [
-        /\bho (?:archiviato|chiuso|ripulito|eliminato|cancellato)\b[^.!?\n]{0,32}\b(?:le schede|le tab|dall'archivio|la cronologia)\b/i,
+        new RegExp(`${HO}(?:archiviato|chiuso|ripulito|eliminato|cancellato)\\b${PONTE(32)}\\b(?:le schede|le tab|dall'archivio|la cronologia)\\b`, 'i'),
       ],
     },
     {
@@ -183,7 +220,7 @@
       tipi: ['CANCELLA_MEMORIA'],
       avviso: 'la memoria è ancora lì',
       frasi: [
-        /\bho (?:cancellato|azzerato|eliminato|resettato|svuotato)\b[^.!?\n]{0,32}\b(?:la memoria|le memorie|il profilo|tutto quello che sapevo)\b/i,
+        new RegExp(`${HO}(?:cancellato|azzerato|eliminato|resettato|svuotato)\\b${PONTE(32)}\\b(?:la memoria|le memorie|il profilo|tutto quello che sapevo)\\b`, 'i'),
       ],
     },
     {
@@ -191,8 +228,8 @@
       tipi: ['PROXY_TAB', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'RIMUOVI_REGOLA_PROXY'],
       avviso: 'il proxy è rimasto com\'era',
       frasi: [
-        /\bho (?:messo|attivato|applicato|tolto|rimosso|disattivato)\b[^.!?\n]{0,32}\bil proxy\b/i,
-        /\bho instradato\b/i,
+        new RegExp(`${HO}(?:messo|attivato|applicato|tolto|rimosso|disattivato)\\b${PONTE(32)}\\bil proxy\\b`, 'i'),
+        new RegExp(`${HO}instradato\\b`, 'i'),
       ],
     },
     // ULTIMA, e senza tipi: la conferma col PRONOME. Quando la cosa l'ha appena
@@ -201,17 +238,20 @@
     // richiesta, ed era l'unica che passava intera.
     // Il pronome però non dice COSA: attribuirlo a una famiglia (e scrivere «la
     // sveglia non c'è» su un appunto) sarebbe peggio di tacere. Quindi `tipi`
-    // vuoto vuol dire «la regge QUALUNQUE azione del turno»: scatta solo nel
-    // caso muto della segnalazione, dove nel turno non è partito niente, e
-    // l'avviso resta generico. Sta in fondo perché una famiglia che sa dire di
-    // cosa si tratta deve vincere su questa.
+    // vuoto vuol dire «la regge QUALUNQUE azione del turno che non stia già
+    // reggendo un'altra dichiarazione», e l'avviso resta generico. Sta in fondo
+    // perché una famiglia che sa dire di cosa si tratta deve vincere su questa.
+    // I verbi del CONSEGNARE UN TESTO («l'ho scritta», «l'ho creata») non sono
+    // qui: quando l'utente chiede una mail, la mail è la risposta, e non esiste
+    // nessuno strumento che possa averla scritta.
     {
       id: 'senza-nome',
       tipi: [],
+      pronome: true,
       avviso: 'non è partito niente',
       frasi: [
-        new RegExp(`\\b(?:te |ve |me )?l${AP}ho (?:mess|impostat|programmat|fissat|creat|aggiunt|salvat|scritt|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[oa]\\b`, 'i'),
-        /\b(?:te |ve )?l[ei] ho (?:mess|impostat|programmat|fissat|creat|aggiunt|salvat|scritt|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[ei]\b/i,
+        new RegExp(`\\b(?:te |ve |me )?l${AP}ho\\s+(mess|impostat|programmat|fissat|aggiunt|salvat|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[oa]\\b`, 'i'),
+        /\b(?:te |ve )?l[ei] ho\s+(mess|impostat|programmat|fissat|aggiunt|salvat|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[ei]\b/i,
       ],
     },
   ];
@@ -220,7 +260,7 @@
   // presidio li aggiunge quando quel contesto c'era. Elencati qui perché la
   // sentinella degli unit test, che pretende che ogni tipo sia uno strumento
   // vero, sappia distinguerli da un nome scritto male.
-  const TIPI_DI_CONTESTO = ['CONTESTO_FILE'];
+  const TIPI_DI_CONTESTO = ['CONTESTO_FILE', 'CONTESTO_IMMAGINE'];
 
   // Negazioni e ipotesi: se stanno nella stessa proposizione, PRIMA della
   // dichiarazione, non c'è nessuna rivendicazione da verificare.
@@ -231,6 +271,10 @@
   // trovato l'evento però ti ho messo la sveglia» restava coperta dal «non»,
   // mentre la stessa frase con «ma» veniva vista.
   const STACCHI = new RegExp(`[.!?;:,\\n—]|${INIZIO}(?:ma|però|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
+  // «Eccola qui sotto»: la cosa dichiarata è dentro la risposta, non da
+  // un'altra parte. Non c'è nessuno strumento che possa averla fatta, quindi
+  // non c'è niente da avvisare.
+  const NELLA_RISPOSTA = /\b(?:qui sotto|qua sotto|qui sopra|qua sopra|qui di seguito|di seguito|nella risposta|qui in chat|eccol[aoie])\b/i;
 
   function proposizionePrima(testo, indice) {
     const prima = testo.slice(0, indice);
@@ -248,6 +292,44 @@
     return fine >= 0 && dopo[fine] === '?';
   }
 
+  // La cosa dichiarata sta nella risposta stessa? Si guarda il resto della
+  // proposizione: «te l'ho scritta qui sotto», «l'ho aggiunta alla lista qui
+  // sopra», o i due punti che introducono il testo consegnato.
+  function puntaAllaRisposta(testo, fine) {
+    const dopo = testo.slice(fine);
+    const stop = dopo.search(/[.!?\n]/);
+    const resto = stop >= 0 ? dopo.slice(0, stop) : dopo;
+    if (NELLA_RISPOSTA.test(resto)) return true;
+    return /:\s*$/.test(stop >= 0 ? dopo.slice(0, stop + 1) : dopo);
+  }
+
+  // La radice di un participio, per capire se due frasi raccontano la STESSA
+  // cosa: «ho messo la sveglia» e «te l'ho messa» sono un fatto solo, «ho messo
+  // la sveglia» e «te l'ho segnata» sono due.
+  function radice(parola) {
+    return String(parola || '').toLowerCase().replace(/[aeio]+$/, '');
+  }
+
+  function radiciDichiarate(testo) {
+    const out = new Set();
+    const rx = /\bho\s+([a-zàèéìíòóùú]{3,})\b/gi;
+    let m;
+    while ((m = rx.exec(testo))) out.add(radice(m[1]));
+    return out;
+  }
+
+  // Gli orari nominati in una frase: «alle 19:00», «alle 19», «alle 7.30».
+  function orariNelTesto(frase) {
+    const out = new Set();
+    const s = String(frase || '');
+    let m;
+    const conMinuti = /\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/g;
+    while ((m = conMinuti.exec(s))) out.add(`${String(m[1]).padStart(2, '0')}:${m[2]}`);
+    const soloOra = /\balle\s+([01]?\d|2[0-3])\b(?![:.]\d)/gi;
+    while ((m = soloOra.exec(s))) out.add(`${String(m[1]).padStart(2, '0')}:00`);
+    return out;
+  }
+
   // La prima dichiarazione VALIDA di una famiglia, o null. Ritorna la frase
   // così com'è scritta (serve sia al modello, per sapere cosa rimangiarsi, sia
   // all'utente): tagliata a 160 caratteri, che è già una frase lunga.
@@ -259,7 +341,9 @@
         if (!m[0]) { rx.lastIndex += 1; continue; }
         if (SMENTITE.test(proposizionePrima(testo, m.index))) continue;
         if (dentroUnaDomanda(testo, m.index)) continue;
-        return frasePiena(testo, m.index, m.index + m[0].length);
+        const fine = m.index + m[0].length;
+        if (famiglia.pronome && puntaAllaRisposta(testo, fine)) continue;
+        return { frase: frasePiena(testo, m.index, fine), verbo: radice(m[1] || '') };
       }
     }
     return null;
@@ -278,9 +362,22 @@
     return frase.length > 160 ? `${frase.slice(0, 157)}…` : frase;
   }
 
+  // Un'azione che è stata CHIAMATA ma non ha fatto nascere niente non regge la
+  // frase che la dà per fatta: la sveglia con l'orario che Filo non sa leggere
+  // lasciava l'utente senza sveglia e senza avviso, che è esattamente la
+  // lamentela del feedback. Restano buone le azioni che hanno prodotto
+  // qualcosa (`_output`: una ricerca senza risultati è comunque partita) e
+  // quelle in attesa di un OK dell'utente, che in chat si vedono.
+  function haFattoQualcosa(a) {
+    if (!a || typeof a !== 'object') return true;
+    if (a._executed !== false) return true;
+    return !!(a._output || a._confirm);
+  }
+
   function insiemeDiTipi(azioni) {
     const out = new Set();
     for (const a of (Array.isArray(azioni) ? azioni : [])) {
+      if (!haFattoQualcosa(a)) continue;
       const t = String((a && (a.type || a.tipo)) || '').toUpperCase();
       if (t) out.add(t);
     }
@@ -298,21 +395,48 @@
     return out;
   }
 
-  // rileva(testo, azioni | Set di tipi) → [{ id, avviso, tipi, frase }]
-  // Una voce per famiglia dichiarata e non retta da nessuna azione.
-  function rileva(testo, azioni) {
+  // rileva(testo, azioni | Set di tipi, stato) → [{ id, avviso, tipi, frase }]
+  // Una voce per famiglia dichiarata e non retta da niente.
+  // `stato.orariSveglie`: gli orari delle sveglie e dei timer che ESISTONO
+  // adesso. Una sveglia messa ieri, in un'altra sessione, non lascia nessuna
+  // azione in questa conversazione: senza guardare lo stato, «sì, l'ho messa
+  // alle 19» diventava un'accusa a ogni riavvio.
+  function rileva(testo, azioni, stato) {
     const t = String(testo || '');
     if (!t.trim()) return [];
     const presenti = (azioni instanceof Set) ? azioni : insiemeDiTipi(azioni);
+    const orari = new Set(Array.isArray(stato?.orariSveglie) ? stato.orariSveglie : []);
     const out = [];
+    // I tipi che stanno già reggendo una dichiarazione: un'azione sola non può
+    // reggerne due diverse.
+    const impegnati = new Set();
+    const radici = radiciDichiarate(t);
+    let pronome = null;
     for (const fam of FAMIGLIE) {
-      // Famiglia senza tipi (vedi «senza-nome»): la regge QUALUNQUE azione, e
-      // parla solo se nessuna famiglia ha già saputo dire di cosa si tratta.
-      if (!fam.tipi.length) {
-        if (out.length || presenti.size > 0) continue;
-      } else if (fam.tipi.some((x) => presenti.has(x))) continue;
-      const frase = dichiarazione(t, fam);
-      if (frase) out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase });
+      const d = dichiarazione(t, fam);
+      if (!d) continue;
+      if (fam.pronome) { pronome = d; continue; }
+      const retta = fam.tipi.filter((x) => presenti.has(x));
+      if (retta.length) { for (const x of retta) impegnati.add(x); continue; }
+      // Nessuna azione: la cosa può esistere lo stesso, se l'ora nominata nella
+      // frase è quella di una sveglia che c'è davvero.
+      if (fam.orari && orari.size) {
+        const nominati = orariNelTesto(d.frase);
+        if ([...nominati].some((o) => orari.has(o))) continue;
+      }
+      out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
+    }
+    // Il pronome parla solo se nessuna famiglia ha già saputo dire di cosa si
+    // tratta, e se non è rimasta nessuna azione libera a reggerlo. Se la
+    // dichiarazione col pronome ripete lo stesso verbo di una già retta («ho
+    // messo la sveglia… te l'ho messa alle 19»), è lo stesso fatto detto due
+    // volte, non un secondo fatto mai successo.
+    if (pronome && !out.length) {
+      const libere = [...presenti].some((x) => !impegnati.has(x));
+      const ripete = pronome.verbo && radici.has(pronome.verbo);
+      if (!libere && !ripete) {
+        out.push({ id: 'senza-nome', avviso: 'non è partito niente', tipi: [], frase: pronome.frase });
+      }
     }
     return out;
   }
@@ -330,9 +454,10 @@
   // passasse intero: la frase arrivava all'utente, la sveglia no, e questa
   // volta senza nemmeno un ritentativo.
   //
-  // Un esempio dentro un blocco di codice — l'utente che chiede «fammi vedere
-  // com'è fatto» — NON è un guasto: la coda si guarda solo fuori dai blocchi
-  // recintati con i tre apici.
+  // Un ESEMPIO non è un guasto: né dentro un blocco recintato con i tre apici,
+  // né quando la riga prima dice che è un esempio («ecco com'è fatta
+  // un'azione:»). Buttare via quella risposta e rifarla lasciava l'utente senza
+  // la cosa che aveva chiesto di vedere.
   function involucro(s, nomi) {
     if (!s) return false;
     // Il vecchio involucro del protocollo, o un oggetto vuoto al posto della
@@ -350,24 +475,37 @@
     return false;
   }
 
+  // La riga che introduce il pezzo di formato dice che è un esempio?
+  const ANNUNCIO_DI_ESEMPIO = /(?:esempi|com['’]?\s*è\s+fatt|come\s+si\s+scriv|si\s+scrive\s+così|la\s+sintassi|il\s+formato\s+è)/i;
+
+  function annunciatoComeEsempio(righe, indice) {
+    for (let j = indice - 1; j >= 0 && j >= indice - 3; j--) {
+      const r = righe[j].trim();
+      if (!r) continue;
+      return ANNUNCIO_DI_ESEMPIO.test(r);
+    }
+    return false;
+  }
+
   function formatoSospetto(testo, nomiStrumenti) {
     const grezzo = String(testo || '').trim();
     if (!grezzo) return false;
     const nomi = Array.isArray(nomiStrumenti) ? new Set(nomiStrumenti)
       : (nomiStrumenti instanceof Set ? nomiStrumenti : nomiDegliStrumenti());
+    const righe = grezzo.split('\n');
     // Tutta la risposta è formato macchina, anche se recintata coi tre apici:
     // una risposta che è SOLO un involucro non è mai un esempio per l'utente.
     const nudo = grezzo.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
     if (involucro(nudo, nomi)) return true;
     // Il formato macchina in coda, dopo la risposta per l'utente. Si parte da
     // ogni riga che potrebbe aprirlo e si guarda da lì alla fine.
-    const righe = grezzo.split('\n');
     let recinto = false;
     for (let i = 0; i < righe.length; i++) {
       if (/^\s*```/.test(righe[i])) { recinto = !recinto; continue; }
       if (i === 0 || recinto) continue;
       const riga = righe[i].trimStart();
       if (!/^[[{]|^[A-Z][A-Z_]{3,}\s*[{(]/.test(riga)) continue;
+      if (annunciatoComeEsempio(righe, i)) continue;
       const coda = righe.slice(i).join('\n').trim().replace(/```[\s\S]*$/, '').trim();
       if (involucro(coda, nomi)) return true;
     }
@@ -391,8 +529,8 @@
       : `- «${f.frase}» (non hai chiamato niente in questo turno)`));
     return 'La tua risposta dice che hai già fatto questo:\n'
       + `${righe.join('\n')}\n`
-      + 'In questo turno però non hai chiamato nessuno strumento che lo faccia: non è successo, '
-      + 'e così com\'è la tua risposta dice all\'utente una cosa falsa.\n'
+      + 'In questo turno però non hai chiamato nessuno strumento che lo faccia, o quello che hai chiamato non ha prodotto niente: '
+      + 'non è successo, e così com\'è la tua risposta dice all\'utente una cosa falsa.\n'
       + 'Adesso fai UNA di queste tre cose:\n'
       + '1. se va fatto ORA, chiama lo strumento giusto e poi rispondi;\n'
       + '2. se l\'avevi già fatto in un turno PRECEDENTE di questa conversazione, NON rifarlo: '
@@ -435,6 +573,7 @@
     rileva,
     insiemeDiTipi,
     tipiDallaCronologia,
+    orariNelTesto,
     formatoSospetto,
     spintaAzioniMancanti,
     spintaFormato,
