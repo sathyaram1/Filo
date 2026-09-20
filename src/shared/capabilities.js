@@ -302,6 +302,18 @@
       invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu Riapri/Elimina.',
     },
     {
+      id: 'chat-archive', title: 'Ritrova le chat con Filo', category: 'save',
+      desc: 'Le chat che fai con Filo nella nuova scheda restano sul tuo computer, per intero, e si ritrovano nella stessa pagina delle schede chiuse. Anche i comandi che dai al terminale, se lo tieni acceso, restano dentro la chat dove li hai scritti, con il loro esito. Le discussioni sono in vista; le chat che erano solo un comando ("metti una sveglia") stanno sotto un interruttore, e ci restano finché non le cancelli tu. Cerca una parola e ti trova la chat che la conteneva, anche a metà conversazione; se cerchi una frase intera e nessuna chat la contiene tutta, Filo cerca con le parole che contano e ti dice con quali ha trovato. Clicca una chat per riaprirla per intero e continuare a scrivere da dove eravate. Il titolo lo scrive Filo, ma è tuo: puoi riscriverlo, e puoi spostare una chat fra le conversazioni e i comandi quando l’ha messa nel posto sbagliato.',
+      invoke: 'Pagina filo://archive/archive.html, sezione «Chat con Filo» in alto. Clicca una chat per riaprirla; tasto destro per il menu: Riapri, Rinomina, Sposta fra le conversazioni o fra i comandi, Elimina. La cancellazione chiede conferma. Una conversazione che stai ancora facendo è segnata «In corso» e cliccandola torni alla scheda dov’è aperta, invece di aprirne una seconda copia.',
+      doesNot: 'Niente sparisce da solo: non c’è una pulizia automatica, e nessuna chat esce dal tuo computer. Le chat fatte in una finestra in incognito non vengono salvate. Non entrano qui le conversazioni con l’Aiuto che compare sopra le pagine web: quelle vivono finché la pagina è aperta. Le immagini che incolli in chat non si conservano; rileggendo la chat trovi scritto quante ce n’erano.',
+    },
+    {
+      id: 'chat-archive-recall', title: 'Filo rilegge le vostre chat di prima', category: 'assistant',
+      desc: 'Puoi dire "riprendi la discussione di ieri sulla coscienza" o "cosa mi avevi detto su quella cosa?": Filo cerca fra le chat che avete già fatto nella nuova scheda, rilegge quella giusta e riparte da lì invece di ricominciare da capo.',
+      invoke: 'Chiediglielo a parole nella nuova scheda, nominando l’argomento o quando ne avevate parlato.',
+      doesNot: 'Rilegge solo le conversazioni con te, salvate sul tuo computer: niente di quello che scrivi finisce altrove.',
+    },
+    {
       id: 'history', title: 'Cronologia delle richieste AI', category: 'save',
       desc: 'L’elenco delle richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), filtrabile e ricercabile, con il costo di ogni richiesta e quanta parte del testo mandato al modello è stata riusata da una richiesta precedente invece di essere rielaborata; puoi rimuovere una singola voce oppure svuotarla del tutto.',
       invoke: 'Pagina filo://history/history.html. Passa il mouse su una voce e clicca «Rimuovi» per toglierla; «Cancella tutto» svuota l’intera cronologia.',

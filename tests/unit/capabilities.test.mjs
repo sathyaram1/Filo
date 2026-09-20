@@ -115,6 +115,21 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
+    // #525 — l'archivio delle chat: lo consulta la pagina Cronologia
+    // (capacità "chat-archive"). La ricerca che fa FILO stesso passa dalle
+    // azioni (FILO_RUN_ACTION → CERCA_CHAT) ed è la capacità gemella
+    // "chat-archive-recall".
+    FILO_CHATS_LIST: 'chat-archive',
+    FILO_CHAT_GET: 'chat-archive',
+    FILO_CHAT_CLOSE: 'chat-archive',
+    FILO_CHAT_DELETE: 'chat-archive',
+    FILO_CHATS_SEARCH: 'chat-archive',
+    // La riga che Filo scrive rispondendo a un comando con lo slash finisce
+    // nella stessa chat, e «torna dov'è aperta» è il clic su una chat ancora in
+    // corso: due pezzi della stessa capacità, non due voci nuove.
+    FILO_CHAT_NOTE: 'chat-archive',
+    FILO_CHAT_UPDATE: 'chat-archive',
+    FILO_CHAT_FOCUS: 'chat-archive',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',

@@ -236,6 +236,13 @@ app.whenReady().then(async () => {
   if (invitoInAttesa) { const a = invitoInAttesa; invitoInAttesa = null; apriInvito(a.code); }
   else apriInvitoDaArgv(process.argv);
 
+  // #525 — le chat lasciate a metà da una sessione finita di colpo: si
+  // chiudono e prendono titolo e tipo adesso. Chiudere Filo è il modo normale
+  // di finire una conversazione, quindi senza questo giro la chat più comune
+  // di tutte resterebbe senza nome in cronologia. In sottofondo: non blocca
+  // l'avvio, e se il modello non c'è si riprova alla partenza dopo.
+  try { require('./services/handlers').sweepPendingChats().catch(() => {}); } catch (_) {}
+
   // Sveglie e timer (#322): controlla nel main le scadenze arrivate, mostra la
   // notifica di sistema e avvisa le dashboard aperte (che fanno partire la
   // suoneria). Senza questo, una sveglia scatta solo se la newtab è aperta.

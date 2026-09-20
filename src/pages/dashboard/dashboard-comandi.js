@@ -22,6 +22,11 @@
   let goThread = null;
   let autoGrowInput = null;
   let refreshLive = null;
+  // #525 — mette una riga di Filo nell'archivio della chat in corso (la targa
+  // la sa la pagina, che è la stessa che la manda coi turni normali).
+  let archiviaRiga = () => {};
+  let chatDellaRiga = () => null;
+  let inChatAperta = () => true;
   // Il terminale: stato e esecuzione stanno nel suo modulo, qui si chiedono.
   let isTerminalMode = () => false;
   let getShell = () => 'powershell';
@@ -47,21 +52,21 @@
     // a chiunque altro darebbe una pagina vuota. Chi vuole MANDARE un feedback
     // lo fa dal menu del tasto destro → "Invia feedback", oppure chiedendolo a
     // Filo in chat, e quella strada non cambia.
-    '/feedback': () => {
+    '/feedback': (text, chat) => {
       if (!isOwner) {
-        showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.');
+        showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
         return;
       }
       send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });
     },
     '/incognito': () => { send({ type: MSG.OPEN_INCOGNITO }); },
-    '/pulisci': () => { runTabCleanup(); },
-    '/pulizia': () => { runTabCleanup(); },
-    '/riordina': () => { runTabReorder(); },
-    '/set': (text) => { handleSetCommand(text); },
-    '/users': () => { handleUsersCommand(); },
-    '/gift': (text) => { handleGiftCommand(text); },
-    '/help': () => {
+    '/pulisci': (text, chat) => { runTabCleanup(chat); },
+    '/pulizia': (text, chat) => { runTabCleanup(chat); },
+    '/riordina': (text, chat) => { runTabReorder(chat); },
+    '/set': (text, chat) => { handleSetCommand(text, chat); },
+    '/users': (text, chat) => { handleUsersCommand(chat); },
+    '/gift': (text, chat) => { handleGiftCommand(text, chat); },
+    '/help': (text, chat) => {
       if (document.body.dataset.state !== 'thread') goThread();
       const lines = [
         '/home, /clear — ricarica la dashboard',
@@ -86,43 +91,54 @@
           '/gift NUMERO EMAIL — regala crediti a un utente (proprietario)',
         );
       }
-      const bubble = makeBubble({ role: 'filo', text: lines.join('\n') });
-      bubblesEl.appendChild(bubble);
-      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+      showFiloLine(lines.join('\n'), chat);
     },
   };
 
   // "/users": elenca le email degli utenti registrati. Riservato al proprietario
   // (il main rifiuta i non-admin con un messaggio chiaro).
-  async function handleUsersCommand() {
-    showFiloLine('Recupero gli utenti registrati…');
+  async function handleUsersCommand(chat) {
+    showFiloLine('Recupero gli utenti registrati…', chat);
     const r = await send({ type: MSG.OWNER_LIST_USERS });
-    if (!r || r.ok === false) { showFiloLine(r?.error || 'Non sono riuscito a recuperare gli utenti.'); return; }
+    if (!r || r.ok === false) { showFiloLine(r?.error || 'Non sono riuscito a recuperare gli utenti.', chat); return; }
     const users = Array.isArray(r.users) ? r.users : [];
-    if (!users.length) { showFiloLine('Nessun utente registrato.'); return; }
+    if (!users.length) { showFiloLine('Nessun utente registrato.', chat); return; }
     const lines = users.map((u) => `• ${u.email}${u.name ? ` (${u.name})` : ''} — ${u.balance} crediti`);
-    showFiloLine(`Utenti registrati (${users.length}):\n${lines.join('\n')}`);
+    showFiloLine(`Utenti registrati (${users.length}):\n${lines.join('\n')}`, chat);
   }
 
   // "/gift NUMERO EMAIL": regala crediti a un utente. Riservato al proprietario.
-  async function handleGiftCommand(text) {
+  async function handleGiftCommand(text, chat) {
     const m = /^\/gift\s+(\S+)\s+(\S+)\s*$/i.exec(String(text || '').trim());
-    if (!m) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com'); return; }
+    if (!m) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com', chat); return; }
     const amount = Number(m[1]);
     const email = m[2];
     if (!Number.isInteger(amount) || amount <= 0) {
-      showFiloLine(`"${m[1]}" non è un numero di crediti valido. Usa un intero positivo.`);
+      showFiloLine(`"${m[1]}" non è un numero di crediti valido. Usa un intero positivo.`, chat);
       return;
     }
-    showFiloLine(`Regalo ${amount} crediti a ${email}…`);
+    showFiloLine(`Regalo ${amount} crediti a ${email}…`, chat);
     const r = await send({ type: MSG.OWNER_GIFT_CREDITS, amount, email });
-    if (!r || r.ok === false) { showFiloLine(r?.error || 'Operazione non riuscita.'); return; }
-    showFiloLine(`✓ Regalati ${r.amount} crediti a ${r.email}. Nuovo saldo del destinatario: ${r.balance}.`);
+    if (!r || r.ok === false) { showFiloLine(r?.error || 'Operazione non riuscita.', chat); return; }
+    showFiloLine(`✓ Regalati ${r.amount} crediti a ${r.email}. Nuovo saldo del destinatario: ${r.balance}.`, chat);
   }
 
   // Mostra una riga di risposta da Filo nel thread (usata dai comandi che
   // hanno bisogno di dire qualcosa: es. l'uso corretto di /set timer).
-  function showFiloLine(text) {
+  // Una riga che Filo scrive senza passare da un modello: la risposta a un
+  // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
+  // resoconto del riordino delle schede).
+  //
+  // #525 — va anche NELL'ARCHIVIO. Prima restava solo a schermo: riaprendo
+  // quella chat da Cronologia la riga non c'era più e la conversazione si
+  // rileggeva con un buco in mezzo. È una riga che l'utente ha letto, e questo
+  // lavoro promette di conservarle tutte.
+  // `chat` è la targa presa quando l'utente ha dato il comando: una riga che
+  // arriva quando quella conversazione qui non c'è più si archivia lì dentro e
+  // basta, senza riportare a schermo una chat che l'utente aveva chiuso.
+  function showFiloLine(text, chat) {
+    try { archiviaRiga(text, 'filo', chat); } catch (_) {}
+    if (!inChatAperta(chat)) return;
     if (document.body.dataset.state !== 'thread') goThread();
     const bubble = makeBubble({ role: 'filo', text });
     bubblesEl.appendChild(bubble);
@@ -132,19 +148,19 @@
   // "/pulisci" (o "/pulizia"): avvia il riordino/archiviazione delle schede non
   // più utili, con la STESSA conferma del bottone "🧹 Riordina e archivia le
   // schede" (mai automatico, spec §2.1). Riusa il popup Filo SN_CONFIRM_UI.
-  async function runTabCleanup() {
+  async function runTabCleanup(chat) {
     const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
       + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
     const ok = window.SN_CONFIRM_UI
       ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
       : window.confirm(`${text} Procedo?`);
     if (!ok) return;
-    showFiloLine('🧹 Riordino in corso…');
+    showFiloLine('🧹 Riordino in corso…', chat);
     const r = await send({ type: MSG.RUN_TAB_TRIAGE });
     const n = (r && r.archived) || 0;
     showFiloLine(n > 0
       ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}.`
-      : '✓ Nessuna scheda da archiviare.');
+      : '✓ Nessuna scheda da archiviare.', chat);
   }
 
   // "/riordina": riordina la striscia delle schede per colore, esattamente come
@@ -152,11 +168,11 @@
   // differenza di /pulisci). Immediato: è deterministico e non tocca i contenuti,
   // quindi niente popup di conferma — l'utente può sempre rifarlo o riaprire una
   // scheda. Diamo comunque un feedback esplicito (spec: ogni azione ha un esito).
-  async function runTabReorder() {
+  async function runTabReorder(chat) {
     const r = await send({ type: MSG.REORDER_TABS });
     showFiloLine(r && r.reordered
       ? '✓ Schede riordinate per colore.'
-      : '✓ Le schede erano già in ordine.');
+      : '✓ Le schede erano già in ordine.', chat);
   }
 
   // Converte l'argomento di "/set timer" in secondi.
@@ -183,15 +199,15 @@
   }
 
   // "/set timer 5:00" oppure "/set timer 8" → avvia un timer.
-  function handleSetCommand(text) {
+  function handleSetCommand(text, chat) {
     const m = /^\/set\s+timer\s+(.+)$/i.exec(String(text || '').trim());
     if (!m) {
-      showFiloLine('Uso: /set timer 5:00 oppure /set timer 8 (minuti).');
+      showFiloLine('Uso: /set timer 5:00 oppure /set timer 8 (minuti).', chat);
       return;
     }
     const seconds = parseTimerArg(m[1]);
     if (seconds == null) {
-      showFiloLine(`Non ho capito la durata "${m[1].trim()}". Prova /set timer 5:00 o /set timer 8.`);
+      showFiloLine(`Non ho capito la durata "${m[1].trim()}". Prova /set timer 5:00 o /set timer 8.`, chat);
       return;
     }
     send({ type: MSG.FILO_ADD_TIMER, label: 'Timer', seconds }).then((r) => {
@@ -199,7 +215,7 @@
         goHome();
         refreshLive();
       } else {
-        showFiloLine('Non sono riuscito ad avviare il timer.');
+        showFiloLine('Non sono riuscito ad avviare il timer.', chat);
       }
     });
   }
@@ -407,7 +423,13 @@
     const firstToken = text.split(/\s+/)[0];
     // 1) Comandi interni di Filo: vincono SEMPRE, anche in modalità terminale.
     const handler = SLASH_COMMANDS[text] || SLASH_COMMANDS[firstToken];
-    if (handler) { handler(text); inputEl.value = ''; autoGrowInput(); updateInputClass(); return true; }
+    // La targa della conversazione si prende ADESSO, mentre l'utente preme
+    // Invio: quello che il comando dirà fra dieci secondi appartiene a questa
+    // chat anche se intanto l'utente è tornato alla home.
+    if (handler) {
+      handler(text, chatDellaRiga());
+      inputEl.value = ''; autoGrowInput(); updateInputClass(); return true;
+    }
     // 2) Navigazione diretta a un sito: solo se è un singolo token "tipo sito".
     //    L'URL (e lo schema: http per i server locali/IP privati, https per i
     //    domini pubblici) lo compone la stessa logica della vecchia barra
@@ -423,7 +445,7 @@
     // 3) Modalità terminale: tutto il resto con `/` viene eseguito dalla shell
     //    (non passa mai all'LLM).
     if (isTerminalMode()) {
-      runShellCommand(text.slice(1).trim());
+      runShellCommand(text.slice(1).trim(), chatDellaRiga());
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
@@ -442,6 +464,9 @@
     goThread = deps.goThread;
     autoGrowInput = deps.autoGrowInput;
     refreshLive = deps.refreshLive;
+    if (deps.archiviaRiga) archiviaRiga = deps.archiviaRiga;
+    if (deps.chatDellaRiga) chatDellaRiga = deps.chatDellaRiga;
+    if (deps.inChatAperta) inChatAperta = deps.inChatAperta;
     if (deps.isTerminalMode) isTerminalMode = deps.isTerminalMode;
     if (deps.getShell) getShell = deps.getShell;
     if (deps.getCwd) getCwd = deps.getCwd;

@@ -21,6 +21,10 @@
   let makeBubble = null;
   let goThread = null;
   let updateInputClass = () => {};
+  // #525 — mette una riga nell'archivio della chat a cui appartiene: la targa
+  // la dà la pagina quando l'utente lancia il comando, non quando l'esito arriva.
+  let archiviaRiga = () => {};
+  let chatDellaRiga = () => null;
 
   // ===== Stato del terminale (fonte unica) =====
   let terminalMode = false;          // attivabile da Preferenze
@@ -136,9 +140,19 @@
     return { end: pos + 2, sgr: null }; // sequenza a due byte (ESC c, ESC 7…)
   }
 
-  function runShellCommand(command) {
+  function runShellCommand(command, chat) {
     if (!command) return;
     if (document.body.dataset.state !== 'thread') goThread();
+    // La conversazione a cui il comando e il suo esito appartengono è questa,
+    // anche se l'esito arriva fra dieci secondi e intanto l'utente se n'è andato.
+    const chatDelComando = chat || chatDellaRiga();
+
+    // #525 — il comando e il suo esito sono battute di QUESTA conversazione:
+    // l'utente li legge qui, in mezzo alle altre, e riaprendo la chat da
+    // Cronologia li deve ritrovare. Prima restavano solo sullo schermo e la
+    // chat si rileggeva con un buco dentro, proprio dove c'era la riga che si
+    // torna a cercare («qual era il comando di ieri?»).
+    archiviaRiga(`/${command}`, 'user', chatDelComando);
 
     // Bolla "comando" (stile utente) con il prompt digitato.
     const cmdBubble = makeBubble({ role: 'user', text: '' });
@@ -211,11 +225,19 @@
       return node;
     };
 
+    // L'esito ripulito dalle sequenze di colore, come lo legge chi guarda: è
+    // quello che finisce nell'archivio della chat quando il comando ha finito.
+    let testoEsito = '';
     const appendOut = (chunk, isErr) => {
       const data = ansi.tail + chunk;
       ansi.tail = '';
       let i = 0, plain = '';
-      const flushPlain = () => { if (plain) { pre.appendChild(styledSpan(plain, isErr)); plain = ''; } };
+      const flushPlain = () => {
+        if (!plain) return;
+        pre.appendChild(styledSpan(plain, isErr));
+        testoEsito += plain;
+        plain = '';
+      };
       while (i < data.length) {
         const esc = data.indexOf('\x1b', i);
         if (esc === -1) { plain += data.slice(i); break; }
@@ -246,6 +268,14 @@
         out.appendChild(tag);
       }
       bubblesEl.scrollTop = bubblesEl.scrollHeight;
+      // L'esito va nell'archivio quando è finito, non a pezzi: un comando che
+      // scrive per un minuto riscriverebbe la chat a ogni riga. Un esito
+      // enorme si accorcia, ma dicendolo (SN_CHAT_ARCHIVE.clampOutput): un
+      // taglio muto toglie proprio l'errore in fondo.
+      const CA = global.SN_CHAT_ARCHIVE;
+      const corpo = `${testoEsito}${label ? `\n${label}` : ''}`.replace(/\s+$/, '');
+      const daScrivere = corpo.trim() ? corpo : '(nessun esito)';
+      archiviaRiga(CA ? CA.clampOutput(daScrivere) : daScrivere, 'filo', chatDelComando);
     };
 
     const handle = window.filo.shellExec({
@@ -288,6 +318,8 @@
     makeBubble = deps.makeBubble;
     goThread = deps.goThread;
     if (deps.updateInputClass) updateInputClass = deps.updateInputClass;
+    if (deps.archiviaRiga) archiviaRiga = deps.archiviaRiga;
+    if (deps.chatDellaRiga) chatDellaRiga = deps.chatDellaRiga;
   }
 
   global.SN_DASH_TERMINALE = {

@@ -15,14 +15,24 @@
   // Quando valorizzato, mostriamo i risultati della ricerca semantica (lista
   // piatta ordinata per pertinenza) invece dell'archivio raggruppato per giorno.
   let semanticResults = null;
+  // #525 — le chat con Filo: voci d'elenco (titolo, date, tipo, estratto),
+  // senza i messaggi. Il testo intero si chiede solo quando si riapre una chat.
+  let chats = [];
+  let showCommands = false;
 
   async function load() {
     const settings = await Storage.getSettings();
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
 
-    const r = await chrome.runtime.sendMessage({ type: MSG.GET_ARCHIVED_TABS });
+    const [r, rc] = await Promise.all([
+      chrome.runtime.sendMessage({ type: MSG.GET_ARCHIVED_TABS }),
+      chrome.runtime.sendMessage({ type: MSG.FILO_CHATS_LIST }).catch(() => null),
+    ]);
     tabs = (r && r.tabs) || [];
+    chats = (rc && rc.chats) || [];
+    chatsTotal = chats.length;
+    renderChats();
     render();
   }
 
@@ -120,6 +130,210 @@
     el.hidden = false;
   }
 
+  // ── #525 — le chat con Filo ───────────────────────────────────────────────
+  //
+  // Prima una chat viveva solo nella pagina aperta: tornando alla home
+  // spariva. Adesso si salvano tutte, per intero, e qui si ritrovano. Le
+  // CONVERSAZIONI (discussioni, spiegazioni, l'intervista di benvenuto) stanno
+  // in vista; i COMANDI ("metti una sveglia") ci sono sempre, sotto
+  // l'interruttore. Chi classifica è un modello economico, e sbaglia nel verso
+  // giusto: nel dubbio "conversazione", cioè visibile.
+  let chatsTotal = 0;      // quante ce ne sono in tutto (la sezione esiste?)
+  let chatSearchToken = 0; // l'ultima ricerca partita vince, non l'ultima arrivata
+  let ricercaAllargata = false; // i risultati rispondono a meno parole di quelle scritte
+  let terminiUsati = [];        // e queste sono le parole con cui sono stati trovati
+
+  function chatDateLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const k = dayKey(iso);
+    const today = new Date();
+    const yest = new Date(); yest.setDate(today.getDate() - 1);
+    const hm = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    if (k === dayKey(today.toISOString())) return `Oggi ${hm}`;
+    if (k === dayKey(yest.toISOString())) return `Ieri ${hm}`;
+    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // Ricarica l'elenco delle chat secondo la ricerca corrente. Con una query
+  // cerca nel TESTO di tutte le chat (lato main, dove i messaggi stanno già in
+  // memoria): "coscienza" trova la discussione anche se quella parola sta a
+  // metà conversazione e non nel titolo.
+  async function refreshChats() {
+    const q = ($('search').value || '').trim();
+    const token = ++chatSearchToken;
+    let r = null;
+    try {
+      r = q
+        ? await chrome.runtime.sendMessage({ type: MSG.FILO_CHATS_SEARCH, query: q })
+        : await chrome.runtime.sendMessage({ type: MSG.FILO_CHATS_LIST });
+    } catch (_) { r = null; }
+    if (token !== chatSearchToken) return; // una ricerca più recente ha già vinto
+    chats = (r && r.chats) || [];
+    // Cercando una frase («discussione sulla coscienza») può darsi che nessuna
+    // chat contenga tutte le parole: allora il main cerca con quelle che
+    // distinguono e lo dice. La pagina lo ripete a chi guarda, invece di
+    // mostrare risultati che non corrispondono alla richiesta scritta.
+    ricercaAllargata = !!(r && r.allargata) && !!q;
+    terminiUsati = (r && Array.isArray(r.termini)) ? r.termini : [];
+    // `chatsTotal` decide se la sezione esiste. Senza ricerca è il conto vero;
+    // con una ricerca attiva non lo si può riscrivere (i risultati sono un
+    // sottoinsieme), ma nemmeno lasciare a zero: una chat nata adesso in
+    // un'altra scheda terrebbe la sezione nascosta pur avendo un risultato.
+    if (!q) chatsTotal = chats.length;
+    else chatsTotal = Math.max(chatsTotal, chats.length);
+    renderChats();
+  }
+
+  function renderChats() {
+    const section = $('chatsSection');
+    const list = $('chatList');
+    const empty = $('chatEmpty');
+    const q = ($('search').value || '').trim();
+
+    // Nessuna chat mai fatta: la sezione non c'è. Una sezione vuota che
+    // annuncia se stessa è rumore su una pagina che si consulta.
+    if (!chatsTotal) { section.hidden = true; return; }
+    section.hidden = false;
+
+    const commands = chats.filter((c) => c && c.kind === 'comando');
+    const visible = showCommands ? chats : chats.filter((c) => !c || c.kind !== 'comando');
+
+    // L'interruttore dei comandi compare solo quando c'è qualcosa da mostrare.
+    const label = $('showCommandsLabel');
+    label.hidden = !commands.length;
+    $('showCommandsText').textContent = showCommands
+      ? `Nascondi i comandi (${commands.length})`
+      : `Mostra anche i comandi (${commands.length})`;
+    // Quando la ricerca si è allargata, la riga del conteggio dice con quali
+    // parole ha trovato: «3 chat» sotto una frase che non combacia farebbe
+    // credere che quella frase ci fosse.
+    const conParole = ricercaAllargata && terminiUsati.length
+      ? ` · trovate con “${terminiUsati.join(' ')}”`
+      : '';
+    $('chatsCount').textContent = visible.length ? `${visible.length} chat${conParole}` : '';
+
+    list.innerHTML = '';
+    if (!visible.length) {
+      // Vuoti diversi, frasi diverse: dire "nessuna chat" mentre una ricerca è
+      // attiva fa credere che l'archivio sia stato cancellato.
+      //
+      // E soprattutto: se la parola cercata sta in una chat di comando, quella
+      // chat C'È. Dire «Nessuna chat per "sveglia"» è falso, e falso proprio
+      // nel caso per cui i comandi si conservano — ritrovare la discussione
+      // che il classificatore aveva messo nel posto sbagliato. Qui si dice
+      // dov'è finita e come vederla.
+      empty.hidden = false;
+      if (q && commands.length) {
+        empty.textContent = commands.length === 1
+          ? `Nessuna conversazione per "${q}": la parola è in 1 chat di comando, accendi l’interruttore per vederla.`
+          : `Nessuna conversazione per "${q}": la parola è in ${commands.length} chat di comando, accendi l’interruttore per vederle.`;
+      } else if (q) empty.textContent = `Nessuna chat per "${q}".`;
+      else if (commands.length) empty.textContent = 'Solo chat di comando: accendi l’interruttore per vederle.';
+      else empty.textContent = 'Nessuna chat, per ora.';
+      return;
+    }
+    empty.hidden = true;
+    for (const c of visible) list.appendChild(renderChat(c));
+  }
+
+  function renderChat(c) {
+    const row = document.createElement('div');
+    row.className = 'arc-chat';
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    row.dataset.chatId = c.id;
+    if (c.kind) row.dataset.kind = c.kind;
+
+    const title = document.createElement('div');
+    title.className = 'arc-chat-title';
+    title.textContent = c.title || 'Chat senza titolo';
+    row.appendChild(title);
+
+    const excerpt = document.createElement('div');
+    excerpt.className = 'arc-chat-excerpt';
+    excerpt.textContent = c.excerpt || '';
+    row.appendChild(excerpt);
+
+    // Una chat ancora APERTA non è un ricordo: è la conversazione che stai
+    // facendo adesso, in un'altra scheda. Sta in elenco (si salva tutto, e
+    // sparire mentre la fai sarebbe peggio), ma si vede per quello che è:
+    // niente titolo generato, niente tipo, e al posto della data «In corso».
+    // Senza questa riga si leggeva come una chat finita, e cliccarla apriva
+    // una seconda copia della stessa conversazione.
+    const inCorso = !c.closedAt;
+    if (inCorso) row.dataset.incorso = '1';
+
+    const date = document.createElement('div');
+    date.className = 'arc-chat-date';
+    date.textContent = inCorso ? 'In corso' : chatDateLabel(c.closedAt || c.updatedAt || c.startedAt);
+    row.appendChild(date);
+
+    row.title = [
+      c.title || '',
+      `${c.messageCount || 0} messaggi`,
+      inCorso ? 'Conversazione ancora aperta' : (c.kind === 'comando' ? 'Comando' : 'Conversazione'),
+      inCorso ? 'Clic per tornare dov’è aperta' : 'Clic per riaprirla e continuare a scrivere',
+    ].filter(Boolean).join('\n');
+
+    row.addEventListener('click', (e) => {
+      // Mentre si rinomina, il clic appartiene al campo, non alla riga.
+      if (e.target.closest('.arc-chat-rename')) return;
+      reopenChat(c);
+    });
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openChatCtxMenu(e.clientX, e.clientY, c, row);
+    });
+    // Parità con il mouse: Invio/Spazio riapre, Shift+F10 o il tasto Menu
+    // aprono lo stesso menu contestuale del tasto destro.
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        reopenChat(c);
+      } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const r = row.getBoundingClientRect();
+        openChatCtxMenu(r.left, r.bottom, c, row);
+      }
+    });
+    return row;
+  }
+
+  // Riaprire una chat = aprirla nella home di Filo, per intero, pronta a
+  // ricevere il messaggio successivo dentro la stessa conversazione.
+  //
+  // Se però quella conversazione è ANCORA APERTA in una scheda, non se ne apre
+  // una seconda: si torna dov'è. Due schede sulla stessa chat non si vedono
+  // fra loro — scrivi in una e l'altra resta indietro — e nell'archivio i due
+  // fili finiscono mescolati.
+  async function reopenChat(c) {
+    if (!c.closedAt) {
+      try {
+        const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_FOCUS, id: c.id });
+        if (r && r.portato) return;
+      } catch (_) { /* nessuna scheda la sta vivendo: si apre normalmente */ }
+    }
+    try { chrome.tabs.create({ url: `filo://dashboard/dashboard.html?chat=${encodeURIComponent(c.id)}` }); }
+    catch (_) {}
+  }
+
+  // Cancellazione manuale, con la conferma prevista per le azioni
+  // irreversibili: una chat cancellata non torna da nessuna parte.
+  async function removeChat(c) {
+    const text = `Cancella per sempre la chat «${c.title || 'senza titolo'}». `
+      + 'L’operazione non si può annullare.';
+    const ok = window.SN_CONFIRM_UI
+      ? await window.SN_CONFIRM_UI.confirm({ title: 'Elimina la chat', text, okLabel: 'Elimina' })
+      : window.confirm(`${text} Procedo?`); // fallback se il modulo non è caricato
+    if (!ok) return;
+    try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_DELETE, id: c.id }); } catch (_) {}
+    chats = chats.filter((x) => x.id !== c.id);
+    chatsTotal = Math.max(0, chatsTotal - 1);
+    renderChats();
+  }
+
   // Ricerca semantica: embeddizza la query e ordina per pertinenza (lato main).
   async function runSemanticSearch() {
     const q = ($('search').value || '').trim();
@@ -158,6 +372,9 @@
   }
 
   function render() {
+    // L'intestazione "Schede chiuse" serve solo quando sopra c'è la sezione
+    // delle chat: senza, la pagina avrebbe un titolo per una lista sola.
+    $('tabsSection').hidden = !tabs.length || !chatsTotal;
     if (semanticResults) { renderSemantic(); return; }
     const q = ($('search').value || '').trim().toLowerCase();
     const list = $('list');
@@ -234,40 +451,76 @@
   // menu di Filo, vedi
   // patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md).
   let openMenu = null;
+  let fuocoPrimaDelMenu = null;
   function closeCtxMenu() {
     if (!openMenu) return;
+    const eraDentro = openMenu.contains(document.activeElement);
     openMenu.remove();
     openMenu = null;
     document.removeEventListener('mousedown', onOutsideClick, true);
     document.removeEventListener('keydown', onMenuKeydown, true);
     window.removeEventListener('scroll', closeCtxMenu, true);
     window.removeEventListener('resize', closeCtxMenu);
+    // Chi era arrivato al menu da tastiera torna sulla riga da cui è partito,
+    // invece di ritrovarsi il fuoco in fondo alla pagina.
+    if (eraDentro && fuocoPrimaDelMenu && document.contains(fuocoPrimaDelMenu)) {
+      try { fuocoPrimaDelMenu.focus(); } catch (_) {}
+    }
+    fuocoPrimaDelMenu = null;
   }
   function onOutsideClick(e) {
     if (openMenu && !openMenu.contains(e.target)) closeCtxMenu();
   }
-  function onMenuKeydown(e) {
-    if (e.key === 'Escape') closeCtxMenu();
+  const vociMenu = () => (openMenu ? [...openMenu.querySelectorAll('.sn-select-option')] : []);
+  function muoviFuocoMenu(passo) {
+    const voci = vociMenu();
+    if (!voci.length) return;
+    const i = voci.indexOf(document.activeElement);
+    voci[i < 0 ? (passo > 0 ? 0 : voci.length - 1) : (i + passo + voci.length) % voci.length].focus();
   }
-  function openCtxMenu(x, y, t) {
+  // Un menu che si apre da tastiera si deve anche percorrere da tastiera:
+  // Rinomina, Sposta ed Elimina non hanno nessun'altra porta, e senza questo
+  // chi non usa il mouse quelle tre cose non le fa.
+  function onMenuKeydown(e) {
+    if (!openMenu) return;
+    const voci = vociMenu();
+    const sopra = voci.includes(document.activeElement) ? document.activeElement : null;
+    const giu = e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey);
+    const su = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey);
+    if (e.key === 'Escape') { e.preventDefault(); closeCtxMenu(); return; }
+    if (giu || su) { e.preventDefault(); muoviFuocoMenu(giu ? 1 : -1); return; }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      if (voci.length) voci[e.key === 'Home' ? 0 : voci.length - 1].focus();
+      return;
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && sopra) { e.preventDefault(); sopra.click(); return; }
+    if (e.key.length === 1 && e.key.trim()) {
+      const lettera = e.key.toLowerCase();
+      const da = voci.indexOf(document.activeElement) + 1;
+      const trovata = voci.slice(da).concat(voci.slice(0, da))
+        .find((o) => o.textContent.trim().toLowerCase().startsWith(lettera));
+      if (trovata) { e.preventDefault(); trovata.focus(); }
+    }
+  }
+  // `items`: [{ label, run }]. Una sola implementazione del menu — clamp alla
+  // finestra, chiusura al clic fuori, Esc — per le schede e per le chat: due
+  // copie della stessa cosa sono due modi di farla divergere.
+  function openMenuAt(x, y, items) {
     closeCtxMenu();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop arc-ctxmenu';
     menu.setAttribute('role', 'menu');
 
-    const reopenOpt = document.createElement('div');
-    reopenOpt.className = 'sn-select-option';
-    reopenOpt.setAttribute('role', 'menuitem');
-    reopenOpt.textContent = 'Riapri';
-    reopenOpt.addEventListener('click', () => { closeCtxMenu(); reopenTab(t); });
-    menu.appendChild(reopenOpt);
-
-    const delOpt = document.createElement('div');
-    delOpt.className = 'sn-select-option';
-    delOpt.setAttribute('role', 'menuitem');
-    delOpt.textContent = 'Elimina';
-    delOpt.addEventListener('click', () => { closeCtxMenu(); removeTab(t); });
-    menu.appendChild(delOpt);
+    for (const it of items) {
+      const opt = document.createElement('div');
+      opt.className = 'sn-select-option';
+      opt.setAttribute('role', 'menuitem');
+      opt.tabIndex = -1;
+      opt.textContent = it.label;
+      opt.addEventListener('click', () => { closeCtxMenu(); it.run(); });
+      menu.appendChild(opt);
+    }
 
     document.body.appendChild(menu);
 
@@ -278,6 +531,11 @@
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
 
     openMenu = menu;
+    // Il fuoco entra nel menu, non sulla prima voce: la freccia giù sceglie la
+    // prima, e finché nessuna è scelta Invio non fa partire niente per sbaglio.
+    fuocoPrimaDelMenu = document.activeElement;
+    menu.tabIndex = -1;
+    try { menu.focus(); } catch (_) {}
     // setTimeout: evita che il mousedown/click che ha aperto il menu lo chiuda
     // subito tramite il listener "outside click".
     setTimeout(() => {
@@ -286,6 +544,84 @@
       window.addEventListener('scroll', closeCtxMenu, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);
+  }
+
+  function openCtxMenu(x, y, t) {
+    openMenuAt(x, y, [
+      { label: 'Riapri', run: () => reopenTab(t) },
+      { label: 'Elimina', run: () => removeTab(t) },
+    ]);
+  }
+
+  // Il titolo e il tipo di una chat li sceglie un modello economico, e sbaglia.
+  // Il titolo è l'unica cosa per cui una chat si riconosce in elenco, e una
+  // discussione finita fra i comandi resta nascosta sotto l'interruttore: se
+  // l'utente non può correggerli, l'errore del modello diventa definitivo.
+  // Stessa strada dell'Editor, dove un titolo scritto da Filo si rinomina dal
+  // menu del tasto destro.
+  function openChatCtxMenu(x, y, c, row) {
+    const versoComando = c.kind !== 'comando';
+    openMenuAt(x, y, [
+      { label: 'Riapri la chat', run: () => reopenChat(c) },
+      { label: 'Rinomina', run: () => rinominaChat(c, row) },
+      {
+        label: versoComando ? 'Sposta fra i comandi' : 'Sposta fra le conversazioni',
+        run: () => spostaChat(c, versoComando ? 'comando' : 'conversazione'),
+      },
+      { label: 'Elimina la chat', run: () => removeChat(c) },
+    ]);
+  }
+
+  // Rinomina sul posto: il titolo diventa un campo, Invio salva, Esc lascia
+  // com'era. Niente finestra di sistema — è la stessa regola per cui i menu di
+  // Filo non sono quelli del browser.
+  function rinominaChat(c, row) {
+    const titleEl = row && row.querySelector('.arc-chat-title');
+    if (!titleEl || row.querySelector('.arc-chat-rename')) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'arc-chat-rename';
+    input.value = c.title || '';
+    input.setAttribute('aria-label', 'Nuovo titolo della chat');
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let chiuso = false;
+    const ripristina = () => {
+      if (chiuso) return;
+      chiuso = true;
+      input.replaceWith(titleEl);
+    };
+    const salva = async () => {
+      if (chiuso) return;
+      const nuovo = input.value.replace(/\s+/g, ' ').trim();
+      // Un campo svuotato non cancella il titolo: la riga resterebbe senza
+      // niente da leggere. Vale come rinuncia.
+      if (!nuovo || nuovo === (c.title || '')) { ripristina(); return; }
+      chiuso = true;
+      try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_UPDATE, id: c.id, title: nuovo }); } catch (_) {}
+      c.title = nuovo;
+      titleEl.textContent = nuovo;
+      input.replaceWith(titleEl);
+      renderChats();
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); salva(); }
+      else if (e.key === 'Escape') { e.preventDefault(); ripristina(); }
+    });
+    input.addEventListener('blur', () => salva());
+    // Un clic dentro il campo non deve riaprire la chat.
+    input.addEventListener('click', (e) => e.stopPropagation());
+  }
+
+  // Sposta una chat fra le conversazioni e i comandi. Da qui in poi il
+  // classificatore non la rimette dov'era: l'ha detto l'utente.
+  async function spostaChat(c, kind) {
+    try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_UPDATE, id: c.id, kind }); } catch (_) {}
+    c.kind = kind;
+    renderChats();
   }
 
   function renderTab(t, { showScore = false } = {}) {
@@ -367,14 +703,38 @@
     e.preventDefault();
   }
 
+  // #525 — una chat finita (o cancellata) in un'altra scheda mentre questa
+  // pagina è aperta: l'elenco si riallinea da solo. Senza, chi tiene la
+  // Cronologia da una parte e chatta dall'altra torna qui e non trova la chat
+  // appena fatta, e crede che non si sia salvata.
+  function ascoltaCambiDelleChat() {
+    if (!chrome.runtime || !chrome.runtime.onMessage) return;
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.FILO_CHATS_UPDATED) refreshChats();
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    ascoltaCambiDelleChat();
     $('list').addEventListener('wheel', onListWheel, { passive: false });
     // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
+    // Le schede si filtrano qui, in pagina; le chat le cerca il main, che ha i
+    // messaggi in memoria e può guardare dentro la conversazione, non solo il
+    // titolo. Una richiesta per tasto premuto: il giro è locale e la risposta
+    // che arriva in ritardo viene scartata (vedi chatSearchToken), così a
+    // digitare in fretta non compare mai il risultato di una ricerca vecchia.
     $('search').addEventListener('input', () => {
       semanticResults = null;
       $('searchNote').hidden = true;
       render();
+      refreshChats();
+    });
+    // L'interruttore dei comandi: mostra o nasconde le chat classificate come
+    // "comando". Nascoste non vuol dire cancellate — ci sono sempre.
+    $('showCommands').addEventListener('change', (e) => {
+      showCommands = !!e.target.checked;
+      renderChats();
     });
     // Invio o bottone = ricerca semantica nei contenuti.
     $('search').addEventListener('keydown', (e) => {
@@ -382,7 +742,18 @@
     });
     $('semantic').addEventListener('click', runSemanticSearch);
     $('clear').addEventListener('click', async () => {
-      if (!tabs.length) return;
+      // Il tasto sta in cima a una pagina che adesso contiene anche le chat, e
+      // svuota solo le schede chiuse. Senza schede da svuotare restava muto:
+      // premuto, non succedeva niente e nessuno spiegava perché — su una
+      // pagina piena di conversazioni sembra che non funzioni.
+      if (!tabs.length) {
+        const note = $('searchNote');
+        note.hidden = false;
+        note.textContent = chatsTotal
+          ? 'Non c’è nessuna scheda chiusa da svuotare. Le chat con Filo restano: si cancellano una alla volta, col tasto destro.'
+          : 'Non c’è nessuna scheda chiusa da svuotare.';
+        return;
+      }
       const text = 'Cancella per sempre tutte le tab archiviate. '
         + 'L’operazione non si può annullare.';
       const ok = window.SN_CONFIRM_UI

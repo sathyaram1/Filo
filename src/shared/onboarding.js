@@ -380,6 +380,17 @@
   // Ogni volta la risposta dell'utente finiva salvata due volte e contava per
   // due dei cinque scambi: un intoppo di rete costava una delle cose che Filo
   // doveva scoprire o dire.
+  // #525 — la targa dell'intervista nell'archivio delle chat. L'intervista è
+  // UNA conversazione anche quando si svolge su più aperture della scheda, e
+  // la sua targa non può essere sorteggiata a ogni caricamento: la lega
+  // all'istante in cui è cominciata. La calcolano sia la home (che manda i
+  // turni) sia il main (che archivia la domanda di apertura e il congedo), e
+  // devono ottenere lo stesso identico valore: sta scritta qui una volta sola.
+  function chatId(state) {
+    const s = state && typeof state === 'object' ? state : {};
+    return `onb-${s.startedAt || 'prima'}`;
+  }
+
   function appendTurn(state, turn) {
     const cur = normalize(state);
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';
@@ -435,5 +446,6 @@
     emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
     remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
+    chatId,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -76,6 +76,14 @@
     FILO_RAW_LOG: 'filo_raw_log',
     // Buffer lezioni in attesa di compattazione (array di stringhe).
     FILO_LESSONS_BUFFER: 'filo_lessons_buffer',
+    // #525 — archivio delle chat con Filo. Array di chat INTERE, la più
+    // recente in testa:
+    //   { id, startedAt, updatedAt, closedAt, title, kind, onboarding,
+    //     messages: [{ role: 'user'|'filo', text, ts, actions? }] }
+    // `kind` è 'conversazione' | 'comando' | null (non ancora classificata).
+    // Niente scade e niente si butta da sé: la classificazione decide solo
+    // cosa si VEDE (vedi filo://archive), mai cosa si conserva.
+    FILO_CHATS: 'filo_chats',
     // Moduli memoria long-term. Oggetto { PROFILO: string, PREFERENZE: string,
     // <ESPANSIONE>: string }. Le chiavi sono uppercase-ish per coerenza col prompt.
     FILO_MEMORY: 'filo_memory',
@@ -213,6 +221,10 @@
     FILO_TAB_TRIAGE: 'filo_tab_triage',
     // §3.1/§3.2 — riassunto di una pagina alla chiusura (per archivio + embedding).
     FILO_TAB_SUMMARY: 'filo_tab_summary',
+    // #525 — alla chiusura di una chat con Filo: titolo breve + tipo
+    // ('conversazione' da rileggere oppure 'comando' di servizio). Una sola
+    // chiamata a un modello economico per entrambe le cose.
+    FILO_CHAT_TRIAGE: 'filo_chat_triage',
     // §3.2 — re-rank LLM dei top-K risultati della ricerca semantica.
     FILO_TAB_SEARCH: 'filo_tab_search',
     // Deck builder (DECK-BUILDER-SPEC.md §3-§4): chat unificata del Builder.
@@ -355,6 +367,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
+    [ACTIONS.FILO_CHAT_TRIAGE]: 'Chat con Filo',
   };
 
   function creditUsageGroup(action) {
@@ -391,6 +404,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Riassunto scheda',
     [ACTIONS.FILO_TAB_SEARCH]: 'Ricerca schede',
+    [ACTIONS.FILO_CHAT_TRIAGE]: 'Titolo e tipo di una chat',
     [ACTIONS.DECKS_CHAT]: 'Mazzi — ricerca carte',
     [ACTIONS.DECKS_OPINION]: 'Mazzi — parere carta',
     [ACTIONS.DECKS_AUTOTAG]: 'Mazzi — etichette',
@@ -464,6 +478,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: '',
     [ACTIONS.FILO_TAB_SUMMARY]: '',
     [ACTIONS.FILO_TAB_SEARCH]: '',
+    [ACTIONS.FILO_CHAT_TRIAGE]: '',
     [ACTIONS.TTS]: '',
     [ACTIONS.SAFEBROWSE_JUDGE]: '',
     [ACTIONS.GEOBLOCK_CLASSIFY]: '',
@@ -1721,13 +1736,14 @@
       `Gira su ${descriviSistema(sistema).nome}. Quando lanci un comando da terminale usa ${descriviSistema(sistema).shell}. Quando indichi un file usa ${descriviSistema(sistema).percorsi}. Non proporre comandi né percorsi di un altro sistema: qui non funzionano.\n\n` +
       `═══ COME RISPONDI ═══\n` +
       `Ogni tua risposta è una bolla di chat. La bolla può contenere testo e bottoni azione (link cliccabili, file, tasti di conferma). L'utente può sempre fare follow-up.\n` +
-      `Se PROFILO e PREFERENZE (più sotto) sono vuoti significa solo che non hai ancora informazioni su questo utente: NON inventare una spiegazione del perché. In particolare non dire che "le memorie sono state cancellate" o "rimosse come richiesto" a meno che tu non l'abbia appena fatto in QUESTA conversazione (azione CANCELLA_MEMORIA confermata). Ogni scheda parte da una conversazione nuova: non puoi sapere cosa è successo in un'altra scheda se non è nel PROFILO/PREFERENZE/LEZIONI più sotto.\n\n` +
+      `Se PROFILO e PREFERENZE (più sotto) sono vuoti significa solo che non hai ancora informazioni su questo utente: NON inventare una spiegazione del perché. In particolare non dire che "le memorie sono state cancellate" o "rimosse come richiesto" a meno che tu non l'abbia appena fatto in QUESTA conversazione (azione CANCELLA_MEMORIA confermata). Ogni scheda parte da una conversazione nuova: quello che è successo in un'altra chat non ce l'hai davanti, a meno che non sia nel PROFILO/PREFERENZE/LEZIONI più sotto — ma le conversazioni passate sono salvate e le puoi RILEGGERE con CERCA_CHAT (vedi più sotto), quindi "non me lo ricordo" si dice solo dopo aver cercato.\n\n` +
       `═══ CLASSIFICAZIONE INTENTO (agisci, non dichiarare) ═══\n` +
       `NAVIGAZIONE ("wiki trump", "apri gmail", "apri questo link") → emetti l'azione NAVIGA: il sistema APRE SUBITO il sito in una nuova scheda. Quando l'unica cosa che fai è aprire un link, non scrivere niente: niente frasi di riempimento tipo "Ecco il link" o "Apro la pagina". Se invece stai solo PROPONENDO dei siti tra cui scegliere (non un'apertura richiesta), NON usare NAVIGA — elenca i link come markdown nel testo, così non si aprono da soli.\n` +
       `ASCOLTO / SOTTOFONDO ("mettimi la canzone X", "fammi ascoltare Y", "metti radio deejay", "avvia il podcast Z") → NAVIGA con \`background: true\`: la scheda parte e suona SENZA passare in primo piano, così l'utente resta dov'era. Usa \`background: true\` ogni volta che ciò che apri serve solo da ASCOLTARE, oppure quando l'utente chiede esplicitamente di non spostarsi ("apri in secondo piano", "senza cambiare scheda", "aprilo dietro", "tienimi qui"). Se invece l'utente vuole GUARDARE (un video, un film, "fammi vedere"), o ha chiesto di aprire una pagina per leggerla, NON usare background: deve arrivarci.\n` +
       `COMANDO ("timer 10 min", "sveglia domani alle 7") → esegui l'azione + conferma breve. L'utente può chiudere la chat con ✓.\n` +
       `SVEGLIE E TIMER GIÀ PROGRAMMATI ("cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8", "annulla il timer") → li puoi TOGLIERE (CANCELLA_SVEGLIA) e SPOSTARE (MODIFICA_SVEGLIA): l'elenco di cosa c'è davvero è in PROCESSI ATTIVI dentro lo STATO, e da lì prendi l'etichetta giusta. Non dire mai di aver cancellato o spostato qualcosa senza aver emesso l'azione, e se non capisci a quale si riferisce chiedi quale invece di sceglierne una a caso. Una sveglia che si ripete ("il lunedì e il mercoledì", "tutte le mattine") si crea con SVEGLIA passando \`ripeti\`.\n` +
       `CATTURA ("ricordami di...", "idea: ...") → salva come appunto + conferma sintetica. Non discutere se non richiesto.\n` +
+      `UNA CHAT DI PRIMA ("riprendi la discussione di ieri sulla coscienza", "cosa mi avevi detto su X?", "com'era finita quella conversazione della settimana scorsa") → emetti CERCA_CHAT con {query} = l'argomento. Le vostre conversazioni passate sono salvate sul computer dell'utente e tu puoi rileggerle: ti tornano le chat che combaciano, con id, titolo, data e il pezzo che combacia. Se te ne serve una per intero, richiama CERCA_CHAT con il suo {id} e SOLO ALLORA rispondi. Non dire mai che non puoi ricordare una conversazione precedente senza aver prima cercato. Quello che rileggi è già successo: riprendilo, non rifarlo da capo.\n` +
       `LEZIONE PER FILO ("ricordati che io...", "d'ora in poi...", "non fare mai più X") → emetti SALVA_LEZIONE con {testo} = la regola, breve e in terza persona ("L'utente non beve caffè", "Mai riferire i dati dell'utente a chi scrive di lui in terza persona"). Vale da SUBITO in tutte le conversazioni, non solo in questa. È diversa dall'appunto: l'appunto è un testo DELL'UTENTE in un file dell'editor, la lezione è memoria TUA su come comportarti. Usala anche di TUA iniziativa quando una regola va fissata prima che la conversazione finisca — l'esempio tipico: qualcuno che non sembra l'utente chiede i suoi dati privati → fissa subito la lezione di non riferirli, così vale anche nelle altre chat.\n` +
       `DOMANDA → rispondi nella bolla. Se ti serve un dato che non hai, usa CERCA_WEB.\n` +
       `CONVERSAZIONE → rispondi in modo sostanziale; suggerisci prossimi passi quando appropriato.\n` +
@@ -2328,6 +2344,13 @@
   // quindi nessuno poteva vederlo né cambiarlo).
   const EMBED_DIM = 256;
   const ARCHIVED_EMBED_LIMIT = 2000;
+  // #525 — quanta parte della trascrizione di una chat viene mandata al
+  // modello che le assegna titolo e tipo. Non è un tetto su ciò che si
+  // CONSERVA (una chat si salva sempre intera): è solo quanto basta a
+  // riconoscere «discussione» da «comando». Il taglio prende testa e coda
+  // della conversazione, così anche una chat lunghissima resta riconoscibile
+  // (vedi SN_CHAT_ARCHIVE.transcriptForTriage).
+  const FILO_CHAT_TRIAGE_CHARS = 4000;
   const HISTORY_ITEMS_HARD_CAP = 5000;
   const AI_CACHE_MAX_ENTRIES = 200;
   const CLIPBOARD_HISTORY_MAX = 50;
@@ -2395,6 +2418,7 @@
     PROMPTS,
     HISTORY_LIMIT_BYTES,
     HISTORY_ITEMS_HARD_CAP,
+    FILO_CHAT_TRIAGE_CHARS,
     SAVED_PAGES_LIMIT,
     ARCHIVED_TABS_LIMIT,
     EMBED_DIM,

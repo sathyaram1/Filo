@@ -33,6 +33,11 @@
   let showHomeMessage = true; // commento centrale (disattivabile da Preferenze)
   let expanded = false;
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
+  // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
+  // a scrivere la conversazione su disco, turno per turno, così una chat
+  // sopravvive anche se questa scheda muore a metà. Torna null quando la chat
+  // si chiude (ritorno alla home, chat nuova), e il messaggio dopo ne apre una.
+  let chatId = null;
   let sending = false;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
@@ -62,6 +67,30 @@
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
   });
+  // #525 — una riga scritta in chat senza passare dal modello (la risposta a un
+  // comando con lo slash, il comando di terminale e il suo esito) entra
+  // nell'archivio come ogni altra battuta: l'utente l'ha letta dentro questa
+  // conversazione, e rileggendola deve ritrovarla. Una sola strada per tutti:
+  // due copie della stessa cosa sono due modi di farla divergere, ed è così che
+  // il terminale era rimasto fuori.
+  //
+  // La riga appartiene alla conversazione in cui l'utente l'ha PROVOCATA, non a
+  // quella aperta quando è pronta: chi la produce prende la targa (`chatDellaRiga`)
+  // al momento del comando e la passa qui. Un comando lento più un ritorno alla
+  // home la mettevano nella chat sbagliata, o in una chat nuova mai fatta.
+  const archiviaRiga = (text, role, chat) => {
+    // L'intervista di benvenuto ha una conversazione sua e un modo suo di
+    // finire: le sue righe le archivia lei.
+    if (Accoglienza.isActive()) return null;
+    const id = chat || ensureChatId();
+    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role }); } catch (_) {}
+    return id;
+  };
+  const chatDellaRiga = () => (Accoglienza.isActive() ? null : ensureChatId());
+  // Una riga di una conversazione che qui non è più a schermo si archivia e
+  // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
+  const inChatAperta = (chat) => !chat || chat === chatId;
+
   Term.init({
     dashDir,
     inputEl,
@@ -69,6 +98,8 @@
     makeBubble: (o) => makeBubble(o),
     goThread: () => goThread(),
     updateInputClass: () => Comandi.updateInputClass(),
+    archiviaRiga,
+    chatDellaRiga,
   });
   Comandi.init({
     send,
@@ -79,10 +110,13 @@
     goThread: () => goThread(),
     autoGrowInput: () => autoGrowInput(),
     refreshLive: () => refreshLive(),
+    archiviaRiga,
+    chatDellaRiga,
+    inChatAperta,
     isTerminalMode: () => Term.isEnabled(),
     getShell: () => Term.getShell(),
     getCwd: () => Term.getCwd(),
-    runShellCommand: (command) => Term.runShellCommand(command),
+    runShellCommand: (command, chat) => Term.runShellCommand(command, chat),
   });
   Accoglienza.init({
     $,
@@ -95,7 +129,12 @@
     stepTrace: (text) => Att.stepTrace(text),
     goHome: () => goHome(),
     goThread: () => goThread(),
-    resetHistory: () => { threadHistory = []; },
+    resetHistory: (onbState) => {
+      threadHistory = [];
+      // #525 — l'intervista è UNA conversazione: la sua targa la dà lo stato
+      // dell'intervista, non il sorteggio di questo caricamento di pagina.
+      if (onbState) chatId = chatIdOnboarding(onbState);
+    },
     pushHistory: (m) => { threadHistory.push(m); },
     isSending: () => sending,
     beginSending: () => { sending = true; sendBtn.disabled = true; },
@@ -218,8 +257,46 @@
     } catch (_) {}
   }
 
+  // ===== Archivio delle chat (#525) =====
+  //
+  // La targa si crea al primo messaggio, non all'apertura della scheda: una
+  // home aperta e mai usata non è una conversazione e non deve comparire in
+  // Cronologia.
+  function ensureChatId() {
+    if (!chatId) {
+      chatId = (self.crypto && self.crypto.randomUUID)
+        ? self.crypto.randomUUID()
+        : `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    }
+    return chatId;
+  }
+
+  // L'intervista di benvenuto (#524) è UNA conversazione, anche se si svolge su
+  // più aperture della scheda: chi la lascia a metà e riapre Filo domani
+  // riprende da dov'era. La targa la calcola il modulo dell'intervista, perché
+  // la calcola anche il main (che archivia la domanda di apertura e il
+  // congedo) e i due devono dire la stessa cosa.
+  function chatIdOnboarding(onbState) {
+    return self.SN_ONBOARDING.chatId(onbState);
+  }
+
+  // Chiude la chat in corso: il main fissa la data di chiusura e fa partire la
+  // classificazione (titolo breve + conversazione/comando). Non si aspetta la
+  // risposta — chi è appena tornato alla home non deve stare fermo mentre un
+  // modello legge la chat di prima.
+  function closeCurrentChat() {
+    if (!chatId) return;
+    const id = chatId;
+    chatId = null;
+    try { send({ type: MSG.FILO_CHAT_CLOSE, id }); } catch (_) {}
+  }
+
   // ===== Stato UI =====
   function goHome() {
+    // Tornare alla home CHIUDE la chat: è il gesto che la finisce, insieme a
+    // "chat nuova" e alla chiusura dell'app. Prima di svuotare le bolle,
+    // perché da qui in poi la conversazione non esiste più in questa pagina.
+    closeCurrentChat();
     body.dataset.state = 'home';
     homeView.hidden = false;
     threadView.hidden = true;
@@ -234,6 +311,65 @@
     body.dataset.state = 'thread';
     homeView.hidden = true;
     threadView.hidden = false;
+  }
+
+  // #525 — riapertura di una chat archiviata (filo://archive → clic su una
+  // chat, oppure un link con ?chat=<id>). La conversazione torna per intero e
+  // si continua a scrivere DENTRO la stessa chat: i messaggi nuovi si
+  // accodano a quelli di prima, non aprono una chat gemella.
+  //
+  // Quello che NON torna sono i bottoni delle azioni: un'azione in attesa di
+  // conferma non si può ri-offrire tre giorni dopo come se fosse di adesso.
+  // Al loro posto resta la riga che racconta cosa Filo aveva fatto.
+  function chatIdFromUrl() {
+    try { return new URLSearchParams(self.location.search).get('chat') || null; }
+    catch (_) { return null; }
+  }
+
+  async function reopenChat(id) {
+    const r = await send({ type: MSG.FILO_CHAT_GET, id });
+    const chat = r && r.ok && r.chat;
+    if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
+    chatId = chat.id;
+    threadHistory = [];
+    bubblesEl.innerHTML = '';
+    goThread();
+    for (const m of chat.messages) {
+      const isUser = m.role === 'user';
+      const text = String(m.text || '');
+      const types = Array.isArray(m.actions) ? m.actions : [];
+      if (text.trim()) {
+        bubblesEl.appendChild(makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser }));
+      }
+      // Le immagini incollate non stanno nell'archivio (sono data URL da
+      // centinaia di KB l'una), ma il loro NUMERO sì: va detto. Senza, chi
+      // rilegge trova «cosa vedi in questo grafico?» riferito al nulla e non
+      // capisce più di cosa si parlasse — un taglio silenzioso su quello che
+      // aveva mandato lui.
+      const quante = Number(m.images) || 0;
+      if (quante > 0) {
+        const nota = document.createElement('div');
+        nota.className = 'dash-bubble-note';
+        nota.dataset.replay = '1';
+        nota.textContent = quante === 1
+          ? '1 immagine, non conservata'
+          : `${quante} immagini, non conservate`;
+        bubblesEl.appendChild(nota);
+      }
+      if (!isUser && types.length) {
+        const note = document.createElement('div');
+        note.className = 'dash-bubble-note';
+        note.dataset.replay = '1';
+        note.textContent = Att.summarizeActivity(types, false);
+        bubblesEl.appendChild(note);
+      }
+      threadHistory.push(isUser
+        ? { role: 'user', text }
+        : { role: 'filo', text, actions: types.map((t) => ({ type: t })) });
+    }
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    inputEl.focus();
+    return true;
   }
 
   // ===== Suggerimenti (colonna sinistra) =====
@@ -723,6 +859,8 @@
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
+      // #525 — la chat si archivia nel main, mentre la si fa.
+      chatId: ensureChatId(),
     };
     if (images.length) {
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
@@ -1069,6 +1207,23 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
+      // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
+      // sta ancora qui a schermo. Continuare a scriverci dentro la farebbe
+      // rinascere con la stessa targa e i messaggi di prima persi: l'opposto
+      // di quello che l'utente ha chiesto. Da qui in poi è una chat nuova — e
+      // lo diciamo, perché una cosa cancellata altrove non deve succedere di
+      // nascosto.
+      if (msg.cancellata === chatId) {
+        chatId = null;
+        if (body.dataset.state === 'thread') {
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          nota.textContent = 'Questa conversazione è stata cancellata dalla Cronologia. Quello che scrivi da adesso apre una chat nuova.';
+          bubblesEl.appendChild(nota);
+          bubblesEl.scrollTop = bubblesEl.scrollHeight;
+        }
+      }
     } else if (msg?.type === MSG.FILO_ONBOARDING_UPDATED) {
       // #524 — un'altra scheda ha fatto avanzare la stessa intervista: qui la
       // conversazione si riallinea invece di restare ferma a com'era.
@@ -1594,6 +1749,22 @@
     setTimeout(() => flyCreditsToAccount(totalCredits), 250);
   }
 
+  // #525 — la scheda sta per sparire (chiusura della scheda o dell'app): è una
+  // chiusura di chat come le altre. Best-effort, perché a pagina che muore un
+  // messaggio può non partire: la rete di sicurezza vera è il giro di riordino
+  // all'avvio successivo (main.js → sweepPendingChats), che chiude e classifica
+  // le chat rimaste appese.
+  self.addEventListener('pagehide', () => {
+    try {
+      // Mentre l'intervista di benvenuto è in corso la scheda che sparisce non
+      // chiude niente: l'intervista riprende dov'era alla prossima apertura, e
+      // chiuderla qui vorrebbe dire pagare un titolo e un tipo a ogni
+      // ricaricamento per una conversazione che non è finita.
+      if (Accoglienza.isActive()) return;
+      closeCurrentChat();
+    } catch (_) {}
+  });
+
   (async function init() {
     renderControls();
     await applySavedTheme();
@@ -1615,11 +1786,21 @@
     // segno "già accolto" NON si scrive qui — si scrive quando l'intervista
     // finisce, altrimenti chi chiude la finestra adesso non la rivede più.
     const onbState = await Accoglienza.fetchOnboarding();
+    // #525 — una chat archiviata da riaprire (?chat=<id>). L'intervista di
+    // benvenuto ha comunque la precedenza: è la PRIMA conversazione e va
+    // finita, e durante l'intervista in archivio non c'è ancora niente.
+    const reopenId = onbState ? null : chatIdFromUrl();
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
-      onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      (onbState || reopenId) ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
+    // Una chat che non c'è più (cancellata da un'altra scheda) non deve
+    // lasciare una pagina vuota: si ricade sulla home normale.
+    if (reopenId) {
+      const opened = await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
+      if (!opened) await loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e));
+    }
     if (onbState) await Accoglienza.openOnboarding(onbState);
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.

@@ -64,9 +64,79 @@
     .arc-score {
       font-size: 10px; color: var(--sn-muted); flex: 0 0 auto;
     }
+    /* Senza questa riga la sezione resta a schermo anche quando la pagina la nasconde:
+       patterns/una-classe-che-scrive-display-deve-lasciarsi-nascondere.md */
+    .arc-section[hidden] { display: none; }
+    /* Una chat non è una chip: ha un titolo e un frammento da leggere, quindi è una riga a tutta larghezza.
+       Le conversazioni si vedono, i comandi stanno sotto l'interruttore: non è per quelli che si apre la pagina. */
+    .arc-section {
+      display: flex; align-items: baseline; gap: 12px;
+      margin: 18px 0 2px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--sn-border);
+    }
+    .arc-section h2 {
+      font-size: 14px; font-weight: 600; margin: 0; color: var(--sn-fg);
+    }
+    .arc-section-count { font-size: 12px; color: var(--sn-muted); }
+    /* Stessa trappola della sezione sopra: senza questa riga l'interruttore resta a schermo anche a zero comandi. */
+    .arc-cmd-toggle[hidden] { display: none; }
+    .arc-cmd-toggle {
+      margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--sn-muted); cursor: pointer;
+      user-select: none;
+    }
+    .arc-cmd-toggle:hover { color: var(--sn-fg); }
+    .arc-chat-list { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+    .arc-chat {
+      display: flex; align-items: baseline; gap: 10px;
+      padding: 8px 10px; border-radius: var(--sn-radius);
+      cursor: pointer; color: var(--sn-fg);
+      border: 1px solid transparent;
+      transition: background 0.1s ease, border-color 0.1s ease;
+    }
+    .arc-chat:hover, .arc-chat:focus-visible { background: var(--sn-hover); }
+    .arc-chat:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    /* Le chat "comando" restano riconoscibili anche quando sono in vista: una
+       riga più sobria dice a colpo d'occhio che lì non c'è una discussione. */
+    .arc-chat[data-kind="comando"] .arc-chat-title { color: var(--sn-muted); font-weight: 400; }
+    .arc-chat-title {
+      font-size: 13px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 0 1 auto; max-width: 46%;
+    }
+    /* Il campo di rinomina prende il posto del titolo e ne tiene la misura, così la riga non salta mentre si scrive.
+       Colori del tema di Filo, non quelli di serie del browser. */
+    .arc-chat-rename {
+      font: inherit; font-size: 13px; font-weight: 500;
+      flex: 0 1 auto; max-width: 46%; min-width: 180px;
+      padding: 1px 6px; margin: -2px 0;
+      color: var(--sn-fg); background: var(--sn-hover);
+      border: 1px solid var(--sn-accent); border-radius: var(--sn-radius);
+      outline: none;
+    }
+    .arc-chat-excerpt {
+      font-size: 12px; color: var(--sn-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 1 1 auto; min-width: 0;
+    }
+    .arc-chat-date { font-size: 11px; color: var(--sn-muted); flex: 0 0 auto; margin-left: auto; }
+    /* Una conversazione ancora aperta: «In corso» al posto della data. Non è
+       una data sbiadita, è uno stato — e cliccandola si torna dov'è aperta. */
+    .arc-chat[data-incorso] .arc-chat-date {
+      color: var(--sn-accent); font-weight: 500;
+    }
+
     /* Stesse classi .sn-select-pop del resto di Filo, ma fixed alle coordinate del click e non ancorato a un host
        relative: da qui il reset di right/top, che il JS imposta esplicitamente. */
     .arc-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
+    /* La voce sotto il mouse o sotto il fuoco della tastiera si deve vedere: senza, chi percorre il menu con le
+       frecce non sa dove si trova. Il menu appena aperto invece non si segna: a dirlo è che è comparso. */
+    .arc-ctxmenu:focus { outline: none; }
+    .arc-ctxmenu .sn-select-option:hover,
+    .arc-ctxmenu .sn-select-option:focus {
+      background-color: rgba(var(--sn-accent-rgb), 0.18);
+      outline: none;
+    }
   </style>
 </head>
 <body>
@@ -74,14 +144,32 @@
     <h1>Cronologia</h1>
 
     <div class="sn-toolbar">
-      <input type="search" id="search" placeholder="Cerca… (Invio = cerca nei contenuti)" />
+      <input type="search" id="search" placeholder="Cerca fra chat e schede… (Invio = cerca nei contenuti)" />
       <button class="sn-btn" id="semantic">🔎 Cerca nei contenuti</button>
-      <button class="sn-btn sn-btn-secondary" id="clear">Svuota archivio</button>
+      <button class="sn-btn sn-btn-secondary" id="clear" title="Cancella tutte le schede chiuse. Le chat con Filo restano.">Svuota archivio</button>
       <button class="sn-btn sn-btn-secondary" id="openHistory">Cronologia AI</button>
       <button class="sn-btn sn-btn-secondary" id="openHome">Aperti per dopo</button>
     </div>
     <p id="searchNote" class="sn-muted" style="margin:-6px 0 12px;" hidden></p>
 
+    <!-- #525 — le chat con Filo. La sezione compare solo quando ce n'è almeno
+         una: una pagina che annuncia una sezione vuota è rumore. -->
+    <section id="chatsSection" hidden>
+      <div class="arc-section">
+        <h2>Chat con Filo</h2>
+        <span id="chatsCount" class="arc-section-count"></span>
+        <label class="arc-cmd-toggle" id="showCommandsLabel" hidden>
+          <input type="checkbox" id="showCommands" />
+          <span id="showCommandsText">Mostra anche i comandi</span>
+        </label>
+      </div>
+      <div id="chatList" class="arc-chat-list"></div>
+      <div id="chatEmpty" class="sn-empty" hidden></div>
+    </section>
+
+    <div id="tabsSection" class="arc-section" hidden>
+      <h2>Schede chiuse</h2>
+    </div>
     <div id="list"></div>
     <div id="empty" class="sn-empty" hidden>Nessuna tab archiviata, per ora.</div>
   </main>

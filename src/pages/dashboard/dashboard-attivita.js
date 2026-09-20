@@ -239,6 +239,7 @@
   // contati. Senza azioni resta il solo ragionamento.
   const ACTIVITY_VERBS = {
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
+    CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
@@ -349,6 +350,11 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    CERCA_CHAT: (a) => {
+      const q = String(a.query || a.testo || '').trim();
+      if (a.id && !q) return { icon: '💬', text: 'Rileggo una conversazione di prima' };
+      return { icon: '💬', text: `Cerco fra le chat di prima: ${q}` };
+    },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
     LEGGI_FILE: (a) => {
       const title = (a._output && a._output.title) || '';
@@ -405,6 +411,7 @@
     CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
     SALVA_APPUNTO: 'Appunto non salvato', SALVA_LEZIONE: 'Non memorizzato',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto',
+    CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non letto',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
@@ -978,5 +985,10 @@
     tellActionInActivity,
     stepTrace,
     isType,
+    // #525 — «Ha aperto una pagina e avviato un timer»: la stessa frase del
+    // diario del turno, per chi RIAPRE una chat archiviata. Lì i bottoni non
+    // si rimettono (un'azione da confermare non si può ri-offrire giorni
+    // dopo): resta il racconto di cosa Filo ha fatto.
+    summarizeActivity,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

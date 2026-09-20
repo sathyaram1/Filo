@@ -82,6 +82,8 @@
     user('filo-dashboard', 'Generazione della home', 'Home', A.FILO_DASHBOARD),
     user('filo-lesson', 'Cosa vale la pena ricordare dopo una conversazione', 'Memoria', A.FILO_LESSON),
     user('filo-compact', 'Riordino dei ricordi', 'Memoria', A.FILO_COMPACT),
+    user('filo-chat-triage', 'Titolo e tipo di una chat finita', 'Home', A.FILO_CHAT_TRIAGE,
+      'Alla chiusura di una chat le dà un titolo breve e decide se era una conversazione da rileggere o solo un comando. Senza, le chat restano in archivio col primo messaggio come titolo, tutte fra le conversazioni.'),
 
     // Schede
     user('tab-triage', 'Riordino automatico delle schede', 'Schede', A.FILO_TAB_TRIAGE),

@@ -336,6 +336,7 @@
     options_action_tab_search: 'Ricerca semantica nell’archivio (re-rank)',
     options_action_filo_dashboard: 'Home — generazione della dashboard',
     options_action_filo_chat: 'Home — chat con Filo',
+    options_action_filo_chat_triage: 'Home — titolo e tipo di una chat finita',
     options_action_decks_chat: 'Mazzi — chat di ricerca carte',
     options_action_decks_opinion: 'Mazzi — parere su una carta',
     options_action_decks_autotag: 'Mazzi — etichette automatiche',

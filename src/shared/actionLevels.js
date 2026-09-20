@@ -228,6 +228,19 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    CERCA_CHAT: {
+      // #525 — Filo rilegge le conversazioni passate con lo stesso utente per
+      // riprendere un discorso di ieri. Sola lettura di dati che sono già
+      // dell'utente e che sono già passati da questo contesto (le ha scritte
+      // lui, con Filo): niente scritture, niente cancellazioni, niente che
+      // esca dal computer → livello 1, come LEGGI_FILE.
+      level: 1,
+      describe: (a) => {
+        const q = String((a && (a.query ?? a.testo)) || '').trim();
+        if (a && a.id && !q) return 'Rileggere una conversazione passata';
+        return `Cercare fra le conversazioni passate${q ? ` ("${q}")` : ''}`;
+      },
+    },
     LEGGI_FILE: {
       // Filo apre per intero un file dell'EDITOR di cui vede solo il riassunto
       // (#379.5). Sola lettura di dati che sono già in parte nel contesto (i

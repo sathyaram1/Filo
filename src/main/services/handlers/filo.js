@@ -4,12 +4,14 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, maybeRunCompactor,
+    executeFiloAction, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
   const Onboarding = globalThis.SN_ONBOARDING;
+  const FiloChats = globalThis.SN_FILO_CHATS;
+  const ChatArchive = globalThis.SN_CHAT_ARCHIVE;
 
   // I messaggi che leggono o riscrivono la memoria dell'utente non sono roba da
   // pagine web: il canale `filo:message` è uno solo e ci arrivano anche i
@@ -17,9 +19,18 @@ module.exports = function register(on, ctx) {
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
-  on(MSG.FILO_CHAT, async (msg, sender) => {
+  // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
+  const annunciaChat = () => {
+    try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
+  };
+
+  on(MSG.FILO_CHAT, async (msg, sender, origin) => {
     try {
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, sender });
+      // #525 — `chatId` è la targa della conversazione in corso: il main ci
+      // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
+      // Solo dalle pagine di Filo: una pagina web non apre chat nell'archivio.
+      const chatId = isFilo(origin) ? (msg.chatId || null) : null;
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
       // #360 — la chat non è un log: se il turno fallisce (rete assente, provider
@@ -96,6 +107,113 @@ module.exports = function register(on, ctx) {
     return { ok: true, compacted: !!compacted, memory: await FiloMem.getMemory() };
   });
 
+  // ── Archivio delle chat con Filo (#525) ──────────────────────────────────
+  //
+  // Le conversazioni dell'utente sono private come la memoria: solo pagine
+  // filo://, mai i content script dei siti visitati (vedi
+  // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
+  on(MSG.FILO_CHATS_LIST, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, chats: await FiloChats.listIndex() };
+  });
+
+  on(MSG.FILO_CHAT_GET, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, chat: await FiloChats.get(msg.id) };
+  });
+
+  // Chiusura di una chat. La risposta NON aspetta il classificatore: chi ha
+  // appena premuto "nuova chat" non deve stare fermo mentre un modello legge
+  // la conversazione di prima. Titolo e tipo arrivano in Cronologia poco dopo.
+  on(MSG.FILO_CHAT_CLOSE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const id = msg.id;
+    if (!id) return { ok: false, error: 'id mancante' };
+    closeAndTriageChat(id)
+      // La Cronologia può essere aperta in un'altra scheda mentre qui si
+      // finisce di chattare: l'annuncio la fa riallineare da sola, invece di
+      // lasciarla ferma a com'era e far credere che la chat non si sia
+      // salvata. Parte a classificazione finita, così la riga arriva già col
+      // titolo e col tipo giusti.
+      .then(() => annunciaChat())
+      .catch((e) => console.warn('[Filo] chiusura chat:', e?.message || e));
+    return { ok: true };
+  });
+
+  on(MSG.FILO_CHAT_DELETE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    await FiloChats.remove(msg.id);
+    // #525 — la conversazione cancellata può essere ancora a schermo in
+    // un'altra scheda. Se nessuno glielo dice, quella scheda continua a
+    // scrivere sulla stessa targa e la chat RINASCE: stessa targa, i messaggi
+    // di prima persi, e di nuovo in Cronologia. L'utente aveva chiesto il
+    // contrario. La scheda che la sta vivendo se ne libera e il messaggio dopo
+    // apre una conversazione nuova, con una targa sua.
+    ctx.dimenticaChat(msg.id);
+    try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, cancellata: msg.id }); } catch (_) {}
+    return { ok: true, chats: await FiloChats.listIndex() };
+  });
+
+  // #525 — una riga che Filo ha scritto in chat senza passare da un modello
+  // (la risposta a un comando con lo slash). Fino a ieri restava solo sullo
+  // schermo: riaprendo la chat dall'archivio quella riga non c'era più, e la
+  // conversazione si rileggeva con un buco in mezzo.
+  on(MSG.FILO_CHAT_NOTE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const id = msg.id;
+    const text = String(msg.text || '');
+    if (!id || !text.trim()) return { ok: false, error: 'niente da archiviare' };
+    // La scheda che scrive questa riga sta vivendo la chat: quando sparisce,
+    // la chat è finita — come per un turno normale.
+    if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
+    const role = msg.role === 'user' ? 'user' : 'filo';
+    await FiloChats.append(id, { role, text });
+    return { ok: true };
+  });
+
+  // #525 — titolo e tipo scelti a mano dall'utente (menu del tasto destro in
+  // Cronologia). Da qui in poi il classificatore non li riscrive più.
+  on(MSG.FILO_CHAT_UPDATE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    if (!msg.id) return { ok: false, error: 'id mancante' };
+    const chat = await FiloChats.setUserTriage(msg.id, { title: msg.title, kind: msg.kind });
+    if (!chat) return { ok: false, error: 'chat inesistente' };
+    // Le altre schede che hanno la Cronologia aperta vedono il nome nuovo.
+    try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
+    return { ok: true, chats: await FiloChats.listIndex() };
+  });
+
+  // #525 — la conversazione che l'utente ha cliccato in Cronologia è ancora
+  // aperta in una scheda: lo portiamo lì. Aprirne una seconda copia significa
+  // due schede sulla stessa chat che non si vedono fra loro.
+  on(MSG.FILO_CHAT_FOCUS, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, portato: ctx.portaAllaChat(msg.id) };
+  });
+
+  on(MSG.FILO_CHATS_SEARCH, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const all = await FiloChats.list();
+    // Una frase intera ("discussione sulla coscienza") non deve dare zero
+    // risultati quando la chat c'è: se pretendere tutte le parole non trova
+    // niente, la ricerca si allarga alle parole che distinguono e lo DICE
+    // (`termini`), così la pagina può scrivere con che cosa ha trovato.
+    const { results, termini, allargata } = ChatArchive.searchWide(all, msg.query, {
+      kind: msg.kind || null,
+      onlyVisible: !!msg.onlyVisible,
+      limit: Number(msg.limit) || 0,
+    });
+    // L'estratto diventa il frammento attorno a ciò che si cercava: è quello
+    // che spiega perché la chat è nel risultato.
+    const q = termini.join(' ');
+    const chats = results.map((c) => {
+      const entry = ChatArchive.toIndexEntry(c);
+      if (entry && q) entry.excerpt = ChatArchive.snippetFor(c, q);
+      return entry;
+    }).filter(Boolean);
+    return { ok: true, chats, termini, allargata };
+  });
+
   // ── Micro-intervista di benvenuto (#524) ─────────────────────────────────
   //
   // La dashboard chiede lo stato all'apertura: se l'intervista è aperta e non è
@@ -164,6 +282,10 @@ module.exports = function register(on, ctx) {
     const state = await saveOnboarding(
       Onboarding.close(Onboarding.appendTurn(cur, { role: 'filo', text: bye })),
     );
+    // #525 — il congedo lo legge l'utente, quindi lo deve ritrovare rileggendo
+    // l'intervista. La targa della chat la calcola il modulo dell'intervista,
+    // lo stesso che usa la home per mandare i turni.
+    await archiviaCongedoAccoglienza(Onboarding.chatId(cur), bye);
     // Niente agente-lezioni: qui non c'è un turno da cui estrarre nulla, ma
     // quello che l'utente aveva già raccontato va comunque messo in memoria.
     finishOnboarding({ lessons: false });
