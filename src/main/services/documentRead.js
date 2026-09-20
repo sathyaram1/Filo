@@ -518,9 +518,12 @@ function pareDueByte(buf) {
   if (!totale) return '';
   const verso = alti > bassi ? 'le' : 'be';
   if (Math.max(alti, bassi) / totale < 0.9) return '';
-  // Byte per byte è già testo? Allora è un testo a 8 bit con qualche byte
-  // guasto, non un file a due byte per carattere.
-  if (quotaNonTestoByte(buf, n) < QUOTA_NON_TESTO) return '';
+  // Il lato che sarebbe il byte ALTO delle coppie è fatto di caratteri o no?
+  // In un file scritto a due byte quel lato non è testo in NESSUN alfabeto: è
+  // zero in italiano, un carattere di controllo in russo e in greco. In un
+  // testo a 8 bit con qualche byte guasto, invece, quel lato è testo come
+  // tutto il resto, perché è testo e basta.
+  if (quotaLatoNonTesto(buf, n, verso === 'le' ? 1 : 0) <= 0.5) return '';
   return quotaNonTesto(leggiDueByte(buf, verso, false)) < QUOTA_NON_TESTO ? verso : '';
 }
 
