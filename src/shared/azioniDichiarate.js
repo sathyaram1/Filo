@@ -697,7 +697,10 @@
   function rileva(testo, azioni, stato, opzioni) {
     const t = String(testo || '');
     if (!t.trim()) return [];
-    const presenti = (azioni instanceof Set) ? azioni : insiemeDiTipi(azioni);
+    // Un insieme che arriva dalla cronologia è passato, non presente.
+    const daCronologia = (azioni instanceof Set) && azioni.dalPassato === true;
+    const presenti = daCronologia ? new Set()
+      : ((azioni instanceof Set) ? azioni : insiemeDiTipi(azioni));
     // Chi chiama può restringere le famiglie da guardare. Serve all'Aiuto,
     // che di Filo fa solo un pezzo: lì «ho aperto il menu» o «ho cercato sul
     // web» sono cose che quel pannello fa per strade sue, e accusarlo di non
