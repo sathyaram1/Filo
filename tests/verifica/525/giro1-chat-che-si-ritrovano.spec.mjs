@@ -266,6 +266,10 @@ test('tema scuro: la sezione delle chat si legge', async ({ app, openTab }) => {
   await page.locator('#showCommands').check();
   await expect(page.locator('.arc-chat')).toHaveCount(2);
   await page.screenshot({ path: 'tests/.shots/525-cronologia-chat-scuro.png' });
+  // E in chiaro, dalla stessa pagina: i due temi si guardano affiancati.
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('light'));
+  await page.screenshot({ path: 'tests/.shots/525-cronologia-chat-chiaro.png' });
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('dark'));
 
   // Il titolo di una chat «comando» resta leggibile: attenuato non vuol dire
   // invisibile sul fondo scuro.
