@@ -580,12 +580,13 @@
         // sotto», «te l'ho messa in ordine alfabetico»), non esiste nessuno
         // strumento che possa averla fatta e non c'è niente da smentire.
         if (puntaAllaRisposta(testo, fine)) continue;
-        const clausola = clausolaDi(testo, m.index, fine);
-        if (viste.has(clausola)) continue;
-        viste.add(clausola);
+        // Due regole che pescano lo stesso pezzo di frase raccontano la
+        // stessa cosa: conta per una. Due pezzi diversi sono due cose.
+        if (sovrapposta(m.index, fine)) continue;
+        presi.push([m.index, fine]);
         out.push({
           frase: frasePiena(testo, m.index, fine),
-          clausola,
+          clausola: clausolaDi(testo, m.index, fine),
           verbo: verboDi(m[0]),
         });
       }
