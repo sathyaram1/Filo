@@ -75,6 +75,8 @@ require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: ri
 // #652 — una manopola numerica: controllo del numero e frase di rifiuto. La
 // parte pura serve anche al main, che rifiuta gli stessi valori della pagina.
 require(path.join(SHARED, 'campoNumero.js'));
+// Come partono le sessioni delle routine: stesse regole in pagina e nel main.
+require(path.join(SHARED, 'routineSessioni.js'));
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
