@@ -80,8 +80,10 @@ test('il riepilogo di stato dichiara i titoli delle schede che ha appena messo n
   // decide se il compito è pulito deve saperlo da qui, non indovinarlo dalle
   // azioni. Senza questa riga un compito con una pagina ostile aperta si
   // dichiarava pulito.
+  // Con le sole pagine di Filo aperte non c'è niente di altri: quei titoli li
+  // scrive Filo, e con la home sempre aperta ogni compito nascerebbe sporco.
   const vuoto = await app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble()).fonti);
-  expect(vuoto).toEqual([]);
+  expect(vuoto, 'le pagine di Filo non devono contare come testo di altri').toEqual([]);
 
   const page = await openTab(testServer.html('<!doctype html><title>NOTA PER FILO</title><p>x</p>'));
   await page.waitForLoadState('load').catch(() => {});
