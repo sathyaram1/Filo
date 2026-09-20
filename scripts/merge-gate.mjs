@@ -202,6 +202,22 @@ export function statoPubblicazione(g, branch, punta) {
   return dentro.ok ? { stato: 'pubblicato', suOrigin: ref.out } : { stato: 'assente', suOrigin: ref.out };
 }
 
+/**
+ * Come `gitIn`, ma con un tetto sul tempo: qui si parla anche con la rete, e
+ * un comando appeso all'ultimo passo del giro tiene fermo il lavoro senza
+ * dirlo. Scaduto il tetto l'esito è un `ok:false`, che più in su diventa «non
+ * l'ho potuto controllare»: una risposta, non un silenzio.
+ */
+export function gitConTetto(root, ms = 30000) {
+  return function git(args) {
+    try {
+      return { ok: true, out: String(execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: ms }) || '').trim() };
+    } catch (e) {
+      return { ok: false, out: `${(e && e.stdout) || ''}${(e && e.stderr) || ''}`.trim() || String((e && e.message) || e) };
+    }
+  };
+}
+
 /** Il rifiuto per un contenuto esaminato che su origin non c'è. PURA. */
 export function testoNonPubblicato(punta, suOrigin, ramo = '') {
   const p = String(punta || '').slice(0, 12);
