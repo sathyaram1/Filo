@@ -107,7 +107,9 @@
   // assolveva tre mai fatte.
   // La sveglia si chiama anche «allarme»: riconoscere solo una delle due
   // parole lasciava passare «ti ho messo l'allarme alle 19».
-  const SVEGLIA = '(?:svegli[ae]|allarm[ei])';
+  // Giro 9: «suoneria» è il terzo modo di chiamarla, e «ho messo la suoneria
+  // alle 19» passava muto.
+  const SVEGLIA = '(?:svegli[ae]|allarm[ei]|suoneri[ae])';
 
   // Giro 8 — le cose che l'utente METTE DAVANTI a Filo: una foto mandata in
   // chat, un testo incollato nel messaggio, un file aperto nell'editor.
