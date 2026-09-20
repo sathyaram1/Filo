@@ -360,6 +360,10 @@
   function isVisibilityHidden(el) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
+    // Prima dello stile: su una pagina di domande frequenti la risposta è quasi
+    // sempre questa, e chiedere lo stile di migliaia di elementi per scoprirlo
+    // si sente all'apertura del menu.
+    if (isInsideClosedDisclosure(el)) return true;
     // La finestra dell'elemento, non la nostra: da quando la traduzione entra
     // nei riquadri senza indirizzo (#407) qui arrivano elementi di un ALTRO
     // documento, e chiederne lo stile alla finestra sbagliata non risponde di
@@ -367,7 +371,9 @@
     const cs = viewOf(el).getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse'
         || cs.contentVisibility === 'hidden') return true;
-    if (isInsideClosedDisclosure(el)) return true;
+    if (isScaledToNothing(cs)) return true;
+    if (isTransparentOnScreen(el, cs)) return true;
+    if (isPushedOutOfPage(el)) return true;
     return isClippedToNothing(el, cs);
   }
 
@@ -376,6 +382,51 @@
   function isInsideClosedDisclosure(el) {
     const p = el.parentElement;
     return !!(p && p.tagName === 'DETAILS' && !p.open && el.tagName !== 'SUMMARY');
+  }
+
+  // Un <details> chiuso nasconde anche il testo scritto SENZA un riquadro
+  // attorno, che non è figlio di nessun elemento da saltare: senza questa
+  // domanda la forma base della fisarmonica — domanda, e sotto la risposta —
+  // veniva tradotta e pagata da chiusa, mentre la stessa risposta dentro un
+  // riquadro veniva rimandata (#505).
+  function isOwnTextHidden(el) {
+    return !!(el.tagName === 'DETAILS' && !el.open);
+  }
+
+  // Schiacciato da una trasformazione a fattore zero: il riquadro e tutto quello
+  // che contiene non arrivano sullo schermo, qualunque sia l'overflow.
+  function isScaledToNothing(cs) {
+    const t = cs.transform;
+    if (!t || t === 'none') return false;
+    const nums = t.slice(t.indexOf('(') + 1, -1).split(',').map((n) => parseFloat(n));
+    if (nums.length === 6) return nums[0] === 0 || nums[3] === 0;
+    if (nums.length === 16) return nums[0] === 0 || nums[5] === 0;
+    return false;
+  }
+
+  // Trasparente del tutto MENTRE è sullo schermo: è il menu a tendina chiuso,
+  // il suggerimento non ancora aperto. Fuori dallo schermo no: lì `opacity:0` è
+  // quasi sempre una comparsa in dissolvenza allo scorrimento, e rimandarla
+  // lascerebbe in lingua originale metà di un articolo che l'utente leggerà
+  // tutto.
+  function isTransparentOnScreen(el, cs) {
+    if (parseFloat(cs.opacity) !== 0) return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    const vx = viewOf(el);
+    return r.top < (vx.innerHeight || 0) && r.bottom > 0 && r.left < (vx.innerWidth || 0) && r.right > 0;
+  }
+
+  // Spinto fuori dalla PAGINA in alto o a sinistra (`left:-9999px`, un cassetto
+  // traslato via): lì non ci si arriva scorrendo. Le coordinate sono quelle del
+  // documento, non della finestra — con quelle della finestra tutto ciò che si
+  // è già scorso sembrerebbe nascosto.
+  function isPushedOutOfPage(el) {
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    if (r.width <= 0 && r.height <= 0) return false;
+    const vx = viewOf(el);
+    return (r.right + (vx.scrollX || 0)) <= 0 || (r.bottom + (vx.scrollY || 0)) <= 0;
   }
 
   // Schiacciato a zero e ritagliato (`max-height:0` più `overflow:hidden`). Il RITAGLIO è la condizione che conta:
