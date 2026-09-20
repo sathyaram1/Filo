@@ -8,6 +8,7 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { newtabPage, configureModel, fakeProvider, restore, chiedi } from './aiuto.mjs';
+import { clickConfirm, confirmText } from '../../helpers/confirm.mjs';
 
 test('confermata un\'impostazione che non si può applicare, l\'utente deve capire cosa è successo', async ({ app, shell }) => {
   test.setTimeout(60_000);
