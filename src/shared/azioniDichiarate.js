@@ -101,6 +101,11 @@
       // La sveglia può già esistere: se ne esiste una all'ora nominata nella
       // frase, la frase è vera anche senza nessuna azione in questo turno.
       orari: true,
+      // …e l'ora DECIDE: se la frase nomina un'ora, la prova è che la sveglia
+      // a quell'ora ci sia, non che in questa conversazione sia partita una
+      // SVEGLIA qualunque. Senza, bastava una sveglia messa prima nel thread
+      // perché ogni sveglia raccontata dopo, a qualunque ora, passasse muta.
+      oreProva: true,
       avviso: 'la sveglia non c\'è',
       frasi: [
         new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(72)}\\b${SVEGLIA}\\b`, 'i'),
@@ -111,6 +116,7 @@
       id: 'timer',
       tipi: ['TIMER'],
       orari: true,
+      oreProva: true,
       avviso: 'il timer non è partito',
       frasi: [
         new RegExp(`${HO}(?:avviato|fatto\\s+partire|messo|impostato|acceso|creato|lanciato|fatto\\s+scattare)\\b${PONTE(72)}\\b(?:timer|conto alla rovescia)\\b`, 'i'),
@@ -592,6 +598,23 @@
       if (fam.appunti && titoli.length && !nominati.size && nominaUnAppunto(d.frase, titoli)) return true;
       return false;
     };
+    // L'ORA DECIDE. Quando la frase promette una sveglia (o un timer) a
+    // un'ora precisa, la prova non è che in questa conversazione sia partita
+    // un'azione di quel genere: è che a quell'ora la sveglia ci sia davvero.
+    // Filo le sveglie ce le ha sotto gli occhi, con le loro ore.
+    // Restituisce true (la frase è vera), false (manca) o null (qui l'ora non
+    // decide: si torna alle azioni). Chi sposta o cancella resta fuori: dopo
+    // «te l'ho cancellata alle 19» quell'ora NON deve esistere.
+    const oraDecide = (fam, d) => {
+      const creazione = fam.oreProva || (fam.pronome && VERBI_CHE_CREANO.has(d.verbo));
+      if (!fam.orari || !creazione) return null;
+      const nominati = orariNelTesto(d.frase);
+      if (!nominati.size) return null;
+      // TUTTE le ore nominate, non una: «ti ho messo la sveglia alle 19 e
+      // quella alle 21» con una sola sveglia chiamata lasciava la seconda
+      // senza niente e senza una parola.
+      return [...nominati].every((o) => orari.has(o));
+    };
     const out = [];
     // I tipi che stanno già reggendo una dichiarazione: un'azione sola non può
     // reggerne due diverse.
@@ -604,6 +627,12 @@
       const d = dichiarazione(t, fam);
       if (!d) continue;
       if (fam.pronome) { pronome = d; continue; }
+      const ora = oraDecide(fam, d);
+      if (ora === true) { if (d.verbo) radiciRette.add(d.verbo); continue; }
+      if (ora === false) {
+        out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
+        continue;
+      }
       const retta = fam.tipi.filter((x) => presenti.has(x));
       if (retta.length) {
         for (const x of retta) impegnati.add(x);
@@ -629,11 +658,16 @@
     // più guardato affatto, ed è il turno di prosecuzione della segnalazione.
     if (pronome && !out.length) {
       const PRONOME = FAMIGLIE[FAMIGLIE.length - 1];
+      const manca = { id: 'senza-nome', avviso: 'non è partito niente', tipi: [], frase: pronome.frase };
+      // Anche qui l'ora decide, quando c'è e quando il verbo crea qualcosa:
+      // «te l'ho messa alle 19», con la sveglia delle 19 che non esiste, è
+      // falsa anche se in questa conversazione una sveglia era già partita.
+      const ora = oraDecide(PRONOME, pronome);
+      if (ora === false) { out.push(manca); return out; }
+      if (ora === true) return out;
       const libere = [...presenti].some((x) => !impegnati.has(x) && !NON_REGGONO_IL_PRONOME.has(x));
       const ripete = pronome.verbo && radiciRette.has(pronome.verbo);
-      if (!libere && !ripete && !esisteGia(PRONOME, pronome)) {
-        out.push({ id: 'senza-nome', avviso: 'non è partito niente', tipi: [], frase: pronome.frase });
-      }
+      if (!libere && !ripete && !esisteGia(PRONOME, pronome)) out.push(manca);
     }
     return out;
   }
