@@ -138,10 +138,12 @@
       // costo 3: quei dati, una volta usciti, non rientrano — ed è il caso che
       // una pagina ostile prova a far scattare. Il flag `_exfil` lo calcola il
       // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
-      // Aprire un link non porta niente nel contesto del modello: la pagina la
-      // legge l'utente, non Filo. Nessuna `fonte`.
+      // La pagina la legge l'utente, ma da qui in poi quella scheda è fra
+      // quelle aperte, e il suo titolo — scritto dal sito — entra nel
+      // riepilogo di stato di ogni turno successivo. Quindi una fonte c'è.
       costo: (a) => (a && a._exfil ? 3 : 1),
       campo: 'web',
+      fonte: 'schede',
       describe: (a) => {
         const url = a.url || a.href || a.link || 'una pagina';
         if (a && a._exfil) {
