@@ -532,6 +532,19 @@
   // si mangia il bottone e la funzione sparisce dalla chat.
   const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
 
+  // Le altre due strade per avere riga E bottone, che dipendono dall'esito e
+  // non dal tipo: un comando che non è partito (il riquadro dice PERCHÉ, e
+  // senza di quello resta un «non riuscito» che non si può capire), l'evento da
+  // aggiungere al calendario e la home chiesta da chi è già nella home.
+  function rigaEBottone(a) {
+    const type = String(a.type || '').toUpperCase();
+    if (ROW_AND_BUTTON.includes(type) && a._executed !== false) return true;
+    if (type === 'ESEGUI_COMANDO' && a._output && a._output.blocked) return true;
+    if (type === 'EVENTO_CALENDARIO' && a._output && a._output.proposta) return true;
+    if (type === 'COMANDO_FINESTRA' && a._output && a._output.already) return true;
+    return false;
+  }
+
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.
   function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
