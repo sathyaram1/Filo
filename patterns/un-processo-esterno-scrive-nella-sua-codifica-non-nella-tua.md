@@ -161,3 +161,44 @@ diventano caratteri di controllo invisibili: non resta nemmeno un rombo a dire
 che manca qualcosa. «12 €» arriva al modello come «12 », e la risposta è su un
 testo bucato. La tabella di 32 voci sta in `daCp1252`
 (`src/main/services/documentRead.js`).
+
+## «Quanti rombi?» è la domanda sbagliata: «sono validi?» è quella giusta
+
+Per scegliere fra UTF-8 e la tabella di Windows si contavano i rombi che
+venivano fuori leggendo come UTF-8, e si ripiegava sopra uno ogni mille
+caratteri. Una percentuale è una soglia, e una soglia sbaglia in tutte e due le
+direzioni:
+
+- **sotto soglia**, un documento salvato in ANSI con pochi segni speciali
+  rispetto alla sua lunghezza resta letto come UTF-8 e li perde tutti. Non è un
+  caso di laboratorio: è la specifica tecnica quasi tutta in caratteri semplici
+  col titolo accentato, ed è il CSV che il foglio di calcolo esporta, righe di
+  numeri e tre voci con l'euro e l'accento. La cura scritta per i file corti
+  passava le prove e non copriva i file veri;
+- **sopra soglia**, un documento scritto BENE in UTF-8 che contiene davvero
+  qualche rombo — gli appunti in cui l'utente ha ricopiato i nomi storpiati che
+  il terminale gli mostrava, un registro di errori — viene riletto tutto con la
+  tabella di Windows, e allora si storpiano gli accenti che erano giusti.
+
+«Questi byte sono UTF-8 valido?» ha una risposta esatta e nessuna soglia da
+tarare (`eUtf8Valido`, cioè un `TextDecoder` in modalità severa). Stessa cosa
+per il testo a due byte senza firma in testa: la firma è una cortesia, ma la
+forma resta riconoscibile — metà dei byte nulli, tutti dalla stessa parte delle
+coppie, cosa che un testo normale non ha mai (`pareDueByte`).
+
+## Un jolly in un'espressione regolare si paga a raddoppi
+
+Il confronto «questi due nomi sono lo stesso nome a meno delle sviste» girava
+come un'espressione regolare con un jolly per ogni carattere perso. Corretta,
+ma il suo tempo RADDOPPIA a ogni jolly in più: ventidue caratteri persi un
+decimo di secondo, ventotto otto secondi, trenta trentaquattro — per UN file,
+che la cartella moltiplica. Il conto gira nel processo principale, che è uno
+solo: mentre gira, Filo non risponde a nient'altro.
+
+Il punto non è il caso limite: è **chi sceglie l'input**. Quel nome lo ricopia
+il modello da quello che il terminale gli ha stampato o da un documento che sta
+leggendo, cioè da fuori — e chi scrive quel testo decide per quanto tempo Filo
+resta fermo. Su input che arriva da fuori un'espressione regolare con dei jolly
+non si scrive: si avanza per posizioni possibili, che sono al massimo quante
+sono le lettere del nome, e il costo torna a crescere con la lunghezza invece
+che con i buchi (`combaciaSezionato`).

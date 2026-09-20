@@ -535,3 +535,61 @@ test('un nome con i caratteri invisibili del verso di lettura si ritrova lo stes
   assert.ok(r.text.includes('la relazione vera'));
   assert.equal(r.name, vero, 'il nome vero non torna a chi legge');
 });
+
+// ── #551, quinto giro di verifica ────────────────────────────────────────────
+
+test('un nome con molti caratteri persi non impantana Filo', () => {
+  // Il confronto tollerante girava come un'espressione regolare con un jolly
+  // per buco, e il suo tempo RADDOPPIAVA a ogni buco in più: ventotto caratteri
+  // persi costavano otto secondi per UN file, trenta ne costavano trentaquattro,
+  // e la cartella li moltiplica. Quel conto gira nel processo principale, che è
+  // uno: mentre girava, Filo non rispondeva a nient'altro — e il nome su cui
+  // gira lo ricopia il modello da quello che il terminale gli ha stampato,
+  // cioè da fuori.
+  for (const n of [28, 40, 120]) {
+    const chiesto = `${'a�'.repeat(n)}.txt`;
+    const vero = `${'a'.repeat(n * 3)}b.txt`;
+    const t0 = Date.now();
+    assert.equal(DR.nomiCombaciano(chiesto, vero), false);
+    const quanto = Date.now() - t0;
+    assert.ok(quanto < 1000, `con ${n} caratteri persi il confronto ha impiegato ${quanto} ms`);
+  }
+  // E quello che deve ancora combaciare, combacia: la regola non è cambiata.
+  assert.equal(DR.nomiCombaciano('Perch� citt�.txt', 'Perché città.txt'), true);
+  assert.equal(DR.nomiCombaciano('Bilanci�.txt', 'Bilancio 2019 definitivo riservato.txt'), false);
+});
+
+test('la codifica di un documento si riconosce, non si stima a percentuale', () => {
+  // Prima si contavano i rombi che venivano fuori leggendo come UTF-8 e si
+  // ripiegava sulla tabella di Windows sopra uno ogni mille caratteri. Una
+  // percentuale sbaglia in tutte e due le direzioni.
+  const ansi = (s) => {
+    const alti = { '€': 0x80, '…': 0x85, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94, '–': 0x96, '—': 0x97 };
+    return Buffer.from([...s].map((c) => (alti[c] !== undefined ? alti[c] : c.codePointAt(0))));
+  };
+
+  // Prima porta: un documento salvato in ANSI con pochi segni speciali rispetto
+  // alla sua lunghezza (una specifica tecnica, un CSV di numeri esportato dal
+  // foglio di calcolo) restava letto come UTF-8 e li perdeva tutti.
+  const lungo = `${'Riga di contorno tutta ascii che allunga il documento.\n'.repeat(200)}TOTALE: -931,50 € — attività`;
+  assert.equal(DR.decodeText(ansi(lungo)).endsWith('TOTALE: -931,50 € — attività'), true);
+
+  // Seconda porta, la stessa regola nell'altro verso: un documento scritto bene
+  // in UTF-8 che contiene davvero qualche rombo — gli appunti in cui l'utente
+  // ha ricopiato i nomi storpiati dal terminale — veniva riletto tutto con la
+  // tabella di Windows, e si storpiavano gli accenti che erano giusti.
+  const appunti = 'Il terminale stampa «Singolarit�.txt», «attivit�», «citt�»: però è la città.';
+  assert.equal(DR.decodeText(Buffer.from(appunti, 'utf8')), appunti);
+
+  // Terza porta: un testo a due byte per carattere SENZA la firma in testa
+  // tornava una fila di caratteri nulli, e Filo dichiarava di averlo letto.
+  const testo = 'Relazione attività finale: 12 €\nCittà: Torino\n';
+  assert.equal(DR.decodeText(Buffer.from(testo, 'utf16le')), testo);
+  assert.equal(DR.pareDueByte(Buffer.from(testo, 'utf16le')), 'le');
+  const grande = Buffer.from(testo, 'utf16le');
+  grande.swap16();
+  assert.equal(DR.decodeText(grande), testo);
+  // E un testo normale non viene scambiato per uno a due byte.
+  assert.equal(DR.pareDueByte(Buffer.from(testo, 'utf8')), '');
+  assert.equal(DR.pareDueByte(ansi(lungo)), '');
+});
