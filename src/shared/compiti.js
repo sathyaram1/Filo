@@ -191,7 +191,10 @@
     // gioco è l'utente che ha scritto: il perimetro non serve ancora.
     if (!c || !c.contaminato) return { ok: true, classe: 'uscita', uscita: k.uscita };
     const perimetro = Array.isArray(c.perimetro) ? c.perimetro : [];
-    if (perimetro.includes(k.uscita)) return { ok: true, classe: 'uscita', uscita: k.uscita };
+    const sempre = Array.isArray(c.sempre) ? c.sempre : [];
+    if (perimetro.includes(k.uscita) || sempre.includes(k.uscita)) {
+      return { ok: true, classe: 'uscita', uscita: k.uscita };
+    }
     return {
       ok: false,
       motivo: 'fuori-perimetro',
