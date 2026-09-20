@@ -154,6 +154,39 @@ test('il doppio clic sul pacchetto Linux avvia Filo senza la gabbia di sicurezza
   assert.match(leggi(join(dove, 'filo-bin'), 'utf8'), /exit 0/, 'la seconda passata ha sovrascritto il programma vero');
 });
 
+// Il lanciatore scritto sopra viene ESEGUITO, su questa macchina, e si guarda
+// cosa passa davvero al programma. La risposta giusta la calcola il test
+// leggendo le stesse manopole: dove il kernel concede gli spazi dei nomi, Filo
+// deve partire protetto; dove li nega, deve partire lo stesso.
+test('il lanciatore spegne la gabbia solo dove questo sistema la nega', { skip: process.platform === 'win32' && 'il lanciatore è del pacchetto Linux' }, async () => {
+  const { writeFileSync, readFileSync: leggi, chmodSync } = await import('node:fs');
+  const { execFileSync } = await import('node:child_process');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
+
+  const { default: afterPack } = require(join(ROOT, pkg.build.afterPack));
+  const dove = cartellaTemporanea('filo-linux-avvio-');
+  // Il finto programma stampa gli argomenti che gli arrivano.
+  writeFileSync(join(dove, 'filo'), '#!/bin/sh\necho "$@"\n', { mode: 0o755 });
+  await afterPack({
+    electronPlatformName: 'linux',
+    appOutDir: dove,
+    packager: { executableName: 'filo', appInfo: { productFilename: 'Filo' } },
+  });
+  chmodSync(join(dove, 'filo'), 0o755);
+
+  const manopola = (p) => { try { return leggi(p, 'utf8').trim(); } catch (_) { return null; } };
+  const negata = manopola('/proc/sys/kernel/apparmor_restrict_unprivileged_userns') === '1'
+    || manopola('/proc/sys/user/max_user_namespaces') === '0'
+    || manopola('/proc/sys/kernel/unprivileged_userns_clone') === '0';
+
+  const uscita = String(execFileSync(join(dove, 'filo'), ['ciao'], { encoding: 'utf8' })).trim();
+  assert.ok(uscita.includes('ciao'), 'il lanciatore non passa al programma gli argomenti che ha ricevuto');
+  assert.equal(uscita.includes('--no-sandbox'), negata,
+    negata
+      ? 'qui il kernel nega gli spazi dei nomi e il lanciatore non spegne la gabbia: Filo non si aprirebbe'
+      : 'qui il kernel concede gli spazi dei nomi e il lanciatore spegne la gabbia lo stesso: difesa buttata via');
+});
+
 test('il pacchetto costruito, se c\'è, ha il lanciatore al posto giusto', () => {
   // Quando la build Linux è appena girata (nel contenitore delle routine, o nel
   // lavoro «Verifica build Linux»), si guarda il risultato vero invece della
