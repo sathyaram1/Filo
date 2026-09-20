@@ -369,7 +369,7 @@
   // presidio li aggiunge quando quel contesto c'era. Elencati qui perché la
   // sentinella degli unit test, che pretende che ogni tipo sia uno strumento
   // vero, sappia distinguerli da un nome scritto male.
-  const TIPI_DI_CONTESTO = ['CONTESTO_FILE', 'CONTESTO_IMMAGINE'];
+  const TIPI_DI_CONTESTO = ['CONTESTO_FILE', 'CONTESTO_IMMAGINE', 'CONTESTO_TESTO'];
 
   // Le azioni che si limitano a GUARDARE. Contano per le famiglie che le
   // nominano (una ricerca regge «ho cercato sul web»), ma non possono essere
