@@ -651,6 +651,12 @@ async function readDocument(input, { cwd } = {}) {
     // file dal nome quasi uguale: chi legge deve sapere che ha in mano un altro
     // file, e l'utente deve vederselo dire (#551).
     requested: '',
+    // Con quale tabella il testo è stato letto, e quanti byte il file aveva
+    // rotti. Servono a DIRLO: un testo letto tirando a indovinare la tabella,
+    // o bucato in qualche punto, non deve arrivare al modello come se fosse
+    // intero (#551, sesto giro).
+    codifica: '',
+    bytesPersi: 0,
   };
   let full = normalizePath(input, cwd);
   if (!full) return { ...base, error: 'no_path', detail: 'nessun percorso indicato' };
