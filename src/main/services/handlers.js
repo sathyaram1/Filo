@@ -2898,6 +2898,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // c'è). Viaggiano con l'errore, così un «Riprova» riparte sapendo cosa era
     // già stato fatto invece di rifarlo.
     try { e.filoActions = renderedActions; } catch (_) {}
+    // #533 (quinto giro di verifica) — e con loro viaggia il NOME di questa
+    // richiesta. Quello che aveva già letto resta nella conversazione, quindi
+    // il messaggio dopo se lo ritrova davanti: senza il nome, il motore non
+    // aveva modo di saperlo e lo faceva nascere senza limiti. Il compito va
+    // anche su disco, perché il «Riprova» può arrivare dopo parecchio.
+    try { e.filoCompito = task ? task.id : null; } catch (_) {}
+    try { await salvaCompito(task); } catch (_) {}
     throw e;
   }
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
