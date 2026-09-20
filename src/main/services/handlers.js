@@ -1597,12 +1597,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           // (è la conversazione di adesso) e ritrovarcela come "risultato"
           // gliela farebbe raccontare all'utente come un ricordo.
           const closed = all.filter((c) => c && c.closedAt);
-          const found = ChatArchive.search(closed, query, { limit: 8 });
+          // «Riprendi la discussione di ieri sulla coscienza» arriva qui come
+          // frase, non come parola chiave: pretendere che compaiano tutte le
+          // parole faceva rispondere "non c'è niente" su una chat che c'era.
+          // Se la ricerca stretta non trova niente si allarga alle parole che
+          // distinguono, e l'esito dice con quali ha cercato davvero.
+          const { results: found, termini, allargata } = ChatArchive.searchWide(closed, query, { limit: 8 });
           return {
             executed: true,
             kept: true,
             output: {
               chatSearch: query,
+              cercatoCon: termini,
+              allargata,
               results: found.map((c) => ({
                 id: c.id,
                 title: c.title || ChatArchive.fallbackTitle(c.messages),
