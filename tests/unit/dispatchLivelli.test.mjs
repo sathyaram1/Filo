@@ -160,7 +160,11 @@ test('usageText: nomina --segnala e --nota', () => {
 test('CLI: pass senza --nota si ferma prima del server; --segnala su un file assente si ferma; con la nota il pass parte', () => {
   const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
   const sandbox = cartellaTemporanea('filo-livelli-cli-');
-  const statoDir = resolve(sandbox, 'stato');
+  // Stato e nota stanno FUORI dal deposito, come dice la ricetta del ruolo: un
+  // file scritto dentro lo sporcherebbe, e il verdetto vale per un commit.
+  const fuori = cartellaTemporanea('filo-livelli-fuori-');
+  const statoDir = resolve(fuori, 'stato');
+  const NOTA = resolve(fuori, 'nota.md');
   try {
     // Un deposito git vero, con un commit: il verdetto del controllo di
     // sicurezza vale per il commit letto, e senza deposito lo strumento
