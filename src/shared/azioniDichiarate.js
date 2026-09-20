@@ -502,7 +502,11 @@
         if (SMENTITE.test(proposizionePrima(testo, m.index))) continue;
         if (dentroUnaDomanda(testo, m.index)) continue;
         const fine = m.index + m[0].length;
-        if (famiglia.pronome && puntaAllaRisposta(testo, fine)) continue;
+        // Giro 5: questo valeva solo per il pronome. Vale per tutte: se la
+        // frase dice che la cosa è nella risposta («te l'ho scritto qui
+        // sotto», «te l'ho messa in ordine alfabetico»), non esiste nessuno
+        // strumento che possa averla fatta e non c'è niente da smentire.
+        if (puntaAllaRisposta(testo, fine)) continue;
         return { frase: frasePiena(testo, m.index, fine), verbo: verboDi(m[0]) };
       }
     }
