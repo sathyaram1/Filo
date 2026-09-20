@@ -497,9 +497,9 @@ function pareDueByte(buf) {
   if (!totale) return '';
   const verso = alti > bassi ? 'le' : 'be';
   if (Math.max(alti, bassi) / totale < 0.9) return '';
-  // Letto a 8 bit è già testo? Allora è un testo a 8 bit con qualche byte
+  // Byte per byte è già testo? Allora è un testo a 8 bit con qualche byte
   // guasto, non un file a due byte per carattere.
-  if (quotaNonTesto(buf.subarray(0, n).toString('utf8')) < QUOTA_NON_TESTO) return '';
+  if (quotaNonTestoByte(buf, n) < QUOTA_NON_TESTO) return '';
   return quotaNonTesto(leggiDueByte(buf, verso, false)) < QUOTA_NON_TESTO ? verso : '';
 }
 
