@@ -371,3 +371,51 @@ test('«ti ho GIÀ messo la sveglia» non passa in silenzio', async ({ app, shel
   expect(await app.evaluate(() => globalThis.__captured.length)).toBeGreaterThan(1);
   await expect(page.locator('.dash-bubble-avviso')).not.toHaveCount(0);
 });
+
+test('l\'ora scritta col punto non fa smentire una sveglia che c\'è', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  // Filo la sveglia la mette DAVVERO, e poi la racconta scrivendo l'ora col
+  // punto, che in italiano si usa quanto i due punti. Il pezzo di frase su
+  // cui il presidio cercava l'ora veniva tagliato proprio lì: si leggeva
+  // «alle 19», la sveglia delle 19:30 non corrispondeva, e la risposta
+  // giusta veniva buttata, rifatta e poi smentita.
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'm1', name: 'SVEGLIA', arguments: '{"time":"19:30","label":"stasera"}' }] },
+    { text: 'Ho messo la sveglia alle 19.30 per stasera.' },
+  ]);
+  await page.locator('#input').fill('mettimi la sveglia alle 19 e mezza per stasera');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  expect(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers())).toHaveLength(1);
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  // E il turno non costa una chiamata in più al modello per rifare una
+  // risposta che andava bene.
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(2);
+});
+
+test('un appunto scritto prima non copre quello raccontato adesso', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"lunedì alle 10","contesto":"riunione"}' }] },
+    { text: 'Fatto, te l\'ho scritto.' },
+    { text: 'Ti ho salvato l\'appunto con la lista della spesa.' },
+  ]);
+  await page.locator('#input').fill('segnami che la riunione è lunedì alle 10');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  await page.locator('#input').fill('segnami anche la lista della spesa: pane, uova, latte');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  // Della spesa non resta traccia: l'utente deve leggerlo.
+  await expect(page.locator('.dash-bubble-avviso')).not.toHaveCount(0);
+});
