@@ -42,7 +42,7 @@
     {
       id: 'sveglia',
       tipi: ['SVEGLIA', 'MODIFICA_SVEGLIA'],
-      avviso: 'la sveglia non è stata impostata',
+      avviso: 'la sveglia non c\'è',
       frasi: [
         /\bho (?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\b[^.!?\n]{0,48}\bsvegli[ae]\b/i,
         /\bfatto[,:!]?\s+(?:la |una )?svegli[ae]\b[^.!?\n]{0,24}\b(?:impostat|programmat|messa|fissat|pronta)/i,
@@ -60,7 +60,7 @@
     {
       id: 'sveglia-tolta',
       tipi: ['CANCELLA_SVEGLIA', 'MODIFICA_SVEGLIA'],
-      avviso: 'la sveglia (o il timer) non è stata tolta',
+      avviso: 'la sveglia (o il timer) c\'è ancora',
       frasi: [
         /\bho (?:cancellato|tolto|rimosso|eliminato|annullato|disattivato|spento|levato)\b[^.!?\n]{0,48}\b(?:svegli[ae]|timer)\b/i,
       ],
@@ -68,7 +68,7 @@
     {
       id: 'sveglia-spostata',
       tipi: ['MODIFICA_SVEGLIA', 'SVEGLIA', 'CANCELLA_SVEGLIA'],
-      avviso: 'la sveglia non è stata spostata',
+      avviso: 'la sveglia è rimasta com\'era',
       frasi: [
         /\bho (?:spostato|anticipato|posticipato|cambiato|modificato|rimandato)\b[^.!?\n]{0,48}\b(?:svegli[ae]|timer)\b/i,
       ],
@@ -76,7 +76,7 @@
     {
       id: 'appunto',
       tipi: ['SALVA_APPUNTO', 'SALVA_LEZIONE', 'EVENTO_CALENDARIO', 'SVEGLIA', 'TIMER'],
-      avviso: 'l\'appunto non è stato salvato',
+      avviso: 'l\'appunto non c\'è',
       frasi: [
         /\bho (?:salvato|scritto|creato|aggiunto|annotato|preso|buttato giù)\b[^.!?\n]{0,48}\b(?:appunt[oi]|not[ae]|promemoria)\b/i,
         /\bme (?:lo|la|ne) sono (?:segnat|appuntat|annotat)[oa]\b/i,
@@ -85,7 +85,7 @@
     {
       id: 'memoria',
       tipi: ['SALVA_LEZIONE', 'SALVA_APPUNTO'],
-      avviso: 'niente è stato messo in memoria',
+      avviso: 'in memoria non è finito niente',
       frasi: [
         // Solo i verbi che dicono «l'ho messo via»: «ho imparato», «ho capito»
         // e simili sono modi di dire, e farebbero scattare il presidio su una
@@ -98,7 +98,7 @@
     {
       id: 'apertura',
       tipi: ['NAVIGA', 'APRI_FILE', 'COMANDO_FINESTRA', 'LEGGI_DOCUMENTO', 'LEGGI_FILE', 'PROXY_TAB', 'REGOLA_PROXY_DOMINIO'],
-      avviso: 'nessuna pagina è stata aperta',
+      avviso: 'non si è aperto niente',
       frasi: [
         /\bho apert[oa]\b/i,
         /\bl'ho apert[oa]\b/i,
@@ -108,7 +108,7 @@
     {
       id: 'ricerca',
       tipi: ['CERCA_WEB', 'NAVIGA', 'ESEGUI_COMANDO', 'LEGGI_DOCUMENTO', 'CAPACITA_DETTAGLIO'],
-      avviso: 'nessuna ricerca è stata fatta',
+      avviso: 'la ricerca non è partita',
       frasi: [
         /\bho (?:cercato|guardato|controllato|verificato)\b[^.!?\n]{0,32}\b(?:sul web|su internet|online|in rete|su google)\b/i,
         /\bho fatto una ricerca\b/i,
@@ -117,7 +117,7 @@
     {
       id: 'comando',
       tipi: ['ESEGUI_COMANDO'],
-      avviso: 'nessun comando è stato eseguito',
+      avviso: 'il comando non è partito',
       frasi: [
         /\bho (?:eseguito|lanciato|fatto girare|avviato)\b[^.!?\n]{0,32}\bcomand[oi]\b/i,
         /\bcomando (?:eseguito|lanciato)\b/i,
@@ -126,7 +126,7 @@
     {
       id: 'lettura',
       tipi: ['LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'ESEGUI_COMANDO', 'CERCA_WEB'],
-      avviso: 'nessun documento è stato letto',
+      avviso: 'il documento non l\'ha letto',
       frasi: [
         /\bho lett[oa]\b[^.!?\n]{0,48}\b(?:documento|file|pdf|bolletta|contratto|estratto conto|fattura|appunto)\b/i,
       ],
@@ -134,7 +134,7 @@
     {
       id: 'impostazione',
       tipi: ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'COMANDO_FINESTRA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'],
-      avviso: 'nessuna impostazione è stata cambiata',
+      avviso: 'l\'impostazione è rimasta com\'era',
       frasi: [
         /\bho (?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo)\b[^.!?\n]{0,48}\b(?:tema|impostazione|preferenza|modalità|opzione|carattere|font|zoom|limite di spesa|colore|sfondo)\b/i,
       ],
@@ -142,7 +142,7 @@
     {
       id: 'segnalazione',
       tipi: ['INVIA_FEEDBACK'],
-      avviso: 'la segnalazione non è stata inviata',
+      avviso: 'la segnalazione non è partita',
       frasi: [
         /\bho (?:inviato|mandato|spedito|girato)\b[^.!?\n]{0,32}\b(?:segnalazione|feedback)\b/i,
         /\bho segnalato\b[^.!?\n]{0,32}\b(?:agli sviluppatori|al team|a chi sviluppa)\b/i,
@@ -151,7 +151,7 @@
     {
       id: 'calendario',
       tipi: ['EVENTO_CALENDARIO', 'SVEGLIA'],
-      avviso: 'l\'evento non è stato aggiunto al calendario',
+      avviso: 'l\'evento non è in calendario',
       frasi: [
         /\bho (?:aggiunto|messo|creato|segnato|inserito)\b[^.!?\n]{0,32}\b(?:in calendario|nel calendario|l'evento|un evento)\b/i,
       ],
@@ -159,7 +159,7 @@
     {
       id: 'schede',
       tipi: ['PULISCI_TAB', 'CANCELLA_ARCHIVIO'],
-      avviso: 'nessuna scheda è stata archiviata o cancellata',
+      avviso: 'le schede sono rimaste com\'erano',
       frasi: [
         /\bho (?:archiviato|chiuso|ripulito|eliminato|cancellato)\b[^.!?\n]{0,32}\b(?:le schede|le tab|dall'archivio|la cronologia)\b/i,
       ],
@@ -167,7 +167,7 @@
     {
       id: 'memoria-cancellata',
       tipi: ['CANCELLA_MEMORIA'],
-      avviso: 'la memoria non è stata cancellata',
+      avviso: 'la memoria è ancora lì',
       frasi: [
         /\bho (?:cancellato|azzerato|eliminato|resettato|svuotato)\b[^.!?\n]{0,32}\b(?:la memoria|le memorie|il profilo|tutto quello che sapevo)\b/i,
       ],
@@ -175,7 +175,7 @@
     {
       id: 'proxy',
       tipi: ['PROXY_TAB', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'RIMUOVI_REGOLA_PROXY'],
-      avviso: 'nessun proxy è stato applicato o tolto',
+      avviso: 'il proxy è rimasto com\'era',
       frasi: [
         /\bho (?:messo|attivato|applicato|tolto|rimosso|disattivato)\b[^.!?\n]{0,32}\bil proxy\b/i,
         /\bho instradato\b/i,
@@ -317,7 +317,7 @@
     const cose = lista.length === 1
       ? lista[0]
       : `${lista.slice(0, -1).join(', ')} e ${lista[lista.length - 1]}`;
-    return `Filo ha scritto di averlo già fatto, ma non l'ha fatto: ${cose}. Se ti serve davvero, chiediglielo di nuovo.`;
+    return `Filo ha scritto di averlo già fatto, ma non l'ha fatto: ${cose}. Se ti serve, chiediglielo di nuovo.`;
   }
 
   global.SN_AZIONI_DICHIARATE = {

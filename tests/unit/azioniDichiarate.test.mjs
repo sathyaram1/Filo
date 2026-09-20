@@ -143,13 +143,13 @@ test('la spinta al modello elenca le frasi e le tre uscite', () => {
 
 test('l\'avviso per l\'utente dice cosa NON è successo', () => {
   const uno = AD.avvisoPerUtente(AD.rileva('Ti ho messo una sveglia alle 19:00.', []));
-  assert.match(uno, /la sveglia non è stata impostata/);
+  assert.match(uno, /la sveglia non c'è/);
   assert.match(uno, /chiediglielo di nuovo/i);
   const due = AD.avvisoPerUtente([
-    { avviso: 'la sveglia non è stata impostata' },
-    { avviso: 'l\'appunto non è stato salvato' },
+    { avviso: 'la sveglia non c\'è' },
+    { avviso: 'l\'appunto non c\'è' },
   ]);
-  assert.match(due, /la sveglia non è stata impostata e l'appunto non è stato salvato/);
+  assert.match(due, /la sveglia non c'è e l'appunto non c'è/);
   assert.equal(AD.avvisoPerUtente([]), '');
 });
 

@@ -6,7 +6,7 @@
 //   (A) la risposta torna indietro al modello una volta — se chiama l'azione,
 //       l'utente non vede nessun avviso e la sveglia c'è davvero;
 //   (B) se il modello insiste con la stessa frase, sotto la risposta compare
-//       scritto che la sveglia NON è stata impostata.
+//       scritto che la sveglia non c'è.
 //
 // Senza il presidio (A) fallisce sulla sveglia mancante e (B) sull'avviso che
 // non compare.
@@ -88,7 +88,7 @@ test('la sveglia raccontata e mai chiamata torna indietro: al secondo giro esist
   expect(spinta).toContain('non hai chiamato nessuno strumento');
 });
 
-test('se il modello insiste, l\'utente legge che la sveglia non è stata impostata', async ({ app, shell }) => {
+test('se il modello insiste, l\'utente legge che la sveglia non c\'è', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -100,7 +100,7 @@ test('se il modello insiste, l\'utente legge che la sveglia non è stata imposta
 
   const avviso = page.locator('.dash-bubble-avviso');
   await expect(avviso).toBeVisible({ timeout: 25_000 });
-  await expect(avviso).toContainText('la sveglia non è stata impostata');
+  await expect(avviso).toContainText('la sveglia non c\'è');
   await expect(avviso).toContainText('chiediglielo di nuovo');
   // La risposta resta leggibile: l'avviso la corregge, non la nasconde.
   await expect(page.locator('.dash-bubble-filo').last()).toContainText('Ti ho messo una sveglia');
