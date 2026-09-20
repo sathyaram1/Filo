@@ -1094,6 +1094,7 @@
       azioniDelTurno = new Set();
       const D = global.SN_AZIONI_DICHIARATE;
       domandaSuCosaFatta = !!(D && D.domandaSuCosaFatta && D.domandaSuCosaFatta(userMessage));
+      richiestaAzione = !!(D && D.richiestaDiAzione && D.richiestaDiAzione(userMessage));
     }
 
     if (userMessage) {
