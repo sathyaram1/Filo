@@ -969,6 +969,7 @@
     send = deps.send;
     if (deps.faviconUrl) faviconUrl = deps.faviconUrl;
     if (deps.applyCommandCwd) applyCommandCwd = deps.applyCommandCwd;
+    if (deps.riprendiCompito) riprendiCompito = deps.riprendiCompito;
   }
 
   global.SN_DASH_ATTIVITA = {
