@@ -200,10 +200,33 @@ module.exports = function register(on, ctx) {
     try {
       const prove = D.statoDaTimerEFile(await FiloMem.listTimers(), await ctx.editorFileSummariesList());
       const precedenti = new Set(Array.isArray(msg.tipiPrecedenti) ? msg.tipiPrecedenti : []);
+      // #517 (giro 8) — le famiglie già smentite in questa conversazione: lì
+      // un'azione emessa prima non copre più niente, altrimenti bastava che
+      // il modello ripetesse la stessa cosa con un «già» davanti.
+      const giaMancate = new Set(Array.isArray(msg.famiglieGiaMancate) ? msg.famiglieGiaMancate : []);
       const fantasmi = D.rileva(String(msg.testo || ''),
         new Set(Array.isArray(msg.tipiEmessi) ? msg.tipiEmessi : []),
-        { ...prove, tipiPrecedenti: precedenti, domandaUtente: !!msg.domandaUtente },
+        {
+          ...prove,
+          tipiPrecedenti: precedenti,
+          famiglieGiaMancate: giaMancate,
+          domandaUtente: !!msg.domandaUtente,
+        },
         { famiglie: D.FAMIGLIE_AIUTO });
+      // #517 (giro 8) — la traccia dell'anomalia, come nella chat della home.
+      // Nel pannello finiva solo nella console degli sviluppatori, che
+      // nessuno apre e che si svuota chiudendo la pagina: la segnalazione
+      // chiedeva l'avviso all'utente «o almeno» una traccia contabile, e
+      // delle due chat ce l'aveva una sola.
+      if (fantasmi.length && msg.ultimoTentativo) {
+        try {
+          await FiloMem.appendRaw({
+            type: 'chat_aiuto',
+            summary: String(msg.testo || '').slice(0, 200),
+            extra: { azioniMancate: fantasmi.map((f) => ({ id: f.id, frase: f.frase })) },
+          });
+        } catch (_) {}
+      }
       return { ok: true, fantasmi: fantasmi.map((f) => ({ id: f.id, avviso: f.avviso, frase: f.frase })) };
     } catch (_) { return { ok: true, fantasmi: [] }; }
   });
