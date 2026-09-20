@@ -888,7 +888,7 @@ async function lessonsBufferText() {
 async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider]) return;
+    if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_LESSON)) return;
     const memory = await FiloMem.getMemory();
     const { profilo, preferenze } = FiloMem.renderMemoryForPrompt(memory);
     const lezioniText = await lessonsBufferText();
