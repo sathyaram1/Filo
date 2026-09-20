@@ -757,6 +757,8 @@
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
+      // #525 — la chat si archivia nel main, mentre la si fa.
+      chatId: ensureChatId(),
     };
     if (images.length) {
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
