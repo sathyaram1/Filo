@@ -1200,6 +1200,35 @@ function compitoPerChiave(chiave) {
   return v.compito;
 }
 
+// Il compito del messaggio PRIMA, anche quando la mappa qui sopra l'ha già
+// buttato via: si svuota dopo mezz'ora, e la pulizia scatta appena Filo viene
+// usato da un'altra parte. La conversazione sullo schermo però è ancora
+// quella, col testo del sito nelle bolle: ripartire a mani libere vorrebbe
+// dire che per riavere tutti gli strumenti basta aspettare (#533, quarto giro
+// di verifica). Il registro su disco tiene le ultime centinaia di richieste
+// con quello che serve per ereditare. Se nemmeno lì c'è, non si sa — e di una
+// richiesta che non si conosce non si può dire che non avesse letto niente:
+// si eredita il caso peggiore, cioè si risponde e si propone e basta.
+async function compitoPrecedenteDi(chiave) {
+  const k = String(chiave || '');
+  if (!k) return null;
+  const vivo = compitoPerChiave(k);
+  if (vivo) return vivo;
+  let salvati = [];
+  try { salvati = await FiloMem.listCompiti({ limit: FiloMem.COMPITI_CAP || 300 }); } catch (_) { salvati = []; }
+  const riga = salvati.find((c) => c && c.id === k);
+  if (riga) {
+    return {
+      id: riga.id,
+      origine: riga.origine || 'chat',
+      contaminato: !!riga.contaminato,
+      fonte: riga.fonte || 'esterno',
+      perimetro: Array.isArray(riga.perimetro) ? riga.perimetro.slice() : [],
+    };
+  }
+  return { id: k, origine: 'chat', contaminato: true, fonte: 'esterno', perimetro: [] };
+}
+
 // L'assistente di pagina vive DENTRO il sito che sta leggendo: nasce già
 // contaminato, e il suo perimetro non lo dichiara il modello (non ha un passo
 // per farlo) ma la superficie, che di uscite ne offre una sola.
