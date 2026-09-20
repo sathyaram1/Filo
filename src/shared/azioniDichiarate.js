@@ -1507,6 +1507,13 @@
     if (busta >= 0) return busta;
     const nuda = riga.search(CHIAMATA_NUDA);
     if (nuda >= 0) return nuda;
+    // Giro 10: il formato interno chiuso fra apici singoli in mezzo alla
+    // prosa, «Fatto: `{"type":"SVEGLIA",…}`». In chat resta un pezzo di
+    // codice e la sveglia non c'è. Cosa ci sia dentro lo decide `involucro`,
+    // che confronta il nome con gli strumenti veri: un `{segnaposto}` non
+    // passa.
+    const apici = riga.search(/`\s*[[{]/);
+    if (apici >= 0) return apici + riga.slice(apici).search(/[[{]/);
     // Sulla prima riga, fuori da un recinto, l'inizio del testo l'ha già
     // guardato `nudo`: qui cercheremmo la stessa cosa due volte.
     if (primaRigaLibera) return -1;
