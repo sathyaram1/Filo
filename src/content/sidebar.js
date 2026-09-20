@@ -835,6 +835,7 @@
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action });
       } catch (_) {}
       const done = !!(c && c.executed);
+      if (done) conta();
       appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
       return done;
     }
