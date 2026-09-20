@@ -161,7 +161,7 @@ test('riaprendo una segnalazione, la schermata allegata si vede in anteprima e s
   await card.locator('.fb-reopen-confirm').click();
   await expect.poll(async () => {
     const ag = await page.evaluate(() => window.__aggiornamenti.slice());
-    return ag.some((m) => /@@filo-attachment/.test(String(m?.payload?.notes || '')));
+    return ag.some((m) => /@@filo-attachment/.test(String(m?.notes || '')));
   }, { timeout: 10_000 }).toBe(true);
 });
 
@@ -209,8 +209,8 @@ test('un log allegato a una risposta torna a chi lo riceve identico a com’era'
 
   const note = await page.evaluate(async () => {
     const ag = window.__aggiornamenti.slice();
-    const con = ag.reverse().find((m) => /@@filo-attachment/.test(String(m?.payload?.notes || '')));
-    return con ? String(con.payload.notes) : '';
+    const con = ag.reverse().find((m) => /@@filo-attachment/.test(String(m?.notes || '')));
+    return con ? String(con.notes) : '';
   });
   expect(note, 'la risposta deve portarsi dietro il log').toMatch(/@@filo-attachment/);
 
@@ -244,16 +244,9 @@ test('un log allegato a una risposta torna a chi lo riceve identico a com’era'
   await expect(pillola).toContainText('filo.log');
   await pillola.click();
 
-  const arrivato = await expect.poll(async () => page.evaluate(() => {
-    const d = (window.__scaricati || [])[0];
-    if (!d) return null;
-    const b64 = String(d.href).split(',')[1] || '';
-    const bin = atob(b64);
-    const byte = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) byte[i] = bin.charCodeAt(i);
-    return { nome: d.nome, testo: new TextDecoder().decode(byte) };
-  }), { timeout: 10_000 }).not.toBeNull();
-  void arrivato;
+  await expect
+    .poll(() => page.evaluate(() => (window.__scaricati || []).length), { timeout: 10_000 })
+    .toBe(1);
 
   const dati = await page.evaluate(() => {
     const d = (window.__scaricati || [])[0];
@@ -345,4 +338,129 @@ test('più allegati di fila: ognuno resta la sua anteprima, e toglierne uno non 
     .poll(() => mount.locator('.fb-attach-thumb img')
       .evaluateAll((els) => els.filter((e) => e.naturalWidth > 0).length), { timeout: 10_000 })
     .toBe(2);
+});
+
+test("l'allegato che non si apre lo dice, e si legge in tutti e due i temi", async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  const chiavi = await coppiaDiProva();
+
+  // Una nota con un allegato che nel deposito non c'è più (link vecchio,
+  // codice di scarico ruotato): la miniatura non può comparire.
+  const nomeOggetto = 'feedback/1780000000000_99999999-2222-3333-4444-555555555555.octetstream';
+  const urlAllegato = `https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/${encodeURIComponent(nomeOggetto)}?alt=media&token=t`;
+  const marcatore = `@@filo-attachment ${JSON.stringify({ kind: 'img', url: urlAllegato })}`;
+
+  await preparaScheda(app, page, {
+    _id: 'verifica-602-rotto',
+    status: 'todo',
+    text: 'il pulsante non risponde',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes: ['Ecco cosa ho visto.', marcatore].join('\n'),
+    createdAt: new Date().toISOString(),
+  }, chiavi);
+
+  await page.locator('[data-tab="queue"]').click();
+  const mount = page.locator('.fb-card .fb-attach-mount[data-kind="notes"]').first();
+  await expect(mount).toBeAttached({ timeout: 10_000 });
+
+  // Al posto della schermata c'è un riquadro che DICE che non si vede — non un
+  // buco muto, e non un'immagine rotta.
+  const segnaposto = mount.locator('.fb-img-broken').first();
+  await expect(segnaposto).toBeVisible({ timeout: 10_000 });
+  await expect(segnaposto).toHaveText(/non visibile|riservato/i);
+
+  // E si legge in tutti e due i temi: misura sua, colore diverso dal fondo.
+  const fondi = [];
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.waitForTimeout(150);
+    const stato = await segnaposto.evaluate((el) => {
+      const s = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return { colore: s.color, fondo: getComputedStyle(document.body).backgroundColor, w: Math.round(r.width), h: Math.round(r.height) };
+    });
+    fondi.push(stato.fondo);
+    expect(stato.w, `tema ${tema}`).toBeGreaterThan(20);
+    expect(stato.h, `tema ${tema}`).toBeGreaterThan(20);
+    expect(stato.colore, `tema ${tema}`).not.toBe(stato.fondo);
+    expect(stato.colore, `tema ${tema}`).not.toBe('rgba(0, 0, 0, 0)');
+    await page.screenshot({ path: `tests/.shots/602-giro2-allegato-non-visibile-${tema}.png` });
+  }
+  expect(fondi[0], 'i due temi devono avere fondi diversi').not.toBe(fondi[1]);
+});
+
+test('nomi storti, file vuoto e 10.000 caratteri: passa il contenuto, non il codice', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  const chiavi = await coppiaDiProva();
+
+  await preparaScheda(app, page, {
+    _id: 'verifica-602-stress',
+    status: 'clarify',
+    text: 'il pulsante non risponde',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes: 'Puoi mandarmi il log?',
+    createdAt: new Date().toISOString(),
+  }, chiavi);
+
+  await page.locator('[data-tab="inbox"]').click();
+  const card = page.locator('.fb-card');
+  await expect(card.locator('.fb-reply-text')).toBeVisible();
+  const mount = card.locator('.fb-attach-mount[data-kind="reply"]');
+
+  // Un nome che prova a portarsi dietro del codice, e un file VUOTO.
+  const nomeStorto = '<img src=x onerror="window.__bucato=1">"\'.log';
+  await mount.locator('input[type="file"]').setInputFiles([
+    { name: nomeStorto, mimeType: 'text/plain', buffer: Buffer.from('a') },
+    { name: 'vuoto.log', mimeType: 'text/plain', buffer: Buffer.from('') },
+  ]);
+  await expect(mount.locator('.fb-attach-chip')).toHaveCount(2, { timeout: 15_000 });
+  // Anche il file vuoto sale, e sale cifrato.
+  const dep = await page.evaluate(() => [...window.__deposito.values()].map((b) => ({ n: b.length, primo: b[0] })));
+  expect(dep.length).toBe(2);
+  expect(dep.every((d) => d.primo === 1 && d.n > 78)).toBe(true);
+
+  // Il nome si legge com'è, e resta TESTO: niente elemento creato dal nome.
+  await expect(mount.locator('.fb-attach-name').first()).toHaveText(nomeStorto);
+  expect(await page.evaluate(() => !!window.__bucato)).toBe(false);
+  expect(await mount.locator('img[src="x"]').count()).toBe(0);
+
+  // Diecimila caratteri nella risposta, con l'allegato attaccato.
+  const lungo = 'a'.repeat(10_000);
+  await card.locator('.fb-reply-text').fill(lungo);
+  await card.locator('.fb-reply-send').click();
+
+  await expect.poll(async () => {
+    const ag = await page.evaluate(() => window.__aggiornamenti.slice());
+    const con = ag.find((m) => /@@filo-attachment/.test(String(m?.notes || '')));
+    if (!con) return null;
+    const n = String(con.notes);
+    return {
+      lungo: n.includes(lungo),
+      allegati: (n.match(/@@filo-attachment/g) || []).length,
+      nome: n.includes(JSON.stringify(nomeStorto).slice(1, -1)),
+    };
+  }, { timeout: 10_000 }).toEqual({ lungo: true, allegati: 2, nome: true });
+
+  // E la scheda, riletta, mostra il nome come testo — non come codice.
+  const note = await page.evaluate(() => {
+    const ag = window.__aggiornamenti.slice().reverse();
+    return String((ag.find((m) => /@@filo-attachment/.test(String(m?.notes || ''))) || {}).notes || '');
+  });
+  await page.evaluate((notes) => {
+    window.SN_FEEDBACK.list = async () => [{
+      _id: 'verifica-602-stress',
+      status: 'todo',
+      text: 'il pulsante non risponde',
+      url: 'https://example.com',
+      clientId: 'tester-123',
+      notes,
+      createdAt: new Date().toISOString(),
+    }];
+  }, note);
+  await page.locator('#refresh').click();
+  await page.locator('[data-tab="queue"]').click();
+  await expect(page.locator('.fb-bubble a.fb-file .fb-file-name').first()).toHaveText(nomeStorto, { timeout: 10_000 });
+  expect(await page.evaluate(() => !!window.__bucato)).toBe(false);
 });
