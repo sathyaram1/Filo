@@ -44,7 +44,9 @@ test('il verdetto locale sopravvive al commit dei rossi attesi', async () => {
   git(['init', '-q', '-b', 'claude/prova']);
   git(['config', 'user.email', 'prova@filo.test']);
   git(['config', 'user.name', 'prova']);
-  writeFileSync(join(dir, '.gitignore'), '.claude/\n');
+  // `.claude/` è ignorato come nel repo vero; il server finto vive qui accanto
+  // ma non è roba del progetto, e una directory sporca fermerebbe la critica.
+  writeFileSync(join(dir, '.gitignore'), '.claude/\nserver-bilanci.mjs\n');
   writeFileSync(join(dir, SPEC), PROVA);
   writeFileSync(join(dir, 'src', 'riquadro.js'), 'const bordo = 1;\n');
   git(['add', '-A']);
