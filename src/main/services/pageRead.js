@@ -105,6 +105,38 @@ const NASCOSTO = new RegExp([
   'clip\\s*:\\s*rect\\(\\s*0',
 ].map((r) => `(?:^|;)\\s*(?:${r})`).join('|'), 'i');
 
+// Riquadro schiacciato a zero che taglia quello che contiene, e riquadro
+// rimpicciolito a zero: il testo resta nella pagina ma fuori dagli occhi.
+const SCHIACCIATO = /(?:^|;)\s*(?:width|height)\s*:\s*[01](?:\.\d+)?\s*(?:px)?\s*(?:;|$)/i;
+const RIMPICCIOLITO = /transform\s*:[^;]*\b(?:scale(?:3d|x|y)?|matrix)\s*\(\s*0(?:\.0+)?\s*[,)]/i;
+const INVISIBILE = /(?:^|;)\s*color\s*:\s*(?:transparent|rgba\s*\([^)]*,\s*0(?:\.0+)?\s*\))/i;
+
+/** Un colore CSS in una forma confrontabile. PURA. */
+function coloreNormale(v) {
+  const s = String(v || '').trim().toLowerCase().replace(/\s+/g, '');
+  const m = /^#([0-9a-f]{3,4})$/.exec(s);
+  return m ? `#${m[1].split('').map((c) => c + c).join('')}` : s;
+}
+
+/**
+ * Questo elemento è nascosto da quello che ha scritto addosso? PURA.
+ *
+ * Il testo del colore dello sfondo l'utente non lo vede, e su una pagina
+ * scritta per chi legge con un agente è l'esca (#553). Il testo dipinto col
+ * proprio sfondo resta: è il titolo sfumato, e si vede benissimo.
+ */
+function nascostoInline(style) {
+  const s = String(style || '');
+  if (!s) return false;
+  if (NASCOSTO.test(s) || RIMPICCIOLITO.test(s)) return true;
+  if (SCHIACCIATO.test(s) && /overflow\s*:\s*hidden/i.test(s)) return true;
+  if (/background-clip\s*:\s*text/i.test(s)) return false;
+  if (INVISIBILE.test(s)) return true;
+  const testo = /(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(s);
+  const sfondo = /(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/i.exec(s);
+  return !!(testo && sfondo && coloreNormale(testo[1]) === coloreNormale(sfondo[1]));
+}
+
 /**
  * Dove finisce il tag aperto in `da`. PURA. Torna -1 se non finisce mai.
  *
