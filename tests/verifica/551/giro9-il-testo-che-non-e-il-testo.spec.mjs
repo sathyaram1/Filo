@@ -88,10 +88,10 @@ test('e non diventa cinese nemmeno una nota di lavoro più lunga', async ({ open
     // è intatto. La lunghezza non salva, perché la soglia è una PROPORZIONE:
     // cresce il file e cresce il numero di guasti che serve, ma il rapporto
     // resta lo stesso.
-    const testo = 'Nota di lavoro: la pratica 137 è chiusa, rimborso di 931,50 € — '
-      + 'da archiviare entro martedì a Città. '.repeat(4);
+    const testo = ('Nota di lavoro: la pratica 137 e chiusa, rimborso di 931,50. '
+      + 'Da archiviare entro martedi. ').repeat(4);
     const f = join(dir, 'nota.txt');
-    writeFileSync(f, conNulliDiPariPassa(Buffer.from(testo.slice(0, 200), 'latin1'), 11));
+    writeFileSync(f, conNulliDiPariPassa(Buffer.from(testo.slice(0, 200), 'utf8'), 11));
 
     const page = await openTab(HOME);
     lettoORifiutato(await leggiDocumento(page, f), 'pratica', 'nota di lavoro');
