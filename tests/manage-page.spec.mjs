@@ -558,11 +558,17 @@ test('un numero di sessioni fuori intervallo non parte, e il rifiuto dice l\'int
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadSessions());
 
-  for (const storto of ['0', '21', '2,5', '']) {
+  for (const storto of ['0', '21', '']) {
     await page.locator('#mgMaxSessions').fill(storto);
     await page.locator('#mgMaxSessionsSave').click();
     await expect(page.locator('#mgMaxSessionsMsg')).toContainText('da 1 a 20');
   }
+  // Un campo numerico con dentro delle lettere risponde `value === ''`: se lo
+  // si leggesse così, a chi ha scritto «tre» si direbbe che il campo è vuoto.
+  await page.locator('#mgMaxSessions').fill('');
+  await page.locator('#mgMaxSessions').pressSequentially('tre');
+  await page.locator('#mgMaxSessionsSave').click();
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('da 1 a 20');
   // Niente è partito: sul server è rimasto il valore di prima.
   expect(await page.evaluate(() => window.__sessionsSets)).toEqual([]);
   expect(await page.evaluate(() => window.__sessions.maxSessions)).toBe(4);
