@@ -71,8 +71,45 @@ test('un appunto che esiste davvero non viene smentito, con o senza i titoli', (
   // vede qui: cambia solo cosa gli si mette davanti.
   const frase = 'Sì, ti ho salvato l\'appunto con la lista della spesa.';
   expect(D.rileva(frase, [], STATO({ titoliAppunti: ['lista della spesa'] })).length).toBe(0);
-  // Quello che l'Aiuto passa davvero: solo le sveglie.
-  expect(D.rileva(frase, new Set(), { orariSveglie: [] }, AIUTO()).length).toBe(0);
+  // Le stesse informazioni devono arrivare anche al pannello.
+  expect(D.rileva(frase, new Set(),
+    { orariSveglie: [], titoliAppunti: ['lista della spesa'] }, AIUTO()).length).toBe(0);
+  // Un appunto che non c'è resta un'accusa, nelle due chat.
+  expect(D.rileva(frase, new Set(), { orariSveglie: [], titoliAppunti: [] }, AIUTO()).length).toBeGreaterThan(0);
+});
+
+test('lo stato del presidio lo costruisce un posto solo per le due chat', () => {
+  // Le sveglie in pausa e quelle che hanno già suonato non provano niente, e
+  // un conto alla rovescia non è una sveglia.
+  const fra2h = new Date(Date.now() + 2 * 3600 * 1000);
+  const prove = D.statoDaTimerEFile([
+    { kind: 'alarm', endsAt: fra2h.toISOString() },
+    { kind: 'alarm', endsAt: fra2h.toISOString(), paused: true },
+    { kind: 'alarm', endsAt: new Date(Date.now() - 3600 * 1000).toISOString(), ringing: true },
+  ], [{ title: 'lista della spesa' }]);
+  expect(prove.sveglie.length).toBe(1);
+  expect(prove.sveglie[0].tipo).toBe('alarm');
+  expect(prove.titoliAppunti).toEqual(['lista della spesa']);
+});
+
+test('una sveglia di oggi non regge la sveglia promessa per domani', () => {
+  const oggi = Date.now();
+  const domani = new Date(oggi);
+  domani.setDate(domani.getDate() + 1);
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const soloOggi = {
+    sveglie: [{ ora: '07:00', giorno: iso(new Date(oggi)), tipo: 'alarm' }],
+    titoliAppunti: [], contiAzioni: {}, oggi,
+  };
+  expect(D.rileva('Ti ho messo la sveglia alle 7 per domani.', [], soloOggi).length).toBeGreaterThan(0);
+  // Quella di oggi invece la regge.
+  expect(D.rileva('Ti ho messo la sveglia alle 7 per stamattina.', [], soloOggi).length).toBe(0);
+  // E un conto alla rovescia che finisce alle 19 non è la sveglia delle 19.
+  const soloTimer = {
+    sveglie: [{ ora: '19:00', giorno: iso(new Date(oggi)), tipo: 'timer' }],
+    titoliAppunti: [], contiAzioni: {}, oggi,
+  };
+  expect(D.rileva('Ti ho messo la sveglia alle 19.', [], soloTimer).length).toBeGreaterThan(0);
 });
 
 test('una richiesta scritta come domanda non spegne il controllo sui turni prima', () => {
