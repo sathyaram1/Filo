@@ -768,6 +768,12 @@
     // schede nuove aperte insieme mostrano la stessa conversazione, non una
     // ferma a com'era. { onboarding }
     FILO_ONBOARDING_UPDATED: 'filo_onboarding_updated',
+    // Broadcast da background -> dashboard (#663): è cambiato se Filo ha o no
+    // un modello da chiamare. La configurazione condivisa arriva dalla rete
+    // DOPO che la prima home è già a schermo: senza questo avviso l'utente
+    // resta davanti al cartello «non posso rispondere» finché non ricarica.
+    // { ready: bool }
+    FILO_READY_CHANGED: 'filo_ready_changed',
     // Broadcast da background -> content: una lettura ad alta voce è attiva
     // (in QUALCHE scheda) oppure no. Ogni scheda usa questo flag per mostrare
     // "Interrompi lettura" nel menu anche se non è lei a leggere. { active: bool }
