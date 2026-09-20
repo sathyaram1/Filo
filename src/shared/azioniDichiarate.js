@@ -98,29 +98,20 @@
       frasi: [
         /\bho (?:salvato|scritto|creato|aggiunto|annotato|preso|buttato giù)\b[^.!?\n]{0,48}\b(?:appunt[oi]|not[ae]|promemoria)\b/i,
         /\bme (?:lo|la|ne) sono (?:segnat|appuntat|annotat)[oa]\b/i,
-      ],
-    },
-    {
-      id: 'memoria',
-      tipi: ['SALVA_LEZIONE', 'SALVA_APPUNTO'],
-      avviso: 'in memoria non è finito niente',
-      frasi: [
-        // Solo i verbi che dicono «l'ho messo via»: «ho imparato», «ho capito»
-        // e simili sono modi di dire, e farebbero scattare il presidio su una
-        // conversazione qualunque.
-        /\b(?:l'|lo |la )?ho memorizzat[oa]\b/i,
-        /\bho (?:salvato|fissato|messo) (?:in|nella|nelle) memoria\b/i,
-        /\bd'ora in poi me (?:ne|lo|la) ricorder(?:ò|o)\b/i,
+        new RegExp(`\\b(?:te |ve )?l${AP}ho (?:salvat|scritt|annotat|mess)[oa]\\b[^.!?\\n]{0,32}\\b(?:appunt[oi]|not[ae]|promemoria)\\b`, 'i'),
       ],
     },
     {
       id: 'apertura',
-      tipi: ['NAVIGA', 'APRI_FILE', 'COMANDO_FINESTRA', 'LEGGI_DOCUMENTO', 'LEGGI_FILE', 'PROXY_TAB', 'REGOLA_PROXY_DOMINIO'],
+      // Un programma o una cartella si aprono con un comando di shell: senza
+      // ESEGUI_COMANDO qui, «ho aperto il blocco note» — fatto davvero —
+      // faceva comparire all'utente «non si è aperto niente».
+      tipi: ['NAVIGA', 'APRI_FILE', 'COMANDO_FINESTRA', 'ESEGUI_COMANDO', 'LEGGI_DOCUMENTO', 'LEGGI_FILE', 'PROXY_TAB', 'REGOLA_PROXY_DOMINIO'],
       avviso: 'non si è aperto niente',
       frasi: [
         /\bho apert[oa]\b/i,
-        /\bl'ho apert[oa]\b/i,
-        /\bte (?:l'|lo |la )ho apert[oa]\b/i,
+        new RegExp(`\\bl${AP}ho apert[oa]\\b`, 'i'),
+        new RegExp(`\\bte (?:l${AP}|lo |la )ho apert[oa]\\b`, 'i'),
       ],
     },
     {
