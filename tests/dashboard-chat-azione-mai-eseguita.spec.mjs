@@ -275,3 +275,47 @@ test('una sveglia messa in una sessione precedente resta una sveglia messa', asy
   await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
   expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
 });
+
+// La stessa sveglia, confermata come si conferma in italiano quando la cosa
+// l'ha appena nominata l'utente: col pronome. La prova dello stato copriva
+// solo la frase lunga che ripete la parola «sveglia», cioè la forma meno
+// probabile subito dopo la domanda.
+test('la sveglia che esiste regge anche la conferma detta col pronome', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.addAlarm({ label: 'sera', time: '19:00' }));
+  await installScript(app, [{ text: 'Sì, te l\'ho messa alle 19:00 come mi avevi chiesto.' }]);
+  await page.locator('#input').fill('hai messo la sveglia per stasera?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  expect(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers())).toHaveLength(1);
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
+});
+
+// L'evento di calendario non si esegue da solo: Filo chiama lo strumento e in
+// chat compare il bottone che preme l'utente. Filo ha fatto tutto quello che
+// poteva, e veniva smentito — con la risposta buttata via e rifatta prima.
+test('l\'evento proposto come bottone non fa buttare né smentire la risposta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'c1', name: 'EVENTO_CALENDARIO', arguments: '{"data":"2026-09-21","ora":"10:00","titolo":"Riunione"}' }] },
+    { text: 'Ti ho aggiunto l\'evento in calendario per domani alle 10.' },
+  ]);
+  await page.locator('#input').fill('aggiungimi al calendario la riunione di domani alle 10');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-filo').last()).toContainText('in calendario per domani');
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  // Due chiamate al modello, non tre: la risposta non è stata rifatta.
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(2);
+});
