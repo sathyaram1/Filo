@@ -179,7 +179,7 @@ function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIll
   if (TAG_ILLEGGIBILI.has(nome)) return true;
   if ('hidden' in attrs) return true;
   if (attrs['aria-hidden'] === 'true') return true;
-  if (/display\s*:\s*none/i.test(attrs.style || '')) return true;
+  if (NASCOSTO.test(attrs.style || '')) return true;
   if (soloIlleggibile) return false;
   const esente = (t) => CORNICE_SITO.test(t)
     && !CORNICE_DICHIARATA.test(t)
