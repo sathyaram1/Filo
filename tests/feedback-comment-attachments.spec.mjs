@@ -26,6 +26,10 @@ async function setupAdmin(app, page, feedback, captureUpdates = false) {
 
   await page.evaluate(({ fb, capture }) => {
     window.SN_FEEDBACK.list = async () => [fb];
+    // Il caricamento VERO, messo da parte: la prova della cifratura (#602) lo
+    // rimette al suo posto, perche' quello che deve guardare e' proprio cosa
+    // finisce nel deposito.
+    window.__caricamentoVero = window.SN_FEEDBACK.uploadAttachment;
     // Mock dell'upload: niente rete, ritorna un URL deterministico per nome.
     window.SN_FEEDBACK.uploadAttachment = async (blob, name) => {
       const type = (blob && blob.type) || '';
@@ -257,4 +261,155 @@ test('nel compositore di una risposta un .svg e un .html sono rifiutati prima di
     .setInputFiles({ name: 'conf.yaml', mimeType: 'application/x-yaml', buffer: Buffer.from('a: 1') });
   await expect(mount.locator('.fb-attach-chip')).toHaveCount(2);
   expect(await page.evaluate(() => window.__caricati)).toEqual(['note.txt', 'conf.yaml']);
+});
+
+// ── #602 — l'allegato di un COMMENTO sale CIFRATO, e la dashboard lo riapre ──
+//
+// Il buco: gli allegati aggiunti ai commenti non passavano dalla cifratura e
+// finivano nel deposito com'erano. È il caso peggiore, perché è lì che si
+// allegano le schermate e i log del lavoro, e il deposito si apre col codice di
+// scarico che sta nel collegamento — un collegamento che gira.
+//
+// La causa vera era in questa pagina: è l'unica che carica da sola nel deposito
+// (il resto passa dal main), e il modulo di cifratura qui non era caricato
+// affatto. Il ripiego «non riesco a cifrare, carico lo stesso» scattava quindi
+// SEMPRE, in silenzio.
+//
+// Questa prova percorre il giro intero, sulla pagina vera e col caricamento
+// vero: si allega una schermata a una risposta, si guarda cosa esce verso il
+// deposito (deve essere un ciphertext, e non deve contenere i byte
+// dell'immagine), e poi si rilegge come la rilegge la dashboard — scaricando e
+// decifrando con la chiave privata — fino a rivedere l'immagine originale nella
+// bolla del turno.
+//
+// Senza il fix è ROSSA: quello che parte verso il deposito è il PNG com'è.
+test('#602 — un allegato di commento sale cifrato e la dashboard lo riapre', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+
+  // Coppia di prova: la pubblica entra nella pagina al posto di quella vera, la
+  // privata resta qui e fa il mestiere che nell'app fa la chiave dell'owner.
+  const { webcrypto } = await import('node:crypto');
+  const pair = await webcrypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const pub = Buffer.from(new Uint8Array(await webcrypto.subtle.exportKey('raw', pair.publicKey)))
+    .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const priv = Buffer.from(new Uint8Array(await webcrypto.subtle.exportKey('pkcs8', pair.privateKey)))
+    .toString('base64');
+
+  await setupAdmin(app, page, {
+    _id: 'mock-att-cifrato',
+    status: 'clarify',
+    text: 'il pulsante non risponde',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes: 'Puoi mandarmi uno screenshot del problema?',
+    createdAt: new Date().toISOString(),
+  }, /* captureUpdates */ true);
+
+  // Deposito finto e chiave privata dell'owner finta, dentro la pagina.
+  await page.evaluate(({ pubKey, privKey }) => {
+    window.SN_FEEDBACK_PUBKEY = pubKey;
+    // Il caricamento vero: è lui che deve cifrare.
+    window.SN_FEEDBACK.uploadAttachment = window.__caricamentoVero;
+
+    // Il deposito: registra i byte che riceve, come li riceve.
+    window.__deposito = new Map();
+    const fetchVero = window.fetch.bind(window);
+    window.fetch = async (url, opts) => {
+      const u = String(url);
+      if (u.includes('uploadType=media')) {
+        // La chiave e' il NOME dell'oggetto: l'indirizzo completo lo compone
+        // l'app col nome vero del deposito, e qui non lo si indovina.
+        const nome = decodeURIComponent((/[?&]name=([^&]+)/.exec(u) || [])[1] || 'x');
+        const byte = new Uint8Array(await new Response(opts.body).arrayBuffer());
+        window.__deposito.set(nome, Array.from(byte));
+        return new Response(JSON.stringify({ downloadTokens: 't' }), { status: 200 });
+      }
+      return fetchVero(url, opts);
+    };
+
+    // Il main visto dalla pagina: davanti a un allegato fa quello che fa il
+    // vero — scarica dal deposito e decifra con la chiave privata di chi riceve
+    // le segnalazioni. Se i byte non fossero cifrati, qui si vedrebbe.
+    const messaggioVero = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_decrypt_image') {
+        const nome = decodeURIComponent(String(msg.url || '').split('/o/')[1]?.split('?')[0] || '');
+        const byte = window.__deposito.get(nome);
+        if (!byte) return { ok: false, error: 'non nel deposito' };
+        const pacchetto = new Uint8Array(byte);
+        if (!window.SN_FEEDBACK_CRYPTO.isEncryptedBytes(pacchetto)) {
+          return { ok: false, error: 'allegato NON cifrato nel deposito' };
+        }
+        const chiaro = await window.SN_FEEDBACK_CRYPTO.decryptBytes(pacchetto, privKey);
+        let bin = '';
+        for (let i = 0; i < chiaro.length; i++) bin += String.fromCharCode(chiaro[i]);
+        return { ok: true, dataUrl: 'data:image/png;base64,' + btoa(bin) };
+      }
+      return messaggioVero(msg);
+    };
+  }, { pubKey: pub, privKey: priv });
+
+  await page.locator('[data-tab="inbox"]').click();
+  const card = page.locator('.fb-card');
+  await expect(card.locator('.fb-reply-text')).toBeVisible();
+  await card.locator('.fb-reply-text').fill('Ecco la schermata.');
+
+  await card.locator('.fb-attach-mount[data-kind="reply"] input[type="file"]')
+    .setInputFiles({ name: 'screen.png', mimeType: 'image/png', buffer: PNG_1x1 });
+  await expect(card.locator('.fb-attach-mount[data-kind="reply"] .fb-attach-thumb img')).toHaveCount(1);
+
+  // ① Quello che è arrivato nel deposito è un ciphertext, e l'immagine non c'è.
+  const depositato = await page.evaluate(() => {
+    const [nome, byte] = [...window.__deposito.entries()][0] || [];
+    return { nome, byte };
+  });
+  expect(depositato.byte, 'un allegato deve essere arrivato al deposito').toBeTruthy();
+  const saliti = Buffer.from(depositato.byte);
+  expect(saliti[0], 'primo byte = versione del formato cifrato').toBe(1);
+  expect(saliti.length).toBeGreaterThan(1 + 65 + 12);
+  expect(saliti.slice(0, 8).toString('hex'), 'nel deposito non deve esserci un PNG')
+    .not.toBe(PNG_1x1.slice(0, 8).toString('hex'));
+  expect(saliti.includes(PNG_1x1), "i byte dell'immagine non devono comparire in chiaro").toBe(false);
+
+  // ② Con la chiave privata tornano ESATTAMENTE i byte dell'originale.
+  const chiaviDecifra = await webcrypto.subtle.importKey(
+    'pkcs8', Buffer.from(priv, 'base64'), { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+  const eph = await webcrypto.subtle.importKey(
+    'raw', saliti.slice(1, 66), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const bits = await webcrypto.subtle.deriveBits({ name: 'ECDH', public: eph }, chiaviDecifra, 256);
+  const base = await webcrypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
+  const aes = await webcrypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: new Uint8Array(saliti.slice(1, 66)) },
+    base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const chiaro = Buffer.from(await webcrypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(saliti.slice(66, 78)) }, aes, saliti.slice(78)));
+  expect(chiaro.equals(PNG_1x1), "decifrato deve tornare l'originale").toBe(true);
+
+  // ③ E la dashboard lo riapre: manda la risposta, ricarica la scheda com'è
+  // salvata e l'immagine del turno si vede — decifrata, non un segnaposto rotto.
+  await card.locator('.fb-reply-send').click();
+  const upd = await page.waitForFunction(
+    () => (window.__updates || []).find((m) => m.id === 'mock-att-cifrato'),
+    null, { timeout: 5_000 },
+  ).then((h) => h.jsonValue());
+  expect(upd.notes).toContain('@@filo-attachment');
+  expect(upd.notes).toContain(encodeURIComponent(depositato.nome));
+
+  await page.evaluate((note) => {
+    window.SN_FEEDBACK.list = async () => [{
+      _id: 'mock-att-cifrato',
+      status: 'todo',
+      text: 'il pulsante non risponde',
+      url: 'https://example.com',
+      clientId: 'tester-123',
+      notes: note,
+      createdAt: new Date().toISOString(),
+    }];
+  }, upd.notes);
+  await page.locator('#refresh').click();
+  await page.locator('[data-tab="queue"]').click();
+
+  const img = page.locator('.fb-card .fb-imgs img').first();
+  await expect(img).toHaveCount(1);
+  await expect(img).toHaveAttribute('src', `data:image/png;base64,${PNG_1x1.toString('base64')}`);
 });
