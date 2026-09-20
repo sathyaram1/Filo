@@ -533,3 +533,84 @@ test('un\'immagine servita come file generico resta quello che è', async () => 
   assert.equal(r.ok, false);
   assert.equal(r.error, 'unsupported');
 });
+
+// ── Il contorno che contiene il dato (#553) ───────────────────────────────────
+// «A che ora apre?» è una delle domande per cui questa lettura esiste, e sul
+// sito di un locale l'orario sta nel piè di pagina. Buttare il contorno a nome
+// faceva sparire l'orario, il telefono, il prezzo scontato di un riquadro
+// «promo» e il titolo del pezzo dentro un «banner». Ora va in coda al testo.
+
+const TRATTORIA = '<!DOCTYPE html><html><head><title>Trattoria</title></head><body>'
+  + '<main><h1>Trattoria da Anna</h1><p>Cucina bolognese dal 1974.</p></main>'
+  + '<footer><h2>Orari</h2><p>Lun-Sab 8:00-19:30</p><p>Tel. 051 123456</p></footer></body></html>';
+
+test('l\'orario e il telefono del piè di pagina arrivano, dopo il contenuto', () => {
+  const { testo } = PR.estraiContenuto(TRATTORIA);
+  assert.match(testo, /Cucina bolognese/);
+  assert.match(testo, /8:00-19:30/);
+  assert.match(testo, /051 123456/);
+  assert.ok(testo.indexOf('Cucina bolognese') < testo.indexOf('8:00-19:30'));
+});
+
+test('il prezzo scontato di un riquadro «promo» non sparisce', () => {
+  const { testo } = PR.estraiContenuto('<body><main><section class="promo"><p>In offerta: 4,99</p></section>'
+    + '<p>Prezzo di listino: 9,99</p></main></body>');
+  assert.match(testo, /9,99/);
+  assert.match(testo, /4,99/);
+});
+
+test('il titolo e la data dentro un «banner» non spariscono', () => {
+  const { testo } = PR.estraiContenuto('<body><main><div class="banner"><h1>Sciopero dei treni</h1>'
+    + '<p>Pubblicato il 12 marzo 2026 alle 14:30</p></div><p>Corpo.</p></main></body>');
+  assert.match(testo, /Sciopero dei treni/);
+  assert.match(testo, /14:30/);
+});
+
+test('menu, cookie e pubblicità restano fuori anche dalla coda', () => {
+  const { testo } = PR.estraiContenuto('<body><nav>Home Contatti</nav>'
+    + '<div class="cookie-banner">Accetta tutto</div><div id="ads">Compra a 19,99</div>'
+    + '<main><p>Il dato: 7</p></main><footer><p>Orari 8-19</p></footer></body>');
+  assert.match(testo, /Il dato: 7/);
+  assert.match(testo, /Orari 8-19/);
+  for (const rumore of ['Home Contatti', 'Accetta tutto', '19,99']) {
+    assert.ok(!testo.includes(rumore), `la cornice è finita nel testo: ${rumore}`);
+  }
+});
+
+test('la coda ha un tetto: un elenco di link non si mangia la lettura', () => {
+  const link = Array.from({ length: 2000 }, (_, i) => `<p>Voce numero ${i}</p>`).join('');
+  const { testo } = PR.estraiContenuto(`<body><main><p>Il dato: 7</p></main><footer>${link}</footer></body>`);
+  assert.match(testo, /Il dato: 7/);
+  assert.ok(testo.length < PR.MAX_CODA_CHARS + 200, `coda senza tetto: ${testo.length}`);
+});
+
+// ── Quello che sta nei controlli di un modulo (#553) ──────────────────────────
+// Sullo schermo le voci di un menù a tendina e i bottoni sono riquadri
+// separati: incollandoli si ottiene un orario che non esiste.
+
+test('le voci di un menù a tendina non si incollano fra loro', () => {
+  const { testo } = PR.estraiContenuto('<body><main><select><option>10:00</option>'
+    + '<option>14:30</option><option>18:00</option></select></main></body>');
+  assert.ok(!testo.includes('10:0014:30'), testo);
+  assert.match(testo, /14:30/);
+});
+
+test('le etichette di due bottoni non si incollano fra loro', () => {
+  const { testo } = PR.estraiContenuto('<body><main><button>Mensile 9,99</button>'
+    + '<button>Annuale 99,00</button></main></body>');
+  assert.ok(!testo.includes('9,99Annuale'), testo);
+});
+
+test('il valore di un campo e il testo alternativo di un\'immagine arrivano', () => {
+  const { testo } = PR.estraiContenuto('<body><main><label>Orario</label>'
+    + '<input type="text" value="14:30"><img src="p.png" alt="12,50 euro"></main></body>');
+  assert.match(testo, /14:30/);
+  assert.match(testo, /12,50/);
+});
+
+test('una password precompilata e i campi nascosti non escono mai', () => {
+  const { testo } = PR.estraiContenuto('<body><main><input type="password" value="segreto123">'
+    + '<input type="hidden" value="token-abc"><p>Accedi</p></main></body>');
+  assert.ok(!testo.includes('segreto123'), testo);
+  assert.ok(!testo.includes('token-abc'), testo);
+});

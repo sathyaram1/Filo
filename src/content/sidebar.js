@@ -645,6 +645,7 @@
     return {
       url: o.pageRead || url, title: o.title || '', text: o.text || '',
       truncated: !!o.truncated, partial: !!o.partial, empty: !!o.empty,
+      source: o.source || '',
       error: o.error || (detail ? 'blocked' : null), detail: o.detail || detail || '',
     };
   }

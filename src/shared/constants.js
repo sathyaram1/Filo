@@ -1403,7 +1403,7 @@
     // Il testo di una pagina che l'Aiuto ha chiesto di leggere. Stessa busta e
     // stesso avviso della chat: lo scrive chi possiede quel sito, e ci arriva
     // perché un motore di ricerca l'ha messo in cima.
-    paginaLettaImbustata: ({ url = '', title = '', text = '', truncated = false, partial = false, empty = false, error = '', detail = '' } = {}) => {
+    paginaLettaImbustata: ({ url = '', title = '', text = '', truncated = false, partial = false, empty = false, source = '', error = '', detail = '' } = {}) => {
       const riga = (v) => esterno().perCanaleSistema(v);
       const dove = riga(url) || 'la pagina';
       if (!String(text || '').trim()) {
@@ -1421,7 +1421,12 @@
       const coda = partial
         ? '\n…(pagina troppo grande: Filo ne ha letta solo la prima parte, il resto non l\'ha visto.)'
         : (truncated ? '\n…(pagina troncata: letto fino a qui.)' : '');
-      return `[Pagina "${dove}"${titolo ? ` — ${titolo}` : ''}]\n`
+      // Da dove viene il testo: la pagina pubblica o la scheda aperta, che è la
+      // pagina come la vede l'utente, col suo accesso (#553).
+      const daScheda = source === 'scheda'
+        ? ' Letta dalla scheda aperta dell\'utente, col suo accesso: non è detto che un altro ci veda le stesse cose.'
+        : '';
+      return `[Pagina "${dove}"${titolo ? ` — ${titolo}` : ''}.${daScheda}]\n`
         + esterno().imbusta({ tipo: 'PAGINA_WEB', testo: text, conIntestazione: true })
         + coda;
     },

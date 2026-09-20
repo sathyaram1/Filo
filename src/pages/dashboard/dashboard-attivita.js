@@ -249,6 +249,13 @@
     return sito || breve || 'una pagina';
   }
 
+  // Leggere dalla scheda aperta dell'utente non è leggere il sito: lì dentro
+  // c'è il suo accesso, la sua posta, il suo conto. La riga deve dirlo (#553).
+  function vociPagina(a) {
+    const daScheda = a && a._output && a._output.source === 'scheda';
+    return `${daScheda ? 'Leggo la tua scheda aperta' : 'Leggo la pagina'}: ${etichettaPagina(a)}`;
+  }
+
   function indirizzoLetto(a) {
     const dal = String((a && a._output && a._output.pageRead) || '').trim();
     if (dal) return dal;
@@ -376,7 +383,7 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
-    LEGGI_PAGINA: (a) => ({ icon: '📄', text: `Leggo la pagina: ${etichettaPagina(a)}` }),
+    LEGGI_PAGINA: (a) => ({ icon: '📄', text: vociPagina(a) }),
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
     LEGGI_FILE: (a) => {
       const title = (a._output && a._output.title) || '';
@@ -877,7 +884,7 @@
       // compare la risposta col dato vero.
       // L'indirizzo per intero sotto il puntatore: la riga nomina il sito, ma
       // due pagine dello stesso sito hanno lo stesso nome.
-      return stepTrace(`📄 Leggo la pagina: ${etichettaPagina(a)}`, indirizzoLetto(a));
+      return stepTrace(`📄 ${vociPagina(a)}`, indirizzoLetto(a));
     }
     if (type === 'CAPACITA_DETTAGLIO') {
       // Traccia del passo intermedio: Filo sta consultando il proprio manifesto

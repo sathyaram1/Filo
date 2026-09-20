@@ -35,6 +35,10 @@ const TIMEOUT_MS = 15000;
 // finirebbe mai (sullo scaricamento un tempo massimo c'era già).
 const MAX_ATTESA_SCHEDA_MS = 5000;
 
+// Quanto contorno entra in coda al contenuto: orari, telefono e indirizzo ci
+// stanno; oltre è un elenco di link, che non deve mangiarsi la lettura.
+const MAX_CODA_CHARS = 4000;
+
 // Elementi che non sono TESTO: dentro c'è codice, o roba che non si legge. Non
 // escono mai, nemmeno dal ripiego: al modello arrivavano righe di JavaScript
 // presentate come il testo della pagina, e lui rispondeva su quelle (#553).
@@ -43,27 +47,36 @@ const TAG_ILLEGGIBILI = new Set([
   'object', 'embed', 'video', 'audio', 'map', 'datalist',
 ]);
 
-// Cornice del sito. Il titolo torna a parte, quindi togliere anche `header` non
-// perde nulla.
-const TAG_FUORI = new Set([...TAG_ILLEGGIBILI, 'dialog', 'nav', 'aside', 'footer', 'header']);
+// Cornice del sito che non è mai il contenuto: un menu è un menu ovunque stia.
+const TAG_FUORI = new Set([...TAG_ILLEGGIBILI, 'dialog', 'nav']);
+
+// Contorno AMBIGUO: sul sito di un locale l'orario sta nel piè di pagina e la
+// scheda tecnica nel riquadro di fianco. Non si butta: va in coda (#553).
+const TAG_CORNICE = new Set(['header', 'footer', 'aside']);
 
 // Classi e id del rumore, confrontati come TOKEN INTERI: per sottostringa
 // `class="header-price"` contiene «header», e il prezzo sparirebbe in silenzio.
 // I blocchi di commenti NON stanno qui: su una discussione o su una domanda con
 // le risposte sotto, il dato che l'utente cerca esiste solo lì (#553).
-const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|sidebar|side-?bar|footer|site-?footer|page-?footer|header|site-?header|masthead|topbar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|banner|promo|promotion|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|related|related-?posts|recommended|widget|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
+const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|footer|site-?footer|page-?footer|header|site-?header|masthead|topbar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|related|related-?posts|recommended|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
 
-const ROLE_RUMORE = /^(navigation|banner|contentinfo|complementary|search|dialog|alertdialog|menu|menubar|toolbar|tablist)$/i;
+// «promo» è il riquadro del prezzo scontato, «banner» spesso il titolo col suo
+// giorno: buttarli dava il prezzo di listino, cioè la risposta sbagliata (#553).
+const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero)$/i;
+
+const ROLE_RUMORE = /^(navigation|search|dialog|alertdialog|menu|menubar|toolbar|tablist)$/i;
+
+const ROLE_CORNICE = /^(banner|contentinfo|complementary)$/i;
 
 // Intestazione e coda: del SITO sono cornice, dell'ARTICOLO sono contenuto (la
 // data, l'ora e la firma stanno lì su quasi ogni blog), e in una tabella sono i
 // nomi delle colonne, senza i quali i numeri sotto non si leggono più.
-const CORNICE_SITO = /^(header|site-?header|masthead|footer|site-?footer|page-?footer|banner|contentinfo|topbar|top-?nav)$/i;
+const CORNICE_SITO = /^(header|site-?header|masthead|footer|site-?footer|page-?footer|topbar|top-?nav)$/i;
 
 // Chi DICE di essere la cornice del sito: quello si butta dovunque stia. Un
 // `header` e basta no: fuori da `main` o `article` è quasi sempre il titolo del
 // pezzo con la sua data, e buttarlo via era il buco del giro prima (#553).
-const CORNICE_DICHIARATA = /^(site-?header|masthead|site-?footer|page-?footer|banner|contentinfo|topbar|top-?nav)$/i;
+const CORNICE_DICHIARATA = /^(site-?header|masthead|site-?footer|page-?footer|topbar|top-?nav)$/i;
 
 const TAG_TABELLA = new Set(['table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup', 'col']);
 
@@ -77,6 +90,10 @@ const BLOCCHI = new Set([
   'p', 'div', 'section', 'article', 'main', 'blockquote', 'pre', 'figure', 'figcaption',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'dl', 'dt', 'dd', 'table', 'thead',
   'tbody', 'tfoot', 'tr', 'form', 'fieldset', 'address', 'hr', 'details', 'summary',
+  // Sullo schermo sono riquadri separati: senza lo stacco le voci di un menù a
+  // tendina diventano «10:0014:3018:00», un orario che non esiste (#553).
+  'option', 'optgroup', 'select', 'button', 'label', 'legend', 'caption', 'textarea',
+  'output', 'header', 'footer', 'aside', 'nav', 'hgroup',
 ]);
 
 const LETTERA = /[a-zA-Z]/;
@@ -179,29 +196,32 @@ function attributi(raw) {
 }
 
 /**
- * Questo elemento è cornice del sito, non contenuto? PURA.
+ * Che cosa è questo elemento? PURA. Torna `'illeggibile'` (codice, o roba che
+ * l'utente non vede), `'fuori'` (menu, pubblicità, cookie: mai contenuto),
+ * `'cornice'` (contorno che però può contenere il dato chiesto) o `false`.
  *
  * `inZona` (dentro `main`/`article`) e le tabelle salvano intestazione e coda:
  * lì sono la data del pezzo o i nomi delle colonne. Fuori si butta solo ciò
  * che si dichiara cornice del sito o che sta in cima al corpo: più in dentro,
  * un `header` è l'intestazione dell'articolo anche senza `main` attorno.
- *
- * `soloIlleggibile` è il passaggio di ripiego: cade la cornice, mai il codice
- * e mai quello che la pagina nasconde all'utente.
  */
 function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIlleggibile = false } = {}) {
-  if (TAG_ILLEGGIBILI.has(nome)) return true;
-  if ('hidden' in attrs) return true;
-  if (attrs['aria-hidden'] === 'true') return true;
-  if (NASCOSTO.test(attrs.style || '')) return true;
+  if (TAG_ILLEGGIBILI.has(nome)) return 'illeggibile';
+  if ('hidden' in attrs) return 'illeggibile';
+  if (String(attrs['aria-hidden'] || '').toLowerCase() === 'true') return 'illeggibile';
+  if (NASCOSTO.test(attrs.style || '')) return 'illeggibile';
   if (soloIlleggibile) return false;
   const esente = (t) => CORNICE_SITO.test(t)
     && !CORNICE_DICHIARATA.test(t)
     && (inZona || TAG_TABELLA.has(nome) || !primoLivello);
-  if (TAG_FUORI.has(nome) && !esente(nome)) return true;
-  if (attrs.role && ROLE_RUMORE.test(attrs.role) && !esente(attrs.role)) return true;
+  if (TAG_FUORI.has(nome)) return 'fuori';
+  if (attrs.role && ROLE_RUMORE.test(attrs.role)) return 'fuori';
   const token = `${attrs.class || ''} ${attrs.id || ''}`.split(/[\s]+/).filter(Boolean);
-  return token.some((t) => TOKEN_RUMORE.test(t) && !esente(t));
+  if (token.some((t) => TOKEN_RUMORE.test(t) && !esente(t))) return 'fuori';
+  const cornice = (TAG_CORNICE.has(nome) && !esente(nome))
+    || (attrs.role && ROLE_CORNICE.test(attrs.role))
+    || token.some((t) => TOKEN_CORNICE.test(t));
+  return cornice ? 'cornice' : false;
 }
 
 // I nomi delle entità dei caratteri 160-255, in ordine di codice. Senza questi
@@ -261,6 +281,9 @@ function htmlATesto(html, dentroZona = false) {
 
 function passaggio(html, modo, dentroZona = false) {
   const soloIlleggibile = modo === 'minimo';
+  // Nel passaggio della coda il contorno resta: è lì che si va a cercare
+  // l'orario di apertura quando il corpo della pagina non ce l'ha.
+  const tieniCornice = modo === 'cornice';
   const src = String(html == null ? '' : html);
   const fuori = []; // pila degli elementi di cornice ancora aperti
   const zone = []; // pila delle zone di contenuto (article/main) ancora aperte
@@ -280,13 +303,25 @@ function passaggio(html, modo, dentroZona = false) {
     const autochiuso = t.autochiuso || VUOTI.has(nome);
     if (!chiusura) {
       if (autochiuso) {
-        if (!fuori.length && (nome === 'br' || nome === 'hr')) pezzi.push('\n');
+        if (fuori.length) continue;
+        if (nome === 'br' || nome === 'hr') { pezzi.push('\n'); continue; }
+        // Quello che sta scritto dentro un campo o sotto un'immagine l'utente lo
+        // legge: l'orario già scelto, il totale, il prezzo disegnato (#553).
+        if (nome !== 'input' && nome !== 'img') continue;
+        const a = attributi(t.attrsRaw);
+        const tipo = String(a.type || '').toLowerCase();
+        if (daScartare(nome, a, { soloIlleggibile: true })) continue;
+        if (nome === 'input' && (tipo === 'hidden' || tipo === 'password')) continue;
+        const v = decodeEntita(nome === 'img' ? (a.alt || '') : (a.value || '')).trim();
+        if (v) pezzi.push(`\n${v}\n`);
         continue;
       }
       pila.push(nome);
       const attrs = attributi(t.attrsRaw);
       const dove = { inZona: dentroZona || zone.length > 0, primoLivello: pila.length === 1, soloIlleggibile };
-      if (!fuori.length && daScartare(nome, attrs, dove)) { fuori.push(pila.length); continue; }
+      const verdetto = daScartare(nome, attrs, dove);
+      const scarta = verdetto && !(tieniCornice && verdetto === 'cornice');
+      if (!fuori.length && scarta) { fuori.push(pila.length); continue; }
       if (!fuori.length && (TAG_ZONA.has(nome) || attrs.role === 'main')) zone.push(pila.length);
       if (fuori.length) continue;
       if (nome === 'li') pezzi.push('\n• ');
@@ -396,7 +431,33 @@ function estraiContenuto(html) {
     const tutto = htmlATesto(corpo);
     if (tutto.length > testo.length) testo = tutto;
   }
-  return { titolo, testo };
+  const coda = testoDiCornice(corpo, testo);
+  return { titolo, testo: coda ? `${testo}\n\n${coda}`.trim() : testo };
+}
+
+/**
+ * Il testo del CONTORNO che non è già nel contenuto principale. PURA.
+ *
+ * Il piè di pagina di una trattoria porta l'orario, il telefono e l'indirizzo,
+ * e «a che ora apre?» è una delle domande per cui questa lettura esiste. Qui
+ * non si decide più a nome: quello che è contorno va in fondo invece che nel
+ * cestino, con un tetto perché un elenco di link non mangi tutta la lettura.
+ * Menu, pubblicità e banner dei cookie restano fuori anche da qui.
+ */
+function testoDiCornice(corpo, principale) {
+  const pieno = passaggio(corpo, 'cornice');
+  if (!pieno) return '';
+  const gia = new Set(String(principale || '').split('\n').map((r) => r.trim()).filter(Boolean));
+  const righe = [];
+  let lunghezza = 0;
+  for (const riga of pieno.split('\n')) {
+    const t = riga.trim();
+    if (!t || gia.has(t)) continue;
+    if (lunghezza + t.length + 1 > MAX_CODA_CHARS) break;
+    righe.push(t);
+    lunghezza += t.length + 1;
+  }
+  return righe.join('\n');
 }
 
 /** Taglia al tetto dichiarando il troncamento. PURA. */
@@ -595,6 +656,9 @@ function nomeBrowser() {
 async function scarica(url) {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
+  // Dove si è arrivati DAVVERO: un accorciatore rimanda altrove, e col nome di
+  // partenza Filo cita all'utente la fonte sbagliata (#553).
+  let arrivo = url;
   try {
     const ua = nomeBrowser();
     const headers = {
@@ -605,7 +669,7 @@ async function scarica(url) {
     const r = await safeFetch(url, {
       signal: ac.signal,
       headers,
-      controllaHop: (u) => { if (pericoloso(u)) throw new Error('blocked-dangerous'); },
+      controllaHop: (u) => { arrivo = u; if (pericoloso(u)) throw new Error('blocked-dangerous'); },
     });
     const contentType = r.headers.get('content-type') || '';
     const pezzi = [];
@@ -628,7 +692,11 @@ async function scarica(url) {
     }
     // `partial` viaggia con i byte: chi legge non ha altro modo di sapere che
     // la pagina finisce perché è finito il tetto, non perché è finita lei.
-    return { status: r.status, contentType, buffer: Buffer.concat(pezzi).subarray(0, MAX_BYTES), partial: tagliato };
+    return {
+      status: r.status, contentType, partial: tagliato,
+      buffer: Buffer.concat(pezzi).subarray(0, MAX_BYTES),
+      arrivo: normalizzaUrl(r.url || arrivo) || url,
+    };
   } finally {
     clearTimeout(t);
   }
@@ -696,7 +764,8 @@ async function readPage(input, { leggiScheda = null } = {}) {
       detail: MOTIVI_RETE[codice] || 'non è stato possibile raggiungere quel sito',
     };
   }
-  return { ...(await daContenuto({ url, ...r })), url, source: 'rete' };
+  const arrivo = r.arrivo || url;
+  return { ...(await daContenuto({ url: arrivo, ...r })), url: arrivo, source: 'rete' };
 }
 
 module.exports = {
@@ -714,5 +783,6 @@ module.exports = {
   MAX_TEXT_CHARS,
   MAX_BYTES,
   MAX_HTML_CHARS,
+  MAX_CODA_CHARS,
   MAX_ATTESA_SCHEDA_MS,
 };

@@ -1025,6 +1025,63 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
+// L'HTML della pagina aperta SENZA quello che sullo schermo non si vede, preso
+// da una COPIA staccata: la pagina dell'utente non si tocca. Un'esca per chi
+// legge con un agente si scrive nel foglio di stile, e di lì passava (#553).
+function copiaVisibile(tetto) {
+  return `(function(){
+  var TETTO = ${tetto + 1};
+  try {
+    var copia = document.documentElement.cloneNode(true);
+    var corpo = document.body;
+    var copiaCorpo = copia.querySelector('body');
+    if (corpo && copiaCorpo) {
+      var budget = 30000;
+      var haTesto = function (el) {
+        for (var n = el.firstChild; n; n = n.nextSibling) {
+          if (n.nodeType === 3 && n.nodeValue && n.nodeValue.trim()) return true;
+        }
+        return false;
+      };
+      var visibile = function (el) {
+        try {
+          if (typeof el.checkVisibility === 'function'
+            && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })) return false;
+          var r = el.getBoundingClientRect();
+          if (r.right <= -500 || r.bottom <= -500) return false;
+          if (haTesto(el)) {
+            var s = window.getComputedStyle(el);
+            if (!s) return true;
+            if (s.display === 'none' || s.visibility === 'hidden') return false;
+            if (parseFloat(s.opacity) === 0) return false;
+            if (parseFloat(s.fontSize) < 1) return false;
+          }
+        } catch (e) {}
+        return true;
+      };
+      var giu = function (orig, cop) {
+        var a = orig.children;
+        var b = cop.children;
+        for (var i = a.length - 1; i >= 0; i--) {
+          if (budget-- <= 0) return;
+          var el = a[i];
+          var cl = b[i];
+          if (!cl) continue;
+          var n = el.tagName;
+          if (n === 'SCRIPT' || n === 'STYLE' || n === 'NOSCRIPT' || n === 'TEMPLATE') continue;
+          if (!visibile(el)) { cl.remove(); continue; }
+          giu(el, cl);
+        }
+      };
+      giu(corpo, copiaCorpo);
+    }
+    return String(copia.outerHTML || '').slice(0, TETTO);
+  } catch (e) {
+    try { return String(document.documentElement.outerHTML || '').slice(0, TETTO); } catch (e2) { return ''; }
+  }
+})()`;
+}
+
 // Il testo RESO di una pagina già aperta in una scheda di Filo, per
 // LEGGI_PAGINA. Si guarda in tutte le finestre, non solo in quella di chi
 // chiede: le schede sono dell'utente, e la chat vive in una finestra sua.
@@ -1056,10 +1113,7 @@ async function testoDaSchedaAperta(url) {
         // risposta non arriva mai, e senza questo il turno della chat restava
         // appeso in silenzio invece di ripiegare sullo scaricamento.
         const html = await Promise.race([
-          t.view.webContents.executeJavaScript(
-            `(function(){try{return String(document.documentElement.outerHTML||"").slice(0, ${tetto + 1});}catch(e){return "";}})()`,
-            true,
-          ),
+          t.view.webContents.executeJavaScript(copiaVisibile(tetto), true),
           new Promise((ok) => setTimeout(() => ok(''), PR.MAX_ATTESA_SCHEDA_MS)),
         ]);
         if (typeof html === 'string' && html.trim()) {
@@ -2236,8 +2290,13 @@ function pageReadsForPrompt(actions) {
       continue;
     }
     const titolo = E.perCanaleSistema(out.title || '');
+    // Pagina pubblica o scheda aperta dell'utente: senza dirlo il modello
+    // riferisce come «quello che dice il sito» ciò che vede solo lui (#553).
+    const daScheda = out.source === 'scheda'
+      ? ' Letta dalla scheda che l\'utente ha aperta, quindi è la pagina come la vede lui, col suo accesso: non è detto che un altro ci veda le stesse cose.'
+      : '';
     blocks.push(
-      `[Pagina "${dove}"${titolo ? ` — ${titolo}` : ''}]\n`
+      `[Pagina "${dove}"${titolo ? ` — ${titolo}` : ''}.${daScheda}]\n`
       + E.imbusta({ tipo: 'PAGINA_WEB', testo: out.text, conIntestazione: true })
       + avvisoTaglio(out, cap),
     );
