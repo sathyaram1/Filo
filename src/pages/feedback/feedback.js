@@ -452,6 +452,58 @@
   // textarea. Ogni file viene caricato SUBITO su Storage (così le note salvano
   // solo l'URL). onChange() è chiamato dopo ogni aggiunta/rimozione — chi vuole
   // persistenza immediata (note editabili) lo usa per fare patch.
+  // #602 — L'ANTEPRIMA DI UN ALLEGATO NEL COMPOSITORE.
+  //
+  // Da quando gli allegati dei commenti salgono cifrati, il loro indirizzo nel
+  // deposito dentro un <img> è un riquadro rotto: quei byte non sono più
+  // un'immagine. L'anteprima però è l'unico modo che ha chi scrive di
+  // controllare di aver allegato il file giusto PRIMA di mandarlo, e nella
+  // conversazione lo stesso allegato si vede benissimo — perché lì Filo lo
+  // decifra. Erano due strade per la stessa immagine e una sola la apriva.
+  //
+  // Le due strade adesso sono una:
+  //  · l'allegato appena scelto la copia in chiaro ce l'ha già qui (è il file
+  //    che l'utente ha aperto): la si tiene da parte e l'anteprima compare
+  //    subito, senza toccare la rete e senza chiave privata — vale quindi anche
+  //    per chi le segnalazioni non le riceve;
+  //  · quello già salvato in una nota una copia locale non ce l'ha, e allora si
+  //    fa la stessa strada del resto della pagina: il main lo scarica e lo
+  //    decifra (`resolveImageSrc`, con la sua cache: una sola richiesta per
+  //    indirizzo, anche se la lista si ridisegna).
+  const anteprimeLocali = new Map(); // indirizzo nel deposito → blob: locale
+
+  function ricordaAnteprimaLocale(url, file) {
+    if (!url || !file) return;
+    try {
+      if (anteprimeLocali.has(url)) return;
+      anteprimeLocali.set(url, URL.createObjectURL(file));
+    } catch (_) { /* senza anteprima locale si ripiega sulla decifratura */ }
+  }
+
+  function dimenticaAnteprimaLocale(url) {
+    const blobUrl = anteprimeLocali.get(url);
+    if (!blobUrl) return;
+    anteprimeLocali.delete(url);
+    try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+  }
+
+  // Riempie la miniatura: copia locale se c'è, altrimenti contenuto decifrato.
+  // Se non si può mostrare niente lo dice con le stesse parole del resto della
+  // pagina, e il motivo per esteso resta nell'hover.
+  async function mostraAnteprimaAllegato(im, url) {
+    const locale = anteprimeLocali.get(url);
+    if (locale) { im.src = locale; im.dataset.full = locale; return; }
+    im.classList.add('fb-img-loading');
+    const { dataUrl, error, soloDestinatario } = await resolveImageSrc(url);
+    im.classList.remove('fb-img-loading');
+    if (dataUrl) { im.src = dataUrl; im.dataset.full = dataUrl; return; }
+    const ph = document.createElement('div');
+    ph.className = 'fb-img-broken';
+    ph.textContent = soloDestinatario ? '(riservato)' : '(non visibile)';
+    ph.title = error || '';
+    im.replaceWith(ph);
+  }
+
   // Ritorna { getAttachments } che torna la lista corrente { kind, url, name, type }.
   function makeAttachComposer({ textarea, mount, initial, onChange }) {
     if (!textarea || !mount) return { getAttachments: () => [] };
