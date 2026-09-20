@@ -161,13 +161,12 @@ test('un titolo ostile non rompe né la pagina né il file dell\'evento', async 
   const prima = elencoIcs(dir);
   const btn = page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' });
   await expect(btn).toBeVisible();
-  // Due click di fila non devono scrivere due eventi.
-  await btn.click();
-  await btn.click().catch(() => {});
+  // Un doppio clic non deve scrivere due eventi.
+  await btn.dblclick();
   await expect(page.locator('.dash-action-btn', { hasText: 'Aperto nel calendario' })).toBeVisible({ timeout: 10_000 });
 
   const nati = nuoviIcs(dir, prima);
-  expect(nati.length, 'un solo evento anche con due click').toBe(1);
+  expect(nati.length, 'un solo evento anche con un doppio clic').toBe(1);
   const ics = readFileSync(join(dir, nati[0]), 'utf8');
   // Nessuna riga oltre i 75 ottetti, e nessun a capo vero dentro un campo:
   // un .ics malformato il calendario lo rifiuta.
