@@ -593,3 +593,57 @@ test('la codifica di un documento si riconosce, non si stima a percentuale', () 
   assert.equal(DR.pareDueByte(Buffer.from(testo, 'utf8')), '');
   assert.equal(DR.pareDueByte(ansi(lungo)), '');
 });
+
+test('un byte rotto non cambia la tabella a tutto il resto del documento', () => {
+  // #551, sesto giro di verifica. La regola «i byte sono UTF-8 valido?» è
+  // esatta ma è tutto o niente: un byte guasto in mezzo a cinquantamila faceva
+  // rileggere l'INTERO documento con la tabella di Windows, e allora ogni
+  // accento, trattino lungo e simbolo dell'euro che era GIUSTO arrivava
+  // storpiato («città» → «cittÃ », «—» → «â€”», «€» → «â‚¬»).
+
+  // Prima porta: l'estratto conto che mescola righe nuove e una riga vecchia.
+  const righe = [];
+  for (let i = 0; i < 150; i++) righe.push(`0${(i % 9) + 1}/03/2026;Rimborso — pratica ${100 + i};${(i * 3.5).toFixed(2)} €`);
+  righe.push('30/03/2026;Commissione attività;-1,50 €');
+  const buono = Buffer.from(`${righe.join('\n')}\n`, 'utf8');
+  const vecchia = Buffer.from([0x43, 0x69, 0x74, 0x74, 0xE0, 0x3B, 0x31, 0x32, 0x0A]); // «Città;12» di una volta
+  const misto = DR.decodeTextDettaglio(Buffer.concat([buono, vecchia]));
+  assert.equal(misto.text.includes('Rimborso — pratica 100'), true);
+  assert.equal(misto.text.includes('Commissione attività'), true);
+  assert.equal(misto.text.includes('Ã') || misto.text.includes('â€'), false);
+  // E il byte rotto non sparisce in silenzio: si sa che c'è e quanti sono.
+  assert.equal(misto.codifica, 'utf8-danneggiato');
+  assert.equal(misto.bytesPersi, 1);
+
+  // Seconda porta: un registro lungo scritto bene con un byte grezzo in mezzo.
+  const corpo = Buffer.from('INFO attività di città: però è così, — 12 €\n'.repeat(400), 'utf8');
+  const registro = DR.decodeText(Buffer.concat([corpo.subarray(0, 6000), Buffer.from([0xFF]), corpo.subarray(6000)]));
+  assert.equal(registro.split('\n')[0], 'INFO attività di città: però è così, — 12 €');
+
+  // Il verso opposto resta chiuso: un documento salvato in ANSI non ha nemmeno
+  // una sequenza a più byte scritta bene, e la sua tabella si riconosce lo
+  // stesso anche quando i segni speciali sono pochi.
+  const ansi = Buffer.from([...'Contratto '].map((c) => c.charCodeAt(0)).concat([0x97, 0x20, 0x61, 0x74, 0x74, 0x69, 0x76, 0x69, 0x74, 0xE0, 0x20, 0x31, 0x32, 0x20, 0x80]));
+  const letto = DR.decodeTextDettaglio(ansi);
+  assert.equal(letto.text, 'Contratto — attività 12 €');
+  assert.equal(letto.codifica, 'windows');
+});
+
+test('un testo a due byte si riconosce anche fuori dall’alfabeto latino', async () => {
+  // #551, sesto giro. Il riconoscimento contava i byte NULLI e pretendeva che
+  // fossero metà: vero solo finché le lettere sono latine. In russo, greco o
+  // cinese il file non veniva riconosciuto e Filo DICHIARAVA di averlo letto,
+  // consegnando al modello una fila di caratteri nulli.
+  const russo = 'Привет, это тестовый файл с русским текстом.\n'.repeat(6);
+  assert.equal(DR.pareDueByte(Buffer.from(russo, 'utf16le')), 'le');
+  assert.equal(DR.decodeText(Buffer.from(russo, 'utf16le')), russo);
+  const greco = 'Αυτό είναι ένα δοκιμαστικό αρχείο με ελληνικά.\n'.repeat(6);
+  const be = Buffer.from(greco, 'utf16le');
+  be.swap16();
+  assert.equal(DR.decodeText(be), greco);
+
+  // E se proprio non si riconosce, non lo si dichiara letto: un testo pieno di
+  // caratteri nulli non è un testo.
+  assert.equal(DR.quotaNonTesto('Relazione attività finale: 12 €') < 0.02, true);
+  assert.equal(DR.quotaNonTesto('\u0000R\u0000e\u0000l\u0000a\u0000z') > 0.02, true);
+});

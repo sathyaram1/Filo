@@ -449,20 +449,29 @@ function leggiDueByte(buf, verso, conFirma) {
  * due passi, e nessuno dei due ha soglie da tarare sulla lingua:
  *   • un testo a 8 bit non contiene MAI un byte nullo. Se c'è, o il file è a
  *     due byte per carattere o non è testo;
- *   • allora lo si legge nei due versi e si tiene quello che dà del testo. Il
- *     verso sbagliato produce ideogrammi a caso e caratteri di controllo, e si
- *     vede subito.
+ *   • in un testo a due byte quei nulli stanno TUTTI dalla stessa parte delle
+ *     coppie: sono il byte alto degli spazi, degli a capo e della
+ *     punteggiatura, che ci sono in qualunque lingua. QUANTI siano dipende
+ *     dall'alfabeto — metà in italiano, pochi in russo, pochissimi in cinese —
+ *     ma a dire il verso è da che PARTE stanno, e quello non dipende dalla
+ *     lingua. Era pretenderne una quota a far cadere gli alfabeti non latini;
+ *   • e infine si controlla che quello che ne viene fuori sia davvero testo,
+ *     così un file binario pieno di nulli non passa per un documento.
  */
 function pareDueByte(buf) {
   if (!buf || buf.length < 8) return '';
-  const n = Math.min(buf.length, 8192);
-  let nullo = false;
-  for (let i = 0; i < n; i++) { if (buf[i] === 0x00) { nullo = true; break; } }
-  if (!nullo) return '';
-  const le = quotaNonTesto(leggiDueByte(buf, 'le', false));
-  const be = quotaNonTesto(leggiDueByte(buf, 'be', false));
-  if (le <= be) return le < QUOTA_NON_TESTO ? 'le' : '';
-  return be < QUOTA_NON_TESTO ? 'be' : '';
+  const n = Math.min(buf.length - (buf.length % 2), 8192);
+  let alti = 0;  // nullo in posizione dispari: byte alto nel verso piccolo
+  let bassi = 0; // nullo in posizione pari: byte alto nel verso grande
+  for (let i = 0; i < n; i += 2) {
+    if (buf[i] === 0x00) bassi++;
+    if (buf[i + 1] === 0x00) alti++;
+  }
+  const totale = alti + bassi;
+  if (!totale) return '';
+  const verso = alti > bassi ? 'le' : 'be';
+  if (Math.max(alti, bassi) / totale < 0.9) return '';
+  return quotaNonTesto(leggiDueByte(buf, verso, false)) < QUOTA_NON_TESTO ? verso : '';
 }
 
 /**
