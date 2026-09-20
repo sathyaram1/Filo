@@ -322,8 +322,9 @@ Da oggi la fusione è una consegna del canale come le altre:
   1. biglietto vivo, ruolo `secaudit`, ramo = quello **del biglietto** (un
      messaggio che ne nomina un altro è respinto e registrato, non corretto);
   2. **stato vero**: PASS della verifica e PASS del controllo di sicurezza
-     **registrati** da consegne validate — e registrati su *quel* ramo. Un
-     verdetto raccontato nel corpo (il vecchio `FILO_L4_VERDICT`) non esiste
+     **registrati** da consegne validate — e registrati su *quello sha*, non
+     su quel ramo (vedi "un esito vale per la versione esaminata", più sotto).
+     Un verdetto raccontato nel corpo (il vecchio `FILO_L4_VERDICT`) non esiste
      come input: nessuno lo legge;
   3. la **punta vera** del ramo, risolta una volta sola: da qui in poi si parla
      di quello sha e mai più del nome (vedi "si esamina e si fonde lo stesso
