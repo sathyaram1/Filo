@@ -87,8 +87,34 @@ bastano due nomi riusati a turno, svuotati prima e dopo ogni giro. Svuotare
 PRIMA e non solo dopo: l'isolamento non deve dipendere da quando è arrivato lo
 svuotamento del turno precedente.
 
-**Una memoria che frena si tiene sulla chiave giusta.** Ricordare un verdetto
+**L'indirizzo della risorsa su internet è una porta come le altre.** Cercare i
+nomi interni copre chi resta dentro il progetto; chi scrive a mano la richiesta
+di rete all'indirizzo del fornitore arriva allo stesso modello, paga sulla
+stessa chiave e passa in mezzo alla sentinella senza toccarla. Gli indirizzi
+non si scrivono nella sentinella: si leggono dal modulo che parla con
+l'esterno, così un fornitore nuovo è coperto dal giorno in cui entra. E un
+controllo che l'elenco degli indirizzi non sia vuoto, altrimenti il giorno in
+cui la lettura smette di trovarli la porta si spegne in silenzio.
+
+**Il freno è del dominio, il verdetto è dell'indirizzo.** Ricordare un verdetto
 per host completo non frena nulla: chi controlla un dominio fa comparire
-sottodomini nuovi a volontà. La chiave è il dominio registrabile, e accanto
-serve l'elenco delle chiamate già in volo — la memoria si riempie quando la
-risposta arriva, e cinquanta richieste partite insieme la trovano tutte vuota.
+sottodomini nuovi a volontà. La tentazione è spostare il ricordo sul dominio
+registrabile, e lì si sbaglia: su una piattaforma dove ogni utente riceve un
+suo sotto-indirizzo (le pagine gratuite di Cloudflare, quelle di progetto di
+GitHub, i blog ospitati) il dominio registrabile è la PIATTAFORMA. Il verdetto
+di un sito di truffa sbarrava allora tutti i siti innocenti ospitati lì, e al
+contrario il «pulito» di un sito innocente impediva del tutto il controllo del
+sito di truffa vicino. Le due cose sono separate e vanno tenute separate: il
+VERDETTO resta dell'indirizzo che l'ha prodotto, e a fermare la spruzzata basta
+un CONTO sul dominio registrabile — quante verifiche costose quel dominio può
+far partire nella finestra di tempo. Accanto serve l'elenco delle chiamate già
+in volo: la memoria si riempie quando la risposta arriva, e cinquanta richieste
+partite insieme la trovano tutte vuota.
+
+**Una verifica costosa non si spende dove non può dare risultato.** Il
+controllo profondo dei siti pericolosi partiva anche sugli indirizzi della rete
+di casa: il router, il NAS, una stampante, un server di prova. Da fuori non li
+raggiunge nessuno, quindi non possono essere la truffa che arriva da una mail,
+e ognuno costava un giudizio del modello più una finestra nascosta puntata
+sulla rete privata di chi naviga. Il nome `localhost` era già escluso; un
+indirizzo numerico privato o un nome in `.local` no.
