@@ -635,3 +635,90 @@ test('la chiamata a funzione con «name» e «arguments» è formato interno', (
   assert.equal(AD.formatoSospetto('{"nome":"Mario","eta":30}'), false);
   assert.equal(AD.formatoSospetto('{"name":"Mario","arguments":{"x":1}}'), false);
 });
+
+// ── Giro 7 ─────────────────────────────────────────────────────────────────
+
+test('la conferma scritta senza «ho» è una dichiarazione come le altre', () => {
+  // È il modo più corto con cui un modello conferma, e non scattava.
+  assert.deepEqual(ids(AD.rileva('Sveglia impostata per le 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Appunto salvato.', [])), ['appunto']);
+  assert.deepEqual(ids(AD.rileva('Evento aggiunto al calendario.', [])), ['calendario']);
+  assert.deepEqual(ids(AD.rileva('La segnalazione è partita.', [])), ['segnalazione']);
+  assert.deepEqual(ids(AD.rileva('Timer avviato.', [])), ['timer']);
+  // …ma una constatazione dello stato resta una constatazione: lì il tempo
+  // non lo dice il verbo, lo dice la parolina che guarda indietro.
+  assert.deepEqual(AD.rileva('La sveglia delle 7 è già impostata, ne vuoi un\'altra?', []), []);
+  // E se la sveglia c'è davvero, l'ora la regge.
+  assert.deepEqual(AD.rileva('Sveglia impostata per le 19.', [], { orariSveglie: ['19:00'] }), []);
+});
+
+test('l\'avviso non accusa Filo di cose che ha fatto o che non gli costano un\'azione', () => {
+  // Il testo INCOLLATO nel messaggio arriva al modello senza strumenti,
+  // esattamente come la foto e i riassunti dei file dell'editor.
+  assert.ok(AD.TIPI_DI_CONTESTO.includes('CONTESTO_TESTO'));
+  assert.deepEqual(AD.rileva('Ho letto il documento: sono 84 euro.', new Set(['CONTESTO_TESTO'])), []);
+  // Quello che Filo impara lo scrive in memoria da solo dopo il turno.
+  assert.deepEqual(AD.rileva('Me lo sono segnato per la prossima volta.', []), []);
+  // Modi di dire: non promettono nessun appunto e nessuna finestra aperta.
+  assert.deepEqual(AD.rileva('Ti ho salvato un po\' di tempo.', []), []);
+  assert.deepEqual(AD.rileva('Ti ho aperto gli occhi su una cosa.', []), []);
+});
+
+test('«l\'hai già fatto?» non è «me lo fai?»', () => {
+  // Solo una domanda sul passato lascia che un\'azione di un turno prima
+  // regga la risposta che la racconta. Prima bastava un punto interrogativo,
+  // e in italiano una richiesta si scrive quasi sempre così.
+  assert.equal(AD.domandaSuCosaFatta('mi segni anche la lista della spesa?'), false);
+  assert.equal(AD.domandaSuCosaFatta('me la metti la sveglia alle 19?'), false);
+  assert.equal(AD.domandaSuCosaFatta('hai salvato la lista della spesa?'), true);
+  assert.equal(AD.domandaSuCosaFatta('l\'hai mandata?'), true);
+  assert.equal(AD.domandaSuCosaFatta('la segnalazione è stata mandata?'), true);
+  assert.equal(AD.domandaSuCosaFatta('hai salvato la lista'), false);
+  // Conseguenza: con la richiesta, l'appunto scritto prima non copre quello
+  // raccontato adesso.
+  const prima = { tipiPrecedenti: new Set(['SALVA_APPUNTO']) };
+  assert.deepEqual(ids(AD.rileva('Ti ho salvato l\'appunto con la lista della spesa.', [],
+    { ...prima, domandaUtente: false })), ['appunto']);
+});
+
+test('lo stato del presidio: niente sveglie in pausa, niente già suonate, coi giorni', () => {
+  const fra2h = new Date(Date.now() + 2 * 3600 * 1000);
+  const prove = AD.statoDaTimerEFile([
+    { kind: 'alarm', endsAt: fra2h.toISOString() },
+    { kind: 'alarm', endsAt: fra2h.toISOString(), paused: true },
+    { kind: 'alarm', endsAt: new Date(Date.now() - 3600 * 1000).toISOString(), ringing: true },
+    { kind: 'alarm', repeat: ['lun'], atTime: '06:30' },
+  ], [{ title: 'lista della spesa' }, { title: 'appunti di lavoro' }]);
+  assert.equal(prove.sveglie.filter((s) => s.tipo === 'alarm').length, 2);
+  assert.deepEqual(prove.titoliAppunti, ['lista della spesa', 'appunti di lavoro']);
+  // Una sveglia che si ripete vale per qualunque giorno.
+  assert.equal(prove.sveglie.find((s) => s.ora === '06:30').giorno, '');
+});
+
+test('la prova di una sveglia guarda il genere e il giorno, non la sola ora', () => {
+  const oggi = Date.now();
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const soloOggi = { sveglie: [{ ora: '07:00', giorno: iso(new Date(oggi)), tipo: 'alarm' }], oggi };
+  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia alle 7 per domani.', [], soloOggi)), ['sveglia']);
+  assert.deepEqual(AD.rileva('Ti ho messo la sveglia alle 7 per stamattina.', [], soloOggi), []);
+  // Un conto alla rovescia che finisce alle 19 non è la sveglia delle 19.
+  const soloTimer = { sveglie: [{ ora: '19:00', giorno: iso(new Date(oggi)), tipo: 'timer' }], oggi };
+  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia alle 19.', [], soloTimer)), ['sveglia']);
+});
+
+test('nell\'Aiuto la conferma col pronome viene guardata come nella chat della home', () => {
+  assert.ok(AD.FAMIGLIE_AIUTO.includes('senza-nome'));
+  const aiuto = { famiglie: AD.FAMIGLIE_AIUTO };
+  assert.deepEqual(ids(AD.rileva('Sì, te l\'ho mandata.', new Set(), {}, aiuto)), ['senza-nome']);
+});
+
+test('le altre due buste con cui un modello scrive una chiamata invece di farla', () => {
+  // La LISTA di chiamate: è come un modello ne dichiara più di una insieme.
+  assert.equal(AD.formatoSospetto('[{"name":"SVEGLIA","arguments":{"time":"19:00"}}]'), true);
+  // La busta dei Llama, che il nome se lo tiene dentro il tag.
+  assert.equal(AD.formatoSospetto('<function=SVEGLIA>{"time":"19:00"}</function>'), true);
+  assert.equal(AD.formatoSospetto('Fatto.\n<function=SVEGLIA>{"time":"19:00"}</function>'), true);
+  // E una lista qualunque, chiesta dall'utente, resta una risposta.
+  assert.equal(AD.formatoSospetto('[{"name":"Mario","arguments":{"x":1}}]'), false);
+  assert.equal(AD.formatoSospetto('La funzione f(x) = 2x è lineare.'), false);
+});
