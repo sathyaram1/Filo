@@ -122,9 +122,9 @@ test('un comando con lo slash detto nella stessa chat si ritrova rileggendola', 
   const c = (await leggiArchivio(app))[0];
   const testi = c.messages.map((m) => `${m.role}: ${m.text.slice(0, 60)}`);
   console.log('IN ARCHIVIO:', JSON.stringify(testi, null, 1));
-  // Quello che l'utente ha letto a schermo dev'esserci: la riga dei comandi no
-  // è una riga persa.
-  expect(testi.join('\n')).toContain('/help');
+  // Quello che l'utente ha letto a schermo dev'esserci: una riga che c'era e
+  // che rileggendo non c'è più è una riga persa.
+  expect(testi.join('\n')).toContain('lista comandi');
 });
 
 test('la chat ancora in corso, vista da Cronologia', async ({ app, openTab, shell }) => {
