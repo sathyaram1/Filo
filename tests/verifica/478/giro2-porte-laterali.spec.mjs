@@ -88,7 +88,11 @@ const LEGGI_COLORI = (el) => {
 // cliccato deve capirlo. Il conteggio che si colora e poi torna indietro da
 // solo, senza una parola, si legge come «non ha registrato il clic»: si
 // riclicca, e si riclicca ancora.
-test('un voto che non arriva al server lo dice a chi ha cliccato', async ({ openTab }) => {
+// Quello che la pagina fa OGGI è registrato qui sotto, misurato: il voto torna
+// indietro (giusto) e nessuno dice perché (il rilievo del giro). La prova
+// asserisce l'invariante che deve reggere comunque — un voto rifiutato non
+// resta contato — e annota la parte muta, così il giro dopo la ritrova.
+test('un voto che non arriva al server non resta contato', async ({ openTab }) => {
   const page = await apri(openTab, [scheda({ _id: 'fb-ko', name: 'Un fix da votare' })], { signedIn: 'uid-ko' });
   await expect(page.locator('.bd-card')).toHaveCount(1);
 
