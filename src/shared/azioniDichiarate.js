@@ -225,8 +225,12 @@
   // Negazioni e ipotesi: se stanno nella stessa proposizione, PRIMA della
   // dichiarazione, non c'è nessuna rivendicazione da verificare.
   const SMENTITE = /\b(?:non|senza|nessun\w*|mai|invece|prima|se|quando|appena|vuoi|vorresti|posso|potrei|dovrei|devo|volevo|avrei|potevo)\b/i;
-  // Dove finisce la proposizione che precede un punto del testo.
-  const STACCHI = /[.!?;:,\n—]|\b(?:ma|però|mentre|quindi|così|perché|siccome)\b/gi;
+  // Dove finisce la proposizione che precede un punto del testo. Le
+  // congiunzioni accentate («però», «perché», «così») vogliono i confini
+  // scritti a mano: con `\b` non avrebbero mai staccato niente, e «non ho
+  // trovato l'evento però ti ho messo la sveglia» restava coperta dal «non»,
+  // mentre la stessa frase con «ma» veniva vista.
+  const STACCHI = new RegExp(`[.!?;:,\\n—]|${INIZIO}(?:ma|però|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
 
   function proposizionePrima(testo, indice) {
     const prima = testo.slice(0, indice);
