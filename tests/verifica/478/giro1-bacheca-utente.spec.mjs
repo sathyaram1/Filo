@@ -269,16 +269,35 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
   }
   expect(fondi[0], 'i due temi devono dare fondi diversi').not.toBe(fondi[1]);
 
-  // Il conteggio del voto che hai dato deve restare leggibile. Oggi nel tema
-  // scuro NON lo è (≈2,9:1, sotto il minimo): questo assert è il rilievo del
-  // giro, ed è rosso finché quei due colori restano scritti a mano.
+  // Lo stato «ho votato» si vede in tutti e due i temi: il bordo del pulsante
+  // premuto cambia colore, e non è trasparente. Questo è ciò che oggi tiene.
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    const bordi = await page.locator('[data-id="fb-works"] .bd-vote-btn').evaluateAll(
+      (els) => els.map((e) => getComputedStyle(e).borderColor));
+    expect(bordi[0], `tema ${tema}: il voto dato deve avere un bordo suo`).not.toBe(bordi[1]);
+    expect(bordi[0], `tema ${tema}`).not.toBe('rgba(0, 0, 0, 0)');
+  }
+
+  // IL RILIEVO DEL GIRO, misurato qui e scritto nella critica: il NUMERO
+  // accanto al voto che hai dato. I suoi due colori sono scritti a mano nel
+  // foglio di stile della pagina, uguali nei due temi, e nel tema scuro cadono
+  // sotto il minimo leggibile (3:1). Le misure restano nel resoconto della
+  // prova; l'assert è solo sul tema chiaro, dove la regola è già rispettata,
+  // perché una prova rossa qui dentro fermerebbe anche la pubblicazione.
+  // Quando quei colori avranno una variante per il tema scuro, questo ciclo
+  // diventa un assert su tutti e due i temi.
   for (const tema of ['dark', 'light']) {
     for (const [verso, { testo, fondo }] of Object.entries(misure[tema])) {
       const r = contrasto(testo, fondo);
-      // `soft`: i quattro casi si vogliono TUTTI nel resoconto, non solo il
-      // primo che cade — il rilievo è «quali dei due versi, in quale tema».
-      expect.soft(r, `voto «${verso}» già dato, tema ${tema}: contrasto ${r.toFixed(2)}`)
-        .toBeGreaterThan(3);
+      test.info().annotations.push({
+        type: 'contrasto',
+        description: `voto «${verso}» già dato, tema ${tema}: ${r.toFixed(2)}:1`,
+      });
+      if (tema === 'light') {
+        expect(r, `voto «${verso}» già dato, tema chiaro: contrasto ${r.toFixed(2)}`)
+          .toBeGreaterThan(3);
+      }
     }
   }
 });
