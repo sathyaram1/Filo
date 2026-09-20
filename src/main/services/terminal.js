@@ -354,4 +354,8 @@ module.exports = {
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
   encodingPrelude, withCwdProbe, PRELUDI_CODIFICA,
+  // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
+  // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
+  // giro di verifica).
+  CWD_MARK_PREFIX, nuovoMarcatore,
 };
