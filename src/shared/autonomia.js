@@ -368,7 +368,9 @@
     // qui. Da chat: chiede a conservativo e default; ad automatico e yolo si
     // usa la cella CONTAMINATA con guardiano obbligatorio. Da automazione:
     // propone (lo applica la regola (b) qui sotto).
-    if (!dentro) {
+    // Il perimetro riguarda le USCITE: leggere di più è sempre libero, e il
+    // costo 0 è per definizione ciò che non esce dalla conversazione.
+    if (!dentro && costo > 0) {
       const fuori = (liv === 'automatico' || liv === 'yolo')
         ? piuStretta(riga.contaminato[costo], SI_G)
         : CHIEDE;

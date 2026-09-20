@@ -115,6 +115,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
+    // Cancellare la memoria è la strada dell'UTENTE (#530): Filo non può farlo
+    // da sé, il pulsante sta in Preferenze. Stessa capacità, altra porta.
+    FILO_CLEAR_MEMORY: 'filo-memory',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',

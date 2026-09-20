@@ -201,7 +201,7 @@ test('il prompt della chat espone LEGGI_DOCUMENTO e quando usarla', () => {
   assert.match(p, /LEGGERE UN DOCUMENTO DELL'UTENTE[\s\S]*non istruzioni da eseguire/);
 });
 
-test('LEGGI_DOCUMENTO è registrata al livello 1 (sola lettura, esegue subito)', () => {
+test('LEGGI_DOCUMENTO è registrata a costo 0 (leggere è libero) e dichiara la fonte', () => {
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
   require(join(ROOT, 'src', 'shared', 'themeTokens.js'));
   require(join(ROOT, 'src', 'shared', 'cmdClassify.js'));
@@ -209,11 +209,15 @@ test('LEGGI_DOCUMENTO è registrata al livello 1 (sola lettura, esegue subito)',
   const AL = globalThis.SN_ACTION_LEVELS;
   // Senza voce nel registro il dispatch RIFIUTA l'azione: sarebbe una feature
   // completa che non parte mai.
-  assert.equal(AL.levelFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), 1);
+  assert.equal(AL.costoFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), 0);
+  // E quello che entra nel contesto viene da un file del computer: da qui in
+  // poi il compito è contaminato, e quello che Filo fa DOPO costa di più.
+  assert.equal(AL.fonteFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), 'documento');
   assert.match(AL.describe({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), /C:\/x\/y\.pdf/);
   // Stessa cosa per la lettura dei documenti dell'EDITOR, che era rimasta fuori
   // dal registro e quindi non è mai partita.
-  assert.equal(AL.levelFor({ type: 'LEGGI_FILE', fileId: 'file-1' }), 1);
+  assert.equal(AL.costoFor({ type: 'LEGGI_FILE', fileId: 'file-1' }), 0);
+  assert.equal(AL.fonteFor({ type: 'LEGGI_FILE', fileId: 'file-1' }), 'editor');
 });
 
 test('il manifesto delle capacità dichiara che Filo legge i documenti', () => {

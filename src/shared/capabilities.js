@@ -363,8 +363,8 @@
     {
       id: 'filo-memory', title: 'Memoria di Filo', category: 'assistant',
       desc: 'Filo ricorda nel tempo chi sei e come preferisci le cose (un profilo e le preferenze che impara dalle conversazioni), così le risposte diventano più su misura.',
-      invoke: 'Si costruisce da sola mentre usi l’assistente; puoi anche fissare tu una regola a parole («ricordati che…», «d’ora in poi…»): Filo la salva fra le sue lezioni e vale da subito in tutte le conversazioni. Per farle dimenticare tutto chiedi a Filo di cancellare la memoria (ti chiederà di digitare "conferma").',
-      doesNot: 'Resta solo sul tuo computer. Ricorda ciò che emerge dalle conversazioni con l’assistente, non il contenuto delle pagine che visiti.',
+      invoke: 'Si costruisce da sola mentre usi l’assistente; puoi anche fissare tu una regola a parole («ricordati che…», «d’ora in poi…»): Filo la salva fra le sue lezioni e vale da subito in tutte le conversazioni. Per farle dimenticare tutto: Preferenze → Memoria di Filo → «Cancella tutto quello che Filo sa di me», dove ti viene chiesto di scrivere «conferma».',
+      doesNot: 'Resta solo sul tuo computer. Ricorda ciò che emerge dalle conversazioni con l’assistente, non il contenuto delle pagine che visiti. Cancellarla non lo fa Filo su richiesta in chat: è una cancellazione definitiva, e quelle le fai tu dalle Preferenze.',
     },
     {
       id: 'filo-notes', title: 'Appunti di Filo', category: 'assistant',
@@ -455,6 +455,12 @@
       desc: 'Quando Filo non riesce a fare qualcosa che gli chiedi, invia automaticamente una segnalazione anonima e generica a chi sviluppa l\'app — senza includere URL o testo personale. Tenerlo attivo premia con 10 crediti extra al giorno.',
       invoke: 'Impostazioni → Sicurezza → "Segnalazione automatica dei problemi".',
       doesNot: 'Non invia mai URL, testo delle conversazioni o dati personali: solo una nota generica sulla funzione mancante.',
+    },
+    {
+      id: 'autonomy-level', title: 'Quanto Filo fa da solo', category: 'settings',
+      desc: 'Un livello solo decide quanto Filo agisce senza chiederti niente. Filo fa da sé quello che si disfa (una sveglia, il tema, una scheda archiviata) e chiede per quello che resta. E guarda anche cosa ha letto in quella conversazione: se ha appena letto una pagina web, una ricerca o un documento di qualcun altro, chiede di più — perché quel testo potrebbe essere lui a chiedere, non tu. Quando chiede, ti dice anche perché.',
+      invoke: 'Preferenze → «Quanto Filo fa da solo». Il livello attivo si vede sempre nella home, in alto: un clic ti porta lì. Alzarlo chiede di scrivere «conferma»; abbassarlo è immediato.',
+      doesNot: 'Alcune cose non le fa a nessun livello: far uscire una password o un codice, scrivere a molte persone insieme, cambiare le credenziali di un servizio, cancellare dati per sempre, e cambiare queste stesse regole. Quelle restano tue. Il livello non lo può cambiare Filo: lo sposti solo tu, da qui.',
     },
     {
       id: 'theme', title: 'Tema chiaro / scuro', category: 'settings',
