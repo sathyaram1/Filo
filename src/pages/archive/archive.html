@@ -145,6 +145,24 @@
     </div>
     <p id="searchNote" class="sn-muted" style="margin:-6px 0 12px;" hidden></p>
 
+    <!-- #525 — le chat con Filo. La sezione compare solo quando ce n'è almeno
+         una: una pagina che annuncia una sezione vuota è rumore. -->
+    <section id="chatsSection" hidden>
+      <div class="arc-section">
+        <h2>Chat con Filo</h2>
+        <span id="chatsCount" class="arc-section-count"></span>
+        <label class="arc-cmd-toggle" id="showCommandsLabel" hidden>
+          <input type="checkbox" id="showCommands" />
+          <span id="showCommandsText">Mostra anche i comandi</span>
+        </label>
+      </div>
+      <div id="chatList" class="arc-chat-list"></div>
+      <div id="chatEmpty" class="sn-empty" hidden></div>
+    </section>
+
+    <div id="tabsSection" class="arc-section" hidden>
+      <h2>Schede chiuse</h2>
+    </div>
     <div id="list"></div>
     <div id="empty" class="sn-empty" hidden>Nessuna tab archiviata, per ora.</div>
   </main>
