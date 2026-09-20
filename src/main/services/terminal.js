@@ -147,39 +147,64 @@ function encodingPrelude(shell) {
   return PRELUDI_CODIFICA[resolveShell(shell)] || '';
 }
 
-// Marcatore (improbabile in output reale) con cui un comando one-shot riporta
-// l'exit code e la cwd RISULTANTE. Serve a far PERSISTERE la cwd tra i comandi
-// dell'assistente: ogni comando parte da una shell nuova, quindi senza questo un
-// `cd` non avrebbe effetto sul comando successivo. La cwd catturata viene
-// ripassata come `cwd` al comando seguente (vedi handlers.js).
-const CWD_MARK = '__FILO_ONESHOT_CWD_8b9cb__';
+// ── La riga di servizio non si fa scrivere da fuori ───────────────────────────
+//
+// Marcatore con cui un comando one-shot riporta l'exit code e la cwd
+// RISULTANTE. Serve a far PERSISTERE la cwd tra i comandi dell'assistente: ogni
+// comando parte da una shell nuova, quindi senza questo un `cd` non avrebbe
+// effetto sul comando successivo. La cwd catturata viene ripassata come `cwd`
+// al comando seguente (vedi handlers.js).
+//
+// #551, ottavo giro di verifica. Quella riga la scrive Filo, ma arriva
+// MESCOLATA a quello che il comando ha stampato — e quello che un comando
+// stampa lo scrive chi ha scritto il file letto, la pagina scaricata, la
+// risposta del servizio. Finché il segno che la distingue era una costante
+// scritta nel programma, uguale a ogni avvio e su ogni macchina, chiunque
+// poteva scriversela: bastava che il file letto la contenesse e che l'uscita
+// del comando fosse abbastanza lunga da far cadere quella vera. Da lì in poi
+// Filo credeva di essere in una cartella scelta da un estraneo, ci faceva
+// girare il comando dopo, e la annunciava nel popup di conferma come se fosse
+// la sua; e un comando fallito risultava riuscito.
+//
+// Adesso il marcatore porta dentro un numero a caso, diverso a OGNI comando:
+// è la stessa difesa che la shell persistente del terminale della dashboard ha
+// da sempre (shell.js, `randSid`), e che infatti non ha mai avuto questo
+// guasto. Il prefisso resta fisso perché le guardie che controllano che il
+// marcatore non finisca sotto gli occhi dell'utente lo cercano per nome.
+const CWD_MARK_PREFIX = '__FILO_ONESHOT_CWD_';
 
-// Appende al comando una "sonda" che stampa CWD_MARK:<exitcode>:<cwd>. La sonda
-// gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale del
-// comando, non quello della sonda. Specifica per shell.
-function withCwdProbe(shell, command) {
+function nuovoMarcatore() {
+  return CWD_MARK_PREFIX
+    + Math.random().toString(36).slice(2, 10)
+    + Date.now().toString(36).slice(-5);
+}
+
+// Appende al comando una "sonda" che stampa <marcatore>:<exitcode>:<cwd>. La
+// sonda gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale
+// del comando, non quello della sonda. Specifica per shell.
+function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
   const sh = resolveShell(shell);
   if (sh === 'cmd') {
     // echo gira comunque; %errorlevel% = esito del comando, %cd% = directory.
-    return `${command}\r\necho ${CWD_MARK}:%errorlevel%:%cd%`;
+    return `${command}\r\necho ${mark}:%errorlevel%:%cd%`;
   }
   if (sh === 'powershell') {
     // try/finally: il marcatore esce anche su errore terminante. Azzeriamo
     // $LASTEXITCODE prima così i cmdlet (che non lo toccano) riportano 0.
-    return `$global:LASTEXITCODE=0\ntry { ${command} } finally { Write-Output "${CWD_MARK}:$($LASTEXITCODE):$((Get-Location).Path)" }`;
+    return `$global:LASTEXITCODE=0\ntry { ${command} } finally { Write-Output "${mark}:$($LASTEXITCODE):$((Get-Location).Path)" }`;
   }
   // bash / sh (incluse le routine cloud Linux): cattura $? subito dopo il
   // comando, poi stampa il marcatore (sempre eseguito, su riga propria).
-  return `${command}\n__filo_c=$?\nprintf '%s:%s:%s\\n' '${CWD_MARK}' "$__filo_c" "$PWD"`;
+  return `${command}\n__filo_c=$?\nprintf '%s:%s:%s\\n' '${mark}' "$__filo_c" "$PWD"`;
 }
 
-// Estrae dal grezzo stdout il marcatore CWD_MARK (se presente), ritornando
-// l'output ripulito + { code, cwd } dal marcatore. Va chiamato PRIMA del
-// troncamento, così non si perde il marcatore in coda quando l'output è enorme.
-function extractCwdMark(rawStdout) {
-  const i = rawStdout.lastIndexOf(CWD_MARK + ':');
+// Estrae dal grezzo stdout il marcatore (se presente), ritornando l'output
+// ripulito + { code, cwd } dal marcatore. Va chiamato PRIMA del troncamento,
+// così non si perde il marcatore in coda quando l'output è enorme.
+function extractCwdMark(rawStdout, mark) {
+  const i = rawStdout.lastIndexOf(mark + ':');
   if (i === -1) return { stdout: rawStdout, code: null, cwd: undefined };
-  const m = rawStdout.slice(i + CWD_MARK.length + 1).match(/^(-?\d+):([^\r\n]*)/);
+  const m = rawStdout.slice(i + mark.length + 1).match(/^(-?\d+):([^\r\n]*)/);
   let cut = i;
   if (rawStdout[cut - 1] === '\n') cut--;
   if (rawStdout[cut - 1] === '\r') cut--;
