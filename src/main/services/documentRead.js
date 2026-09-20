@@ -237,7 +237,7 @@ async function risolviTollerante(full) {
     // file dell'utente — si dice che sono più d'uno e li si elenca. Vale anche
     // a METÀ percorso: a storpiarsi può essere il nome di una cartella, e
     // tacere lì lasciava l'utente senza il modo di scegliere, mentre sul nome
-    // del file gliene давano l'elenco (#551, secondo giro di verifica).
+    // del file gliene si dava l'elenco (#551, secondo giro di verifica).
     if (cand.length !== 1) return { path: '', ambigui: cand, tipo: ultimo ? 'file' : 'cartella' };
     cur = path.join(cur, cand[0]);
   }
@@ -352,7 +352,7 @@ async function readDocument(input) {
     if (alt.path) {
       try { st = await fsp.stat(alt.path); } catch (_) { st = null; }
     }
-    if (!st) return { ...base, error: 'not_found', detail: dettaglioNonTrovato(alt.ambigui) };
+    if (!st) return { ...base, error: 'not_found', detail: dettaglioNonTrovato(alt.ambigui, alt.tipo) };
     base.requested = full;
     full = alt.path;
     base.path = full;
