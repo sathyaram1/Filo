@@ -751,7 +751,7 @@
     if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
     // #517 — l'azione è partita davvero: da qui in poi la frase che la
     // racconta è vera, anche fra qualche messaggio.
-    try { azioniFiloEmesse.add(String(action && action.type || '').toUpperCase()); } catch (_) {}
+    try { azioniDelTurno.add(String(action && action.type || '').toUpperCase()); } catch (_) {}
 
     // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
     // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
