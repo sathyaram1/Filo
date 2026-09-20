@@ -149,10 +149,20 @@ test('canale deliver secaudit: lo sha lo timbra lo strumento, e resta quello dic
     assert.equal((primo.body.data || {}).sha, atteso,
       'la strada del canale timbra lo stesso commit di quella di dispatch: due strade equivalenti, stesso comportamento');
 
-    // Chi lo dichiara resta padrone del campo: non lo si sovrascrive.
-    const dichiarato = await lancia(['deliver', 'biglietto-finto', 'secaudit', '--verdict', 'fail', '--sha', 'dichiarato123']);
-    assert.equal(dichiarato.status, 0, dichiarato.stderr);
-    assert.equal((ricevuti[ricevuti.length - 1].body.data || {}).sha, 'dichiarato123');
+    // Dichiararne uno diverso NON lo sostituisce: può solo confermare la punta
+    // vera, come il nome del ramo può solo confermare quello del biglietto.
+    // Altrimenti la difesa si spegne scrivendo un argomento in più, e l'esito
+    // nasce intestato a un contenuto che qui non c'è (verifica del giro 1).
+    const quanti = ricevuti.length;
+    const dichiarato = await lancia(['deliver', 'biglietto-finto', 'secaudit', '--verdict', 'fail', '--sha', 'f'.repeat(40)]);
+    assert.equal(dichiarato.status, 1, 'un\'impronta dettata deve fermare la consegna');
+    assert.match(dichiarato.stderr, /non registrato/);
+    assert.equal(ricevuti.length, quanti, 'e il server non deve nemmeno essere chiamato');
+
+    // Dichiarare quello VERO va bene: è una conferma, non una sostituzione.
+    const confermato = await lancia(['deliver', 'biglietto-finto', 'secaudit', '--verdict', 'pass', '--sha', atteso]);
+    assert.equal(confermato.status, 0, confermato.stderr);
+    assert.equal((ricevuti[ricevuti.length - 1].body.data || {}).sha, atteso);
   } finally {
     srv.close();
     rmSync(dir, { recursive: true, force: true });
