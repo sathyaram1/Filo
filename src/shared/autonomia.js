@@ -365,9 +365,9 @@
       const fuori = (liv === 'automatico' || liv === 'yolo')
         ? piuStretta(riga.contaminato[costo], SI_G)
         : CHIEDE;
-      const prima = risposta;
-      risposta = piuStretta(risposta, fuori);
-      if (risposta !== prima || fuori === risposta) regola = 'fuori-perimetro';
+      const nuova = piuStretta(risposta, fuori);
+      if (STRETTEZZA[nuova] > STRETTEZZA[risposta]) regola = 'fuori-perimetro';
+      risposta = nuova;
       if (risposta === SI_G) guardiano = true;
     }
 
