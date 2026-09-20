@@ -753,14 +753,26 @@
   // punteggiatura.
   const BUSTE = /<\s*\/?\s*(?:tool_call|tool▁call|tool_use|function_call|function_calls|invoke|antml:invoke)\b|<\|[^|>]{0,32}tool[^|>]{0,32}\|>|\[TOOL_CALLS\]/i;
 
+  // La chiamata NUDA appoggiata alla prosa, sulla stessa riga: «Fatto!
+  // SVEGLIA({"ora":"19:00"})». Vale ovunque nella riga come le buste, perché
+  // una parola tutta maiuscola seguita da una graffa non è punteggiatura. La
+  // parentesi vuole la graffa subito dietro: senza, «il formato HTML (…)»
+  // basterebbe a far scattare il controllo. Il nome poi lo confronta
+  // `involucro` con quelli veri.
+  const CHIAMATA_NUDA = /(?:(?:functions?|tools?)\s*\.\s*)?\b[A-Z][A-Z_]{3,}\s*(?:\{|\(\s*\{)/;
+
   function inizioFormato(riga, primaRigaLibera) {
     const busta = riga.search(BUSTE);
     if (busta >= 0) return busta;
+    const nuda = riga.search(CHIAMATA_NUDA);
+    if (nuda >= 0) return nuda;
     // Sulla prima riga, fuori da un recinto, l'inizio del testo l'ha già
     // guardato `nudo`: qui cercheremmo la stessa cosa due volte.
     if (primaRigaLibera) return -1;
-    const m = riga.match(/^\s*(?:[[{]|(?:functions?|tools?)\s*\.\s*[A-Z]|[A-Z][A-Z_]{3,}\s*[{(])/);
-    return m ? m[0].length - m[0].trimStart().length : -1;
+    // Il segno di elenco davanti non cambia niente: «- {"type":…}» è la
+    // stessa chiamata lasciata scritta, con un trattino davanti.
+    const m = /^(\s*(?:(?:[-*•+]|\d+[.)])\s+)?)([[{]|(?:functions?|tools?)\s*\.\s*[A-Z]|[A-Z][A-Z_]{3,}\s*[{(])/.exec(riga);
+    return m ? m[1].length : -1;
   }
 
   function formatoSospetto(testo, nomiStrumenti) {
