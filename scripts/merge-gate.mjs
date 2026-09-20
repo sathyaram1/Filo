@@ -261,6 +261,49 @@ export function testoNonPubblicato(punta, suOrigin, ramo = '') {
     + 'Se il push non riesce, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
 }
 
+/**
+ * Il rifiuto per un ramo che su origin è andato OLTRE il contenuto esaminato.
+ * PURA.
+ *
+ * Qui spedire non c'entra: là c'è già tutto, e c'è pure dell'altro. Il danno è
+ * quello della segnalazione #485 all'ultimo passo possibile: chi fonde prende
+ * la punta, e la punta è un contenuto che nessuno ha guardato. Il rimedio è lo
+ * stesso del ramo mosso sotto i piedi, perché la causa è la stessa: gli esiti
+ * parlano di un'altra versione, quindi decadono e il giro si rifà su quella
+ * nuova. E si REGISTRA, invece di restare a schermo su questa macchina.
+ */
+export function testoPiuAvanti(punta, suOrigin, ramo = '') {
+  const p = String(punta || '').slice(0, 12);
+  const o = String(suOrigin || '').slice(0, 12);
+  const r = String(ramo || '<ramo>');
+  return 'fusione non chiesta: su origin il ramo è più avanti del contenuto esaminato, e chi fonde prende la PUNTA del ramo, non quello che c\'è in questa directory.\n'
+    + `  qui i via libera valgono per ${p}\n`
+    + `  su origin il ramo ${r} è in cima a ${o}\n`
+    + 'Quello che verrebbe fuso è il contenuto in cima, che nessuno ha esaminato. Non spedire niente e non riportare indietro il ramo: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via.\n'
+    + 'Gli esiti parlano di un\'altra versione, quindi sono decaduti: il giro va rifatto su quel contenuto, e la decadenza va registrata invece di restare su questa macchina.\n'
+    + `  node scripts/routine-channel.mjs deliver status --status revision_capability --branch ${r} --notes "su origin il ramo è più avanti del contenuto esaminato: verifica e controllo di sicurezza vanno rifatti su ${o}"\n`
+    + 'Se il server rifiuta quel passaggio, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
+}
+
+/**
+ * Il rifiuto per un ramo nominato che non è quello su cui sta la directory.
+ * PURA.
+ *
+ * Tutto quello che questo strumento controlla lo legge dalla directory: i file
+ * fuori dai commit, la punta, i via libera registrati. Se il nome sulla riga di
+ * comando è di un altro ramo, quei controlli parlano di una cosa e la richiesta
+ * ne nomina un'altra, e la versione dichiarata è di un ramo che non c'entra.
+ * Fermarsi qui non è pignoleria: è l'unica posizione da cui i controlli dopo
+ * hanno un senso.
+ */
+export function testoRamoDiverso(nominato, corrente) {
+  const n = String(nominato || '<ramo>');
+  const c = String(corrente || '');
+  return `fusione non chiesta: mi hai nominato il ramo ${n.slice(0, 80)}${n.length > 80 ? '…' : ''}, ma questa directory sta ${c ? `sul ramo ${c}` : 'su nessun ramo (testa staccata)'}.\n`
+    + 'Tutto quello che controllo prima di chiedere la fusione lo leggo da qui: i file fuori dai commit, la versione, su quale contenuto sono stati dati i via libera. Con due rami diversi quei controlli parlano di uno e la richiesta nomina l\'altro, e la versione che dichiarerei sarebbe di un ramo che non c\'entra.\n'
+    + 'Posizionati sul ramo del lavoro e rilancia, oppure nomina il ramo su cui sei.';
+}
+
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
