@@ -63,15 +63,27 @@ test('un documento arrivato a metà non viene dichiarato danneggiato', async ({ 
   test.setTimeout(60_000);
   await openTab('filo://newtab/');
 
-  const out = await app.evaluate(async (_e, { b64, modulo }) => {
-    const PR = require(modulo);
+  // Un documento che arriva mozzo è esattamente quello che il tetto qui sopra
+  // produce su un PDF di più di cinque megabyte — un manuale, un contratto
+  // scansionato, un estratto conto.
+  const out = await app.evaluate(async (_e, b64) => {
     const intero = Buffer.from(b64, 'base64');
-    const mezzo = intero.subarray(0, Math.floor(intero.length * 0.6));
-    return {
-      intero: await PR.daContenuto({ url: 'https://example.com/a.pdf', contentType: 'application/pdf', buffer: intero, status: 200 }),
-      mezzo: await PR.daContenuto({ url: 'https://example.com/a.pdf', contentType: 'application/pdf', buffer: mezzo, status: 200 }),
+    const orig = globalThis.fetch;
+    globalThis.__ripristinaRete = () => { globalThis.fetch = orig; };
+    const serviamo = (buf) => {
+      globalThis.fetch = async () => new Response(new Uint8Array(buf), {
+        status: 200, headers: { 'content-type': 'application/pdf' },
+      });
     };
-  }, { b64: PDF, modulo: PAGE_READ });
+    const leggi = async () => (await globalThis.SN_EXECUTE_FILO_ACTION({
+      type: 'LEGGI_PAGINA', url: 'https://example.com/contratto.pdf',
+    })).output;
+    serviamo(intero);
+    const a = await leggi();
+    serviamo(intero.subarray(0, Math.floor(intero.length * 0.6)));
+    const b = await leggi();
+    return { intero: a, mezzo: b };
+  }, PDF);
 
   // Controllo: intero si legge.
   expect(out.intero.ok).toBe(true);

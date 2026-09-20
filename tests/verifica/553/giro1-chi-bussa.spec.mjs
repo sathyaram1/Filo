@@ -20,7 +20,7 @@ test('la richiesta si presenta come un browser, non come uno script', async ({ a
   test.setTimeout(60_000);
   await openTab('filo://newtab/');
 
-  const { inviati, browser } = await app.evaluate(async () => {
+  const { inviati, browser } = await app.evaluate(async (electron) => {
     const orig = globalThis.fetch;
     globalThis.__ripristinaRete = () => { globalThis.fetch = orig; };
     let visti = {};
@@ -34,8 +34,7 @@ test('la richiesta si presenta come un browser, non come uno script', async ({ a
       });
     };
     await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'LEGGI_PAGINA', url: 'https://example.com/pagina' });
-    const { session } = require('electron');
-    return { inviati: visti, browser: session.defaultSession.getUserAgent() };
+    return { inviati: visti, browser: electron.session.defaultSession.getUserAgent() };
   });
 
   // Il nome con cui Filo apre le pagine nelle sue schede.
