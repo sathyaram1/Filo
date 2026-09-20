@@ -98,6 +98,41 @@ test('da una cartella che non c’è più Filo riesce almeno ad andarsene', asyn
   }
 });
 
+test('il terminale che l’utente digita, sulla stessa cartella sparita, continua', async ({ openTab }) => {
+  // La strada gemella: la stessa cartella che sparisce sotto i piedi, ma al
+  // terminale che l'utente usa a mano. Qui la cartella inutilizzabile viene
+  // riportata alla home e il comando gira lo stesso. È la misura di quanto le
+  // due strade divergono.
+  const base = cartellaTemporanea('filo-551-sparita-gemella-');
+  try {
+    const page = await openTab(HOME);
+    await accendiTerminale(page);
+    rmSync(base, { recursive: true, force: true });
+
+    const out = await page.evaluate((cwd) => new Promise((resolve) => {
+      let acc = '';
+      let chiuso = false;
+      const fine = (d) => {
+        if (chiuso) return;
+        chiuso = true;
+        resolve(acc + (d && d.message ? `\n${d.message}` : ''));
+      };
+      window.filo.shellExec({
+        command: 'echo ciao',
+        cwd,
+        onData: (d) => { if (d && typeof d.chunk === 'string') acc += d.chunk; },
+        onExit: () => fine(),
+        onError: fine,
+      });
+      setTimeout(() => fine(), 15000);
+    }), base);
+
+    expect(out, `anche il terminale dell’utente si blocca: ${JSON.stringify(out)}`).toContain('ciao');
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test('il taglio di un documento lungo non lascia mezzo carattere in fondo', async ({ openTab }) => {
   const base = cartellaTemporanea('filo-551-taglio-documento-');
   try {
