@@ -76,9 +76,8 @@ function pickSafeBrowsing(json) {
   return '';
 }
 
-// Il motivo del rifiuto può arrivare sotto tre nomi a seconda di come la
-// funzione è scritta: si prende il primo che è davvero una stringa, perché un
-// oggetto interpolato diventa «[object Object]» e non spiega niente.
+// Il motivo del rifiuto arriva sotto nomi diversi a seconda di com'è scritta la
+// funzione; un oggetto interpolato diventa «[object Object]» e non spiega niente.
 function primaStringa(...valori) {
   for (const v of valori) {
     if (typeof v === 'string' && v.trim()) return v.trim();
