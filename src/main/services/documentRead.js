@@ -474,14 +474,15 @@ function leggiDueByte(buf, verso, conFirma) {
  * caratteri STAMPABILI, quindi nemmeno la rete finale se ne accorgeva: Filo
  * dichiarava letto un estratto conto e rispondeva su una fila di segni cinesi.
  *
- * Il passo che mancava è la stessa domanda che si fa sul testo decodificato,
- * fatta qui sulla lettura a 8 BIT: questo file, letto a 8 bit, è GIÀ testo? Se
- * lo è, i nulli sono il danno e non la struttura, e il testo va letto com'è
- * scritto. In un testo a due byte la risposta è no in qualunque alfabeto: a non
- * essere testo è il byte ALTO di ogni coppia — zero in italiano, un carattere
- * di controllo in russo e in greco — e sono la metà dei byte del file. Nessuna
- * soglia nuova da tarare: è la quota che il modulo usa già per decidere se
- * qualcosa è testo.
+ * Il passo che mancava è la stessa domanda che il modulo fa già sui BYTE per
+ * capire se un file è testo, fatta qui contando anche i nulli: questo file,
+ * byte per byte, è GIÀ testo? Se lo è, i nulli sono il danno e non la
+ * struttura, e il documento va letto com'è scritto. In un testo a due byte la
+ * risposta è no in qualunque alfabeto, e non per una questione di quantità:
+ * metà dei byte del file sono il byte ALTO delle coppie, che non è un
+ * carattere. È zero in italiano, un carattere di controllo in russo e in greco,
+ * e in cinese a non esserlo è il byte basso. Nessuna soglia nuova da tarare:
+ * è la stessa quota con cui si riconosce un binario.
  */
 function pareDueByte(buf) {
   if (!buf || buf.length < 8) return '';
