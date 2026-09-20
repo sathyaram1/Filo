@@ -257,7 +257,7 @@
         // e la famiglia giusta è un'altra.
         // I modi di dire: «ti ho salvato un po' di tempo» non promette nessun
         // appunto, e l'avviso lì aveva torto.
-        new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+${AVV}(?:segnat|appuntat|salvat)[oa]\\b`
+        senzaOggetto(new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+${AVV}(?:segnat|appuntat|annotat|salvat)[oa]\\b`
           + '(?!\\s+(?:la vita|(?:molto |un po\' di |un po’ di |parecchio |tanto |del )?tempo'
           + '|un sacco|la giornata|la serata|la situazione|la pelle|la faccia|le spese|la fatica))'
           // Giro 8: «agenda» accanto a «calendario». «Ti ho segnato la
