@@ -238,6 +238,9 @@
       frasi: [
         new RegExp(`${HO}(?:messo|salvato|scritto|creato|aggiunto|annotato|impostato|segnato|preso|fissato)\\b${PONTE(72)}\\bpromemoria\\b`, 'i'),
         new RegExp(`\\b${PRON}(?:mess|salvat|scritt|annotat|segnat)[oa]\\b${PONTE(32)}\\bpromemoria\\b`, 'i'),
+        // Giro 10: la conferma corta, come per la sveglia. «Fatto:
+        // promemoria per le 19» non la prendeva nessuna regola.
+        new RegExp(`${ASSENSO}\\s+(?:il |un )?promemoria\\b[^.!?]{0,12}\\b(?:alle|all['’]|per\\s+le|delle)\\s*\\d`, 'i'),
         participio('promemoria', 'creato|impostato|salvato|messo|pronto|segnato'),
       ],
     },
