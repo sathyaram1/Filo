@@ -71,8 +71,9 @@ cartella intera, così un pezzo spostato non esce dal controllo in silenzio).
   sezione che lega le quattro parti e passa le dipendenze.
 - `src/pages/dashboard/dashboard-{attivita,onboarding,comandi,terminale}.js`
 - `tests/unit/dashboardParti.test.mjs` — la sentinella.
-- `PIANO-DIVISIONE-FILE-2026-09-17.md` (allegato al #635) — le altre pagine in
-  coda per lo stesso taglio.
+- Il piano di divisione dei file del 17/09/2026 elenca le altre pagine in coda
+  per lo stesso taglio. Non sta nel progetto: è l'allegato del #635, e si legge
+  dalla scheda della segnalazione in dashboard.
 
 La mappa di `specsForChangedFiles` (`scripts/finish-local.mjs`) non si tocca:
 per una pagina l'area la dà la CARTELLA, quindi `dashboard-comandi.js` lancia
