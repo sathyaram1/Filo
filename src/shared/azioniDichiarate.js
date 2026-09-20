@@ -75,6 +75,10 @@
   // per fare quella cosa), ma non escono più dalla famiglia: prima una sveglia
   // reggeva anche l'appunto e l'evento in calendario, quindi una cosa fatta ne
   // assolveva tre mai fatte.
+  // La sveglia si chiama anche «allarme»: riconoscere solo una delle due
+  // parole lasciava passare «ti ho messo l'allarme alle 19».
+  const SVEGLIA = '(?:svegli[ae]|allarm[ei])';
+
   const FAMIGLIE = [
     {
       id: 'sveglia',
