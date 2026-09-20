@@ -37,8 +37,14 @@ async function stubModel(app) {
       if (content.indexOf('Traduci il seguente testo in italiano mantenendo struttura') !== 0) {
         return { text: '{}', model: 'm', provider: 'openrouter', usage: {} };
       }
-      const i = content.indexOf('Testo:\n\n');
-      const chunk = i >= 0 ? content.slice(i + 'Testo:\n\n'.length) : content;
+      // #593 — il testo da tradurre arriva al modello dentro una busta, come
+      // ogni altro contenuto che scrive il sito: qui si finge di leggerla
+      // come la leggerebbe lui.
+      const APRE = '<<<TESTO_IN_PAGINA>>>\n';
+      const CHIUDE = '\n<<<FINE_TESTO_IN_PAGINA>>>';
+      const i = content.indexOf(APRE);
+      const fine = content.lastIndexOf(CHIUDE);
+      const chunk = i >= 0 && fine > i ? content.slice(i + APRE.length, fine) : content;
       globalThis.__trChunks.push(chunk);
       globalThis.__trCalls++;
       const segs = chunk.split(/\n?@@@\s*SN_SEP\s*@@@\n?/);

@@ -14,10 +14,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 
 function loadConstants() {
-  const code = readFileSync(resolve(ROOT, 'src/shared/constants.js'), 'utf8');
   const sandbox = {};
   vm.createContext(sandbox);
-  vm.runInContext(code, sandbox);
+  // #593 — i prompt che nominano testo di una pagina lo imbustano passando da
+  // SN_ESTERNO: qui la scatola è nuda (niente require), quindi il modulo va
+  // messo dentro prima, come fa lo <script> delle pagine filo://.
+  for (const f of ['src/shared/contenutoEsterno.js', 'src/shared/constants.js']) {
+    vm.runInContext(readFileSync(resolve(ROOT, f), 'utf8'), sandbox);
+  }
   return sandbox.SN_CONST;
 }
 

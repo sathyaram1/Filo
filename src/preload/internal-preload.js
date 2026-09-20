@@ -282,6 +282,7 @@ function loadContentScripts() {
   // stessi oggetti su globalThis).
   const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
   safe(path.join(SHARED, 'constants.js'));
+  safe(path.join(SHARED, 'contenutoEsterno.js')); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
   // la disegnano, lo legge chi cammina sulla pagina.
   safe(path.join(SHARED, 'filoUi.js'));

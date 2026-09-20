@@ -14,12 +14,17 @@
 (function (global) {
   'use strict';
 
-  const { ACTIONS } = global.SN_CONST;
+  const { ACTIONS, PROMPTS } = global.SN_CONST;
   const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
   const Highlight = global.SN_HIGHLIGHT;
   const Extract = global.SN_EXTRACT;
   const Popup = global.SN_POPUP;
+  // #593 — la porta unica del contenuto esterno. Qui serve per due cose: la
+  // nota di sistema resta una frase di Filo su una riga, e quello che viene
+  // da fuori (risultati di ricerca, etichette della pagina) entra in
+  // cronologia gia imbustato.
+  const Esterno = global.SN_ESTERNO;
 
   let root = null;
   let stackEntry = null;
@@ -89,7 +94,15 @@
       history.push({
         role: 'user',
         kind: 'action',
-        content: `(Sistema: l'utente ha aperto Aiuto col tasto destro sulla scheda «${ctxTitle}» (${ctxUrl}). Aspetta la sua domanda sulla scheda.)`,
+        // #593 — titolo e indirizzo della scheda li scrive il sito: la nota
+        // dice cosa ha fatto l'utente (quella è la voce di Filo), la scheda va
+        // nella busta. Prima entravano fra virgolette dentro «(Sistema: …)»,
+        // cioè nel canale che le istruzioni presentano come fidato.
+        content: PROMPTS.turnoAutomaticoAiuto({
+          nota: 'l\'utente ha aperto Aiuto col tasto destro sulla scheda descritta qui sotto. Aspetta la sua domanda sulla scheda',
+          dati: { scheda: { titolo: ctxTitle, url: ctxUrl } },
+          perCronologia: true,
+        }),
       });
     }
     root = document.createElement('div');
@@ -814,7 +827,7 @@
 
   // ---------- Submit / loop ----------
 
-  function buildPayload(userMessage, userAction) {
+  function buildPayload(userMessage, userAction, esterno) {
     const screenshot = null; // riempito dopo
     const outline = (() => { try { return Extract?.extractInteractiveOutline?.() || ''; } catch (_) { return ''; } })();
     const viewport = (() => { try { return Extract?.viewportInfo?.() || null; } catch (_) { return null; } })();
@@ -825,6 +838,11 @@
       title: document.title,
       userMessage: userMessage || undefined,
       userAction: userAction || undefined,
+      // #593 — il contenuto esterno viaggia SEPARATO dalla nota di sistema, e
+      // grezzo: a imbustarlo e' il main, quando compone il messaggio. Qui non
+      // si manda una busta gia' fatta, cosi' il punto in cui il testo di
+      // terzi diventa prompt resta uno solo.
+      esterno: esterno || undefined,
       history: aiHistory,
       screenshot,
       outline,
@@ -882,7 +900,11 @@
 
   // submit({ userMessage }) — invio iniziale o domanda dell'utente
   // submit({ userAction }) — proseguimento automatico dopo un'azione utente
-  async function submit({ userMessage = '', userAction = '', preActionUrl = '' } = {}) {
+  // submit({ userAction, esterno }) — idem, quando la nota deve nominare
+  //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
+  //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
+  //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
+  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '' } = {}) {
     if (!root) return;
     const wasCollapsed = collapsed;
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
@@ -909,7 +931,7 @@
       await waitForPageSettle({ initialUrl: preActionUrl || location.href });
     }
     const screenshot = await captureScreenshot();
-    const payload = buildPayload(userMessage, userAction);
+    const payload = buildPayload(userMessage, userAction, esterno);
     payload.screenshot = screenshot || undefined;
 
     try {
@@ -936,26 +958,40 @@
         }
         if (session) session.webSearchCount += 1;
         appendActionLog(`ricerca web: "${parsed.query}"`);
-        let resultsText = '';
-        let provider = '';
+        // #593 — I RISULTATI NON SONO UNA NOTA DI FILO.
+        //
+        // Titolo, indirizzo e riassunto di ogni risultato li scrive chi
+        // possiede quella pagina. Finivano impastati in una stringa che il
+        // prompt rendeva come «(Sistema: …)», cioè col timbro di Filo: bastava
+        // comparire fra i primi risultati per dare ordini all'agente, e senza
+        // nemmeno una chiave (il ripiego di ricerca è pubblico). Adesso la
+        // nota dice soltanto che la ricerca è stata fatta — quella è la voce
+        // di Filo — e i risultati viaggiano a parte, per essere imbustati.
+        let ricercaWeb = null;
+        let esitoVuoto = '';
         try {
           const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query });
           if (r?.ok && Array.isArray(r.results) && r.results.length) {
-            provider = r.provider || '';
-            resultsText = r.results.map((x, i) =>
-              `${i + 1}. ${x.title}\n   ${x.url}\n   ${x.snippet || ''}`
-            ).join('\n');
+            ricercaWeb = { query: parsed.query, provider: r.provider || '', results: r.results };
           } else {
-            resultsText = '(nessun risultato)';
+            esitoVuoto = 'la ricerca web che avevi chiesto non ha dato nessun risultato';
           }
         } catch (_) {
-          resultsText = '(errore di rete durante la ricerca)';
+          esitoVuoto = 'la ricerca web che avevi chiesto è fallita per un errore di rete';
         }
-        const note = `risultati ricerca web (${provider || 'n/a'}) per "${parsed.query}":\n${resultsText}\n\nProcedi ora con il JSON normale (highlight / choices / text / status).`;
+        const note = ricercaWeb
+          ? 'ho eseguito la ricerca web che avevi chiesto; i risultati te li rimando qui sotto come contenuto esterno, fra le marcature. Procedi ora con il JSON normale (highlight / choices / text / status)'
+          : `${esitoVuoto}. Procedi ora con il JSON normale (highlight / choices / text / status) usando solo ciò che già sai`;
         // Mostra anche un placeholder assistant così l'utente vede che è
         // successo qualcosa (altrimenti la chat sembra "saltare un turno").
-        history.push({ role: 'assistant', content: `(ho richiesto una ricerca web: "${parsed.query}")` });
-        setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 50);
+        // La query la scrive il modello, spesso ricopiando la pagina: anche qui
+        // niente a capo e niente marcature.
+        history.push({ role: 'assistant', content: `(ho richiesto una ricerca web: "${Esterno.perCanaleSistema(parsed.query)}")` });
+        setTimeout(() => submit({
+          userAction: note,
+          esterno: ricercaWeb ? { ricercaWeb } : null,
+          preActionUrl: location.href,
+        }), 50);
         return;
       }
 
@@ -1041,7 +1077,14 @@
 
       // Aggiorna la storia AI
       if (userAction && !userMessage) {
-        history.push({ role: 'user', content: `(Sistema: ${userAction}. Stato pagina aggiornato.)`, kind: 'action' });
+        history.push({
+          role: 'user',
+          // Stessa funzione che compone il messaggio in partenza (#593): qui
+          // cambia solo la coda, perché la cronologia non deve ripetere a ogni
+          // turno l'invito a valutare screenshot e outline.
+          content: PROMPTS.turnoAutomaticoAiuto({ nota: userAction, dati: esterno, perCronologia: true }),
+          kind: 'action',
+        });
       }
       history.push({ role: 'assistant', content: parsed.display || res.text });
 
@@ -1073,10 +1116,18 @@
               : (targetLabel ? `menu aperto su ${targetLabel}` : 'menu aperto');
             appendActionLog(msg);
             if (parsed.status === 'continue') {
+              // #593 — l'etichetta la scrive il sito e il selettore lo propone
+              // il modello leggendo il sito: nessuno dei due è una frase di
+              // Filo, quindi nessuno dei due entra nel canale «(Sistema: …)».
+              // La nota dice cosa ha fatto Filo; l'elemento va nella busta.
               const aiNote = act === 'reveal'
-                ? `ho eseguito reveal su ${targetLabel || parsed.highlight.selector}: la sezione è ora aperta. Outline e screenshot sono aggiornati.`
-                : `ho eseguito hover su ${targetLabel || parsed.highlight.selector}: il menu è ora aperto. Outline e screenshot sono aggiornati.`;
-              setTimeout(() => submit({ userAction: aiNote, preActionUrl: location.href }), 150);
+                ? 'ho eseguito reveal sull\'elemento qui sotto: la sezione è ora aperta. Outline e screenshot sono aggiornati'
+                : 'ho eseguito hover sull\'elemento qui sotto: il menu è ora aperto. Outline e screenshot sono aggiornati';
+              setTimeout(() => submit({
+                userAction: aiNote,
+                esterno: { elementoPagina: { etichetta: targetLabel, selettore: parsed.highlight.selector } },
+                preActionUrl: location.href,
+              }), 150);
             }
           } else {
             // Reveal rifiutato (whitelist) o target mancante: chiediamo
@@ -1169,10 +1220,12 @@
     let logText, aiNote;
     if (highlight.action === 'fill') {
       logText = label ? `testo inserito in ${label}` : 'testo inserito';
-      aiNote = `l'utente ha accettato il suggerimento di fill e il testo è stato inserito nel campo`;
+      aiNote = 'l\'utente ha accettato il suggerimento di fill e il testo è stato inserito nel campo qui sotto';
     } else {
       logText = label ? `click su ${label}` : 'click eseguito';
-      aiNote = `l'utente ha cliccato sull'elemento che avevi indicato (${label || highlight.selector})`;
+      // #593 — il nome dell'elemento lo scrive il sito: va nella busta, non
+      // nella nota. Prima entrava fra parentesi dentro «(Sistema: …)».
+      aiNote = 'l\'utente ha cliccato sull\'elemento che avevi indicato, descritto qui sotto';
     }
     // Telemetria: traccia lo step eseguito. Niente value (anche se è un fill):
     // i contenuti dei campi possono essere sensibili.
@@ -1191,7 +1244,11 @@
     // cambio di route (SPA o navigazione classica) e aspettare che la pagina
     // sia effettivamente cambiata prima di fare lo screenshot.
     const preActionUrl = location.href;
-    submit({ userAction: aiNote, preActionUrl });
+    submit({
+      userAction: aiNote,
+      esterno: { elementoPagina: { etichetta: label, selettore: highlight.selector } },
+      preActionUrl,
+    });
   }
 
   global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget };

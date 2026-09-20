@@ -215,13 +215,23 @@ module.exports = function register(on, ctx) {
           if (Number.isFinite(status) && status >= 400 && status < 500 && status !== 429) {
             // Query rifiutata (sintassi): il modello la corregge o spiega.
             try {
+              // #593 (quarto giro di verifica) — IL MOTIVO DEL RIFIUTO LO
+              // SCRIVE IL SERVIZIO REMOTO, E QUESTA RIGA È LA VOCE DI FILO.
+              // Era l'ultimo punto in cui del testo arrivato da fuori entrava
+              // in un prompt dentro una nota di sistema, cioè la forma che
+              // questo lavoro ha tolto da tutte le altre parti. La riga di
+              // Filo resta una frase di Filo (query compresa: quella la scrive
+              // il modello, spesso ricopiando qualcosa che ha letto), e il
+              // messaggio del servizio viaggia a parte, in una busta.
+              const E = globalThis.SN_ESTERNO;
               const retryMessages = [...messages,
                 { role: 'assistant', content: r.text },
                 { role: 'user', content:
-                  `(Sistema) La ricerca Scryfall con la query «${parsed.query}» è stata rifiutata` +
-                  `${detail ? ` con questo errore: ${detail}` : ' (sintassi non valida)'}. ` +
+                  `(Sistema) La ricerca Scryfall con la query «${E.perCanaleSistema(parsed.query)}» è stata rifiutata` +
+                  `${detail ? ' e il servizio ha spiegato perché qui sotto' : ' (sintassi non valida)'}. ` +
                   'Correggi la sintassi e rispondi di nuovo con il SOLO JSON {"reply": "...", "query": "<query corretta>"}. ' +
-                  'Se la richiesta non è esprimibile in sintassi Scryfall, spiega il problema all\'utente in "reply" (in italiano, senza codici tecnici) e ometti "query".' },
+                  'Se la richiesta non è esprimibile in sintassi Scryfall, spiega il problema all\'utente in "reply" (in italiano, senza codici tecnici) e ometti "query".' +
+                  (detail ? `\n\n${E.imbusta({ tipo: 'ESITO_SERVIZIO', testo: detail, conIntestazione: true, max: 2000 })}` : '') },
               ];
               const r2 = await handleAIRequest({
                 action: ACTIONS.DECKS_CHAT,

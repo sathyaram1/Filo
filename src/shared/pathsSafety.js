@@ -12,7 +12,9 @@
 //     deploy: una copia a mano dall'altra parte divergerebbe in silenzio.
 //
 //   • in LETTURA — `formatKnownPathsForPrompt()` impacchetta i percorsi fra due
-//     marcature e li ripulisce di nuovo. La seconda pulizia non è un doppione:
+//     marcature, chiedendo la busta a SN_ESTERNO (`src/shared/contenutoEsterno.js`),
+//     che dal #593 è la porta unica di tutto ciò che entra in un prompt venendo
+//     da fuori, e li ripulisce di nuovo. La seconda pulizia non è un doppione:
 //     nella raccolta restano i documenti scritti quando chiunque poteva
 //     scriverli, e un percorso inviato in buona fede può comunque contenere il
 //     testo di una pagina ostile. Il prompt (`SN_CONST.PROMPTS.helpContext`)
@@ -38,12 +40,29 @@
   // più al modello.
   const MAX_PATH_CHARS = Math.floor(KNOWN_PATHS_BUDGET_CHARS / 4);
 
-  // Le due righe che delimitano il blocco nel messaggio di sistema. Il testo
-  // dei percorsi non può contenerle (vedi `neutralizzaMarcature`): senza questa
-  // precauzione basterebbe un intento che scrive la riga di chiusura per far
-  // credere al modello che quello che segue non è più contenuto esterno.
-  const FENCE_START = '<<<PERCORSI_CONDIVISI>>>';
-  const FENCE_END = '<<<FINE_PERCORSI_CONDIVISI>>>';
+  // Il tipo di contenuto esterno sotto cui i percorsi entrano nel prompt. La
+  // busta — le due righe che delimitano il blocco, e la pulizia che impedisce
+  // al contenuto di scriversele da sé — la fa SN_ESTERNO
+  // (src/shared/contenutoEsterno.js), che è la porta unica di tutto ciò che
+  // arriva da fuori (#593).
+  //
+  // Si prende al momento dell'uso, non al caricamento, e per un motivo
+  // preciso: questo file viene INCORPORATO nel backend di sicurezza al deploy
+  // (predeploy `bake-shared`), dove gira da solo e dove serve la sola
+  // scrittura (`sanitizeSubmission`). La lettura — l'unica parte che imbusta —
+  // là non viene mai chiamata. Un `require` in testa spegnerebbe il deploy per
+  // una funzione che il server non usa.
+  const TIPO_ESTERNO = 'PERCORSI_CONDIVISI';
+
+  function esterno() {
+    if (!global.SN_ESTERNO && typeof require === 'function') {
+      require('./contenutoEsterno.js');
+    }
+    if (!global.SN_ESTERNO) {
+      throw new Error('SN_ESTERNO mancante: carica shared/contenutoEsterno.js prima di pathsSafety.js');
+    }
+    return global.SN_ESTERNO;
+  }
 
   const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
   const LONG_NUM_RE = /\b\d{6,}\b/g;
@@ -157,6 +176,13 @@
   // solo a fingere di essere la struttura del prompt: caratteri di controllo,
   // a capo (ogni campo è una riga sola), sequenze di < o > che imiterebbero le
   // marcature, e il nome delle marcature stesse.
+  //
+  // Questa è la pulizia in SCRITTURA, e gira anche sul server, dove SN_ESTERNO
+  // non c'è: resta quindi autonoma. Non conosce i nomi delle buste degli altri
+  // tipi, e non le serve — schiacciando ogni coppia di parentesi angolari non
+  // può uscirne una marcatura di nessun tipo. Il nome per esteso lo cancella
+  // comunque SN_ESTERNO quando imbusta, in lettura, dove la tabella dei tipi
+  // c'è tutta.
   function neutralizzaMarcature(testo) {
     return String(testo == null ? '' : testo)
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
@@ -719,7 +745,14 @@
       chars += block.length + 2;
     }
     if (!blocchi.length) return '';
-    return `${FENCE_START}\n${blocchi.join('\n\n')}\n${FENCE_END}`;
+    // L'intestazione qui non si chiede: la scrive per esteso il prompt
+    // dell'Aiuto, che ha spazio per dire anche a cosa servono i percorsi e
+    // perché vanno verificati nell'outline.
+    return esterno().imbusta({
+      tipo: TIPO_ESTERNO,
+      testo: blocchi.join('\n\n'),
+      max: KNOWN_PATHS_BUDGET_CHARS,
+    });
   }
 
   global.SN_PATHS_SAFETY = {
@@ -729,8 +762,11 @@
     // o un percorso depositato sotto `localhost` tornerebbe a chiunque apra
     // l'Aiuto su una pagina locale (src/shared/paths.js → segmentoDominio).
     sitoCondivisibile,
-    FENCE_START,
-    FENCE_END,
+    // Le due marcature le decide SN_ESTERNO, che è l'unico a sapere come è
+    // fatta una busta. Qui sono due finestre su quella tabella, lette quando
+    // servono: nessuna copia da tenere allineata a mano.
+    get FENCE_START() { return esterno().marcature(TIPO_ESTERNO).inizio; },
+    get FENCE_END() { return esterno().marcature(TIPO_ESTERNO).fine; },
     LIMITI: { MAX_STEPS, MAX_SELECTOR_LEN, MAX_INTENT_LEN, MAX_DOMAIN_LEN, MAX_URL_LEN, KNOWN_PATHS_BUDGET_CHARS, MAX_PATH_CHARS },
     // Esposti per i test e per chi riusa i singoli pezzi.
     _internal: {
