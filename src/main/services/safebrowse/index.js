@@ -28,16 +28,26 @@ const net = require('./net');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
 
-// ── Cache TTL semplice ──────────────────────────────────────────────────
+// ── Cache TTL semplice, con un fondo ────────────────────────────────────
+// #591 — la scadenza da sola non basta a tenerla piccola: chi controlla un
+// dominio può far comparire host sempre nuovi più in fretta di quanto scadano.
+// Oltre `max` esce la voce inserita per prima.
 class TtlCache {
-  constructor(ttlMs) { this.ttl = ttlMs; this.m = new Map(); }
+  constructor(ttlMs, max = 2000) { this.ttl = ttlMs; this.max = max; this.m = new Map(); }
   get(k) {
     const e = this.m.get(k);
     if (!e) return undefined;
     if (Date.now() > e.exp) { this.m.delete(k); return undefined; }
     return e.v;
   }
-  set(k, v, ttl) { this.m.set(k, { v, exp: Date.now() + (ttl || this.ttl) }); return v; }
+  set(k, v, ttl) {
+    if (this.m.size >= this.max && !this.m.has(k)) {
+      const oldest = this.m.keys().next().value;
+      if (oldest !== undefined) this.m.delete(oldest);
+    }
+    this.m.set(k, { v, exp: Date.now() + (ttl || this.ttl) });
+    return v;
+  }
   has(k) { return this.get(k) !== undefined; }
   delete(k) { this.m.delete(k); }
 }
@@ -48,8 +58,20 @@ const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 const gsbCache = new TtlCache(30 * MIN);
 const ageCache = new TtlCache(7 * DAY);
 const certCache = new TtlCache(HOUR);
+// #591 — giudizio del modello e finestra nascosta si ricordano per DOMINIO
+// REGISTRABILE, non per host completo: con la chiave sull'host bastavano
+// sottodomini sempre nuovi sullo stesso dominio per far ripartire ogni volta
+// una chiamata al modello e una finestra nascosta, aggirando l'unico freno che
+// c'era. Sono i due stadi che costano (soldi l'uno, una finestra con
+// JavaScript attivo l'altro); gli altri restano come stavano.
 const sandboxCache = new TtlCache(30 * MIN);
 const llmCache = new TtlCache(HOUR);
+
+// Chiamate già in volo, per dominio registrabile. La cache si riempie solo
+// quando la risposta arriva: senza questo, cinquanta sottodomini aperti insieme
+// facevano partire cinquanta chiamate prima che la prima rispondesse.
+const llmInFlight = new Set();
+const sandboxInFlight = new Set();
 
 // Fetcher di rete iniettabili (default: assenti = best-effort no-op).
 let providers = { gsb: null, rdap: null, ct: null, sandbox: null, llm: null };
@@ -84,8 +106,8 @@ function assembleCached(norm) {
     gsb: gsbCache.get('u:' + norm.host) || gsbCache.get(reg),
     ageDays: ageCache.get(reg),
     cert: certCache.get(reg),
-    sandbox: sandboxCache.get(norm.host),
-    llm: llmCache.get(norm.host),
+    sandbox: sandboxCache.get(reg),
+    llm: llmCache.get(reg),
   };
 }
 
@@ -131,15 +153,17 @@ function analyze(url, ctx = {}, onUpdate) {
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
-  if (worthDeepening && providers.llm && need.llm === undefined) {
+  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(reg)) {
+    llmInFlight.add(reg);
     tasks.push(Promise.resolve(providers.llm(buildLlmMeta(norm, ctx, first))).then((r) => {
-      if (r) llmCache.set(norm.host, r);
-    }).catch(() => {}));
+      if (r) llmCache.set(reg, r);
+    }).catch(() => {}).finally(() => { llmInFlight.delete(reg); }));
   }
-  if (worthDeepening && providers.sandbox && need.sandbox === undefined) {
+  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(reg)) {
+    sandboxInFlight.add(reg);
     tasks.push(Promise.resolve(providers.sandbox(url, norm)).then((r) => {
-      if (r) sandboxCache.set(norm.host, r);
-    }).catch(() => {}));
+      if (r) sandboxCache.set(reg, r);
+    }).catch(() => {}).finally(() => { sandboxInFlight.delete(reg); }));
   }
 
   if (tasks.length && typeof onUpdate === 'function') {
@@ -196,6 +220,8 @@ const API = {
   },
   // cache (per test / invalidazione)
   _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache },
+  // Chiamate in volo per dominio registrabile (test e diagnostica).
+  _inFlight: { llm: llmInFlight, sandbox: sandboxInFlight },
   // sotto-moduli (per test)
   normalize: normalizeMod.normalize,
   parseHost: normalizeMod.parseHost,

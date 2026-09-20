@@ -109,8 +109,8 @@ function electron() {
 
 // `evaluateFinal(finalUrl)` è iniettata: ri-valuta l'URL finale con l'engine
 // (segnali locali) per capire se la destinazione vera è ingannevole.
-// `opts.electron` serve agli unit test (in produzione non si passa: il modulo
-// se lo prende da sé).
+// `opts` esiste per gli unit test (Electron finto e tempi accorciati): in
+// produzione non si passa, e valgono le costanti qui sopra.
 async function detonate(url, evaluateFinal, opts = {}) {
   const el = opts.electron || electron();
   if (!el || !el.BrowserWindow || !el.session) return null;
@@ -118,12 +118,14 @@ async function detonate(url, evaluateFinal, opts = {}) {
   // Oltre il tetto (o dopo troppa attesa in coda) si rinuncia: nessuna finestra
   // viene aperta e il verdetto resta "non pervenuto" — che NON finisce in
   // cache, così al prossimo passaggio si riprova.
-  const out = await gate.run(() => detonateNow(el, url, evaluateFinal));
+  const out = await gate.run(() => detonateNow(el, url, evaluateFinal, opts));
   if (out.refused) return null;
   return out.value;
 }
 
-async function detonateNow(el, url, evaluateFinal) {
+async function detonateNow(el, url, evaluateFinal, opts = {}) {
+  const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : DETONATE_TIMEOUT_MS;
+  const lifetimeMs = Number(opts.hardLifetimeMs) > 0 ? Number(opts.hardLifetimeMs) : HARD_LIFETIME_MS;
   const partition = `filo-detonate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const ses = el.session.fromPartition(partition, { cache: false });
 
@@ -177,12 +179,24 @@ async function detonateNow(el, url, evaluateFinal) {
       resolve({ verdict, finalUrl, redirects, download: downloadStarted ? (downloadName || true) : false, ...extra });
     };
 
-    timer = setTimeout(() => done(downloadStarted ? 'dangerous' : 'clean'), DETONATE_TIMEOUT_MS);
+    timer = setTimeout(() => done(downloadStarted ? 'dangerous' : 'clean'), timeoutMs);
     // Il tetto di vita: nessun cammino lo annulla, solo `done`. Prima, appena la
     // pagina finiva di caricare il timer di attesa veniva annullato e una
     // valutazione dell'URL finale che non tornava mai lasciava la finestra
     // viva, con JavaScript attivo, per tutta la sessione.
-    hardTimer = setTimeout(() => done(downloadStarted ? 'dangerous' : null, { timedOut: true }), HARD_LIFETIME_MS);
+    // Scaduto il tetto: se un download era già partito il verdetto è certo e
+    // vale; altrimenti si esce senza verdetto (null), che index.js NON mette in
+    // cache — al prossimo passaggio si riprova, invece di ricordarsi per mezz'ora
+    // un "pulito" che nessuno ha mai stabilito.
+    hardTimer = setTimeout(() => {
+      if (downloadStarted) return done('dangerous', { timedOut: true });
+      if (finished) return;
+      finished = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      hardTimer = null;
+      cleanup();
+      resolve(null);
+    }, lifetimeMs);
     if (timer && typeof timer.unref === 'function') timer.unref();
     if (hardTimer && typeof hardTimer.unref === 'function') hardTimer.unref();
 
