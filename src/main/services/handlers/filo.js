@@ -124,13 +124,21 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const id = msg.id;
     if (!id) return { ok: false, error: 'id mancante' };
-    closeAndTriageChat(id).catch((e) => console.warn('[Filo] chiusura chat:', e?.message || e));
+    closeAndTriageChat(id)
+      // La Cronologia può essere aperta in un'altra scheda mentre qui si
+      // finisce di chattare: l'annuncio la fa riallineare da sola, invece di
+      // lasciarla ferma a com'era e far credere che la chat non si sia
+      // salvata. Parte a classificazione finita, così la riga arriva già col
+      // titolo e col tipo giusti.
+      .then(() => annunciaChat())
+      .catch((e) => console.warn('[Filo] chiusura chat:', e?.message || e));
     return { ok: true };
   });
 
   on(MSG.FILO_CHAT_DELETE, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     await FiloChats.remove(msg.id);
+    annunciaChat();
     return { ok: true, chats: await FiloChats.listIndex() };
   });
 
