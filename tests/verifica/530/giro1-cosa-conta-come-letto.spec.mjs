@@ -54,13 +54,19 @@ test('PORTA: Filo apre una pagina web e il compito resta «pulito»', async ({ a
 
 test('PORTA: i titoli delle schede aperte stanno nel contesto di ogni turno', async ({ app, openTab, testServer }) => {
   const url = testServer.html(PAGINA_OSTILE);
-  await openTab(url);
-  const stato = await app.evaluate(async () => {
-    try {
-      const r = await globalThis.SN_FILO_STATE.assemble();
-      return String(r.stateText || '');
-    } catch (e) { return `ERRORE:${e && e.message}`; }
-  });
+  const page = await openTab(url);
+  await page.waitForLoadState('load').catch(() => {});
+  let stato = '';
+  for (let i = 0; i < 25; i += 1) {
+    stato = await app.evaluate(async () => {
+      try {
+        const r = await globalThis.SN_FILO_STATE.assemble();
+        return String(r.stateText || '');
+      } catch (e) { return `ERRORE:${e && e.message}`; }
+    });
+    if (/127\.0\.0\.1|PROMEMORIA DI FILO/i.test(stato)) break;
+    await new Promise((r) => setTimeout(r, 400));
+  }
   expect(stato.startsWith('ERRORE:'), stato).toBe(false);
   // Il titolo lo scrive il sito. Se compare qui, è testo di qualcun altro
   // dentro il contesto di un compito che la regola chiama «pulito».
