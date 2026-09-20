@@ -610,13 +610,15 @@ module.exports = function register(on, ctx) {
   // Come partono le sessioni delle routine (config/routines): quante insieme,
   // da quale account per prima, quali esclusi. Owner-only. Le legge il server
   // quando accende le sessioni: cambiarle qui vale dalla prossima.
-  const sessionsReply = (s) => ({
-    ok: true,
-    maxSessions: s.maxSessions,
-    priorityAccount: s.priorityAccount,
-    accountAOff: s.accountAOff,
-    accountBOff: s.accountBOff,
-  });
+  // `letto: false` = ho scritto ma non ho potuto rileggere, e allora tornano
+  // solo i campi scritti: gli altri restano ignoti invece di valere il default.
+  const sessionsReply = (s) => {
+    const r = { ok: true, letto: s.letto !== false };
+    for (const k of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff']) {
+      if (s[k] !== undefined) r[k] = s[k];
+    }
+    return r;
+  };
   on(MSG.AUTOMATION_SESSIONS_GET, ownerOnly(async () => {
     try {
       const idToken = await auth.getIdToken();
