@@ -43,7 +43,7 @@ function scheda(over = {}) {
 function fsDoc(card) {
   const fields = {};
   for (const [k, v] of Object.entries(card)) {
-    if (k.startsWith('_')) continue;
+    if (k.startsWith('_') || v === undefined || v === null) continue;
     fields[k] = typeof v === 'number' ? { integerValue: String(v) } : { stringValue: String(v) };
   }
   return {
