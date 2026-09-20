@@ -114,11 +114,12 @@ test('«/pulisci»: il resoconto arriva quando sei già tornato alla home', asyn
   await dash.evaluate(() => {
     window.SN_CONFIRM_UI = { confirm: async () => true };
     const vero = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (msg, ...resto) => {
+    chrome.runtime.sendMessage = (msg, cb) => {
       if (msg && msg.type === 'run_tab_triage') {
-        return new Promise((res) => setTimeout(() => res({ ok: true, archived: 2 }), 6000));
+        setTimeout(() => { if (typeof cb === 'function') cb({ ok: true, archived: 2 }); }, 6000);
+        return undefined;
       }
-      return vero(msg, ...resto);
+      return vero(msg, cb);
     };
   });
   await dash.locator('#input').fill('Parlami di Epicuro');
