@@ -100,6 +100,11 @@ function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
   g(['config', 'user.email', 't@t']);
   g(['config', 'user.name', 't']);
   g(['commit', '-q', '--allow-empty', '-m', 'base']);
+  // E POSIZIONATO sul ramo che si sta per far fondere, com'è nel giro vero: il
+  // gate legge tutto dalla directory, e un nome di un altro ramo lo ferma
+  // prima di ogni altra cosa (#485, verifica del giro 4).
+  const ramo = String((args || [])[0] || '');
+  if (/^[A-Za-z0-9._/-]+$/.test(ramo) && !ramo.startsWith('-') && !ramo.includes('..')) g(['checkout', '-q', '-b', ramo]);
   const env = {
     ...process.env,
     FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
