@@ -57,7 +57,6 @@
   // segnalazioni non ne parte nessuna. Il riconoscimento è lo stesso della
   // chat della home (SN_AZIONI_DICHIARATE), ristretto alle famiglie che
   // l'Aiuto può fare solo emettendo un'azione di Filo.
-  let rimandiAzioneRaccontata = 0;
   // Le azioni di Filo già emesse da questo pannello: una cosa fatta due
   // messaggi fa regge la frase che la racconta.
   const azioniFiloEmesse = new Set();
@@ -980,7 +979,7 @@
     // click, una ricerca, un comando) sono lo stesso turno e se lo portano
     // dietro, altrimenti due risposte fuori formato di fila si rimbalzerebbero
     // all'infinito.
-    if (userMessage) { rimandiFuoriFormato = 0; rimandiAzioneRaccontata = 0; }
+    if (userMessage) rimandiFuoriFormato = 0;
 
     if (userMessage) {
       appendChatMessage('user', userMessage);
@@ -1028,17 +1027,16 @@
         setTimeout(() => submit({ userAction: NUDGE_FUORI_FORMATO, preActionUrl: location.href }), 50);
         return;
       }
-      // Una risposta arrivata bene chiude il conto: il rimbalzo è uno per
-      // turno sbagliato, non uno per sessione.
-      if (!parsed.fuoriFormato) rimandiFuoriFormato = 0;
 
       // #517 — la risposta è nel formato giusto ma racconta un'azione che non
       // ha emesso. Stesso guasto della prosa, stesso rimedio: torna indietro
       // una volta, e se il modello insiste l'utente lo legge sotto la
-      // risposta invece di credere che sia fatto.
-      const azioniMancate = azioniRaccontate(parsed);
-      if (azioniMancate.length && rimandiAzioneRaccontata < 1) {
-        rimandiAzioneRaccontata += 1;
+      // risposta invece di credere che sia fatto. Il budget dei rimbalzi è
+      // UNO per turno, condiviso coi due guasti: due chiamate in più al
+      // modello per la stessa risposta sbagliata non servono a niente.
+      const azioniMancate = parsed.fuoriFormato ? [] : azioniRaccontate(parsed);
+      if (azioniMancate.length && rimandiFuoriFormato < 1) {
+        rimandiFuoriFormato += 1;
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         history.push({ role: 'assistant', content: String(parsed.display || res.text || '').slice(0, 4000) });
         appendActionLog('risposta rifatta: diceva di aver già fatto una cosa mai eseguita');
@@ -1047,7 +1045,9 @@
         }), 50);
         return;
       }
-      if (!azioniMancate.length) rimandiAzioneRaccontata = 0;
+      // Una risposta arrivata bene chiude il conto: il rimbalzo è uno per
+      // turno sbagliato, non uno per sessione.
+      if (!parsed.fuoriFormato && !azioniMancate.length) rimandiFuoriFormato = 0;
 
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
       // mostra il log in chat, poi rilancia un turno con i risultati come

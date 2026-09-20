@@ -319,3 +319,55 @@ test('l\'evento proposto come bottone non fa buttare né smentire la risposta', 
   // Due chiamate al modello, non tre: la risposta non è stata rifatta.
   expect(await app.evaluate(() => globalThis.__captured.length)).toBe(2);
 });
+
+// Giro 5 della verifica. Bastava che una sveglia fosse partita UNA volta
+// nella conversazione perché ogni sveglia raccontata dopo, a qualunque ora,
+// passasse muta: è il caso del feedback in un turno di prosecuzione, cioè
+// dove il feedback lo colloca. Adesso la prova è l'ORA: la sveglia a
+// quell'ora deve esistere davvero.
+
+test('una sveglia messa prima non copre quella raccontata adesso a un\'altra ora', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'm1', name: 'SVEGLIA', arguments: '{"time":"07:00","label":"mattina"}' }] },
+    { text: 'Fatto, sveglia alle 7.' },
+    { text: 'Ti ho messo la sveglia alle 19:00 per stasera.' },
+  ]);
+  await page.locator('#input').fill('mettimi la sveglia alle 7');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  await page.locator('#input').fill('mettimi anche la sveglia alle 19 per stasera');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  // Di sveglie ce n'è una sola, quella delle 7.
+  const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
+  expect(timers.map((t) => t.label)).toEqual(['mattina']);
+  // Quindi l'utente legge che la sveglia delle 19 non c'è.
+  await expect(page.locator('.dash-bubble-avviso')).not.toHaveCount(0);
+  await expect(page.locator('.dash-bubble-avviso').last()).toContainText('la sveglia non c\'è');
+});
+
+test('«ti ho GIÀ messo la sveglia» non passa in silenzio', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  // Una parolina fra «ho» e il participio, e il presidio non vedeva niente:
+  // niente secondo tentativo, niente avviso, niente sveglia.
+  await installScript(app, [{ text: 'Ti ho già messo la sveglia alle 19 per stasera.' }]);
+  await page.locator('#input').fill('mettimi una sveglia alle 19 per stasera');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  expect(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers())).toHaveLength(0);
+  // Il turno è tornato indietro al modello, e siccome ha insistito l'utente
+  // legge che la sveglia non c'è.
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBeGreaterThan(1);
+  await expect(page.locator('.dash-bubble-avviso')).not.toHaveCount(0);
+});

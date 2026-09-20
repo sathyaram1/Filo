@@ -85,3 +85,41 @@ test('una risposta nel formato giusto non fa scattare niente', async ({ openTab 
   const testo = await page.evaluate(() => (document.querySelector('.sn-sidebar-conv')?.textContent || ''));
   expect(testo).toContain('in alto a destra');
 });
+
+// Giro 5 della verifica. Il presidio guardava solo la FORMA della risposta:
+// una risposta nel formato giusto che racconta un'azione mai emessa restava
+// muta, ed è il caso principale del feedback. Nella chat della home la stessa
+// frase veniva vista: due chat, una sola coperta.
+
+test('nel formato giusto, l\'azione raccontata e mai emessa torna indietro e poi si legge', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab(NEWTAB);
+  await agenteCheRisponde(page, JSON.stringify({
+    text: 'Ho mandato la segnalazione agli sviluppatori: ci penseranno loro.',
+    status: 'done',
+  }));
+  await apriAiutoEChiedi(page, 'manda un feedback: la barra in alto sparisce');
+
+  // Nessuna segnalazione parte: la frase è falsa.
+  expect(await page.evaluate(() => window.__azioni.length)).toBe(0);
+  // Il turno torna indietro una volta sola, e la chat lo dice.
+  await expect(page.locator('.sn-sidebar-log', { hasText: 'risposta rifatta' })).toHaveCount(1);
+  // Il modello insiste: l'utente lo legge sotto la risposta.
+  await expect(page.locator('.sn-sidebar-msg-avviso')).toHaveCount(1);
+  await expect(page.locator('.sn-sidebar-msg-avviso')).toContainText('non l\'ha fatto');
+});
+
+test('il presidio dell\'Aiuto non accusa Filo di ciò che fa per altre strade', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab(NEWTAB);
+  // Aprire un menu, evidenziare un passo, cercare sul web: cose che l'Aiuto
+  // fa senza emettere un'azione tipizzata. Lì un avviso sarebbe un'accusa.
+  await agenteCheRisponde(page, JSON.stringify({
+    text: 'Ho aperto il menu e ho cercato sul web la pagina giusta.',
+    status: 'done',
+  }));
+  await apriAiutoEChiedi(page, 'dove sta il pulsante per disdire?');
+
+  await expect(page.locator('.sn-sidebar-log', { hasText: 'risposta rifatta' })).toHaveCount(0);
+  await expect(page.locator('.sn-sidebar-msg-avviso')).toHaveCount(0);
+});
