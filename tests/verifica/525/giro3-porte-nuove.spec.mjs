@@ -155,6 +155,58 @@ test('la chat ancora in corso, vista da Cronologia', async ({ app, openTab, shel
   expect(viste.length).toBe(1);
 });
 
+test('senza nemmeno una chat di comando, l’interruttore dei comandi non si mostra', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  await stubProvider(app, { Epicuro: { tipo: 'conversazione', titolo: 'Epicuro' } });
+
+  await turno(app, 'c-sola-conv', 'Discutiamo di Epicuro');
+  await app.evaluate(() => globalThis.SN_CLOSE_FILO_CHAT('c-sola-conv'));
+  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).kind || '', { timeout: 25_000 }).toBe('conversazione');
+
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('.arc-chat').first()).toBeVisible({ timeout: 20_000 });
+  const visibile = await page.evaluate(() => {
+    const el = document.getElementById('showCommandsLabel');
+    return { attributo: el.hasAttribute('hidden'), aSchermo: el.getBoundingClientRect().height > 0, testo: el.textContent.trim() };
+  });
+  console.log('INTERRUTTORE COMANDI:', JSON.stringify(visibile));
+  // La pagina lo vuole nascosto (mette l'attributo): deve esserlo davvero.
+  expect(visibile.aSchermo).toBe(false);
+});
+
+test('una chat senza titolo generato non scrive due volte la stessa frase', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  // Nessun classificatore: la chat prende il primo messaggio come titolo. È il
+  // caso di chi non ha (ancora) un modello per il titolo — e di ogni chat
+  // mentre è ancora in corso.
+  await app.evaluate(async () => {
+    const rispondi = async ({ attempts, messages }) => {
+      const joined = messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
+      if (joined.includes('Classifichi le conversazioni')) throw new Error('niente modello');
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: JSON.stringify({ text: 'Va bene.', actions: [] }) };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = rispondi;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = rispondi;
+  });
+
+  await turno(app, 'c-senza-titolo', 'Discutiamo di Epicuro e del piacere');
+  await app.evaluate(() => globalThis.SN_CLOSE_FILO_CHAT('c-senza-titolo'));
+  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).title || '', { timeout: 25_000 }).not.toBe('');
+
+  const page = await openTab(ARCHIVE);
+  const riga = page.locator('.arc-chat').first();
+  await expect(riga).toBeVisible({ timeout: 20_000 });
+  const parti = await riga.evaluate((el) => ({
+    titolo: el.querySelector('.arc-chat-title').textContent,
+    estratto: el.querySelector('.arc-chat-excerpt').textContent,
+  }));
+  console.log('RIGA:', JSON.stringify(parti));
+  // La riga non deve dire due volte la stessa cosa, una accanto all'altra.
+  expect(parti.estratto).not.toBe(parti.titolo);
+});
+
 test('Cronologia con chat e senza schede chiuse: «Svuota archivio» dice cosa fa', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await configura(app);
