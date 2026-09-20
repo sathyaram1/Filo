@@ -270,6 +270,14 @@
       past,
       startedAt: s.startedAt || null,
       closedAt: s.closedAt || null,
+      // #533 (quinto giro di verifica) — a quale richiesta apparteneva l'ultima
+      // risposta dell'intervista. L'intervista è l'unica conversazione che Filo
+      // rimette a schermo da capo, anche in un'altra scheda e dopo un riavvio:
+      // lì la scheda non ha nessun nome da citare, e senza questo il motore
+      // decideva che la conversazione non avesse mai letto niente, mentre le
+      // parole del sito erano ancora nelle bolle. Il nome resta qui, dove sta
+      // la conversazione.
+      compito: s.compito ? String(s.compito) : '',
       // 'early' = chiusa prima di aver finito: la home lo dice, con la strada
       // per rifarla. Si spegne appena l'utente l'ha letto.
       notice: s.notice === 'early' ? 'early' : '',
