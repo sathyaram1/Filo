@@ -480,6 +480,41 @@ il ramo spediva `main` su `origin` con le credenziali della macchina, prima
 ancora di parlare col server. Adesso il valore è inchiodato, e la spedizione
 rifiuta esplicitamente `main`, `master` e il ramo di default del repo.
 
+### Un esito vale per la versione esaminata (2026-09-20, feedback #485)
+
+Il paragrafo qui sopra ha chiuso la finestra *dentro* il cancello: si esamina e
+si fonde lo stesso commit. Restava aperta la finestra **un piano più sopra**,
+sui due esiti ragionati — la verifica funzionale (L3) e il controllo di
+sicurezza (L4). Erano registrati sul **nome del ramo**: firmare "il documento
+nella cartella X" invece di "questa esatta versione". Basta sostituire il
+foglio e la firma resta lì, buona, su un contenuto che nessuno ha guardato — e
+chi lavora ha per costruzione il permesso di spingere sul proprio ramo, quindi
+la finestra si apre da sé.
+
+La regola, uguale per tutti e due:
+
+- **un esito si registra con lo sha del commit esaminato.** La critica della
+  verifica lo porta dal 2026-09-13; il verdetto del controllo di sicurezza lo
+  porta da adesso (`secaudit` → campo `sha`, sempre presente). Un verdetto
+  senza commit non si distingue da uno dato su un contenuto qualunque, ed è
+  respinto prima di scrivere qualsiasi cosa (§5.3);
+- **se il contenuto cambia, l'esito decade** e quel controllo va rifatto — la
+  stessa cosa che già succede alle richieste di fusione in attesa. Al passo 2
+  del cancello i PASS si leggono sullo **sha** risolto al passo 3, non sul nome
+  del ramo;
+- **l'esito vale per un commit, quindi si registra da un commit.** Con
+  modifiche fuori dai commit il salvataggio automatico le committa *dopo* la
+  registrazione, la punta si sposta e l'esito nasce già decaduto. Le tre
+  consegne che valgono per un commit — la messa in revisione, la correzione e
+  la critica — lo respingevano già; il verdetto L4 era l'unico rimasto fuori, e
+  adesso respinge come le altre (fonte unica: `scripts/lib/dirty-tree.mjs`).
+
+Nel repo pubblico stanno il lato che consegna (`scripts/dispatch.mjs`,
+`scripts/routine-channel.mjs`: lo sha si timbra da solo, non si chiede a chi
+lavora) e questa regola. Il confronto al passo 2 del cancello vive nel server
+(`filo-security`): finché non è deployato, a fermare una fusione su contenuto
+cambiato resta il solo sha della verifica funzionale.
+
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
 La stessa forma — `TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"` — era rimasta nel
