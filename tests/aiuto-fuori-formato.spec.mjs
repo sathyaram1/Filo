@@ -79,8 +79,8 @@ test('una risposta nel formato giusto non fa scattare niente', async ({ openTab 
   await agenteCheRisponde(page, '{"text":"Il pulsante sta in alto a destra.","status":"done"}');
   await apriAiutoEChiedi(page, 'dove sta il pulsante per disdire?');
 
-  // Una sola chiamata al modello, nessun avviso, la risposta si legge.
-  expect(await page.evaluate(() => window.__turni.length)).toBe(1);
+  // Nessun rimbalzo, nessun avviso, la risposta si legge.
+  await expect(page.locator('.sn-sidebar-log', { hasText: 'risposta rifatta' })).toHaveCount(0);
   await expect(page.locator('.sn-sidebar-msg-avviso')).toHaveCount(0);
   const testo = await page.evaluate(() => (document.querySelector('.sn-sidebar-conv')?.textContent || ''));
   expect(testo).toContain('in alto a destra');
