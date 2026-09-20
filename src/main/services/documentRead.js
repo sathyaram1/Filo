@@ -387,7 +387,16 @@ function decodeText(buf) {
 function capText(text, max = MAX_TEXT_CHARS) {
   const s = String(text == null ? '' : text);
   if (s.length <= max) return { text: s, truncated: false };
-  return { text: s.slice(0, max), truncated: true };
+  // Il taglio cade dove capita, e un'emoji occupa DUE unità di testo: tagliando
+  // per numero di unità si resta con la prima metà, che da sola non è nessun
+  // carattere e si mostra come un rombo. Se in fondo resta una metà di coppia
+  // la si lascia fuori: un carattere in meno, nessun carattere rotto. È la
+  // stessa cura già messa al taglio dell'output dei comandi (#551, secondo
+  // giro); qui era rimasta fuori, ed è lo stesso taglio (quarto giro).
+  let n = max;
+  const ultimo = s.charCodeAt(n - 1);
+  if (ultimo >= 0xD800 && ultimo <= 0xDBFF) n -= 1;
+  return { text: s.slice(0, n), truncated: true };
 }
 
 /** Estrae il testo da un PDF con unpdf (pdf.js). Ritorna { text, pages }. */
