@@ -133,10 +133,6 @@ test('«/pulisci»: il resoconto arriva quando sei già tornato alla home', asyn
 
   // Torno alla home mentre Filo sta ancora riordinando: la conversazione di
   // Epicuro è finita.
-  await dash.evaluate(() => {
-    const b = document.getElementById('backHome') || document.querySelector('[data-action="home"]');
-    if (b) b.click();
-  });
   await dash.locator('#input').fill('/home');
   await dash.locator('#input').press('Enter');
   await dash.waitForTimeout(800);
