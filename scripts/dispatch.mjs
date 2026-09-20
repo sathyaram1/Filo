@@ -966,7 +966,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
     // «elenco che non combacia». Tosa lui, per la storia, dopo aver letto.
     critique: critiqueNorm.trim(),
     branch: base.branch || '',
-    sha: headSha(ROOT) || '',
+    sha: shaProvato,
     // L3: la segnalazione per l'owner, se c'è (un trade-off vero trovato
     // verificando). Il server la cifra in `livelli.l3`.
     ...(String(segnalazione || '').trim() ? { segnalazione: String(segnalazione).trim() } : {}),
