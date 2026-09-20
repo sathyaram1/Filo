@@ -597,6 +597,7 @@
         // stessa cosa: conta per una. Due pezzi diversi sono due cose.
         if (sovrapposta(m.index, fine)) continue;
         presi.push([m.index, fine]);
+        if (out.length >= MAX_DICHIARAZIONI) break;
         out.push({
           frase: frasePiena(testo, m.index, fine),
           clausola: clausolaDi(testo, m.index, fine),
