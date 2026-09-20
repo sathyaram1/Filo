@@ -1407,9 +1407,8 @@
       const riga = (v) => esterno().perCanaleSistema(v);
       const dove = riga(url) || 'la pagina';
       if (!String(text || '').trim()) {
-        // Letta ma senza testo non è «non letta»: è una pagina vuota, di sole
-        // immagini, o che si costruisce solo aprendola davvero. Chiamarla non
-        // letta manda l'utente a cercare un guasto che non c'è.
+        // Letta ma senza testo non è «non letta»: chiamarla così manda
+        // l'utente a cercare un guasto che non c'è (#553).
         if (empty && !error) {
           return `[Pagina "${dove}": nessun testo da leggere. È una pagina vuota, o fatta di sole immagini, `
             + 'o di contenuto che compare solo aprendola davvero. Non inventare cosa c\'è scritto: prova '

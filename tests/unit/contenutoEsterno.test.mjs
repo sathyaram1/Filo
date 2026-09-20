@@ -466,3 +466,20 @@ test('anche l’assistente dei mazzi sa cosa vuol dire una busta', () => {
   assert.ok(prompt.includes('<<<NOME>>>'), 'al modello non è stato detto cosa sono le marcature');
   assert.ok(Object.prototype.hasOwnProperty.call(E.TIPI, 'ESITO_SERVIZIO'));
 });
+
+test('una pagina senza testo si annuncia vuota, non «non letta» (#553)', () => {
+  // Un sito che si costruisce nel browser si legge senza errori e senza testo.
+  // Chiamarlo «non letto» manda l'utente a cercare un guasto che non c'è.
+  const vuota = PROMPTS.turnoAutomaticoAiuto({
+    nota: 'ho letto la pagina',
+    dati: { paginaLetta: { url: 'https://esempio.it/p', text: '', empty: true } },
+  });
+  assert.ok(vuota.includes('nessun testo da leggere'), vuota);
+  assert.ok(!vuota.includes('non letta'), vuota);
+
+  const fallita = PROMPTS.turnoAutomaticoAiuto({
+    nota: 'ho letto la pagina',
+    dati: { paginaLetta: { url: 'https://esempio.it/p', text: '', error: 'timeout', detail: 'il sito non ha risposto in tempo' } },
+  });
+  assert.ok(fallita.includes('non letta'), fallita);
+});

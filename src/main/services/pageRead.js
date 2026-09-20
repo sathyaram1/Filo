@@ -35,10 +35,9 @@ const TIMEOUT_MS = 15000;
 // finirebbe mai (sullo scaricamento un tempo massimo c'era già).
 const MAX_ATTESA_SCHEDA_MS = 5000;
 
-// Elementi che non sono TESTO: il loro contenuto è codice o non si legge. Non
-// escono mai, nemmeno nel ripiego senza potatura: consegnarli al modello gli fa
-// rispondere sul codice di un sito invece di dire che non c'è niente da
-// leggere, e con loro rientrerebbe anche ciò che la pagina tiene nascosto.
+// Elementi che non sono TESTO: dentro c'è codice, o roba che non si legge. Non
+// escono mai, nemmeno dal ripiego: al modello arrivavano righe di JavaScript
+// presentate come il testo della pagina, e lui rispondeva su quelle (#553).
 const TAG_ILLEGGIBILI = new Set([
   'script', 'style', 'noscript', 'svg', 'iframe', 'template', 'canvas',
   'object', 'embed', 'video', 'audio', 'map', 'datalist',
@@ -240,10 +239,9 @@ function decodeEntita(s) {
  */
 function htmlATesto(html, dentroZona = false) {
   const potato = passaggio(html, 'tutto', dentroZona);
-  // SE POTARE NON LASCIA NIENTE, SI RINUNCIA ALLA SOLA CORNICE. L'HTML vero è
-  // pieno di tag mai chiusi: un `<nav>` che non chiude si porta via tutta la
-  // pagina che viene dopo. Script, stili e blocchi nascosti restano fuori anche
-  // qui: senza testo la pagina va dichiarata vuota, non riempita di codice.
+  // SE POTARE NON LASCIA NIENTE, SI RINUNCIA ALLA SOLA CORNICE: l'HTML vero è
+  // pieno di tag mai chiusi, e un `<nav>` che non chiude si porta via tutto
+  // quello che viene dopo. Senza testo la pagina si dichiara vuota.
   return potato || passaggio(html, 'minimo', dentroZona);
 }
 
