@@ -160,4 +160,8 @@ test('Opzioni: la pagina non interroga i server di chi produce i modelli, acceso
   await expect(page.locator('#openWeightsOnly')).toBeChecked();
   await page.waitForTimeout(1_500);
   expect(versoIlProduttore, `partita comunque una richiesta: ${versoIlProduttore[0]}`).toEqual([]);
+
+  await app.evaluate(() => {
+    if (globalThis.__catalogoVero) globalThis.SN_PROVIDER_OPENROUTER.listCatalog = globalThis.__catalogoVero;
+  });
 });
