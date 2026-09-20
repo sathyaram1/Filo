@@ -266,6 +266,22 @@ test('SENTINELLA: ogni azione registrata ha un costo valido e una describe', () 
   }
 });
 
+test('SENTINELLA: il registro dei costi e i poteri veri di Filo sono lo stesso elenco', () => {
+  // La sentinella qui sopra cammina sul registro: non può accorgersi di una
+  // voce che MANCA. Un potere nuovo aggiunto al dispatch senza il suo costo
+  // viene rifiutato a runtime, in silenzio: l'utente lo chiede, non succede
+  // niente e nessuno gli dice perché. Qui si confrontano i due elenchi.
+  const src = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const dispatch = src.slice(src.indexOf('SN_ACTION_LEVELS'));
+  const poteri = [...new Set([...dispatch.matchAll(/case '([A-Z_]+)':/g)].map((m) => m[1]))];
+  assert.ok(poteri.length > 20, 'i case del dispatch non si trovano più: la sentinella guarda nel posto sbagliato');
+  const registro = new Set(Object.keys(AL.REGISTRY));
+  const senzaCosto = poteri.filter((p) => !registro.has(p));
+  assert.deepEqual(senzaCosto, [], `poteri del dispatch senza costo nel registro: ${senzaCosto.join(', ')}`);
+  const senzaPotere = [...registro].filter((k) => !poteri.includes(k));
+  assert.deepEqual(senzaPotere, [], `voci del registro che nessuno può chiamare: ${senzaPotere.join(', ')}`);
+});
+
 test('SENTINELLA: campi, fonti e voci dell\'elenco fisso esistono nella regola', () => {
   // Il registro dichiara campo/fonte/vietato con dei NOMI: se uno di questi
   // non esiste in autonomia.js la manopola non si applica, la contaminazione
