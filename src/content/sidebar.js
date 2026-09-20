@@ -537,7 +537,15 @@
   // ---------- Parsing risposta AI ----------
 
   function parseAssistantOutput(text) {
-    const fallback = { display: (text || '').trim(), highlight: null, choices: [], status: 'done', collapse: false };
+    // #517 — `fuoriFormato` dice che quello che è arrivato non è il formato
+    // dell'agente: prosa al posto del JSON, o un oggetto che non contiene
+    // niente da mostrare e niente da fare. Chi chiama lo usa per rimandare il
+    // turno indietro invece di consegnare all'utente una risposta che non fa
+    // succedere niente.
+    const fallback = {
+      display: (text || '').trim(), highlight: null, choices: [], status: 'done',
+      collapse: false, fuoriFormato: true,
+    };
     if (!text) return fallback;
     const trimmed = text.trim();
     const start = trimmed.indexOf('{');
