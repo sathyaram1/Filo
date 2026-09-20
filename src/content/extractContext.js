@@ -359,7 +359,27 @@
     // documento, e chiederne lo stile alla finestra sbagliata non risponde di
     // loro.
     const cs = viewOf(el).getComputedStyle(el);
-    return cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse';
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse') return true;
+    // Il sito decide COME ripiegare una sezione; il conto dell'utente non può
+    // dipendere da quella scelta (#505). Chiuso è chiuso: far sparire il
+    // riquadro, saltarne il contenuto, o schiacciarlo a zero e ritagliarlo.
+    if (cs.contentVisibility === 'hidden') return true;
+    return isClippedToNothing(el, cs);
+  }
+
+  // Ripiegato schiacciandolo a zero (`max-height:0` più `overflow:hidden`: la
+  // fisarmonica che si apre con un'animazione). Il RITAGLIO è la condizione che
+  // conta — a misura zero senza ritaglio il testo deborda e si legge — e il
+  // contenuto dev'essere davvero più grande del riquadro, o un elemento vuoto
+  // fermerebbe la discesa verso i figli.
+  function isClippedToNothing(el, cs) {
+    const clipsY = CLIPPING_OVERFLOW.has(cs.overflowY);
+    const clipsX = CLIPPING_OVERFLOW.has(cs.overflowX);
+    if (!clipsY && !clipsX) return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    if (clipsY && r.height <= 0.5 && el.scrollHeight > 0) return true;
+    return !!(clipsX && r.width <= 0.5 && el.scrollWidth > 0);
   }
 
   function viewOf(el) {
