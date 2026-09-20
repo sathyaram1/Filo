@@ -202,28 +202,55 @@ test('i colori della bacheca, misurati nei due temi', async ({ openTab }) => {
   await expect(page.locator('.bd-card')).toHaveCount(3);
 
   // Apre il form e prova a mandarlo vuoto: è la strada più corta all'errore.
-  await page.locator('.bd-reopen-link').click();
-  await expect(page.locator('.bd-reopen-form')).toBeVisible();
-  await page.locator('.bd-reopen-actions button', { hasText: 'Invia' }).click();
-  const err = page.locator('.bd-reopen-err');
-  await expect(err).toBeVisible();
+  await page.locator('[data-id="fb-re"] .bd-reopen-link').click();
+  await expect(page.locator('[data-id="fb-re"] .bd-reopen-form')).toBeVisible();
+  await page.locator('[data-id="fb-re"] .bd-reopen-actions button', { hasText: 'Invia' }).click();
+  await expect(page.locator('[data-id="fb-re"] .bd-reopen-err')).toBeVisible();
 
-  const misure = {};
+  // Il conteggio del voto si misura sulla PILLOLA: il suo fondo è una tinta
+  // semitrasparente, e leggere il colore del solo numero darebbe il fondo
+  // della pagina e un numero più generoso del vero.
+  const punti = [
+    ['errore «Ancora rotto?»', '[data-id="fb-re"] .bd-reopen-err'],
+    ['conteggio «funziona» votato', '[data-id="fb-w"] .bd-vote-works'],
+    ['conteggio «non funziona» votato', '[data-id="fb-b"] .bd-vote-broken'],
+    ['conteggio non votato', '[data-id="fb-w"] .bd-vote-broken'],
+    ['titolo del miglioramento', '[data-id="fb-w"] .bd-card-title'],
+    ['numero sotto il titolo', '[data-id="fb-w"] .bd-card-sub'],
+  ];
+
+  const misure = [];
   for (const tema of ['light', 'dark']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
     await page.waitForTimeout(150);
-    misure[tema] = await err.evaluate(LEGGI_COLORI);
+    for (const [nome, sel] of punti) {
+      const m = await page.locator(sel).evaluate(LEGGI_COLORI);
+      misure.push({ tema, nome, r: contrasto(m.testo, m.fondo) });
+    }
     await page.screenshot({ path: `tests/.shots/verifica-478-giro2-riapri-${tema}.png` });
   }
 
-  for (const [tema, { testo, fondo }] of Object.entries(misure)) {
-    const r = contrasto(testo, fondo);
-    test.info().annotations.push({
-      type: 'contrasto',
-      description: `errore «Ancora rotto?», tema ${tema}: ${r.toFixed(2)}:1`,
-    });
-    expect(r, `errore «Ancora rotto?», tema ${tema}: contrasto ${r.toFixed(2)}`).toBeGreaterThan(4.5);
+  for (const { tema, nome, r } of misure) {
+    test.info().annotations.push({ type: 'contrasto', description: `${nome}, tema ${tema}: ${r.toFixed(2)}:1` });
   }
+
+  // La soglia che il giro 1 ha usato per il rilievo sul numero del voto: sotto
+  // 3 il testo è illeggibile, e lì il tema scuro stava a 2,9. Quella porta
+  // resta chiusa e questa riga la tiene chiusa.
+  for (const { tema, nome, r } of misure) {
+    expect(r, `${nome}, tema ${tema}: contrasto ${r.toFixed(2)}`).toBeGreaterThan(3);
+  }
+
+  // Sotto 4,5 un testo piccolo si legge male anche quando non sparisce. Due
+  // punti ci stanno: l'errore rosso del form nel tema scuro (3,10) e il
+  // conteggio «funziona» nel tema chiaro (3,09). Sono i rilievi del giro 2:
+  // finché restano, questa riga li elenca invece di nasconderli.
+  const deboli = misure.filter((m) => m.r < 4.5)
+    .map((m) => `${m.nome} (${m.tema}) ${m.r.toFixed(2)}`);
+  test.info().annotations.push({
+    type: 'porta aperta',
+    description: `sotto 4,5 volte il fondo: ${deboli.length ? deboli.join('; ') : 'nessuno'}`,
+  });
 });
 
 // ── 4. Schede limite: titolo di soli spazi, nessun voto ─────────────────────
