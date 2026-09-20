@@ -2406,7 +2406,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
-  const fileSummaries = await editorFileSummaries();
+  // La LISTA prima del testo: i titoli servono anche al presidio #517, per
+  // sapere quali appunti esistono davvero; leggerla due volte sarebbe due letture.
+  const fileList = await editorFileSummariesList();
+  const fileSummaries = (() => {
+    try {
+      const Summary = globalThis.SN_EDITOR_SUMMARY;
+      return Summary ? Summary.renderForPrompt(fileList) : '';
+    } catch (_) { return ''; }
+  })();
   // #524 — finché la micro-intervista di benvenuto è aperta, il prompt riceve
   // l'elenco di ciò che resta da scoprire e da dire. Per l'utente resta una
   // chat normale: nessuna schermata a passi, nessun modulo.
