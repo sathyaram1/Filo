@@ -510,14 +510,10 @@
         if (d.verbo) radiciRette.add(d.verbo);
         continue;
       }
-      // Nessuna azione: la cosa può esistere lo stesso, se l'ora nominata nella
-      // frase è quella di una sveglia che c'è davvero.
-      if (fam.orari && orari.size) {
-        const nominati = orariNelTesto(d.frase);
-        if ([...nominati].some((o) => orari.has(o))) {
-          if (d.verbo) radiciRette.add(d.verbo);
-          continue;
-        }
+      // Nessuna azione: la cosa può esistere lo stesso.
+      if (esisteGia(fam, d)) {
+        if (d.verbo) radiciRette.add(d.verbo);
+        continue;
       }
       out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
     }
