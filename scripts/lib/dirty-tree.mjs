@@ -124,7 +124,12 @@ export function statoDirectory(root) {
 
 /** Il rifiuto quando lo stato della directory non si è potuto leggere. PURA. */
 export function statoIllegibileText(motivo, cosa = 'critica') {
-  const quale = cosa === 'consegna' ? 'consegna' : cosa === 'revisione' ? 'consegna' : cosa === 'verdetto' ? 'verdetto' : 'critica';
+  const quale = cosa === 'consegna' ? 'consegna' : cosa === 'revisione' ? 'consegna' : cosa === 'verdetto' ? 'verdetto' : cosa === 'fusione' ? 'fusione' : 'critica';
+  if (quale === 'fusione') {
+    return `fusione non chiesta: non sono riuscito a farmi dire se ci sono file fuori dai commit (${motivo || 'git non ha risposto'}), `
+      + 'e senza quella risposta non posso garantire che i via libera valgano per il contenuto che verrebbe fuso. '
+      + 'Non tratto il silenzio come «directory pulita»: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia.';
+  }
   const finita = quale === 'verdetto' ? 'registrato' : 'registrata';
   return `${quale} non ${finita}: non sono riuscito a farmi dire se ci sono file fuori dai commit (${motivo || 'git non ha risposto'}), `
     + 'e senza quella risposta non posso garantire che l\'esito valga per il commit giusto. '
