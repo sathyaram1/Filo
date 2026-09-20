@@ -244,7 +244,7 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
     await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
     await page.waitForTimeout(150);
     fondi.push(await page.evaluate(() => getComputedStyle(document.body).backgroundColor));
-    misure[tema] = await page.locator('.bd-card .bd-vote-works').evaluate((el) => {
+    const leggi = async (sel) => page.locator(sel).evaluate((el) => {
       // Il fondo VERO sotto il pulsante premuto: il suo colore semitrasparente
       // steso sopra il primo antenato che un colore pieno ce l'ha davvero (la
       // scheda può essere trasparente, e prenderla per bianca falserebbe il
