@@ -57,12 +57,26 @@ async function apriAutomazioni(openTab, doc = {}, opts = {}) {
   return page;
 }
 
-// Cambia un interruttore/radio come farebbe un click dell'utente.
+// Cambia un interruttore come farebbe un click dell'utente.
 const cambia = (page, id, checked) => page.evaluate(([i, c]) => {
   const el = document.getElementById(i);
   el.checked = c;
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }, [id, checked]);
+
+// La pillola dell'account prioritario: si clicca l'etichetta, come l'utente
+// (il radio vero è nascosto sotto di essa).
+const pillola = (page, valore) => page.locator('.mg-auto-choice-item')
+  .filter({ has: page.locator(`input[name="mgPriorityAccount"][value="${valore}"]`) });
+
+// Scrive nel campo numerico passando dalla tastiera: `fill()` rifiuta tutto ciò
+// che numero non è, e proprio quei casi sono il motivo della prova.
+async function scriviNumero(page, testo) {
+  await page.locator('#mgMaxSessions').click();
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Delete');
+  if (testo) await page.keyboard.type(testo);
+}
 
 test('il cammino dell\'owner: scelgo le sessioni, l\'account prioritario, escludo e riattivo', async ({ openTab }) => {
   const page = await apriAutomazioni(openTab);
