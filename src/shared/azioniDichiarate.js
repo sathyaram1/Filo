@@ -107,7 +107,7 @@
       tipi: ['CANCELLA_SVEGLIA', 'MODIFICA_SVEGLIA'],
       avviso: 'la sveglia (o il timer) c\'è ancora',
       frasi: [
-        new RegExp(`${HO}(?:cancellato|tolto|rimosso|eliminato|annullato|disattivato|spento|levato)\\b${PONTE(48)}\\b(?:svegli[ae]|timer)\\b`, 'i'),
+        new RegExp(`${HO}(?:cancellato|tolto|rimosso|eliminato|annullato|disattivato|spento|levato)\\b${PONTE(48)}\\b(?:${SVEGLIA}|timer)\\b`, 'i'),
       ],
     },
     {
