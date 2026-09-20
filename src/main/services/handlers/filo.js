@@ -111,6 +111,17 @@ module.exports = function register(on, ctx) {
     try {
       const dir = path.join(app.getPath('temp'), 'filo-eventi');
       await fs.promises.mkdir(dir, { recursive: true });
+      // Un evento consegnato al calendario di ieri non serve più a nessuno:
+      // senza questa ripulita la cartella cresce a ogni uso e non la svuota nessuno.
+      const limite = Date.now() - 24 * 60 * 60 * 1000;
+      for (const nome of await fs.promises.readdir(dir)) {
+        if (!nome.endsWith('.ics')) continue;
+        const vecchio = path.join(dir, nome);
+        try {
+          const st = await fs.promises.stat(vecchio);
+          if (st.mtimeMs < limite) await fs.promises.unlink(vecchio);
+        } catch (_) {}
+      }
       file = path.join(dir, `${Date.now().toString(36)}-${C.fileName(ev)}`);
       await fs.promises.writeFile(file, C.buildIcs(ev), 'utf8');
     } catch (e) {
