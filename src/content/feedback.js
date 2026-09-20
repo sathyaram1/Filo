@@ -787,7 +787,7 @@
         }
       } catch (e) {
         console.error('[SN feedback] submit', e);
-        statusEl.textContent = 'Errore invio: ' + (e?.message || e);
+        statusEl.textContent = e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e));
         sendBtn.disabled = false;
         cancelBtn.disabled = false;
       }
