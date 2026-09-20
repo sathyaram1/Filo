@@ -670,7 +670,7 @@ test('un byte nullo dentro un testo è un danno, non un testo a due byte', async
   // scritto. Le posizioni sono fini di riga, così il byte guasto non cade
   // dentro le parole su cui si asserisce: quello che si verifica qui è che il
   // documento non cambi tabella, non che un byte perso si ricostruisca.
-  const fineRiga = (k) => buono.indexOf(10, 0) && buono.indexOf('\n'.charCodeAt(0), k);
+  const fineRiga = (k) => buono.indexOf(0x0A, k);
   for (const dove of [0, 1, fineRiga(20), fineRiga(200), fineRiga(999)]) {
     const letto = DR.decodeTextDettaglio(conNullo(dove));
     assert.equal(letto.codifica === 'due-byte', false, `byte nullo in ${dove}: letto a due byte`);
