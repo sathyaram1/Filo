@@ -1781,6 +1781,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const cwd = getAssistantCwd(sender);
         const out = await runCommand(cmd, { shell, cwd, trackCwd: true });
         if (out.cwd) setAssistantCwd(sender, out.cwd);
+        ricordaLetto(`${out.stdout || ''}\n${out.stderr || ''}`);
         return { executed: out.code === 0, kept: true, output: out };
       }
       // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
