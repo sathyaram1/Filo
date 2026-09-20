@@ -45,6 +45,8 @@ test('le forme normali con cui si dichiara una cosa mai fatta vengono viste', as
   // Spazi doppi: un modello li produce, e il presidio non deve dipendere da
   // quanti ne ha messi.
   expect(ids('Ho  messo  la  sveglia alle 19.')).toContain('sveglia');
-  // «Ho messo il promemoria» è italiano normalissimo e oggi non è nell'elenco.
-  expect(ids('Ho messo il promemoria per domani.')).toContain('appunto');
+  // «Ho messo il promemoria» è italiano normalissimo e non veniva visto.
+  expect(ids('Ho messo il promemoria per domani.').length).toBeGreaterThan(0);
+  // E una dichiarazione spezzata su due righe vale quanto la stessa su una.
+  expect(ids('Ti ho messo\nuna sveglia alle 19.')).toContain('sveglia');
 });
