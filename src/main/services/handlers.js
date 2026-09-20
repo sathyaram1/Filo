@@ -3038,7 +3038,7 @@ async function maybeCategorizeAsync(savedEntry, pageInput) {
   const settings = await getEffectiveSettings();
   if (!settings.featureFlags?.categorize) return;
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) return;
-  if (!settings.apiKeys?.[settings.provider]) return;
+  if (!SN_CONST.canServeAction(settings, ACTIONS.CATEGORIZE)) return;
   const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '' });
   const result = await Categorizer.categorize({
     invokeAI,
