@@ -76,6 +76,14 @@
     FILO_RAW_LOG: 'filo_raw_log',
     // Buffer lezioni in attesa di compattazione (array di stringhe).
     FILO_LESSONS_BUFFER: 'filo_lessons_buffer',
+    // #525 — archivio delle chat con Filo. Array di chat INTERE, la più
+    // recente in testa:
+    //   { id, startedAt, updatedAt, closedAt, title, kind, onboarding,
+    //     messages: [{ role: 'user'|'filo', text, ts, actions? }] }
+    // `kind` è 'conversazione' | 'comando' | null (non ancora classificata).
+    // Niente scade e niente si butta da sé: la classificazione decide solo
+    // cosa si VEDE (vedi filo://archive), mai cosa si conserva.
+    FILO_CHATS: 'filo_chats',
     // Moduli memoria long-term. Oggetto { PROFILO: string, PREFERENZE: string,
     // <ESPANSIONE>: string }. Le chiavi sono uppercase-ish per coerenza col prompt.
     FILO_MEMORY: 'filo_memory',
