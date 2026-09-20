@@ -82,6 +82,7 @@ test('una risposta SCRITTA da Filo non viene buttata via né smentita', async ({
   // SUCCESSO dal punto di vista dell'utente: la mail è lì e nessuno gli dice
   // che Filo non l'ha scritta.
   await expect(page.locator('.dash-bubble-filo').last()).toContainText('Gentile Marco');
+  await page.screenshot({ path: 'tests/.shots/517-giro2-mail-scritta.png', fullPage: false });
   await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
   // E il turno non è stato rimandato indietro: la risposta era già buona, e
   // rifarla costa una chiamata al modello e una risposta diversa da quella
