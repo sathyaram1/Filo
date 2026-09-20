@@ -327,8 +327,11 @@
       tipi: ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'COMANDO_FINESTRA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'],
       avviso: 'l\'impostazione è rimasta com\'era',
       frasi: [
-        new RegExp(`${HO}(?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo)\\b${PONTE(72)}`
-          + `\\b(?:tema|impostazione|preferenza|modalità|opzione|carattere|font|zoom|limite di spesa|colore|sfondo)${FINE}`, 'i'),
+        // Giro 8: «notifiche» e «dimensione» mancavano fra le cose, e
+        // «ridotto/aumentato» fra i verbi — «ho ridotto la dimensione del
+        // testo» e «ho aumentato lo zoom» passavano mute.
+        new RegExp(`${HO}(?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo|ridotto|aumentato|alzato|abbassato|ingrandito|rimpicciolito)\\b${PONTE(72)}`
+          + `\\b(?:tema|impostazione|preferenza|modalità|opzione|carattere|font|zoom|limite di spesa|colore|sfondo|notifiche|dimensione|luminosità)${FINE}`, 'i'),
       ],
     },
     {
