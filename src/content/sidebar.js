@@ -76,7 +76,11 @@
   let domandaSuCosaFatta = false;
   // #517 (giro 9) — e se ha chiesto una cosa che passa da un'azione di Filo.
   // Senza, «te l'ho tolta» dopo «togli quella parola» diventava un'accusa.
-  let richiestaAzione = false;
+  // #517 (giro 10) — `null` vuol dire «non lo so», ed è diverso da «no». Con
+  // `false` di partenza, il primo turno del pannello — quello che parte dal
+  // contesto della pagina, senza che l'utente abbia ancora scritto — nasceva
+  // come se l'utente avesse chiesto un testo, e lì il presidio taceva.
+  let richiestaAzione = null;
 
   // #517 — il confronto con le sveglie e gli appunti che esistono davvero lo
   // fa il MAIN, non questo pannello: quella è roba dell'utente e qui siamo
@@ -202,7 +206,7 @@
     azioniDelTurno = new Set();
     famiglieMancate = new Map();
     domandaSuCosaFatta = false;
-    richiestaAzione = false;
+    richiestaAzione = null;
     rimandiFuoriFormato = 0;
   }
 
@@ -1106,7 +1110,7 @@
       azioniDelTurno = new Set();
       const D = global.SN_AZIONI_DICHIARATE;
       domandaSuCosaFatta = !!(D && D.domandaSuCosaFatta && D.domandaSuCosaFatta(userMessage));
-      richiestaAzione = !!(D && D.richiestaDiAzione && D.richiestaDiAzione(userMessage));
+      richiestaAzione = (D && D.richiestaDiAzione) ? !!D.richiestaDiAzione(userMessage) : null;
     }
 
     if (userMessage) {

@@ -589,3 +589,52 @@ test('la conferma più corta non diventa muta dopo una cosa fatta prima', async 
 
   await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
 });
+
+test('una richiesta detta senza nominare la cosa non spegne il presidio', async ({ app, shell }) => {
+  // In italiano un promemoria si chiede quasi sempre senza nominarlo. Finché
+  // la promessa doveva farsi riconoscere dalle parole dell'utente, «te l'ho
+  // segnato» dopo «non farmelo dimenticare» tornava muto come prima del
+  // lavoro: nessun appunto, nessun ritentativo, niente sotto la risposta.
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: 'Te l\'ho segnato, così domani te lo ricordo.' },
+    { text: 'Te l\'ho segnato, così domani te lo ricordo.' },
+  ]);
+  await page.locator('#input').fill('domani devo chiamare il dentista, non farmelo dimenticare');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
+});
+
+test('un documento incollato non fa accusare Filo di non aver preso nota', async ({ app, shell }) => {
+  // L'utente incolla un contratto e chiede cosa conta: Filo glielo scrive
+  // nella risposta. «Ti ho segnato i punti principali» faceva cancellare la
+  // risposta, rifarla con una seconda chiamata al modello e poi smentirla.
+  // Nel documento incollato può esserci qualunque parola («si rinnova salvo
+  // disdetta»): la richiesta è quella dell'utente, non il testo di altri.
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: 'Le cose che contano sono tre:\n\n- la penale è del 5%\n- il preavviso è di 30 giorni\n- il rinnovo è automatico\n\nTi ho segnato i punti principali.' },
+  ]);
+  const contratto = `leggi questo contratto e dimmi cosa c'è di importante:\n\n${
+    'Articolo 1. Il presente contratto ha durata annuale e si rinnova tacitamente salvo disdetta. '
+    + 'Articolo 2. Il recesso anticipato comporta una penale pari al cinque per cento del corrispettivo residuo. '
+    + 'Articolo 3. La disdetta va comunicata con un preavviso di almeno trenta giorni dalla scadenza. '
+    + 'Articolo 4. Il foro competente per ogni controversia è quello della sede del fornitore. '
+    + 'Articolo 5. Le parti si impegnano alla riservatezza su ogni informazione scambiata.'}`;
+  await page.locator('#input').fill(contratto);
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
+});
