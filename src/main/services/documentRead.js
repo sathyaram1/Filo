@@ -479,16 +479,34 @@ function daCp1252(buf) {
 }
 
 /**
- * Decodifica un buffer di testo. Due byte per carattere se il file lo dichiara
- * in testa; altrimenti UTF-8 (BOM tolto); se il risultato è pieno di
- * caratteri di sostituzione ripiega sulla tabella di Windows — il caso tipico
- * degli export CSV italiani, dove altrimenti spariscono tutti gli accenti.
- * PURA.
+ * Decodifica un buffer di testo. PURA.
+ *
+ * L'ordine è per certezze, dalla più solida alla più debole:
+ *   1. il file DICHIARA in testa di essere a due byte per carattere;
+ *   2. non lo dichiara ma ne ha la forma (metà byte nulli, tutti dalla stessa
+ *      parte delle coppie);
+ *   3. i byte sono UTF-8 VALIDO → è UTF-8, e i rombi che contiene sono roba
+ *      sua, non un errore di lettura;
+ *   4. non lo sono → la tabella di Windows, che è come Windows ha sempre
+ *      salvato i testi e come il foglio di calcolo esporta un CSV.
+ * Nessuna percentuale: ogni passo è una domanda con una risposta esatta
+ * (#551, quinto giro di verifica).
  */
 function decodeText(buf) {
   let b = buf;
-  const due = bomDueByte(b);
+  const due = bomDueByte(b) || pareDueByte(b);
   if (due) {
+    if (!bomDueByte(b)) {
+      // Senza firma non c'è niente da togliere in testa: si riallinea il
+      // corpo così com'è.
+      let corpo = b.length % 2 ? b.subarray(0, b.length - 1) : b;
+      if (due === 'be') {
+        const girato = Buffer.from(corpo);
+        try { girato.swap16(); } catch (_) { return corpo.toString('utf8'); }
+        corpo = girato;
+      }
+      return corpo.toString('utf16le');
+    }
     // Via la firma, e un byte spaiato in fondo (file troncato) non deve far
     // morire la lettura: si scarta, come si scarta mezza coppia in coda.
     let corpo = b.subarray(2);
