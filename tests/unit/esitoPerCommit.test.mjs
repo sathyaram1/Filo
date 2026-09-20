@@ -312,3 +312,77 @@ test('lo stato della directory non si può leggere: il verdetto non si registra 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ─── Confermare l'impronta, non ricopiarla ──────────────────────────────────
+//
+// L'impronta la timbra lo strumento, e una dichiarata può solo confermarla.
+// Confermare però vuol dire riconoscere la stessa VERSIONE: gli strumenti
+// stampano le impronte accorciate a dodici lettere dappertutto, e git tratta
+// la forma corta come il commit intero. Rifiutare chi conferma con quello che
+// ha appena letto a schermo era attrito, e il rifiuto si contraddiceva da solo
+// («hai dichiarato 1774f56387b9, ma la directory è su 1774f56387b9»: le stesse
+// dodici lettere due volte, con dentro scritto che sono diverse). Verifica del
+// giro 2 su #485.
+
+test('l\'impronta dichiarata conferma: forma corta e maiuscole sono lo stesso commit, un pezzo troppo corto no', () => {
+  const vera = '1774f56387b900993b3fb8101e7b61627f24c331';
+  assert.equal(confermaImpronta('', vera).ok, true, 'nessuna impronta dichiarata: non c\'è niente da confermare');
+  assert.equal(confermaImpronta(vera, vera).ok, true);
+  assert.equal(confermaImpronta(vera.toUpperCase(), vera).ok, true, 'sono lettere esadecimali: la forma non cambia il commit');
+  assert.equal(confermaImpronta(vera.slice(0, 12), vera).ok, true, 'la forma corta che gli strumenti stampano è lo stesso commit');
+  assert.equal(confermaImpronta(`  ${vera.slice(0, 12)}  `, vera).ok, true, 'spazi da copia-incolla');
+  assert.equal(confermaImpronta(vera.slice(0, MIN_IMPRONTA_CHARS), vera).ok, true);
+
+  const corta = confermaImpronta(vera.slice(0, MIN_IMPRONTA_CHARS - 1), vera);
+  assert.equal(corta.ok, false, 'sotto il minimo un pezzo combacia anche con commit diversi: non conferma niente');
+  assert.equal(corta.motivo, 'troppo_corta');
+
+  const altro = confermaImpronta('f'.repeat(40), vera);
+  assert.equal(altro.ok, false, 'un\'altra impronta non si sostituisce a quella vera');
+  assert.equal(altro.motivo, 'altro_commit');
+  assert.equal(confermaImpronta(vera, '').motivo, 'punta_sconosciuta');
+});
+
+test('il rifiuto dell\'impronta non mostra due volte le stesse dodici lettere dicendo che sono diverse', () => {
+  const vera = '1774f56387b900993b3fb8101e7b61627f24c331';
+  // Due commit diversi che iniziano uguale: accorciare direbbe due volte la
+  // stessa cosa e manderebbe chi legge a cercare una differenza che non vede.
+  const gemello = `${vera.slice(0, 12)}${'e'.repeat(28)}`;
+  const testo = testoImprontaDiversa('verdetto non registrato', gemello, vera, 'altro_commit');
+  assert.ok(testo.includes(gemello) && testo.includes(vera), 'quando le forme corte coincidono, le impronte si stampano per intero');
+
+  // Quando invece si distinguono a colpo d'occhio restano accorciate, come
+  // ovunque negli strumenti.
+  const diverso = testoImprontaDiversa('verdetto non registrato', 'f'.repeat(40), vera, 'altro_commit');
+  assert.ok(!diverso.includes(vera), 'impronte che si distinguono restano accorciate');
+  assert.match(diverso, /la timbra lo strumento/, 'e il rimedio resta scritto');
+
+  const troppoCorta = testoImprontaDiversa('verdetto non registrato', 'abc', vera, 'troppo_corta');
+  assert.match(troppoCorta, /più corto/, 'il motivo vero, non un generico «non combacia»');
+  assert.match(troppoCorta, /abc/);
+});
+
+// ─── Il rifiuto della fusione dice cosa REGISTRARE ──────────────────────────
+//
+// Fermare la fusione e basta lascia la notizia su una macchina sola: sul
+// canale i due via libera continuano a risultare buoni per quel ramo, che è la
+// segnalazione #485 spostata di un passo. Il rifiuto deve nominare il passo che
+// la registra, il rientro in verifica, invece di nominare una persona che non
+// c'è («chi ha cambiato il ramo lo rimette in verifica»: chi ha cambiato il
+// ramo è una sessione ormai chiusa). Verifica del giro 2 su #485.
+
+test('la fusione fermata dal decadimento dice quale passo registrare, col ramo dentro', () => {
+  const A = 'a'.repeat(40);
+  const B = 'b'.repeat(40);
+  const decaduti = esitiDecaduti({ verifierSha: A, secauditSha: A }, B);
+  const testo = testoEsitiDecaduti(decaduti, B, 'worker/485-xyz');
+
+  assert.match(testo, /la verifica ha dato l'ok su a{12}/);
+  assert.match(testo, /il controllo di sicurezza ha dato l'ok su a{12}/);
+  assert.match(testo, /la directory adesso è su b{12}/);
+  assert.match(testo, /revision_capability/, 'il passo che registra la decadenza, per nome');
+  assert.ok(testo.includes('worker/485-xyz'), 'col ramo dentro: il comando si copia, non si ricostruisce');
+  assert.match(testo, /--guasto/, 'e la via d\'uscita se il server rifiuta quel passaggio');
+  assert.ok(!/chi ha cambiato il ramo lo rimette in verifica/.test(testo),
+    'non si nomina una persona che non esiste al posto di un passo da registrare');
+});
