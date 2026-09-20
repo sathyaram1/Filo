@@ -61,6 +61,14 @@
     send,
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
+    // #533 — dato il permesso, il lavoro riparte da solo: farlo ridire
+    // all'utente sarebbe chiedergli due volte la stessa cosa.
+    riprendiCompito: (compito) => {
+      if (sending) return;
+      sending = true;
+      sendBtn.disabled = true;
+      runTurnAndContinue({ userMessage: RIPRESA_PERMESSO, internal: true, compito });
+    },
   });
   Term.init({
     dashDir,
