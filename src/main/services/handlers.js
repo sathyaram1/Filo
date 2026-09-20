@@ -2180,12 +2180,13 @@ function pageReadsForPrompt(actions) {
 }
 
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
-// output dei comandi, dettagli delle capacità, risultati di ricerca, file e
-// documenti letti, documenti di trasparenza. Mai istruzioni — ma non tutti
-// nello stesso modo: le capacità e i documenti di trasparenza li scrive Filo,
-// i file dell'editor li scrive l'utente, mentre i risultati di una ricerca, il
-// testo di un documento e quello che un comando ha stampato li scrive qualcun
-// altro e arrivano imbustati come ogni altro contenuto esterno (#593).
+// output dei comandi, dettagli delle capacità, risultati di ricerca, file,
+// documenti e pagine web lette, documenti di trasparenza. Mai istruzioni — ma
+// non tutti nello stesso modo: le capacità e i documenti di trasparenza li
+// scrive Filo, i file dell'editor li scrive l'utente, mentre i risultati di una
+// ricerca, il testo di un documento, quello di una pagina web e quello che un
+// comando ha stampato li scrive qualcun altro e arrivano imbustati come ogni
+// altro contenuto esterno (#593).
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),

@@ -600,6 +600,7 @@
   // secondo prima vale più di un'etichetta precisa un secondo dopo.
   const START_LABELS = {
     CERCA_WEB: 'Cerco sul web…',
+    LEGGI_PAGINA: 'Leggo la pagina…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',

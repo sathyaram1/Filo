@@ -234,11 +234,23 @@
     };
   }
 
+  // Come si chiama la pagina che Filo sta leggendo: il titolo se è già
+  // arrivato, altrimenti il dominio — «Leggo la pagina: …» senza niente dopo
+  // non dice all'utente dove Filo sia andato a leggere.
+  function etichettaPagina(a) {
+    const titolo = String((a && a._output && a._output.title) || '').trim();
+    if (titolo) return titolo.length > 70 ? `${titolo.slice(0, 67)}…` : titolo;
+    const url = String((a && (a.url || a.href || a.link)) || '').trim();
+    if (!url) return 'una pagina';
+    try { return new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`).host; } catch (_) { return url; }
+  }
+
   // «Ha cercato sul web, impostato una sveglia e letto un documento»: il
   // riassunto delle azioni, nell'ordine in cui sono avvenute, con i doppioni
   // contati. Senza azioni resta il solo ragionamento.
   const ACTIVITY_VERBS = {
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
+    LEGGI_PAGINA: (n) => (n > 1 ? `letto ${n} pagine` : 'letto una pagina'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
@@ -349,6 +361,7 @@
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    LEGGI_PAGINA: (a) => ({ icon: '📄', text: `Leggo la pagina: ${etichettaPagina(a)}` }),
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
     LEGGI_FILE: (a) => {
       const title = (a._output && a._output.title) || '';
@@ -404,7 +417,7 @@
     TIMER: 'Timer non avviato', SVEGLIA: 'Sveglia non impostata',
     CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
     SALVA_APPUNTO: 'Appunto non salvato', SALVA_LEZIONE: 'Non memorizzato',
-    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto',
+    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', LEGGI_PAGINA: 'Pagina non letta',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non letto',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
@@ -841,6 +854,12 @@
       // REALI. NON è un bottone: prima aveva la forma di una pill e l'utente si
       // ritrovava "due bottoni" per una cosa sola (#376).
       return stepTrace(`🔎 Cerco sul web: ${a.query || ''}`.trim());
+    }
+    if (type === 'LEGGI_PAGINA') {
+      // Traccia del passo intermedio: Filo scarica una pagina web e ne legge il
+      // testo. Il contenuto rientra nel turno successivo (auto-continue), dove
+      // compare la risposta col dato vero.
+      return stepTrace(`📄 Leggo la pagina: ${etichettaPagina(a)}`);
     }
     if (type === 'CAPACITA_DETTAGLIO') {
       // Traccia del passo intermedio: Filo sta consultando il proprio manifesto

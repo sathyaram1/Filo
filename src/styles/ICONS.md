@@ -115,7 +115,7 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `undo` | Freccia che torna indietro: ripristina |
 | `mailOpen` | Busta aperta: posta letta (prevista) |
 | `mailSend` | Busta con freccia: posta inviata (prevista) |
-| `readPage` | Finestra con righe di testo: legge la pagina aperta (prevista) |
+| `readPage` | Finestra con righe di testo: legge il testo di una pagina web |
 | `click` | Freccia del puntatore: clicca nella pagina (prevista) |
 | `typeText` | Casella con cursore: scrive in un campo (prevista) |
 | `pencil` | Matita: modifica un file (prevista) |
