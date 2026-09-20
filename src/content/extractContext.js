@@ -366,10 +366,7 @@
     const cs = viewOf(el).getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse'
         || cs.contentVisibility === 'hidden') return true;
-    // Un <details> chiuso resta display:block con una misura sua: se lo disegni lo sa solo il motore. Opacità e
-    // content-visibility:auto restano fuori di proposito: quel testo torna da sé appena si scorre.
-    if (typeof el.checkVisibility === 'function'
-        && !el.checkVisibility({ visibilityProperty: true })) return true;
+    if (isInsideClosedDisclosure(el)) return true;
     return isClippedToNothing(el, cs);
   }
 
