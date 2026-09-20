@@ -547,3 +547,91 @@ test('un appunto che esiste non prova un promemoria a un\'ora che non esiste', (
   // …ma non una frase che promette un'ora: un'ora è una sveglia.
   assert.deepEqual(ids(AD.rileva('Ti ho messo il promemoria per la spesa alle 18.', [], conAppunto)), ['promemoria']);
 });
+
+// ── Giro 6 ────────────────────────────────────────────────────────────────
+
+test('l\'ora si scrive anche col punto, con la virgola e coi minuti a parole', () => {
+  // La sveglia delle 19:30 c'è: la frase che la racconta è vera, comunque sia
+  // scritta l'ora. Prima il pezzo di frase veniva tagliato al primo punto,
+  // che è uno dei segni con cui in italiano si scrive un orario, e Filo
+  // veniva smentito su una sveglia che aveva appena messo.
+  const alle1930 = { orariSveglie: ['19:30'] };
+  assert.deepEqual(AD.rileva('Ho messo la sveglia alle 19.30 per stasera.', [], alle1930), []);
+  assert.deepEqual(AD.rileva('Ho messo la sveglia alle 19,30.', [], alle1930), []);
+  assert.deepEqual(AD.rileva('Ho messo la sveglia alle 19 e trenta.', [], alle1930), []);
+  assert.deepEqual(AD.rileva('Te l\'ho messa alle 8.15.', [], { orariSveglie: ['08:15'] }), []);
+  assert.ok(AD.orariNelTesto('alle 19.30.').has('19:30'));
+  // E la frase che l'utente legge non si ferma a metà dell'ora.
+  const [f] = AD.rileva('Ho messo la sveglia alle 19.30.', [], { orariSveglie: [] });
+  assert.match(f.frase, /19\.30/);
+  // L'ora sbagliata resta un avviso.
+  assert.deepEqual(ids(AD.rileva('Ho messo la sveglia alle 19.30.', [], { orariSveglie: ['07:00'] })), ['sveglia']);
+});
+
+test('senza l\'elenco delle sveglie l\'ora non decide niente', () => {
+  // «Non lo so» non è «non ce n'è nessuna». L'Aiuto, che di Filo vede solo la
+  // pagina, chiamava il presidio senza stato: ogni frase con un'ora veniva
+  // smentita, anche quella che raccontava la sveglia appena messa da lì.
+  const aiuto = { famiglie: AD.FAMIGLIE_AIUTO };
+  assert.deepEqual(AD.rileva('Sì, ho messo la sveglia alle 19:00 come mi avevi chiesto.', new Set(['SVEGLIA']), {}, aiuto), []);
+  assert.deepEqual(AD.rileva('Ho avviato il timer alle 19.', new Set(['TIMER']), {}, aiuto), []);
+  // Senza nessuna azione la dichiarazione resta scoperta: il presidio non si
+  // spegne, torna solo a guardare le azioni.
+  assert.deepEqual(ids(AD.rileva('Ti ho messo una sveglia alle 19:00.', new Set(), {}, aiuto)), ['sveglia']);
+});
+
+test('una cosa fatta prima nella conversazione non copre quelle raccontate dopo', () => {
+  const crono = (t) => AD.tipiDallaCronologia([{ role: 'filo', actions: [{ type: t, _executed: true }] }]);
+  // Un appunto scritto all'inizio non prova l'appunto raccontato adesso…
+  assert.deepEqual(ids(AD.rileva('Ti ho salvato l\'appunto con la lista della spesa.', crono('SALVA_APPUNTO'))), ['appunto']);
+  assert.deepEqual(ids(AD.rileva('Ti ho aggiunto l\'evento in calendario per domani.', crono('EVENTO_CALENDARIO'))), ['calendario']);
+  assert.deepEqual(ids(AD.rileva('Ho mandato la segnalazione agli sviluppatori.', crono('INVIA_FEEDBACK'))), ['segnalazione']);
+  assert.deepEqual(ids(AD.rileva('Ho aperto il blocco note.', crono('ESEGUI_COMANDO'))), ['apertura']);
+  // …ma la CONFERMA di una cosa fatta prima resta vera: è per questo che la
+  // cronologia conta.
+  assert.deepEqual(AD.rileva('Sì, te l\'ho già salvato negli appunti.', crono('SALVA_APPUNTO')), []);
+  assert.deepEqual(AD.rileva('Come ti dicevo, ho mandato la segnalazione agli sviluppatori.', crono('INVIA_FEEDBACK')), []);
+  // E se l'utente sta facendo una domanda, la risposta guarda indietro da sé.
+  assert.deepEqual(AD.rileva('Ho mandato la segnalazione agli sviluppatori.', crono('INVIA_FEEDBACK'), { domandaUtente: true }), []);
+});
+
+test('due cose della stessa specie vogliono due azioni', () => {
+  const unAppunto = [{ type: 'SALVA_APPUNTO', _executed: true }];
+  assert.deepEqual(
+    ids(AD.rileva('Ti ho salvato l\'appunto della spesa e ti ho segnato anche quello del lavoro.', unAppunto, {})),
+    ['appunto'],
+  );
+  // Con due scritture partite davvero non resta niente da dire.
+  assert.deepEqual(AD.rileva(
+    'Ti ho salvato l\'appunto della spesa e ti ho segnato anche quello del lavoro.',
+    [{ type: 'SALVA_APPUNTO', _executed: true }, { type: 'SALVA_APPUNTO', _executed: true }],
+    { contiAzioni: { SALVA_APPUNTO: 2 } },
+  ), []);
+  // E l'utente non legge due volte la stessa riga.
+  assert.equal(
+    (AD.avvisoPerUtente([{ avviso: 'l\'appunto non c\'è' }, { avviso: 'l\'appunto non c\'è' }]).match(/appunto/g) || []).length,
+    1,
+  );
+});
+
+test('altri modi normali di dichiarare una cosa mai fatta', () => {
+  assert.deepEqual(ids(AD.rileva('Ho fissato l\'appuntamento in calendario per domani.', [])), ['calendario']);
+  assert.deepEqual(ids(AD.rileva('Ho aggiunto la riunione al calendario di domani.', [])), ['calendario']);
+  assert.deepEqual(ids(AD.rileva('Ho inoltrato la segnalazione agli sviluppatori.', [])), ['segnalazione']);
+  assert.deepEqual(ids(AD.rileva('Ho provveduto a metterti la sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Sono riuscito a metterti la sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ti avevo messo la sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Te l\'avevo messa alle 19.', [])), ['senza-nome']);
+  // Il grassetto di Markdown intorno al verbo, e l'apostrofo al posto
+  // dell'accento: i modelli scrivono così di continuo.
+  assert.deepEqual(ids(AD.rileva('Ti ho **messo** la sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ti ho gia\' messo la sveglia alle 19.', [])), ['sveglia']);
+});
+
+test('la chiamata a funzione con «name» e «arguments» è formato interno', () => {
+  assert.equal(AD.formatoSospetto('{"name":"SVEGLIA","arguments":{"time":"19:00"}}'), true);
+  assert.equal(AD.formatoSospetto('Fatto!\n{"name":"SVEGLIA","arguments":{"time":"19:00"}}'), true);
+  // Un JSON qualunque, chiesto dall'utente, resta una risposta.
+  assert.equal(AD.formatoSospetto('{"nome":"Mario","eta":30}'), false);
+  assert.equal(AD.formatoSospetto('{"name":"Mario","arguments":{"x":1}}'), false);
+});

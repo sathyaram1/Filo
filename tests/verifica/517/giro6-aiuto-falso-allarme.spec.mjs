@@ -60,29 +60,25 @@ const testoChat = (page) => page.evaluate(() => Array.from(
   document.querySelectorAll('.sn-sidebar-msg, .sn-sidebar-chat *'),
 ).map((el) => (el.textContent || '').trim()).join('\n'));
 
-test('la sveglia messa dall\'Aiuto stesso non viene smentita un messaggio dopo', async ({ openTab }) => {
+test('la sveglia che esiste davvero non viene smentita nell\'Aiuto', async ({ app, openTab }) => {
   test.setTimeout(60_000);
+  // La sveglia delle 19 c'è: messa ieri, o dalla chat della home. L'Aiuto lo
+  // stato non lo guardava mai, quindi la frase che la racconta era un'accusa.
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.addAlarm({ label: 'sera', time: '19:00' }));
   const page = await openTab(NEWTAB);
   await agenteASequenza(page, [
-    // Turno 1: l'Aiuto emette davvero l'azione. La sveglia delle 19 nasce.
-    JSON.stringify({ action: 'filo', filo: { type: 'SVEGLIA', time: '19:00', label: 'stasera' }, text: 'Va bene, la metto.' }),
-    // Turno 2: la racconta. È vero: l'ha messa lui.
     JSON.stringify({ text: 'Sì, ho messo la sveglia alle 19:00 come mi avevi chiesto.', status: 'done' }),
   ]);
   await apriAiuto(page);
   await page.evaluate(() => { window.__turni = []; window.__azioni = []; });
 
-  await chiedi(page, 'mettimi una sveglia alle 19 per stasera', 1);
-  // L'azione è partita davvero.
-  expect(await page.evaluate(() => window.__azioni.length)).toBe(1);
-
-  await chiedi(page, 'hai messo la sveglia?', 2);
+  await chiedi(page, 'hai messo la sveglia per stasera?', 1);
 
   // La frase è vera: sotto non ci deve essere nessuna accusa…
   const testo = await testoChat(page);
   expect(testo).not.toMatch(/non l'ha fatto|non è partito niente|la sveglia non c'è/i);
   // …e la risposta non deve essere buttata e rifatta con un'altra chiamata.
-  expect(await page.evaluate(() => window.__turni.length)).toBe(2);
+  expect(await page.evaluate(() => window.__turni.length)).toBe(1);
 });
 
 test('nell\'Aiuto una sveglia raccontata senza ora e mai messa resta vista', async ({ openTab }) => {
