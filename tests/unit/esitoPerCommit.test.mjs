@@ -517,7 +517,8 @@ test('il contenuto esaminato deve stare dove chi fonde andrà a prenderlo', () =
   assert.match(testo, new RegExp(`${'p'.repeat(12)}`), 'quale contenuto è stato esaminato');
   assert.match(testo, new RegExp(`${'o'.repeat(12)}`), 'e a cosa è fermo il ramo dove si va a prenderlo');
   assert.ok(testo.includes('worker/485-xyz'), 'col ramo dentro: il comando si copia, non si ricostruisce');
-  assert.match(testo, /git push/, 'e il rimedio, non solo il no');
+  assert.match(testo, /git push origin worker\/485-xyz:worker\/485-xyz/,
+    'e il rimedio, col ramo di arrivo dichiarato: un comando che si copia da un rifiuto non può lasciar scegliere l\'arrivo alla configurazione locale');
 });
 
 test('i comandi del rifiuto puntano agli attrezzi del giro, non a quelli del ramo', () => {
