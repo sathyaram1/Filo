@@ -1674,6 +1674,13 @@
     setTimeout(() => flyCreditsToAccount(totalCredits), 250);
   }
 
+  // #525 — la scheda sta per sparire (chiusura della scheda o dell'app): è una
+  // chiusura di chat come le altre. Best-effort, perché a pagina che muore un
+  // messaggio può non partire: la rete di sicurezza vera è il giro di riordino
+  // all'avvio successivo (main.js → sweepPendingChats), che chiude e classifica
+  // le chat rimaste appese.
+  self.addEventListener('pagehide', () => { try { closeCurrentChat(); } catch (_) {} });
+
   (async function init() {
     renderControls();
     await applySavedTheme();
