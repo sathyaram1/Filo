@@ -59,6 +59,17 @@
     return CHIAVI_AUTONOMIA.test(String(chiave == null ? '' : chiave).trim());
   }
 
+  // Grado di un comando secondo il classificatore (1 sola lettura, 2 modifica
+  // recuperabile, 3 cancellazioni / pericolosi / non riconosciuti). Senza
+  // comando o senza classificatore vale 3: la massima cautela.
+  function gradoComando(action) {
+    const C = global.SN_CMD_CLASSIFY;
+    const cmd = String((action && (action.comando ?? action.command ?? action.cmd)) || '').trim();
+    if (!cmd || !C) return 3;
+    const g = C.classify(cmd);
+    return g === 1 || g === 2 || g === 3 ? g : 3;
+  }
+
   // Token + valore di un'azione estetica (più sinonimi che un LLM può produrre).
   function estTok(action) {
     return action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
@@ -218,9 +229,13 @@
     },
     INVIA_FEEDBACK: {
       // Filo invia un feedback agli sviluppatori a NOME dell'utente (#146.5).
-      // Esce dall'app verso un servizio esterno (Firestore) → costo 2: dura e
-      // si vede fuori, ma si rimedia (un feedback si ritira).
-      costo: 2,
+      // Esce dall'app verso un servizio esterno (Firestore) e non torna
+      // indietro: un messaggio partito a nome di qualcuno non si ritira. È
+      // «modulo inviato», uno degli esempi di costo 3 della regola (#530).
+      // Conseguenza voluta: a livello normale con compito pulito resta il
+      // popup col testo intero, che è la difesa del #414 — quello che parte a
+      // tuo nome lo leggi prima. Dopo una pagina web diventa parola digitata.
+      costo: 3,
       describe: (a) => {
         // Il popup mostra il testo INTERO, mai una versione tagliata: è quello
         // che parte a nome dell'utente, e un consenso su un testo che non si
@@ -389,9 +404,12 @@
       // in chat (#146.4). Reversibile → livello 1: si applica subito, e nella
       // bolla compare un controllo per raffinarlo. ECCEZIONE: se la modifica
       // rende il testo ~uguale allo sfondo (illeggibilità estrema) il livello
-      // sale a 2. Il flag `_illegible` lo calcola il main process (ha i token
-      // correnti); mai l'LLM.
-      costo: (a) => (a && a._illegible ? 2 : 1),
+      // sale a 3: non perché sia irreversibile in sé, ma perché la strada per
+      // disfarlo passa da un'interfaccia che quella modifica ha appena reso
+      // illeggibile. Costoso da rimediare, quindi si chiede prima. Il flag
+      // `_illegible` lo calcola il main process (ha i token correnti), mai
+      // l'LLM.
+      costo: (a) => (a && a._illegible ? 3 : 1),
       describe: (a) => {
         const T = global.SN_THEME_TOKENS;
         const t = T && T.get(estTok(a));
@@ -405,24 +423,32 @@
       },
     },
     ESEGUI_COMANDO: {
-      // Filo lancia un comando nel terminale (#146.6). Il livello NON è fisso:
+      // Filo lancia un comando nel terminale (#146.6). Il costo NON è fisso:
       // dipende dal comando EFFETTIVO, classificato dal main (mai dall'LLM) in
-      // src/shared/cmdClassify.js. 1 = sola lettura (esegue subito); 2 =
-      // modifica recuperabile (popup); 3 = cancellazioni, comandi pericolosi e
-      // qualsiasi comando non riconosciuto (digita "conferma"). Una sequenza di
-      // comandi (`&&`/`||`/`;`) prende il livello massimo dei suoi pezzi.
-      // Comando assente o classificatore non caricato → 3 per massima cautela.
+      // src/shared/cmdClassify.js. Una sequenza di comandi (`&&`/`||`/`;`)
+      // prende il grado massimo dei suoi pezzi.
+      //
+      // La traduzione in costi non è quella meccanica (1→1, 2→2, 3→3), e il
+      // motivo sta nella regola stessa (#530): fra i suoi esempi, «comando che
+      // modifica» è costo 3. Quindi:
+      //   sola lettura            → costo 1  (parte subito, come sempre)
+      //   modifica recuperabile   → costo 3  (a livello normale: popup, come prima)
+      //   cancellazioni, comandi pericolosi, non riconosciuti
+      //                           → costo 3 + `allenta`
+      // L'`allenta` sull'ultimo grado non è un'etichetta di comodo: un `rm` o
+      // uno scaricamento che atterra in `~/.ssh` TOGLIE una difesa (#479), ed è
+      // proprio il caso che una pagina ostile prova a far eseguire. La regola
+      // (d) gli tiene addosso la parola digitata a ogni livello, che è quello
+      // che pretendeva anche il framework di prima.
+      //
+      // Comando assente o classificatore non caricato → il grado più alto, per
+      // massima cautela.
       campo: 'terminale',
       // Quello che un comando stampa entra nel contesto del modello e l'ha
       // scritto chissà chi: da lì in poi il compito è contaminato.
       fonte: 'comando',
-      costo: (a) => {
-        const C = global.SN_CMD_CLASSIFY;
-        const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
-        if (!cmd || !C) return 3;
-        const lvl = C.classify(cmd);
-        return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
-      },
+      costo: (a) => (gradoComando(a) === 1 ? 1 : 3),
+      allenta: (a) => gradoComando(a) === 3,
       describe: (a) => {
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
         // DOVE il comando agisce non si legge nel comando: la cartella di lavoro

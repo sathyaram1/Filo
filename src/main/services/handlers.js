@@ -1348,10 +1348,6 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       origine: 'chat',
     });
   }
-  // Quello che l'azione porta DENTRO sporca il compito da qui in avanti — non
-  // se stessa: leggere è sempre libero, ed è già stato deciso qui sopra.
-  if (Levels) addTaskFonte(sender, Levels.fonteFor(action));
-
   const risposta = esito ? esito.risposta : (costo >= 2 ? 'chiede' : 'si');
   const motivo = (esito && esito.motivo) || '';
   // L'elenco fisso: no a ogni livello, e il modello riceve il perché — così lo
@@ -1399,6 +1395,13 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       return { executed: false, kept: false, rejected: true };
     }
   }
+
+  // Da qui in poi l'azione si fa davvero. Quello che porta DENTRO (una
+  // ricerca, un documento, quello che stampa un comando) sporca il compito da
+  // adesso in avanti, non se stessa: leggere è sempre libero. Si registra qui
+  // e non prima del gate, perché un'azione rimasta in attesa di conferma non
+  // ha ancora messo niente nel contesto.
+  if (Levels) addTaskFonte(sender, Levels.fonteFor(action));
 
   try {
     switch (type) {

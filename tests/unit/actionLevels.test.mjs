@@ -109,8 +109,8 @@ test('IMPOSTA_PREFERENZA: impostazioni sensibili (#146.5) → costo 2', () => {
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '10' }), 2);
 });
 
-test('INVIA_FEEDBACK è costo 2 e descrive il testo nel popup', () => {
-  assert.equal(AL.costoFor({ type: 'INVIA_FEEDBACK', testo: 'la ricerca è lenta' }), 2);
+test('INVIA_FEEDBACK è costo 3 (parte a nome tuo e non si ritira) e descrive il testo nel popup', () => {
+  assert.equal(AL.costoFor({ type: 'INVIA_FEEDBACK', testo: 'la ricerca è lenta' }), 3);
   const d = AL.describe({ type: 'INVIA_FEEDBACK', testo: 'la ricerca è lenta', titolo: 'ricerca lenta' });
   assert.match(d, /feedback/i);
   assert.match(d, /la ricerca è lenta/);
@@ -134,11 +134,12 @@ test('INVIA_FEEDBACK: il popup mostra il testo INTERO, non una versione tagliata
   assert.ok(d.includes('😀'));
 });
 
-test('IMPOSTA_ESTETICA: costo 1 di norma, 2 se rende il testo illeggibile', () => {
+test('IMPOSTA_ESTETICA: costo 1 di norma, 3 se rende il testo illeggibile', () => {
   // Cambio estetico normale → si disfa, costo 1.
   assert.equal(AL.costoFor({ type: 'IMPOSTA_ESTETICA', token: 'button.bg', valore: '#3a7d44' }), 1);
-  // Il flag `_illegible` (calcolato dal main) alza il costo a 2.
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_ESTETICA', token: 'text', valore: '#f8f6f0', _illegible: true }), 2);
+  // Il flag `_illegible` (calcolato dal main) alza il costo a 3: per disfare
+  // quella modifica servirebbe leggere l'interfaccia che ha reso illeggibile.
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_ESTETICA', token: 'text', valore: '#f8f6f0', _illegible: true }), 3);
 });
 
 test('IMPOSTA_ESTETICA: describe usa l’etichetta del token e avvisa se illeggibile', () => {
@@ -177,15 +178,24 @@ test('ESEGUI_COMANDO (#146.6): il costo dipende dal comando, classificato dal re
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'cd ..' }), 1);
   // ma un `cd` con metacaratteri (sostituzione/concatenazione) resta 3.
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'cd $(rm -rf x)' }), 3);
-  // Modifica recuperabile → 2 (popup).
-  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'git push' }), 2);
-  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'npm install' }), 2);
-  // Cancellazione / non riconosciuto / concatenato → 3 (digita "conferma").
+  // Modifica recuperabile → 3: «comando che modifica» è uno degli esempi di
+  // costo 3 della regola (#530). A livello normale e compito pulito resta il
+  // popup di sempre; dopo una pagina web diventa la parola digitata.
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'git push' }), 3);
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'npm install' }), 3);
+  assert.equal(AL.allentaFor({ type: 'ESEGUI_COMANDO', comando: 'git push' }), false);
+  // Cancellazione / non riconosciuto / concatenato → 3 e ALLENTA una difesa:
+  // la parola digitata a ogni livello, come pretendeva il #479.
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build' }), 3);
+  assert.equal(AL.allentaFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build' }), true);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'comandoinventato' }), 3);
+  assert.equal(AL.allentaFor({ type: 'ESEGUI_COMANDO', comando: 'comandoinventato' }), true);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'ls && rm x' }), 3);
-  // Comando assente → 3 per cautela (mai eseguire alla cieca).
+  assert.equal(AL.allentaFor({ type: 'ESEGUI_COMANDO', comando: 'ls && rm x' }), true);
+  // Comando assente → 3 per cautela (mai eseguire alla cieca), e con la parola
+  // digitata: di un comando che non sappiamo leggere non sappiamo niente.
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO' }), 3);
+  assert.equal(AL.allentaFor({ type: 'ESEGUI_COMANDO' }), true);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: '' }), 3);
 });
 
