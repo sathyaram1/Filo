@@ -31,6 +31,8 @@
     ]);
     tabs = (r && r.tabs) || [];
     chats = (rc && rc.chats) || [];
+    chatsTotal = chats.length;
+    renderChats();
     render();
   }
 
