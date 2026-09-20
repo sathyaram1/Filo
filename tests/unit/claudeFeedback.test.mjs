@@ -107,6 +107,13 @@ test('il guasto del server è "riprova", il rifiuto no', () => {
   assert.equal(SCRIPT.exitCodeForError(new Error('firestore create fallito (400): bad')), SCRIPT.EXIT.RIFIUTATO);
   assert.equal(SCRIPT.exitCodeForError(new Error('firestore create fallito (409): esiste già')), SCRIPT.EXIT.RIFIUTATO);
   assert.equal(SCRIPT.exitCodeForError(new Error('ETIMEDOUT')), SCRIPT.EXIT.IRRAGGIUNGIBILE);
+
+  // #602 — la cifratura che non si può fare è un no definitivo: riprovare non
+  // cambia niente finché la copia dell'app resta com'è. Senza questa riga
+  // finiva fra i "riprova" e lo script ci girava dentro all'infinito.
+  const cifratura = new Error('Non è partito niente: manca la chiave con cui si cifra.');
+  cifratura.cifratura = true;
+  assert.equal(SCRIPT.exitCodeForError(cifratura), SCRIPT.EXIT.RIFIUTATO);
 });
 
 test('priorità: si accettano 1-3, il resto è un errore d’uso', () => {
