@@ -36,8 +36,9 @@ const TIMEOUT_MS = 15000;
 const MAX_ATTESA_SCHEDA_MS = 5000;
 
 // Quanto contorno entra in coda al contenuto: orari, telefono e indirizzo ci
-// stanno; oltre è un elenco di link, che non deve mangiarsi la lettura.
-const MAX_CODA_CHARS = 4000;
+// stanno; oltre è un elenco di link, che non deve mangiarsi la lettura. Largo
+// perché la coda sta DOPO il contenuto e il tetto sul testo taglia da lì.
+const MAX_CODA_CHARS = 8000;
 
 // Elementi che non sono TESTO: dentro c'è codice, o roba che non si legge. Non
 // escono mai, nemmeno dal ripiego: al modello arrivavano righe di JavaScript
