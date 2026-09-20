@@ -289,7 +289,7 @@
     }
     const attivo = A.livello(livelloAttuale);
     $('autonomiaNota').textContent = attivo
-      ? `Adesso: ${attivo.label}. Lo vedi sempre anche nella home, in alto.`
+      ? `Autonomia adesso: ${attivo.label}. La vedi sempre anche nella home, in alto a destra.`
       : '';
   }
 

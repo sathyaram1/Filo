@@ -115,7 +115,7 @@ test('il livello attivo si vede nella home e porta dove si cambia', async ({ ope
   const home = await openTab('filo://dashboard/dashboard.html');
   const chip = home.locator('#dashAutonomia');
   await expect(chip).toBeVisible({ timeout: 8_000 });
-  await expect(chip).toHaveText('Normale');
+  await expect(chip).toHaveText(/Normale/);
   // Il nome del livello non basta da solo: l'hover dice cosa vuol dire.
   const titolo = await chip.getAttribute('title');
   expect(String(titolo)).toMatch(/fa da solo/i);
@@ -175,7 +175,7 @@ test('alzare il livello chiede di scriverlo, abbassarlo no, e la home lo sa', as
 
   // E la home lo dice: il livello attivo è quello, senza riaprire le Preferenze.
   const home = await openTab('filo://dashboard/dashboard.html');
-  await expect(home.locator('#dashAutonomia')).toHaveText('Conservativo', { timeout: 8_000 });
+  await expect(home.locator('#dashAutonomia')).toHaveText(/Conservativo/, { timeout: 8_000 });
 });
 
 test('la memoria si cancella dalle Preferenze, scrivendo la parola', async ({ app, openTab }) => {

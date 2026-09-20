@@ -1156,7 +1156,9 @@
     chip.className = 'dash-autonomia';
     chip.id = 'dashAutonomia';
     chip.dataset.livello = liv.id;
-    chip.textContent = liv.label;
+    // Il nome del livello da solo («Normale») non dice di che cosa parla: la
+    // parola davanti lo lega a quello che l'utente sceglie nelle Preferenze.
+    chip.textContent = `Autonomia · ${liv.label}`;
     chip.title = `Quanto Filo fa da solo. Livello ${liv.label.toLowerCase()}. ${liv.frase} Clicca per cambiarlo.`;
     chip.setAttribute('aria-label', `Autonomia di Filo: ${liv.label}`);
     chip.addEventListener('click', () => send({

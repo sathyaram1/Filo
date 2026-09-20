@@ -44,8 +44,13 @@
 
     /* «Quanto Filo fa da solo»: una riga per livello, cliccabile tutta. */
     .aut-livelli { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
-    .aut-riga {
+    /* `.sn-page label` appiattisce: si stila con `label.classe` rimettendo margine e
+       colore (patterns/controllo-custom-dentro-una-label-sn-page-label.md). */
+    .sn-page label.aut-riga {
       display: flex;
+      margin: 0;
+      font-size: inherit;
+      color: inherit;
       align-items: baseline;
       gap: 10px;
       padding: 10px 12px;
@@ -53,11 +58,10 @@
       border: 1px solid var(--sn-border, rgba(127, 127, 127, 0.28));
       cursor: pointer;
       transition: background 0.15s ease, border-color 0.15s ease;
-      margin: 0;
     }
-    .aut-riga:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
-    .aut-riga[data-attivo="1"] { border-color: var(--sn-accent, #c77d3a); }
-    .aut-riga input { margin: 0; flex: 0 0 auto; }
+    .sn-page label.aut-riga:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
+    .sn-page label.aut-riga[data-attivo="1"] { border-color: var(--sn-accent, #c77d3a); }
+    .sn-page label.aut-riga input { margin: 0; flex: 0 0 auto; }
     .aut-nome { font-weight: 600; flex: 0 0 auto; }
     .aut-frase { opacity: 0.75; line-height: 1.4; }
     .aut-attivo { margin-top: 10px; }
