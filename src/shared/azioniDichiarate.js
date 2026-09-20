@@ -109,6 +109,25 @@
   // parole lasciava passare «ti ho messo l'allarme alle 19».
   const SVEGLIA = '(?:svegli[ae]|allarm[ei])';
 
+  // Giro 7 — la conferma SENZA «ho», che è il modo più corto di dirlo:
+  // «Sveglia impostata per le 19», «Appunto salvato», «Evento aggiunto al
+  // calendario». Nessuna di queste scattava, mentre «ti ho messo la sveglia»
+  // sì. La ragione scritta era che un participio da solo può raccontare uno
+  // STATO vero invece di una rivendicazione; adesso lo stato lo si guarda
+  // davvero (le ore delle sveglie, i titoli degli appunti), quindi il rischio
+  // che copriva non c'è più.
+  // Due cautele restano. La prima: la frase deve APRIRE una proposizione
+  // (inizio riga, oppure dopo «fatto», «ok», «ecco»…), perché in mezzo a un
+  // periodo un participio è quasi sempre una descrizione. La seconda: dentro
+  // il ponte non ci può stare un «non», altrimenti «la sveglia non è
+  // impostata» — che è una frase onesta — diventerebbe un'accusa.
+  const APRE = `(?:^|[\\n.!?;]|\\b(?:fatto|ok|okay|ecco|perfetto|bene|certo|subito|va bene)\\b[,:;!.…]?)\\s*`;
+  const SENZA_NON = (n) => `(?![^.!?]{0,${n}}\\bnon\\b)`;
+  function participio(nome, participi, n = 24) {
+    return new RegExp(`${APRE}(?:l[ae] |un[ao] |il |un |l['’])?${nome}\\b${SENZA_NON(n)}`
+      + `${PONTE(n)}\\b(?:è\\s+|e['’]\\s+|già\\s+)?(?:${participi})\\b`, 'i');
+  }
+
   const FAMIGLIE = [
     {
       id: 'sveglia',
