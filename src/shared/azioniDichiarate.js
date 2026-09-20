@@ -599,13 +599,42 @@
     // Il tasto «Fallo adesso» manda esattamente questa frase: senza, premerlo
     // spegneva il controllo invece di riaccenderlo.
     + `|fallo|falla|rifallo|rifai|davvero)${FINE}`, 'i');
+
+  // Giro 10 — L'ELENCO NON PUÒ ESSERE QUELLO DELLE COSE CHE PASSANO DA UNO
+  // STRUMENTO. Finché la promessa doveva farsi riconoscere dalle parole
+  // dell'utente, tutto quello che l'utente chiedeva SENZA nominare la cosa
+  // spegneva il presidio: «non farmelo dimenticare», «mettilo da parte»,
+  // «tienimelo a mente» sono richieste di un promemoria a tutti gli effetti,
+  // e «te l'ho segnato» tornava muto come prima del lavoro. In italiano una
+  // richiesta quasi mai nomina lo strumento.
+  //
+  // Quindi si ribalta: una richiesta è una PROMESSA da verificare a meno che
+  // non riguardi il TESTO della risposta. Questo elenco è quello delle cose
+  // su cui Filo lavora dentro la risposta — una frase, una parola, una mail,
+  // un riassunto — e vince solo quando l'utente non ha nominato niente che
+  // passi da uno strumento. Sul dubbio si parla: il silenzio è il lato
+  // sbagliato dove sbagliare, ed è il guasto della segnalazione.
+  const SU_UN_TESTO = new RegExp(
+    `${INIZIO}(?:fras[ei]|parol[ae]|test[oi]|paragraf[oi]|period[oi]|titol[oi]`
+    + `|riassum[a-zà-ù]*|riassunt[oi]|sintetizz[a-zà-ù]*|sunto`
+    + `|riscriv[a-zà-ù]*|riscritt[a-zà-ù]*|corregg[a-zà-ù]*|correzion[ei]|refuso|refusi`
+    + `|traduc[a-zà-ù]*|tradur[a-zà-ù]*|traduzion[ei]`
+    + `|accorcia[a-zà-ù]*|allung[a-zà-ù]*|abbrevi[a-zà-ù]*|semplific[a-zà-ù]*`
+    + `|plurale|singolare|maiuscol[a-zà-ù]*|minuscol[a-zà-ù]*|virgolette|grassetto|corsivo`
+    + `|spieg[a-zà-ù]*|spiegazion[ei]|dimmi|ditemi|raccontami|scrivimi|scrivilo|scrivila`
+    + `|mail|email|lettera|bozz[ae]`
+    + `|ordin[a-zà-ù]*|riordin[a-zà-ù]*|alfabetic[oa]|elenc[a-zà-ù]*`
+    + `|legg[a-zà-ù]*|rileggi|rivedi|revision[ei])${FINE}`, 'i');
+
   function richiestaDiAzione(messaggio) {
     const s = String(messaggio || '');
     if (!s.trim()) return false;
-    // «L'hai già mandata?» non chiede di farlo adesso: chiede se è fatto, e
-    // lì una cosa fatta prima è la risposta giusta.
-    if (domandaSuCosaFatta(s)) return false;
-    return COSE_DA_STRUMENTO.test(s);
+    // Una cosa nominata per nome è una promessa comunque, anche dentro una
+    // domanda: «l'hai mandata agli sviluppatori?» senza che sia mai partito
+    // niente resta una cosa da dire all'utente. Che una cosa fatta PRIMA
+    // possa reggere la risposta lo decide `domandaUtente`, non questo.
+    if (COSE_DA_STRUMENTO.test(s)) return true;
+    return !SU_UN_TESTO.test(s);
   }
 
   // La dichiarazione è dentro una domanda? («Ho aperto la pagina giusta?»)
