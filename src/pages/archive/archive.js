@@ -319,6 +319,9 @@
   }
 
   function render() {
+    // L'intestazione "Schede chiuse" serve solo quando sopra c'è la sezione
+    // delle chat: senza, la pagina avrebbe un titolo per una lista sola.
+    $('tabsSection').hidden = !tabs.length || !chatsTotal;
     if (semanticResults) { renderSemantic(); return; }
     const q = ($('search').value || '').trim().toLowerCase();
     const list = $('list');
