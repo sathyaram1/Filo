@@ -319,8 +319,13 @@ export function applyFixed(state) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
   s.verifierVerdict = null;
   s.verifierCritique = '';
+  s.verifierSha = '';
   s.secauditDone = false;
   s.secauditVerdict = null;
+  // Gli sha degli esiti se ne vanno con gli esiti: una correzione è contenuto
+  // nuovo, e tenerli vorrebbe dire lasciare in giro la firma di un controllo
+  // fatto su un'altra versione (feedback #485).
+  s.secauditSha = '';
   return s;
 }
 
