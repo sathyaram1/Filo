@@ -65,14 +65,22 @@
   // non veniva vista affatto, in nessuna famiglia e nemmeno col pronome.
   // L'elenco è chiuso apposta: un `\w+` qualunque qui dentro farebbe passare
   // il complemento («ho la sveglia messa da parte») per un avverbio.
-  const AVVERBI = '(?:gi[àa]|appena|anche|pure|subito|poi|quindi|comunque|intanto|infine'
+  // Giro 6: «gia'» con l'apostrofo al posto dell'accento. I modelli scrivono
+  // così di continuo, e la parola con l'accento era l'unica riconosciuta.
+  const AVVERBI = `(?:gi[àa]${AP}?|appena|anche|pure|subito|poi|quindi|comunque|intanto|infine`
     + '|ovviamente|certamente|sicuramente|effettivamente|finalmente|volentieri|prontamente'
     + '|ora|adesso|oggi|ieri|stamattina|stasera|stanotte|nel frattempo|per te|per voi)';
-  const AVV = `(?:${AVVERBI}\\s+){0,2}`;
+  // Giro 6: il grassetto di Markdown, che può stare intorno al verbo da solo
+  // («ti ho **messo** la sveglia»). Gli asterischi e gli underscore contano
+  // come spazio, non come parola.
+  const MD = '[*_]{0,3}';
+  const AVV = `(?:${MD}${AVVERBI}${MD}\\s+){0,3}${MD}`;
   // «Ho» e il participio: quanti spazi vuole il modello, e anche un a capo.
   // Scritto con uno spazio solo, «Ho  messo  la  sveglia» passava intero, e
   // così «Ti ho messo» con l'a capo prima di «una sveglia».
-  const HO = `\\bho\\s+${AVV}`;
+  // Giro 6: «avevo» accanto a «ho». Il trapassato è il tempo con cui si dice
+  // «l'avevo già fatto», ed è la risposta tipica a chi richiede una cosa.
+  const HO = `\\b(?:ho|avevo)\\s+${AVV}`;
   // Il pezzo di frase fra il verbo e la cosa. Prima escludeva l'a capo: una
   // dichiarazione spezzata su due righe non veniva vista. Da 48 a 72: con 48
   // «Ho messo, come mi avevi chiesto ieri sera prima di uscire, la sveglia
