@@ -941,6 +941,7 @@
           clausola: clausolaDi(testo, m.index, fine),
           verbo: verboDi(m[0]),
           senzaHo,
+          senzaOggetto: SENZA_OGGETTO.has(re),
         });
       }
     }
