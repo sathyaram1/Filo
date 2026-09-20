@@ -105,8 +105,39 @@ Tre cose imparate dal primo giro di verifica:
   nominata l'utente si risponde «l'ho messa alle 19», non «ho messo la
   sveglia»: era la forma più probabile, ed era l'unica che passava intera. Il
   pronome però non dice DI COSA si tratta, e scrivere «la sveglia non c'è» su
-  un appunto sarebbe peggio di tacere: la regge qualunque azione del turno,
-  scatta solo nel caso muto, e l'avviso lì resta generico.
+  un appunto sarebbe peggio di tacere: la regge un'azione del turno rimasta
+  libera, scatta solo nel caso muto, e l'avviso lì resta generico.
+
+Il terzo giro di verifica ha rimesso in piedi la stessa domanda — cosa vale
+come prova — e ha trovato che era stata richiusa su una forma sola per parte.
+La regola che ne esce è che **ogni risposta a quella domanda va scritta per la
+categoria intera, non per la frase che l'ha fatta nascere**:
+
+- **un'azione che mette un bottone in chat è un'azione fatta.** L'evento di
+  calendario, la pulizia delle schede e la cancellazione dell'archivio non si
+  eseguono da sole: il main le TIENE e preme l'utente. Contate come «mai
+  chiamate» facevano buttare la risposta, rifarla e poi smentire Filo per una
+  cosa che aveva fatto per intero — e il tasto «Fallo adesso» non portava da
+  nessuna parte, perché Filo poteva solo riproporre lo stesso bottone. Una
+  sveglia chiamata e non riuscita resta fuori: lì in chat non resta niente;
+- **«qualunque azione libera» era troppo larga.** Un'azione che si limita a
+  GUARDARE (una ricerca, una lettura) non può essere la cosa che l'utente si
+  sente confermare col pronome, e un segno di contesto non è un'azione del
+  tutto. Bastava avere un file aperto nell'editor — quel segno arriva a ogni
+  turno — perché il presidio non parlasse mai più: funzionava su un Filo vuoto
+  e smetteva appena veniva usato. Il comando di terminale resta l'eccezione, e
+  per scelta: un comando può davvero salvare o cancellare qualunque cosa;
+- **la prova che sta nello stato vale per tutte le frasi, non per una.** La
+  sveglia che esiste reggeva solo la forma lunga che ripete la parola
+  «sveglia» con l'ora in cifre, cioè la forma meno probabile subito dopo la
+  domanda: il pronome, la parola «promemoria» e l'ora detta a lettere («alle
+  sette», «alle 7 di sera», che sono le 19) restavano un'accusa. Lo stesso
+  vale per gli appunti: un appunto salvato ieri regge la frase che lo nomina;
+- **il formato interno ha più di una busta.** Oltre al vecchio involucro, alla
+  lista di azioni e al nome dello strumento con le parentesi, i modelli aperti
+  lo emettono avvolto in un tag (`<tool_call>…`) o preceduto dallo spazio dei
+  nomi (`functions.SVEGLIA({…})`). Nel testo sono lo stesso guasto: in chat
+  resta un blocco di codice e la sveglia non c'è.
 
 Il rimbalzo non è invisibile per l'utente quanto sembra: la risposta già
 comparsa a schermo viene cancellata, e una risposta che si cancella da sola
