@@ -306,7 +306,9 @@
     const presenti = (azioni instanceof Set) ? azioni : insiemeDiTipi(azioni);
     const out = [];
     for (const fam of FAMIGLIE) {
-      if (fam.tipi.some((x) => presenti.has(x))) continue;
+      // Famiglia senza tipi: la regge qualunque azione del turno (vedi
+      // «senza-nome»). Con almeno un'azione in giro non si accusa nessuno.
+      if (!fam.tipi.length ? presenti.size > 0 : fam.tipi.some((x) => presenti.has(x))) continue;
       const frase = dichiarazione(t, fam);
       if (frase) out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase });
     }
