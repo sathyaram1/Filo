@@ -251,25 +251,25 @@ function normalizzaTesto(s) {
  */
 function sottoalbero(html, vale) {
   const src = String(html == null ? '' : html);
-  const re = new RegExp(TAG_RE.source, 'g');
-  let m;
-  while ((m = re.exec(src))) {
-    if (m[1] === '/' || m[4] === '/') continue;
-    const nome = m[2].toLowerCase();
-    if (VUOTI.has(nome) || !vale(nome, attributi(m[3]))) continue;
+  let i = 0;
+  for (;;) {
+    const t = prossimoTag(src, i);
+    if (!t || t.troncato) return null;
+    i = t.fine;
+    if (t.salta || t.chiusura || t.autochiuso) continue;
+    if (VUOTI.has(t.nome) || !vale(t.nome, attributi(t.attrsRaw))) continue;
     // Trovato: cerca la chiusura corrispondente contando gli annidati.
-    const dentro = new RegExp(`<(/?)${nome}\\b([^>]*?)(/?)>`, 'gi');
-    dentro.lastIndex = re.lastIndex;
     let livello = 1;
-    let d;
-    while ((d = dentro.exec(src))) {
-      if (d[3] === '/') continue;
-      livello += d[1] === '/' ? -1 : 1;
-      if (livello === 0) return src.slice(re.lastIndex, d.index);
+    let j = t.fine;
+    for (;;) {
+      const d = prossimoTag(src, j);
+      if (!d || d.troncato) return src.slice(t.fine);
+      j = d.fine;
+      if (d.salta || d.autochiuso || d.nome !== t.nome) continue;
+      livello += d.chiusura ? -1 : 1;
+      if (livello === 0) return src.slice(t.fine, d.inizio);
     }
-    return src.slice(re.lastIndex);
   }
-  return null;
 }
 
 /** Il titolo della pagina: <title>, poi og:title, poi il primo <h1>. PURA. */
