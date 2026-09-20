@@ -31,6 +31,7 @@
     SALVA_LEZIONE: 'pin',
     INVIA_FEEDBACK: 'feedback',
     CERCA_WEB: 'searchWeb',
+    LEGGI_PAGINA: 'readPage',
     ONBOARDING: 'checklist',
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',
@@ -56,7 +57,6 @@
   const PREVISTE = {
     LEGGI_POSTA: 'mailOpen',
     INVIA_POSTA: 'mailSend',
-    LEGGI_PAGINA: 'readPage',
     SCREENSHOT: 'screenshot',
     CLICCA: 'click',
     SCRIVI_NELLA_PAGINA: 'typeText',
