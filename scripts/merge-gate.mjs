@@ -42,10 +42,10 @@
 
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pinnedRepoRoot } from './lib/tools-pin.mjs';
+import { pinnedRepoRoot, absolutizeRecipe, TOOLS_ROOT } from './lib/tools-pin.mjs';
 import { merge } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
-import { headSha, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
+import { headSha, findStateIdByBranch, readBranchState, gitIn } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
