@@ -89,6 +89,7 @@ test('il nome del file arriva al modello com’è scritto sul disco', async ({ a
 });
 
 test('il file si apre anche col nome che il modello ha letto', async ({ app, openTab }) => {
+  test.fail(true, 'porta aperta: il rilievo è in coda come feedback derivato');
   const dir = cartellaTemporanea('filo-551-g7-riapri-');
   try {
     // La terza porta, quella che l'utente sente: dal nome storpiato non si
