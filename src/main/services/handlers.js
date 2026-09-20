@@ -2999,7 +2999,11 @@ function dashboardScheduler() {
       const cached = await FiloMem.getDashboardCache();
       // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
       if (cached && cached.signature === inputs.signature) return;
-      const result = await generateDashboardFromInputs(inputs);
+      // Un giro fallito (rete giù, modello che rifiuta) lascia la home com'è e
+      // basta: qui siamo dentro un timer, e rilanciare porterebbe giù il main.
+      let result = null;
+      try { result = await generateDashboardFromInputs(inputs); }
+      catch (e) { console.warn('[Filo] ricalcolo home fallito', e); return; }
       // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
       broadcastToTabs({
         type: MSG.FILO_DASHBOARD_UPDATED,
