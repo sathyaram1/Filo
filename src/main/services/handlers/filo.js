@@ -154,6 +154,30 @@ module.exports = function register(on, ctx) {
     return { ok: true, chats: await FiloChats.listIndex() };
   });
 
+  // #525 — una riga che Filo ha scritto in chat senza passare da un modello
+  // (la risposta a un comando con lo slash). Fino a ieri restava solo sullo
+  // schermo: riaprendo la chat dall'archivio quella riga non c'era più, e la
+  // conversazione si rileggeva con un buco in mezzo.
+  on(MSG.FILO_CHAT_NOTE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const id = msg.id;
+    const text = String(msg.text || '');
+    if (!id || !text.trim()) return { ok: false, error: 'niente da archiviare' };
+    // La scheda che scrive questa riga sta vivendo la chat: quando sparisce,
+    // la chat è finita — come per un turno normale.
+    if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
+    await FiloChats.append(id, { role: 'filo', text });
+    return { ok: true };
+  });
+
+  // #525 — la conversazione che l'utente ha cliccato in Cronologia è ancora
+  // aperta in una scheda: lo portiamo lì. Aprirne una seconda copia significa
+  // due schede sulla stessa chat che non si vedono fra loro.
+  on(MSG.FILO_CHAT_FOCUS, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, portato: ctx.portaAllaChat(msg.id) };
+  });
+
   on(MSG.FILO_CHATS_SEARCH, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const all = await FiloChats.list();
