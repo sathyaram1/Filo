@@ -58,6 +58,15 @@ function deposito(prefisso) {
   return { dir, g, punta: () => g(['rev-parse', 'HEAD']).trim() };
 }
 
+/**
+ * Lo stato locale del lavoro, come lo lascia il dispatcher quando assegna il
+ * ramo: qui serve solo perché il ramo ci sia scritto, come nel giro vero.
+ */
+function seminaStato(statoDir, id, branch) {
+  mkdirSync(statoDir, { recursive: true });
+  writeFileSync(resolve(statoDir, `${id}.json`), JSON.stringify({ id, branch }, null, 2) + '\n', 'utf8');
+}
+
 function lancia(script, args, env, cwd) {
   return new Promise((r) => execFile(process.execPath, [script, ...args], { env, cwd },
     (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
