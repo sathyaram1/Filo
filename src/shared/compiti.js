@@ -224,6 +224,7 @@
       id: c.id,
       origine: c.origine,
       perimetro: Array.isArray(c.perimetro) ? c.perimetro.slice() : null,
+      sempre: c.sempre.slice(),
       dichiarato: !!c.dichiarato,
       contaminato: !!c.contaminato,
       fonte: c.fonte,
