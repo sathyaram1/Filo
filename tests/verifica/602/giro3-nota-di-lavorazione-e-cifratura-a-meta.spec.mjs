@@ -272,15 +272,26 @@ test('la frase «non è partito niente» si legge per intero, sul chiaro e sullo
   const stato = mount.locator('.fb-attach-status');
   await expect(stato).toContainText(/non ho mandato niente/i, { timeout: 10_000 });
 
-  for (const tema of ['light', 'dark']) {
-    await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, tema);
-    // Niente taglio: quello che si legge è tutta la frase, non un pezzo.
-    const misura = await stato.evaluate((el) => ({
-      testo: el.textContent || '',
-      tagliato: el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1,
-    }));
+  const fondi = [];
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.waitForTimeout(150);
+    // Niente taglio: quello che si legge è tutta la frase, non un pezzo. E il
+    // colore non è quello del fondo.
+    const misura = await stato.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        testo: el.textContent || '',
+        tagliato: el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1,
+        colore: s.color,
+        fondo: getComputedStyle(document.body).backgroundColor,
+      };
+    });
+    fondi.push(misura.fondo);
     expect(misura.testo).toMatch(/lo può leggere chiunque/i);
     expect(misura.tagliato, `la frase non deve essere tagliata (tema ${tema})`).toBe(false);
+    expect(misura.colore, `tema ${tema}`).not.toBe(misura.fondo);
     await page.screenshot({ path: `tests/.shots/602-giro3-frase-${tema}.png` });
   }
+  expect(fondi[0], 'i due temi devono avere fondi diversi').not.toBe(fondi[1]);
 });
