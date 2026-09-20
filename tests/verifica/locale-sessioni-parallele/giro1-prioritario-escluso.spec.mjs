@@ -32,9 +32,13 @@ test('escluso l\'account prioritario, la pagina dice quale account resta', async
   await expect(page.locator('#mgAccountA')).not.toBeChecked();
 
   // Da qualche parte deve comparire che la scelta «Prima A» ora non vale.
-  const testi = (await page.locator('#mgAccountsWarn').textContent() || '')
+  const visibile = await page.locator('#mgPriorityWarn').isVisible()
+    || await page.locator('#mgAccountsWarn').isVisible();
+  const testi = (await page.locator('#mgPriorityWarn').textContent() || '')
+    + (await page.locator('#mgAccountsWarn').textContent() || '')
     + (await page.locator('#mgPriorityAccountMsg').textContent() || '');
-  const avvisato = await page.locator('#mgAccountsWarn').isVisible() || /escluso|non vale|ignorat/i.test(testi);
-  test.fail(true, 'la pagina non segnala che il prioritario è escluso (rilievo del giro 1)');
-  expect(avvisato).toBe(true);
+  expect(visibile).toBe(true);
+  expect(/escluso|non vale|ignorat/i.test(testi)).toBe(true);
+  // E dice su quale account si lavora adesso, non solo che qualcosa non torna.
+  expect(/\bB\b/.test(testi)).toBe(true);
 });
