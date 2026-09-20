@@ -22,7 +22,9 @@
 //   SN_CONST     STORAGE_KEYS.FEEDBACK_OUTBOX
 //
 // API
-//   init({ prepare, onDone, log, backoffMin, backoffMax })  — una volta all'avvio
+//   init({ prepare, onDone, onGiveUp, log, backoffMin, backoffMax })  — una volta all'avvio
+//     onGiveUp(item, motivo) torna `false` se l'avviso non è arrivato a
+//     nessuno: quella voce resta in coda finché non si riesce a dirlo.
 //   enqueue(payload) -> { id, queued:true }                 — accoda + prova subito
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   size()                                                  — voci in coda
@@ -47,13 +49,22 @@
   let auto = true;       // scheduling automatico (disattivabile nei test)
   let prepareFn = null;  // async (payload) -> name (titolo generato al momento dell'invio)
   let onDoneFn = null;   // (item, result) -> void  (es. avvisare di allegati non caricati)
+  // (item, motivo) -> boolean  (#602: rinuncia definitiva, va DETTA; `false`
+  // = non c'era nessuno a cui dirlo, la voce resta in coda e si riprova)
+  let onGiveUpFn = null;
   let logFn = function () { try { console.log.apply(console, ['[feedback-outbox]'].concat([].slice.call(arguments))); } catch (_) {} };
   let backoffMin = 3000;
   let backoffMax = 30000;
   let backoff = backoffMin;
 
   function serialize(it) {
-    return { id: it.id, payload: it.payload, name: it.name, prepared: !!it.prepared, queuedAt: it.queuedAt, attempts: it.attempts || 0 };
+    return {
+      id: it.id, payload: it.payload, name: it.name, prepared: !!it.prepared,
+      queuedAt: it.queuedAt, attempts: it.attempts || 0,
+      // #602 — una voce che aspetta solo di essere ANNUNCIATA (non partirà
+      // mai): si persiste come le altre, così l'avviso sopravvive a un riavvio.
+      rinuncia: !!it.rinuncia, motivoRinuncia: it.motivoRinuncia || '',
+    };
   }
 
   async function persist() {
@@ -76,6 +87,8 @@
             prepared: !!x.prepared,
             queuedAt: Number(x.queuedAt) || Date.now(),
             attempts: Number(x.attempts) || 0,
+            rinuncia: !!x.rinuncia,
+            motivoRinuncia: x.motivoRinuncia || '',
           }));
       }
     } catch (e) { logFn('load fallito:', e?.message || e); }
@@ -85,6 +98,7 @@
     opts = opts || {};
     if (typeof opts.prepare === 'function') prepareFn = opts.prepare;
     if (typeof opts.onDone === 'function') onDoneFn = opts.onDone;
+    if (typeof opts.onGiveUp === 'function') onGiveUpFn = opts.onGiveUp;
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
@@ -116,6 +130,25 @@
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
 
+  // #602 — DIRLO È PARTE DEL BUTTARE VIA.
+  //
+  // Una segnalazione che non si può cifrare non partirà mai, e chi l'ha mandata
+  // ha già letto «inviato». L'unica cosa che le resta è l'avviso: finché quello
+  // non è arrivato a qualcuno, la voce NON si toglie dalla coda (che è
+  // persistita, quindi regge anche un riavvio). Prima l'avviso partiva una
+  // volta sola, verso chi c'era in quel momento: all'avvio, o con Filo in
+  // secondo piano, non lo vedeva nessuno e la segnalazione spariva in silenzio.
+  //
+  // Chi riceve l'avviso risponde `false` quando non c'era nessuno a cui dirlo.
+  // Tutto il resto (nessun avvisatore, un valore qualunque, un'eccezione)
+  // conta come detto: una coda che non si svuota più per un avvisatore rotto
+  // sarebbe un guasto peggiore di quello che cura.
+  function annunciaRinuncia(it) {
+    if (!onGiveUpFn) return true;
+    try { return onGiveUpFn(it, it.motivoRinuncia) !== false; }
+    catch (_) { return true; }
+  }
+
   // Tenta di inviare TUTTA la coda una volta. Ritorna true se la coda è vuota
   // dopo il tentativo. Su fallimento (offline) le voci restano in coda e, se
   // `auto`, viene pianificato un nuovo tentativo con backoff crescente.
@@ -126,6 +159,13 @@
     try {
       await load();
       for (const it of queue.slice()) {
+        // Voce già rinunciata: non si tenta più di spedirla e non scade, si
+        // prova solo a dirlo. Detto, esce dalla coda.
+        if (it.rinuncia) {
+          if (annunciaRinuncia(it)) remove(it.id);
+          else anyFail = true;
+          continue;
+        }
         if (Date.now() - it.queuedAt > MAX_AGE_MS) {
           logFn('voce scaduta dopo troppi tentativi, rinuncio:', it.id);
           remove(it.id);
@@ -152,6 +192,19 @@
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
+          // #602 — una cifratura che non si può fare NON è la rete che manca.
+          // Riprovare non cambia niente finché quella copia di Filo resta com'è,
+          // e intanto chi ha mandato la segnalazione ha già letto «inviato»:
+          // restava in coda un giorno intero e poi spariva senza una parola.
+          // Qui si smette subito e glielo si dice.
+          if (fb.isEncryptionError && fb.isEncryptionError(e)) {
+            logFn('rinuncio, la cifratura non si può fare:', it.id, e?.message || e);
+            it.rinuncia = true;
+            it.motivoRinuncia = e?.message || String(e);
+            if (annunciaRinuncia(it)) remove(it.id);
+            else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
+            continue;
+          }
           it.attempts = (it.attempts || 0) + 1;
           anyFail = true;
           logFn('invio fallito (riprovo):', it.id, e?.message || e);
@@ -179,7 +232,7 @@
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
       queue = []; loaded = false; flushing = false; auto = true;
-      prepareFn = null; onDoneFn = null; backoff = backoffMin;
+      prepareFn = null; onDoneFn = null; onGiveUpFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
     },
   };

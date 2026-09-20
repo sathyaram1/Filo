@@ -9,6 +9,17 @@
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/feedback.js"></script>
+  <!-- LA CIFRATURA, che qui mancava (#602). Questa pagina è l'unica che carica
+       da sola nel deposito: gli allegati dei COMMENTI (immagini e log del
+       lavoro) partono da `SN_FEEDBACK.uploadAttachment`, che gira nella pagina
+       e non passa dal main. Senza questi due file `SN_FEEDBACK_CRYPTO` qui non
+       esiste, e la cifratura si limitava a non farsi — in silenzio, con gli
+       allegati che finivano nel deposito in chiaro. Ora chi carica senza poter
+       cifrare si ferma e lo dice, ma il modo di non arrivarci è caricare la
+       cifratura: è questo. Il resto della pagina (stati, note) non ne ha
+       bisogno perché scrive passando dal main, che li carica già. -->
+  <script src="filo://shared/feedbackPublicKey.js"></script>
+  <script src="filo://shared/feedbackCrypto.js"></script>
   <!-- Vocabolario UNICO della macchina a stati + la logica di sezione condivisa
        con la dashboard di gestione (#509). Prima questa pagina aveva una sua
        tassonomia (new/draft/todo/review/blocked/clarify/done/verified) e mandava
@@ -200,6 +211,18 @@
     .fb-attach-thumb img {
       width: 64px; height: 64px; object-fit: cover;
       border: 1px solid var(--sn-border); border-radius: 6px; cursor: zoom-in; display: block;
+    }
+    /* L'allegato sale cifrato (#602): finché Filo non ne ha in mano una copia
+       mostrabile la miniatura pulsa, e se non ce n'è nessuna resta un riquadro
+       della stessa misura, così la fila non si scompone. */
+    .fb-attach-thumb img.fb-img-loading {
+      object-fit: contain; cursor: default;
+      background: var(--sn-surface-2, rgba(127,127,127,.08));
+      animation: fbImgPulse 1.2s ease-in-out infinite;
+    }
+    .fb-attach-thumb .fb-img-broken {
+      width: 64px; height: 64px; font-size: 10px; line-height: 1.2;
+      text-align: center; padding: 2px; box-sizing: border-box;
     }
     .fb-attach-chip {
       display: inline-flex; align-items: center; gap: 6px;

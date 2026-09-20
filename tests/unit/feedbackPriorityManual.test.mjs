@@ -22,6 +22,12 @@ const require = createRequire(import.meta.url);
 // Carica feedback.js (IIFE → SN_FEEDBACK su globalThis).
 // Il modulo usa `fetch` globale: lo sostituiamo con un mock che cattura la
 // chiamata e ritorna un oggetto ok senza toccare la rete.
+// #602 — la cifratura si carica come la carica l'app (loader.js): da quando
+// non c'è più un ripiego in chiaro, un test che gira SENZA cifratura non prova
+// la stessa cosa che gira in produzione, prova l'unico caso che non deve
+// esistere. Priority viaggia cifrata, e qui si asserisce proprio quello.
+require(join(ROOT, 'src', 'shared', 'feedbackPublicKey.js'));
+require(join(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
 require(join(ROOT, 'src', 'shared', 'feedback.js'));
 const FB = globalThis.SN_FEEDBACK;
 
@@ -108,10 +114,7 @@ test('P6: updateStatus senza priorityManual NON scrive il campo (retrocompat)', 
 test('P6: updateStatus con priority+priorityManual:true scrive entrambi in mask', async () => {
   installFetchMock();
 
-  // Cifratura spenta (gate dormiente): priority viene scritto come integerValue.
-  const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
-  globalThis.SN_FEEDBACK_ENC_ENABLED = false;
-  try {
+  {
     await FB.updateStatus('doc-id-combo', { priority: 2, priorityManual: true });
 
     assert.ok(lastCall, 'fetch deve essere stata chiamata');
@@ -124,10 +127,12 @@ test('P6: updateStatus con priority+priorityManual:true scrive entrambi in mask'
     assert.ok('priority' in fields, 'priority deve essere nei fields');
     assert.ok('priorityManual' in fields, 'priorityManual deve essere nei fields');
     assert.deepEqual(fields.priorityManual, { booleanValue: true }, 'priorityManual deve essere booleanValue:true');
-    // priority senza cifratura → integerValue '2'
-    assert.deepEqual(fields.priority, { integerValue: '2' }, 'priority deve essere { integerValue: "2" }');
-  } finally {
-    globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
+    // #602 — priority va sul documento SOLO cifrata: niente più `integerValue`
+    // in chiaro quando la cifratura non riesce. Il numero in chiaro su un
+    // documento che si legge da fuori dice quanto ci si tiene a quel feedback.
+    assert.ok(fields.priority.stringValue, 'priority deve essere una stringa cifrata, non un numero');
+    assert.match(fields.priority.stringValue, /^FENC1:/, 'priority deve essere un ciphertext FENC1:');
+    assert.ok(!('integerValue' in fields.priority), 'priority non deve mai essere scritta in chiaro');
   }
 });
 
@@ -136,9 +141,7 @@ test('P6: updateStatus con priority+priorityManual:true scrive entrambi in mask'
 test('P6: updateStatus con solo priority (senza priorityManual) NON scrive priorityManual', async () => {
   installFetchMock();
 
-  const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
-  globalThis.SN_FEEDBACK_ENC_ENABLED = false;
-  try {
+  {
     await FB.updateStatus('doc-id-prio-only', { priority: 3 });
 
     assert.ok(lastCall, 'fetch deve essere stata chiamata');
@@ -149,7 +152,5 @@ test('P6: updateStatus con solo priority (senza priorityManual) NON scrive prior
 
     const fields = extractFields(lastCall.opts);
     assert.ok(!('priorityManual' in fields), 'priorityManual NON deve essere nei fields se non passato esplicitamente');
-  } finally {
-    globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
   }
 });

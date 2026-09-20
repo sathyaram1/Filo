@@ -480,6 +480,32 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // #602 — un avviso che DEVE essere visto: va nella cornice della finestra
+  // (la stessa striscia di notifiche che annuncia la fine di uno scaricamento),
+  // non nella pagina davanti. Resta lì finché non lo si chiude, perché dice che
+  // una segnalazione non è mai partita e va rimandata.
+  //
+  // Ritorna `false` se non c'era nessuna finestra pronta a mostrarlo: chi
+  // chiama tiene allora da parte l'avviso e riprova più tardi, invece di
+  // parlare al vuoto. Una finestra che sta ancora caricando non conta: la sua
+  // cornice non ascolta ancora.
+  function avvisoNellaFinestra(testo) {
+    let dette = 0;
+    try {
+      const { BrowserWindow } = require('electron');
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
+        const wc = win.webContents;
+        if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
+        try {
+          wc.send('shell:toast', { text: testo, opts: { durationSec: 0 } });
+          dette++;
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return dette > 0;
+  }
+
   // Coda d'invio del feedback (#341): "Invia" NON aspetta più la rete. Il box
   // sparisce subito e il main si fa carico di consegnare il feedback in
   // background, ritentando da solo finché la connessione torna. L'invio è
@@ -506,6 +532,20 @@ module.exports = function register(on, ctx) {
           });
         } catch (_) {}
       },
+      // #602 — la coda rinuncia perché non si può cifrare. Chi ha mandato la
+      // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
+      // glielo diciamo, quella segnalazione sparisce e non lo sa nessuno. Il
+      // motivo arriva già scritto per chi legge (dice cosa manca e che non è
+      // partito niente).
+      //
+      // Non passa dagli avvisi delle pagine: quelli li mostra solo una pagina
+      // web che in quel momento è davanti E a fuoco, quindi con Filo in
+      // secondo piano, su una pagina interna o appena avviato non li vedeva
+      // nessuno, e la segnalazione spariva in silenzio lo stesso. Va nella
+      // cornice della finestra, dove resta finché non la si chiude.
+      onGiveUp: (_item, motivo) => avvisoNellaFinestra(
+        String(motivo || 'La tua segnalazione non è partita.'),
+      ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
@@ -532,6 +572,21 @@ module.exports = function register(on, ctx) {
       }
       if (!Outbox?.enqueue) {
         throw new Error('SN_FEEDBACK_OUTBOX non caricato nel main process');
+      }
+      // #602 — la cifratura si controlla PRIMA di accodare. La coda risponde
+      // «ricevuto» appena il feedback è al sicuro sul disco e spedisce dopo:
+      // se la cifratura non si potesse fare, chi manda avrebbe già letto
+      // «grazie, inviato» e la segnalazione riproverebbe per giorni senza
+      // partire mai. Qui invece la risposta è un no, con il motivo.
+      const motivoCifratura = globalThis.SN_FEEDBACK.encryptionUnavailable?.() || '';
+      if (motivoCifratura) {
+        // `cifratura: true` dice al riquadro che questa frase è già la frase
+        // per l'utente: non va incorniciata in un «Errore invio:».
+        return {
+          ok: false,
+          cifratura: true,
+          error: globalThis.SN_FEEDBACK.encryptionBlockedMessage(motivoCifratura),
+        };
       }
       const payload = msg.payload || {};
       // Se l'utente è loggato come admin (l'owner), marca il suo invio come

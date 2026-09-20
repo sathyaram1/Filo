@@ -16,6 +16,20 @@
 
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+// #602 — anche questa strada carica nel deposito, e finché non passava dalla
+// cifratura le schermate dello schermo dell'owner ci finivano in chiaro: un
+// punto che carica in chiaro vale tutti gli altri messi insieme, perché il
+// deposito è lo stesso e il link col codice di scarico gira allo stesso modo.
+// Il modulo di cifratura è lo stesso dell'app (gira in Node come nel browser).
+const __agentDir = dirname(fileURLToPath(import.meta.url));
+const __repoRoot = join(__agentDir, '..', '..');
+const __require = createRequire(import.meta.url);
+__require(join(__repoRoot, 'src', 'shared', 'feedbackPublicKey.js'));
+const CRYPTO = __require(join(__repoRoot, 'src', 'shared', 'feedbackCrypto.js'));
 
 // Stessi valori (pubblici) di src/shared/feedback.js.
 const PROJECT_ID = 'filo-8b9cb';
@@ -46,10 +60,27 @@ function toFsValue(v) {
 // utensile a sé, e la sentinella tests/unit/storageRulesAllegati.test.mjs prova
 // anche la variante con etichetta.
 async function uploadImage(buffer, mime = 'image/png') {
+  // Cifratura obbligatoria, come nell'app (#602): se non si può cifrare non si
+  // carica. Chi chiama (`pushIssue`) tratta l'errore come «niente immagine» e
+  // la segnalazione parte lo stesso, senza lo screenshot.
+  if (!CRYPTO.isEnabled()) {
+    throw new Error('cifratura non disponibile: non carico lo screenshot in chiaro');
+  }
+  const sealed = await CRYPTO.encryptBytesForOwner(new Uint8Array(buffer));
+  if (!CRYPTO.isEncryptedBytes(sealed)) {
+    throw new Error('cifratura non riuscita: lo screenshot non risulta cifrato');
+  }
+  // Il contenuto cifrato è opaco: viaggia come octet-stream (è il tipo che
+  // storage.rules ammette per i blob cifrati) e la dashboard ne indovina il
+  // formato dai primi byte dopo averlo decifrato.
   const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
   const name = `${COLLECTION}/agent_${Date.now()}_${randomUUID()}.${ext}`;
   const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': mime }, body: buffer });
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: sealed,
+  });
   if (!res.ok) throw new Error(`upload storage ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
   const json = await res.json();
   const token = json.downloadTokens || json.metadata?.downloadTokens || '';

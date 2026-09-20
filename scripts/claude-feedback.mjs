@@ -132,6 +132,11 @@ export const EXIT = Object.freeze({
  */
 export function exitCodeForError(err) {
   const msg = String((err && err.message) || err || '');
+  // #602 — la cifratura che non si può fare è un NO definitivo, non una rete
+  // caduta: riprovare non cambia niente finché la copia dell'app resta com'è.
+  // Senza questa riga cadeva nel ramo "riprova" qui sotto, e chi lancia lo
+  // script a ripetizione ci sarebbe rimasto dentro.
+  if (err && err.cifratura === true) return EXIT.RIFIUTATO;
   // Rifiuto esplicito del server: le regole non hanno accettato il documento
   // (403), il documento era malformato (400) o esisteva già (409).
   if (/\((400|401|403|404|409|422)\)/.test(msg)) return EXIT.RIFIUTATO;

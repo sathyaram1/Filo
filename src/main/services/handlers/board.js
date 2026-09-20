@@ -142,6 +142,13 @@ module.exports = function register(on, ctx) {
         // sotto fallisce a metà.
         await FB.castReopenRequest(id, uid, { idToken });
         created = await FB.submit({
+          // Un id d'invio STABILE per questa coppia (fix, persona): se la
+          // risposta si perde per strada ma il documento è nato lo stesso, un
+          // secondo tentativo non crea un doppione — il server lo riconosce e
+          // torna quello di prima. È ciò che rende sicuro rimettere a posto il
+          // segnale qui sotto quando la creazione fallisce: la porta si riapre
+          // per chi deve riprovare, e resta chiusa ai duplicati.
+          submissionId: `reopen-${id}-${uid}`,
           text: `[Riapertura #${original.seq || id}] ${text}`,
           // #583: l'URL e il titolo della pagina del feedback originale non
           // arrivano più fin qui — sono di chi l'aveva mandato, e la scheda
@@ -159,6 +166,15 @@ module.exports = function register(on, ctx) {
         // fine dopo aver già scalato — restituiamo i crediti invece di
         // lasciare l'utente scalato senza nulla in cambio.
         try { await Credits.award({ kind: 'board_reopen_refund', credits: amount, ref: id }); } catch (_) {}
+        // E torna indietro anche il SEGNALE di riapertura. Lo scriviamo per
+        // primo apposta, perché chiude la porta ai duplicati (#269); ma se la
+        // segnalazione collegata non è nata, di duplicati non ce n'è nessuno —
+        // c'è solo chi ha scritto cosa non funziona ancora e, con quel segnale
+        // rimasto lì, si sentiva rispondere che il fix era «già stato
+        // segnalato»: i crediti tornavano, la spiegazione no, e non poteva più
+        // mandarla. Adesso può riprovare, e l'id d'invio stabile qui sopra
+        // impedisce che da un ritentativo nasca un doppione.
+        try { await FB.clearReopenRequest(id, uid, { idToken }); } catch (_) {}
         throw e;
       }
 

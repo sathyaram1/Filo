@@ -25,6 +25,16 @@ require(join(ROOT, 'src', 'shared', 'feedbackThread.js'));
 
 const TH = globalThis.SN_FEEDBACK_THREAD;
 
+// Coppia ECDH P-256 di prova: serve a rileggere cio che la scrittura cifra.
+async function coppiaDiProva() {
+  const { webcrypto } = await import('node:crypto');
+  const pair = await webcrypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const pubRaw = new Uint8Array(await webcrypto.subtle.exportKey('raw', pair.publicKey));
+  const privPkcs8 = new Uint8Array(await webcrypto.subtle.exportKey('pkcs8', pair.privateKey));
+  const b64url = (b) => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return { pub: b64url(pubRaw), priv: Buffer.from(privPkcs8).toString('base64') };
+}
+
 // Conversazione finta a turni: ogni turno è un blocco con marcatore.
 function conversation(turns, bodyLen) {
   const parts = ['report iniziale della routine: ' + 'a'.repeat(bodyLen)];
@@ -77,11 +87,22 @@ test('tetto piccolo su misura: il testo tagliato resta una conversazione leggibi
 // quello che impedisce al feedback di diventare immobile. Qui si intercetta la
 // richiesta che parte verso Firestore e si guarda cosa contiene davvero.
 test('il salvataggio dalla dashboard non spedisce mai note oltre il tetto', async () => {
+  // #602 — il cammino di scrittura gira CIFRATO, come in produzione: da quando
+  // non c'e piu un ripiego in chiaro, provarlo con la cifratura spenta
+  // significa provare l'unico caso che non deve esistere. Le note escono
+  // percio come ciphertext, e per guardarci dentro si cifra verso una coppia
+  // di prova e si decifra con la sua privata.
+  require(join(ROOT, 'src', 'shared', 'feedbackPublicKey.js'));
+  require(join(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
   require(join(ROOT, 'src', 'shared', 'feedback.js'));
   const FB = globalThis.SN_FEEDBACK;
+  const CRYPTO = globalThis.SN_FEEDBACK_CRYPTO;
+  const { pub, priv } = await coppiaDiProva();
 
   let sent = null;
   const realFetch = globalThis.fetch;
+  const pubSalvata = globalThis.SN_FEEDBACK_PUBKEY;
+  globalThis.SN_FEEDBACK_PUBKEY = pub;
   globalThis.fetch = async (url, opts) => {
     sent = JSON.parse(opts.body);
     return { ok: true, status: 200, text: async () => '', json: async () => ({}) };
@@ -90,9 +111,12 @@ test('il salvataggio dalla dashboard non spedisce mai note oltre il tetto', asyn
     await FB.updateStatus('doc-1', { notes: conversation(20, 5000) }, { idToken: 'x' });
   } finally {
     globalThis.fetch = realFetch;
+    globalThis.SN_FEEDBACK_PUBKEY = pubSalvata;
   }
 
-  const notes = sent.fields.notes.stringValue;
+  const spedite = sent.fields.notes.stringValue;
+  assert.match(spedite, /^FENC1:/, 'le note non devono mai partire in chiaro');
+  const notes = await CRYPTO.decrypt(spedite, priv);
   assert.ok(notes.length <= TH.NOTES_MAX, `spedite ${notes.length} char, tetto ${TH.NOTES_MAX}`);
   assert.ok(notes.includes('risposta 19'), 'l’ultimo turno deve arrivare a destinazione');
 });

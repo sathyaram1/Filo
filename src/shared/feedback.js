@@ -207,7 +207,16 @@
   // L'URL che torna porta il download token: da quando la lettura del bucket è
   // riservata all'owner, quel token È il permesso di leggere l'allegato — va
   // trattato come il contenuto, non come un indirizzo qualunque.
+  //
+  // ⚠️ DA QUI NON ESCE NIENTE IN CHIARO (#602). Questo è l'unico punto dell'app
+  // che scrive nel deposito, ed è qui che il controllo va messo: i chiamanti
+  // erano tre e la cifratura la ricordavano in due. Chi carica passa da
+  // `sealForUpload`; se i byte che arrivano non sono un ciphertext la chiamata
+  // si ferma prima della rete. Il tetto di lettura di quel deposito è il link
+  // col codice di scarico, che vive dentro il documento del feedback e gira: un
+  // allegato in chiaro lì dentro lo legge chiunque si sia portato via il link.
   async function uploadImage(blob) {
+    await assertSealed(blob);
     const name = attachmentPath(blob.type || 'png');
     const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
     const res = await fetch(url, {
@@ -282,15 +291,66 @@
   }
 
   // ---- cifratura campi sensibili (S1.2) ----
-  // Cifra un campo testo se la chiave pubblica è disponibile. Guard: se la
-  // pubblica non c'è (hasPublicKey() false) restituisce il valore invariato
-  // (niente crash, scrittura in chiaro come prima).
+
+  // PERCHÉ NON ESISTE PIÙ UN RIPIEGO IN CHIARO (#602)
+  //   Fin qui la cifratura era una cortesia: se la chiave pubblica non c'era, o
+  //   se l'operazione andava storta, il testo e gli allegati partivano lo stesso
+  //   in chiaro, con una riga nella console che non legge nessuno. Il risultato
+  //   è il contrario di quello che la cifratura serve a ottenere: il momento in
+  //   cui qualcosa si rompe è esattamente il momento in cui il contenuto va
+  //   protetto di più, e chi manda non lo sa. Adesso una cifratura che non si
+  //   può fare FERMA la scrittura, e chi l'ha chiesta legge cosa è mancato.
+  //
+  //   Il cutover è del 25 giugno 2026 e non torna indietro: `isEnabled()` falso
+  //   vuol dire chiave pubblica assente o interruttore spento a mano, cioè una
+  //   copia dell'app messa male — non uno stato di esercizio.
+
+  // Il motivo per cui la cifratura non si può fare, in una frase leggibile da
+  // chi non sa niente di codice. Stringa vuota = si può cifrare.
+  function encryptionUnavailable() {
+    const C = global.SN_FEEDBACK_CRYPTO;
+    if (!C || typeof C.isEnabled !== 'function') {
+      return 'la parte di Filo che cifra non è stata caricata';
+    }
+    if (!C.hasPublicKey()) return 'manca la chiave con cui si cifra';
+    if (!C.isEnabled()) return 'la cifratura è spenta su questa copia di Filo';
+    return '';
+  }
+
+  // Frase unica per chi manda: dice cosa è mancato E che non è partito niente.
+  // La leggono il riquadro dentro le pagine, la pagina dei feedback e la board.
+  // Va bene sia per un invio sia per un singolo allegato, perché in tutti e due
+  // i casi la cosa vera da dire è la stessa: non è arrivato niente da nessuna
+  // parte, e il motivo.
+  function encryptionBlockedMessage(motivo) {
+    return `Non ho mandato niente: ${motivo || 'non riesco a cifrare'}. `
+      + 'Senza cifratura quel contenuto lo può leggere chiunque.';
+  }
+
+  // Cifra un campo testo. Se non si può cifrare, LANCIA: il chiamante decide se
+  // fermarsi (l'invio) o lasciare il campo com'era (le scritture della
+  // dashboard), ma nessuno scrive il valore in chiaro al posto del cifrato.
   async function maybeEncrypt(value) {
     if (value == null || value === '') return value;
+    const motivo = encryptionUnavailable();
+    // Stesso tipo di errore degli allegati: chi lo riceve deve poter distinguere
+    // «non si è potuto cifrare» da «la rete non c'era», perché il primo non si
+    // risolve riprovando (scripts/claude-feedback.mjs lo usa per il codice
+    // d'uscita, la pagina per decidere che frase mostrare).
+    if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
     const C = global.SN_FEEDBACK_CRYPTO;
-    if (!C || !C.isEnabled()) return value; // dormiente finché il cutover non accende SN_FEEDBACK_ENC_ENABLED
-    try { return await C.encryptForOwner(String(value)); }
-    catch (e) { console.warn('[SN feedback] cifratura testo fallita:', e?.message || e); return value; }
+    let out;
+    try { out = await C.encryptForOwner(String(value)); }
+    catch (e) {
+      throw new ErroreCifratura(encryptionBlockedMessage(
+        `la cifratura non è riuscita (${e?.message || e})`));
+    }
+    // Cintura: se quello che torna non è un ciphertext, qualcuno ha sostituito
+    // il modulo di cifratura con qualcosa che restituisce l'originale.
+    if (!C.isEncrypted(out)) {
+      throw new ErroreCifratura(encryptionBlockedMessage('il testo non risulta cifrato'));
+    }
+    return out;
   }
 
   // S1.F2.1: cifra il campo `status` fine quando il gate è acceso.
@@ -310,20 +370,57 @@
     return { fineStatus, publicStatus };
   }
 
-  // Cifra i byte di un'immagine prima dell'upload su Storage.
-  // Ritorna un Blob con contentType application/octet-stream (il contenuto è
-  // opaco: ciphertext Uint8Array). Guard: senza pubkey ritorna il blob originale.
-  async function maybeEncryptBlob(blob) {
+  // L'errore che dice «questo non si è potuto cifrare». Ha una classe sua
+  // perché chi invia lo tratta diversamente da un caricamento andato storto:
+  // un caricamento fallito lascia partire il resto della segnalazione, una
+  // cifratura mancata ferma tutto.
+  class ErroreCifratura extends Error {
+    constructor(message) { super(message); this.name = 'ErroreCifratura'; this.cifratura = true; }
+  }
+  function isEncryptionError(e) { return !!(e && e.cifratura === true); }
+
+  // Cifra i byte di un allegato prima dell'upload su Storage. Ritorna un Blob
+  // con contentType application/octet-stream (il contenuto è opaco: ciphertext
+  // Uint8Array). Se non si può cifrare LANCIA un ErroreCifratura: il blob
+  // originale da qui non esce (#602).
+  async function sealForUpload(blob) {
+    const motivo = encryptionUnavailable();
+    if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
     const C = global.SN_FEEDBACK_CRYPTO;
-    if (!C || !C.isEnabled()) return blob; // dormiente finché il cutover non accende SN_FEEDBACK_ENC_ENABLED
+    let sealed;
     try {
       const ab = await blob.arrayBuffer();
-      const plain = new Uint8Array(ab);
-      const sealed = await C.encryptBytesForOwner(plain);
-      return new Blob([sealed], { type: 'application/octet-stream' });
+      sealed = await C.encryptBytesForOwner(new Uint8Array(ab));
     } catch (e) {
-      console.warn('[SN feedback] cifratura bytes fallita:', e?.message || e);
-      return blob;
+      throw new ErroreCifratura(encryptionBlockedMessage(
+        `la cifratura dell'allegato non è riuscita (${e?.message || e})`));
+    }
+    if (!C.isEncryptedBytes(sealed)) {
+      throw new ErroreCifratura(encryptionBlockedMessage("l'allegato non risulta cifrato"));
+    }
+    return new Blob([sealed], { type: 'application/octet-stream' });
+  }
+
+  // Il controllo all'imbocco del deposito: i byte che stanno per partire devono
+  // essere un ciphertext. Legge solo l'intestazione (78 byte), non l'allegato
+  // intero. Un `Blob` senza `slice` (i finti dei test) viene letto per intero.
+  async function assertSealed(blob) {
+    const C = global.SN_FEEDBACK_CRYPTO;
+    if (!C || !C.isEncryptedBytes) {
+      throw new ErroreCifratura(encryptionBlockedMessage(encryptionUnavailable()
+        || 'la parte di Filo che cifra non è stata caricata'));
+    }
+    const HEAD = 1 + 65 + 12; // versione + chiave effimera + nonce
+    let testa;
+    try {
+      const pezzo = (blob && typeof blob.slice === 'function') ? blob.slice(0, HEAD) : blob;
+      testa = new Uint8Array(await pezzo.arrayBuffer());
+    } catch (e) {
+      throw new ErroreCifratura(encryptionBlockedMessage(
+        `non ho potuto controllare che l'allegato fosse cifrato (${e?.message || e})`));
+    }
+    if (!C.isEncryptedBytes(testa)) {
+      throw new ErroreCifratura(encryptionBlockedMessage("l'allegato non risulta cifrato"));
     }
   }
 
@@ -332,10 +429,18 @@
   // (#190.3). Su feedback/* chiunque può CREARE un allegato nuovo senza login
   // (storage.rules), ma nessuno può sovrascriverne uno: niente token da passare
   // di qui. Ritorna { kind:'img'|'file', url, name, type }.
+  //
+  // #602: qui si cifra come nell'invio di un feedback. Gli allegati dei commenti
+  // salivano in chiaro, ed è il caso peggiore — nei commenti finiscono proprio
+  // le schermate e i log del lavoro. `kind` e `type` restano quelli del file
+  // VERO (non dell'involucro cifrato): sono il modo in cui la dashboard sa se
+  // mostrare un'immagine o un collegamento, e con che tipo riaprire il file
+  // dopo averlo decifrato.
   async function uploadAttachment(blob, name) {
-    const u = await uploadImage(blob); // upload generico (usa blob.type)
     const type = (blob && blob.type) || '';
     const kind = type.startsWith('image/') ? 'img' : 'file';
+    const sealed = await sealForUpload(blob);
+    const u = await uploadImage(sealed);
     return {
       kind,
       url: u.url,
@@ -583,6 +688,14 @@
   // proprio), `parentId` serve solo a far comparire "collegato a #N" in
   // dashboard e a far risalire chi triagia all'originale.
   async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }) {
+    // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
+    // qualunque caricamento e prima di creare il documento: così «non è partito
+    // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
+    // Chi chiama trasforma questo errore in una frase per l'utente.
+    {
+      const motivo = encryptionUnavailable();
+      if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
+    }
     // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
     // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
     // silenzio e il feedback partiva senza il file, senza alcun segnale).
@@ -600,12 +713,16 @@
         continue;
       }
       try {
-        // S1.2: cifra i byte prima dell'upload. Guard inclusa in maybeEncryptBlob:
-        // senza pubkey carica il blob originale invariato.
-        const blobToUpload = await maybeEncryptBlob(rawBlob);
+        // S1.2: cifra i byte prima dell'upload. Da #602 `sealForUpload` lancia
+        // invece di ripiegare sul blob in chiaro.
+        const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload);
         uploaded.push(u.url);
       } catch (e) {
+        // Una cifratura mancata NON è un caricamento andato storto: quella
+        // lascia partire il resto della segnalazione, questa ferma tutto. Le
+        // immagini già caricate sono cifrate, e il documento non esiste ancora.
+        if (isEncryptionError(e)) throw e;
         console.warn('[SN feedback] upload immagine fallito:', e);
         failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'caricamento non riuscito' });
       }
@@ -622,10 +739,11 @@
       if (rawBlob.size > 4 * 1024 * 1024) { failed.push({ name: fname, reason: 'troppo grande (max 4 MB)' }); continue; }
       try {
         // S1.2: cifra anche gli allegati non-immagine.
-        const blobToUpload = await maybeEncryptBlob(rawBlob);
+        const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
         uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || rawBlob.type || '') });
       } catch (e) {
+        if (isEncryptionError(e)) throw e; // come sopra: si ferma tutto
         console.warn('[SN feedback] upload file fallito:', e);
         failed.push({ name: fname, reason: 'caricamento non riuscito' });
       }
@@ -1328,10 +1446,13 @@
       const capped = T && T.capNotes ? T.capNotes(notes) : notes;
       const C = global.SN_FEEDBACK_CRYPTO;
       let value = capped;
-      if (C && C.isEnabled && C.isEnabled() && capped && !C.isEncrypted(capped)) {
-        // Fail-safe: se la cifratura non riesce NON si scrive il report in
-        // chiaro. Si lascia la conversazione com'era.
-        try { value = await C.encryptForOwner(capped); } catch (_) { value = undefined; }
+      if (capped && !(C && C.isEncrypted && C.isEncrypted(capped))) {
+        // Se la cifratura non riesce NON si scrive il report in chiaro. E non
+        // si tace nemmeno: fino al #602 il campo veniva lasciato cadere in
+        // silenzio, cioè chi aveva appena scritto il report vedeva la scheda
+        // salvarsi e il testo sparire senza una parola. L'errore risale e la
+        // dashboard lo mostra; niente di questa scrittura parte.
+        value = await maybeEncrypt(capped);
       }
       if (value !== undefined) { fields.notes = toFsValue(value); mask.push('notes'); }
     }
@@ -1404,20 +1525,12 @@
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
-      // S1.priority: con cifratura attiva, `priority` va scritto come stringValue
-      // (ciphertext FENC1:). Senza cifratura, integerValue come prima (retrocompat).
-      const C = global.SN_FEEDBACK_CRYPTO;
-      if (C && C.isEnabled()) {
-        try {
-          const encPriority = await C.encryptForOwner(String(p));
-          fields.priority = { stringValue: encPriority };
-        } catch (e) {
-          console.warn('[SN feedback] cifratura priority fallita, scrivo in chiaro:', e?.message || e);
-          fields.priority = { integerValue: String(p) };
-        }
-      } else {
-        fields.priority = { integerValue: String(p) };
-      }
+      // S1.priority: `priority` va scritto come stringValue (ciphertext FENC1:).
+      // #602 — niente più ripiego su `integerValue` in chiaro quando la
+      // cifratura non riesce: la priorità dice quanto ci tiene chi lavora un
+      // feedback, e su un documento pubblico in chiaro è un'informazione
+      // regalata. Se non si può cifrare la scrittura si ferma qui.
+      fields.priority = { stringValue: await maybeEncrypt(String(p)) };
       mask.push('priority');
     }
     // priorityManual: flag booleano, non cifrato (indica che l'owner ha fissato
@@ -1589,6 +1702,34 @@
     return entry;
   }
 
+  // RETE: toglie la PROPRIA richiesta di riapertura (cancella
+  // `reopenRequests.<uid>`), stessa forma di `clearVote`.
+  //
+  // Serve quando la riapertura non arriva in fondo. Il segnale si scrive PRIMA
+  // di creare il feedback collegato, ed è lui a chiudere la porta ai duplicati;
+  // ma se il feedback non è nato, di duplicati non ce n'è nessuno da temere, e
+  // quel segnale rimasto lì dice a chi ha provato a riaprire che il fix è «già
+  // stato segnalato»: la spiegazione appena scritta non ha più dove andare, e
+  // non c'è modo di rimandarla. Toglierlo rimette la porta com'era.
+  async function clearReopenRequest(id, uid, opts = {}) {
+    if (!id) throw new Error('id mancante');
+    if (!uid) throw new Error('uid mancante');
+    const fieldPath = `reopenRequests.\`${uid}\``;
+    const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
+    const endpoint = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    // Nessun valore per quel campo nel corpo: con la maschera d'aggiornamento è
+    // così che Firestore lo cancella. Le regole lo prevedono — un utente tocca
+    // solo la propria chiave, e la propria chiave può anche non esserci più.
+    const res = await fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields: {} }) });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore clearReopenRequest fallito (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return true;
+  }
+
   global.SN_FEEDBACK = {
     submit,
     list,
@@ -1638,8 +1779,18 @@
     VOTE_VALUES,
     // Riapertura a pagamento (DC4).
     castReopenRequest,
+    clearReopenRequest,
     uploadImage,
     uploadAttachment,
+    // #602 — la cifratura degli allegati non ha più un ripiego in chiaro.
+    // `encryptionUnavailable()` dice in una frase perché non si può cifrare
+    // ('' se si può): il main la chiede PRIMA di accodare un invio, così chi
+    // manda si sente dire subito che non è partito niente invece di ricevere
+    // un «grazie» e vedere la segnalazione riprovare in eterno nella coda.
+    encryptionUnavailable,
+    encryptionBlockedMessage,
+    isEncryptionError,
+    sealForUpload,
     // #582 — il confine degli allegati: la forma del nome (che storage.rules
     // pretende), il riconoscimento di un URL del bucket e le intestazioni con
     // cui l'owner lo scarica. Pure, e usate anche dal main.

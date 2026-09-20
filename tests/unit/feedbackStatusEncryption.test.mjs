@@ -141,18 +141,37 @@ test('encryptStatus con gate ON: done→fineStatus FENC1:, publicStatus closed',
   }
 });
 
-test('encryptStatus con gate OFF: fineStatus resta in chiaro', () => {
+test('senza cifratura lo stato NON si scrive in chiaro: la scrittura si ferma (#602)', async () => {
+  // Fin qui il gate spento voleva dire «scrivi in chiaro», e lo stato fine in
+  // chiaro su un documento che si legge da fuori dice a chi è stato beccato che
+  // è stato beccato. Adesso la scrittura si rifiuta invece di degradarsi.
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
   const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
+  const realFetch = globalThis.fetch;
+  let toccataLaRete = false;
   globalThis.SN_FEEDBACK_PUBKEY = 'qualcosa';
   globalThis.SN_FEEDBACK_ENC_ENABLED = false; // gate spento
+  globalThis.fetch = async () => {
+    toccataLaRete = true;
+    return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
+  };
 
   try {
     assert.ok(!C.isEnabled(), 'gate deve essere OFF per questo test');
-    // Con gate OFF, maybeEncrypt ritorna invariato → fineStatus = 'blocked' in chiaro.
-    // Lo verifichiamo indirettamente: statusToPublic('blocked') = 'open'.
+    await assert.rejects(
+      () => FB.updateStatus('doc-gate-off', { status: 'blocked' }),
+      (e) => {
+        assert.equal(FB.isEncryptionError(e), true, 'va riconosciuto come errore di cifratura');
+        assert.match(String(e.message), /non ho mandato niente/i);
+        return true;
+      },
+    );
+    assert.equal(toccataLaRete, false, 'niente doveva partire verso il database');
+    // `statusPublic`, il valore grossolano, resta quello di sempre: è in chiaro
+    // per costruzione e i beccati ci collassano sopra come i feedback normali.
     assert.equal(FB.statusToPublic('blocked'), 'open');
   } finally {
+    globalThis.fetch = realFetch;
     globalThis.SN_FEEDBACK_PUBKEY = savedPub;
     globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
   }
@@ -258,18 +277,35 @@ test('S1.F2.2: con gate ON, clientId viene cifrato e clientIdHash è in chiaro',
   }
 });
 
-test('S1.F2.2: con gate DORMIENTE, clientId resta in chiaro', () => {
+test('S1.F2.2: senza cifratura il clientId non parte affatto (#602)', async () => {
+  // Il gate «dormiente» era il ripiego del cutover, ed è finito nel 2026: oggi
+  // spento vuol dire copia dell'app messa male, non uno stato di esercizio. Il
+  // mittente non si scrive in chiaro accanto a quello che ha segnalato: non si
+  // scrive e basta.
   const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
   const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
+  const realFetch = globalThis.fetch;
+  let toccataLaRete = false;
   globalThis.SN_FEEDBACK_PUBKEY = null;
   globalThis.SN_FEEDBACK_ENC_ENABLED = false;
+  globalThis.fetch = async () => {
+    toccataLaRete = true;
+    return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
+  };
 
   try {
     assert.ok(!C.isEnabled(), 'gate deve essere OFF');
-    // Con gate dormiente: maybeEncrypt ritorna il valore invariato.
-    // Verifichiamo indirettamente che isEnabled() sia false.
-    assert.ok(!C.isEnabled(), 'isEnabled() false → clientId resta in chiaro (invariante dormiente)');
+    await assert.rejects(
+      () => FB.submit({ text: 'ciao', clientId: 'install-xyz' }),
+      (e) => {
+        assert.equal(FB.isEncryptionError(e), true);
+        assert.match(String(e.message), /non ho mandato niente/i);
+        return true;
+      },
+    );
+    assert.equal(toccataLaRete, false, 'nemmeno il contatore dei numeri doveva essere toccato');
   } finally {
+    globalThis.fetch = realFetch;
     globalThis.SN_FEEDBACK_PUBKEY = savedPub;
     globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
   }

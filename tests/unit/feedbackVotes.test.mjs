@@ -112,3 +112,50 @@ test('round-trip: un map di voti sopravvive a toFsValue → fromFsValue', () => 
   // E il tally calcolato dal valore decodificato è coerente.
   assert.deepEqual(FB.tallyVotes(decoded), { works: 1, broken: 1, total: 2, score: -2 });
 });
+
+// ── #602, giro 2: togliere la PROPRIA richiesta di riapertura ───────────────
+//
+// Quando la riapertura non arriva in fondo, il segnale scritto per primo va
+// tolto: finché resta, chi ha provato a riaprire legge «già segnalato» e la
+// spiegazione che ha appena scritto non ha più dove andare. La forma della
+// richiesta è la stessa del ritiro di un voto: maschera d'aggiornamento sulla
+// sola chiave di chi scrive, e NESSUN valore per quel campo nel corpo (è così
+// che il database lo cancella). Spedire un valore lo riscriverebbe invece di
+// toglierlo, che è il contrario.
+test('clearReopenRequest: cancella solo la propria chiave, senza scrivere un valore', async () => {
+  assert.equal(typeof FB.clearReopenRequest, 'function');
+  const chiamate = [];
+  const prev = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    chiamate.push({ url: String(url), opts });
+    return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
+  };
+  try {
+    await FB.clearReopenRequest('fb-1', 'user-abc', { idToken: 'tok' });
+  } finally {
+    globalThis.fetch = prev;
+  }
+
+  assert.equal(chiamate.length, 1);
+  const { url, opts } = chiamate[0];
+  assert.equal(opts.method, 'PATCH');
+  assert.equal(opts.headers.Authorization, 'Bearer tok');
+  assert.match(decodeURIComponent(url), /updateMask\.fieldPaths=reopenRequests\.`user-abc`/,
+    'la maschera deve puntare alla sola chiave di chi scrive');
+  const body = JSON.parse(opts.body);
+  assert.deepEqual(body, { fields: {} },
+    'nessun valore per quel campo: è così che si cancella');
+});
+
+test('clearReopenRequest: un rifiuto del database non passa inosservato', async () => {
+  const prev = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: false, status: 403, text: async () => 'denied' });
+  try {
+    await assert.rejects(
+      () => FB.clearReopenRequest('fb-1', 'user-abc', {}),
+      /clearReopenRequest fallito \(403\)/,
+    );
+  } finally {
+    globalThis.fetch = prev;
+  }
+});

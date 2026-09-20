@@ -74,3 +74,73 @@ test('BOARD_REOPEN rifiuta testo troppo lungo con messaggio chiaro', async ({ op
   expect(typeof r.error).toBe('string');
   expect(r.error.length).toBeGreaterThan(0);
 });
+
+// #602, giro 2 — SE LA RIAPERTURA NON RIESCE, SI PUÒ RIPROVARE.
+//
+// La spiegazione di cosa non funziona ancora è la parte che serve a chi
+// raccoglie la segnalazione. Quando l'invio falliva, i crediti tornavano
+// indietro ma il segnale di riapertura restava scritto sul fix: al secondo
+// tentativo la bacheca rispondeva «già segnalato», e quella spiegazione non
+// aveva più dove andare. Qui si prova quello che vede chi riapre: l'errore, il
+// testo ancora nel riquadro, e il secondo tentativo che va a buon fine.
+const FIX_USCITO = {
+  _id: 'fb-riapertura-602',
+  name: 'Il pulsante Condividi non risponde',
+  status: 'done',
+  resolvedInVersion: '0.2.70',
+  seq: 91, subSeq: 0,
+  clientId: 'tester@example.com',
+  createdAt: '2026-06-20T10:00:00Z',
+  votes: {},
+};
+
+test('riapertura non riuscita: il testo resta e il secondo tentativo passa', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__boardTest && window.SN_MANAGE_REVIEW, null, { timeout: 15_000 });
+
+  // Il main risponde: prima un guasto, poi va a buon fine (è il ritentativo).
+  await page.evaluate(() => {
+    window.__tentativi = [];
+    const vero = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'board_reopen') {
+        window.__tentativi.push(msg.text);
+        if (window.__tentativi.length === 1) {
+          return { ok: false, error: 'Invio non riuscito: la connessione è caduta.' };
+        }
+        return { ok: true, feedbackId: 'fb-figlio', balance: 90 };
+      }
+      return vero(msg);
+    };
+  });
+
+  await page.evaluate((fix) => {
+    window.__boardTest.setReleasedVersion('0.2.71');
+    window.__boardTest.setSignedIn('chi-riapre@example.com');
+    window.__boardTest.setData([fix]);
+  }, FIX_USCITO);
+
+  const card = page.locator('.bd-card').first();
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  await card.locator('.bd-reopen-link').click();
+
+  const testo = 'Succede ancora: premo Condividi e non si apre niente.';
+  await card.locator('.bd-reopen-text').fill(testo);
+  await card.locator('.bd-reopen-actions button', { hasText: 'Invia' }).click();
+
+  // Primo tentativo: si legge cosa è andato storto, e quello che ho scritto è
+  // ancora lì — con il pulsante di nuovo premibile.
+  const err = card.locator('.bd-reopen-err');
+  await expect(err).toBeVisible({ timeout: 10_000 });
+  await expect(card.locator('.bd-reopen-text')).toHaveValue(testo);
+  const invia = card.locator('.bd-reopen-actions button', { hasText: 'Invia' });
+  await expect(invia).toBeEnabled();
+
+  // Secondo tentativo: passa. Il fix esce dalla bacheca (è tornato in
+  // lavorazione), che è il modo in cui chi riapre vede che è arrivata.
+  await invia.click();
+  await expect(page.locator('.bd-card')).toHaveCount(0, { timeout: 10_000 });
+  const tentativi = await page.evaluate(() => window.__tentativi.slice());
+  expect(tentativi, 'la stessa spiegazione, mandata due volte').toEqual([testo, testo]);
+});

@@ -755,7 +755,13 @@
           submissionId, // #370: id stabile → il server deduplica i re-invii
         };
         const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
-        if (!res?.ok) throw new Error(res?.error || 'invio fallito');
+        if (!res?.ok) {
+          const err = new Error(res?.error || 'invio fallito');
+          // #602 — quando il no arriva dalla cifratura, il main manda già la
+          // frase intera per chi legge: mostrarla così com'è.
+          err.fraseGiaPronta = !!res?.cifratura;
+          throw err;
+        }
         statusEl.textContent = '';
         clearDraft();
         // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
@@ -781,7 +787,7 @@
         }
       } catch (e) {
         console.error('[SN feedback] submit', e);
-        statusEl.textContent = 'Errore invio: ' + (e?.message || e);
+        statusEl.textContent = e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e));
         sendBtn.disabled = false;
         cancelBtn.disabled = false;
       }
