@@ -699,12 +699,16 @@
         continue;
       }
       try {
-        // S1.2: cifra i byte prima dell'upload. Guard inclusa in maybeEncryptBlob:
-        // senza pubkey carica il blob originale invariato.
-        const blobToUpload = await maybeEncryptBlob(rawBlob);
+        // S1.2: cifra i byte prima dell'upload. Da #602 `sealForUpload` lancia
+        // invece di ripiegare sul blob in chiaro.
+        const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload);
         uploaded.push(u.url);
       } catch (e) {
+        // Una cifratura mancata NON è un caricamento andato storto: quella
+        // lascia partire il resto della segnalazione, questa ferma tutto. Le
+        // immagini già caricate sono cifrate, e il documento non esiste ancora.
+        if (isEncryptionError(e)) throw e;
         console.warn('[SN feedback] upload immagine fallito:', e);
         failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'caricamento non riuscito' });
       }
