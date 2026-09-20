@@ -36,8 +36,9 @@ test('quello che Filo SCRIVE nella risposta non è un\'azione mancata', async ()
   expect(ids("L'ho creata qui sotto, dimmi se ti piace.")).toEqual([]);
   expect(ids("Te l'ho aggiunta alla lista qui sopra.")).toEqual([]);
   // E la stessa cosa detta su un'immagine che l'utente ha mandato in chat:
-  // leggerla non passa da nessuno strumento.
-  expect(ids('Ho letto la bolletta che mi hai mandato: sono 84 euro.')).toEqual([]);
+  // leggerla non passa da nessuno strumento, e il turno lo dice col suo segno
+  // di contesto, come già faceva per i file dell'editor.
+  expect(ids('Ho letto la bolletta che mi hai mandato: sono 84 euro.', [{ type: 'CONTESTO_IMMAGINE' }])).toEqual([]);
 });
 
 test('le forme normali con cui si dichiara una cosa mai fatta vengono viste', async () => {
