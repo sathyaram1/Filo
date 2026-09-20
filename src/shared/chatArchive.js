@@ -351,6 +351,23 @@
     return out;
   }
 
+  // ── L'esito di un comando di terminale ───────────────────────────────────
+  // Anche questo è una battuta della conversazione: l'utente l'ha letto a
+  // schermo, e rileggendo la chat deve ritrovarlo. Può però essere enorme (un
+  // `cat` su un file grosso), e l'archivio resta su disco per anni. Si tiene
+  // l'inizio e la fine, e si DICE quanto manca: un taglio muto sull'esito di un
+  // comando toglie proprio la riga di errore in fondo.
+  const OUTPUT_MAX = 20000;
+  function clampOutput(text, maxChars) {
+    const cap = Number(maxChars) > 0 ? Number(maxChars) : OUTPUT_MAX;
+    const s = String(text == null ? '' : text);
+    if (s.length <= cap) return s;
+    const testa = s.slice(0, Math.floor(cap * 0.6));
+    const coda = s.slice(-Math.floor(cap * 0.4));
+    const tolti = s.length - testa.length - coda.length;
+    return `${testa}\n…(${tolti} caratteri dell'esito non conservati)…\n${coda}`;
+  }
+
   global.SN_CHAT_ARCHIVE = {
     KIND_TALK,
     KIND_COMMAND,
