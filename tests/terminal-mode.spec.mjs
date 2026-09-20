@@ -331,3 +331,46 @@ test('un comando confermato scrive nella cartella che Filo aveva mostrato', asyn
     try { rmSync(join(homedir(), 'prova-di-filo'), { recursive: true, force: true }); } catch (_) {}
   }
 });
+
+test('se quella cartella sparisce, Filo continua a eseguire e il popup dice dove', async ({ openTab }) => {
+  // L'altra metà dello stesso appunto (#551, quarto giro): farlo durare
+  // significa portarsi dietro anche una cartella che nel frattempo non c'è
+  // più. Lì non fallisce il comando, fallisce la shell prima di leggerlo, e
+  // ogni comando dopo cade uguale — compreso quello per andarsene.
+  const { rmSync, renameSync, writeFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const base = cartellaTemporanea('filo-cwd-sparita-');
+  const dopo = `${base}-rinominata`;
+  try {
+    writeFileSync(join(base, 'bolletta.txt'), 'totale 84,50\n', 'utf8');
+    const page = await openTab('filo://dashboard/dashboard.html');
+    await setTerminal(page, true);
+    await eseguiComando(page, `cd '${base}'`);
+
+    // L'utente la rinomina dal gestore dei file mentre chiacchiera con Filo.
+    renameSync(base, dopo);
+
+    const eco = await eseguiComando(page, 'echo ciao');
+    expect(
+      String(eco.output?.stdout || '') + String(eco.output?.stderr || ''),
+      'Filo non esegue più niente in questa scheda',
+    ).toContain('ciao');
+    expect(eco.output?.cwdPersa, 'a chi legge non viene detto che la cartella non c’è più').toBe(true);
+
+    // E il popup di conferma promette la cartella dove il comando finirà
+    // davvero, non quella sparita.
+    const proposta = await page.evaluate(() => new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: window.SN_MSG.MSG.FILO_RUN_ACTION,
+        action: { type: 'ESEGUI_COMANDO', comando: 'mkdir prova-di-filo' },
+      }, (r) => resolve(r));
+    }));
+    expect(
+      String(proposta.action?._cwd || ''),
+      'il popup promette una cartella che non esiste più',
+    ).not.toContain('filo-cwd-sparita-');
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+    rmSync(dopo, { recursive: true, force: true });
+  }
+});
