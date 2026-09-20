@@ -211,6 +211,15 @@ I server applicano regole precise (Firebase Security Rules):
   segnalazioni ne ha un'altra, ed è voluto — è quello che rende utile ritirare
   quel collegamento se finisce in giro. Prima bastava il nome del deposito, che
   è scritto nel codice, per scaricarli tutti.
+- **Un allegato può stare solo nel deposito di Filo.** Dentro un feedback un
+  allegato è scritto come un indirizzo, e quell'indirizzo viene poi APERTO da
+  chi legge il feedback — chi riceve le segnalazioni, e il controllo automatico
+  che guarda gli screenshot. Finché lì poteva finire un indirizzo qualunque,
+  chiunque mandava una segnalazione che faceva bussare quel controllo a una
+  porta scelta da lui: un servizio interno, la scheda della macchina su cui
+  gira. Adesso un indirizzo che non è del deposito di Filo non entra proprio
+  nel feedback, e chi legge lo ricontrolla comunque per conto suo prima di
+  aprirlo.
 
 C'è una seconda raccolta aperta a tutti, e va detto perché. Quando l'assistente
 ti aiuta a fare qualcosa su un sito, Filo può tenere da parte come ci è
