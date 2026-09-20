@@ -315,6 +315,36 @@ test('una chat vuota non lascia un guscio senza titolo in Cronologia', async ({ 
   expect((await leggiArchivio(app)).length).toBe(2);
 });
 
+test('l’intervista di benvenuto resta una conversazione anche se il modello dice "comando"', async ({ app, openTab }) => {
+  // Niente `configura`: su un profilo nuovo l'intervista è APERTA, e la prima
+  // chat È l'intervista. Il classificatore qui risponde sempre "comando":
+  // deve perdere.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: {
+        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_CHAT_TRIAGE]: 'deepseek-flash',
+      },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  await stubProvider(app, { Utente: { tipo: 'comando', titolo: 'Due parole' } });
+
+  await turno(app, 'c-accoglienza', 'Ciao, mi chiamo Ada');
+  await chiudi(app, 'c-accoglienza');
+
+  const chats = await leggiArchivio(app);
+  expect(chats[0].onboarding).toBe(true);
+  expect(chats[0].kind).toBe('conversazione');
+
+  // E quindi si vede senza toccare l'interruttore dei comandi.
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('.arc-chat')).toHaveCount(1);
+});
+
 test('la sezione delle chat non compare quando non c’è ancora nessuna chat', async ({ app, openTab }) => {
   await configura(app);
   const page = await openTab(ARCHIVE);
