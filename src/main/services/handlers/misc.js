@@ -540,7 +540,13 @@ module.exports = function register(on, ctx) {
       // partire mai. Qui invece la risposta è un no, con il motivo.
       const motivoCifratura = globalThis.SN_FEEDBACK.encryptionUnavailable?.() || '';
       if (motivoCifratura) {
-        return { ok: false, error: globalThis.SN_FEEDBACK.encryptionBlockedMessage(motivoCifratura) };
+        // `cifratura: true` dice al riquadro che questa frase è già la frase
+        // per l'utente: non va incorniciata in un «Errore invio:».
+        return {
+          ok: false,
+          cifratura: true,
+          error: globalThis.SN_FEEDBACK.encryptionBlockedMessage(motivoCifratura),
+        };
       }
       const payload = msg.payload || {};
       // Se l'utente è loggato come admin (l'owner), marca il suo invio come
