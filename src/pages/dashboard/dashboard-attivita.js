@@ -121,9 +121,8 @@
       return parts[parts.length - 1] || '';
     };
     const append = (el) => {
-      // Il blocco si era tolto perché non c'era niente da raccontare: se
-      // qualcosa arriva dopo (una conferma data a risposta già scritta) torna,
-      // invece di finire in un blocco staccato che nessuno vede.
+      // Il blocco tolto perché vuoto torna se qualcosa arriva dopo (una
+      // conferma data a risposta già scritta): altrimenti nessuno la vedrebbe.
       if (!wrap.isConnected) container.appendChild(wrap);
       body.appendChild(el);
       items += 1;
@@ -175,9 +174,8 @@
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
       // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
-      // A lavoro già finito il riassunto si rifà: la riga di un'impostazione
-      // confermata nel popup arriva DOPO, e senza questo il blocco restava
-      // intitolato «Come ha lavorato» mentre dentro l'impostazione c'era.
+      // A lavoro finito il riassunto si rifà: la riga dell'impostazione
+      // confermata nel popup arriva dopo, e il titolo deve contarla.
       addRow(type, rowIcon, text, failed = false) {
         closeTurnReasoning();
         if (!failed) doneTypes.push(String(type || '').toUpperCase());
@@ -430,9 +428,8 @@
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
-      // La home chiesta dalla home non ricarica niente (butterebbe via il
-      // lavoro e la risposta appena scritti): lo si dice, e il bottone qui
-      // accanto la svuota quando l'utente ha letto.
+      // La home chiesta dalla home non ricarica niente: butterebbe via il
+      // lavoro e la risposta appena scritti.
       if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home' };
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
@@ -469,9 +466,8 @@
       return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
     }
     const type = String(a.type || '').toUpperCase();
-    // Proposta all'utente (l'evento di calendario): il main non l'ha eseguita
-    // perché non tocca a lui — tocca al bottone qui sotto. Non è un fallimento
-    // e non va raccontata come tale.
+    // Proposta (l'evento di calendario): il main non l'ha eseguita perché tocca
+    // al bottone qui sotto, e raccontarla come fallita sarebbe falso.
     if (a._output && a._output.proposta) {
       const fn = ACTIVITY_ROWS[type];
       return fn ? fn(a) : { icon: '•', text: `Proposto · ${type.toLowerCase().replace(/_/g, ' ')}` };
@@ -532,10 +528,8 @@
   // si mangia il bottone e la funzione sparisce dalla chat.
   const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
 
-  // Le altre due strade per avere riga E bottone, che dipendono dall'esito e
-  // non dal tipo: un comando che non è partito (il riquadro dice PERCHÉ, e
-  // senza di quello resta un «non riuscito» che non si può capire), l'evento da
-  // aggiungere al calendario e la home chiesta da chi è già nella home.
+  // Riga e bottone insieme anche quando lo decide l'ESITO: il comando non
+  // partito (il riquadro dice perché), l'evento da aggiungere, la home già qui.
   function rigaEBottone(a) {
     const type = String(a.type || '').toUpperCase();
     if (ROW_AND_BUTTON.includes(type) && a._executed !== false) return true;
@@ -943,8 +937,7 @@
     }
     if (type === 'EVENTO_CALENDARIO') {
       // Filo propone, l'utente aggiunge: il main scrive l'evento in un file e
-      // lo apre col calendario del computer. Prima questo bottone era spento e
-      // la proposta non portava da nessuna parte.
+      // lo apre col calendario del computer.
       const ev = (a._output && a._output.evento) || {
         data: a.data || a.date, ora: a.ora || a.orario || a.time,
         titolo: a.titolo || a.title, dettagli: a.dettagli || a.details,
@@ -985,9 +978,8 @@
       return btn;
     }
     if (type === 'COMANDO_FINESTRA' && a._output && a._output.already && onAck) {
-      // La home era già questa pagina: invece di ricaricarla sotto il naso
-      // dell'utente (e portarsi via lavoro e risposta), il ritorno alla home lo
-      // decide lui, quando ha letto.
+      // La home era già questa pagina: ricaricarla porterebbe via lavoro e
+      // risposta, quindi quando tornarci lo decide l'utente, dopo aver letto.
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
       btn.type = 'button';
