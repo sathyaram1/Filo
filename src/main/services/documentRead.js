@@ -234,20 +234,28 @@ async function risolviTollerante(full) {
     if (await esiste(diretto)) { cur = diretto; continue; }
     const cand = await candidatiNellaCartella(cur, segs[i], !ultimo);
     // Zero: non c'è niente di simile. Due o più: non si tira a indovinare su un
-    // file dell'utente — si dice che sono più d'uno e li si elenca.
-    if (cand.length !== 1) return { path: '', ambigui: ultimo ? cand : [] };
+    // file dell'utente — si dice che sono più d'uno e li si elenca. Vale anche
+    // a METÀ percorso: a storpiarsi può essere il nome di una cartella, e
+    // tacere lì lasciava l'utente senza il modo di scegliere, mentre sul nome
+    // del file gliene давano l'elenco (#551, secondo giro di verifica).
+    if (cand.length !== 1) return { path: '', ambigui: cand, tipo: ultimo ? 'file' : 'cartella' };
     cur = path.join(cur, cand[0]);
   }
-  return { path: cur, ambigui: [] };
+  return { path: cur, ambigui: [], tipo: 'file' };
 }
 
 /** Il motivo da dare a chi legge quando il file non si trova. PURA. */
-function dettaglioNonTrovato(ambigui) {
+function dettaglioNonTrovato(ambigui, tipo) {
   if (!Array.isArray(ambigui) || ambigui.length < 2) {
     return 'a quel percorso non c\'è nessun file';
   }
   const mostrati = ambigui.slice(0, 5).map((n) => `"${n}"`).join(', ');
   const resto = ambigui.length > 5 ? ` e altri ${ambigui.length - 5}` : '';
+  if (tipo === 'cartella') {
+    return `a quel percorso non c'è nessun file, e di cartelle col nome quasi uguale a una `
+      + `di quelle scritte nel percorso ce ne sono ${ambigui.length} (${mostrati}${resto}): `
+      + 'serve sapere quale';
+  }
   return `a quel percorso non c'è nessun file, e nella cartella ce ne sono ${ambigui.length} `
     + `con un nome quasi uguale (${mostrati}${resto}): serve sapere quale`;
 }
