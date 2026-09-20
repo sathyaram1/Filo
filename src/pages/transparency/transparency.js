@@ -18,10 +18,20 @@
 
   function $(id) { return document.getElementById(id); }
 
-  function currentId() {
+  // Il documento chiesto nell'indirizzo, così com'è scritto. Serve anche quando
+  // non esiste: chi arriva da un link che prometteva la privacy deve leggere
+  // che quella sezione non è scritta, non trovarsi un altro documento al suo
+  // posto mentre l'indirizzo continua a dire «privacy» (#515).
+  function requestedId() {
     const q = new URLSearchParams(window.location.search).get('doc');
+    return String(q == null ? '' : q).trim().slice(0, 60);
+  }
+
+  function currentId() {
+    const q = requestedId();
     const ids = T.ids();
-    return ids.includes(q) ? q : ids[0];
+    if (ids.includes(q)) return q;
+    return q ? '' : ids[0];
   }
 
   function renderNav(activeId) {
