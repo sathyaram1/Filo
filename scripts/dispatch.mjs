@@ -257,8 +257,12 @@ export function defaultState(id, branch) {
     improvableCount: 0,
     verifierVerdict: null,
     verifierCritique: '',
+    // Il commit su cui ciascun esito è stato dato: un esito vale per il
+    // contenuto esaminato, non per il nome del ramo (feedback #485).
+    verifierSha: '',
     secauditDone: false,
     secauditVerdict: null,
+    secauditSha: '',
   };
 }
 
