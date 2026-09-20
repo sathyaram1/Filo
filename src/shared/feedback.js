@@ -319,9 +319,12 @@
 
   // Frase unica per chi manda: dice cosa è mancato E che non è partito niente.
   // La leggono il riquadro dentro le pagine, la pagina dei feedback e la board.
+  // Va bene sia per un invio sia per un singolo allegato, perché in tutti e due
+  // i casi la cosa vera da dire è la stessa: non è arrivato niente da nessuna
+  // parte, e il motivo.
   function encryptionBlockedMessage(motivo) {
-    return `Non ho inviato niente: ${motivo || 'la cifratura non è disponibile'}. `
-      + 'Senza cifratura il contenuto resterebbe leggibile a chiunque, quindi mi fermo.';
+    return `Non è partito niente: ${motivo || 'la cifratura non è disponibile'}, `
+      + 'e in chiaro il contenuto lo leggerebbe chiunque abbia il collegamento.';
   }
 
   // Cifra un campo testo. Se non si può cifrare, LANCIA: il chiamante decide se
