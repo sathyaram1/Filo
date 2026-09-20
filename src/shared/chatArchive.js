@@ -129,16 +129,34 @@
       updatedAt: chat.updatedAt || chat.startedAt || null,
       closedAt: chat.closedAt || null,
       messageCount: messages.length,
-      excerpt: excerptOf(messages),
+      excerpt: excerptOf(messages, chat.title || fallbackTitle(messages)),
     };
   }
 
-  function excerptOf(messages) {
-    const list = Array.isArray(messages) ? messages : [];
-    const first = list.find((m) => m && m.role === 'user' && String(m.text || '').trim());
-    const raw = first ? String(first.text) : '';
-    const oneLine = raw.replace(/\s+/g, ' ').trim();
-    return oneLine.length > 180 ? `${oneLine.slice(0, 180)}…` : oneLine;
+  // L'anteprima che sta accanto al titolo, in elenco. Di norma è il primo
+  // messaggio dell'utente: è quello che fa capire di cosa si parlava.
+  //
+  // Ma quando il titolo NON è stato generato — la chat è ancora in corso,
+  // oppure un modello per i titoli non c'è — il titolo È quel primo messaggio,
+  // e la riga finiva per dire due volte la stessa frase, una accanto
+  // all'altra. In quel caso l'anteprima passa oltre e mostra il pezzo DOPO:
+  // così la riga aggiunge qualcosa invece di ripetersi. Se dopo non c'è
+  // niente, meglio niente che un'eco.
+  function excerptOf(messages, title) {
+    const list = (Array.isArray(messages) ? messages : [])
+      .filter((m) => m && String(m.text || '').trim());
+    const primoUtente = list.findIndex((m) => m.role === 'user');
+    const da = primoUtente >= 0 ? primoUtente : 0;
+    const candidati = list.slice(da);
+    const base = String(title == null ? '' : title).replace(/…$/, '').trim();
+    for (const m of candidati) {
+      const oneLine = String(m.text).replace(/\s+/g, ' ').trim();
+      // «Già detto nel titolo» si riconosce dall'inizio, non dall'uguaglianza:
+      // un titolo di ripiego è il messaggio accorciato, non il messaggio.
+      if (base.length >= 8 && oneLine.startsWith(base)) continue;
+      return oneLine.length > 180 ? `${oneLine.slice(0, 180)}…` : oneLine;
+    }
+    return '';
   }
 
   // Le chat che si VEDONO senza filtri: le conversazioni e quelle non ancora
