@@ -32,6 +32,9 @@ const { getBuildKeys, getBuildSafeBrowsingKey } = require('../config/default-key
 // Registra SN_FEEDBACK_THREAD su globalThis: da lì viene l'elenco dei gruppi di
 // mittente dell'auto-approvazione, che deve restare uno solo (#446).
 require('../../shared/feedbackThread.js');
+// Registra SN_ROUTINE_SESSIONI: le regole su quante sessioni e da quale
+// account, le stesse che applica la pagina di gestione.
+require('../../shared/routineSessioni.js');
 
 const PROJECT_ID = 'filo-8b9cb';
 const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per design
