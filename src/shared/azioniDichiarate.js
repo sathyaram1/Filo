@@ -123,9 +123,15 @@
   // impostata» — che è una frase onesta — diventerebbe un'accusa.
   const APRE = `(?:^|[\\n.!?;]|\\b(?:fatto|ok|okay|ecco|perfetto|bene|certo|subito|va bene)\\b[,:;!.…]?)\\s*`;
   const SENZA_NON = (n) => `(?![^.!?]{0,${n}}\\bnon\\b)`;
+  // Le regole che riconoscono questa forma restano espressioni regolari come
+  // tutte le altre (la sentinella degli unit test le controlla una per una):
+  // il fatto che siano «senza ho» sta qui accanto.
+  const SENZA_HO = new Set();
   function participio(nome, participi, n = 24) {
-    return new RegExp(`${APRE}(?:l[ae] |un[ao] |il |un |l['’])?${nome}\\b${SENZA_NON(n)}`
+    const re = new RegExp(`${APRE}(?:l[ae] |un[ao] |il |un |l['’])?${nome}\\b${SENZA_NON(n)}`
       + `${PONTE(n)}\\b(?:è\\s+|e['’]\\s+|già\\s+)?(?:${participi})\\b`, 'i');
+    SENZA_HO.add(re);
+    return re;
   }
 
   const FAMIGLIE = [
