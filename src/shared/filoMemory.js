@@ -84,6 +84,12 @@
       type: entry.type || 'unknown', // 'chat_user', 'chat_filo', 'dismiss', 'click', ...
       summary: entry.summary || '',
       extra: entry.extra || null,
+      // #533 (terzo giro di verifica) — vero se in quel testo può esserci roba
+      // scritta da altri: la risposta di un turno in cui Filo aveva letto una
+      // pagina riporta quasi sempre le parole della pagina. Serve a chi
+      // rimette questa riga davanti al modello, che quel testo non ce lo deve
+      // rimettere.
+      ...(entry.esterno ? { esterno: true } : {}),
     });
     if (list.length > RAW_LOG_CAP) list.length = RAW_LOG_CAP;
     await setRaw(KEYS.FILO_RAW_LOG, list);
