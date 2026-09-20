@@ -323,10 +323,10 @@ async function avvisa(mancanti, righe) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || body.ok === false) {
-      console.warn(`[bake] allarme non consegnato (${res.status}${body.reason ? ` ${body.reason}` : ''}): resta solo l'errore qui sopra.`);
+      console.warn(`::warning::Feedback dell'allarme non consegnato (${res.status}${body.reason ? ` ${body.reason}` : ''}): di questa pubblicazione ferma resta solo il guasto qui sopra.`);
     }
   } catch (e) {
-    console.warn(`[bake] allarme non consegnato (${e.message}): resta solo l'errore qui sopra.`);
+    console.warn(`::warning::Feedback dell'allarme non consegnato (${e.message}): di questa pubblicazione ferma resta solo il guasto qui sopra.`);
   }
 }
 
