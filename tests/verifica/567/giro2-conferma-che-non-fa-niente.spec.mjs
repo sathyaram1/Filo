@@ -31,10 +31,10 @@ test('confermata un\'impostazione che non si può applicare, l\'utente deve capi
   await chiedi(page, 'attiva la modalità terminale quando serve');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
 
-  // Il popup si apre da solo: l'utente conferma.
-  const ok = page.locator('.sn-confirm-ok, .sn-modal-ok, button', { hasText: /^(OK|Conferma|Continua)$/i }).first();
-  await expect(ok).toBeVisible({ timeout: 10_000 });
-  await ok.click();
+  // Il popup si apre da solo: l'utente legge e conferma.
+  await expect.poll(() => confirmText(page), { timeout: 10_000 }).not.toBe('');
+  const testoPopup = await confirmText(page);
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
 
   const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
   await expect(btn).toContainText('✗', { timeout: 10_000 });
