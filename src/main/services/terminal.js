@@ -96,29 +96,33 @@ function truncate(text) {
 //
 // Il preludio è SEMPRE anteposto (non solo con la sonda della cartella): un
 // comando senza sonda ha lo stesso identico problema.
-function encodingPrelude(shell) {
-  const sh = resolveShell(shell);
-  if (sh === 'cmd') {
-    // 65001 = UTF-8. `>nul` perché `chcp` stampa una riga ("Tabella codici
-    // attiva: 65001") che finirebbe in testa all'output del comando.
-    return 'chcp 65001>nul\r\n';
-  }
-  if (sh === 'powershell') {
-    // Due codifiche, due lavori diversi, servono entrambe:
-    //   [Console]::OutputEncoding → con cosa la console scrive su stdout (è
-    //     questa che rovinava i nomi);
-    //   $OutputEncoding           → con cosa PowerShell scrive quando passa
-    //     testo in pipe a un programma esterno.
-    // UTF8Encoding($false) = senza BOM: il BOM comparirebbe come «ï»¿» in
-    // testa alla prima riga. In try/catch perché il setter di [Console] può
-    // rifiutare quando non c'è una console vera attaccata: in quel caso il
-    // comando deve girare lo stesso, non morire sul preludio.
-    return 'try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n'
-      + '$OutputEncoding = New-Object System.Text.UTF8Encoding $false\n';
-  }
+// I preludi, per shell EFFETTIVA. Vivono qui e basta: la shell persistente
+// della modalità terminale (shell.js) li prende da qui invece di tenerne una
+// copia, così non possono divergere — e ognuno finisce già con l'a-capo,
+// perché va anteposto sia a una riga di comando sia a uno stdin.
+const PRELUDI_CODIFICA = {
+  // 65001 = UTF-8. `>nul` perché `chcp` stampa una riga ("Tabella codici
+  // attiva: 65001") che finirebbe in testa all'output del comando.
+  cmd: 'chcp 65001>nul\r\n',
+  // Due codifiche, due lavori diversi, servono entrambe:
+  //   [Console]::OutputEncoding → con cosa la console scrive su stdout (è
+  //     questa che rovinava i nomi);
+  //   $OutputEncoding           → con cosa PowerShell scrive quando passa
+  //     testo in pipe a un programma esterno.
+  // UTF8Encoding($false) = senza BOM: il BOM comparirebbe come «ï»¿» in testa
+  // alla prima riga. In try/catch perché il setter di [Console] può rifiutare
+  // quando non c'è una console vera attaccata: in quel caso il comando deve
+  // girare lo stesso, non morire sul preludio.
+  powershell: 'try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n'
+    + '$OutputEncoding = New-Object System.Text.UTF8Encoding $false\n',
   // bash / sh: nessun preludio. Su Linux e macOS lo stdout è già UTF-8 e
   // forzare una locale che sulla macchina può non esistere farebbe solo danno.
-  return '';
+  bash: '',
+  sh: '',
+};
+
+function encodingPrelude(shell) {
+  return PRELUDI_CODIFICA[resolveShell(shell)] || '';
 }
 
 // Marcatore (improbabile in output reale) con cui un comando one-shot riporta
