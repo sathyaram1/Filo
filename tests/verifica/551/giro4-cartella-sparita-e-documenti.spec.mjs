@@ -19,7 +19,7 @@
 //     invisibili, e il modello risponde su un testo bucato.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { writeFileSync, rmSync, renameSync, mkdirSync } from 'node:fs';
+import { writeFileSync, rmSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
