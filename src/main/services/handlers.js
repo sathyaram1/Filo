@@ -955,9 +955,10 @@ async function maybeRunCompactor() {
 // Filo passa da «non ho un modello da chiamare» a «ce l'ho», o viceversa. Le
 // home già aperte lo devono sapere: l'accoglienza che aspettava parte e il
 // cartello sparisce, senza che l'utente ricarichi o apra una scheda nuova.
-// Le sorgenti sono due e arrivano in momenti diversi: la configurazione
-// condivisa (dalla rete, dopo l'avvio) e le impostazioni (chiave, modelli,
-// interruttore dei pesi aperti). Un solo avviso per tutte e due (#663).
+// Le sorgenti sono TRE e arrivano in momenti diversi: la configurazione
+// condivisa (dalla rete, dopo l'avvio), le impostazioni (chiave, modelli,
+// interruttore dei pesi aperti) e il portafoglio, dove vive la chiave di chi
+// entra con un invito. Un solo avviso per tutte e tre (#663).
 let _potevaRispondere = null;
 async function avvisaSeLaProntezzaCambia() {
   let ora = false;
