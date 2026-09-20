@@ -144,7 +144,7 @@ test('il manifesto dice che nessuna chat esce dal computer: alla chiusura ci esc
 
   const promessa = await app.evaluate(() => {
     const C = globalThis.SN_CAPABILITIES;
-    const voci = (C.list ? C.list() : C.CAPABILITIES) || [];
+    const voci = (C.all ? C.all() : C.CAPABILITIES) || [];
     const trovate = [];
     for (const v of voci) {
       const testo = `${v.desc || ''} ${v.doesNot || ''}`;
