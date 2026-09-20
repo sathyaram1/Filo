@@ -614,6 +614,8 @@
     IMPOSTA_PREFERENZA: 'Cambio un\'impostazione…',
     IMPOSTA_ESTETICA: 'Cambio l\'aspetto…',
     INVIA_FEEDBACK: 'Preparo una segnalazione…',
+    DICHIARA_USCITE: 'Fisso cosa posso fare…',
+    CHIEDI_USCITA: 'Ti chiedo un permesso…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
