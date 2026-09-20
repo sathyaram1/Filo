@@ -10,9 +10,10 @@
 //   1. una sveglia RICORRENTE si crea e si vede, con i giorni scritti;
 //   2. la si CANCELLA chiedendolo per etichetta → sparisce dalla colonna;
 //   3. una sveglia si SPOSTA a un altro orario → la colonna mostra il nuovo;
-//   4. "togli tutte le sveglie" chiede conferma ed elenca cosa sta per sparire,
-//      e finché non arriva la conferma non tocca niente (è il caso da cui è
-//      nato tutto: fra le sveglie ce n'era una per l'antibiotico);
+//   4. "togli tutte le sveglie" dice per nome cosa ha tolto, e se in quella
+//      conversazione Filo ha letto roba di fuori chiede prima, elencandole (è
+//      il caso da cui è nato tutto: fra le sveglie ce n'era una per
+//      l'antibiotico);
 //   5. i timer restano in piedi quando si cancellano "tutte le sveglie".
 //
 // Senza le nuove azioni i passi 2-5 sono rossi (azione non registrata → il
@@ -86,7 +87,7 @@ test('spostare una sveglia a un altro orario', async ({ app, openTab }) => {
   expect(alarm.repeat).toEqual(['lun', 'mar', 'mer', 'gio', 'ven']);
 });
 
-test('"togli tutte le sveglie" elenca cosa sparisce e aspetta l\'OK; i timer restano', async ({ app, openTab }) => {
+test('"togli tutte le sveglie" dice cosa ha tolto; dopo una pagina web chiede prima; i timer restano', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await page.waitForLoadState('domcontentloaded');
 
@@ -95,21 +96,28 @@ test('"togli tutte le sveglie" elenca cosa sparisce e aspetta l\'OK; i timer res
   await execAction(app, { type: 'TIMER', seconds: 900, label: 'pasta' });
   expect((await readTimers(page)).length).toBe(3);
 
-  // Cancellarne più d'una NON parte da sola: chiede conferma, e nella
-  // spiegazione c'è scritto cosa sta per perdere (l'antibiotico compreso).
-  const ask = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' });
+  // La stessa richiesta fatta da dentro una pagina web NON parte da sola: quel
+  // testo l'ha scritto qualcun altro, e Filo chiede elencando cosa sta per
+  // perdere (l'antibiotico compreso).
+  const pagina = { tab: { id: 8207, url: 'http://esempio.test/x' }, url: 'http://esempio.test/x' };
+  const ask = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' }, { sender: pagina });
   expect(ask.executed).toBe(false);
   expect(ask.needsConfirm).toBe(2);
   expect(ask.describe).toContain('palestra');
   expect(ask.describe).toContain('antibiotico');
 
-  // Finché l'utente non conferma, in colonna c'è ancora tutto.
+  // Finché non arriva la conferma, in colonna c'è ancora tutto.
   await expect(page.locator('.dash-live-card', { hasText: 'antibiotico' })).toBeVisible({ timeout: 10_000 });
   expect((await readTimers(page)).length).toBe(3);
 
-  // Dopo l'OK spariscono le sveglie — e SOLO quelle: il timer della pasta resta.
-  const done = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' }, { confirmed: true });
+  // Chiesto dall'utente in una conversazione pulita, invece, Filo lo fa e basta
+  // (#530: una sveglia si rimette) — e dice per nome che cosa ha tolto, che è
+  // quello che serve per rimetterla. Spariscono SOLO le sveglie: il timer
+  // della pasta resta.
+  const done = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' });
   expect(done.executed).toBe(true);
+  expect(String(done.output.removed.join(' '))).toContain('antibiotico');
+  expect(String(done.output.removed.join(' '))).toContain('palestra');
   await expect(page.locator('.dash-live-card', { hasText: 'antibiotico' })).toHaveCount(0, { timeout: 10_000 });
   await expect(page.locator('.dash-live-card', { hasText: 'pasta' })).toBeVisible();
 
