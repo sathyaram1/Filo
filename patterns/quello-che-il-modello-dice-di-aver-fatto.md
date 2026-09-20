@@ -69,6 +69,25 @@ in memoria un passaggio che parte da solo a turno finito, quindi «l'ho
 memorizzato» è vero. Per lo stesso motivo la cronologia si guarda intera, non
 solo i venti messaggi che vanno al modello.
 
+Il secondo giro di verifica ha trovato altre tre cose che non hanno bisogno di
+prova, e ognuna faceva partire anche il rimbalzo, quindi la risposta buona
+spariva da sotto gli occhi dell'utente prima di essere smentita:
+
+- **quello che Filo consegna DENTRO la risposta.** L'utente chiede una mail,
+  Filo scrive «te l'ho scritta qui sotto» e la mail è lì: non esiste nessuno
+  strumento che possa averla scritta. I verbi del consegnare un testo non
+  stanno nella conferma col pronome, e una frase che rimanda alla risposta
+  stessa («qui sotto», «qui sopra», i due punti che introducono il testo) non
+  conta;
+- **un'immagine mandata in chat.** Arriva al modello dentro il messaggio, come
+  i riassunti dei file dell'editor: per dire quanto c'è scritto sulla bolletta
+  fotografata non serve nessuno strumento;
+- **una sveglia che ESISTE.** Messa ieri, in un'altra sessione, non lascia
+  nessuna azione in questa conversazione, e «sì, l'ho messa alle 19» diventava
+  un'accusa a ogni riavvio. Si confronta l'ora nominata nella frase con le
+  sveglie vere: un'altra ora non copre niente, che è il caso della
+  segnalazione.
+
 Tre cose imparate dal primo giro di verifica:
 
 - **il formato macchina arriva anche in CODA.** «Scrive la risposta buona come
