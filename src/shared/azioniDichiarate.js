@@ -681,6 +681,10 @@
       if (!m || m.role !== 'filo') continue;
       for (const t of insiemeDiTipi(m.actions)) out.add(t);
     }
+    // Giro 6: questi tipi vengono dal PASSATO, e il presidio deve saperlo.
+    // Mescolati con quelli di adesso, una cosa fatta una volta copriva tutte
+    // quelle della sua specie raccontate dopo.
+    try { Object.defineProperty(out, 'dalPassato', { value: true }); } catch (_) {}
     return out;
   }
 
