@@ -34,10 +34,8 @@ test('conservativo + compito sporco: un feedback non parte più, e Filo dice qua
   // può fare adesso (rifarlo in una conversazione pulita, o dove farlo a mano).
   const testo = String(r.error || '');
   expect(testo.length, 'un rifiuto senza spiegazione').toBeGreaterThan(0);
-  expect(
-    testo,
-    `PORTA: il rifiuto non dice cosa fare adesso — "${testo}"`,
-  ).toMatch(/nuova conversazione|conversazione nuova|puoi|Preferenze|autonomia|a mano/i);
+  expect(testo, `il rifiuto non dice cosa fare adesso — "${testo}"`).toMatch(/conversazione nuova/i);
+  expect(testo, `il rifiuto non dice dove si cambia il livello — "${testo}"`).toMatch(/Preferenze/);
 });
 
 test('costo 3 con compito pulito, a livello normale: basta un clic, non più la parola scritta', async ({ app }) => {
