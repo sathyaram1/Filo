@@ -625,7 +625,7 @@ module.exports = function register(on, ctx) {
     (async () => {
       try {
         const settings = await getEffectiveSettings();
-        if (!SN_CONST.canServeAction(settings, ACTIONS.HELP_INTENT_GUESS)) return;
+        if (!SN_CONST.canServeAction(settings, SN_CONST.ACTIONS.HELP_INTENT_GUESS)) return;
         // Niente user agent e nessun identificativo del mittente (#584): nel
         // documento non ci entrano, e sistema operativo più versione più lingua
         // bastavano a rimettere insieme i percorsi della stessa installazione su
