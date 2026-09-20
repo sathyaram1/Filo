@@ -281,7 +281,12 @@ test('su Linux il terminale non prova ad avviare PowerShell', () => {
       assert.equal(resolveShell(chiesta), 'sh', `su Linux "${chiesta}" deve diventare la shell di sistema`);
     }
     assert.equal(resolveShell('bash'), 'bash', 'chi sceglie Bash deve avere Bash');
-    assert.equal(defaultShell(), 'bash', 'la shell predefinita fuori da Windows non può essere di Windows');
+    // Il ripiego dei comandi dell'assistente e quello della sessione
+    // persistente del terminale devono essere LO STESSO: se divergono, le due
+    // strade equivalenti rispondono con due shell diverse.
+    assert.equal(defaultShell(), 'sh', 'la shell predefinita fuori da Windows non può essere di Windows');
+    assert.equal(resolveShell(defaultShell()), resolveShell(undefined),
+      'il ripiego dei comandi dell\'assistente e quello della modalità terminale non coincidono');
     assert.equal(shellInvocation('powershell', 'ls').file, '/bin/sh',
       'su Linux il comando partirebbe con powershell.exe, che lì non esiste');
   });
