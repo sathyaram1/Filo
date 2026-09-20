@@ -169,7 +169,12 @@
     } catch (_) { r = null; }
     if (token !== chatSearchToken) return; // una ricerca più recente ha già vinto
     chats = (r && r.chats) || [];
+    // `chatsTotal` decide se la sezione esiste. Senza ricerca è il conto vero;
+    // con una ricerca attiva non lo si può riscrivere (i risultati sono un
+    // sottoinsieme), ma nemmeno lasciare a zero: una chat nata adesso in
+    // un'altra scheda terrebbe la sezione nascosta pur avendo un risultato.
     if (!q) chatsTotal = chats.length;
+    else chatsTotal = Math.max(chatsTotal, chats.length);
     renderChats();
   }
 
