@@ -37,8 +37,14 @@
   // dell'utente. Un titolo approssimativo si riconosce lo stesso; una riga
   // vuota in un elenco no.
   function fallbackTitle(messages) {
-    const list = Array.isArray(messages) ? messages : [];
-    const first = list.find((m) => m && m.role === 'user' && String(m.text || '').trim());
+    const list = (Array.isArray(messages) ? messages : [])
+      .filter((m) => m && String(m.text || '').trim());
+    // Di norma il titolo di ripiego è la prima cosa che ha detto l'utente. Ma
+    // una chat può non averne nemmeno una — l'utente ha scritto solo un comando
+    // con lo slash, e a parlare è stato solo Filo: lì si prende la prima riga
+    // che c'è. «Chat senza testo» su una chat piena di testo è una bugia in
+    // elenco.
+    const first = list.find((m) => m.role === 'user') || list[0];
     const raw = first ? String(first.text) : '';
     const oneLine = raw.replace(/\s+/g, ' ').trim();
     if (!oneLine) return 'Chat senza testo';
