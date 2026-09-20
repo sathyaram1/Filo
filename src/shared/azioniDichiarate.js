@@ -87,7 +87,10 @@
       tipi: ['SALVA_LEZIONE', 'SALVA_APPUNTO'],
       avviso: 'niente è stato messo in memoria',
       frasi: [
-        /\b(?:l'|lo |la )?ho (?:memorizzat|registrat|imparat)[oa]\b/i,
+        // Solo i verbi che dicono «l'ho messo via»: «ho imparato», «ho capito»
+        // e simili sono modi di dire, e farebbero scattare il presidio su una
+        // conversazione qualunque.
+        /\b(?:l'|lo |la )?ho memorizzat[oa]\b/i,
         /\bho (?:salvato|fissato|messo) (?:in|nella|nelle) memoria\b/i,
         /\bd'ora in poi me (?:ne|lo|la) ricorder(?:ò|o)\b/i,
       ],
