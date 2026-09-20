@@ -158,8 +158,8 @@
   function classeFonte(id, spostate) {
     const k = String(id == null ? '' : id).trim().toLowerCase();
     const base = FONTI[k] ? FONTI[k].classe : CLASSE_MAX;
-    const n = spostate && Number(spostate[k]);
-    if (Number.isFinite(n) && n >= CLASSE_MIN && n <= CLASSE_MAX) return Math.round(n);
+    const n = spostate ? numero(spostate[k]) : null;
+    if (n != null && n >= CLASSE_MIN && n <= CLASSE_MAX) return Math.round(n);
     return base;
   }
   function fraseFonte(id) {
@@ -199,19 +199,32 @@
     const v = manopole[c];
     return !!(v && v[manopola]);
   }
+  // Un numero vero, non «qualcosa che Number() trasforma in zero»: `null` e la
+  // stringa vuota valgono 0 per JavaScript, e un costo mancante passerebbe per
+  // un costo zero — cioè per un'azione che non costa niente.
+  function numero(v) {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return Number(v);
+    return null;
+  }
+
   // Solo restringono: una manopola può abbassare la classe di una fonte, mai
   // alzarla.
   function classeConManopole(classe, campo, manopole) {
-    const n = Number(classe);
-    if (!Number.isFinite(n)) return CLASSE_MAX;
+    const n = numero(classe);
+    if (n == null) return CLASSE_MAX;
     const giu = manopolaAccesa(campo, 'fiducia', manopole) ? 1 : 0;
     return Math.min(CLASSE_MAX, Math.max(CLASSE_MIN, Math.round(n) + giu));
   }
+  // Il costo dichiarato dall'azione, più la manopola «quanto è grave sbagliare
+  // qui» del suo campo. Un costo fuori scala NON si arrotonda dentro: torna
+  // null, e chi decide risponde no — un potere che dichiara un costo assurdo è
+  // un potere rotto, non un potere gratis.
   function costoConManopole(costo, campo, manopole) {
-    const n = Number(costo);
-    if (!Number.isFinite(n)) return null;
+    const n = numero(costo);
+    if (n == null || !Number.isInteger(n) || n < COSTO_MIN || n > COSTO_MAX) return null;
     const su = manopolaAccesa(campo, 'gravita', manopole) ? 1 : 0;
-    return Math.min(COSTO_MAX, Math.max(COSTO_MIN, Math.round(n) + su));
+    return Math.min(COSTO_MAX, n + su);
   }
 
   // ── 3. Costo di sbagliare ────────────────────────────────────────────────
@@ -223,9 +236,11 @@
   ];
   const COSTO_MIN = 0;
   const COSTO_MAX = 3;
+  // Un costo vero, non «qualcosa che assomiglia a un numero»: `null` diventa 0
+  // se lo si passa da Number(), e un'azione senza costo verrebbe scambiata per
+  // un'azione che non costa niente. Qui dev'essere già un intero.
   function costoValido(c) {
-    const n = Number(c);
-    return Number.isInteger(n) && n >= COSTO_MIN && n <= COSTO_MAX;
+    return Number.isInteger(c) && c >= COSTO_MIN && c <= COSTO_MAX;
   }
 
   // ── 4/5. Perimetro e origine ─────────────────────────────────────────────
