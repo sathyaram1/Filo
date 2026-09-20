@@ -114,14 +114,31 @@ export function esitiDecaduti(state, punta) {
   return fuori;
 }
 
-/** Il rifiuto per un via libera che parla di un altro commit. PURA. */
-export function testoEsitiDecaduti(decaduti, punta) {
+/**
+ * Il rifiuto per un via libera che parla di un altro commit. PURA.
+ *
+ * Il rifiuto dice anche COSA REGISTRARE. Fermarsi e basta lascia la notizia su
+ * questa macchina: sul canale i due via libera continuano a risultare buoni per
+ * questo ramo, che è la segnalazione #485 spostata di un passo. Il passo che la
+ * registra è il rientro in verifica (`revision_security` → `revision_capability`
+ * nella macchina a stati: la stessa strada del riallineamento, dove il
+ * contenuto cambia e verifica e controllo di sicurezza si rifanno su quello
+ * nuovo). Chi legge non deve inventarsi il comando, né accontentarsi di un
+ * guasto, che dice «non riesco a lavorare» e non «gli esiti non parlano più di
+ * questo contenuto».
+ */
+export function testoEsitiDecaduti(decaduti, punta, ramo = '') {
   const righe = (Array.isArray(decaduti) ? decaduti : [])
     .map((d) => `  ${d.quale} ha dato l'ok su ${String(d.sha).slice(0, 12)}`);
+  const p = String(punta || '').slice(0, 12);
+  const r = String(ramo || '<ramo>');
   return 'fusione non chiesta: il ramo si è mosso dopo i via libera, che valgono per il contenuto esaminato e non per il nome del ramo.\n'
     + `${righe.join('\n')}\n`
-    + `  la directory adesso è su ${String(punta || '').slice(0, 12)}\n`
-    + 'Quello che verrebbe fuso contiene righe che nessuno ha letto. Il giro va rifatto su questo contenuto, non chiuso: chi ha cambiato il ramo lo rimette in verifica.';
+    + `  la directory adesso è su ${p}\n`
+    + 'Quello che verrebbe fuso contiene righe che nessuno ha letto: il giro va rifatto su questo contenuto, non chiuso.\n'
+    + 'Non fermarti qui. Finché la notizia resta su questa macchina, sul canale i due via libera continuano a risultare buoni per questo ramo. Registrala rimettendo il lavoro in verifica sul contenuto nuovo:\n'
+    + `  node scripts/routine-channel.mjs deliver status --status revision_capability --branch ${r} --notes "il ramo si è mosso dopo i via libera: verifica e controllo di sicurezza vanno rifatti su ${p}"\n`
+    + 'Se il server rifiuta quel passaggio, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
 }
 
 export function exitCodeFor(reply) {
