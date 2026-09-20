@@ -1360,8 +1360,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
     return {
       executed: false,
       kept: true,
-      needsConfirm: level,
-      describe: Levels ? Levels.describe(action) : '',
+      needsConfirm: livelloEffettivo,
+      describe: premessaPerimetro + (Levels ? Levels.describe(action) : ''),
+      fuoriPerimetro: verdettoPerimetro.ok ? null : verdettoPerimetro,
     };
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
