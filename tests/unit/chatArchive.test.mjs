@@ -67,6 +67,34 @@ test('una chat senza testo non resta senza nome', () => {
   assert.equal(CA.fallbackTitle(null), 'Chat senza testo');
 });
 
+test('una chat in cui ha parlato solo Filo prende comunque il nome da quello che c’è', () => {
+  // Succede con un comando con lo slash: l'utente scrive «/help», a schermo
+  // compare solo la risposta di Filo. «Chat senza testo» su una chat piena di
+  // testo è una bugia in elenco.
+  const t = CA.fallbackTitle([{ role: 'filo', text: '/home, /clear — ricarica la dashboard' }]);
+  assert.equal(t, '/home, /clear — ricarica la dashboard');
+});
+
+test('l’anteprima non ripete il titolo: quando il titolo È il primo messaggio, mostra il pezzo dopo', () => {
+  const messages = [
+    { role: 'user', text: 'Discutiamo di Epicuro e del piacere' },
+    { role: 'filo', text: 'Volentieri: Epicuro distingue i piaceri…' },
+  ];
+  // Titolo di ripiego (nessun modello): è il primo messaggio.
+  const senzaModello = CA.toIndexEntry({ id: 'c1', messages });
+  assert.equal(senzaModello.title, 'Discutiamo di Epicuro e del piacere');
+  assert.notEqual(senzaModello.excerpt, senzaModello.title);
+  assert.ok(senzaModello.excerpt.startsWith('Volentieri'), senzaModello.excerpt);
+
+  // Titolo generato: l'anteprima torna a essere quello che ha scritto l'utente.
+  const conModello = CA.toIndexEntry({ id: 'c1', title: 'Epicuro e il piacere', messages });
+  assert.equal(conModello.excerpt, 'Discutiamo di Epicuro e del piacere');
+
+  // Nient'altro da mostrare: meglio niente che un'eco del titolo.
+  const sola = CA.toIndexEntry({ id: 'c2', messages: [messages[0]] });
+  assert.equal(sola.excerpt, '');
+});
+
 test('un titolo lunghissimo si accorcia sulla parola, e lo dichiara', () => {
   const t = CA.clampTitle('parola '.repeat(60));
   assert.ok(t.length <= CA.TITLE_MAX + 1, `titolo troppo lungo: ${t.length}`);

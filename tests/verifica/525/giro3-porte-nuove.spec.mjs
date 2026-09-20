@@ -229,9 +229,22 @@ test('Cronologia con chat e senza schede chiuse: «Svuota archivio» dice cosa f
   await app.evaluate(() => globalThis.SN_CLOSE_FILO_CHAT('c-sola'));
   await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).title || '', { timeout: 25_000 }).not.toBe('');
 
+  // Una chat di comando e una ancora in corso, per guardare la pagina intera.
+  await turno(app, 'c-comando', 'Metti una sveglia alle 7');
+  await app.evaluate(() => globalThis.SN_CLOSE_FILO_CHAT('c-comando'));
+  await turno(app, 'c-viva', 'Questa è ancora aperta');
+
   const page = await openTab(ARCHIVE);
   await expect(page.locator('.arc-chat').first()).toBeVisible({ timeout: 20_000 });
+  await page.locator('#showCommands').check();
   await page.screenshot({ path: 'tests/.shots/525-giro3-cronologia-chiaro.png', fullPage: true });
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    window.SN_PAGE_BOOTSTRAP.applyTheme('dark');
+  });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'tests/.shots/525-giro3-cronologia-scuro.png', fullPage: true });
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('light'));
 
   // Il bottone c'è, in cima a una pagina piena di chat. Premuto, deve fare
   // qualcosa o dire perché no: non restare muto.
