@@ -50,73 +50,66 @@ test('nelle Preferenze la shell offerta e\' una che su Linux esiste davvero', as
     .toContain(scelta);
 });
 
-// Le due strade equivalenti, provate facendo rispondere la shell stessa invece
-// di fidarsi di cio' che le abbiamo chiesto: `$BASH_VERSION` e' vuota in sh e
-// piena in bash.
+// La modalita' terminale della dashboard, provata dove vive davvero: da una
+// pagina filo://, con la stessa porta che usa la dashboard (`window.filo`).
+// La shell risponde da se' chi e': `$BASH_VERSION` e' vuota in sh e piena in
+// bash, quindi non ci si fida di cio' che le abbiamo chiesto.
 const CHIEDI_CHI_SEI = 'echo "sono:${BASH_VERSION:-non-bash}"';
 
-test('senza nessuna scelta, le due strade per lanciare un comando rispondono con la stessa shell', async ({ app }) => {
-  const risposte = await app.evaluate(async ({}, comando) => {
-    const { runCommand, resolveShell } = require('./src/main/services/terminal.js');
-    const { createSession } = require('./src/main/services/shell.js');
-
-    // Strada 1 — i comandi dell'assistente: nessuna preferenza salvata.
-    const uno = await runCommand(comando, { trackCwd: true });
-
-    // Strada 2 — la modalita' terminale della dashboard: stessa assenza di
-    // scelta. La sessione e' persistente, quindi si aspetta l'uscita.
-    const due = await new Promise((risolvi, rifiuta) => {
-      const s = createSession({});
-      let out = '';
-      const stop = setTimeout(() => { try { s.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, 20_000);
-      s.exec(comando, {
-        onData: ({ chunk }) => { out += chunk; },
-        onExit: () => { clearTimeout(stop); try { s.kill(); } catch (_) {} risolvi({ out, shell: s.shell }); },
-        onError: ({ message }) => { clearTimeout(stop); try { s.kill(); } catch (_) {} rifiuta(new Error(message)); },
-      });
+async function lanciaDalTerminale(page, shell) {
+  return page.evaluate(([comando, sh]) => new Promise((risolvi, rifiuta) => {
+    let out = '';
+    const stop = setTimeout(() => rifiuta(new Error('la shell non ha risposto entro il tempo')), 25_000);
+    window.filo.shellExec({
+      command: comando,
+      shell: sh === null ? undefined : sh,
+      onData: ({ chunk }) => { out += chunk; },
+      onExit: ({ code }) => { clearTimeout(stop); risolvi({ out, code }); },
+      onError: ({ message }) => { clearTimeout(stop); rifiuta(new Error(message)); },
     });
+  }), [CHIEDI_CHI_SEI, shell === undefined ? null : shell]);
+}
 
-    return {
-      assistente: { out: uno.stdout || '', code: uno.code, shell: resolveShell(undefined) },
-      terminale: { out: due.out, shell: due.shell },
-    };
-  }, CHIEDI_CHI_SEI);
+const chiHaRisposto = (t) => (/sono:non-bash/.test(t) ? 'sh' : /sono:/.test(t) ? 'bash' : 'nessuno');
 
-  // Prima: tutte e due devono aver risposto. Su Linux una shell di Windows
-  // fallirebbe con ENOENT, e l'utente vedrebbe un comando che non parte.
-  expect(risposte.assistente.out, `i comandi dell'assistente non hanno prodotto niente: ${JSON.stringify(risposte.assistente)}`)
+test('senza aver scelto niente, la modalita\' terminale lancia davvero un comando su Linux', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForFunction(() => !!window.filo?.shellExec, null, { timeout: 15_000 });
+
+  // Nessuna shell chiesta: e' la condizione di chi apre Filo per la prima
+  // volta e non tocca le Preferenze.
+  const esito = await lanciaDalTerminale(page, undefined);
+
+  // Il successo dal punto di vista dell'utente: il comando GIRA e risponde.
+  // Se qui partisse powershell.exe, su Linux non esisterebbe e non
+  // arriverebbe niente.
+  expect(esito.out, `la modalita' terminale non ha eseguito il comando: ${JSON.stringify(esito)}`)
     .toContain('sono:');
-  expect(risposte.terminale.out, `la modalita' terminale non ha prodotto niente: ${JSON.stringify(risposte.terminale)}`)
-    .toContain('sono:');
-
-  // Poi: e' la STESSA shell. Questo e' il rilievo del giro 1.
-  const chi = (t) => (/sono:non-bash/.test(t) ? 'sh' : 'bash');
-  expect(chi(risposte.assistente.out),
-    `senza nessuna scelta l'assistente parla con ${chi(risposte.assistente.out)} e il terminale con ${chi(risposte.terminale.out)}: lo stesso comando puo' comportarsi in modo diverso a seconda di dove lo scrivi`)
-    .toBe(chi(risposte.terminale.out));
+  expect(esito.code, `il comando e' uscito con ${esito.code}`).toBe(0);
+  expect(chiHaRisposto(esito.out), 'senza nessuna scelta deve rispondere la shell di sistema')
+    .toBe('sh');
 });
 
-test('chi sceglie Bash nelle Preferenze ottiene Bash su tutte e due le strade', async ({ app }) => {
-  const risposte = await app.evaluate(async ({}, comando) => {
-    const { runCommand } = require('./src/main/services/terminal.js');
-    const { createSession } = require('./src/main/services/shell.js');
+test('chi sceglie Bash nelle Preferenze ottiene davvero Bash nella modalita\' terminale', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForFunction(() => !!window.filo?.shellExec, null, { timeout: 15_000 });
 
-    const uno = await runCommand(comando, { shell: 'bash', trackCwd: true });
-    const due = await new Promise((risolvi, rifiuta) => {
-      const s = createSession({ shell: 'bash' });
-      let out = '';
-      const stop = setTimeout(() => { try { s.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, 20_000);
-      s.exec(comando, {
-        onData: ({ chunk }) => { out += chunk; },
-        onExit: () => { clearTimeout(stop); try { s.kill(); } catch (_) {} risolvi({ out, shell: s.shell }); },
-        onError: ({ message }) => { clearTimeout(stop); try { s.kill(); } catch (_) {} rifiuta(new Error(message)); },
-      });
-    });
-    return { assistente: uno.stdout || '', terminale: due.out };
-  }, CHIEDI_CHI_SEI);
+  const esito = await lanciaDalTerminale(page, 'bash');
+  expect(esito.out, `chiedendo Bash non ha risposto nessuna shell: ${JSON.stringify(esito)}`)
+    .toContain('sono:');
+  expect(chiHaRisposto(esito.out), 'la voce «Bash» delle Preferenze non cambia chi risponde')
+    .toBe('bash');
+});
 
-  expect(risposte.assistente, 'chi ha scelto Bash lancia i comandi dell\'assistente in un\'altra shell')
-    .not.toMatch(/sono:non-bash/);
-  expect(risposte.terminale, 'chi ha scelto Bash apre la modalita\' terminale in un\'altra shell')
-    .not.toMatch(/sono:non-bash/);
+// E il valore che l'app usa quando l'utente non ha scelto niente ("powershell",
+// che sta nei valori di serie ed e' nato su Windows) su Linux non deve MAI
+// arrivare cosi' com'e' a uno spawn: li' non esiste.
+test('una preferenza nata su Windows non fa partire PowerShell su Linux', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForFunction(() => !!window.filo?.shellExec, null, { timeout: 15_000 });
+
+  const esito = await lanciaDalTerminale(page, 'powershell');
+  expect(esito.out, `con la preferenza di serie il comando non parte: ${JSON.stringify(esito)}`)
+    .toContain('sono:');
+  expect(esito.code, 'il comando non e\' andato a buon fine').toBe(0);
 });
