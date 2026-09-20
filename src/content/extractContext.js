@@ -360,9 +360,8 @@
   function isVisibilityHidden(el) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
-    // Prima dello stile: su una pagina di domande frequenti la risposta è quasi
-    // sempre questa, e chiedere lo stile di migliaia di elementi per scoprirlo
-    // si sente all'apertura del menu.
+    // Prima dello stile: su una pagina di domande frequenti la risposta è quasi sempre questa, e chiedere lo stile
+    // di migliaia di elementi per scoprirlo si sente all'apertura del menu.
     if (isInsideClosedDisclosure(el)) return true;
     // La finestra dell'elemento, non la nostra: da quando la traduzione entra
     // nei riquadri senza indirizzo (#407) qui arrivano elementi di un ALTRO
@@ -384,11 +383,8 @@
     return !!(p && p.tagName === 'DETAILS' && !p.open && el.tagName !== 'SUMMARY');
   }
 
-  // Un <details> chiuso nasconde anche il testo scritto SENZA un riquadro
-  // attorno, che non è figlio di nessun elemento da saltare: senza questa
-  // domanda la forma base della fisarmonica — domanda, e sotto la risposta —
-  // veniva tradotta e pagata da chiusa, mentre la stessa risposta dentro un
-  // riquadro veniva rimandata (#505).
+  // Un <details> chiuso nasconde anche il testo scritto senza un riquadro attorno, che non è figlio di niente da
+  // saltare: senza questa domanda la fisarmonica nella sua forma base si pagava da chiusa, con un riquadro no (#505).
   function isOwnTextHidden(el) {
     return !!(el.tagName === 'DETAILS' && !el.open);
   }
@@ -404,11 +400,8 @@
     return false;
   }
 
-  // Trasparente del tutto MENTRE è sullo schermo: è il menu a tendina chiuso,
-  // il suggerimento non ancora aperto. Fuori dallo schermo no: lì `opacity:0` è
-  // quasi sempre una comparsa in dissolvenza allo scorrimento, e rimandarla
-  // lascerebbe in lingua originale metà di un articolo che l'utente leggerà
-  // tutto.
+  // Trasparente MENTRE è sullo schermo: il menu a tendina chiuso, il suggerimento non ancora aperto. Fuori no: lì
+  // è quasi sempre una comparsa in dissolvenza allo scorrimento, e rimandarla lascerebbe mezzo articolo in inglese.
   function isTransparentOnScreen(el, cs) {
     if (parseFloat(cs.opacity) !== 0) return false;
     let r;
@@ -417,12 +410,9 @@
     return r.top < (vx.innerHeight || 0) && r.bottom > 0 && r.left < (vx.innerWidth || 0) && r.right > 0;
   }
 
-  // Sfilato dalla pagina verso l'alto o verso sinistra (`left:-9999px`, un
-  // cassetto traslato via): lì non ci si arriva scorrendo. Due cautele. Le
-  // coordinate sono quelle del DOCUMENTO: con quelle della finestra, tutto
-  // quello che si è già scorso sembrerebbe nascosto. E vale solo per chi è
-  // uscito dal flusso: le diapositive già passate di una giostra stanno a
-  // sinistra allo stesso modo, ma l'utente ci torna con una strisciata.
+  // Sfilato dalla pagina in alto o a sinistra (`left:-9999px`, un cassetto traslato via): lì non si arriva scorrendo.
+  // Coordinate del DOCUMENTO, o sembrerebbe nascosto tutto ciò che si è già scorso; e solo fuori flusso, o ci
+  // finirebbero le diapositive già passate di una giostra, a cui si torna con una strisciata.
   function isPushedOutOfPage(el, cs) {
     if (cs.position !== 'absolute' && cs.position !== 'fixed') return false;
     let r;
@@ -479,9 +469,8 @@
   function hasRevealedText(list) {
     for (const voce of (list || [])) {
       try {
-        // Due forme nella stessa lista: un sottoalbero rimandato, oppure il solo
-        // testo proprio di un elemento che si vede (la fisarmonica chiusa senza
-        // riquadro attorno alla risposta).
+        // Due forme nella stessa lista: un sottoalbero rimandato, oppure il solo testo proprio di un elemento che
+        // si vede (la fisarmonica chiusa senza riquadro attorno alla risposta).
         const own = !!(voce && voce.own);
         const el = own ? voce.el : voce;
         if (!el || !el.isConnected) continue;
@@ -637,12 +626,8 @@
   // l'avviso finale: senza, una pagina enorme veniva dichiarata "tradotta" con
   // la coda ancora in lingua originale (la bugia di #407, altra causa). Contare
   // costa una camminata nel DOM, niente richieste al modello.
-  // Quanti sottoalberi nascosti tenere d'occhio. È una guardia contro la pagina
-  // patologica, non una misura: a 200 una pagina di domande frequenti un po'
-  // lunga lo superava, e la sezione aperta oltre il tetto non faceva più offrire
-  // niente — restava solo tornare all'originale e ripagare tutto (#505). Il
-  // costo di tenerne tante è una domanda per elemento all'apertura del menu, e
-  // per le forme comuni quella domanda si chiude prima di arrivare allo stile.
+  // Guardia contro la pagina patologica, non una misura: a 200 una pagina di domande frequenti un po' lunga lo
+  // superava, e la sezione aperta oltre il tetto non faceva più offrire niente se non ripagare tutto (#505).
   const MAX_HIDDEN = 5000;
 
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
@@ -734,9 +719,8 @@
         // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
         const txt = ownTextOf(el);
         if (txt.length >= 2 && HAS_LETTER.test(txt)) {
-          // L'elemento si vede, il suo testo no: una fisarmonica chiusa con la
-          // risposta scritta senza riquadro attorno. Si rimanda come ogni altra
-          // sezione ripiegata (#505), segnandola perché il menu se ne accorga.
+          // L'elemento si vede, il suo testo no: la fisarmonica chiusa con la risposta scritta senza riquadro
+          // attorno. Si rimanda come ogni altra sezione ripiegata, segnandola perché il menu se ne accorga (#505).
           if (isOwnTextHidden(el)) {
             if (hidden.length < MAX_HIDDEN) hidden.push({ el, own: true });
           } else if (room()) out.push({ el, text: txt });
