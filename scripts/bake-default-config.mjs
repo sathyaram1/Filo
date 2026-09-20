@@ -269,21 +269,37 @@ async function main() {
   }
 }
 
-/** Apre un feedback quando la costruzione sta per produrre una versione monca. */
-async function avvisa() {
+// Apre un feedback quando la costruzione sta per produrre una versione monca.
+// Porta le STESSE righe del registro: chi apre il feedback deve poter agire da
+// lì, senza risalire ai log della costruzione (#642).
+async function avvisa(mancanti, righe) {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
   if (!passphrase) return;
+  const nomi = (mancanti || []).map((c) => c.nome).join(', ');
+  const testo = testoEntroIlTetto([
+    'La costruzione non ha trovato nessuna chiave di default, e la pubblicazione è stata fermata: meglio nessuna versione nuova che una che arriva agli utenti senza niente di preimpostato.',
+    '',
+    ...(righe || []),
+  ].join('\n'));
   try {
-    await fetch(`${CANALE}/buildAlarm`, {
+    const res = await fetch(`${CANALE}/buildAlarm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         passphrase,
-        name: 'Versione costruita senza chiavi di default',
-        text: 'La costruzione non ha trovato nessuna chiave di default: né dal server (parola d\'ordine assente, sbagliata o revocata) né fra i segreti del job. La pubblicazione e\' stata fermata: meglio nessuna versione nuova che una che arriva senza chiavi preimpostate. Controlla la parola d\'ordine della costruzione e i segreti di riserva del job.',
+        name: nomi
+          ? `Pubblicazione ferma: manca la chiave di default ${nomi}`
+          : 'Pubblicazione ferma: nessuna chiave di default',
+        text: testo,
       }),
     });
-  } catch (_) { /* se non si riesce ad avvisare, resta l'errore nei log */ }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) {
+      console.warn(`[bake] allarme non consegnato (${res.status}${body.reason ? ` ${body.reason}` : ''}): resta solo l'errore qui sopra.`);
+    }
+  } catch (e) {
+    console.warn(`[bake] allarme non consegnato (${e.message}): resta solo l'errore qui sopra.`);
+  }
 }
 
 main().catch((e) => {
