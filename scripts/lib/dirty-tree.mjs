@@ -12,6 +12,14 @@
 //   La regola vale su TUTTE E DUE le strade, quella delle routine
 //   (dispatch --record-verifier) e quella locale (verify-local critica): una
 //   fonte sola, così una porta chiusa da una parte non resta aperta dall'altra.
+//
+//   E vale per TUTTI gli esiti che valgono per un commit, non solo per la
+//   critica: la messa in revisione, la consegna di una correzione e — dal
+//   feedback #485 — il verdetto del controllo di sicurezza, che era l'unico
+//   rimasto fuori. Un verdetto L4 registrato con la directory sporca parla del
+//   diff che il controllo ha letto, mentre il salvataggio automatico sposta la
+//   punta subito dopo: il pentagono in dashboard dice «controllato» di un
+//   contenuto che nessuno ha guardato.
 
 import { execFileSync } from 'node:child_process';
 
