@@ -121,6 +121,12 @@
       // mentre l'appunto vero vuole l'azione che scrive un appunto.
       id: 'promemoria',
       tipi: ['SALVA_APPUNTO', 'SALVA_LEZIONE', 'EVENTO_CALENDARIO', 'SVEGLIA', 'TIMER'],
+      // Un promemoria è spessissimo una sveglia, e può essere un appunto: se
+      // l'ora nominata è quella di una sveglia che c'è, o se la frase nomina un
+      // appunto che c'è, la frase è vera. Senza, «ti ho messo il promemoria per
+      // le 19» smentiva una sveglia delle 19 esistente.
+      orari: true,
+      appunti: true,
       avviso: 'il promemoria non c\'è',
       frasi: [
         new RegExp(`${HO}(?:messo|salvato|scritto|creato|aggiunto|annotato|impostato|segnato|preso|fissato)\\b${PONTE(48)}\\bpromemoria\\b`, 'i'),
