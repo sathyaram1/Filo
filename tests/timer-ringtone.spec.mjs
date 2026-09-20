@@ -293,7 +293,10 @@ test('due finestre, una sola suoneria, e il turno passa a chi resta', async ({ a
   expect(stato.filter(Boolean).length, 'una scadenza sola, una suoneria sola').toBe(1);
 
   const [chiSuona, altra] = stato[0] ? [due[0], due[1]] : [due[1], due[0]];
-  await chiSuona.evaluate(() => window.filoShell.window.close());
+  // La chiusura si programma e non si aspetta: chiuderebbe la pagina in cui sta
+  // girando questa evaluate, e la chiamata resterebbe appesa per sempre.
+  await chiSuona.evaluate(() => { setTimeout(() => window.filoShell.window.close(), 0); }).catch(() => {});
+  await expect.poll(() => chiSuona.isClosed(), { timeout: 15_000 }).toBe(true);
   // Chi resta prende il turno: la scadenza è ancora viva, e nessuno l'ha fermata.
   await expect.poll(() => suona(altra), { timeout: 20_000 }).toBe(true);
 
