@@ -2176,6 +2176,18 @@ function documentReadsForPrompt(actions) {
     // dal corpo della risposta di un servizio (#593, terzo giro di verifica).
     const E = globalThis.SN_ESTERNO;
     const etichetta = E.perCanaleSistema(out.name || out.documentRead || 'documento');
+    // #551 — il percorso chiesto non esisteva, ma nella cartella c'era un solo
+    // file col nome uguale a meno di accenti e trattini: è stato aperto quello.
+    // Il modello deve sapere QUALE file ha in mano — e dirlo — invece di
+    // continuare a usare il nome storpiato che non porta da nessuna parte.
+    if (out.ok && out.requested) {
+      blocks.push(
+        `[Al percorso "${E.perCanaleSistema(out.requested)}" non c'era nessun file. Nella stessa `
+        + `cartella ce n'era uno solo col nome uguale a meno di accenti, maiuscole e tipo di `
+        + `trattino, ed è quello che hai letto: il nome VERO è "${etichetta}". Usa questo d'ora `
+        + `in poi e dillo all'utente in una riga.]`,
+      );
+    }
     if (!out.ok) {
       const why = E.perCanaleSistema(out.detail || out.error || 'non è stato possibile leggerlo');
       blocks.push(
