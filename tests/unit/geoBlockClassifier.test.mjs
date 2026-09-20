@@ -274,3 +274,85 @@ test('classify: accetta result come stringa o come { text }', async () => {
   const asObj = await C.classify({ statusCode: 403, text: 'x', host: 'b.com', url: 'https://b.com/x' }, { complete: async () => ({ text: 'login_wall' }) });
   assert.equal(asObj.class, 'login_wall');
 });
+
+// ─── Il freno (#591, terzo giro) ─────────────────────────────────────────────
+//
+// Questo livello parte da solo a ogni caricamento di pagina, sulla chiave
+// condivisa. Il ricordo per (indirizzo, forma del percorso) evita di ripagare
+// la stessa pagina, ma non fermava un sito che si porta da solo su percorsi
+// sempre nuovi: duecento percorsi facevano duecento chiamate al modello, cento
+// sottodomini altre cento, e l'unico fondo era il tetto di spesa mensile, che
+// esaurito spegne tutta l'AI di Filo per il resto del mese.
+//
+// In più la stessa pagina si pagava due volte: Filo ne prende un campione
+// appena ha finito di caricare e un altro due secondi dopo, e il ricordo si
+// scrive solo quando la risposta arriva.
+
+test('un solo sito non può far partire chiamate senza fine', async () => {
+  const cache = C.createCache();
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'errore_generico'; };
+  for (let i = 0; i < 200; i++) {
+    await C.classify(
+      { statusCode: 403, text: 'x', host: 'sito-ostile.esempio', url: `https://sito-ostile.esempio/p${i}` },
+      { complete, cache },
+    );
+  }
+  assert.ok(chiamate <= C.FRENO_PER_SITO,
+    `duecento percorsi hanno fatto partire ${chiamate} chiamate al modello`);
+});
+
+test('i sottodomini sempre nuovi contano come lo stesso sito', async () => {
+  const cache = C.createCache();
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'errore_generico'; };
+  for (let i = 0; i < 100; i++) {
+    await C.classify(
+      { statusCode: 403, text: 'x', host: `s${i}.sito-ostile.esempio`, url: `https://s${i}.sito-ostile.esempio/` },
+      { complete, cache },
+    );
+  }
+  assert.ok(chiamate <= C.FRENO_PER_SITO,
+    `cento sottodomini hanno fatto partire ${chiamate} chiamate al modello`);
+});
+
+test('anche una spruzzata su piattaforme diverse trova un tetto', async () => {
+  const cache = C.createCache();
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'errore_generico'; };
+  for (let i = 0; i < C.FRENO_TOTALE + 60; i++) {
+    await C.classify(
+      { statusCode: 403, text: 'x', host: `sito${i}.pages.dev`, url: `https://sito${i}.pages.dev/` },
+      { complete, cache },
+    );
+  }
+  assert.ok(chiamate <= C.FRENO_TOTALE, `spruzzata: ${chiamate} chiamate al modello`);
+});
+
+test('i due campioni della stessa pagina costano una chiamata sola', async () => {
+  const cache = C.createCache();
+  let chiamate = 0;
+  const complete = async () => { chiamate++; await new Promise((r) => setTimeout(r, 30)); return 'geo_block'; };
+  const input = { statusCode: 403, text: 'x', host: 'sito.esempio', url: 'https://sito.esempio/video' };
+  const [a, b] = await Promise.all([
+    C.classify(input, { complete, cache }),
+    C.classify(input, { complete, cache }),
+  ]);
+  assert.equal(chiamate, 1, 'il secondo campione deve aspettare il primo, non pagarne un altro');
+  assert.equal(a.class, 'geo_block');
+  assert.equal(b.class, 'geo_block', 'chi aspetta riceve lo stesso verdetto');
+});
+
+test('chi rinuncia per il freno non lascia in memoria un verdetto che nessuno ha stabilito', async () => {
+  const cache = C.createCache({ freno: C.createFreno({ maxPerSito: 1, maxTotale: 10 }) });
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'geo_block'; };
+  await C.classify({ statusCode: 403, text: 'x', host: 'a.esempio', url: 'https://a.esempio/uno' }, { complete, cache });
+  const secondo = await C.classify({ statusCode: 403, text: 'x', host: 'a.esempio', url: 'https://a.esempio/due' }, { complete, cache });
+  assert.equal(chiamate, 1);
+  assert.equal(secondo.rinunciato, true);
+  assert.equal(secondo.class, 'errore_generico', 'rinunciare non deve attivare niente');
+  assert.equal(secondo.route.proxy, false);
+  // Non si ricorda: passato il giro di orologio si riprova.
+  assert.equal(cache.get(C.cacheKey('a.esempio', 'https://a.esempio/due')), undefined);
+});

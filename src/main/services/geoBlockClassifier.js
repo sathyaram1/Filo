@@ -42,6 +42,10 @@
 // condiviso è logica pura e non tira dentro Electron: questo file resta
 // eseguibile sotto node:test com'era.
 require('../../shared/contenutoEsterno.js');
+// #591 (terzo giro) — «chi possiede il sito», per contare le chiamate dove sta
+// chi scrive la pagina e non dove sta chi ha comprato il dominio. Logica pura
+// come questo file: nessun Electron, nessuna rete.
+const { proprietario } = require('./safebrowse/psl.js');
 
 // Classi chiuse dell'output. Qualsiasi cosa fuori da qui è invalida.
 const CLASSES = {
@@ -237,7 +241,58 @@ function cacheKey(host, url) {
 // ─── Cache con TTL ───────────────────────────────────────────────────────────
 // Mappa in memoria, chiave = cacheKey(host, url), scadenza per voce. `now`
 // iniettabile per i test. prune() rimuove le voci scadute (chiamato in get).
-function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500 } = {}) {
+// ─── Il freno ────────────────────────────────────────────────────────────────
+// #591 (terzo giro). Questo livello parte da solo, a ogni caricamento di
+// pagina, sulla chiave condivisa. Il ricordo per (indirizzo, forma del
+// percorso) evita di ripagare la stessa pagina, ma non ferma un sito che si
+// porta da solo su percorsi sempre nuovi: duecento percorsi facevano duecento
+// chiamate, e cento sottodomini altre cento. L'unico fondo era il tetto di
+// spesa mensile, che una volta esaurito spegne TUTTA l'AI di Filo per il resto
+// del mese, chat compresa.
+//
+// Due numeri, come per la verifica dei siti pericolosi: quante chiamate può
+// far partire chi possiede un sito, e quante se ne possono fare in tutto nella
+// stessa finestra di tempo. Navigando non ci si arriva (questo livello parte
+// solo sulle risposte ambigue); ci arriva chi lo fa apposta.
+const FRENO_PER_SITO = 8;
+const FRENO_TOTALE = 60;
+const FRENO_FINESTRA_MS = 60 * 60 * 1000;
+const CHIAVE_TUTTI = '\u0000tutti';
+
+// Finestra FISSA: parte al primo gettone e scade da sola. Rimandare la
+// scadenza a ogni gettone lascerebbe spegnere il livello 2 per un'ora intera a
+// chi tiene caldo il contatore.
+function createFreno({
+  maxPerSito = FRENO_PER_SITO,
+  maxTotale = FRENO_TOTALE,
+  finestraMs = FRENO_FINESTRA_MS,
+  now = Date.now,
+} = {}) {
+  const m = new Map();
+  const vivo = (e, ora) => e && ora < e.fino;
+  return {
+    prendi(host) {
+      const chiave = proprietario(host) || String(host || '');
+      const ora = now();
+      const suo = m.get(chiave);
+      const tutti = m.get(CHIAVE_TUTTI);
+      const nSuo = vivo(suo, ora) ? suo.n : 0;
+      const nTutti = vivo(tutti, ora) ? tutti.n : 0;
+      if (nSuo >= maxPerSito || nTutti >= maxTotale) return false;
+      if (vivo(suo, ora)) suo.n = nSuo + 1; else m.set(chiave, { n: 1, fino: ora + finestraMs });
+      if (vivo(tutti, ora)) tutti.n = nTutti + 1; else m.set(CHIAVE_TUTTI, { n: 1, fino: ora + finestraMs });
+      if (m.size > 256) for (const [k, e] of m) if (!vivo(e, ora)) m.delete(k);
+      return true;
+    },
+    valore(host) {
+      const e = m.get(proprietario(host) || String(host || ''));
+      return vivo(e, now()) ? e.n : 0;
+    },
+    clear() { m.clear(); },
+  };
+}
+
+function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500, freno } = {}) {
   const map = new Map();
 
   function get(key) {
@@ -263,7 +318,14 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500 } =
     return map.size;
   }
 
-  return { get, set, prune, get size() { return map.size; } };
+  return {
+    get, set, prune, get size() { return map.size; },
+    // Il freno e le chiamate in volo viaggiano con la cache: chi la crea una
+    // volta sola (il main) se li ritrova senza doverli passare a mano, e chi
+    // scrive un test li può sostituire.
+    freno: freno || createFreno({ now }),
+    inVolo: new Map(),
+  };
 }
 
 // ─── Orchestratore: classifica un caso ambiguo ──────────────────────────────
@@ -274,7 +336,8 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500 } =
 // Ritorna { class, route, cached, error? }. Non lancia mai: in caso di errore
 // di rete/modello cade su errore_generico (= nessuna azione), che è il
 // comportamento prudente per una feature opzionale.
-async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {
+async function classify(input = {}, opts = {}) {
+  const { complete, cache, now = Date.now, signal } = opts;
   const { title, text, statusCode, host, url } = input;
 
   // 1) Gate: se non è un caso ambiguo, non chiamare il modello.
@@ -289,27 +352,53 @@ async function classify(input = {}, { complete, cache, now = Date.now, signal } 
     if (hit) return { class: hit, route: routeForClass(hit), cached: true };
   }
 
+  // 2b) Stessa pagina già in viaggio? Filo ne prende due campioni, uno appena
+  // la pagina ha finito di caricare e uno due secondi dopo, e il ricordo si
+  // scrive solo quando la risposta arriva: senza questo, ogni pagina ambigua
+  // si pagava due volte.
+  const inVolo = cache && cache.inVolo;
+  if (inVolo && inVolo.has(key)) return await inVolo.get(key);
+
+  // 2c) Il freno: quante chiamate chi possiede questo sito può far partire.
+  // Rinunciare NON si ricorda: al prossimo giro di orologio si riprova.
+  const freno = opts.freno || (cache && cache.freno) || null;
+  if (freno && typeof freno.prendi === 'function' && !freno.prendi(host)) {
+    return {
+      class: CLASSES.ERRORE_GENERICO,
+      route: routeForClass(CLASSES.ERRORE_GENERICO),
+      cached: false,
+      rinunciato: true,
+    };
+  }
+
   // 3) Chiamata al modello (best-effort).
   if (typeof complete !== 'function') {
     return { class: CLASSES.ERRORE_GENERICO, route: routeForClass(CLASSES.ERRORE_GENERICO), cached: false, error: 'no_model' };
   }
-  let cls = CLASSES.ERRORE_GENERICO;
-  let error = null;
-  try {
-    const { messages } = buildPrompt({ title, text, statusCode, host });
-    const res = await complete({ messages, signal });
-    const raw = typeof res === 'string' ? res : (res && (res.text || res.content)) || '';
-    cls = parseClassification(raw);
-  } catch (err) {
-    error = (err && err.message) || String(err);
-    cls = CLASSES.ERRORE_GENERICO;
+  const giro = (async () => {
+    let cls = CLASSES.ERRORE_GENERICO;
+    let error = null;
+    try {
+      const { messages } = buildPrompt({ title, text, statusCode, host });
+      const res = await complete({ messages, signal });
+      const raw = typeof res === 'string' ? res : (res && (res.text || res.content)) || '';
+      cls = parseClassification(raw);
+    } catch (err) {
+      error = (err && err.message) || String(err);
+      cls = CLASSES.ERRORE_GENERICO;
+    }
+
+    // 4) Memorizza (anche errore_generico: evita di ri-bombardare il modello su
+    // una pagina che non sa classificare; il TTL lo farà riprovare più tardi).
+    if (cache) { void now; cache.set(key, cls); }
+
+    return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}) };
+  })();
+  if (inVolo) {
+    inVolo.set(key, giro);
+    try { return await giro; } finally { inVolo.delete(key); }
   }
-
-  // 4) Memorizza (anche errore_generico: evita di ri-bombardare il modello su
-  // una pagina che non sa classificare; il TTL lo farà riprovare più tardi).
-  if (cache) { void now; cache.set(key, cls); }
-
-  return { class: cls, route: routeForClass(cls), cached: false, ...(error ? { error } : {}) };
+  return await giro;
 }
 
 const api = {
@@ -323,6 +412,9 @@ const api = {
   pathPattern,
   cacheKey,
   createCache,
+  createFreno,
+  FRENO_PER_SITO,
+  FRENO_TOTALE,
   classify,
 };
 

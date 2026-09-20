@@ -84,7 +84,7 @@ test('un vicino già controllato non impedisce il controllo di un sito di truffa
   assert.equal(finestre.length, 2, 'ogni sito deve avere il suo controllo, non quello del vicino');
 });
 
-test('una spruzzata di sottodomini non moltiplica le chiamate: il conto è del dominio', async () => {
+test('una spruzzata di sottodomini non moltiplica le chiamate: il conto è di chi possiede il sito', async () => {
   pulisci();
   let giudizi = 0;
   let finestre = 0;
@@ -100,8 +100,8 @@ test('una spruzzata di sottodomini non moltiplica le chiamate: il conto è del d
     SB.analyze(`http://paypa1-accedi-${i}.esempio-spruzzata-591.tk/login`, DA_EMAIL, () => {});
     await attendi(2);
   }
-  assert.equal(giudizi, SB.DEEP_MAX_PER_DOMAIN, 'quaranta sottodomini, non quaranta giudizi');
-  assert.equal(finestre, SB.DEEP_MAX_PER_DOMAIN, 'quaranta sottodomini, non quaranta finestre');
+  assert.equal(giudizi, SB.DEEP_MAX_PER_OWNER, 'quaranta sottodomini, non quaranta giudizi');
+  assert.equal(finestre, SB.DEEP_MAX_PER_OWNER, 'quaranta sottodomini, non quaranta finestre');
 });
 
 test('gli indirizzi della rete di casa non fanno partire il controllo profondo', async () => {
@@ -134,4 +134,68 @@ test('riconoscere un indirizzo della rete di casa: casi limite', () => {
     '2001:db8::1', 'esempio.it', 'localhost.esempio.it', 'pages.dev'];
   for (const h of privati) assert.equal(engine.isHostPrivato(h), true, `${h} è della rete di casa`);
   for (const h of pubblici) assert.equal(engine.isHostPrivato(h), false, `${h} NON è della rete di casa`);
+});
+
+// ─── Il conto è di CHI POSSIEDE il sito (#591, terzo giro) ───────────────────
+//
+// Il freno restava sul dominio registrabile, e su una piattaforma di hosting
+// quello è la piattaforma: quattro sotto-indirizzi di chi attacca esaurivano il
+// conto e da lì in poi, per un'ora, nessun altro sito ospitato lì riceveva né
+// il giudizio del modello né la finestra nascosta. Compreso quello di truffa:
+// è la stessa strada del giro prima, allargata da un vicino a quattro.
+//
+// Il conto è passato al proprietario del sito. Accanto c'è un tetto
+// complessivo, che copre le piattaforme che l'elenco non conosce ancora:
+// senza, dare a ogni sotto-indirizzo il suo conto rimetterebbe in piedi la
+// spruzzata di sottodomini.
+
+test('chi possiede il sito: su una piattaforma di hosting ogni sotto-indirizzo è suo', () => {
+  assert.equal(SB.proprietario('paypa1-accedi.pages.dev'), 'paypa1-accedi.pages.dev');
+  assert.equal(SB.proprietario('portfolio-di-marco.pages.dev'), 'portfolio-di-marco.pages.dev');
+  assert.equal(SB.proprietario('www.tizio.github.io'), 'tizio.github.io');
+  // Su un dominio normale resta il dominio: la spruzzata di sottodomini non
+  // deve diventare una spruzzata di proprietari.
+  assert.equal(SB.proprietario('n42.paypa1-accedi.truffa-esempio.com'), 'truffa-esempio.com');
+  assert.equal(SB.proprietario('truffa-esempio.com'), 'truffa-esempio.com');
+});
+
+test('i siti-esca di un vicino non spengono il controllo di una truffa', async () => {
+  pulisci();
+  const profonde = [];
+  SB.setProviders({
+    gsb: null, rdap: null, ct: null,
+    llm: async (meta) => { profonde.push('giudizio:' + meta.host); return { suspicious: false }; },
+    sandbox: async (url) => { profonde.push('finestra:' + url); return { verdict: 'clean' }; },
+  });
+  // Chi attacca si prende sotto-indirizzi gratuiti sulla stessa piattaforma e
+  // li fa visitare: bastano quattro navigazioni di seguito.
+  for (let i = 1; i <= SB.DEEP_MAX_PER_OWNER; i++) {
+    SB.analyze(`http://accesso-sicuro-${i}.pages.dev/login`, DA_EMAIL, () => {});
+    await attendi(5);
+  }
+  profonde.length = 0;
+  // La truffa vera, su un altro sotto-indirizzo della stessa piattaforma.
+  SB.analyze('http://paypa1-verifica-conto.pages.dev/login', DA_EMAIL, () => {});
+  await attendi(20);
+  assert.notDeepEqual(profonde, [], 'il conto dei vicini non è il suo: il controllo deve partire');
+});
+
+test('il tetto complessivo ferma comunque una spruzzata su tanti proprietari', async () => {
+  pulisci();
+  let giudizi = 0;
+  SB.setProviders({
+    gsb: null, rdap: null, ct: null,
+    llm: async () => { giudizi++; return { suspicious: false }; },
+    sandbox: null,
+  });
+  // Piattaforma di hosting: ogni sotto-indirizzo è un proprietario diverso,
+  // quindi il conto per proprietario non lo ferma. Lo ferma il tetto di tutti.
+  for (let i = 0; i < SB.DEEP_MAX_TOTAL + 40; i++) {
+    SB.analyze(`http://paypa1-accedi-${i}.pages.dev/login`, DA_EMAIL, () => {});
+    await attendi(1);
+  }
+  assert.ok(giudizi <= SB.DEEP_MAX_TOTAL,
+    `cento sotto-indirizzi non devono fare cento giudizi: ne ho contati ${giudizi}`);
+  assert.ok(giudizi >= SB.DEEP_MAX_PER_OWNER,
+    'il tetto complessivo deve essere largo, non spegnere tutto al primo giro');
 });

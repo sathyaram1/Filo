@@ -195,7 +195,7 @@ test('una spruzzata di sottodomini non moltiplica le verifiche profonde', async 
     safebrowse.analyze(`http://n${i}.paypal-secure-login.truffa-esempio.com/verifica`, {}, () => {});
     await attendi(1);
   }
-  const perStadio = safebrowse.DEEP_MAX_PER_DOMAIN;
+  const perStadio = safebrowse.DEEP_MAX_PER_OWNER;
   assert.ok(chiamati.length <= perStadio * 2,
     `cento sottodomini non devono fare cento verifiche: ne ho contate ${chiamati.length}`);
 

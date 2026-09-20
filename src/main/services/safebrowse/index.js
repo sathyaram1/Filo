@@ -75,23 +75,65 @@ const certCache = new TtlCache(HOUR);
 // verifiche profonde quel dominio può far partire nella finestra di tempo
 // della sua cache. Duecento sottodomini non fanno duecento chiamate, e due
 // siti diversi sulla stessa piattaforma hanno ciascuno il suo verdetto.
+//
+// #591, terzo giro — il conto non è del DOMINIO, è di CHI POSSIEDE IL SITO.
+// Sulle piattaforme dove ogni utente riceve un sotto-indirizzo gratuito il
+// dominio registrabile è la piattaforma: contare lì dentro voleva dire che
+// quattro sotto-indirizzi di chi attacca spegnevano la verifica profonda per
+// tutti i siti ospitati accanto, truffa vera compresa. Il conto è passato al
+// proprietario (psl.proprietario), e accanto c'è un tetto COMPLESSIVO, che
+// copre le piattaforme che l'elenco non conosce ancora: senza, dare a ogni
+// sotto-indirizzo il suo conto avrebbe rimesso in piedi la spruzzata.
 const sandboxCache = new TtlCache(30 * MIN);
 const llmCache = new TtlCache(HOUR);
-const DEEP_MAX_PER_DOMAIN = 4;
-const llmSpesa = new TtlCache(HOUR);
-const sandboxSpesa = new TtlCache(30 * MIN);
+const DEEP_MAX_PER_OWNER = 4;
+// Quante verifiche profonde in tutto nella finestra di tempo. Navigando non ci
+// si arriva mai (si conta solo quello che è già risultato sospetto); ci arriva
+// una pagina che si porta da sola su decine di indirizzi diversi, ed è proprio
+// quello che il tetto deve fermare.
+const DEEP_MAX_TOTAL = 60;
+const CHIAVE_TUTTI = '\u0000tutti';
 
-// Prende un gettone dal conto del dominio. Falso = quel dominio ne ha già fatte
-// partire troppe di recente, e si rinuncia (senza ricordare niente: al prossimo
-// giro di orologio si riprova).
-function prendiGettone(conto, reg, max = DEEP_MAX_PER_DOMAIN) {
-  const n = conto.get(reg) || 0;
-  if (n >= max) return false;
-  conto.set(reg, n + 1);
-  return true;
+// Conto a finestra FISSA: la finestra parte al primo gettone e scade da sola.
+// Un conto che rimandasse la scadenza a ogni gettone (come fa una cache con
+// TTL) lascerebbe spegnere le verifiche per un'ora intera a chi tiene il
+// contatore caldo.
+function creaConto(finestraMs) {
+  const m = new Map();
+  const vivo = (e, ora) => e && ora < e.fino;
+  return {
+    prendi(chiave, max, maxTotale) {
+      const ora = Date.now();
+      const suo = m.get(chiave);
+      const tutti = m.get(CHIAVE_TUTTI);
+      const nSuo = vivo(suo, ora) ? suo.n : 0;
+      const nTutti = vivo(tutti, ora) ? tutti.n : 0;
+      if (nSuo >= max || nTutti >= maxTotale) return false;
+      if (vivo(suo, ora)) suo.n = nSuo + 1; else m.set(chiave, { n: 1, fino: ora + finestraMs });
+      if (vivo(tutti, ora)) tutti.n = nTutti + 1; else m.set(CHIAVE_TUTTI, { n: 1, fino: ora + finestraMs });
+      // Le voci scadute non servono più a nessuno: si buttano quando si passa.
+      if (m.size > 256) for (const [k, e] of m) if (!vivo(e, ora)) m.delete(k);
+      return true;
+    },
+    valore(chiave) {
+      const e = m.get(chiave);
+      return vivo(e, Date.now()) ? e.n : 0;
+    },
+    clear() { m.clear(); },
+  };
 }
 
-// Chiamate già in volo, per dominio registrabile. La cache si riempie solo
+const llmSpesa = creaConto(HOUR);
+const sandboxSpesa = creaConto(30 * MIN);
+
+// Prende un gettone dal conto di chi possiede il sito. Falso = quel sito (o
+// tutti insieme) ne ha già fatte partire troppe di recente, e si rinuncia
+// (senza ricordare niente: al prossimo giro di orologio si riprova).
+function prendiGettone(conto, chi, max = DEEP_MAX_PER_OWNER, maxTotale = DEEP_MAX_TOTAL) {
+  return conto.prendi(chi, max, maxTotale);
+}
+
+// Chiamate già in volo, per proprietario del sito. La cache si riempie solo
 // quando la risposta arriva: senza questo, cinquanta sottodomini aperti insieme
 // facevano partire cinquanta chiamate prima che la prima rispondesse.
 const llmInFlight = new Set();
@@ -156,6 +198,9 @@ function analyze(url, ctx = {}, onUpdate) {
   }
 
   const reg = norm.registrable;
+  // Chi possiede il sito: il conto delle verifiche profonde e il segno "già in
+  // volo" stanno qui, non sul dominio (vedi il commento sulle cache).
+  const prop = psl.proprietario(norm.host);
   const tasks = [];
   const need = assembleCached(norm);
 
@@ -182,7 +227,7 @@ function analyze(url, ctx = {}, onUpdate) {
   // Il segno "già in volo" si toglie SEMPRE, anche se il provider salta subito:
   // un segno rimasto lì spegnerebbe il controllo su quel dominio per sempre.
   const inVolo = (insieme, avvia, salva) => {
-    insieme.add(reg);
+    insieme.add(prop);
     tasks.push((async () => {
       try {
         const r = await avvia();
@@ -190,18 +235,18 @@ function analyze(url, ctx = {}, onUpdate) {
       } catch (_) {
         /* best-effort: uno stadio profondo che non risponde non ferma il resto */
       } finally {
-        insieme.delete(reg);
+        insieme.delete(prop);
       }
     })());
   };
   // `prendiGettone` va per ultimo: è l'unico con un effetto: il gettone si
   // consuma solo quando la chiamata parte davvero.
-  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(reg)
-      && prendiGettone(llmSpesa, reg)) {
+  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(prop)
+      && prendiGettone(llmSpesa, prop)) {
     inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first)), (r) => llmCache.set(norm.host, r));
   }
-  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(reg)
-      && prendiGettone(sandboxSpesa, reg)) {
+  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(prop)
+      && prendiGettone(sandboxSpesa, prop)) {
     inVolo(sandboxInFlight, () => providers.sandbox(url, norm), (r) => sandboxCache.set(norm.host, r));
   }
 
@@ -259,10 +304,13 @@ const API = {
   },
   // cache (per test / invalidazione)
   _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache, llmSpesa, sandboxSpesa },
-  // Quante verifiche profonde può far partire un dominio registrabile prima
-  // che si rinunci (test e diagnostica).
-  DEEP_MAX_PER_DOMAIN,
-  // Chiamate in volo per dominio registrabile (test e diagnostica).
+  // Quante verifiche profonde può far partire chi possiede un sito, e quante se
+  // ne possono fare in tutto, prima che si rinunci (test e diagnostica).
+  DEEP_MAX_PER_OWNER,
+  DEEP_MAX_TOTAL,
+  // Chi possiede il sito (test e diagnostica).
+  proprietario: psl.proprietario,
+  // Chiamate in volo per proprietario del sito (test e diagnostica).
   _inFlight: { llm: llmInFlight, sandbox: sandboxInFlight },
   // sotto-moduli (per test)
   normalize: normalizeMod.normalize,

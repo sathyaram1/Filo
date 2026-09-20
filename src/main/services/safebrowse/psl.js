@@ -139,4 +139,53 @@ function isIpAddress(host) {
   return false;
 }
 
-module.exports = { getDomainInfo, isIpAddress };
+// ─── Chi possiede il sito ────────────────────────────────────────────────────
+// #591, terzo giro. Il dominio registrabile risponde a «chi ha comprato questo
+// dominio». Per decidere quante verifiche costose un sito può far partire
+// serve un'altra risposta: «chi scrive quello che c'è dentro». Sulle
+// piattaforme dove ogni utente riceve un suo sotto-indirizzo gratuito le due
+// risposte divergono: il dominio di sito-di-tizio.pages.dev è pages.dev, ma
+// quel sito è di Tizio e quello accanto è di Caio, che non si conoscono.
+// Contare insieme le verifiche di tutti i siti ospitati lì vuol dire che
+// quattro sotto-indirizzi di chi attacca spengono il controllo per tutti gli
+// altri, truffe comprese.
+//
+// L'elenco è per forza incompleto (ne nascono di nuove ogni mese): è la prima
+// difesa, non l'unica. Chi conta le verifiche tiene anche un tetto complessivo,
+// che vale per le piattaforme che qui non ci sono ancora.
+const PIATTAFORME_MULTI_UTENTE = new Set([
+  // pagine statiche e anteprime
+  'pages.dev', 'workers.dev', 'r2.dev', 'trycloudflare.com',
+  'github.io', 'gitlab.io', 'github.dev',
+  'vercel.app', 'netlify.app', 'netlify.com', 'onrender.com', 'fly.dev',
+  'deno.dev', 'surge.sh', 'herokuapp.com', 'azurewebsites.net',
+  'appspot.com', 'web.app', 'firebaseapp.com', 'pythonanywhere.com',
+  'repl.co', 'replit.app', 'codesandbox.io', 'stackblitz.io', 'glitch.me',
+  '000webhostapp.com', 'neocities.org',
+  // blog e costruttori di siti
+  'blogspot.com', 'wordpress.com', 'tumblr.com', 'wixsite.com', 'weebly.com',
+  'webflow.io', 'carrd.co', 'strikingly.com', 'jimdosite.com', 'notion.site',
+  'framer.website', 'bubbleapps.io', 'softr.app', 'myshopify.com',
+  'square.site', 'canva.site',
+  // tunnel e indirizzi dinamici
+  'ngrok.io', 'ngrok-free.app', 'loca.lt', 'serveo.net', 'duckdns.org',
+]);
+
+// Ritorna la stringa che identifica chi controlla il contenuto di `host`: il
+// dominio registrabile, oppure il sotto-indirizzo quando il dominio
+// registrabile è una piattaforma multi-utente. Per un indirizzo IP o un nome
+// senza punti ritorna il nome stesso.
+function proprietario(host) {
+  const h = String(host == null ? '' : host).toLowerCase().replace(/\.$/, '');
+  if (!h) return '';
+  const info = getDomainInfo(h);
+  if (!info || !info.registrable) return h;
+  const reg = info.registrable;
+  if (!PIATTAFORME_MULTI_UTENTE.has(reg)) return reg;
+  if (h === reg || !h.endsWith('.' + reg)) return reg;
+  const davanti = h.slice(0, h.length - reg.length - 1).split('.');
+  const ultima = davanti[davanti.length - 1];
+  return ultima ? `${ultima}.${reg}` : reg;
+}
+
+module.exports = { getDomainInfo, isIpAddress, proprietario, PIATTAFORME_MULTI_UTENTE };

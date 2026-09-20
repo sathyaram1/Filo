@@ -429,13 +429,20 @@ module.exports = function register(on, ctx) {
   // #591 — una prova è una richiesta VERA, pagata con le chiavi vere: passa dal
   // cancello come tutte le altre (limite di spesa e conteggio del costo).
   // `settings` serve proprio a quello.
+  // #591 (terzo giro) — il consumo che il fornitore riporta va CONSEGNATO al
+  // cancello, non riconfezionato via. La risposta che torna alla pagina dice
+  // quanti byte di audio o quante dimensioni ha il vettore; il cancello
+  // registra la spesa solo se ci trova dentro `usage`, e senza quello la prova
+  // di un modello di voce, dettatura o indicizzazione si pagava senza comparire
+  // in nessun conto, mentre quella di un modello di testo ci compariva.
   async function probeNonText({ kind, provider, apiKey, model, routing, nickname, settings }) {
     const startMs = performance.now();
-    const done = (extra) => ({
+    const done = (extra, usage) => ({
       ok: true, provider, model, nickname, kind,
       ttftMs: Math.round(performance.now() - startMs),
       totalMs: Math.round(performance.now() - startMs),
       completionTokens: null, tokensPerSec: null,
+      ...(usage ? { usage } : {}),
       ...extra,
     });
     return await Gate.probe({
@@ -449,14 +456,23 @@ module.exports = function register(on, ctx) {
           const voice = Voices ? Voices.resolveVoice({ chosen: '', lang: 'it', modelId: model, learned: learnedVoices.get(model) }) : '';
           const r = await synthesizeWithVoiceRecovery(P, { apiKey, model, text: 'Uno, due, tre: prova della voce.', voice, lang: 'it', speed: 1, routing });
           if (!r || !r.audioBase64) return { ok: false, error: 'Il modello ha risposto senza audio' };
-          return done({ audioBytes: Math.round(r.audioBase64.length * 3 / 4) });
+          // La lettura ad alta voce non dice il costo nella risposta: lo si
+          // rilegge dopo con l'id della generazione, come per una lettura vera.
+          if (typeof auditServedByLater === 'function') {
+            auditServedByLater({
+              settings, action: SN_CONST.ACTIONS.PROVIDER_TEST, provider, model,
+              apiKey: r.keyUsed || apiKey, generationId: r.generationId,
+              recordCost: true, keySource: r.keySource || '',
+            });
+          }
+          return done({ audioBytes: Math.round(r.audioBase64.length * 3 / 4) }, r.usage);
         }
         if (kind === 'embedding') {
           if (typeof P.embed !== 'function') return { ok: false, error: 'Questo fornitore non sa indicizzare' };
           const r = await P.embed({ apiKey, model, texts: ['prova'], dim: SN_CONST.EMBED_DIM, providerRouting: routing });
           const v = r && r.vectors && r.vectors[0];
           if (!v || !v.length) return { ok: false, error: 'Il modello ha risposto senza vettori' };
-          return done({ dims: v.length });
+          return done({ dims: v.length }, r.usage);
         }
         if (kind === 'stt') {
           if (typeof P.transcribe !== 'function') return { ok: false, error: 'Questo fornitore non sa trascrivere' };
@@ -464,7 +480,7 @@ module.exports = function register(on, ctx) {
           const wav = Seg.pcm16ToWav(new Int16Array(16000), 16000); // un secondo di silenzio
           const r = await P.transcribe({ apiKey, model, audioBase64: Seg.bytesToBase64(wav), format: 'wav', providerRouting: routing });
           if (!r || typeof r.text !== 'string') return { ok: false, error: 'Il modello non ha risposto' };
-          return done({});
+          return done({}, r.usage);
         }
         return { ok: false, error: 'Tipo di modello non riconosciuto' };
       },

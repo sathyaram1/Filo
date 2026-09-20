@@ -61,6 +61,12 @@ globalThis.SN_PROVIDERS = {
       onDelta('1, 2, 3');
       return { usage: { completionTokens: 7 } };
     },
+    // #591 (terzo giro) — un modello che non è di testo si prova nel suo
+    // mestiere, e anche lì il fornitore dice quanto è costata la chiamata.
+    embed: async ({ apiKey, model, providerRouting }) => {
+      state.calls.push({ provider, apiKey, model, providerRouting, metodo: 'embed' });
+      return { vectors: [[0.1, 0.2, 0.3]], usage: { promptTokens: 4, costUsd: 0.0002 } };
+    },
   }),
 };
 
@@ -264,6 +270,25 @@ test('interruttore acceso: nemmeno la riga scritta a mano dall\'amministratore p
   const res = await testModel({ provider: 'openrouter', model: 'anthropic/claude-3.7-sonnet' });
   assert.equal(res.ok, false);
   assert.equal(state.calls.length, 0);
+});
+
+// #591 (terzo giro) — il consumo che il fornitore riporta arriva fino al conto
+// anche quando il modello non è di testo. La risposta che torna alla pagina
+// racconta il mestiere (quante dimensioni ha il vettore, quanti byte di audio),
+// e prima quel racconto si mangiava il consumo: la chiamata partiva, si pagava
+// sulla chiave condivisa e non compariva né nella pagina dei costi né nel
+// totale del mese, mentre la prova di un modello di testo ci compariva.
+
+test('la prova di un modello di indicizzazione scrive la sua riga di spesa', async () => {
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.defaults.modelRegistry = {
+    vettori: { provider: 'openrouter', model: 'acme/vettori', inputs: ['text'], outputs: ['embedding'] },
+  };
+  const res = await testModel({ nickname: 'vettori' });
+  assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
+  assert.equal(state.calls.length, 1, 'la chiamata al fornitore è partita davvero');
+  assert.equal(state.calls[0].metodo, 'embed', 'provato nel suo mestiere');
+  assert.equal(state.costs.length, 1, 'la spesa di una prova non di testo va nel conto come le altre');
 });
 
 // ── Stesso cancello per il "Prova" accanto alle CHIAVI (test_provider) ───────
