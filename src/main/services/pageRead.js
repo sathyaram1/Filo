@@ -406,6 +406,14 @@ function tronca(testo, max = MAX_TEXT_CHARS) {
   return { text: s.slice(0, max), truncated: true };
 }
 
+/** È un PDF, comunque il sito lo abbia etichettato? PURA. */
+function sembraPdf(buffer) {
+  if (!buffer || buffer.length < 5) return false;
+  try {
+    return /^[\s\0]*%PDF-/.test(Buffer.from(buffer).subarray(0, 1024).toString('latin1'));
+  } catch (_) { return false; }
+}
+
 function tipoDaContentType(ct) {
   const t = String(ct || '').toLowerCase().split(';')[0].trim();
   if (!t || t === 'text/html' || t === 'application/xhtml+xml') return 'html';
