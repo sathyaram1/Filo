@@ -108,6 +108,7 @@ test('invitato, poi «solo modelli a pesi aperti»: la home dice che Filo non pu
     modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
   });
   await chiaveNelPortafoglio(app);
+  await avvisoCreditiCambiati(app);
   await accoglienzaGiaFatta(app);
   await stubProviders(app);
   await page.reload();
