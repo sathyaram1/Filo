@@ -101,7 +101,7 @@
       // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
       level: (a) => (a && a._exfil ? 2 : 1),
       describe: (a) => {
-        const url = a.url || a.href || a.link || 'una pagina';
+        const url = (global.SN_URL_NAV && global.SN_URL_NAV.indirizzoAzione(a)) || 'una pagina';
         if (a && a._exfil) {
           const why = a._exfilReason ? ` (${a._exfilReason})` : '';
           return `Filo sta per aprire un link che${why}:\n${url}\n\n`
