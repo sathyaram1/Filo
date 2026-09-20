@@ -120,10 +120,10 @@ test('fixedPayload: con la segnalazione parte il campo `segnalazione`, che il se
   assert.deepEqual(p, { report: 'R', userNote: '', branch: 'b', segnalazione: '## Problema\nX' });
 });
 
-test('secauditPayload: `testo` c\'è solo se la nota c\'è', () => {
-  assert.deepEqual(secauditPayload({ verdict: 'fail', branch: 'b' }), { verdict: 'fail', branch: 'b' });
-  assert.deepEqual(secauditPayload({ verdict: 'pass', branch: 'b', testo: 'Letto tutto il diff.\n' }),
-    { verdict: 'pass', branch: 'b', testo: 'Letto tutto il diff.' });
+test('secauditPayload: `testo` c\'è solo se la nota c\'è; lo `sha` del commit controllato c\'è sempre', () => {
+  assert.deepEqual(secauditPayload({ verdict: 'fail', branch: 'b' }), { verdict: 'fail', branch: 'b', sha: '' });
+  assert.deepEqual(secauditPayload({ verdict: 'pass', branch: 'b', sha: 'c0ffee', testo: 'Letto tutto il diff.\n' }),
+    { verdict: 'pass', branch: 'b', sha: 'c0ffee', testo: 'Letto tutto il diff.' });
 });
 
 // ─── Pass senza nota ──────────────────────────────────────────────────────────
