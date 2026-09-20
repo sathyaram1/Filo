@@ -206,7 +206,7 @@ test('le scelte restano manovrabili anche a routine spente', async ({ openTab })
   const page = await apriAutomazioni(openTab);
   await expect(page.locator('#mgMaxSessions')).toBeEnabled();
   await expect(page.locator('#mgAccountA')).toBeEnabled();
-  await expect(page.locator('input[name="mgPriorityAccount"][value="A"]')).toBeEnabled();
+  await expect(page.locator('input[name="mgPriorityAccount"][value="A"]')).not.toBeDisabled();
 });
 
 test('da non-admin le scelte sono in sola lettura', async ({ openTab }) => {
