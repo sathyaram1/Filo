@@ -137,18 +137,50 @@
     return null;
   }
 
+  // Forma normalizzata per il confronto con ciò che Filo ha LETTO: sole
+  // lettere e cifre minuscole, come `exposedAlnum`, così separatori, maiuscole
+  // e percentuali non aiutano a evadere.
+  function alnum(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+
+  // Un pezzo di quello che Filo ha letto (una pagina, un documento, l'uscita di
+  // un comando) ricopiato dentro un indirizzo non è una coincidenza: è un
+  // trasporto. Si cerca una sovrapposizione LUNGA e non i singoli token perché
+  // il corpus qui è un testo intero: a token, una parola qualsiasi della pagina
+  // farebbe scattare il freno su ogni link successivo.
+  // Finestre da READ_RUN, a passi di metà: qualunque ricopiatura lunga il
+  // doppio cade dentro una finestra allineata.
+  function readTaint(url, read) {
+    const hay = alnum(read);
+    if (hay.length < READ_RUN) return null;
+    const exposed = exposedAlnum(url);
+    if (exposed.length < READ_RUN) return null;
+    for (let i = 0; i + READ_RUN <= exposed.length; i += READ_STEP) {
+      if (hay.includes(exposed.slice(i, i + READ_RUN))) {
+        return { reason: 'si porta dietro un pezzo di quello che Filo ha appena letto' };
+      }
+    }
+    return null;
+  }
+
   // Fallback strutturale: payload corposo / blob opaco in un URL nato da
   // contenuto NON fidato (es. l'agente sulla pagina). Copre i dati cifrati che
   // il taint-match non riconosce. Attivo solo con fromUntrusted per non infastidire
   // sui link legittimi con query lunghe (tracking, OAuth) nati da input diretto.
-  function structural(url) {
+  //
+  // `soloCoda` toglie dal conto il PERCORSO: per una lettura, che segue quasi
+  // sempre una ricerca, il percorso di un articolo vero è lungo e illeggibile
+  // per conto suo, e contarlo faceva chiedere conferma su letture innocenti. I
+  // dati da portare fuori stanno nella coda dell'indirizzo.
+  function structural(url, { soloCoda = false } = {}) {
     let u;
     try { u = new URL(url); } catch (_) {
       try { u = new URL('https://' + url); } catch (_) { return null; }
     }
     const search = u.search || '';
     const hash = u.hash || '';
-    const path = (u.pathname && u.pathname !== '/') ? u.pathname : '';
+    const path = (!soloCoda && u.pathname && u.pathname !== '/') ? u.pathname : '';
     const carrier = search.length + hash.length + path.length;
     if (carrier >= STRUCT_CARRIER) {
       return { reason: 'porta una grande quantità di dati nel link' };
