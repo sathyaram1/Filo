@@ -29,7 +29,6 @@ async function seedMemory(app) {
 // sarebbe partita.
 async function intercettaRete(app) {
   await app.evaluate(() => {
-    globalThis.__retе = [];
     globalThis.__rete = [];
     const orig = globalThis.fetch;
     globalThis.__ripristinaRete = () => { globalThis.fetch = orig; };
