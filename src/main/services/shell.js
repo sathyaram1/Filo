@@ -77,9 +77,9 @@ function shellConfig(shell, sid, startCwd) {
     // /q = niente echo dei comandi; /k = resta aperto leggendo da stdin.
     // Cambiamo il prompt nel marcatore RDY ($_ = CRLF): così ogni prompt
     // diventa una riga FILO_RDY_<sid> che rimuoviamo dall'output.
-    // `chcp 65001` PRIMA di tutto: vedi #551 e il preludio gemello in
-    // terminal.js. Senza, i nomi con accenti e trattini lunghi arrivano
-    // storpiati anche qui, nel terminale che l'utente guarda.
+    // Davanti a tutto il preludio che porta la tabella codici a UTF-8 (#551,
+    // gemello di quello in terminal.js): senza, i nomi con accenti e trattini
+    // lunghi arrivano storpiati anche qui, nel terminale che l'utente guarda.
     return {
       file: process.env.ComSpec || 'cmd.exe',
       args: ['/q', '/k'],
