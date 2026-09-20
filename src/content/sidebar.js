@@ -1209,8 +1209,17 @@
       if (parsed.kind === 'filo_action') {
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (parsed.display) {
-          appendChatMessage('assistant', parsed.display);
+          const el = appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
+          // #517 — l'azione parte, ma la risposta ne raccontava anche un'altra
+          // che nessuno ha emesso: l'utente lo legge qui sotto.
+          if (azioniMancate.length) {
+            const D = global.SN_AZIONI_DICHIARATE;
+            renderRifallo(appendChatMessage('avviso', D.avvisoPerUtente(azioniMancate)));
+            console.warn('[Filo] #517 azione dichiarata e mai emessa nell\'Aiuto:',
+              azioniMancate.map((f) => `${f.id} ← «${f.frase}»`).join(' | '));
+          }
+          void el;
         }
         await runFiloAction(parsed.filoAction);
         expand({ ai: true });
