@@ -124,6 +124,11 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_CLOSE: 'chat-archive',
     FILO_CHAT_DELETE: 'chat-archive',
     FILO_CHATS_SEARCH: 'chat-archive',
+    // La riga che Filo scrive rispondendo a un comando con lo slash finisce
+    // nella stessa chat, e «torna dov'è aperta» è il clic su una chat ancora in
+    // corso: due pezzi della stessa capacità, non due voci nuove.
+    FILO_CHAT_NOTE: 'chat-archive',
+    FILO_CHAT_FOCUS: 'chat-archive',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',
