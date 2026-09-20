@@ -1317,3 +1317,17 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   color: var(--dash-ink-mute);
   padding: 0 12px;
 }
+
+/* #517 — Filo ha scritto di aver fatto una cosa che non ha fatto. Non è un
+   errore (la risposta è arrivata) ma l'utente NON deve poterlo mancare: stesso
+   posto della riga discreta, tono dell'accento e un filo di bordo che la stacca
+   dalla risposta. I colori sono i token del tema: vale chiaro e scuro. */
+.dash-bubble-avviso {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--dash-accent);
+  border-left: 2px solid var(--dash-accent);
+  padding: 2px 12px;
+  margin-left: 2px;
+  max-width: 100%;
+}
