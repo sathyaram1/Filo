@@ -646,6 +646,7 @@
     `${INIZIO}(?:fras[ei]|parol[ae]|test[oi]|paragraf[oi]|period[oi]|titol[oi]`
     + `|riassum[a-zà-ù]*|riassunt[oi]|sintetizz[a-zà-ù]*|sunto`
     + `|riscriv[a-zà-ù]*|riscritt[a-zà-ù]*|corregg[a-zà-ù]*|correzion[ei]|refuso|refusi`
+    + `|riformul[a-zà-ù]*|sostituisc[a-zà-ù]*|sostituir[a-zà-ù]*`
     + `|traduc[a-zà-ù]*|tradur[a-zà-ù]*|traduzion[ei]`
     + `|accorcia[a-zà-ù]*|allung[a-zà-ù]*|abbrevi[a-zà-ù]*|semplific[a-zà-ù]*`
     + `|plurale|singolare|maiuscol[a-zà-ù]*|minuscol[a-zà-ù]*|virgolette|grassetto|corsivo`
