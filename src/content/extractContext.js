@@ -726,7 +726,12 @@
         // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
         const txt = ownTextOf(el);
         if (txt.length >= 2 && HAS_LETTER.test(txt)) {
-          if (room()) out.push({ el, text: txt });
+          // L'elemento si vede, il suo testo no: una fisarmonica chiusa con la
+          // risposta scritta senza riquadro attorno. Si rimanda come ogni altra
+          // sezione ripiegata (#505), segnandola perché il menu se ne accorga.
+          if (isOwnTextHidden(el)) {
+            if (hidden.length < MAX_HIDDEN) hidden.push({ el, own: true });
+          } else if (room()) out.push({ el, text: txt });
           else truncated++;
         }
       }
