@@ -417,7 +417,8 @@
     security_perimetro_desc:
       'Quando Filo legge qualcosa scritto da altri, per esempio una pagina web o un documento, ' +
       'da lì in poi può fare solo le cose che gli avevi chiesto. Tutto il resto te lo deve chiedere. ' +
-      'Qui sotto ci sono le ultime richieste e cosa gli era permesso in ciascuna.',
+      'Qui sotto, per ogni richiesta recente: cosa ha letto, cosa gli era permesso e cosa gli è stato impedito. ' +
+      'L’elenco resta anche dopo aver chiuso e riaperto Filo.',
     security_perimetro_empty: 'Nessuna richiesta recente.',
     security_perimetro_nulla: 'solo rispondere e proporre',
     security_perimetro_pulito: 'niente di scritto da altri: nessun limite da applicare',

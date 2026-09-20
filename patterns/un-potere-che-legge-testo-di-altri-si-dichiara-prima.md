@@ -108,5 +108,43 @@ fidato (il main, le pagine `filo://`).
 E una quarta, meno grave: **la contaminazione non moriva col messaggio.**
 Il testo che Filo ha letto resta in chat, riportato nella sua risposta: il
 messaggio dopo ricominciava a mani libere. Il compito nuovo eredita quello di
-prima — contaminazione e perimetro già concesso — e per un'uscita in più passa
+prima — contaminazione e uscite dichiarate — e per un'uscita in più passa
 dall'utente come sempre. Dopo un messaggio pulito non cambia niente.
+
+## Quello che il secondo giro ha aggiunto
+
+**Togliere il testo di altri da una strada non basta: si contano tutte le
+strade che portano lì.** I titoli delle schede erano stati tolti dallo stato,
+ma il messaggio della schermata iniziale Filo lo scrive LEGGENDO quei titoli e
+quelli delle pagine salvate, e quel messaggio tornava nel prompt di ogni
+richiesta. Il titolo non arrivava più diretto: arrivava di rimbalzo, sempre
+prima che esistesse un perimetro. Vale per qualunque testo **derivato** da
+roba scritta da altri: un riassunto, un messaggio generato, una didascalia.
+Se la sorgente è di fuori, il derivato è di fuori.
+
+**Un'uscita che riporta indietro del testo è anche una lettura.** Un comando
+sul computer stampa il contenuto di un file scaricato o la risposta di un sito:
+è testo scritto da altri come una pagina web, ma essendo classificato solo come
+uscita non contaminava niente, e dopo averlo letto il modello aveva ancora
+tutto in mano. In `compiti.js` un'azione può dichiarare `ritorna: 'esterno'`, e
+il giro la conta come lettura oltre che come azione.
+
+**Il sì dell'utente vale per la richiesta in cui l'ha dato, e basta.** Farlo
+ereditare dal messaggio dopo sembrava la scelta gentile (meno popup), ma un
+«ok grazie» rinnovava da solo un permesso dato una volta, col testo della
+pagina ancora lì davanti. Per questo i permessi concessi stanno in
+`allargamenti` e non nel perimetro: quello che si eredita è ciò che la
+richiesta di partenza aveva DICHIARATO, non ciò che un popup aveva concesso.
+
+**Un rifiuto muto è un bug anche quando la sicurezza è salva.** L'azione fuori
+perimetro non veniva mostrata: il blocco di attività annunciava «metto la
+sveglia», poi niente, e l'utente restava convinto che la sveglia ci fosse. Ora
+resta come riga che dice cosa Filo ha provato a fare e perché non ha potuto
+(vedi `patterns/un-controllo-che-rifiuta-non-rifiuta-mai-in-silenzio.md`).
+
+**Un registro che si svuota da solo non risponde alla domanda per cui esiste.**
+I compiti stavano in una mappa in memoria, con mezz'ora di vita: «cosa era
+autorizzato a fare Filo?» uno se la chiede quando si accorge di qualcosa di
+strano, cioè quasi mai entro mezz'ora, e mai nella stessa sessione. Il
+riassunto di ogni compito va su disco (`FILO_COMPITI`, senza il registro riga
+per riga: cosa ha letto e cosa gli è stato impedito bastano e pesano poco).
