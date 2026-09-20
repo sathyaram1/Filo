@@ -89,7 +89,7 @@ function cercaComeFilo(app, query) {
 test('la scheda della home chiusa col suo tasto: la chat non resta senza nome', async ({ app, shell, openTab }) => {
   test.setTimeout(120_000);
   await configura(app);
-  await stubProvider(app, { spinoza: { tipo: 'conversazione', titolo: 'Spinoza' } });
+  await stubProvider(app, { Spinoza: { tipo: 'conversazione', titolo: 'Spinoza' } });
 
   const dash = await openTab(DASH);
   await dash.locator('#input').fill('Parlami di Spinoza');
