@@ -90,7 +90,7 @@ import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
-import { isProtectedBranch } from './lib/branch-integrity.mjs';
+import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
 
