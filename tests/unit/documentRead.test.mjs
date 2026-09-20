@@ -647,3 +647,55 @@ test('un testo a due byte si riconosce anche fuori dall’alfabeto latino', asyn
   assert.equal(DR.quotaNonTesto('Relazione attività finale: 12 €') < 0.02, true);
   assert.equal(DR.quotaNonTesto('\u0000R\u0000e\u0000l\u0000a\u0000z') > 0.02, true);
 });
+
+test('un byte nullo dentro un testo è un danno, non un testo a due byte', async () => {
+  // #551, settimo giro. Il riconoscimento dei file scritti a due byte per
+  // carattere guardava da che PARTE delle coppie stanno i byte nulli, e non
+  // pretendeva più niente su quanti fossero. Uno solo bastava: con un nullo
+  // soltanto quel conto dà il cento per cento, il file veniva riletto due byte
+  // alla volta, e quello che ne usciva erano ideogrammi. Ideogrammi
+  // STAMPABILI, quindi nemmeno la rete finale se ne accorgeva: Filo dichiarava
+  // letto un estratto conto e rispondeva su una fila di segni cinesi.
+  //
+  // Un byte nullo dentro un file di testo capita per davvero: il registro di un
+  // programma che si è chiuso male, l'export di un gestionale vecchio, il file
+  // recuperato da una chiavetta staccata.
+  const righe = ['Data;Causale;Importo'];
+  for (let i = 0; i < 40; i++) righe.push(`0${(i % 9) + 1}/03/2026;Rimborso — pratica ${137 + i};${i},50 €`);
+  righe.push('30/03/2026;Commissione attività;-931,50 €');
+  const buono = Buffer.from(`${righe.join('\n')}\n`, 'utf8');
+  const conNullo = (dove) => Buffer.concat([buono.subarray(0, dove), Buffer.from([0]), buono.subarray(dove)]);
+
+  // Dove cade il nullo non cambia niente: il resto del testo resta quello
+  // scritto. Le posizioni sono fini di riga, così il byte guasto non cade
+  // dentro le parole su cui si asserisce: quello che si verifica qui è che il
+  // documento non cambi tabella, non che un byte perso si ricostruisca.
+  const fineRiga = (k) => buono.indexOf(10, 0) && buono.indexOf('\n'.charCodeAt(0), k);
+  for (const dove of [0, 1, fineRiga(20), fineRiga(200), fineRiga(999)]) {
+    const letto = DR.decodeTextDettaglio(conNullo(dove));
+    assert.equal(letto.codifica === 'due-byte', false, `byte nullo in ${dove}: letto a due byte`);
+    assert.equal(letto.text.includes('Rimborso — pratica 139'), true, `byte nullo in ${dove}`);
+    assert.equal(letto.text.includes('-931,50 €'), true, `byte nullo in ${dove}: totale perso`);
+  }
+  // Due nulli dalla stessa parte delle coppie: stesso discorso.
+  const due = Buffer.concat([buono.subarray(0, 100), Buffer.from([0]), buono.subarray(100, 300), Buffer.from([0]), buono.subarray(300)]);
+  assert.equal(DR.decodeText(due).includes('Rimborso — pratica 137'), true);
+
+  // E lo stesso vale per un documento salvato come Windows ha sempre salvato i
+  // testi: un byte guasto non deve farlo passare per un file a due byte.
+  const ansi = Buffer.concat([
+    Buffer.from([...Buffer.from('SPECIFICHE '), 0x97, ...Buffer.from(' singolarit'), 0xE0, ...Buffer.from(': 12 '), 0x80, 0x0A]),
+    Buffer.from('riga normale di testo\n'.repeat(40), 'latin1'),
+  ]);
+  const ansiRotto = Buffer.concat([ansi.subarray(0, 200), Buffer.from([0]), ansi.subarray(200)]);
+  assert.equal(DR.decodeText(ansiRotto).includes('SPECIFICHE — singolarità: 12 €'), true);
+
+  // La porta chiusa nei giri prima resta chiusa: un file davvero scritto a due
+  // byte si riconosce ancora, con e senza la firma in testa, dentro e fuori
+  // dall'alfabeto latino.
+  const testo = 'RELAZIONE — attività finale\nCittà di Milano: 12 €\n'.repeat(8);
+  assert.equal(DR.decodeText(Buffer.from(testo, 'utf16le')), testo);
+  assert.equal(DR.decodeText(Buffer.concat([Buffer.from([0xFF, 0xFE]), Buffer.from(testo, 'utf16le')])), testo);
+  const russo = 'Привет, это тестовый файл с русским текстом.\n'.repeat(6);
+  assert.equal(DR.decodeText(Buffer.from(russo, 'utf16le')), russo);
+});
