@@ -387,6 +387,8 @@
     normalizeForSearch,
     matches,
     search,
+    searchWide,
+    terminiCheDistinguono,
     snippetFor,
     toStoredMessage,
   };
