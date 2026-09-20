@@ -243,6 +243,7 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
     assert.match(String(segVer.stderr), /seg-manca\.md non esiste/);
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
+    rmSync(fuori, { recursive: true, force: true });
   }
 });
 
