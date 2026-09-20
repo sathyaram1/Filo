@@ -261,6 +261,7 @@
     probe,
     canLookupServedBy,
     lookupServedBy,
+    keyInfo,
   };
 
   global.SN_MODEL_GATE = API;
