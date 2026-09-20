@@ -126,19 +126,31 @@ test('Opzioni: la pagina non interroga i server di chi produce i modelli, acceso
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
 
   const versoIlProduttore = [];
-  const versoIlRouter = [];
+  const versoUnFornitore = [];
   const PRODUTTORI = /generativelanguage\.googleapis\.com|api\.openai\.com|api\.mistral\.ai|api\.x\.ai|dashscope/i;
   page.on('request', (r) => {
     if (PRODUTTORI.test(r.url())) versoIlProduttore.push(r.url());
-    if (r.url().includes('openrouter.ai/api/v1/models')) versoIlRouter.push(r.url());
+    if (r.url().includes('openrouter.ai')) versoUnFornitore.push(r.url());
   });
 
-  // Pre-condizione: a interruttore SPENTO il catalogo parte davvero, dal
-  // router. Senza questa metà il test passerebbe anche a pagina muta.
+  // Il catalogo lo chiede il processo principale: si conta lì.
+  await app.evaluate(() => {
+    const P = globalThis.SN_PROVIDER_OPENROUTER;
+    if (!globalThis.__catalogoVero) globalThis.__catalogoVero = P.listCatalog;
+    globalThis.__catalogoChiesto = 0;
+    P.listCatalog = async () => { globalThis.__catalogoChiesto += 1; return []; };
+  });
+
+  // Pre-condizione: a interruttore SPENTO il catalogo parte davvero. Senza
+  // questa metà il test passerebbe anche a pagina muta.
   await page.reload();
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
-  await expect.poll(() => versoIlRouter.length, { timeout: 8_000 }).toBeGreaterThan(0);
+  await expect.poll(
+    () => app.evaluate(() => globalThis.__catalogoChiesto), { timeout: 8_000 },
+  ).toBeGreaterThan(0);
   expect(versoIlProduttore, `partita una richiesta verso un produttore: ${versoIlProduttore[0]}`).toEqual([]);
+  expect(versoUnFornitore,
+    `la pagina ha parlato da sola con un fornitore: ${versoUnFornitore[0]}`).toEqual([]);
 
   // Acceso: idem, niente verso i produttori.
   await chiaveSalvata(true);
