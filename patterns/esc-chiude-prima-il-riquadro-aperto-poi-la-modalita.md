@@ -114,13 +114,25 @@ tasto fosse servito a chiudere qualcosa di nostro, e intanto azzerava il conto
 con un `mousedown` finto fabbricato dal documento. Sei Esc, dentro. Per questo
 lo stesso tetto (`ESC_RIVENDICAZIONI_MAX` in `src/main/tabs.js`) è contato
 anche dal main, che conta le rivendicazioni arrivate mentre un'uscita era in
-attesa e, superate tre di fila, smette di credere alla pagina ed esce. Riparte
+attesa e, superato il tetto, smette di credere alla pagina ed esce. Riparte
 da zero solo su cose che la pagina non può fabbricare: l'input vero
 (`input-event` della WebContents, tutto tranne l'Esc stesso) e il cambio di
 modalità. **Regola generale: un limite contro l'abuso di una pagina non può
 essere contato dentro quella pagina**, per isolato che sia il mondo in cui
 gira. La prova sta in `tests/verify-514-g6.spec.mjs` («sito ladro»), con la
 controprova della stessa pagina senza gli eventi finti.
+
+**Al tetto si esce, ma il tasto non si ruba.** Arrivato al tetto il main faceva
+`preventDefault`, cioè si riprendeva l'Esc prima che il documento lo vedesse: il
+riquadro in cima restava aperto **e** la modalità se ne andava. È esattamente il
+danno che questo pattern esiste per evitare, fatto da noi nel punto in cui
+smettiamo di credere alla pagina (#648). Non crederle vuol dire uscire lo
+stesso, non scavalcarla: l'uscita parte subito e il tasto prosegue verso il
+documento, così il riquadro si chiude comunque. La regola generale: **un limite
+dice quando smetti di aspettare, non ti autorizza a prenderti quello che stavi
+aspettando.** Che i due tetti non si scollino — quello del main sotto quello
+della pagina rifà il danno da solo, perché il main esce mentre la pagina
+rivendica ancora — lo tiene `tests/unit/escTetti.test.mjs`.
 
 **Un tasto che serve a USCIRE non vale come gesto per ENTRARE.** Dal momento in
 cui l'Esc arriva al documento — e ci deve arrivare, è il tasto che chiude i
