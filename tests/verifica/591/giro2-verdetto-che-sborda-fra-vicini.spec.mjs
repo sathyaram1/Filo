@@ -25,13 +25,11 @@ const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
 const DA_EMAIL = { linkOrigin: 'email', hasPassword: true };
 
 // Le cache del rilevatore vivono nel modulo: ogni caso parte pulito.
-function pulisci(...chiavi) {
+function pulisci() {
   for (const c of Object.values(SB._caches)) {
-    for (const k of chiavi) { try { c.delete(k); } catch (_) {} }
+    if (typeof c.clear === 'function') c.clear();
   }
-  for (const s of Object.values(SB._inFlight)) {
-    for (const k of chiavi) { try { s.delete(k); } catch (_) {} }
-  }
+  for (const s of Object.values(SB._inFlight)) s.clear();
 }
 
 test('la finestra nascosta di un sito di truffa marchia i siti vicini che non c\'entrano', async () => {
