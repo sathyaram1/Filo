@@ -276,6 +276,22 @@
     } catch (_) { return ''; }
   }
 
+  // Dove porta un suggerimento, in una riga che si legge: il sito per gli
+  // indirizzi web, il nome della pagina interna per quelle di Filo, il file
+  // per i file. '' quando il bottone non porta da nessuna parte.
+  function destinazioneLeggibile(a) {
+    const type = String(a?.type || '').toUpperCase();
+    if (type !== 'NAVIGA' && type !== 'APRI_FILE') return '';
+    const raw = String(a?.url || a?.path || '');
+    if (!raw) return '';
+    try {
+      const u = new URL(raw);
+      if (u.protocol === 'http:' || u.protocol === 'https:') return u.hostname;
+      if (u.protocol === 'filo:') return `${u.hostname || ''} (pagina di Filo)`.trim();
+      return raw;
+    } catch (_) { return raw; }
+  }
+
   function renderSuggestions() {
     // Default visibili: importance >= 3, max 5. Espanso: max 12.
     const sorted = [...suggestions].sort((a, b) => (b.importance || 0) - (a.importance || 0));
