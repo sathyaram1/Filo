@@ -650,6 +650,7 @@
           frase: frasePiena(testo, m.index, fine),
           clausola: clausolaDi(testo, m.index, fine),
           verbo: verboDi(m[0]),
+          senzaHo,
         });
       }
     }
