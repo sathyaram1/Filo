@@ -371,6 +371,8 @@
         // che in italiano è il calendario quanto «calendario».
         new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito|fissato|preso|programmato)\\b${PONTE(32)}\\b(?:(?:in|nel|nella|al|alla|sul|sulla)\\s+(?:tu[oa]\\s+)?(?:calendario|agenda)|l${AP}evento|un evento|l${AP}appuntamento|un appuntamento)\\b`, 'i'),
         new RegExp(`\\b${PRON}(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in|nel|nella|al|alla|sul|sulla)\\s+(?:tu[oa]\\s+)?(?:calendario|agenda)\\b`, 'i'),
+        // Giro 9: il verbo che il calendario si è preso per sé.
+        new RegExp(`${HO}calendarizzato\\b`, 'i'),
         participio('(?:evento|appuntamento|riunione)', 'aggiunt[oa]|creat[oa]|inserit[oa]|fissat[oa]|messo|messa|segnat[oa]|in calendario', 40),
       ],
     },
