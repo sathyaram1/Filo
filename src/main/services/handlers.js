@@ -1615,7 +1615,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
                 title: c.title || ChatArchive.fallbackTitle(c.messages),
                 date: c.closedAt || c.updatedAt || null,
                 kind: c.kind || null,
-                snippet: ChatArchive.snippetFor(c, query),
+                snippet: ChatArchive.snippetFor(c, termini.join(' ')),
               })),
             },
           };
