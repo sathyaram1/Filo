@@ -323,6 +323,43 @@ test('solo tastiera: il menu di una chat si apre, ma si può scegliere qualcosa?
   expect(almenoUno, `nessuna combinazione apre una voce: ${JSON.stringify(tentativi)}`).toBe(true);
 });
 
+test('Cronologia: la riga arrivata tardi si vede come una conversazione a sé', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  await configura(app, { terminal: { enabled: true } });
+  await stubProvider(app);
+
+  const dash = await openTab(DASH);
+  await dash.locator('#input').fill('Parlami di Kant');
+  await dash.locator('#input').press('Enter');
+  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
+  await dash.locator('#input').fill('/sleep 5; echo "ESIT""O-ORFANO"');
+  await dash.locator('#input').press('Enter');
+  await dash.waitForTimeout(900);
+  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').press('Enter');
+  await dash.waitForTimeout(12_000);
+
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('.arc-chat').first()).toBeVisible({ timeout: 20_000 });
+  const righe = await page.evaluate(() =>
+    [...document.querySelectorAll('.arc-chat')].map((r) => ({
+      titolo: (r.querySelector('.arc-chat-title') || {}).textContent || '',
+      data: (r.querySelector('.arc-chat-date') || {}).textContent || '',
+    })));
+  console.log('RIGHE IN CRONOLOGIA:', JSON.stringify(righe, null, 1));
+  await page.screenshot({ path: 'tests/.shots/525-giro5-cronologia-chiaro.png' });
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    window.SN_PAGE_BOOTSTRAP.applyTheme('dark');
+  });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'tests/.shots/525-giro5-cronologia-scuro.png' });
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('light'));
+
+  // L'utente ha fatto UNA conversazione: in Cronologia ne deve vedere una.
+  expect(righe.length, `righe: ${JSON.stringify(righe)}`).toBe(1);
+});
+
 test('due Cronologia aperte: quello che si cambia di qua si vede di là', async ({ app, openTab }) => {
   test.setTimeout(180_000);
   await configura(app);
