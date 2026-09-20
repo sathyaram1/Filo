@@ -1354,7 +1354,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   // dice all'utente invece di riprovare.
   if (risposta === 'no') {
     console.warn('[Filo] azione fuori da quello che Filo può fare:', type, esito && esito.regola);
-    const dove = Levels ? Levels.rifiutoFor(action) : '';
+    // La strada che resta: il registro la dà per l'elenco fisso (dove si fa a
+    // mano), la regola per un «no» della tabella (riprova in una conversazione
+    // pulita, o alza il livello). Un rifiuto senza strada è un vicolo cieco.
+    const dove = (Levels ? Levels.rifiutoFor(action) : '') || (esito && esito.uscita) || '';
     const perche = motivo || 'non è una cosa che posso fare io';
     return { executed: false, kept: false, rejected: true, error: dove ? `${perche} ${dove}` : perche };
   }
