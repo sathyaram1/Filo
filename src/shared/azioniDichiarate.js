@@ -109,6 +109,17 @@
   // parole lasciava passare «ti ho messo l'allarme alle 19».
   const SVEGLIA = '(?:svegli[ae]|allarm[ei])';
 
+  // Giro 8 — le cose che l'utente METTE DAVANTI a Filo: una foto mandata in
+  // chat, un testo incollato nel messaggio, un file aperto nell'editor.
+  // Arrivano al modello senza passare da nessuno strumento, e il giro 2 e il
+  // giro 7 hanno già stabilito che «ho letto la bolletta» lì è vero. Dette con
+  // l'altro verbo — «ho aperto la bolletta», che è la parola più comune —
+  // cadevano nella famiglia dell'apertura, che quei segni non li guarda: la
+  // risposta veniva buttata, rifatta con un'altra chiamata al modello e poi
+  // smentita, su un cammino che un utente nuovo percorre subito.
+  const DOCUMENTO = '(?:documento|documenti|file|pdf|bolletta|contratto|estratto conto|fattura'
+    + '|allegat[oi]|scontrino|ricevuta|foto|immagine|appunt[oi]|not[ae])';
+
   // Giro 7 — la conferma SENZA «ho», che è il modo più corto di dirlo:
   // «Sveglia impostata per le 19», «Appunto salvato», «Evento aggiunto al
   // calendario». Nessuna di queste scattava, mentre «ti ho messo la sveglia»
