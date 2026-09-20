@@ -291,15 +291,52 @@
   }
 
   // ---- cifratura campi sensibili (S1.2) ----
-  // Cifra un campo testo se la chiave pubblica è disponibile. Guard: se la
-  // pubblica non c'è (hasPublicKey() false) restituisce il valore invariato
-  // (niente crash, scrittura in chiaro come prima).
+
+  // PERCHÉ NON ESISTE PIÙ UN RIPIEGO IN CHIARO (#602)
+  //   Fin qui la cifratura era una cortesia: se la chiave pubblica non c'era, o
+  //   se l'operazione andava storta, il testo e gli allegati partivano lo stesso
+  //   in chiaro, con una riga nella console che non legge nessuno. Il risultato
+  //   è il contrario di quello che la cifratura serve a ottenere: il momento in
+  //   cui qualcosa si rompe è esattamente il momento in cui il contenuto va
+  //   protetto di più, e chi manda non lo sa. Adesso una cifratura che non si
+  //   può fare FERMA la scrittura, e chi l'ha chiesta legge cosa è mancato.
+  //
+  //   Il cutover è del 25 giugno 2026 e non torna indietro: `isEnabled()` falso
+  //   vuol dire chiave pubblica assente o interruttore spento a mano, cioè una
+  //   copia dell'app messa male — non uno stato di esercizio.
+
+  // Il motivo per cui la cifratura non si può fare, in una frase leggibile da
+  // chi non sa niente di codice. Stringa vuota = si può cifrare.
+  function encryptionUnavailable() {
+    const C = global.SN_FEEDBACK_CRYPTO;
+    if (!C || typeof C.isEnabled !== 'function') {
+      return 'la parte di Filo che cifra non è stata caricata';
+    }
+    if (!C.hasPublicKey()) return 'manca la chiave con cui si cifra';
+    if (!C.isEnabled()) return 'la cifratura è spenta su questa copia di Filo';
+    return '';
+  }
+
+  // Frase unica per chi manda: dice cosa è mancato E che non è partito niente.
+  // La leggono il riquadro dentro le pagine, la pagina dei feedback e la board.
+  function encryptionBlockedMessage(motivo) {
+    return `Non ho inviato niente: ${motivo || 'la cifratura non è disponibile'}. `
+      + 'Senza cifratura il contenuto resterebbe leggibile a chiunque, quindi mi fermo.';
+  }
+
+  // Cifra un campo testo. Se non si può cifrare, LANCIA: il chiamante decide se
+  // fermarsi (l'invio) o lasciare il campo com'era (le scritture della
+  // dashboard), ma nessuno scrive il valore in chiaro al posto del cifrato.
   async function maybeEncrypt(value) {
     if (value == null || value === '') return value;
+    const motivo = encryptionUnavailable();
+    if (motivo) throw new Error(`cifratura non disponibile: ${motivo}`);
     const C = global.SN_FEEDBACK_CRYPTO;
-    if (!C || !C.isEnabled()) return value; // dormiente finché il cutover non accende SN_FEEDBACK_ENC_ENABLED
-    try { return await C.encryptForOwner(String(value)); }
-    catch (e) { console.warn('[SN feedback] cifratura testo fallita:', e?.message || e); return value; }
+    const out = await C.encryptForOwner(String(value));
+    // Cintura: se quello che torna non è un ciphertext, qualcuno ha sostituito
+    // il modulo di cifratura con qualcosa che restituisce l'originale.
+    if (!C.isEncrypted(out)) throw new Error('cifratura non riuscita: il testo non risulta cifrato');
+    return out;
   }
 
   // S1.F2.1: cifra il campo `status` fine quando il gate è acceso.
