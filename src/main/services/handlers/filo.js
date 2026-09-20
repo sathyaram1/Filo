@@ -19,7 +19,7 @@ module.exports = function register(on, ctx) {
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
-  on(MSG.FILO_CHAT, async (msg, sender) => {
+  on(MSG.FILO_CHAT, async (msg, sender, origin) => {
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
