@@ -190,6 +190,7 @@
         el.classList.add('dash-activity-cmd');
         append(el);
         if (phase !== 'done') setPhase('act', `Eseguito · ${(out && out.command) || 'comando'}`);
+        else renderSummary();
       },
       // La bolla di un turno che NON era l'ultimo («Provo subito tutti e tre…»)
       // entra nella cronologia come nota e sparisce dalla conversazione: per
