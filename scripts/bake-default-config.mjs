@@ -38,6 +38,9 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync } from 'node:fs';
+// Il tetto del testo che il server accetta vive in un posto solo: là sta anche
+// la regola che un taglio si dichiara invece di mangiare la parte che contava.
+import { testoEntroIlTetto } from './build-alarm.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
