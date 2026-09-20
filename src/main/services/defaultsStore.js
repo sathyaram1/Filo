@@ -656,6 +656,8 @@ module.exports = {
   setRoutinesEnabled,
   getRoutineCaps,
   setRoutineCaps,
+  getRoutineSessions,
+  setRoutineSessions,
   getCreditsKnobs,
   setCreditsKnobs,
   getWorkerLog,
