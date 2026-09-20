@@ -129,6 +129,14 @@ test('una chat finita: cosa si può farle dal suo menu del tasto destro', async 
     [...document.querySelectorAll('.arc-ctxmenu .sn-select-option')].map((o) => o.textContent.trim()));
   console.log('VOCI DEL MENU DI UNA CHAT:', JSON.stringify(voci));
   expect(voci.length).toBeGreaterThan(0);
+  await page.screenshot({ path: 'tests/.shots/525-giro4-menu-chat-chiaro.png' });
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    window.SN_PAGE_BOOTSTRAP.applyTheme('dark');
+  });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'tests/.shots/525-giro4-menu-chat-scuro.png' });
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('light'));
 
   // Il titolo e il tipo li ha scritti un modello. Se ha sbagliato, l'utente
   // deve poterli correggere: nell'Editor un titolo generato si rinomina e si
