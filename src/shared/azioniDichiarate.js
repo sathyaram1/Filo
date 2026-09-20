@@ -262,6 +262,12 @@
       id: 'senza-nome',
       tipi: [],
       pronome: true,
+      // Anche il pronome può raccontare una cosa che ESISTE già: «sì, te l'ho
+      // messa alle 19», con la sveglia delle 19 che c'è davvero, è vero. La
+      // prova dello stato valeva solo per la frase lunga che ripete la parola
+      // «sveglia», cioè la forma meno probabile subito dopo la domanda.
+      orari: true,
+      appunti: true,
       avviso: 'non è partito niente',
       frasi: [
         new RegExp(`\\b(?:te |ve |me )?l${AP}ho\\s+(mess|impostat|programmat|fissat|aggiunt|salvat|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[oa]\\b`, 'i'),
