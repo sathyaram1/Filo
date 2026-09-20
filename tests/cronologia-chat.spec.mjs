@@ -105,6 +105,11 @@ test('una chat finita si salva per intero e si ritrova in Cronologia', async ({ 
   expect(disc.messages[1].text).toBe('Va bene, ci penso.');
   expect(disc.title).toBe('La coscienza è emergente?');
   expect(disc.kind).toBe('conversazione');
+  const cmd = salvate.find((c) => c.id === 'chat-comando');
+  expect(cmd.kind).toBe('comando');
+  // Classificata «comando» ma conservata intera: la classificazione decide
+  // cosa si VEDE, mai cosa si conserva.
+  expect(cmd.messages.length).toBe(2);
 
   // In pagina: la conversazione si vede, il comando no (ma esiste).
   const page = await openTab(ARCHIVE);
