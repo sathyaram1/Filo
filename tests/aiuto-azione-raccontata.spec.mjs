@@ -148,3 +148,78 @@ test('anche l\'avviso della risposta fuori formato offre il tasto che rimanda la
   ).map((b) => (b.textContent || '').trim()).filter(Boolean));
   expect(tasti.some((t) => /fallo adesso/i.test(t))).toBe(true);
 });
+
+test('un turno che aziona un comando della barra viene guardato come gli altri', async ({ openTab }) => {
+  // Il pannello mostra in chat il testo scritto insieme al comando, e quel
+  // testo non lo guardava nessuno: né ritentativo, né riga sotto la risposta.
+  // È il caso del feedback in un turno di prosecuzione dopo un comando.
+  test.setTimeout(90_000);
+  const page = await openTab(NEWTAB);
+  await page.evaluate(() => { window.__shell = []; });
+  await agenteASequenza(page, [
+    JSON.stringify({
+      action: 'shell',
+      command: 'settings',
+      text: 'Apro le impostazioni. Ho mandato la segnalazione agli sviluppatori: ci penseranno loro.',
+      status: 'done',
+    }),
+  ]);
+  await page.evaluate(() => {
+    window.__shell = [];
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, ...rest) => {
+      if (msg && msg.type === 'shell_action') {
+        window.__shell.push(msg.command);
+        return Promise.resolve({ ok: true });
+      }
+      return orig(msg, ...rest);
+    };
+  });
+  await apriAiuto(page);
+
+  await chiedi(page, 'apri le impostazioni e manda un feedback: la barra in alto sparisce');
+
+  // Le impostazioni si aprono, la segnalazione no.
+  expect(await page.evaluate(() => window.__shell.length)).toBe(1);
+  expect(await page.evaluate(() => window.__azioni.length)).toBe(0);
+  expect(await testoChat(page)).toMatch(AVVISATO);
+});
+
+test('una cosa già smentita non torna vera perché il modello la ripete', async ({ openTab }) => {
+  // Premuto «Fallo adesso», il modello ripete la stessa cosa con un «già»
+  // davanti: senza il ricordo dell'avviso, un'azione emessa prima nella
+  // sessione tornava a coprirla e il presidio taceva.
+  test.setTimeout(120_000);
+  const page = await openTab(NEWTAB);
+  await agenteASequenza(page, [
+    // Primo turno: la segnalazione parte davvero.
+    JSON.stringify({
+      text: 'Ho mandato la segnalazione agli sviluppatori.',
+      action: 'filo',
+      filo: { type: 'INVIA_FEEDBACK', testo: 'la barra in alto sparisce' },
+      status: 'done',
+    }),
+    // Secondo turno: la racconta e basta, anche dopo il ritentativo.
+    JSON.stringify({ text: 'Ho mandato la segnalazione agli sviluppatori.', status: 'done' }),
+    JSON.stringify({ text: 'Ho mandato la segnalazione agli sviluppatori.', status: 'done' }),
+    // Terzo turno, quello del tasto: la ripete guardando indietro.
+    JSON.stringify({ text: 'Te l\'ho già mandata, come ti dicevo.', status: 'done' }),
+  ]);
+  await apriAiuto(page);
+
+  await chiedi(page, 'manda un feedback: la barra in alto sparisce');
+  expect(await page.evaluate(() => window.__azioni.length)).toBe(1);
+
+  await chiedi(page, 'manda anche un feedback: il menu si chiude da solo');
+  await page.waitForSelector('.sn-sidebar-msg-avviso', { timeout: 10_000 });
+  const primi = await page.evaluate(() => document.querySelectorAll('.sn-sidebar-msg-avviso').length);
+
+  await page.evaluate(() => { window.__turni = []; });
+  await chiedi(page, 'Non l\'hai fatto davvero: fallo adesso.');
+
+  // La seconda segnalazione non esiste ancora: l'utente deve leggerlo anche
+  // stavolta, non credere che premendo il tasto sia andata.
+  expect(await page.evaluate(() => window.__azioni.length)).toBe(1);
+  const dopo = await page.evaluate(() => document.querySelectorAll('.sn-sidebar-msg-avviso').length);
+  expect(dopo).toBeGreaterThan(primi);
+});
