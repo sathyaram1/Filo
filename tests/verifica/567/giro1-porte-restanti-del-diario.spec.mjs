@@ -36,7 +36,7 @@ test('la memoria cancellata dalla chat: cosa ne resta nel diario', async ({ app,
   await btn.click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'ok');
+  await clickConfirm(page, 'danger');
 
   // È successo davvero.
   await expect.poll(
@@ -69,6 +69,8 @@ test('tema scuro: il riquadro del comando bloccato e il diario restano leggibili
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.snTheme || ''), { timeout: 8_000 }).toBe('dark');
 
   await fakeProvider(app, [
