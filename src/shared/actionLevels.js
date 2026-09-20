@@ -135,11 +135,12 @@
       // anti-esfiltrazione: se l'URL trasporta FUORI dati sensibili che il
       // modello aveva nel contesto (taint-match) o ha la forma di un payload di
       // esfiltrazione da origine non fidata (fallback strutturale), sale a
-      // livello 2 → conferma con l'URL mostrato. Il flag `_exfil` lo calcola il
+      // costo 3: quei dati, una volta usciti, non rientrano — ed è il caso che
+      // una pagina ostile prova a far scattare. Il flag `_exfil` lo calcola il
       // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
       // Aprire un link non porta niente nel contesto del modello: la pagina la
       // legge l'utente, non Filo. Nessuna `fonte`.
-      costo: (a) => (a && a._exfil ? 2 : 1),
+      costo: (a) => (a && a._exfil ? 3 : 1),
       campo: 'web',
       describe: (a) => {
         const url = a.url || a.href || a.link || 'una pagina';

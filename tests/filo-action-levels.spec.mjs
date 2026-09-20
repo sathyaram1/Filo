@@ -1,9 +1,15 @@
-// #146.2 — Framework dei livelli di sicurezza per le azioni di Filo.
+// #146.2 + #530 — Il gate delle azioni di Filo.
 //
-// Verifica il contratto della spec: livello 1 esegue subito; livello 2 NON
-// esegue finché l'utente non conferma dal popup; livello 3 richiede di
-// digitare "conferma"; le azioni NON registrate vengono rifiutate dal
-// dispatch (anche se arrivano già "confermate" dal client).
+// Verifica il contratto: quello che si disfa parte subito; quello che dura si
+// ferma e chiede (popup); quello che allenta una difesa pretende la parola
+// «conferma» digitata, a ogni livello di autonomia; le azioni NON registrate
+// (senza costo) vengono rifiutate dal dispatch, anche se arrivano già
+// "confermate" dal client.
+//
+// Dal #530 la risposta non è più un numero fisso accanto all'azione: la
+// decide src/shared/autonomia.js dal costo dichiarato, dal livello scelto
+// dall'utente e da cosa il compito ha già letto. `needsConfirm` resta il MODO
+// di chiedere: 2 popup, 3 parola digitata.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
@@ -28,16 +34,17 @@ test('livello 1 esegue subito, senza chiedere nulla', async ({ app, openTab }) =
   expect(timers.some((t) => t.label === 'Pasta')).toBe(true);
 });
 
-test('livello 2 non esegue senza conferma; la conferma esegue davvero', async ({ app, openTab }) => {
+test('accendere il terminale non esegue senza conferma; la conferma esegue davvero', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   const action = { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' };
 
-  // Senza conferma: l'azione NON viene eseguita, torna al client con il
-  // livello e la spiegazione per il popup.
+  // Senza conferma: l'azione NON viene eseguita, torna al client col modo di
+  // chiedere e la spiegazione. Dare a Filo la shell allenta una difesa, quindi
+  // la parola digitata (#530, regola (d)) e non il semplice OK.
   const r = await execAction(app, action);
   expect(r.executed).toBe(false);
   expect(r.kept).toBe(true);
-  expect(r.needsConfirm).toBe(2);
+  expect(r.needsConfirm).toBe(3);
   expect(r.describe).toContain('erminale');
   expect((await getSettings(page)).terminal?.enabled || false).toBe(false);
 
@@ -230,9 +237,18 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
   }
 
   // curl senza flag di output stampa a schermo: non fa atterrare niente, resta
-  // alla conferma leggera (nessuna frizione aggiunta dove non serve).
-  const stampa = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'curl http://esempio.test/x' });
+  // alla conferma leggera (nessuna frizione aggiunta dove non serve). Lo
+  // chiediamo da una conversazione APPENA cominciata: in quella di sopra sono
+  // già girati dei comandi, e quello che un comando stampa entra nel contesto
+  // come qualunque altro testo scritto da altri — da lì in poi anche la
+  // conferma leggera diventa la parola digitata (#530).
+  const altraChat = { tab: { id: 9479, url: 'filo://dashboard/dashboard.html' }, url: 'filo://dashboard/dashboard.html' };
+  const stampa = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'curl http://esempio.test/x' }, { sender: altraChat });
   expect(stampa.needsConfirm).toBe(2);
+  // …e nella conversazione dove i comandi sono già girati, la stessa identica
+  // riga chiede di scriverlo.
+  const dopoAltri = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'curl http://esempio.test/x' });
+  expect(dopoAltri.needsConfirm).toBe(3);
 });
 
 test('Esc annulla il popup di conferma', async ({ openTab }) => {
