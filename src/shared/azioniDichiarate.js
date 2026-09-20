@@ -777,33 +777,39 @@
     let pronome = null;
     for (const fam of FAMIGLIE) {
       if (ammesse && !fam.pronome && !ammesse.has(fam.id)) continue;
-      const d = dichiarazione(t, fam);
-      if (!d) continue;
-      if (fam.pronome) { pronome = d; continue; }
-      const ora = oraDecide(fam, d);
-      if (ora === true) {
-        // L'azione che l'ha fatta, se c'è, resta impegnata qui: non può
-        // reggere anche la dichiarazione dopo, detta col pronome.
-        for (const x of fam.tipi) if (presenti.has(x)) impegnati.add(x);
-        if (d.verbo) radiciRette.add(d.verbo);
-        continue;
-      }
-      if (ora === false) {
+      const trovate = dichiarazioni(t, fam);
+      if (!trovate.length) continue;
+      if (fam.pronome) { [pronome] = trovate; continue; }
+      // Le azioni di questa famiglia partite adesso: ognuna regge UNA
+      // dichiarazione, non tutte quelle della sua specie.
+      let disponibili = quanteAzioni(fam);
+      for (const d of trovate) {
+        const ora = oraDecide(fam, d);
+        if (ora === true) {
+          // L'azione che l'ha fatta, se c'è, resta impegnata qui: non può
+          // reggere anche la dichiarazione dopo, detta col pronome.
+          for (const x of fam.tipi) if (presenti.has(x)) impegnati.add(x);
+          if (d.verbo) radiciRette.add(d.verbo);
+          continue;
+        }
+        if (ora === false) {
+          out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
+          continue;
+        }
+        if (disponibili > 0) {
+          disponibili -= 1;
+          for (const x of fam.tipi) if (presenti.has(x)) impegnati.add(x);
+          if (d.verbo) radiciRette.add(d.verbo);
+          continue;
+        }
+        // Nessuna azione adesso: la cosa può esistere lo stesso, o essere
+        // stata fatta in un turno precedente e raccontata come tale.
+        if (esisteGia(fam, d) || copertaDalPassato(fam, d)) {
+          if (d.verbo) radiciRette.add(d.verbo);
+          continue;
+        }
         out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
-        continue;
       }
-      const retta = fam.tipi.filter((x) => presenti.has(x));
-      if (retta.length) {
-        for (const x of retta) impegnati.add(x);
-        if (d.verbo) radiciRette.add(d.verbo);
-        continue;
-      }
-      // Nessuna azione: la cosa può esistere lo stesso.
-      if (esisteGia(fam, d)) {
-        if (d.verbo) radiciRette.add(d.verbo);
-        continue;
-      }
-      out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase: d.frase });
     }
     // Il pronome parla solo se nessuna famiglia ha già saputo dire di cosa si
     // tratta, e se non è rimasta nessuna azione libera a reggerlo. Se la
