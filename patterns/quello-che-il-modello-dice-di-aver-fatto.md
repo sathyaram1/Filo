@@ -139,6 +139,36 @@ categoria intera, non per la frase che l'ha fatta nascere**:
   nomi (`functions.SVEGLIA({…})`). Nel testo sono lo stesso guasto: in chat
   resta un blocco di codice e la sveglia non c'è.
 
+Il quarto giro di verifica ha aggiunto due cose, e la prima è la più grossa.
+
+- **il presidio vale per OGNI chat che può agire, non per quella dove è nato.**
+  Filo ha due chat: quella della home e l'Aiuto, il pannello che si apre sulle
+  pagine. L'Aiuto parla in JSON e da lì Filo manda segnalazioni, copia, cerca,
+  comanda la finestra. Una sua risposta in prosa, o chiusa con un oggetto
+  vuoto, non esegue niente: l'utente leggeva «ho mandato la segnalazione» e
+  non partiva nulla, oppure perdeva anche la frase e leggeva «(risposta
+  vuota)». Sono le due forme che la segnalazione descriveva, e lì il
+  fallimento era rimasto muto perché il presidio stava nell'altra chat. Adesso
+  l'Aiuto fa gli stessi due gradini: rimbalzo una volta, con la riga nel log
+  che dice perché la risposta è sparita, e poi la frase all'utente. La
+  risposta scritta prima dell'oggetto vuoto non si butta più;
+- **le parole che zittiscono il presidio vanno rilette una per una.** Fra le
+  negazioni c'erano «invece», «prima», «quando» e «appena», che sono
+  congiunzioni: davanti a una dichiarazione già al passato raccontano quando
+  la cosa è successa, non che non è successa, e «non ho trovato l'evento,
+  invece ti ho messo la sveglia alle 19» non scattava. Stessa famiglia del
+  «però» del primo giro, dall'altra parte;
+- **i tre apici non sono un salvacondotto.** Un modello abituato a recintare i
+  blocchi di codice ci mette dentro anche la chiamata, e il turno passava
+  intero. Adesso si guarda anche dentro il recinto, e l'esempio resta un
+  esempio grazie alla riga che lo annuncia («ecco un esempio di come si
+  scrive»), non grazie agli apici. Per non buttare la risposta a chi chiede un
+  JSON qualunque, il nome dentro `"type"` si confronta con gli strumenti veri;
+- **il titolo di un appunto non prova un'ora.** Un appunto che esiste regge la
+  frase che lo nomina, ma chi ne teneva uno intitolato «spesa» non veniva più
+  avvisato di nessun promemoria che nominasse la spesa. Se la frase promette
+  un'ora, la prova è una sveglia, non un appunto.
+
 Il rimbalzo non è invisibile per l'utente quanto sembra: la risposta già
 comparsa a schermo viene cancellata, e una risposta che si cancella da sola
 senza una parola sembra un guasto. Nel blocco di attività resta la riga che
