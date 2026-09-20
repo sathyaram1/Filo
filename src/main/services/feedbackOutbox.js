@@ -155,6 +155,13 @@
     try {
       await load();
       for (const it of queue.slice()) {
+        // Voce già rinunciata: non si tenta più di spedirla e non scade, si
+        // prova solo a dirlo. Detto, esce dalla coda.
+        if (it.rinuncia) {
+          if (annunciaRinuncia(it)) remove(it.id);
+          else anyFail = true;
+          continue;
+        }
         if (Date.now() - it.queuedAt > MAX_AGE_MS) {
           logFn('voce scaduta dopo troppi tentativi, rinuncio:', it.id);
           remove(it.id);
