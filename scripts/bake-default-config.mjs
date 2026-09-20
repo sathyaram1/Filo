@@ -274,6 +274,12 @@ async function main() {
   );
   console.log(`[bake] scritto ${OUT_PATH}:`, JSON.stringify(summary));
 
+  // Il ripiego sui segreti del job non ferma la pubblicazione, ma vuol dire che
+  // una chiave appena cambiata dall'owner NON è arrivata a nessuno: va in evidenza.
+  if (esitoServer.stato !== 'ok') {
+    console.warn(`::warning::Le chiavi di questa versione non vengono dal server ma dai segreti di riserva del job: una chiave cambiata di recente in Modelli predefiniti non è arrivata agli utenti. ${descriviEsitoServer(esitoServer)}`);
+  }
+
   // Qualcuna c'è, quindi si pubblica — ma una chiave che l'applicazione legge e
   // che nel pacchetto non c'è resterebbe muta all'utente senza dirlo a nessuno.
   if (mancanti.length) {
