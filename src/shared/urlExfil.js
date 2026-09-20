@@ -29,6 +29,11 @@
   const STRONG_TOKEN = 12;  // un solo token così lungo che combacia → già sospetto
   const STRUCT_CARRIER = 80; // payload (query+fragment+path) per il fallback strutturale
   const STRUCT_BLOB = 24;   // singolo token opaco (sottodominio/segmento) → sospetto
+  // Ricopiatura da ciò che Filo ha letto: 40 caratteri alfanumerici di fila
+  // sono una decina di parole, che due indirizzi diversi non condividono per
+  // caso; col passo a metà qualunque ricopiatura da 80 in su viene presa.
+  const READ_RUN = 40;
+  const READ_STEP = 20;
 
   // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
   // evitano che un URL legittimo che le contiene scateni il match a token singolo.
