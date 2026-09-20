@@ -22,6 +22,13 @@ sempre, finché c'è la finestra.
   dalla pagina: due superfici che suonano lo stesso motivo sfasate sono peggio
   del silenzio. La pagina tiene lo stato visibile (in dashboard
   `#live[data-ringing]`), non l'audio.
+- **Una sola anche fra le finestre.** Ogni finestra ha la sua shell, e le
+  finestre della stessa vista vedono la stessa scadenza: se suonassero tutte
+  tornerebbe il motivo sfasato, da un'altra porta. Il main elegge la finestra
+  più anziana della vista e lo dice alla shell (`suona`, nella risposta a
+  `FILO_GET_TIMERS`); quando quella si chiude un `broadcastLiveUpdate` passa il
+  turno a chi resta, o il rumore morirebbe con la finestra a scadenza viva. Il
+  pulsante che ferma invece sta in TUTTE: l'utente è davanti a una qualunque.
 - **Il comando per farlo smettere sta nella fila di tab.** È l'unica striscia
   della shell **mai coperta** dalla WebContentsView della pagina (vedi
   [Animazioni che coprono la pagina](animazioni-che-coprono-la-pagina-vivono-nel-content-overlay.md)):
@@ -36,7 +43,9 @@ sempre, finché c'è la finestra.
   tutto schermo un secondo dopo per riavere il rumore senza interruttore.
 - **Una finestra incognito ha la SUA lista.** I timer non sono fra le chiavi che
   l'incognito eredita dal disco, quindi ogni shell chiede le proprie scadenze e
-  nessuna può squillare in due finestre insieme. Il rovescio: chi guarda solo la
+  una scadenza incognito non squilla nella finestra normale; fra due finestre
+  incognito, che l'overlay in RAM se lo dividono, decide l'elezione qui sopra.
+  Il rovescio: chi guarda solo la
   lista su disco non vede mai quelle scadenze, e il watcher del main deve fare
   una passata anche dentro `runIncognito()` o quei timer restano muti per
   sempre. La notifica di sistema lì resta fuori di proposito: il nome del timer
