@@ -234,40 +234,15 @@ test('la fusione: parte dichiarando il commit esaminato, e non parte se il ramo 
     rmSync(dir, { recursive: true, force: true });
     rmSync(fuori, { recursive: true, force: true });
   }
-
-  async function fintoServer() {
-    const s = createServer((req, res) => {
-      let body = '';
-      req.on('data', (c) => { body += c; });
-      req.on('end', () => {
-        let j = {};
-        try { j = body ? JSON.parse(body) : {}; } catch (_) { /* lo scoprono gli assert */ }
-        buste.push({ url: String(req.url || ''), body: j });
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ ok: true, result: 'merged', sha: 'z'.repeat(40) }));
-      });
-    });
-    return new Promise((r) => s.listen(0, '127.0.0.1', () => r({ srv: s, port: s.address().port })));
-  }
 });
 
 test('la fusione non si chiede con roba fuori dai commit: il salvataggio automatico sposterebbe la punta subito dopo', async () => {
-  const buste = [];
-  const s = createServer((req, res) => {
-    let body = '';
-    req.on('data', (c) => { body += c; });
-    req.on('end', () => {
-      buste.push({ url: String(req.url || '') });
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true, result: 'merged', sha: 'z'.repeat(40) }));
-    });
-  });
-  const port = await new Promise((r) => s.listen(0, '127.0.0.1', () => r(s.address().port)));
+  const { srv, ricevuti: buste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'z'.repeat(40) });
   const { dir, punta } = deposito('filo-485-fusione-sporca-');
   const fuori = cartellaTemporanea('filo-485-fusione-sporca-fuori-');
   const statoDir = resolve(fuori, 'stato');
   try {
-    execFileSync('mkdir', ['-p', statoDir]);
+    mkdirSync(statoDir, { recursive: true });
     writeFileSync(resolve(statoDir, 'ID1.json'),
       JSON.stringify({ id: 'ID1', branch: 'worker/485', secauditDone: true, secauditVerdict: 'pass', secauditSha: punta() }), 'utf8');
     writeFileSync(resolve(dir, 'aggiunto-dopo.js'), 'module.exports = 1;\n', 'utf8');
