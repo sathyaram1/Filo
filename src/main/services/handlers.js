@@ -3026,6 +3026,7 @@ const handlerCtx = {
   // Archivio delle chat (#525)
   closeAndTriageChat,
   sweepPendingChats,
+  archiviaCongedoAccoglienza,
   // Intervista di benvenuto (#524)
   saveOnboarding,
   finishOnboarding,
