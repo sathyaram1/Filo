@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const PDF = readFileSync(fileURLToPath(new URL('../../fixtures/documenti/documento-con-testo.pdf', import.meta.url))).toString('base64');
+const PAGE_READ = fileURLToPath(new URL('../../../src/main/services/pageRead.js', import.meta.url));
 
 test.afterEach(async ({ app }) => {
   await app.evaluate(() => { try { globalThis.__ripristinaRete?.(); } catch (_) {} });
