@@ -68,6 +68,15 @@ function comandoPerPowerShell(command) {
   return `Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64}')))`;
 }
 
+// Quella cartella c'è ancora, ed è una cartella? La domanda si fa qui per
+// tutti, perché la risposta sia la stessa nei tre punti che la fanno: la shell
+// persistente quando nasce, il comando one-shot dell'assistente quando parte, e
+// il popup che dice all'utente in quale cartella quel comando scriverà.
+function cartellaViva(p) {
+  if (!p) return false;
+  try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
+}
+
 // La cartella iniziale può arrivare da uno stato persistito (#259: "riparti da
 // dove eri"): se nel frattempo è stata cancellata/rinominata, spawnare con una
 // cwd inesistente farebbe morire la shell. Ripieghiamo sulla home. I path in
@@ -76,10 +85,32 @@ function comandoPerPowerShell(command) {
 function usableCwd(cwd) {
   if (!cwd) return defaultCwd();
   if (process.platform === 'win32' && /^\//.test(cwd)) return cwd;
-  try {
-    if (fs.statSync(cwd).isDirectory()) return cwd;
-  } catch (_) {}
-  return defaultCwd();
+  return cartellaViva(cwd) ? cwd : defaultCwd();
+}
+
+// La cartella in cui far girare DAVVERO un comando, più la notizia che quella
+// chiesta non c'è più.
+//
+// #551, quarto giro di verifica. La cartella in cui Filo sta guardando può
+// sparire sotto i piedi: l'utente la rinomina mentre riordina, stacca la
+// chiavetta, o la cancella Filo stesso perché gliel'ha chiesto. Avviare una
+// shell lì dentro non fa fallire il COMANDO: fa fallire la shell prima ancora
+// di leggerlo, con un motivo che parla del programma («spawn … ENOENT») e non
+// della cartella. E siccome la cartella resta appuntata, da quello stato non si
+// esce più nemmeno chiedendo di andare altrove: in quella scheda il terminale
+// dell'assistente è finito finché l'utente non la chiude. Il terminale che
+// l'utente digita a mano questo controllo ce l'ha da sempre (qui sopra), e
+// infatti riparte dalla home e continua a funzionare: erano due strade
+// equivalenti con esiti diversi.
+//
+// Il ripiego è la home, la stessa da cui il terminale parte. Se non esiste
+// nemmeno quella (profilo su un disco di rete staccato) si lascia decidere al
+// sistema invece di insistere su un percorso che non c'è.
+function cartellaPerComando(cwd) {
+  const chiesta = String(cwd || '');
+  if (chiesta && cartellaViva(chiesta)) return { cwd: chiesta, persa: false };
+  const casa = defaultCwd();
+  return { cwd: cartellaViva(casa) ? casa : undefined, persa: !!chiesta };
 }
 
 // Identificativo di sessione, improbabile in output reale. Entra nei marcatori.
