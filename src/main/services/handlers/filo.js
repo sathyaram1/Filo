@@ -166,8 +166,21 @@ module.exports = function register(on, ctx) {
     // La scheda che scrive questa riga sta vivendo la chat: quando sparisce,
     // la chat è finita — come per un turno normale.
     if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
-    await FiloChats.append(id, { role: 'filo', text });
+    const role = msg.role === 'user' ? 'user' : 'filo';
+    await FiloChats.append(id, { role, text });
     return { ok: true };
+  });
+
+  // #525 — titolo e tipo scelti a mano dall'utente (menu del tasto destro in
+  // Cronologia). Da qui in poi il classificatore non li riscrive più.
+  on(MSG.FILO_CHAT_UPDATE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    if (!msg.id) return { ok: false, error: 'id mancante' };
+    const chat = await FiloChats.setUserTriage(msg.id, { title: msg.title, kind: msg.kind });
+    if (!chat) return { ok: false, error: 'chat inesistente' };
+    // Le altre schede che hanno la Cronologia aperta vedono il nome nuovo.
+    try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
+    return { ok: true, chats: await FiloChats.listIndex() };
   });
 
   // #525 — la conversazione che l'utente ha cliccato in Cronologia è ancora
