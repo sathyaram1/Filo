@@ -49,7 +49,13 @@ const {
   defaultState,
 } = await import('../../scripts/dispatch.mjs');
 
-const { esitiDecaduti } = await import('../../scripts/merge-gate.mjs');
+const { esitiDecaduti, testoEsitiDecaduti } = await import('../../scripts/merge-gate.mjs');
+
+const {
+  confermaImpronta,
+  testoImprontaDiversa,
+  MIN_IMPRONTA_CHARS,
+} = await import('../../scripts/routine-channel.mjs');
 
 const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
 const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
