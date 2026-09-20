@@ -425,66 +425,6 @@ function quotaNonTesto(s) {
   return rumore / n;
 }
 
-/**
- * La stessa domanda sui BYTE grezzi, byte nulli compresi. PURA.
- *
- * È il conto che riconosce un file binario (`looksLikeText`), scritto qui una
- * volta sola perché serve anche a distinguere un testo a 8 bit con qualche byte
- * guasto da un testo scritto a due byte per carattere (#551, settimo giro): in
- * un file a due byte metà dei byte sono il byte ALTO delle coppie, che non è un
- * carattere, e questo conto lo vede in qualunque alfabeto.
- */
-function quotaNonTestoByte(buf, fino) {
-  const n = Math.min(buf.length, fino || 8192);
-  if (!n) return 1;
-  let rumore = 0;
-  for (let i = 0; i < n; i++) {
-    const b = buf[i];
-    if (b >= 32 || b === 9 || b === 10 || b === 13 || b === 12 || b === 27) continue;
-    rumore++;
-  }
-  return rumore / n;
-}
-
-/**
- * La stessa domanda su UN SOLO LATO delle coppie di byte. PURA.
- * `salto` è 0 per i byte in posizione pari, 1 per quelli in posizione dispari.
- *
- * #551, ottavo giro di verifica. Prima la domanda «questi byte sono già testo?»
- * si faceva su TUTTO il file, e la risposta era una percentuale: sopra il due
- * per cento di rumore il file passava per un testo a due byte per carattere.
- * Due file normalissimi stanno sopra quella soglia senza essere niente del
- * genere:
- *   • un file CORTO. In un promemoria di quaranta caratteri un byte nullo solo
- *     vale il due e mezzo per cento;
- *   • un file che contiene già qualche carattere di controllo suo. Il registro
- *     di un programma che disegna una barra di avanzamento torna indietro di un
- *     carattere per volta per riscrivere la riga: lì il conto sta sopra la
- *     soglia da solo, e allora un nullo qualunque, in un file di qualunque
- *     lunghezza, faceva rileggere tutto a coppie di byte. Quello che ne usciva
- *     erano ideogrammi cinesi — stampabili, quindi nemmeno la rete finale se ne
- *     accorgeva — e Filo dichiarava di aver letto l'estratto conto.
- *
- * Guardare un lato solo non è una soglia più fine: è una domanda diversa, e la
- * risposta non dipende più dalla lunghezza del file né da quanti caratteri di
- * controllo ci siano nel testo vero. In un file scritto a due byte il lato alto
- * delle coppie non è fatto di caratteri per costruzione, in qualunque alfabeto:
- * è nullo in italiano, ed è un carattere di controllo in russo e in greco. In un
- * testo a 8 bit quel lato è testo, perché è testo come tutto il resto del file.
- * Fra i due conteggi vince la maggioranza, come già fa il bilancio dell'UTF-8.
- */
-function quotaLatoNonTesto(buf, fino, salto) {
-  const n = Math.min(buf.length, fino || 8192);
-  let quanti = 0;
-  let rumore = 0;
-  for (let i = salto; i < n; i += 2) {
-    quanti++;
-    const b = buf[i];
-    if (b >= 32 || b === 9 || b === 10 || b === 13 || b === 12 || b === 27) continue;
-    rumore++;
-  }
-  return quanti ? rumore / quanti : 0;
-}
 
 /** Legge il buffer come testo a due byte nel verso dato. PURA. */
 function leggiDueByte(buf, verso, conFirma) {
@@ -535,15 +475,20 @@ function leggiDueByte(buf, verso, conFirma) {
  * caratteri STAMPABILI, quindi nemmeno la rete finale se ne accorgeva: Filo
  * dichiarava letto un estratto conto e rispondeva su una fila di segni cinesi.
  *
- * Il passo che mancava è la stessa domanda che il modulo fa già sui BYTE per
- * capire se un file è testo, fatta qui contando anche i nulli: questo file,
- * byte per byte, è GIÀ testo? Se lo è, i nulli sono il danno e non la
- * struttura, e il documento va letto com'è scritto. In un testo a due byte la
- * risposta è no in qualunque alfabeto, e non per una questione di quantità:
- * metà dei byte del file sono il byte ALTO delle coppie, che non è un
- * carattere. È zero in italiano, un carattere di controllo in russo e in greco,
- * e in cinese a non esserlo è il byte basso. Nessuna soglia nuova da tarare:
- * è la stessa quota con cui si riconosce un binario.
+ * #551, ottavo giro. La cura del settimo giro chiedeva «questo file, byte per
+ * byte, è già testo?» e rispondeva con una percentuale sul file intero: sopra
+ * il due per cento di rumore il file tornava a passare per un testo a due byte.
+ * Due file normalissimi stanno sopra quella soglia senza esserlo. Un file CORTO:
+ * in un promemoria di quaranta caratteri un nullo solo vale il due e mezzo per
+ * cento. E un file che contiene già qualche carattere di controllo suo: il
+ * registro di un programma che disegna una barra di avanzamento torna indietro
+ * di un carattere per volta per riscrivere la riga, e lì il conto sta sopra la
+ * soglia da solo, a qualunque lunghezza.
+ *
+ * La domanda giusta non è quanto rumore c'è, ma se i nulli siano la STRUTTURA
+ * del file o il suo DANNO, e si risponde guardando quanti sono rispetto alle
+ * coppie. Una percentuale c'è ancora, ma non è più una soglia da tarare: fra i
+ * due casi c'è un fattore mille, non un paio di punti.
  */
 function pareDueByte(buf) {
   if (!buf || buf.length < 8) return '';
@@ -558,12 +503,16 @@ function pareDueByte(buf) {
   if (!totale) return '';
   const verso = alti > bassi ? 'le' : 'be';
   if (Math.max(alti, bassi) / totale < 0.9) return '';
-  // Il lato che sarebbe il byte ALTO delle coppie è fatto di caratteri o no?
-  // In un file scritto a due byte quel lato non è testo in NESSUN alfabeto: è
-  // zero in italiano, un carattere di controllo in russo e in greco. In un
-  // testo a 8 bit con qualche byte guasto, invece, quel lato è testo come
-  // tutto il resto, perché è testo e basta.
-  if (quotaLatoNonTesto(buf, n, verso === 'le' ? 1 : 0) <= 0.5) return '';
+  // I nulli sono la STRUTTURA del file o il suo DANNO? In un file scritto a due
+  // byte per carattere ogni spazio, ogni a capo e ogni segno di punteggiatura
+  // mette un nullo dal lato alto delle coppie, e in un testo vero quei caratteri
+  // sono almeno uno ogni dieci: in italiano i nulli sono quasi uno per coppia,
+  // in russo e in greco circa uno su cinque. In un testo a 8 bit con qualche
+  // byte guasto sono due o tre in tutto il file, cioè meno di uno su mille. Fra
+  // i due casi c'è un fattore mille, quindi qui non c'è nessuna soglia fine da
+  // tarare: è la differenza fra una cosa che c'è per costruzione e una che c'è
+  // per sbaglio.
+  if (Math.max(alti, bassi) < (n / 2) / 10) return '';
   return quotaNonTesto(leggiDueByte(buf, verso, false)) < QUOTA_NON_TESTO ? verso : '';
 }
 
