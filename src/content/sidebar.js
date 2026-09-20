@@ -51,6 +51,37 @@
   const AVVISO_FUORI_FORMATO = 'Filo ha risposto fuori dal suo formato: in questo turno non ha '
     + 'eseguito niente. Se ti aspettavi che facesse qualcosa, chiediglielo di nuovo.';
 
+  // #517 (giro 5) — l'altra metà dello stesso guasto. La risposta può
+  // arrivare nel formato giusto e raccontare lo stesso un'azione che non è
+  // mai partita: «ho mandato la segnalazione agli sviluppatori», e di
+  // segnalazioni non ne parte nessuna. Il riconoscimento è lo stesso della
+  // chat della home (SN_AZIONI_DICHIARATE), ristretto alle famiglie che
+  // l'Aiuto può fare solo emettendo un'azione di Filo.
+  let rimandiAzioneRaccontata = 0;
+  // Le azioni di Filo già emesse da questo pannello: una cosa fatta due
+  // messaggi fa regge la frase che la racconta.
+  const azioniFiloEmesse = new Set();
+
+  function azioniRaccontate(parsed) {
+    const D = global.SN_AZIONI_DICHIARATE;
+    if (!D || !parsed || parsed.kind) return [];
+    const testo = String(parsed.display || '');
+    if (!testo.trim()) return [];
+    try {
+      return D.rileva(testo, azioniFiloEmesse, {}, { famiglie: D.FAMIGLIE_AIUTO });
+    } catch (_) { return []; }
+  }
+
+  function nudgeAzioniRaccontate(fantasmi) {
+    return 'la tua ultima risposta dice che hai già fatto questo:\n'
+      + fantasmi.map((f) => `- «${f.frase}»`).join('\n')
+      + '\nIn questo turno però non hai emesso nessuna azione che lo faccia: non è successo, e '
+      + 'così com\'è la tua risposta dice all\'utente una cosa falsa. Se va fatto ORA, rispondi con '
+      + 'l\'azione nel formato {"action":"filo","filo":{...}}; se non si può fare, riscrivi la '
+      + 'risposta senza dire che è fatto e spiega cosa manca. Non ripetere la risposta di prima '
+      + 'uguale: questo messaggio non lo vede l\'utente.';
+  }
+
   // Telemetria sessione: viene inviata a fine task (status:"done" + 👍/👎) per
   // arricchire il database globale dei percorsi (vedi pathsCollector.js).
   // Tutto qui resta locale finché l'utente non clicca pollice su/giù.

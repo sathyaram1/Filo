@@ -581,10 +581,17 @@
   // adesso. Una sveglia messa ieri, in un'altra sessione, non lascia nessuna
   // azione in questa conversazione: senza guardare lo stato, «sì, l'ho messa
   // alle 19» diventava un'accusa a ogni riavvio.
-  function rileva(testo, azioni, stato) {
+  function rileva(testo, azioni, stato, opzioni) {
     const t = String(testo || '');
     if (!t.trim()) return [];
     const presenti = (azioni instanceof Set) ? azioni : insiemeDiTipi(azioni);
+    // Chi chiama può restringere le famiglie da guardare. Serve all'Aiuto,
+    // che di Filo fa solo un pezzo: lì «ho aperto il menu» o «ho cercato sul
+    // web» sono cose che quel pannello fa per strade sue, e accusarlo di non
+    // averle fatte sarebbe il falso allarme di sempre.
+    const ammesse = opzioni && opzioni.famiglie
+      ? new Set(opzioni.famiglie instanceof Set ? [...opzioni.famiglie] : opzioni.famiglie)
+      : null;
     const orari = new Set(Array.isArray(stato?.orariSveglie) ? stato.orariSveglie : []);
     const titoli = Array.isArray(stato?.titoliAppunti) ? stato.titoliAppunti : [];
     // La cosa dichiarata ESISTE già, anche se in questo turno non è partito
@@ -628,6 +635,7 @@
     const radiciRette = new Set();
     let pronome = null;
     for (const fam of FAMIGLIE) {
+      if (ammesse && !fam.pronome && !ammesse.has(fam.id)) continue;
       const d = dichiarazione(t, fam);
       if (!d) continue;
       if (fam.pronome) { pronome = d; continue; }
@@ -660,7 +668,7 @@
     // cosa che l'utente si sente confermare. Bastava una ricerca nello stesso
     // turno — o un appunto aperto nell'editor — perché il pronome non venisse
     // più guardato affatto, ed è il turno di prosecuzione della segnalazione.
-    if (pronome && !out.length) {
+    if (pronome && !out.length && !(ammesse && !ammesse.has('senza-nome'))) {
       const PRONOME = FAMIGLIE[FAMIGLIE.length - 1];
       const manca = { id: 'senza-nome', avviso: 'non è partito niente', tipi: [], frase: pronome.frase };
       // Anche qui l'ora decide, quando c'è e quando il verbo crea qualcosa:
@@ -865,8 +873,16 @@
     return 'Filo ha risposto con un pezzo del suo formato interno: quello che c\'era scritto lì dentro non è stato fatto. Se ti serve, chiediglielo di nuovo.';
   }
 
+  // Le famiglie che l'Aiuto — l'altra chat, il pannello sulla pagina — può
+  // fare SOLO emettendo un'azione tipizzata di Filo, e che non lasciano
+  // niente sullo schermo. Se il modello le racconta senza emetterle, non è
+  // successo niente e nessuno se ne accorgerebbe.
+  const FAMIGLIE_AIUTO = ['sveglia', 'timer', 'sveglia-tolta', 'sveglia-spostata',
+    'promemoria', 'appunto', 'segnalazione', 'calendario', 'memoria-cancellata', 'schede'];
+
   global.SN_AZIONI_DICHIARATE = {
     FAMIGLIE,
+    FAMIGLIE_AIUTO,
     TIPI_DI_CONTESTO,
     TIPI_DI_SOLA_LETTURA,
     rileva,

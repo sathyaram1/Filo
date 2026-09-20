@@ -294,6 +294,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'themeTokens.js'));
   safe(path.join(SHARED, 'confirmUi.js'));
   safe(path.join(SHARED, 'chatErrors.js')); // #360 — errori tecnici → frasi per l'utente
+  safe(path.join(SHARED, 'azioniDichiarate.js')); // #517 — l'azione raccontata e mai emessa: PRIMA di sidebar.js
   safe(path.join(SHARED, 'icons.js'));
   safe(path.join(SHARED, 'qr.js'));
   safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
