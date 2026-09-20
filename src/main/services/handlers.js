@@ -3047,6 +3047,7 @@ const handlerCtx = {
   auditServedByLater,
   maybeCategorizeAsync,
   searchArchivedTabs,
+  testoDaSchedaAperta,
   handleFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
