@@ -144,6 +144,28 @@ test('nell\'Aiuto la conferma col pronome non resta muta', async ({ openTab }) =
   expect(turni > 1 || AVVISATO.test(testo)).toBe(true);
 });
 
+test('nell\'Aiuto un appunto che esiste davvero non viene smentito', async ({ app, openTab }) => {
+  // Il rovescio: al pannello i titoli degli appunti non arrivavano mai,
+  // quindi la frase vera diventava un'accusa. Nella chat della home la stessa
+  // frase resta muta dal giro 3.
+  test.setTimeout(60_000);
+  await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({
+    type: 'SALVA_APPUNTO', testo: 'pane, uova, latte', contesto: 'lista della spesa',
+  }));
+  const page = await openTab(NEWTAB);
+  await agenteASequenza(page, [
+    JSON.stringify({ text: 'Sì, ti ho salvato l\'appunto con la lista della spesa.', status: 'done' }),
+  ]);
+  await apriAiuto(page);
+  await page.evaluate(() => { window.__turni = []; window.__azioni = []; });
+
+  await chiedi(page, 'hai salvato la lista della spesa?', 1);
+
+  const testo = await testoChat(page);
+  expect(testo).not.toMatch(/non l'ha fatto|non è partito niente|l'appunto non c'è/i);
+  expect(testo).not.toMatch(/risposta rifatta/i);
+});
+
 test('nell\'Aiuto l\'avviso del formato offre lo stesso tasto dell\'altro avviso', async ({ openTab }) => {
   // Il giro 6 ha messo il tasto «Fallo adesso» sotto l'avviso dell'azione
   // raccontata. L'altro avviso dello stesso presidio — la risposta arrivata
