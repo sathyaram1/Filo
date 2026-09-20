@@ -429,8 +429,10 @@
   // solo «alle», quindi «ti ho messo la sveglia per le 19» e «la sveglia
   // delle 19» non venivano lette affatto, e la sveglia delle 19 che esisteva
   // veniva smentita.
-  const PREP_ORA = `(?:alle|all${AP}|a|per\\s+le|per\\s+l${AP}|entro\\s+le|dalle|delle|sulle|verso\\s+le|verso\\s+l${AP})`
+  // Col numero la preposizione nuda «a» resta fuori: «a 3» non è un'ora.
+  const PREP_ORA_NUM = `(?:alle|all${AP}|per\\s+le|per\\s+l${AP}|entro\\s+le|dalle|delle|sulle|verso\\s+le|verso\\s+l${AP})`
     + '(?:\\s+ore)?';
+  const PREP_ORA = `(?:${PREP_ORA_NUM}|a)`;
   // La mezz'ora e il quarto d'ora, che in italiano si dicono così e basta.
   // «Alle 7 e mezza», con la sveglia delle 7:30 che c'è, veniva smentita
   // perché l'ora si leggeva 7:00.
