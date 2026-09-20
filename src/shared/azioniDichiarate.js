@@ -1217,7 +1217,10 @@
       // «lista» o «spesa» non veniva più avvisato di nessuna lista mai
       // salvata. L'ora di una sveglia resta una prova anche lì, perché
       // l'ora è precisa: o quella sveglia c'è o non c'è.
-      if (fam.appunti && chiesto === true) return false;
+      // Giro 10: «chiesto» adesso è vero anche quando l'utente CHIEDE se una
+      // cosa è già stata fatta. Lì l'appunto che c'è resta l'unica prova
+      // disponibile (giro 3), quindi la domanda la rimette in gioco.
+      if (fam.appunti && chiesto === true && !domanda) return false;
       if (fam.appunti && titoli.length && !nominati.size && nominaUnAppunto(d.clausola || d.frase, titoli)) return true;
       return false;
     };
