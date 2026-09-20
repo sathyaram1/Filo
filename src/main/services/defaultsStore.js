@@ -574,7 +574,14 @@ async function setRoutineSessions(patch, idToken) {
     mask.push(k);
   }
   if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
-  return getRoutineSessions(idToken);
+  // La scrittura è andata: se la rilettura che la segue non riesce, dirlo è
+  // l'unica risposta vera. Fingere un fallimento cancellerebbe una scrittura
+  // avvenuta, e fingere una lettura rimetterebbe i valori di partenza.
+  try {
+    return Object.assign({ letto: true }, await getRoutineSessions(idToken));
+  } catch (_) {
+    return Object.assign({ letto: false }, esito.valori);
+  }
 }
 
 
