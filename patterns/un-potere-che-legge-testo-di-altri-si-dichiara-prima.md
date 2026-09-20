@@ -58,10 +58,15 @@ al motore, e il modello quell'output lo ha scritto leggendo la pagina. Un gate
 che vive nel giro della chat lo lascia scoperto proprio dove il testo ostile
 arriva per primo. Il gate va dove passano **tutte** le azioni.
 
-L'altro tranello: contaminare il compito solo a lettura riuscita. Se nello
-stesso giro il modello chiama una lettura e un'uscita, la contaminazione va
-segnata appena la lettura parte — altrimenti basta mettere le due chiamate nello
-stesso giro per scavalcare il perimetro.
+L'altro tranello, ed è quello in cui sono caduto: far mordere la lettura
+**dentro** il giro in cui avviene. Sembra la scelta prudente, e invece è
+sbagliata in tutti e due i versi. Rifiuta «leggi il pdf e apri il link», dove
+il modello ha chiesto le due cose insieme e quindi ha deciso di aprire il link
+prima di vedere una riga del documento. E non protegge da niente in più: perché
+il modello chieda un'uscita suggerita dal testo ostile, quel testo deve già
+essere nel suo contesto, cioè il compito è già contaminato da un giro prima.
+Le letture di un giro valgono dal giro dopo. Quello è il momento in cui il testo
+di altri entra davvero nel contesto.
 
 ## Le prove
 
