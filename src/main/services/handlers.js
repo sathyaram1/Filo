@@ -1355,8 +1355,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // PULISCI_TAB e CANCELLA_ARCHIVIO hanno già un flusso di conferma dedicato
   // lato client (bottone → RUN_TAB_TRIAGE / pannello eliminazione): restano
   // `kept` come prima e la conferma la gestisce la loro UI specifica.
-  const hasBespokeConfirm = type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO';
-  if (level >= 2 && !confirmed && !hasBespokeConfirm) {
+  // Fuori perimetro il consenso deve passare da un popup anche per chi aveva
+  // una UI sua: la sua domanda non nomina l'uscita in più.
+  const hasBespokeConfirm = (type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO') && !premessaPerimetro;
+  if (livelloEffettivo >= 2 && !confirmed && !hasBespokeConfirm) {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
     recordPendingConfirm(sender, action);
