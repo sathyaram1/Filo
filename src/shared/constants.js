@@ -1403,10 +1403,18 @@
     // Il testo di una pagina che l'Aiuto ha chiesto di leggere. Stessa busta e
     // stesso avviso della chat: lo scrive chi possiede quel sito, e ci arriva
     // perché un motore di ricerca l'ha messo in cima.
-    paginaLettaImbustata: ({ url = '', title = '', text = '', truncated = false, partial = false, error = '', detail = '' } = {}) => {
+    paginaLettaImbustata: ({ url = '', title = '', text = '', truncated = false, partial = false, empty = false, error = '', detail = '' } = {}) => {
       const riga = (v) => esterno().perCanaleSistema(v);
       const dove = riga(url) || 'la pagina';
       if (!String(text || '').trim()) {
+        // Letta ma senza testo non è «non letta»: è una pagina vuota, di sole
+        // immagini, o che si costruisce solo aprendola davvero. Chiamarla non
+        // letta manda l'utente a cercare un guasto che non c'è.
+        if (empty && !error) {
+          return `[Pagina "${dove}": nessun testo da leggere. È una pagina vuota, o fatta di sole immagini, `
+            + 'o di contenuto che compare solo aprendola davvero. Non inventare cosa c\'è scritto: prova '
+            + 'un\'altra pagina o dillo all\'utente.]';
+        }
         const perche = riga(detail || error) || 'non è stato possibile leggerla';
         return `[Pagina "${dove}" non letta: ${perche}. Dillo all'utente così com'è, senza inventare il contenuto.]`;
       }
