@@ -505,7 +505,9 @@
       out.add(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
     };
     let m;
-    const conMinuti = /\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/g;
+    // L'ora si scrive coi due punti, col punto e anche con la virgola: «alle
+    // 19,30» è la stessa ora di «alle 19:30».
+    const conMinuti = /\b([01]?\d|2[0-3])[:.,]([0-5]\d)\b/g;
     while ((m = conMinuti.exec(s))) metti(m[1], m[2], s.slice(m.index + m[0].length));
     const soloOra = new RegExp(`${INIZIO}${PREP_ORA_NUM}\\s+([01]?\\d|2[0-3])\\b(?![:.]\\d)`, 'gi');
     while ((m = soloOra.exec(s))) metti(m[1], '00', s.slice(m.index + m[0].length));
