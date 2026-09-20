@@ -690,6 +690,35 @@
       ? (attesaDaStato instanceof Set ? [...attesaDaStato] : attesaDaStato)
       : tipiInAttesa(azioni));
     const titoli = Array.isArray(stato?.titoliAppunti) ? stato.titoliAppunti : [];
+    // Giro 6: i tipi che vengono dai turni PRECEDENTI della conversazione,
+    // tenuti separati da quelli di adesso. Messi tutti in un mucchio, una
+    // cosa fatta una volta copriva tutte quelle della sua specie raccontate
+    // dopo: l'appunto scritto all'inizio assolveva ogni appunto raccontato
+    // più tardi, e lo stesso valeva per l'evento in calendario, la
+    // segnalazione, l'apertura e l'impostazione.
+    const prima = stato && stato.tipiPrecedenti;
+    const precedenti = new Set(prima ? (prima instanceof Set ? [...prima] : prima) : []);
+    // Quante azioni di ciascun tipo sono partite in QUESTO turno: due
+    // dichiarazioni della stessa specie vogliono due azioni.
+    const conti = (stato && stato.contiAzioni && typeof stato.contiAzioni === 'object')
+      ? stato.contiAzioni : null;
+    const quanteAzioni = (fam) => {
+      let n = 0;
+      for (const x of fam.tipi) {
+        if (!presenti.has(x)) continue;
+        n += conti ? Math.max(1, Number(conti[x]) || 1) : 1;
+      }
+      return n;
+    };
+    // Una dichiarazione retta SOLO da un turno precedente deve guardare
+    // indietro: «te l'ho già messa», «come ti dicevo», «sì, l'ho mandata»,
+    // oppure una domanda dell'utente a cui sta rispondendo. Detta come una
+    // cosa appena fatta, un'azione vecchia non la prova.
+    const domanda = !!(stato && stato.domandaUtente);
+    const copertaDalPassato = (fam, d) => {
+      if (!fam.tipi.some((x) => precedenti.has(x))) return false;
+      return domanda || GUARDA_INDIETRO.test(d.frase || '');
+    };
     // La cosa dichiarata ESISTE già, anche se in questo turno non è partito
     // niente? Vale per l'ora di una sveglia che c'è e per il titolo di un
     // appunto che c'è. Prima valeva solo per la sveglia, e solo se la frase
