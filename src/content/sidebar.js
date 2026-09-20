@@ -61,13 +61,33 @@
   // messaggi fa regge la frase che la racconta.
   const azioniFiloEmesse = new Set();
 
-  function azioniRaccontate(parsed) {
+  // #517 (giro 6) — le sveglie che ESISTONO davvero. Senza, qui lo stato era
+  // vuoto e l'ora non trovava mai riscontro: ogni frase che nominava un'ora
+  // veniva smentita, anche quella che raccontava la sveglia appena messa da
+  // questo pannello. Se il main non risponde restano `null`, che vuol dire
+  // «non lo so» e non «non ce n'è nessuna».
+  async function orariDelleSveglie() {
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.FILO_GET_TIMERS });
+      if (!res || !res.ok || !Array.isArray(res.timers)) return null;
+      return res.timers.map((t) => {
+        if (t && t.atTime) return String(t.atTime);
+        const d = t && t.endsAt ? new Date(t.endsAt) : null;
+        if (!d || Number.isNaN(d.getTime())) return '';
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      }).filter(Boolean);
+    } catch (_) { return null; }
+  }
+
+  async function azioniRaccontate(parsed) {
     const D = global.SN_AZIONI_DICHIARATE;
     if (!D || !parsed || parsed.kind) return [];
     const testo = String(parsed.display || '');
     if (!testo.trim()) return [];
+    const orariSveglie = await orariDelleSveglie();
     try {
-      return D.rileva(testo, azioniFiloEmesse, {}, { famiglie: D.FAMIGLIE_AIUTO });
+      const stato = orariSveglie ? { orariSveglie } : {};
+      return D.rileva(testo, azioniFiloEmesse, stato, { famiglie: D.FAMIGLIE_AIUTO });
     } catch (_) { return []; }
   }
 
