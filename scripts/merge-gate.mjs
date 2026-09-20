@@ -91,6 +91,39 @@ export function parseArgs(argv) {
  * blocco di sicurezza da spiegare all'owner, è una richiesta fuori perimetro
  * che il server ha già messo a registro.
  */
+/**
+ * I via libera registrati che NON parlano del contenuto che si sta per far
+ * fondere. PURA.
+ *
+ * Un esito vale per la versione esaminata. Verifica e controllo di sicurezza
+ * lasciano scritto su quale commit sono stati dati; se la punta del ramo si è
+ * mossa dopo, quegli esiti parlano di un contenuto diverso da quello che
+ * atterrerebbe su main, e il giro va rifatto invece che chiuso (feedback
+ * #485). Un esito senza commit scritto accanto non decade: viene da uno
+ * strumento vecchio, e a giudicarlo resta il server.
+ */
+export function esitiDecaduti(state, punta) {
+  const s = state && typeof state === 'object' ? state : {};
+  const p = String(punta || '');
+  if (!p) return [];
+  const fuori = [];
+  for (const [campo, quale] of [['verifierSha', 'la verifica'], ['secauditSha', 'il controllo di sicurezza']]) {
+    const sha = String(s[campo] || '');
+    if (sha && sha !== p) fuori.push({ quale, sha });
+  }
+  return fuori;
+}
+
+/** Il rifiuto per un via libera che parla di un altro commit. PURA. */
+export function testoEsitiDecaduti(decaduti, punta) {
+  const righe = (Array.isArray(decaduti) ? decaduti : [])
+    .map((d) => `  ${d.quale} ha dato l'ok su ${String(d.sha).slice(0, 12)}`);
+  return 'fusione non chiesta: il ramo si è mosso dopo i via libera, che valgono per il contenuto esaminato e non per il nome del ramo.\n'
+    + `${righe.join('\n')}\n`
+    + `  la directory adesso è su ${String(punta || '').slice(0, 12)}\n`
+    + 'Quello che verrebbe fuso contiene righe che nessuno ha letto. Il giro va rifatto su questo contenuto, non chiuso: chi ha cambiato il ramo lo rimette in verifica.';
+}
+
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
