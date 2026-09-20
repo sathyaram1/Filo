@@ -34,8 +34,20 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
+// Le regole SENZA i commenti: il taglio del blocco `create` finisce al primo
+// `;`, e in un commento un punto e virgola ci sta benissimo. Il commento non è
+// la regola.
+const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8')
+  .replace(/^[ \t]*\/\/.*$/gm, '');
 const FEEDBACK_JS = readFileSync(join(ROOT, 'src', 'shared', 'feedback.js'), 'utf8');
+
+/**
+ * Il testo di una funzione delle regole con le barre di protezione tolte:
+ * dentro un'espressione regolare il punto si scrive `\\.`, e confrontare
+ * quella forma a mano è un modo di sbagliare. Qui `filo-8b9cb\\.appspot\\.com`
+ * torna a leggersi `filo-8b9cb.appspot.com`.
+ */
+const senzaProtezioni = (t) => t.replace(/\\\\/g, '');
 
 /** Il corpo di una funzione delle regole, dalla firma alla graffa che chiude. */
 function funzione(nome) {
@@ -84,10 +96,11 @@ test('un indirizzo del deposito è una stringa https, corta, del nostro deposito
   assert.ok(!/\^http:\/\//.test(f), 'http in chiaro non è ammesso');
   // Il confronto è sul DEPOSITO, non sull'host: fermarsi a
   // `storage.googleapis.com` lascerebbe entrare il bucket di chiunque.
-  for (const pezzo of ['firebasestorage\\.googleapis\\.com', 'storage\\.googleapis\\.com']) {
-    assert.ok(f.includes(pezzo), `l’espressione deve nominare l’host ${pezzo}`);
+  const piatto = senzaProtezioni(f);
+  for (const host of ['firebasestorage.googleapis.com', 'storage.googleapis.com']) {
+    assert.ok(piatto.includes(host), `l’espressione deve nominare l’host ${host}`);
   }
-  assert.ok(f.includes('filo-8b9cb\\.'), 'l’espressione deve nominare il nostro deposito, non il solo host');
+  assert.ok(piatto.includes('filo-8b9cb.'), 'l’espressione deve nominare il nostro deposito, non il solo host');
 });
 
 test('la lista è enumerata tutta: il tetto sta dentro la funzione che la guarda', () => {
@@ -133,14 +146,14 @@ test('le regole e l’app dicono lo stesso deposito', () => {
   const deposito = FEEDBACK_JS.match(/const BUCKET = '([^']+)'/);
   assert.ok(progetto && deposito, 'src/shared/feedback.js non dichiara più PROJECT_ID / BUCKET come prima');
 
-  const f = funzione('urlDelDeposito');
-  const atteso = [deposito[1], `${progetto[1]}.appspot.com`];
-  for (const nome of atteso) {
-    // Nell'espressione i punti sono protetti (`\\.`): si confronta la forma
-    // scritta nelle regole, non il nome nudo.
-    const nelleRegole = nome.replace(/\./g, '\\\\.');
+  const piatto = senzaProtezioni(funzione('urlDelDeposito'));
+  for (const nome of [deposito[1], `${progetto[1]}.appspot.com`]) {
+    // L'espressione nomina il deposito una volta sola, con la coda in
+    // alternativa (`filo-8b9cb.(firebasestorage.app|appspot.com)`): si cerca il
+    // prefisso e la coda, non la stringa intera.
+    const [prefisso, ...coda] = nome.split('.');
     assert.ok(
-      f.includes(nelleRegole) || f.includes(nelleRegole.replace(`${progetto[1]}\\\\.`, '')),
+      piatto.includes(`${prefisso}.`) && piatto.includes(coda.join('.')),
       `le regole non nominano il deposito '${nome}' che src/shared/feedback.js considera nostro`,
     );
   }
@@ -149,7 +162,7 @@ test('le regole e l’app dicono lo stesso deposito', () => {
   assert.ok(hostApp.length >= 2, 'src/shared/feedback.js non elenca più gli host degli allegati come prima');
   for (const host of hostApp) {
     assert.ok(
-      f.includes(host.replace(/\./g, '\\\\.')),
+      piatto.includes(host),
       `le regole non nominano l’host '${host}' che src/shared/feedback.js considera nostro`,
     );
   }

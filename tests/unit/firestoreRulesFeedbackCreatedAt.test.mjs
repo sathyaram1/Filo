@@ -25,7 +25,13 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
+// Le regole SENZA i commenti. Il taglio qui sotto finisce al primo `;`, e in un
+// commento un punto e virgola ci sta benissimo: con i commenti dentro, una
+// frase scritta sopra una riga tagliava il vincolo a metà e questa sentinella
+// diventava rossa per una virgola (#597). Il commento non è la regola: si
+// toglie prima di guardare.
+const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8')
+  .replace(/^[ \t]*\/\/.*$/gm, '');
 
 /** Il blocco `allow create` anonimo di /feedback (quello con hasOnly). */
 function createAnonimaDiFeedback() {
