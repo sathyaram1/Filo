@@ -155,16 +155,18 @@ test('il taglio di un documento lungo non lascia mezzo carattere in fondo', asyn
   }
 });
 
-test('un nome con i segni di direzione arriva intero al modello', async ({ app, openTab }) => {
-  // I nomi scritti in arabo o ebraico si portano dietro dei segni invisibili che
-  // dicono da che parte si legge la riga. La rete che ripulisce tutto ciò che
-  // entra nel prompt li toglie: il nome che il modello legge non è più quello
-  // sul disco, e da lì in poi non riapre niente — né col terminale né col
-  // lettore, che quei segni non li perdona.
+test('un nome con i segni di direzione si riapre dal nome che il modello legge', async ({ app, openTab }) => {
+  // I nomi scritti in arabo o in ebraico si portano dietro dei caratteri
+  // invisibili che dicono da che parte si legge la riga. La rete che ripulisce
+  // tutto quello che entra nel prompt li toglie, e deve continuare a toglierli:
+  // servono anche a nascondere le marcature del prompt dentro una parola. Il
+  // nome che il modello legge è quindi diverso da quello sul disco, e chiedere
+  // quel file non apriva più niente. Il giro completo, come lo fa Filo dal
+  // vivo: elenca, prendi il nome come lo legge il modello, chiedi il documento.
   const base = cartellaTemporanea('filo-551-direzione-');
   const nome = 'RELAZIONE ‫تقرير‬.txt';
   try {
-    writeFileSync(join(base, nome), 'contenuto\n', 'utf8');
+    writeFileSync(join(base, nome), 'la relazione vera\n', 'utf8');
     const page = await openTab(HOME);
     await accendiTerminale(page);
     await eseguiComando(page, `cd '${base}'`);
@@ -172,15 +174,19 @@ test('un nome con i segni di direzione arriva intero al modello', async ({ app, 
     const stampato = String(elenco.output?.stdout || '');
     expect(stampato, 'l’elenco non ha stampato il file').toContain('تقرير');
 
-    // Com'è fatto il testo che arriva davvero al modello.
+    // Il nome com'è quando arriva al modello, cioè dopo la busta.
     const perIlModello = await app.evaluate((_e, testo) => globalThis.SN_ESTERNO.imbusta({
       tipo: 'ESITO_COMANDO', testo, conIntestazione: true, max: 4000,
     }), stampato);
+    const letto = perIlModello.split('\n').map((r) => r.trim())
+      .find((r) => r.includes('تقرير') && r.endsWith('.txt'));
+    expect(letto, 'dall’output del modello non esce nessun nome').toBeTruthy();
 
+    const r = await leggiDocumento(page, letto);
     expect(
-      perIlModello.includes(nome),
-      'il nome arriva al modello senza i segni di direzione: da lì non riapre più il file',
-    ).toBe(true);
+      String(r?.output?.text || ''),
+      `il nome che il modello legge non riapre il file: ${JSON.stringify(letto)}`,
+    ).toContain('la relazione vera');
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
