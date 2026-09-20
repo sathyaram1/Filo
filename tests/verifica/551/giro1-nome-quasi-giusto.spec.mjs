@@ -120,18 +120,36 @@ test('quando i candidati sono due Filo non tira a indovinare: li dice', async ({
   }
 });
 
-test('un nome fatto quasi solo di caratteri persi non apre niente', async ({ openTab }) => {
-  // Il carattere di sostituzione vale come jolly: se valesse anche quando sotto
-  // non è rimasto un nome, in una cartella con un file solo Filo lo aprirebbe
-  // sempre — e direbbe di aver letto il documento chiesto.
+test('un carattere perso non deve valere per mezzo nome', async ({ openTab }) => {
+  // Il carattere di sostituzione vale come jolly, ed è giusto: sotto ci stava
+  // un carattere vero che nessuno può più ricostruire. Ma UNO — non un pezzo
+  // di nome lungo a piacere. Qui si guardano le due porte che portano allo
+  // stesso stato sbagliato: Filo apre un documento dell'utente che l'utente
+  // non ha chiesto, lo manda al modello e risponde su quello.
   const base = cartellaTemporanea('filo-551-jolly-');
   try {
+    // Porta 1: del nome non è rimasto niente, solo l'estensione. La cartella ha
+    // un file solo con quell'estensione e viene aperto quello.
     writeFileSync(join(base, 'Estratto conto dicembre.txt'), 'saldo: 1.234,56\n', 'utf8');
     const page = await openTab(HOME);
-    for (const nome of ['��.txt', 'Es�', '�']) {
+    for (const nome of ['��.txt', '�.txt']) {
       const r = await leggiDocumento(page, join(base, nome));
       expect(r.output.ok, `«${nome}» non è un nome: non deve aprire niente`).toBe(false);
       expect(r.output.text).toBe('');
+    }
+
+    // Porta 2: un carattere solo perso, e il jolly si mangia tutta la coda del
+    // nome. Chi chiedeva «Bilancià.txt» si ritrova il bilancio riservato.
+    const dir2 = cartellaTemporanea('filo-551-jolly-b-');
+    try {
+      writeFileSync(join(dir2, 'Bilancio 2019 definitivo riservato.txt'), 'numeri veri\n', 'utf8');
+      const r = await leggiDocumento(page, join(dir2, 'Bilanci�.txt'));
+      expect(
+        r.output.name,
+        'un carattere perso non può stare per «o 2019 definitivo riservato»',
+      ).not.toBe('Bilancio 2019 definitivo riservato.txt');
+    } finally {
+      rmSync(dir2, { recursive: true, force: true });
     }
   } finally {
     rmSync(base, { recursive: true, force: true });

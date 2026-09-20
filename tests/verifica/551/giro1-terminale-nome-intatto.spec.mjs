@@ -80,12 +80,17 @@ test('la cartella corrente continua a persistere fra un comando e l’altro', as
     const page = await openTab(HOME);
     await accendiTerminale(page);
 
-    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'pwd', cwd: dir }, { cwd: dir });
+    const vai = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `cd "${dir}"` });
+    expect(vai.executed).toBe(true);
+    expect(String(vai.output?.cwd || ''), 'la sonda deve riportare la cartella risultante').toContain('filo-551-cwd-');
+
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'ls' });
     expect(r.executed).toBe(true);
     const out = String(r.output?.stdout || '');
     // Il marcatore interno non si mostra all'utente.
     expect(out).not.toContain('__FILO_ONESHOT_CWD');
-    expect(String(r.output?.cwd || out)).toContain('filo-551-cwd-');
+    // Il `cd` di prima è ancora valido: siamo nella cartella del file.
+    expect(out).toContain(NOME);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -103,7 +108,7 @@ test('un nome pieno di segni difficili sopravvive al giro intero', async ({ app,
     const page = await openTab(HOME);
     await accendiTerminale(page);
 
-    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'ls', cwd: dir }, { cwd: dir });
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: `ls "${dir}"` });
     expect(r.executed).toBe(true);
     expect(String(r.output?.stdout || '')).toContain(difficile);
 
