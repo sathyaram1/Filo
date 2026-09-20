@@ -27,9 +27,9 @@ test('una pagina troppo grande viene letta a metà, e Filo lo dice', async ({ ap
 
   const out = await app.evaluate(async () => {
     // Pagina vera ma pesante: il dato utile sta in fondo, dopo blocchi di
-    // pubblicità che l'estrazione scarta comunque. Un sito di oggi che spedisce
-    // sei megabyte di markup non è un caso di laboratorio.
-    const zavorra = '<div class="ads">pubblicita</div>'.repeat(180_000);
+    // pubblicità che l'estrazione scarta comunque. Un sito che spedisce
+    // decine di megabyte di markup non è un caso di laboratorio.
+    const zavorra = '<div class="ads">pubblicita</div>'.repeat(900_000);
     const html = '<!DOCTYPE html><html><head><title>Listino</title></head><body><main>'
       + '<p>Il canone mensile e di 19,90 euro.</p>'
       + zavorra
@@ -48,7 +48,7 @@ test('una pagina troppo grande viene letta a metà, e Filo lo dice', async ({ ap
     return { byte: html.length, output: r.output };
   });
 
-  expect(out.byte).toBeGreaterThan(5 * 1024 * 1024);
+  expect(out.byte).toBeGreaterThan(25 * 1024 * 1024);
   expect(out.output.ok).toBe(true);
   // Controllo: la parte iniziale è arrivata.
   expect(String(out.output.text)).toContain('19,90');
@@ -56,18 +56,23 @@ test('una pagina troppo grande viene letta a metà, e Filo lo dice', async ({ ap
   // O il dato in fondo arriva, o Filo dichiara di essersi fermato prima: quello
   // che non può fare è consegnare mezza pagina spacciandola per intera.
   const completo = String(out.output.text).includes('9:30');
-  expect(completo || out.output.truncated).toBe(true);
+  const dichiarato = !!out.output.partial || !!out.output.truncated;
+  expect(completo || dichiarato).toBe(true);
 });
 
 test('un documento arrivato a metà non viene dichiarato danneggiato', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await openTab('filo://newtab/');
 
-  // Un documento che arriva mozzo è esattamente quello che il tetto qui sopra
-  // produce su un PDF di più di cinque megabyte — un manuale, un contratto
-  // scansionato, un estratto conto.
+  // Un manuale, un contratto scansionato, un estratto conto: PDF che pesano più
+  // del tetto, e che quindi arrivano mozzi.
   const out = await app.evaluate(async (_e, b64) => {
     const intero = Buffer.from(b64, 'base64');
+    // Stesso documento, ingrassato con spazi legali fra un oggetto e l'altro
+    // finché non supera il tetto: quello che arriva è solo l'inizio.
+    const enorme = Buffer.concat([
+      intero.subarray(0, 9), Buffer.alloc(26 * 1024 * 1024, 0x0a), intero.subarray(9),
+    ]);
     const orig = globalThis.fetch;
     globalThis.__ripristinaRete = () => { globalThis.fetch = orig; };
     const serviamo = (buf) => {
@@ -80,17 +85,18 @@ test('un documento arrivato a metà non viene dichiarato danneggiato', async ({ 
     })).output;
     serviamo(intero);
     const a = await leggi();
-    serviamo(intero.subarray(0, Math.floor(intero.length * 0.6)));
+    serviamo(enorme);
     const b = await leggi();
-    return { intero: a, mezzo: b };
+    return { intero: a, mozzo: b };
   }, PDF);
 
-  // Controllo: intero si legge.
+  // Controllo: un documento che ci sta tutto si legge.
   expect(out.intero.ok).toBe(true);
 
-  // È il tetto sullo scaricamento ad averlo tagliato, non l'autore ad averlo
-  // rotto: dare la colpa al documento manda l'utente a cercare un guasto che
-  // non c'è, e gli nasconde che basterebbe aprirlo.
-  expect(String(out.mezzo.detail || '')).not.toContain('danneggiato');
-  expect(String(out.mezzo.detail || '')).not.toContain('password');
+  // È il tetto ad averlo tagliato, non l'autore ad averlo rotto. Dare la colpa
+  // al documento manda l'utente a cercare un guasto che non c'è.
+  expect(out.mozzo.ok).toBe(false);
+  expect(String(out.mozzo.detail || '')).not.toContain('danneggiato');
+  expect(String(out.mozzo.detail || '')).not.toContain('password');
+  expect(String(out.mozzo.detail || '')).toMatch(/MB|grande|parte/);
 });

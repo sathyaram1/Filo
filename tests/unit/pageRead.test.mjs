@@ -262,3 +262,74 @@ test('un sito segnalato come pericoloso non si legge', async () => {
     if (prima === undefined) delete globalThis.SN_SAFEBROWSE; else globalThis.SN_SAFEBROWSE = prima;
   }
 });
+
+// ── il dato che sta nell'intestazione dell'articolo (#553, giro 1) ───────────
+
+const ARTICOLO_CON_DATA = `<!DOCTYPE html>
+<html lang="it"><head><title>Rincaro del canone</title></head><body>
+  <header class="site-header"><a href="/">Il Giornale</a></header>
+  <nav><ul><li>Cronaca</li></ul></nav>
+  <main><article>
+    <header class="entry-header">
+      <h1>Rincaro del canone</h1>
+      <p class="meta">Pubblicato il 12 marzo 2026 alle 14:30 da Anna Bianchi</p>
+    </header>
+    <p>Il gestore ha annunciato l'aumento.</p>
+    <div class="ads">Compra adesso</div>
+    <table>
+      <tr class="header"><td>Piano</td><td>Canone mensile</td></tr>
+      <tr><td>Base</td><td>19,90 euro</td></tr>
+    </table>
+    <aside class="related">Leggi anche</aside>
+  </article></main>
+  <footer class="site-footer">© 2026</footer>
+</body></html>`;
+
+test('data, ora e firma dell\'articolo arrivano al modello', () => {
+  const { testo } = PR.estraiContenuto(ARTICOLO_CON_DATA);
+  assert.match(testo, /12 marzo 2026/);
+  assert.match(testo, /14:30/);
+  assert.match(testo, /Anna Bianchi/);
+  assert.match(testo, /Il gestore ha annunciato/);
+});
+
+test('la riga di testata di una tabella porta i nomi delle colonne, anche marcata «header»', () => {
+  const { testo } = PR.estraiContenuto(ARTICOLO_CON_DATA);
+  assert.match(testo, /Canone mensile/);
+  assert.match(testo, /19,90/);
+});
+
+test('l\'intestazione del SITO resta fuori anche quando quella dell\'articolo entra', () => {
+  const { testo } = PR.estraiContenuto(ARTICOLO_CON_DATA);
+  assert.doesNotMatch(testo, /Il Giornale/);
+  assert.doesNotMatch(testo, /Cronaca/);
+  assert.doesNotMatch(testo, /Compra adesso/);
+  assert.doesNotMatch(testo, /Leggi anche/);
+});
+
+// ── i tetti si dichiarano, e non danno la colpa a chi ha scritto il file ─────
+
+test('una pagina tagliata dal tetto sui byte non si spaccia per intera', async () => {
+  const r = await PR.daContenuto({
+    url: 'https://esempio.test/lunga', contentType: 'text/html; charset=utf-8',
+    buffer: buf('<html><body><main><p>Solo l\'inizio</p>'), partial: true,
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.partial, true);
+});
+
+test('un PDF tagliato dal tetto non viene dichiarato danneggiato', async () => {
+  const finto = buf('%PDF-1.4\n% questo documento finisce qui perche e stato tagliato');
+  const mozzo = await PR.daContenuto({ url: 'https://esempio.test/a.pdf', contentType: 'application/pdf', buffer: finto, partial: true });
+  assert.equal(mozzo.ok, false);
+  assert.doesNotMatch(String(mozzo.detail), /danneggiato|password/);
+  assert.match(String(mozzo.detail), /MB/);
+  // Un PDF davvero rotto, arrivato tutto, resta un PDF rotto.
+  const rotto = await PR.daContenuto({ url: 'https://esempio.test/a.pdf', contentType: 'application/pdf', buffer: finto });
+  assert.match(String(rotto.detail), /danneggiato/);
+});
+
+test('leggere una pagina dal web e leggerla dal disco hanno lo stesso tetto', () => {
+  const DR = require(join(ROOT, 'src', 'main', 'services', 'documentRead.js'));
+  assert.equal(PR.MAX_BYTES, DR.MAX_FILE_BYTES);
+});
