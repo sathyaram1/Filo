@@ -209,6 +209,11 @@ test.describe('#533 giro 3 — quello che una lettura lascia scritto in giro', (
       testoFinale: 'Fatto.',
     });
 
+    // La prova vale solo se il timer è stato messo davvero: senza, non
+    // starebbe controllando niente.
+    const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
+    expect(JSON.stringify(timers), 'il timer con quell\'etichetta è stato messo').toContain(PEZZO);
+
     const dopo = await richiestaDopo(app);
     expect(dopo.veleno && dopo.tutti,
       'l\'etichetta scritta dalla pagina resta nei processi attivi, davanti a ogni richiesta successiva, che ha tutti gli strumenti in mano')
