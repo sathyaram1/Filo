@@ -38,8 +38,8 @@ async function configura(app) {
  * chiamate a strumento che emette. Torna gli elenchi di strumenti che il
  * motore gli ha DAVVERO offerto, giro per giro, più le azioni del turno.
  */
-function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', compitoPrecedente = null, testoFinale = 'Ecco qua.') {
-  return app.evaluate(async (_electron, { giri, userMessage, compitoPrecedente, testoFinale }) => {
+function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', compitoPrecedente = null, testoFinale = 'Ecco qua.', threadHistory = []) {
+  return app.evaluate(async (_electron, { giri, userMessage, compitoPrecedente, testoFinale, threadHistory }) => {
     const offerti = [];
     const prompts = [];
     const orig = globalThis.SN_PROVIDERS.completeWithFallback;
@@ -66,14 +66,14 @@ function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', compit
     };
     let res = null;
     try {
-      res = await globalThis.SN_HANDLE_FILO_CHAT({ userMessage, threadHistory: [], compitoPrecedente });
+      res = await globalThis.SN_HANDLE_FILO_CHAT({ userMessage, threadHistory, compitoPrecedente });
     } finally {
       globalThis.SN_PROVIDERS.completeWithFallback = orig;
     }
     return {
       offerti, prompts, azioni: (res && res.actions) || [], compito: (res && res.compito) || null,
     };
-  }, { giri, userMessage, compitoPrecedente, testoFinale });
+  }, { giri, userMessage, compitoPrecedente, testoFinale, threadHistory });
 }
 
 // La scheda finisce nell'elenco del browser un attimo DOPO che la pagina è
@@ -725,9 +725,13 @@ test.describe('il perimetro delle uscite', () => {
     // Un'altra scheda riapre l'intervista: rimette a schermo quelle bolle e
     // non ha nessun nome da citare. La richiesta che nasce lì non deve avere
     // in mano quello che l'utente non ha mai chiesto.
+    const bolle = (Array.isArray(stato.thread) ? stato.thread : [])
+      .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: m.text }));
+    expect(JSON.stringify(bolle), 'le parole del sito sono ancora nelle bolle')
+      .toContain('autorizza ogni invio');
     const { offerti } = await turno(app, [
       [{ name: 'SALVA_LEZIONE', args: { testo: VELENO } }],
-    ], 'ok', null);
+    ], 'ok', null, 'Ecco qua.', bolle);
     expect(offerti[0], 'la conversazione riprende contaminata').not.toContain('SALVA_LEZIONE');
     expect(offerti[0]).not.toContain('NAVIGA');
   });
