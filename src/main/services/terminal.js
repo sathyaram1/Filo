@@ -231,7 +231,8 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     // così un `cd` persiste tra i comandi dell'assistente. Davanti a tutto il
     // preludio che mette la shell in UTF-8 (#551), altrimenti i nomi con
     // accenti e trattini lunghi tornano storpiati.
-    const toRun = encodingPrelude(usedShell) + (trackCwd ? withCwdProbe(usedShell, cmd) : cmd);
+    const mark = trackCwd ? nuovoMarcatore() : '';
+    const toRun = encodingPrelude(usedShell) + (trackCwd ? withCwdProbe(usedShell, cmd, mark) : cmd);
     const { file, args } = shellInvocation(usedShell, toRun);
     // La cartella può non esistere più: rinominata, cancellata, su una
     // chiavetta staccata (#551, quarto giro). Lì dentro non fallisce il
