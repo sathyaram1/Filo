@@ -148,11 +148,30 @@ function parteRiconosciuta(chiave) {
 }
 
 /**
+ * Gli invisibili di formattazione, tolti come li toglie la busta con cui ogni
+ * contenuto esterno entra nel prompt. Un nome di file in arabo o in ebraico si
+ * porta dietro le marche che dicono da che parte si legge la riga: la busta le
+ * toglie (servono anche a nascondere le marcature del prompt dentro una
+ * parola), quindi al modello quel nome arriva senza, e riscrivendolo com'è
+ * scritto non riapriva più niente (#551, quarto giro). La lista la tiene la
+ * busta: qui la si chiede, non la si ricopia.
+ */
+function senzaInvisibili(s) {
+  try {
+    if (!globalThis.SN_ESTERNO) require('../../shared/contenutoEsterno.js');
+    const E = globalThis.SN_ESTERNO;
+    if (E && typeof E.invisibiliTolti === 'function') return E.invisibiliTolti(s);
+  } catch (_) {}
+  return s;
+}
+
+/**
  * Chiave con cui due nomi di file si confrontano «a meno delle sviste». PURA.
- * Minuscole, accenti tolti, trattini e apostrofi normalizzati, spazi collassati.
+ * Minuscole, accenti tolti, trattini e apostrofi normalizzati, spazi collassati,
+ * invisibili di formattazione tolti.
  */
 function chiaveTollerante(nome) {
-  let s = String(nome == null ? '' : nome);
+  let s = senzaInvisibili(String(nome == null ? '' : nome));
   s = s.replace(TRATTINI, '-');
   // Apici e virgolette tipografiche → forma dritta (l'altra metà dei segni che
   // un programma di scrittura sostituisce da solo mentre si dà il nome).
