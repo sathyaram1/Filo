@@ -2239,6 +2239,13 @@ function toolResultText({ action, res, rendered }) {
   // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
   // una spunta dell'accoglienza): l'esito lo dice `executed`.
+  // #533 — fuori perimetro: la risposta del motore, non un consiglio. Dice
+  // anche dov'è la porta, altrimenti il modello ritenta la stessa azione.
+  if (res && res.fuoriPerimetro && res.rejected) {
+    return `Azione ${type} RIFIUTATA: «${res.fuoriPerimetro.etichetta}» non è fra le uscite di questa `
+      + 'richiesta, e hai già letto materiale scritto da altri. Non riprovare: se ti serve davvero per '
+      + 'quello che ti ha chiesto l\'utente, chiamane CHIEDI_USCITA spiegando perché; altrimenti rispondi senza.';
+  }
   if (!res || res.rejected) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
