@@ -348,8 +348,10 @@
       frasi: [
         // Giro 6: «fissare» e «prendere» sono i verbi dell'appuntamento in
         // italiano, e «al calendario» si dice quanto «in calendario».
-        new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito|fissato|preso|programmato)\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario|sul calendario|l${AP}evento|un evento|l${AP}appuntamento|un appuntamento)\\b`, 'i'),
-        new RegExp(`\\b${PRON}(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
+        // Giro 8: il possessivo («al TUO calendario») e la parola «agenda»,
+        // che in italiano è il calendario quanto «calendario».
+        new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito|fissato|preso|programmato)\\b${PONTE(32)}\\b(?:(?:in|nel|nella|al|alla|sul|sulla)\\s+(?:tu[oa]\\s+)?(?:calendario|agenda)|l${AP}evento|un evento|l${AP}appuntamento|un appuntamento)\\b`, 'i'),
+        new RegExp(`\\b${PRON}(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in|nel|nella|al|alla|sul|sulla)\\s+(?:tu[oa]\\s+)?(?:calendario|agenda)\\b`, 'i'),
         participio('(?:evento|appuntamento|riunione)', 'aggiunt[oa]|creat[oa]|inserit[oa]|fissat[oa]|messo|messa|segnat[oa]|in calendario', 40),
       ],
     },
