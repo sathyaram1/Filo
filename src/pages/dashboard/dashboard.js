@@ -288,7 +288,10 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'dash-suggestion';
-      btn.title = s.text || '';
+      // #533 (quarto giro di verifica) — dove porta il bottone si legge prima
+      // di premerlo: la scritta la sceglie un modello che ha letto i titoli
+      // dei siti, quindi da sola non dice dove si va a finire.
+      btn.title = [s.text || '', destinazioneLeggibile(s.action)].filter(Boolean).join('\n→ ');
       const icon = document.createElement('span');
       icon.className = 'dash-sug-icon';
       icon.dataset.icon = s.icon || '';
