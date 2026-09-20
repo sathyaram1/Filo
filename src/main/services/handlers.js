@@ -426,12 +426,10 @@ function buildAttemptChain(settings, modelRef, action) {
     usable = pol.refs;
   }
 
-  // Ogni modello del registry porta il proprio provider, quindi l'ordine qui
-  // conta solo per i ref "legacy" (id grezzi senza nickname). Oggi il fornitore
-  // è uno solo, il router. buildModelAttempts scarta da sé i provider senza
-  // chiave o senza un id concreto per quel modello.
-  const providerOrder = ['openrouter'];
-  const out = SN_CONST.buildModelAttempts(usable, registry, providerOrder, settings.apiKeys || {});
+  // L'ordine dei fornitori è uno solo, condiviso con il controllo che decide se
+  // Filo è pronto (SN_CONST.canServeAction): le due cose devono guardare la
+  // stessa lista, o «pronto» e «servibile» divergono in silenzio (#663).
+  const out = SN_CONST.buildModelAttempts(usable, registry, SN_CONST.PROVIDER_ORDER, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
     e.code = 'NO_API_KEY';
