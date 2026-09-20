@@ -405,7 +405,7 @@ export function fixedPayload({ report, frase, branch, segnalazione } = {}) {
  * funzionale: senza, l'esito è legato al solo nome del ramo — una firma su
  * «il documento nella cartella X» invece che su quella esatta versione — e
  * resta buono anche dopo che il contenuto è stato sostituito (feedback #485).
- * Il campo c'è sempre: un verdetto senza il commito controllato non si
+ * Il campo c'è sempre: un verdetto senza il commit controllato non si
  * distingue da uno dato su un contenuto qualunque.
  */
 export function secauditPayload({ verdict, branch, testo, sha } = {}) {
