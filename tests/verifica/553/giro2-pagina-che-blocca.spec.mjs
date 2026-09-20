@@ -21,9 +21,10 @@ test('una pagina piena di tag mai chiusi non tiene ferma l\'app', async ({ app, 
   await openTab('filo://newtab/');
 
   const out = await app.evaluate(async () => {
-    // 256 KB, una misura che qualunque sito raggiunge. L'HTML è rotto come lo
-    // sono tante pagine vere, e il dato utile sta in fondo.
-    const html = '<html><body>' + '<a'.repeat(128 * 1024) + '<p>Lo sportello apre alle 9:30.</p></body></html>';
+    // 256 KB, una misura che qualunque sito raggiunge. La pagina è normale e
+    // il dato utile c'è: in coda, dopo l'ultima parentesi chiusa, una fila di
+    // tag che non chiudono mai. Costa un carattere scriverla.
+    const html = '<html><body><p>Lo sportello apre alle 9:30.</p>' + '<a'.repeat(128 * 1024);
 
     const orig = globalThis.fetch;
     globalThis.__ripristinaRete = () => { globalThis.fetch = orig; };
