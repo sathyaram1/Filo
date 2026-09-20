@@ -164,3 +164,28 @@ test('accoglienza già fatta: riscattato l’invito, il cartello sparisce senza 
 
   await expect(page.locator('#homeMessage')).not.toContainText(/codice d.invito/i, { timeout: 30_000 });
 });
+
+// La direzione opposta, sempre dal portafoglio: la chiave personale sparisce da
+// questo computer (deposito perso, chiave revocata). Da quel momento Filo non
+// ha più niente con cui rispondere, e la home aperta deve dirlo.
+test('la chiave del portafoglio che sparisce: la home aperta lo dice', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await configCondivisa(app, { provider: 'openrouter' });
+  await chiaveNelleImpostazioni(app, '');
+  await chiaveNelPortafoglio(app);
+  await avvisoCreditiCambiati(app);
+  await accoglienzaGiaFatta(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+  await expect(page.locator('#homeMessage')).toContainText(FRASE_DEL_MODELLO, { timeout: 20_000 });
+
+  await chiaveNelPortafoglio(app, '');
+  await avvisoCreditiCambiati(app);
+
+  await expect(page.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 30_000 });
+});
