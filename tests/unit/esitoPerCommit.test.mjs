@@ -261,7 +261,7 @@ test('la fusione non si chiede con roba fuori dai commit: il salvataggio automat
     assert.match(r.stderr, /fusione non chiesta/);
     assert.equal(buste.length, 0, 'il server non deve nemmeno essere chiamato');
   } finally {
-    s.close();
+    srv.close();
     rmSync(dir, { recursive: true, force: true });
     rmSync(fuori, { recursive: true, force: true });
   }
