@@ -3040,6 +3040,7 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   maybeRunCompactor,
+  compitiRecenti,
   // Intervista di benvenuto (#524)
   saveOnboarding,
   finishOnboarding,
