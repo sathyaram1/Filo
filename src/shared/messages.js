@@ -588,6 +588,10 @@
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
+    // #533 — i compiti recenti col perimetro che avevano: serve a far vedere
+    // cosa Filo era AUTORIZZATO a fare, non solo cosa ha fatto.
+    // Risposta: { ok, compiti: [{ id, origine, perimetro, contaminato, registro }] }
+    FILO_GET_COMPITI: 'filo_get_compiti',
     // Genera dashboard (messaggio centro + suggerimenti). Usa cache con cooldown.
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }
