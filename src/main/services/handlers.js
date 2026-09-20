@@ -1317,6 +1317,41 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
     console.warn('[Filo] azione non registrata rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
   }
+
+  // ── gate del perimetro delle uscite (#533) ────────────────────────────────
+  // Finché il compito non ha letto niente scritto da altri l'unica autorità in
+  // gioco è chi ha scritto in chat, e qui non cambia nulla. Dopo, un'uscita non
+  // dichiarata non passa: dove il modello ha CHIEDI_USCITA viene rifiutata e
+  // deve chiedere; dove non ce l'ha (assistente di pagina) a chiedere è il
+  // motore, con la regola di autonomia.
+  let livelloEffettivo = level;
+  let premessaPerimetro = '';
+  let uscitaDaAllargare = null;
+  const verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type) : { ok: true };
+  if (!verdettoPerimetro.ok) {
+    if (verdettoPerimetro.puoChiedere) {
+      Compiti.registraAzione(task, { type, esito: 'rifiutata: fuori perimetro' });
+      return { executed: false, kept: false, rejected: true, fuoriPerimetro: verdettoPerimetro };
+    }
+    const Auto = globalThis.SN_AUTONOMIA;
+    const scelta = Auto
+      ? Auto.decidi({ livello: task.livello, perimetro: 'fuori', origine: task.origine })
+      : 'chiede';
+    if (scelta !== 'fa') {
+      // «propone» (automazione, nessuno davanti allo schermo) e «chiede» (chat)
+      // si dicono con lo stesso popup: cambia solo chi lo vede e quando.
+      livelloEffettivo = Math.max(level, 2);
+      uscitaDaAllargare = verdettoPerimetro.uscita;
+      premessaPerimetro = 'Filo ha letto testo scritto da altri — una pagina, un documento, dei risultati di '
+        + `ricerca — e adesso vuole ${verdettoPerimetro.etichetta}.\n\n`
+        + 'Non era fra le cose che gli hai chiesto. Permetteglielo solo se te l’aspettavi.\n\n';
+    }
+  }
+  // Il sì dell'utente allarga il perimetro di QUELLA uscita e solo per QUESTO
+  // compito: il turno può proseguire senza richiedere un permesso già dato.
+  if (confirmed && !verdettoPerimetro.ok && task && Compiti) {
+    Compiti.allarga(task, verdettoPerimetro.uscita, 'confermata dall’utente');
+  }
   // PULISCI_TAB e CANCELLA_ARCHIVIO hanno già un flusso di conferma dedicato
   // lato client (bottone → RUN_TAB_TRIAGE / pannello eliminazione): restano
   // `kept` come prima e la conferma la gestisce la loro UI specifica.
