@@ -148,7 +148,13 @@
       frasi: [
         new RegExp(`${HO}(?:salvato|scritto|creato|aggiunto|annotato|segnato|messo|preso|buttato\\s+giù)\\b${PONTE(48)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
         /\bme (?:lo|la|ne) sono (?:segnat|appuntat|annotat)[oa]\b/i,
-        new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:salvat|scritt|annotat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
+        new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:salvat|scritt|annotat|segnat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
+        // «Ti ho segnato la spesa»: il verbo del prendere nota, col pronome di
+        // chi lo riceve e senza la parola «appunto». Accanto a una sveglia
+        // partita davvero questa restava l'unica cosa mai fatta, e nessuno lo
+        // diceva. Fuori dal calendario, dove «segnare» vuol dire un'altra cosa
+        // e la famiglia giusta è un'altra.
+        new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+(?:segnat|appuntat)[oa]\\b(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|evento)\\b)`, 'i'),
       ],
     },
     {
