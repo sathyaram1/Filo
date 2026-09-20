@@ -350,9 +350,12 @@
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
       const url = a.url || a.path;
       if (/^https?:|^chrome-extension:|^chrome:/.test(url)) chrome.tabs.create({ url });
-    } else if (type === 'CHAT' && a.prompt) {
-      // Trigger interno: prepopola la chat con il prompt.
-      inputEl.value = a.prompt;
+    } else if (type === 'CHAT') {
+      // Trigger interno: manda in chat quello che c'è scritto sul bottone.
+      // #533 (quarto giro di verifica) — NON il testo nascosto dentro
+      // l'azione: la scritta e quello che parte devono essere la stessa cosa,
+      // perché il bottone lo compone un modello che ha letto i titoli dei siti.
+      inputEl.value = s.text || '';
       inputForm.dispatchEvent(new Event('submit'));
     } else {
       // Fallback: trasforma la voce in messaggio chat.
