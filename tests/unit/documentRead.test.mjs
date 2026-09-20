@@ -261,6 +261,28 @@ test('un carattere di sostituzione vale come jolly, non come lettera', () => {
   // Ma non deve mangiarsi mezzo nome fino a un file diverso.
   assert.equal(DR.nomiCombaciano('Singolarit�.txt', 'Singolarità.pdf'), false);
   assert.equal(DR.nomiCombaciano('Singolarit�.txt', 'Altro.txt'), false);
+  // Un nome fatto di soli caratteri ignoti combacerebbe con qualunque cosa:
+  // in una cartella con un file solo aprirebbe quello senza aver riconosciuto
+  // niente. Sotto i jolly serve del nome vero.
+  assert.equal(DR.nomiCombaciano('�', 'bolletta.pdf'), false);
+  assert.equal(DR.nomiCombaciano('���', 'contratto.txt'), false);
+});
+
+test('gli input limite non fanno inciampare la ricerca tollerante', () => {
+  for (const v of ['', '   ', null, undefined]) {
+    assert.equal(DR.nomiCombaciano(v, 'bolletta.pdf'), false);
+    assert.equal(DR.nomiCombaciano('bolletta.pdf', v), false);
+    assert.equal(DR.chiaveTollerante(v), '');
+  }
+  // I metacaratteri di un'espressione regolare sono lettere di un nome come
+  // tutte le altre: non devono diventare parte del confronto.
+  assert.equal(DR.nomiCombaciano('conto (1).txt', 'conto (1).txt'), true);
+  assert.equal(DR.nomiCombaciano('cont� (1).txt', 'conto (1).txt'), true);
+  assert.equal(DR.nomiCombaciano('cont� (1).txt', 'contoXXXXX1).txt'), false);
+  // Nomi lunghissimi: nessuna esplosione, nessun falso positivo.
+  const lungo = `${'a'.repeat(10000)}.txt`;
+  assert.equal(DR.nomiCombaciano(lungo, lungo), true);
+  assert.equal(DR.nomiCombaciano(lungo, `${'a'.repeat(9999)}b.txt`), false);
 });
 
 test('il file col trattino lungo si ritrova anche chiedendolo col trattino breve', async () => {
