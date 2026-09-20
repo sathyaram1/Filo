@@ -65,29 +65,23 @@ test('terminale: un comando che finisce dopo il ritorno alla home', async ({ app
   await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
 
   // Un comando che ci mette qualche secondo: è il motivo per cui il terminale
-  // esiste (un build, un npm install, un download).
-  await dash.locator('#input').fill('/sleep 4; echo esito-del-comando-lento');
+  // esiste (un build, un npm install, un download). La riga del comando e la
+  // riga dell'esito devono essere distinguibili, quindi l'esito lo compone la
+  // shell: «ESIT» + «O-TARDIVO».
+  await dash.locator('#input').fill('/sleep 5; echo "ESIT""O-TARDIVO"');
   await dash.locator('#input').press('Enter');
-  await dash.waitForTimeout(700);
+  await dash.waitForTimeout(900);
 
   // L'utente se ne va prima che finisca. È il gesto più normale del mondo:
   // «parte, intanto faccio altro».
-  await dash.evaluate(() => {
-    const b = [...document.querySelectorAll('button')].find((x) => /home|←/i.test(x.textContent || ''));
-    if (b) b.click();
-  });
   await dash.locator('#input').fill('/home');
   await dash.locator('#input').press('Enter');
   await dash.waitForTimeout(500);
   const statoSubito = await dash.evaluate(() => document.body.dataset.state);
   console.log('STATO DOPO IL RITORNO ALLA HOME:', statoSubito);
 
-  // Adesso il comando finisce.
-  await expect.poll(async () => {
-    const chats = await leggiArchivio(app);
-    return chats.some((c) => (c.messages || []).some((m) => String(m.text).includes('esito-del-comando-lento')));
-  }, { timeout: 60_000 }).toBe(true);
-  await dash.waitForTimeout(1500);
+  // Adesso il comando finisce: gli si dà tutto il tempo.
+  await dash.waitForTimeout(12_000);
 
   const chats = await leggiArchivio(app);
   console.log('ARCHIVIO:', JSON.stringify(chats.map((c) => ({
