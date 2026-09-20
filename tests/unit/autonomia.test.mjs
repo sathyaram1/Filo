@@ -278,6 +278,42 @@ test('ogni fonte dichiara classe e frase; ogni classe e ogni costo hanno un\'eti
   for (const c of A.COSTI) assert.ok(c.label && c.esempi);
 });
 
+test('quello che sta nel contesto senza che Filo l\'abbia cercato: schede aperte e immagini', () => {
+  // Il titolo di una scheda lo scrive il sito, e sta nel riepilogo di stato di
+  // OGNI turno: il compito non può dirsi pulito senza contarlo. Sono classe 2
+  // (roba che l'utente ha scelto e ha sotto mano, come i file dell'editor):
+  // a classe 5 un browser con una scheda aperta sarebbe contaminato sempre, e
+  // il livello normale non varrebbe mai per nessuno.
+  assert.equal(A.classeFonte('schede'), 2);
+  assert.equal(A.classeFonte('immagine'), 2);
+  assert.equal(A.statoPerFonti(['schede'], 'default'), 'pulito');
+  assert.equal(A.statoPerFonti(['schede'], 'conservativo'), 'contaminato');
+  assert.equal(A.statoPerFonti(['immagine'], 'conservativo'), 'contaminato');
+  // A livello prudente, con delle schede aperte, una lezione si ferma.
+  assert.equal(A.decide({ livello: 'conservativo', fonti: ['schede'], costo: 2 }), 'chiede');
+  // La manopola della fiducia sul web le porta a classe 3: a quel punto anche
+  // il livello normale chiede.
+  assert.equal(A.statoPerFonti(['schede'], 'default', { manopole: { web: { fiducia: true } } }), 'contaminato');
+});
+
+test('un «no» della tabella dice come uscirne; quello dell\'elenco fisso no', () => {
+  // Conservativo + compito sporco + costo 3 = no. Senza una via d'uscita è un
+  // vicolo cieco: chi tiene il livello prudente ci finisce appena cerca
+  // qualcosa sul web.
+  const tabella = A.valuta({ livello: 'conservativo', fonti: ['ricerca'], costo: 3 });
+  assert.equal(tabella.risposta, 'no');
+  assert.ok(tabella.uscita.length > 40, 'il rifiuto non dice cosa si può fare adesso');
+  assert.match(tabella.uscita, /conversazione nuova/i);
+  assert.match(tabella.uscita, /Preferenze/);
+  // L'elenco fisso invece è definitivo: la strada a mano la dice il registro
+  // delle azioni, non la regola.
+  const fissa = A.valuta({ livello: 'default', stato: 'pulito', costo: 1, vietato: 'cancellazione-definitiva' });
+  assert.equal(fissa.risposta, 'no');
+  assert.equal(fissa.uscita, '');
+  // Chi si ferma prima di «no» non ha niente da dire qui.
+  assert.equal(A.valuta({ livello: 'default', stato: 'pulito', costo: 3 }).uscita, '');
+});
+
 test('il livello: yolo esiste ma non si sceglie; un valore sconosciuto ricade sul default', () => {
   assert.equal(A.LIVELLO_DEFAULT, 'default');
   assert.ok(A.livello('yolo'));
