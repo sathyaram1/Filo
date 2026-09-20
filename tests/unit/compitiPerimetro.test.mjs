@@ -188,6 +188,14 @@ test('le due azioni del motore si spiegano in chiaro a chi deve decidere', () =>
   assert.equal(Levels.levelFor({ type: 'DICHIARA_USCITE', uscite: [] }), 1, 'restringere non si conferma');
 });
 
+test('chiedere il permesso per un potere inventato non apre nessun popup', () => {
+  // `levelFor` null → il dispatch rifiuta l'azione: un popup su una cosa che
+  // non esiste è una domanda a cui l'utente non può rispondere.
+  for (const u of ['', 'inventata', 'accoglienza', '<script>']) {
+    assert.equal(Levels.levelFor({ type: 'CHIEDI_USCITA', uscita: u }), null, `uscita "${u}" non deve prendere un livello`);
+  }
+});
+
 // ── la tabella di autonomia (il seme di #530) ────────────────────────────────
 
 test('dentro il perimetro si fa, a qualunque livello', () => {
