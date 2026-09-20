@@ -85,12 +85,10 @@ function primaStringa(...valori) {
   return '';
 }
 
-// Chiede al server le chiavi di default. Ritorna `{ apiKeys, esito }`: le
-// chiavi trovate (vuote se non disponibili) e PERCHÉ, che è l'informazione che
-// serve a chi legge il guasto — degradare in silenzio non è degradare (#642).
-// Non lancia: in caso di problemi si ripiega sui segreti del job, perché una
-// versione con quelle chiavi è meglio di nessuna versione. Se non resta nemmeno
-// quello, decide main — e si ferma.
+// Ritorna `{ apiKeys, esito }`: le chiavi e PERCHÉ non ci sono, che è quello
+// che serve a chi legge il guasto — degradare in silenzio non è degradare.
+// Non lancia: si ripiega sui segreti del job, perché una versione con quelle
+// chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
 async function fetchRemoteKeys(passphrase) {
   if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
   try {
