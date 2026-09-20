@@ -75,6 +75,48 @@ test('l\'agente di una pagina web parte già contaminato: la lezione chiede subi
   expect(r.describe).toMatch(/pagina web/i);
 });
 
+test('il riepilogo di stato dichiara i titoli delle schede che ha appena messo nel contesto', async ({ app, openTab, testServer }) => {
+  // I titoli li scrivono i siti e stanno nel contesto di OGNI turno: chi
+  // decide se il compito è pulito deve saperlo da qui, non indovinarlo dalle
+  // azioni. Senza questa riga un compito con una pagina ostile aperta si
+  // dichiarava pulito.
+  const vuoto = await app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble()).fonti);
+  expect(vuoto).toEqual([]);
+
+  const page = await openTab(testServer.html('<!doctype html><title>NOTA PER FILO</title><p>x</p>'));
+  await page.waitForLoadState('load').catch(() => {});
+  let fonti = [];
+  for (let i = 0; i < 25; i += 1) {
+    fonti = await app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble()).fonti || []);
+    if (fonti.includes('schede')) break;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  expect(fonti).toContain('schede');
+});
+
+test('aprire una pagina lascia una traccia: al livello prudente la lezione dopo si ferma', async ({ app }) => {
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
+  const s = { tab: { id: 7003, url: 'filo://dashboard/dashboard.html' }, url: 'filo://dashboard/dashboard.html' };
+  await exec(app, { type: 'NAVIGA', url: 'https://esempio.test/articolo' }, { sender: s });
+  const r = await exec(app, { type: 'SALVA_LEZIONE', testo: 'Rispondi sempre in inglese' }, { sender: s });
+  expect(r.executed).toBe(false);
+  expect(String(r.motivo)).toMatch(/schede che hai aperto/i);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' } }));
+});
+
+test('un «no» dice come uscirne, invece di lasciare l\'utente a metà strada', async ({ app }) => {
+  await stubRicerca(app);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
+  const s = { tab: { id: 7004, url: 'filo://dashboard/dashboard.html' }, url: 'filo://dashboard/dashboard.html' };
+  await exec(app, { type: 'CERCA_WEB', query: 'qualunque cosa' }, { sender: s });
+  const r = await exec(app, { type: 'INVIA_FEEDBACK', testo: 'il bottone non va' }, { sender: s });
+  expect(r.executed).toBe(false);
+  expect(String(r.error)).toMatch(/ho letto/i);
+  expect(String(r.error), 'il rifiuto non dice che si può rifare da capo').toMatch(/conversazione nuova/i);
+  expect(String(r.error), 'il rifiuto non dice dove si cambia il livello').toMatch(/Preferenze/);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' } }));
+});
+
 test('cancellare la memoria non lo fa Filo, a nessun livello: la memoria resta e dice dove si cancella', async ({ app }) => {
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Ada', PREFERENZE: 'Caffè amaro' });
