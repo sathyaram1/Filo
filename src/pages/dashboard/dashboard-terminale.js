@@ -151,7 +151,7 @@
     // Cronologia li deve ritrovare. Prima restavano solo sullo schermo e la
     // chat si rileggeva con un buco dentro, proprio dove c'era la riga che si
     // torna a cercare («qual era il comando di ieri?»).
-    archiviaRiga(`/${command}`, 'user');
+    archiviaRiga(`/${command}`, 'user', chatDelComando);
 
     // Bolla "comando" (stile utente) con il prompt digitato.
     const cmdBubble = makeBubble({ role: 'user', text: '' });
