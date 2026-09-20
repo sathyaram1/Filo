@@ -132,7 +132,12 @@ test('a «l\'hai aggiunto?» Filo deve sapere che l\'utente l\'ha aggiunto', asy
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Rispondo.' }).nth(1)).toBeVisible({ timeout: 10_000 });
 
   const visto = await app.evaluate(() => (globalThis.__v567g2c_msg || []).join('\n'));
-  expect(/aggiunt|calendar_add|"_confirmed"|aperto/i.test(visto), 'nel turno dopo il modello non trova traccia che l\'utente abbia aggiunto l\'evento').toBe(true);
+  // Nel turno dopo il modello legge ancora «Proposta all'utente come bottone»:
+  // il click dell'utente non ha lasciato traccia da nessuna parte.
+  expect(visto).toContain('EVENTO_CALENDARIO');
+  const restaSoloProposta = /Proposta all.utente come bottone/i.test(visto)
+    && !/l.utente l.ha aggiunt|evento aggiunto|aggiunto al calendario/i.test(visto);
+  expect(restaSoloProposta, 'il modello trova traccia dell\'aggiunta').toBe(false);
 
   await app.evaluate(() => { try { globalThis.__v567g2c_restore?.(); } catch (_) {} });
 });
