@@ -1,0 +1,157 @@
+// Il cancello che ferma la pubblicazione deve dire QUALE chiave manca e dove
+// si mette. Sentinella nata dal #642.
+//
+// Il caso. Dall'11/09 il cancello conta solo le chiavi che l'applicazione legge
+// davvero, e sul server quel documento non ne aveva nessuna: da allora nessuna
+// versione è uscita. Il registro diceva «Nessuna chiave di default da nessuna
+// fonte» e la mail di GitHub «workflow fallito» — otto giorni per scoprire che
+// mancava una riga in un documento. Peggio: la risposta di rifiuto del server
+// arriva con HTTP 200 e `ok:false`, quindi una parola d'ordine sbagliata
+// diventava un oggetto vuoto senza nemmeno una riga nel registro.
+//
+// La regola che questa sentinella tiene ferma: chi legge il guasto — nel
+// registro della costruzione o nel feedback che l'allarme apre — sa il nome
+// della chiave, le fonti da cui è stata cercata e perché il server non l'ha
+// data.
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createServer } from 'node:http';
+import { rmSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+// La cartella temporanea si chiede sempre a questo aiuto (CLAUDE.md § Run/test).
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { spiegaChiaviMancanti, descriviEsitoServer } from '../../scripts/bake-default-config.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const RADICE = resolve(__dirname, '..', '..');
+const BAKE = join(RADICE, 'scripts', 'bake-default-config.mjs');
+const esegui = promisify(execFile);
+
+// Ambiente pulito più quello passato: le chiavi della macchina che fa girare i
+// test non devono poter far passare una prova che deve fallire.
+async function costruisci(ambiente) {
+  const cartella = cartellaTemporanea('filo-bake-642-');
+  const env = { ...process.env, FILO_BAKE_OUT: join(cartella, 'generato.json') };
+  for (const n of ['FILO_BUILD_PASSPHRASE', 'FILO_DEFAULT_OPENROUTER_KEY', 'FILO_DEFAULT_GEMINI_KEY',
+    'FILO_DEFAULT_TAVILY_KEY', 'FILO_DEFAULT_SAFEBROWSING_KEY', 'FILO_ROUTINE_API']) delete env[n];
+  // Il server finto sta sul cappio locale: un proxy in mezzo lo renderebbe
+  // irraggiungibile e la prova misurerebbe l'ambiente invece del codice.
+  env.NO_PROXY = '127.0.0.1,localhost';
+  env.no_proxy = '127.0.0.1,localhost';
+  Object.assign(env, ambiente);
+
+  let uscita = 0;
+  let stdout = '';
+  let stderr = '';
+  try {
+    const r = await esegui(process.execPath, [BAKE], { env });
+    stdout = r.stdout;
+    stderr = r.stderr;
+  } catch (e) {
+    uscita = typeof e.code === 'number' ? e.code : 1;
+    stdout = e.stdout || '';
+    stderr = e.stderr || '';
+  }
+  rmSync(cartella, { recursive: true, force: true });
+  return { uscita, registro: `${stdout}\n${stderr}` };
+}
+
+// Server finto: risponde quello che gli si dice e tiene le richieste ricevute,
+// così si può guardare cosa è finito nel testo dell'allarme.
+async function serverFinto(risposte) {
+  const ricevute = [];
+  const srv = createServer((req, res) => {
+    let corpo = '';
+    req.on('data', (c) => { corpo += c; });
+    req.on('end', () => {
+      let json = null;
+      try { json = JSON.parse(corpo); } catch (_) {}
+      ricevute.push({ percorso: req.url, corpo: json });
+      const r = risposte[req.url] || { stato: 200, json: { ok: true } };
+      res.writeHead(r.stato, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(r.json));
+    });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  return {
+    base: `http://127.0.0.1:${srv.address().port}`,
+    ricevute,
+    chiudi: () => new Promise((ok) => srv.close(ok)),
+  };
+}
+
+test('la spiegazione nomina la chiave, il campo del server e il segreto del job', () => {
+  const righe = spiegaChiaviMancanti(
+    [{ nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' }],
+    { stato: 'senza-chiavi' }
+  ).join(' ');
+
+  assert.match(righe, /tavily/);
+  assert.match(righe, /config\/secrets\.apiKeys\.tavily/);
+  assert.match(righe, /FILO_DEFAULT_TAVILY_KEY/);
+  assert.match(righe, /Modelli predefiniti/,
+    'deve dire anche DOVE si mette la chiave, non solo che manca');
+});
+
+test('una parola d’ordine rifiutata si legge come tale, non come "non c’era"', () => {
+  const rifiuto = descriviEsitoServer({ stato: 'rifiutato', reason: 'bad_passphrase' });
+  assert.match(rifiuto, /bad_passphrase/);
+  assert.match(rifiuto, /FILO_BUILD_PASSPHRASE/);
+
+  // Le due situazioni non devono raccontarsi con la stessa frase: sono due
+  // rimedi diversi (la parola d'ordine da rifare, o la chiave da mettere).
+  assert.notEqual(rifiuto, descriviEsitoServer({ stato: 'senza-chiavi' }));
+});
+
+test('senza nessuna fonte il cancello dice quale chiave manca e da dove l’ha cercata', async () => {
+  const r = await costruisci({});
+  assert.notEqual(r.uscita, 0, 'senza nessuna chiave la pubblicazione deve fermarsi');
+  assert.match(r.registro, /::error::/);
+  assert.match(r.registro, /tavily/, 'il guasto deve nominare la chiave che manca');
+  assert.match(r.registro, /config\/secrets\.apiKeys\.tavily/,
+    'il guasto deve nominare il campo del documento sul server');
+  assert.match(r.registro, /FILO_DEFAULT_TAVILY_KEY/,
+    'il guasto deve nominare il segreto di riserva del job');
+});
+
+test('una risposta di rifiuto del server non passa in silenzio', async () => {
+  const srv = await serverFinto({
+    '/buildKeys': { stato: 200, json: { ok: false, reason: 'bad_passphrase' } },
+    '/buildAlarm': { stato: 200, json: { ok: true, num: '#1' } },
+  });
+  try {
+    const r = await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: 'sbagliata' });
+    assert.notEqual(r.uscita, 0);
+    // HTTP 200 con ok:false diventava `{}`, indistinguibile da un documento
+    // senza quella chiave: il motivo vero non compariva da nessuna parte.
+    assert.match(r.registro, /bad_passphrase/,
+      'il motivo del rifiuto deve comparire nel registro della costruzione');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('l’allarme porta le stesse informazioni del registro', async () => {
+  const srv = await serverFinto({
+    '/buildKeys': { stato: 200, json: { ok: false, reason: 'bad_passphrase' } },
+    '/buildAlarm': { stato: 200, json: { ok: true, num: '#1' } },
+  });
+  try {
+    await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: 'sbagliata' });
+
+    const allarme = srv.ricevute.find((x) => x.percorso === '/buildAlarm');
+    assert.ok(allarme, 'la costruzione fermata deve aprire un feedback');
+    const testo = `${allarme.corpo.name}\n${allarme.corpo.text}`;
+    assert.match(testo, /tavily/, 'chi apre il feedback deve leggere quale chiave manca');
+    assert.match(testo, /config\/secrets\.apiKeys\.tavily/);
+    assert.match(testo, /FILO_DEFAULT_TAVILY_KEY/);
+    assert.match(testo, /bad_passphrase/,
+      'anche il perché il server non l\'ha data deve arrivare nel feedback');
+  } finally {
+    await srv.chiudi();
+  }
+});
