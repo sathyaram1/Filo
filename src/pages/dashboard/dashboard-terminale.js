@@ -140,6 +140,13 @@
     if (!command) return;
     if (document.body.dataset.state !== 'thread') goThread();
 
+    // #525 — il comando e il suo esito sono battute di QUESTA conversazione:
+    // l'utente li legge qui, in mezzo alle altre, e riaprendo la chat da
+    // Cronologia li deve ritrovare. Prima restavano solo sullo schermo e la
+    // chat si rileggeva con un buco dentro, proprio dove c'era la riga che si
+    // torna a cercare («qual era il comando di ieri?»).
+    archiviaRiga(`/${command}`, 'user');
+
     // Bolla "comando" (stile utente) con il prompt digitato.
     const cmdBubble = makeBubble({ role: 'user', text: '' });
     cmdBubble.classList.add('dash-term-cmd');
