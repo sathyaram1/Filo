@@ -2708,11 +2708,21 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
   if (chatId) {
-    await appendToChatArchive(
+    const dopo = await appendToChatArchive(
       chatId,
       { role: 'filo', text: textReply, actions: actionsToRun },
       { onboarding: onbActive },
     );
+    // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
+    // ha chiesto qualcosa ed è tornato alla home (o ha chiuso la scheda) prima
+    // di leggere. La risposta si salva lo stesso, ma poi la chat va RICHIUSA,
+    // altrimenti resta «in corso» col titolo di mezza conversazione e Filo non
+    // la ritrova più quando gli si chiede di riprenderla.
+    if (dopo && dopo.closedAt) {
+      closeAndTriageChat(chatId)
+        .then(() => { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {} })
+        .catch((e) => console.warn('[Filo] richiusura chat dopo la risposta:', e?.message || e));
+    }
   }
   // #524 — chiusura dell'intervista di benvenuto: la sequenza sta in
   // `finishOnboarding`. Se invece l'intervista prosegue, il turno di Filo viene
