@@ -154,7 +154,7 @@
         "repo": "Filo"
       }
     ],
-    "afterPack": "scripts/after-pack-mac.js"
+    "afterPack": "scripts/after-pack.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
