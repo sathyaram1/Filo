@@ -461,6 +461,27 @@
     + `|l${AP}avevo|come (?:ti )?(?:dicevo|avevo detto|richiesto|chiesto|volevi)`
     + `|^\\s*s[iì]\\b|\\bti confermo\\b`, 'i');
 
+  // Il messaggio dell'utente sta CHIEDENDO se una cosa è già stata fatta?
+  // («l'hai mandata?», «hai messo la sveglia per stasera?»). Solo lì un'azione
+  // di un turno precedente può reggere da sola la risposta che la racconta.
+  //
+  // Giro 7: prima bastava un punto interrogativo qualunque. In italiano però
+  // una RICHIESTA si scrive quasi sempre così — «mi segni anche la lista della
+  // spesa?» — e da lì in poi tutto quello che era stato fatto prima nella
+  // conversazione copriva quello che veniva raccontato adesso: il presidio
+  // tornava muto proprio nel caso della segnalazione. Serve il passato alla
+  // seconda persona («hai…», «avevi…», «è stata…»): è quello che distingue
+  // «l'hai già fatto?» da «me lo fai?».
+  const CHIEDE_DEL_PASSATO = new RegExp(
+    `${INIZIO}(?:hai|avete|avevi|avevate|ce\\s+l${AP}hai|l${AP}hai|li\\s+hai|le\\s+hai)${FINE}`
+    + `|${INIZIO}(?:è|e${AP})\\s+(?:gi[àa]\\s+)?(?:stat[ao]|partit[ao]|andat[ao])${FINE}`
+    + `|${INIZIO}sono\\s+(?:gi[àa]\\s+)?stat[ei]${FINE}`, 'i');
+  function domandaSuCosaFatta(messaggio) {
+    const s = String(messaggio || '');
+    if (!s.includes('?')) return false;
+    return CHIEDE_DEL_PASSATO.test(s);
+  }
+
   // La dichiarazione è dentro una domanda? («Ho aperto la pagina giusta?»)
   //
   // Giro 5: si guardava fino al primo `.!?\n`, e la virgola non contava. Così
