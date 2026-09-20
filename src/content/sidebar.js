@@ -807,7 +807,15 @@
     if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
     // #517 — l'azione è partita davvero: da qui in poi la frase che la
     // racconta è vera, anche fra qualche messaggio.
-    try { azioniDelTurno.add(String(action && action.type || '').toUpperCase()); } catch (_) {}
+    // #517 (giro 9) — «partita» vuol dire ANDATA. Prima bastava che il main
+    // rispondesse: un'azione rifiutata dal registro, non riuscita, o
+    // annullata dall'utente al popup restava scritta fra le cose fatte per
+    // tutta la sessione, e da lì in poi ogni frase che la raccontava passava
+    // muta. Nella chat della home quella porta è chiusa dal giro 2.
+    const conta = () => {
+      try { azioniDelTurno.add(String(action && action.type || '').toUpperCase()); } catch (_) {}
+    };
+    if (res.executed || res.kept || res.output) conta();
 
     // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
     // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
