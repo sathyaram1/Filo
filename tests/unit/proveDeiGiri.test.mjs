@@ -63,9 +63,8 @@ test('nessun sorgente del repo contiene un byte NUL crudo', () => {
     + ' carattere, e il file resta testo.');
 });
 
-// Una prova che non si carica è peggio di una prova assente: il rosso sembra
-// del ramo. Ventitré prove di giri passati importavano ./fixtures da una
-// sottocartella dove quel percorso non esiste, e non se n'era accorto nessuno.
+// Una prova che non si carica è peggio di una prova assente: il rosso sembra del
+// ramo. Ventitré importavano ./fixtures da una cartella dove quel percorso non c'è.
 test('ogni import relativo di uno spec o di un unit test punta a un file che esiste', () => {
   const rotti = [];
   for (const f of nelRepo('tests')) {
