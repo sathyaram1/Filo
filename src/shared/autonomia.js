@@ -467,6 +467,19 @@
     return '';
   }
 
+  // Un «no» che arriva dalla TABELLA non è un divieto per sempre: a un altro
+  // livello, o in un compito che non ha letto niente di altri, la stessa cosa
+  // si fa. Senza questa riga il rifiuto è un vicolo cieco muto, e chi tiene il
+  // livello prudente ci finisce appena cerca qualcosa sul web. Il «no»
+  // dell'elenco fisso invece è definitivo: lì la strada a mano la dice il
+  // registro delle azioni.
+  function uscitaPer({ risposta, regola }) {
+    if (risposta !== NO || regola !== 'tabella') return '';
+    return 'A questo punto non posso farlo. Puoi rifarmelo chiedere in una conversazione nuova, '
+      + 'dove non ho ancora letto niente scritto da altri, oppure dare a Filo più autonomia in '
+      + 'Preferenze → «Quanto Filo fa da solo». Dillo all\'utente e non riprovare.';
+  }
+
   // Stato del compito da un elenco di fonti lette (comodo per chi non deve
   // decidere ma solo mostrare): la classe meno fidata contro la soglia.
   function statoPerFonti(fonti, liv, { manopole = null, fontiSpostate = null } = {}) {
