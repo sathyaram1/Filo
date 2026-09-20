@@ -1145,7 +1145,7 @@
   // sulla stessa riga della prosa è lo stesso turno buttato. Una graffa o una
   // quadra invece contano solo a inizio riga, perché in mezzo a una frase sono
   // punteggiatura.
-  const BUSTE = /<\s*\/?\s*(?:tool_call|tool▁call|tool_use|function_call|function_calls|invoke|antml:invoke)\b|<\|[^|>]{0,32}tool[^|>]{0,32}\|>|\[TOOL_CALLS\]/i;
+  const BUSTE = /<\s*\/?\s*(?:tool_call|tool▁call|tool_use|function_call|function_calls|invoke|antml:invoke)\b|<\s*function\s*=\s*[A-Za-z_]|<\|[^|>]{0,32}tool[^|>]{0,32}\|>|\[TOOL_CALLS\]/i;
 
   // La chiamata NUDA appoggiata alla prosa, sulla stessa riga: «Fatto!
   // SVEGLIA({"ora":"19:00"})». Vale ovunque nella riga come le buste, perché
