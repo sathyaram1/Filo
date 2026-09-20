@@ -73,6 +73,16 @@ function pickSafeBrowsing(json) {
   return '';
 }
 
+// Il motivo del rifiuto può arrivare sotto tre nomi a seconda di come la
+// funzione è scritta: si prende il primo che è davvero una stringa, perché un
+// oggetto interpolato diventa «[object Object]» e non spiega niente.
+function primaStringa(...valori) {
+  for (const v of valori) {
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return '';
+}
+
 // Chiede al server le chiavi di default. Ritorna `{ apiKeys, esito }`: le
 // chiavi trovate (vuote se non disponibili) e PERCHÉ, che è l'informazione che
 // serve a chi legge il guasto — degradare in silenzio non è degradare (#642).
