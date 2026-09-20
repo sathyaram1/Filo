@@ -225,12 +225,18 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
     // di rosso atteso nelle prove del giro. Quello che gira è lo stesso, e il
     // verdetto riguarda quello. `leggiDiff` legge i due contenuti da git: chi
     // non lo passa (i controlli sulla sola logica) ha il cancello stretto di
-    // sempre. Con modifiche non salvate non si tollera niente: il confronto
-    // guarda due commit, e quelle non stanno in nessuno dei due.
-    const tol = (!dirty && typeof leggiDiff === 'function' && entry.sha && headSha)
+    // sempre.
+    const tol = (typeof leggiDiff === 'function' && entry.sha && headSha)
       ? soloMarcatori(leggiDiff(entry.sha, headSha))
       : null;
-    if (tol && tol.ok) {
+    if (!tol || !tol.ok) {
+      const perche = tol && tol.motivo ? ` (${tol.motivo})` : '';
+      return { ok: false, reason: `il codice è cambiato dopo la verifica: l’esito riguarda una versione diversa da quella che pubblicheresti${perche}` };
+    }
+    // Tollerato — ma le modifiche non salvate non stanno in nessuno dei due
+    // commit, quindi il confronto non le ha viste: di quelle risponde il
+    // controllo qui sotto, che è anche quello che dice la cosa vera.
+    if (!dirty) {
       return {
         ok: true,
         tollerato: true,
@@ -240,8 +246,6 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
           : `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei il contenuto non è cambiato`,
       };
     }
-    const perche = tol && tol.motivo ? ` (${tol.motivo})` : '';
-    return { ok: false, reason: `il codice è cambiato dopo la verifica: l’esito riguarda una versione diversa da quella che pubblicheresti${perche}` };
   }
   // Il confronto sopra guarda l'ULTIMO SALVATAGGIO, e le modifiche non ancora
   // salvate non lo spostano: senza questo, si può far approvare una versione,

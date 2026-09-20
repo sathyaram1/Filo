@@ -162,8 +162,11 @@ test('checkVerdict: fuori dalla cartella, o con codice vero, il pass decade lo s
 
 test('checkVerdict: la tolleranza non riapre le altre porte', () => {
   const soloMarc = diffFinto([{ path: 'tests/verifica/locale-x/giro4.spec.mjs', prima: PROVA, dopo: PROVA_SEGNATA }]);
-  // Modifiche non salvate: non stanno in nessuno dei due commit, e restano un no.
-  assert.equal(checkVerdict({ verdict: 'pass', sha: SHA }, ALTRO_SHA, true, soloMarc).ok, false);
+  // Modifiche non salvate: non stanno in nessuno dei due commit, quindi il
+  // confronto non le ha viste. Restano un no, e il motivo dice quale.
+  const sporco = checkVerdict({ verdict: 'pass', sha: SHA }, ALTRO_SHA, true, soloMarc);
+  assert.equal(sporco.ok, false);
+  assert.match(sporco.reason, /modifiche non salvate/);
   // Un verdetto che non è un pass non diventa un pass.
   assert.equal(checkVerdict({ verdict: 'fail', critique: 'non salva', sha: SHA }, ALTRO_SHA, false, soloMarc).ok, false);
   assert.equal(checkVerdict({ verdict: 'fix-pending', sha: SHA }, ALTRO_SHA, false, soloMarc).ok, false);
