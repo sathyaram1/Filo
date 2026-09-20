@@ -172,7 +172,49 @@ async function main() {
     process.exit(1);
   }
 
-  const reply = await merge(ticket, source);
+  // Il CONTENUTO che si sta per far fondere. Da qui in poi il nome del ramo
+  // serve solo a dire quale ramo è: a decidere è il commit (feedback #485).
+  // Se git non risponde ci si ferma, come fa la registrazione di un verdetto:
+  // il silenzio non vale «va tutto bene».
+  const punta = headSha(ROOT);
+  if (!punta) {
+    console.error('[merge-gate] ERROR: non riesco a farmi dire su quale commit è la directory, e i via libera valgono per un commit. Sistema git e rilancia.');
+    process.exit(1);
+  }
+  // Niente fuori dai commit: quei file il salvataggio automatico li committa e
+  // li spedisce subito dopo, il server fonde la punta NUOVA, e righe mai lette
+  // arrivano agli utenti. La registrazione del verdetto, un passo prima, lo
+  // rifiuta già; questo è lo stesso rifiuto all'ultimo passo.
+  const stato = statoDirectory(ROOT);
+  if (!stato.ok) {
+    console.error(statoIllegibileText(stato.motivo, 'fusione'));
+    process.exit(1);
+  }
+  if (stato.lines.length) {
+    console.error(dirtyTreeText(stato.lines, 'fusione'));
+    process.exit(1);
+  }
+  // I via libera già registrati su questa macchina parlano ancora di questo
+  // contenuto? Il muro vero resta il server, che risolve la punta da GitHub;
+  // questo è il controllo che si può fare qui, e che sul cammino locale
+  // (`npm run finish`) c'è da sempre.
+  const statoRamo = (() => {
+    const id = findStateIdByBranch(ROOT, source);
+    return id ? readBranchState(ROOT, id) : null;
+  })();
+  const decaduti = esitiDecaduti(statoRamo, punta);
+  if (decaduti.length) {
+    console.error(testoEsitiDecaduti(decaduti, punta));
+    process.exit(1);
+  }
+  // Astenersi si dice: se da qui non risulta nessun via libera con il suo
+  // commit, il controllo non l'ho fatto, e chi legge il registro non deve
+  // credere il contrario.
+  if (!decaduti.length && !esitiDecaduti({ ...(statoRamo || {}), verifierSha: 'x', secauditSha: 'x' }, punta).length) {
+    console.error('[merge-gate] nota: da questa macchina non risulta su quale commit sono stati dati i via libera, quindi non ho potuto controllare che parlino di questo. Decide il server.');
+  }
+
+  const reply = await merge(ticket, source, { sha: punta });
   const code = exitCodeFor(reply);
   if (code === 0) console.log(`[merge-gate] OK: ${source} fuso su main dal server${reply.sha ? ` (${reply.sha.slice(0, 12)})` : ''}`);
   else if (code === 10) {
