@@ -637,10 +637,13 @@
   // l'avviso finale: senza, una pagina enorme veniva dichiarata "tradotta" con
   // la coda ancora in lingua originale (la bugia di #407, altra causa). Contare
   // costa una camminata nel DOM, niente richieste al modello.
-  // Quanti sottoalberi nascosti tenere d'occhio: la lista serve al menu del
-  // tasto destro, che deve aprirsi subito. Una pagina con centinaia di sezioni
-  // ripiegate ne segna le prime: basta una per offrire "traduci quello nuovo".
-  const MAX_HIDDEN = 200;
+  // Quanti sottoalberi nascosti tenere d'occhio. È una guardia contro la pagina
+  // patologica, non una misura: a 200 una pagina di domande frequenti un po'
+  // lunga lo superava, e la sezione aperta oltre il tetto non faceva più offrire
+  // niente — restava solo tornare all'originale e ripagare tutto (#505). Il
+  // costo di tenerne tante è una domanda per elemento all'apertura del menu, e
+  // per le forme comuni quella domanda si chiude prima di arrivare allo stile.
+  const MAX_HIDDEN = 5000;
 
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
