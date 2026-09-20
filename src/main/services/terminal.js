@@ -286,7 +286,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
       clearTimeout(timer);
       let rawOut = stdout;
       let realCode = typeof code === 'number' ? code : (timedOut ? 124 : 1);
-      let resultCwd = trackCwd ? (cwd || undefined) : undefined;
+      let resultCwd = trackCwd ? (cartella || undefined) : undefined;
       if (trackCwd) {
         // La sonda è l'ULTIMO comando eseguito: l'exit code del processo è il
         // suo (0), non quello del comando. Prendiamo entrambi dal marcatore.
