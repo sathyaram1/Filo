@@ -1035,13 +1035,27 @@ function copiaVisibile(tetto) {
     var copia = document.documentElement.cloneNode(true);
     var corpo = document.body;
     var copiaCorpo = copia.querySelector('body');
+    // Alto apposta: chi scrive la pagina sceglie quanti riquadri metterci, e un
+    // budget stretto si esaurisce a comando. Il tempo lo limita chi chiama.
+    var budget = 150000;
+    var sforato = false;
     if (corpo && copiaCorpo) {
-      var budget = 30000;
       var haTesto = function (el) {
         for (var n = el.firstChild; n; n = n.nextSibling) {
           if (n.nodeType === 3 && n.nodeValue && n.nodeValue.trim()) return true;
         }
         return false;
+      };
+      var opaco = function (c) { return !!c && c !== 'transparent' && !/,\s*0(\.0+)?\s*\)\s*$/.test(c); };
+      // Lo sfondo che si vede DIETRO l'elemento: quello suo è quasi sempre
+      // trasparente, e il colore vero arriva da un antenato.
+      var sfondo = function (el) {
+        for (var p = el, i = 0; p && i < 12; p = p.parentElement, i++) {
+          var c = '';
+          try { c = window.getComputedStyle(p).backgroundColor || ''; } catch (e) { return ''; }
+          if (opaco(c)) return c;
+        }
+        return '';
       };
       var visibile = function (el) {
         try {
@@ -1053,24 +1067,43 @@ function copiaVisibile(tetto) {
           var sx = window.scrollX || window.pageXOffset || 0;
           var sy = window.scrollY || window.pageYOffset || 0;
           if (r.right + sx <= -500 || r.bottom + sy <= -500) return false;
+          var s = window.getComputedStyle(el);
+          if (!s) return true;
+          // Un riquadro schiacciato a zero che TAGLIA quello che contiene, e uno
+          // rimpicciolito a zero: due modi di scrivere l'esca (#553).
+          var ov = (s.overflow || '') + ' ' + (s.overflowX || '') + ' ' + (s.overflowY || '');
+          if ((r.width < 2 || r.height < 2) && /hidden|clip/.test(ov)) return false;
+          if (/^matrix(3d)?\(\s*0[\s,)]/.test(s.transform || '')) return false;
           if (haTesto(el)) {
-            var s = window.getComputedStyle(el);
-            if (!s) return true;
             if (s.display === 'none' || s.visibility === 'hidden') return false;
             if (parseFloat(s.opacity) === 0) return false;
             if (parseFloat(s.fontSize) < 1) return false;
+            // Il testo del colore dello sfondo l'utente non lo legge. Quello
+            // dipinto col proprio sfondo resta: è il titolo sfumato.
+            var clip = s.webkitBackgroundClip || s.backgroundClip || '';
+            if (String(clip).indexOf('text') < 0) {
+              var col = s.color || '';
+              if (!opaco(col)) return false;
+              if (col === sfondo(el)) return false;
+            }
           }
         } catch (e) {}
         return true;
       };
       var giu = function (orig, cop) {
-        var a = orig.children;
-        var b = cop.children;
-        for (var i = a.length - 1; i >= 0; i--) {
-          if (budget-- <= 0) return;
+        var a = [];
+        var b = [];
+        var i;
+        for (i = 0; i < orig.children.length; i++) a.push(orig.children[i]);
+        for (i = 0; i < cop.children.length; i++) b.push(cop.children[i]);
+        for (i = 0; i < a.length; i++) {
           var el = a[i];
           var cl = b[i];
           if (!cl) continue;
+          // Finito il budget il resto si TOGLIE, non passa non controllato: di
+          // lì l'esca rientrava intatta, e bastava allungare la pagina (#553).
+          if (budget <= 0) { sforato = true; cl.remove(); continue; }
+          budget--;
           var n = el.tagName;
           if (n === 'SCRIPT' || n === 'STYLE' || n === 'NOSCRIPT' || n === 'TEMPLATE') continue;
           if (!visibile(el)) { cl.remove(); continue; }
@@ -1079,9 +1112,12 @@ function copiaVisibile(tetto) {
       };
       giu(corpo, copiaCorpo);
     }
-    return String(copia.outerHTML || '').slice(0, TETTO);
+    var html = String(copia.outerHTML || '');
+    return { html: html.slice(0, TETTO), tagliato: sforato || html.length > TETTO };
   } catch (e) {
-    try { return String(document.documentElement.outerHTML || '').slice(0, TETTO); } catch (e2) { return ''; }
+    // Senza il controllo di cosa si vede l'HTML reso non si consegna: chi
+    // chiama ripiega sullo scaricamento, dove il filtro sull'esca c'è comunque.
+    return { html: '', tagliato: true };
   }
 })()`;
 }
@@ -1116,12 +1152,13 @@ async function testoDaSchedaAperta(url) {
         // Con un tempo massimo: se il JavaScript della pagina è inchiodato la
         // risposta non arriva mai, e senza questo il turno della chat restava
         // appeso in silenzio invece di ripiegare sullo scaricamento.
-        const html = await Promise.race([
+        const reso = await Promise.race([
           t.view.webContents.executeJavaScript(copiaVisibile(tetto), true),
-          new Promise((ok) => setTimeout(() => ok(''), PR.MAX_ATTESA_SCHEDA_MS)),
+          new Promise((ok) => setTimeout(() => ok(null), PR.MAX_ATTESA_SCHEDA_MS)),
         ]);
-        if (typeof html === 'string' && html.trim()) {
-          return { html: html.slice(0, tetto), title: t.title || '', partial: html.length > tetto };
+        const html = String((reso && reso.html) || '');
+        if (html.trim()) {
+          return { html: html.slice(0, tetto), title: t.title || '', partial: !!reso.tagliato };
         }
       } catch (_) {}
     }
