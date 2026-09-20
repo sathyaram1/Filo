@@ -423,6 +423,35 @@
       level: 1,
       describe: () => 'Togliere le modifiche di stile applicate alla pagina',
     },
+    // ── il perimetro delle uscite (#533) ──────────────────────────────────────
+    // Dichiarare RESTRINGE, quindi non c'è niente da confermare: livello 1.
+    DICHIARA_USCITE: {
+      level: 1,
+      describe: (a) => {
+        const C = global.SN_COMPITI;
+        const u = Array.isArray(a && a.uscite) ? a.uscite : [];
+        const voci = C ? u.map((x) => C.etichettaUscita(x)) : u;
+        return `Limitare questa richiesta a: ${voci.join('; ') || 'niente, solo rispondere'}`;
+      },
+    },
+    // Livello 2 perché la risposta È il popup: chi decide di allargare il
+    // perimetro è l'utente, e il motore non ha altro modo di chiederglielo.
+    CHIEDI_USCITA: {
+      level: 2,
+      describe: (a) => {
+        const C = global.SN_COMPITI;
+        const et = C ? C.etichettaUscita(a && a.uscita) : String((a && a.uscita) || '');
+        const motivo = String((a && (a.motivo ?? a.reason)) || '').trim();
+        return `Per questa richiesta avevi chiesto altro, e intanto Filo ha letto testo scritto da altri.\n\n`
+          + `Adesso vuole anche: ${et}.\n\n`
+          + `Dice che gli serve perché: “${motivo || '(non l’ha detto)'}”\n\n`
+          + 'Permetteglielo solo se torna con quello che gli hai chiesto tu. Vale solo per questa richiesta.';
+      },
+      describeDone: (a) => {
+        const C = global.SN_COMPITI;
+        return `Permesso dato per questa richiesta: ${C ? C.etichettaUscita(a && a.uscita) : ''}`;
+      },
+    },
   };
 
   // Livello dell'azione: 1|2|3, oppure null se l'azione NON è registrata
