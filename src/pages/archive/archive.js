@@ -169,6 +169,12 @@
     } catch (_) { r = null; }
     if (token !== chatSearchToken) return; // una ricerca più recente ha già vinto
     chats = (r && r.chats) || [];
+    // Cercando una frase («discussione sulla coscienza») può darsi che nessuna
+    // chat contenga tutte le parole: allora il main cerca con quelle che
+    // distinguono e lo dice. La pagina lo ripete a chi guarda, invece di
+    // mostrare risultati che non corrispondono alla richiesta scritta.
+    ricercaAllargata = !!(r && r.allargata) && !!q;
+    terminiUsati = (r && Array.isArray(r.termini)) ? r.termini : [];
     // `chatsTotal` decide se la sezione esiste. Senza ricerca è il conto vero;
     // con una ricerca attiva non lo si può riscrivere (i risultati sono un
     // sottoinsieme), ma nemmeno lasciare a zero: una chat nata adesso in
