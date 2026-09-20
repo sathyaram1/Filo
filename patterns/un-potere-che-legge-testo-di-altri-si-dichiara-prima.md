@@ -75,3 +75,38 @@ di altri entra davvero nel contesto.
 modello che **casca in pieno** nell'istruzione ostile e chiama davvero
 `SALVA_LEZIONE` e `NAVIGA`: memoria e schede devono restare come prima. Un test
 che si limita a far comportare bene il modello non prova niente.
+
+## Le tre porte che restavano aperte (primo giro di verifica)
+
+Il meccanismo era giusto e coprivano le letture che il modello CHIEDE. Tre
+strade restavano fuori, e le tre lezioni valgono oltre questo caso.
+
+**Quello che entra nel prompt da solo è una lettura, anche se nessuno l'ha
+chiesta.** I titoli delle schede aperte li scrivono i siti, e stavano nello
+stato che l'agente riceve a ogni messaggio: arrivavano prima che esistesse un
+perimetro da rispettare, quindi il perimetro non scattava mai su quella strada.
+Contare quello stato come una contaminazione non si poteva: il modello non ha
+nessun «prima» in cui dichiarare, e ogni richiesta sarebbe nata a mani vuote.
+La cura è togliere il testo di altri da ciò che arriva da solo e farlo chiedere
+(`LEGGI_SCHEDE`): leggere costa niente e resta libero, ma diventa un gesto con
+un momento preciso, e la dichiarazione ha di nuovo un «prima». Regola generale:
+**quando si mette un cancello sulle letture, si guarda anche cosa entra nel
+prompt senza passare da nessuna porta.**
+
+**Un permesso è legato all'autorità che l'ha dato, e quella va identificata per
+quello che è.** L'assistente dentro una pagina aveva un compito per SCHEDA: un
+sì dato su un sito restava valido quando quella scheda ne apriva un altro, per
+mezz'ora. La scheda è un contenitore, il sito è l'autorità: il compito si tiene
+per sito.
+
+**Il nome di un compito è una chiave.** L'azione portava con sé l'id del
+compito e il motore lo prendeva per buono da chiunque, anche da un'azione nata
+dentro un sito. Che oggi quegli id siano lunghi e casuali non è un controllo,
+è una fortuna: un nome che apre dei permessi si accetta solo da un mittente
+fidato (il main, le pagine `filo://`).
+
+E una quarta, meno grave: **la contaminazione non moriva col messaggio.**
+Il testo che Filo ha letto resta in chat, riportato nella sua risposta: il
+messaggio dopo ricominciava a mani libere. Il compito nuovo eredita quello di
+prima — contaminazione e perimetro già concesso — e per un'uscita in più passa
+dall'utente come sempre. Dopo un messaggio pulito non cambia niente.
