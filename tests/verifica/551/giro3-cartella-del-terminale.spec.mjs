@@ -36,8 +36,13 @@ const accendiTerminale = (page) =>
 // Un turno di chat: stesso mittente per tutte le azioni, come il ciclo
 // dell'assistente quando lancia un comando e poi prosegue da sé.
 const turnoDiChat = (app, azioni) =>
-  app.evaluate(async (_electron, azioniIn) => {
-    const mittente = { url: 'filo://dashboard/dashboard.html', tab: null };
+  app.evaluate(async (electron, azioniIn) => {
+    // Il mittente com'è fatto davvero: un oggetto nuovo per ogni messaggio, che
+    // porta con sé i webContents della scheda. Dentro UN turno l'assistente
+    // riusa lo stesso oggetto per tutte le azioni che lancia di fila.
+    const wc = electron.webContents.getAllWebContents()
+      .find((w) => String(w.getURL() || '').includes('dashboard.html'));
+    const mittente = { url: wc ? wc.getURL() : '', tab: null, wc: wc || null };
     const esiti = [];
     for (const a of azioniIn) {
       esiti.push(await globalThis.SN_EXECUTE_FILO_ACTION(a, { sender: mittente }));

@@ -246,3 +246,88 @@ test('Preferenze: il toggle modalità terminale e la scelta della shell si persi
   await expect(page.locator('#terminalEnabled')).toBeChecked({ timeout: 8_000 });
   await expect(page.locator('#terminalShell')).toHaveValue(scelta);
 });
+
+// ── La cartella di lavoro dell'ASSISTENTE (#551) ────────────────────────────
+//
+// Altra cosa dalla shell persistente qui sopra: questa è la cartella dei
+// comandi che lancia Filo, e vive fra un messaggio e l'altro. Veniva appuntata
+// sul mittente del messaggio, che è un oggetto costruito da capo ogni volta:
+// appena l'utente scriveva di nuovo — o CONFERMAVA — Filo era già tornato
+// nella cartella personale. Due danni: il file appena elencato «non esiste
+// più», e il comando che l'utente approva leggendo «scriverò qui» scrive
+// altrove.
+
+const eseguiComando = (page, comando) =>
+  page.evaluate((c) => new Promise((resolve) => {
+    chrome.runtime.sendMessage({
+      type: 'filo_confirm_action',
+      action: { type: 'ESEGUI_COMANDO', comando: c },
+    }, (r) => resolve(r));
+  }), comando);
+
+test('la cartella dell’assistente vale ancora al messaggio dopo', async ({ openTab }) => {
+  const { writeFileSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const base = cartellaTemporanea('filo-cwd-assistente-');
+  try {
+    writeFileSync(join(base, 'bolletta.txt'), 'totale 84,50\n', 'utf8');
+    const page = await openTab('filo://dashboard/dashboard.html');
+    await setTerminal(page, true);
+
+    const cd = await eseguiComando(page, `cd '${base}'`);
+    expect(cd.executed, `il cd non è partito: ${JSON.stringify(cd).slice(0, 300)}`).toBe(true);
+
+    // Messaggio NUOVO: è qui che l'appunto si perdeva.
+    const ls = await eseguiComando(page, 'ls');
+    expect(
+      String(ls.output?.stdout || ''),
+      'il comando dopo il «cd» gira altrove: il file appena trovato «non esiste»',
+    ).toContain('bolletta.txt');
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('un comando confermato scrive nella cartella che Filo aveva mostrato', async ({ app, openTab }) => {
+  const { existsSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { homedir } = await import('node:os');
+  const base = cartellaTemporanea('filo-conferma-cwd-');
+  try {
+    const page = await openTab('filo://dashboard/dashboard.html');
+    await setTerminal(page, true);
+
+    // Un turno dell'assistente: entra nella cartella e poi propone un comando
+    // che modifica — livello 2, quindi si ferma e chiede.
+    const [vai, proposta] = await app.evaluate(async (electron, dove) => {
+      const wc = electron.webContents.getAllWebContents()
+        .find((w) => String(w.getURL() || '').includes('dashboard.html'));
+      const mittente = { url: wc ? wc.getURL() : '', tab: null, wc: wc || null };
+      const esiti = [];
+      for (const comando of [`cd '${dove}'`, 'mkdir prova-di-filo']) {
+        esiti.push(await globalThis.SN_EXECUTE_FILO_ACTION(
+          { type: 'ESEGUI_COMANDO', comando },
+          { sender: mittente },
+        ));
+      }
+      return esiti;
+    }, base);
+    expect(vai.executed).toBe(true);
+    expect(proposta.executed, 'un comando che modifica deve fermarsi a chiedere').toBe(false);
+    expect(
+      String(proposta.action?._cwd || proposta.describe || ''),
+      'il popup deve dire in quale cartella si scriverà',
+    ).toContain('filo-conferma-cwd-');
+
+    // La conferma dell'utente è per forza un messaggio nuovo.
+    const fatto = await eseguiComando(page, 'mkdir prova-di-filo');
+    expect(fatto.executed, `la conferma non ha eseguito: ${JSON.stringify(fatto).slice(0, 300)}`).toBe(true);
+    expect(
+      existsSync(join(base, 'prova-di-filo')),
+      'il comando confermato ha scritto in una cartella diversa da quella mostrata',
+    ).toBe(true);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+    try { rmSync(join(homedir(), 'prova-di-filo'), { recursive: true, force: true }); } catch (_) {}
+  }
+});

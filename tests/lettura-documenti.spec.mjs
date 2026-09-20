@@ -108,3 +108,50 @@ test('un formato che Filo non legge viene rifiutato dicendo cos’è', async ({ 
   expect(r?.executed).toBe(false);
   expect(r.output.error).toBe('unsupported');
 });
+
+// ── Il nome senza cartella (#551) ───────────────────────────────────────────
+//
+// Un elenco stampa i NOMI, non i percorsi: è in quella forma che il nome arriva
+// al passo dopo. Il lettore non guardava dove Filo stesse guardando e cercava
+// nella cartella del PROGRAMMA: il file dell'utente non si trovava, e da quando
+// un nome quasi giusto viene perdonato poteva perfino aprirsi un file di Filo e
+// finire nella risposta al posto del documento chiesto.
+
+test('un nome senza cartella si apre dove Filo sta guardando, non dove sta il programma', async ({ app, openTab }) => {
+  const base = cartellaTemporanea('filo-doc-senza-cartella-');
+  try {
+    writeFileSync(join(base, 'Relazione — attività.txt'), 'giacenza media 1.234 euro\n', 'utf8');
+    const page = await openTab(HOME);
+    await page.evaluate(() => new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { terminal: { enabled: true } } },
+        (r) => resolve(r),
+      );
+    }));
+
+    // Filo entra nella cartella dell'utente, come fa quando cerca un file.
+    const vai = await page.evaluate((dove) => new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'filo_confirm_action',
+        action: { type: 'ESEGUI_COMANDO', comando: `cd '${dove}'` },
+      }, (r) => resolve(r));
+    }), base);
+    expect(vai.executed).toBe(true);
+
+    // Il nome così come l'elenco lo stampa: senza cartella.
+    const r = await leggiDocumento(page, 'Relazione — attività.txt');
+    expect(r?.output?.ok, `il file non si apre: ${JSON.stringify(r?.output?.detail || '')}`).toBe(true);
+    expect(String(r?.output?.text || '')).toContain('giacenza media');
+
+    // E un nome che somiglia a un file del programma non lo pesca: lì l'utente
+    // non sta guardando, e quel contenuto finirebbe nella risposta come se
+    // fosse il suo documento.
+    const sbagliato = await leggiDocumento(page, 'package.jso�');
+    expect(
+      sbagliato?.output?.ok,
+      `aperto un file che non sta dove l'utente guarda: ${JSON.stringify(sbagliato?.output?.name || '')}`,
+    ).toBe(false);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});

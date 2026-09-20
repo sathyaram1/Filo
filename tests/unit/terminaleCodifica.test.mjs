@@ -228,3 +228,53 @@ test('il taglio dell\'output enorme non lascia mezza emoji in fondo', async () =
     `il taglio ha lasciato mezzo carattere: ${JSON.stringify(out.stdout.slice(-4))}`,
   );
 });
+
+// ── #551, terzo giro di verifica ────────────────────────────────────────────
+
+test('il preludio di PowerShell cambia la tabella della console PRIMA di dire che si parla UTF-8', () => {
+  // Due versi, una riga sola. `chcp` cambia la tabella della CONSOLE: è quella
+  // che i programmi esterni usano per scrivere E per leggere. Senza, dire a
+  // PowerShell «i programmi esterni parlano UTF-8» è una bugia (il programma
+  // scrive ancora in OEM), e quello che l'utente digita nella casella di
+  // risposta a un programma in corso gli arriva storpiato.
+  const p = T.PRELUDI_CODIFICA.powershell;
+  assert.ok(/chcp\s+65001/.test(p), 'il preludio non porta la console a UTF-8');
+  assert.ok(
+    p.indexOf('chcp') < p.indexOf('OutputEncoding'),
+    'la tabella della console va cambiata prima di dichiarare la codifica dei programmi esterni',
+  );
+  // Deve poter fallire senza fermare il comando dell'utente, e senza stampare
+  // la riga «Tabella codici attiva».
+  assert.ok(/try \{ chcp 65001 > \$null \} catch \{\}/.test(p), 'chcp non è protetto o stampa');
+});
+
+test('un comando che stampa moltissimo non fa perdere cartella ed esito', async () => {
+  // Il marcatore con cui la shell riporta cartella ed esito sta in CODA
+  // all'output. Oltre il tetto di raccolta non arrivava più: il `cd` non
+  // valeva per il comando dopo e un comando FALLITO risultava riuscito.
+  // È lo scenario di ogni ricerca dentro una cartella grande, cioè quello che
+  // Filo fa quando non sa ancora dove sta il file che gli hanno chiesto.
+  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
+  const comando = process.platform === 'win32'
+    ? `1..${righe} | ForEach-Object { "riga-di-elenco" }; cmd /c exit 3`
+    : `for i in $(seq 1 ${righe}); do echo riga-di-elenco; done; exit 3`;
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 60_000, trackCwd: true });
+  assert.equal(out.truncated, true, 'l\'output doveva sfondare il tetto');
+  assert.equal(out.code, 3, `l'esito del comando si è perso: ${out.code}`);
+  assert.ok(out.cwd, 'la cartella riportata si è persa');
+  assert.ok(
+    !out.stdout.includes('__FILO_ONESHOT_CWD'),
+    'il marcatore interno non deve mai comparire nell\'output mostrato',
+  );
+});
+
+test('la cartella in cui il comando è finito torna anche con un output enorme', async () => {
+  const sotto = join(TMP, 'sottocartella');
+  try { rmSync(sotto, { recursive: true, force: true }); } catch (_) {}
+  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
+  const comando = process.platform === 'win32'
+    ? `mkdir "${sotto}" | Out-Null; Set-Location "${sotto}"; 1..${righe} | ForEach-Object { "riga-di-elenco" }`
+    : `mkdir -p "${sotto}"; cd "${sotto}"; for i in $(seq 1 ${righe}); do echo riga-di-elenco; done`;
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 60_000, trackCwd: true });
+  assert.equal(out.cwd, sotto, `dopo un output lungo Filo crede di essere altrove: ${out.cwd}`);
+});

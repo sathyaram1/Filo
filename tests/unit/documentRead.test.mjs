@@ -15,6 +15,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
@@ -428,4 +429,54 @@ test('una cartella sola col nome quasi giusto si attraversa senza domande', asyn
   const r = await DR.readDocument(join(dir, 'Citt� nuova', 'nota.txt'));
   assert.equal(r.ok, true, `doveva ritrovarlo: ${r.detail}`);
   assert.match(r.text, /appunti veri/);
+});
+
+// ── #551, terzo giro di verifica ────────────────────────────────────────────
+
+test('un nome senza cartella si cerca dove Filo sta guardando, mai dove sta il programma', () => {
+  // Un elenco stampa i NOMI, non i percorsi: è in quella forma che il nome
+  // arriva al passo dopo. Risolto contro la cartella del programma, il file
+  // dell'utente non si trovava — e col perdono sui nomi quasi giusti poteva
+  // perfino aprirsi un file di Filo al posto del documento chiesto.
+  assert.equal(DR.normalizePath('appunti.txt', TMP), join(TMP, 'appunti.txt'));
+  assert.equal(DR.normalizePath('Documenti/bolletta.pdf', TMP), join(TMP, 'Documenti', 'bolletta.pdf'));
+  // Senza cartella nota si ripiega sulla home (da dove il terminale parte),
+  // MAI sulla cartella in cui gira il programma.
+  const senzaCartella = DR.normalizePath('appunti.txt');
+  assert.equal(senzaCartella, join(homedir(), 'appunti.txt'));
+  assert.notEqual(senzaCartella, join(process.cwd(), 'appunti.txt'));
+  // Un percorso assoluto resta quello che è: la cartella non c'entra.
+  const assoluto = join(TMP, 'altrove', 'x.txt');
+  assert.equal(DR.normalizePath(assoluto, join(TMP, 'qualsiasi')), assoluto);
+});
+
+test('un file di testo scritto a due byte per carattere si legge, non torna spazzatura', async () => {
+  // La codifica che su Windows sta dappertutto: Windows PowerShell 5.1 la usa
+  // per ogni file prodotto mandando l'uscita di un comando in un file — cioè
+  // per i file che Filo stesso crea col terminale — e il Blocco note la offre
+  // come «Unicode». Letta come UTF-8 diventa una fila di byte nulli.
+  const testo = 'Attività di marzo — resoconto\nCittà: Torino\nTotale: 1.234,56\n';
+
+  const le = join(TMP, 'uscita-le.txt');
+  writeFileSync(le, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(testo, 'utf16le')]));
+  const rLe = await DR.readDocument(le);
+  assert.equal(rLe.ok, true);
+  assert.ok(rLe.text.includes('Attività di marzo'), `testo storpiato: ${JSON.stringify(rLe.text.slice(0, 40))}`);
+  assert.ok(!rLe.text.includes('\u0000'), 'restano i byte nulli della codifica a due byte');
+
+  // Lo stesso, col verso opposto dei byte.
+  const grezzo = Buffer.from(testo, 'utf16le');
+  const girato = Buffer.from(grezzo);
+  girato.swap16();
+  const be = join(TMP, 'uscita-be.txt');
+  writeFileSync(be, Buffer.concat([Buffer.from([0xfe, 0xff]), girato]));
+  const rBe = await DR.readDocument(be);
+  assert.equal(rBe.ok, true);
+  assert.ok(rBe.text.includes('Città: Torino'), `testo storpiato: ${JSON.stringify(rBe.text.slice(0, 40))}`);
+
+  // Un file a due byte con un'estensione che non dice niente non va scambiato
+  // per binario: i byte nulli ci sono per costruzione.
+  assert.equal(DR.looksLikeText(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(testo, 'utf16le')])), true);
+  // Un UTF-8 normale continua a leggersi come prima.
+  assert.equal(DR.decodeText(Buffer.from(testo, 'utf8')), testo);
 });
