@@ -56,7 +56,7 @@ module.exports = function register(on, ctx) {
       // per la pagina Crediti solo quando è lì che si sistema.
       const W = globalThis.SN_WALLET;
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, compito };
     }
   });
 
