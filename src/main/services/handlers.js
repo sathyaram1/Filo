@@ -2571,6 +2571,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let exhausted = true;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
+      // #533 — l'elenco si ricostruisce a ogni giro: dopo la prima lettura di
+      // roba scritta da altri le uscite non dichiarate spariscono dalla lista,
+      // e sparire è diverso da essere sconsigliate.
+      const tools = Tools
+        ? Tools.definitions({ sistema: process.platform, onboarding: onbActive, compito: task })
+        : null;
       r = await handleAIRequest({
         action: ACTIONS.FILO_CHAT,
         payload: { ...payloadBase, threadMessages },
