@@ -43,10 +43,12 @@ test('la suite di default non raccoglie le prove dei giri', async () => {
   delete process.env.FILO_TEST_VERIFICA;
   const cfg = (await import(new URL(`file://${resolve(ROOT, 'playwright.config.js').replace(/\\/g, '/')}`).href)).default;
   const regole = Array.isArray(cfg.testIgnore) ? cfg.testIgnore : [cfg.testIgnore];
-  assert.ok(regole.some((r) => r instanceof RegExp && r.test('tests/verifica/495/giro1-x.spec.mjs')),
+  // Playwright confronta il percorso INTERO del file, non quello dalla radice.
+  const dentro = `${ROOT}/tests/verifica/495/giro1-x.spec.mjs`;
+  assert.ok(regole.some((r) => r instanceof RegExp && r.test(dentro)),
     'senza questa esclusione le prove di ogni giro passato rientrerebbero nella suite completa, e la'
     + ' pulizia del #510 si disferebbe da sola');
-  assert.ok(!regole.some((r) => r instanceof RegExp && r.test('tests/boot.spec.mjs')),
+  assert.ok(!regole.some((r) => r instanceof RegExp && r.test(`${ROOT}/tests/boot.spec.mjs`)),
     'l\'esclusione deve valere solo per tests/verifica/');
 });
 
