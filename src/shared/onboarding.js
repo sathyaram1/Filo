@@ -446,5 +446,6 @@
     emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
     remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
+    chatId,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
