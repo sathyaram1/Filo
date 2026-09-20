@@ -410,25 +410,23 @@
   function onMenuKeydown(e) {
     if (e.key === 'Escape') closeCtxMenu();
   }
-  function openCtxMenu(x, y, t) {
+  // `items`: [{ label, run }]. Una sola implementazione del menu — clamp alla
+  // finestra, chiusura al clic fuori, Esc — per le schede e per le chat: due
+  // copie della stessa cosa sono due modi di farla divergere.
+  function openMenuAt(x, y, items) {
     closeCtxMenu();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop arc-ctxmenu';
     menu.setAttribute('role', 'menu');
 
-    const reopenOpt = document.createElement('div');
-    reopenOpt.className = 'sn-select-option';
-    reopenOpt.setAttribute('role', 'menuitem');
-    reopenOpt.textContent = 'Riapri';
-    reopenOpt.addEventListener('click', () => { closeCtxMenu(); reopenTab(t); });
-    menu.appendChild(reopenOpt);
-
-    const delOpt = document.createElement('div');
-    delOpt.className = 'sn-select-option';
-    delOpt.setAttribute('role', 'menuitem');
-    delOpt.textContent = 'Elimina';
-    delOpt.addEventListener('click', () => { closeCtxMenu(); removeTab(t); });
-    menu.appendChild(delOpt);
+    for (const it of items) {
+      const opt = document.createElement('div');
+      opt.className = 'sn-select-option';
+      opt.setAttribute('role', 'menuitem');
+      opt.textContent = it.label;
+      opt.addEventListener('click', () => { closeCtxMenu(); it.run(); });
+      menu.appendChild(opt);
+    }
 
     document.body.appendChild(menu);
 
