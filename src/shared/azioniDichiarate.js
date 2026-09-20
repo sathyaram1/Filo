@@ -307,6 +307,7 @@
         // italiano, e «al calendario» si dice quanto «in calendario».
         new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito|fissato|preso|programmato)\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario|sul calendario|l${AP}evento|un evento|l${AP}appuntamento|un appuntamento)\\b`, 'i'),
         new RegExp(`\\b${PRON}(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
+        { re: participio('(?:evento|appuntamento|riunione)', 'aggiunt[oa]|creat[oa]|inserit[oa]|fissat[oa]|messo|messa|segnat[oa]|in calendario', 40), senzaHo: true },
       ],
     },
     {
