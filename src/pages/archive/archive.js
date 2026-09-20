@@ -206,7 +206,13 @@
     $('showCommandsText').textContent = showCommands
       ? `Nascondi i comandi (${commands.length})`
       : `Mostra anche i comandi (${commands.length})`;
-    $('chatsCount').textContent = visible.length ? `${visible.length} chat` : '';
+    // Quando la ricerca si è allargata, la riga del conteggio dice con quali
+    // parole ha trovato: «3 chat» sotto una frase che non combacia farebbe
+    // credere che quella frase ci fosse.
+    const conParole = ricercaAllargata && terminiUsati.length
+      ? ` · trovate con “${terminiUsati.join(' ')}”`
+      : '';
+    $('chatsCount').textContent = visible.length ? `${visible.length} chat${conParole}` : '';
 
     list.innerHTML = '';
     if (!visible.length) {
