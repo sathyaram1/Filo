@@ -392,6 +392,16 @@
   // giusta, o mi sono sbagliato?»).
   const ALTERNATIVA = /(?:^|[\s,;])(?:o|oppure|o no|vero|giusto)(?:[\s,;]|$)/i;
 
+  // Giro 6: la frase guarda INDIETRO, cioè racconta una cosa fatta prima e
+  // non una appena fatta. È quello che serve perché un'azione di un turno
+  // precedente possa reggerla: «sì, te l'ho già messa» dopo la sveglia di
+  // due messaggi fa è vero, «ti ho salvato l'appunto della spesa» dopo un
+  // appunto scritto sul lavoro non lo è.
+  const GUARDA_INDIETRO = new RegExp(
+    `${INIZIO}(?:gi[àa]${AP}?|avevo|prima|in precedenza|all${AP}inizio|poco fa|confermo|esatto|certo|ricordi)${FINE}`
+    + `|l${AP}avevo|come (?:ti )?(?:dicevo|avevo detto|richiesto|chiesto|volevi)`
+    + `|^\\s*s[iì]\\b|\\bti confermo\\b`, 'i');
+
   // La dichiarazione è dentro una domanda? («Ho aperto la pagina giusta?»)
   //
   // Giro 5: si guardava fino al primo `.!?\n`, e la virgola non contava. Così
