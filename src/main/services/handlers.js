@@ -3103,12 +3103,19 @@ async function generateDashboardFromInputs(inputs) {
     message = String(parsed.message || '').trim();
     if (Array.isArray(parsed.suggestions)) {
       suggestions = parsed.suggestions
-        .map((s) => ({
-          icon: String(s.icon || 'link').toLowerCase(),
-          text: String(s.text || '').trim(),
-          action: s.action && typeof s.action === 'object' ? s.action : null,
-          importance: Number(s.importance) || 2,
-        }))
+        .map((s) => {
+          const text = String(s.text || '').trim();
+          const action = s.action && typeof s.action === 'object' ? { ...s.action } : null;
+          // #533 (quarto giro di verifica) — il bottone della home fa quello
+          // che c'è scritto sopra. Il messaggio e i bottoni li scrive un
+          // modello che legge anche i titoli dei siti aperti e salvati: se un
+          // titolo lo inganna, il bottone poteva portarsi dietro una frase
+          // diversa dalla scritta e mandarla in chat come se l'avesse scritta
+          // l'utente — cioè con tutti gli strumenti in mano. La frase che
+          // parte è quella che l'utente legge, sempre.
+          if (action && String(action.type || '').toUpperCase() === 'CHAT') action.prompt = text;
+          return { icon: String(s.icon || 'link').toLowerCase(), text, action, importance: Number(s.importance) || 2 };
+        })
         .filter((s) => s.text);
     }
   }
