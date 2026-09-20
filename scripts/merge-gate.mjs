@@ -210,8 +210,9 @@ async function main() {
   // Astenersi si dice: se da qui non risulta nessun via libera con il suo
   // commit, il controllo non l'ho fatto, e chi legge il registro non deve
   // credere il contrario.
-  if (!decaduti.length && !esitiDecaduti({ ...(statoRamo || {}), verifierSha: 'x', secauditSha: 'x' }, punta).length) {
-    console.error('[merge-gate] nota: da questa macchina non risulta su quale commit sono stati dati i via libera, quindi non ho potuto controllare che parlino di questo. Decide il server.');
+  const nessunCommitScritto = !String((statoRamo || {}).verifierSha || '') && !String((statoRamo || {}).secauditSha || '');
+  if (nessunCommitScritto) {
+    console.error('[merge-gate] nota: da questa macchina non risulta su quale commit sono stati dati i via libera, quindi non ho potuto controllare che parlino di questo contenuto. Decide il server.');
   }
 
   const reply = await merge(ticket, source, { sha: punta });
