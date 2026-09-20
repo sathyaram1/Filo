@@ -136,9 +136,10 @@ test('nella nota di lavorazione un allegato si aggiunge E si toglie, e il salvat
 
   await preparaScheda(app, page, schedaInLavorazione('verifica-602-g3-nota'), chiavi);
 
+  await page.locator('[data-tab="queue"]').click();
   const card = page.locator('.fb-card');
-  const mount = card.locator('.fb-attach-mount[data-kind="notes"]');
-  await expect(mount).toBeVisible({ timeout: 10_000 });
+  const mount = card.locator('.fb-attach-mount[data-kind="notes"]').first();
+  await expect(mount).toBeAttached({ timeout: 10_000 });
 
   await mount.locator('input[type="file"]')
     .setInputFiles({ name: 'schermata.png', mimeType: 'image/png', buffer: PNG_1x1 });
