@@ -91,6 +91,75 @@ test("l'invito filo:// arriva a Filo anche su Linux", () => {
   assert.ok(filo, 'senza build.protocols l\'AppImage non dichiara filo:// e su Linux il link d\'invito non apre Filo');
 });
 
+// ── Il doppio clic deve aprire Filo, non un errore che nessuno legge ───────
+//
+// Chromium, all'avvio, si chiude in una gabbia di sicurezza che vuole un
+// permesso del kernel (gli spazi dei nomi utente non privilegiati). Dove quel
+// permesso è negato ripiega su `chrome-sandbox`, che dovrebbe appartenere a
+// root ed essere setuid: dentro un AppImage quel marchio non può esistere, e
+// allora Chromium non parte affatto — «No usable sandbox!», sul terminale, dove
+// chi ha fatto doppio clic non lo legge mai. Quel permesso è negato di serie su
+// Ubuntu dalla 23.10 in avanti, cioè sulla versione che si scarica oggi.
+//
+// La voce di menu dentro il pacchetto chiede `--no-sandbox` da sé (lo scrive
+// electron-builder), ma vale solo per chi ha integrato l'applicazione: il
+// doppio clic passa dal lanciatore interno del pacchetto, che eseguiva il
+// programma senza aggiungere niente. Da qui il passo che mette un lanciatore
+// al posto del programma. Se sparisce, il doppio clic torna a non aprire
+// niente su metà delle macchine Linux, in silenzio.
+
+test('il doppio clic sul pacchetto Linux avvia Filo senza la gabbia di sicurezza', async () => {
+  const { mkdtempSync, writeFileSync, readFileSync: leggi, existsSync: c_e } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+
+  const hook = pkg.build?.afterPack;
+  assert.ok(hook, 'build.afterPack sparito: nessuno mette più il lanciatore nel pacchetto Linux');
+  const { default: afterPack } = require(join(ROOT, hook));
+
+  // Una finta cartella impacchettata: dentro c'è solo il "programma".
+  const dove = mkdtempSync(join(tmpdir(), 'filo linux afterpack '));
+  writeFileSync(join(dove, 'filo'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+
+  await afterPack({
+    electronPlatformName: 'linux',
+    appOutDir: dove,
+    packager: { executableName: 'filo', appInfo: { productFilename: 'Filo' } },
+  });
+
+  assert.ok(c_e(join(dove, 'filo-bin')),
+    'il programma vero non è stato spostato: il lanciatore non ha niente da avviare');
+  const lanciatore = leggi(join(dove, 'filo'), 'utf8');
+  assert.match(lanciatore, /--no-sandbox/,
+    'il lanciatore non chiede più l\'avvio senza gabbia: su Ubuntu 24.04 il doppio clic non aprirebbe niente');
+  assert.match(lanciatore, /filo-bin/, 'il lanciatore non nomina il programma vero');
+  // Senza `exec -a` il processo si chiamerebbe «filo-bin» e la finestra non si
+  // aggancerebbe più alla sua icona nella barra (StartupWMClass=Filo).
+  assert.match(lanciatore, /exec -a/,
+    'il lanciatore cambia il nome del processo: la finestra non si aggancia più alla sua icona nella barra');
+
+  // Una seconda passata sulla stessa cartella non deve rifare lo spostamento,
+  // altrimenti il lanciatore prenderebbe il posto del programma vero.
+  await afterPack({
+    electronPlatformName: 'linux',
+    appOutDir: dove,
+    packager: { executableName: 'filo', appInfo: { productFilename: 'Filo' } },
+  });
+  assert.equal(leggi(join(dove, 'filo'), 'utf8'), lanciatore, 'la seconda passata ha riscritto il lanciatore');
+  assert.match(leggi(join(dove, 'filo-bin'), 'utf8'), /exit 0/, 'la seconda passata ha sovrascritto il programma vero');
+});
+
+test('il pacchetto costruito, se c\'è, ha il lanciatore al posto giusto', () => {
+  // Quando la build Linux è appena girata (nel contenitore delle routine, o nel
+  // lavoro «Verifica build Linux»), si guarda il risultato vero invece della
+  // ricetta. Se non c'è, non c'è niente da dire.
+  const dentro = join(ROOT, 'dist', 'linux-unpacked');
+  if (!existsSync(join(dentro, 'filo'))) return;
+  assert.ok(existsSync(join(dentro, 'filo-bin')),
+    'nel pacchetto costruito il programma vero non è stato spostato: il lanciatore non c\'è');
+  assert.match(readFileSync(join(dentro, 'filo'), 'utf8'), /--no-sandbox/,
+    'nel pacchetto costruito il lanciatore non chiede l\'avvio senza gabbia');
+});
+
 // ── La pubblicazione automatica ─────────────────────────────────────────────
 
 const WORKFLOW = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
