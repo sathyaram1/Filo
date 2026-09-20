@@ -66,7 +66,7 @@ test('lo specchio locale tiene il commit di ogni esito, e una correzione se li p
 
 // ─── Le due strade che registrano il verdetto ────────────────────────────────
 
-function fintoServer() {
+function fintoServer(risposta = { ok: true, id: 'ID1', num: '#485' }) {
   const ricevuti = [];
   const srv = createServer((req, res) => {
     let body = '';
@@ -74,9 +74,9 @@ function fintoServer() {
     req.on('end', () => {
       let j = {};
       try { j = body ? JSON.parse(body) : {}; } catch (_) { /* il test lo scopre dagli assert */ }
-      ricevuti.push({ url: req.url, body: j });
+      ricevuti.push({ url: String(req.url || ''), body: j });
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true, id: 'ID1', num: '#485' }));
+      res.end(JSON.stringify(risposta));
     });
   });
   return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, ricevuti, port: srv.address().port })));
