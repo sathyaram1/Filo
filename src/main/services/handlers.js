@@ -1575,6 +1575,45 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           return { executed: false, kept: true, output: { search: query, results: [], error: e?.message || String(e) } };
         }
       }
+      case 'LEGGI_PAGINA': {
+        // Lettura del TESTO di una pagina web. Prima di questa azione il
+        // modello aveva accesso a tutto il web tranne che al suo contenuto:
+        // la ricerca gli dava 240 caratteri di riassunto, e per un prezzo o
+        // una clausola dentro la pagina poteva solo indovinare. Il testo torna
+        // come `output` e rientra nel contesto nello stesso turno.
+        // Sola lettura: non apre schede, non scrive, non esegue.
+        const url = action.url ?? action.href ?? action.link ?? action.indirizzo ?? action.pagina;
+        let r = null;
+        try {
+          const PR = require('./pageRead');
+          r = await PR.readPage(url, { leggiScheda: testoDaSchedaAperta });
+        } catch (e) {
+          console.warn('[Filo] lettura pagina fallita', e?.message || e);
+        }
+        if (!r) {
+          return {
+            executed: false,
+            kept: true,
+            output: { pageRead: String(url == null ? '' : url), ok: false, error: 'network', detail: 'lettura non disponibile' },
+          };
+        }
+        return {
+          executed: !!r.ok,
+          kept: true,
+          output: {
+            pageRead: r.url || String(url == null ? '' : url),
+            ok: !!r.ok,
+            title: r.title || '',
+            kind: r.kind || '',
+            source: r.source || '',
+            empty: !!r.empty,
+            truncated: !!r.truncated,
+            text: r.text || '',
+            error: r.error || null,
+            detail: r.detail || '',
+          },
+        };
+      }
       case 'LEGGI_TRASPARENZA': {
         // I documenti di trasparenza (transparency/*.md → SN_TRANSPARENCY) sono
         // le scelte dell'owner messe per iscritto: quando l'utente chiede perché
