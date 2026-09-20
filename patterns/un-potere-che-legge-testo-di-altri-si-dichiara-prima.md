@@ -148,3 +148,34 @@ autorizzato a fare Filo?» uno se la chiede quando si accorge di qualcosa di
 strano, cioè quasi mai entro mezz'ora, e mai nella stessa sessione. Il
 riassunto di ogni compito va su disco (`FILO_COMPITI`, senza il registro riga
 per riga: cosa ha letto e cosa gli è stato impedito bastano e pesano poco).
+
+## Quello che il terzo giro ha aggiunto
+
+**Una lettura non finisce col turno: finisce dove finiscono le cose che ha
+lasciato scritte.** Chiuse le strade con cui il testo di un sito ARRIVAVA,
+restavano quelle con cui TORNAVA. Filo riassume una pagina e nella risposta ne
+riporta la frase; la risposta finisce nel registro delle ultime ventiquattr'ore;
+quel registro sta nello stato di ogni richiesta successiva. L'utente preme Esc,
+riscrive, e la richiesta nuova nasce «pulita» con la frase della pagina davanti
+e tutti gli strumenti in mano. Sopravvive anche alla chiusura di Filo. Stessa
+forma per un appunto salvato leggendo una pagina (il suo riassunto sta nel
+prompt di ogni messaggio) e per l'etichetta di una sveglia trovata su quella
+pagina (sta nei processi attivi). La regola: **tutto ciò che Filo scrive
+durante un compito contaminato si porta dietro quella marcatura**, e per chi
+poi agisce quel testo non torna nello stato — resta il fatto che c'è, e il
+contenuto si chiede con una lettura, che fa scattare il perimetro.
+
+Perché la marcatura e non la busta del contenuto esterno: una busta è un
+avvertimento al modello, e il punto di tutto questo è non dipendere da quanto
+il modello è bravo a non cascarci. La busta serve dove il testo DEVE arrivare
+(una ricerca, una pagina da riassumere); qui il testo non deve arrivare per
+niente, perché arriverebbe prima che la richiesta abbia dichiarato qualcosa.
+
+**Anche gli aiutanti che partono da soli passano dal perimetro.** A fine turno
+un agente rilegge la conversazione e decide cosa vale la pena ricordare
+dell'utente: scrive in memoria, cioè fa un'uscita, per conto di una richiesta
+che quell'uscita non aveva. Bastava che ci cascasse una volta e la frase di una
+pagina diventava una cosa «imparata», in memoria per sempre e davanti a ogni
+richiesta futura. Dopo un turno contaminato non parte. Si perde qualche lezione
+sui turni in cui Filo ha letto qualcosa; i turni puliti, che sono la maggior
+parte, continuano a insegnargli chi è l'utente.
