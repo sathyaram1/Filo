@@ -477,11 +477,11 @@ test('l\'astensione parla anche quando di UNO solo dei due ok non si sa il conte
   assert.match(testoEsitiSenzaCommit(['la verifica', 'il controllo di sicurezza']), /i via libera/);
 });
 
-test('il contenuto esaminato deve stare dove chi fonde andrà a prenderlo', () => {
+test('in cima al ramo, dove chi fonde va a prendere, dev\'esserci il contenuto esaminato', () => {
   const P = 'p'.repeat(40);
   const O = 'o'.repeat(40);
   // Si sceglie sul PRIMO argomento: «refs/remotes/origin/…» contiene la parola
-  // «remote», e un finto che guardasse tutta la riga risponderebbe a rev-parse
+  // «remote», e un finto che guardasse tutta la riga risponderebbe a ls-remote
   // con la lista dei remoti.
   const finto = (risposte) => (args) => {
     const val = risposte[String(args[0] || '')];
@@ -494,24 +494,65 @@ test('il contenuto esaminato deve stare dove chi fonde andrà a prenderlo', () =
   assert.equal(statoPubblicazione(finto({ remote: { ok: false, out: '' } }), 'worker/485', P).stato,
     'sconosciuto', 'git che non risponde non vale «tutto a posto»');
 
-  assert.equal(statoPubblicazione(finto({
+  // La punta vera si chiede a origin. Se origin non risponde ci si astiene e
+  // lo si dice: concludere dal riferimento locale è rispondere a memoria a una
+  // domanda sul presente (feedback #485, giro 4).
+  const muto = statoPubblicazione(finto({
     remote: { ok: true, out: 'origin' },
-    'rev-parse': { ok: false, out: '' },
-  }), 'worker/485', P).stato, 'sconosciuto', 'senza il ramo su origin non si conclude niente');
+    'ls-remote': { ok: false, out: 'fatal: could not read from remote repository' },
+    'rev-parse': { ok: true, out: O },
+  }), 'worker/485', P);
+  assert.equal(muto.stato, 'sconosciuto', 'origin che non risponde non si sostituisce col ricordo locale');
+  assert.match(muto.motivo, /could not read|non riesco/i, 'e il motivo si legge');
 
   assert.equal(statoPubblicazione(finto({
     remote: { ok: true, out: 'origin' },
-    'rev-parse': { ok: true, out: O },
+    'ls-remote': { ok: true, out: `${P}\trefs/heads/worker/485` },
+  }), 'worker/485', P).stato, 'pubblicato', 'in cima c\'è proprio il contenuto esaminato');
+
+  // Contenuto esaminato CONTENUTO nella storia ma non in cima: è il caso che
+  // prima passava per «pubblicato», e ad atterrare sarebbe il commit in cima,
+  // che nessuno ha guardato.
+  const avanti = statoPubblicazione(finto({
+    remote: { ok: true, out: 'origin' },
+    'ls-remote': { ok: true, out: `${O}\trefs/heads/worker/485` },
+    'cat-file': { ok: true, out: '' },
     'merge-base': { ok: true, out: '' },
-  }), 'worker/485', P).stato, 'pubblicato');
+  }), 'worker/485', P);
+  assert.equal(avanti.stato, 'piu_avanti', 'stare nella storia non vuol dire essere quello che atterra');
+  assert.equal(avanti.suOrigin, O);
 
   const assente = statoPubblicazione(finto({
     remote: { ok: true, out: 'origin\nbackup' },
-    'rev-parse': { ok: true, out: O },
+    'ls-remote': { ok: true, out: `${O}\trefs/heads/worker/485` },
+    'cat-file': { ok: true, out: '' },
     'merge-base': { ok: false, out: '' },
   }), 'worker/485', P);
-  assert.equal(assente.stato, 'assente', 'un commit rimasto solo qui non è pubblicato');
+  assert.equal(assente.stato, 'indietro', 'un commit rimasto solo qui non è quello che atterra');
   assert.equal(assente.suOrigin, O);
+
+  // Il ramo su origin non c'è proprio: non è «non lo so», è «là non c'è niente
+  // da fondere», e il rimedio è lo stesso del contenuto rimasto qui.
+  assert.equal(statoPubblicazione(finto({
+    remote: { ok: true, out: 'origin' },
+    'ls-remote': { ok: true, out: '' },
+  }), 'worker/485', P).stato, 'indietro');
+
+  // Le due versioni differiscono ma l'oggetto di origin qui non c'è e non si
+  // riesce a scaricarlo: non si sa in che senso differiscono, e i due rimedi
+  // sono opposti (spedire, oppure NON spedire e rifare il giro). Ci si astiene.
+  assert.equal(statoPubblicazione(finto({
+    remote: { ok: true, out: 'origin' },
+    'ls-remote': { ok: true, out: `${O}\trefs/heads/worker/485` },
+    'cat-file': { ok: false, out: '' },
+  }), 'worker/485', P).stato, 'sconosciuto');
+
+  const piuAvanti = testoPiuAvanti(P, O, 'worker/485-xyz');
+  assert.match(piuAvanti, new RegExp(`${'p'.repeat(12)}`), 'quale contenuto è stato esaminato');
+  assert.match(piuAvanti, new RegExp(`${'o'.repeat(12)}`), 'e cosa c\'è in cima al ramo');
+  assert.match(piuAvanti, /revision_capability/, 'la decadenza si registra, non resta a schermo');
+  assert.ok(!/git push/.test(piuAvanti),
+    'e non si suggerisce di spedire: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via');
 
   const testo = testoNonPubblicato(P, O, 'worker/485-xyz');
   assert.match(testo, new RegExp(`${'p'.repeat(12)}`), 'quale contenuto è stato esaminato');

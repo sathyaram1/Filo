@@ -46,7 +46,7 @@ import { fileURLToPath } from 'node:url';
 import { pinnedRepoRoot, absolutizeRecipe, TOOLS_ROOT } from './lib/tools-pin.mjs';
 import { merge } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
-import { headSha, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
+import { headSha, currentBranch, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -319,12 +319,14 @@ const USO = [
   '  Chiede al SERVER di fondere <ramo> su main: lui scarica il diff, fa girare',
   '  i controlli e fonde con la sua identità. Qui non ci sono opzioni.',
   '  Serve il biglietto del giro, che si rilegge da solo dal promemoria.',
+  '  <ramo> dev\'essere quello su cui sta la directory: da lì si legge tutto.',
   '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo i via libera,',
-  '  se nella directory c\'è qualcosa fuori dai commit, o se il contenuto',
-  '  esaminato non è arrivato su origin (da dove il server lo prende), non parte.',
+  '  se nella directory c\'è qualcosa fuori dai commit, o se in cima al ramo su',
+  '  origin (da dove il server lo prende) non c\'è il contenuto esaminato, non parte.',
   '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
-  '        20 conflitto · 1 uso sbagliato, ramo mosso dopo i via libera,',
-  '           contenuto non pubblicato, o rifiuto del server',
+  '        20 conflitto · 1 uso sbagliato, ramo diverso da quello della directory,',
+  '           ramo mosso dopo i via libera, contenuto che non è quello in cima',
+  '           su origin, o rifiuto del server',
 ].join('\n');
 
 async function main() {
