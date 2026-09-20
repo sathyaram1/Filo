@@ -136,7 +136,7 @@ test('escludere tutti e due gli account lo dice, e riattivarne uno lo toglie', a
 test('un numero storto non si salva e lo dice, senza toccare quello che c\'era', async ({ openTab }) => {
   const page = await apriAutomazioni(openTab, { maxSessions: 4 });
   for (const scritto of ['0', '21', '3.5', '', '   ', '-2', '999999', 'e', '1e3']) {
-    await page.locator('#mgMaxSessions').fill(scritto);
+    await scriviNumero(page, scritto);
     await page.locator('#mgMaxSessionsSave').click();
     await expect(page.locator('#mgMaxSessionsMsg')).toContainText('Non salvato.', { timeout: 3000 });
     expect(await page.evaluate(() => window.__sessionsDoc.maxSessions)).toBe(4);
