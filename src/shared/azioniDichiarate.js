@@ -1102,6 +1102,9 @@
       // Le azioni di questa famiglia partite adesso: ognuna regge UNA
       // dichiarazione, non tutte quelle della sua specie.
       let disponibili = quanteAzioni(fam);
+      // …e quante ne reggono i turni prima. Una scrittura sola non può
+      // reggere tre appunti raccontati dopo.
+      let dalPrima = quantePassate(fam);
       for (const d of trovate) {
         const ora = oraDecide(fam, d);
         if (ora === true) {
