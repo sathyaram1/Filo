@@ -52,13 +52,26 @@ La forma giusta, ogni volta che un esito attraversa il tempo:
   unica, chiamata da tutte le strade, e un solo posto dove sta scritto quali
   esiti valgono per un commit.
 - **L'impronta deve descrivere quello che chi legge andrà DAVVERO a
-  prendere.** Se l'esaminato sta qui e il lettore scarica da un'altra parte,
-  l'impronta è giusta e il contenuto no: si controlla che sia arrivato là,
-  prima di chiedere. È il gemello del rifiuto per i file fuori dai commit — lì
-  la punta si sposta in avanti dopo l'ok, qui non si è mai mossa dove conta —
-  e il controllo che parla con la rete ha un tetto sul tempo, perché «non
-  risponde» deve diventare «non l'ho potuto controllare», non un comando
-  appeso.
+  prendere, e il controllo è un'UGUAGLIANZA.** Se l'esaminato sta qui e il
+  lettore scarica da un'altra parte, l'impronta è giusta e il contenuto no: si
+  controlla che là ci sia quello, prima di chiedere. «C'è arrivato» non basta:
+  un contenuto può stare nella storia senza essere quello che il lettore
+  prende, e allora ad arrivare è il resto, che nessuno ha guardato. Le due
+  direzioni vogliono rimedi opposti e vanno distinte: se là manca si spedisce,
+  se là c'è di più non si spedisce niente (sovrascrivere butterebbe via lavoro
+  che qui non c'è) e il giro si rifà su quel contenuto. È il gemello del
+  rifiuto per i file fuori dai commit — lì la punta si sposta in avanti dopo
+  l'ok, qui non si è mai mossa dove conta. La punta vera si chiede a chi la
+  tiene, non al ricordo locale di dov'era; il controllo che parla con la rete
+  ha un tetto sul tempo, e se la rete non risponde la risposta è «non l'ho
+  potuto controllare», mai una conclusione tratta dal ricordo.
+- **Chi controlla il contenuto di un'etichetta dev'essere posizionato su
+  quell'etichetta.** Se lo strumento legge tutto dalla cartella che ha sotto
+  (i file fuori dai commit, la versione, gli esiti registrati) ma il nome
+  glielo passa chi lo chiama, i controlli parlano di una cosa e la richiesta
+  ne nomina un'altra. Il nome e la cartella devono combaciare, e se non
+  combaciano ci si ferma lì: è l'unica posizione da cui i controlli dopo hanno
+  un senso.
 - **I comandi che un rifiuto detta puntano agli attrezzi di chi lo legge.**
   Un rimedio scritto con un percorso relativo riporta dentro la cosa da cui il
   lettore era stato mandato via — e un comando che si copia da un rifiuto vale

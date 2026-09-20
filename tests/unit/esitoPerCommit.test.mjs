@@ -602,3 +602,105 @@ test('il ramo nominato dev\'essere quello su cui sta la directory', () => {
   // su nessun ramo, e va detto così.
   assert.match(testoRamoDiverso('worker/485', ''), /testa staccata/);
 });
+
+// ─── Quello che atterra è la PUNTA del ramo su origin ───────────────────────
+//
+// Chi fonde non prende quello che c'è in questa directory: scarica il ramo e
+// fonde la sua punta. «Il contenuto esaminato è arrivato là» non basta, perché
+// un commit può stare nella storia del ramo senza essere quello che atterra.
+// Con il solo contenimento, un ramo più avanti su origin passava in silenzio e
+// ad atterrare era un contenuto che nessuno aveva guardato: la segnalazione
+// #485 all'ultimo passo (verifica del giro 4).
+
+test('la fusione non parte se su origin il ramo è più avanti del contenuto esaminato', async () => {
+  const { srv, ricevuti: buste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'x'.repeat(40) });
+  const { dir, g, punta } = deposito('filo-485-avanti-');
+  const remoto = cartellaTemporanea('filo-485-avanti-remoto-');
+  const altra = cartellaTemporanea('filo-485-avanti-altra-');
+  const fuori = cartellaTemporanea('filo-485-avanti-fuori-');
+  const statoDir = resolve(fuori, 'stato');
+  try {
+    execFileSync('git', ['init', '-q', '--bare'], { cwd: remoto, stdio: ['ignore', 'pipe', 'pipe'] });
+    g(['remote', 'add', 'origin', remoto]);
+    g(['push', '-q', '--no-verify', 'origin', 'worker/485']);
+    const esaminato = punta();
+    mkdirSync(statoDir, { recursive: true });
+    writeFileSync(resolve(statoDir, 'ID1.json'),
+      JSON.stringify({ id: 'ID1', branch: 'worker/485', verifierSha: esaminato, secauditSha: esaminato }), 'utf8');
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: dir,
+      FILO_TOOLS_ROOT: dir,
+      FILO_DISPATCH_STATE_DIR: statoDir,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-finto',
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+    };
+    const lancia = (ramo = 'worker/485') => new Promise((r) => execFile(process.execPath, [GATE, ramo], { env, cwd: dir },
+      (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
+
+    // A contenuto fermo la fusione parte: la difesa non blocca chi non ha
+    // fatto niente di storto.
+    const onesto = await lancia();
+    assert.equal(onesto.status, 0, `il cammino onesto doveva arrivare in fondo: ${onesto.stderr}`);
+    assert.equal(buste.find((x) => x.url.includes('routineMerge'))?.body?.sha, esaminato);
+
+    // Ora il ramo su origin va avanti senza che questa copia si muova: succede
+    // quando il ripristino a un punto fermo riporta indietro la copia locale e
+    // il riallineamento di quella pubblicata non riesce.
+    execFileSync('git', ['clone', '-q', remoto, altra], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const h = (args) => execFileSync('git', args, { cwd: altra, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    h(['config', 'user.email', 't@t']); h(['config', 'user.name', 't']);
+    h(['checkout', '-q', 'worker/485']);
+    h(['commit', '-q', '--allow-empty', '-m', 'in cima a origin, mai esaminato']);
+    h(['push', '-q', '--no-verify', 'origin', 'worker/485']);
+    const inCima = h(['rev-parse', 'HEAD']).trim();
+    assert.equal(punta(), esaminato, 'questa copia non si è mossa');
+
+    const quante = buste.length;
+    const dopo = await lancia();
+    assert.equal(dopo.status, 1, 'in cima al ramo c\'è un contenuto che nessuno ha esaminato: la fusione non si chiede');
+    assert.match(dopo.stderr, /più avanti/);
+    assert.ok(dopo.stderr.includes(inCima.slice(0, 12)), 'e si dice cosa ci sarebbe in cima');
+    assert.match(dopo.stderr, /revision_capability/, 'la decadenza si registra, non resta a schermo');
+    assert.ok(!/git push/.test(dopo.stderr), 'e non si suggerisce di spedire: là c\'è lavoro che qui non c\'è');
+    assert.equal(buste.length, quante, 'il server non viene nemmeno chiamato');
+  } finally {
+    srv.close();
+    for (const d of [dir, remoto, altra, fuori]) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test('la fusione non parte se il ramo nominato non è quello su cui sta la directory', async () => {
+  const { srv, ricevuti: buste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'x'.repeat(40) });
+  const { dir } = deposito('filo-485-ramo-diverso-');
+  const fuori = cartellaTemporanea('filo-485-ramo-diverso-fuori-');
+  try {
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: dir,
+      FILO_TOOLS_ROOT: dir,
+      FILO_DISPATCH_STATE_DIR: resolve(fuori, 'stato'),
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-finto',
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+    };
+    const lancia = (ramo) => new Promise((r) => execFile(process.execPath, [GATE, ramo], { env, cwd: dir },
+      (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stderr: String(se || '') })));
+
+    // Un ramo che qui non c'è: tutte le guardie si astenevano una per una (di
+    // quel ramo non risulta niente) e la richiesta partiva lo stesso, con la
+    // versione di un altro ramo.
+    const altro = await lancia('worker/485-altro');
+    assert.equal(altro.status, 1, 'doveva fermarsi');
+    assert.match(altro.stderr, /fusione non chiesta/);
+    assert.equal(buste.length, 0, 'e il server non viene nemmeno chiamato');
+
+    const lunghissimo = await lancia('w'.repeat(10000));
+    assert.equal(lunghissimo.status, 1, 'un nome da diecimila lettere non è il ramo della directory');
+    assert.equal(buste.length, 0);
+  } finally {
+    srv.close();
+    for (const d of [dir, fuori]) rmSync(d, { recursive: true, force: true });
+  }
+});
