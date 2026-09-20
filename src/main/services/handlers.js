@@ -2957,6 +2957,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     if (textReply && textReply !== '(vuoto)') {
       after = Onboarding.appendTurn(after, { role: 'filo', text: textReply });
     }
+    // #533 (quinto giro di verifica) — la conversazione dell'intervista si
+    // porta dietro il nome della richiesta che l'ha scritta: quando ricompare
+    // in un'altra scheda, o dopo un riavvio, riparte con gli stessi limiti.
+    if (task) after = Onboarding.rememberCompito(after, task.id);
     if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
     await saveOnboarding(after);
     onboardingClosed = !!after.done;
