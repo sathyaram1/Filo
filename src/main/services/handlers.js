@@ -2213,10 +2213,18 @@ function contaTipi(azioni) {
   return out;
 }
 
-function tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini) {
+// #517 (giro 7) — il testo INCOLLATO nel messaggio è il terzo segno di
+// contesto, accanto ai riassunti dei file e all'immagine. Incollare è il modo
+// più comune di far leggere qualcosa a Filo: il testo gli arriva dentro la
+// domanda, senza passare da nessuno strumento, e «ho letto il documento: sono
+// 84 euro» diventava un'accusa falsa. La soglia è la lunghezza: sotto, un
+// messaggio è una richiesta, non un documento incollato.
+const TESTO_INCOLLATO = 400;
+function tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini, userMessage) {
   const tipi = Dichiarate.insiemeDiTipi(renderedActions);
   if (String(fileSummaries || '').trim()) tipi.add('CONTESTO_FILE');
   if (conImmagini) tipi.add('CONTESTO_IMMAGINE');
+  if (String(userMessage || '').length >= TESTO_INCOLLATO) tipi.add('CONTESTO_TESTO');
   return tipi;
 }
 
