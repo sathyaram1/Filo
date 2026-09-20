@@ -3012,8 +3012,8 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   const inputs = await gatherDashboardInputs({ openTabsCount });
   const cached = await FiloMem.getDashboardCache();
 
-  // Senza chiave API: messaggio istantaneo dalle pagine salvate (come prima).
-  if (!inputs.hasKey) {
+  // Senza un modello servibile: messaggio istantaneo dalle pagine salvate.
+  if (!inputs.canServe) {
     const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
     await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature });
     return { ...payload, cached: false, ts: new Date().toISOString() };
