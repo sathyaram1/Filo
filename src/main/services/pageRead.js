@@ -192,25 +192,23 @@ function attributi(raw) {
  * l'utente non vede), `'fuori'` (menu, pubblicità, cookie: mai contenuto),
  * `'cornice'` (contorno che però può contenere il dato chiesto) o `false`.
  *
- * `inZona` (dentro `main`/`article`) e le tabelle salvano intestazione e coda:
- * lì sono la data del pezzo o i nomi delle colonne. Fuori si butta solo ciò
- * che si dichiara cornice del sito o che sta in cima al corpo: più in dentro,
- * un `header` è l'intestazione dell'articolo anche senza `main` attorno.
+ * Dentro `main`/`article` e in una tabella l'intestazione e la coda sono del
+ * PEZZO, non del sito (la data, la firma, i nomi delle colonne): restano al
+ * loro posto. Fuori diventano contorno, mai cestino: il nome del riquadro non
+ * basta a decidere che il dato chiesto non è lì dentro (#553).
  */
-function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIlleggibile = false } = {}) {
+function daScartare(nome, attrs, { inZona = false, soloIlleggibile = false } = {}) {
   if (TAG_ILLEGGIBILI.has(nome)) return 'illeggibile';
   if ('hidden' in attrs) return 'illeggibile';
   if (String(attrs['aria-hidden'] || '').toLowerCase() === 'true') return 'illeggibile';
   if (NASCOSTO.test(attrs.style || '')) return 'illeggibile';
   if (soloIlleggibile) return false;
-  const esente = (t) => CORNICE_SITO.test(t)
-    && !CORNICE_DICHIARATA.test(t)
-    && (inZona || TAG_TABELLA.has(nome) || !primoLivello);
   if (TAG_FUORI.has(nome)) return 'fuori';
   if (attrs.role && ROLE_RUMORE.test(attrs.role)) return 'fuori';
   const token = `${attrs.class || ''} ${attrs.id || ''}`.split(/[\s]+/).filter(Boolean);
-  if (token.some((t) => TOKEN_RUMORE.test(t) && !esente(t))) return 'fuori';
-  const cornice = (TAG_CORNICE.has(nome) && !esente(nome))
+  if (token.some((t) => TOKEN_RUMORE.test(t))) return 'fuori';
+  if (inZona || TAG_TABELLA.has(nome)) return false;
+  const cornice = TAG_CORNICE.has(nome)
     || (attrs.role && ROLE_CORNICE.test(attrs.role))
     || token.some((t) => TOKEN_CORNICE.test(t));
   return cornice ? 'cornice' : false;
