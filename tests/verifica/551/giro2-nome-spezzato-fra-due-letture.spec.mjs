@@ -33,9 +33,16 @@ const NOME = 'RELAZIONE — attività finale.txt';
 // e l'altro Filo legge, e si trova in mano mezzo carattere.
 const A_META = `printf 'RELAZIONE \\342\\200\\224 attivit\\303'; sleep 0.5; printf '\\240 finale.txt\\n'`;
 
-const execAction = (app, action, opts) =>
-  app.evaluate((_electron, { action, opts }) =>
-    globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
+// Il comando passa dal canale della PAGINA, come quando lo emette l'assistente
+// nella chat della home: una pagina filo:// è fidata per origine, quindi un
+// comando che chiede conferma parte davvero invece di restare sospeso.
+const eseguiComando = (page, comando) =>
+  page.evaluate((c) => new Promise((resolve) => {
+    chrome.runtime.sendMessage({
+      type: 'filo_confirm_action',
+      action: { type: 'ESEGUI_COMANDO', comando: c },
+    }, (r) => resolve(r));
+  }), comando);
 
 const accendiTerminale = (page) =>
   page.evaluate(async () => chrome.runtime.sendMessage({
@@ -43,11 +50,11 @@ const accendiTerminale = (page) =>
     action: { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' },
   }));
 
-test('il nome non si rompe se l’output arriva in due pezzi', async ({ app, openTab }) => {
+test('il nome non si rompe se l’output arriva in due pezzi', async ({ openTab }) => {
   const page = await openTab(HOME);
   await accendiTerminale(page);
 
-  const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: A_META });
+  const r = await eseguiComando(page, A_META);
   expect(r.executed, `il comando non è partito: ${JSON.stringify(r).slice(0, 400)}`).toBe(true);
   const stdout = String(r.output?.stdout || '');
 
@@ -58,7 +65,7 @@ test('il nome non si rompe se l’output arriva in due pezzi', async ({ app, ope
   expect(stdout).toContain(NOME);
 });
 
-test('il nome storpiato non apre più niente col terminale', async ({ app, openTab }) => {
+test('il nome storpiato non apre più niente col terminale', async ({ openTab }) => {
   // Perché conta: il modello prende il nome dall'output e lo rimette nel
   // comando dopo (copia, sposta, apri, leggi col terminale). Se il nome è
   // storpiato quel comando non trova niente, e l'utente si sente rispondere
@@ -71,16 +78,13 @@ test('il nome storpiato non apre più niente col terminale', async ({ app, openT
     const page = await openTab(HOME);
     await accendiTerminale(page);
 
-    const elenco = await execAction(app, { type: 'ESEGUI_COMANDO', comando: A_META });
+    const elenco = await eseguiComando(page, A_META);
     expect(elenco.executed, `il comando non è partito: ${JSON.stringify(elenco).slice(0, 400)}`).toBe(true);
     const nomeLetto = String(elenco.output?.stdout || '')
       .split(/\r?\n/).map((s) => s.trim()).find((s) => s.endsWith('.txt')) || '';
     expect(nomeLetto, 'dall’output non è uscito nessun nome di file').not.toBe('');
 
-    const riuso = await execAction(app, {
-      type: 'ESEGUI_COMANDO',
-      comando: `cat "${join(dir, nomeLetto)}"`,
-    });
+    const riuso = await eseguiComando(page, `cat "${join(dir, nomeLetto)}"`);
     expect(
       String(riuso.output?.stdout || ''),
       `il nome preso dall’output non riapre il file: ${JSON.stringify(nomeLetto)}`,
@@ -90,7 +94,7 @@ test('il nome storpiato non apre più niente col terminale', async ({ app, openT
   }
 });
 
-test('il terminale della dashboard, sullo stesso comando, non perde niente', async ({ app, openTab }) => {
+test('il terminale della dashboard, sullo stesso comando, non perde niente', async ({ openTab }) => {
   // La strada gemella: lo stesso identico comando, digitato dall'utente nel
   // terminale della dashboard invece che emesso dall'assistente. Qui il nome
   // resta intero. Le due strade devono comportarsi allo stesso modo: questa
