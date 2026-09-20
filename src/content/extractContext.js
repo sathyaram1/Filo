@@ -362,12 +362,17 @@
     // nei riquadri senza indirizzo (#407) qui arrivano elementi di un ALTRO
     // documento, e chiederne lo stile alla finestra sbagliata non risponde di
     // loro.
+    // Il sito decide COME ripiegare una sezione, e da quella scelta non possono
+    // dipendere né il comportamento né il conto dell'utente (#505): far sparire
+    // il riquadro, saltarne il contenuto o schiacciarlo a zero è chiuso uguale.
     const cs = viewOf(el).getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse') return true;
-    // Il sito decide COME ripiegare una sezione; il conto dell'utente non può
-    // dipendere da quella scelta (#505). Chiuso è chiuso: far sparire il
-    // riquadro, saltarne il contenuto, o schiacciarlo a zero e ritagliarlo.
-    if (cs.contentVisibility === 'hidden') return true;
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse'
+        || cs.contentVisibility === 'hidden') return true;
+    // Un <details> chiuso resta display:block con una misura sua: se lo disegna
+    // lo sa solo il motore. Opacità e content-visibility:auto restano fuori di
+    // proposito: quel testo torna da sé appena si scorre.
+    if (typeof el.checkVisibility === 'function'
+        && !el.checkVisibility({ visibilityProperty: true })) return true;
     return isClippedToNothing(el, cs);
   }
 
