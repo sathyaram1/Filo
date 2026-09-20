@@ -1241,7 +1241,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   if (type === 'NAVIGA' || type === 'LEGGI_PAGINA') {
     try {
       const Exfil = globalThis.SN_URL_EXFIL;
-      const url = String(action.url ?? action.href ?? action.link ?? action.indirizzo ?? '').trim();
+      // Stessa lettura dell'indirizzo che fa chi esegue: un elenco di nomi di
+      // campo più corto qui che là è una strada aperta, non una svista (#553).
+      const url = globalThis.SN_URL_NAV.indirizzoAzione(action);
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
         const fromUntrusted = /^https?:/i.test(origin);
