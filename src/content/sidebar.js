@@ -100,6 +100,19 @@
     } catch (_) { return []; }
   }
 
+  // La riga che l'utente legge quando una cosa raccontata non è mai partita,
+  // col tasto che rimanda la richiesta. Una sola, usata da tutte le strade:
+  // prima la chiamavano in due posti diversi e uno dei due il tasto non ce
+  // l'aveva.
+  function mostraAzioniMancate(fantasmi) {
+    if (!fantasmi || !fantasmi.length) return;
+    const D = global.SN_AZIONI_DICHIARATE;
+    if (!D) return;
+    renderRifallo(appendChatMessage('avviso', D.avvisoPerUtente(fantasmi)));
+    console.warn('[Filo] #517 azione dichiarata e mai emessa nell\'Aiuto:',
+      fantasmi.map((f) => `${f.id} ← «${f.frase}»`).join(' | '));
+  }
+
   function nudgeAzioniRaccontate(fantasmi) {
     return 'la tua ultima risposta dice che hai già fatto questo:\n'
       + fantasmi.map((f) => `- «${f.frase}»`).join('\n')
