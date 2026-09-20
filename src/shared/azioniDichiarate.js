@@ -159,8 +159,13 @@
       oreProva: true,
       avviso: 'la sveglia non c\'è',
       frasi: [
-        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(72)}\\b${SVEGLIA}\\b`, 'i'),
+        // Giro 8: «preparato» e «schedulato» mancavano fra i verbi.
+        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato|preparato|schedulato)\\b${PONTE(72)}\\b${SVEGLIA}\\b`, 'i'),
         new RegExp(`\\bfatto[,:!]?\\s+(?:la |una |l['’])?${SVEGLIA}\\b${PONTE(24)}\\b(?:impostat|programmat|messa|fissat|pronta)`, 'i'),
+        // Giro 8: la conferma più corta di tutte, «Ecco fatto: sveglia alle
+        // 19». Senza un participio dietro non la prendeva nessuna regola, ed
+        // è l'ora a renderla una promessa.
+        new RegExp(`\\bfatto\\b[,:!.…]?\\s+(?:la |una |l['’])?${SVEGLIA}\\b[^.!?]{0,12}\\b(?:alle|all['’]|per\\s+le|delle)\\s*\\d`, 'i'),
         new RegExp(`${PERIFRASI}${PONTE(48)}\\b${SVEGLIA}\\b`, 'i'),
         participio(SVEGLIA, 'impostat[ao]|programmat[ao]|messa|fissat[ao]|creat[ao]|attivat[ao]|settat[ao]|puntat[ao]|pronta'),
       ],
