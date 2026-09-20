@@ -415,7 +415,7 @@
   // sopra», o i due punti che introducono il testo consegnato.
   function puntaAllaRisposta(testo, fine) {
     const dopo = testo.slice(fine);
-    const stop = dopo.search(/[.!?\n]/);
+    const stop = dopo.search(FINE_FRASE);
     const resto = stop >= 0 ? dopo.slice(0, stop) : dopo;
     if (NELLA_RISPOSTA.test(resto)) return true;
     if (FORMA_DEL_TESTO.test(resto)) return true;
