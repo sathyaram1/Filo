@@ -42,7 +42,7 @@ function banco({ oltreIlLimite = false } = {}) {
   globalThis.SN_PROVIDERS = {
     completeWithFallback: async (args) => {
       chiamate.push(args);
-      return { text: 'blocco_geografico', usage: { promptTokens: 200, completionTokens: 5 } };
+      return { text: 'geo_block', usage: { promptTokens: 200, completionTokens: 5 } };
     },
   };
   globalThis.SN_COSTS = {
@@ -86,7 +86,7 @@ test('sotto il limite il classificatore parte e il suo costo finisce nel conto',
     cache: Classifier.createCache(),
   });
   assert.equal(b.chiamate.length, 1, 'il modello va chiamato');
-  assert.equal(out.class, Classifier.CLASSES.BLOCCO_GEOGRAFICO);
+  assert.equal(out.class, Classifier.CLASSES.GEO_BLOCK);
   assert.equal(b.registrate.length, 1, 'la chiamata deve comparire nel conteggio dei costi');
   assert.equal(b.registrate[0].action, ACTIONS.GEOBLOCK_CLASSIFY,
     'sotto il nome della funzione che l\'ha fatta partire, non di un\'altra');
