@@ -305,7 +305,12 @@ async function avvisa(mancanti, righe) {
   }
 }
 
-main().catch((e) => {
+// La spiegazione del guasto è logica pura e va provata senza scrivere niente:
+// l'esecuzione parte solo quando lo script è il comando, non quando è importato.
+const eseguitoDirettamente = process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (eseguitoDirettamente) main().catch((e) => {
   // Un errore INATTESO (rete strana, disco pieno) non deve far saltare la
   // pubblicazione: si scrive un file valido e si prosegue. Il caso "nessuna
   // chiave da nessuna fonte" NON passa di qui — lo gestisce main, che si ferma.
