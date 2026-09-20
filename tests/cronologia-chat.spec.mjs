@@ -245,7 +245,7 @@ test('senza modello la chat non si perde: prende il primo messaggio come titolo 
     if (!globalThis.__filoOrigComplete) {
       globalThis.__filoOrigComplete = globalThis.SN_PROVIDERS.completeWithFallback;
     }
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+    const rispondi = ({ attempts, messages }) => {
       const joined = messages
         .map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)))
         .join('\n');
@@ -255,6 +255,8 @@ test('senza modello la chat non si perde: prende il primo messaggio come titolo 
         model: attempts[0].model, provider: attempts[0].provider, usage: {},
       };
     };
+    globalThis.SN_PROVIDERS.completeWithFallback = async (o) => rispondi(o);
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => rispondi(o);
   });
 
   await turno(app, 'c-senza-modello', 'Quanto dista la Luna?');
