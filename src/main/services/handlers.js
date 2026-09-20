@@ -3031,7 +3031,9 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   // subito il saluto neutro e la home vera arriva dal giro in background.
   if (cached && cached.noAi && !force) {
     const payload = buildWaitingDashboard(inputs.saved);
-    await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature });
+    // Firma vuota di proposito: è un saluto di attesa, non una home calcolata,
+    // e il giro in background deve trovarla diversa e rifarla davvero.
+    await FiloMem.setDashboardCache({ ...payload, signature: '' });
     dashboardScheduler().request(openTabsCount);
     return { ...payload, cached: false, ts: new Date().toISOString() };
   }
