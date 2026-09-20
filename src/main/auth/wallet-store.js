@@ -41,8 +41,16 @@ function load() {
   return cache;
 }
 
+// Questa chiave è l'unica di chi entra con un invito, e non passa dalle
+// impostazioni: senza questo avviso chi tiene il conto di «Filo può rispondere»
+// resta fermo su com'era prima del riscatto, e le home aperte con lui (#663).
+function avvisaProntezza() {
+  try { globalThis.SN_PRONTEZZA_CAMBIATA?.(); } catch (_) {}
+}
+
 function save(wallet) {
   if (!wallet || !wallet.key) return false;
+  const primaKey = cache ? cache.key : '';
   cache = {
     key: wallet.key, pseudonym: wallet.pseudonym || '', redeemedAt: wallet.redeemedAt || new Date().toISOString(),
     // L'ultimo stato letto dal server (saldo, codici, quota): serve quando il
