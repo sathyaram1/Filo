@@ -174,10 +174,12 @@ test.describe('#533 giro 4 — quello che resta di una lettura, seconda mano', (
   test('il suggerimento della home manda in chat quello che l\'utente legge sul bottone', async ({ app }) => {
     await configura(app);
 
-    // Il generatore della home legge i titoli dei siti aperti. Se ci casca,
-    // scrive un suggerimento con una faccia innocua e un testo nascosto: il
-    // bottone dice «Riassumi le notizie», ma quello che parte verso la chat è
-    // un'altra frase, che l'utente non ha mai letto.
+    // Il generatore della home legge i titoli dei siti aperti e dei salvati.
+    // Quello che scrive finisce su bottoni cliccabili, e il bottone porta con
+    // sé un testo che l'utente non legge: quello che parte verso la chat (o
+    // l'indirizzo che apre) può essere diverso dalla scritta. Qui il modello
+    // della home casca e scrive un bottone con la faccia innocua e dentro
+    // un'altra frase.
     const s = await app.evaluate(async (_e, { veleno }) => {
       const orig = globalThis.SN_PROVIDERS.completeWithFallback;
       globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => ({
