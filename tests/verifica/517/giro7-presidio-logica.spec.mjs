@@ -152,8 +152,12 @@ test('un testo incollato in chat non fa accusare Filo di non averlo letto', () =
   // L'utente incolla il testo del contratto dentro il messaggio e chiede un
   // riassunto: a Filo non serve nessuno strumento per leggerlo, come per la
   // foto della bolletta (chiusa al giro 2). Qui l'accusa compare.
-  expect(D.rileva('Ho letto il documento che mi hai incollato: sono 84 euro.',
-    [], STATO()).length).toBe(0);
+  expect(D.TIPI_DI_CONTESTO).toContain('CONTESTO_TESTO');
+  expect(D.rileva('Ho letto il documento: sono 84 euro, scadenza il 12.',
+    new Set(['CONTESTO_TESTO']), STATO()).length).toBe(0);
+  // Senza niente da leggere davanti, la frase resta una dichiarazione.
+  expect(D.rileva('Ho letto il documento: sono 84 euro, scadenza il 12.',
+    [], STATO()).length).toBeGreaterThan(0);
 });
 
 test('quello che Filo impara da sé non è un\'azione mancata', () => {
