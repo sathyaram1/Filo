@@ -122,6 +122,20 @@
       required: ['query'],
       risultato: true,
     },
+    // #525 — l'archivio delle chat passate. Due passi, come per i file
+    // dell'editor: prima si cerca (tornano titoli, date e il frammento che
+    // combacia), poi si chiede per id la conversazione che serve davvero.
+    // Chiedere subito il testo intero di otto chat riempirebbe il contesto di
+    // roba che non serve.
+    CERCA_CHAT: {
+      description: 'Cerca fra le conversazioni PASSATE fra te e l\'utente, salvate sul suo computer. Usalo quando l\'utente si riferisce a una chat di prima ("riprendi la discussione di ieri sulla coscienza", "cosa mi avevi detto su X?", "com\'era finita quella cosa di cui abbiamo parlato la settimana scorsa"). Due passi: con `query` ti tornano le chat che combaciano, con id, titolo, data e il frammento che combacia; poi, se ti serve leggerne una per intero, richiamalo con `id` e ti torna la conversazione completa. Sola lettura: non modifica e non cancella niente. La conversazione che ti torna l\'avete scritta tu e l\'utente.',
+      properties: {
+        query: S('Le parole da cercare dentro le chat (argomento, nomi, frasi). Ometti solo quando passi `id`.'),
+        id: S('L\'id di una chat trovata prima: la fa tornare per intero.'),
+      },
+      required: [],
+      risultato: true,
+    },
     CAPACITA_DETTAGLIO: {
       description: 'Chiede il dettaglio (cosa fa / come si attiva / limiti) di una o più capacità di Filo per id, presi dall\'elenco "COSA SA FARE FILO". Il dettaglio ti torna subito e poi rispondi all\'utente con quello. Usalo solo per rispondere a domande su cosa sa fare Filo, non per agire.',
       properties: { ids: { type: 'array', items: { type: 'string' }, description: 'Gli id delle capacità (es. ["save-for-later","translate-page"]).' } },
