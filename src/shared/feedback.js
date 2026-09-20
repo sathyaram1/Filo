@@ -1779,6 +1779,7 @@
     VOTE_VALUES,
     // Riapertura a pagamento (DC4).
     castReopenRequest,
+    clearReopenRequest,
     uploadImage,
     uploadAttachment,
     // #602 — la cifratura degli allegati non ha più un ripiego in chiaro.
