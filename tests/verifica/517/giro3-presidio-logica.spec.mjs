@@ -73,8 +73,13 @@ test('un\'azione di tutt\'altro genere non copre la conferma fatta col pronome',
   // (dopo una ricerca, dopo un comando) in cui la sveglia resta solo raccontata.
   expect(ids('Ho guardato il meteo: stasera piove. Te l\'ho messa alle 19.',
     [{ type: 'CERCA_WEB', _output: { results: [] } }])).toContain('senza-nome');
+  // Il comando di terminale resta l'eccezione, e per scelta: un comando può
+  // davvero salvare, spostare o cancellare qualunque cosa, quindi «te l'ho
+  // salvato» dopo un comando può essere vero e smentirlo sarebbe il falso
+  // allarme che uccide il presidio. Il terminale, per giunta, è spento di
+  // serie: l'eccezione tocca pochi turni di pochi utenti.
   expect(ids('Ecco l\'elenco dei file. Te l\'ho salvato.',
-    [{ type: 'ESEGUI_COMANDO', _output: { code: 0 } }])).toContain('senza-nome');
+    [{ type: 'ESEGUI_COMANDO', _output: { code: 0 } }])).toEqual([]);
 });
 
 test('avere un file aperto nell\'editor non è la prova che la sveglia c\'è', async () => {
