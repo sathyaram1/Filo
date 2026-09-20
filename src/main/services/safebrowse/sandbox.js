@@ -169,13 +169,16 @@ async function detonateNow(el, url, evaluateFinal, opts = {}) {
 
   let downloadStarted = false;
   let downloadName = '';
-  try {
-    ses.on('will-download', (e, item) => {
-      downloadStarted = true;
-      try { downloadName = item.getFilename(); } catch (_) {}
-      e.preventDefault(); // non scaricare davvero nulla
-    });
-  } catch (_) {}
+  // Il sorvegliante dei download si toglie alla fine del giro: la memoria è
+  // riusata, e uno lasciato attaccato si sommerebbe a quello del giro dopo
+  // (e ai suoi, e ai suoi ancora), scrivendo su variabili di un controllo
+  // ormai chiuso.
+  const suDownload = (e, item) => {
+    downloadStarted = true;
+    try { downloadName = item.getFilename(); } catch (_) {}
+    e.preventDefault(); // non scaricare davvero nulla
+  };
+  try { ses.on('will-download', suDownload); } catch (_) {}
 
   let win;
   try {
