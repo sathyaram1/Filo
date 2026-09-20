@@ -518,13 +518,26 @@ La regola, uguale per tutti e due:
   la critica — lo respingevano già; il verdetto L4 era l'unico rimasto fuori, e
   adesso respinge come le altre (fonte unica: `scripts/lib/dirty-tree.mjs`).
 
-Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs` e
-`scripts/routine-channel.mjs`, dove lo sha si timbra da solo invece di
-chiederlo a chi lavora — e questa regola. **Il confronto al passo 2 del
-cancello vive nel server** (`filo-security`), che è il posto giusto: è
-l'ultimo livello, quello che non si può convincere. Finché lì il verdetto L4
-si legge sul nome del ramo, il campo arriva e non viene guardato: da solo il
-lato che consegna non fa decadere niente.
+- **anche l'ULTIMO passo parla del commit.** Timbrare l'impronta sugli esiti
+  non chiude niente finché la fusione si chiede per nome del ramo. Dal
+  2026-09-20 `routineMerge` porta anche `sha`, come `ownerMerge` dal
+  2026-08-20, e il citofono (`scripts/merge-gate.mjs`) fa prima due controlli
+  che sul cammino locale c'erano da sempre e qui mancavano: non chiede la
+  fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
+  automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
+  NUOVA), e non la chiede se un via libera registrato su questa macchina parla
+  di un altro commit. Se su questa macchina non risulta su quale commit sono
+  stati dati, lo **dice** e prosegue: astenersi in silenzio è la classe di
+  guasto che questa spec toglie dappertutto.
+
+Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
+`scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
+timbra da solo invece di chiederlo a chi lavora — e questa regola. **Il
+confronto al passo 2 del cancello vive nel server** (`filo-security`), che è
+il posto giusto: è l'ultimo livello, quello che non si può convincere. Finché
+lì il verdetto L4 si legge sul nome del ramo, il campo arriva e non viene
+guardato: quello che il repo pubblico può fare da solo è chiudere il cammino
+onesto (fatto), non il muro.
 
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
