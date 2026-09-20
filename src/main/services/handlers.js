@@ -2458,6 +2458,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // rispondere: allora l'utente deve saperlo, non ricevere l'ultima nota di
   // lavoro spacciata per risposta.
   let exhausted = true;
+  // #517 — il presidio contro l'azione RACCONTATA e mai eseguita. Una risposta
+  // che dice «ti ho messo la sveglia» senza aver chiamato nessuno strumento non
+  // chiude il turno: torna indietro una volta al modello, che o chiama
+  // l'azione o riscrive la frase. Una sola volta per turno (il tetto ai giri è
+  // già stretto, e due rimbalzi di fila vogliono dire che il modello insiste).
+  const Dichiarate = globalThis.SN_AZIONI_DICHIARATE;
+  let rimandatoIndietro = false;
+  // Il testo rimandato indietro: se dopo il rimbalzo il modello non scrive più
+  // niente, questo resta l'unica risposta che c'era — meglio mostrarla con
+  // l'avviso che lasciare la bolla vuota.
+  let testoScartato = '';
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       r = await handleAIRequest({
