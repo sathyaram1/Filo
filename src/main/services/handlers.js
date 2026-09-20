@@ -2616,8 +2616,34 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // una nota di lavoro. Lasciarla nel blocco chiuso voleva dire un turno
     // senza nessuna bolla. Torna alla scheda come testo, e non più come nota.
     textReply = notes.pop();
+  } else if (!String(textReply || '').trim() && testoScartato.trim()) {
+    // #517 — il testo era stato rimandato indietro e dopo il rimbalzo non è
+    // arrivato nient'altro: meglio la risposta di prima, con l'avviso qui
+    // sotto, che una bolla vuota.
+    textReply = testoScartato;
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
+  // #517 — il conto finale: la risposta dichiara ancora un'azione che non è mai
+  // stata eseguita? Qui la dichiarazione la reggono anche le azioni dei turni
+  // PRECEDENTI di questa conversazione: «sì, te l'ho messa alle 7» dopo una
+  // sveglia messa due messaggi fa è vero, e un avviso lì sarebbe un falso
+  // allarme. Quello che resta è il caso muto del feedback: nessuna azione, né
+  // adesso né prima, e l'utente che crede sia fatto. Glielo diciamo, e resta
+  // scritto nei log come anomalia.
+  let azioniMancate = [];
+  let avvisoAzioni = '';
+  if (Dichiarate) {
+    try {
+      const coperti = Dichiarate.tipiDallaCronologia(cleanHistory);
+      for (const t of Dichiarate.insiemeDiTipi(renderedActions)) coperti.add(t);
+      azioniMancate = Dichiarate.rileva(textReply, coperti);
+      avvisoAzioni = Dichiarate.avvisoPerUtente(azioniMancate);
+      if (avvisoAzioni) {
+        console.warn('[Filo] #517 azione dichiarata e mai eseguita:',
+          azioniMancate.map((f) => `${f.id} ← «${f.frase}»`).join(' | '));
+      }
+    } catch (e) { console.warn('[Filo] controllo azioni dichiarate fallito', e); }
+  }
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
