@@ -218,8 +218,11 @@
         // partita davvero questa restava l'unica cosa mai fatta, e nessuno lo
         // diceva. Fuori dal calendario, dove «segnare» vuol dire un'altra cosa
         // e la famiglia giusta è un'altra.
+        // I modi di dire: «ti ho salvato un po' di tempo» non promette nessun
+        // appunto, e l'avviso lì aveva torto.
         new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+${AVV}(?:segnat|appuntat|salvat)[oa]\\b`
-          + '(?!\\s+(?:la vita|molto tempo|tempo|un sacco|la giornata|la serata|la situazione))'
+          + '(?!\\s+(?:la vita|(?:molto |un po\' di |un po’ di |parecchio |tanto |del )?tempo'
+          + '|un sacco|la giornata|la serata|la situazione|la pelle|la faccia|le spese|la fatica))'
           + `(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|evento)\\b)`, 'i'),
       ],
     },
