@@ -3073,6 +3073,8 @@ const handlerCtx = {
   closeAndTriageChat,
   sweepPendingChats,
   archiviaCongedoAccoglienza,
+  dimenticaChat,
+  schedaDiChat,
   // Intervista di benvenuto (#524)
   saveOnboarding,
   finishOnboarding,
