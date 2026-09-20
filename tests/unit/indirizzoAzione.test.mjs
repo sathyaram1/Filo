@@ -57,3 +57,14 @@ test('nessun punto si riscrive a mano l\'elenco dei campi dell\'indirizzo', () =
     }
   }
 });
+
+// Chi descrive un'azione nel popup di conferma chiede l'indirizzo a urlNav. Se
+// il caricatore lo mettesse dopo, la conferma mostrerebbe «una pagina» invece
+// dell'indirizzo, e l'utente confermerebbe alla cieca.
+test('il caricatore mette urlNav prima di actionLevels', () => {
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'loader.js'), 'utf8');
+  const nav = src.indexOf('urlNav.js');
+  const liv = src.indexOf('actionLevels.js');
+  assert.ok(nav >= 0 && liv >= 0, 'il caricatore deve caricarli entrambi');
+  assert.ok(nav < liv, 'urlNav.js va caricato prima di actionLevels.js');
+});

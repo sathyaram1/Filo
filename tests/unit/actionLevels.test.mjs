@@ -16,6 +16,9 @@ require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'themeTokens.js'));
 // ESEGUI_COMANDO (#146.6) delega il livello al classificatore di comandi.
 require(join(__dirname, '..', '..', 'src', 'shared', 'cmdClassify.js'));
+// NAVIGA e LEGGI_PAGINA chiedono a urlNav qual è l'indirizzo dell'azione: è
+// l'unico elenco dei nomi di campo che il modello può usare (#553).
+require(join(__dirname, '..', '..', 'src', 'shared', 'urlNav.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'actionLevels.js'));
 
 const AL = globalThis.SN_ACTION_LEVELS;
