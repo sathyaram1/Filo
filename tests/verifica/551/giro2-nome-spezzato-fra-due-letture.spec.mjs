@@ -100,24 +100,16 @@ test('il terminale della dashboard, sullo stesso comando, non perde niente', asy
   await accendiTerminale(page);
 
   const out = await page.evaluate((comando) => new Promise((resolve) => {
-    const MSG = window.SN_MSG.MSG;
     let acc = '';
-    const onMsg = (m) => {
-      if (!m || !m.type) return;
-      if (m.type === MSG.TERMINAL_DATA && typeof m.chunk === 'string') acc += m.chunk;
-      if (m.type === MSG.TERMINAL_EXIT) {
-        chrome.runtime.onMessage.removeListener(onMsg);
-        resolve(acc);
-      }
-    };
-    chrome.runtime.onMessage.addListener(onMsg);
-    chrome.runtime.sendMessage({ type: MSG.TERMINAL_OPEN }, () => {
-      chrome.runtime.sendMessage({ type: MSG.TERMINAL_EXEC, command: comando });
+    let chiuso = false;
+    const fine = () => { if (!chiuso) { chiuso = true; resolve(acc); } };
+    window.filo.shellExec({
+      command: comando,
+      onData: (d) => { if (d && typeof d.chunk === 'string') acc += d.chunk; },
+      onExit: fine,
+      onError: fine,
     });
-    setTimeout(() => {
-      chrome.runtime.onMessage.removeListener(onMsg);
-      resolve(acc);
-    }, 15000);
+    setTimeout(fine, 15000);
   }), A_META);
 
   expect(out.includes('�'), `il terminale della dashboard ha perso un carattere: ${JSON.stringify(out)}`).toBe(false);
