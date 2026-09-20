@@ -149,7 +149,16 @@ test('più indirizzi insieme non aprono più finestre del tetto', async () => {
   assert.ok(el.state.create <= sandbox.LIMITS.MAX_CONCURRENT + sandbox.LIMITS.MAX_QUEUE,
     `finestre create in tutto: ${el.state.create}`);
   assert.equal(el.state.aperte, 0, 'alla fine non ne resta nessuna viva');
-  assert.deepEqual(sandbox.stats(), { active: 0, queued: 0 }, 'il tetto torna libero');
+  const dopo = sandbox.stats();
+  assert.equal(dopo.active, 0, 'il tetto torna libero');
+  assert.equal(dopo.queued, 0, 'la coda si svuota');
+  // L'altra metà della risorsa: ogni finestra si porta dietro una memoria di
+  // navigazione isolata, e quella sopravvive alla finestra. Se ne fabbricasse
+  // una nuova a ogni controllo, una lunga navigazione se ne lascerebbe dietro
+  // a decine: i nomi sono tanti quanti le finestre che possono girare insieme,
+  // e si riusano a turno.
+  assert.ok(dopo.partizioni <= sandbox.LIMITS.MAX_CONCURRENT,
+    `memorie isolate fabbricate: ${dopo.partizioni}, tetto ${sandbox.LIMITS.MAX_CONCURRENT}`);
 });
 
 // ─── La memoria: per dominio registrabile, non per host ─────────────────────
