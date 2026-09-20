@@ -141,6 +141,80 @@ export function testoEsitiDecaduti(decaduti, punta, ramo = '') {
     + 'Se il server rifiuta quel passaggio, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
 }
 
+/**
+ * Quali dei due via libera NON hanno un commit scritto accanto, su questa
+ * macchina. PURA.
+ *
+ * Serve a dire COSA non si è potuto controllare, non solo che non si è
+ * controllato niente: sapere metà è il caso peggiore dei tre, perché sembra
+ * controllato più degli altri. Prima la nota usciva solo quando mancavano
+ * tutti e due, e il caso «la verifica ha dato l'ok altrove, il controllo di
+ * sicurezza qui» passava in silenzio (feedback #485, giro 3).
+ */
+export function esitiSenzaCommit(state) {
+  const s = state && typeof state === 'object' ? state : {};
+  const fuori = [];
+  for (const [campo, quale] of [['verifierSha', 'la verifica'], ['secauditSha', 'il controllo di sicurezza']]) {
+    if (!String(s[campo] || '')) fuori.push(quale);
+  }
+  return fuori;
+}
+
+/** La nota di astensione, per quello che qui non risulta. PURA. '' se risulta tutto. */
+export function testoEsitiSenzaCommit(quali) {
+  const l = Array.isArray(quali) ? quali.filter(Boolean) : [];
+  if (!l.length) return '';
+  if (l.length > 1) {
+    return '[merge-gate] nota: da questa macchina non risulta su quale commit sono stati dati i via libera, quindi non ho potuto controllare che parlino di questo contenuto. Decide il server.';
+  }
+  const altro = l[0] === 'la verifica' ? 'il controllo di sicurezza' : 'la verifica';
+  return `[merge-gate] nota: da questa macchina non risulta su quale commit ha dato l'ok ${l[0]}, quindi non ho potuto controllare che parli di questo contenuto — ${altro} l'ho controllato, ed è su questo contenuto. Metà controllo non è un controllo: decide il server.`;
+}
+
+/**
+ * Il contenuto esaminato è arrivato DOVE CHI FONDE ANDRÀ A PRENDERLO? PURA
+ * rispetto a git (`g` è l'esecutore, iniettabile dai test).
+ *
+ * Il server non fonde quello che c'è in questa directory: scarica il ramo da
+ * GitHub e fonde quello. Se un commit è rimasto solo qui — il salvataggio
+ * automatico prova a spedire e, quando non ci riesce, per costruzione lo scrive
+ * nei log e prosegue — i via libera parlano di un contenuto che non atterrerà
+ * mai, e ad atterrare sarà quello vecchio, che nessuno ha esaminato. È il
+ * gemello del rifiuto per le modifiche non salvate: lì la punta si sposta in
+ * avanti dopo l'ok, qui non si è mai mossa dove conta (feedback #485, giro 3).
+ *
+ * @returns {{ stato:'pubblicato'|'assente'|'sconosciuto'|'senza_origine', suOrigin?:string, motivo?:string }}
+ */
+export function statoPubblicazione(g, branch, punta) {
+  const b = String(branch || '');
+  const p = String(punta || '');
+  if (!b || !p) return { stato: 'sconosciuto', motivo: 'ramo o commit assenti' };
+  const remoti = g(['remote']);
+  if (!remoti.ok) return { stato: 'sconosciuto', motivo: 'non riesco a farmi dire se c\'è un origin' };
+  if (!String(remoti.out || '').split(/\r?\n/).map((r) => r.trim()).includes('origin')) return { stato: 'senza_origine' };
+  // Il riferimento locale a origin può essere vecchio: si aggiorna quello solo,
+  // e se la rete non risponde si prosegue con quello che c'è (dirlo, più sotto,
+  // è meglio che fermare un giro per una rete lenta).
+  g(['fetch', '--quiet', 'origin', `refs/heads/${b}:refs/remotes/origin/${b}`]);
+  const ref = g(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${b}`]);
+  if (!ref.ok || !ref.out) return { stato: 'sconosciuto', motivo: `su origin il ramo ${b} non si legge` };
+  const dentro = g(['merge-base', '--is-ancestor', p, ref.out]);
+  return dentro.ok ? { stato: 'pubblicato', suOrigin: ref.out } : { stato: 'assente', suOrigin: ref.out };
+}
+
+/** Il rifiuto per un contenuto esaminato che su origin non c'è. PURA. */
+export function testoNonPubblicato(punta, suOrigin, ramo = '') {
+  const p = String(punta || '').slice(0, 12);
+  const o = String(suOrigin || '').slice(0, 12);
+  const r = String(ramo || '<ramo>');
+  return 'fusione non chiesta: il contenuto esaminato non è arrivato su origin, e chi fonde non prende quello che c\'è in questa directory: scarica il ramo da lì.\n'
+    + `  qui i via libera valgono per ${p}\n`
+    + `  su origin il ramo ${r} è fermo a ${o}\n`
+    + 'Quello che verrebbe fuso è il contenuto vecchio, che nessuno ha esaminato, e la correzione non ci sarebbe nemmeno.\n'
+    + `Spedisci il ramo e rilancia lo stesso comando: git push origin ${r}\n`
+    + 'Se il push non riesce, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
+}
+
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
