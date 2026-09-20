@@ -931,7 +931,8 @@
     // ripeteva la parola «sveglia» con l'ora in cifre.
     const esisteGia = (fam, d) => {
       const nominati = orariNelTesto(d.clausola || d.frase);
-      if (fam.orari && orari.size && [...nominati].some((o) => orari.has(o))) return true;
+      const buone = oreCheReggono(fam, d.clausola || d.frase);
+      if (fam.orari && buone.size && [...nominati].some((o) => buone.has(o))) return true;
       // Il titolo di un appunto che esiste regge la frase che lo nomina, ma
       // non una frase che promette un'ORA: un'ora è una sveglia, e un appunto
       // non la prova. Senza questa riga bastava tenere un appunto intitolato
