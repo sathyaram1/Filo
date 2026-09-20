@@ -66,6 +66,25 @@ test('la pulizia delle schede proposta come bottone non è un\'azione mancata', 
   expect(ids('Ho cancellato la cronologia.', [{ type: 'CANCELLA_ARCHIVIO', _executed: false }])).toEqual([]);
 });
 
+// ── B bis. un'azione LIBERA qualunque zittisce la conferma col pronome ───────
+
+test('un\'azione di tutt\'altro genere non copre la conferma fatta col pronome', async () => {
+  // Il caso della segnalazione, parola per parola: un turno di prosecuzione
+  // (dopo una ricerca, dopo un comando) in cui la sveglia resta solo raccontata.
+  expect(ids('Ho guardato il meteo: stasera piove. Te l\'ho messa alle 19.',
+    [{ type: 'CERCA_WEB', _output: { results: [] } }])).toContain('senza-nome');
+  expect(ids('Ecco l\'elenco dei file. Te l\'ho salvato.',
+    [{ type: 'ESEGUI_COMANDO', _output: { code: 0 } }])).toContain('senza-nome');
+});
+
+test('avere un file aperto nell\'editor non è la prova che la sveglia c\'è', async () => {
+  // Il segno di contesto dei file dell'editor viaggia a OGNI turno: a chiunque
+  // abbia anche un solo appunto salvato, il presidio non parla mai più.
+  expect(ids('Te l\'ho messa alle 19.', [{ type: 'CONTESTO_FILE' }])).toContain('senza-nome');
+  // Stessa cosa per una foto mandata in chat.
+  expect(ids('Te l\'ho messa alle 19.', [{ type: 'CONTESTO_IMMAGINE' }])).toContain('senza-nome');
+});
+
 // ── C. il formato interno lasciato scritto ───────────────────────────────────
 
 test('il formato interno si riconosce anche nelle forme che usano i modelli aperti', async () => {
