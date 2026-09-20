@@ -138,9 +138,55 @@ function envKey(name) {
 // Se un giorno l'applicazione torna a leggere una chiave nuova, va aggiunta
 // qui: la sentinella `tests/unit/bakeChiaviLette.test.mjs` diventa rossa se le
 // due parti divergono.
+// `server` è il campo ESATTO del documento dei segreti: un guasto che dice
+// «manca» senza dire dove si rimedia costa a chi lo legge il giro d'indagine
+// che è costato a noi (#642).
 const CHIAVI_DEL_PACCHETTO = [
-  { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY' },
+  { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' },
 ];
+
+// Fuori dalla lista sopra perché non è una chiave di provider e la sua assenza
+// non ferma la pubblicazione: qui serve solo a spiegarla con le stesse parole.
+const FONTE_SAFE_BROWSING = {
+  nome: 'safeBrowsing',
+  env: 'FILO_DEFAULT_SAFEBROWSING_KEY',
+  server: 'config/secrets.safeBrowsingKey',
+};
+
+/** Perché il server non ha dato la chiave, in una frase. PURA. */
+export function descriviEsitoServer(esito) {
+  const e = esito || {};
+  switch (e.stato) {
+    case 'passphrase-assente':
+      return 'Il server non è stato nemmeno interrogato: FILO_BUILD_PASSPHRASE è assente dal job.';
+    case 'rifiutato':
+      return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata.`;
+    case 'http':
+      return `Il server ha risposto HTTP ${e.status}.`;
+    case 'rete':
+      return `Il server non era raggiungibile (${e.messaggio || 'motivo ignoto'}).`;
+    case 'senza-chiavi':
+      return 'Il server ha risposto, ma il documento config/secrets non porta nessuna chiave.';
+    case 'ok':
+      return 'Il server ha risposto, ma senza questa chiave nel documento config/secrets.';
+    default:
+      return 'Il server non ha dato questa chiave, per un motivo non registrato.';
+  }
+}
+
+/**
+ * Le righe che spiegano quali chiavi mancano, da quali fonti sono state
+ * cercate e dove si mettono. PURA: la stessa spiegazione va nel registro della
+ * costruzione e nel feedback dell'allarme, e devono dire la stessa cosa.
+ */
+export function spiegaChiaviMancanti(mancanti, esitoServer) {
+  const righe = (mancanti || []).map(
+    (c) => `Manca ${c.nome}: né dal server (${c.server}) né dal segreto ${c.env} del job.`
+  );
+  righe.push(descriviEsitoServer(esitoServer));
+  righe.push('Dove si mette: la chiave del server la scrive l\'owner in Gestione → Modelli predefiniti; il segreto di riserva sta nelle impostazioni del repo, Settings → Secrets and variables → Actions.');
+  return righe;
+}
 
 async function main() {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
