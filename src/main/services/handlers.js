@@ -2194,6 +2194,17 @@ function toolResultText({ action, res, rendered }) {
 // turno precedente il modello lo sa e la spinta gli dice di scriverlo, senza
 // rifare niente. L'avviso all'utente, che è molto più caro di un giro in più,
 // guarda invece tutta la conversazione (vedi sotto).
+// Cosa regge, in questo turno, una frase del tipo «l'ho già fatto»: le azioni
+// davvero emesse, più i SEGNI di contesto — i riassunti dei file dell'editor
+// arrivano al modello a ogni turno, quindi per dire cosa c'è scritto in un file
+// non gli serve nessuna azione, e accusarlo di non averlo letto è un falso
+// allarme (un avviso che sbaglia si smette di leggere).
+function tipiDelTurno(Dichiarate, renderedActions, fileSummaries) {
+  const tipi = Dichiarate.insiemeDiTipi(renderedActions);
+  if (String(fileSummaries || '').trim()) tipi.add('CONTESTO_FILE');
+  return tipi;
+}
+
 function spintaDiRimedio(Dichiarate, text, coperti) {
   try {
     const fantasmi = Dichiarate.rileva(text, coperti);
