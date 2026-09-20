@@ -274,7 +274,7 @@
           // Giro 8: «agenda» accanto a «calendario». «Ti ho segnato la
           // riunione sulla tua agenda» faceva comparire «l'appunto non c'è»
           // a chi aveva chiesto un evento.
-          + `(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|agenda|evento)\\b)`, 'i'),
+          + `(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|agenda|evento)\\b)`, 'i')),
         // Giro 9: «ho trascritto la lista della spesa» e «ho messo per
         // iscritto la lista della spesa» non nominano né l'appunto né chi lo
         // riceve, e restavano muti. I due verbi vogliono dire scrivere
