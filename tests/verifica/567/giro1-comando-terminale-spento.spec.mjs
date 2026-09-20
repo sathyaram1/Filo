@@ -37,8 +37,8 @@ test('il comando che non parte spiega che il terminale è spento e porta all\'in
   await expect(apri).toBeVisible();
   await apri.click();
   await expect.poll(
-    () => app.evaluate(() => {
-      const w = require('electron').BrowserWindow.getAllWindows()[0];
+    () => app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0];
       const t = w && w._filoTabs;
       return (t ? t.tabs : []).map((x) => String(x.url || '')).join(' ');
     }),
