@@ -77,6 +77,50 @@ function truncate(text) {
   return { text: s.slice(0, MAX_OUTPUT_CHARS), truncated: true };
 }
 
+// ── La shell deve PARLARE UTF-8 ───────────────────────────────────────────────
+//
+// #551. Su Windows la console non scrive in UTF-8: scrive nella tabella OEM del
+// sistema (cp850 dalle nostre parti). Lì dentro il trattino lungo «—» non
+// esiste e diventa «-», e la «à» diventa un byte che in UTF-8 non vuol dire
+// niente e arriva qui come «<27>». Noi leggiamo lo stdout come UTF-8 — ed è
+// giusto così — quindi il modello vedeva nomi di file SBAGLIATI, li ricopiava
+// nel comando dopo (o nel percorso da leggere), e ogni passo successivo
+// falliva in modo onesto su un nome che non è mai esistito. Visto dal vivo:
+// «SPECIFICHE SEO E METADATI — singolarita.txt» elencato come «… - singolarita»
+// e poi non più ritrovato. Riguarda qualunque nome con accenti o segni
+// tipografici, cioè moltissimi file di un utente italiano.
+//
+// La cura sta a monte: si chiede alla shell di scrivere in UTF-8 prima ancora
+// che il comando dell'utente parta. Non è cosmetico e non è filtrabile a valle:
+// una volta che «à» è diventata un byte invalido, l'informazione è persa.
+//
+// Il preludio è SEMPRE anteposto (non solo con la sonda della cartella): un
+// comando senza sonda ha lo stesso identico problema.
+function encodingPrelude(shell) {
+  const sh = resolveShell(shell);
+  if (sh === 'cmd') {
+    // 65001 = UTF-8. `>nul` perché `chcp` stampa una riga ("Tabella codici
+    // attiva: 65001") che finirebbe in testa all'output del comando.
+    return 'chcp 65001>nul\r\n';
+  }
+  if (sh === 'powershell') {
+    // Due codifiche, due lavori diversi, servono entrambe:
+    //   [Console]::OutputEncoding → con cosa la console scrive su stdout (è
+    //     questa che rovinava i nomi);
+    //   $OutputEncoding           → con cosa PowerShell scrive quando passa
+    //     testo in pipe a un programma esterno.
+    // UTF8Encoding($false) = senza BOM: il BOM comparirebbe come «ï»¿» in
+    // testa alla prima riga. In try/catch perché il setter di [Console] può
+    // rifiutare quando non c'è una console vera attaccata: in quel caso il
+    // comando deve girare lo stesso, non morire sul preludio.
+    return 'try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n'
+      + '$OutputEncoding = New-Object System.Text.UTF8Encoding $false\n';
+  }
+  // bash / sh: nessun preludio. Su Linux e macOS lo stdout è già UTF-8 e
+  // forzare una locale che sulla macchina può non esistere farebbe solo danno.
+  return '';
+}
+
 // Marcatore (improbabile in output reale) con cui un comando one-shot riporta
 // l'exit code e la cwd RISULTANTE. Serve a far PERSISTERE la cwd tra i comandi
 // dell'assistente: ogni comando parte da una shell nuova, quindi senza questo un
