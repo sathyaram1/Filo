@@ -358,17 +358,21 @@ function titoloDa(html) {
 /**
  * Da una pagina HTML al suo CONTENUTO PRINCIPALE. PURA.
  *
- * La zona principale (`<main>`, `role="main"`, `<article>`) vince sul corpo
- * intero, ma solo se ci si trova davvero del testo: su un sito che marca
- * `<main>` attorno a un guscio la regola rigida darebbe una pagina vuota
- * proprio quando il contenuto c'è.
+ * La zona principale (`<main>`, `role="main"`) vince sul corpo intero, ma solo
+ * se ci si trova davvero del testo: su un sito che marca `<main>` attorno a un
+ * guscio la regola rigida darebbe una pagina vuota proprio quando il contenuto
+ * c'è.
+ *
+ * `<article>` NON è una zona: una pagina ne ha quanti ne vuole (un messaggio
+ * per ciascuno in una discussione, una scheda per ciascuno in un listino), e
+ * tenere il primo buttava via la risposta, che sta sempre in uno degli altri
+ * (#553). La cornice la toglie già la potatura.
  */
 function estraiContenuto(html) {
   const src = String(html == null ? '' : html);
   const titolo = titoloDa(src);
   const corpo = sottoalbero(src, (n) => n === 'body') ?? src;
-  const zona = sottoalbero(corpo, (n, a) => n === 'main' || a.role === 'main')
-    ?? sottoalbero(corpo, (n) => n === 'article');
+  const zona = sottoalbero(corpo, (n, a) => n === 'main' || a.role === 'main');
   // Dentro la zona di contenuto già isolata l'intestazione è dell'articolo:
   // il tag che la racchiudeva non c'è più, e senza questo il filtro la
   // scambierebbe per quella del sito.
