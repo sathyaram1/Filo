@@ -9,7 +9,10 @@
 // finestra restava aperta per tutta la sessione.
 //
 // Qui si prova quello che non dipende da Electron: il tetto di concorrenza con
-// la sua coda, e il fatto che una finestra venga distrutta comunque.
+// la sua coda, il fatto che una finestra venga distrutta comunque, e il tetto
+// sulle memorie di navigazione isolate — l'altra risorsa che ogni finestra si
+// porta dietro, che sopravvive alla finestra e che senza un tetto si
+// accumulava una per ogni sito sospetto incontrato.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -197,4 +200,61 @@ test('il verdetto profondo si ricorda per dominio, non per sottodominio', async 
   assert.ok(chiamati.length > dopoIlPrimo, 'un dominio diverso resta un controllo nuovo');
 
   safebrowse.setProviders({ gsb: null, rdap: null, ct: null, llm: null, sandbox: null });
+});
+
+// ─── La memoria isolata riusata non si porta dietro il giro prima ───────────
+
+// Electron finto con le memorie VERE: `fromPartition` con lo stesso nome torna
+// lo stesso oggetto, come fa Electron. Solo così si vede cosa resta attaccato
+// a una memoria riusata.
+function electronConMemorie() {
+  const memorie = new Map();
+  const stato = { svuotate: 0 };
+  class Wc {
+    on() {}
+    setWindowOpenHandler() {}
+    loadURL() { return new Promise(() => {}); }
+  }
+  class Win {
+    constructor() { this.webContents = new Wc(); this._morta = false; }
+    isDestroyed() { return this._morta; }
+    destroy() { this._morta = true; }
+  }
+  return {
+    memorie,
+    stato,
+    BrowserWindow: Win,
+    session: {
+      fromPartition: (nome) => {
+        if (!memorie.has(nome)) {
+          memorie.set(nome, {
+            ascoltatori: [],
+            on(_evento, fn) { this.ascoltatori.push(fn); },
+            removeListener(_evento, fn) {
+              const i = this.ascoltatori.indexOf(fn);
+              if (i >= 0) this.ascoltatori.splice(i, 1);
+            },
+            clearStorageData() { stato.svuotate++; return Promise.resolve(); },
+          });
+        }
+        return memorie.get(nome);
+      },
+    },
+  };
+}
+
+test('una memoria riusata non accumula i sorveglianti dei giri passati', async () => {
+  const el = electronConMemorie();
+  for (let i = 0; i < 8; i++) {
+    await sandbox.detonate(`http://riuso-${i}.esempio.test/`, null,
+      { electron: el, timeoutMs: 5000, hardLifetimeMs: 20 });
+  }
+  assert.ok(el.memorie.size <= sandbox.LIMITS.MAX_CONCURRENT,
+    `memorie fabbricate: ${el.memorie.size}, tetto ${sandbox.LIMITS.MAX_CONCURRENT}`);
+  for (const [nome, m] of el.memorie) {
+    assert.equal(m.ascoltatori.length, 0,
+      `la memoria "${nome}" si è tenuta ${m.ascoltatori.length} sorveglianti di controlli già chiusi`);
+  }
+  // Svuotata prima e dopo ogni giro: l'isolamento non aspetta il turno prima.
+  assert.ok(el.stato.svuotate >= 8, 'ogni giro deve svuotare la memoria che riusa');
 });
