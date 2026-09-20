@@ -225,12 +225,10 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_GET_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: true, onboarding: { done: true, ticked: [], thread: [] }, ready: false };
-    // Senza un modello che la chat possa davvero chiamare Filo non può
-    // sostenere una conversazione: l'intervista resta in attesa e la home dice
-    // cosa manca. Aprirla comunque significherebbe accogliere l'utente con una
-    // bolla d'errore. La domanda è «questa chiamata parte?», non «esiste una
-    // chiave intestata al fornitore dichiarato»: quel campo può nominare un
-    // fornitore ritirato e spegneva l'accoglienza a chiave buona (#663).
+    // Senza un modello che la chat possa chiamare l'intervista resta in attesa
+    // e la home dice cosa manca: accoglierlo con una bolla d'errore sarebbe
+    // peggio. La domanda è «questa chiamata parte?», non «c'è una chiave
+    // intestata al fornitore dichiarato»: quel campo può essere vecchio (#663).
     const settings = await ctx.getEffectiveSettings();
     const ready = SN_CONST.canServeAction(settings, SN_CONST.ACTIONS.FILO_CHAT);
     let state = await FiloMem.getOnboarding();
