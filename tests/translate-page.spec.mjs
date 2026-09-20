@@ -875,6 +875,80 @@ test('la sezione ripiegata che si apre DOPO si traduce dal menu, senza rifare il
   expect(doubled).toBe(0);
 });
 
+// #505 — il sito sceglie COME ripiegare una sezione, e quella scelta non deve
+// cambiare né il comportamento né il conto: far sparire il riquadro, lasciarlo
+// al browser (<details>) o schiacciarlo a zero e ritagliarlo sono la stessa
+// cosa per chi guarda lo schermo. Prima l'ultimo caso veniva tradotto subito e
+// pagato anche da chi non l'avrebbe mai aperto.
+const FOLDS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">One gesture, three ways of folding a section away</h1>
+  <p id="visible">The paragraph anyone can read without opening anything at all.</p>
+
+  <button id="t1" onclick="document.getElementById('gone').style.display='block'">Open the first one</button>
+  <div id="gone" style="display:none">
+    <p id="gbody">The body of the section the site makes disappear entirely.</p>
+  </div>
+
+  <button id="t2" onclick="document.getElementById('squashed').style.maxHeight='500px'">Open the second one</button>
+  <div id="squashed" style="max-height:0;overflow:hidden">
+    <p id="sbody">The body of the section the site squashes down to nothing.</p>
+  </div>
+
+  <details id="det">
+    <summary id="dsum">Open the third one</summary>
+    <p id="detbody">The body of the section the browser folds away by itself.</p>
+  </details>
+</body></html>`;
+
+const foldedTexts = (page) => page.evaluate(() => ({
+  gone: document.getElementById('gbody').textContent || '',
+  squashed: document.getElementById('sbody').textContent || '',
+  details: document.getElementById('detbody').textContent || '',
+}));
+
+async function translateNewFromMenu(page) {
+  await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
+  const icon = page.locator('[data-sn-icon-id="translate"]');
+  await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+  await icon.click();
+}
+
+test('ripiegata, schiacciata a zero o lasciata al browser: una sezione chiusa vale come le altre', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, FOLDS);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#visible');
+
+  await expect(page.locator('#visible')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#dsum')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+
+  // Nessuna delle tre sezioni chiuse è stata pagata: quello che l'utente non
+  // vede non si traduce, comunque il sito abbia scelto di chiuderlo.
+  const before = await foldedTexts(page);
+  expect(before.gone).not.toMatch(/^IT /);
+  expect(before.squashed).not.toMatch(/^IT /);
+  expect(before.details).not.toMatch(/^IT /);
+
+  // …e aprendole si traducono, allo stesso prezzo: un blocco per sezione.
+  let paid = await blocksSent(app);
+  for (const [open, body] of [['#t1', '#gbody'], ['#t2', '#sbody'], ['#dsum', '#detbody']]) {
+    await page.locator(open).click();
+    await translateNewFromMenu(page);
+    await expect(page.locator(body)).toHaveText(/^IT /, { timeout: 60000 });
+    const now = await blocksSent(app);
+    expect(now - paid).toBe(1);
+    paid = now;
+  }
+
+  // Niente pagato due volte lungo la strada.
+  const doubled = await page.evaluate(() => Array.from(document.querySelectorAll('[data-sn-translated="1"]'))
+    .filter((el) => /^IT\s+IT\s/.test(el.textContent || '')).length);
+  expect(doubled).toBe(0);
+  await page.screenshot({ path: 'tests/.shots/translate-page-folds.png' }).catch(() => {});
+});
+
 // Le scritte sui bottoni dei moduli: su <input> la scritta è `value`. La riga
 // di confine passa in mezzo agli input — si traduce ciò che si legge, mai ciò
 // che il modulo rimanda indietro (e il valore di un bottone parte solo se il
