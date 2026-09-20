@@ -221,6 +221,10 @@ module.exports = function register(on, ctx) {
     const state = await saveOnboarding(
       Onboarding.close(Onboarding.appendTurn(cur, { role: 'filo', text: bye })),
     );
+    // #525 — il congedo lo legge l'utente, quindi lo deve ritrovare rileggendo
+    // l'intervista. La targa della chat la calcola il modulo dell'intervista,
+    // lo stesso che usa la home per mandare i turni.
+    await archiviaCongedoAccoglienza(Onboarding.chatId(cur), bye);
     // Niente agente-lezioni: qui non c'è un turno da cui estrarre nulla, ma
     // quello che l'utente aveva già raccontato va comunque messo in memoria.
     finishOnboarding({ lessons: false });
