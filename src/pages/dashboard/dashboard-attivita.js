@@ -23,6 +23,7 @@
   let send = null;
   let faviconUrl = () => '';
   let applyCommandCwd = () => {};
+  let riprendiCompito = null;
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
