@@ -283,7 +283,7 @@
     const conTutte = candidate.filter((c) => tutte.every((t) => hays.get(c.id).includes(t)));
     if (conTutte.length) return { results: taglia(conTutte), termini: tutte, allargata: false };
 
-    const forti = tutte.filter((t) => t.length > 3 && !PAROLE_CHE_NON_DISTINGUONO.has(t));
+    const forti = terminiCheDistinguono(tutte);
     // Nessuna parola restringe il campo (l'utente ha cercato «di ieri»):
     // allargare vorrebbe dire tirare fuori mezzo archivio spacciandolo per una
     // risposta. Meglio dire che non si è trovato niente.
