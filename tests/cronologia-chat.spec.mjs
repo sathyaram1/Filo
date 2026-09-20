@@ -85,6 +85,18 @@ function leggiArchivio(app) {
   return app.evaluate(() => globalThis.SN_FILO_CHATS.list());
 }
 
+// La nuova scheda che l'app apre da sola all'avvio: è lì che vive l'intervista
+// di benvenuto.
+async function pagineNuovaScheda(app) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('nuova scheda non trovata');
+}
+
 // Due chat pronte: una discussione e un comando.
 async function preparaDueChat(app) {
   await configura(app);
