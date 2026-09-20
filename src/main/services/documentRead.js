@@ -183,9 +183,77 @@ function chiaveTollerante(nome) {
   return s.toLowerCase();
 }
 
-/** Scherma i metacaratteri di un'espressione regolare. PURA. */
-function scherma(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Il nome con i caratteri persi, sezionato: i pezzi di nome VERO e, fra un
+ * pezzo e l'altro, quanti caratteri può aver mangiato il buco. PURA.
+ * → { pezzi: [stringhe], buchi: [{ min, max }] } con pezzi.length = buchi.length + 1
+ */
+function sezionaConJolly(conJolly) {
+  const pezzi = [];
+  const buchi = [];
+  const run = new RegExp(IGNOTI_RUN.source, 'g');
+  let da = 0;
+  let m;
+  while ((m = run.exec(conJolly)) !== null) {
+    pezzi.push(conJolly.slice(da, m.index));
+    // Ogni carattere perso vale UN carattere vero, non un pezzo di nome lungo a
+    // piacere: con «uno o più» bastava perdere la «o» di «Bilancio» per aprire
+    // «Bilancio 2019 definitivo riservato». Il carattere in più che si concede
+    // copre le tabelle a due byte, dove un carattere solo può averne persi due.
+    buchi.push({ min: 1, max: m[0].length + 1 });
+    da = m.index + m[0].length;
+  }
+  pezzi.push(conJolly.slice(da));
+  return { pezzi, buchi };
+}
+
+/**
+ * Il nome sezionato combacia con quello vero? PURA.
+ *
+ * #551, quinto giro di verifica. Prima questa domanda si faceva costruendo
+ * un'espressione regolare con un jolly per ogni buco e provandola sul nome
+ * vero. Funzionava, ma il tempo di quella prova RADDOPPIA a ogni buco in più:
+ * con ventidue caratteri persi un decimo di secondo, con ventotto otto secondi,
+ * con trenta trentaquattro — e sono i secondi per UN file, che la cartella
+ * moltiplica. Il conto gira nel processo principale, che è uno solo: mentre
+ * gira, Filo non risponde a nient'altro (misurato dentro l'app: una richiesta
+ * che non c'entrava niente ha aspettato undici secondi e mezzo). E il nome su
+ * cui gira non lo sceglie l'utente — lo ricopia il modello da quello che il
+ * terminale gli ha stampato o da un documento, cioè da fuori.
+ *
+ * Qui si avanza invece per POSIZIONI: dopo ogni pezzo di nome vero si tiene
+ * l'insieme dei punti in cui si può essere arrivati, e le posizioni sono al
+ * massimo quante sono le lettere del nome. Nessun ritorno sui propri passi,
+ * quindi il costo cresce con la LUNGHEZZA del nome e non con i buchi: un nome
+ * di duecento caratteri tutto a buchi si risolve in meno di un millisecondo.
+ * La regola che decide resta identica a prima, e le prove dei giri passati lo
+ * verificano.
+ */
+function combaciaSezionato({ pezzi, buchi }, altro) {
+  if (!altro.startsWith(pezzi[0])) return false;
+  let posizioni = [pezzi[0].length];
+  for (let i = 0; i < buchi.length; i++) {
+    const { min, max } = buchi[i];
+    const atteso = pezzi[i + 1];
+    const viste = new Set();
+    const prossime = [];
+    for (const p of posizioni) {
+      for (let salto = min; salto <= max; salto++) {
+        const q = p + salto;
+        if (q + atteso.length > altro.length) break;
+        // Mai un separatore di percorso dentro un buco: qui si confronta un
+        // singolo nome, non un pezzo di percorso.
+        const mangiato = altro.charAt(q - 1);
+        if (mangiato === '/' || mangiato === '\\') break;
+        if (!altro.startsWith(atteso, q)) continue;
+        const fine = q + atteso.length;
+        if (!viste.has(fine)) { viste.add(fine); prossime.push(fine); }
+      }
+    }
+    if (!prossime.length) return false;
+    posizioni = prossime;
+  }
+  return posizioni.includes(altro.length);
 }
 
 /**
@@ -206,24 +274,7 @@ function nomiCombaciano(a, b) {
   // senza che nessuno abbia riconosciuto niente. Serve del nome VERO sotto, e
   // l'estensione non conta come nome.
   if (parteRiconosciuta(conJolly).length < 3) return false;
-  // Ogni carattere perso vale UN carattere vero, non un pezzo di nome lungo a
-  // piacere: con «uno o più» bastava perdere la «o» di «Bilancio» per aprire
-  // «Bilancio 2019 definitivo riservato». Il carattere in più che si concede
-  // copre le tabelle a due byte, dove un carattere solo può averne persi due.
-  // Mai un separatore di percorso: qui si confronta un singolo nome.
-  let pattern = '';
-  let da = 0;
-  const run = new RegExp(IGNOTI_RUN.source, 'g');
-  let m;
-  while ((m = run.exec(conJolly)) !== null) {
-    pattern += scherma(conJolly.slice(da, m.index));
-    pattern += `[^\\\\/]{1,${m[0].length + 1}}`;
-    da = m.index + m[0].length;
-  }
-  pattern += scherma(conJolly.slice(da));
-  let re;
-  try { re = new RegExp(`^${pattern}$`); } catch (_) { return false; }
-  return re.test(altro);
+  return combaciaSezionato(sezionaConJolly(conJolly), altro);
 }
 
 /** Il percorso esiste? (file o cartella, non importa). */
