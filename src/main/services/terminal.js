@@ -275,8 +275,12 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
         // suo (0), non quello del comando. Prendiamo entrambi dal marcatore.
         const parsed = extractCwdMark(rawOut);
         rawOut = parsed.stdout;
-        if (parsed.code !== null) realCode = parsed.code;
-        if (parsed.cwd) resultCwd = parsed.cwd;
+        // Se l'output ha sfondato il tetto il marcatore non è in `rawOut`: sta
+        // nella coda, che teniamo apposta. Lì non c'è niente da ripulire —
+        // quella coda non si mostra a nessuno.
+        const mark = parsed.code !== null ? parsed : extractCwdMark(codaOut);
+        if (mark.code !== null) realCode = mark.code;
+        if (mark.cwd) resultCwd = mark.cwd;
       }
       const out = truncate(rawOut);
       const err = truncate(stderr);
