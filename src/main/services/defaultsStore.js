@@ -544,6 +544,32 @@ async function setRoutineCaps(patch, idToken) {
 }
 
 
+// Come partono le sessioni delle routine (config/routines): quante insieme,
+// da quale account per prima, quali account sono esclusi. Le regole stanno in
+// SN_ROUTINE_SESSIONI (stesse per pagina e main); qui si legge il documento e
+// si scrivono i SOLI campi ricevuti.
+async function getRoutineSessions(idToken) {
+  const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  return globalThis.SN_ROUTINE_SESSIONI.leggiDoc(doc);
+}
+
+async function setRoutineSessions(patch, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare le sessioni delle routine.');
+  const esito = globalThis.SN_ROUTINE_SESSIONI.valida(patch);
+  // Un valore fuori intervallo non si aggiusta di nascosto: chi ha scritto
+  // deve sapere che sul server è rimasto quello di prima.
+  if (!esito.ok) throw new Error(esito.testo);
+  const fields = {};
+  const mask = [];
+  for (const [k, v] of Object.entries(esito.valori)) {
+    fields[k] = toFsValue(v);
+    mask.push(k);
+  }
+  if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
+  return getRoutineSessions(idToken);
+}
+
+
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
 // Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
 // pagina. La tabella di cosa sono e quanto possono valere sta in
