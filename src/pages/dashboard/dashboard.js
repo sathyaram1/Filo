@@ -637,7 +637,7 @@
     return h;
   }
 
-  async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
+  async function runFiloTurn({ userMessage, images = [], internal = false, activity = null, compito = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
