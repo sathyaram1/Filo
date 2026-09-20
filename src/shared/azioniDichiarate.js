@@ -1412,6 +1412,8 @@
     insiemeDiTipi,
     tipiInAttesa,
     tipiDallaCronologia,
+    contiDallaCronologia,
+    famiglieMancateDallaCronologia,
     orariNelTesto,
     formatoSospetto,
     spintaAzioniMancanti,
