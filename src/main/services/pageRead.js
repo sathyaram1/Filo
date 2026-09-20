@@ -234,7 +234,7 @@ function daScartare(nome, attrs, { inZona = false, soloIlleggibile = false } = {
   if (TAG_ILLEGGIBILI.has(nome)) return 'illeggibile';
   if ('hidden' in attrs) return 'illeggibile';
   if (String(attrs['aria-hidden'] || '').toLowerCase() === 'true') return 'illeggibile';
-  if (NASCOSTO.test(attrs.style || '')) return 'illeggibile';
+  if (nascostoInline(attrs.style)) return 'illeggibile';
   if (soloIlleggibile) return false;
   if (TAG_FUORI.has(nome)) return 'fuori';
   if (attrs.role && ROLE_RUMORE.test(attrs.role)) return 'fuori';
