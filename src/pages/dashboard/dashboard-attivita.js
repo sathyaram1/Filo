@@ -108,6 +108,14 @@
       wrap.dataset.phase = p;
       label.textContent = text;
     };
+    // Durata e esito congelati alla fine del lavoro: una riga che arriva dopo
+    // (l'impostazione confermata nel popup) rifà il riassunto, non il cronometro.
+    let doneAt = 0;
+    let doneFailed = false;
+    const renderSummary = () => {
+      const summary = `${summarizeActivity(doneTypes, sawReasoning)} · ${fmtActivityDuration(doneAt - startedAt)}`;
+      setPhase('done', doneFailed ? `Tentativo non riuscito · ${summary}` : summary);
+    };
     const lastSentence = (t) => {
       const parts = String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?…])\s+/);
       return parts[parts.length - 1] || '';
