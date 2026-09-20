@@ -49,7 +49,7 @@ test('l\'evento proposto si aggiunge al calendario, e fino ad allora il diario l
   const testoRiga = await riga.textContent();
   expect(testoRiga).toContain('proposto');
   expect(testoRiga).not.toContain('creato');
-  expect(testoRiga).toContain('21/9/2026 alle 10:00');
+  expect(testoRiga).toContain('21/09/2026 alle 10:00');
 
   // Il bottone c'è, è acceso, e fa quello che dice.
   const btn = page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' });
