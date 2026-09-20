@@ -164,12 +164,18 @@ test('più indirizzi insieme non aprono più finestre del tetto', async () => {
     `memorie isolate fabbricate: ${dopo.partizioni}, tetto ${sandbox.LIMITS.MAX_CONCURRENT}`);
 });
 
-// ─── La memoria: per dominio registrabile, non per host ─────────────────────
+// ─── Il freno è del dominio, il verdetto è dell'indirizzo ───────────────────
+//
+// Secondo giro di verifica: mettere il VERDETTO sul dominio registrabile
+// fermava la spruzzata di sottodomini, ma faceva valere il verdetto di un sito
+// per tutti i siti vicini (vedi safebrowseVerdettoPerIndirizzo.test.mjs). Il
+// freno alla spruzzata resta, ed è un conto di quante verifiche profonde un
+// dominio può far partire.
 
-test('il verdetto profondo si ricorda per dominio, non per sottodominio', async () => {
+test('una spruzzata di sottodomini non moltiplica le verifiche profonde', async () => {
   const chiamati = [];
-  safebrowse._caches.sandboxCache.m.clear();
-  safebrowse._caches.llmCache.m.clear();
+  for (const c of Object.values(safebrowse._caches)) c.clear();
+  for (const s of Object.values(safebrowse._inFlight)) s.clear();
   safebrowse.setProviders({
     gsb: null, rdap: null, ct: null,
     llm: async (meta) => { chiamati.push('llm:' + meta.host); return { verdict: 'unclear' }; },
@@ -179,25 +185,25 @@ test('il verdetto profondo si ricorda per dominio, non per sottodominio', async 
   // Un indirizzo che il motore locale trova sospetto: senza sospetto gli stadi
   // profondi non partono affatto.
   const sospetto = (host) => `http://paypal-secure-login.${host}/verifica`;
-  const attese = [];
   safebrowse.analyze(sospetto('truffa-esempio.com'), {}, () => {});
   await attendi(5);
-  const dopoIlPrimo = chiamati.length;
-  assert.ok(dopoIlPrimo > 0, 'il primo passaggio deve far partire gli stadi profondi');
+  assert.ok(chiamati.length > 0, 'il primo passaggio deve far partire gli stadi profondi');
 
-  // Sottodomini nuovi sullo STESSO dominio registrabile: prima ripartivano
-  // tutti, perché la memoria era sull'host completo.
-  for (let i = 0; i < 20; i++) {
-    attese.push(safebrowse.analyze(`http://n${i}.paypal-secure-login.truffa-esempio.com/verifica`, {}, () => {}));
+  // Cento sottodomini nuovi sullo stesso dominio, uno dopo l'altro come li
+  // vedrebbe chi naviga. Prima ripartivano tutti.
+  for (let i = 0; i < 100; i++) {
+    safebrowse.analyze(`http://n${i}.paypal-secure-login.truffa-esempio.com/verifica`, {}, () => {});
+    await attendi(1);
   }
-  await attendi(10);
-  assert.equal(chiamati.length, dopoIlPrimo,
-    'sottodomini nuovi sullo stesso dominio non devono far ripartire niente');
+  const perStadio = safebrowse.DEEP_MAX_PER_DOMAIN;
+  assert.ok(chiamati.length <= perStadio * 2,
+    `cento sottodomini non devono fare cento verifiche: ne ho contate ${chiamati.length}`);
 
-  // Un dominio registrabile DIVERSO invece è un caso nuovo, e si controlla.
+  // Un dominio registrabile DIVERSO ha il suo conto, e si controlla.
+  const prima = chiamati.length;
   safebrowse.analyze(sospetto('altra-truffa.com'), {}, () => {});
   await attendi(5);
-  assert.ok(chiamati.length > dopoIlPrimo, 'un dominio diverso resta un controllo nuovo');
+  assert.ok(chiamati.length > prima, 'un dominio diverso resta un controllo nuovo');
 
   safebrowse.setProviders({ gsb: null, rdap: null, ct: null, llm: null, sandbox: null });
 });

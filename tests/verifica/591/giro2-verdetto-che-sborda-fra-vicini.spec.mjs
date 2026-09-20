@@ -33,7 +33,7 @@ function pulisci() {
 }
 
 test('la finestra nascosta di un sito di truffa marchia i siti vicini che non c\'entrano', async () => {
-  pulisci('pages.dev');
+  pulisci();
   SB.setProviders({
     gsb: null,
     rdap: null,
@@ -59,7 +59,7 @@ test('la finestra nascosta di un sito di truffa marchia i siti vicini che non c\
 });
 
 test('il giudizio del modello su un sito di truffa mette l\'avviso sui siti vicini', async () => {
-  pulisci('pages.dev');
+  pulisci();
   SB.setProviders({
     gsb: null,
     rdap: null,
@@ -75,7 +75,7 @@ test('il giudizio del modello su un sito di truffa mette l\'avviso sui siti vici
 });
 
 test('un vicino già controllato impedisce il controllo profondo di un sito di truffa', async () => {
-  pulisci('pages.dev');
+  pulisci();
   const finestre = [];
   SB.setProviders({
     gsb: null,
@@ -101,7 +101,7 @@ test('su un dominio normale il freno resta dov\'era: un solo controllo per domin
   // Caso di riscontro: quello che il freno per dominio doveva ottenere — e che
   // deve continuare a valere — è che una spruzzata di sottodomini sullo stesso
   // dominio NON moltiplichi i controlli.
-  pulisci('esempio-verifica-591-giro2.tk');
+  pulisci();
   let giudizi = 0;
   let finestre = 0;
   SB.setProviders({
