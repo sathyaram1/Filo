@@ -54,7 +54,13 @@
   let backoff = backoffMin;
 
   function serialize(it) {
-    return { id: it.id, payload: it.payload, name: it.name, prepared: !!it.prepared, queuedAt: it.queuedAt, attempts: it.attempts || 0 };
+    return {
+      id: it.id, payload: it.payload, name: it.name, prepared: !!it.prepared,
+      queuedAt: it.queuedAt, attempts: it.attempts || 0,
+      // #602 — una voce che aspetta solo di essere ANNUNCIATA (non partirà
+      // mai): si persiste come le altre, così l'avviso sopravvive a un riavvio.
+      rinuncia: !!it.rinuncia, motivoRinuncia: it.motivoRinuncia || '',
+    };
   }
 
   async function persist() {
