@@ -216,8 +216,21 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
       killTree(child);
     }, Math.max(1000, timeoutMs));
 
+    // L'output NON arriva in un pezzo solo: arriva man mano, e ogni pezzo
+    // finisce dove capita. Una «à» occupa due byte, un'emoji quattro: se la
+    // lettura cade in mezzo e si trasforma in testo un pezzo per volta, quei
+    // byte non vogliono dire niente né di qua né di là e diventano rombi. Il
+    // nome torna storpiato come prima del preludio UTF-8, su Windows come su
+    // Linux, perché qui la shell non c'entra: c'entra dove cade la lettura
+    // (#551, secondo giro di verifica). `setEncoding` mette davanti allo
+    // stream il decodificatore che tiene da parte i byte di un carattere
+    // ancora incompleto e li riattacca al pezzo dopo. È lo stesso che fa la
+    // shell persistente del terminale della dashboard, che infatti non ha mai
+    // avuto questo guasto: le due strade adesso leggono allo stesso modo.
+    if (child.stdout) child.stdout.setEncoding('utf8');
+    if (child.stderr) child.stderr.setEncoding('utf8');
     const cap = (chunk, which) => {
-      const s = chunk.toString();
+      const s = String(chunk);
       if (which === 'out') { if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += s; }
       else if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += s;
     };
