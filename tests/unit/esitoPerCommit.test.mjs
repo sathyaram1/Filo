@@ -49,7 +49,17 @@ const {
   defaultState,
 } = await import('../../scripts/dispatch.mjs');
 
-const { esitiDecaduti, testoEsitiDecaduti } = await import('../../scripts/merge-gate.mjs');
+const {
+  esitiDecaduti,
+  testoEsitiDecaduti,
+  esitiSenzaCommit,
+  testoEsitiSenzaCommit,
+  statoPubblicazione,
+  testoNonPubblicato,
+} = await import('../../scripts/merge-gate.mjs');
+
+const { ricordaEsitoSuCommit, CAMPI_ESITO } = await import('../../scripts/lib/branch-integrity.mjs');
+const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
 
 const {
   confermaImpronta,
