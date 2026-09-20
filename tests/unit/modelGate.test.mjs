@@ -209,6 +209,7 @@ function banco({ oltreIlLimite = false } = {}) {
         transcribe: async () => { tocchi.push({ metodo: 'transcribe' }); return { text: 'ciao', usage: { costUsd: 0.5 } }; },
         streamComplete: async () => { tocchi.push({ metodo: 'streamComplete' }); return { usage: { completionTokens: 3 } }; },
         lookupServedBy: async () => ({ servedBy: 'HostFinto' }),
+        keyInfo: async () => { tocchi.push({ metodo: 'keyInfo' }); return { limit: 10, usage: 3 }; },
       };
     },
   };
