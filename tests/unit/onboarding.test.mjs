@@ -410,3 +410,24 @@ test('il manifesto delle capacità dichiara l’onboarding', () => {
   assert.ok(voce, 'manifesto senza la voce onboarding: l’agente non saprebbe di saperlo fare');
   assert.match(voce.invoke, /Preferenze/, 'deve dire come rilanciarla');
 });
+
+// #533 (quinto giro di verifica) — l'intervista è l'unica conversazione che
+// Filo rimette a schermo da capo, anche in un'altra scheda e dopo un riavvio.
+// Là la scheda non ha nessuna richiesta da citare, e senza il nome qui sotto
+// il motore decideva che quella conversazione non avesse mai letto niente,
+// mentre le parole del sito erano ancora nelle bolle.
+test('la conversazione dell\'intervista si porta dietro il nome della richiesta che l\'ha scritta', () => {
+  const O = globalThis.SN_ONBOARDING;
+  assert.equal(O.emptyState().compito, '');
+  const con = O.rememberCompito(O.emptyState(), 'c-123');
+  assert.equal(con.compito, 'c-123');
+  // Le risposte scritte a mano da Filo (benvenuto, congedo) non hanno una
+  // richiesta dietro e non devono far dimenticare quella che c'era.
+  assert.equal(O.rememberCompito(con, '').compito, 'c-123');
+  assert.equal(O.rememberCompito(con, null).compito, 'c-123');
+  // Sopravvive a un giro dal disco e all'aggiunta di un turno.
+  const dopo = O.appendTurn(JSON.parse(JSON.stringify(con)), { role: 'user', text: 'ciao' });
+  assert.equal(dopo.compito, 'c-123');
+  // Rifare l'intervista riparte pulita: quella di prima non conta più.
+  assert.equal(O.restart(dopo).compito, '');
+});

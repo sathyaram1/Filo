@@ -121,6 +121,14 @@
     },
     {
       keys: ['stile_agente', 'stile agente', "stile dell'agente", 'agentstyle', 'stile'],
+      // #533 (quinto giro di verifica) — questa non è una preferenza come le
+      // altre: il testo che ci finisce dentro entra in cima a OGNI richiesta
+      // futura, presentato al modello come lo stile che l'utente ha chiesto e
+      // da applicare a tutte le risposte. È un'istruzione su come Filo si
+      // comporta, vale per sempre e in tutte le conversazioni, esattamente come
+      // una regola nella memoria. Quindi ha una famiglia di uscita sua, che un
+      // compito contaminato non ottiene per nessuna strada.
+      uscita: 'contegno',
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
@@ -498,5 +506,23 @@
     return null;
   }
 
-  global.SN_PREF = { buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS };
+  // A quale famiglia di uscita appartiene una preferenza (#533, quinto giro di
+  // verifica). Quasi tutte sono «impostazioni»; quelle che lasciano scritta
+  // un'istruzione su come Filo si comporterà d'ora in poi hanno la loro, e non
+  // si ottengono da una richiesta che ha letto roba scritta da altri. La
+  // ricerca della chiave è la stessa di buildPreferencePartial, così una chiave
+  // scritta storta non finisce nella famiglia sbagliata.
+  function uscitaPerPreferenza(rawKey) {
+    const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
+    if (!key) return 'impostazioni';
+    for (const setter of PREF_SETTERS) {
+      if (setter.keys.includes(key)) return setter.uscita || 'impostazioni';
+    }
+    for (const setter of PREF_SETTERS) {
+      if (setter.keys.some((k) => key.includes(k) || k.includes(key))) return setter.uscita || 'impostazioni';
+    }
+    return 'impostazioni';
+  }
+
+  global.SN_PREF = { buildPreferencePartial, uscitaPerPreferenza, parsePrefBool, parseItalianNumber, PREF_SETTERS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

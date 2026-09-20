@@ -510,7 +510,13 @@
       riga.append(dove);
     }
     // E cosa si è fermato: è la riga che risponde a «perché non l'ha fatto?».
-    const fermate = (c.rifiutate || []).map((t) => (C ? C.etichettaUscita(C.uscitaDi(t)) : t)).filter(Boolean);
+    // Le famiglie come il registro le ha scritte al momento del rifiuto: uno
+    // strumento solo può appartenere a famiglie diverse a seconda di cosa
+    // stava per fare (#533, quinto giro di verifica).
+    const uscite = (c.usciteRifiutate && c.usciteRifiutate.length)
+      ? c.usciteRifiutate
+      : (c.rifiutate || []).map((t) => (C ? C.uscitaDi(t) : t));
+    const fermate = uscite.map((u) => (C ? C.etichettaUscita(u) : u)).filter(Boolean);
     if (fermate.length) {
       const stop = document.createElement('div');
       stop.className = 'sn-muted';

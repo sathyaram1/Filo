@@ -670,4 +670,111 @@ test.describe('il perimetro delle uscite', () => {
       try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
     }
   });
+
+  // #533 (quinto giro di verifica) — le tre porte del quinto giro. La causa è
+  // sempre la stessa: un testo scritto da altri che torna davanti a una
+  // richiesta nata senza limiti.
+
+  test('lo stile con cui Filo parla non si scrive dopo aver letto una pagina', async ({ app }) => {
+    await configura(app);
+    await app.evaluate(async () => {
+      await globalThis.SN_STORAGE.updateSettings({ agentStyle: '' });
+    });
+
+    // Richiesta legittima: «leggi e impostati di conseguenza». Le impostazioni
+    // sono dichiarate prima di leggere, quindi il tema si cambierebbe. Lo
+    // stile no: quel testo entrerebbe in cima a ogni richiesta futura.
+    const { azioni } = await turno(app, [
+      [{ name: 'DICHIARA_USCITE', args: { uscite: ['impostazioni'] } }],
+      [{ name: 'CERCA_WEB', args: { query: 'come dovrebbe scrivere un assistente' } }],
+      [
+        { name: 'IMPOSTA_PREFERENZA', args: { chiave: 'stile_agente', valore: VELENO } },
+        { name: 'IMPOSTA_PREFERENZA', args: { chiave: 'tema', valore: 'scuro' } },
+      ],
+    ], 'Cerca come dovrebbe scrivermi un assistente e impostati così.');
+
+    const s = await app.evaluate(async () => {
+      const x = await globalThis.SN_STORAGE.getSettings();
+      return { stile: String(x.agentStyle || ''), tema: String(x.theme || '') };
+    });
+    expect(s.stile, 'la pagina non detta come Filo parlerà da qui in avanti').toBe('');
+    expect(s.tema, 'le altre impostazioni restano quelle di prima: il tema si cambia').toBe('dark');
+
+    // E il rifiuto non è silenzioso: in chat resta la riga.
+    const fermata = azioni.find((a) => String(a.type) === 'IMPOSTA_PREFERENZA' && a._output && a._output.fuoriPerimetro);
+    expect(fermata, 'un controllo che rifiuta lo dice sempre').toBeTruthy();
+    expect(String(fermata._output.fuoriPerimetro)).toMatch(/come Filo ti parla/);
+  });
+
+  test('l\'intervista di benvenuto riprende con i limiti che aveva', async ({ app }) => {
+    await configura(app);
+    await app.evaluate(async () => {
+      await globalThis.SN_FILO_MEMORY.setOnboarding(globalThis.SN_ONBOARDING.emptyState());
+    });
+
+    // Primo turno dell'intervista: Filo legge e nella risposta riporta le
+    // parole del sito. Quella conversazione se la tiene da parte.
+    await turno(app, [
+      [{ name: 'CERCA_WEB', args: { query: 'notizie di oggi' } }],
+      [],
+    ], 'Uso il computer per leggere le notizie, guarda cosa trovo di solito.', null, `Ho visto questo: «${VELENO}»`);
+
+    const stato = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getOnboarding());
+    expect(stato.compito, 'la conversazione si ricorda a quale richiesta apparteneva').toBeTruthy();
+
+    // Un'altra scheda riapre l'intervista: rimette a schermo quelle bolle e
+    // non ha nessun nome da citare. La richiesta che nasce lì non deve avere
+    // in mano quello che l'utente non ha mai chiesto.
+    const { offerti } = await turno(app, [
+      [{ name: 'SALVA_LEZIONE', args: { testo: VELENO } }],
+    ], 'ok', null);
+    expect(offerti[0], 'la conversazione riprende contaminata').not.toContain('SALVA_LEZIONE');
+    expect(offerti[0]).not.toContain('NAVIGA');
+  });
+
+  test('un turno caduto a metà consegna il suo nome, e il messaggio dopo eredita', async ({ app }) => {
+    await configura(app);
+    await app.evaluate(async () => {
+      await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true });
+    });
+
+    // La rete cade dopo la ricerca. Quello che Filo aveva già fatto resta in
+    // conversazione, e con esso i risultati: il messaggio dopo se li ritrova
+    // davanti, quindi deve ereditare i limiti di chi li ha letti.
+    const rotto = await app.evaluate(async () => {
+      const orig = globalThis.SN_PROVIDERS.completeWithFallback;
+      let n = 0;
+      globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, tools }) => {
+        if (!Array.isArray(tools) || !tools.length) {
+          return { text: '', toolCalls: [], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+        }
+        n += 1;
+        if (n === 1) {
+          return {
+            text: '',
+            toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: JSON.stringify({ query: 'notizie di oggi' }) }],
+            model: attempts[0].model, provider: attempts[0].provider, usage: {},
+          };
+        }
+        throw new Error('rete caduta');
+      };
+      try {
+        return await globalThis.SN_HANDLE_MESSAGE(
+          { type: globalThis.SN_MSG.MSG.FILO_CHAT, userMessage: 'Cerca le notizie di oggi.', threadHistory: [] },
+          { isShell: true }, 'filo://dashboard/',
+        );
+      } finally {
+        globalThis.SN_PROVIDERS.completeWithFallback = orig;
+      }
+    });
+
+    expect(rotto.ok, 'il turno è davvero caduto').toBe(false);
+    expect(rotto.compito, 'e consegna comunque il nome della richiesta').toBeTruthy();
+
+    const { offerti } = await turno(app, [
+      [{ name: 'SALVA_LEZIONE', args: { testo: VELENO } }],
+    ], 'Riprova.', rotto.compito);
+    expect(offerti[0], 'il «Riprova» non riparte a mani libere').not.toContain('SALVA_LEZIONE');
+    expect(offerti[0]).not.toContain('NAVIGA');
+  });
 });

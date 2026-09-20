@@ -1374,12 +1374,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // prima di qualsiasi altra cosa. Se arrivasse più in basso, un terminale
   // spento le risponderebbe per primo «proponi di attivarlo», che è proprio la
   // strada che un'istruzione ostile vorrebbe farle prendere.
-  const verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type) : { ok: true };
+  // L'azione viaggia col verdetto: per IMPOSTA_PREFERENZA la famiglia dipende
+  // da QUALE preferenza sta per scrivere (#533, quinto giro di verifica).
+  const verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type, action) : { ok: true };
   // `secco` è il rifiuto che non conosce permessi: vale anche dove a chiedere
   // per conto del modello sarebbe il motore (#533, quarto giro di verifica).
   if (!verdettoPerimetro.ok && (verdettoPerimetro.secco || verdettoPerimetro.puoChiedere)) {
     Compiti.registraAzione(task, {
       type,
+      azione: action,
       esito: verdettoPerimetro.secco ? 'rifiutata: mai da testo esterno' : 'rifiutata: fuori perimetro',
     });
     return { executed: false, kept: false, rejected: true, fuoriPerimetro: verdettoPerimetro };
@@ -2721,7 +2724,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // capo (altra scheda, riavvio, ripresa automatica), e lì la scheda riparte
     // senza niente in mano mentre le parole lette prima sono ancora nelle
     // bolle.
-    const chiavePrec = compitoPrecedente || (onbActive ? (onbBefore.compito || null) : null);
+    // Solo quando la conversazione è già a schermo: se la scheda manda una
+    // conversazione vuota siamo a un inizio, e un inizio non eredita niente.
+    const intervistaRipresa = onbActive && Array.isArray(threadHistory) && threadHistory.length > 0;
+    const chiavePrec = compitoPrecedente || (intervistaRipresa ? (onbBefore.compito || null) : null);
     const prec = chiavePrec ? await compitoPrecedenteDi(chiavePrec) : null;
     task = ricordaCompito(Compiti.erede(prec, {
       richiesta: userMessage,
@@ -2813,7 +2819,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // quindi nessuna lettura di questo giro può averlo influenzato. Segnarle
         // subito rifiuterebbe «leggi il pdf e apri il link» sul secondo pezzo.
         if (task && Compiti && Compiti.classeDi(a.type).classe === 'uscita') {
-          Compiti.registraAzione(task, { type: a.type, esito: res.executed ? 'fatta' : 'no' });
+          Compiti.registraAzione(task, { type: a.type, azione: a, esito: res.executed ? 'fatta' : 'no' });
         }
         const rendered = { ...a };
         delete rendered._argsError;

@@ -23,13 +23,28 @@
     // un compito contaminato questa uscita non la ottiene per nessuna strada
     // (#533, quarto giro di verifica). Un contenuto trovato leggendo si salva
     // come appunto.
-    memoria: { label: 'scrivere nella memoria di Filo', maiDaEsterno: true },
+    memoria: {
+      label: 'scrivere nella memoria di Filo',
+      maiDaEsterno: true,
+      nota: 'Un contenuto trovato leggendo si salva con appunti.',
+    },
     // Cancellare tutta la memoria non è «scrivere nella memoria»: chi legge
     // «scrivere» e dice sì non sta concedendo di buttare via il profilo di
     // anni (#533, secondo giro di verifica). Famiglia sua, frase sua.
     oblio: { label: 'cancellare tutta la memoria di Filo' },
     schede: { label: 'aprire, archiviare o eliminare schede' },
     impostazioni: { label: 'cambiare le impostazioni di Filo' },
+    // Scrivere come Filo deve parlare non è cambiare un'impostazione: quel
+    // testo entra in cima a OGNI richiesta futura, presentato come una cosa
+    // che ha chiesto l'utente e da applicare a tutte le risposte. È
+    // un'istruzione che vale per sempre e in tutte le conversazioni, come una
+    // regola nella memoria, quindi come quella non nasce da testo scritto da
+    // altri e ha una frase sua nel riquadro (#533, quinto giro di verifica).
+    contegno: {
+      label: 'decidere come Filo ti parla, in tutte le conversazioni',
+      maiDaEsterno: true,
+      nota: 'È la preferenza stile_agente: quello che ci scrivi torna davanti a te in ogni conversazione futura.',
+    },
     aspetto: { label: 'cambiare l’aspetto di Filo o della pagina' },
     rete: { label: 'cambiare da quale paese si naviga' },
     terminale: { label: 'eseguire comandi sul computer' },
@@ -68,7 +83,21 @@
     NAVIGA: { classe: 'uscita', uscita: 'schede' },
     PULISCI_TAB: { classe: 'uscita', uscita: 'schede' },
     CANCELLA_ARCHIVIO: { classe: 'uscita', uscita: 'schede' },
-    IMPOSTA_PREFERENZA: { classe: 'uscita', uscita: 'impostazioni' },
+    // La famiglia dipende dalla PREFERENZA, non dallo strumento: cambiare il
+    // tema è «impostazioni», scrivere come Filo deve parlare è «contegno».
+    // Senza l'azione sotto mano resta la famiglia larga, che è quella con cui
+    // lo strumento viene offerto.
+    IMPOSTA_PREFERENZA: {
+      classe: 'uscita',
+      uscita: 'impostazioni',
+      famiglia: (azione) => {
+        const P = global.SN_PREF;
+        if (!P || typeof P.uscitaPerPreferenza !== 'function') return 'impostazioni';
+        const chiave = azione && (azione.chiave ?? azione.key ?? azione.nome ?? azione.name ?? azione.preferenza);
+        const u = P.uscitaPerPreferenza(chiave);
+        return (u in USCITE) ? u : 'impostazioni';
+      },
+    },
     IMPOSTA_ESTETICA: { classe: 'uscita', uscita: 'aspetto' },
     STILE_PAGINA: { classe: 'uscita', uscita: 'aspetto' },
     RIPRISTINA_STILE_PAGINA: { classe: 'uscita', uscita: 'aspetto' },
@@ -104,9 +133,15 @@
     return CLASSI[t] || { classe: 'uscita', uscita: `sconosciuta:${t || '?'}` };
   }
 
-  function uscitaDi(type) {
+  // Con l'azione sotto mano la famiglia può essere più stretta di quella dello
+  // strumento: senza, resta quella larga.
+  function uscitaDi(type, azione) {
     const c = classeDi(type);
-    return c.classe === 'uscita' ? c.uscita : null;
+    if (c.classe !== 'uscita') return null;
+    if (azione && typeof c.famiglia === 'function') {
+      try { return c.famiglia(azione); } catch (_) { return c.uscita; }
+    }
+    return c.uscita;
   }
 
   // Un'uscita interna non l'ha autorizzata l'utente: è contabilità di Filo, e
@@ -121,6 +156,14 @@
   function maiDaEsterno(uscita) {
     const u = USCITE[String(uscita || '')];
     return !!(u && u.maiDaEsterno);
+  }
+
+  // La riga in più che l'elenco degli strumenti scrive accanto a un'uscita che
+  // da un compito contaminato non si ottiene: perché non si ottiene, e cosa
+  // fare invece.
+  function notaUscita(uscita) {
+    const u = USCITE[String(uscita || '')];
+    return (u && u.nota) || '';
   }
 
   // La richiesta così come l'ha scritta l'utente, su una riga sola e corta:
@@ -269,44 +312,47 @@
     scrivi(c, { tipo: 'lettura', azione: normType(type), fonte: f, dettaglio: dettaglio || '' });
   }
 
-  function registraAzione(c, { type, esito, uscita } = {}) {
-    scrivi(c, { tipo: 'azione', azione: normType(type), esito: String(esito || ''), uscita: uscita || uscitaDi(type) });
+  function registraAzione(c, { type, esito, uscita, azione } = {}) {
+    scrivi(c, { tipo: 'azione', azione: normType(type), esito: String(esito || ''), uscita: uscita || uscitaDi(type, azione) });
   }
 
   /**
    * Il verdetto del motore su una singola azione. `ok:false` con
    * `motivo:'fuori-perimetro'` è la sola porta da cui si passa all'allargamento.
    */
-  function consentito(c, type) {
+  function consentito(c, type, azione) {
     const t = normType(type);
     const k = classeDi(t);
     if (k.classe !== 'uscita') return { ok: true, classe: k.classe };
+    // La famiglia vera di QUESTA azione: per IMPOSTA_PREFERENZA dipende da
+    // quale preferenza sta per scrivere (#533, quinto giro di verifica).
+    const uscita = uscitaDi(t, azione) || k.uscita;
     // Finché niente di esterno è entrato nel contesto, l'unica autorità in
     // gioco è l'utente che ha scritto: il perimetro non serve ancora.
-    if (!c || !c.contaminato) return { ok: true, classe: 'uscita', uscita: k.uscita };
+    if (!c || !c.contaminato) return { ok: true, classe: 'uscita', uscita };
     // Uscite che da un compito contaminato non si ottengono per nessuna
     // strada: né dichiarandole prima, né chiedendole all'utente durante.
     // `secco` dice a chi applica di rifiutare e basta, senza popup.
-    if (maiDaEsterno(k.uscita)) {
+    if (maiDaEsterno(uscita)) {
       return {
         ok: false,
         motivo: 'mai-da-esterno',
         secco: true,
         classe: 'uscita',
-        uscita: k.uscita,
-        etichetta: etichettaUscita(k.uscita),
+        uscita,
+        etichetta: etichettaUscita(uscita),
         puoChiedere: false,
       };
     }
-    if (usciteVive(c).includes(k.uscita)) {
-      return { ok: true, classe: 'uscita', uscita: k.uscita };
+    if (usciteVive(c).includes(uscita)) {
+      return { ok: true, classe: 'uscita', uscita };
     }
     return {
       ok: false,
       motivo: 'fuori-perimetro',
       classe: 'uscita',
-      uscita: k.uscita,
-      etichetta: etichettaUscita(k.uscita),
+      uscita,
+      etichetta: etichettaUscita(uscita),
       puoChiedere: c.dichiarazione === 'modello',
     };
   }
@@ -338,6 +384,17 @@
       .filter((r) => r.tipo === 'azione' && String(r.esito || '').startsWith('rifiutata'))
       .map((r) => r.azione)));
   }
+  // Le FAMIGLIE che si sono fermate, come il registro le aveva scritte al
+  // momento del rifiuto. Non si ricavano più dal nome dello strumento: uno
+  // strumento solo può appartenere a famiglie diverse a seconda di cosa stava
+  // per fare (#533, quinto giro di verifica), e chi mostra la riga deve
+  // leggere la frase giusta.
+  function usciteRifiutate(c) {
+    if (!c || !Array.isArray(c.registro)) return [];
+    return Array.from(new Set(c.registro
+      .filter((r) => r.tipo === 'azione' && String(r.esito || '').startsWith('rifiutata') && r.uscita)
+      .map((r) => r.uscita)));
+  }
 
   function riassunto(c) {
     if (!c) return null;
@@ -356,6 +413,7 @@
       allargamenti: c.allargamenti.slice(),
       letture: letture(c),
       rifiutate: rifiutate(c),
+      usciteRifiutate: usciteRifiutate(c),
       registro: c.registro.slice(),
       omesse: c.omesse,
     };
@@ -363,8 +421,8 @@
 
   global.SN_COMPITI = {
     FONTI, USCITE, USCITE_DICHIARABILI, CLASSI, MAX_RIGHE,
-    classeDi, uscitaDi, etichettaUscita, uscitaInterna, maiDaEsterno, etichettaRichiesta, MAX_RICHIESTA, usciteVive,
-    nuovo, erede, dichiara, allarga, registraLettura, registraAzione, letture, rifiutate,
+    classeDi, uscitaDi, etichettaUscita, uscitaInterna, maiDaEsterno, notaUscita, etichettaRichiesta, MAX_RICHIESTA, usciteVive,
+    nuovo, erede, dichiara, allarga, registraLettura, registraAzione, letture, rifiutate, usciteRifiutate,
     consentito, strumentiPermessi, riassunto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

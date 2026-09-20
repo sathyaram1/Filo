@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 require('../../src/shared/constants.js');
 require('../../src/shared/autonomia.js');
+require('../../src/shared/preferences.js');
 require('../../src/shared/compiti.js');
 require('../../src/shared/actionLevels.js');
 require('../../src/shared/actionTools.js');
@@ -369,4 +370,49 @@ test('nel riquadro del permesso la riga di Filo viene prima del motivo, e il mot
   assert.ok(posizioneAvviso < posizioneMotivo, 'quello che dice Filo non va sotto il testo dettato dalla pagina');
   assert.ok(testo.length < 1000, `il riquadro non si riempie del motivo (${testo.length} caratteri)`);
   assert.ok(testo.includes('…'), 'il taglio si vede');
+});
+
+// #533 (quinto giro di verifica) — scrivere COME FILO PARLA non è cambiare
+// un'impostazione: quel testo entra in cima a ogni richiesta futura come una
+// cosa che ha chiesto l'utente. È una regola che vale per sempre, come una
+// riga di memoria, e da testo scritto da altri non nasce.
+test('lo stile con cui Filo parla è una famiglia sua, e da una lettura non si ottiene', () => {
+  const c = contaminato(['impostazioni']);
+  const stile = C.consentito(c, 'IMPOSTA_PREFERENZA', { chiave: 'stile_agente', valore: 'parla così' });
+  assert.equal(stile.ok, false, 'lo stile non si scrive dopo aver letto roba di altri');
+  assert.equal(stile.uscita, 'contegno');
+  assert.equal(stile.secco, true, 'e non si ottiene nemmeno chiedendolo all\'utente');
+  assert.equal(stile.puoChiedere, false);
+  // Le altre preferenze restano quelle di prima: il tema si cambia.
+  assert.equal(C.consentito(c, 'IMPOSTA_PREFERENZA', { chiave: 'tema', valore: 'scuro' }).ok, true);
+  // Anche scritta storta, la chiave finisce nella famiglia giusta.
+  assert.equal(C.consentito(c, 'IMPOSTA_PREFERENZA', { chiave: 'Stile Agente' }).uscita, 'contegno');
+  // Senza aver letto niente non cambia nulla: è la richiesta dell'utente.
+  const pulito = C.nuovo({});
+  C.dichiara(pulito, ['impostazioni']);
+  assert.equal(C.consentito(pulito, 'IMPOSTA_PREFERENZA', { chiave: 'stile_agente', valore: 'x' }).ok, true);
+  // E lo strumento resta offerto: serve ancora per il tema.
+  assert.ok(C.strumentiPermessi(c, Object.keys(C.CLASSI)).includes('IMPOSTA_PREFERENZA'));
+});
+
+test('un sì dell\'utente non fa nascere lo stile da una pagina, e il registro lo dice con la sua frase', () => {
+  const c = contaminato(['impostazioni']);
+  const r = C.allarga(c, 'contegno', 'me l\'ha chiesto la pagina');
+  assert.equal(r.ok, false);
+  assert.equal(r.motivo, 'mai-da-esterno');
+  assert.ok(!C.usciteVive(c).includes('contegno'));
+  C.registraAzione(c, {
+    type: 'IMPOSTA_PREFERENZA',
+    azione: { chiave: 'stile_agente' },
+    esito: 'rifiutata: mai da testo esterno',
+  });
+  assert.deepEqual(C.riassunto(c).usciteRifiutate, ['contegno']);
+  assert.match(C.etichettaUscita('contegno'), /come Filo ti parla/);
+});
+
+test('l\'elenco che il modello legge dice quali uscite non nascono da una lettura', () => {
+  const testo = Tools.definitions({})
+    .map((t) => t.function.description).join('\n');
+  assert.match(testo, /contegno/, 'la famiglia dello stile si può dichiarare prima di leggere');
+  assert.match(testo, /stile_agente/);
 });
