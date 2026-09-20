@@ -223,7 +223,7 @@ test('una chat senza titolo generato non scrive due volte la stessa frase', asyn
 test('Cronologia con chat e senza schede chiuse: «Svuota archivio» dice cosa fa', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await configura(app);
-  await stubProvider(app, {});
+  await stubProvider(app, { sveglia: { tipo: 'comando', titolo: 'Sveglia alle sette' } });
 
   await turno(app, 'c-sola', 'Una chat e nessuna scheda chiusa');
   await app.evaluate(() => globalThis.SN_CLOSE_FILO_CHAT('c-sola'));
