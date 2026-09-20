@@ -121,6 +121,10 @@
       return parts[parts.length - 1] || '';
     };
     const append = (el) => {
+      // Il blocco si era tolto perché non c'era niente da raccontare: se
+      // qualcosa arriva dopo (una conferma data a risposta già scritta) torna,
+      // invece di finire in un blocco staccato che nessuno vede.
+      if (!wrap.isConnected) container.appendChild(wrap);
       body.appendChild(el);
       items += 1;
       followBody();
