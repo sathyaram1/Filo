@@ -152,6 +152,10 @@ function nomiCombaciano(a, b) {
   const conJolly = ka.includes(IGNOTO) ? ka : (kb.includes(IGNOTO) ? kb : '');
   if (!conJolly) return false;
   const altro = conJolly === ka ? kb : ka;
+  // Un nome fatto (quasi) di soli caratteri ignoti non è un nome: combacerebbe
+  // con qualunque cosa, e in una cartella con un file solo aprirebbe quello
+  // senza che nessuno abbia riconosciuto niente. Serve del nome VERO sotto.
+  if (conJolly.split(IGNOTO).join('').trim().length < 3) return false;
   // Ogni sequenza di caratteri ignoti vale «uno o più caratteri qualsiasi»,
   // mai un separatore di percorso: qui si confronta un singolo nome.
   const pattern = conJolly.split(/�+/).map(scherma).join('[^\\\\/]+?');
