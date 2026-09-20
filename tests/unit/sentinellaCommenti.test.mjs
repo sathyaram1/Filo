@@ -39,6 +39,7 @@ test('un albero pulito passa: la sentinella non è rossa da sola', () => {
   const uscita = corsa({
     'a.css': '/* Intestazione del foglio. */\n\n/* Il perché di questa regola, in una riga. */\n.a { color: red; }\n',
     'b.html': '<!doctype html>\n<html><body>\n<!-- Il perché, in una riga. -->\n<div id="x"></div>\n</body></html>\n',
+    'coda-breve.css': '.a { color: red; } /* il perché, in coda */\n.b { margin: 0; } /* due righe in coda:\n   la seconda */\n',
   });
   assert.doesNotMatch(uscita, /not ok \d+ -/, `la sentinella è rossa su un albero in regola:\n${uscita}`);
 });
@@ -89,6 +90,24 @@ test('una riga vuota non spezza il muro: due commenti di fila contano insieme', 
   });
   assert.ok(rosso(uscita, 'un commento a sé non supera le due righe'),
     `tre righe di commento separate da una riga vuota passano:\n${uscita}`);
+});
+
+// La terza porta della stessa famiglia: chi attacca il commento in coda a una
+// riga di codice se lo faceva scendere quanto voleva, fuori da ogni misura.
+test('un racconto attaccato in coda a una riga di codice non sfugge alla misura', () => {
+  const uscita = corsa({
+    'coda.css': ['.a { color: red; } /* riga uno del racconto', '   riga due del racconto',
+      '   riga tre del racconto', '   riga quattro del racconto */', '.b { color: blue; }', ''].join('\n'),
+  });
+  assert.ok(rosso(uscita, 'un commento a sé non supera le due righe'),
+    `quattro righe attaccate in coda a una regola passano:\n${uscita}`);
+
+  const inPagina = corsa({
+    'coda.html': ['<!doctype html>', '<html><body>', '<div>x</div> <!-- riga uno del racconto',
+      '  riga due del racconto', '  riga tre del racconto -->', '<p>y</p>', '</body></html>', ''].join('\n'),
+  });
+  assert.ok(rosso(inPagina, 'un commento a sé non supera le due righe'),
+    `tre righe attaccate in coda a un tag passano:\n${inPagina}`);
 });
 
 // La sentinella legge i commenti col lexer di TypeScript: se il progetto non lo

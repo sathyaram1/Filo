@@ -170,15 +170,14 @@ test('una riga di commento resta una riga: al massimo 120 caratteri di testo', (
   assert.deepEqual(lunghe, [], 'righe di commento oltre i 120 caratteri');
 });
 
-// Quel che si misura è il muro che il lettore deve attraversare prima del
-// codice: righe vuote e commenti separati in mezzo non lo spezzano, e
-// l'intestazione è quella vera, cioè il primo commento del file.
+// Quel che si misura è il muro che il lettore attraversa prima del codice: righe vuote e commenti separati in mezzo
+// non lo spezzano, l'intestazione è quella vera (il primo commento del file) e uno attaccato in coda conta da solo.
 test('un commento a sé non supera le due righe, salvo l’intestazione del file', () => {
   const blocchi = [];
   for (const [f, { commenti, righe }] of perFile) {
     let blocco = null;
     for (const c of commenti) {
-      if (c.trailing) { blocco = null; continue; }
+      if (c.trailing) { blocchi.push({ f, ls: c.ls, le: c.le, conta: c.rows.length, testa: false }); blocco = null; continue; }
       if (blocco && righe.slice(blocco.le, c.ls - 1).every(vuota)) {
         blocco.le = c.le;
         blocco.conta += c.rows.length;

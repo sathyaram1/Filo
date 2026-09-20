@@ -9,7 +9,10 @@
 // sintatticamente validi.
 //
 // Il commit di partenza è fissato a mano: dopo la fusione `origin/main`
-// conterrebbe già la potatura e il confronto diventerebbe vuoto.
+// conterrebbe già la potatura e il confronto diventerebbe vuoto. Va rimesso a
+// mano a ogni ribasatura del ramo, altrimenti il confronto si porta dentro
+// anche il lavoro che la linea principale ha fatto nel frattempo, e i file che
+// altri hanno cambiato risultano diversi senza che la potatura c'entri.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { execFileSync } from 'node:child_process';
@@ -18,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const BASE = 'd5de15101a8a96fba8b96ed1683d852aeef0bdf9';
+const BASE = '13793c5b06bbd3123352446f016e2b2d5f4d730e';
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 const esiste = () => { try { git('cat-file', '-e', `${BASE}^{commit}`); return true; } catch (_) { return false; } };
