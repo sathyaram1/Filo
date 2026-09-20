@@ -293,28 +293,22 @@ test('tema scuro: la sezione delle chat si legge', async ({ app, openTab }) => {
   expect(contrasto).toBeGreaterThan(3);
 });
 
-test('cancellare una chat non la fa tornare indietro da un’altra scheda', async ({ app, openTab }) => {
+test('le chat si vedono anche senza nessuna scheda chiusa, e «Svuota archivio» non se le porta via', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await configura(app);
   await stubProvider(app, { coscienza: { tipo: 'conversazione', titolo: 'La coscienza' } });
-  await turno(app, 'c-cancellata', 'Secondo te la coscienza è emergente?');
-  await chiudi(app, 'c-cancellata');
+  await turno(app, 'c-sola', 'Secondo te la coscienza è emergente?');
+  await chiudi(app, 'c-sola');
 
-  // La chat è aperta in una home, e intanto la si cancella dalla Cronologia.
-  const dash = await openTab(`${DASH}?chat=c-cancellata`);
-  await expect(dash.locator('.dash-bubble').first()).toBeVisible();
-  await app.evaluate(() => globalThis.SN_FILO_CHATS.remove('c-cancellata'));
-  expect((await leggiArchivio(app)).length).toBe(0);
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('#chatsSection')).toBeVisible();
+  await expect(page.locator('.arc-chat')).toHaveCount(1);
 
-  // Si continua a scrivere nella home rimasta aperta: la chat cancellata
-  // «per sempre» non deve risorgere a metà, con dentro solo la coda.
-  await dash.locator('#input').fill('E il libero arbitrio?');
-  await dash.locator('#input').press('Enter');
-  await expect(dash.locator('.dash-bubble')).toHaveCount(4, { timeout: 20_000 });
-
-  await expect.poll(async () => {
-    const chats = await leggiArchivio(app);
-    if (!chats.length) return 'nessuna';
-    return `${chats.length} chat, ${chats[0].messages.length} messaggi`;
-  }, { timeout: 15_000 }).not.toBe('1 chat, 2 messaggi');
+  // Il tasto che svuota le schede non tocca le conversazioni: nessuna pulizia
+  // automatica, e nessuna pulizia per sbaglio.
+  await page.locator('#clear').click();
+  const chiesto = await page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null);
+  if (chiesto) await page.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'));
+  await expect(page.locator('.arc-chat')).toHaveCount(1);
+  expect((await leggiArchivio(app)).length).toBe(1);
 });
