@@ -349,3 +349,81 @@ test('input limite: vuoto, spazi, testo lunghissimo, caratteri strani', () => {
   assert.ok(Date.now() - t0 < 1000, 'troppo lento su un testo lungo');
   assert.deepEqual(AD.rileva('¡™£¢ 😀 <<<ROBA>>> ho messo', []), []);
 });
+
+// ── Giro 3 della verifica: cosa vale come prova, ancora ──────────────────────
+//
+// Le guardie qui sotto tengono chiuse le porte del terzo giro. Tutte sulla
+// stessa domanda: la prova che una cosa è stata fatta davvero.
+
+test('un\'azione che mette un bottone in chat è comunque un\'azione fatta', () => {
+  // L'evento di calendario, la pulizia delle schede e la cancellazione
+  // dell'archivio non si eseguono da sole: il main le TIENE e in chat compare
+  // il bottone che preme l'utente. Contarle come «mai chiamate» faceva buttare
+  // la risposta, rifarla, e poi smentire Filo per una cosa che aveva fatto.
+  const bottone = (type) => [{ type, _executed: false, _kept: true }];
+  assert.deepEqual(AD.rileva('Ti ho aggiunto l\'evento in calendario per domani alle 10.', bottone('EVENTO_CALENDARIO')), []);
+  assert.deepEqual(AD.rileva('Te l\'ho aggiunta al calendario.', bottone('EVENTO_CALENDARIO')), []);
+  assert.deepEqual(AD.rileva('Ho chiuso le schede che non usavi.', bottone('PULISCI_TAB')), []);
+  assert.deepEqual(AD.rileva('Ho cancellato la cronologia.', bottone('CANCELLA_ARCHIVIO')), []);
+  // E la porta del giro 2 resta chiusa: una sveglia CHIAMATA e non riuscita
+  // non tiene niente in chat, e non copre la frase che la dà per fatta.
+  assert.deepEqual(ids(AD.rileva('Ti ho messo una sveglia alle 19:00.',
+    [{ type: 'SVEGLIA', _executed: false, _kept: false }])), ['sveglia']);
+});
+
+test('un\'azione che si limita a guardare non copre la conferma col pronome', () => {
+  // Il turno di prosecuzione della segnalazione: «dopo un comando, una lettura,
+  // una ricerca». Bastava una ricerca perché il pronome non venisse più
+  // guardato, e la sveglia raccontata tornava muta come prima.
+  assert.deepEqual(ids(AD.rileva('Ho guardato il meteo: stasera piove. Te l\'ho messa alle 19.',
+    [{ type: 'CERCA_WEB', _output: { results: [] } }])), ['senza-nome']);
+  // Peggio: bastava avere un file aperto nell'editor. Quel segno arriva a OGNI
+  // turno, quindi il presidio funzionava solo su un Filo vuoto.
+  for (const segno of AD.TIPI_DI_CONTESTO) {
+    assert.deepEqual(ids(AD.rileva('Te l\'ho messa alle 19.', [{ type: segno }])), ['senza-nome'],
+      `il segno di contesto ${segno} non può reggere una conferma col pronome`);
+  }
+  // I tipi di sola lettura sono dichiarati, non indovinati: la sentinella
+  // pretende che siano strumenti veri.
+  const veri = new Set(Tools.NAMES);
+  for (const t of AD.TIPI_DI_SOLA_LETTURA) {
+    assert.ok(veri.has(t), `${t} è dichiarato di sola lettura ma non è uno strumento del modello`);
+  }
+});
+
+test('quello che esiste già regge la frase che lo racconta, comunque sia detta', () => {
+  const sveglia = { orariSveglie: ['19:00'] };
+  // La forma lunga (chiusa nel giro 2) e le forme che restavano un'accusa.
+  assert.deepEqual(AD.rileva('Sì, ho messo la sveglia alle 19:00 come mi avevi chiesto.', [], sveglia), []);
+  assert.deepEqual(AD.rileva('Sì, te l\'ho messa alle 19:00 come mi avevi chiesto.', [], sveglia), []);
+  assert.deepEqual(AD.rileva('L\'ho messa alle 19.', [], sveglia), []);
+  assert.deepEqual(AD.rileva('Ti ho messo il promemoria per le 19:00.', [], sveglia), []);
+  // L'ora si dice anche a lettere, e «alle 7 di sera» sono le 19.
+  assert.deepEqual(AD.rileva('Ho messo la sveglia alle sette.', [], { orariSveglie: ['07:00'] }), []);
+  assert.deepEqual(AD.rileva('Ho messo la sveglia alle 7 di sera.', [], sveglia), []);
+  // Un appunto che esiste, nominato per titolo, regge la frase che lo racconta.
+  assert.deepEqual(AD.rileva('Sì, l\'ho salvato fra gli appunti: si chiama Lista della spesa.',
+    [], { titoliAppunti: ['Lista della spesa'] }), []);
+  // Ma senza niente che la regga la dichiarazione resta una dichiarazione.
+  assert.deepEqual(ids(AD.rileva('Ti ho messo la sveglia alle 19:00.', [], { orariSveglie: ['07:00'] })), ['sveglia']);
+});
+
+test('l\'ora a lettere e il pomeriggio si leggono come li scrive il modello', () => {
+  assert.deepEqual([...AD.orariNelTesto('alle sette')], ['07:00']);
+  assert.deepEqual([...AD.orariNelTesto('alle 7 di sera')], ['19:00']);
+  assert.deepEqual([...AD.orariNelTesto('alle 7 di mattina')], ['07:00']);
+  assert.deepEqual([...AD.orariNelTesto('a mezzogiorno')], ['12:00']);
+  assert.deepEqual([...AD.orariNelTesto('a mezzanotte')], ['00:00']);
+});
+
+test('il formato interno si riconosce anche nelle forme dei modelli aperti', () => {
+  assert.equal(AD.formatoSospetto('Ti metto la sveglia.\n<tool_call>{"name":"SVEGLIA","arguments":{"time":"19:00"}}</tool_call>'), true);
+  assert.equal(AD.formatoSospetto('Ti metto la sveglia.\nfunctions.SVEGLIA({"time":"19:00"})'), true);
+  // Ma un pezzo di HTML dentro una risposta non è una chiamata.
+  assert.equal(AD.formatoSospetto('Ecco il codice che mi hai chiesto.\n<div class="box">ciao</div>'), false);
+});
+
+test('le parole con cui si dichiara restano riconosciute anche nelle varianti', () => {
+  assert.deepEqual(ids(AD.rileva('Ti ho messo l\'allarme alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ho segnato la spesa fra gli appunti.', [])), ['appunto']);
+});
