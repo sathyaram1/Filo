@@ -73,6 +73,19 @@ test('dirtyTreeText per la consegna: dice che la correzione starebbe fuori da og
   assert.match(t, /\n  a\.txt$/);
 });
 
+// Feedback #485: il verdetto del controllo di sicurezza era l'unico dei
+// quattro esiti a non guardare la directory. Un pass registrato con file fuori
+// dai commit parla del diff letto, mentre il salvataggio automatico sposta la
+// punta subito dopo: nella fusione finiscono righe mai controllate.
+test('dirtyTreeText per il verdetto di sicurezza: dice che le righe non controllate finirebbero nella fusione, e di rileggere il diff', () => {
+  const t = dirtyTreeText(['src/main/services/handlers/auth.js'], 'verdetto');
+  assert.match(t, /^verdetto non registrato/);
+  assert.match(t, /rileggilo prima di registrare lo stesso verdetto/, 'se quelle righe cambiano il codice, il diff letto non vale più');
+  assert.doesNotMatch(t, /critica/, 'la parola della strada sbagliata non compare');
+  assert.match(t, /git add -A && git commit/);
+  assert.match(t, /\n  src\/main\/services\/handlers\/auth\.js$/);
+});
+
 // Verifica del 2026-09-08 (giro 3): la PRIMA consegna del lavoro — chi risolve
 // mette il feedback in revisione dal canale, come dice la sua ricetta — e le
 // consegne dirette della correzione e del verdetto passavano con modifiche non
