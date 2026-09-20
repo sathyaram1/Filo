@@ -200,9 +200,8 @@ test.describe('il perimetro delle uscite', () => {
     expect(dopoIlSi.altra.rejected, 'il sì valeva per una sola uscita').toBe(true);
   });
 
-  test('l\'assistente di pagina può segnalare, non scrivere in memoria', async ({ app, openTab }) => {
+  test('l\'assistente di pagina può segnalare, non scrivere in memoria', async ({ app }) => {
     await configura(app);
-    await openTab('/injection.html');
     const lezioniPrima = await lezioni(app);
 
     // Il finto mittente dell'assistente di pagina: una scheda su un sito.
