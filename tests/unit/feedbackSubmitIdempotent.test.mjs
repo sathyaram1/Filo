@@ -20,6 +20,12 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// #602 - la cifratura si carica come la carica l'app (loader.js). Da quando
+// non esiste piu un ripiego in chiaro, `submit` si rifiuta di partire se non
+// puo cifrare: un test senza questi due file proverebbe l'unico caso che non
+// deve esistere.
+require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackPublicKey.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackCrypto.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'feedback.js'));
 const FB = globalThis.SN_FEEDBACK;
 
