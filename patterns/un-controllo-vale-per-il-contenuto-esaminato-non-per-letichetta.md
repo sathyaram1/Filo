@@ -19,10 +19,20 @@ La forma giusta, ogni volta che un esito attraversa il tempo:
 - **L'impronta la timbra lo strumento, e una dichiarata può solo
   CONFERMARLA.** Chiederla a chi consegna è la scommessa già persa sulla
   provenienza dei feedback. Accettarla senza confronto è peggio: la difesa si
-  spegne scrivendo un argomento in più.
+  spegne scrivendo un argomento in più. Confermare però vuol dire riconoscere
+  la stessa VERSIONE, non ricopiarla lettera per lettera: la forma abbreviata
+  che gli strumenti stampano a schermo è lo stesso commit, e rifiutarla è
+  attrito per chi fa la cosa giusta. Sotto le sette lettere no: un pezzo così
+  corto combacia anche con commit diversi, quindi non conferma niente.
 - **Chi legge l'esito lo confronta col contenuto vero**, risolto da lui una
   volta sola. Se non combaciano l'esito è decaduto, e il controllo va rifatto
   invece che dato per buono.
+- **Il decadimento si REGISTRA, non si stampa e basta.** Accorgersene su una
+  macchina e fermarsi lì lascia l'esito «buono» dove lo leggono gli altri: è
+  lo stesso difetto spostato di un passo. Il rifiuto nomina il passo che
+  rimette il lavoro in verifica, col comando pronto, invece di nominare
+  qualcuno che dovrebbe farlo (per esempio «chi ha cambiato il ramo»: quasi
+  sempre una sessione ormai chiusa).
 - **Ogni passo a valle parla dell'impronta, fino all'ultimo.** Timbrarla sugli
   esiti non chiude niente se poi l'azione finale si chiede per etichetta: il
   giro intero va letto, non il pezzo appena toccato.
