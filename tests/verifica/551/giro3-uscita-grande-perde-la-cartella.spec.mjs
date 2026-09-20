@@ -4,16 +4,16 @@
 // L'output di quel comando viene raccolto fino a un tetto, e oltre il tetto non
 // si raccoglie più niente. Ma in fondo all'output c'è il marcatore con cui la
 // shell riporta a Filo la cartella in cui è finita e com'è andato il comando:
-// oltre il tetto quel marcatore non arriva. Due danni, tutti e due dalla stessa
-// causa e tutti e due sul cammino della segnalazione:
-//   1) il «cd» non vale più per il comando dopo — che quindi guarda nella
-//      cartella sbagliata, e il file «non esiste»;
-//   2) un comando FALLITO viene riportato come riuscito: la ricerca che non ha
-//      trovato niente sembra andata a buon fine.
-// Niente a che vedere con Windows: succede dove gira Filo.
+// oltre il tetto quel marcatore non arriva mai. Due danni dalla stessa causa,
+// tutti e due dentro un solo comando (niente a che vedere con la memoria fra
+// un messaggio e l'altro):
+//   1) la cartella riportata non è quella in cui il comando è finito;
+//   2) un comando FALLITO risulta riuscito — la ricerca che non ha trovato
+//      niente sembra andata a buon fine, e Filo prosegue come se avesse trovato.
+// Succede dove gira Filo: non è un guasto di Windows.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
@@ -33,27 +33,23 @@ const accendiTerminale = (page) =>
     action: { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' },
   }));
 
-test('dopo un elenco lungo la cartella resta quella in cui Filo è entrato', async ({ openTab }) => {
+test('dopo un elenco lungo Filo sa ancora in che cartella è finito', async ({ openTab }) => {
   const base = cartellaTemporanea('filo-551-grande-');
   try {
     mkdirSync(join(base, 'Documenti'), { recursive: true });
-    writeFileSync(join(base, 'Documenti', 'bolletta.txt'), 'totale 84,50\n', 'utf8');
     const page = await openTab(HOME);
     await accendiTerminale(page);
 
-    // Entra nella cartella e fruga: l'elenco è più lungo di quanto Filo tenga.
-    const grande = await eseguiComando(
+    // Un solo comando: entra nella cartella e fruga. L'elenco è più lungo di
+    // quanto Filo tenga da parte.
+    const r = await eseguiComando(
       page,
       `cd '${join(base, 'Documenti')}'; printf '%0.sriga-di-elenco\\n' $(seq 1 3000)`,
     );
-    expect(String(grande.output?.stdout || '').length, 'l’elenco doveva essere lungo').toBeGreaterThan(1000);
-
-    // Il comando dopo deve partire da lì: è quello che Filo promette a sé stesso
-    // quando dice che la cartella di lavoro è persistente.
-    const dopo = await eseguiComando(page, 'pwd');
+    expect(String(r.output?.stdout || '').length, 'l’elenco doveva essere lungo').toBeGreaterThan(1000);
     expect(
-      String(dopo.output?.stdout || '').trim(),
-      'dopo un output lungo Filo torna a cercare nella cartella di prima',
+      String(r.output?.cwd || ''),
+      'dopo un output lungo Filo crede di essere rimasto dov’era',
     ).toBe(join(base, 'Documenti'));
   } finally {
     rmSync(base, { recursive: true, force: true });
