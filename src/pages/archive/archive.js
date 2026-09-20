@@ -193,9 +193,7 @@
     $('showCommandsText').textContent = showCommands
       ? `Nascondi i comandi (${commands.length})`
       : `Mostra anche i comandi (${commands.length})`;
-    $('chatsCount').textContent = visible.length
-      ? `${visible.length} ${visible.length === 1 ? 'chat' : 'chat'}`
-      : '';
+    $('chatsCount').textContent = visible.length ? `${visible.length} chat` : '';
 
     list.innerHTML = '';
     if (!visible.length) {
