@@ -139,9 +139,12 @@
     return { end: pos + 2, sgr: null }; // sequenza a due byte (ESC c, ESC 7…)
   }
 
-  function runShellCommand(command) {
+  function runShellCommand(command, chat) {
     if (!command) return;
     if (document.body.dataset.state !== 'thread') goThread();
+    // La conversazione a cui il comando e il suo esito appartengono è questa,
+    // anche se l'esito arriva fra dieci secondi e intanto l'utente se n'è andato.
+    const chatDelComando = chat || chatDellaRiga();
 
     // #525 — il comando e il suo esito sono battute di QUESTA conversazione:
     // l'utente li legge qui, in mezzo alle altre, e riaprendo la chat da
