@@ -38,7 +38,32 @@ sempre una strada aperta:
 
 **La prova che vale.** Prima di dichiararla finita, la sentinella statica si fa
 girare sul codice com'era PRIMA: se non diventa rossa lì, sta guardando la cosa
-sbagliata.
+sbagliata. Non basta: va provata anche al contrario, scrivendo APPOSTA la
+chiamata che deve far scattare — una per ogni nome dell'elenco. Alla prima
+stesura ne mancava proprio quello principale, il nome con cui la risorsa si
+trova su `globalThis`, che è poi il modo in cui il modulo di smistamento la
+trova al suo interno: chi copiava quella riga passava, e la sentinella restava
+verde.
+
+**I nomi da cercare sono quelli dell'ULTIMO anello, non del primo.** Se lo
+smistatore trova il fornitore per nome, quel nome è la porta vera: cercare
+solo le funzioni dello smistatore lascia scoperto chi lo scavalca — e chi lo
+scavalca è la persona distratta, non l'avversario.
+
+**Anche quello che non costa passa dal cancello.** «Quanto resta su questa
+chiave» non consuma niente e non ha un tetto da rispettare: sembra la
+tentazione giusta per un'eccezione, ed è l'eccezione che apre il buco. Non
+perché quella riga faccia danno, ma perché resta scritta nel progetto e viene
+copiata per la chiamata successiva, che invece costa.
+
+**Il modo in cui la sentinella legge i sorgenti deve sbagliare verso il
+rosso.** Togliere i commenti con un'espressione regolare per riga tagliava alla
+prima coppia di barre, e una stringa innocua (`"a//b"`) faceva sparire la
+chiamata scritta dopo, sulla stessa riga: nessun rumore, nessun rosso, difesa
+spenta. Ci vuole uno scorrimento carattere per carattere che sappia dove si
+trova — codice, stringa, template, espressione regolare, commento — e che dal
+codice non tolga mai niente. Un falso rosso si vede e si sistema riscrivendo un
+commento; un falso verde non si vede mai.
 
 **Dove vive.** `src/main/services/modelGate.js` (il cancello: limite di spesa,
 conteggio dei costi, registrazione di chi ha servito),
