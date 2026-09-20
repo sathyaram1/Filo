@@ -467,7 +467,17 @@ const MOTIVI_RETE = {
   'bad-url': 'l\'indirizzo non è scritto in un modo valido',
   'too-many-redirects': 'il sito continua a rimandare altrove senza mai arrivare a una pagina',
   'dns-empty': 'quel dominio non esiste',
+  'blocked-dangerous': 'quel sito è segnalato come pericoloso: Filo non lo legge',
 };
+
+/** Il giudizio che protegge una scheda protegge anche una lettura. */
+function pericoloso(url) {
+  try {
+    const SB = globalThis.SN_SAFEBROWSE;
+    const v = SB && SB.analyze(url, {});
+    return !!(v && v.level === 'pericoloso');
+  } catch (_) { return false; }
+}
 
 // Con che faccia Filo bussa. Senza, parte il nome di serie di node, che i
 // filtri anti-bot riconoscono per primo e bloccano: Filo È un browser e nelle
