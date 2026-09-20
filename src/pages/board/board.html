@@ -87,28 +87,6 @@
     /* Voti: due pulsanti funziona/non-funziona + conteggi. Persistiti su
        Firestore (DC2) tramite l'handler IPC; il conteggio riflette il tally
        reale dei voti, non solo la scelta locale dell'utente. */
-    /* I colori del voto GIÀ DATO. Erano scritti a mano una volta sola e
-       valevano per tutti e due i temi: nel tema scuro il conteggio finiva a
-       2,9 volte il fondo (sotto il minimo di 3) e il numero spariva proprio
-       dopo aver votato, cioè dopo il gesto per cui la bacheca esiste. Adesso
-       sono variabili con la loro variante scura, come ogni altro colore di
-       Filo. Il tema chiaro resta com'era: lì il numero si leggeva già. */
-    .bd-vote {
-      --bd-voto-si: #1e8449;
-      --bd-voto-si-bordo: #27ae60;
-      --bd-voto-si-fondo: rgba(39, 174, 96, 0.15);
-      --bd-voto-no: #c0392b;
-      --bd-voto-no-bordo: #c0392b;
-      --bd-voto-no-fondo: rgba(192, 57, 43, 0.15);
-    }
-    [data-sn-theme="dark"] .bd-vote {
-      --bd-voto-si: #5fd08a;
-      --bd-voto-si-bordo: #2f9e60;
-      /* Il rosso del tema scuro è quello che Filo usa già per gli errori. */
-      --bd-voto-no: var(--sn-error, #ff6b6b);
-      --bd-voto-no-bordo: #d4503f;
-    }
-
     .bd-vote { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
     .bd-vote-btn[disabled] { opacity: .6; cursor: default; }
     .bd-vote-btn {
