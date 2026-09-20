@@ -417,11 +417,14 @@
     return r.top < (vx.innerHeight || 0) && r.bottom > 0 && r.left < (vx.innerWidth || 0) && r.right > 0;
   }
 
-  // Spinto fuori dalla PAGINA in alto o a sinistra (`left:-9999px`, un cassetto
-  // traslato via): lì non ci si arriva scorrendo. Le coordinate sono quelle del
-  // documento, non della finestra — con quelle della finestra tutto ciò che si
-  // è già scorso sembrerebbe nascosto.
-  function isPushedOutOfPage(el) {
+  // Sfilato dalla pagina verso l'alto o verso sinistra (`left:-9999px`, un
+  // cassetto traslato via): lì non ci si arriva scorrendo. Due cautele. Le
+  // coordinate sono quelle del DOCUMENTO: con quelle della finestra, tutto
+  // quello che si è già scorso sembrerebbe nascosto. E vale solo per chi è
+  // uscito dal flusso: le diapositive già passate di una giostra stanno a
+  // sinistra allo stesso modo, ma l'utente ci torna con una strisciata.
+  function isPushedOutOfPage(el, cs) {
+    if (cs.position !== 'absolute' && cs.position !== 'fixed') return false;
     let r;
     try { r = el.getBoundingClientRect(); } catch (_) { return false; }
     if (r.width <= 0 && r.height <= 0) return false;
