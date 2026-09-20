@@ -130,8 +130,10 @@ function assembleCached(norm) {
     gsb: gsbCache.get('u:' + norm.host) || gsbCache.get(reg),
     ageDays: ageCache.get(reg),
     cert: certCache.get(reg),
-    sandbox: sandboxCache.get(reg),
-    llm: llmCache.get(reg),
+    // Il verdetto è di QUESTO indirizzo, non del dominio: vedi il commento
+    // sulle cache qui sopra.
+    sandbox: sandboxCache.get(norm.host),
+    llm: llmCache.get(norm.host),
   };
 }
 
