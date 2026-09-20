@@ -1066,6 +1066,23 @@ if (isMain) {
       }
     }
     const r = await deliver(biglietto, intento, data);
+    // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
+    // stato dato. Non è un doppione dello sha appena spedito: è la memoria su
+    // cui si regge il rifiuto dell'ultimo passo, che prima la scriveva solo
+    // l'altra strada — e bastava registrare l'ok da qui perché la fusione
+    // ripartisse a foglio sostituito (feedback #485, giro 3). Una correzione la
+    // cancella, perché è contenuto nuovo.
+    if (r.outcome === 'ok' && ['verdict', 'secaudit', 'fixed'].includes(intento)) {
+      try {
+        const { ricordaEsitoSuCommit } = await import('./lib/branch-integrity.mjs');
+        const esito = ricordaEsitoSuCommit(ROOT, intento, String(data.sha || ''));
+        // Astenersi si dice: se qui non resta niente, chi chiude deve saperlo
+        // prima di credere che il controllo del contenuto sia stato fatto.
+        if (!esito.scritto && intento !== 'fixed') {
+          console.error(`nota: su questa macchina non resta scritto su quale commit vale questo esito (${esito.why}), quindi l'ultimo passo non potrà controllarlo da qui. Decide il server.`);
+        }
+      } catch (_) { /* best-effort: l'esito è già registrato */ }
+    }
     if (r.outcome === 'ok' && (intento === 'status' || intento === 'fixed')) {
       // La consegna è REGISTRATA dal server: da questo istante il contenuto
       // della directory è la consegna, e il punto fermo va sigillato qui
