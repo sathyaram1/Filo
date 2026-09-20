@@ -346,16 +346,56 @@
     return m ? radice(m[1]) : '';
   }
 
-  // Gli orari nominati in una frase: «alle 19:00», «alle 19», «alle 7.30».
+  // Le ore scritte a lettere. «Ho messo la sveglia alle sette», con la sveglia
+  // delle 7 che esiste davvero, veniva smentita perché l'ora si leggeva solo
+  // in cifre — e in italiano l'ora si dice a lettere quanto in cifre.
+  const ORE_A_PAROLE = {
+    una: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8,
+    nove: 9, dieci: 10, undici: 11, dodici: 12, mezzogiorno: 12, mezzanotte: 0,
+  };
+  // «alle 7 di sera» sono le 19: senza questo l'avviso era doppiamente
+  // sbagliato, perché smentiva una sveglia che c'era all'ora giusta.
+  const POMERIGGIO = /^[\s,]*(?:di|del|della|nel|nella)?\s*(?:sera|serata|pomeriggio)\b/i;
+  const MATTINO = /^[\s,]*(?:di|del|della|al|nella)?\s*(?:mattina|mattino|notte)\b/i;
+
+  // Gli orari nominati in una frase: «alle 19:00», «alle 19», «alle 7.30»,
+  // «alle sette», «alle 7 di sera», «a mezzogiorno».
   function orariNelTesto(frase) {
     const out = new Set();
     const s = String(frase || '');
+    const metti = (ora, minuti, dopo) => {
+      let h = Number(ora);
+      if (!Number.isFinite(h) || h < 0 || h > 23) return;
+      const coda = String(dopo || '');
+      if (h >= 1 && h <= 11 && POMERIGGIO.test(coda)) h += 12;
+      else if (h >= 1 && h <= 11 && !MATTINO.test(coda) && POMERIGGIO.test(coda)) h += 12;
+      out.add(`${String(h).padStart(2, '0')}:${String(minuti || '00').padStart(2, '0')}`);
+    };
     let m;
     const conMinuti = /\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/g;
-    while ((m = conMinuti.exec(s))) out.add(`${String(m[1]).padStart(2, '0')}:${m[2]}`);
+    while ((m = conMinuti.exec(s))) metti(m[1], m[2], s.slice(m.index + m[0].length));
     const soloOra = /\balle\s+([01]?\d|2[0-3])\b(?![:.]\d)/gi;
-    while ((m = soloOra.exec(s))) out.add(`${String(m[1]).padStart(2, '0')}:00`);
+    while ((m = soloOra.exec(s))) metti(m[1], '00', s.slice(m.index + m[0].length));
+    const aParole = new RegExp(`${INIZIO}(?:alle|all${AP}|a)\\s+(${Object.keys(ORE_A_PAROLE).join('|')})${FINE}`, 'gi');
+    while ((m = aParole.exec(s))) {
+      metti(ORE_A_PAROLE[m[1].toLowerCase()], '00', s.slice(m.index + m[0].length));
+    }
     return out;
+  }
+
+  // La frase nomina un appunto che ESISTE già? Si confrontano i titoli dei
+  // file e degli appunti che Filo ha davanti a ogni turno: un appunto salvato
+  // ieri non lascia nessuna azione in questa conversazione, e senza questo
+  // «l'ho salvato fra gli appunti della spesa» era un'accusa in ogni chat
+  // nuova. Si guarda il TITOLO, non la sola esistenza di appunti: «l'ho
+  // salvato» e basta resta una dichiarazione da verificare.
+  function nominaUnAppunto(frase, titoli) {
+    const s = String(frase || '').toLowerCase();
+    for (const t of (Array.isArray(titoli) ? titoli : [])) {
+      const pulito = String(t || '').trim().toLowerCase();
+      if (pulito.length >= 4 && s.includes(pulito)) return true;
+    }
+    return false;
   }
 
   // La prima dichiarazione VALIDA di una famiglia, o null. Ritorna la frase
