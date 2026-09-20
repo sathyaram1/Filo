@@ -2930,22 +2930,30 @@ function buildWaitingDashboard(saved) {
 // perché un'assenza muta faceva credere senza crediti chi li aveva (#663).
 function buildNoKeyDashboard(settings, saved) {
   const suggestions = savedSuggestions(saved);
-  const senzaChiave = !SN_CONST.modelProvidersWithKey(settings.apiKeys).length;
+  const motivo = SN_CONST.whyCannotServe(settings, [ACTIONS.FILO_DASHBOARD, ACTIONS.FILO_CHAT]);
+  const inOpzioni = (text) => ({
+    icon: 'options', text,
+    action: { type: 'NAVIGA', url: 'filo://options/options.html', label: 'Opzioni' },
+    importance: 3,
+  });
   // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
-  suggestions.unshift(senzaChiave
+  suggestions.unshift(motivo === 'chiave'
     ? {
       icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
       action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
       importance: 3,
     }
-    : {
-      icon: 'options', text: 'Scegli un modello in Opzioni',
-      action: { type: 'NAVIGA', url: 'filo://options/options.html', label: 'Opzioni' },
-      importance: 3,
-    });
-  const message = senzaChiave
-    ? 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.'
-    : 'I crediti ci sono, ma nessun modello configurato può rispondere: la configurazione dei modelli è vuota o cita modelli che non esistono più. Puoi sceglierne uno tu in Opzioni. Intanto, le tue pagine salvate sono qui.';
+    : inOpzioni(motivo === 'pesi-aperti'
+      ? 'Apri Opzioni e rivedi «solo modelli a pesi aperti»'
+      : 'Scegli un modello in Opzioni'));
+  let message;
+  if (motivo === 'chiave') {
+    message = 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
+  } else if (motivo === 'pesi-aperti') {
+    message = 'I modelli che hai scelto vanno bene, ma «solo modelli a pesi aperti» li esclude tutti e nessuno di loro ha un equivalente a pesi aperti. In Opzioni puoi spegnere l\'interruttore o scegliere altri modelli. Intanto, le tue pagine salvate sono qui.';
+  } else {
+    message = 'I crediti ci sono, ma nessun modello configurato può rispondere: la configurazione dei modelli è vuota o cita modelli che non esistono più. Puoi sceglierne uno tu in Opzioni. Intanto, le tue pagine salvate sono qui.';
+  }
   return { message, suggestions };
 }
 
