@@ -116,7 +116,7 @@
     isTerminalMode: () => Term.isEnabled(),
     getShell: () => Term.getShell(),
     getCwd: () => Term.getCwd(),
-    runShellCommand: (command) => Term.runShellCommand(command),
+    runShellCommand: (command, chat) => Term.runShellCommand(command, chat),
   });
   Accoglienza.init({
     $,
