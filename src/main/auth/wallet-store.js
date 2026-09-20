@@ -57,6 +57,9 @@ function save(wallet) {
     // dell'invito e un saldo locale che non compra niente.
     lastServer: wallet.lastServer || (cache && cache.lastServer) || null,
   };
+  // Da qui Filo ha di che rispondere, anche se la scrittura su disco fallisce:
+  // la chiave in memoria basta per tutta la sessione.
+  avvisaProntezza();
   if (!canEncrypt()) {
     console.warn('[wallet] safeStorage non disponibile: chiave personale tenuta solo in memoria');
     return false;
