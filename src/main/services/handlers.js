@@ -1564,11 +1564,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         return { executed: true, kept: true, output: { doc: doc || null, text } };
       }
       case 'EVENTO_CALENDARIO': {
-        // Filo PROPONE l'evento: nel calendario ci entra quando l'utente
-        // clicca. `proposta` lo dice alla chat, che senza lo racconterebbe
-        // come un'azione non riuscita — e un bottone spento non è una
-        // proposta. Data e ora si controllano qui: un 31 febbraio inventato
-        // dal modello va detto adesso, non scoperto dal calendario.
+        // Filo PROPONE: nel calendario l'evento entra col bottone. `proposta`
+        // lo dice alla chat, che senza lo racconterebbe come non riuscito; data
+        // e ora si controllano qui, non nel calendario dell'utente.
         const C = globalThis.SN_CALENDAR;
         const evento = C ? C.normalize(action) : null;
         if (!evento) return { executed: false, kept: false, output: { event: 'invalid' } };
@@ -1831,11 +1829,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         }
         const win = winOf(sender);
         if (!win) return { executed: false, kept: false };
-        // «Portami alla home» chiesto DALLA home ricaricava la pagina, e la
-        // ricarica buttava via il blocco di lavoro e la risposta prima che
-        // l'utente potesse leggerli. Chi è già a casa non ci si porta: lo
-        // diciamo, e la chat offre il bottone per svuotare la conversazione
-        // quando l'utente ha finito di leggere.
+        // Chi è già nella home non ci si porta: ricaricarla butterebbe via il
+        // lavoro e la risposta prima che l'utente li legga (il bottone per
+        // svuotare la conversazione lo mette la chat).
         if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
           return { executed: true, kept: true, output: { window: 'home', already: true } };
         }

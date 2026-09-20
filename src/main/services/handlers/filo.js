@@ -1,6 +1,8 @@
 // Handler di dominio: l'agente Filo — chat, dashboard generata, memoria,
 // note, timer e notifiche.
 
+const { soloFilo } = require('./origine');
+
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
@@ -18,7 +20,6 @@ module.exports = function register(on, ctx) {
   // content script dei siti visitati (vedi
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
-  const { soloFilo } = require('./origine');
 
   // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
   const annunciaChat = () => {
@@ -96,12 +97,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
-  // L'evento che Filo ha proposto in chat finisce nel calendario dell'utente:
-  // scriviamo un .ics e lo apriamo col programma che il sistema usa per il
-  // calendario. Filo non ha un calendario suo e non conosce quello dell'utente:
-  // il file è la porta che tutti i calendari sanno aprire, su Windows come su
-  // Mac. Se il sistema non sa aprirlo, il percorso torna indietro: l'utente ha
-  // comunque il file, invece di un bottone che non fa niente.
+  // Filo non ha un calendario suo: scrive l'evento in un .ics e lo passa al
+  // programma dell'utente, che è la porta che ogni calendario sa aprire. Se il
+  // sistema non lo apre torna il percorso, così il bottone non finisce nel nulla.
   on(MSG.CALENDAR_ADD, soloFilo(async (msg) => {
     const C = globalThis.SN_CALENDAR;
     const ev = C && C.normalize(msg && msg.evento);
