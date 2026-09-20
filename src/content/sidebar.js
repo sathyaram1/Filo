@@ -941,6 +941,13 @@
     // si riapra mentre il modello sta elaborando.
     if (userMessage) expand({ ai: false });
 
+    // #517 — un messaggio scritto dall'utente apre un turno nuovo: il conto
+    // dei rimbalzi riparte da zero. I proseguimenti automatici (dopo un
+    // click, una ricerca, un comando) sono lo stesso turno e se lo portano
+    // dietro, altrimenti due risposte fuori formato di fila si rimbalzerebbero
+    // all'infinito.
+    if (userMessage) rimandiFuoriFormato = 0;
+
     if (userMessage) {
       appendChatMessage('user', userMessage);
       history.push({ role: 'user', content: userMessage, kind: 'real' });
