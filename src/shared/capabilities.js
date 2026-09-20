@@ -309,7 +309,7 @@
     },
     {
       id: 'chat-archive-recall', title: 'Filo rilegge le vostre chat di prima', category: 'assistant',
-      desc: 'Puoi dire "riprendi la discussione di ieri sulla coscienza" o "cosa mi avevi detto su quella cosa?": Filo cerca fra le vostre conversazioni passate, rilegge quella giusta e riparte da lì invece di ricominciare da capo.',
+      desc: 'Puoi dire "riprendi la discussione di ieri sulla coscienza" o "cosa mi avevi detto su quella cosa?": Filo cerca fra le chat che avete già fatto nella nuova scheda, rilegge quella giusta e riparte da lì invece di ricominciare da capo.',
       invoke: 'Chiediglielo a parole nella nuova scheda, nominando l’argomento o quando ne avevate parlato.',
       doesNot: 'Rilegge solo le conversazioni con te, salvate sul tuo computer: niente di quello che scrivi finisce altrove.',
     },
