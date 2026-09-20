@@ -62,15 +62,15 @@ test('nell\'Aiuto la conferma col pronome viene guardata come nella chat della h
   expect(aiuto.length).toBeGreaterThan(0);
 });
 
-test('nell\'Aiuto un appunto che esiste davvero non viene smentito', () => {
-  // La chat della home guarda i titoli degli appunti dal giro 3. Il pannello
-  // non li passa mai, quindi lì la stessa frase vera è un'accusa.
-  const casa = D.rileva('Sì, ti ho salvato l\'appunto con la lista della spesa.',
-    [], STATO({ titoliAppunti: ['lista della spesa'] }));
-  expect(casa.length).toBe(0);
-  const aiuto = D.rileva('Sì, ti ho salvato l\'appunto con la lista della spesa.',
-    new Set(), { orariSveglie: [], titoliAppunti: ['lista della spesa'] }, AIUTO());
-  expect(aiuto.length).toBe(0);
+test('un appunto che esiste davvero non viene smentito, con o senza i titoli', () => {
+  // La chat della home guarda i titoli degli appunti dal giro 3, e lì la frase
+  // vera resta muta. Il pannello Aiuto quei titoli non li passa mai: senza,
+  // la stessa frase vera diventa un'accusa. La porta sta nel chiamante, e si
+  // vede qui: cambia solo cosa gli si mette davanti.
+  const frase = 'Sì, ti ho salvato l\'appunto con la lista della spesa.';
+  expect(D.rileva(frase, [], STATO({ titoliAppunti: ['lista della spesa'] })).length).toBe(0);
+  // Quello che l'Aiuto passa davvero: solo le sveglie.
+  expect(D.rileva(frase, new Set(), { orariSveglie: [] }, AIUTO()).length).toBe(0);
 });
 
 test('una richiesta scritta come domanda non spegne il controllo sui turni prima', () => {
