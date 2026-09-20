@@ -848,6 +848,7 @@
         if (!m[0]) { rx.lastIndex += 1; continue; }
         if (SMENTITE.test(proposizionePrima(testo, m.index))) continue;
         if (dentroUnaDomanda(testo, m.index)) continue;
+        if (dentroUnaCitazione(testo, m.index)) continue;
         const fine = m.index + m[0].length;
         // Giro 5: questo valeva solo per il pronome. Vale per tutte: se la
         // frase dice che la cosa è nella risposta («te l'ho scritto qui
