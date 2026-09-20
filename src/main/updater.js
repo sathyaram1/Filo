@@ -76,29 +76,48 @@ function initAutoUpdater() {
   });
 }
 
+// I sistemi dove l'installazione automatica può fermarsi, col marcatore che
+// riconosce l'avviso già scritto e la frase che l'utente legge. Su Windows non
+// c'è niente: lì l'aggiornamento si installa da sé.
+//
+// Il marcatore resta diverso per sistema perché una macchina sola ne vede uno
+// solo: cambiarlo tutto in un nome unico farebbe ricomparire, a chi l'aveva già
+// scartato su Mac, lo stesso avviso per la stessa versione.
+const AGGIORNAMENTO_BLOCCATO = {
+  darwin: {
+    tipo: 'aggiornamento-mac',
+    testo: (v) => `C'è la versione ${v} di Filo, ma su Mac non riesce a installarsi da sola.\n`
+      + 'Scaricala da filo.red e sostituisci l\'app. Ci vuole un minuto.',
+  },
+  linux: {
+    tipo: 'aggiornamento-linux',
+    testo: (v) => `C'è la versione ${v} di Filo, ma su Linux non riesce a installarsi da sola.\n`
+      + 'Scaricala da filo.red e sostituisci il file di Filo con quello nuovo. Ci vuole un minuto.',
+  },
+};
+
 // Scrive fra le notifiche che c'è una versione nuova e va presa a mano.
 //
-// Solo su Mac, e solo se una versione nuova ESISTE davvero: altrove
-// l'aggiornamento si installa da sé e un avviso sarebbe rumore; senza una
-// versione trovata l'errore è del controllo, non dell'installazione, e non
-// cambia niente per l'utente.
+// Solo dove l'installazione può fermarsi (Mac e Linux), e solo se una versione
+// nuova ESISTE davvero: senza una versione trovata l'errore è del controllo,
+// non dell'installazione, e non cambia niente per l'utente.
 //
 // Una notifica per versione: se l'app riparte dieci volte prima che l'utente
 // scarichi, la scheda resta una. Chi l'ha già scartata non se la ritrova.
 async function avvisaSeAggiornamentoBloccato(versione) {
-  if (process.platform !== 'darwin' || !versione) return;
+  const caso = AGGIORNAMENTO_BLOCCATO[process.platform];
+  if (!caso || !versione) return;
   try {
     const FiloMem = globalThis.SN_FILO_MEMORY;
     if (!FiloMem?.addNotification) return;
     // Il riconoscimento passa da `action`, che la scheda NON mostra: un
     // marcatore dentro al testo lo leggerebbe l'utente.
     const gia = await FiloMem.listNotifications({ includeDismissed: true });
-    if (gia.some((n) => n.action?.tipo === 'aggiornamento-mac' && n.action?.versione === versione)) return;
+    if (gia.some((n) => n.action?.tipo === caso.tipo && n.action?.versione === versione)) return;
     await FiloMem.addNotification({
       kind: 'alert',
-      action: { tipo: 'aggiornamento-mac', versione },
-      text: `C'è la versione ${versione} di Filo, ma su Mac non riesce a installarsi da sola.\n`
-        + 'Scaricala da filo.red e sostituisci l\'app. Ci vuole un minuto.',
+      action: { tipo: caso.tipo, versione },
+      text: caso.testo(versione),
     });
   } catch (e) {
     console.error('[updater] avviso aggiornamento non scritto:', e?.message || e);
