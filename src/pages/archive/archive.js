@@ -543,8 +543,20 @@
     e.preventDefault();
   }
 
+  // #525 — una chat finita (o cancellata) in un'altra scheda mentre questa
+  // pagina è aperta: l'elenco si riallinea da solo. Senza, chi tiene la
+  // Cronologia da una parte e chatta dall'altra torna qui e non trova la chat
+  // appena fatta, e crede che non si sia salvata.
+  function ascoltaCambiDelleChat() {
+    if (!chrome.runtime || !chrome.runtime.onMessage) return;
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.FILO_CHATS_UPDATED) refreshChats();
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    ascoltaCambiDelleChat();
     $('list').addEventListener('wheel', onListWheel, { passive: false });
     // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
     // Le schede si filtrano qui, in pagina; le chat le cerca il main, che ha i
