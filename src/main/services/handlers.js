@@ -1515,7 +1515,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
         // Niente caratteri di controllo (byte nullo compreso) in un'etichetta
         // che poi va nel diario e nella colonna dei timer.
         const label = cleanLabel(action.label || action.etichetta) || 'Timer';
-        const entry = await FiloMem.addTimer({ label, seconds });
+        // L'etichetta trovata leggendo una pagina è testo di altri: il timer se
+        // lo porta scritto (#533, terzo giro di verifica).
+        const entry = await FiloMem.addTimer({ label, seconds, esterno: !!(task && task.contaminato) });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
       }
@@ -1528,6 +1530,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
           label: cleanLabel(action.label ?? action.etichetta),
           time: action.time ?? action.orario ?? action.at ?? '',
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
+          esterno: !!(task && task.contaminato),
         });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
@@ -1579,7 +1582,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
         if (text) {
           try {
             const EF = require('./editorFiles');
-            const r = await EF.writeNote({ text, topic, forceNew });
+            const r = await EF.writeNote({ text, topic, forceNew, esterno: !!(task && task.contaminato) });
             wrote = !!(r && r.wrote);
           } catch (e) {
             console.warn('[Filo] salvataggio appunto fallito', e?.message || e);
@@ -1759,6 +1762,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
         return {
           executed: !!(r && r.ok),
           kept: true,
+          // Leggere un appunto che Filo aveva scritto da una pagina è leggere
+          // quella pagina: chi registra la lettura deve trattarlo come tale
+          // (#533, terzo giro di verifica).
+          fonteLetta: (r && r.esterno) ? 'esterno' : null,
           output: { fileRead: String(fileId == null ? '' : fileId), found: !!(r && r.ok), title: (r && r.title) || '', text: (r && r.text) || '' },
         };
       }
@@ -2509,12 +2516,12 @@ async function editorFileSummariesList() {
     return await EF.listFileSummaries();
   } catch (_) { return []; }
 }
-async function editorFileSummaries() {
+async function editorFileSummaries({ conEsterno = true } = {}) {
   try {
     const Summary = globalThis.SN_EDITOR_SUMMARY;
     if (!Summary) return '';
     const list = await editorFileSummariesList();
-    return Summary.renderForPrompt(list);
+    return Summary.renderForPrompt(list, { conEsterno });
   } catch (_) { return ''; }
 }
 
@@ -2563,7 +2570,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
-  const fileSummaries = await editorFileSummaries();
+  const fileSummaries = await editorFileSummaries({ conEsterno: false });
   // #524 — finché la micro-intervista di benvenuto è aperta, il prompt riceve
   // l'elenco di ciò che resta da scoprire e da dire. Per l'utente resta una
   // chat normale: nessuna schermata a passi, nessun modulo.
@@ -2781,13 +2788,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // di altri entra davvero nel contesto del modello, e da lì in poi il
       // perimetro morde.
       if (task && Compiti) {
-        for (const a of actions) {
+        for (const { action: a, res } of results) {
           const k = Compiti.classeDi(a.type);
-          if (k.classe === 'ingresso') Compiti.registraLettura(task, { type: a.type });
+          // Una lettura può essere più sporca della sua classe: LEGGI_FILE è
+          // roba dell'utente, ma un appunto che Filo aveva scritto da una
+          // pagina è quella pagina (#533, terzo giro di verifica). Se l'esito
+          // dichiara una fonte, vince quella.
+          const fonte = (res && res.fonteLetta) || null;
+          if (k.classe === 'ingresso') Compiti.registraLettura(task, { type: a.type, fonte });
           // Un'uscita che RIPORTA indietro del testo conta come lettura di quel
           // testo: quello che stampa un comando è roba scritta da altri come una
           // pagina web (#533, secondo giro di verifica).
-          else if (k.ritorna) Compiti.registraLettura(task, { type: a.type, fonte: k.ritorna });
+          else if (k.ritorna) Compiti.registraLettura(task, { type: a.type, fonte: fonte || k.ritorna });
         }
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
@@ -2858,7 +2870,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // gli era permesso e quello che gli è stato rifiutato va sul disco, così la
   // pagina Sicurezza lo racconta anche domani.
   await salvaCompito(task);
-  await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
+  await FiloMem.appendRaw({
+    type: 'chat_filo',
+    summary: textReply.slice(0, 200),
+    extra: { actions: actionsToRun },
+    // #533 (terzo giro di verifica) — se questo turno aveva letto roba scritta
+    // da altri, la risposta ne riporta quasi sempre le parole: la riga resta
+    // nel registro, ma non torna nel prompt delle richieste dopo.
+    esterno: !!(task && task.contaminato),
+  });
   // #524 — chiusura dell'intervista di benvenuto: la sequenza sta in
   // `finishOnboarding`. Se invece l'intervista prosegue, il turno di Filo viene
   // messo da parte per la ripresa.
@@ -2873,9 +2893,19 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     onboardingClosed = !!after.done;
     if (!internal) releaseOnboardingResume();
   }
+  // #533 (terzo giro di verifica) — l'agente che a fine turno decide cosa
+  // ricordare dell'utente SCRIVE IN MEMORIA, e scrivere in memoria è un'uscita.
+  // Una richiesta che ha letto roba scritta da altri ce l'ha solo se
+  // l'utente gliel'ha data, e quello che non le è stato dato non lo ottiene per
+  // interposto agente: altrimenti la frase di una pagina diventa una cosa che
+  // Filo ha «imparato» e resta lì per sempre, davanti a ogni richiesta futura.
+  // Quindi dopo un turno contaminato non si impara niente. Si perde qualche
+  // lezione sui turni in cui Filo ha letto qualcosa; i turni puliti, che sono
+  // la maggior parte, continuano a insegnargli chi è l'utente.
+  const imparabile = Compiti ? !(task && task.contaminato) : true;
   if (onboardingClosed) {
-    finishOnboarding({ userMessage, filoReply: textReply, stateText });
-  } else {
+    finishOnboarding({ userMessage, filoReply: textReply, stateText, lessons: imparabile });
+  } else if (imparabile) {
     maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.

@@ -75,6 +75,10 @@ async function writeNote(opts) {
     text,
     topic: o.topic || '',
     forceNew: !!o.forceNew,
+    // #533 (terzo giro di verifica) — l'appunto nasce da una pagina che Filo
+    // ha appena letto: il file se lo porta scritto, così il suo riassunto non
+    // torna nel contesto di una richiesta che non ha ancora letto niente.
+    esterno: !!o.esterno,
   });
   if (!res.wrote) return { wrote: false };
 
@@ -173,7 +177,9 @@ async function readFile(fileId) {
     const file = Store.findFile(collection, id);
     if (!file) return { ok: false, id };
     const title = (file.meta && file.meta.title) || 'Documento senza titolo';
-    return { ok: true, id, title, text: Summary.fileText(file) };
+    // Se il file l'ha scritto Filo leggendo una pagina, leggerlo è leggere
+    // quella pagina: chi registra la lettura deve saperlo (#533, terzo giro).
+    return { ok: true, id, title, text: Summary.fileText(file), esterno: !!(file.meta && file.meta.esterno) };
   } catch (_) { return { ok: false, id }; }
 }
 

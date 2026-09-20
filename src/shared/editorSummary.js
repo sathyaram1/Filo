@@ -133,17 +133,31 @@
         title: (meta.title && String(meta.title).trim()) || 'Documento senza titolo',
         summary: s.text,
         source: s.source,
+        // #533 (terzo giro di verifica) — l'appunto l'ha scritto Filo dopo
+        // aver letto una pagina: titolo e riassunto vengono da lì.
+        esterno: !!meta.esterno,
       };
     });
   }
 
   // Rende i riassunti in un blocco di testo per il prompt. Ogni riga porta l'id
   // del file (serve a Filo per chiederne il contenuto con LEGGI_FILE).
-  function renderForPrompt(contextFiles) {
+  /**
+   * `conEsterno: false` toglie titolo e riassunto dei file che Filo ha scritto
+   * dopo aver letto una pagina: quelle parole le ha dettate la pagina, e in un
+   * prompt che arriva PRIMA di qualunque lettura dichiarata non ci vanno
+   * (#533, terzo giro di verifica). La riga resta, con l'id: il contenuto si
+   * chiede con LEGGI_FILE, che è una lettura e fa scattare il perimetro.
+   */
+  function renderForPrompt(contextFiles, { conEsterno = true } = {}) {
     const list = Array.isArray(contextFiles) ? contextFiles : [];
     if (!list.length) return '';
     return list
-      .map((f) => `- [${f.id}] ${f.title}: ${f.summary}`)
+      .map((f) => (
+        (!conEsterno && f.esterno)
+          ? `- [${f.id}] (appunto scritto da Filo leggendo una pagina: chiedilo con LEGGI_FILE se ti serve)`
+          : `- [${f.id}] ${f.title}: ${f.summary}`
+      ))
       .join('\n');
   }
 

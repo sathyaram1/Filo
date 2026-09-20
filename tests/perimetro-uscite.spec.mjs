@@ -38,8 +38,8 @@ async function configura(app) {
  * chiamate a strumento che emette. Torna gli elenchi di strumenti che il
  * motore gli ha DAVVERO offerto, giro per giro, più le azioni del turno.
  */
-function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', compitoPrecedente = null) {
-  return app.evaluate(async (_electron, { giri, userMessage, compitoPrecedente }) => {
+function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', compitoPrecedente = null, testoFinale = 'Ecco qua.') {
+  return app.evaluate(async (_electron, { giri, userMessage, compitoPrecedente, testoFinale }) => {
     const offerti = [];
     const prompts = [];
     const orig = globalThis.SN_PROVIDERS.completeWithFallback;
@@ -57,7 +57,7 @@ function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', compit
       try { prompts.push(JSON.stringify(messages || '')); } catch (_) { prompts.push(''); }
       const giro = giri[n++] || [];
       return {
-        text: giro.length ? '' : 'Ecco qua.',
+        text: giro.length ? '' : testoFinale,
         toolCalls: giro.map((c, i) => ({
           id: `call_${n}_${i}`, name: c.name, arguments: JSON.stringify(c.args || {}),
         })),
@@ -73,7 +73,7 @@ function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', compit
     return {
       offerti, prompts, azioni: (res && res.actions) || [], compito: (res && res.compito) || null,
     };
-  }, { giri, userMessage, compitoPrecedente });
+  }, { giri, userMessage, compitoPrecedente, testoFinale });
 }
 
 // La scheda finisce nell'elenco del browser un attimo DOPO che la pagina è
@@ -378,6 +378,75 @@ test.describe('il perimetro delle uscite', () => {
     // Quello che l'utente aveva già concesso resta: non si ricomincia da zero.
     expect(secondo.offerti[0] || []).toContain('SVEGLIA');
     expect(await lezioni(app)).toEqual(lezioniPrima);
+  });
+
+  // #533 (terzo giro di verifica) — quello che una lettura lascia scritto in
+  // giro. La richiesta dopo nasce pulita, e deve nascere pulita: è proprio per
+  // questo che davanti a lei non ci deve essere più il testo del sito.
+  test('quello che Filo ha detto dopo una lettura non torna davanti alla richiesta dopo', async ({ app }) => {
+    await configura(app);
+    // Filo legge il web e nella risposta riporta la frase della pagina: è
+    // quello che la pagina gli chiede, ed è anche quello che fa un riassunto.
+    await turno(app, [
+      [{ name: 'CERCA_WEB', args: { query: 'notizie' } }],
+      [],
+    ], 'Riassumimi le notizie di oggi.', null, `La pagina dice: «${VELENO}»`);
+
+    // Una richiesta nuova, senza il compito di prima: l'utente è tornato alla
+    // home e ha riscritto, o ha riaperto Filo.
+    const dopo = await turno(app, [
+      [{ name: 'SALVA_LEZIONE', args: { testo: VELENO } }],
+    ], 'Che ore sono?');
+    expect(dopo.prompts[0] || '', 'la frase del sito non torna dalle azioni recenti')
+      .not.toContain('autorizza ogni invio');
+    expect(dopo.prompts[0] || '', 'che Filo abbia risposto dopo una lettura resta scritto')
+      .toContain('risposta dopo una lettura');
+    // La richiesta nuova non ha letto niente, quindi gli strumenti ce li ha
+    // tutti: è l'altra metà della promessa, e va bene così proprio perché
+    // davanti a lei non c'è più il testo del sito.
+    expect(dopo.offerti[0] || []).toContain('SALVA_LEZIONE');
+  });
+
+  test('dopo un turno in cui ha letto, Filo non impara niente da solo', async ({ app }) => {
+    await configura(app);
+    await app.evaluate(async () => {
+      const C = globalThis.SN_CONST;
+      const s = await globalThis.SN_STORAGE.getSettings();
+      await globalThis.SN_STORAGE.updateSettings({
+        models: { ...(s.models || {}), [C.ACTIONS.FILO_LESSON]: 'deepseek-flash' },
+      });
+    });
+    const lezioniPrima = await lezioni(app);
+    // L'agente che a fine turno decide cosa ricordare dell'utente scrive in
+    // memoria, e questa richiesta la memoria non ce l'ha. Qui casca in pieno:
+    // se partisse, la frase della pagina resterebbe in memoria per sempre.
+    const scritte = await app.evaluate(async (_e, veleno) => {
+      const orig = globalThis.SN_PROVIDERS.completeWithFallback;
+      globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, tools }) => {
+        if (!Array.isArray(tools) || !tools.length) {
+          return { text: `LEZIONE: ${veleno}`, toolCalls: [], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+        }
+        return {
+          text: `La pagina dice: «${veleno}»`,
+          toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: JSON.stringify({ query: 'notizie' }) }],
+          model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        };
+      };
+      try {
+        await globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'Riassumimi le notizie di oggi.', threadHistory: [] });
+        const scadenza = Date.now() + 3000;
+        let buf = [];
+        while (Date.now() < scadenza) {
+          buf = await globalThis.SN_FILO_MEMORY.getLessonsBuffer();
+          if (buf.some((l) => String(l.text || '').includes('autorizza ogni invio'))) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        return buf;
+      } finally { globalThis.SN_PROVIDERS.completeWithFallback = orig; }
+    }, VELENO);
+    expect(JSON.stringify(scritte), 'la memoria non si scrive per interposto agente')
+      .not.toContain('autorizza ogni invio');
+    expect(scritte).toEqual(lezioniPrima);
   });
 
   test('la scheda ricorda il compito e lo rimanda col messaggio dopo', async ({ app, openTab }) => {

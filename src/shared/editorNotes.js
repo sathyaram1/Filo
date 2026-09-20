@@ -156,7 +156,15 @@
     const updated = {
       ...target,
       content: appendToContent(target.content, paras),
-      meta: { ...(target.meta || {}), modified: new Date(now).toISOString() },
+      meta: {
+        ...(target.meta || {}),
+        modified: new Date(now).toISOString(),
+        // #533 (terzo giro di verifica) — una volta che in un file è finito
+        // testo che veniva da una pagina, il file resta marcato: il riassunto
+        // che Filo si rilegge a ogni messaggio viene anche da lì. Si marca e
+        // non si smarca: un append successivo non ripulisce quello di prima.
+        ...(o.esterno ? { esterno: true } : {}),
+      },
     };
     STORE.replaceFile(collection, target.id, updated);
     collection.activeId = target.id;
