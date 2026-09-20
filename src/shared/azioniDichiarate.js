@@ -1112,6 +1112,12 @@
     // e in chat restava un blocco di codice con dentro la sveglia che non c'è.
     if (/^\[TOOL_CALLS\]/i.test(s)) return true;
     if (/^<\|[^|>]{0,32}tool[^|>]{0,32}\|>/i.test(s)) return true;
+    // Giro 7: la busta dei Llama, che scrive il nome dentro il tag stesso.
+    // Il nome si confronta con quelli veri, come per le altre.
+    {
+      const f = s.match(/^<\s*function\s*=\s*([A-Za-z_][A-Za-z0-9_]{2,})\s*>/i);
+      if (f) return !nomi || nomi.has(f[1].toUpperCase());
+    }
     // Il nome di uno strumento con i suoi argomenti, anche preceduto dallo
     // spazio dei nomi che alcuni modelli ci mettono davanti
     // («functions.SVEGLIA({…})»). Il nome si confronta con quelli VERI quando
