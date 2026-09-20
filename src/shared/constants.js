@@ -1009,6 +1009,31 @@
 
   const DEFAULT_PROVIDER = 'openrouter';
 
+  // L'ordine dei fornitori che una richiesta prova DAVVERO. Ogni voce del
+  // registry porta il proprio fornitore, quindi conta solo per i ref legacy
+  // (id grezzi senza nickname): oggi il fornitore è uno solo, il router.
+  const PROVIDER_ORDER = [DEFAULT_PROVIDER];
+
+  // I fornitori di modelli per cui esiste una chiave. La chiave della ricerca
+  // web non serve a rispondere e non entra nel conto. PURA.
+  function modelProvidersWithKey(apiKeys) {
+    return PROVIDER_ORDER.filter((p) => (apiKeys || {})[p]);
+  }
+
+  // Filo ha davvero modo di servire questa funzione? Guarda quello che la
+  // richiesta userà — i nickname della funzione risolti sul registry, col
+  // fornitore che ogni voce dichiara e la chiave di QUEL fornitore — e non il
+  // campo `provider` dei settings, che è una dichiarazione a parte: quando
+  // nominava un fornitore ritirato, accoglienza e home si spegnevano mentre
+  // ogni chiamata funzionava (#663). PURA.
+  function canServeAction(settings, action) {
+    const s = settings || {};
+    const registry = s.modelRegistry || {};
+    let refs = usableModelRefs(parseModelRefs((s.models || {})[action] || ''), registry);
+    if (s.openWeightsOnly === true) refs = applyOpenWeightsPolicy(refs, registry, action).refs;
+    return buildModelAttempts(refs, registry, PROVIDER_ORDER, s.apiKeys || {}).length > 0;
+  }
+
   // ─── IL SISTEMA SU CUI GIRA FILO, DETTO AL MODELLO ─────────────────────────
   // Filo lancia comandi da terminale e legge file per percorso: due cose che
   // hanno una forma DIVERSA su Windows, Mac e Linux. Finché il prompt non lo
