@@ -419,3 +419,72 @@ test('un appunto scritto prima non copre quello raccontato adesso', async ({ app
   // Della spesa non resta traccia: l'utente deve leggerlo.
   await expect(page.locator('.dash-bubble-avviso')).not.toHaveCount(0);
 });
+
+test('una richiesta scritta come domanda non spegne il presidio', async ({ app, shell }) => {
+  // In italiano una richiesta si scrive quasi sempre col punto interrogativo
+  // («mi segni anche la spesa?»). Prima bastava quello perché tutto ciò che
+  // era stato fatto prima nella conversazione coprisse quello che veniva
+  // raccontato adesso, e il presidio tornava muto.
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"lunedì alle 10","contesto":"riunione"}' }] },
+    { text: 'Fatto, te l\'ho scritto.' },
+    { text: 'Ti ho salvato l\'appunto con la lista della spesa.' },
+  ]);
+  await page.locator('#input').fill('segnami che la riunione è lunedì alle 10');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  await page.locator('#input').fill('mi segni anche la lista della spesa: pane, uova, latte?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).not.toHaveCount(0);
+});
+
+test('a una domanda sul già fatto Filo può rispondere di sì senza essere smentito', async ({ app, shell }) => {
+  // La controprova: «l'hai salvata?» → «sì, te l'avevo già salvata» resta
+  // muto, perché l'appunto in questa conversazione è stato scritto davvero.
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"pane, uova, latte","contesto":"spesa"}' }] },
+    { text: 'Fatto, te l\'ho scritto.' },
+    { text: 'Sì, te l\'avevo già salvata negli appunti poco fa.' },
+  ]);
+  await page.locator('#input').fill('segnami la lista della spesa: pane, uova, latte');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  await page.locator('#input').fill('hai salvato la lista della spesa?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+});
+
+test('un testo incollato in chat non fa accusare Filo di non averlo letto', async ({ app, shell }) => {
+  // Incollare è il modo più comune di far leggere qualcosa a Filo: il testo
+  // gli arriva dentro la domanda, senza passare da nessuno strumento.
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: 'Ho letto il documento: sono 84 euro, scadenza il 12.' },
+  ]);
+  const bolletta = `Quanto devo pagare?\n${'FORNITURA ENERGIA ELETTRICA — dettaglio dei consumi del bimestre. '.repeat(8)}`;
+  await page.locator('#input').fill(bolletta);
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  // E la risposta non viene buttata e rifatta con una seconda chiamata.
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
+});
