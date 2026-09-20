@@ -1263,9 +1263,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // lungo e illeggibile quasi sempre. Un allarme che suona sette volte su
         // dieci insegna a cliccare OK. Il freno sui DATI dell'utente resta su
         // tutte e due le strade (#553).
-        const fromUntrusted = type === 'NAVIGA' && /^https?:/i.test(origin);
+        const fromUntrusted = /^https?:/i.test(origin);
         const corpus = await navExfilCorpus();
-        const v = Exfil.assess(url, { corpus, fromUntrusted });
+        // Quello che Filo ha letto su richiesta del modello (una scheda
+        // dell'utente, un documento, l'uscita di un comando) esce da qui come
+        // qualunque altro dato, e nel corpus a token non può stare: è un testo
+        // intero, e a token farebbe suonare l'allarme su ogni link (#553).
+        let letto = '';
+        try { letto = require('./testoLetto').letto(); } catch (_) {}
+        const v = Exfil.assess(url, {
+          corpus, letto, fromUntrusted, soloCoda: type === 'LEGGI_PAGINA',
+        });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
       }
     } catch (_) {}
