@@ -98,6 +98,13 @@
       font-size: 14px; font-weight: 600; margin: 0; color: var(--sn-fg);
     }
     .arc-section-count { font-size: 12px; color: var(--sn-muted); }
+    /* Stessa trappola della sezione qui sopra: `display` scritto in una classe
+       batte il `display:none` che il browser dà a [hidden], e l'interruttore
+       restava a schermo anche quando la pagina lo voleva via — «Mostra anche i
+       comandi (0)», una casella che non fa niente, addosso a chiunque abbia
+       salvato la sua prima chat. Quando si scrive un `display` si scrive anche
+       la riga che lo lascia nascondere. */
+    .arc-cmd-toggle[hidden] { display: none; }
     .arc-cmd-toggle {
       margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
       font-size: 12px; color: var(--sn-muted); cursor: pointer;
