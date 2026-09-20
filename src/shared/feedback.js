@@ -207,7 +207,16 @@
   // L'URL che torna porta il download token: da quando la lettura del bucket è
   // riservata all'owner, quel token È il permesso di leggere l'allegato — va
   // trattato come il contenuto, non come un indirizzo qualunque.
+  //
+  // ⚠️ DA QUI NON ESCE NIENTE IN CHIARO (#602). Questo è l'unico punto dell'app
+  // che scrive nel deposito, ed è qui che il controllo va messo: i chiamanti
+  // erano tre e la cifratura la ricordavano in due. Chi carica passa da
+  // `sealForUpload`; se i byte che arrivano non sono un ciphertext la chiamata
+  // si ferma prima della rete. Il tetto di lettura di quel deposito è il link
+  // col codice di scarico, che vive dentro il documento del feedback e gira: un
+  // allegato in chiaro lì dentro lo legge chiunque si sia portato via il link.
   async function uploadImage(blob) {
+    await assertSealed(blob);
     const name = attachmentPath(blob.type || 'png');
     const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
     const res = await fetch(url, {
