@@ -506,7 +506,11 @@ La regola, uguale per tutti e due:
   altro è un rifiuto messo a registro, non una correzione silenziosa).
   Dichiararne uno diverso dalla punta della directory ferma la consegna:
   altrimenti la difesa si spegne scrivendo un argomento in più, e l'esito
-  nasce intestato a un contenuto che su quella macchina non c'è;
+  nasce intestato a un contenuto che su quella macchina non c'è. Confermare
+  vuol dire riconoscere la stessa versione, non ricopiarla lettera per
+  lettera: la forma abbreviata che gli strumenti stampano dappertutto e le
+  maiuscole sono lo stesso commit e passano; sotto le sette lettere no, perché
+  un pezzo così corto combacia anche con commit diversi;
 - **se il contenuto cambia, l'esito decade** e quel controllo va rifatto — la
   stessa cosa che già succede alle richieste di fusione in attesa. Al passo 2
   del cancello i PASS si leggono sullo **sha** risolto al passo 3, non sul nome
