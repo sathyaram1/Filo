@@ -34,27 +34,20 @@ html, body {
   background: var(--dash-paper);
   color: var(--dash-ink);
   font-family: var(--sn-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-  /* `--sn-zoom` (impostata da pageBootstrap.applyTextScale) compensa il fatto
-     che `zoom` magnifica i `vh`: senza la divisione, ingrandire il testo faceva
-     traboccare la home oltre la viewport e comparire uno scroll (feedback
-     alpha). Con la compensazione la home riempie esattamente la viewport a
-     qualsiasi dimensione testo e gli elementi restano nella stessa posizione. */
+  /* `--sn-zoom` (pageBootstrap.applyTextScale) compensa il fatto che `zoom` magnifica anche i `vh`:
+     senza la divisione, ingrandire il testo faceva traboccare la home e comparire uno scroll. */
   min-height: calc(100vh / var(--sn-zoom, 1));
   height: 100%;
   font-size: 14px;
-  /* La home è una dashboard responsive (le colonne collassano sotto soglia):
-     non deve MAI mostrare uno scrollbar orizzontale, che con `zoom > 1`
-     rubava qualche px di altezza e innescava anche uno scroll verticale. */
+  /* La home collassa le colonne sotto soglia e non deve MAI mostrare uno scrollbar orizzontale:
+     con `zoom > 1` rubava altezza e innescava anche uno scroll verticale. */
   overflow-x: hidden;
 }
 
-/* L'attributo HTML `hidden` viene normalmente reso `display: none` dalla UA
-   stylesheet, ma le nostre regole `display: inline-flex` lo sovrascrivono.
-   Riportiamo la priorità qui in modo esplicito. */
+/* L'attributo `hidden` vale `display: none` per la UA stylesheet, ma le nostre regole
+   `display: inline-flex` lo sovrascrivono: qui gli si ridà la priorità. */
 [hidden] { display: none !important; }
 
-/* Layout principale a tre zone + input bar.
-   Griglia: left | center | right, con input fissa in basso. */
 .dash {
   position: relative;
   min-height: calc(100vh / var(--sn-zoom, 1));
@@ -74,7 +67,6 @@ html, body {
   .dash-left, .dash-right { display: none; }
 }
 
-/* ===== Colonna sinistra: suggerimenti ===== */
 .dash-left {
   grid-column: 1;
   grid-row: 1;
@@ -135,7 +127,6 @@ html, body {
   object-fit: contain;
 }
 
-/* Colorazione contestuale dell'icona per servizio (solo colore testo). */
 .dash-sug-icon[data-icon="gmail"]      { color: #8a4a1f; }
 .dash-sug-icon[data-icon="calendar"]   { color: #4a6238; }
 .dash-sug-icon[data-icon="editor"],
@@ -152,7 +143,7 @@ html, body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-/* Stato compresso (conversazione attiva): solo icone, allineate a sinistra. */
+/* In conversazione la colonna si comprime a sole icone. */
 body[data-state="thread"] .dash-suggestion .dash-sug-text { display: none; }
 body[data-state="thread"] .dash-suggestion { justify-content: flex-start; padding: 6px; }
 
@@ -170,7 +161,6 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-expand-btn:hover { color: var(--dash-ink); }
 
-/* ===== Centro ===== */
 .dash-center {
   grid-column: 2;
   grid-row: 1;
@@ -189,11 +179,8 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   height: 100%;
   padding: 40px 0;
 }
-/* #524 — dopo un'accoglienza chiusa prima della fine. Una riga sopra il
-   messaggio della home, con l'azione accanto: dice cosa è successo e come
-   tornarci. Sta sopra e non sotto perché è una cosa appena successa, e resta
-   finché non la si toglie — il segno "già accolto" è definitivo, questa riga è
-   l'unico posto in cui l'utente può accorgersene. */
+/* Riga sopra il messaggio della home dopo un'accoglienza chiusa a metà: il segno «già accolto» è
+   definitivo, e questa riga è l'unico posto in cui l'utente può accorgersene e tornare indietro. */
 .dash-onb-notice {
   display: flex;
   align-items: center;
@@ -238,19 +225,9 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-home-msg.dash-home-msg-loading { color: var(--dash-ink-mute); font-style: italic; }
 
-/* Il benvenuto NON è più un messaggio al centro della home travestito da bolla
-   (#524): è la prima bolla di una conversazione vera, quindi usa lo stile delle
-   bolle qui sotto e non ha più regole sue. */
 
-/* Conversation.
-   #521 — in conversazione la griglia ha un'altezza FISSA (la viewport, con la
-   stessa compensazione dello zoom del testo) e la colonna centrale può
-   restringersi (min-height: 0): così è il thread a scorrere al suo interno e
-   il campo di scrittura resta sempre in fondo alla finestra. Prima il thread
-   aveva un tetto a «100vh meno 160px» tirato a occhio: appena il campo
-   cresceva (Shift+Invio, anteprime immagini, riga della cartella in modalità
-   terminale) la somma superava la finestra, la pagina scorreva e il campo
-   finiva tagliato sotto il bordo. */
+/* In conversazione la griglia ha un'altezza fissa (la viewport, con la stessa compensazione dello zoom)
+   e la colonna centrale può restringersi: scorre il thread, e il campo di scrittura resta in fondo. */
 body[data-state="thread"] .dash { height: calc(100vh / var(--sn-zoom, 1)); }
 body[data-state="thread"] .dash-left,
 body[data-state="thread"] .dash-center,
@@ -295,9 +272,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-bubble-filo.dash-bubble-pending { color: var(--dash-ink-mute); font-style: italic; }
 
-/* #418 — bolla con formattazione leggera renderizzata (HTML). Il contenuto ha
-   gia' i suoi blocchi <p>/<ul>, quindi niente pre-wrap (che renderebbe letterali
-   gli a-capo fra i blocchi). Link cliccabili in tono con il tema. */
+/* Bolla con formattazione leggera già renderizzata in HTML: ha i suoi <p>/<ul>, quindi niente
+   pre-wrap, che renderebbe letterali gli a-capo fra i blocchi. */
 .dash-bubble-md { white-space: normal; }
 .dash-bubble-md p { margin: 0 0 8px 0; }
 .dash-bubble-md p:last-child { margin-bottom: 0; }
@@ -324,9 +300,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-bubble-md a.filo-md-link:hover { text-decoration: none; }
 
-/* #420 — bolla che si sta scrivendo in diretta: un cursore lampeggiante segnala
-   che la risposta è ancora in arrivo. Sparisce quando lo streaming termina
-   (la classe .dash-bubble-streaming viene tolta a fine turno). */
+/* Bolla che si sta scrivendo in diretta: il cursore lampeggiante dice che la risposta è ancora
+   in arrivo, e sparisce quando lo streaming finisce. */
 .dash-bubble-filo.dash-bubble-streaming::after {
   content: '';
   display: inline-block;
@@ -343,9 +318,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   .dash-bubble-filo.dash-bubble-streaming::after { animation: none; }
 }
 
-/* #521 — blocco di attività del turno: sta sopra la risposta e racconta cosa
-   Filo ha fatto prima di parlare (attesa → ragionamento → azioni). Colore
-   smorzato e niente cornice: è il retroscena, la risposta è la bolla sotto. */
+/* Il retroscena del turno (attesa, ragionamento, azioni) sta sopra la risposta: colore smorzato e
+   niente cornice, perché la risposta è la bolla sotto. */
 .dash-activity {
   align-self: flex-start;
   width: 86%;
@@ -419,9 +393,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
     opacity: 0.35;
   }
 }
-/* La cronologia: ragionamento, azioni, note e comandi nell'ordine in cui sono
-   avvenuti. Si apre solo a richiesta, scorre da sola restando in fondo mentre
-   il lavoro va avanti. Testo selezionabile. */
+/* Ragionamento, azioni, note e comandi nell'ordine in cui sono avvenuti. Si apre a richiesta e
+   scorre da sola restando in fondo mentre il lavoro va avanti. */
 .dash-activity-body {
   display: flex;
   flex-direction: column;
@@ -438,7 +411,7 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   white-space: pre-wrap;
   word-wrap: break-word;
 }
-/* Commento a metà lavoro («Provo subito tutti e tre…»): era una bolla, è una nota. */
+/* Commento a metà lavoro («Provo subito tutti e tre…»): è una nota, non una bolla. */
 .dash-activity-note {
   font-style: italic;
   color: var(--dash-ink-soft);
@@ -482,9 +455,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   font-family: inherit;
 }
 .dash-action-btn:hover { background: var(--dash-ink); color: var(--dash-paper); }
-/* #524 — l'uscita dall'accoglienza. Sta sotto la conversazione, discreta:
-   l'intervista è la strada principale, questa è la porta di servizio, e deve
-   essere lì anche quando il modello non risponde. */
+/* L'uscita dall'accoglienza: discreta, perché l'intervista è la strada principale, ma deve essere
+   lì anche quando il modello non risponde. */
 .dash-skip-row {
   display: flex;
   justify-content: center;
@@ -514,9 +486,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   padding: 6px 12px;
   font-size: 13px;
 }
-/* #376 — traccia di un passo intermedio (cerco sul web, leggo un file…): è un
-   racconto di cosa sta facendo Filo, non un bottone. Niente pill né bordo: così
-   nella conversazione resta cliccabile solo il risultato vero. */
+/* Traccia di un passo intermedio (cerco sul web, leggo un file…): è un racconto, non un bottone.
+   Niente pill né bordo, così nella conversazione resta cliccabile solo il risultato vero. */
 .dash-action-step {
   display: inline-flex;
   align-items: center;
@@ -557,7 +528,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   color: #fff;
 }
 .dash-action-btn-danger:hover { opacity: 0.88; background: #c0392b; color: #fff; }
-/* #162 — chip "link aperto/riapri": pill con favicon piccolo + nome del sito. */
 .dash-action-link-chip .dash-action-favicon {
   width: 16px;
   height: 16px;
@@ -571,15 +541,12 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   border-color: transparent;
 }
 .dash-bubble.dash-bubble-actions-only .dash-bubble-actions { margin-top: 0; }
-/* #146.6 — esito di un comando da terminale mostrato in chat. */
 .dash-cmd-result {
   margin-top: 8px;
   width: 100%;
 }
-/* Riga di comando: scatola QUADRATA col colore della bolla utente (sfondo
-   scuro, testo chiaro), così il comando si distingue a colpo d'occhio dalle
-   bolle arrotondate delle istruzioni passate a Filo, ed è sempre leggibile
-   (prima il testo era tenue su sfondo trasparente → quasi invisibile). */
+/* Riga di comando: scatola QUADRATA col colore della bolla utente, così si distingue a colpo d'occhio
+   dalle bolle arrotondate delle istruzioni, e il testo resta leggibile invece che tenue sul trasparente. */
 .dash-cmd-line {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -625,7 +592,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   border: 1px dashed var(--dash-line-strong);
   border-radius: 8px;
 }
-/* §5 — pannello di conferma cancellazione archivio. */
 .dash-delete-panel {
   margin-top: 8px;
   padding: 10px 12px;
@@ -644,9 +610,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-delete-list li { margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* #146.4 — box di raffinamento estetico (color picker / slider con anteprima
-   live). L'overlay è volutamente poco invadente: lo sfondo resta visibile così
-   l'anteprima live sulle superfici dietro si vede mentre si trascina. */
+/* Il raffinamento estetico (color picker, slider) è volutamente poco invadente: lo sfondo resta
+   visibile perché l'anteprima live sulle superfici dietro si veda mentre si trascina. */
 .sn-refine-overlay {
   position: fixed;
   inset: 0;
@@ -725,7 +690,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .sn-refine-done:hover { opacity: 0.85; }
 .sn-refine-cancel:hover { background: var(--dash-ink); color: var(--dash-paper); }
 
-/* ===== Colonna destra: stato live ===== */
 .dash-right {
   grid-column: 3;
   grid-row: 1;
@@ -796,7 +760,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-live-dismiss:hover { background: var(--dash-line); color: var(--dash-ink); }
 
-/* Pausa/ripresa di un countdown: gemello della × , subito alla sua sinistra */
 .dash-live-pause {
   position: absolute;
   top: 6px;
@@ -816,7 +779,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-live-pause:hover { background: var(--dash-line); color: var(--dash-ink); }
 
-/* Timer in stato "squilla": bordo animato + colore laterale rosso */
 .dash-live-card[data-ringing="1"] {
   border-color: var(--dash-accent);
   animation: dash-ring-pulse 1s ease-in-out infinite;
@@ -826,7 +788,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 30%, transparent); }
 }
-/* Pulsante "Ferma" nella card del timer che squilla */
 .dash-live-stop {
   align-self: flex-start;
   padding: 4px 12px;
@@ -841,7 +802,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-live-stop:hover { background: var(--dash-accent); color: var(--dash-paper); }
 
-/* ===== Barra input (footer) ===== */
 .dash-input-wrap {
   grid-column: 2;
   grid-row: 2;
@@ -891,7 +851,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-send:hover { opacity: 0.85; }
 .dash-send[disabled] { opacity: 0.4; cursor: not-allowed; }
 
-/* Image paste preview */
 .dash-img-preview {
   position: relative;
   display: flex;
@@ -930,7 +889,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   cursor: zoom-in;
 }
 
-/* Strip anteprime multi-immagine sopra la barra di input. */
 .dash-img-previews {
   flex-basis: 100%;
   display: flex;
@@ -944,7 +902,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-img-previews .dash-img-remove { top: -6px; right: -6px; left: auto; }
 
-/* Lightbox: immagine ingrandita a tutto schermo (click per chiudere o Esc). */
 .dash-lightbox {
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.85);
@@ -958,8 +915,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   .dash-input-wrap { grid-column: 1; }
 }
 
-/* ===== Modalità terminale ===== */
-/* Riga grigia con la directory corrente, sopra il testo, larga quanto la barra. */
 .dash-dir {
   flex-basis: 100%;
   padding: 2px 14px 0;
@@ -971,9 +926,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   text-overflow: ellipsis;
 }
 
-/* Evidenziazione live dell'input: arancione = comando Filo (o sito),
-   azzurro = comando shell, rosso = comando "/" non riconosciuto. Solo il
-   colore del testo digitato cambia. */
+/* Evidenziazione live dell'input: arancione = comando Filo o sito, azzurro = comando shell,
+   rosso = comando "/" non riconosciuto. */
 .dash-input.is-cmd-filo    { color: #d98324; font-weight: 600; }
 .dash-input.is-cmd-shell   { color: #2f7fd1; font-weight: 600; }
 .dash-input.is-cmd-unknown { color: #d14343; font-weight: 600; }
@@ -1038,7 +992,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   font-style: italic;
 }
 
-/* Skeleton mentre carichiamo il messaggio centro. */
 .dash-skeleton {
   display: inline-block;
   width: 60%;
@@ -1052,9 +1005,7 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   50% { opacity: 1; }
 }
 
-/* ── Controlli del browser dentro la home (in alto a destra) ──────────────────
-   Sostituiscono la vecchia barra in alto: home, impostazioni, app, profilo.
-   Stile minimale, in tinta con la "carta calda", così sembrano parte della
+/* Controlli del browser dentro la home: in tinta con la "carta calda", così sembrano parte della
    pagina e non una barra a sé. */
 .dash-controls {
   position: fixed;
@@ -1097,10 +1048,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   object-fit: cover;
 }
 
-/* ===== Recap aggiornamento (C4) =====
-   Popup all'avvio dopo un update: novità in alto, correzioni in basso, header
-   "vecchia → nuova", pulsante condividi/copia. Vive nella pagina home (non
-   occlusa dalla WebContentsView, che copre l'area pagina solo sui siti). */
+/* Recap dopo un aggiornamento. Vive nella pagina home perché lì non c'è la WebContentsView, che
+   copre l'area pagina solo sui siti. */
 .dash-recap-overlay {
   position: fixed;
   inset: 0;
@@ -1249,7 +1198,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   .dash-recap-overlay, .dash-recap-box { animation: none; }
 }
 
-/* ===== Ringraziamento feedback risolto (C5) ===== */
 .dash-thanks-header {
   display: flex;
   align-items: center;
@@ -1307,9 +1255,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   white-space: pre-wrap;
 }
 
-/* #629 — riga discreta sotto una risposta: la chiave OpenRouter dell'utente è
-   stata rifiutata e ha risposto la chiave personale (i crediti di Filo). Non è
-   un errore, la risposta c'è: sta in tono col blocco di attività. */
+/* Riga discreta sotto una risposta: la chiave OpenRouter dell'utente è stata rifiutata e ha risposto
+   la chiave personale. Non è un errore — la risposta c'è — quindi sta in tono col blocco di attività. */
 .dash-bubble-note {
   align-self: flex-start;
   font-size: 12px;

@@ -1,8 +1,7 @@
 /* Correttore AI — overlay esterno con zigzag blu + popup correzione */
 
-/* Overlay assoluto (in document.body) sopra l'editabile.
-   Riproduce il testo con color: transparent così solo lo zigzag blu è visibile.
-   Il testo "vero" e il rosso nativo del browser restano sull'editabile sotto. */
+/* L'overlay sta in document.body sopra l'editabile e ne ripete il testo in trasparente: si vede solo
+   lo zigzag blu, mentre il testo vero e il rosso del browser restano sull'editabile sotto. */
 .sn-spell-overlay {
   /* le proprietà dimensionali e di posizione sono settate inline da JS */
   pointer-events: none;
@@ -20,10 +19,8 @@
   box-sizing: border-box;
 }
 
-/* Sottolineatura zigzag blu sui range di errore semantico/grammaticale.
-   Lo zigzag è leggermente più in basso del rosso nativo del browser, così se
-   una parola è marcata sia rossa che blu i due tratti convivono affiancati e
-   non si sovrappongono. */
+/* Lo zigzag sta un filo più in basso del rosso nativo del browser: se una parola è marcata sia rossa
+   sia blu i due tratti convivono affiancati invece di sovrapporsi. */
 .sn-spell-overlay .sn-semantic-error {
   background-repeat: repeat-x;
   background-position: 0 calc(100% + 2px);
@@ -37,9 +34,7 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpolyline points='0,3 2,0 4,3 6,0 8,3' fill='none' stroke='%2360a5fa' stroke-width='1.2'/%3E%3C/svg%3E");
 }
 
-/* ============================================================================
-   Popup correzione (sostituisce il menu nativo per il click destro su errori)
-   ============================================================================ */
+/* Popup di correzione: sostituisce il menu nativo del tasto destro sugli errori. */
 
 .sn-spell-popup {
   position: fixed;

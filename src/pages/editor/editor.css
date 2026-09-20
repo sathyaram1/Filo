@@ -15,22 +15,20 @@ html, body {
   overflow: hidden;
 }
 
-/* ── Pannello testo ─────────────────────────────────────────────────── */
 .ed-text-pane {
   flex: 1 1 60%;
   min-width: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--sn-border);
-  /* ancora la topbar flottante (icona + stato salvataggio) in alto a destra */
+  /* Àncora della topbar flottante. */
   position: relative;
 }
 .ed-root.sidebar-hidden .ed-text-pane { border-right: none; }
 .ed-root.sidebar-hidden .ed-sidebar { display: none; }
 
-/* La topbar non è più una barra a tutta larghezza: è un gruppo di controlli
-   flottante in alto a destra, sopra il foglio. Niente bordo né sfondo, così
-   il documento parte direttamente dall'alto. */
+/* La topbar è un gruppo di controlli flottante, non una barra a tutta larghezza: niente bordo né
+   sfondo, così il documento parte direttamente dall'alto. */
 .ed-topbar {
   position: absolute;
   top: 10px;
@@ -39,8 +37,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* non intercettare i click sull'area vuota tra i controlli: solo i figli
-     reali (icona, stato) restano cliccabili */
+  /* I click sull'area vuota fra i controlli passano oltre: cliccabili solo i figli veri. */
   pointer-events: none;
 }
 .ed-topbar > * { pointer-events: auto; }
@@ -84,9 +81,8 @@ html, body {
   outline: none;
   font-size: 16px;
   line-height: 1.7;
-  /* Riempie l'area visibile del foglio: senza min-height il contenteditable
-     sarebbe alto quanto il testo (una riga su documento vuoto) e cliccare nel
-     resto del "foglio" non darebbe il focus. */
+  /* Senza min-height il contenteditable sarebbe alto quanto il testo (una riga su documento vuoto)
+     e cliccare nel resto del "foglio" non darebbe il focus. */
   min-height: 100%;
 }
 .ed-doc-wrap { cursor: text; }
@@ -116,7 +112,6 @@ html, body {
   cursor: pointer;
 }
 
-/* freccia di collasso accanto ai titoli */
 .ed-collapse-toggle {
   position: absolute;
   left: -22px;
@@ -135,10 +130,8 @@ html, body {
 .ed-collapse-toggle svg { transition: transform 0.12s; }
 .ed-collapse-toggle.is-collapsed svg { transform: rotate(-90deg); }
 
-/* cursore "commenta" */
 .ed-root.commenting .ed-doc { cursor: crosshair; }
 
-/* ── Vista impostazioni ─────────────────────────────────────────────── */
 .ed-settings-view {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -147,7 +140,6 @@ html, body {
 .ed-settings-view h2 { margin: 0 0 6px; font-size: 20px; }
 .ed-settings-hint { color: var(--sn-muted); font-size: 13px; margin: 0 0 18px; }
 
-/* Controllo dimensione griglia (sopra l'elenco dei moduli) */
 .ed-grid-size {
   margin: 0 0 18px;
   padding: 12px 14px;
@@ -190,7 +182,6 @@ html, body {
 .ed-palette-item .pi-desc { color: var(--sn-muted); font-size: 12px; margin-top: 6px; }
 .ed-palette-item .pi-size { color: var(--sn-muted); font-size: 11px; margin-top: 4px; }
 
-/* ── Splitter verticale ─────────────────────────────────────────────── */
 .ed-splitter {
   flex: 0 0 5px;
   cursor: col-resize;
@@ -209,7 +200,6 @@ html, body {
 }
 .ed-root.sidebar-hidden .ed-splitter { display: none; }
 
-/* ── Sidebar / griglia ──────────────────────────────────────────────── */
 .ed-sidebar {
   flex: 0 0 40%;
   max-width: 60%;
@@ -235,8 +225,8 @@ html, body {
   align-items: center;
   justify-content: center;
   color: var(--sn-muted);
-  /* Feedback alpha: i "+" devono vedersi appena, non rubare l'occhio. Restano
-     pienamente visibili al passaggio del mouse e durante un drop. */
+  /* I "+" devono vedersi appena, non rubare l'occhio. Tornano pienamente visibili al passaggio
+     del mouse e durante un drop. */
   opacity: 0.14;
   cursor: pointer;
   transition: opacity 0.12s ease;
@@ -244,8 +234,7 @@ html, body {
 .ed-cell-empty:hover { opacity: 1; border-color: var(--sn-accent); color: var(--sn-accent); }
 .ed-cell-empty.drop-target { opacity: 1; border-color: var(--sn-accent); background: rgba(var(--sn-accent-rgb), 0.08); }
 
-/* Anteprima fantasma del modulo durante il trascinamento: occupa l'impronta
-   completa nella posizione di atterraggio, a opacità ridotta. */
+/* Il fantasma occupa l'impronta completa nella posizione di atterraggio, a opacità ridotta. */
 .ed-drag-ghost {
   border: 2px dashed var(--sn-accent);
   border-radius: 12px;
@@ -289,11 +278,9 @@ html, body {
 }
 .ed-module:hover .ed-mod-drag { opacity: 0.85; }
 .ed-mod-drag:active { cursor: grabbing; }
-/* Durante il trascinamento di un modulo il cursore è una "mano che afferra"
-   ovunque (feedback alpha: "tenendo premuto il cursore deve cambiare in mano"). */
+/* Tenendo premuto il cursore deve diventare una "mano che afferra", ovunque si passi. */
 body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 
-/* resize handle per i moduli */
 .ed-mod-resize {
   position: absolute;
   bottom: 0;
@@ -329,20 +316,15 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-module:hover .ed-mod-resize-h { opacity: 0.4; }
 .ed-mod-resize-h:hover { opacity: 1 !important; background: var(--sn-accent); border-radius: 0 6px 6px 0; }
 
-/* contenuti specifici dei moduli */
 .ed-mod-pad { padding: 10px; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
 .ed-mod-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--sn-muted); }
 
-/* word-count */
 .ed-wc { align-items: center; justify-content: center; text-align: center; cursor: pointer; }
 .ed-wc .wc-num { font-size: 26px; font-weight: 700; line-height: 1; }
-/* La didascalia (parole/commenti) vale ovunque compaia, non solo nel word-count:
-   il modulo Commenta la riusa e senza questa regola ereditava il font del corpo
-   (più grande), tanto che alla larghezza minima "commenti" veniva tagliato a
-   "comment". A 11px con line-height ridotto rientra nella cella più stretta. */
+/* La didascalia vale ovunque compaia, non solo nel word-count: il modulo Commenta la riusa e senza
+   questa regola ereditava il font del corpo, che alla larghezza minima tagliava "commenti". */
 .wc-cap { font-size: 11px; color: var(--sn-muted); margin-top: 4px; line-height: 1.1; }
 
-/* switch */
 .ed-switch { flex-direction: row; align-items: stretch; gap: 0; padding: 0; }
 .ed-switch-arrow {
   flex: 0 0 16px;
@@ -361,7 +343,6 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-switch-icon.active { color: #fff; background: var(--sn-accent); }
 .ed-switch-icon svg { display: block; }
 
-/* search-replace */
 .ed-sr input {
   width: 100%; margin-bottom: 6px; padding: 5px 8px;
   border: 1px solid var(--sn-border); border-radius: 6px;
@@ -377,7 +358,6 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-sr-row button:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
 .ed-sr-count { font-size: 11px; color: var(--sn-muted); margin-bottom: 4px; }
 
-/* chat */
 .ed-chat { padding: 8px; }
 .ed-chat-log { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 .ed-chat-msg { font-size: 12px; padding: 6px 9px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; }
@@ -396,7 +376,6 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   background: var(--sn-accent); color: #fff; cursor: pointer; font-size: 12px;
 }
 
-/* settings module (ingranaggio: apre/chiude la modalità modifica moduli) */
 .ed-settings-mod {
   align-items: center;
   justify-content: center;
@@ -406,10 +385,9 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-settings-mod:hover { color: var(--sn-accent); }
 .ed-settings-mod svg { display: block; }
 .ed-root.settings-mode .ed-module[data-type="settings"] { color: var(--sn-accent); outline-color: var(--sn-accent); }
-/* L'ingranaggio non è eliminabile: niente maniglia di trascinamento ambigua;
-   resta comunque spostabile come gli altri (draggable sul cell). */
+/* L'ingranaggio non è eliminabile, quindi niente maniglia di trascinamento ambigua: resta
+   comunque spostabile come gli altri, dal cell. */
 
-/* moduli di formattazione (grassetto, corsivo, allineamento, dimensione…) */
 .ed-fmt { padding: 6px; gap: 4px; }
 .ed-fmt-row { flex-direction: row; }
 .ed-fmt-btn {
@@ -428,28 +406,21 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-fmt-row .ed-fmt-btn { font-size: 14px; }
 .ed-align .ed-fmt-btn { color: var(--sn-muted); }
 .ed-align .ed-fmt-btn:hover { color: var(--sn-accent); }
-/* Modulo font: il <select> riempie il modulo come i bottoni di formattazione. */
 .ed-font { padding: 6px; }
-/* Il <select> nativo resta nel DOM (sorgente di verità + test) ma invisibile:
-   l'utente interagisce col dropdown custom .ed-font-button (lo nasconde la
-   regola condivisa .sn-select-wrap > select in theme.css). */
+/* Il <select> nativo resta nel DOM come sorgente di verità e per i test; a nasconderlo è la regola
+   condivisa .sn-select-wrap > select di theme.css. */
 .ed-font-wrap { display: flex; flex: 1 1 auto; min-width: 0; align-items: stretch; }
 .ed-font-button { width: 100%; }
 .ed-font-button:hover { border-color: var(--sn-accent); }
-/* Popup font: ricerca fissa in alto, lista scrollabile sotto. Eredita i colori
-   coerenti col tema dai .sn-select-* (vedi theme.css). */
-/* Fixed così il popup non viene tagliato da .ed-module { overflow: hidden }
-   (nessun antenato crea un containing block: il fixed sfugge al ritaglio). Le
-   coordinate sono impostate in JS dal rect del bottone all'apertura. */
+/* Fixed così il popup non viene tagliato da .ed-module { overflow: hidden }: nessun antenato crea un
+   containing block, quindi sfugge al ritaglio. Le coordinate le mette il JS all'apertura. */
 .sn-select-pop.ed-font-pop {
   position: fixed; right: auto;
   flex-direction: column;
   padding: 0; max-height: 280px; min-width: 180px;
 }
-/* `display: flex` solo quando il popup è aperto: questa regola ha la stessa
-   specificità di `.sn-select-pop[hidden] { display: none }` (theme.css) ma è
-   caricata dopo, quindi senza `:not([hidden])` vincerebbe sempre e il popup
-   resterebbe visibile anche dopo close() (che imposta l'attributo hidden). */
+/* Senza `:not([hidden])` questa regola, caricata dopo .sn-select-pop[hidden] di theme.css e di pari
+   specificità, vincerebbe sempre: il popup resterebbe visibile anche dopo close(). */
 .sn-select-pop.ed-font-pop:not([hidden]) {
   display: flex;
 }
@@ -468,12 +439,10 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 /* In modalità modifica i bottoni non devono "rubare" il click di configurazione. */
 .ed-root.settings-mode .ed-fmt-btn { pointer-events: none; }
 
-/* comment module */
 .ed-comment-mod { align-items: center; justify-content: center; text-align: center; cursor: pointer; }
 .ed-comment-mod .cm-count { font-size: 22px; font-weight: 700; }
 .ed-root.commenting .ed-module[data-type="comment"] { outline: 2px solid var(--sn-accent); }
 
-/* ── Overlay ────────────────────────────────────────────────────────── */
 .ed-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.32);
@@ -515,9 +484,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-btn.danger { color: var(--sn-error); border-color: var(--sn-error); background: transparent; }
 .ed-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
 
-/* ── Storico versioni (pannello overlay) ──────────────────────────────── */
 .ed-vh-empty { font-size: 13px; line-height: 1.5; color: var(--sn-muted); margin: 0; }
-/* Confine del ripristino: cosa torna indietro e cosa no. */
 .ed-vh-scope { font-size: 12px; line-height: 1.45; color: var(--sn-muted); margin: 0 0 10px; }
 .ed-vh-list { display: flex; flex-direction: column; gap: 8px; }
 .ed-vh-item {
@@ -553,8 +520,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-vh-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .ed-vh-more { width: 100%; margin-top: 10px; }
 
-/* ── Cestino documenti (stessa lista dello storico, righe non cliccabili:
-      qui l'azione è nei due bottoni, non nell'apertura di un'anteprima) ── */
+/* Cestino documenti: stessa lista dello storico ma righe non cliccabili, qui l'azione sta nei due bottoni. */
 .ed-tr-item { cursor: default; }
 .ed-tr-item:hover { background: transparent; border-color: var(--sn-border); }
 .ed-tr-name { font-size: 13px; font-weight: 600; color: var(--sn-fg); }
@@ -569,11 +535,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   white-space: normal; word-break: break-word;
 }
 
-/* Toast discreto in basso a destra (fallimenti non bloccanti, es. switch che
-   non può allargarsi). Stile coerente con una notifica d'errore.
-   Gli avvisi si IMPILANO nel contenitore: un nuovo avviso non cancella più il
-   precedente (e il suo "Annulla"). Due argini come lo stack della shell: tetto
-   al numero di card (nel JS) e altezza massima col contenitore che scorre. */
+/* Gli avvisi si IMPILANO: un avviso nuovo non cancella più il precedente e il suo "Annulla".
+   Due argini, come lo stack della shell: tetto al numero di card (nel JS) e altezza massima. */
 .ed-toasts {
   position: fixed; right: 18px; bottom: 18px;
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
@@ -627,10 +590,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 }
 .ed-icon-choice button.sel { border-color: var(--sn-accent); color: var(--sn-accent); }
 
-/* ── Selettore documento (collezione di file) ─────────────────────────── */
-/* Controllo flottante in alto a SINISTRA: mostra il nome del file attivo e
-   apre il menu dei documenti (crea/apri/rinomina/elimina). Simmetrico alla
-   topbar flottante a destra: niente barra piena, il foglio parte dall'alto. */
+/* Controllo flottante in alto a sinistra, simmetrico alla topbar a destra: niente barra piena,
+   il foglio parte dall'alto. */
 .ed-docbar {
   position: absolute;
   top: 10px;
@@ -695,7 +656,6 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   white-space: nowrap;
   font-size: 13px;
 }
-/* Campo di rinomina inline: sostituisce il nome quando si rinomina. */
 .ed-doc-item-input {
   flex: 1 1 auto;
   min-width: 0;
@@ -707,7 +667,6 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   border-radius: 4px;
   padding: 2px 4px;
 }
-/* Azioni per-file (rinomina / elimina): compaiono all'hover della riga. */
 .ed-doc-act {
   flex: 0 0 auto;
   width: 22px;
@@ -754,7 +713,6 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   min-width: 180px;
 }
 
-/* Rinomina inline dalla docbar: sostituisce il selettore documento. */
 .ed-doc-title-input {
   max-width: 240px;
   font: inherit;
@@ -766,7 +724,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   padding: 5px 10px;
 }
 
-/* Titolo in fase di (ri)generazione: leggero pulsare per dare feedback. */
+/* Il titolo pulsa mentre si (ri)genera: è il riscontro che il lavoro è in corso. */
 .ed-doc-generating { opacity: 0.6; animation: ed-title-pulse 1s ease-in-out infinite; }
 @keyframes ed-title-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.75; } }
 @media (prefers-reduced-motion: reduce) {

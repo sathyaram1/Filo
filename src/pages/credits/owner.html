@@ -14,12 +14,10 @@
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
-  <!-- Gli inviti si leggono con le stesse funzioni della pagina Crediti
-       (#651): un invito vale per più persone, e qui come lì si mostra il link
-       da dare e quanti sono entrati. -->
+  <!-- Gli inviti si leggono con le stesse funzioni della pagina Crediti: un invito vale per più persone, e qui
+     come lì si mostra il link da dare e quanti sono entrati. -->
   <script src="filo://shared/wallet.js"></script>
-  <!-- La manopola numerica (#652): un campo, il controllo sul numero, il
-       salvataggio e il «rimetti com'era». Qui ne servono sette. -->
+  <!-- La manopola numerica: campo, controllo sul numero, salvataggio e «rimetti com'era». Qui ne servono sette. -->
   <script src="filo://shared/campoNumero.js"></script>
 </head>
 <body>
@@ -38,8 +36,7 @@
       <div class="sn-manopole" id="ownerKnobs"></div>
 
       <div class="sn-wallet-owner-row">
-        <!-- novalidate: i controlli sui numeri li fa la pagina, con una frase
-             di Filo, non la bolla del browser. -->
+        <!-- novalidate: i controlli sui numeri li fa la pagina, con una frase di Filo, non la bolla del browser. -->
         <form id="ownerInvitesForm" class="sn-wallet-inline" autocomplete="off" novalidate>
           <label for="ownerInviteCount">Nuovi codici</label>
           <input type="number" id="ownerInviteCount" min="1" max="200" value="5" />

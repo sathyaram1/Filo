@@ -27,13 +27,10 @@
       <button type="button" class="rt-tab" data-tab="codes" id="codesTab" role="tab" hidden>Codici</button>
     </nav>
 
-    <!-- ====================== TAB STATISTICHE ====================== -->
     <section class="rt-panel" id="panel-stats" data-panel="stats">
 
-      <!-- Verifica account via CODICE DI INVITO. Mostrata finché non sei
-           verificato, anche da sloggato: in quel caso "Verifica codice" fa
-           prima il login e poi riscatta (vedi redteam.js). Il campo codice è in
-           primo piano così è subito chiaro dove inserirlo. -->
+      <!-- Mostrata finché non sei verificato, anche da sloggato: in quel caso "Verifica codice" fa prima il login
+         e poi riscatta. Il campo codice è in primo piano perché sia subito chiaro dove inserirlo. -->
       <div class="rt-gate rt-verify" id="gateVerify" hidden>
         <h2 class="rt-verify-title">Diventa red teamer verificato</h2>
         <p class="rt-verify-intro">Inserisci il <strong>codice di invito</strong> che hai ricevuto: si lega al tuo account e sblocca le statistiche dei tuoi tentativi e la leaderboard.</p>
@@ -48,10 +45,8 @@
         </form>
       </div>
 
-      <!-- Contenuto verificato -->
       <div class="rt-verified" id="statsContent" hidden>
 
-        <!-- Live reveal (solo con ?attempt=) -->
         <section class="rt-reveal" id="revealSection" hidden>
           <h2>Tentativo in corso</h2>
           <p class="rt-reveal-title sn-muted" id="revealTitle"></p>
@@ -59,25 +54,21 @@
           <div class="rt-reveal-summary" id="revealSummary" hidden></div>
         </section>
 
-        <!-- Griglia record 4×3 (hero) -->
         <section class="rt-grid-section">
           <h2>I tuoi record per giudice</h2>
           <div class="rt-grid" id="grid" role="table" aria-label="Griglia record per giudice"></div>
         </section>
 
-        <!-- Milestone aggregati -->
         <section class="rt-badges-section">
           <h2>Traguardi</h2>
           <div class="rt-badges" id="badges"></div>
         </section>
 
-        <!-- Riepilogo numerico -->
         <section class="rt-summary-section">
           <h2>Riepilogo</h2>
           <div class="rt-summary" id="summary"></div>
         </section>
 
-        <!-- Storico tentativi (spec §6.1) -->
         <section class="rt-history-section" id="historySection">
           <h2>Storico tentativi</h2>
           <div class="rt-history-scroll">
@@ -102,7 +93,6 @@
       <p class="rt-error sn-muted" id="statsError" hidden></p>
     </section>
 
-    <!-- ====================== TAB LEADERBOARD ====================== -->
     <section class="rt-panel" id="panel-leaderboard" data-panel="leaderboard" hidden>
       <table class="rt-lb" id="leaderboard">
         <thead>
@@ -121,12 +111,10 @@
       <p class="rt-error sn-muted" id="leaderboardError" hidden></p>
     </section>
 
-    <!-- ====================== TAB REGOLE ====================== -->
     <section class="rt-panel" id="panel-rules" data-panel="rules" hidden>
       <div class="rt-rules" id="rules"></div>
     </section>
 
-    <!-- ====================== TAB CODICI (solo owner) ====================== -->
     <section class="rt-panel" id="panel-codes" data-panel="codes" hidden>
 
       <!-- Genera nuovi codici monouso (mostrati una sola volta, copiabili). -->
@@ -143,7 +131,6 @@
         </form>
       </section>
 
-      <!-- Elenco di tutti i codici con stato (libero/usato) e revoca dei liberi. -->
       <section class="rt-owner-list">
         <div class="rt-owner-list-head">
           <h2>Codici esistenti</h2>

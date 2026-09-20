@@ -9,30 +9,17 @@
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/feedback.js"></script>
-  <!-- LA CIFRATURA, che qui mancava (#602). Questa pagina è l'unica che carica
-       da sola nel deposito: gli allegati dei COMMENTI (immagini e log del
-       lavoro) partono da `SN_FEEDBACK.uploadAttachment`, che gira nella pagina
-       e non passa dal main. Senza questi due file `SN_FEEDBACK_CRYPTO` qui non
-       esiste, e la cifratura si limitava a non farsi — in silenzio, con gli
-       allegati che finivano nel deposito in chiaro. Ora chi carica senza poter
-       cifrare si ferma e lo dice, ma il modo di non arrivarci è caricare la
-       cifratura: è questo. Il resto della pagina (stati, note) non ne ha
-       bisogno perché scrive passando dal main, che li carica già. -->
+  <!-- La cifratura serve QUI: gli allegati dei commenti partono dalla pagina, non dal main, e senza
+       questi due file finivano nel deposito in chiaro. -->
   <script src="filo://shared/feedbackPublicKey.js"></script>
   <script src="filo://shared/feedbackCrypto.js"></script>
-  <!-- Vocabolario UNICO della macchina a stati + la logica di sezione condivisa
-       con la dashboard di gestione (#509). Prima questa pagina aveva una sua
-       tassonomia (new/draft/todo/review/blocked/clarify/done/verified) e mandava
-       in "Ricevuti" tutto ciò che non riconosceva: le stesse segnalazioni si
-       leggevano "Ricevuti (3)" di là e "Ricevuti (9)" di qua. L'ordine conta:
-       feedbackStatus legge le tabelle di feedbackTransitions, manageReview legge
-       feedbackStatus. -->
+  <!-- Vocabolario UNICO della macchina a stati, condiviso con la dashboard di gestione: senza, le stesse segnalazioni
+     si contavano diverse nelle due pagine. L'ordine di caricamento conta: feedbackStatus prima, manageReview poi. -->
   <script src="filo://shared/feedbackTransitions.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
-  <!-- L'allowlist dei tipi allegabili: la stessa che usa il riquadro di
-       segnalazione dentro i siti, così le due strade rifiutano le stesse cose
-       con le stesse parole (#582, giro 7). -->
+  <!-- Stessa allowlist dei tipi allegabili del riquadro di segnalazione dentro i siti, così le due strade
+     rifiutano le stesse cose con le stesse parole. -->
   <script src="filo://shared/feedbackAttachTypes.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
@@ -73,15 +60,13 @@
     .fb-file:hover { border-color: var(--sn-accent, var(--sn-border)); }
     .fb-file svg { flex: 0 0 auto; color: var(--sn-muted); }
     .fb-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    /* Un allegato che chi guarda non può aprire (parte cifrato con la chiave di
-       chi riceve le segnalazioni): lo dice sulla pillola, come il segnaposto
-       dell'immagine qui accanto, invece di consegnare un file rotto. */
+    /* Un allegato cifrato con la chiave di chi riceve le segnalazioni chi guarda non può aprirlo: lo dice sulla
+       pillola, come il segnaposto dell'immagine, invece di consegnare un file rotto. */
     .fb-file-note { flex: 0 0 auto; color: var(--sn-muted); font-style: italic; }
     .fb-file--closed { border-style: dashed; }
     .fb-file--loading { opacity: 0.6; }
     .fb-empty { color: var(--sn-muted); text-align: center; padding: 60px 0; }
-    /* Stato d'errore del caricamento: frase per l'utente (mai il messaggio grezzo
-       dell'eccezione) + un modo per riprovare, invece di "Errore: Failed to fetch". */
+    /* Errore di caricamento: una frase per l'utente, mai il messaggio grezzo dell'eccezione, e un modo per riprovare. */
     .fb-load-error-msg { margin: 0 auto 14px; max-width: 420px; color: var(--sn-fg); font-size: 14px; line-height: 1.5; }
     .fb-load-retry {
       font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
@@ -105,11 +90,8 @@
     }
     .fb-filter:hover { color: var(--sn-fg); }
     .fb-actions { margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px; }
-    /* UN CLIC, UNA SCHEDA. Mentre la scrittura è in volo la scheda si spegne:
-       il clic si VEDE (prima non si vedeva niente, ed è per questo che veniva
-       naturale premere una seconda volta) e nessun pulsante suo resta
-       premibile. Poi la scheda resta al proprio posto con l'esito scritto:
-       niente si sposta da sotto il puntatore fermo. */
+    /* UN CLIC, UNA SCHEDA: mentre la scrittura è in volo la scheda si spegne, così il clic si VEDE — non vedendo
+       niente veniva naturale premere una seconda volta — e poi resta al suo posto, con l'esito scritto. */
     .fb-card--busy { opacity: 0.55; }
     .fb-card--busy .sn-btn { cursor: progress; }
     .fb-act--busy { position: relative; }
@@ -125,8 +107,7 @@
       display: inline-flex; align-items: center; gap: 6px;
     }
     @media (prefers-reduced-motion: reduce) { .fb-act--busy::after { animation: none; } }
-    /* Le sezioni sono quattro, ma gli stati dentro "Ricevuti"/"In coda" sono
-       tanti: l'etichetta dello stato sta sulla card, come nella gemella. */
+    /* Le sezioni sono quattro ma gli stati dentro sono tanti: l'etichetta dello stato sta sulla card, come nella gemella. */
     .fb-state {
       display: inline-flex; align-items: center; gap: 5px;
       font-size: 11px; color: var(--sn-muted);
@@ -142,8 +123,7 @@
     .fb-usernote-label { display: block; margin-top: 10px; font-size: 12px; color: var(--sn-muted); }
     .fb-usernote { width: 100%; box-sizing: border-box; margin-top: 4px; padding: 6px 8px; font: inherit; font-size: 13px; background: var(--sn-bg, transparent); color: inherit; border: 1px solid var(--sn-border); border-radius: 6px; }
     .fb-notes-readonly { margin-top: 8px; padding: 6px 10px; font-size: 13px; border-left: 2px solid var(--sn-border); color: var(--sn-muted); white-space: pre-wrap; }
-    /* Conversazione a turni (#108): segnalazione, risposte di Filo e risposte
-       dell'utente in BOLLE diverse invece che in un unico blocco di note. */
+    /* Conversazione a turni: segnalazione, risposte di Filo e risposte dell'utente in BOLLE diverse. */
     .fb-thread { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
     .fb-bubble {
       max-width: 88%; padding: 8px 12px; border-radius: 12px;
@@ -165,10 +145,8 @@
       border-color: color-mix(in srgb, var(--sn-accent) 32%, var(--sn-border));
     }
     .fb-bubble--report.fb-bubble--user { align-self: stretch; }
-    /* Tinta della bolla-segnalazione per ORIGINE del feedback (vedi legenda
-       card più sotto). Più specifica di --model/--user, così vince sul tint
-       neutro/accento di default: arancione = tester esterno, verde = invio
-       dell'owner, blu = audit di una routine, accento = agente esploratore. */
+    /* Tinta della bolla-segnalazione per ORIGINE (legenda più sotto): arancione = tester esterno, verde = invio
+       dell'owner, blu = audit di una routine, accento = agente esploratore. Più specifica di --model/--user. */
     .fb-bubble--report.fb-bubble--origin-user {
       background: color-mix(in srgb, #e08e0b 12%, var(--sn-bg, transparent));
       border-color: color-mix(in srgb, #e08e0b 34%, var(--sn-border));
@@ -185,15 +163,12 @@
       background: color-mix(in srgb, var(--sn-accent) 10%, var(--sn-bg, transparent));
       border-color: color-mix(in srgb, var(--sn-accent) 32%, var(--sn-border));
     }
-    /* Sessione locale di Claude (viola): senza una tinta sua ricadrebbe sul
-       neutro e sembrerebbe una segnalazione senza provenienza. */
+    /* Sessione locale di Claude: senza una tinta sua ricadrebbe sul neutro e sembrerebbe senza provenienza. */
     .fb-bubble--report.fb-bubble--origin-local {
       background: color-mix(in srgb, #8b5cd6 12%, var(--sn-bg, transparent));
       border-color: color-mix(in srgb, #8b5cd6 34%, var(--sn-border));
     }
-    /* Le immagini/allegati vivono dentro la bolla della segnalazione. */
     .fb-bubble .fb-imgs, .fb-bubble .fb-files { margin-top: 8px; }
-    /* Composer "Rispondi" del tab Chiarimenti (e riapertura): stesso look. */
     .fb-reply { width: 100%; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
     .fb-reply-text {
       width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit; font-size: 13px;
@@ -201,9 +176,7 @@
       border-radius: 6px; resize: vertical;
     }
     .fb-reply-buttons { display: flex; gap: 8px; justify-content: flex-end; }
-    /* Compositore allegati nei commenti (#190.3): incolla/trascina/allega
-       immagini e file mentre si scrive una nota/risposta. Gli allegati si
-       ancorano al turno (vivono come marcatori dentro le note). */
+    /* Gli allegati dei commenti si ancorano al turno: vivono come marcatori dentro le note. */
     .fb-attach-mount { margin-top: 6px; }
     .fb-attach-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
     .fb-attach-thumbs:not(:empty) { margin-bottom: 6px; }
@@ -212,9 +185,8 @@
       width: 64px; height: 64px; object-fit: cover;
       border: 1px solid var(--sn-border); border-radius: 6px; cursor: zoom-in; display: block;
     }
-    /* L'allegato sale cifrato (#602): finché Filo non ne ha in mano una copia
-       mostrabile la miniatura pulsa, e se non ce n'è nessuna resta un riquadro
-       della stessa misura, così la fila non si scompone. */
+    /* L'allegato sale cifrato: finché non se ne ha una copia mostrabile la miniatura pulsa, e senza nessuna copia
+       resta un riquadro della stessa misura, così la fila non si scompone. */
     .fb-attach-thumb img.fb-img-loading {
       object-fit: contain; cursor: default;
       background: var(--sn-surface-2, rgba(127,127,127,.08));
@@ -244,20 +216,16 @@
     .fb-attach-bar { display: flex; align-items: center; gap: 10px; }
     .fb-attach-btn { padding: 4px 10px; font-size: 12px; }
     .fb-attach-status { font-size: 12px; color: var(--sn-muted); }
-    /* Feedback visivo quando si trascina un file sopra una textarea-composer. */
     .fb-drop-hover { outline: 2px dashed var(--sn-accent); outline-offset: -2px; }
     .fb-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--sn-border); }
-    /* `display: flex` batte l'attributo hidden: senza questa riga la barra
-       resterebbe a schermo anche quando la pagina decide di non disegnarla. */
+    /* `display: flex` batte l'attributo hidden: senza, la barra resta a schermo anche quando non va disegnata. */
     .fb-tabs[hidden] { display: none; }
     .fb-tab {
       background: transparent; border: 0; padding: 8px 14px;
       color: var(--sn-muted); cursor: pointer; font: inherit;
       border-bottom: 2px solid transparent; margin-bottom: -1px;
-      /* Il numero fa corpo unico col nome: la barra manda a capo le SCHEDE
-         INTERE (flex-wrap sul contenitore), la singola scheda non si spezza
-         mai — o alla larghezza minima si leggeva "In" / "coda" / "(0)" su tre
-         righe, col numero staccato dal nome che qualifica. */
+      /* Il numero fa corpo unico col nome: va a capo la SCHEDA INTERA (flex-wrap sul contenitore) e la singola
+         scheda non si spezza mai, o alla larghezza minima si leggeva "In" / "coda" / "(0)" su tre righe. */
       white-space: nowrap;
     }
     .fb-tab--active { color: var(--sn-text, inherit); border-bottom-color: currentColor; }
@@ -284,12 +252,8 @@
       background: #6e7bd622; color: #4a57c0; border: 1px solid #6e7bd688;
     }
     .fb-card--agent { border-left: 3px solid var(--sn-accent); }
-    /* Bordo a sinistra colorato per ORIGINE del feedback, leggibile a colpo
-       d'occhio in ogni tab. Legenda: arancione = alpha tester esterno, verde =
-       invio manuale dell'owner (admin loggato), blu = audit automatico di una
-       routine cloud, accento = agente esploratore LLM. Le regole d'origine
-       seguono .fb-card--agent così, a parità di specificità, vincono (una card
-       d'audit-routine resta blu invece dell'accento). */
+    /* Bordo sinistro colorato per ORIGINE: arancione = alpha tester esterno, verde = invio dell'owner, blu = audit
+       di una routine cloud, accento = agente esploratore. Vengono DOPO .fb-card--agent, così a pari specificità vincono. */
     .fb-card--origin-user { border-left: 3px solid #e08e0b; }
     .fb-card--origin-owner { border-left: 3px solid #2e9e5b; }
     .fb-card--origin-routine { border-left: 3px solid #5b6ee0; }
@@ -316,13 +280,10 @@
       background: var(--sn-overlay-bg); font-size: 13px; color: var(--sn-muted);
     }
     .fb-admin-banner button { margin-left: auto; }
-    /* `display: flex` qui sopra vince sull'attributo `hidden` (regola UA
-       [hidden]{display:none}, meno specifica di una regola d'autore): senza
-       questa riga il banner "sola lettura" restava visibile ANCHE per gli
-       admin, che lo vedevano pur potendo gestire i feedback. */
+    /* Il `display: flex` qui sopra vince sull'attributo `hidden` (la regola UA è meno specifica di una d'autore):
+       senza questa riga il banner "sola lettura" restava visibile anche agli admin, che i feedback li gestiscono. */
     .fb-admin-banner[hidden] { display: none; }
-    /* Box dell'interruttore automazione (owner-only): stesso contorno morbido
-       del banner admin, così si legge come "zona proprietario". */
+    /* Stesso contorno morbido del banner admin, così il box si legge come "zona proprietario". */
     .fb-automation {
       margin-bottom: 16px; padding: 4px 14px 12px;
       border: 1px solid var(--sn-border); border-radius: 8px;
@@ -341,9 +302,8 @@
       <button type="button" class="sn-btn" id="adminSignIn">Accedi</button>
     </div>
 
-    <!-- Interruttore master dell'auto-miglioramento (owner-only). Visibile solo
-         agli admin (lo smaschera feedback.js). Default OFF = autonomia spenta:
-         ogni feedback, anche sicuro, passa da te. Vedi filo-security DESIGN §2. -->
+    <!-- Interruttore master dell'auto-miglioramento, owner-only (lo smaschera feedback.js). Default OFF: ogni
+       feedback, anche sicuro, passa dall'owner. Vedi filo-security DESIGN §2. -->
     <div class="fb-automation" id="automationRow" hidden>
       <div class="sn-toggle-row">
         <label>
@@ -354,9 +314,7 @@
       </div>
     </div>
 
-    <!-- Le sezioni sono quelle della macchina a stati, identiche alla dashboard
-         di gestione (#509): stesso nome, stessa regola, stesso numero — che è
-         il punto, visto che sono la stessa barra vista da due ruoli. -->
+    <!-- Le sezioni sono quelle della macchina a stati, identiche alla dashboard di gestione: stessa barra vista da due ruoli. -->
     <div class="fb-tabs" id="tabs">
       <button type="button" class="fb-tab fb-tab--active" data-tab="inbox">Ricevuti</button>
       <button type="button" class="fb-tab" data-tab="queue">In coda</button>
@@ -364,19 +322,14 @@
       <button type="button" class="fb-tab" data-tab="archived">Archiviati</button>
     </div>
 
-    <!-- Lo stato di un feedback viaggia cifrato: senza la chiave dell'owner
-         resta un blob. Chi non può leggerlo non può sapere in che sezione va,
-         e allora le sezioni non si disegnano: prima la pagina le mostrava
-         tutte e quattro, scriveva "In coda (0) · Risolti (0) · Archiviati (0)"
-         e ammucchiava tutto nei Ricevuti, risolti compresi. -->
+    <!-- Lo stato di un feedback viaggia cifrato: chi non ha la chiave non sa in che sezione va, e allora le sezioni
+       non si disegnano. Mostrarle tutte e quattro significava ammucchiare tutto nei Ricevuti, risolti compresi. -->
     <p class="fb-no-sections" id="noSections" hidden></p>
 
     <div class="fb-toolbar">
       <input type="search" id="search" class="fb-search" placeholder="Cerca per testo, URL, clientId…" />
-      <!-- I ritrovamenti automatici (agente esploratore e audit delle routine)
-           avevano una sezione tutta loro; una sezione in più però è una regola
-           in più che diverge dalla gemella. Sono un FILTRO: la sezione resta
-           quella della macchina a stati, e il numero segue il filtro. -->
+      <!-- I ritrovamenti automatici sono un FILTRO, non una sezione: una sezione in più è una regola in più che
+         diverge dalla gemella. La sezione resta quella della macchina a stati, e il numero segue il filtro. -->
       <label class="fb-filter" title="Mostra solo i ritrovamenti dell'agente esploratore e degli audit delle routine">
         <input type="checkbox" id="agentOnly" />
         <span>🤖 Solo automatici</span>

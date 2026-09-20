@@ -72,7 +72,6 @@
 .sn-credits-move-label { flex: 1 1 auto; }
 .sn-credits-move-date { color: var(--sn-muted); font-size: 12px; }
 
-/* ── Crediti sul server e inviti (#598) ─────────────────────────────────── */
 .sn-wallet { margin-top: 20px; }
 .sn-wallet-redeem label { display: block; font-weight: 600; margin-bottom: 6px; }
 .sn-wallet-redeem-row { display: flex; gap: 8px; align-items: center; max-width: 420px; }
@@ -141,12 +140,8 @@
 }
 .sn-wallet-numero-barra > span { display: block; height: 100%; background: var(--sn-accent); }
 
-/* Le sette manopole (#652). Una colonna di righe: nome, campo coi due
-   pulsanti, esito sotto. «Rimetti com'era» compare solo quando c'è qualcosa da
-   rimettere, così la riga a riposo è pulita. */
-/* Sette righe in colonna lasciavano vuoti due terzi di finestra e spingevano
-   la tabella degli utenti sotto la piega: vanno in griglia, tante per riga
-   quante ce ne stanno. */
+/* Le manopole vanno in griglia, tante per riga quante ce ne stanno: in colonna lasciavano vuoti due terzi
+   di finestra e spingevano la tabella degli utenti sotto la piega. */
 .sn-manopole {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   gap: 14px 28px; margin-top: 10px;
@@ -159,18 +154,16 @@
   background: var(--sn-bg-elev, var(--sn-bg)); color: var(--sn-fg); width: 9em;
 }
 .sn-manopola-riga input:focus { outline: none; border-color: var(--sn-accent); }
-/* Il campo mostra un numero che il server non ha ancora: finché dura si vede.
-   Sparisce da solo appena il numero parte, cioè quando il cursore lascia il
-   campo. */
+/* Il campo mostra un numero che il server non ha ancora: si vede finché dura, e sparisce da solo appena
+   il numero parte, cioè quando il cursore lascia il campo. */
 .sn-page .sn-manopola.is-sporco .sn-manopola-riga input[type="number"] {
   border-color: var(--sn-accent);
   box-shadow: 0 0 0 3px rgba(var(--sn-accent-rgb), 0.16);
 }
 .sn-manopola-msg { margin: 0; font-size: 13px; }
 
-/* Il menu del tasto destro su una persona: riusa il popup di Filo
-   (.sn-select-pop in theme.css), che però nasce ancorato al suo campo. Qui si
-   posa dove ha cliccato il cursore. */
+/* Il menu del tasto destro su una persona riusa il popup di Filo (.sn-select-pop in theme.css), che però
+   nasce ancorato al suo campo: qui si posa dove ha cliccato il cursore. */
 .sn-wallet-ctx { position: fixed; left: 0; top: 0; right: auto; min-width: 190px; }
 .sn-wallet-ctx .sn-select-option { transition: background-color 120ms ease; }
 .sn-wallet-ctx .sn-select-option:hover,
@@ -183,10 +176,8 @@
 .sn-wallet-owner-row { display: flex; flex-wrap: wrap; gap: 18px 32px; margin-top: 10px; }
 .sn-wallet-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sn-wallet-inline label { font-weight: 600; }
-/* La regola generale delle pagine (`.sn-page input[type=...] { width: 100% }`)
-   è più specifica di `.sn-wallet-inline input` e vinceva: i campi prendevano
-   la colonna intera e il modulo si impilava su tre righe. Stessa specificità
-   più uno, e la riga resta una riga. */
+/* `.sn-page input[type=...] { width: 100% }` è più specifica di `.sn-wallet-inline input` e vinceva: i campi
+   prendevano la colonna intera e il modulo si impilava su tre righe. Stessa specificità più uno. */
 .sn-page .sn-wallet-inline input[type="text"],
 .sn-page .sn-wallet-inline input[type="number"] {
   padding: 6px 10px; border: 1px solid var(--sn-border); border-radius: 8px;
@@ -216,8 +207,7 @@
 .sn-wallet-usage-detail ul { list-style: none; margin: 0; padding: 0; }
 .sn-wallet-usage-detail li { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
 
-/* La scheda di una persona (#652): blocchi affiancati finché c'è spazio, in
-   colonna quando la finestra si stringe. */
+/* La scheda di una persona: blocchi affiancati finché c'è spazio, in colonna quando la finestra si stringe. */
 .sn-wallet-scheda { display: flex; flex-wrap: wrap; gap: 18px 32px; align-items: flex-start; }
 .sn-wallet-scheda-blocco { flex: 1 1 260px; min-width: 240px; }
 .sn-wallet-scheda-blocco h4 { margin: 0 0 4px; font-size: 13px; color: var(--sn-muted); font-weight: 600; }
@@ -231,8 +221,8 @@
 .sn-wallet-scheda .sn-wallet-code { font-size: 13px; }
 #resetIdentityBtn { margin-top: 8px; }
 
-/* La chiave OpenRouter propria (#629). Il campo ha la stessa riga del codice
-   d'invito ma è una chiave, non un codice: niente maiuscole né spaziatura. */
+/* Il campo della chiave OpenRouter ha la stessa riga del codice d'invito, ma è una chiave e non un codice:
+   niente maiuscole né spaziatura. */
 .sn-ownkey-row input { text-transform: none; letter-spacing: normal; font-size: 15px; }
 .sn-ownkey-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0 0; }
 .sn-ownkey-tail { cursor: default; }

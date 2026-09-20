@@ -3,14 +3,11 @@
 .sn-fb-overlay {
   position: fixed;
   inset: 0;
-  /* z-index gestito inline da feedback.js via Popup.registerStack — il modale
-     partecipa allo stacking dei popup (sopra ai box aperti prima, sotto a
-     quelli aperti dopo). Il menu contestuale (2147483646) resta sempre
-     visibile sopra il modale grazie al z dedicato. */
+  /* z-index inline da feedback.js via Popup.registerStack: il modale partecipa allo stacking dei popup, e il
+     menu contestuale resta sopra grazie al suo z dedicato. */
   z-index: 2147483600;
-  /* Ombra leggera su tutta la pagina: si vede ancora cosa c'è sotto, ma è
-     chiaro che si è in "modalità annotazione". Il cursore a mirino segnala
-     che si può disegnare. */
+  /* Ombra leggera su tutta la pagina: si vede ancora cosa c'è sotto, ma è chiaro che si è in "modalità
+     annotazione". Il mirino segnala che si può disegnare. */
   background: rgba(0, 0, 0, 0.18);
   cursor: crosshair;
   font-family: var(--sn-font);
@@ -26,7 +23,6 @@
   touch-action: none;
 }
 
-/* Lightbox per ingrandire le anteprime degli screenshot allegati */
 .sn-fb-lightbox {
   position: absolute;
   inset: 0;
@@ -65,7 +61,6 @@
   cursor: default;
 }
 
-/* Maniglia per spostare il box (richiesta utente): una barretta in alto. */
 .sn-fb-drag {
   flex: 0 0 auto;
   height: 16px;
@@ -88,9 +83,8 @@
 }
 
 .sn-fb-body {
-  /* Bordo più sottile (richiesta utente) e niente spazio morto: i contenitori
-     vuoti (anteprime/stato) si nascondono via :empty, così l'area scrivibile
-     arriva fin sopra la riga dei bottoni. */
+  /* Niente spazio morto: i contenitori vuoti (anteprime, stato) si nascondono via :empty, così l'area
+     scrivibile arriva fin sopra la riga dei bottoni. */
   padding: 8px 10px;
   overflow-y: auto;
   display: flex;
@@ -124,8 +118,7 @@
   box-shadow: none !important;
 }
 
-/* Riga azioni: i 4 bottoni (Allega, Chiudi, Invia e — solo se c'è un disegno —
-   Cancella disegno). Niente più header/titolo né footer separato. */
+/* Una riga sola di azioni, senza header né footer separati. */
 .sn-fb-actions {
   display: flex;
   align-items: center;
@@ -133,8 +126,7 @@
   padding: 8px 10px;
   border-top: 1px solid var(--sn-border);
 }
-/* Ordine richiesto: Chiudi (primo), Allega (secondo), Allega screenshot/Cancella,
-   Invia (ultimo, primario, a destra). */
+/* L'ordine dei bottoni è una richiesta esplicita: Chiudi, Allega, screenshot/cancella, Invia a destra. */
 .sn-fb-send { margin-left: auto; }
 
 .sn-fb-attach {
@@ -144,9 +136,8 @@
 }
 .sn-fb-attach svg { display: block; }
 
-/* Bottone sempre presente: di default "Allega screenshot" (allega lo scatto
-   della pagina anche senza disegnare); quando c'è un disegno diventa "Cancella".
-   In entrambi gli stati "selezionati" usa lo stesso colore (accent). */
+/* Un bottone solo per due stati: "Allega screenshot" allega lo scatto anche senza disegnare, e diventa
+   "Cancella" quando c'è un disegno. Da selezionati hanno lo stesso colore. */
 .sn-fb-clear {
   cursor: pointer;
   font: inherit;
@@ -202,7 +193,6 @@
   padding: 0;
 }
 
-/* Pillola di un allegato non-immagine (pdf, txt, md, json…) */
 .sn-fb-file-chip {
   display: inline-flex;
   align-items: center;

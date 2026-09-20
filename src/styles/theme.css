@@ -4,10 +4,8 @@
   --sn-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --sn-radius: 6px;
   --sn-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-  /* Token specifici (#146.1, registro in src/shared/themeTokens.js): di
-     default ereditano dal token di categoria via var(), così un override
-     della categoria si propaga da solo; un override del token specifico
-     viene emesso a specificità maggiore (html[data-sn-theme]) e vince. */
+  /* Token specifici (registro in src/shared/themeTokens.js): ereditano dalla categoria via var(), così
+     un override di categoria si propaga da solo; quello del token specifico esce più specifico e vince. */
   --sn-btn-bg: var(--sn-fg);
   --sn-btn-fg: var(--sn-bg);
   --sn-link: var(--sn-accent);
@@ -58,11 +56,8 @@
   color: var(--sn-selection-fg);
 }
 
-/* Dropdown nativo <select>: l'opzione evidenziata/selezionata di default è blu
-   (highlight di sistema). Forziamo l'arancione della palette così è coerente
-   con il resto della UI Filo. Chromium applica questi stili agli <option> nel
-   popup nativo (fallback: i <select> di Filo vengono comunque sostituiti dal
-   dropdown custom .sn-select-* qui sotto). */
+/* Senza queste due regole l'opzione evidenziata del popup nativo resta il blu di sistema: la riportiamo
+   all'arancione della palette. Ripiego, perché i <select> di Filo passano dal dropdown custom qui sotto. */
 [data-sn-theme] option:checked,
 [data-sn-theme] option:hover {
   background-color: var(--sn-accent);
@@ -72,19 +67,15 @@
   accent-color: var(--sn-accent);
 }
 
-/* ===========================================================================
-   Dropdown custom per i <select> (vedi pageBootstrap.js → enhanceSelect).
-   Il popup nativo non rispetta `option:hover` e usa il blu di sistema: lo
-   rimpiazziamo con un popup di nostri <div> totalmente controllabile a CSS.
-   Il <select> nativo resta nel DOM ma trasparente, sotto al bottone custom.
-   =========================================================================== */
+/* Dropdown custom per i <select> (pageBootstrap.js → enhanceSelect): il popup nativo non rispetta
+   `option:hover` e usa il blu di sistema, quindi lo rimpiazziamo con <div> nostri, controllabili a CSS. */
 .sn-select-wrap {
   position: relative;
   display: block;
   width: 100%;
 }
-/* Il <select> nativo resta nel DOM (sorgente di verità + Playwright selectOption)
-   ma invisibile e non cliccabile: l'utente interagisce col bottone custom. */
+/* Il <select> nativo non si toglie: è la sorgente di verità e ci passa selectOption di Playwright.
+   Invisibile e non cliccabile, sotto al bottone custom. */
 .sn-select-wrap > select {
   position: absolute;
   inset: 0;
@@ -157,9 +148,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* HOVER: arancione a bassa opacità. SELEZIONATA: arancione a opacità maggiore.
-   SELEZIONATA + HOVER: le opacità si sommano (0.18 + 0.30 ≈ 0.48), così l'hover
-   sull'opzione già selezionata dà comunque un riscontro visivo. Mai il blu. */
+/* Le opacità si sommano apposta: così l'hover sull'opzione GIÀ selezionata dà comunque un
+   riscontro visivo invece di restare uguale. Mai il blu di sistema. */
 .sn-select-option.sn-hover {
   background-color: rgba(var(--sn-accent-rgb), 0.18);
 }
@@ -174,7 +164,6 @@
   cursor: not-allowed;
 }
 
-/* Scrollbar globale — sottile, senza freccette, arrotondata */
 [data-sn-theme] {
   scrollbar-width: thin;
   scrollbar-color: var(--sn-border) transparent;
@@ -199,21 +188,8 @@
   height: 0;
 }
 
-/* ===========================================================================
-   Difesa delle icone iniettate contro il CSS dei siti ospiti.
-   theme.css è iniettato anche nelle pagine web esterne (vedi page-preload.js),
-   dove però l'<html> del sito NON ha [data-sn-theme]: per questo le regole qui
-   sotto NON usano quel prefisso ma i contenitori Filo (.sn-menu/.sn-popup/…).
-
-   Perché serve (feedback alpha: "su magnific.com le icone sono rotte"): molte
-   pagine impostano regole globali tipo `svg { fill: currentColor }` (default di
-   parecchi framework di icone). Le nostre icone sono outline (fill="none",
-   stroke="currentColor"): la regola del sito sovrascrive l'attributo `fill` e
-   le riempie di colore pieno, trasformandole in sagome illeggibili. Qui
-   riasseriamo i default della famiglia DENTRO i contenitori Filo, con
-   !important e specificità più alta del sito, ma rispettando gli elementi che
-   hanno un fill/stroke proprio esplicito (es. i puntini pieni dell'icona App,
-   che usano fill="currentColor" stroke="none"). =========================== */
+/* theme.css è iniettato anche nelle pagine esterne, dove l'<html> del sito non ha [data-sn-theme]: qui il
+   prefisso sono i contenitori Filo. Riafferma le icone outline contro un `svg { fill: currentColor }` del sito. */
 .sn-menu svg,
 .sn-popup svg,
 .sn-sidebar svg,

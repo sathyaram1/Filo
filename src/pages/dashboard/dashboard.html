@@ -25,16 +25,11 @@
   <script src="filo://shared/filoState.js"></script>
 </head>
 <body data-state="home">
-  <!-- Controlli del browser spostati dentro la home (la barra in alto di Filo è
-       stata tolta): home, impostazioni, app e profilo, in alto a destra. Ogni
-       icona aziona il comando reale della shell via MSG.SHELL_ACTION. -->
+  <!-- I controlli del browser stanno dentro la home, non in una barra in alto: ogni icona aziona il comando
+     reale della shell via MSG.SHELL_ACTION. -->
   <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
   <main class="dash" id="dash">
-    <!-- Le fusioni in attesa del via libera dell'owner NON vivono più qui:
-         stanno in cima ai Ricevuti della dashboard di gestione, insieme alle
-         altre cose che aspettano una sua decisione (scelta owner 2026-08-26). -->
 
-    <!-- Left column: suggested actions -->
     <aside class="dash-left" id="left">
       <ul class="dash-suggestions" id="suggestions"></ul>
       <button class="dash-expand-btn" id="expandBtn" hidden>
@@ -45,30 +40,23 @@
       </button>
     </aside>
 
-    <!-- Center: home message OR conversation -->
     <section class="dash-center" id="center">
-      <!-- Home state -->
       <div class="dash-home" id="homeView">
-        <!-- #524 — riga di ritorno dopo un'accoglienza chiusa a metà: il congedo
-             in chat dura quanto ci mette la home ad arrivare, e senza questa
-             riga chi non fa in tempo a leggerlo non sa perché Filo ha smesso di
-             presentarsi né che si può rifare. -->
+        <!-- Il congedo in chat dura quanto ci mette la home ad arrivare: senza questa riga, chi non fa in tempo a
+           leggerlo non sa perché Filo ha smesso di presentarsi né che si può rifare. -->
         <div class="dash-onb-notice" id="onbNotice" hidden></div>
         <p class="dash-home-msg" id="homeMessage">…</p>
       </div>
 
-      <!-- Conversation state -->
       <div class="dash-thread" id="threadView" hidden>
         <div class="dash-bubbles" id="bubbles" role="log" aria-live="polite"></div>
       </div>
     </section>
 
-    <!-- Right column: live state -->
     <aside class="dash-right" id="right">
       <div class="dash-live" id="live"></div>
     </aside>
 
-    <!-- Input bar -->
     <form class="dash-input-wrap" id="inputForm" autocomplete="off">
       <div class="dash-dir" id="dashDir" hidden></div>
       <div class="dash-img-previews" id="imgPreviews" hidden></div>
@@ -88,10 +76,8 @@
     </form>
   </main>
 
-  <!-- Le parti della home, PRIMA di dashboard.js: si registrano su globalThis
-       e restano ferme finché dashboard.js non le inizializza con le sue
-       dipendenze. Nessuna tocca il DOM al caricamento, quindi l'ordine fra
-       loro non conta — conta solo che vengano prima. -->
+  <!-- Le parti della home vanno PRIMA di dashboard.js: si registrano e restano ferme finché lui non le inizializza.
+       Fra loro l'ordine non conta: nessuna tocca il DOM al caricamento. -->
   <script src="dashboard-attivita.js"></script>
   <script src="dashboard-onboarding.js"></script>
   <script src="dashboard-comandi.js"></script>

@@ -16,11 +16,8 @@
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/icons.js"></script>
   <style>
-    /* Elenco scaricamenti (#410.3). Un file per RIGA, dal più recente. Ogni riga
-       è un elemento con azioni puntuali: clic sinistro = azione primaria (apri il
-       file se completato), tasto destro = menu contestuale con tutte le azioni —
-       coerente con la centralità del tasto destro in Filo. Gli scaricamenti in
-       corso mostrano barra + percentuale live. */
+    /* Un file per RIGA, dal più recente. Clic sinistro = azione primaria (apri, se completato), tasto destro =
+       tutte le azioni, com'è centrale in Filo. Gli scaricamenti in corso mostrano barra e percentuale live. */
     .dl-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 
     .dl-item {
@@ -47,15 +44,12 @@
       color: var(--sn-muted);
       flex: 0 0 30px;
     }
-    /* Colore dell'icona per stato: interrotto/annullato tenue-rosso, completato
-       accento, in corso neutro (l'attenzione la prende la barra). */
+    /* Colore dell'icona per stato: l'attenzione, quando è in corso, la deve prendere la barra. */
     .dl-item[data-state="interrupted"] .dl-icon,
     .dl-item[data-state="cancelled"] .dl-icon { color: #c0392b; }
     .dl-item[data-state="completed"] .dl-icon { color: var(--sn-accent); }
-    /* Scaricato, ma il file non è più al suo posto (spostato, rinominato,
-       cestinato): la voce si attenua e il nome viene barrato, così lo stato si
-       legge prima del clic. Niente cursore "cliccabile": non c'è più un file da
-       aprire. */
+    /* Scaricato ma non più al suo posto: la voce si attenua e il nome viene barrato, così lo stato si legge prima
+       del clic. Niente cursore cliccabile: non c'è più un file da aprire. */
     .dl-item[data-missing="1"] { opacity: 0.62; cursor: default; }
     .dl-item[data-missing="1"] .dl-name { text-decoration: line-through; color: var(--sn-muted); }
     .dl-item[data-missing="1"] .dl-icon { color: var(--sn-muted); }
@@ -78,8 +72,7 @@
       margin-top: 4px; opacity: 0.85;
     }
 
-    /* Barra di avanzamento per gli scaricamenti in corso: occupa la riga 3 al
-       posto (idealmente sopra) del percorso quando è attivo. */
+    /* La barra occupa la riga del percorso mentre lo scaricamento è attivo. */
     .dl-bar {
       grid-column: 2 / span 2; grid-row: 3;
       height: 4px; border-radius: 3px; margin-top: 6px;
@@ -114,9 +107,8 @@
     .dl-btn:hover { color: var(--sn-fg); background: var(--sn-bg); border-color: var(--sn-accent); }
     .dl-btn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
 
-    /* Menu contestuale: stesse classi del resto di Filo, posizionato "fixed"
-       alle coordinate del click (vedi
-       patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md). */
+    /* Stesse classi del resto di Filo, ma fixed alle coordinate del click:
+       patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md */
     .dl-ctxmenu { position: fixed; right: auto; top: auto; min-width: 160px; }
     .dl-count { font-size: 12px; color: var(--sn-muted); margin-left: auto; }
   </style>
