@@ -85,6 +85,10 @@
        fila che scorre. Le conversazioni si vedono; i comandi ("metti una
        sveglia") stanno sotto l'interruttore, perché ci sono sempre ma non è
        per quelli che si apre questa pagina. */
+    /* `hidden` deve vincere su `display:flex`: senza questa riga l'attributo
+       c'è ma la sezione si vede lo stesso (la regola di classe batte il
+       display:none del browser). */
+    .arc-section[hidden] { display: none; }
     .arc-section {
       display: flex; align-items: baseline; gap: 12px;
       margin: 18px 0 2px; padding-bottom: 6px;
