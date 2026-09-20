@@ -244,4 +244,9 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
   });
 }
 
-module.exports = { runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS };
+module.exports = {
+  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
+  // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
+  // che si può verificare senza avviare una shell su ogni piattaforma).
+  encodingPrelude, withCwdProbe,
+};
