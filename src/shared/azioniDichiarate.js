@@ -320,13 +320,64 @@
   // che arriva in chat non è una risposta, e le azioni che conteneva non sono
   // partite. Si riconosce solo quando NESSUNO strumento è stato chiamato e il
   // recupero del formato vecchio ha già fallito: lì è un turno buttato.
-  function formatoSospetto(testo) {
-    const t = String(testo || '').trim().replace(/^```(?:json)?\s*/i, '');
-    if (!t) return false;
-    if (/^\{[\s\S]*$/.test(t) && /"(?:text|actions|type)"\s*:/.test(t)) return true;
-    if (/"actions"\s*:\s*\[/.test(t)) return true;
-    if (/^[A-Z][A-Z_]{3,}\s*(?:\{|\()/.test(t)) return true;
+  //
+  // Il formato macchina arriva in due posti, e sono lo stesso guasto: da solo,
+  // oppure IN CODA alla risposta buona («scrive la risposta buona come
+  // preambolo e chiude con un oggetto», dalla segnalazione). Prima si guardava
+  // solo l'inizio del testo, quindi bastava una frase davanti perché il turno
+  // passasse intero: la frase arrivava all'utente, la sveglia no, e questa
+  // volta senza nemmeno un ritentativo.
+  //
+  // Un esempio dentro un blocco di codice — l'utente che chiede «fammi vedere
+  // com'è fatto» — NON è un guasto: la coda si guarda solo fuori dai blocchi
+  // recintati con i tre apici.
+  function involucro(s, nomi) {
+    if (!s) return false;
+    // Il vecchio involucro del protocollo, o un oggetto vuoto al posto della
+    // risposta: in chat sono un blocco di codice e basta.
+    if (/^\{[\s\S]*\}$/.test(s) && /"(?:text|actions|type)"\s*:/.test(s)) return true;
+    if (/^\{\s*\}$/.test(s)) return true;
+    // Una lista di azioni scritta invece che chiamata.
+    if (/^\[\s*\{[\s\S]*"type"\s*:/.test(s)) return true;
+    // Il nome di uno strumento con i suoi argomenti. Il nome si confronta con
+    // quelli VERI quando li abbiamo: senza, una parola tutta maiuscola con una
+    // parentesi dietro passerebbe per una chiamata.
+    const m = s.match(/^([A-Z][A-Z_]{3,})\s*(?:\{|\()/);
+    if (m) return !nomi || nomi.has(m[1]);
     return false;
+  }
+
+  function formatoSospetto(testo, nomiStrumenti) {
+    const grezzo = String(testo || '').trim();
+    if (!grezzo) return false;
+    const nomi = Array.isArray(nomiStrumenti) ? new Set(nomiStrumenti)
+      : (nomiStrumenti instanceof Set ? nomiStrumenti : nomiDegliStrumenti());
+    // Tutta la risposta è formato macchina, anche se recintata coi tre apici:
+    // una risposta che è SOLO un involucro non è mai un esempio per l'utente.
+    const nudo = grezzo.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    if (involucro(nudo, nomi)) return true;
+    // Il formato macchina in coda, dopo la risposta per l'utente. Si parte da
+    // ogni riga che potrebbe aprirlo e si guarda da lì alla fine.
+    const righe = grezzo.split('\n');
+    let recinto = false;
+    for (let i = 0; i < righe.length; i++) {
+      if (/^\s*```/.test(righe[i])) { recinto = !recinto; continue; }
+      if (i === 0 || recinto) continue;
+      const riga = righe[i].trimStart();
+      if (!/^[[{]|^[A-Z][A-Z_]{3,}\s*[{(]/.test(riga)) continue;
+      const coda = righe.slice(i).join('\n').trim().replace(/```[\s\S]*$/, '').trim();
+      if (involucro(coda, nomi)) return true;
+    }
+    return false;
+  }
+
+  // I nomi veri degli strumenti, se il registro è già caricato accanto a noi.
+  function nomiDegliStrumenti() {
+    try {
+      const T = global.SN_ACTION_TOOLS;
+      if (T && Array.isArray(T.NAMES) && T.NAMES.length) return new Set(T.NAMES);
+    } catch (_) {}
+    return null;
   }
 
   // La spinta che torna al modello quando la risposta dichiara un'azione mai
