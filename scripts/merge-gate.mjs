@@ -414,8 +414,14 @@ async function main() {
   // l'ultimo passo del giro: una rete che non risponde deve diventare «non l'ho
   // potuto controllare» in mezzo minuto, non un comando appeso.
   const pubblicazione = statoPubblicazione(gitConTetto(ROOT), source, punta);
-  if (pubblicazione.stato === 'assente') {
+  if (pubblicazione.stato === 'indietro') {
     console.error(testoNonPubblicato(punta, pubblicazione.suOrigin, source));
+    process.exit(1);
+  }
+  if (pubblicazione.stato === 'piu_avanti') {
+    // Il rimedio con gli attrezzi del GIRO, come l'altro rifiuto che nomina un
+    // comando: `scripts/…` qui dentro è la copia del ramo.
+    console.error(absolutizeRecipe(testoPiuAvanti(punta, pubblicazione.suOrigin, source), TOOLS_ROOT, ROOT));
     process.exit(1);
   }
   if (pubblicazione.stato === 'sconosciuto') {
