@@ -533,6 +533,15 @@ module.exports = function register(on, ctx) {
       if (!Outbox?.enqueue) {
         throw new Error('SN_FEEDBACK_OUTBOX non caricato nel main process');
       }
+      // #602 — la cifratura si controlla PRIMA di accodare. La coda risponde
+      // «ricevuto» appena il feedback è al sicuro sul disco e spedisce dopo:
+      // se la cifratura non si potesse fare, chi manda avrebbe già letto
+      // «grazie, inviato» e la segnalazione riproverebbe per giorni senza
+      // partire mai. Qui invece la risposta è un no, con il motivo.
+      const motivoCifratura = globalThis.SN_FEEDBACK.encryptionUnavailable?.() || '';
+      if (motivoCifratura) {
+        return { ok: false, error: globalThis.SN_FEEDBACK.encryptionBlockedMessage(motivoCifratura) };
+      }
       const payload = msg.payload || {};
       // Se l'utente è loggato come admin (l'owner), marca il suo invio come
       // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
