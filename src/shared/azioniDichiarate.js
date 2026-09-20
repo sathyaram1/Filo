@@ -608,7 +608,7 @@
       if (/^\s*```/.test(righe[i])) { recinto = !recinto; continue; }
       if (i === 0 || recinto) continue;
       const riga = righe[i].trimStart();
-      if (!/^[[{]|^[A-Z][A-Z_]{3,}\s*[{(]/.test(riga)) continue;
+      if (!/^[[{<]|^(?:functions?|tools?)\s*\.\s*[A-Z]|^[A-Z][A-Z_]{3,}\s*[{(]/.test(riga)) continue;
       if (annunciatoComeEsempio(righe, i)) continue;
       const coda = righe.slice(i).join('\n').trim().replace(/```[\s\S]*$/, '').trim();
       if (involucro(coda, nomi)) return true;
