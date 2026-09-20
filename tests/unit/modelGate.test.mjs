@@ -51,6 +51,30 @@ const PORTE = [
   { nome: 'getProvider', re: /\bgetProvider\s*\(/ },
 ];
 
+// L'ultima porta, e quella che i nomi non coprono: l'INDIRIZZO del fornitore su
+// internet. Chi scrive la richiesta di rete a mano arriva allo stesso modello,
+// paga sulla stessa chiave condivisa, non passa dal tetto mensile e non compare
+// in nessun conto. Gli indirizzi non si scrivono qui: si leggono dai fornitori,
+// così un fornitore nuovo è coperto dal giorno in cui entra.
+// `filo.local` non è un indirizzo che Filo chiama: è il nome che dichiara di sé
+// nelle intestazioni, e sta in quei file per quello.
+const NON_SONO_INDIRIZZI = new Set(['filo.local']);
+
+function indirizziDeiFornitori() {
+  const host = new Set();
+  for (const p of fileJs(join(REPO, 'src/main/services/providers'))) {
+    for (const m of readFileSync(p, 'utf8').matchAll(/https?:\/\/([a-z0-9.-]+)/gi)) {
+      const h = m[1].toLowerCase();
+      if (!NON_SONO_INDIRIZZI.has(h)) host.add(h);
+    }
+  }
+  return [...host];
+}
+
+for (const h of indirizziDeiFornitori()) {
+  PORTE.push({ nome: `indirizzo del fornitore (${h})`, re: new RegExp(h.replace(/\./g, '\\.'), 'i') });
+}
+
 function fileJs(dir, out = []) {
   for (const nome of readdirSync(dir)) {
     if (nome === 'node_modules' || nome.startsWith('.')) continue;
