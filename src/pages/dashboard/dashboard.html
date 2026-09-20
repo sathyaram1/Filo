@@ -76,10 +76,8 @@
     </form>
   </main>
 
-  <!-- Le parti della home, PRIMA di dashboard.js: si registrano su globalThis
-       e restano ferme finché dashboard.js non le inizializza con le sue
-       dipendenze. Nessuna tocca il DOM al caricamento, quindi l'ordine fra
-       loro non conta — conta solo che vengano prima. -->
+  <!-- Le parti della home vanno PRIMA di dashboard.js: si registrano e restano ferme finché lui non le inizializza.
+       Fra loro l'ordine non conta: nessuna tocca il DOM al caricamento. -->
   <script src="dashboard-attivita.js"></script>
   <script src="dashboard-onboarding.js"></script>
   <script src="dashboard-comandi.js"></script>
