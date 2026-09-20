@@ -114,27 +114,34 @@ test('una chat cancellata da Cronologia mentre è ancora viva in un’altra sche
   await dash.locator('#input').press('Enter');
   await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 20_000 });
 
-  // La chat è in corso e si vede già in Cronologia. L'utente la cancella da lì.
+  // La chat è in corso e si vede già in Cronologia. L'utente la cancella da lì,
+  // per la sua strada vera: tasto destro, «Elimina la chat», conferma.
   const page = await openTab(ARCHIVE);
   await expect(page.locator('.arc-chat').first()).toBeVisible({ timeout: 20_000 });
-  const quante = await app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l.length));
-  console.log('CHAT PRIMA DELLA CANCELLAZIONE:', quante);
-  await app.evaluate(async () => {
-    const l = await globalThis.SN_FILO_CHATS.list();
-    for (const c of l) await globalThis.SN_FILO_CHATS.remove(c.id);
-  });
-  expect(await app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l.length))).toBe(0);
+  const cancellata = await app.evaluate(() => globalThis.SN_FILO_CHATS.list().then((l) => l[0].id));
+  await page.locator('.arc-chat').first().click({ button: 'right' });
+  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina la chat' }).click();
+  await expect.poll(
+    () => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null),
+    { timeout: 15_000 },
+  ).toBe('Elimina la chat');
+  await page.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'));
+  await expect.poll(async () => (await leggiArchivio(app)).length, { timeout: 15_000 }).toBe(0);
 
   // …poi torna sulla scheda di prima e continua a scrivere.
-  await dash.bringToFront?.().catch(() => {});
   await dash.locator('#input').fill('E del Rococò?');
   await dash.locator('#input').press('Enter');
   await expect(dash.locator('.dash-bubble-filo').nth(1)).toBeVisible({ timeout: 20_000 });
 
   const dopo = await leggiArchivio(app);
   console.log('DOPO:', JSON.stringify(dopo.map((c) => ({ id: c.id, n: c.messages.length, testi: c.messages.map((m) => m.text.slice(0, 30)) }))));
-  // Quello che conta: la chat cancellata NON deve tornare come guscio a metà.
-  expect(dopo.length).toBe(0);
+  // Quello che conta: la chat cancellata NON torna. Quello che si scrive dopo
+  // è una conversazione nuova, con una targa sua — e senza dentro i messaggi
+  // che l'utente aveva appena buttato via.
+  expect(dopo.map((c) => c.id)).not.toContain(cancellata);
+  expect(JSON.stringify(dopo)).not.toContain('Barocco');
+  // E la scheda dice cos'è successo, invece di lasciarlo capire da sé.
+  await expect(dash.locator('.dash-bubble-note', { hasText: 'cancellata dalla Cronologia' })).toBeVisible({ timeout: 15_000 });
 });
 
 test('un turno fallito senza risposta: la chat chiusa ha comunque nome e tipo', async ({ app }) => {
