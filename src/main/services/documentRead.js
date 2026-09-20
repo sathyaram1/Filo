@@ -805,7 +805,14 @@ async function readDocument(input, { cwd } = {}) {
   // codifica che Filo non sa riconoscere arrivava al modello come una fila di
   // caratteri nulli, e Filo diceva di averlo letto: il modello rispondeva sul
   // nulla senza che nessuno potesse accorgersene (#551, sesto giro).
-  if (quotaNonTesto(letto.text) >= QUOTA_NON_TESTO) {
+  //
+  // Un PUGNO di caratteri così però non è una codifica sbagliata: è un
+  // documento sano con qualche byte perso, e su un file corto bastava un byte
+  // solo per sfondare la quota. Quelli si tolgono e si CONTANO, come i byte
+  // rotti di un UTF-8 danneggiato, invece di rifiutare il documento dando la
+  // colpa alla codifica (#551, ottavo giro).
+  const pulito = senzaRumore(letto.text);
+  if (pulito.persi > RUMORE_TOLLERATO && quotaNonTesto(letto.text) >= QUOTA_NON_TESTO) {
     return {
       ...base,
       error: 'unreadable',
@@ -813,7 +820,7 @@ async function readDocument(input, { cwd } = {}) {
         + 'non vuol dire niente. Riaprilo e risalvalo in UTF-8',
     };
   }
-  const capped = capText(letto.text);
+  const capped = capText(pulito.text);
   return {
     ...base,
     ok: true,
@@ -821,7 +828,7 @@ async function readDocument(input, { cwd } = {}) {
     text: capped.text,
     truncated: capped.truncated,
     codifica: letto.codifica,
-    bytesPersi: letto.bytesPersi,
+    bytesPersi: letto.bytesPersi + pulito.persi,
   };
 }
 
