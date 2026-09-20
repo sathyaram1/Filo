@@ -18,6 +18,7 @@ module.exports = function register(on, ctx) {
   // content script dei siti visitati (vedi
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
+  const { soloFilo } = require('./origine');
 
   // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
   const annunciaChat = () => {
