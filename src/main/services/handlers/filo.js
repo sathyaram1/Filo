@@ -19,7 +19,9 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_CHAT, async (msg, sender) => {
     try {
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, sender });
+      // `compitoRipreso` (#533) tiene in vita il perimetro appena allargato
+      // dall'utente: senza, il sì morirebbe col turno in cui l'ha dato.
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, compitoRipreso: msg.compito || null, sender });
       return { ok: true, ...r };
     } catch (e) {
       // #360 — la chat non è un log: se il turno fallisce (rete assente, provider
