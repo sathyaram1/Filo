@@ -570,11 +570,17 @@
   // sola: il secondo appunto non nasceva e nessuno lo diceva. Due
   // dichiarazioni che cadono nella stessa proposizione sono la stessa cosa
   // detta da due regole diverse, e contano per una.
+  // Oltre questo numero, per una famiglia sola, non cambia più niente:
+  // l'utente legge una riga comunque, e continuare a contare su una risposta
+  // lunghissima costa e basta.
+  const MAX_DICHIARAZIONI = 8;
+
   function dichiarazioni(testo, famiglia) {
     const out = [];
     const presi = [];
     const sovrapposta = (a, b) => presi.some(([x, y]) => a < y && b > x);
     for (const re of famiglia.frasi) {
+      if (out.length >= MAX_DICHIARAZIONI) break;
       const rx = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
       let m;
       while ((m = rx.exec(testo))) {
