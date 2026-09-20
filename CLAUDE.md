@@ -286,7 +286,9 @@ Come si verifica, dato che un Linux desktop non ce l'abbiamo:
   quella del Mac. Una regola nuova per Linux si aggiunge lì.
 - Il lavoro **«Verifica build Linux»**
   (`.github/workflows/verifica-linux.yml`) costruisce davvero l'AppImage e non
-  pubblica niente. Guarda anche dentro il pacchetto, nella voce di menu.
+  pubblica niente. Guarda dentro il pacchetto, nella voce di menu, e poi lo
+  AVVIA togliendogli il permesso del kernel che Ubuntu gli nega: se Filo non
+  resta aperto, il lavoro è rosso lì invece che dal tester.
 - L'AppImage si costruisce anche **nel contenitore delle routine**:
   `npm run build:linux` mette `dist/Filo-Linux.AppImage` e
   `dist/latest-linux.yml`. Per aprirla lì serve estrarla
