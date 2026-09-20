@@ -355,32 +355,26 @@
   // del testo che il sito AGGIUNGE dopo, e va trattato uguale (#407): non si
   // traduce adesso, ma appena si vede il menu deve offrire di tradurlo, invece
   // di lasciare come unica strada tornare all'originale e ripagare la pagina.
+  // Il sito sceglie COME ripiegare, e da quella scelta non possono dipendere né
+  // il comportamento né il conto (#505): i tre modi qui sotto valgono uguale.
   function isVisibilityHidden(el) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
     // La finestra dell'elemento, non la nostra: da quando la traduzione entra
     // nei riquadri senza indirizzo (#407) qui arrivano elementi di un ALTRO
-    // documento, e chiederne lo stile alla finestra sbagliata non risponde di
-    // loro.
-    // Il sito decide COME ripiegare una sezione, e da quella scelta non possono
-    // dipendere né il comportamento né il conto dell'utente (#505): far sparire
-    // il riquadro, saltarne il contenuto o schiacciarlo a zero è chiuso uguale.
+    // documento, e chiederne lo stile alla finestra sbagliata non risponde di loro.
     const cs = viewOf(el).getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse'
         || cs.contentVisibility === 'hidden') return true;
-    // Un <details> chiuso resta display:block con una misura sua: se lo disegna
-    // lo sa solo il motore. Opacità e content-visibility:auto restano fuori di
-    // proposito: quel testo torna da sé appena si scorre.
+    // Un <details> chiuso resta display:block con una misura sua: se lo disegni lo sa solo il motore. Opacità e
+    // content-visibility:auto restano fuori di proposito: quel testo torna da sé appena si scorre.
     if (typeof el.checkVisibility === 'function'
         && !el.checkVisibility({ visibilityProperty: true })) return true;
     return isClippedToNothing(el, cs);
   }
 
-  // Ripiegato schiacciandolo a zero (`max-height:0` più `overflow:hidden`: la
-  // fisarmonica che si apre con un'animazione). Il RITAGLIO è la condizione che
-  // conta — a misura zero senza ritaglio il testo deborda e si legge — e il
-  // contenuto dev'essere davvero più grande del riquadro, o un elemento vuoto
-  // fermerebbe la discesa verso i figli.
+  // Schiacciato a zero e ritagliato (`max-height:0` più `overflow:hidden`). Il RITAGLIO è la condizione che conta:
+  // a misura zero senza ritaglio il testo deborda e si legge; e a contenuto vuoto non c'è niente da rimandare.
   function isClippedToNothing(el, cs) {
     const clipsY = CLIPPING_OVERFLOW.has(cs.overflowY);
     const clipsX = CLIPPING_OVERFLOW.has(cs.overflowX);
