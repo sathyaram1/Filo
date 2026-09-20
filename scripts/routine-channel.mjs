@@ -1054,9 +1054,12 @@ if (isMain) {
           console.error('Niente è stato consegnato: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia lo stesso comando.');
           process.exit(1);
         }
-        if (data.sha && String(data.sha) !== punta) {
-          console.error(`${quale}: hai dichiarato il commit ${String(data.sha).slice(0, 12)}, ma la directory è su ${punta.slice(0, 12)}.`);
-          console.error('Niente è stato consegnato: un esito vale per il contenuto che hai davvero davanti, e l\'impronta la timbra lo strumento. Togli --sha e rilancia, oppure posizionati sul commit che hai esaminato.');
+        // Confermare vuol dire riconoscere la stessa versione, non ricopiarla
+        // lettera per lettera: la forma corta che gli strumenti stampano
+        // dappertutto, e le maiuscole, sono lo stesso commit.
+        const conferma = confermaImpronta(data.sha, punta);
+        if (!conferma.ok) {
+          console.error(testoImprontaDiversa(quale, data.sha, punta, conferma.motivo));
           process.exit(1);
         }
         data.sha = punta;
