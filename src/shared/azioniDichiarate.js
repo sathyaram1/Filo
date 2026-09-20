@@ -244,6 +244,24 @@
       ],
     },
     {
+      // Giro 8 — «ho aperto la bolletta che mi hai mandato: sono 84 euro»,
+      // con la foto della bolletta in chat. Dire «ho letto» qui è vero dal
+      // giro 2, perché un'immagine mandata in chat, un testo incollato nel
+      // messaggio e i file dell'editar arrivano al modello senza nessuno
+      // strumento; dirlo con «ho aperto», che è la parola più comune, faceva
+      // buttare la risposta, rifarla e poi smentirla.
+      // Sta PRIMA dell'apertura generica, e i suoi tipi sono l'unione dei due
+      // casi: un documento Filo può averlo davvero aperto (una pagina, un
+      // file) oppure averlo già davanti.
+      id: 'apertura-documento',
+      tipi: ['NAVIGA', 'APRI_FILE', 'COMANDO_FINESTRA', 'ESEGUI_COMANDO', 'LEGGI_DOCUMENTO',
+        'LEGGI_FILE', 'CONTESTO_FILE', 'CONTESTO_IMMAGINE', 'CONTESTO_TESTO'],
+      avviso: 'non si è aperto niente',
+      frasi: [
+        new RegExp(`${HO}apert[oa]\\b${PONTE(24)}\\b${DOCUMENTO}\\b`, 'i'),
+      ],
+    },
+    {
       id: 'apertura',
       // Un programma o una cartella si aprono con un comando di shell: senza
       // ESEGUI_COMANDO qui, «ho aperto il blocco note» — fatto davvero —
