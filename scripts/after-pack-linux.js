@@ -24,10 +24,10 @@
 //
 // COSA FA
 //   Sposta il programma vero accanto, col suffisso `-bin`, e mette al suo posto
-//   un lanciatore di tre righe che lo avvia aggiungendo `--no-sandbox`. AppRun
-//   trova il nome che si aspetta, e da lì in poi tutte le strade (doppio clic,
-//   file lanciato a mano, cartella estratta, voce di menu) partono nello stesso
-//   modo.
+//   un lanciatore che guarda se il sistema concede quel permesso e, se non lo
+//   concede, avvia Filo con `--no-sandbox`. AppRun trova il nome che si
+//   aspetta, e da lì in poi tutte le strade (doppio clic, file lanciato a mano,
+//   cartella estratta, voce di menu) partono nello stesso modo.
 //
 // LA GABBIA SI TIENE DOVE IL SISTEMA LA LASCIA
 //   Filo è un browser: apre siti qualunque, e la gabbia di Chromium è la
