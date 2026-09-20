@@ -227,4 +227,32 @@ test.describe('il perimetro delle uscite', () => {
     expect(esito.segnala.needsConfirm).toBe(2);
     expect(esito.segnala.describe).not.toContain('scritto da altri');
   });
+
+  test('in filo://security/ si legge cosa Filo era autorizzato a fare, nei due temi', async ({ app, openTab }) => {
+    await configura(app);
+    // Un compito che ha letto una pagina e uno che non ha letto niente.
+    await turno(app, [
+      [{ name: 'DICHIARA_USCITE', args: { uscite: ['sveglie'] } }],
+      [{ name: 'CERCA_WEB', args: { query: 'x' } }],
+    ]);
+    await turno(app, [[{ name: 'SALVA_LEZIONE', args: { testo: 'niente di esterno' } }]]);
+
+    for (const tema of ['chiaro', 'scuro']) {
+      await app.evaluate((_e, t) => globalThis.SN_STORAGE.updateSettings({ theme: t }), tema);
+      const page = await openTab('filo://security/');
+      await page.waitForSelector('#sec-perimetro-list > div', { timeout: 8000 });
+      const righe = await page.$$eval('#sec-perimetro-list > div', (ds) => ds.map((d) => d.textContent));
+      // Il compito che ha letto dice il suo perimetro; quello che non ha letto
+      // dice che non c'era niente da limitare. Nessuna riga muta.
+      expect(righe.join('\n')).toContain('sveglie e timer');
+      expect(righe.some((r) => r.includes('nessun limite'))).toBe(true);
+      for (const r of righe) expect(r.trim().length).toBeGreaterThan(0);
+      // Leggibile: il titolo non è del colore dello sfondo.
+      const col = await page.$eval('#sec-perimetro-title', (el) => ({
+        fg: getComputedStyle(el).color,
+        bg: getComputedStyle(document.body).backgroundColor,
+      }));
+      expect(col.fg, `tema ${tema}: titolo invisibile`).not.toBe(col.bg);
+    }
+  });
 });
