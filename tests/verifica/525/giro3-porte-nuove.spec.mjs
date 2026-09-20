@@ -103,9 +103,10 @@ test('un comando con lo slash detto nella stessa chat si ritrova rileggendola', 
   await dash.locator('#input').fill('/help');
   await dash.locator('#input').press('Enter');
   await dash.waitForTimeout(1000);
-  const aSchermo = await dash.evaluate(() => [...document.querySelectorAll('.dash-bubble')].map((b) => b.textContent.slice(0, 40)));
-  console.log('A SCHERMO:', JSON.stringify(aSchermo));
-  expect(aSchermo.some((t) => t.includes('/help'))).toBeTruthy();
+  const aSchermo = await dash.evaluate(() => [...document.querySelectorAll('.dash-bubble')].map((b) => b.textContent));
+  console.log('A SCHERMO:', JSON.stringify(aSchermo.map((t) => t.slice(0, 50))));
+  // Filo ha risposto a schermo, dentro questa conversazione.
+  expect(aSchermo.some((t) => t.includes('lista comandi'))).toBeTruthy();
 
   await dash.locator('#input').fill('E dei Promessi Sposi?');
   await dash.locator('#input').press('Enter');
