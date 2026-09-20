@@ -277,9 +277,11 @@ Come si verifica, dato che un Linux desktop non ce l'abbiamo:
 - L'AppImage si costruisce anche **nel contenitore delle routine**:
   `npm run build:linux` mette `dist/Filo-Linux.AppImage` e
   `dist/latest-linux.yml`. Per aprirla lì serve estrarla
-  (`./Filo-Linux.AppImage --appimage-extract`, poi `APPDIR=$PWD/squashfs-root
-  xvfb-run -a ./squashfs-root/AppRun --no-sandbox`): senza FUSE l'AppImage non
-  si monta.
+  (`./Filo-Linux.AppImage --appimage-extract`): senza FUSE l'AppImage non si
+  monta. Poi, dalla cartella che contiene `squashfs-root`, il comando è questo,
+  intero — mezzo comando qui non fa partire Electron e il rosso sembra del
+  codice:
+  `APPDIR=$PWD/squashfs-root ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a ./squashfs-root/AppRun --no-sandbox`
 - Quello che **nessuno di questi prova** è che l'app si apra e funzioni su un
   Linux desktop vero, con la sua sessione grafica, le sue notifiche e il suo
   gestore di file. Dichiaralo nel report invece di darlo per fatto.
