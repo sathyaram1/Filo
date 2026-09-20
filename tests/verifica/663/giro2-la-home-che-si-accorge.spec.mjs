@@ -235,12 +235,15 @@ test('invitato, poi «usa i modelli predefiniti» spento: la home deve dire che 
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
   await expect(page.locator('#homeMessage')).toContainText(FRASE_DEL_MODELLO, { timeout: 20_000 });
 
-  // «Voglio gestirmi i modelli da solo», senza averne ancora scelto nessuno:
-  // da qui Filo non ha più niente da chiamare.
+  // «Voglio gestirmi i modelli da solo», e nessuno scelto. L'interruttore da
+  // solo non basta: la configurazione personale nasce già piena, quindi Filo
+  // continuerebbe a rispondere. Qui la si svuota davvero.
   await page.evaluate(async () => {
+    const vuoti = {};
+    for (const a of Object.values(window.SN_CONST.ACTIONS)) vuoti[a] = '';
     await chrome.runtime.sendMessage({
       type: window.SN_MSG.MSG.UPDATE_SETTINGS,
-      settings: { useDefaultModels: false },
+      settings: { useDefaultModels: false, models: vuoti },
     });
   });
 
