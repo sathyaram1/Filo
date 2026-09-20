@@ -120,11 +120,20 @@
 
   // Mostra una riga di risposta da Filo nel thread (usata dai comandi che
   // hanno bisogno di dire qualcosa: es. l'uso corretto di /set timer).
+  // Una riga che Filo scrive senza passare da un modello: la risposta a un
+  // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
+  // resoconto del riordino delle schede).
+  //
+  // #525 — va anche NELL'ARCHIVIO. Prima restava solo a schermo: riaprendo
+  // quella chat da Cronologia la riga non c'era più e la conversazione si
+  // rileggeva con un buco in mezzo. È una riga che l'utente ha letto, e questo
+  // lavoro promette di conservarle tutte.
   function showFiloLine(text) {
     if (document.body.dataset.state !== 'thread') goThread();
     const bubble = makeBubble({ role: 'filo', text });
     bubblesEl.appendChild(bubble);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    try { archiviaRiga(text); } catch (_) {}
   }
 
   // "/pulisci" (o "/pulizia"): avvia il riordino/archiviazione delle schede non
