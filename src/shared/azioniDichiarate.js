@@ -137,6 +137,10 @@
   // il ponte non ci può stare un «non», altrimenti «la sveglia non è
   // impostata» — che è una frase onesta — diventerebbe un'accusa.
   const APRE = `(?:^|[\\n.!?;]|\\b(?:fatto|ok|okay|ecco|perfetto|bene|certo|subito|va bene)\\b[,:;!.…]?)\\s*`;
+  // Le parole con cui un modello apre una conferma corta. «Fatto» era l'unica
+  // riconosciuta, e «Perfetto, sveglia alle 19» o «Ok, sveglia alle 19»
+  // restavano mute: sono la stessa promessa, con l'altra parola davanti.
+  const ASSENSO = '\\b(?:ecco\\s+fatto|fatto|perfetto|ok|okay|va\\s+bene|bene)\\b[,:!.…]?';
   const SENZA_NON = (n) => `(?![^.!?]{0,${n}}\\bnon\\b)`;
   // Le regole che riconoscono questa forma restano espressioni regolari come
   // tutte le altre (la sentinella degli unit test le controlla una per una):
