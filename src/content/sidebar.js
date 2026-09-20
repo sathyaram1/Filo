@@ -35,6 +35,22 @@
   let aiPrefersOpen = false;
   let docClickHandler = null;
 
+  // #517 — quante volte, in questo turno, la risposta è tornata fuori dal
+  // formato che l'agente deve usare. L'agente parla in JSON: una risposta in
+  // prosa, o un oggetto che non contiene niente, non esegue niente. Finora
+  // l'utente non lo sapeva: leggeva «ho mandato la segnalazione» e la
+  // segnalazione non partiva, oppure perdeva anche la frase e leggeva
+  // «(risposta vuota)». Si rimanda indietro una volta, come fa la chat della
+  // home; se non basta, l'utente lo legge.
+  let rimandiFuoriFormato = 0;
+  const NUDGE_FUORI_FORMATO = 'la tua ultima risposta non è arrivata nel formato previsto: '
+    + 'non era un oggetto JSON valido, oppure non conteneva né "text" né "highlight" né "choices". '
+    + 'Scritta così non esegue niente e all\'utente non arriva nulla. Se avevi detto di aver fatto '
+    + 'qualcosa, non è stato fatto: rifallo adesso nel formato giusto. Rispondi ora con un solo '
+    + 'oggetto JSON valido, senza markdown e senza testo fuori dall\'oggetto.';
+  const AVVISO_FUORI_FORMATO = 'Filo ha risposto fuori dal suo formato: in questo turno non ha '
+    + 'eseguito niente. Se ti aspettavi che facesse qualcosa, chiediglielo di nuovo.';
+
   // Telemetria sessione: viene inviata a fine task (status:"done" + 👍/👎) per
   // arricchire il database globale dei percorsi (vedi pathsCollector.js).
   // Tutto qui resta locale finché l'utente non clicca pollice su/giù.
