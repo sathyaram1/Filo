@@ -62,6 +62,16 @@ server un verdetto raccontato non lo legge).
    breve, senza nomi di file o funzioni. Il file va FUORI dal repo, nella
    cartella temporanea del sistema (per esempio `../nota-<numero>.md`): non
    deve entrare nel ramo che stai giudicando.
+
+   **Il tuo verdetto vale per il commit che hai letto, non per il ramo.** Lo
+   sha parte insieme al verdetto (non devi passarlo: lo timbra lo strumento),
+   e se il contenuto cambia dopo, l'esito decade e il controllo va rifatto.
+   Per la stessa ragione il comando si ferma se nella directory c'è qualcosa
+   fuori dai commit: il salvataggio automatico lo committerebbe subito dopo,
+   spostando la punta, e nella fusione finirebbero righe che non hai mai
+   controllato. Se ti ferma: guarda cosa sono quei file, portali a un commit,
+   e se cambiano il codice rileggi il diff prima di registrare lo stesso
+   verdetto.
 2. Su **pass**, chiedi la fusione (su **fail** non fondere: accoda `design`
    con la tua spiegazione nella nota — decide l'owner):
    ```bash
