@@ -21,7 +21,7 @@ restava rosso e muto).
 - **Prima di aggiungere un controllo, guarda chi è già esente**: se localhost e
   gli IP privati sono esclusi, anche i nomi della rete di casa (`nas.lan`,
   `raspberrypi.local`) lo devono essere — la simmetria mancante È il bug.
-- **Dove:** `showUnresolvedSite()` in `src/pages/dashboard/dashboard.js`,
+- **Dove:** `showUnresolvedSite()` in `src/pages/dashboard/dashboard-comandi.js`,
   esenzioni in `src/shared/urlNav.js` (`isLocalHost`/`isLocalNetworkName`) usate
   da `src/main/services/hostResolve.js`. Test
   `tests/dashboard-local-network-address.spec.mjs`,
