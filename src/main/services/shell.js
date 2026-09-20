@@ -84,7 +84,7 @@ function shellConfig(shell, sid, startCwd) {
       file: process.env.ComSpec || 'cmd.exe',
       args: ['/q', '/k'],
       options: { cwd: startCwd || undefined, windowsHide: true },
-      ready: `chcp 65001>nul\r\nprompt FILO_RDY_${sid}$_\r\n`,
+      ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\n`,
       wrap: (command) =>
         `${command}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`,
     };
