@@ -123,8 +123,9 @@ un perché legittimo e restano, compressi; le etichette di sezione che ripetono
 il selettore sotto se ne vanno.
 
 Quel che si misura a macchina lo tiene `tests/unit/commentiRegola.test.mjs`:
-righe fino a 120 caratteri, blocchi fino a due righe (tre per l'intestazione),
-niente date, niente etichette uguali al nome sotto. Oggi guarda HTML e CSS —
+righe fino a 120 caratteri, blocchi fino a due righe (tre per l'intestazione,
+e un commento attaccato in coda a una riga di codice conta da solo), niente
+date, niente etichette uguali al nome sotto. Oggi guarda HTML e CSS —
 compresi gli script e gli stili incorporati nelle pagine — e per estenderla ai
 `.js` basta aggiungere l'estensione a `ESTENSIONI`.
 
