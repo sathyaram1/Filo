@@ -367,8 +367,7 @@
       let h = Number(ora);
       if (!Number.isFinite(h) || h < 0 || h > 23) return;
       const coda = String(dopo || '');
-      if (h >= 1 && h <= 11 && POMERIGGIO.test(coda)) h += 12;
-      else if (h >= 1 && h <= 11 && !MATTINO.test(coda) && POMERIGGIO.test(coda)) h += 12;
+      if (h >= 1 && h <= 11 && !MATTINO.test(coda) && POMERIGGIO.test(coda)) h += 12;
       out.add(`${String(h).padStart(2, '0')}:${String(minuti || '00').padStart(2, '0')}`);
     };
     let m;
