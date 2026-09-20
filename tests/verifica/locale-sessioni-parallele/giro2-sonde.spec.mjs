@@ -63,7 +63,6 @@ const cambia = (page, id, checked) => page.evaluate(([i, c]) => {
 }, [id, checked]);
 
 test('una scelta fatta mentre la prima lettura è ancora per strada non viene riscritta da quella', async ({ openTab }) => {
-  test.fail(true, 'rilievo del giro 2: la lettura di apertura arriva dopo e rimette lo stato di prima');
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo && window.SN_ROUTINE_SESSIONI);
