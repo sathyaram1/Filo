@@ -116,7 +116,7 @@
       orari: true,
       avviso: 'la sveglia è rimasta com\'era',
       frasi: [
-        new RegExp(`${HO}(?:spostato|anticipato|posticipato|cambiato|modificato|rimandato)\\b${PONTE(48)}\\b(?:svegli[ae]|timer)\\b`, 'i'),
+        new RegExp(`${HO}(?:spostato|anticipato|posticipato|cambiato|modificato|rimandato)\\b${PONTE(48)}\\b(?:${SVEGLIA}|timer)\\b`, 'i'),
       ],
     },
     {
