@@ -135,6 +135,31 @@ test('una risposta di rifiuto del server non passa in silenzio', async () => {
   }
 });
 
+test('un rifiuto malfatto si spiega lo stesso, senza «[object Object]»', async () => {
+  const srv = await serverFinto({
+    '/buildKeys': { stato: 200, json: { ok: false, reason: { codice: 9 }, message: 'parola d\'ordine scaduta' } },
+    '/buildAlarm': { stato: 200, json: { ok: true } },
+  });
+  try {
+    const r = await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: 'scaduta' });
+    assert.match(r.registro, /parola d'ordine scaduta/,
+      'se `reason` non è una stringa si ripiega sugli altri campi invece di tacere');
+    assert.doesNotMatch(r.registro, /\[object Object\]/);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('una risposta che non è JSON non si racconta come "il documento è vuoto"', () => {
+  // Due guasti diversi, due rimedi diversi: un indirizzo sbagliato non si cura
+  // mettendo una chiave nel documento.
+  assert.notEqual(
+    descriviEsitoServer({ stato: 'illeggibile' }),
+    descriviEsitoServer({ stato: 'senza-chiavi' })
+  );
+  assert.match(descriviEsitoServer({ stato: 'illeggibile' }), /JSON/);
+});
+
 test('le chiavi del server continuano a passare, con o senza il campo ok', async () => {
   // La guardia sul rifiuto non deve mangiare la strada buona: qui il server
   // risponde davvero, ed è la sola strada che porta agli utenti una chiave
