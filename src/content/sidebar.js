@@ -337,6 +337,29 @@
     return msg;
   }
 
+  // #517 (giro 6) — il tasto sotto l'avviso, lo stesso che la chat della home
+  // ha dal giro 1. «Chiediglielo di nuovo» lasciava all'utente il lavoro di
+  // riscrivere la richiesta, e Filo sa già qual era.
+  function renderRifallo(afterEl) {
+    if (!afterEl) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-choices';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-choice';
+    btn.textContent = '↻ Fallo adesso';
+    btn.title = 'Chiede a Filo di farlo davvero';
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      submit({ userMessage: 'Non l\'hai fatto davvero: fallo adesso.' });
+    });
+    wrap.appendChild(btn);
+    afterEl.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
   // Render dei bottoni "choices" sotto un messaggio dell'assistente.
   // Click → invia il prompt come messaggio utente e disattiva tutti i bottoni
   // (un solo percorso per turno).
