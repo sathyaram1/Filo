@@ -68,9 +68,10 @@
   };
 
   // Ogni voce: `description` e `properties` (testo/oggetto, oppure una funzione
-  // del contesto quando dipendono da cosa esiste a runtime), `required`. `risultato: true` marca gli strumenti il cui esito (risultati
-  // di ricerca, testo di un documento, output di un comando) torna al modello
-  // per intero: gli altri tornano una riga di conferma.
+  // del contesto quando dipendono da cosa esiste a runtime), `required`.
+  // `risultato: true` marca gli strumenti il cui esito (risultati di ricerca,
+  // testo di un documento, output di un comando) torna al modello per intero:
+  // gli altri tornano una riga di conferma.
   const TOOLS = {
     NAVIGA: {
       description: 'APRE SUBITO un sito in una nuova scheda. Usalo quando l\'utente chiede di aprire qualcosa. Con `background: true` la scheda si apre in SECONDO PIANO (l\'utente resta dov\'è, la musica parte lo stesso): usalo per ciò che si ascolta e basta, o quando l\'utente chiede di non cambiare scheda. Se stai solo PROPONENDO dei siti tra cui scegliere, non usarlo: elenca i link nel testo.',
