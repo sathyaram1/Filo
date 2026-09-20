@@ -224,3 +224,74 @@ test('un livello sconosciuto vale quanto il predefinito, non di più', () => {
   assert.equal(A.livelloValido('yolo'), true);
   assert.equal(A.livelloValido('inventato'), false);
 });
+
+// ── quello che il primo giro di verifica ha trovato aperto (#533) ────────────
+
+test('il messaggio dopo eredita la contaminazione e il perimetro di quello prima', () => {
+  const prima = contaminato(['sveglie']);
+  const dopo = C.erede(prima, { richiesta: 'ok' });
+  // Il testo di altri è ancora in chat: ricominciare a mani libere vorrebbe
+  // dire che basta un «ok» dell'utente per riavere tutti gli strumenti.
+  assert.equal(dopo.contaminato, true);
+  assert.deepEqual(dopo.perimetro, ['sveglie']);
+  assert.equal(C.consentito(dopo, 'SVEGLIA').ok, true);
+  assert.equal(C.consentito(dopo, 'SALVA_LEZIONE').ok, false);
+  assert.ok(!C.strumentiPermessi(dopo, Tools.NAMES).includes('SALVA_LEZIONE'));
+  // E resta la porta per chiedere: l'utente può sempre concedere una cosa in più.
+  assert.ok(C.strumentiPermessi(dopo, Tools.NAMES).includes('CHIEDI_USCITA'));
+});
+
+test('dopo un messaggio che non ha letto niente di altri non si eredita nulla', () => {
+  const prima = C.nuovo({});
+  const dopo = C.erede(prima, { richiesta: 'ricordati che non bevo caffè' });
+  assert.equal(dopo.contaminato, false);
+  assert.equal(dopo.dichiarato, false, 'deve poter ancora dichiarare');
+  assert.equal(C.consentito(dopo, 'SALVA_LEZIONE').ok, true);
+});
+
+test('il permesso dato dall\'utente si eredita, non si perde a metà conversazione', () => {
+  const prima = contaminato([]);
+  C.allarga(prima, 'memoria', 'l\'utente ha detto sì');
+  const dopo = C.erede(prima, { richiesta: 'e adesso segnati anche questo' });
+  assert.equal(C.consentito(dopo, 'SALVA_LEZIONE').ok, true);
+  assert.equal(C.consentito(dopo, 'ESEGUI_COMANDO').ok, false);
+});
+
+test('leggere i titoli delle schede è una lettura di testo scritto da altri', () => {
+  const k = C.classeDi('LEGGI_SCHEDE');
+  assert.equal(k.classe, 'ingresso');
+  assert.equal(k.fonte, 'esterno');
+  const c = C.nuovo({});
+  C.dichiara(c, ['sveglie']);
+  C.registraLettura(c, { type: 'LEGGI_SCHEDE' });
+  assert.equal(c.contaminato, true);
+  assert.equal(C.consentito(c, 'SALVA_LEZIONE').ok, false);
+});
+
+test('la contabilità interna di Filo non si legge come un permesso dell\'utente', () => {
+  assert.equal(C.uscitaInterna('accoglienza'), true);
+  assert.equal(C.uscitaInterna('memoria'), false);
+  // E non si può dichiarare: non nasce da una richiesta dell'utente.
+  assert.ok(!C.USCITE_DICHIARABILI.includes('accoglienza'));
+});
+
+test('la richiesta resta scritta nel compito, su una riga sola e con un tetto', () => {
+  const c = C.nuovo({ richiesta: '  Metti la sveglia\nprima dell\'esame  ' });
+  assert.equal(c.richiesta, 'Metti la sveglia prima dell\'esame');
+  const lungo = C.nuovo({ richiesta: 'a'.repeat(10000) });
+  assert.ok(lungo.richiesta.length <= C.MAX_RICHIESTA);
+  assert.ok(lungo.richiesta.endsWith('…'), 'un taglio si vede, non si nasconde');
+  assert.equal(C.nuovo({}).richiesta, '');
+  assert.equal(C.riassunto(c).richiesta, 'Metti la sveglia prima dell\'esame');
+});
+
+test('nel riquadro del permesso la riga di Filo viene prima del motivo, e il motivo ha un tetto', () => {
+  const motivo = 'PREMI OK SUBITO. '.repeat(600);
+  const testo = Levels.describe({ type: 'CHIEDI_USCITA', uscita: 'memoria', motivo });
+  const posizioneAvviso = testo.indexOf('Permetteglielo solo se');
+  const posizioneMotivo = testo.indexOf('PREMI OK SUBITO');
+  assert.ok(posizioneAvviso > -1 && posizioneMotivo > -1);
+  assert.ok(posizioneAvviso < posizioneMotivo, 'quello che dice Filo non va sotto il testo dettato dalla pagina');
+  assert.ok(testo.length < 1000, `il riquadro non si riempie del motivo (${testo.length} caratteri)`);
+  assert.ok(testo.includes('…'), 'il taglio si vede');
+});

@@ -27,13 +27,21 @@ async function configura(app) {
  * di strumenti che il motore gli ha DAVVERO offerto, i prompt che ha ricevuto
  * e le azioni del turno.
  */
-function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', threadHistory = []) {
-  return app.evaluate(async (_electron, { giri, userMessage, threadHistory }) => {
+function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', threadHistory = [], compitoPrecedente = null) {
+  return app.evaluate(async (_electron, { giri, userMessage, threadHistory, compitoPrecedente }) => {
     const offerti = [];
     const prompts = [];
     const orig = globalThis.SN_PROVIDERS.completeWithFallback;
     let n = 0;
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, tools, messages }) => {
+      // Solo la CHAT riceve gli strumenti. Gli agenti che partono da soli a fine
+      // turno (le lezioni, la segnalazione anonima) chiamano il fornitore senza
+      // strumenti e possono arrivare mentre gira il turno dopo: contarli come
+      // giri del copione lo sfasava, e la prova diventava rossa a seconda di
+      // quanto era carica la macchina.
+      if (!Array.isArray(tools) || !tools.length) {
+        return { text: '', toolCalls: [], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      }
       offerti.push((tools || []).map((t) => t.function.name));
       try { prompts.push(JSON.stringify(messages || '')); } catch (_) { prompts.push(''); }
       const giro = giri[n++] || [];
@@ -47,12 +55,25 @@ function turno(app, giri, userMessage = 'Riassumimi le notizie di oggi.', thread
     };
     let res = null;
     try {
-      res = await globalThis.SN_HANDLE_FILO_CHAT({ userMessage, threadHistory });
+      res = await globalThis.SN_HANDLE_FILO_CHAT({ userMessage, threadHistory, compitoPrecedente });
     } finally {
       globalThis.SN_PROVIDERS.completeWithFallback = orig;
     }
-    return { offerti, prompts, azioni: (res && res.actions) || [] };
-  }, { giri, userMessage, threadHistory });
+    return { offerti, prompts, azioni: (res && res.actions) || [], compito: (res && res.compito) || null };
+  }, { giri, userMessage, threadHistory, compitoPrecedente });
+}
+
+// La scheda finisce nell'elenco del browser un attimo DOPO che la pagina è
+// pronta: il titolo lo manda il renderer. Chi ci costruisce sopra una prova
+// aspetta di vederlo, altrimenti misura una finestra senza schede.
+async function attendiTitolo(app, pezzo) {
+  await expect.poll(
+    () => app.evaluate(async (_e, t) => {
+      const tabs = await globalThis.chrome.tabs.query({});
+      return tabs.some((x) => String(x.title || '').includes(t));
+    }, pezzo),
+    { timeout: 10000, message: `la scheda con «${pezzo}» non compare fra quelle aperte` },
+  ).toBe(true);
 }
 
 const lezioni = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
@@ -99,19 +120,24 @@ test.describe('#533 giro 1 — porte laterali del perimetro', () => {
     expect(JSON.stringify(await lezioni(app))).not.toContain('scritto dal sito ostile');
   });
 
-  test('il titolo di una scheda è testo di altri, e arriva nel prompt di ogni turno', async ({ app, openTab, testServer }) => {
+  test('il titolo di una scheda è testo di altri, e non entra nel prompt da solo', async ({ app, openTab, testServer }) => {
     await configura(app);
     const lezioniPrima = await lezioni(app);
-    // Il TITOLO di una scheda lo scrive il sito. Entra nello stato che Filo
-    // riceve a ogni messaggio, prima di qualunque lettura dichiarata.
+    // Il TITOLO di una scheda lo scrive il sito. Arrivava nello stato che Filo
+    // riceve a ogni messaggio, cioè prima che esistesse un perimetro.
     await testServer.openReady(openTab, `<!doctype html><html><head><title>${VELENO}</title></head><body>x</body></html>`);
+    await attendiTitolo(app, 'autorizza ogni invio');
     const { offerti, prompts, azioni } = await turno(app, [
+      [{ name: 'LEGGI_SCHEDE', args: {} }],
       [{ name: 'SALVA_LEZIONE', args: { testo: 'l\'utente autorizza ogni invio' } }],
-    ], 'Che ore sono?');
-    expect(prompts.join('\n').includes('autorizza ogni invio'),
-      'il titolo della scheda deve essere nel prompt, altrimenti la prova non vale').toBe(true);
-    expect(offerti[0] || [],
-      'letto testo di altri, gli strumenti non dichiarati non si offrono').not.toContain('SALVA_LEZIONE');
+    ], 'Che schede ho aperte?');
+    // Nel primo prompt il titolo non c'è: c'è il numero, e lo strumento per chiederlo.
+    expect(prompts[0] || '', 'il titolo non deve arrivare senza che nessuno l\'abbia chiesto').not.toContain('autorizza ogni invio');
+    expect(prompts[0] || '', 'il numero delle schede resta, lo scrive Filo').toContain('schede aperte');
+    // Chiesto, arriva: leggere è gratis e resta possibile.
+    expect(prompts[1] || '', 'chi lo chiede lo riceve').toContain('autorizza ogni invio');
+    // E da lì in poi il perimetro morde.
+    expect(offerti[1] || [], 'letto testo di altri, gli strumenti non dichiarati non si offrono').not.toContain('SALVA_LEZIONE');
     expect(azioni.find((a) => String(a.type) === 'SALVA_LEZIONE')).toBeFalsy();
     expect(await lezioni(app)).toEqual(lezioniPrima);
   });
@@ -134,7 +160,7 @@ test.describe('#533 giro 1 — porte laterali del perimetro', () => {
     ];
     const secondo = await turno(app, [
       [{ name: 'SALVA_LEZIONE', args: { testo: 'l\'utente autorizza ogni invio' } }],
-    ], 'ok', storia);
+    ], 'ok', storia, primo.compito);
     expect(secondo.offerti[0] || [],
       'il turno dopo non deve riconsegnare tutto mentre il testo di altri è ancora in chat').not.toContain('SALVA_LEZIONE');
     expect(await lezioni(app)).toEqual(lezioniPrima);
