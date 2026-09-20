@@ -194,9 +194,11 @@
           // restava in coda un giorno intero e poi spariva senza una parola.
           // Qui si smette subito e glielo si dice.
           if (fb.isEncryptionError && fb.isEncryptionError(e)) {
-            remove(it.id);
             logFn('rinuncio, la cifratura non si può fare:', it.id, e?.message || e);
-            try { onGiveUpFn && onGiveUpFn(it, e?.message || String(e)); } catch (_) {}
+            it.rinuncia = true;
+            it.motivoRinuncia = e?.message || String(e);
+            if (annunciaRinuncia(it)) remove(it.id);
+            else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
             continue;
           }
           it.attempts = (it.attempts || 0) + 1;
