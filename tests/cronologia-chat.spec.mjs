@@ -463,13 +463,20 @@ test('l’intervista spezzata su più aperture resta UNA chat, non cinque', asyn
   await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
   await page.locator('#input').fill('Lavoro sui compilatori');
   await page.locator('#input').press('Enter');
+  // Cinque messaggi: la domanda con cui Filo apre l'intervista più due
+  // scambi. L'apertura è un testo fisso che non passa da nessun turno, ma
+  // l'utente l'ha letta sullo schermo e la deve ritrovare (verifica #525,
+  // giro 1): senza, l'intervista in archivio cominciava dalla risposta.
   await expect.poll(async () => {
     const chats = await leggiArchivio(app);
     return chats.length === 1 ? chats[0].messages.length : `${chats.length} chat`;
-  }, { timeout: 20_000 }).toBe(4);
+  }, { timeout: 20_000 }).toBe(5);
 
   const chats = await leggiArchivio(app);
   expect(chats[0].onboarding).toBe(true);
+  const benvenuto = await app.evaluate(() => globalThis.SN_ONBOARDING.WELCOME_MESSAGE);
+  expect(chats[0].messages[0].role).toBe('filo');
+  expect(chats[0].messages[0].text).toBe(benvenuto);
 });
 
 test('la trascrizione arriva al classificatore imbustata, e non può chiudersi la recinzione da sola', async ({ app }) => {

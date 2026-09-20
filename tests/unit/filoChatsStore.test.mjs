@@ -7,9 +7,9 @@
 //     cancella la prima);
 //   • una domanda riprovata dopo un errore non finisce scritta due volte.
 //
-// Niente Electron: `chrome.storage.local` è un finto in memoria, con una
-// lettura volutamente lenta per allargare la finestra in cui due scritture si
-// accavallano. Senza quel ritardo la prova passerebbe per fortuna.
+// Niente Electron: `chrome.storage.local` è un finto in memoria, con la
+// scrittura volutamente lenta per allargare la finestra in cui due scritture
+// si accavallano. Senza quel ritardo la prova passerebbe per fortuna.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -45,7 +45,7 @@ const Store = globalThis.SN_FILO_CHATS;
 
 function azzera() {
   disco = {};
-  ritardoLettura = 0;
+  ritardoScrittura = 0;
 }
 
 const turno = (role, text, ts) => ({ role, text, ts });
@@ -54,7 +54,7 @@ const turno = (role, text, ts) => ({ role, text, ts });
 
 test('tre chat che nascono insieme si salvano tutte e tre', async () => {
   azzera();
-  ritardoLettura = 5; // la finestra in cui due scritture si accavallano
+  ritardoScrittura = 5; // la finestra in cui due scritture si accavallano
   // Archivio vuoto: è il caso di chi usa Filo da poco, e quello in cui la
   // scrittura non condivide nemmeno la lista con le altre.
   await Promise.all([
@@ -68,7 +68,7 @@ test('tre chat che nascono insieme si salvano tutte e tre', async () => {
 
 test('domanda e risposta che arrivano insieme nella stessa chat restano tutte e due', async () => {
   azzera();
-  ritardoLettura = 5;
+  ritardoScrittura = 5;
   await Store.append('x', turno('user', 'Apro la chat', '2026-09-20T10:00:00.000Z'));
   await Promise.all([
     Store.append('x', turno('user', 'Una domanda', '2026-09-20T10:00:01.000Z')),
@@ -80,7 +80,7 @@ test('domanda e risposta che arrivano insieme nella stessa chat restano tutte e 
 
 test('una cancellazione partita insieme a una scrittura non resuscita la chat cancellata', async () => {
   azzera();
-  ritardoLettura = 5;
+  ritardoScrittura = 5;
   await Store.append('viva', turno('user', 'Resto qui', '2026-09-20T10:00:00.000Z'));
   await Store.append('morta', turno('user', 'Vado via', '2026-09-20T10:00:01.000Z'));
   await Promise.all([
@@ -133,7 +133,7 @@ test('due domande diverse di fila restano due', async () => {
 // ── La targa dell'intervista di benvenuto ────────────────────────────────────
 
 test('la targa dell’intervista la dice un posto solo, e non cambia a ogni lettura', async () => {
-  const Onb = require('../../src/shared/onboarding.js') || globalThis.SN_ONBOARDING;
+  require('../../src/shared/onboarding.js');
   const O = globalThis.SN_ONBOARDING;
   assert.equal(typeof O.chatId, 'function');
   const stato = { startedAt: '2026-09-20T09:00:00.000Z' };
@@ -142,5 +142,4 @@ test('la targa dell’intervista la dice un posto solo, e non cambia a ogni lett
   assert.equal(O.chatId({}), 'onb-prima');
   assert.equal(O.chatId(null), 'onb-prima');
   assert.notEqual(O.chatId(stato), O.chatId({ startedAt: '2026-09-21T09:00:00.000Z' }));
-  void Onb;
 });
