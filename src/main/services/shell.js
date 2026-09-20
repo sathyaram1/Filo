@@ -36,6 +36,38 @@ function defaultCwd() {
   return os.homedir();
 }
 
+// ── Il comando dell'UTENTE viaggia verso PowerShell per lo stdin ─────────────
+//
+// #551, l'altro verso. Il preludio mette la shell in UTF-8 quando SCRIVE, e i
+// nomi che escono tornano interi. Quando LEGGE, no: Windows PowerShell
+// decodifica lo stdin con la tabella di codici della console (quella OEM),
+// mentre Node gli scrive UTF-8. Un comando che contiene «attività» arriva alla
+// shell con un nome diverso da quello digitato, e lei risponde che il file non
+// esiste. È il guasto della segnalazione, dalla parte opposta. Con cmd non
+// succede: lì il passaggio alla tabella 65001 vale in tutti e due i versi.
+//
+// Toccare `[Console]::InputEncoding` sarebbe peggio del male. Il setter di .NET
+// butta via il lettore dello stdin, e con lui tutto quello che aveva già letto
+// in avanti: la riga di «pronto» parte nello stesso pezzo del preludio, quindi
+// andrebbe persa e la sessione resterebbe muta per sempre.
+//
+// La cura è non far viaggiare caratteri non ASCII sul filo. Il comando parte in
+// base64 e lo rimette insieme PowerShell, che ricostruisce il testo da sé senza
+// passare da nessuna tabella. Si fa SOLO quando serve: un comando di soli
+// caratteri ASCII parte identico a prima, e `exit`, `cd`, le variabili e tutto
+// quello che un utente digita di solito si comportano come si sono sempre
+// comportati. `Invoke-Expression` gira nello scope di chi chiama, quindi anche
+// per un comando accentato le variabili e la cartella restano quelle della
+// sessione: continua a essere un terminale vero.
+const SOLO_ASCII = /^[\x00-\x7F]*$/;
+
+function comandoPerPowerShell(command) {
+  const cmd = String(command == null ? '' : command);
+  if (SOLO_ASCII.test(cmd)) return cmd;
+  const b64 = Buffer.from(cmd, 'utf8').toString('base64');
+  return `Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64}')))`;
+}
+
 // La cartella iniziale può arrivare da uno stato persistito (#259: "riparti da
 // dove eri"): se nel frattempo è stata cancellata/rinominata, spawnare con una
 // cwd inesistente farebbe morire la shell. Ripieghiamo sulla home. I path in
