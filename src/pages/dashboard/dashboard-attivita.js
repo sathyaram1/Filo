@@ -930,11 +930,55 @@
       return stepTrace('📄 Rileggo la pagina di trasparenza');
     }
     if (type === 'EVENTO_CALENDARIO') {
+      // Filo propone, l'utente aggiunge: il main scrive l'evento in un file e
+      // lo apre col calendario del computer. Prima questo bottone era spento e
+      // la proposta non portava da nessuna parte.
+      const ev = (a._output && a._output.evento) || {
+        data: a.data || a.date, ora: a.ora || a.orario || a.time,
+        titolo: a.titolo || a.title, dettagli: a.dettagli || a.details,
+      };
+      const btn = document.createElement('button');
+      btn.className = 'dash-action-btn dash-action-btn-primary';
+      btn.type = 'button';
+      btn.textContent = '📅 Aggiungi al calendario';
+      btn.title = `${ev.titolo || 'Evento'}${ev.quando ? ` · ${ev.quando}` : ''}`;
+      btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = '📅 Aggiungo…';
+        const r = await send({ type: MSG.CALENDAR_ADD, evento: ev });
+        if (r && r.ok && r.aperto) {
+          btn.textContent = '✓ Aperto nel calendario';
+          btn.title = 'Il calendario ha l’evento davanti: salvalo lì per tenerlo.';
+          return;
+        }
+        if (r && r.ok) {
+          // Nessun programma di calendario ha risposto: il file c'è comunque, e
+          // dove sta finito va detto — un bottone che non porta a niente è il
+          // difetto che stavamo togliendo.
+          btn.textContent = '✓ Evento salvato';
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          nota.textContent = `Il computer non ha aperto nessun calendario. L’evento è nel file ${r.file}: aprilo col tuo calendario.`;
+          btn.after(nota);
+          return;
+        }
+        btn.disabled = false;
+        btn.textContent = '📅 Aggiungi al calendario';
+        btn.title = `Non è riuscito${r && r.error ? ` (${r.error})` : ''}. Riprova.`;
+      });
+      return btn;
+    }
+    if (type === 'COMANDO_FINESTRA' && a._output && a._output.already && onAck) {
+      // La home era già questa pagina: invece di ricaricarla sotto il naso
+      // dell'utente (e portarsi via lavoro e risposta), il ritorno alla home lo
+      // decide lui, quando ha letto.
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
       btn.type = 'button';
-      btn.disabled = true;
-      btn.textContent = `📅 ${a.title || a.titolo || ''}`;
+      btn.textContent = '🏠 Torna alla home';
+      btn.title = 'Chiude questa conversazione';
+      btn.addEventListener('click', onAck);
       return btn;
     }
     if (type === 'PULISCI_TAB') {
