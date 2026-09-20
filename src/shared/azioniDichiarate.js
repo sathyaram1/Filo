@@ -357,6 +357,11 @@
     + `|alla lista|nella lista|all${AP}elenco|nell${AP}elenco`
     + `|più (?:breve|corta|corto|lunga|lungo|chiara|chiaro|semplice|semplici))\\b`, 'i');
 
+  // Dove finisce la proposizione che SEGUE un punto del testo. Senza i due
+  // punti: dentro «19:30» quelli sono un orario, non uno stacco, e tagliare
+  // lì faceva leggere le 19 al posto delle 19:30.
+  const STACCHI_DOPO = new RegExp(`[.!?;,\\n—]|${INIZIO}(?:ma|però|invece|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
+
   function proposizionePrima(testo, indice) {
     const prima = testo.slice(0, indice);
     let taglio = -1;
@@ -517,10 +522,28 @@
         // sotto», «te l'ho messa in ordine alfabetico»), non esiste nessuno
         // strumento che possa averla fatta e non c'è niente da smentire.
         if (puntaAllaRisposta(testo, fine)) continue;
-        return { frase: frasePiena(testo, m.index, fine), verbo: verboDi(m[0]) };
+        return {
+          frase: frasePiena(testo, m.index, fine),
+          clausola: clausolaDi(testo, m.index, fine),
+          verbo: verboDi(m[0]),
+        };
       }
     }
     return null;
+  }
+
+  // La sola PROPOSIZIONE in cui sta la dichiarazione. La frase intera serve a
+  // farla leggere all'utente; per capire se la cosa esiste davvero serve solo
+  // il pezzo che la dichiara. Senza, in «Ho messo la sveglia alle 19, e te
+  // l'ho segnata» l'ora della prima proposizione faceva da prova anche alla
+  // seconda, che parla di un appunto.
+  function clausolaDi(testo, da, a) {
+    const pre = proposizionePrima(testo, da);
+    const inizio = Math.max(0, da - pre.length);
+    const dopo = testo.slice(a);
+    STACCHI_DOPO.lastIndex = 0;
+    const m = STACCHI_DOPO.exec(dopo);
+    return testo.slice(inizio, m ? a + m.index : testo.length);
   }
 
   // Dalla dichiarazione alla frase intera in cui sta: «ho messo» da solo non
@@ -619,14 +642,14 @@
     // appunto che c'è. Prima valeva solo per la sveglia, e solo se la frase
     // ripeteva la parola «sveglia» con l'ora in cifre.
     const esisteGia = (fam, d) => {
-      const nominati = orariNelTesto(d.frase);
+      const nominati = orariNelTesto(d.clausola || d.frase);
       if (fam.orari && orari.size && [...nominati].some((o) => orari.has(o))) return true;
       // Il titolo di un appunto che esiste regge la frase che lo nomina, ma
       // non una frase che promette un'ORA: un'ora è una sveglia, e un appunto
       // non la prova. Senza questa riga bastava tenere un appunto intitolato
       // «spesa» perché «ti ho messo il promemoria per la spesa alle 18»
       // passasse senza una parola, con nessun promemoria da nessuna parte.
-      if (fam.appunti && titoli.length && !nominati.size && nominaUnAppunto(d.frase, titoli)) return true;
+      if (fam.appunti && titoli.length && !nominati.size && nominaUnAppunto(d.clausola || d.frase, titoli)) return true;
       return false;
     };
     // L'ORA DECIDE. Quando la frase promette una sveglia (o un timer) a
@@ -642,7 +665,7 @@
       // Un'azione di questa famiglia sta aspettando l'utente: l'effetto non
       // c'è ancora, e l'ora non può fare da prova.
       if (attesa.size && (fam.pronome || fam.tipi.some((x) => attesa.has(x)))) return null;
-      const nominati = orariNelTesto(d.frase);
+      const nominati = orariNelTesto(d.clausola || d.frase);
       if (!nominati.size) return null;
       // TUTTE le ore nominate, non una: «ti ho messo la sveglia alle 19 e
       // quella alle 21» con una sola sveglia chiamata lasciava la seconda
