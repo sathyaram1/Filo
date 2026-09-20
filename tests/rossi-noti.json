@@ -6,7 +6,6 @@
     "tests/tab-reorder-reopen",
     "tests/verify-495-avversariale",
     "tests/verify-495-vfx3",
-    "tests/verify-514-g11",
     "tests/options-home-models",
     "tests/verify-509-giro4",
     "tests/verify-downloads-410",
@@ -43,13 +42,6 @@
         ],
         "perche": "stesso motivo di tests/wallet-owner-page: la prova finge di essere l’owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c’è, l’owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo.",
         "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
-      },
-      {
-        "spec": "tests/verify-514-g11",
-        "caso": "home: quattro riquadri impilati — nessuno dei quattro Esc porta via la modalità",
-        "perche": "stesso caso già elencato fra i rossi della macchina di chi sviluppa Filo, ma è rosso anche qui, e i due elenchi sono separati apposta: tenuto solo di là, questo file mentiva a chi verifica dal contenitore (secondo giro di verifica del #581). Con tre riquadri impilati la prova passa, col quarto no: è il tetto che il main si dà sulle rivendicazioni dell’Esc. Da risolvere o spiegare meglio, poi togliere la voce da entrambi gli elenchi.",
-        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581",
-        "ancheSullaMacchinaDellOwner": true
       },
       {
         "spec": "tests/manage-frase-non-si-perde",
@@ -174,12 +166,6 @@
       "spec": "tests/verify-495-vfx3",
       "caso": "i due casi «caricamento fallito»",
       "perche": "presume Firestore irraggiungibile; qui è raggiungibile e le schede dicono «Ricevuti (495+)». rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/verify-514-g11",
-      "caso": "quattro riquadri impilati",
-      "perche": "rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
       "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
     },
     {

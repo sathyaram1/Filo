@@ -88,9 +88,13 @@ ingrandita della home). Il taglio giusto è quello che si è visto succedere:
 
 - **prova forte** — qualcosa è sparito davvero: un pezzo nostro staccato dal
   documento, o (solo su una pagina di Filo) la pagina che si è alleggerita.
-  Tetto **tre**: tre riquadri impilati chiusi uno per Esc sono già più di
-  quanti ne esistano, e il tetto serve solo a non lasciare scritto «per
-  sempre» da nessuna parte.
+  Tetto **dieci**, e il numero ha una storia: era tre, «più di quanti riquadri
+  se ne possano impilare». Non era vero — una risposta ne apre un'altra, e
+  sopra ci sta ancora un menu del tasto destro — e il quarto Esc di quattro
+  riquadri impilati portava via la modalità (#648). Il tetto è la rete contro
+  una pagina che mente, non il budget di chi usa Filo: dimensionarlo sulla pila
+  vera, con margine, costa solo qualche Esc in più a chi resta chiuso dentro da
+  un sito ostile, e quello è il verso giusto dell'errore.
 - **prova debole** — nessuno si è visto sparire, ma su una pagina di Filo
   qualcuno il tasto se l'è preso. Tetto **uno**: chi si prendesse ogni Esc
   senza chiudere niente si ferma al secondo.
