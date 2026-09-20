@@ -436,8 +436,14 @@
     },
     // Livello 2 perché la risposta È il popup: chi decide di allargare il
     // perimetro è l'utente, e il motore non ha altro modo di chiederglielo.
+    // Un'uscita che non esiste non prende un livello: chiedere il permesso per
+    // un potere inventato è un popup a cui l'utente non può rispondere.
     CHIEDI_USCITA: {
-      level: 2,
+      level: (a) => {
+        const C = global.SN_COMPITI;
+        const u = String((a && a.uscita) || '').trim();
+        return (!C || C.USCITE_DICHIARABILI.includes(u)) ? 2 : null;
+      },
       describe: (a) => {
         const C = global.SN_COMPITI;
         const et = C ? C.etichettaUscita(a && a.uscita) : String((a && a.uscita) || '');
