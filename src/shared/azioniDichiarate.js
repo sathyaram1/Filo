@@ -269,7 +269,12 @@
         // riceve, e restavano muti. I due verbi vogliono dire scrivere
         // qualcosa da qualche parte e basta. «Buttare giù» resta fuori: una
         // bozza buttata giù è quasi sempre dentro la risposta.
-        new RegExp(`${HO}(?:trascritto|messo\\s+per\\s+iscritto)\\b`, 'i'),
+        senzaOggetto(new RegExp(`${HO}(?:trascritto|messo\\s+per\\s+iscritto)\\b`, 'i')),
+        // Giro 10: «Ho salvato tutto» è il modo più corto di dire che una
+        // cosa è finita da qualche parte, e restava muto. Il verbo da solo
+        // non basta («ho salvato il file» lo dice anche l'editor): serve il
+        // «tutto» che non nomina niente.
+        senzaOggetto(new RegExp(`${HO}salvato\\s+tutto${FINE}`, 'i')),
       ],
     },
     {
