@@ -19,7 +19,6 @@ import { test, expect } from '@playwright/test';
 import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
 import { rmSync, writeFileSync, mkdirSync } from 'node:fs';
-/* eslint-disable no-unused-vars */
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
