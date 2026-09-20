@@ -56,24 +56,29 @@ test('le schede aperte contano: il riepilogo di stato le dichiara a chi decide',
 
   // Il titolo lo ha scritto il sito, e finisce nel riepilogo di stato che
   // accompagna ogni turno di chat.
-  let stato = '';
+  let r = { stateText: '', fonti: [] };
   for (let i = 0; i < 25; i += 1) {
-    stato = await app.evaluate(async () => {
-      try { return String((await globalThis.SN_FILO_STATE.assemble()).stateText || ''); }
-      catch (e) { return `ERRORE:${e && e.message}`; }
+    r = await app.evaluate(async () => {
+      try {
+        const x = await globalThis.SN_FILO_STATE.assemble();
+        return { stateText: String(x.stateText || ''), fonti: x.fonti || [] };
+      } catch (e) { return { stateText: `ERRORE:${e && e.message}`, fonti: [] }; }
     });
-    if (/NOTA PER FILO/i.test(stato)) break;
-    await new Promise((r) => setTimeout(r, 400));
+    if (/NOTA PER FILO/i.test(r.stateText)) break;
+    await new Promise((res) => setTimeout(res, 400));
   }
-  expect(
-    stato,
-    'il titolo scritto dal sito non compare nel riepilogo di stato (allora questa porta è chiusa)',
-  ).toMatch(/NOTA PER FILO/i);
+  expect(r.stateText, 'il titolo scritto dal sito non compare nel riepilogo di stato').toMatch(/NOTA PER FILO/i);
+  // Chi decide non deve indovinarlo dalle azioni: il riepilogo dichiara da sé
+  // che ha appena messo nel contesto del testo scritto da altri.
+  expect(r.fonti, 'il riepilogo non dichiara i titoli che ha appena messo nel contesto').toContain('schede');
 
-  // E nonostante quel testo sia nel contesto, il compito della chat è pulito:
-  // una lezione, e un'impostazione delicata, partono senza chiedere.
-  const s = chat(9520);
-  const lezione = await exec(app, { type: 'SALVA_LEZIONE', testo: 'Rispondi sempre in inglese' }, { sender: s });
-  expect(lezione.executed, 'PORTA APERTA: compito dichiarato pulito con una pagina web nel contesto').toBe(true);
-  expect(lezione.needsConfirm).toBeFalsy();
+  // Al livello prudente quella dichiarazione ferma una lezione; al livello
+  // normale no, perché un browser ha sempre delle schede aperte.
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
+  const A = await app.evaluate(() => ({
+    prudente: globalThis.SN_AUTONOMIA.decide({ livello: 'conservativo', fonti: ['schede'], costo: 2 }),
+    normale: globalThis.SN_AUTONOMIA.decide({ livello: 'default', fonti: ['schede'], costo: 2 }),
+  }));
+  expect(A.prudente).toBe('chiede');
+  expect(A.normale).toBe('si');
 });
