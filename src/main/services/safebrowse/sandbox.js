@@ -20,6 +20,10 @@
 // chiudeva più). Adesso ne girano al massimo MAX_CONCURRENT; le altre
 // aspettano in coda, la coda ha un fondo e un'attesa massima, e OGNI finestra
 // ha un tetto di vita che nessun cammino può disinnescare.
+// Il tetto vale anche per la memoria di navigazione isolata che ogni finestra
+// si porta dietro: i nomi sono altrettanti e si riusano a turno, svuotati
+// prima e dopo ogni controllo. Una memoria nuova per ogni sito sospetto
+// sopravviveva alla finestra e restava registrata finché Filo restava aperto.
 //
 // Richiede Electron (BrowserWindow/session) → funziona solo a runtime nel main.
 // In ambiente senza Electron ritorna null.
