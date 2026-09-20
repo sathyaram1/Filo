@@ -2695,7 +2695,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // sua risposta): il compito nuovo eredita la contaminazione e il perimetro
     // già concesso, invece di ricominciare a mani libere. Dopo un messaggio
     // pulito non cambia niente.
-    const prec = compitoPrecedente ? compitoPerChiave(compitoPrecedente) : null;
+    const prec = compitoPrecedente ? await compitoPrecedenteDi(compitoPrecedente) : null;
     task = ricordaCompito(Compiti.erede(prec, {
       richiesta: userMessage,
       sempre: onbActive ? ['accoglienza'] : [],
