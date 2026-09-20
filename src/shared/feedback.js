@@ -333,12 +333,23 @@
   async function maybeEncrypt(value) {
     if (value == null || value === '') return value;
     const motivo = encryptionUnavailable();
-    if (motivo) throw new Error(`cifratura non disponibile: ${motivo}`);
+    // Stesso tipo di errore degli allegati: chi lo riceve deve poter distinguere
+    // «non si è potuto cifrare» da «la rete non c'era», perché il primo non si
+    // risolve riprovando (scripts/claude-feedback.mjs lo usa per il codice
+    // d'uscita, la pagina per decidere che frase mostrare).
+    if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
     const C = global.SN_FEEDBACK_CRYPTO;
-    const out = await C.encryptForOwner(String(value));
+    let out;
+    try { out = await C.encryptForOwner(String(value)); }
+    catch (e) {
+      throw new ErroreCifratura(encryptionBlockedMessage(
+        `la cifratura non è riuscita (${e?.message || e})`));
+    }
     // Cintura: se quello che torna non è un ciphertext, qualcuno ha sostituito
     // il modulo di cifratura con qualcosa che restituisce l'originale.
-    if (!C.isEncrypted(out)) throw new Error('cifratura non riuscita: il testo non risulta cifrato');
+    if (!C.isEncrypted(out)) {
+      throw new ErroreCifratura(encryptionBlockedMessage('il testo non risulta cifrato'));
+    }
     return out;
   }
 
