@@ -213,7 +213,10 @@ module.exports = function register(on, ctx) {
           domandaUtente: !!msg.domandaUtente,
           // #517 (giro 9) — cosa ha chiesto l'utente: è quello che dice se
           // «te l'ho tolta» promette un'azione o consegna un testo.
-          richiestaAzione: !!msg.richiestaAzione,
+          // #517 (giro 10) — «non lo so» non è «no»: se il pannello non l'ha
+          // ancora calcolato non si passa niente, e il presidio guarda tutto
+          // come prima invece di tacere.
+          ...(typeof msg.richiestaAzione === 'boolean' ? { richiestaAzione: msg.richiestaAzione } : {}),
         },
         { famiglie: D.FAMIGLIE_AIUTO });
       // #517 (giro 8) — la traccia dell'anomalia, come nella chat della home.
