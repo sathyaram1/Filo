@@ -307,13 +307,51 @@ function looksLikeText(buf) {
 }
 
 /**
- * Decodifica un buffer di testo. UTF-8 (BOM tolto); se il risultato è pieno di
+ * La firma in testa a un file scritto A DUE BYTE per carattere, se c'è. PURA.
+ * → 'le' | 'be' | ''
+ *
+ * #551, terzo giro di verifica. È la codifica che su Windows sta dappertutto:
+ * Windows PowerShell 5.1 la usa per OGNI file prodotto mandando l'uscita di un
+ * comando in un file — cioè per i file che Filo stesso crea col terminale — e
+ * il Blocco note la offre come «Unicode». Letto come UTF-8, un file così
+ * diventa una fila di byte nulli alternati alle lettere: Filo dichiarava di
+ * averlo letto e rispondeva sul nulla. È lo stesso danno della segnalazione un
+ * passo più in là — non il nome del file, il suo contenuto.
+ */
+function bomDueByte(buf) {
+  if (!buf || buf.length < 2) return '';
+  // FF FE 00 00 è la firma a QUATTRO byte per carattere: non è questa.
+  if (buf[0] === 0xff && buf[1] === 0xfe) {
+    if (buf.length >= 4 && buf[2] === 0x00 && buf[3] === 0x00) return '';
+    return 'le';
+  }
+  if (buf[0] === 0xfe && buf[1] === 0xff) return 'be';
+  return '';
+}
+
+/**
+ * Decodifica un buffer di testo. Due byte per carattere se il file lo dichiara
+ * in testa; altrimenti UTF-8 (BOM tolto); se il risultato è pieno di
  * caratteri di sostituzione ripiega su latin1 — il caso tipico degli export CSV
  * italiani, scritti in windows-1252, dove altrimenti spariscono tutti gli accenti.
  * PURA.
  */
 function decodeText(buf) {
   let b = buf;
+  const due = bomDueByte(b);
+  if (due) {
+    // Via la firma, e un byte spaiato in fondo (file troncato) non deve far
+    // morire la lettura: si scarta, come si scarta mezza coppia in coda.
+    let corpo = b.subarray(2);
+    if (corpo.length % 2) corpo = corpo.subarray(0, corpo.length - 1);
+    if (due === 'be') {
+      // Node sa leggere solo il verso piccolo: si scambiano i byte a coppie.
+      const girato = Buffer.from(corpo);
+      try { girato.swap16(); } catch (_) { return corpo.toString('utf8'); }
+      corpo = girato;
+    }
+    return corpo.toString('utf16le');
+  }
   if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) b = b.subarray(3);
   const utf8 = b.toString('utf8');
   const bad = (utf8.match(/�/g) || []).length;
