@@ -54,6 +54,11 @@ const ROLE_RUMORE = /^(navigation|banner|contentinfo|complementary|search|dialog
 // nomi delle colonne, senza i quali i numeri sotto non si leggono più.
 const CORNICE_SITO = /^(header|site-?header|masthead|footer|site-?footer|page-?footer|banner|contentinfo|topbar|top-?nav)$/i;
 
+// Chi DICE di essere la cornice del sito: quello si butta dovunque stia. Un
+// `header` e basta no: fuori da `main` o `article` è quasi sempre il titolo del
+// pezzo con la sua data, e buttarlo via era il buco del giro prima (#553).
+const CORNICE_DICHIARATA = /^(site-?header|masthead|site-?footer|page-?footer|banner|contentinfo|topbar|top-?nav)$/i;
+
 const TAG_TABELLA = new Set(['table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup', 'col']);
 
 const TAG_ZONA = new Set(['article', 'main']);
