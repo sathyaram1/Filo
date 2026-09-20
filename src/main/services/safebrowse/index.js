@@ -258,7 +258,10 @@ const API = {
     };
   },
   // cache (per test / invalidazione)
-  _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache },
+  _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache, llmSpesa, sandboxSpesa },
+  // Quante verifiche profonde può far partire un dominio registrabile prima
+  // che si rinunci (test e diagnostica).
+  DEEP_MAX_PER_DOMAIN,
   // Chiamate in volo per dominio registrabile (test e diagnostica).
   _inFlight: { llm: llmInFlight, sandbox: sandboxInFlight },
   // sotto-moduli (per test)
