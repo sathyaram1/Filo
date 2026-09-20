@@ -282,6 +282,16 @@
   // vero, sappia distinguerli da un nome scritto male.
   const TIPI_DI_CONTESTO = ['CONTESTO_FILE', 'CONTESTO_IMMAGINE'];
 
+  // Le azioni che si limitano a GUARDARE. Contano per le famiglie che le
+  // nominano (una ricerca regge «ho cercato sul web»), ma non possono essere
+  // la cosa che l'utente si sente confermare col pronome: «te l'ho messa alle
+  // 19» non lo regge una ricerca. Insieme ai segni di contesto — che non sono
+  // azioni del tutto — bastavano a zittire il presidio per intero: a chiunque
+  // tenesse un appunto aperto nell'editor il segno dei file arrivava a OGNI
+  // turno, e il caso della segnalazione tornava muto come prima.
+  const TIPI_DI_SOLA_LETTURA = ['CERCA_WEB', 'LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO'];
+  const NON_REGGONO_IL_PRONOME = new Set([...TIPI_DI_CONTESTO, ...TIPI_DI_SOLA_LETTURA]);
+
   // Negazioni e ipotesi: se stanno nella stessa proposizione, PRIMA della
   // dichiarazione, non c'è nessuna rivendicazione da verificare.
   const SMENTITE = /\b(?:non|senza|nessun\w*|mai|invece|prima|se|quando|appena|vuoi|vorresti|posso|potrei|dovrei|devo|volevo|avrei|potevo)\b/i;
