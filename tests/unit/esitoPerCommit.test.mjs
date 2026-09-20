@@ -18,10 +18,20 @@
 //   - non si registra se nella directory c'è qualcosa fuori dai commit (il
 //     salvataggio automatico lo committerebbe dopo, spostando la punta);
 //   - resta scritto accanto all'esito nello specchio locale, e una correzione
-//     se lo porta via insieme all'esito.
+//     se lo porta via insieme all'esito;
+//   - non si detta: dichiararne uno diverso dalla punta vera ferma la
+//     consegna, come già succede a chi nomina un ramo diverso da quello del
+//     biglietto.
 //
-// Senza il fix: il payload del verdetto non ha nessun campo `sha`, e gli
-// assert che lo cercano sono rossi.
+// E l'ULTIMO passo del giro, che è quello che conta: la richiesta di fusione
+// dichiara il commit esaminato e non parte se il ramo si è mosso dopo i via
+// libera, o se nella directory è rimasto qualcosa fuori dai commit. Timbrare
+// l'impronta sugli esiti non chiude niente finché la fusione si chiede per
+// nome del ramo (verifica del giro 1).
+//
+// Senza il fix: il payload del verdetto non ha nessun campo `sha`, la
+// richiesta di fusione porta solo il nome del ramo, e gli assert che cercano
+// il commit sono rossi.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
