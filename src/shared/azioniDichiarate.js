@@ -208,7 +208,7 @@
     {
       id: 'senza-nome',
       tipi: [],
-      avviso: 'quello che ha detto di aver fatto non è stato fatto',
+      avviso: 'non è partito niente',
       frasi: [
         new RegExp(`\\b(?:te |ve |me )?l${AP}ho (?:mess|impostat|programmat|fissat|creat|aggiunt|salvat|scritt|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[oa]\\b`, 'i'),
         /\b(?:te |ve )?l[ei] ho (?:mess|impostat|programmat|fissat|creat|aggiunt|salvat|scritt|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[ei]\b/i,
@@ -306,9 +306,11 @@
     const presenti = (azioni instanceof Set) ? azioni : insiemeDiTipi(azioni);
     const out = [];
     for (const fam of FAMIGLIE) {
-      // Famiglia senza tipi: la regge qualunque azione del turno (vedi
-      // «senza-nome»). Con almeno un'azione in giro non si accusa nessuno.
-      if (!fam.tipi.length ? presenti.size > 0 : fam.tipi.some((x) => presenti.has(x))) continue;
+      // Famiglia senza tipi (vedi «senza-nome»): la regge QUALUNQUE azione, e
+      // parla solo se nessuna famiglia ha già saputo dire di cosa si tratta.
+      if (!fam.tipi.length) {
+        if (out.length || presenti.size > 0) continue;
+      } else if (fam.tipi.some((x) => presenti.has(x))) continue;
       const frase = dichiarazione(t, fam);
       if (frase) out.push({ id: fam.id, avviso: fam.avviso, tipi: fam.tipi.slice(), frase });
     }

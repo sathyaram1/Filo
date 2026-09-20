@@ -2194,11 +2194,11 @@ function toolResultText({ action, res, rendered }) {
 // turno precedente il modello lo sa e la spinta gli dice di scriverlo, senza
 // rifare niente. L'avviso all'utente, che è molto più caro di un giro in più,
 // guarda invece tutta la conversazione (vedi sotto).
-function spintaDiRimedio(Dichiarate, text, renderedActions) {
+function spintaDiRimedio(Dichiarate, text, coperti) {
   try {
-    const fantasmi = Dichiarate.rileva(text, renderedActions);
-    if (fantasmi.length) return Dichiarate.spintaAzioniMancanti(fantasmi);
-    if (Dichiarate.formatoSospetto(text)) return Dichiarate.spintaFormato();
+    const fantasmi = Dichiarate.rileva(text, coperti);
+    if (fantasmi.length) return { spinta: Dichiarate.spintaAzioniMancanti(fantasmi), motivo: 'azioni' };
+    if (Dichiarate.formatoSospetto(text)) return { spinta: Dichiarate.spintaFormato(), motivo: 'formato' };
   } catch (_) {}
   return null;
 }
