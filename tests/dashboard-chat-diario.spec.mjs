@@ -18,7 +18,13 @@
 //  (C) un'impostazione confermata nel popup entra nel diario, e al turno dopo
 //      il modello sa che è stata confermata invece di tirare a indovinare;
 //  (D) un guasto a metà: le azioni già fatte tornano al modello al tentativo
-//      successivo, che non le rifà.
+//      successivo, che non le rifà;
+//  (E) un comando con la modalità terminale spenta dice perché non è partito, e
+//      porta all'interruttore;
+//  (F) «portami alla home» chiesto dalla home non ricarica la pagina: il lavoro
+//      e la risposta restano da leggere;
+//  (G) l'evento proposto si aggiunge davvero al calendario, e finché non lo si
+//      aggiunge il diario lo chiama proposta.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
@@ -280,4 +286,139 @@ test('D — guasto a metà: al nuovo tentativo il modello sa cosa era già stato
   expect(ultimo).toContain('Pasta');
 
   await restore(app, '__fakeD');
+});
+
+test('E — comando con la modalità terminale spenta: il riquadro dice perché, e porta all\'interruttore', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  // La modalità terminale è spenta: è il caso dell'utente che non sa nemmeno
+  // che quell'interruttore esiste.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }); });
+
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'e1', name: 'ESEGUI_COMANDO', arguments: '{"comando":"ls -la"}' }] },
+    { text: 'Non posso eseguirlo.' },
+  ], '__fakeE');
+
+  await page.locator('#input').fill('elenca i file');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Non posso eseguirlo.' })).toBeVisible({ timeout: 10_000 });
+
+  // Il riquadro che spiega è TORNATO, ed è in vista sotto la risposta: non
+  // dentro il diario, che è chiuso (prima restava solo «Azione non riuscita»).
+  const blocco = page.locator('.dash-cmd-blocked');
+  await expect(blocco).toBeVisible({ timeout: 5_000 });
+  await expect(blocco).toContainText('modalità terminale è spenta');
+  await expect(blocco).toContainText('ls -la');
+  // E porta dove si accende, invece di lasciare l'utente a cercarlo.
+  await expect(blocco.locator('button', { hasText: 'Apri Preferenze' })).toHaveCount(1);
+
+  // Nel diario la riga dice cosa non è partito e perché, non un generico
+  // «Azione non riuscita».
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  const riga = activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Comando non eseguito' });
+  await expect(riga).toHaveCount(1);
+  await expect(riga).toContainText('modalità terminale è spenta');
+  await page.screenshot({ path: 'tests/agent/.out/diario-terminale-spento.png' });
+
+  await restore(app, '__fakeE');
+});
+
+test('F — «portami alla home» chiesto dalla home non ricarica niente: lavoro e risposta restano', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'f1', name: 'COMANDO_FINESTRA', arguments: '{"comando":"home"}' }] },
+    { text: 'Sei già qui, nella home.' },
+  ], '__fakeF');
+
+  // Un segno che solo una ricarica della pagina può cancellare.
+  await page.evaluate(() => { window.__segnoVivo = 'io c\'ero'; });
+  await page.locator('#input').fill('portami alla home');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Sei già qui' })).toBeVisible({ timeout: 10_000 });
+
+  // La pagina NON si è ricaricata: la domanda, il blocco e la risposta sono
+  // ancora lì (prima sparivano prima che l'utente potesse leggerli).
+  expect(await page.evaluate(() => window.__segnoVivo)).toBe('io c\'ero');
+  await expect(page.locator('.dash-bubble-user', { hasText: 'portami alla home' })).toHaveCount(1);
+
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Sei già nella home' })).toHaveCount(1);
+
+  // E la home vuota resta a un click, quando l'utente ha finito di leggere.
+  const torna = page.locator('.dash-action-btn', { hasText: 'Torna alla home' });
+  await expect(torna).toHaveCount(1);
+  await torna.click();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 5_000 });
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(0);
+
+  await restore(app, '__fakeF');
+});
+
+test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+
+  await fakeProvider(app, [
+    {
+      toolCalls: [{
+        id: 'g1',
+        name: 'EVENTO_CALENDARIO',
+        arguments: '{"data":"2026-09-24","ora":"15:00","titolo":"Riunione team","dettagli":"Sala 2","durata_min":30}',
+      }],
+    },
+    { text: 'Eccolo, aggiungilo col bottone.' },
+  ], '__fakeG');
+
+  await page.locator('#input').fill('segna la riunione di giovedì alle 15');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Eccolo' })).toBeVisible({ timeout: 10_000 });
+
+  // Il diario racconta una PROPOSTA: l'evento nel calendario non c'è ancora.
+  const activity = page.locator('.dash-activity');
+  await expect(activity.locator('.dash-activity-label')).toContainText('proposto un evento');
+  await activity.locator('.dash-activity-head').click();
+  const riga = activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Evento proposto' });
+  await expect(riga).toHaveCount(1);
+  await expect(riga).toContainText('24/09/2026 alle 15:00');
+  await expect(riga).not.toContainText('Evento creato');
+
+  // Il bottone è vivo (prima era spento: la proposta non portava da nessuna
+  // parte) e all'utente consegna l'evento.
+  const btn = page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' });
+  await expect(btn).toBeEnabled();
+  await btn.click();
+  await expect(page.locator('.dash-action-btn', { hasText: '✓' })).toHaveCount(1, { timeout: 10_000 });
+
+  // L'evento è davvero uscito da Filo: il file che il calendario apre esiste e
+  // contiene quello che l'utente ha chiesto.
+  const ics = await app.evaluate(async ({ app: electronApp }) => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const dir = path.join(electronApp.getPath('temp'), 'filo-eventi');
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.ics'));
+    if (!files.length) return '';
+    const ultimo = files.map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t)[0].f;
+    return fs.readFileSync(path.join(dir, ultimo), 'utf8');
+  });
+  expect(ics).toContain('SUMMARY:Riunione team');
+  expect(ics).toContain('DTSTART:20260924T150000');
+  expect(ics).toContain('DTEND:20260924T153000');
+  await page.screenshot({ path: 'tests/agent/.out/diario-evento-calendario.png' });
+
+  await restore(app, '__fakeG');
 });
