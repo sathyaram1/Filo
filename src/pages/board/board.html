@@ -119,10 +119,12 @@
     }
     .bd-vote-btn:hover { border-color: var(--sn-accent); }
     .bd-vote-btn[aria-pressed="true"].bd-vote-works {
-      background: rgba(39, 174, 96, 0.15); border-color: #27ae60; color: #1e8449;
+      background: var(--bd-voto-si-fondo); border-color: var(--bd-voto-si-bordo);
+      color: var(--bd-voto-si);
     }
     .bd-vote-btn[aria-pressed="true"].bd-vote-broken {
-      background: rgba(192, 57, 43, 0.15); border-color: #c0392b; color: #c0392b;
+      background: var(--bd-voto-no-fondo); border-color: var(--bd-voto-no-bordo);
+      color: var(--bd-voto-no);
     }
     .bd-vote-count { font-variant-numeric: tabular-nums; }
 
