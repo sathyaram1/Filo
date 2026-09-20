@@ -81,9 +81,16 @@ test('emoji, virgolette e caratteri speciali non rompono il comando', async ({ o
 
 test('un comando che fallisce lo dice, invece di far finta di essere riuscito', async ({ openTab }) => {
   const page = await apriPagina(openTab);
-  const esito = await lancia(page, 'exit 3');
+  // Non `exit`: quello chiude la sessione, e vale su ogni sistema. Un comando
+  // normale che fallisce, invece, deve tornare col suo codice — e il codice
+  // passa dal marcatore, che cambia da shell a shell.
+  const esito = await lancia(page, 'ls /questa-cartella-non-esiste-di-sicuro');
   expect(esito.appeso, 'un comando fallito lascia la modalita\' terminale appesa').toBeFalsy();
-  expect(esito.code, `un comando uscito con 3 viene riportato come ${esito.code}`).toBe(3);
+  expect(esito.code, `un comando fallito viene riportato come ${esito.code}: l'utente lo vedrebbe come riuscito`).not.toBe(0);
+
+  // E la shell resta viva: un errore non deve chiudere il terminale.
+  const dopo = await lancia(page, 'echo ancora-viva');
+  expect(dopo.out, 'dopo un comando fallito la shell non risponde piu\'').toContain('ancora-viva');
 });
 
 test('dieci comandi uno dietro l\'altro, e la cartella resta quella di prima', async ({ openTab }) => {
