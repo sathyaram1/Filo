@@ -134,7 +134,8 @@ const PRELUDI_CODIFICA = {
   // vietato dove PowerShell gira in modalità ristretta. In quei casi il
   // comando dell'utente deve girare lo stesso — con i nomi storpiati, come
   // prima — non morire sul preludio né sporcare stderr con un errore suo.
-  powershell: 'try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n'
+  powershell: 'try { chcp 65001 > $null } catch {}\n'
+    + 'try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n'
     + 'try { $OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n',
   // bash / sh: nessun preludio. Su Linux e macOS lo stdout è già UTF-8 e
   // forzare una locale che sulla macchina può non esistere farebbe solo danno.
