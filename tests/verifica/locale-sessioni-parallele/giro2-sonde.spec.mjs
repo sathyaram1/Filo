@@ -62,6 +62,34 @@ const cambia = (page, id, checked) => page.evaluate(([i, c]) => {
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }, [id, checked]);
 
+test('una scelta fatta mentre la prima lettura è ancora per strada non viene riscritta da quella', async ({ openTab }) => {
+  test.fail(true, 'rilievo del giro 2: la lettura di apertura arriva dopo e rimette lo stato di prima');
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo && window.SN_ROUTINE_SESSIONI);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stub(page, {}, {});
+  // La lettura di apertura ci mette un po', come su una rete lenta.
+  await page.evaluate(() => {
+    const prec = window.filo.message;
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_sessions_get') {
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      return prec(msg);
+    };
+  });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => { window.__mgTest.loadSessions(); });
+
+  // L'owner non aspetta: esclude l'account A subito.
+  await cambia(page, 'mgAccountA', false);
+  await expect.poll(() => page.evaluate(() => window.__doc.accountAOff)).toBe(true);
+
+  await page.waitForTimeout(1500);
+  await expect(page.locator('#mgAccountA')).not.toBeChecked();
+});
+
 test('dopo una lettura andata a buon fine non resta scritto che non si è potuto leggere', async ({ openTab }) => {
   test.fail(true, 'rilievo del giro 2: l\'avviso «non ho potuto leggere» resta anche quando i valori a schermo vengono dal server');
   // Prima apertura con la rete giù: le tre righe dicono «non ho potuto leggere».
