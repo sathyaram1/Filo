@@ -595,6 +595,22 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Catalogo modelli con la chiave dell'utente, per le tendine delle Opzioni.
+  // La pagina lo chiedeva da sola al fornitore (#591, secondo giro): adesso lo
+  // chiede qui, e la richiesta parte dal cancello unico come ogni altra.
+  // La chiave arriva nel messaggio perché in Opzioni la si sta ancora
+  // digitando; è facoltativa, il catalogo è pubblico.
+  on(MSG.MODELS_CATALOG, async (msg) => {
+    try {
+      const provider = msg?.provider || 'openrouter';
+      const items = await Gate.listCatalog({ provider, apiKey: String(msg?.apiKey || '').trim() });
+      if (!items) return { ok: false, error: 'Catalogo non disponibile per questo fornitore', items: [] };
+      return { ok: true, provider, items };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e), items: [] };
+    }
+  });
+
   on(MSG.WEB_SEARCH, async (msg) => {
     try {
       const settings = await getEffectiveSettings();
