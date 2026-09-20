@@ -41,11 +41,21 @@ new Function('globalThis', sorgente)(globalThis);
 const D = globalThis.SN_AZIONI_DICHIARATE;
 
 const STATO = (o = {}) => ({ orariSveglie: [], titoliAppunti: [], contiAzioni: {}, ...o });
+// Lo stato come lo costruiscono le due chat quando l'utente ha scritto QUESTO.
+const DOPO = (messaggio, o = {}) => STATO({
+  domandaUtente: D.domandaSuCosaFatta(messaggio),
+  richiestaAzione: D.richiestaDiAzione(messaggio),
+  ...o,
+});
 
 test('un testo consegnato dentro la risposta non diventa «non è partito niente»', () => {
   // Le consegne che il giro 3 ha già chiuso: restano chiuse.
   expect(D.rileva('Te l\'ho messa in ordine alfabetico.', new Set(), STATO()).length).toBe(0);
   expect(D.rileva('Te l\'ho scritta qui sotto.', new Set(), STATO()).length).toBe(0);
+
+  // Quello che l'utente aveva chiesto: sistemare un testo, non fare una cosa
+  // che passa da uno strumento.
+  const sulTesto = DOPO('nella frase «il gatto grigio dorme sul divano» togli la parola grigio');
 
   // Le stesse consegne dette con le parole di tutti i giorni. Sono le
   // risposte normali a «togli quella parola», «mettila al plurale»,
