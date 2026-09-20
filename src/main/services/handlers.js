@@ -2529,7 +2529,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const Caps = globalThis.SN_CAPABILITIES;
   const capacita = Caps ? Caps.renderIndexForPrompt() : '';
   const Tools = globalThis.SN_ACTION_TOOLS;
-  const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive }) : null;
+  // #533 — il compito di QUESTO turno. `compitoRipreso` arriva solo dai turni
+  // di prosecuzione dopo un allargamento confermato: senza, il sì appena dato
+  // morirebbe col turno e l'utente dovrebbe ridirlo.
+  const Compiti = globalThis.SN_COMPITI;
+  let task = compitoRipreso ? compitoPerChiave(compitoRipreso) : null;
+  if (!task && Compiti) {
+    // L'accoglienza è contabilità di Filo su una conversazione sua: il permesso
+    // glielo dà l'intervista aperta, non la richiesta dell'utente.
+    task = ricordaCompito(Compiti.nuovo({ origine: 'chat', perimetro: onbActive ? ['accoglienza'] : null }));
+  }
   const payloadBase = {
     profilo, preferenze, espansioni, lezioni, stato: stateText, capacita,
     files: fileSummaries,
