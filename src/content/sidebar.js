@@ -1095,7 +1095,10 @@
       // UNO per turno, condiviso coi due guasti: due chiamate in più al
       // modello per la stessa risposta sbagliata non servono a niente.
       const azioniMancate = parsed.fuoriFormato ? [] : await azioniRaccontate(parsed);
-      if (azioniMancate.length && rimandiFuoriFormato < 1) {
+      // Quando il turno porta anche un'azione da eseguire, il rimbalzo la
+      // butterebbe via insieme alla risposta: lì l'azione parte e l'avviso
+      // compare sotto, senza un secondo giro.
+      if (azioniMancate.length && !parsed.kind && rimandiFuoriFormato < 1) {
         rimandiFuoriFormato += 1;
         if (thinking) { thinking.stop(); thinking.el.remove(); }
         history.push({ role: 'assistant', content: String(parsed.display || res.text || '').slice(0, 4000) });
