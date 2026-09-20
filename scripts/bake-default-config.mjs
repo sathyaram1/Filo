@@ -156,8 +156,7 @@ function envKey(name) {
 // qui: la sentinella `tests/unit/bakeChiaviLette.test.mjs` diventa rossa se le
 // due parti divergono.
 // `server` è il campo ESATTO del documento dei segreti: un guasto che dice
-// «manca» senza dire dove si rimedia costa a chi lo legge il giro d'indagine
-// che è costato a noi (#642).
+// «manca» senza dire dove si rimedia costa a chi legge un giro d'indagine (#642).
 const CHIAVI_DEL_PACCHETTO = [
   { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' },
 ];
