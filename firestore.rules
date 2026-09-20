@@ -255,10 +255,22 @@ service cloud.firestore {
         // S1.F2.2: clientIdHash — hash SHA-256 troncato in chiaro (32 char hex) per match C5.
         && request.resource.data.get('clientIdHash', '') is string
         && request.resource.data.get('clientIdHash', '').size() <= 64
+        // #597 — `images` è la lista degli INDIRIZZI degli screenshot, e quegli
+        // indirizzi il server dei giudici li SCARICA per darli a un modello con
+        // ingresso visivo. Finché qui si chiedeva solo «una lista di al più
+        // cinque», chiunque — senza account, è un create anonimo — ci metteva
+        // dentro `http://169.254.169.254/...` o l'indirizzo di un servizio
+        // interno e il server andava a prenderlo. Adesso ogni elemento deve
+        // essere una stringa e un indirizzo del deposito di Filo.
         && request.resource.data.get('images', []) is list
-        && request.resource.data.get('images', []).size() <= 5
+        && soloAllegatiDelDeposito(request.resource.data.get('images', []))
+        // Stessa cosa per gli allegati non-immagine: qui gli elementi sono
+        // mappe { url, name, type }, e l'`url` è un indirizzo del deposito
+        // esattamente come sopra. L'ha chiesto #597 per le immagini; lasciare
+        // aperta la porta accanto voleva dire riaprirla il giorno in cui
+        // qualcosa, a valle, scarica anche i documenti.
         && request.resource.data.get('files', []) is list
-        && request.resource.data.get('files', []).size() <= 5
+        && soloAllegatiConUrlDelDeposito(request.resource.data.get('files', []))
         && request.resource.data.get('seq', 0) is int
         && request.resource.data.get('seq', 0) >= 0
         && request.resource.data.get('seq', 0) <= 1000000
