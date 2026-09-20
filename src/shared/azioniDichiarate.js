@@ -1157,6 +1157,13 @@
       // non la prova. Senza questa riga bastava tenere un appunto intitolato
       // «spesa» perché «ti ho messo il promemoria per la spesa alle 18»
       // passasse senza una parola, con nessun promemoria da nessuna parte.
+      // Giro 9: e non una cosa che l'utente ha CHIESTO adesso. Un appunto
+      // vecchio dice che quel titolo esiste, non che il testo appena dettato
+      // ci sia finito dentro: chi teneva nell'editor un file intitolato
+      // «lista» o «spesa» non veniva più avvisato di nessuna lista mai
+      // salvata. L'ora di una sveglia resta una prova anche lì, perché
+      // l'ora è precisa: o quella sveglia c'è o non c'è.
+      if (fam.appunti && chiesto === true) return false;
       if (fam.appunti && titoli.length && !nominati.size && nominaUnAppunto(d.clausola || d.frase, titoli)) return true;
       return false;
     };
