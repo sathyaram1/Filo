@@ -109,6 +109,12 @@
         tipiEmessi: [...emessi],
         tipiPrecedenti: [...azioniFiloEmesse].filter((t) => !emessi.has(t)),
         domandaUtente: domandaSuCosaFatta,
+        famiglieGiaMancate: [...famiglieMancate],
+        // Questo turno non ha più un ritentativo davanti (o non può averlo,
+        // perché porta un'azione da eseguire): quello che trova adesso è
+        // definitivo, e il main lo scrive accanto al turno come fa la chat
+        // della home. Prima l'anomalia dell'Aiuto finiva solo nella console.
+        ultimoTentativo: !!parsed.kind || rimandiFuoriFormato >= 1,
       });
       return (res && res.ok && Array.isArray(res.fantasmi)) ? res.fantasmi : [];
     } catch (_) { return []; }
