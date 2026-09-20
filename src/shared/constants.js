@@ -150,6 +150,12 @@
     // ferma subito la pratica.
     CAP_MIN: 0,
     CAP_MAX: 10,
+    // Quante sessioni delle routine possono lavorare insieme (config/routines,
+    // campo `maxSessions`). Intervallo SUO, non quello dei bilanci qui sopra:
+    // uno zero sarebbe un interruttore master di nascosto, e quello esiste già.
+    MAX_SESSIONS_MIN: 1,
+    MAX_SESSIONS_MAX: 20,
+    MAX_SESSIONS_DEFAULT: 1,
     // Il testo della fase 2 (istruzioni per chi corregge): stesso tetto del
     // server, che oltre taglia. La dashboard rifiuta il testo più lungo invece
     // di salvarlo mozzato in silenzio.
