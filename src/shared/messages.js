@@ -614,8 +614,18 @@
     // ANNUNCIO (dal main a tutte le schede): l'elenco delle chat è cambiato —
     // una si è chiusa e ha preso titolo e tipo, oppure è stata cancellata.
     // La Cronologia aperta si riallinea invece di restare ferma a com'era
-    // quando l'hanno aperta.
+    // quando l'hanno aperta. Con `cancellata: <id>` dice anche QUALE è stata
+    // cancellata: la scheda che quella conversazione la sta ancora vivendo
+    // smette di scriverci dentro, invece di farla rinascere al messaggio dopo.
     FILO_CHATS_UPDATED: 'filo_chats_updated',
+    // Una riga che Filo scrive in chat senza passare da un modello (la risposta
+    // a un comando con lo slash: l'elenco dei comandi, la conferma di un timer,
+    // il resoconto del riordino). L'utente la legge sullo schermo, quindi la
+    // deve ritrovare rileggendo la chat. { id, text } → { ok }
+    FILO_CHAT_NOTE: 'filo_chat_note',
+    // Porta l'utente alla scheda dove una conversazione è ANCORA APERTA, invece
+    // di aprirgliene una seconda copia. { id } → { ok, portato }
+    FILO_CHAT_FOCUS: 'filo_chat_focus',
 
     // CRUD memoria/contenuti dashboard
     FILO_GET_MEMORY: 'filo_get_memory',
