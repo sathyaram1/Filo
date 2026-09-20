@@ -60,7 +60,10 @@
   function renderOnboardingThread(state) {
     const thread = Array.isArray(state?.thread) ? state.thread : [];
     bubblesEl.innerHTML = '';
-    resetHistory();
+    // Lo stato viaggia con l'azzeramento: la home lo usa per legare TUTTA
+    // l'intervista a una sola chat in archivio (#525), anche quando si svolge
+    // su più aperture della scheda.
+    resetHistory(state);
     if (thread.length > 1 && Onb?.RESUME_NOTE) bubblesEl.appendChild(stepTrace(Onb.RESUME_NOTE));
     for (const m of thread) {
       const role = m.role === 'filo' ? 'filo' : 'user';

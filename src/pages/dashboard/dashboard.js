@@ -100,7 +100,12 @@
     stepTrace: (text) => Att.stepTrace(text),
     goHome: () => goHome(),
     goThread: () => goThread(),
-    resetHistory: () => { threadHistory = []; },
+    resetHistory: (onbState) => {
+      threadHistory = [];
+      // #525 — l'intervista è UNA conversazione: la sua targa la dà lo stato
+      // dell'intervista, non il sorteggio di questo caricamento di pagina.
+      if (onbState) chatId = chatIdOnboarding(onbState);
+    },
     pushHistory: (m) => { threadHistory.push(m); },
     isSending: () => sending,
     beginSending: () => { sending = true; sendBtn.disabled = true; },
