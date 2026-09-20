@@ -36,8 +36,16 @@ const AMMESSI = new Set([
 const CARTELLE_AMMESSE = ['src/main/services/providers/'];
 
 // Le porte da cui si arriva davvero a un fornitore.
+// `SN_PROVIDER_` è la porta PRINCIPALE, e all'inizio mancava: un fornitore non
+// si trova solo chiedendolo al router, si trova per NOME su globalThis
+// (`SN_PROVIDER_<NOME>`) — è così che il router stesso lo trova al suo interno.
+// Chi scriveva quella riga arrivava al modello, spendeva sulla chiave condivisa
+// e non compariva in nessun conto, con la sentinella verde. Il pezzo di nome
+// basta da solo: prende sia `globalThis.SN_PROVIDER_OPENROUTER` sia la forma
+// costruita a pezzi (`'SN_PROVIDER_' + nome`).
 const PORTE = [
   { nome: 'SN_PROVIDERS', re: /\bSN_PROVIDERS\b/ },
+  { nome: 'SN_PROVIDER_<nome>', re: /SN_PROVIDER_/ },
   { nome: 'completeWithFallback', re: /\bcompleteWithFallback\s*\(/ },
   { nome: 'streamCompleteWithFallback', re: /\bstreamCompleteWithFallback\s*\(/ },
   { nome: 'getProvider', re: /\bgetProvider\s*\(/ },
