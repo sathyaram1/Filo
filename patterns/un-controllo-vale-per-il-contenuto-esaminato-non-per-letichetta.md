@@ -75,7 +75,11 @@ ogni volta era già stato chiuso di sotto:
    [Un cancello automatico che blocca deve avere una via d'uscita](un-cancello-automatico-che-blocca-deve-avere-una-via-duscita.md));
 3. la critica della verifica era registrata sul nome del ramo (2026-09-13);
 4. il verdetto del controllo di sicurezza e la **richiesta di fusione** lo
-   erano ancora (2026-09-20, feedback #485).
+   erano ancora (2026-09-20, feedback #485);
+5. chiuse quelle, il confronto restava disarmabile da sotto: la memoria di
+   quale contenuto avesse l'ok la scriveva una sola delle due strade, chi
+   sapeva metà taceva, e nessuno guardava se l'esaminato fosse arrivato dove
+   chi fonde va a prenderlo (2026-09-20, stesso feedback, terza verifica).
 
 Dove vive: `ROUTINE-AUTH-SPEC.md` §11 («Un esito vale per la versione
 esaminata»), `scripts/dispatch.mjs`, `scripts/routine-channel.mjs`,
