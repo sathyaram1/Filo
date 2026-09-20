@@ -189,6 +189,9 @@ test('quello che disegnano le parti si legge, in chiaro e in scuro', async ({ ap
   await page.locator('#input').fill('/echo prova');
   await page.locator('#input').press('Enter');
   await expect(page.locator('#bubbles .dash-term-out')).toContainText('rosso', { timeout: 8_000 });
+  // Il comando che hai scritto si rilegge sopra il suo output: senza, una
+  // conversazione di comandi diventa una pila di risposte senza domande.
+  await expect(page.locator('#bubbles .dash-term-cmd')).toContainText('echo prova', { timeout: 8_000 });
   // La cartella che il comando ha lasciato compare nella riga sopra la barra.
   await expect(page.locator('#dashDir')).toHaveText('/tmp/filo-verifica-635', { timeout: 8_000 });
 
