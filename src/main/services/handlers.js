@@ -2605,6 +2605,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // L'esito viaggia con l'azione: il diario del lavoro deve poter dire
         // «fatto» o «non riuscito», non solo «l'ha chiamata».
         rendered._executed = !!res.executed;
+        // #517 — e viaggia anche il fatto che il main l'abbia TENUTA: un evento
+        // di calendario, una pulizia delle schede, una cancellazione
+        // dell'archivio non si eseguono da sole, mettono in chat un bottone che
+        // preme l'utente. Senza questo segno il presidio le contava come «mai
+        // chiamate»: la risposta veniva buttata, rifatta e poi smentita, per
+        // un'azione che Filo aveva fatto per intero.
+        rendered._kept = !!res.kept;
         // `kept: false` non vuol dire invisibile: vuol dire che in chat non c'è
         // niente da CLICCARE (un appunto scritto, una lezione fissata, il
         // proxy tolto). Nel diario ci va lo stesso, come riga: se Filo fa una
