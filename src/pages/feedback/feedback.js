@@ -548,7 +548,10 @@
         setStatus('');
         if (typeof onChange === 'function') onChange();
       } catch (e) {
-        setStatus('Caricamento non riuscito: ' + (e?.message || e));
+        // #602 — se a fermarsi è stata la cifratura, la frase è già quella
+        // giusta per chi legge (dice che non è partito niente e perché).
+        const gia = !!(window.SN_FEEDBACK?.isEncryptionError?.(e));
+        setStatus(gia ? String(e.message) : ('Caricamento non riuscito: ' + (e?.message || e)));
       } finally {
         uploading = Math.max(0, uploading - 1);
         if (uploading === 0) btn.disabled = false;
