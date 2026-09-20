@@ -244,11 +244,11 @@
 
   // L'intervista di benvenuto (#524) è UNA conversazione, anche se si svolge su
   // più aperture della scheda: chi la lascia a metà e riapre Filo domani
-  // riprende da dov'era. Quindi la sua targa non può essere sorteggiata a ogni
-  // caricamento — sarebbe l'intervista spezzata in cinque chat diverse in
-  // Cronologia. La lega all'istante in cui l'intervista è cominciata.
+  // riprende da dov'era. La targa la calcola il modulo dell'intervista, perché
+  // la calcola anche il main (che archivia la domanda di apertura e il
+  // congedo) e i due devono dire la stessa cosa.
   function chatIdOnboarding(onbState) {
-    return `onb-${(onbState && onbState.startedAt) || 'prima'}`;
+    return self.SN_ONBOARDING.chatId(onbState);
   }
 
   // Chiude la chat in corso: il main fissa la data di chiusura e fa partire la
