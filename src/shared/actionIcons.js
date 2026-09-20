@@ -51,6 +51,8 @@
     COMANDO_FINESTRA: 'windowFrame',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
+    DICHIARA_USCITE: 'lock',
+    CHIEDI_USCITA: 'question',
   };
 
   const PREVISTE = {
