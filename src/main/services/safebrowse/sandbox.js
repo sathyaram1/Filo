@@ -66,7 +66,6 @@ function createConcurrencyGate({
         if (i >= 0) waiting.splice(i, 1);
         entry.settle('queue_timeout');
       }, maxWaitMs);
-      if (entry.timer && typeof entry.timer.unref === 'function') entry.timer.unref();
       waiting.push(entry);
     });
   }
@@ -197,8 +196,6 @@ async function detonateNow(el, url, evaluateFinal, opts = {}) {
       cleanup();
       resolve(null);
     }, lifetimeMs);
-    if (timer && typeof timer.unref === 'function') timer.unref();
-    if (hardTimer && typeof hardTimer.unref === 'function') hardTimer.unref();
 
     try {
       wc.on('did-redirect-navigation', (_e, u) => { if (u) { redirects.push(u); finalUrl = u; } });
