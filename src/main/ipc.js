@@ -171,7 +171,11 @@ function registerIpcHandlers() {
       try { event.sender.send(`shell:${execId}:${suffix}`, data); } catch (_) {}
     };
     const key = event.sender.id;
-    const wantShell = shell || 'powershell';
+    // La shell EFFETTIVA su questo sistema: fuori da Windows «powershell» e
+    // «cmd» non esistono e diventano la shell di sistema. Si confronta quella,
+    // non quella chiesta, altrimenti su Linux e Mac la sessione risulterebbe
+    // sempre «diversa» e verrebbe ricreata a ogni comando (addio `cd`).
+    const wantShell = resolveShell(shell);
     let session = shellSessions.get(key);
     // (Ri)crea la sessione se manca, è morta o l'utente ha cambiato shell nelle
     // Preferenze. La cwd passata serve solo allo spawn iniziale: per una
