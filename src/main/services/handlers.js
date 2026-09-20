@@ -3219,6 +3219,45 @@ async function appendToChatArchive(chatId, turn, meta) {
   catch (e) { console.warn('[Filo] chat non archiviata:', e?.message || e); }
 }
 
+// L'intervista di benvenuto comincia con una domanda di Filo, che nessun turno
+// produce: il testo è fisso e viene messo nella conversazione prima ancora che
+// l'utente scriva. Senza questo, in archivio l'intervista cominciava dalla
+// RISPOSTA dell'utente («mi chiamo Ada») e chi la rileggeva partiva da metà —
+// proprio la chat che il #525 nomina come da rileggere per intero.
+//
+// La domanda si archivia al PRIMO turno dell'utente, non quando compare a
+// schermo: un'accoglienza aperta e mai risposta non è una conversazione e non
+// deve lasciare un guscio in Cronologia.
+async function archiviaAperturaAccoglienza(chatId, state) {
+  if (!chatId || !FiloChats) return;
+  try {
+    const chat = await FiloChats.get(chatId);
+    if (chat && Array.isArray(chat.messages) && chat.messages.length) return;
+    const thread = Array.isArray(state && state.thread) ? state.thread : [];
+    const apertura = [];
+    for (const m of thread) {
+      if (!m || m.role !== 'filo') break;   // fin dove parla Filo: è l'apertura
+      apertura.push({ role: 'filo', text: String(m.text || '') });
+    }
+    if (apertura.length) await FiloChats.append(chatId, apertura, { onboarding: true });
+  } catch (e) { console.warn('[Filo] apertura accoglienza non archiviata:', e?.message || e); }
+}
+
+// …e finisce con un saluto, anch'esso un testo fisso che non passa da un
+// turno. L'utente lo legge sullo schermo, quindi lo deve ritrovare. Vale per
+// tutte e due le uscite: la parola di stop scritta in chat e il pulsante
+// «Salta l'accoglienza».
+async function archiviaCongedoAccoglienza(chatId, testo) {
+  if (!chatId || !FiloChats || !String(testo || '').trim()) return;
+  try {
+    const chat = await FiloChats.get(chatId);
+    // Nessuna chat: l'utente non ha mai risposto. Un congedo da solo non è una
+    // conversazione.
+    if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return;
+    await FiloChats.append(chatId, { role: 'filo', text: String(testo) }, { onboarding: true });
+  } catch (e) { console.warn('[Filo] congedo accoglienza non archiviato:', e?.message || e); }
+}
+
 // Titolo breve + tipo di una chat finita, in UNA chiamata a un modello
 // economico. Due cose insieme perché il testo da leggere è lo stesso: due
 // chiamate costerebbero il doppio per rileggere la stessa conversazione.
