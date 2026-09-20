@@ -2189,8 +2189,8 @@ function pageReadsForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
-    confirmedActionsForPrompt(actions),
+    fileReadsForPrompt(actions), documentReadsForPrompt(actions), pageReadsForPrompt(actions),
+    transparencyDocsForPrompt(actions), confirmedActionsForPrompt(actions),
   ].filter(Boolean).join('\n\n');
 }
 
