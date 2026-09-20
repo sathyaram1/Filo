@@ -279,14 +279,11 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
     expect(bordi[0], `tema ${tema}`).not.toBe('rgba(0, 0, 0, 0)');
   }
 
-  // IL RILIEVO DEL GIRO, misurato qui e scritto nella critica: il NUMERO
-  // accanto al voto che hai dato. I suoi due colori sono scritti a mano nel
-  // foglio di stile della pagina, uguali nei due temi, e nel tema scuro cadono
-  // sotto il minimo leggibile (3:1). Le misure restano nel resoconto della
-  // prova; l'assert è solo sul tema chiaro, dove la regola è già rispettata,
-  // perché una prova rossa qui dentro fermerebbe anche la pubblicazione.
-  // Quando quei colori avranno una variante per il tema scuro, questo ciclo
-  // diventa un assert su tutti e due i temi.
+  // IL RILIEVO DEL GIRO, misurato qui: il NUMERO accanto al voto che hai dato.
+  // I suoi colori erano scritti a mano una volta sola per tutti e due i temi, e
+  // nel tema scuro cadevano sotto il minimo leggibile: 2,86 per «funziona» e
+  // 2,77 per «non funziona», contro 3. Corretto nello stesso giro dando ai due
+  // colori una variante scura. Le misure restano nel resoconto della prova.
   for (const tema of ['dark', 'light']) {
     for (const [verso, { testo, fondo }] of Object.entries(misure[tema])) {
       const r = contrasto(testo, fondo);
@@ -294,10 +291,8 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
         type: 'contrasto',
         description: `voto «${verso}» già dato, tema ${tema}: ${r.toFixed(2)}:1`,
       });
-      if (tema === 'light') {
-        expect(r, `voto «${verso}» già dato, tema chiaro: contrasto ${r.toFixed(2)}`)
-          .toBeGreaterThan(3);
-      }
+      expect(r, `voto «${verso}» già dato, tema ${tema}: contrasto ${r.toFixed(2)}`)
+        .toBeGreaterThan(3);
     }
   }
 });
