@@ -48,11 +48,6 @@ const OUT_PATH = process.env.FILO_BAKE_OUT
   ? resolve(process.env.FILO_BAKE_OUT)
   : resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
 
-// Chiede al server le chiavi di default. Ritorna
-// { openrouter?, gemini?, tavily?, safeBrowsing? } oppure {} se non disponibili.
-// Non lancia: in caso di problemi degrada ai segreti del job, perché una
-// versione con quelle chiavi è meglio di nessuna versione. Se non resta nemmeno
-// quello, decide main — e si ferma.
 const CANALE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
