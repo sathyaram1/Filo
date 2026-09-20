@@ -365,18 +365,10 @@ function openWeightsConfigError(settings, action, droppedRefs) {
   return e;
 }
 
-// Il limite di spesa ha una sola implementazione, ed è nel cancello (#591).
-// Queste due restano come nomi storici per chi le importa.
-async function ensureUnderLimit(settings) {
-  return Gate.ensureUnderLimit(settings);
-}
-
-// Oltre il limite di spesa nessun tentativo parte: non esiste più un fornitore
-// "gratuito" su cui ripiegare (era l'API diretta di Google, oggi fuori da Filo).
-async function applyLimitToChain(settings, attempts) {
-  await ensureUnderLimit(settings);
-  return attempts;
-}
+// Il limite di spesa vive nel cancello, e solo lì (#591). Qui non resta
+// nemmeno una scorciatoia: «applica il limite a questa catena» era un invito a
+// chiamare poi il fornitore per conto proprio, ed è esattamente come i quattro
+// chiamanti scoperti dal banco di prova erano finiti fuori dal tetto.
 
 // Catena di tentativi per servire una richiesta. L'UNICA sorgente dei modelli è
 // la configurazione effettiva (condivisa o personale): il registry scritto nel
@@ -2871,7 +2863,6 @@ const handlerCtx = {
   buildAttemptChain,
   providerRouting,
   openWeightsBlockReason,
-  applyLimitToChain,
   handleAIRequest,
   noteServedProvider,
   auditServedByLater,

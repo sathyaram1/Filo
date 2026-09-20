@@ -195,6 +195,11 @@
     // un rifiuto locale ("questo fornitore non sa leggere ad alta voce") non è
     // una riga di spesa da zero euro nel conto del mese.
     if (result && result.usage && record !== false) {
+      // Anche una prova va verificata su CHI l'ha servita: senza, l'unica
+      // richiesta di Filo che un fornitore escluso può servire in silenzio
+      // sarebbe proprio quella che parte dalla pagina dove si accende
+      // l'interruttore.
+      try { deps().noteServedProvider(settings, action, result); } catch (_) {}
       const C = costs();
       if (C) {
         const listino = pricing !== undefined
