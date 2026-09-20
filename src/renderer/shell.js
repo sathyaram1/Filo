@@ -79,6 +79,8 @@
       applyShellTokens(r?.settings?.themeTokens);
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
+      applyRingTone(r?.settings?.timerRingtone);
+      refreshRinging();
       try { render(); } catch (_) {}
     })
     .catch(() => {});
@@ -88,6 +90,7 @@
         applyShellTokens(m.settings?.themeTokens);
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
+        applyRingTone(m.settings?.timerRingtone);
         try { render(); } catch (_) {}
       }
     });
@@ -106,6 +109,86 @@
       badge.innerHTML = ico + '<span class="incognito-label">Incognito</span>';
       badge.hidden = false;
     }
+  }
+
+  // ── Suoneria di timer e sveglie ───────────────────────────────────────────
+  // Suona QUI perché la shell c'è sempre: una scadenza coglie l'utente su una
+  // scheda qualunque, e la pagina Nuova scheda può non essere nemmeno aperta.
+  const MSG_FILO = (window.SN_MSG && window.SN_MSG.MSG) || {};
+  const ringBtn = document.getElementById('ring-indicator');
+  const ringLabel = document.getElementById('ring-ind-label');
+  setIcon(document.getElementById('ring-ind-icon'), 'alarm', 15);
+  let ringTone = 'default';
+  let ringingIds = [];
+  let ringWake = null;
+
+  function applyRingTone(id) {
+    const tones = window.SN_SOUNDS && window.SN_SOUNDS.TONES;
+    if (typeof id === 'string' && tones && tones[id]) ringTone = id;
+  }
+
+  function testoSuoneria(list) {
+    if (list.length > 1) return `${list.length} scadenze`;
+    const t = list[0];
+    if (t.kind === 'alarm') return t.label ? `Sveglia — ${t.label}` : 'Sveglia';
+    return t.label ? `${t.label} — scaduto` : 'Timer scaduto';
+  }
+
+  // Il watcher del main ricontrolla ogni pochi secondi: sentire la suoneria
+  // cinque secondi dopo lo zero è attrito, quindi ci svegliamo sulla scadenza.
+  function programmaRisveglio(timers) {
+    if (ringWake) { clearTimeout(ringWake); ringWake = null; }
+    let primo = Infinity;
+    for (const t of timers) {
+      if (!t || t.ringing || t.paused) continue;
+      const ms = new Date(t.endsAt).getTime() - Date.now();
+      if (Number.isFinite(ms) && ms < primo) primo = ms;
+    }
+    if (primo === Infinity) return;
+    ringWake = setTimeout(refreshRinging, Math.min(60000, Math.max(250, primo + 150)));
+  }
+
+  function applyRinging(timers) {
+    const tutti = Array.isArray(timers) ? timers : [];
+    programmaRisveglio(tutti);
+    const list = tutti.filter((t) => t && t.ringing);
+    ringingIds = list.map((t) => t.id);
+    const acceso = list.length > 0;
+    if (ringBtn) ringBtn.hidden = !acceso;
+    if (acceso && ringLabel) ringLabel.textContent = testoSuoneria(list);
+    const S = window.SN_SOUNDS;
+    if (!S) return;
+    if (acceso) S.ring(ringTone); else S.silence();
+  }
+
+  // Ogni finestra chiede le SUE scadenze: quella incognito vede solo le proprie
+  // (i timer non sono fra le chiavi che eredita dal disco), quindi nessuna
+  // scadenza può squillare in due finestre insieme.
+  function refreshRinging() {
+    const type = MSG_FILO.FILO_GET_TIMERS;
+    if (!type) return;
+    api.message({ type })
+      .then((r) => applyRinging(r && r.ok ? r.timers : []))
+      .catch(() => {});
+  }
+
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === MSG_FILO.FILO_LIVE_UPDATED) refreshRinging();
+    });
+  }
+
+  if (ringBtn) {
+    ringBtn.addEventListener('click', () => {
+      const type = MSG_FILO.FILO_STOP_TIMER_ALARM;
+      const ids = ringingIds.slice();
+      // Zittisci subito: l'attesa della risposta è attrito su un gesto che
+      // esiste per far smettere un rumore.
+      applyRinging([]);
+      if (!type) return;
+      Promise.all(ids.map((id) => api.message({ type, id }).catch(() => {})))
+        .then(refreshRinging);
+    });
   }
 
   // Registro app del launcher. Il Feedback vive qui fra le App.

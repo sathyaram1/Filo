@@ -1,16 +1,6 @@
 // Suoni dell'interfaccia (toni sintetici, nessun file audio).
-//
-// PERCHÉ ESISTE
-//   Sia le Preferenze (anteprima suoneria/notifica) sia la shell del browser
-//   (suono opzionale quando compare una notifica in basso a destra, spec
-//   #170.1) devono riprodurre brevi toni. Prima la sequenza di note + il player
-//   AudioContext vivevano solo dentro preferences.js: questo modulo li estrae in
-//   un punto condiviso così la shell, le Preferenze e — in futuro — il timer
-//   suonano gli STESSI toni senza duplicare codice.
-//
-//   IIFE su globalThis come gli altri moduli shared/: chi lo carica trova
-//   `SN_SOUNDS` su globalThis (nelle pagine filo:// e nella shell via
-//   <script src="filo://shared/sounds.js">).
+// Punto unico: Preferenze (anteprima), notifiche della shell e suoneria di
+// timer e sveglie suonano gli stessi motivi. Chi lo carica trova `SN_SOUNDS`.
 (function (global) {
   'use strict';
 
@@ -42,31 +32,55 @@
     return _ctx;
   }
 
-  // Riproduce un tono. Non lancia mai (audio non disponibile/headless =
+  // Note già programmate sulla linea del tempo dell'AudioContext: tenerne il
+  // riferimento è l'unico modo di zittire SUBITO quando l'utente preme Ferma.
+  let _live = [];
+  let _ringTone = null;
+  let _ringTimer = null;
+
+  function durataMs(toneId) {
+    const notes = TONES[toneId] || TONES.default;
+    let ms = 0;
+    for (const [, d] of notes) ms += d;
+    return ms;
+  }
+
+  // Programma `ripetizioni` giri del motivo in CODA a quanto già programmato
+  // (`daQuando`), mai da adesso: un lotto che ricomincia da capo mentre il
+  // precedente non è finito fa suonare due copie della stessa suoneria insieme.
+  // Ritorna il momento in cui la coda finisce.
+  function programma(c, toneId, ripetizioni, daQuando) {
+    const notes = TONES[toneId] || TONES.default;
+    let t = Math.max(c.currentTime, Number(daQuando) || 0);
+    for (let i = 0; i < ripetizioni; i++) {
+      for (const [freq, durMs] of notes) {
+        if (freq > 0) {
+          const osc = c.createOscillator();
+          const gain = c.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.35, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + durMs / 1000 - 0.01);
+          osc.connect(gain);
+          gain.connect(c.destination);
+          osc.start(t);
+          osc.stop(t + durMs / 1000);
+          _live.push(osc);
+          osc.onended = () => { const i2 = _live.indexOf(osc); if (i2 >= 0) _live.splice(i2, 1); };
+        }
+        t += durMs / 1000;
+      }
+    }
+    return t;
+  }
+
+  // Riproduce un tono una volta. Non lancia mai (audio non disponibile/headless =
   // no-op silenzioso). Ritorna true se la riproduzione è stata avviata.
   function play(toneId) {
     try {
       const c = ctx();
       if (!c) return false;
-      const notes = TONES[toneId] || TONES.default;
-      const start = () => {
-        let t = c.currentTime;
-        for (const [freq, durMs] of notes) {
-          if (freq > 0) {
-            const osc = c.createOscillator();
-            const gain = c.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.35, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + durMs / 1000 - 0.01);
-            osc.connect(gain);
-            gain.connect(c.destination);
-            osc.start(t);
-            osc.stop(t + durMs / 1000);
-          }
-          t += durMs / 1000;
-        }
-      };
+      const start = () => { programma(c, toneId, 1, 0); };
       if (c.state === 'suspended') c.resume().then(start).catch(() => {});
       else start();
       return true;
@@ -75,5 +89,53 @@
     }
   }
 
-  global.SN_SOUNDS = { TONES, TONE_IDS, TONE_LABELS, play };
+  // Quanta suoneria programmiamo in un colpo solo. Un timer che scade con Filo
+  // ridotto a icona suona in una pagina NASCOSTA, dove i setTimeout vengono
+  // strozzati a uno al minuto: la linea del tempo dell'AudioContext no, quindi
+  // un lotto lungo continua a suonare anche se il rifornimento arriva tardi.
+  const LOTTO_MS = 60000;
+
+  // Suoneria insistente: va avanti finché non si chiama silence(). Idempotente
+  // sullo stesso tono (la ripetizione del broadcast non la fa ripartire da capo).
+  function ring(toneId) {
+    const id = TONES[toneId] ? toneId : 'default';
+    if (_ringTone === id) return true;
+    silence();
+    try {
+      const c = ctx();
+      if (!c) return false;
+      _ringTone = id;
+      const giro = Math.max(1, durataMs(id));
+      const ripetizioni = Math.max(1, Math.ceil(LOTTO_MS / giro));
+      let fine = 0;
+      const lotto = () => {
+        if (_ringTone !== id) return;
+        fine = programma(c, id, ripetizioni, fine);
+        _ringTimer = global.setTimeout(lotto, Math.round(giro * ripetizioni * 0.8));
+      };
+      if (c.state === 'suspended') c.resume().then(lotto).catch(() => {});
+      else lotto();
+      return true;
+    } catch (_) {
+      _ringTone = null;
+      return false;
+    }
+  }
+
+  // Zittisce la suoneria adesso, comprese le note già programmate.
+  function silence() {
+    _ringTone = null;
+    if (_ringTimer) { try { global.clearTimeout(_ringTimer); } catch (_) {} }
+    _ringTimer = null;
+    for (const osc of _live.slice()) { try { osc.stop(); } catch (_) {} }
+    _live = [];
+  }
+
+  // Stato dell'AudioContext ('running', 'suspended', null se non c'è audio):
+  // è l'unico modo, in un test, di distinguere "suona" da "ho chiamato play".
+  function state() { return _ctx ? _ctx.state : null; }
+
+  const isRinging = () => _ringTone !== null;
+
+  global.SN_SOUNDS = { TONES, TONE_IDS, TONE_LABELS, play, ring, silence, isRinging, state };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -12,6 +12,12 @@
       <button class="tab-new" id="tab-new" data-tip="Nuova scheda" aria-label="Nuova scheda"></button>
       <div class="tab-drag-spacer"></div>
       <span class="incognito-badge" id="incognito-badge" hidden data-tip="Sessione incognito: niente cronologia né dati salvati su questo computer" aria-label="Finestra incognito"></span>
+      <!-- Timer/sveglia che sta suonando: sta QUI perché la fila di tab è l'unica striscia mai coperta
+         dalla view della pagina, e una scadenza coglie l'utente su una scheda qualunque. -->
+      <button class="ring-indicator" id="ring-indicator" hidden data-tip="Ferma la suoneria" aria-label="Ferma la suoneria">
+        <span class="ring-ind-icon" id="ring-ind-icon"></span>
+        <span class="ring-ind-label" id="ring-ind-label"></span>
+      </button>
       <!-- Indicatore scaricamenti: compare solo con almeno un download attivo o recente, e il click apre il
          pannello con i singoli download. -->
       <button class="dl-indicator" id="dl-indicator" hidden data-tip="Scaricamenti" aria-label="Scaricamenti">
@@ -44,6 +50,7 @@
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shell/shell.js"></script>
 </body>

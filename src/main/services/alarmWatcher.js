@@ -1,22 +1,12 @@
 // Watcher delle scadenze di timer e sveglie nel PROCESSO MAIN (#322).
+// Nessuna pagina è garantita aperta, quindi è qui che le scadenze vengono
+// marcate; chi le rende percepibili lo dice il pattern «farsi sentire ovunque».
 //
-// La suoneria vive nella dashboard (AudioContext della pagina newtab): finché
-// una newtab è aperta, il suo ticker chiama gcTimers ogni secondo e la
-// scadenza suona da sé. Ma una SVEGLIA ("alle 07:00") scatta tipicamente
-// quando l'utente NON sta guardando la newtab: senza un controllo nel main
-// nessuno marcherebbe la scadenza e l'avviso non partirebbe mai.
-//
-// Questo watcher gira nel main ogni pochi secondi:
-//   1. gcTimers() marca `ringing` le scadenze arrivate;
-//   2. per ogni scadenza NUOVA mostra una notifica di sistema (arriva anche
-//      con Filo ridotto a icona o su un'altra scheda);
-//   3. broadcastLiveUpdate() avvisa le superfici aperte (una dashboard aperta
-//      aggiorna la colonna live e fa partire la suoneria).
-//
-// Vale sia per le sveglie (kind 'alarm') sia per i timer: prima un timer che
-// scadeva senza la newtab aperta restava muto — stessa lacuna, stesso fix.
+// Ogni pochi secondi: gcTimers() marca `ringing`, ogni scadenza NUOVA fa una
+// notifica di sistema, e broadcastLiveUpdate() sveglia le superfici aperte —
+// la shell fa partire la suoneria, la nuova scheda mostra la sua scheda.
 
-const { Notification } = require('electron');
+const { BrowserWindow, Notification } = require('electron');
 
 const CHECK_MS = 5000;
 let handle = null;
@@ -24,34 +14,85 @@ let handle = null;
 // finché l'utente non preme "Ferma". Una scadenza ancora `ringing` al boot
 // (arrivata mentre Filo era chiuso o nella sessione precedente) viene
 // notificata una volta: meglio un avviso in ritardo che nessun avviso.
-const notified = new Set();
+// Due insiemi perché le viste normale e incognito dello storage sono due liste
+// separate: con uno solo, ogni passata cancellerebbe le scadenze dell'altra.
+const notified = { normale: new Set(), incognito: new Set() };
 
+// Una scadenza chiesta da una finestra incognito vive SOLO nella vista incognito
+// dello storage: senza una passata lì dentro nessuno la vede mai scadere, e quel
+// timer resta muto per sempre.
 async function tick() {
+  await passata(false);
+  const conIncognito = BrowserWindow.getAllWindows().some((w) => {
+    try { return !w.isDestroyed() && !!w._filoIncognito; } catch (_) { return false; }
+  });
+  if (!conIncognito) return;
+  try {
+    const { runIncognito } = require('../shim/storage');
+    await runIncognito(() => passata(true));
+  } catch (_) { /* best-effort: la passata normale è già andata */ }
+}
+
+async function passata(incognito) {
   const FiloMem = globalThis.SN_FILO_MEMORY;
   if (!FiloMem) return;
   let list;
   try { list = await FiloMem.gcTimers(); } catch (_) { return; }
+  const visti = incognito ? notified.incognito : notified.normale;
   // Una sveglia RICORRENTE resta in lista dopo essere stata fermata: senza
   // dimenticarla qui, la stessa sveglia non avviserebbe mai più (l'id è già
   // "notificato" per sempre). Si dimentica appena smette di suonare — la volta
   // dopo è una scadenza nuova a tutti gli effetti.
   const ringingNow = new Set((list || []).filter((t) => t.ringing).map((t) => t.id));
-  for (const id of notified) if (!ringingNow.has(id)) notified.delete(id);
-  const fresh = (list || []).filter((t) => t.ringing && !notified.has(t.id));
+  for (const id of visti) if (!ringingNow.has(id)) visti.delete(id);
+  // Vale finché QUALCOSA suona, non solo all'istante della scadenza: un tutto
+  // schermo che arriva DOPO ricoprirebbe il pulsante e rimetterebbe il rumore
+  // senza interruttore.
+  if (ringingNow.size) rientraDaTuttoSchermo(incognito);
+  const fresh = (list || []).filter((t) => t.ringing && !visti.has(t.id));
   if (!fresh.length) return;
   for (const t of fresh) {
-    notified.add(t.id);
+    visti.add(t.id);
+    // Niente notifica di sistema per una scadenza incognito: titolo ed etichetta
+    // resterebbero nel centro notifiche del sistema, cioè una traccia su questo
+    // computer di quello che si è fatto in incognito.
+    if (incognito) continue;
     try {
       if (Notification.isSupported()) {
         const isAlarm = t.kind === 'alarm';
-        new Notification({
+        const n = new Notification({
           title: isAlarm ? '⏰ Sveglia' : '⏱ Timer scaduto',
           body: t.label || (isAlarm ? 'È ora.' : ''),
-        }).show();
+        });
+        // Con Filo ridotto a icona questa notifica è l'unica cosa che l'utente
+        // vede, e il pulsante che ferma la suoneria sta nella finestra.
+        n.on('click', () => { try { mostraFinestra(); } catch (_) {} });
+        n.show();
       }
     } catch (_) { /* best-effort: la card ringing in dashboard resta comunque */ }
   }
   try { require('./handlers').broadcastLiveUpdate(); } catch (_) {}
+}
+
+// A tutto schermo la pagina copre la fila di tab, cioè l'unico posto da cui si
+// ferma la suoneria: senza uscirne il rumore parte e non ha interruttore. Ogni
+// passata tocca solo le finestre che vedono le scadenze di quella lista.
+function rientraDaTuttoSchermo(incognito) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      if (win.isDestroyed() || !!win._filoIncognito !== !!incognito) continue;
+      const tabs = win._filoTabs;
+      if (tabs && tabs.contentFullscreen) tabs.setContentFullscreen(false);
+    } catch (_) { /* best-effort: una finestra sola non deve fermare le altre */ }
+  }
+}
+
+function mostraFinestra() {
+  const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
 }
 
 function start() {

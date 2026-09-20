@@ -661,3 +661,42 @@ html[data-feedback-dim="1"] .shell {
 /* Scaricato ma non più al suo posto: la riga si attenua, così si vede prima ancora di cliccare. */
 .dl-row[data-missing="1"] .dl-row-name { color: var(--fg-soft); text-decoration: line-through; }
 .dl-row[data-missing="1"] .dl-row-meta { opacity: 0.8; }
+
+/* Suoneria in corso: stessa forma del chip scaricamenti, ma col colore d'allerta e un battito, perché
+   deve farsi notare da qualunque scheda l'utente stia guardando. Cliccarlo ferma. */
+.ring-indicator {
+  align-self: center;
+  flex: 0 0 auto;
+  margin: -8px 6px 0 0;
+  height: 26px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 22%, var(--tab-bg));
+  border: 1px solid var(--accent);
+  color: var(--fg);
+  cursor: pointer;
+  animation: ringPulse 1.1s ease-in-out infinite;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.ring-indicator[hidden] { display: none; }
+.ring-indicator:hover { background: color-mix(in srgb, var(--accent) 38%, var(--tab-bg)); }
+.ring-ind-icon { display: inline-flex; }
+.ring-ind-icon svg { display: block; }
+.ring-ind-label {
+  font: 600 12px/1 system-ui, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes ringPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-indicator { animation: none; }
+}
