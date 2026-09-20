@@ -6,18 +6,25 @@
 // esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
 //
 // Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS }.
-// `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk }
+// `buildPreferencePartial(chiave, valore)` → { partial, label, costo, risk, allenta }
 // oppure null se chiave/valore non sono validi. Solo le preferenze qui elencate
 // sono scrivibili. Dal #146.5 l'elenco copre TUTTE le impostazioni della pagina
 // Opzioni (modelli, provider, chiavi API, sicurezza/privacy, limite di spesa,
 // funzionalità) oltre a quelle estetiche/comportamentali: ognuna dichiara il
-// proprio `level` (1 = applica subito, 2 = popup di conferma). Le impostazioni
-// sensibili (sicurezza, modelli, chiavi, provider, costi) sono di livello 2.
+// proprio `costo` (#530: 1 = si disfa, 2 = dura ma si rimedia). Le
+// impostazioni sensibili (sicurezza, modelli, chiavi, provider, costi) sono di
+// costo 2.
 //
-// REGOLA (#183): ogni setter di livello 2 DEVE dichiarare anche `risk` — una
+// Quelle che ALLENTANO una protezione — accendere il terminale, spegnere la
+// navigazione sicura, togliere i modelli predefiniti, mettere una chiave API
+// arrivata da chissà dove — dichiarano anche `allenta(valore)`: abbassare una
+// difesa vuole la parola «conferma» digitata a OGNI livello di autonomia,
+// anche col compito pulito. È la regola (d) di src/shared/autonomia.js.
+//
+// REGOLA (#183): ogni setter di costo 2 DEVE dichiarare anche `risk` — una
 // frase in chiaro che spiega cosa controlla l'impostazione e quali sono gli
 // eventuali rischi. È il testo che il popup di conferma mostra all'utente
-// (lo compone actionLevels.describe). Un setter di livello 2 senza `risk` è
+// (lo compone actionLevels.describe). Un setter di costo 2 senza `risk` è
 // un bug: il test tests/unit/preferences.test.mjs lo intercetta.
 
 (function (global) {
@@ -72,11 +79,12 @@
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
   // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
   // annidati vicini); `label` è la conferma leggibile per l'utente.
-  // `level` (opzionale, default 1) è il livello di sicurezza quando è FILO a
-  // cambiare la preferenza via chat (#146.2, vedi actionLevels.js): 1 applica
-  // subito, 2 chiede conferma con popup. `risk` (obbligatorio quando level=2,
-  // #183) è la spiegazione in chiaro mostrata nel popup: cosa controlla
-  // l'impostazione e quali rischi comporta toccarla.
+  // `costo` (opzionale, default 1) è quanto costa sbagliare quando è FILO a
+  // cambiare la preferenza via chat (#530, vedi actionLevels.js e
+  // autonomia.js): 1 si disfa, 2 dura ma si rimedia. `risk` (obbligatorio
+  // quando costo=2, #183) è la spiegazione in chiaro mostrata nel popup: cosa
+  // controlla l'impostazione e quali rischi comporta toccarla. `allenta(v)`
+  // dice se QUEL valore abbassa una difesa.
   const PREF_SETTERS = [
     {
       keys: ['tema', 'theme', 'aspetto'],
@@ -155,7 +163,9 @@
     {
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
       // La modalità terminale dà a Filo accesso alla shell: conferma esplicita.
-      level: 2,
+      costo: 2,
+      // Dare a Filo la shell è il permesso più grosso che esista: allenta.
+      allenta: (v) => parsePrefBool(v) === true,
       risk: 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer. '
         + 'È un permesso potente: una volta attivo, Filo può lanciare comandi (quelli rischiosi '
         + 'chiederanno comunque una conferma a parte). Attivalo solo se ti fidi di quello che gli chiedi.',
@@ -167,7 +177,7 @@
     },
     {
       keys: ['shell_terminale', 'shell terminale', 'shell'],
-      level: 2,
+      costo: 2,
       risk: 'Sceglie quale shell usa Filo per eseguire i comandi del terminale (su Windows '
         + 'PowerShell, Prompt dei comandi o Bash; su Mac e Linux sh o Bash). Cambia come '
         + 'vengono interpretati i comandi che Filo lancia.',
@@ -276,10 +286,11 @@
       },
     },
 
-    // ── Sicurezza / privacy — livello 2 (popup di conferma prima di applicare) ──
+    // ── Sicurezza / privacy — costo 2, e chi allenta vuole «conferma» digitata ──
     {
       keys: ['protezione_ip', 'protezione ip', 'proteggi ip', 'protezione ip locale', 'webrtc', 'protezione webrtc', 'ip locale'],
-      level: 2,
+      costo: 2,
+      allenta: (v) => parsePrefBool(v) === false,
       risk: 'Controlla la protezione che impedisce ai siti di scoprire il tuo indirizzo IP locale '
         + 'tramite WebRTC. Disattivarla espone più informazioni sulla tua rete ai siti che visiti.',
       build(v) {
@@ -290,7 +301,8 @@
     },
     {
       keys: ['blocco_popup', 'blocco popup', 'blocca popup', 'popup', 'finestre popup'],
-      level: 2,
+      costo: 2,
+      allenta: (v) => parsePrefBool(v) === false,
       risk: 'Controlla il blocco delle finestre popup. Disattivarlo permette ai siti di aprire '
         + 'finestre da soli, anche pubblicitarie o ingannevoli.',
       build(v) {
@@ -301,7 +313,8 @@
     },
     {
       keys: ['navigazione_sicura', 'navigazione sicura', 'rilevamento siti pericolosi', 'siti pericolosi', 'safe browsing', 'safebrowsing', 'protezione phishing', 'rilevamento phishing'],
-      level: 2,
+      costo: 2,
+      allenta: (v) => parsePrefBool(v) === false,
       risk: 'Controlla il rilevamento dei siti pericolosi (phishing e malware). Disattivarlo '
         + 'toglie l’avviso prima che tu apra un sito potenzialmente dannoso.',
       build(v) {
@@ -312,7 +325,10 @@
     },
     {
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
-      level: 2,
+      costo: 2,
+      // «Automatico» accetta tutto: è il meno protettivo dei tre.
+      allenta: (v) => /^(automatic[oa]|auto|default|standard|tutti|accetta)$/i.test(String(v == null ? '' : v).trim()),
+
       risk: 'Decide come Filo gestisce i cookie dei siti. Le modalità più permissive aumentano '
         + 'il tracciamento pubblicitario; quelle più strette possono farti perdere i login già attivi.',
       build(v) {
@@ -330,7 +346,8 @@
     },
     {
       keys: ['fingerprint', 'anti-fingerprinting', 'anti fingerprinting', 'antifingerprint', 'impronta digitale', 'protezione impronta', 'protezione fingerprint'],
-      level: 2,
+      costo: 2,
+      allenta: (v) => /^(off|no|disattivat[oa]|spent[oa]|niente|nessuna)$/i.test(String(v == null ? '' : v).trim()),
       risk: 'Controlla la protezione contro il fingerprinting, cioè il riconoscimento del tuo '
         + 'browser tra un sito e l’altro. Cambiarla incide sulla tua privacy e su come i siti ti identificano.',
       build(v) {
@@ -347,10 +364,12 @@
       },
     },
 
-    // ── Modelli / provider / chiavi / costi — livello 2 (conferma) ──
+    // ── Modelli / provider / chiavi / costi — costo 2 ──
     {
       keys: ['modelli_predefiniti', 'modelli predefiniti', 'usa modelli predefiniti', 'modelli di default', 'configurazione predefinita modelli'],
-      level: 2,
+      costo: 2,
+      // Spegnerli vuol dire uscire dalla configurazione vagliata: allenta.
+      allenta: (v) => parsePrefBool(v) === false,
       risk: 'Decide se Filo usa i modelli AI predefiniti o la tua configurazione personalizzata. '
         + 'Cambia quali modelli elaborano le tue richieste, con effetti su qualità e costi.',
       build(v) {
@@ -363,7 +382,7 @@
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
         'solo modelli aperti', 'modelli aperti', 'modelli proprietari', 'niente modelli proprietari',
         'disattiva modelli proprietari', 'open weights'],
-      level: 2,
+      costo: 2,
       risk: 'Spegne tutti i modelli proprietari (Anthropic compresa) e lascia lavorare solo modelli '
         + 'a pesi aperti serviti da fornitori indipendenti. Alcune funzioni cambiano modello e quelle '
         + 'senza equivalente aperto smettono di funzionare finché non lo rispegni.',
@@ -378,7 +397,7 @@
     },
     {
       keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],
-      level: 2,
+      costo: 2,
       risk: 'Cambia il fornitore AI che elabora le tue richieste. '
         + 'Le richieste e i relativi costi passeranno dal nuovo provider, con la sua chiave API.',
       build(v) {
@@ -391,7 +410,10 @@
     },
     {
       keys: ['chiave_openrouter', 'chiave openrouter', 'api key openrouter', 'chiave api openrouter', 'openrouter key'],
-      level: 2,
+      costo: 2,
+      // Una credenziale che autorizza spese, messa da una chat: la parola
+      // digitata è l'unica difesa contro una chiave arrivata da una pagina.
+      allenta: () => true,
       risk: 'Imposta la chiave API di OpenRouter. È una credenziale che autorizza spese sul tuo '
         + 'account: confermala solo se questa chiave arriva davvero da te.',
       build(v) {
@@ -403,7 +425,8 @@
 
     {
       keys: ['chiave_tavily', 'chiave tavily', 'api key tavily', 'chiave ricerca', 'chiave api tavily', 'tavily key'],
-      level: 2,
+      costo: 2,
+      allenta: () => true,
       risk: 'Imposta la chiave API di Tavily, il servizio di ricerca web. È una credenziale '
         + 'collegata al tuo account Tavily: confermala solo se arriva davvero da te.',
       build(v) {
@@ -414,7 +437,7 @@
     },
     {
       keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget'],
-      level: 2,
+      costo: 2,
       risk: 'Imposta il tetto di spesa mensile per le richieste AI. Alzarlo può far aumentare i '
         + 'costi; abbassarlo può bloccare le richieste una volta raggiunto il limite.',
       build(v) {
@@ -426,7 +449,7 @@
       },
     },
 
-    // ── Colore identità delle tab — cosmetico, reversibile → livello 1 ──
+    // ── Colore identità delle tab — cosmetico, reversibile → costo 1 ──
     // Mappa le richieste verbali ("voglio colori più vivaci nelle tab", "rendile
     // più neutre", "niente colore", "Poste è verde non gialla") sui sei parametri
     // di src/shared/tabColor.js. I valori sono preset ASSOLUTI (non delta: il
@@ -460,10 +483,10 @@
       },
     },
 
-    // ── Suoneria timer — reversibile, innocuo → livello 1 ──
+    // ── Suoneria timer — reversibile, innocuo → costo 1 ──
     {
       keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
-      level: 1,
+      costo: 1,
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         const map = {
@@ -485,15 +508,18 @@
   function buildPreferencePartial(rawKey, rawVal) {
     const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
     if (!key) return null;
-    const withLevel = (setter) => {
+    const withCosto = (setter) => {
       const r = setter.build(rawVal);
-      return r ? { ...r, level: setter.level || 1, risk: setter.risk || '' } : null;
+      if (!r) return null;
+      let allenta = false;
+      try { allenta = typeof setter.allenta === 'function' ? !!setter.allenta(rawVal, r) : !!setter.allenta; } catch (_) { allenta = false; }
+      return { ...r, costo: setter.costo || 1, risk: setter.risk || '', allenta };
     };
     for (const setter of PREF_SETTERS) {
-      if (setter.keys.includes(key)) return withLevel(setter);
+      if (setter.keys.includes(key)) return withCosto(setter);
     }
     for (const setter of PREF_SETTERS) {
-      if (setter.keys.some((k) => key.includes(k) || k.includes(key))) return withLevel(setter);
+      if (setter.keys.some((k) => key.includes(k) || k.includes(key))) return withCosto(setter);
     }
     return null;
   }

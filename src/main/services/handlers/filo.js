@@ -96,6 +96,18 @@ module.exports = function register(on, ctx) {
     return { ok: true, compacted: !!compacted, memory: await FiloMem.getMemory() };
   });
 
+  // La cancellazione della memoria è dell'UTENTE, non di Filo (#530): l'agente
+  // non può farla nemmeno con la parola digitata — è nell'elenco fisso — e
+  // senza questa strada non esisterebbe più nessun modo di cancellarla. Il
+  // pulsante sta in Preferenze e chiede di scrivere «conferma».
+  on(MSG.FILO_CLEAR_MEMORY, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    await FiloMem.setMemory({ PROFILO: '', PREFERENZE: '' });
+    await FiloMem.clearLessonsBuffer();
+    try { broadcastLiveUpdate(); } catch (_) {}
+    return { ok: true, memory: await FiloMem.getMemory() };
+  });
+
   // ── Micro-intervista di benvenuto (#524) ─────────────────────────────────
   //
   // La dashboard chiede lo stato all'apertura: se l'intervista è aperta e non è

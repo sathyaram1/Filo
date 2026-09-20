@@ -602,6 +602,13 @@
     // memoria dell'utente.
     // Risposta: { ok, compacted }
     FILO_COMPACT_MEMORY: 'filo_compact_memory',
+    // Cancella TUTTA la memoria di Filo (profilo, preferenze apprese, lezioni
+    // non ancora compattate). Solo pagine filo://: è la strada dell'UTENTE —
+    // il pulsante in Preferenze, con la parola «conferma» digitata. Filo non
+    // può farlo da sé: cancellare dati in modo definitivo è nell'elenco fisso
+    // dei livelli di autonomia (#530).
+    // Risposta: { ok, memory }
+    FILO_CLEAR_MEMORY: 'filo_clear_memory',
     // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
     // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }
     FILO_GET_ONBOARDING: 'filo_get_onboarding',

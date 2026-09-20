@@ -2062,6 +2062,19 @@
     // Mostra il commento proattivo di Filo al centro della home (newtab).
     // Disattivabile da Preferenze per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Quanto Filo fa da solo (#530). `livello` è la scelta globale
+    // dell'utente: conservativo | default | automatico (yolo esiste come
+    // valore ma non è selezionabile finché non c'è il guardiano dei registri).
+    // `campi` sono le due manopole per campo — «quanto mi fido di ciò che
+    // leggo da qui» e «quanto è grave sbagliare qui» — che solo restringono;
+    // `fonti` sono le classi spostate a mano dall'utente (id → classe 1-5).
+    // La REGOLA che legge tutto questo sta in src/shared/autonomia.js: i
+    // valori qui devono restare allineati ai suoi dati.
+    autonomia: {
+      livello: 'default',
+      campi: {},
+      fonti: {},
+    },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è

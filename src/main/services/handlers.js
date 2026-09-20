@@ -1140,6 +1140,63 @@ function consumePendingConfirm(sender, action) {
   return exp > Date.now();
 }
 
+// ── Stato del compito: che cosa è entrato nel contesto (#530) ───────────────
+//
+// La regola («Filo può fare X?») non guarda solo l'azione: guarda anche quello
+// che il compito ha LETTO prima. Leggere una mail e rispondere in chat è
+// innocuo; leggere la stessa mail e salvare una lezione nella memoria no.
+//
+// Qui teniamo, per mittente, l'elenco delle FONTI entrate nel contesto. Lo
+// semina la chat all'inizio di ogni turno (dalla conversazione che il modello
+// sta per rileggere) e lo aggiorna il dispatch a ogni azione che porta dentro
+// qualcosa. Mai il modello: quale fonte porti dentro un'azione lo dichiara il
+// registro (src/shared/actionLevels.js), e che classe abbia quella fonte lo
+// dice la regola (src/shared/autonomia.js).
+const taskSources = new Map(); // senderKey → { fonti: string[], at: ms }
+const TASK_SOURCES_TTL = 12 * 60 * 60 * 1000;
+function purgeTaskSources(now) {
+  for (const [k, v] of taskSources) if (!v || (now - v.at) > TASK_SOURCES_TTL) taskSources.delete(k);
+}
+function setTaskFonti(sender, fonti) {
+  const now = Date.now();
+  purgeTaskSources(now);
+  const puliti = Array.from(new Set((Array.isArray(fonti) ? fonti : []).filter(Boolean).map(String)));
+  taskSources.set(senderKey(sender), { fonti: puliti, at: now });
+}
+function addTaskFonte(sender, fonte) {
+  if (!fonte) return;
+  const key = senderKey(sender);
+  const rec = taskSources.get(key) || { fonti: [], at: Date.now() };
+  if (!rec.fonti.includes(fonte)) rec.fonti.push(String(fonte));
+  rec.at = Date.now();
+  taskSources.set(key, rec);
+}
+function taskFonti(sender) {
+  const rec = taskSources.get(senderKey(sender));
+  const fonti = rec ? rec.fonti.slice() : [];
+  // Un'azione che arriva da una pagina web esterna (l'agente di pagina) vive
+  // dentro un compito che quella pagina l'ha già letta: non c'è niente da
+  // ricordare, lo dice l'origine del mittente.
+  const origin = String(sender?.tab?.url || sender?.url || '');
+  if (/^https?:/i.test(origin) && !fonti.includes('web')) fonti.push('web');
+  return fonti;
+}
+// Le fonti lette nei turni PASSATI della stessa conversazione: quello che è
+// entrato nel contesto ci resta, e il turno nuovo lo rilegge insieme al resto.
+function fontiDaStorico(storico) {
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const out = [];
+  if (!Levels || !Array.isArray(storico)) return out;
+  for (const m of storico) {
+    for (const a of (Array.isArray(m && m.actions) ? m.actions : [])) {
+      if (!a || a._executed === false) continue;
+      const f = Levels.fonteFor(a);
+      if (f && !out.includes(f)) out.push(f);
+    }
+  }
+  return out;
+}
+
 // Riferimento dell'utente a una sveglia / un timer, normalizzato dai sinonimi
 // che un modello può produrre. `tipo` restringe a sveglie o a countdown quando
 // la richiesta lo dice ("tutte le SVEGLIE"), altrimenti si guardano entrambi.
@@ -1252,33 +1309,81 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     action._cwd = displayCwd(getAssistantCwd(sender));
   }
 
-  // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
-  // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
-  // mai deciso dall'LLM. Azione non registrata → rifiutata (ogni nuovo potere
-  // di Filo è obbligato a dichiarare il suo livello). Livello ≥ 2 senza
-  // conferma utente → non si esegue: torna al client con la spiegazione, il
-  // client mostra popup (2) o box "digita conferma" (3) e solo allora rimanda
-  // l'azione via MSG.FILO_CONFIRM_ACTION. La riclassificazione avviene anche
-  // alla conferma (`confirmed` salta solo la sospensione, non il registro).
+  // ── il gate: la regola sta in autonomia.js, qui si applica (#146.2, #530) ──
+  // Il registro (src/shared/actionLevels.js) dichiara COSTO e CAMPO di ogni
+  // azione — staticamente, mai l'LLM. La risposta («sì», «chiede», «conferma»,
+  // «no») la dà src/shared/autonomia.js combinando quel costo con il livello di
+  // autonomia scelto dall'utente e con lo stato del compito (che cosa è entrato
+  // nel contesto finora). Azione senza costo → rifiutata: ogni nuovo potere di
+  // Filo è obbligato a dichiararlo. Risposta «chiede»/«conferma» senza conferma
+  // utente → non si esegue: torna al client con la spiegazione, il client mostra
+  // il popup (chiede) o il box "digita conferma" (conferma) e solo allora
+  // rimanda l'azione via MSG.FILO_CONFIRM_ACTION. La decisione viene rifatta
+  // anche alla conferma (`confirmed` salta solo la sospensione, non la regola).
   const Levels = globalThis.SN_ACTION_LEVELS;
-  const level = Levels ? Levels.levelFor(action) : 1;
-  if (Levels && !level) {
-    console.warn('[Filo] azione non registrata rifiutata:', type);
+  const Autonomia = globalThis.SN_AUTONOMIA;
+  const costo = Levels ? Levels.costoFor(action) : 0;
+  if (Levels && costo == null) {
+    console.warn('[Filo] azione senza costo rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
   }
+  let esito = null;
+  if (Levels && Autonomia) {
+    let aut = {};
+    try { aut = (await Storage.getSettings()).autonomia || {}; } catch (_) {}
+    esito = Autonomia.valuta({
+      livello: aut.livello,
+      fonti: taskFonti(sender),
+      costo,
+      campo: Levels.campoFor(action),
+      manopole: aut.campi,
+      fontiSpostate: aut.fonti,
+      vietato: Levels.vietatoFor(action),
+      allentaDifesa: Levels.allentaFor(action),
+      // Perimetro e origine esistono come ingressi fin da ora: oggi ogni
+      // compito nasce da una richiesta in chat dell'utente, quindi è dentro il
+      // perimetro e l'origine è la chat. Le automazioni (che propongono invece
+      // di chiedere) e le uscite fuori perimetro arrivano con la posta.
+      dentroPerimetro: true,
+      origine: 'chat',
+    });
+  }
+  // Quello che l'azione porta DENTRO sporca il compito da qui in avanti — non
+  // se stessa: leggere è sempre libero, ed è già stato deciso qui sopra.
+  if (Levels) addTaskFonte(sender, Levels.fonteFor(action));
+
+  const risposta = esito ? esito.risposta : (costo >= 2 ? 'chiede' : 'si');
+  const motivo = (esito && esito.motivo) || '';
+  // L'elenco fisso: no a ogni livello, e il modello riceve il perché — così lo
+  // dice all'utente invece di riprovare.
+  if (risposta === 'no') {
+    console.warn('[Filo] azione fuori da quello che Filo può fare:', type, esito && esito.regola);
+    const dove = Levels ? Levels.rifiutoFor(action) : '';
+    const perche = motivo || 'non è una cosa che posso fare io';
+    return { executed: false, kept: false, rejected: true, error: dove ? `${perche} ${dove}` : perche };
+  }
+  // «propone» (notifica con l'azione pronta) è la forma delle automazioni: il
+  // canale che la porta arriva con la posta. Finché non c'è, vale la richiesta
+  // in chat — popup, o parola digitata se la proposta se la portava dietro.
+  const chiedeConferma = risposta === 'chiede' || risposta === 'conferma' || risposta === 'propone';
+  const modo = (risposta === 'conferma' || (esito && esito.parola)) ? 3 : 2;
   // PULISCI_TAB e CANCELLA_ARCHIVIO hanno già un flusso di conferma dedicato
   // lato client (bottone → RUN_TAB_TRIAGE / pannello eliminazione): restano
   // `kept` come prima e la conferma la gestisce la loro UI specifica.
   const hasBespokeConfirm = type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO';
-  if (level >= 2 && !confirmed && !hasBespokeConfirm) {
+  if (chiedeConferma && !confirmed && !hasBespokeConfirm) {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
     recordPendingConfirm(sender, action);
+    const testo = Levels ? Levels.describe(action) : '';
     return {
       executed: false,
       kept: true,
-      needsConfirm: level,
-      describe: Levels ? Levels.describe(action) : '',
+      needsConfirm: modo,
+      // Il motivo in fondo, una frase: «In questo compito ho letto una pagina
+      // web.» Senza, un popup comparso stavolta e non ieri sembra un capriccio.
+      describe: motivo ? `${testo}\n\n${motivo}` : testo,
+      motivo,
     };
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
@@ -1286,7 +1391,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   // richiesta di conferma (RUN → popup → CONFIRM). Le pagine interne filo://
   // sono fidate per origine. Un FILO_CONFIRM_ACTION forgiato "a freddo" da fuori
   // non ha un pending corrispondente → rifiutato (l'azione non si esegue).
-  if (level >= 2 && confirmed && !hasBespokeConfirm) {
+  if (chiedeConferma && confirmed && !hasBespokeConfirm) {
     const origin = sender?.tab?.url || sender?.url || '';
     const trusted = String(origin).startsWith('filo://');
     if (!trusted && !consumePendingConfirm(sender, action)) {
@@ -2360,6 +2465,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // chat normale: nessuna schermata a passi, nessun modulo.
   const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
+  // #530 — lo stato del compito riparte da quello che i turni PASSATI di questa
+  // conversazione hanno letto: una pagina web letta due turni fa è ancora nel
+  // contesto che il modello sta per rileggere, e conta ancora.
+  setTaskFonti(sender, fontiDaStorico(cleanHistory));
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
   // messaggio dell'assistente, così nei turni successivi il modello SA davvero

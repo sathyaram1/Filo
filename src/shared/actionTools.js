@@ -9,11 +9,11 @@
 // azioni arrivano in streaming come il testo.
 //
 // UNA fonte per le azioni: qui stanno descrizione e parametri di ogni
-// strumento; il LIVELLO di sicurezza sta nel registro (actionLevels.js) e
-// resta l'unico a decidere se un'azione si esegue subito, chiede conferma o
-// pretende «conferma» digitato. Una sentinella negli unit test pretende che i
-// due elenchi combacino: uno strumento senza livello non si esegue, un livello
-// senza strumento non si può chiamare.
+// strumento; il COSTO di sbagliarle sta nel registro (actionLevels.js) e la
+// risposta — subito, popup, «conferma» digitata, no — la dà la regola
+// (autonomia.js). Una sentinella negli unit test pretende che i due elenchi
+// combacino: uno strumento senza costo non si esegue, un potere senza
+// strumento non si può chiamare.
 //
 // Il nome dello strumento È il tipo dell'azione (`CERCA_WEB`), e gli argomenti
 // sono i campi dell'azione: `{type: nome, ...argomenti}` entra pari pari in
@@ -175,13 +175,13 @@
       required: ['query'],
     },
     CANCELLA_MEMORIA: {
-      description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Il sistema chiede all\'utente di digitare "conferma" prima di eseguire; non parte mai senza. NON dichiarare di averlo già fatto.',
+      description: 'Cancellare la memoria di Filo (profilo, preferenze apprese, lezioni) NON lo puoi fare tu: è una cancellazione definitiva, e quelle le fa l\'utente con le sue mani. Se te lo chiede, mandalo in Preferenze → Memoria di Filo → «Cancella tutto quello che Filo sa di me» (lì gli viene chiesto di scrivere «conferma»). Chiamando questo strumento ricevi lo stesso il percorso, ma è più veloce dirlo e basta.',
       properties: {},
       required: [],
     },
     IMPOSTA_PREFERENZA: {
       description: ({ sistema }) =>
-        'Modifica un\'impostazione dell\'app. Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2: il sistema chiede conferma all\'utente da sé, tu non chiederla a parole. Chiavi valide e valori ammessi:\n'
+        'Modifica un\'impostazione dell\'app. Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono delicate: il sistema chiede conferma all\'utente da sé — e quando la modifica ALLENTA una protezione gli fa scrivere «conferma» — tu non chiederla a parole. Il livello di autonomia di Filo non si cambia da qui: lo sposta solo l\'utente, in Preferenze. Chiavi valide e valori ammessi:\n'
         + '• tema: "sistema" | "chiaro" | "scuro"\n'
         + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
         + '• commento_home: true | false (commento di Filo al centro della home)\n'

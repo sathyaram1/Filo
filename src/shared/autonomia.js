@@ -86,13 +86,20 @@
     const k = String(id == null ? '' : id).trim().toLowerCase();
     return LIVELLI.find((l) => l.id === k) || null;
   }
-  // Il livello valido più vicino a ciò che c'è nelle impostazioni: un valore
-  // sconosciuto (storage vecchio, scrittura sbagliata) ricade sul default, che
-  // non è mai il più permissivo.
+  // Il livello NOTO più vicino a ciò che gli viene passato: un valore
+  // sconosciuto (scrittura sbagliata, modulo più vecchio) ricade sul default,
+  // che non è mai il più permissivo. Yolo è noto — la tabella ce l'ha e i test
+  // la coprono per intero — ma non è SCEGLIBILE: quello lo dice
+  // `livelloValido`, che è ciò che si legge dalle impostazioni.
+  function livelloNoto(id) {
+    const l = livello(id);
+    return l ? l.id : LIVELLO_DEFAULT;
+  }
+  // Il livello valido come SCELTA dell'utente: quello che non si può scegliere
+  // (yolo, finché non c'è il guardiano) ricade sul default.
   function livelloValido(id) {
     const l = livello(id);
-    if (!l) return LIVELLO_DEFAULT;
-    if (!l.selezionabile) return LIVELLO_DEFAULT;
+    if (!l || !l.selezionabile) return LIVELLO_DEFAULT;
     return l.id;
   }
   function livelliSelezionabili() {
@@ -101,7 +108,7 @@
   // Ordine dal più prudente al più permissivo: serve a sapere se un cambio
   // ALZA il livello (allenta una difesa → parola digitata, regola (d)).
   function indiceLivello(id) {
-    return LIVELLI.findIndex((l) => l.id === livelloValido(id));
+    return LIVELLI.findIndex((l) => l.id === livelloNoto(id));
   }
   function alzaLivello(da, a) {
     return indiceLivello(a) > indiceLivello(da);
@@ -317,7 +324,7 @@
   //                  abbassa un costo
   function valuta(opts) {
     const o = opts || {};
-    const liv = livelloValido(o.livello);
+    const liv = livelloNoto(o.livello);
     const campo = campoValido(o.campo);
     const manopole = o.manopole || null;
     const costo = costoConManopole(o.costo, campo, manopole);
@@ -426,7 +433,7 @@
   // Stato del compito da un elenco di fonti lette (comodo per chi non deve
   // decidere ma solo mostrare): la classe meno fidata contro la soglia.
   function statoPerFonti(fonti, liv, { campo = null, manopole = null, fontiSpostate = null } = {}) {
-    const soglia = (livello(livelloValido(liv)) || {}).soglia || 1;
+    const soglia = (livello(livelloNoto(liv)) || {}).soglia || 1;
     let mass = CLASSE_MIN;
     for (const f of (Array.isArray(fonti) ? fonti : [])) {
       const c = classeConManopole(classeFonte(f, fontiSpostate), campo, manopole);
@@ -450,7 +457,7 @@
     FONTI, CAMPI, MANOPOLE, COSTI, COSTO_MIN, COSTO_MAX, TABELLA, STATI,
     ELENCO_FISSO, ORIGINI,
     // lettura
-    livello, livelloValido, livelliSelezionabili, indiceLivello, alzaLivello,
+    livello, livelloNoto, livelloValido, livelliSelezionabili, indiceLivello, alzaLivello,
     classeFonte, fraseFonte, campoValido, manopolaAccesa, classeConManopole,
     costoConManopole, costoValido, origineValida, risolviGuardiano, vocefissa,
     statoPerFonti, manopoleDiSerie, piuStretta,

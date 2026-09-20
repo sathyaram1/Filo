@@ -21,48 +21,48 @@ require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 const P = globalThis.SN_PREF;
 const build = (k, v) => P.buildPreferencePartial(k, v);
 
-test('preferenze estetiche/comportamentali → livello 1, partial giusto', () => {
-  assert.deepEqual(build('tema', 'scuro'), { partial: { theme: 'dark' }, label: 'Tema → Scuro', level: 1, risk: '' });
-  assert.equal(build('correttore', 'off').level, 1);
+test('preferenze estetiche/comportamentali → costo 1, partial giusto', () => {
+  assert.deepEqual(build('tema', 'scuro'), { partial: { theme: 'dark' }, label: 'Tema → Scuro', costo: 1, risk: '', allenta: false });
+  assert.equal(build('correttore', 'off').costo, 1);
   assert.deepEqual(build('correttore', 'off').partial, { featureFlags: { spellcheck: false } });
   assert.deepEqual(build('sidebar_aiuto', 'attiva').partial, { featureFlags: { help: true } });
   assert.deepEqual(build('categorizzazione', 'sì').partial, { featureFlags: { categorize: true } });
   assert.deepEqual(build('archivia_se_inattivo', 'no').partial, { autoArchive: { onIdle: false } });
 });
 
-test('sicurezza/privacy → livello 2, partial annidato corretto', () => {
+test('sicurezza/privacy → costo 2, partial annidato corretto', () => {
   const cookie = build('gestione_cookie', 'privacy');
-  assert.equal(cookie.level, 2);
+  assert.equal(cookie.costo, 2);
   assert.deepEqual(cookie.partial, { security: { cookies: { mode: 'privacy' } } });
 
   assert.deepEqual(build('gestione_cookie', 'automatico').partial, { security: { cookies: { mode: 'default' } } });
   assert.deepEqual(build('gestione_cookie', 'manuale').partial, { security: { cookies: { mode: 'manual' } } });
 
   const fp = build('fingerprint', 'off');
-  assert.equal(fp.level, 2);
+  assert.equal(fp.costo, 2);
   assert.deepEqual(fp.partial, { security: { fingerprint: { mode: 'off' } } });
   assert.deepEqual(build('fingerprint', 'privacy').partial, { security: { fingerprint: { mode: 'privacy' } } });
 
   assert.deepEqual(build('navigazione_sicura', 'disattiva').partial, { security: { safeBrowse: { enabled: false } } });
   assert.deepEqual(build('protezione_ip', 'off').partial, { security: { protectIpLeak: false } });
   assert.deepEqual(build('blocco_popup', 'on').partial, { security: { blockPopups: true } });
-  assert.equal(build('blocco_popup', 'on').level, 2);
+  assert.equal(build('blocco_popup', 'on').costo, 2);
 });
 
-test('modelli / provider / chiavi / costi → livello 2', () => {
+test('modelli / provider / chiavi / costi → costo 2', () => {
   const prov = build('provider', 'openrouter');
-  assert.equal(prov.level, 2);
+  assert.equal(prov.costo, 2);
   assert.equal(prov.label, 'Provider → OpenRouter');
   assert.deepEqual(prov.partial, { provider: 'openrouter' });
   // Google non è più un fornitore di Filo: chiederlo a parole non deve
   // scrivere niente.
   assert.equal(build('provider', 'gemini'), null);
   assert.equal(build('chiave_gemini', 'AIzaSEGRETO1234'), null);
-  assert.equal(build('modelli_predefiniti', 'off').level, 2);
+  assert.equal(build('modelli_predefiniti', 'off').costo, 2);
   assert.deepEqual(build('modelli_predefiniti', 'off').partial, { useDefaultModels: false });
 
   const k = build('chiave_openrouter', 'sk-or-v1-SEGRETO1234');
-  assert.equal(k.level, 2);
+  assert.equal(k.costo, 2);
   assert.deepEqual(k.partial, { apiKeys: { openrouter: 'sk-or-v1-SEGRETO1234' } });
   // L'etichetta NON stampa l'intera chiave (solo testa/coda).
   assert.doesNotMatch(k.label, /SEGRETO1234/);
@@ -71,7 +71,7 @@ test('modelli / provider / chiavi / costi → livello 2', () => {
   assert.deepEqual(build('chiave_tavily', 'tvly-abcd1234').partial, { apiKeys: { tavily: 'tvly-abcd1234' } });
 
   const limit = build('limite_spesa', '12 euro');
-  assert.equal(limit.level, 2);
+  assert.equal(limit.costo, 2);
   assert.deepEqual(limit.partial, { monthlyLimitEur: 12 });
 });
 
@@ -122,26 +122,26 @@ test('valori non validi → null (niente scrittura accidentale)', () => {
   assert.equal(build('apiKey', 'x'), null);
 });
 
-test('il livello di default è 1 quando il setter non lo dichiara', () => {
-  // I setter estetici storici non hanno `level` esplicito.
-  assert.equal(build('dimensione_testo', 'grande').level, 1);
-  assert.equal(build('stile_agente', 'professionale').level, 1);
+test('il costo di default è 1 quando il setter non lo dichiara', () => {
+  // I setter estetici storici non hanno `costo` esplicito.
+  assert.equal(build('dimensione_testo', 'grande').costo, 1);
+  assert.equal(build('stile_agente', 'professionale').costo, 1);
 });
 
-// ── #183: il popup di livello 2 spiega cosa Filo fa E i rischi ───────────────
-// Itera sul registro REALE: qualsiasi setter di livello 2 aggiunto in futuro
+// ── #183: il popup di costo 2 spiega cosa Filo fa E i rischi ────────────────
+// Itera sul registro REALE: qualsiasi setter di costo 2 aggiunto in futuro
 // senza `risk` fa diventare rosso questo test (è il guard-rail della regola).
-test('REGOLA #183: ogni setter di livello 2 dichiara un messaggio di rischio non vuoto', () => {
+test('REGOLA #183: ogni setter di costo 2 dichiara un messaggio di rischio non vuoto', () => {
   const senzaRischio = P.PREF_SETTERS
-    .filter((s) => s.level === 2)
+    .filter((s) => s.costo === 2)
     .filter((s) => !s.risk || String(s.risk).trim().length < 20)
     .map((s) => s.keys[0]);
-  assert.deepEqual(senzaRischio, [], `setter di livello 2 senza messaggio di rischio (#183): ${senzaRischio.join(', ')}`);
+  assert.deepEqual(senzaRischio, [], `setter di costo 2 senza messaggio di rischio (#183): ${senzaRischio.join(', ')}`);
 });
 
 test('#183: il messaggio di rischio è esposto da buildPreferencePartial e parla del rischio', () => {
   const term = build('terminale', 'on');
-  assert.equal(term.level, 2);
+  assert.equal(term.costo, 2);
   assert.match(term.risk, /shell/i, 'la modalità terminale spiega l’accesso alla shell');
 
   const key = build('chiave_openrouter', 'sk-or-v1-SEGRETO1234');
@@ -159,7 +159,7 @@ test('#183: il messaggio di rischio è esposto da buildPreferencePartial e parla
 // questi assert diventerebbero rossi (build → null).
 test('colore_tab: "più vivaci" alza saturazione/opacità, livello 1', () => {
   const r = build('colore_tab', 'voglio colori più vivaci');
-  assert.equal(r.level, 1);
+  assert.equal(r.costo, 1);
   assert.equal(r.partial.tabColor.saturazione_tab, 1);
   assert.ok(r.partial.tabColor.opacita_tab > 0.6, 'opacità alzata sopra il default');
 });
@@ -224,4 +224,26 @@ test('extractIdentityFromPixels rispetta saturazione_tab (param di estrazione)',
   const sat = (s) => { const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(s); const p = [+m[1], +m[2], +m[3]]; return Math.max(...p) - Math.min(...p); };
   assert.ok(sat(full) > sat(flat), `saturazione 1 (${full}) deve essere più satura di 0 (${flat})`);
   assert.equal(sat(flat), 0, 'saturazione 0 → grigio');
+});
+
+// ── #530, regola (d): chi ALLENTA una difesa lo dichiara ────────────────────
+// Il costo non basta a distinguere «accendo il terminale» da «lo spengo»: la
+// prima dà a Filo la shell, la seconda gliela toglie. Il setter dichiara
+// `allenta(valore)` e la regola porta quel caso alla parola digitata.
+test('REGOLA #530: i setter che allentano una difesa lo dichiarano per il valore giusto', () => {
+  const allenta = (k, v) => build(k, v).allenta;
+  assert.equal(allenta('modalita_terminale', 'attiva'), true);
+  assert.equal(allenta('modalita_terminale', 'disattiva'), false);
+  assert.equal(allenta('navigazione_sicura', 'off'), true);
+  assert.equal(allenta('navigazione_sicura', 'on'), false);
+  assert.equal(allenta('protezione_ip', 'off'), true);
+  assert.equal(allenta('blocco_popup', 'no'), true);
+  assert.equal(allenta('gestione_cookie', 'automatico'), true);
+  assert.equal(allenta('gestione_cookie', 'privacy'), false);
+  assert.equal(allenta('fingerprint', 'off'), true);
+  assert.equal(allenta('modelli_predefiniti', 'no'), true);
+  assert.equal(allenta('chiave_openrouter', 'sk-or-v1-abcd1234'), true);
+  // Una preferenza estetica non allenta niente.
+  assert.equal(allenta('tema', 'scuro'), false);
+  assert.equal(allenta('dimensione_testo', 'grande'), false);
 });
