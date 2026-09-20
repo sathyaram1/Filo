@@ -355,14 +355,15 @@
   // del testo che il sito AGGIUNGE dopo, e va trattato uguale (#407): non si
   // traduce adesso, ma appena si vede il menu deve offrire di tradurlo, invece
   // di lasciare come unica strada tornare all'originale e ripagare la pagina.
-  // Il sito sceglie COME ripiegare, e da quella scelta non possono dipendere né
-  // il comportamento né il conto (#505): i tre modi qui sotto valgono uguale.
+  // Il sito sceglie COME ripiegare una sezione, e da quella scelta non possono
+  // dipendere né il comportamento né il conto dell'utente (#505).
   function isVisibilityHidden(el) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
     // La finestra dell'elemento, non la nostra: da quando la traduzione entra
     // nei riquadri senza indirizzo (#407) qui arrivano elementi di un ALTRO
-    // documento, e chiederne lo stile alla finestra sbagliata non risponde di loro.
+    // documento, e chiederne lo stile alla finestra sbagliata non risponde di
+    // loro.
     const cs = viewOf(el).getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse'
         || cs.contentVisibility === 'hidden') return true;
