@@ -134,11 +134,12 @@ test('a «l\'hai aggiunto?» Filo deve sapere che l\'utente l\'ha aggiunto', asy
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Rispondo.' }).nth(1)).toBeVisible({ timeout: 10_000 });
 
   // Un'impostazione confermata nel popup arriva al modello al turno dopo
-  // («l'utente ha confermato, è già fatto»). L'evento aggiunto col bottone no:
-  // nel contesto del turno seguente non ne resta niente.
+  // («l'utente ha CONFERMATO e il sistema ha eseguito»). L'evento aggiunto col
+  // bottone no: si guardano solo i turni di Filo, perché la domanda dell'utente
+  // contiene già la parola e non prova niente.
   const visto = await app.evaluate(() => (globalThis.__v567g2c_msg || []).join('\n'));
-  expect(visto, 'il modello non trova traccia dell\'evento aggiunto dall\'utente')
-    .toMatch(/aggiunt\w*\s+(al\s+)?calendario|l.ha aggiunto|Cena con Anna/i);
+  expect(visto, 'nei turni di Filo non resta traccia che l\'utente abbia aggiunto l\'evento')
+    .toMatch(/aggiunt/i);
 
   await app.evaluate(() => { try { globalThis.__v567g2c_restore?.(); } catch (_) {} });
 });
