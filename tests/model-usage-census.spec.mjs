@@ -134,8 +134,11 @@ test('il pulsante «Prova» usa il modello configurato, e cambia se cambio la co
 
   // Intercetta la chiamata nel processo principale: ci interessa CON QUALE
   // modello parte la prova, non la risposta del servizio.
+  // #591 — si intercetta il FORNITORE, non il router: da quando ogni chiamata
+  // passa dal cancello unico (limite di spesa, conteggio dei costi), la prova
+  // arriva al fornitore attraverso getProvider, non con SN_PROVIDERS.streamComplete.
   const askedFor = async (provider) => app.evaluate(async ({ }, prov) => {
-    const P = globalThis.SN_PROVIDERS;
+    const P = globalThis.SN_PROVIDERS.getProvider(prov);
     const orig = P.streamComplete;
     let seen = null;
     P.streamComplete = async ({ model, onDelta }) => {
