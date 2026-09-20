@@ -1267,13 +1267,13 @@
         || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (grezzo || '(risposta vuota)'));
       assistantEl = appendChatMessage('assistant', displayText);
       if (parsed.fuoriFormato) {
-        appendChatMessage('avviso', AVVISO_FUORI_FORMATO);
+        // #517 (giro 7) — anche qui il tasto che rimanda la richiesta. Sono i
+        // due guasti della stessa segnalazione e l'utente non deve riscrivere
+        // la richiesta in uno dei due e non nell'altro.
+        renderRifallo(appendChatMessage('avviso', AVVISO_FUORI_FORMATO));
         console.warn('[Filo] #517 risposta fuori formato dell\'agente Aiuto, niente eseguito:', grezzo.slice(0, 200));
-      } else if (azioniMancate.length) {
-        const D = global.SN_AZIONI_DICHIARATE;
-        renderRifallo(appendChatMessage('avviso', D.avvisoPerUtente(azioniMancate)));
-        console.warn('[Filo] #517 azione dichiarata e mai emessa nell\'Aiuto:',
-          azioniMancate.map((f) => `${f.id} ← «${f.frase}»`).join(' | '));
+      } else {
+        mostraAzioniMancate(azioniMancate);
       }
 
       // Aggiorna la storia AI
