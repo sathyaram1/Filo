@@ -59,13 +59,28 @@
   const INIZIO = '(?<![\\wàèéìíòóùú])';
   // L'apostrofo si scrive in due modi e il modello usa tutti e due.
   const AP = "['’]";
+  // Le paroline che si infilano fra «ho» e il participio. Giro 5: il
+  // participio doveva stare ATTACCATO a «ho», quindi «ti ho GIÀ messo la
+  // sveglia alle 19» — la risposta tipica quando l'utente richiede una cosa —
+  // non veniva vista affatto, in nessuna famiglia e nemmeno col pronome.
+  // L'elenco è chiuso apposta: un `\w+` qualunque qui dentro farebbe passare
+  // il complemento («ho la sveglia messa da parte») per un avverbio.
+  const AVVERBI = '(?:gi[àa]|appena|anche|pure|subito|poi|quindi|comunque|intanto|infine'
+    + '|ovviamente|certamente|sicuramente|effettivamente|finalmente|volentieri|prontamente'
+    + '|ora|adesso|oggi|ieri|stamattina|stasera|stanotte|nel frattempo|per te|per voi)';
+  const AVV = `(?:${AVVERBI}\\s+){0,2}`;
   // «Ho» e il participio: quanti spazi vuole il modello, e anche un a capo.
   // Scritto con uno spazio solo, «Ho  messo  la  sveglia» passava intero, e
   // così «Ti ho messo» con l'a capo prima di «una sveglia».
-  const HO = '\\bho\\s+';
+  const HO = `\\bho\\s+${AVV}`;
   // Il pezzo di frase fra il verbo e la cosa. Prima escludeva l'a capo: una
-  // dichiarazione spezzata su due righe non veniva vista.
+  // dichiarazione spezzata su due righe non veniva vista. Da 48 a 72: con 48
+  // «Ho messo, come mi avevi chiesto ieri sera prima di uscire, la sveglia
+  // alle 19» restava muta.
   const PONTE = (n) => `[^.!?]{0,${n}}`;
+  // I pronomi con cui si risponde quando la cosa l'ha appena nominata
+  // l'utente. «Gliel'ho messa» mancava: c'erano solo prima e seconda persona.
+  const PRON = `(?:te |ve |me |glie)?l${AP}ho\\s+${AVV}`;
 
   // Ogni famiglia: come il modello DICE di aver fatto la cosa (`frasi`), quali
   // azioni la reggono davvero (`tipi`) e cosa va detto all'utente quando la
