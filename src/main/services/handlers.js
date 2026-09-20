@@ -1232,11 +1232,13 @@ async function navExfilCorpus() {
   } catch (_) { return ''; }
 }
 
-// Quello che Filo LEGGE per il modello (una pagina, un documento, l'uscita di
-// un comando) va tenuto da parte: se riparte dentro un indirizzo, quella è
-// un'uscita di dati come le altre e l'utente deve vederla prima (#553).
-function ricordaLetto(testo) {
-  try { if (testo) require('./testoLetto').ricorda(testo); } catch (_) {}
+// Quello che Filo LEGGE per il modello (una scheda dell'utente, un documento,
+// l'uscita di un comando) va tenuto da parte: se riparte dentro un indirizzo,
+// quella è un'uscita di dati come le altre e l'utente deve vederla prima
+// (#553). `da` è il sito da cui viene, per non chiedere conferma quando quel
+// testo torna a casa sua.
+function ricordaLetto(testo, da = '') {
+  try { if (testo) require('./testoLetto').ricorda(testo, da); } catch (_) {}
 }
 
 // ── Difesa in profondità sulle azioni confermate (#250) ─────────────────────
