@@ -241,7 +241,9 @@ function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIll
   const token = `${attrs.class || ''} ${attrs.id || ''}`.split(/[\s]+/).filter(Boolean);
   if (token.some((t) => TOKEN_RUMORE.test(t))) return 'fuori';
   if (inZona || TAG_TABELLA.has(nome)) return false;
-  const cornice = TAG_CORNICE.has(nome)
+  // Un `header` attaccato al corpo della pagina è del sito; più in dentro è
+  // l'intestazione del pezzo, e lì stanno il titolo, la data e la firma.
+  const cornice = (TAG_CORNICE.has(nome) && primoLivello)
     || (attrs.role && ROLE_CORNICE.test(attrs.role))
     || token.some((t) => TOKEN_CORNICE.test(t));
   return cornice ? 'cornice' : false;
