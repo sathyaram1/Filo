@@ -240,6 +240,9 @@ module.exports = {
   readDocument,
   // esportati per gli unit test e per chi formatta l'osservazione
   normalizePath,
+  // Anche la lettura di una pagina web incontra dei PDF (un listino, un
+  // bilancio linkato da una ricerca): l'estrattore è lo stesso.
+  estraiPdf: extractPdf,
   kindFromExtension,
   looksLikeText,
   decodeText,
