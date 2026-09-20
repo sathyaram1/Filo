@@ -90,16 +90,8 @@ test('i due file della segnalazione: l’elenco li dice interi e il nome apre il
 });
 
 test('la cartella storpiata si ritrova, e il nome vero arriva a chi legge', async ({ openTab }) => {
-  const dir = cartellaTemporanea('filo-551-g9-cartella-');
+  const base = cartellaTemporanea('filo-551-g9-cartella-');
   try {
-    const sotto = join(dir, 'Progetto — Singolarità');
-    writeFileSync(join(cartellaTemporanea('x') && sotto, ''), '');
-  } catch (_) { /* creata sotto */ }
-  rmSync(dir, { recursive: true, force: true });
-
-  const base = cartellaTemporanea('filo-551-g9-cartella-b-');
-  try {
-    const { mkdirSync } = await import('node:fs');
     const sotto = join(base, 'Progetto — Singolarità');
     mkdirSync(sotto);
     writeFileSync(join(sotto, SEO), 'TITOLO SEO\n', 'utf8');
