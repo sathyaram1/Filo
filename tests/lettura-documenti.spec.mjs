@@ -75,6 +75,30 @@ test('un documento che non esiste torna un rifiuto spiegato', async ({ openTab }
   expect(String(r.output.detail).length).toBeGreaterThan(0);
 });
 
+test('il file col nome quasi giusto si apre, e Filo sa quale ha aperto', async ({ openTab }) => {
+  // #551. Il terminale di Windows storpiava i nomi (trattino lungo → «-»,
+  // «à» → carattere di sostituzione) e il modello ricopiava il nome sbagliato.
+  // Qui si chiede il file col nome STORPIATO e deve arrivare il testo del file
+  // vero, insieme al nome vero: il campo `requested` è quello che dice al
+  // modello «non era questo il nome», e senza la sua strada fino in fondo il
+  // modello continuerebbe a usare il nome che non esiste.
+  const dir = cartellaTemporanea('filo-nome-storpiato-');
+  const vero = join(dir, 'SPECIFICHE SEO E METADATI — singolarità.txt');
+  writeFileSync(vero, 'meta description: 155 caratteri\n', 'utf8');
+  const storpiato = join(dir, 'SPECIFICHE SEO E METADATI - singolarit�.txt');
+  try {
+    const page = await openTab(HOME);
+    const r = await leggiDocumento(page, storpiato);
+
+    expect(r?.executed, 'doveva ritrovare il file, non arrendersi al nome storpiato').toBe(true);
+    expect(r.output.text).toContain('155 caratteri');
+    expect(r.output.name).toBe('SPECIFICHE SEO E METADATI — singolarità.txt');
+    expect(r.output.requested).toBe(storpiato);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('un formato che Filo non legge viene rifiutato dicendo cos’è', async ({ openTab }) => {
   const page = await openTab(HOME);
   const r = await leggiDocumento(page, join(__dirname, '..', 'assets', 'icons', 'icon.ico'));
