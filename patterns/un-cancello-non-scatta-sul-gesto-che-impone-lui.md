@@ -2,11 +2,11 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-**Regola.** Quando un controllo obbliga a un gesto — segnare un rosso atteso,
-aggiornare un file di stato, rigenerare un elenco — quel gesto non deve farlo
-scattare. Il controllo si lega a **quello che gira**, non alla punta del ramo:
-si confronta il contenuto ridotto a ciò che decide, e se lì non è cambiato
-niente il verdetto regge.
+**Regola.** Certi controlli obbligano a un gesto prima di lasciar passare:
+segnare un rosso atteso, aggiornare un file di stato, rigenerare un elenco.
+Quel gesto non deve farli scattare. Il controllo si lega a **quello che gira**,
+non alla punta del ramo. Si confronta il contenuto ridotto a ciò che decide, e
+se lì non è cambiato niente il verdetto regge.
 
 ## Il caso
 
@@ -19,8 +19,8 @@ verdetto era legato allo sha: la chiusura rispondeva «il codice è cambiato dop
 la verifica» e ci voleva un giro intero, di un'altra istanza, per riverificare
 un ramo in cui era cambiata una riga di test.
 
-Il cancello chiedeva un gesto e poi puniva chi lo faceva. È costato due giri —
-mezz'ora e un'istanza l'uno — prima che diventasse un feedback (#661).
+Il cancello chiedeva un gesto e poi puniva chi lo faceva. È costato due giri,
+mezz'ora e un'istanza l'uno, prima che diventasse un feedback (#661).
 
 ## Cosa non ha funzionato
 
@@ -37,17 +37,17 @@ punto può cambiare senza che nessuno se ne accorga.
 
 ## Come si fa
 
-Si riducono i due contenuti a **ciò che fa girare la prova** — via righe vuote,
-commenti e marcatori — e si confrontano. Uguali: il verdetto regge, e chi
-pubblica legge quali file sono passati. Diversi, o anche un solo file fuori
-dalla cartella delle prove del giro: decade come prima.
+Dai due contenuti si tolgono righe vuote, commenti e marcatori. Quello che
+resta è **ciò che fa girare la prova**, e si confronta. Se è uguale il verdetto
+regge, e chi pubblica legge quali file sono passati. Se è diverso, o se anche un
+solo file sta fuori dalla cartella delle prove del giro, decade come prima.
 
 Tre paletti, e nessuno è di gusto:
 
-- la riduzione perdona solo ciò che **non cambia cosa succede** (un commento,
-  una riga vuota, un marcatore). Una riga commentata via non è perdonata:
-  quello che c'era prima sparisce dal confronto, ed è il modo più facile di
-  spegnere una prova;
+- si perdona solo ciò che **non cambia cosa succede**, cioè un commento, una
+  riga vuota, un marcatore. Una riga commentata via non è perdonata. Quello che
+  c'era prima sparisce dal confronto, ed è il modo più facile di spegnere una
+  prova;
 - ciò che non si riconosce come marcatore intero **resta una riga come le
   altre**. Meglio un verdetto che decade di uno che tollera una riga di codice
   inghiottita da un marcatore scritto male;

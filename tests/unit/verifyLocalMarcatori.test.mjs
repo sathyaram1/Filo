@@ -61,6 +61,13 @@ test('corpoSenzaMarcatori: marcatori, commenti e righe vuote non contano', () =>
   // Un motivo lungo va a capo e resta un marcatore solo.
   const aCapo = PROVA.replace('  const riga', "  test.fail(true,\n    'un motivo che non sta su una riga sola perché il rilievo è lungo da spiegare');\n  const riga");
   assert.equal(corpoSenzaMarcatori(aCapo), corpoSenzaMarcatori(PROVA));
+  // Sulla macchina dell'owner i file stanno su Windows: un ritorno a capo in
+  // più non è una riga cambiata.
+  assert.equal(corpoSenzaMarcatori(PROVA_SEGNATA.replace(/\n/g, '\r\n')), corpoSenzaMarcatori(PROVA));
+  // Un file vuoto, o niente: nessuna eccezione, nessun contenuto.
+  assert.equal(corpoSenzaMarcatori(''), '');
+  assert.equal(corpoSenzaMarcatori(undefined), '');
+  assert.equal(corpoSenzaMarcatori('\n\n   \n'), '');
 });
 
 test('corpoSenzaMarcatori: quello che gira resta, e si vede', () => {
