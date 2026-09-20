@@ -18,7 +18,7 @@
     {
       version: '0.2.228', date: '2026-09-11',
       features: [
-        'Quando Filo legge qualcosa scritto da altri — una pagina, un documento, dei risultati di ricerca — può fare solo le cose che la tua richiesta comportava. Se gli serve fare altro te lo chiede, dicendoti cosa e perché, e il permesso vale solo per quella richiesta. Così una pagina che prova a dargli ordini non ottiene niente. In filo://security/ vedi cosa gli era permesso in ogni richiesta recente.',
+        'Quando Filo legge qualcosa scritto da altri, per esempio una pagina web, un documento o dei risultati di ricerca, da lì in poi può fare solo le cose che gli avevi chiesto. Se gli serve fare altro te lo chiede, dicendoti quale azione e perché, e il permesso vale solo per quella richiesta. Così una pagina che prova a dargli ordini non ottiene niente. In filo://security/ vedi cosa gli era permesso in ogni richiesta recente.',
         'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta. La pagina Crediti ricorda l’ultimo rifiuto finché la chiave non torna a funzionare.',
         'Un invito adesso è un link. Chi lo apre scarica Filo e al primo avvio si ritrova i crediti già dentro, senza ricopiare il codice. Ogni tuo link vale per tre persone, e nella pagina Crediti vedi quanti sono entrati e quanti posti restano.',
         'Mandare una segnalazione dà crediti, e se viene risolta ne dà altri. Li trovi nei movimenti della pagina Crediti, insieme all\'invito riscattato, alla quota di ogni giorno e ai regali.',
