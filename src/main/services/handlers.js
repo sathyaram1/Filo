@@ -2450,6 +2450,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const bye = Onboarding.CLOSING_MESSAGE;
     const closed = Onboarding.close(Onboarding.appendTurn(onbBefore, { role: 'filo', text: bye }));
     await saveOnboarding(closed);
+    // Il congedo è l'ultima cosa che l'utente legge dell'accoglienza: finisce
+    // in archivio come ogni altra battuta. Questo turno esce di qui e non
+    // passa dal salvataggio della risposta più in basso.
+    await archiviaCongedoAccoglienza(chatId, bye);
     releaseOnboardingResume();
     // Le lezioni si estraggono comunque: se prima di dire «basta» l'utente
     // aveva raccontato qualcosa, quel qualcosa è suo e resta.
