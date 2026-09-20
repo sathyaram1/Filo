@@ -288,8 +288,12 @@ async function readDocument(input) {
   const base = {
     ok: false, path: '', name: '', kind: '', text: '', truncated: false,
     pages: 0, empty: false, bytes: 0, error: null, detail: '',
+    // Valorizzato SOLO quando il percorso chiesto non esisteva e si è aperto un
+    // file dal nome quasi uguale: chi legge deve sapere che ha in mano un altro
+    // file, e l'utente deve vederselo dire (#551).
+    requested: '',
   };
-  const full = normalizePath(input);
+  let full = normalizePath(input);
   if (!full) return { ...base, error: 'no_path', detail: 'nessun percorso indicato' };
   base.path = full;
   base.name = path.basename(full);
@@ -298,7 +302,17 @@ async function readDocument(input) {
   try {
     st = await fsp.stat(full);
   } catch (_) {
-    return { ...base, error: 'not_found', detail: 'a quel percorso non c\'è nessun file' };
+    // Il percorso non c'è così com'è scritto. Prima di arrendersi: c'è UN SOLO
+    // file che combacia a meno di accenti, trattini e maiuscole? (#551)
+    const alt = await risolviTollerante(full);
+    if (alt.path) {
+      try { st = await fsp.stat(alt.path); } catch (_) { st = null; }
+    }
+    if (!st) return { ...base, error: 'not_found', detail: dettaglioNonTrovato(alt.ambigui) };
+    base.requested = full;
+    full = alt.path;
+    base.path = full;
+    base.name = path.basename(full);
   }
   if (st.isDirectory()) {
     return { ...base, error: 'is_directory', detail: 'quello è il percorso di una cartella, non di un file' };
