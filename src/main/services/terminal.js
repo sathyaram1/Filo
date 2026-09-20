@@ -232,7 +232,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     let child;
     try {
       child = spawn(file, args, {
-        cwd: cwd || undefined,
+        cwd: cartella,
         env: env || process.env,
         windowsHide: true,
         shell: false,
