@@ -69,13 +69,20 @@ test('un testo consegnato dentro la risposta non diventa «non è partito niente
     'Ecco la frase con la citazione:\n\n«Il gatto dorme».\n\nTe l\'ho messa tra virgolette.',
   ];
   for (const testo of consegne) {
-    expect(D.rileva(testo, new Set(), STATO()), testo).toEqual([]);
+    expect(D.rileva(testo, new Set(), sulTesto), testo).toEqual([]);
   }
 
   // La controprova: una cosa che Filo può fare solo chiamando uno strumento,
   // detta con lo stesso pronome, resta una dichiarazione da verificare.
-  expect(D.rileva('Te l\'ho messa alle 19.', new Set(), STATO()).length).toBeGreaterThan(0);
-  expect(D.rileva('Te l\'ho mandata agli sviluppatori.', new Set(), STATO()).length).toBeGreaterThan(0);
+  const perLaSveglia = DOPO('mettimi la sveglia alle 19 per stasera');
+  expect(D.rileva('Te l\'ho messa alle 19.', new Set(), perLaSveglia).length).toBeGreaterThan(0);
+  const perIlFeedback = DOPO('manda un feedback: la barra in alto sparisce');
+  expect(D.rileva('Sì, te l\'ho mandata.', new Set(), perIlFeedback).length).toBeGreaterThan(0);
+  // …e una richiesta scritta come domanda resta una richiesta.
+  const conDomanda = DOPO('mi segni anche la lista della spesa: pane, uova, latte?');
+  expect(D.rileva('Te l\'ho segnata.', new Set(), conDomanda).length).toBeGreaterThan(0);
+  // L'ora promessa vale comunque, qualunque cosa avesse chiesto l'utente.
+  expect(D.rileva('Te l\'ho messa alle 19.', new Set(), sulTesto).length).toBeGreaterThan(0);
 });
 
 test('la conferma corta non viene coperta da una cosa fatta in un turno prima', () => {
