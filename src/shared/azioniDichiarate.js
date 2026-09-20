@@ -175,12 +175,16 @@
       avviso: 'la sveglia non c\'è',
       frasi: [
         // Giro 8: «preparato» e «schedulato» mancavano fra i verbi.
-        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato|preparato|schedulato)\\b${PONTE(72)}\\b${SVEGLIA}\\b`, 'i'),
+        // Giro 10: «sistemato» mancava, ed è il verbo di chi rimette a posto
+        // una cosa che l'utente gli ha chiesto.
+        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato|preparato|schedulato|sistemato)\\b${PONTE(72)}\\b${SVEGLIA}\\b`, 'i'),
         new RegExp(`\\bfatto[,:!]?\\s+(?:la |una |l['’])?${SVEGLIA}\\b${PONTE(24)}\\b(?:impostat|programmat|messa|fissat|pronta)`, 'i'),
         // Giro 8: la conferma più corta di tutte, «Ecco fatto: sveglia alle
         // 19». Senza un participio dietro non la prendeva nessuna regola, ed
         // è l'ora a renderla una promessa.
-        new RegExp(`\\bfatto\\b[,:!.…]?\\s+(?:la |una |l['’])?${SVEGLIA}\\b[^.!?]{0,12}\\b(?:alle|all['’]|per\\s+le|delle)\\s*\\d`, 'i'),
+        // Giro 10: la stessa conferma vale dietro qualunque parola di assenso.
+        // Solo «fatto» la apriva, e «Perfetto, sveglia alle 19» restava muta.
+        new RegExp(`${ASSENSO}\\s+(?:la |una |l['’])?${SVEGLIA}\\b[^.!?]{0,12}\\b(?:alle|all['’]|per\\s+le|delle)\\s*\\d`, 'i'),
         new RegExp(`${PERIFRASI}${PONTE(48)}\\b${SVEGLIA}\\b`, 'i'),
         participio(SVEGLIA, 'impostat[ao]|programmat[ao]|messa|fissat[ao]|creat[ao]|attivat[ao]|settat[ao]|puntat[ao]|pronta'),
       ],
