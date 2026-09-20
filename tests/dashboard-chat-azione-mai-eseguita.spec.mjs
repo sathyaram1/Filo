@@ -210,3 +210,68 @@ test('un\'apertura fatta con un comando non viene smentita all\'utente', async (
   // Due chiamate e basta: nessun rimbalzo su una frase che era vera.
   expect(await app.evaluate(() => globalThis.__captured.length)).toBe(2);
 });
+
+// Giro 2 della verifica. Il presidio taceva anche quando lo strumento era
+// stato chiamato ma non aveva fatto nascere niente, e parlava quando non
+// doveva: la risposta che l'utente aveva chiesto veniva buttata, rifatta e poi
+// smentita.
+
+test('una sveglia chiamata ma non riuscita non copre la frase che la dà per fatta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  // Lo strumento parte con un orario che Filo non sa leggere: nessuna sveglia
+  // nasce. Poi il modello la racconta lo stesso.
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'k1', name: 'SVEGLIA', arguments: '{"time":"quando fa buio","label":"sera"}' }] },
+    { text: FRASE + '.' },
+  ]);
+  await page.locator('#input').fill('mettimi una sveglia per stasera');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  expect(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers())).toHaveLength(0);
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
+});
+
+test('la risposta che Filo SCRIVE non viene buttata via né smentita', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  // La cosa chiesta è il testo, e il testo è nella risposta: non esiste
+  // nessuno strumento che possa averlo scritto.
+  await installScript(app, [
+    { text: "Te l'ho scritta qui sotto:\n\nGentile Marco, ti chiedo scusa per il ritardo di ieri." },
+  ]);
+  await page.locator('#input').fill('scrivimi una mail di scuse per il ritardo');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-filo').last()).toContainText('Gentile Marco');
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  // Una chiamata sola: la risposta era già buona, e rifarla costa un giro e
+  // fa sparire da sotto gli occhi quella che l'utente stava leggendo.
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
+});
+
+test('una sveglia messa in una sessione precedente resta una sveglia messa', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.addAlarm({ label: 'sera', time: '19:00', repeat: ['lun', 'mar', 'mer'] });
+  });
+  await installScript(app, [{ text: 'Sì, ho messo la sveglia alle 19:00 come mi avevi chiesto.' }]);
+  await page.locator('#input').fill('hai messo la sveglia per stasera?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
+});
