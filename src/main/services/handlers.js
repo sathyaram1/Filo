@@ -2748,7 +2748,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const precedenti = Dichiarate.tipiDallaCronologia(threadHistory);
       const adesso = tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini, userMessage);
       azioniMancate = Dichiarate.rileva(textReply, adesso, {
-        ...(await statoDichiarazioni(renderedActions)), tipiPrecedenti: precedenti,
+        ...(await statoDichiarazioni(renderedActions)),
+        tipiPrecedenti: precedenti,
+        // #517 (giro 8) — QUANTE ne hanno fatte i turni prima, e su quali
+        // famiglie l'avviso è già comparso. Senza il conto, un appunto
+        // scritto una volta reggeva ogni appunto raccontato dopo; senza le
+        // famiglie già avvisate, bastava premere «Fallo adesso» e sentirsi
+        // ripetere «te l'ho già salvato» perché il presidio tacesse proprio
+        // dove l'utente aveva appena chiesto di rimediare.
+        contiPrecedenti: Dichiarate.contiDallaCronologia(threadHistory),
+        famiglieGiaMancate: Dichiarate.famiglieMancateDallaCronologia(threadHistory),
       });
       avvisoAzioni = Dichiarate.avvisoPerUtente(azioniMancate);
       if (avvisoAzioni) {
