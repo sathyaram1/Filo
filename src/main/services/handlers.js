@@ -1521,7 +1521,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         overrides[token] = String(valore).trim();
         await applySettingsUpdate({ themeTokens: overrides });
         // kept:true → il client renderizza il bottone di raffinamento (GUI).
-        return { executed: true, kept: true };
+        // Il nome in italiano del token («Colore d'accento») viaggia con
+        // l'esito: nel diario va letto, non il nome interno.
+        const voce = T.get(token);
+        return {
+          executed: true,
+          kept: true,
+          output: { estetica: `${(voce && voce.label) || token} → ${String(valore).trim()}` },
+        };
       }
       case 'CERCA_WEB': {
         // #368 — la ricerca web ora viene ESEGUITA DAVVERO qui e i risultati
