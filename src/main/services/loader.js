@@ -73,6 +73,10 @@ require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: ri
 // parte pura serve anche al main, che rifiuta gli stessi valori della pagina.
 require(path.join(SHARED, 'campoNumero.js'));
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
+// #533 — il perimetro delle uscite. Va PRIMA dei due sotto: actionLevels
+// descrive le famiglie nei popup, actionTools le elenca al modello.
+require(path.join(SHARED, 'autonomia.js'));
+require(path.join(SHARED, 'compiti.js'));
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
 require(path.join(SHARED, 'pageRestyle.js'));
