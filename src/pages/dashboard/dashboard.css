@@ -1016,9 +1016,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   align-items: center;
   gap: 2px;
 }
-/* #530 — il livello di autonomia attivo, in alto a destra accanto ai comandi.
-   Una parola, non un'icona: è un nome che si legge, e cliccandola si apre dove
-   si cambia. */
+/* #530 — il livello di autonomia attivo, accanto ai comandi. Una parola e non
+   un'icona, perché è un nome che si legge; cliccandola si apre dove si cambia. */
 .dash-autonomia {
   height: 34px;
   padding: 0 10px;
