@@ -198,6 +198,7 @@ async function detonateNow(el, url, evaluateFinal, opts = {}) {
     if (ripulito) return;
     ripulito = true;
     try { if (!win.isDestroyed()) win.destroy(); } catch (_) {}
+    try { ses.removeListener('will-download', suDownload); } catch (_) {}
     // Svuota i dati effimeri della memoria e la rimette nel giro.
     try { Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) {}
     rendiPartizione(partition);
