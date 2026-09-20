@@ -347,7 +347,15 @@
   // trovato l'evento però ti ho messo la sveglia» restava coperta dal «non»,
   // mentre la stessa frase con «ma» veniva vista. «Invece» sta qui per lo
   // stesso motivo di «però»: stacca, non nega.
-  const STACCHI = new RegExp(`[.!?;:,\\n—]|${INIZIO}(?:ma|però|invece|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
+  // Giro 6: il punto e la virgola FRA DUE CIFRE non staccano niente. Sono i
+  // segni con cui in italiano si scrive un orario, e tagliando lì «Ho messo la
+  // sveglia alle 19.30» si leggeva «…alle 19»: la sveglia delle 19:30, che
+  // esisteva davvero, veniva smentita.
+  const PUNTO = '(?:(?<!\\d)\\.|\\.(?!\\d))';
+  const VIRGOLA = '(?:(?<!\\d),|,(?!\\d))';
+  // Dove finisce una frase, con la stessa cautela sull'orario.
+  const FINE_FRASE = new RegExp(`${PUNTO}|[!?\\n]`);
+  const STACCHI = new RegExp(`${PUNTO}|${VIRGOLA}|[!?;:\\n—]|${INIZIO}(?:ma|però|invece|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
   // «Eccola qui sotto»: la cosa dichiarata è dentro la risposta, non da
   // un'altra parte. Non c'è nessuno strumento che possa averla fatta, quindi
   // non c'è niente da avvisare.
