@@ -38,19 +38,21 @@ const AIUTO = () => ({ famiglie: D.FAMIGLIE_AIUTO });
 const STATO = (o = {}) => ({ orariSveglie: [], titoliAppunti: [], contiAzioni: {}, ...o });
 
 test('nell\'Aiuto una cosa fatta una volta non copre quelle raccontate dopo', () => {
-  // Nel pannello Aiuto le azioni emesse si accumulano in un insieme solo, che
-  // vale come «fatto adesso» per sempre. Chiedi due feedback di fila: il primo
-  // parte, il secondo il modello lo racconta e basta, e nessuno lo dice.
-  const emesse = new Set(['INVIA_FEEDBACK']);
-  const out = D.rileva('Ho mandato la segnalazione agli sviluppatori: ci penseranno loro.',
-    emesse, { orariSveglie: [] }, AIUTO());
-  expect(out.length).toBeGreaterThan(0);
-
-  // Stessa cosa per l'appunto e per l'evento in calendario.
+  // Nel pannello Aiuto le azioni emesse stavano in un insieme solo, che
+  // valeva come «fatto adesso» per sempre. Chiedi due feedback di fila: il
+  // primo parte, il secondo il modello lo racconta e basta. Adesso il
+  // pannello tiene separato quello che ha fatto PRIMA, e una cosa raccontata
+  // come appena fatta vuole un'azione di adesso.
+  const prima = { orariSveglie: [], tipiPrecedenti: new Set(['INVIA_FEEDBACK']) };
+  expect(D.rileva('Ho mandato la segnalazione agli sviluppatori: ci penseranno loro.',
+    new Set(), prima, AIUTO()).length).toBeGreaterThan(0);
   expect(D.rileva('Ti ho salvato l\'appunto con la lista della spesa.',
-    new Set(['SALVA_APPUNTO']), { orariSveglie: [] }, AIUTO()).length).toBeGreaterThan(0);
+    new Set(), { orariSveglie: [], tipiPrecedenti: new Set(['SALVA_APPUNTO']) }, AIUTO()).length).toBeGreaterThan(0);
   expect(D.rileva('Ti ho aggiunto l\'evento in calendario per domani alle 10.',
-    new Set(['EVENTO_CALENDARIO']), { orariSveglie: [] }, AIUTO()).length).toBeGreaterThan(0);
+    new Set(), { orariSveglie: [], tipiPrecedenti: new Set(['EVENTO_CALENDARIO']) }, AIUTO()).length).toBeGreaterThan(0);
+  // …e quella di adesso la regge, come prima.
+  expect(D.rileva('Ho mandato la segnalazione agli sviluppatori.',
+    new Set(['INVIA_FEEDBACK']), { orariSveglie: [] }, AIUTO()).length).toBe(0);
 });
 
 test('nell\'Aiuto la conferma col pronome viene guardata come nella chat della home', () => {
