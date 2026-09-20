@@ -308,6 +308,10 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
         code: realCode,
         signal: signal || null,
         cwd: resultCwd,
+        // La cartella chiesta non c'era più e il comando è girato nella home.
+        // Chi formatta l'esito per il modello lo riporta, così l'utente sente
+        // la causa vera invece di un guasto inventato (#551, quarto giro).
+        cwdPersa: cartellaPersa || undefined,
         truncated: out.truncated || err.truncated,
         timedOut,
         durationMs: Date.now() - startedAt,
