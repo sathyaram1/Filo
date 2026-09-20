@@ -2523,17 +2523,22 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // vecchio ha già fallito)? Allora il turno non è finito: si rimanda
         // indietro, con dentro il motivo. Serve almeno un giro libero: al tetto
         // dei giri l'ultimo testo vale come risposta, non come tentativo.
-        const spinta = (Dichiarate && Tools && !rimandatoIndietro && round < MAX_ROUNDS)
-          ? spintaDiRimedio(Dichiarate, text, renderedActions)
+        const rimedio = (Dichiarate && Tools && !rimandatoIndietro && round < MAX_ROUNDS)
+          ? spintaDiRimedio(Dichiarate, text, tipiDelTurno(Dichiarate, renderedActions, fileSummaries))
           : null;
-        if (spinta) {
+        if (rimedio) {
           rimandatoIndietro = true;
+          motivoRimbalzo = rimedio.motivo;
           testoScartato = text;
           // La scheda butta il testo già scritto in diretta: al suo posto
           // arriva la risposta rifatta, non due risposte in fila.
           push('filo:answer', { reset: true });
+          // …e nel blocco di attività resta scritto PERCHÉ è sparita: una
+          // risposta cancellata di colpo, senza una parola, è il genere di cosa
+          // che fa credere all'utente che Filo si sia impallato.
+          push('filo:action', { kind: 'rilettura', motivo: rimedio.motivo });
           threadMessages.push(Tools.assistantMessage({ text, toolCalls: [], reasoningDetails: r.reasoningDetails }));
-          threadMessages.push({ role: 'user', content: spinta });
+          threadMessages.push({ role: 'user', content: rimedio.spinta });
           continue;
         }
         textReply = text;
