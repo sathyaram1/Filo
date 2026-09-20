@@ -49,7 +49,7 @@ test('impostazioni delicate: a compito pulito partono senza popup', async ({ app
   }
 });
 
-test('PORTA: con una pagina web aperta accanto, il compito si dice ancora pulito', async ({ app, openTab, testServer }) => {
+test('le schede aperte contano: il riepilogo di stato le dichiara a chi decide', async ({ app, openTab, testServer }) => {
   const url = testServer.html(PAGINA);
   const page = await openTab(url);
   await page.waitForLoadState('load').catch(() => {});
