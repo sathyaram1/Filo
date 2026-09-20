@@ -28,7 +28,9 @@ const fs = require('node:fs');
 // sola e sta in terminal.js. Erano due: i comandi dell'assistente onoravano
 // "bash" fuori da Windows, questa sessione ricadeva sempre su /bin/sh — cioè
 // su Linux e Mac la voce "Bash" delle Preferenze non faceva niente.
-const { resolveShell } = require('./terminal');
+// I preludi che mettono la shell di Windows in UTF-8 (#551) stanno in un posto
+// solo, accanto ai comandi one-shot dell'assistente: due copie divergono.
+const { resolveShell, PRELUDI_CODIFICA } = require('./terminal');
 
 function defaultCwd() {
   return os.homedir();
