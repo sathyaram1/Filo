@@ -155,6 +155,7 @@ function envKey(name) {
 // Se un giorno l'applicazione torna a leggere una chiave nuova, va aggiunta
 // qui: la sentinella `tests/unit/bakeChiaviLette.test.mjs` diventa rossa se le
 // due parti divergono.
+//
 // `server` è il campo ESATTO del documento dei segreti: un guasto che dice
 // «manca» senza dire dove si rimedia costa a chi legge un giro d'indagine (#642).
 const CHIAVI_DEL_PACCHETTO = [
