@@ -66,6 +66,13 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // #533 — il registro dei perimetri è una superficie che racconta cosa Filo
+  // poteva fare: da una pagina web non si legge, come tutto ciò che ha potere.
+  on(MSG.FILO_GET_COMPITI, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, compiti: compitiRecenti() };
+  });
+
   on(MSG.FILO_GET_STATE, async () => {
     const { state, stateText } = await FiloState.assemble();
     return { ok: true, state, stateText };
