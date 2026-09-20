@@ -21,6 +21,35 @@ const YOUNG_DOMAIN_DAYS = 30;     // sotto: dominio "giovane" → rinforzo sospe
 const VERY_YOUNG_DOMAIN_DAYS = 7; // sotto: rinforzo forte (combinato → pericoloso)
 const CERT_BAD = new Set(['expired', 'mismatch', 'self_signed', 'untrusted', 'absent', 'revoked']);
 
+// #591, secondo giro — gli indirizzi della rete di casa.
+// Il router, il NAS, una stampante, un server di prova sulla propria macchina.
+// Da fuori non li raggiunge nessuno, quindi non possono essere la truffa che
+// arriva da una mail, e non vale la pena pagarci un giudizio del modello né
+// aprirli in una finestra nascosta con JavaScript attivo (che è una richiesta
+// verso la rete privata di chi naviga). `localhost` era già escluso perché è
+// un nome senza punti; un indirizzo numerico o un nome in `.local` no.
+const SUFFISSI_LOCALI = ['.local', '.localhost', '.home.arpa', '.internal', '.lan', '.intranet'];
+
+function isHostPrivato(host) {
+  const h = String(host || '').toLowerCase();
+  if (!h) return false;
+  if (SUFFISSI_LOCALI.some((s) => h.endsWith(s))) return true;
+  // IPv6: ::1 (loopback), fc00::/7 (locali), fe80::/10 (link-local).
+  if (h.includes(':')) {
+    const v6 = h.replace(/^\[|\]$/g, '');
+    return v6 === '::1' || /^f[cd][0-9a-f]{0,2}:/.test(v6) || /^fe[89ab][0-9a-f]?:/.test(v6);
+  }
+  const q = h.split('.');
+  if (q.length !== 4 || !q.every((n) => /^\d{1,3}$/.test(n) && Number(n) <= 255)) return false;
+  const [a, b] = q.map(Number);
+  if (a === 10 || a === 127 || a === 0) return true;          // privata, loopback, «questa rete»
+  if (a === 192 && b === 168) return true;                     // privata
+  if (a === 172 && b >= 16 && b <= 31) return true;            // privata
+  if (a === 169 && b === 254) return true;                     // link-local
+  if (a === 100 && b >= 64 && b <= 127) return true;           // rete dell'operatore
+  return false;
+}
+
 function agePhrase(days) {
   if (days == null) return '';
   if (days < 1) return 'oggi';
