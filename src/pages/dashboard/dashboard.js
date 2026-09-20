@@ -67,6 +67,19 @@
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
   });
+  // #525 — una riga scritta in chat senza passare dal modello (la risposta a un
+  // comando con lo slash, il comando di terminale e il suo esito) entra
+  // nell'archivio come ogni altra battuta: l'utente l'ha letta dentro questa
+  // conversazione, e rileggendola deve ritrovarla. Una sola strada per tutti:
+  // due copie della stessa cosa sono due modi di farla divergere, ed è così che
+  // il terminale era rimasto fuori.
+  const archiviaRiga = (text, role) => {
+    // L'intervista di benvenuto ha una conversazione sua e un modo suo di
+    // finire: le sue righe le archivia lei.
+    if (Accoglienza.isActive()) return;
+    try { send({ type: MSG.FILO_CHAT_NOTE, id: ensureChatId(), text, role }); } catch (_) {}
+  };
+
   Term.init({
     dashDir,
     inputEl,
@@ -74,6 +87,7 @@
     makeBubble: (o) => makeBubble(o),
     goThread: () => goThread(),
     updateInputClass: () => Comandi.updateInputClass(),
+    archiviaRiga,
   });
   Comandi.init({
     send,
