@@ -52,17 +52,11 @@ const HOVER_INPUT_TYPES = new Set([
 const ESC_ATTESA_MS = 400;
 const ESC_ATTESA_PAGINA_CHE_RISPONDE_MS = 2500;
 
-// #514 — quante volte di fila la pagina può dire "quell'Esc me lo sono preso
-// io" prima che il main smetta di crederle. Il conto sta QUI, nel main, perché
-// nella pagina il sito ci arriva: un evento finto fabbricato dal documento
-// azzerava il conto tenuto dal content script, e da lì un sito scritto apposta
-// si rivendicava ogni Esc e teneva l'utente dentro allo schermo intero per
-// sempre. Il main vede solo l'input vero, che una pagina non può fabbricare.
-// Tre è più di quanti riquadri di Filo si possano impilare uno sull'altro, e il
-// conto riparte da zero appena l'utente fa qualsiasi altra cosa (un clic, un
-// altro tasto) o appena la modalità cambia: aprire un riquadro chiede sempre un
-// gesto, quindi in mano a chi usa Filo il tetto non si tocca mai.
-const ESC_RIVENDICAZIONI_MAX = 3;
+// #514 — quante volte di fila la pagina può dire "quell'Esc me lo sono preso io"
+// prima che il main smetta di crederle: è la rete contro una pagina ostile, non
+// il budget di chi usa Filo, che i riquadri li impila davvero (#648). Il conto
+// sta qui, dove arriva l'input vero: nella pagina un evento finto lo azzerava.
+const ESC_RIVENDICAZIONI_MAX = 10;
 
 // #514 — la scheda a cui appartiene una WebContents, in qualunque finestra. La
 // sessione è condivisa fra finestre e schede, mentre "l'ultimo tasto era l'Esc"
