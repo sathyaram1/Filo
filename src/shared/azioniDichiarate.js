@@ -614,6 +614,28 @@
     return /:\s*$/.test(stop >= 0 ? dopo.slice(0, stop + 1) : dopo);
   }
 
+  // Giro 9 — la dichiarazione è una frase CITATA, non una frase di Filo.
+  // «Hai scritto: "ti ho messo la sveglia alle 19"» e «un esempio di risposta
+  // sbagliata: "ti ho messo la sveglia alle 19"» facevano comparire l'avviso,
+  // e prima ancora facevano buttare e rifare la risposta.
+  // Non basta che ci siano le virgolette: un modello che risponde fra
+  // virgolette direbbe comunque la sua. Serve che davanti alla citazione ci
+  // sia il verbo di chi riporta le parole di un altro.
+  const APERTURE = { '«': '»', '"': '"', '“': '”', '‘': '’' };
+  const RIPORTA = /\b(?:scritt[oa]|dett[oa]|dice|dici|dire|scrivere|frase|frasi|esempi\w*|parole|risposta|risposte|suona|suonerebbe|tipo)\b[^«"“]{0,24}$/i;
+  function dentroUnaCitazione(testo, indice) {
+    let apre = -1;
+    let chiusura = '';
+    for (let i = indice - 1; i >= 0 && i >= indice - FINESTRA; i--) {
+      const c = testo[i];
+      if (APERTURE[c]) { apre = i; chiusura = APERTURE[c]; break; }
+      if (c === '»' || c === '”' || c === '’') return false;
+    }
+    if (apre < 0) return false;
+    if (testo.indexOf(chiusura, indice) < 0) return false;
+    return RIPORTA.test(testo.slice(Math.max(0, apre - 60), apre));
+  }
+
   // La radice di un participio, per capire se due frasi raccontano la STESSA
   // cosa: «ho messo la sveglia» e «te l'ho messa» sono un fatto solo, «ho messo
   // la sveglia» e «te l'ho segnata» sono due.
