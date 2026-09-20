@@ -230,7 +230,8 @@
     // succedere**, non su quale pagina siamo:
     //  · PROVA FORTE — qualcosa è sparito davvero: un pezzo nostro si è
     //    staccato dal documento, oppure (su una pagina di Filo) la pagina si è
-    //    alleggerita. Tetto tre, come i riquadri che si possono impilare.
+    //    alleggerita. Tetto dieci: i riquadri si impilano davvero (una risposta
+    //    ne apre un'altra), e a tre il quarto Esc costava la modalità (#648).
     //  · PROVA DEBOLE — solo "qualcuno ha consumato il tasto", senza che si sia
     //    visto sparire niente. Tetto uno: chi si prendesse ogni Esc senza
     //    chiudere nulla si ferma al secondo.
