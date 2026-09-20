@@ -1261,8 +1261,13 @@
   // fare SOLO emettendo un'azione tipizzata di Filo, e che non lasciano
   // niente sullo schermo. Se il modello le racconta senza emetterle, non è
   // successo niente e nessuno se ne accorgerebbe.
+  // Giro 7: «senza-nome» è la conferma col PRONOME («sì, te l'ho mandata»),
+  // ed era l'unica famiglia esclusa qui dentro. Nella chat della home è vista
+  // dal giro 3, ed è la forma più probabile subito dopo la richiesta
+  // dell'utente: nel pannello passava senza una parola.
   const FAMIGLIE_AIUTO = ['sveglia', 'timer', 'sveglia-tolta', 'sveglia-spostata',
-    'promemoria', 'appunto', 'segnalazione', 'calendario', 'memoria-cancellata', 'schede'];
+    'promemoria', 'appunto', 'segnalazione', 'calendario', 'memoria-cancellata', 'schede',
+    'senza-nome'];
 
   global.SN_AZIONI_DICHIARATE = {
     FAMIGLIE,
