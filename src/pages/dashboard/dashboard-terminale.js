@@ -21,6 +21,9 @@
   let makeBubble = null;
   let goThread = null;
   let updateInputClass = () => {};
+  // #525 — mette una riga di questa conversazione nell'archivio della chat in
+  // corso (la targa la sa la pagina, che è la stessa che manda i turni).
+  let archiviaRiga = () => {};
 
   // ===== Stato del terminale (fonte unica) =====
   let terminalMode = false;          // attivabile da Preferenze
