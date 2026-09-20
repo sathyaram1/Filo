@@ -401,6 +401,13 @@
       const t = String(a.testo || a.text || a.lezione || '').trim();
       return { icon: '🧠', text: `Memorizzato · ${t.length > 60 ? `${t.slice(0, 57)}…` : t}` };
     },
+    // Le due azioni che l'utente conferma nel popup e poi non ritrova da
+    // nessuna parte: proprio quelle che non si disfano più.
+    CANCELLA_MEMORIA: () => ({ icon: '🧠', text: 'Memoria cancellata' }),
+    INVIA_FEEDBACK: (a) => {
+      const t = pulito(a.titolo || a.title);
+      return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t}` : ''}` };
+    },
     ONBOARDING: (a) => {
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
