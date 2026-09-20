@@ -1,4 +1,4 @@
-# Release automatica di Filo (Windows + Mac).
+# Release automatica di Filo (Windows + Mac + Linux).
 #
 # COSA FA
 #   A intervalli regolari (cron) controlla se su `main` ci sono commit nuovi
