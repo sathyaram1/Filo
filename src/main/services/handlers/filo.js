@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, maybeRunCompactor, compitiRecenti,
+    executeFiloAction, maybeRunCompactor, compitiRecenti, apriFileLocale,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
@@ -87,6 +87,24 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_GET_COMPITI, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     return { ok: true, compiti: await compitiRecenti() };
+  });
+
+  // #533 (sesto giro di verifica) — apre davvero il file del bottone «apri il
+  // file». Il percorso lo ricontrolla il main con la stessa regola con cui l'ha
+  // accettato: un indirizzo web, un percorso di rete o uno schema qualunque non
+  // sono un file del computer, e da una pagina web questo messaggio non arriva.
+  on(MSG.FILO_OPEN_FILE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const v = apriFileLocale(msg && msg.percorso);
+    if (!v.ok) return { ok: false, error: 'Non è un file del tuo computer.' };
+    try {
+      const { shell } = require('electron');
+      const r = await shell.openPath(v.percorso);
+      if (r) return { ok: false, error: r };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e && e.message) || 'apertura fallita' };
+    }
   });
 
   on(MSG.FILO_GET_STATE, async () => {

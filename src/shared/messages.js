@@ -592,6 +592,13 @@
     // cosa Filo era AUTORIZZATO a fare, non solo cosa ha fatto.
     // Risposta: { ok, compiti: [{ id, origine, perimetro, contaminato, registro }] }
     FILO_GET_COMPITI: 'filo_get_compiti',
+    // #533 (sesto giro di verifica) — apre il file che il bottone di APRI_FILE
+    // mostra in chat. Prima quel bottone era un collegamento col percorso
+    // dentro: non apriva niente (un percorso del disco non è un indirizzo) e
+    // lasciava passare qualunque indirizzo web. Adesso l'apertura la fa il
+    // main, che ricontrolla il percorso per conto suo.
+    // { percorso }  Risposta: { ok } | { ok: false, error }
+    FILO_OPEN_FILE: 'filo_open_file',
     // Genera dashboard (messaggio centro + suggerimenti). Usa cache con cooldown.
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }

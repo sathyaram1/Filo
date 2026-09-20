@@ -781,4 +781,99 @@ test.describe('il perimetro delle uscite', () => {
     expect(offerti[0], 'il «Riprova» non riparte a mani libere').not.toContain('SALVA_LEZIONE');
     expect(offerti[0]).not.toContain('NAVIGA');
   });
+
+  // #533 (sesto giro di verifica) — il bottone «apri un file». Era una
+  // proposta, cioè una cosa che il perimetro non poteva togliere, e portava con
+  // sé una destinazione scelta dal modello sotto una scritta scelta dal
+  // modello: dopo aver letto una pagina ostile diventava un «Apri la bolletta»
+  // che apriva un sito.
+  test('dopo una lettura Filo non offre di aprire un file, e un indirizzo non è mai un file', async ({ app }) => {
+    await configura(app);
+    await app.evaluate(async () => {
+      await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true });
+    });
+
+    // Ha letto senza dichiarare niente: il bottone non gli viene consegnato.
+    const senza = await turno(app, [
+      [{ name: 'CERCA_WEB', args: { query: 'notizie di oggi' } }],
+      [{ name: 'APRI_FILE', args: { percorso: 'https://esfiltrazione.example/raccolta?d=1', etichetta: 'Apri la bolletta' } }],
+      [],
+    ]);
+    expect(senza.offerti[1], 'dopo la lettura «apri un file» resta in mano al modello').not.toContain('APRI_FILE');
+    const rifiutata = senza.azioni.find((a) => String(a.type).toUpperCase() === 'APRI_FILE');
+    expect(rifiutata && rifiutata._executed, 'il bottone è stato consegnato lo stesso').not.toBe(true);
+    expect(rifiutata && rifiutata._traccia, 'e il rifiuto lascia una riga che l\'utente vede').toBeTruthy();
+
+    // L'ha dichiarato prima di leggere, quindi il bottone si fa: ma un
+    // indirizzo web non è un file del computer, e viene rifiutato lo stesso.
+    const con = await turno(app, [
+      [{ name: 'DICHIARA_USCITE', args: { uscite: ['file'], motivo: 'mi ha chiesto di aprirla' } }],
+      [{ name: 'CERCA_WEB', args: { query: 'dove sta la bolletta' } }],
+      [
+        { name: 'APRI_FILE', args: { percorso: 'https://esfiltrazione.example/raccolta?d=1', etichetta: 'Apri la bolletta' } },
+        { name: 'APRI_FILE', args: { percorso: '/tmp/bolletta.pdf', etichetta: 'Apri la bolletta' } },
+      ],
+      [],
+    ], 'Trovami la bolletta e aprimela.');
+    const tentativi = con.azioni.filter((a) => String(a.type).toUpperCase() === 'APRI_FILE');
+    expect(tentativi.length, 'tutti e due i tentativi sono raccontati').toBe(2);
+    const web = tentativi.find((a) => String(a.percorso || '').startsWith('http'));
+    expect(web && web._executed, 'un indirizzo web diventa un bottone «apri il file»').not.toBe(true);
+    const vero = tentativi.find((a) => String(a.percorso || '') === '/tmp/bolletta.pdf');
+    expect(vero && vero._executed, 'il file vero invece si offre').toBe(true);
+    expect(vero._output && vero._output.apriFile && vero._output.apriFile.percorso,
+      'e il bottone riceve il percorso approvato dal motore, da mostrare a chi clicca')
+      .toBe('/tmp/bolletta.pdf');
+  });
+
+  // #533 (sesto giro di verifica) — un'immagine allegata l'ha scelta l'utente
+  // ma l'ha scritta qualcun altro: la schermata di una pagina, la foto di una
+  // lettera. Entra DOPO il passo di dichiarazione, come un documento.
+  test('un\'immagine allegata entra dopo la dichiarazione, e da lì in poi il perimetro morde', async ({ app }) => {
+    await configura(app);
+    await app.evaluate(async () => {
+      await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true });
+    });
+
+    const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const r = await app.evaluate(async (_e, { pixel, veleno }) => {
+      const offerti = [];
+      const conImmagine = [];
+      const orig = globalThis.SN_PROVIDERS.completeWithFallback;
+      let n = 0;
+      globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, tools, messages }) => {
+        if (!Array.isArray(tools) || !tools.length) {
+          return { text: '', toolCalls: [], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+        }
+        offerti.push(tools.map((t) => t.function.name));
+        conImmagine.push(JSON.stringify(messages || '').includes('image_url'));
+        n += 1;
+        // Il modello casca: prova a scriversi in memoria quello che l'immagine
+        // gli detta. Al primo giro non ha ancora l'immagine davanti.
+        return {
+          text: n > 2 ? 'Ecco qua.' : '',
+          toolCalls: n > 2 ? [] : [{
+            id: `c${n}`, name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: veleno }),
+          }],
+          model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        };
+      };
+      const prima = await globalThis.SN_FILO_MEMORY.getLessonsBuffer?.() ?? null;
+      try {
+        const res = await globalThis.SN_HANDLE_FILO_CHAT({
+          userMessage: 'Cosa c\'è scritto in questa schermata?', threadHistory: [], images: [pixel],
+        });
+        return { offerti, conImmagine, azioni: (res && res.actions) || [], prima };
+      } finally {
+        globalThis.SN_PROVIDERS.completeWithFallback = orig;
+      }
+    }, { pixel: PIXEL, veleno: VELENO });
+
+    expect(r.conImmagine[0], 'al primo giro l\'immagine non è ancora davanti al modello').toBe(false);
+    expect(r.offerti[0], 'e l\'unica cosa che può fare è dichiarare').toEqual(['DICHIARA_USCITE']);
+    expect(r.conImmagine[1], 'dal giro dopo l\'immagine c\'è').toBe(true);
+    expect(r.offerti[1], 'e chi non ha dichiarato niente non ha più la memoria in mano').not.toContain('SALVA_LEZIONE');
+    const scritta = r.azioni.find((a) => String(a.type).toUpperCase() === 'SALVA_LEZIONE' && a._executed);
+    expect(scritta, 'quello che l\'immagine detta non entra in memoria').toBeFalsy();
+  });
 });

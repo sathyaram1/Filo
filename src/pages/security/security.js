@@ -463,6 +463,7 @@
     CAPACITA_DETTAGLIO: 'una pagina di Filo',
     ESEGUI_COMANDO: 'quello che ha stampato un comando',
     PAGINA: 'la pagina su cui stavi',
+    IMMAGINE: 'un\'immagine che avevi allegato',
   };
 
   // #533 — la riga di un compito dice il PERIMETRO, cioè cosa gli era

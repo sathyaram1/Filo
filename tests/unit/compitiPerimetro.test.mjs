@@ -416,3 +416,22 @@ test('l\'elenco che il modello legge dice quali uscite non nascono da una lettur
   assert.match(testo, /contegno/, 'la famiglia dello stile si può dichiarare prima di leggere');
   assert.match(testo, /stile_agente/);
 });
+
+test('aprire un file è un\'uscita, non una proposta a costo zero', () => {
+  // #533 (sesto giro di verifica) — una proposta resta a costo zero finché non
+  // porta con sé un bersaglio che sceglie il modello sotto una scritta che
+  // sceglie il modello. «Apri un file» ce l'aveva.
+  assert.equal(C.classeDi('APRI_FILE').classe, 'uscita');
+  assert.equal(C.uscitaDi('APRI_FILE'), 'file');
+  assert.ok(C.USCITE_DICHIARABILI.includes('file'), 'la famiglia si deve poter dichiarare');
+  const c = contaminato(['sveglie']);
+  assert.equal(C.consentito(c, 'APRI_FILE').ok, false, 'chi ha letto e non l\'aveva chiesto non lo ottiene');
+  assert.ok(!C.strumentiPermessi(c, Tools.NAMES).includes('APRI_FILE'));
+  const d = contaminato(['file']);
+  assert.equal(C.consentito(d, 'APRI_FILE').ok, true, 'chi l\'aveva dichiarato prima di leggere sì');
+});
+
+test('la frase del permesso per un file dice che si apre sul computer', () => {
+  const t = Levels.describe({ type: 'CHIEDI_USCITA', uscita: 'file', motivo: 'devo aprirti la bolletta' });
+  assert.ok(/file/i.test(t), `la frase non nomina il file: ${t}`);
+});

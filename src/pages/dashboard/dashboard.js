@@ -282,7 +282,7 @@
   function destinazioneLeggibile(a) {
     const type = String(a?.type || '').toUpperCase();
     if (type !== 'NAVIGA' && type !== 'APRI_FILE') return '';
-    const raw = String(a?.url || a?.path || '');
+    const raw = String(a?.url || a?.path || a?.percorso || '');
     if (!raw) return '';
     try {
       const u = new URL(raw);
@@ -366,9 +366,13 @@
     }
     if (type === 'NAVIGA' && a.url) {
       chrome.tabs.create({ url: a.url });
-    } else if (type === 'APRI_FILE' && (a.path || a.url)) {
-      const url = a.url || a.path;
-      if (/^https?:|^chrome-extension:|^chrome:/.test(url)) chrome.tabs.create({ url });
+    } else if (type === 'APRI_FILE' && (a.percorso || a.path || a.url)) {
+      // #533 (sesto giro di verifica) — «apri un file» apre un FILE. Prima
+      // questa strada apriva una scheda quando dentro c'era un indirizzo web,
+      // e il messaggio della home lo scrive un modello che legge i titoli dei
+      // siti aperti e salvati: la scritta del bottone diceva una cosa e la
+      // scheda ne apriva un'altra. Il percorso lo ricontrolla il main.
+      send({ type: MSG.FILO_OPEN_FILE, percorso: a.percorso || a.path || a.url });
     } else if (type === 'CHAT') {
       // Trigger interno: manda in chat quello che c'è scritto sul bottone.
       // #533 (quarto giro di verifica) — NON il testo nascosto dentro

@@ -130,6 +130,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CLOSE_ONBOARDING: 'onboarding',
     FILO_ONBOARDING_NOTICE_SEEN: 'onboarding',
     FILO_GET_COMPITI: 'perimetro-uscite',
+    // Il bottone «apri il file» che l'agente mette in chat: è una delle azioni
+    // dell'agente, e l'apertura la fa il main perché il percorso va ricontrollato.
+    FILO_OPEN_FILE: 'agent-actions',
   };
 
   for (const h of handlers) {

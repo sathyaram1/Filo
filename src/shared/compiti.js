@@ -33,6 +33,12 @@
     // anni (#533, secondo giro di verifica). Famiglia sua, frase sua.
     oblio: { label: 'cancellare tutta la memoria di Filo' },
     schede: { label: 'aprire, archiviare o eliminare schede' },
+    // Aprire un file lo fa il sistema, con il programma che quel file si porta
+    // dietro: un documento si apre, un programma parte. A premere è l'utente,
+    // ma il percorso lo sceglie il modello e la scritta sul bottone pure: da
+    // una richiesta che ha letto roba scritta da altri quel bottone nasce solo
+    // se l'utente l'aveva chiesto (#533, sesto giro di verifica).
+    file: { label: 'aprire un file del tuo computer' },
     impostazioni: { label: 'cambiare le impostazioni di Filo' },
     // Scrivere come Filo deve parlare non è cambiare un'impostazione: quel
     // testo entra in cima a OGNI richiesta futura, presentato come una cosa
@@ -56,9 +62,12 @@
 
   const USCITE_DICHIARABILI = Object.keys(USCITE).filter((k) => !USCITE[k].interna);
 
-  // Classe di ogni strumento. `ingresso` e `proposta` non si dichiarano mai:
-  // leggere di più non aggiunge pericolo a un compito già contaminato, e
-  // proporre in chat costa zero perché a premere il bottone è l'utente.
+  // Classe di ogni strumento. `ingresso` non si dichiara mai: leggere di più
+  // non aggiunge pericolo a un compito già contaminato. `proposta` nemmeno, ma
+  // solo finché la proposta è davvero a costo zero — cioè finché non porta con
+  // sé una destinazione che il modello sceglie e l'utente non legge. Il bottone
+  // «apri un file» ce l'aveva, e infatti adesso è un'uscita (#533, sesto giro
+  // di verifica): una proposta che nomina un bersaglio non è una proposta.
   const CLASSI = {
     CERCA_WEB: { classe: 'ingresso', fonte: 'esterno' },
     LEGGI_DOCUMENTO: { classe: 'ingresso', fonte: 'esterno' },
@@ -68,7 +77,6 @@
     CAPACITA_DETTAGLIO: { classe: 'ingresso', fonte: 'filo' },
 
     EVENTO_CALENDARIO: { classe: 'proposta' },
-    APRI_FILE: { classe: 'proposta' },
 
     DICHIARA_USCITE: { classe: 'motore' },
     CHIEDI_USCITA: { classe: 'motore' },
@@ -81,6 +89,7 @@
     SALVA_LEZIONE: { classe: 'uscita', uscita: 'memoria' },
     CANCELLA_MEMORIA: { classe: 'uscita', uscita: 'oblio' },
     NAVIGA: { classe: 'uscita', uscita: 'schede' },
+    APRI_FILE: { classe: 'uscita', uscita: 'file' },
     PULISCI_TAB: { classe: 'uscita', uscita: 'schede' },
     CANCELLA_ARCHIVIO: { classe: 'uscita', uscita: 'schede' },
     // La famiglia dipende dalla PREFERENZA, non dallo strumento: cambiare il

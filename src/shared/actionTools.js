@@ -188,9 +188,12 @@
       required: ['data', 'ora', 'titolo'],
     },
     APRI_FILE: {
-      description: 'Mostra in chat un bottone per aprire un file del computer dell\'utente.',
+      description: 'Mostra in chat un bottone per aprire un file del computer dell\'utente. '
+        + 'Solo un percorso del disco: un indirizzo web o una cartella di rete vengono rifiutati, '
+        + 'e il bottone mostra sempre all\'utente il percorso vero, non solo l\'etichetta. '
+        + 'Appartiene all\'uscita `file`: ad aprire è l\'utente, ma il file lo scegli tu.',
       properties: {
-        percorso: S('Percorso del file.'),
+        percorso: S('Percorso del file sul computer (assoluto, oppure che comincia per ~).'),
         etichetta: S('Nome leggibile.'),
       },
       required: ['percorso'],

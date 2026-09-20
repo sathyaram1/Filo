@@ -90,8 +90,9 @@ test.describe('#533 giro 6 — quello che resta in mano a una richiesta che ha l
     // Copione: l'utente chiede di leggere un documento (il caso del feedback:
     // un PDF che gli ha mandato qualcun altro). Filo non dichiara niente e
     // legge, quindi da lì in poi gli resta «rispondere e proporre». Poi il
-    // modello, avvelenato da quello che ha letto, mette in chat un bottone con
-    // una scritta innocua e dentro un indirizzo che l'utente non vede.
+    // modello, avvelenato da quello che ha letto, prova a mettere in chat un
+    // bottone con una scritta innocua e dentro un indirizzo che l'utente non
+    // vede.
     await app.evaluate(async (_electron, { destinazione, scritta }) => {
       globalThis.__origProv = globalThis.SN_PROVIDERS.completeWithFallback;
       let n = 0;
@@ -115,7 +116,6 @@ test.describe('#533 giro 6 — quello che resta in mano a una richiesta che ha l
       };
     }, { destinazione: DESTINAZIONE, scritta: SCRITTA });
 
-    // La richiesta dell'utente, mandata come la manda la home.
     const azioni = await page.evaluate(async () => {
       const r = await chrome.runtime.sendMessage({
         type: window.SN_MSG.MSG.FILO_CHAT,
@@ -127,32 +127,103 @@ test.describe('#533 giro 6 — quello che resta in mano a una richiesta che ha l
 
     // Gli stessi bottoni che la chat disegna sotto la risposta: non una
     // riscrittura, proprio la funzione che la home usa.
-    const bottone = await page.evaluate((elenco) => {
+    const bottoni = await page.evaluate((elenco) => {
       const box = document.createElement('div');
       document.body.appendChild(box);
       window.SN_DASH_ATTIVITA.renderActions(box, elenco, {});
-      const a = box.querySelector('a.dash-action-btn');
-      return a ? { href: a.getAttribute('href'), testo: a.textContent || '' } : null;
+      return [...box.querySelectorAll('a, button')].map((el) => ({
+        tag: el.tagName, href: el.getAttribute('href') || '', testo: el.textContent || '',
+      }));
     }, azioni);
 
     await app.evaluate(() => {
       if (globalThis.__origProv) globalThis.SN_PROVIDERS.completeWithFallback = globalThis.__origProv;
     });
 
-    expect(azioni.some((a) => String(a.type).toUpperCase() === 'APRI_FILE'),
-      'il motore consegna ancora APRI_FILE a una richiesta che ha letto senza aver dichiarato niente')
-      .toBe(true);
-    expect(bottone, 'il bottone compare in chat').not.toBe(null);
-    const dove = String(bottone.href || '');
-    const cosaDice = String(bottone.testo || '');
-
-    // Quello che il bottone fa dev'essere quello che il bottone dice, e dove
-    // porta si deve poter leggere prima di premerlo (la regola del giro 4 per
-    // i bottoni della schermata iniziale). Qui la scritta parla di un file
-    // dell'utente e l'indirizzo è un sito che raccoglie dati.
-    expect(String(dove || '').startsWith('http') && !cosaDice.includes('raccolta-dati.example'),
-      'il bottone in chat porta a un indirizzo web che la scritta non nomina, e la scritta la sceglie il modello che ha appena letto la pagina')
+    // Aprire un file è una cosa che Filo fa al computer dell'utente, e il file
+    // lo sceglie il modello: a una richiesta che ha letto senza aver dichiarato
+    // niente non viene consegnata.
+    const apri = azioni.find((a) => String(a.type).toUpperCase() === 'APRI_FILE');
+    expect(apri && apri._executed === true,
+      'il motore consegna ancora il bottone «apri un file» a una richiesta che ha letto senza aver dichiarato niente')
       .toBe(false);
+    expect(JSON.stringify(azioni).includes('raccolta-dati.example')
+      && bottoni.some((b) => b.href.startsWith('http')),
+      'quello che il modello ha scritto dopo la lettura diventa un bottone che porta fuori da Filo')
+      .toBe(false);
+    // E il rifiuto non è silenzioso: l'utente lo legge.
+    expect(apri && apri._traccia, 'il bottone rifiutato lascia una riga che l\'utente vede').toBeTruthy();
+  });
+
+  test('anche quando l\'utente l\'ha chiesto, il bottone apre un file e dice quale', async ({ app, openTab }) => {
+    await configura(app);
+    const page = await openTab(NEWTAB);
+    await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
+
+    // La richiesta buona: «trovami la bolletta e aprimela». Il modello dichiara
+    // prima di leggere, quindi il bottone si fa. Resta che l'indirizzo di un
+    // sito non è un file, e che la scritta la sceglie il modello: dove porta si
+    // deve poter leggere prima di premere.
+    await app.evaluate(async (_electron, { destinazione, scritta }) => {
+      globalThis.__origProv = globalThis.SN_PROVIDERS.completeWithFallback;
+      let n = 0;
+      globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, tools }) => {
+        if (!Array.isArray(tools) || !tools.length) {
+          return { text: '', toolCalls: [], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+        }
+        const giri = [
+          [{ name: 'DICHIARA_USCITE', args: { uscite: ['file'], motivo: 'mi ha chiesto di aprirgliela' } }],
+          [{ name: 'LEGGI_DOCUMENTO', args: { percorso: '/tmp/bolletta-che-non-ce.pdf' } }],
+          [
+            { name: 'APRI_FILE', args: { percorso: destinazione, etichetta: scritta } },
+            { name: 'APRI_FILE', args: { percorso: '/tmp/bolletta-di-marzo.pdf', etichetta: scritta } },
+          ],
+          [],
+        ];
+        const giro = giri[n++] || [];
+        return {
+          text: giro.length ? '' : 'Eccola.',
+          toolCalls: giro.map((c, i) => ({
+            id: `c_${n}_${i}`, name: c.name, arguments: JSON.stringify(c.args || {}),
+          })),
+          model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        };
+      };
+    }, { destinazione: DESTINAZIONE, scritta: SCRITTA });
+
+    const azioni = await page.evaluate(async () => {
+      const r = await chrome.runtime.sendMessage({
+        type: window.SN_MSG.MSG.FILO_CHAT,
+        userMessage: 'Trovami la bolletta di marzo e aprimela.',
+        threadHistory: [],
+      });
+      return (r && r.actions) || [];
+    });
+
+    const resa = await page.evaluate((elenco) => {
+      const box = document.createElement('div');
+      document.body.appendChild(box);
+      window.SN_DASH_ATTIVITA.renderActions(box, elenco, {});
+      const link = [...box.querySelectorAll('a')].map((el) => el.getAttribute('href') || '');
+      const bottoni = [...box.querySelectorAll('button')].map((el) => el.textContent || '');
+      return { link, bottoni };
+    }, azioni);
+
+    await app.evaluate(() => {
+      if (globalThis.__origProv) globalThis.SN_PROVIDERS.completeWithFallback = globalThis.__origProv;
+    });
+
+    // L'indirizzo di un sito non diventa mai un bottone «apri il file».
+    expect(resa.link.some((h) => h.startsWith('http'))
+      || resa.bottoni.some((t) => t.includes('raccolta-dati.example')),
+      'l\'indirizzo di un sito passa lo stesso per un file del computer')
+      .toBe(false);
+    // Il file vero sì, e il bottone dice quale file è.
+    const bottone = resa.bottoni.find((t) => t.includes(SCRITTA));
+    expect(bottone, 'il bottone del file vero compare in chat').toBeTruthy();
+    expect(String(bottone).includes('/tmp/bolletta-di-marzo.pdf'),
+      'il bottone non dice dove porta: la scritta la sceglie il modello, e chi clicca ha letto solo quella')
+      .toBe(true);
   });
 
   test('un\'immagine che l\'utente incolla è scritta da altri: la richiesta non resta senza limiti', async ({ app }) => {
@@ -207,23 +278,34 @@ test.describe('#533 giro 6 — quello che resta in mano a una richiesta che ha l
     await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
 
     // Il caso buono, quello per cui il bottone esiste: Filo ha trovato la
-    // bolletta sul disco e la mette in chat. Il percorso viaggia così com'è e
-    // finisce dentro un collegamento: se il collegamento non porta al file, il
-    // bottone non fa la cosa per cui c'è, e l'unica destinazione che funziona
-    // davvero è quella che porta fuori.
-    const link = await page.evaluate(() => {
+    // bolletta sul disco e la mette in chat. Prima il percorso finiva dentro un
+    // collegamento, e un percorso non è un indirizzo: il bottone non apriva
+    // niente, e l'unica destinazione che raggiungeva davvero era quella che
+    // porta fuori. Qui si preme e si guarda che l'apertura arrivi al sistema.
+    const esito = await page.evaluate(async () => {
       const box = document.createElement('div');
       document.body.appendChild(box);
-      window.SN_DASH_ATTIVITA.renderActions(box, [
-        { type: 'APRI_FILE', percorso: '/home/utente/Documenti/bolletta.pdf', etichetta: 'Bolletta di marzo', _executed: true },
-      ], {});
-      const a = box.querySelector('a.dash-action-btn');
-      return a ? { risolto: a.href } : null;
+      window.SN_DASH_ATTIVITA.renderActions(box, [{
+        type: 'APRI_FILE',
+        percorso: '/tmp/bolletta.pdf',
+        etichetta: 'Bolletta di marzo',
+        _executed: true,
+        _output: { apriFile: { ok: true, percorso: '/tmp/bolletta.pdf', mostra: '/tmp/bolletta.pdf', nome: 'bolletta.pdf' } },
+      }], {});
+      const link = box.querySelector('a');
+      const btn = box.querySelector('button');
+      if (!btn) return { btn: false, link: link ? link.href : '' };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 600));
+      return { btn: true, link: link ? link.href : '', testo: btn.textContent || '' };
     });
 
-    expect(link, 'il bottone compare').not.toBe(null);
-    expect(link.risolto.startsWith('filo://'),
-      'il bottone «apri il file» punta a una pagina interna di Filo che non esiste, invece che al file dell\'utente')
+    expect(esito.link.startsWith('filo://'),
+      'il bottone punta a una pagina interna di Filo che non esiste, invece che al file dell\'utente')
+      .toBe(false);
+    expect(esito.btn, 'il bottone del file c\'è').toBe(true);
+    expect(String(esito.testo).includes('Non si apre'),
+      'premendo il bottone Filo non riesce ad aprire il file')
       .toBe(false);
   });
 });

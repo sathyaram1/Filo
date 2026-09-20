@@ -408,6 +408,7 @@
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non letto',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
+    APRI_FILE: 'File non offerto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
@@ -443,6 +444,16 @@
     return null;
   }
   // La ragione del fallimento, quando il main la conosce.
+  // Perché Filo non ha potuto offrirti quel file. Un controllo che rifiuta lo
+  // dice sempre, nominando la cosa rifiutata (#533, sesto giro di verifica).
+  const RIFIUTI_FILE = {
+    vuoto: 'non ha detto quale file',
+    rete: 'era una cartella di rete, non un file del tuo computer',
+    'non-e-un-file': 'era un indirizzo, non un file del tuo computer',
+    'non-assoluto': 'non ha detto dove sta quel file',
+    altro: 'non era un file del tuo computer',
+  };
+
   function motivoFallimento(a) {
     const o = a && a._output;
     if (!o) return '';
@@ -453,6 +464,10 @@
     // e non c'è permesso che la renda buona (#533, quarto giro di verifica).
     if (o.perimetroSecco) return 'una regola in memoria non può venire da quello che ha letto';
     if (o.fuoriPerimetro) return 'non gliel’avevi chiesto, e aveva letto testo scritto da altri';
+    // #533 (sesto giro di verifica) — il percorso che il modello aveva scritto
+    // non è un file del computer: un indirizzo web, una cartella di rete, o
+    // niente. Il bottone non compare, e la riga dice perché.
+    if (o.apriFile && o.apriFile.ok === false) return RIFIUTI_FILE[o.apriFile.motivo] || RIFIUTI_FILE.altro;
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
@@ -805,13 +820,40 @@
       return btn;
     }
     if (type === 'APRI_FILE') {
-      const btn = document.createElement('a');
+      // #533 (sesto giro di verifica) — prima era un collegamento con dentro la
+      // stringa scritta dal modello, e la scritta sopra pure. Due guai in uno:
+      // il percorso di un file non è un indirizzo, quindi il bottone non apriva
+      // niente; e un indirizzo web ci passava, quindi dopo aver letto una
+      // pagina ostile Filo poteva mettere in chat un «Apri la bolletta» che
+      // apriva un sito. Adesso il percorso lo approva il motore, il bottone lo
+      // MOSTRA, e ad aprire è il main.
+      // Un percorso che il motore non ha approvato non diventa un bottone: la
+      // sua riga sta nel diario, con il motivo.
+      const info = (a._output && a._output.apriFile) || null;
+      const percorso = (info && info.ok && info.percorso) || '';
+      if (!percorso) return null;
+      const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'dash-action-btn';
-      const filePath = a.percorso || a.path || '';
-      btn.href = filePath || '#';
-      btn.target = '_blank';
-      btn.rel = 'noopener';
-      btn.textContent = a.etichetta || a.label || (filePath || 'File');
+      const etichetta = String(a.etichetta || a.label || (info && info.nome) || 'File');
+      const testo = document.createElement('span');
+      testo.textContent = `📄 ${etichetta}`;
+      // Dove porta si legge PRIMA di premere: la scritta la sceglie il modello,
+      // il percorso no (stessa regola dei bottoni della schermata iniziale,
+      // quarto giro di verifica).
+      const dove = document.createElement('span');
+      dove.className = 'dash-action-path';
+      dove.textContent = (info && info.mostra) || percorso;
+      btn.append(testo, dove);
+      btn.title = (info && info.mostra) || percorso;
+      btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        const r = await send({ type: MSG.FILO_OPEN_FILE, percorso });
+        if (r && r.ok) { btn.disabled = false; return; }
+        testo.textContent = '📄 Non si apre';
+        dove.textContent = (r && r.error) || 'Filo non è riuscito ad aprire questo file.';
+      });
       return btn;
     }
     if (type === 'TIMER') {
