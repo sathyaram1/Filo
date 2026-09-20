@@ -56,6 +56,8 @@ const {
   testoEsitiSenzaCommit,
   statoPubblicazione,
   testoNonPubblicato,
+  testoPiuAvanti,
+  testoRamoDiverso,
 } = await import('../../scripts/merge-gate.mjs');
 
 const { ricordaEsitoSuCommit, CAMPI_ESITO } = await import('../../scripts/lib/branch-integrity.mjs');
@@ -577,4 +579,26 @@ test('i comandi del rifiuto puntano agli attrezzi del giro, non a quelli del ram
 
   // In locale le due radici coincidono e il testo non si tocca.
   assert.equal(absolutizeRecipe(crudo, '/il/deposito', '/il/deposito'), crudo);
+});
+
+test('il ramo nominato dev\'essere quello su cui sta la directory', () => {
+  // Tutto quello che il citofono controlla lo legge dalla directory: i file
+  // fuori dai commit, la punta, su quale contenuto sono stati dati i via
+  // libera. Con due rami diversi quei controlli parlano di uno e la richiesta
+  // ne nomina un altro, e la versione dichiarata è di un ramo che non c'entra
+  // (feedback #485, giro 4).
+  const t = testoRamoDiverso('worker/485-altro', 'worker/485');
+  assert.match(t, /fusione non chiesta/);
+  assert.match(t, /worker\/485-altro/, 'quale ramo è stato nominato');
+  assert.match(t, /worker\/485/, 'e su quale sta la directory');
+
+  // Un nome lunghissimo non finisce per intero nel rifiuto (un ramo da
+  // diecimila lettere arrivava fin qui), ma si vede che è stato tagliato.
+  const lungo = testoRamoDiverso('w'.repeat(10000), 'worker/485');
+  assert.ok(lungo.length < 2000, 'il rifiuto resta leggibile');
+  assert.match(lungo, /…/, 'e dice di aver tagliato invece di far finta');
+
+  // Testa staccata: non è «nessun ramo nominato», è una directory che non sta
+  // su nessun ramo, e va detto così.
+  assert.match(testoRamoDiverso('worker/485', ''), /testa staccata/);
 });

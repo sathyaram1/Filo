@@ -427,7 +427,7 @@ async function main() {
     process.exit(1);
   }
   if (pubblicazione.stato === 'sconosciuto') {
-    console.error(`[merge-gate] nota: non ho potuto controllare che il contenuto esaminato sia arrivato su origin (${pubblicazione.motivo}), e chi fonde prende il ramo da lì. Decide il server.`);
+    console.error(`[merge-gate] nota: non ho potuto controllare che in cima al ramo su origin ci sia il contenuto esaminato (${pubblicazione.motivo}), e chi fonde prende da lì la punta del ramo. Decide il server.`);
   }
 
   const reply = await merge(ticket, source, { sha: punta });
