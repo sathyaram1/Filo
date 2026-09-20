@@ -154,6 +154,34 @@ test('il modello scelto nelle Opzioni mentre la home è aperta: l’accoglienza 
     .toContainText('Ciao, sono Filo', { timeout: 10_000 });
 });
 
+test('la configurazione condivisa arriva dalla rete a home già aperta: l’accoglienza parte', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  // Il primissimo avvio: i crediti ci sono, ma la configurazione condivisa dei
+  // modelli non è ancora arrivata (è una lettura di rete che parte con l'app e
+  // finisce dopo). Nell'app, senza di lei, non esiste nessun modello.
+  await configCondivisa(app, { models: {}, modelRegistry: {} });
+  await conChiave(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 15_000 });
+
+  // La risposta della rete arriva: da adesso Filo ha di che rispondere.
+  await app.evaluate(() => {
+    const Defaults = globalThis.__filoDefaults;
+    Defaults.get = globalThis.__filoDefaultsOrigGet;
+  });
+
+  // L'utente è ancora lì, sulla stessa home aperta: Filo deve presentarsi,
+  // senza che debba ricaricare o aprire una scheda nuova.
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 30_000 });
+  await expect(page.locator('.dash-bubble-filo').first())
+    .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+});
+
 test('«solo modelli a pesi aperti» senza sostituti: la home dice perché Filo tace', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
