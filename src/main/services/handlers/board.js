@@ -166,6 +166,15 @@ module.exports = function register(on, ctx) {
         // fine dopo aver già scalato — restituiamo i crediti invece di
         // lasciare l'utente scalato senza nulla in cambio.
         try { await Credits.award({ kind: 'board_reopen_refund', credits: amount, ref: id }); } catch (_) {}
+        // E torna indietro anche il SEGNALE di riapertura. Lo scriviamo per
+        // primo apposta, perché chiude la porta ai duplicati (#269); ma se la
+        // segnalazione collegata non è nata, di duplicati non ce n'è nessuno —
+        // c'è solo chi ha scritto cosa non funziona ancora e, con quel segnale
+        // rimasto lì, si sentiva rispondere che il fix era «già stato
+        // segnalato»: i crediti tornavano, la spiegazione no, e non poteva più
+        // mandarla. Adesso può riprovare, e l'id d'invio stabile qui sopra
+        // impedisce che da un ritentativo nasca un doppione.
+        try { await FB.clearReopenRequest(id, uid, { idToken }); } catch (_) {}
         throw e;
       }
 
