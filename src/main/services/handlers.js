@@ -2256,6 +2256,15 @@ function documentReadsForPrompt(actions) {
     }
     const meta = [];
     if (out.kind === 'pdf' && out.pages) meta.push(`${out.pages} ${out.pages === 1 ? 'pagina' : 'pagine'}`);
+    // #551, sesto giro. Il file aveva dei byte rotti: al loro posto nel testo
+    // c'è un rombo. Il modello deve sapere che quel rombo è un buco del file e
+    // non una lettera, così non lo ricopia in un nome o in un comando e può
+    // dirlo all'utente invece di rispondere su un testo bucato senza saperlo.
+    if (out.bytesPersi > 0) {
+      meta.push(`${out.bytesPersi} ${out.bytesPersi === 1 ? 'carattere' : 'caratteri'} del file `
+        + 'sono scritti male e nel testo qui sotto compaiono come «�»: '
+        + 'non ricopiarli e, se cadono dove serve leggere, dillo all\'utente');
+    }
     // #593 (terzo giro di verifica) — LA CORNICE LA SCRIVEVA IL DOCUMENTO.
     // Che il testo venga da fuori era già scritto, ma lo era in una riga fra
     // parentesi quadre come tutte le altre: un PDF che contiene quella stessa
