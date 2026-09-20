@@ -499,7 +499,11 @@ async function scarica(url) {
       'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
       ...(ua ? { 'User-Agent': ua } : {}),
     };
-    const r = await safeFetch(url, { signal: ac.signal, headers });
+    const r = await safeFetch(url, {
+      signal: ac.signal,
+      headers,
+      controllaHop: (u) => { if (pericoloso(u)) throw new Error('blocked-dangerous'); },
+    });
     const contentType = r.headers.get('content-type') || '';
     const pezzi = [];
     let totale = 0;
