@@ -45,6 +45,8 @@ import { fileURLToPath } from 'node:url';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { merge } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
+import { headSha, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
+import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // FILO_REPO_ROOT: override della root (dove si cerca il biglietto). Esiste SOLO
