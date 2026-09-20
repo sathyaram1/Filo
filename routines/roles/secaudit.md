@@ -86,6 +86,13 @@ server un verdetto raccontato non lo legge).
    buoni per quel ramo. Registrala col comando che il rifiuto ti scrive già
    pronto, che rimette il lavoro in verifica sul contenuto nuovo; se il server
    rifiuta quel passaggio, dichiaralo nel rilascio con `--guasto`.
+   Il `<branch>` che nomini dev'essere quello su cui sei posizionato: il gate
+   legge tutto dalla directory, e con due rami diversi controllerebbe uno e
+   chiederebbe l'altro. Guarda anche cosa ti dice su dov'è il ramo su origin,
+   da dove il server lo prende: se là manca il contenuto che hai controllato,
+   spediscilo e rilancia; se là il ramo è più avanti, NON spedire e non
+   riportarlo indietro (sovrascriveresti lavoro che qui non c'è) — è lo stesso
+   caso del ramo mosso, e si registra allo stesso modo.
    Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
    verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
    sul diff che scarica da GitHub, e fonde con la sua identità. Qui non gira
