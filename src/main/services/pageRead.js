@@ -230,7 +230,7 @@ function attributi(raw) {
  * loro posto. Fuori diventano contorno, mai cestino: il nome del riquadro non
  * basta a decidere che il dato chiesto non è lì dentro (#553).
  */
-function daScartare(nome, attrs, { inZona = false, soloIlleggibile = false } = {}) {
+function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIlleggibile = false } = {}) {
   if (TAG_ILLEGGIBILI.has(nome)) return 'illeggibile';
   if ('hidden' in attrs) return 'illeggibile';
   if (String(attrs['aria-hidden'] || '').toLowerCase() === 'true') return 'illeggibile';
