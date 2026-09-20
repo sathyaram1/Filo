@@ -741,6 +741,9 @@
       // #155 — firma degli input con cui è stato generato questo messaggio:
       // serve a capire se la home andrebbe ricalcolata (input cambiati).
       signature: payload?.signature || '',
+      // Scritto dal ripiego senza AI: quando Filo torna a poter rispondere
+      // questo messaggio è già falso e non va riservito (#663).
+      noAi: !!payload?.noAi,
     });
   }
 

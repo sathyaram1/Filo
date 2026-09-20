@@ -272,6 +272,23 @@ test('riscattato l’invito, la home aperta smette di mandare a riscattarlo', as
   await page.click('#redeemBtn');
   await expect(page.locator('#redeemMsg')).toContainText('riscattato', { timeout: 15000 });
 
+  const diag = await app.evaluate(async () => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    const H = req('./services/handlers.js');
+    const s = await H.getEffectiveSettings();
+    const C = globalThis.SN_CONST;
+    return {
+      provider: s.provider,
+      keys: Object.keys(s.apiKeys || {}).map((k) => `${k}=${(s.apiKeys[k] || '').slice(0, 8)}`),
+      modelDash: (s.models || {})[C.ACTIONS.FILO_DASHBOARD],
+      canServe: C.canServeAction(s, C.ACTIONS.FILO_DASHBOARD),
+      useDefaults: s.useDefaultModels,
+      cache: await globalThis.SN_FILO_MEMORY.getDashboardCache(),
+    };
+  });
+  console.log('DIAG', JSON.stringify(diag));
   // Adesso i crediti ci sono: la home lo sa, senza aspettare una scheda nuova.
   await expect.poll(() => home.evaluate(() => document.body.innerText), { timeout: 25000, intervals: [500] })
     .not.toContain('serve un codice d\'invito');
