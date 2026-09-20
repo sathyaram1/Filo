@@ -1374,7 +1374,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // qualunque altro dato, e nel corpus a token non può stare: è un testo
         // intero, e a token farebbe suonare l'allarme su ogni link (#553).
         let letto = '';
-        try { letto = require('./testoLetto').letto(); } catch (_) {}
+        try { letto = require('./testoLetto').letto(url); } catch (_) {}
         const v = Exfil.assess(url, {
           corpus, letto, fromUntrusted, soloCoda: type === 'LEGGI_PAGINA',
         });
