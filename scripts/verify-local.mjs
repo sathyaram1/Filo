@@ -49,6 +49,11 @@
 //   Il verdetto vale per il commit su cui è stato dato. Se dopo il PASS si
 //   tocca ancora il codice, il verdetto decade e va rifatto: altrimenti
 //   basterebbe farsi approvare una versione e pubblicarne un'altra.
+//   UNICA eccezione (#661): i marcatori di rosso atteso (`test.fail`) che chi
+//   verifica scrive sulle prove del giro per i rilievi messi da parte. Lì
+//   quello che gira non cambia, e il verdetto regge sul commit che li
+//   aggiunge — a patto che in quel commit non cambi altro, e niente fuori da
+//   `tests/verifica/`.
 //
 // DOVE VIVE
 //   `.claude/verify-local.json`, effimero e gitignorato come gli altri
@@ -197,7 +202,7 @@ export function leggiCoda(root = ROOT) {
  *   - qualcuno ha verificato e ha approvato, ma POI il codice è cambiato → il
  *     verdetto riguarda una versione che non è quella che uscirebbe.
  */
-export function checkVerdict(entry, headSha, dirty = false) {
+export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
   if (!entry || (!entry.verdict && !entry.request)) {
     return { ok: false, reason: 'nessuna verifica avviata per questo lavoro' };
   }
@@ -216,7 +221,31 @@ export function checkVerdict(entry, headSha, dirty = false) {
     return { ok: false, reason: `la verifica ha bocciato il lavoro: ${entry.critique || '(nessuna critica registrata)'}` };
   }
   if (!headSha || entry.sha !== headSha) {
-    return { ok: false, reason: 'il codice è cambiato dopo la verifica: l’esito riguarda una versione diversa da quella che pubblicheresti' };
+    // Unica eccezione (#661): dopo la verifica sono cambiati solo i marcatori
+    // di rosso atteso nelle prove del giro. Quello che gira è lo stesso, e il
+    // verdetto riguarda quello. `leggiDiff` legge i due contenuti da git: chi
+    // non lo passa (i controlli sulla sola logica) ha il cancello stretto di
+    // sempre.
+    const tol = (typeof leggiDiff === 'function' && entry.sha && headSha)
+      ? soloMarcatori(leggiDiff(entry.sha, headSha))
+      : null;
+    if (!tol || !tol.ok) {
+      const perche = tol && tol.motivo ? ` (${tol.motivo})` : '';
+      return { ok: false, reason: `il codice è cambiato dopo la verifica: l’esito riguarda una versione diversa da quella che pubblicheresti${perche}` };
+    }
+    // Tollerato — ma le modifiche non salvate non stanno in nessuno dei due
+    // commit, quindi il confronto non le ha viste: di quelle risponde il
+    // controllo qui sotto, che è anche quello che dice la cosa vera.
+    if (!dirty) {
+      return {
+        ok: true,
+        tollerato: true,
+        files: tol.files,
+        reason: tol.files.length
+          ? `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei nelle prove del giro sono cambiati solo i marcatori di rosso atteso (${tol.files.join(', ')}), e quello che gira è lo stesso`
+          : `verifica superata su ${String(entry.sha).slice(0, 8)}: dopo di lei il contenuto non è cambiato`,
+      };
+    }
   }
   // Il confronto sopra guarda l'ULTIMO SALVATAGGIO, e le modifiche non ancora
   // salvate non lo spostano: senza questo, si può far approvare una versione,
@@ -457,7 +486,183 @@ export function cartellaProveGiro(branch) {
     .replace(/^-+|-+$/g, '')
     .toLowerCase()
     .slice(0, 60) || 'giro';
-  return `tests/verifica/locale-${slug}`;
+  return `${PROVE_GIRO}locale-${slug}`;
+}
+
+// ─── Il verdetto non decade per i soli marcatori di rosso atteso (#661) ─────
+//
+// Quando il giro mette da parte un rilievo (bilancio esaurito) e dice «si può
+// pubblicare», le prove del giro che riproducono quel rilievo restano rosse:
+// la chiusura le rilancia e si ferma lì. Chi verifica le segna come rosso
+// atteso (`test.fail`) e le committa — e quel commit sposta la punta del ramo
+// DOPO il verdetto, che vale per il commit di prima. La chiusura respingeva
+// («il codice è cambiato dopo la verifica») e serviva un giro intero in più,
+// di un'altra istanza, per riverificare un ramo in cui era cambiata una riga
+// di test. È successo due volte: il 10/09 sul ramo della suite locale e il
+// 18/09 su quello del ripiego crediti (#629), dove il quarto giro è servito
+// solo a questo.
+//
+// LA REGOLA: il verdetto regge su un commit successivo se quello che è
+// cambiato non cambia niente di quello che GIRA, e sta tutto nelle prove del
+// giro. Non si leggono le righe del diff una per una: si riducono i due
+// contenuti a ciò che fa girare — via commenti, righe vuote e marcatori — e si
+// confrontano. Così un marcatore aggiunto, tolto o riscritto passa, e una riga
+// di codice cambiata dentro una prova del giro no. Il resto del cancello non
+// si muove: una prova del giro rossa SENZA marcatore ferma la chiusura come
+// prima, perché la chiusura quelle prove le lancia davvero.
+
+/** Dove vivono le prove dei giri di verifica: l'unica cartella tollerata. */
+export const PROVE_GIRO = 'tests/verifica/';
+
+/** Il percorso sta fra le prove dei giri? PURA. */
+export function dentroProveGiro(percorso) {
+  const p = String(percorso ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
+  return p.startsWith(PROVE_GIRO) && !p.split('/').includes('..');
+}
+
+// Un marcatore di rosso atteso, nelle due forme che Playwright accetta:
+//   · modificatore dentro il corpo — `test.fail(true, 'motivo');`
+//   · dichiarazione — `test.fail('titolo', async () => { … });`
+// Il primo argomento distingue: una stringa è il TITOLO di una prova, quindi
+// è la dichiarazione; tutto il resto (niente, una condizione, una funzione) è
+// il modificatore. `test.skip` non è qui di proposito: non dice «questo è
+// rosso e lo so», toglie la prova dal giro.
+const MARCATORE = /^(?:await\s+)?test\s*\.\s*(?:fail|fixme)\s*\(/;
+const MARCATORE_DICHIARAZIONE = /^test\s*\.\s*(?:fail|fixme)\s*\(\s*['"`]/;
+const APRE_MARCATORE = /test\s*\.\s*(?:fail|fixme)\s*\(/;
+// Quante righe al massimo può occupare un marcatore: un motivo lungo va a capo
+// una volta o due, non otto.
+const MAX_RIGHE_MARCATORE = 8;
+
+/** Saldo delle tonde di una riga. */
+function saldoTonde(riga) {
+  let s = 0;
+  for (const c of String(riga)) {
+    if (c === '(') s += 1;
+    else if (c === ')') s -= 1;
+  }
+  return s;
+}
+
+/**
+ * L'ultima riga del marcatore che comincia a `i`, o -1 se quella riga non è un
+ * marcatore intero. In quel caso vale come una riga qualunque e si confronta
+ * com'è: meglio un verdetto che decade di uno che tollera una riga di codice
+ * inghiottita da un marcatore scritto male.
+ *
+ * Una virgoletta dimenticata (`test.fail(true, 'motivo;`) lascia le tonde
+ * aperte, e chiudono solo sul `});` che chiude la prova: senza i due paletti
+ * qui sotto il marcatore si sarebbe mangiato il CORPO della prova, e due corpi
+ * diversi sarebbero risultati uguali. Quindi una riga di continuazione è il
+ * resto di un argomento e nient'altro: niente graffe, niente frecce, e niente
+ * punto e virgola prima che le tonde si chiudano.
+ */
+function fineIstruzione(righe, i) {
+  let saldo = 0;
+  for (let j = i; j < righe.length && j - i < MAX_RIGHE_MARCATORE; j += 1) {
+    const r = righe[j];
+    if (j > i && (/[{}]/.test(r) || r.includes('=>'))) return -1;
+    saldo += saldoTonde(r);
+    if (saldo <= 0) return j;
+    if (j > i && r.trim().endsWith(';')) return -1;
+  }
+  return -1;
+}
+
+/**
+ * Riduce una prova del giro a ciò che FA GIRARE: via le righe vuote, via i
+ * commenti, via i marcatori di rosso atteso. PURA.
+ *
+ * Righe vuote e commenti non cambiano cosa fa una prova, e chi segna un rosso
+ * atteso quasi sempre scrive accanto anche il perché: se contassero, il giro
+ * in più tornerebbe per una riga di commento. Una riga che diventa un commento
+ * (`// expect(…)`) invece si vede eccome: quello che c'era prima sparisce dal
+ * confronto e il verdetto decade, com'è giusto.
+ */
+export function corpoSenzaMarcatori(testo) {
+  const righe = String(testo ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const out = [];
+  let blocco = false;
+  for (let i = 0; i < righe.length; i += 1) {
+    const riga = righe[i];
+    const t = riga.trim();
+    if (blocco) {
+      const k = riga.indexOf('*/');
+      if (k < 0) continue;
+      blocco = false;
+      // Codice dopo la chiusura del commento: la riga conta, e conta com'è.
+      if (riga.slice(k + 2).trim()) out.push(riga);
+      continue;
+    }
+    if (!t) continue;
+    if (t.startsWith('//')) continue;
+    if (t.startsWith('/*')) {
+      const k = riga.indexOf('*/');
+      if (k < 0) { blocco = true; continue; }
+      if (riga.slice(k + 2).trim()) out.push(riga);
+      continue;
+    }
+    if (MARCATORE_DICHIARAZIONE.test(t)) {
+      // `test.fail('titolo', …)` e `test('titolo', …)` sono la stessa prova
+      // con e senza marcatore: si confrontano nella forma senza.
+      out.push(riga.replace(APRE_MARCATORE, 'test('));
+      continue;
+    }
+    if (MARCATORE.test(t)) {
+      const fine = fineIstruzione(righe, i);
+      if (fine >= 0) { i = fine; continue; }
+    }
+    out.push(riga);
+  }
+  return out.join('\n');
+}
+
+/**
+ * Le differenze fra il commit verificato e quello di adesso sono SOLO
+ * marcatori di rosso atteso nelle prove del giro? PURA.
+ *
+ * `files`: `[{ path, prima, dopo }]` — il contenuto ai due commit, stringa
+ * vuota dove il file non c'era (aggiunto o cancellato); `null` quando non si è
+ * riuscito a leggere il diff, che NON è un via libera. Ritorna
+ * `{ ok, motivo, files }`: `motivo` è già la frase da mostrare a chi pubblica.
+ */
+export function soloMarcatori(files) {
+  if (!Array.isArray(files)) return { ok: false, motivo: 'non sono riuscito a leggere cosa è cambiato dopo la verifica', files: [] };
+  const elenco = files.filter((f) => f && f.path);
+  const fuori = elenco.filter((f) => !dentroProveGiro(f.path)).map((f) => f.path);
+  if (fuori.length) {
+    const primi = fuori.slice(0, 5).join(', ');
+    return { ok: false, files: [], motivo: `fuori dalle prove del giro: ${primi}${fuori.length > 5 ? ` e altri ${fuori.length - 5}` : ''}` };
+  }
+  const veri = elenco.filter((f) => corpoSenzaMarcatori(f.prima) !== corpoSenzaMarcatori(f.dopo)).map((f) => f.path);
+  if (veri.length) {
+    const primi = veri.slice(0, 5).join(', ');
+    return { ok: false, files: [], motivo: `nelle prove del giro non sono cambiati solo i marcatori di rosso atteso: ${primi}${veri.length > 5 ? ` e altri ${veri.length - 5}` : ''}` };
+  }
+  return { ok: true, motivo: '', files: elenco.map((f) => f.path) };
+}
+
+/**
+ * Cosa fare delle prove del giro che restano rosse quando un rilievo è messo
+ * da parte. PURA. Si stampa col pass, che è l'unico momento in cui chi
+ * verifica ha in mano insieme i rilievi non corretti e un ramo da chiudere.
+ *
+ * Senza queste righe la strada la si trova da soli, e le due volte che è
+ * successo (10/09 e 18/09, #629) è costata un giro intero: si segnavano i
+ * rossi attesi DOPO il verdetto, il commit spostava la punta e la chiusura
+ * respingeva. Adesso il verdetto regge su quel commit — ma solo se lì cambiano
+ * i marcatori e nient'altro, e questo va detto a chi li scrive.
+ */
+export function testoRossiAttesi(branch) {
+  const cartella = cartellaProveGiro(branch);
+  return [
+    'Le prove del giro che riproducono questi rilievi restano rosse, e la chiusura le rilancia.',
+    `Segnale come rosso atteso in ${cartella}, una riga per rilievo.`,
+    "  test.fail(true, '<il rilievo, in breve>');   (in testa al corpo della prova)",
+    'Il commit che aggiunge i marcatori NON fa decadere questo verdetto, finché lì cambiano solo',
+    'quelli. Qualunque altra riga, o un file fuori da quella cartella, lo fa decadere e serve un',
+    'altro giro. Una prova rossa senza marcatore ferma la chiusura come prima.',
+  ].join('\n');
 }
 
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
@@ -644,7 +849,38 @@ export function isDirty(root = ROOT) { return git(['status', '--porcelain'], roo
 export function verdictForCurrentBranch(root = ROOT) {
   const branch = currentBranch(root);
   const entry = readState(root)[branch];
-  return { branch, entry, ...checkVerdict(entry, headSha(root), isDirty(root)) };
+  return { branch, entry, ...checkVerdict(entry, headSha(root), isDirty(root), (base, head) => diffDopoLaVerifica(base, head, root)) };
+}
+
+/**
+ * Cosa è cambiato fra il commit verificato e quello di adesso, contenuto
+ * compreso: `[{ path, prima, dopo }]`, o `[]` se git non risponde.
+ *
+ * I NOMI si guardano per primi, e sono l'uscita a buon mercato: se anche un
+ * solo file sta fuori dalle prove del giro non si legge niente, qualunque sia
+ * la dimensione del diff.
+ */
+export function diffDopoLaVerifica(base, head, root = ROOT) {
+  if (!base || !head || base === head) return null;
+  const elenco = tryGit(['diff', '--name-only', '-z', `${base}`, `${head}`], root);
+  // Git muto non è git contento: senza il diff non si tollera niente.
+  if (!elenco.ok) return null;
+  const paths = elenco.out.split('\0').map((p) => p.trim()).filter(Boolean);
+  if (!paths.length || paths.some((p) => !dentroProveGiro(p))) {
+    return paths.map((path) => ({ path, prima: '', dopo: '' }));
+  }
+  return paths.map((path) => ({
+    path,
+    prima: contenutoAl(base, path, root),
+    dopo: contenutoAl(head, path, root),
+  }));
+}
+
+/** Il contenuto di un file a un commit, stringa vuota se lì non c'era. */
+function contenutoAl(sha, path, root = ROOT) {
+  try {
+    return execFileSync('git', ['show', `${sha}:${path}`], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch (_) { return ''; }
 }
 
 // ─── Il testo consegnato all'istanza che verifica ───────────────────────────
@@ -885,6 +1121,7 @@ if (isMain) {
       console.log(`══ ESITO: verifica superata per '${branch}' su ${sha.slice(0, 8)} ══`);
       if (e.derived && e.derived.length) {
         console.log(`Rilievi non corretti, da riportare nel report per l'owner:\n${ROUND.formatFindings(e.derived)}`);
+        console.log(testoRossiAttesi(branch));
       }
       // «Si può pubblicare» solo se è vero adesso: il pass vale per l'ultimo
       // salvataggio, e con modifiche non salvate `status` (e la chiusura)
@@ -922,6 +1159,10 @@ if (isMain) {
     if (r.outcome === 'pass') {
       console.log(`Nessun commit nuovo dopo la critica: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}.`);
       console.log(`Rilievi non corretti, da riportare nel report per l'owner:\n${ROUND.formatFindings(r.derived)}`);
+      // Stessa uscita, stesso consiglio: di qui esce un pass con rilievi
+      // aperti esattamente come da «critica», e le prove del giro sono rosse
+      // nello stesso modo.
+      console.log(testoRossiAttesi(branch));
       process.exit(0);
     }
     console.log(`Correzione consegnata su '${branch}' (${sha.slice(0, 8)}). Serve un'altra verifica, di un'altra istanza:`);

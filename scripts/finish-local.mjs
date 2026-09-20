@@ -524,7 +524,17 @@ async function main() {
       console.error('  argomenti).');
       process.exit(1);
     }
-    if (v.ok) console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
+    if (v.ok) {
+      console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
+      // Il verdetto vale per un commit. Se la punta si è mossa solo per i
+      // marcatori di rosso atteso nelle prove del giro, regge lo stesso
+      // (#661): quando succede si DICE quali file sono passati, perché un
+      // cancello che si apre in silenzio è indistinguibile da uno che non c'è.
+      if (v.tollerato) {
+        console.log(`  Il ramo si è mosso dopo la verifica, ma solo per i marcatori di rosso atteso: ${(v.files || []).join(', ')}`);
+        console.log('  Quello che gira è lo stesso contenuto verificato, quindi il verdetto regge.');
+      }
+    }
   }
 
   if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }
