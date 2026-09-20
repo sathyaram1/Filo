@@ -27,7 +27,9 @@
 //   Il biglietto si ritrova da solo (lo ha depositato dispatch, come per le
 //   consegne). Il branch passato può solo CONFERMARE quello legato al
 //   biglietto: chiedere di fondere un altro ramo è un rifiuto registrato sul
-//   server, non una correzione silenziosa.
+//   server, non una correzione silenziosa. E dev'essere anche quello su cui
+//   sta la directory, perché è da lì che si leggono i file fuori dai commit,
+//   la punta e gli esiti registrati (#485).
 //
 //   Exit code (contratto invariato):
 //     0  → fuso su main (dal server)
@@ -411,10 +413,11 @@ async function main() {
   const senzaCommit = testoEsitiSenzaCommit(esitiSenzaCommit(statoRamo));
   if (senzaCommit) console.error(senzaCommit);
 
-  // Il contenuto esaminato deve stare dove chi fonde andrà a prenderlo. Il
-  // tetto sul tempo c'è perché qui dentro si parla con la rete, e questo è
-  // l'ultimo passo del giro: una rete che non risponde deve diventare «non l'ho
-  // potuto controllare» in mezzo minuto, non un comando appeso.
+  // In cima al ramo, dove chi fonde va a prendere, dev'esserci il contenuto
+  // esaminato: un'uguaglianza, non un «c'è arrivato». Il tetto sul tempo c'è
+  // perché qui dentro si parla con la rete, e questo è l'ultimo passo del giro:
+  // una rete che non risponde deve diventare «non l'ho potuto controllare» in
+  // mezzo minuto, non un comando appeso.
   const pubblicazione = statoPubblicazione(gitConTetto(ROOT), source, punta);
   if (pubblicazione.stato === 'indietro') {
     console.error(testoNonPubblicato(punta, pubblicazione.suOrigin, source));
@@ -428,6 +431,9 @@ async function main() {
   }
   if (pubblicazione.stato === 'sconosciuto') {
     console.error(`[merge-gate] nota: non ho potuto controllare che in cima al ramo su origin ci sia il contenuto esaminato (${pubblicazione.motivo}), e chi fonde prende da lì la punta del ramo. Decide il server.`);
+  }
+  if (pubblicazione.stato === 'senza_origine') {
+    console.error('[merge-gate] nota: in questa directory non c\'è nessun origin, quindi non ho potuto guardare cosa troverà chi fonde. Decide il server.');
   }
 
   const reply = await merge(ticket, source, { sha: punta });
