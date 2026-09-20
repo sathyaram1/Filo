@@ -477,6 +477,9 @@ async function commandExists({ shell, cwd, command } = {}) {
 // su una macchina carica.
 module.exports = {
   createSession, defaultCwd, commandExists, existenceProbes,
+  // La cartella di lavoro, controllata in un posto solo (#551, quarto giro):
+  // la usano il comando one-shot dell'assistente e il popup di conferma.
+  cartellaViva, cartellaPerComando, usableCwd,
   // esportata per la guardia di regressione di #551: il comando che l'utente
   // digita non deve mai arrivare a PowerShell con byte fuori dall'ASCII.
   comandoPerPowerShell,
