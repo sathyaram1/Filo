@@ -466,7 +466,7 @@
     let m;
     const conMinuti = /\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/g;
     while ((m = conMinuti.exec(s))) metti(m[1], m[2], s.slice(m.index + m[0].length));
-    const soloOra = new RegExp(`${INIZIO}${PREP_ORA}\\s+([01]?\\d|2[0-3])\\b(?![:.]\\d)`, 'gi');
+    const soloOra = new RegExp(`${INIZIO}${PREP_ORA_NUM}\\s+([01]?\\d|2[0-3])\\b(?![:.]\\d)`, 'gi');
     while ((m = soloOra.exec(s))) metti(m[1], '00', s.slice(m.index + m[0].length));
     const aParole = new RegExp(`${INIZIO}${PREP_ORA}\\s+(${Object.keys(ORE_A_PAROLE).join('|')})${FINE}`, 'gi');
     while ((m = aParole.exec(s))) {
