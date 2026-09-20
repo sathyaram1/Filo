@@ -887,6 +887,13 @@
       // si confronta con quelli veri quando li abbiamo.
       const t = tipoDichiarato(s);
       if (t) return !nomi || nomi.has(t);
+      // Giro 6: la busta con `name` e `arguments`, che è la forma standard
+      // con cui un modello dichiara una chiamata a funzione. Scritta nel
+      // testo non esegue niente, e in chat resta un blocco di codice. Il nome
+      // si confronta con quelli veri: senza, «{"name":"Mario"}» passerebbe
+      // per una chiamata.
+      const n = nomeDichiarato(s);
+      if (n && /"(?:arguments|parameters|args|input)"\s*:/.test(s)) return !nomi || nomi.has(n);
     }
     if (/^\{\s*\}$/.test(s)) return true;
     // Una lista di azioni scritta invece che chiamata.
