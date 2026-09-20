@@ -497,6 +497,9 @@
         else if (UN_QUARTO.test(coda)) { min = 15; coda = coda.replace(UN_QUARTO, ''); }
         else if (MENO_UN_QUARTO.test(coda)) { min = 45; h = (h + 23) % 24; coda = coda.replace(MENO_UN_QUARTO, ''); }
         else if ((q = coda.match(E_MINUTI))) { min = Number(q[1]); coda = coda.slice(q[0].length); }
+        else if ((q = coda.match(E_MINUTI_A_PAROLE))) {
+          min = MINUTI_A_PAROLE[q[1].toLowerCase()]; coda = coda.slice(q[0].length);
+        }
       }
       if (h >= 1 && h <= 11 && !MATTINO.test(coda) && POMERIGGIO.test(coda)) h += 12;
       out.add(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
