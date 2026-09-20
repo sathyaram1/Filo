@@ -98,15 +98,7 @@
     goThread: () => goThread(),
     autoGrowInput: () => autoGrowInput(),
     refreshLive: () => refreshLive(),
-    // #525 — una riga che Filo scrive senza passare dal modello (la risposta a
-    // un comando con lo slash) entra nell'archivio come ogni altra battuta:
-    // l'utente l'ha letta, e rileggendo la chat deve ritrovarla.
-    archiviaRiga: (text) => {
-      // L'intervista di benvenuto ha una conversazione sua e un modo suo di
-      // finire: le sue righe le archivia lei.
-      if (Accoglienza.isActive()) return;
-      try { send({ type: MSG.FILO_CHAT_NOTE, id: ensureChatId(), text }); } catch (_) {}
-    },
+    archiviaRiga,
     isTerminalMode: () => Term.isEnabled(),
     getShell: () => Term.getShell(),
     getCwd: () => Term.getCwd(),
