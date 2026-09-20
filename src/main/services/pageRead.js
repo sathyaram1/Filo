@@ -414,30 +414,49 @@ async function daContenuto({ url = '', contentType = '', buffer = null, status =
       return { ...base, kind: 'pdf', error: 'pdf_failed', detail: 'il PDF è danneggiato o protetto da password' };
     }
   }
-  const grezzo = decodifica(buffer, contentType);
+  const intero = decodifica(buffer, contentType);
+  // Oltre il tetto non si attraversa: si taglia e il troncamento viaggia con
+  // l'esito, come per i byte scaricati.
+  const mozzo = intero.length > MAX_HTML_CHARS;
+  const grezzo = mozzo ? intero.slice(0, MAX_HTML_CHARS) : intero;
+  const parziale = !!partial || mozzo;
   if (tipo === 'testo') {
     const capped = tronca(normalizzaTesto(grezzo));
     return {
       ...base, ok: true, kind: 'text', text: capped.text, truncated: capped.truncated,
-      empty: !capped.text,
+      empty: !capped.text, partial: parziale,
     };
   }
   const { titolo, testo } = estraiContenuto(grezzo);
   const capped = tronca(testo);
   return {
     ...base, ok: true, kind: 'html', title: titolo, text: capped.text,
-    truncated: capped.truncated, empty: !capped.text,
+    truncated: capped.truncated, empty: !capped.text, partial: parziale,
   };
+}
+
+/**
+ * La codifica dichiarata DENTRO la pagina. PURA. I siti più vecchi la scrivono
+ * solo lì, e leggerli come se fossero UTF-8 riempie di rombi accenti, virgolette
+ * e il simbolo dell'euro: il prezzo arriva al modello storpiato (#553).
+ */
+function charsetDaHtml(buffer) {
+  const testa = Buffer.from(buffer).subarray(0, 4096).toString('latin1');
+  const m = testa.match(/<meta[^>]{0,400}?charset\s*=\s*["']?\s*([\w-]+)/i);
+  return m ? m[1] : '';
 }
 
 /** Byte → stringa, rispettando il charset dichiarato quando lo sappiamo fare. */
 function decodifica(buffer, contentType) {
   if (!buffer || !buffer.length) return '';
+  const b = Buffer.from(buffer);
+  const bom = b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf ? 'utf-8'
+    : (b[0] === 0xff && b[1] === 0xfe ? 'utf-16le' : (b[0] === 0xfe && b[1] === 0xff ? 'utf-16be' : ''));
   const m = String(contentType || '').match(/charset\s*=\s*["']?([\w-]+)/i);
-  const enc = (m ? m[1] : 'utf-8').toLowerCase();
-  try { return new TextDecoder(enc, { fatal: false }).decode(buffer); } catch (_) {}
-  try { return new TextDecoder('utf-8', { fatal: false }).decode(buffer); } catch (_) {}
-  return Buffer.from(buffer).toString('utf8');
+  const enc = (bom || (m ? m[1] : '') || charsetDaHtml(b) || 'utf-8').toLowerCase();
+  try { return new TextDecoder(enc, { fatal: false }).decode(b); } catch (_) {}
+  try { return new TextDecoder('utf-8', { fatal: false }).decode(b); } catch (_) {}
+  return b.toString('utf8');
 }
 
 // I motivi di safe-fetch si traducono qui: il modello deve dire all'utente cosa
