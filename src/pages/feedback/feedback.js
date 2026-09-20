@@ -609,6 +609,9 @@
       uploading++; btn.disabled = true; setStatus('Caricamento…');
       try {
         const att = await SN_FEEDBACK.uploadAttachment(file, file.name);
+        // La copia in chiaro è qui, ed è l'anteprima: quella che sta nel
+        // deposito è cifrata e in un <img> non compare (#602).
+        if (att && att.kind === 'img') ricordaAnteprimaLocale(att.url, file);
         attachments.push(att);
         renderThumbs();
         setStatus('');
