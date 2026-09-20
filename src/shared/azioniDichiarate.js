@@ -247,7 +247,7 @@
       // Giro 8 — «ho aperto la bolletta che mi hai mandato: sono 84 euro»,
       // con la foto della bolletta in chat. Dire «ho letto» qui è vero dal
       // giro 2, perché un'immagine mandata in chat, un testo incollato nel
-      // messaggio e i file dell'editar arrivano al modello senza nessuno
+      // messaggio e i file dell'editor arrivano al modello senza nessuno
       // strumento; dirlo con «ho aperto», che è la parola più comune, faceva
       // buttare la risposta, rifarla e poi smentirla.
       // Sta PRIMA dell'apertura generica, e i suoi tipi sono l'unione dei due
