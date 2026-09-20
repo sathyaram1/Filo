@@ -373,7 +373,7 @@
         || cs.contentVisibility === 'hidden') return true;
     if (isScaledToNothing(cs)) return true;
     if (isTransparentOnScreen(el, cs)) return true;
-    if (isPushedOutOfPage(el)) return true;
+    if (isPushedOutOfPage(el, cs)) return true;
     return isClippedToNothing(el, cs);
   }
 
