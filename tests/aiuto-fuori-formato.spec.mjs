@@ -52,8 +52,9 @@ test('la risposta in prosa torna indietro al modello una volta, poi l\'utente lo
 
   // Nessuna segnalazione parte: la frase è falsa.
   expect(await page.evaluate(() => window.__azioni.length)).toBe(0);
-  // Il turno è tornato indietro al modello una volta.
-  expect(await page.evaluate(() => window.__turni.length)).toBe(2);
+  // Il turno è tornato indietro al modello una volta, e la chat lo dice
+  // invece di saltare un turno in silenzio.
+  await expect(page.locator('.sn-sidebar-log', { hasText: 'risposta rifatta' })).toHaveCount(1);
   // E, siccome il modello ha insistito, l'utente lo legge sotto la risposta.
   await expect(page.locator('.sn-sidebar-msg-avviso')).toHaveCount(1);
   await expect(page.locator('.sn-sidebar-msg-avviso')).toContainText('non ha eseguito niente');
