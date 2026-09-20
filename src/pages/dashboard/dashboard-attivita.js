@@ -718,6 +718,12 @@
           const row = activityRowFor(a);
           if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
         }
+        // Permesso dato: il lavoro riparte da solo, sullo STESSO compito.
+        if (r && r.executed && r.riprendi && riprendiCompito) {
+          btn.textContent = `✓ ${shortLabel}`;
+          riprendiCompito(r.riprendi);
+          return;
+        }
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           btn.textContent = (r && r.executed) ? `✓ ${short}` : `✗ ${short}`;
