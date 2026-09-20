@@ -522,10 +522,16 @@
     // dichiarazione col pronome ripete lo stesso verbo di una già retta («ho
     // messo la sveglia… te l'ho messa alle 19»), è lo stesso fatto detto due
     // volte, non un secondo fatto mai successo.
+    // «Libera» non vuol dire «qualunque»: un'azione che si limita a guardare
+    // (una ricerca, una lettura) e un segno di contesto non possono essere la
+    // cosa che l'utente si sente confermare. Bastava una ricerca nello stesso
+    // turno — o un appunto aperto nell'editor — perché il pronome non venisse
+    // più guardato affatto, ed è il turno di prosecuzione della segnalazione.
     if (pronome && !out.length) {
-      const libere = [...presenti].some((x) => !impegnati.has(x));
+      const PRONOME = FAMIGLIE[FAMIGLIE.length - 1];
+      const libere = [...presenti].some((x) => !impegnati.has(x) && !NON_REGGONO_IL_PRONOME.has(x));
       const ripete = pronome.verbo && radiciRette.has(pronome.verbo);
-      if (!libere && !ripete) {
+      if (!libere && !ripete && !esisteGia(PRONOME, pronome)) {
         out.push({ id: 'senza-nome', avviso: 'non è partito niente', tipi: [], frase: pronome.frase });
       }
     }
