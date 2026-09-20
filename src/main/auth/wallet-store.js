@@ -77,6 +77,7 @@ function save(wallet) {
 function clear() {
   cache = null;
   try { fs.rmSync(filePath(), { force: true }); } catch (_) {}
+  avvisaProntezza();
 }
 
 // La sola chiave, o '' se non c'è. È quello che withDefaults chiede.
