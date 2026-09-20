@@ -59,7 +59,8 @@ test('«Salvato.» e intanto il campo torna a 1: la seconda porta dello stesso g
   await page.keyboard.press('Control+a');
   await page.keyboard.type('12');
   await page.locator('#mgMaxSessionsSave').click();
-  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('Salvato');
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('non l\'ho potuto rileggere');
 
   // Tornare a 1 direbbe che la scrittura non c'è stata, e invece c'è stata.
   await expect(page.locator('#mgMaxSessions')).not.toHaveValue('1');
