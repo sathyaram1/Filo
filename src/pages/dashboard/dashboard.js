@@ -1270,6 +1270,12 @@
       // aspettava parte adesso, come già fa all'accesso. Senza, chi entrava con
       // un invito la vedeva solo alla scheda dopo (#663).
       Accoglienza.maybeOpenOnboardingLater();
+    } else if (msg?.type === MSG.FILO_READY_CHANGED) {
+      // Adesso Filo ha (o non ha più) un modello da chiamare. La home aperta si
+      // rifà da sé: chi aspettava la configurazione condivisa, che arriva dalla
+      // rete dopo l'avvio, restava sul cartello «non posso rispondere» fino a
+      // un ricaricamento (#663).
+      risvegliaHome().catch(() => {});
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
       const n = Math.round(Number(msg.amount) || 0);
