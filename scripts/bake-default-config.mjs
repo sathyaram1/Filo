@@ -253,12 +253,19 @@ async function main() {
       .map(([k, v]) => [k, v ? 'presente' : 'assente'])
   );
   console.log(`[bake] scritto ${OUT_PATH}:`, JSON.stringify(summary));
+
+  // Qualcuna c'è, quindi si pubblica — ma una chiave che l'applicazione legge e
+  // che nel pacchetto non c'è resterebbe muta all'utente senza dirlo a nessuno.
+  if (mancanti.length) {
+    console.warn(`::warning::Questa versione esce senza una delle chiavi che l'applicazione legge. ${spiegaChiaviMancanti(mancanti, esitoServer).join(' ')}`);
+  }
+
   // La Safe Browsing assente non ferma la pubblicazione (è un contorno: senza,
   // il primo stadio si salta e restano giudice LLM, sandbox e segnali di rete),
   // ma NON deve sparire in silenzio: da quando il documento dei segreti è
   // admin-only, questa è l'unica strada che porta la chiave agli utenti.
   if (!safeBrowsingKey) {
-    console.warn('::warning::Nessuna chiave Google Safe Browsing: il primo stadio del rilevamento siti pericolosi resterà spento in questa versione.');
+    console.warn(`::warning::Nessuna chiave Google Safe Browsing: il primo stadio del rilevamento siti pericolosi resterà spento in questa versione. ${spiegaChiaviMancanti([FONTE_SAFE_BROWSING], esitoServer).join(' ')}`);
   }
 }
 
