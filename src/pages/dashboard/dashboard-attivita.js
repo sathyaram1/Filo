@@ -430,6 +430,10 @@
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
+      // La home chiesta dalla home non ricarica niente (butterebbe via il
+      // lavoro e la risposta appena scritti): lo si dice, e il bottone qui
+      // accanto la svuota quando l'utente ha letto.
+      if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home' };
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
   };
