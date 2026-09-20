@@ -389,8 +389,15 @@
   // lì faceva leggere le 19 al posto delle 19:30.
   const STACCHI_DOPO = new RegExp(`${PUNTO}|${VIRGOLA}|[!?;\\n—]|${INIZIO}(?:ma|però|invece|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
 
+  // Quanto si guarda indietro: una proposizione non è lunga mezza pagina, e
+  // risalire ogni volta dall'inizio del testo costa il quadrato su una
+  // risposta lunga (giro 6: con settemila frasi uguali il controllo passava
+  // da millesimi di secondo a dieci secondi).
+  const FINESTRA = 600;
+
   function proposizionePrima(testo, indice) {
-    const prima = testo.slice(0, indice);
+    const da = Math.max(0, indice - FINESTRA);
+    const prima = testo.slice(da, indice);
     let taglio = -1;
     STACCHI.lastIndex = 0;
     let m;
