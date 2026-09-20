@@ -124,17 +124,13 @@ async function giroDellInvitato(app) {
 }
 
 test('entrato con l’invito, Filo si presenta', async ({ app, shell }) => {
-  test.fail(true, 'con i modelli predefiniti Filo crede di non avere nessuna chiave: l’accoglienza non parte mai');
   test.setTimeout(300000);
 
   const home = await giroDellInvitato(app);
 
-  // I crediti ci sono e la home saluta come se tutto fosse a posto.
-  await expect
-    .poll(async () => (await home.innerText('body')).slice(0, 200), { timeout: 30000, intervals: [1000] })
-    .toContain('Filo è qui');
-
-  // Ma la conversazione con cui Filo si presenta non parte: né lì…
+  // Risolto dal #663: con i modelli predefiniti la conversazione parte. Prima
+  // il controllo di prontezza cercava una chiave intestata al fornitore
+  // dichiarato, che non ne aveva nessuna, e l'accoglienza non arrivava mai.
   await expect.poll(() => siEPresentato(home), { timeout: 45000, intervals: [1000] }).toBe(true);
 
   // …né su una scheda nuova, che è l'unica strada che restava.
