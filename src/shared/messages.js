@@ -592,6 +592,26 @@
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }
     FILO_GENERATE_DASHBOARD: 'filo_generate_dashboard',
+    // === Archivio delle chat con Filo (#525) ===
+    // Ogni chat si salva per intero, turno per turno, mentre la si fa (il
+    // salvataggio lo fa il main dentro FILO_CHAT, che riceve `chatId`). Questi
+    // messaggi servono a CONSULTARLO: la pagina Cronologia e l'agente stesso.
+    // Sono conversazioni private dell'utente: rispondono solo alle pagine
+    // filo://, mai ai content script dei siti.
+    // Elenco senza i messaggi (titolo, date, tipo, estratto). Risposta: { ok, chats }
+    FILO_CHATS_LIST: 'filo_chats_list',
+    // Una chat INTERA, per riaprirla e continuare a scrivere. { id } → { ok, chat }
+    FILO_CHAT_GET: 'filo_chat_get',
+    // Chiusura di una chat (ritorno alla home, chat nuova, chiusura dell'app):
+    // fissa la data di chiusura e fa partire la classificazione (titolo +
+    // conversazione/comando). { id } → { ok }
+    FILO_CHAT_CLOSE: 'filo_chat_close',
+    // Cancellazione manuale di una chat, dopo la conferma. { id } → { ok, chats }
+    FILO_CHAT_DELETE: 'filo_chat_delete',
+    // Ricerca per testo dentro tutte le chat. { query, kind?, limit? }
+    // Risposta: { ok, chats } (voci d'elenco, con il frammento che combacia).
+    FILO_CHATS_SEARCH: 'filo_chats_search',
+
     // CRUD memoria/contenuti dashboard
     FILO_GET_MEMORY: 'filo_get_memory',
     // Compattazione FORZATA della memoria: svuota subito il buffer delle
