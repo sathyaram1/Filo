@@ -88,7 +88,7 @@
   const PONTE = (n) => `[^.!?]{0,${n}}`;
   // I pronomi con cui si risponde quando la cosa l'ha appena nominata
   // l'utente. «Gliel'ho messa» mancava: c'erano solo prima e seconda persona.
-  const PRON = `(?:te |ve |me |glie)?l${AP}ho\\s+${AVV}`;
+  const PRON = `(?:te |ve |me |glie)?l${AP}(?:ho|avevo)\\s+${AVV}`;
 
   // Ogni famiglia: come il modello DICE di aver fatto la cosa (`frasi`), quali
   // azioni la reggono davvero (`tipi`) e cosa va detto all'utente quando la
