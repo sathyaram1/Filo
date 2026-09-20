@@ -122,12 +122,15 @@ function shellConfig(shell, sid, startCwd) {
 // onError({message}).
 function createSession({ shell, cwd } = {}) {
   const sid = randSid();
-  const wantShell = process.platform !== 'win32' ? 'sh' : (shell || 'powershell');
+  const wantShell = resolveShell(shell);
   const startCwd = usableCwd(cwd);
   const cfg = shellConfig(wantShell, sid, startCwd);
 
   const session = {
-    shell: shell || 'powershell',
+    // La shell VERA, non quella chiesta: chi confronta per decidere se
+    // ricreare la sessione (ipc.js) deve vedere lo stesso valore che ha
+    // calcolato lui, altrimenti la sessione si ricrea a ogni comando.
+    shell: wantShell,
     sid,
     cwd: startCwd,
     dead: false,
