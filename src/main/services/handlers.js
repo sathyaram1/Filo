@@ -2769,7 +2769,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         if (res.rejected && res.fuoriPerimetro) {
           rendered._traccia = true;
           rendered._executed = false;
-          rendered._output = { fuoriPerimetro: res.fuoriPerimetro.etichetta || '' };
+          rendered._output = {
+            fuoriPerimetro: res.fuoriPerimetro.etichetta || '',
+            ...(res.fuoriPerimetro.secco ? { perimetroSecco: true } : {}),
+          };
         }
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
