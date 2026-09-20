@@ -401,10 +401,17 @@
   }
 
   // Il participio di una dichiarazione, preso dal pezzo che ha fatto match.
+  // Le paroline in mezzo («ti ho già messo») si saltano: prese per il verbo,
+  // due dichiarazioni diverse sembravano la stessa cosa detta due volte.
+  const VERBO_DOPO_HO = new RegExp(`\\bho\\s+${AVV}([a-zàèéìíòóùú]{3,})`, 'i');
   function verboDi(pezzo) {
-    const m = String(pezzo || '').match(/\bho\s+([a-zàèéìíòóùú]{3,})/i);
+    const m = String(pezzo || '').match(VERBO_DOPO_HO);
     return m ? radice(m[1]) : '';
   }
+  // I verbi che creano qualcosa a un'ora: lì l'ora nominata è la prova. Chi
+  // sposta o cancella no — dopo «te l'ho cancellata alle 19» la sveglia delle
+  // 19 non deve esistere, e pretenderla sarebbe l'accusa al contrario.
+  const VERBI_CHE_CREANO = new Set(['mess', 'impostat', 'programmat', 'fissat', 'creat', 'aggiunt', 'piazzat', 'settat', 'puntat', 'avviat', 'accés', 'acces', 'lanciat']);
 
   // Le ore scritte a lettere. «Ho messo la sveglia alle sette», con la sveglia
   // delle 7 che esiste davvero, veniva smentita perché l'ora si leggeva solo
