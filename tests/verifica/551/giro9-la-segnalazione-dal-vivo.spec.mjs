@@ -15,7 +15,7 @@
 // del contenuto esterno, lettore — e che vale su ogni piattaforma.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { writeFileSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
