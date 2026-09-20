@@ -1032,6 +1032,14 @@
     // dietro, altrimenti due risposte fuori formato di fila si rimbalzerebbero
     // all'infinito.
     if (userMessage) rimandiFuoriFormato = 0;
+    // …e le azioni emesse tornano nel mucchio del passato: da qui in poi
+    // reggono una frase solo se la frase guarda indietro.
+    if (userMessage) {
+      for (const t of azioniDelTurno) azioniFiloEmesse.add(t);
+      azioniDelTurno = new Set();
+      const D = global.SN_AZIONI_DICHIARATE;
+      domandaSuCosaFatta = !!(D && D.domandaSuCosaFatta && D.domandaSuCosaFatta(userMessage));
+    }
 
     if (userMessage) {
       appendChatMessage('user', userMessage);
