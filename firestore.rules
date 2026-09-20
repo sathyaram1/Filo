@@ -87,6 +87,75 @@ service cloud.firestore {
             && (!('l4' in d.livelli) || livelloValido(d.livelli.l4)));
     }
 
+    // #597 — Un indirizzo del DEPOSITO di Filo, e nient'altro.
+    //
+    // Perché sta qui. Gli indirizzi degli allegati non li sceglie né l'owner né
+    // il server: li scrive chi manda la segnalazione, e una segnalazione la
+    // manda chiunque, senza account. A valle quegli indirizzi vengono
+    // SCARICATI (il giudice visivo passa gli screenshot a un modello con
+    // ingresso visivo), quindi un campo libero qui è una fetch che parte dalla
+    // rete del server verso un indirizzo scelto da un estraneo: metadati della
+    // macchina, servizi raggiungibili solo dall'interno, e la descrizione di
+    // ciò che è stato scaricato che torna scritta nel feedback.
+    //
+    // È la stessa domanda che si fa `SN_FEEDBACK.isAttachmentUrl`
+    // (src/shared/feedback.js) prima di far partire una fetch dal main, e che
+    // il server rifà per conto suo prima di scaricare. Tre posti, una risposta
+    // sola: le regole da sole non bastano mai (un documento scritto con
+    // l'Admin SDK, o prima di questo deploy, qui non passa).
+    //
+    // Il confronto è sul DEPOSITO, non sull'host: fermarsi a
+    // `storage.googleapis.com` lascerebbe entrare il bucket di chiunque.
+    // I nomi ammessi sono due e sono lo stesso deposito — quello attuale
+    // (`…firebasestorage.app`) e quello storico (`…appspot.com`), che gli
+    // allegati più vecchi hanno ancora dentro l'indirizzo.
+    //
+    // `matches()` in queste regole confronta la stringa INTERA, quindi
+    // `https://firebasestorage.googleapis.com@esempio.invalid/…` non passa:
+    // dopo il nome dell'host ci deve essere una barra, non una chiocciola.
+    function urlDelDeposito(v) {
+      return v is string
+        && v.size() > 0
+        && v.size() <= 2000
+        && (v.matches('^https://firebasestorage\\.googleapis\\.com/v0/b/filo-8b9cb\\.(firebasestorage\\.app|appspot\\.com)/o/[^\\s]*$')
+            || v.matches('^https://storage\\.googleapis\\.com/filo-8b9cb\\.(firebasestorage\\.app|appspot\\.com)/[^\\s]*$'));
+    }
+
+    // Il linguaggio delle regole non ha cicli: con al più cinque elementi si
+    // scrivono i cinque indici a mano. Il tetto di cinque sta DENTRO questa
+    // funzione, ed è ciò che rende vera l'enumerazione: una lista più lunga non
+    // passa, quindi non esiste un elemento che nessuno ha guardato.
+    function soloAllegatiDelDeposito(l) {
+      return l.size() <= 5
+        && (l.size() < 1 || urlDelDeposito(l[0]))
+        && (l.size() < 2 || urlDelDeposito(l[1]))
+        && (l.size() < 3 || urlDelDeposito(l[2]))
+        && (l.size() < 4 || urlDelDeposito(l[3]))
+        && (l.size() < 5 || urlDelDeposito(l[4]));
+    }
+
+    // Gli allegati non-immagine viaggiano come mappe { url, name, type }
+    // (src/shared/feedback.js → submit): l'indirizzo è dentro `url` ed è un
+    // indirizzo del deposito esattamente come sopra. Nome e tipo sono etichette
+    // che la dashboard mostra: stringhe, con un tetto abbondante.
+    function allegatoConUrl(v) {
+      return v is map
+        && v.keys().hasOnly(['url', 'name', 'type'])
+        && urlDelDeposito(v.get('url', ''))
+        && v.get('name', '') is string
+        && v.get('name', '').size() <= 300
+        && v.get('type', '') is string
+        && v.get('type', '').size() <= 200;
+    }
+    function soloAllegatiConUrlDelDeposito(l) {
+      return l.size() <= 5
+        && (l.size() < 1 || allegatoConUrl(l[0]))
+        && (l.size() < 2 || allegatoConUrl(l[1]))
+        && (l.size() < 3 || allegatoConUrl(l[2]))
+        && (l.size() < 4 || allegatoConUrl(l[3]))
+        && (l.size() < 5 || allegatoConUrl(l[4]));
+    }
+
     // Allowlist amministratori. Gestita SOLO da console Firebase.
     match /admins/{email} {
       allow read: if isAdmin();
