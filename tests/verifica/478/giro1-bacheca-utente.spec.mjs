@@ -75,8 +75,10 @@ async function reteDaUtente(page, schede) {
           { status: 403, headers: { 'Content-Type': 'application/json' } });
       }
       const ordinati = docs.slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-      const dopo = q?.startAt?.values?.[0]?.referenceValue || '';
-      const da = dopo ? ordinati.findIndex((d) => d.name === dopo) + 1 : 0;
+      // Il cursore che manda la pagina è il nome pieno del documento, costruito
+      // sul progetto vero: si confronta l'ultimo pezzo, cioè l'id.
+      const dopo = String(q?.startAt?.values?.[0]?.referenceValue || '').split('/').pop();
+      const da = dopo ? ordinati.findIndex((d) => d.name.split('/').pop() === dopo) + 1 : 0;
       const limite = Number(q?.limit) || ordinati.length;
       const pagina = ordinati.slice(da, da + limite);
       return new Response(JSON.stringify(pagina.map((d) => ({ document: d }))),
