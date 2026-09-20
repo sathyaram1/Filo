@@ -699,3 +699,54 @@ test('un byte nullo dentro un testo è un danno, non un testo a due byte', async
   const russo = 'Привет, это тестовый файл с русским текстом.\n'.repeat(6);
   assert.equal(DR.decodeText(Buffer.from(russo, 'utf16le')), russo);
 });
+
+test('un byte nullo dentro un testo non lo fa leggere a coppie di byte', () => {
+  // #551, ottavo giro di verifica. Il settimo giro chiedeva «questi byte sono
+  // già testo?» e rispondeva con una percentuale sul file intero. Due file
+  // normalissimi stanno sopra quella soglia senza essere scritti a due byte per
+  // carattere, e allora un nullo solo li faceva rileggere a coppie: quello che
+  // ne usciva erano ideogrammi cinesi, stampabili, quindi nemmeno la rete
+  // finale se ne accorgeva, e Filo dichiarava di aver letto il documento.
+  const conNullo = (buf, dove) => {
+    const b = Buffer.from(buf);
+    b[dove] = 0;
+    return b;
+  };
+
+  // Prima strada: il file è CORTO. In un promemoria di quaranta caratteri un
+  // nullo solo vale il due e mezzo per cento.
+  const nota = Buffer.from('Promemoria: chiamare l\'idraulico martedì.\n', 'utf8');
+  assert.equal(DR.pareDueByte(conNullo(nota, 7)), '');
+  assert.equal(DR.pareDueByte(conNullo(nota, 6)), '');
+  assert.equal(DR.decodeText(conNullo(nota, 7)).includes('chiamare l\'idraulico martedì'), true);
+
+  // Seconda strada, e vale a qualunque lunghezza: il file contiene già qualche
+  // carattere di controllo suo. Il registro di un programma che disegna una
+  // barra di avanzamento torna indietro un carattere per volta.
+  let registro = '';
+  for (let i = 0; i < 100; i++) registro += `Scarico attività ${i}%${'\b'.repeat(30)}\n`;
+  registro += 'TOTALE: 931,50 € — pratica conclusa a Città\n';
+  const barra = Buffer.from(registro, 'utf8');
+  assert.ok(barra.length > 5000, 'il registro di prova dev\'essere lungo');
+  for (const dove of [7, 6, barra.length - 3]) {
+    assert.equal(DR.pareDueByte(conNullo(barra, dove)), '', `nullo in posizione ${dove}`);
+  }
+
+  // Un pugno di caratteri guasti non condanna il documento: si tolgono, si
+  // contano e il resto si legge. Sopra quel pugno il rifiuto resta.
+  const letto = DR.decodeTextDettaglio(conNullo(nota, 7));
+  assert.equal(letto.codifica, 'utf8');
+  assert.equal(DR.senzaRumore(letto.text).persi, 1);
+
+  // E le porte chiuse nei giri prima restano chiuse: un file davvero scritto a
+  // due byte si riconosce ancora, con e senza firma, dentro e fuori
+  // dall'alfabeto latino.
+  const testo = 'RELAZIONE — attività finale\nCittà di Milano: 12 €\n'.repeat(8);
+  assert.equal(DR.pareDueByte(Buffer.from(testo, 'utf16le')), 'le');
+  assert.equal(DR.decodeText(Buffer.from(testo, 'utf16le')), testo);
+  const be = Buffer.from(testo, 'utf16le');
+  be.swap16();
+  assert.equal(DR.decodeText(be), testo);
+  const russo = 'Привет, это тестовый файл с русским текстом.\n'.repeat(6);
+  assert.equal(DR.decodeText(Buffer.from(russo, 'utf16le')), russo);
+});
