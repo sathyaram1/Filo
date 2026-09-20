@@ -117,6 +117,29 @@ test('la foto di una bolletta letta da Filo non diventa «il documento non l\'ha
   expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
 });
 
+test('una sveglia CHIAMATA ma non riuscita non copre la frase che la dà per fatta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  // Lo strumento viene chiamato davvero, ma con un orario che Filo non sa
+  // leggere: nessuna sveglia nasce. Poi il modello racconta che è fatta —
+  // ed è di nuovo esattamente la lamentela della segnalazione.
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'k1', name: 'SVEGLIA', arguments: '{"time":"quando fa buio","label":"sera"}' }] },
+    { text: 'Ti ho messo una sveglia alle 19:00 per stasera.' },
+  ]);
+  await chiedi(page, 'mettimi una sveglia per stasera');
+
+  // La sveglia non c'è: il danno è quello del feedback.
+  const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
+  expect(timers).toHaveLength(0);
+  // E allora l'utente deve saperlo, come lo sa quando lo strumento non è
+  // stato chiamato per niente.
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
+});
+
 test('una sveglia messa in una sessione precedente resta una sveglia messa', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
