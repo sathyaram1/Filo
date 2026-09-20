@@ -147,17 +147,20 @@ test('un titolo ostile resta testo e non sfonda la pagina', async ({ openTab }) 
   await page.screenshot({ path: 'tests/.shots/verifica-478-titolo-ostile.png' });
 });
 
-// ── 3. Le due strade per essere «risolto» ───────────────────────────────────
-// Un fix chiuso può arrivare in bacheca come `done` o come `verified`: sono la
-// stessa cosa per chi guarda. Se solo una delle due comparisse, metà dei
-// miglioramenti resterebbe invisibile — il sintomo, in piccolo.
-test('un fix verificato compare come uno chiuso', async ({ openTab }) => {
+// ── 3. I fix chiusi PRIMA che le schede esistessero ─────────────────────────
+// Il feedback lo chiedeva espressamente: cosa si fa dei fix chiusi quando la
+// scheda non c'era ancora? Quelli non hanno la versione di rilascio (il campo è
+// nato dopo). Se il filtro «già in produzione» li scartasse, resterebbero fuori
+// dalla bacheca per sempre. E un feedback chiuso ARCHIVIANDOLO — che una scheda
+// ce l'ha, perché serve all'annuncio della ricompensa — non è un miglioramento
+// rilasciato e in vetrina non ci deve andare.
+test('uno storico senza versione compare; un archiviato no', async ({ openTab }) => {
   const page = await apri(openTab, [
-    scheda({ _id: 'fb-done', seq: 1, name: 'Chiuso' }),
-    scheda({ _id: 'fb-verified', seq: 2, name: 'Verificato', status: 'verified' }),
+    scheda({ _id: 'fb-storico', seq: 12, name: 'Corretto prima delle schede', resolvedInVersion: undefined }),
+    scheda({ _id: 'fb-archiviato', seq: 13, name: 'Chiuso archiviando', status: 'archived' }),
   ]);
-  await expect(page.locator('.bd-card')).toHaveCount(2);
-  await expect(page.locator('.bd-card-title', { hasText: 'Verificato' })).toHaveCount(1);
+  await expect(page.locator('.bd-card')).toHaveCount(1);
+  await expect(page.locator('.bd-card-title')).toHaveText('Corretto prima delle schede');
 });
 
 // ── 4. Un fix non ancora uscito non si vota ─────────────────────────────────
