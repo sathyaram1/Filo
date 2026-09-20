@@ -231,6 +231,59 @@ Come si verifica, dato che un Mac non ce l'abbiamo:
   Mac. Quello lo dice solo un Mac vero: dichiaralo nel report invece di darlo
   per fatto.
 
+## Filo gira anche su Linux
+
+Stessa storia del Mac, stesso rischio: nessuno di noi ha un Linux desktop
+sotto mano. Filo per Linux è un file solo, `Filo-Linux.AppImage`, allegato
+alla stessa release dal lavoro `release-linux` di
+`.github/workflows/release.yml`. Il nome è **fisso**: il sito ha un
+collegamento solo e non sa che numero di versione sia uscito.
+
+- **Ctrl resta Ctrl.** Su Linux non c'è il Cmd del Mac e non c'è la barra dei
+  menu dell'applicazione: le scorciatoie si chiamano e si comportano come su
+  Windows. `SN_TASTI` lo sa già; non aggiungere rami per Linux dove non
+  servono.
+- **La modalità terminale non è PowerShell.** Fuori da Windows si parte da
+  `/bin/sh`, o da `bash` se l'utente l'ha scelto nelle Preferenze. La regola
+  sta in un posto solo, `resolveShell` di
+  `src/main/services/terminal.js`: la sessione persistente
+  (`src/main/services/shell.js`) e i comandi dell'assistente chiedono lì. Due
+  copie divergono, ed è già successo (la voce «Bash» delle Preferenze non
+  faceva niente).
+- **L'aggiornamento automatico può fermarsi, e allora lo dice.** Su Linux
+  electron-updater riscrive l'AppImage da cui Filo sta girando: riesce se
+  quel file è scrivibile e se l'app è partita davvero come AppImage. Quando
+  inciampa, `avvisaSeAggiornamentoBloccato` scrive fra le notifiche che la
+  versione nuova va presa a mano, come già fa su Mac. Un aggiornamento che
+  fallisce in silenzio lascia l'utente fermo per sempre.
+- **Il link d'invito passa dalla voce di menu.** Su Linux `filo://` arriva a
+  Filo solo se il file `.desktop` dentro l'AppImage dichiara
+  `x-scheme-handler/filo`, e quella riga la scrive electron-builder solo
+  perché `build.protocols` è dichiarato. L'indirizzo poi arriva fra gli
+  argomenti, come su Windows.
+- **La ricetta si tocca con cautela**: `build.linux` in `package.json` e il
+  lavoro `release-linux`. `artifactName`, `category` e `desktop` non sono
+  decorazioni: senza il primo il collegamento del sito si rompe, senza gli
+  altri due Filo non compare nel menu di sistema e la sua finestra non si
+  aggancia alla propria icona nella barra.
+
+Come si verifica, dato che un Linux desktop non ce l'abbiamo:
+
+- `tests/unit/linuxSupport.test.mjs` è la sentinella sempre accesa, gemella di
+  quella del Mac. Una regola nuova per Linux si aggiunge lì.
+- Il lavoro **«Verifica build Linux»**
+  (`.github/workflows/verifica-linux.yml`) costruisce davvero l'AppImage e non
+  pubblica niente. Guarda anche dentro il pacchetto, nella voce di menu.
+- L'AppImage si costruisce anche **nel contenitore delle routine**:
+  `npm run build:linux` mette `dist/Filo-Linux.AppImage` e
+  `dist/latest-linux.yml`. Per aprirla lì serve estrarla
+  (`./Filo-Linux.AppImage --appimage-extract`, poi `APPDIR=$PWD/squashfs-root
+  xvfb-run -a ./squashfs-root/AppRun --no-sandbox`): senza FUSE l'AppImage non
+  si monta.
+- Quello che **nessuno di questi prova** è che l'app si apra e funzioni su un
+  Linux desktop vero, con la sua sessione grafica, le sue notifiche e il suo
+  gestore di file. Dichiaralo nel report invece di darlo per fatto.
+
 ## Limiti: abbondanti, e mai un taglio silenzioso
 
 Un tetto troppo stretto è già costato due volte (i feedback inviati dallo
