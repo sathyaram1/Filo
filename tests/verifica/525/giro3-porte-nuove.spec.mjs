@@ -160,7 +160,7 @@ test('la chat ancora in corso, vista da Cronologia', async ({ app, openTab, shel
     const lista = snap.tabs || snap;
     return {
       urls: lista.map((t) => String(t.url || '')),
-      attiva: String((lista.find((t) => t.active) || {}).url || ''),
+      attiva: String((lista.find((t) => t.id === snap.activeId) || {}).url || ''),
     };
   });
   console.log('SCHEDE PRIMA:', JSON.stringify(prima), 'DOPO:', JSON.stringify(dopo));
