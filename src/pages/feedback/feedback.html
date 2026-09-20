@@ -212,6 +212,18 @@
       width: 64px; height: 64px; object-fit: cover;
       border: 1px solid var(--sn-border); border-radius: 6px; cursor: zoom-in; display: block;
     }
+    /* L'allegato sale cifrato (#602): finché Filo non ne ha in mano una copia
+       mostrabile la miniatura pulsa, e se non ce n'è nessuna resta un riquadro
+       della stessa misura, così la fila non si scompone. */
+    .fb-attach-thumb img.fb-img-loading {
+      object-fit: contain; cursor: default;
+      background: var(--sn-surface-2, rgba(127,127,127,.08));
+      animation: fbImgPulse 1.2s ease-in-out infinite;
+    }
+    .fb-attach-thumb .fb-img-broken {
+      width: 64px; height: 64px; font-size: 10px; line-height: 1.2;
+      text-align: center; padding: 2px; box-sizing: border-box;
+    }
     .fb-attach-chip {
       display: inline-flex; align-items: center; gap: 6px;
       max-width: 220px; padding: 5px 8px; padding-right: 24px; position: relative;
