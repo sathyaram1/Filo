@@ -124,7 +124,10 @@ test('invitato, poi «solo modelli a pesi aperti»: la home dice che Filo non pu
   await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
 });
 
-test('invitato, poi «usa i modelli predefiniti» spento: la home dice che Filo non può più rispondere', async ({ app, shell }) => {
+// «Voglio gestirmi i modelli da solo» non basta a spegnere Filo: la
+// configurazione personale nasce già piena. Perché Filo diventi muto davvero
+// bisogna anche svuotarla, ed è quello che fa questo test.
+test('invitato, poi i modelli propri e nessuno scelto: la home dice che Filo non può più rispondere', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
