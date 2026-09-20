@@ -78,11 +78,16 @@ function lancia(script, args, env, cwd) {
     (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
 }
 
+// Gli attrezzi del giro stanno FUORI dal ramo, com'è nelle routine: così il
+// comando che il rifiuto detta esce col percorso intero e si può eseguire
+// davvero, che è il punto di questo file.
+const ATTREZZI = fileURLToPath(new URL('../../..', import.meta.url));
+
 function ambiente(dir, fuori, port) {
   return {
     ...process.env,
     FILO_REPO_ROOT: dir,
-    FILO_TOOLS_ROOT: dir,
+    FILO_TOOLS_ROOT: ATTREZZI,
     FILO_DISPATCH_STATE_DIR: resolve(fuori, 'stato'),
     FILO_NO_BEAT: '1',
     FILO_ROUTINE_TICKET: 'biglietto-finto',
