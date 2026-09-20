@@ -296,8 +296,15 @@ export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
  * La critica si
  * conserva com'è stata scritta (coi livelli), per il fogliettino locale.
  */
-export function applyVerifierVerdict(state, outcome, critique = '') {
+export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
+  // Un esito vale per il CONTENUTO esaminato, non per il nome del ramo: lo sha
+  // del commit provato viaggia col verdetto e resta scritto qui accanto
+  // (feedback #485). Senza, «verificato» è una firma su una cartella, e basta
+  // sostituire il foglio perché resti buona su un contenuto che nessuno ha
+  // guardato — chi lavora ha per costruzione il permesso di spingere sul
+  // proprio ramo, quindi la finestra si apre da sé.
+  if (String(sha || '')) s.verifierSha = String(sha);
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'blocked';
