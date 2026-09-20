@@ -79,12 +79,21 @@
   // fa il MAIN, non questo pannello: quella è roba dell'utente e qui siamo
   // dentro una pagina web. Di là passa il testo che il modello ha scritto, di
   // qua tornano le righe da mostrare.
+  // I turni il cui testo l'utente LEGGE in chat. Fuori da qui il modello non
+  // scrive niente che arrivi a nessuno (la ricerca web), quindi non c'è
+  // niente da smentire.
+  // #517 (giro 8) — «shell» mancava: un turno in cui il pannello aziona un
+  // comando della barra in alto mostra il suo testo in chat e non lo guardava
+  // nessuno. Niente ritentativo, niente riga sotto la risposta, niente nei
+  // log: il fallimento muto della segnalazione, dopo un comando.
+  const KIND_DA_GUARDARE = new Set(['filo_action', 'page_action', 'shell']);
+
   async function azioniRaccontate(parsed) {
     const D = global.SN_AZIONI_DICHIARATE;
     // Un turno che emette un'azione va guardato come gli altri: il pannello
     // ne emette UNA per turno, quindi se l'utente ne chiede due la seconda il
     // modello la racconta e basta.
-    if (!D || !parsed || (parsed.kind && parsed.kind !== 'filo_action' && parsed.kind !== 'page_action')) return [];
+    if (!D || !parsed || (parsed.kind && !KIND_DA_GUARDARE.has(parsed.kind))) return [];
     const testo = String(parsed.display || '');
     if (!testo.trim()) return [];
     // L'azione che sta per partire in questo turno conta come partita: il
