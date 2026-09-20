@@ -217,10 +217,6 @@ test('riaprire una chat, continuarla e chiuderla: titolo e tipo si rifanno sulla
   await expect(dash.locator('.dash-bubble-filo').last()).toBeVisible({ timeout: 20_000 });
 
   // Chiusa di nuovo, non può restare «comando» nascosta sotto l'interruttore.
-  const id = await app.evaluate(async () => {
-    const win = globalThis.__filoWindows ? null : null; return win;
-  }).catch(() => null);
-  void id;
   await dash.evaluate(() => { window.location.href = 'filo://history/history.html'; });
 
   await expect.poll(async () => {
