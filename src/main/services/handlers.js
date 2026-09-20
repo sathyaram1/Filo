@@ -3074,7 +3074,7 @@ const handlerCtx = {
   sweepPendingChats,
   archiviaCongedoAccoglienza,
   dimenticaChat,
-  schedaDiChat,
+  portaAllaChat,
   // Intervista di benvenuto (#524)
   saveOnboarding,
   finishOnboarding,
