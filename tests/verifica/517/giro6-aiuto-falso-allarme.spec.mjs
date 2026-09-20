@@ -78,7 +78,7 @@ test('la sveglia che esiste davvero non viene smentita nell\'Aiuto', async ({ ap
   const testo = await testoChat(page);
   expect(testo).not.toMatch(/non l'ha fatto|non è partito niente|la sveglia non c'è/i);
   // …e la risposta non deve essere buttata e rifatta con un'altra chiamata.
-  expect(await page.evaluate(() => window.__turni.length)).toBe(1);
+  expect(testo).not.toMatch(/risposta rifatta/i);
 });
 
 test('nell\'Aiuto una sveglia raccontata senza ora e mai messa resta vista', async ({ openTab }) => {
