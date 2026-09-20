@@ -133,6 +133,32 @@ test('un file senza estensione nota con un byte nullo non passa per testo a due 
   }
 });
 
+test('un registro scritto benissimo non viene rifiutato per la codifica', async ({ openTab }) => {
+  const dir = cartellaTemporanea('filo-551-g8-falso-rifiuto-');
+  try {
+    // Nessun byte nullo, nessun byte guasto: UTF-8 perfetto. Solo i ritorni
+    // indietro con cui il programma riscriveva la riga dell'avanzamento.
+    let registro = '';
+    for (let i = 0; i < 100; i++) {
+      registro += `Scarico attività ${i}%${'\b'.repeat(30)}\n`;
+    }
+    registro += 'TOTALE: 931,50 € — pratica conclusa a Città\n';
+    const f = join(dir, 'scaricamento.log');
+    writeFileSync(f, Buffer.from(registro, 'utf8'));
+
+    const page = await openTab(HOME);
+    const r = await leggiDocumento(page, f);
+    expect(
+      r?.output?.ok,
+      'Filo rifiuta un registro scritto bene e dà la colpa alla codifica: '
+      + JSON.stringify(String(r?.output?.detail || '')),
+    ).toBe(true);
+    expect(String(r?.output?.text || '')).toContain('TOTALE');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('un documento sano continua a leggersi', async ({ openTab }) => {
   const dir = cartellaTemporanea('filo-551-g8-sano-');
   try {
