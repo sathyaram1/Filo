@@ -132,6 +132,7 @@ function isAdminUser() {
 // `config/secrets` si legge SOLO da admin (#581): per tutti gli altri le chiavi
 // sono quelle incastonate dal build, e questo documento non si tocca affatto.
 async function refresh() {
+  const prima = get();
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
 
