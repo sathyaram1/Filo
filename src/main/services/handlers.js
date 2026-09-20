@@ -3319,21 +3319,25 @@ function dimenticaChat(chatId) {
   codeDiChiusura.delete(chatId);
 }
 
-// La scheda che sta vivendo una chat, se c'è ancora: serve a portare l'utente
-// LÌ invece di aprirgli una seconda copia della stessa conversazione (che poi
-// non si vedono fra loro e finiscono mescolate nell'archivio).
-// Ritorna { winId, tabId } oppure null.
-function schedaDiChat(chatId) {
+// Una conversazione ancora in corso VIVE in una scheda. Chi la clicca in
+// Cronologia va portato LÌ, non davanti a una seconda copia: due schede sulla
+// stessa chat non si vedono fra loro — scrivi in una e l'altra resta indietro
+// — e nell'archivio i due fili finiscono mescolati.
+// Ritorna true se l'utente è stato portato dov'era già aperta.
+function portaAllaChat(chatId) {
   const wc = chatId ? proprietariDiChat.get(chatId) : null;
-  if (!wc) return null;
-  try { if (wc.isDestroyed()) return null; } catch (_) { return null; }
+  if (!wc) return false;
+  try { if (wc.isDestroyed()) return false; } catch (_) { return false; }
   for (const win of BrowserWindow.getAllWindows()) {
     const tm = win && win._filoTabs;
     if (!tm || !Array.isArray(tm.tabs)) continue;
     const tab = tm.tabs.find((t) => t.view && t.view.webContents === wc);
-    if (tab) return { winId: win.id, tabId: tab.id };
+    if (!tab) continue;
+    try { tm.activate(tab.id); } catch (_) { return false; }
+    try { win.focus(); } catch (_) {}
+    return true;
   }
-  return null;
+  return false;
 }
 
 // L'intervista di benvenuto comincia con una domanda di Filo, che nessun turno
