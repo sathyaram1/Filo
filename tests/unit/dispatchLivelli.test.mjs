@@ -162,6 +162,14 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
   const sandbox = cartellaTemporanea('filo-livelli-cli-');
   const statoDir = resolve(sandbox, 'stato');
   try {
+    // Un deposito git vero, con un commit: il verdetto del controllo di
+    // sicurezza vale per il commit letto, e senza deposito lo strumento
+    // rifiuta (non tratta il silenzio di git come «directory pulita»).
+    const g = (args) => spawnSync('git', args, { cwd: sandbox, encoding: 'utf8' });
+    g(['init', '-q', '--initial-branch=main']);
+    g(['config', 'user.email', 't@t']); g(['config', 'user.name', 't']);
+    writeFileSync(resolve(sandbox, 'base.txt'), 'base\n', 'utf8');
+    g(['add', '-A']); g(['commit', '-qm', 'base']);
     const env = {
       ...process.env,
       FILO_REPO_ROOT: sandbox,
