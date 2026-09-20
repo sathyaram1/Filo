@@ -144,8 +144,10 @@
     const stateText = renderForPrompt(state);
     // Che cosa di ALTRI questo riepilogo ha appena messo nel contesto (#530):
     // i titoli delle schede li scrivono i siti, e chi decide se il compito è
-    // ancora pulito deve saperlo da qui — non indovinarlo dalle azioni.
-    const fonti = state.tabs.length ? ['schede'] : [];
+    // ancora pulito deve saperlo da qui — non indovinarlo dalle azioni. Le
+    // pagine di Filo non contano: quei titoli li scrive Filo, e con la home
+    // sempre aperta ogni compito nascerebbe già sporco.
+    const fonti = state.tabs.some((t) => !/^filo:/i.test(String(t.url || ''))) ? ['schede'] : [];
     return { state, stateText, fonti };
   }
 
