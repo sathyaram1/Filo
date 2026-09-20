@@ -34,8 +34,12 @@ async function startServer() {
     }
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  // Il nome, non il numero. #591 (quinto giro): il livello 2 non parte sugli
+  // indirizzi della rete di casa — il router, il NAS, un server di prova — e
+  // 127.0.0.1 è proprio uno di quelli. Qui il server locale fa la parte di un
+  // SITO, quindi si raggiunge col nome che la fixture mappa sul loopback.
   return {
-    origin: `http://127.0.0.1:${server.address().port}`,
+    origin: `http://blocked.test:${server.address().port}`,
     async close() {
       try { server.closeAllConnections?.(); } catch (_) {}
       await new Promise((r) => server.close(r));
@@ -92,7 +96,7 @@ test('geo-block livello 2: solo geo_block dalla coda ambigua emette il segnale (
     let sig = (await signals())[0];
     expect(sig.source).toBe('llm_classifier');
     expect(sig.detail).toBe('geo_block');
-    expect(sig.host).toBe('127.0.0.1');
+    expect(sig.host).toBe('blocked.test');
     let tab = await webTabGeo(app);
     expect(tab.geoBlock.source).toBe('llm_classifier');
     // RILEVA, NON AGISCE: nessun retry via proxy è partito.
