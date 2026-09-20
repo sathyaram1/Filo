@@ -135,6 +135,26 @@ test('una risposta di rifiuto del server non passa in silenzio', async () => {
   }
 });
 
+test('il caso vero: il server risponde, ma con chiavi che l’applicazione non legge', async () => {
+  // Il documento dei segreti ha openrouter e gemini, non tavily: è la
+  // situazione che dal 10/09 teneva ferma la pubblicazione. Qui il server non
+  // ha sbagliato niente — va detto così, perché il rimedio è un altro.
+  const srv = await serverFinto({
+    '/buildKeys': { stato: 200, json: { ok: true, apiKeys: { openrouter: 'or', gemini: 'gem' } } },
+    '/buildAlarm': { stato: 200, json: { ok: true } },
+  });
+  try {
+    const r = await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: 'giusta' });
+    assert.notEqual(r.uscita, 0);
+    assert.match(r.registro, /Manca tavily/);
+    assert.match(r.registro, /config\/secrets\.apiKeys\.tavily/);
+    assert.doesNotMatch(r.registro, /rifiutato|FILO_BUILD_PASSPHRASE è sbagliata/,
+      'la parola d\'ordine ha funzionato: dare la colpa a lei manda chi legge dalla parte sbagliata');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
 test('un rifiuto malfatto si spiega lo stesso, senza «[object Object]»', async () => {
   const srv = await serverFinto({
     '/buildKeys': { stato: 200, json: { ok: false, reason: { codice: 9 }, message: 'parola d\'ordine scaduta' } },
