@@ -270,6 +270,20 @@
     // Finché niente di esterno è entrato nel contesto, l'unica autorità in
     // gioco è l'utente che ha scritto: il perimetro non serve ancora.
     if (!c || !c.contaminato) return { ok: true, classe: 'uscita', uscita: k.uscita };
+    // Uscite che da un compito contaminato non si ottengono per nessuna
+    // strada: né dichiarandole prima, né chiedendole all'utente durante.
+    // `secco` dice a chi applica di rifiutare e basta, senza popup.
+    if (k.maiDaEsterno) {
+      return {
+        ok: false,
+        motivo: 'mai-da-esterno',
+        secco: true,
+        classe: 'uscita',
+        uscita: k.uscita,
+        etichetta: etichettaUscita(k.uscita),
+        puoChiedere: false,
+      };
+    }
     if (usciteVive(c).includes(k.uscita)) {
       return { ok: true, classe: 'uscita', uscita: k.uscita };
     }
