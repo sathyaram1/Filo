@@ -448,7 +448,9 @@ function testoDiCornice(avanzi, principale) {
   for (const riga of String(avanzi).split('\n')) {
     const t = riga.trim();
     if (!t || gia.has(t)) continue;
-    if (lunghezza + t.length + 1 > MAX_CODA_CHARS) break;
+    // Si SALTA la riga che non ci sta, non ci si ferma: l'informativa sui
+    // cookie sta in cima al piè di pagina e si portava via l'orario (#553).
+    if (lunghezza + t.length + 1 > MAX_CODA_CHARS) continue;
     righe.push(t);
     lunghezza += t.length + 1;
   }
