@@ -187,9 +187,19 @@ test('il voto di chi non è connesso apre l’accesso e non conta niente se salt
 // tema scuro rendevano illeggibile il numero del voto. Nella stessa pagina ne
 // resta un terzo, sullo stesso gesto (dire che un fix NON funziona): il rosso
 // dell'errore del form «Ancora rotto?». Stessa famiglia, stessa prova.
-test('il rosso dell’errore «Ancora rotto?» si legge nei due temi', async ({ openTab }) => {
-  const page = await apri(openTab, [scheda({ _id: 'fb-re', name: 'Un fix da riaprire' })], { signedIn: 'uid-re' });
-  await expect(page.locator('.bd-card')).toHaveCount(1);
+test('i colori della bacheca, misurati nei due temi', async ({ openTab }) => {
+  const page = await apri(openTab, [
+    scheda({ _id: 'fb-re', name: 'Un fix da riaprire' }),
+    scheda({
+      _id: 'fb-w', name: 'Votato funziona', seq: 11,
+      votes: { 'uid-re': { vote: 'works', at: '2026-09-02T10:00:00.000Z', credibilitySnapshot: 1 } },
+    }),
+    scheda({
+      _id: 'fb-b', name: 'Votato non funziona', seq: 12,
+      votes: { 'uid-re': { vote: 'broken', at: '2026-09-02T10:00:00.000Z', credibilitySnapshot: 1 } },
+    }),
+  ], { signedIn: 'uid-re' });
+  await expect(page.locator('.bd-card')).toHaveCount(3);
 
   // Apre il form e prova a mandarlo vuoto: è la strada più corta all'errore.
   await page.locator('.bd-reopen-link').click();
