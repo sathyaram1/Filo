@@ -52,7 +52,7 @@ async function evalSafe(app, fn, arg) {
 async function build(app, chiave, valore) {
   return evalSafe(app, ({}, [k, v]) => {
     const r = globalThis.SN_PREF.buildPreferencePartial(k, v);
-    return r ? { partial: r.partial, label: r.label, level: r.level } : null;
+    return r ? { partial: r.partial, label: r.label, costo: r.costo, allenta: r.allenta } : null;
   }, [chiave, valore]);
 }
 
@@ -65,17 +65,20 @@ test('SN_PREF mappa il linguaggio naturale sulle preferenze giuste', async ({ ap
   expect(await build(app, 'modalita_terminale', 'attiva')).toMatchObject({ partial: { terminal: { enabled: true } } });
   expect(await build(app, 'commento_home', 'nascondi')).toMatchObject({ partial: { showHomeMessage: false } });
   expect(await build(app, 'ore_inattivita', '12 ore')).toMatchObject({ partial: { autoArchive: { idleHours: 12 } } });
-  // #146.5 — ora TUTTE le impostazioni sono scrivibili, comprese le sensibili
-  // (sicurezza, modelli, provider, chiavi, costi): quelle a livello 2 portano
-  // `level: 2` così il dispatch chiede conferma prima di applicarle.
-  expect(await build(app, 'provider', 'openrouter')).toMatchObject({ partial: { provider: 'openrouter' }, level: 2 });
+  // #146.5 — TUTTE le impostazioni sono scrivibili, comprese le sensibili
+  // (sicurezza, modelli, provider, chiavi, costi): quelle che durano portano
+  // `costo: 2`, e quelle che ALLENTANO una protezione lo dichiarano — è quello
+  // che porta il dispatch a chiedere la parola digitata (#530, regola (d)).
+  expect(await build(app, 'provider', 'openrouter')).toMatchObject({ partial: { provider: 'openrouter' }, costo: 2, allenta: false });
   // Google non è più un fornitore di Filo: a parole non si imposta.
   expect(await build(app, 'provider', 'gemini')).toBeNull();
-  expect(await build(app, 'gestione_cookie', 'privacy')).toMatchObject({ partial: { security: { cookies: { mode: 'privacy' } } }, level: 2 });
-  expect(await build(app, 'navigazione_sicura', 'disattiva')).toMatchObject({ partial: { security: { safeBrowse: { enabled: false } } }, level: 2 });
-  expect(await build(app, 'limite_spesa', '12 euro')).toMatchObject({ partial: { monthlyLimitEur: 12 }, level: 2 });
-  expect(await build(app, 'chiave_openrouter', 'sk-or-v1-SEGRETO1234')).toMatchObject({ partial: { apiKeys: { openrouter: 'sk-or-v1-SEGRETO1234' } }, level: 2 });
-  expect(await build(app, 'correttore', 'off')).toMatchObject({ partial: { featureFlags: { spellcheck: false } }, level: 1 });
+  expect(await build(app, 'gestione_cookie', 'privacy')).toMatchObject({ partial: { security: { cookies: { mode: 'privacy' } } }, costo: 2, allenta: false });
+  expect(await build(app, 'gestione_cookie', 'automatico')).toMatchObject({ allenta: true });
+  expect(await build(app, 'navigazione_sicura', 'disattiva')).toMatchObject({ partial: { security: { safeBrowse: { enabled: false } } }, costo: 2, allenta: true });
+  expect(await build(app, 'navigazione_sicura', 'attiva')).toMatchObject({ allenta: false });
+  expect(await build(app, 'limite_spesa', '12 euro')).toMatchObject({ partial: { monthlyLimitEur: 12 }, costo: 2 });
+  expect(await build(app, 'chiave_openrouter', 'sk-or-v1-SEGRETO1234')).toMatchObject({ partial: { apiKeys: { openrouter: 'sk-or-v1-SEGRETO1234' } }, costo: 2, allenta: true });
+  expect(await build(app, 'correttore', 'off')).toMatchObject({ partial: { featureFlags: { spellcheck: false } }, costo: 1 });
   // 'apiKey' generico resta ambiguo (quale provider?) → non scrivibile: serve
   // dire chiave_openrouter / chiave_tavily.
   expect(await build(app, 'apiKey', 'segreto')).toBeNull();
