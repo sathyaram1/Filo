@@ -341,7 +341,7 @@
         if (dentroUnaDomanda(testo, m.index)) continue;
         const fine = m.index + m[0].length;
         if (famiglia.pronome && puntaAllaRisposta(testo, fine)) continue;
-        return { frase: frasePiena(testo, m.index, fine), verbo: radice(m[1] || '') };
+        return { frase: frasePiena(testo, m.index, fine), verbo: verboDi(m[0]) };
       }
     }
     return null;
