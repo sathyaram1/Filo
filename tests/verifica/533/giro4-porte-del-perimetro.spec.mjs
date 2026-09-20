@@ -190,7 +190,10 @@ test.describe('#533 giro 4 — quello che resta di una lettura, seconda mano', (
         toolCalls: [], model: attempts[0].model, provider: attempts[0].provider, usage: {},
       });
       try {
-        const r = await globalThis.SN_HANDLE_FILO_DASHBOARD({ force: true });
+        const r = await globalThis.SN_HANDLE_MESSAGE(
+          { type: globalThis.SN_MSG.FILO_GENERATE_DASHBOARD, force: true },
+          null,
+        );
         return (r && r.suggestions) || [];
       } catch (_) {
         return null;
