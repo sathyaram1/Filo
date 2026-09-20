@@ -1133,6 +1133,11 @@ test('il menu di una chat si percorre e si sceglie da tastiera', async ({ app, o
   await expect(page.locator('.arc-ctxmenu')).toBeVisible({ timeout: 10_000 });
   // Riapri la chat, Rinomina, Sposta, Elimina: la seconda voce è Rinomina.
   await page.keyboard.press('ArrowDown');
+  await page.screenshot({ path: 'tests/.shots/525-menu-fuoco-chiaro.png' });
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('dark'));
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: 'tests/.shots/525-menu-fuoco-scuro.png' });
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('light'));
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(page.locator('.arc-chat-rename')).toBeVisible({ timeout: 10_000 });
