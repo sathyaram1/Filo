@@ -26,6 +26,8 @@
 //  (G) l'evento proposto si aggiunge davvero al calendario, e finché non lo si
 //      aggiunge il diario lo chiama proposta.
 
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
 
