@@ -479,6 +479,19 @@
     if (!t.trim()) return [];
     const presenti = (azioni instanceof Set) ? azioni : insiemeDiTipi(azioni);
     const orari = new Set(Array.isArray(stato?.orariSveglie) ? stato.orariSveglie : []);
+    const titoli = Array.isArray(stato?.titoliAppunti) ? stato.titoliAppunti : [];
+    // La cosa dichiarata ESISTE già, anche se in questo turno non è partito
+    // niente? Vale per l'ora di una sveglia che c'è e per il titolo di un
+    // appunto che c'è. Prima valeva solo per la sveglia, e solo se la frase
+    // ripeteva la parola «sveglia» con l'ora in cifre.
+    const esisteGia = (fam, d) => {
+      if (fam.orari && orari.size) {
+        const nominati = orariNelTesto(d.frase);
+        if ([...nominati].some((o) => orari.has(o))) return true;
+      }
+      if (fam.appunti && titoli.length && nominaUnAppunto(d.frase, titoli)) return true;
+      return false;
+    };
     const out = [];
     // I tipi che stanno già reggendo una dichiarazione: un'azione sola non può
     // reggerne due diverse.
