@@ -185,7 +185,7 @@ test('se il salvataggio fallisce la pagina non mostra una scelta mai arrivata', 
   await cambia(page, 'mgAccountA', false);
   await expect(page.locator('#mgAccountsMsg')).toContainText('NON è cambiata');
   await expect(page.locator('#mgAccountA')).toBeChecked();
-  await page.locator('input[name="mgPriorityAccount"][value="A"]').check();
+  await pillola(page, 'A').click();
   await expect(page.locator('#mgPriorityAccountMsg')).toContainText('NON è cambiata');
   await expect(page.locator('input[name="mgPriorityAccount"][value=""]')).toBeChecked();
 });
