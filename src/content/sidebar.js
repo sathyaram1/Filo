@@ -1054,7 +1054,7 @@
       // risposta invece di credere che sia fatto. Il budget dei rimbalzi è
       // UNO per turno, condiviso coi due guasti: due chiamate in più al
       // modello per la stessa risposta sbagliata non servono a niente.
-      const azioniMancate = parsed.fuoriFormato ? [] : azioniRaccontate(parsed);
+      const azioniMancate = parsed.fuoriFormato ? [] : await azioniRaccontate(parsed);
       if (azioniMancate.length && rimandiFuoriFormato < 1) {
         rimandiFuoriFormato += 1;
         if (thinking) { thinking.stop(); thinking.el.remove(); }
