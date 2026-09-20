@@ -127,6 +127,36 @@ test('Cronologia: una frase con dentro una parola corta non trova la chat', asyn
   expect(conFrase.righe, `la pagina dice: ${conFrase.vuoto}`).toBeGreaterThan(0);
 });
 
+test('Cronologia: «cerca nei contenuti» e la chat che intanto è lì sopra', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  await stubProvider(app, { coscienza: { tipo: 'conversazione', titolo: 'La coscienza' } });
+
+  await turno(app, 'c-cosc', 'Parliamo della coscienza e del libero arbitrio');
+  await app.evaluate(() => globalThis.SN_CLOSE_FILO_CHAT('c-cosc'));
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.kind).length, { timeout: 30_000 }).toBe(1);
+
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('.arc-chat').first()).toBeVisible({ timeout: 20_000 });
+
+  await page.locator('#search').fill('coscienza');
+  await page.waitForTimeout(900);
+  await page.locator('#search').press('Enter');
+  await page.waitForTimeout(1500);
+
+  const esito = await page.evaluate(() => ({
+    righeChat: document.querySelectorAll('.arc-chat').length,
+    nota: (document.getElementById('searchNote').hidden
+      ? '' : document.getElementById('searchNote').textContent) || '',
+  }));
+  console.log('INVIO NEL CAMPO DI RICERCA:', JSON.stringify(esito));
+  await page.screenshot({ path: 'tests/.shots/525-giro6-invio-ricerca.png', fullPage: true });
+
+  // Con una chat trovata a schermo, la riga in cima non deve dire il contrario.
+  expect(/nessun risultato/i.test(esito.nota) && esito.righeChat > 0,
+    `la pagina dice «${esito.nota}» con ${esito.righeChat} chat in elenco`).toBeFalsy();
+});
+
 test('il manifesto dice che nessuna chat esce dal computer: alla chiusura ci esce', async ({ app }) => {
   test.setTimeout(120_000);
   await configura(app);
