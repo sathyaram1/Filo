@@ -463,6 +463,25 @@ function leggiDueByte(buf, verso, conFirma) {
  *     lingua. Era pretenderne una quota a far cadere gli alfabeti non latini;
  *   • e infine si controlla che quello che ne viene fuori sia davvero testo,
  *     così un file binario pieno di nulli non passa per un documento.
+ *
+ * #551, settimo giro. «Un testo a 8 bit non contiene MAI un byte nullo» è vero
+ * di un testo INTATTO, e di un testo intatto soltanto. Un byte nullo dentro un
+ * file di testo capita per davvero: il registro di un programma che si è chiuso
+ * male, l'export di un gestionale vecchio, il file recuperato dalla chiavetta
+ * staccata del quarto giro. E uno solo bastava: con un nullo soltanto il conto
+ * «da che parte stanno» dà il cento per cento, il file veniva riletto due byte
+ * alla volta, e quello che ne usciva erano ideogrammi. Ideogrammi che sono
+ * caratteri STAMPABILI, quindi nemmeno la rete finale se ne accorgeva: Filo
+ * dichiarava letto un estratto conto e rispondeva su una fila di segni cinesi.
+ *
+ * Il passo che mancava è la stessa domanda che si fa sul testo decodificato,
+ * fatta qui sulla lettura a 8 BIT: questo file, letto a 8 bit, è GIÀ testo? Se
+ * lo è, i nulli sono il danno e non la struttura, e il testo va letto com'è
+ * scritto. In un testo a due byte la risposta è no in qualunque alfabeto: a non
+ * essere testo è il byte ALTO di ogni coppia — zero in italiano, un carattere
+ * di controllo in russo e in greco — e sono la metà dei byte del file. Nessuna
+ * soglia nuova da tarare: è la quota che il modulo usa già per decidere se
+ * qualcosa è testo.
  */
 function pareDueByte(buf) {
   if (!buf || buf.length < 8) return '';
@@ -477,6 +496,9 @@ function pareDueByte(buf) {
   if (!totale) return '';
   const verso = alti > bassi ? 'le' : 'be';
   if (Math.max(alti, bassi) / totale < 0.9) return '';
+  // Letto a 8 bit è già testo? Allora è un testo a 8 bit con qualche byte
+  // guasto, non un file a due byte per carattere.
+  if (quotaNonTesto(buf.subarray(0, n).toString('utf8')) < QUOTA_NON_TESTO) return '';
   return quotaNonTesto(leggiDueByte(buf, verso, false)) < QUOTA_NON_TESTO ? verso : '';
 }
 
