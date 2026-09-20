@@ -91,3 +91,48 @@ test('una volta aggiunto, il diario non deve continuare a chiamarlo soltanto una
 
   await restore(app, '__v567g2b');
 });
+
+test('a «l\'hai aggiunto?» Filo deve sapere che l\'utente l\'ha aggiunto', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await fingiApertura(app, '');
+
+  // Come fakeProvider, ma mette da parte i messaggi con cui il turno riparte.
+  await app.evaluate(async (_e, EV) => {
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__v567g2c_restore = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    globalThis.__v567g2c_msg = [];
+    let n = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
+      globalThis.__v567g2c_msg.push(JSON.stringify(messages));
+      n += 1;
+      const calls = n === 1 ? [{ id: 'g2c', name: 'EVENTO_CALENDARIO', arguments: EV }] : [];
+      for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
+      const text = calls.length ? '' : 'Rispondo.';
+      if (text) { try { onDelta && onDelta(text); } catch (_) {} }
+      return {
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        text, toolCalls: calls, reasoningDetails: [],
+        finishReason: calls.length ? 'tool_calls' : 'stop',
+      };
+    };
+  }, EVENTO);
+
+  await chiedi(page, 'segnami la cena con Anna venerdì alle 20:30');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Rispondo.' })).toBeVisible({ timeout: 10_000 });
+
+  await page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' }).click();
+  await expect(page.locator('.dash-action-btn', { hasText: 'Aperto nel calendario' })).toBeVisible({ timeout: 10_000 });
+
+  await app.evaluate(() => { globalThis.__v567g2c_msg = []; });
+  await chiedi(page, 'l\'hai aggiunto al calendario?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Rispondo.' }).nth(1)).toBeVisible({ timeout: 10_000 });
+
+  const visto = await app.evaluate(() => (globalThis.__v567g2c_msg || []).join('\n'));
+  expect(/aggiunt|calendar_add|"_confirmed"|aperto/i.test(visto), 'nel turno dopo il modello non trova traccia che l\'utente abbia aggiunto l\'evento').toBe(true);
+
+  await app.evaluate(() => { try { globalThis.__v567g2c_restore?.(); } catch (_) {} });
+});
