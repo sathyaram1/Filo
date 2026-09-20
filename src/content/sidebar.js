@@ -1187,6 +1187,11 @@
       if (parsed.fuoriFormato) {
         appendChatMessage('avviso', AVVISO_FUORI_FORMATO);
         console.warn('[Filo] #517 risposta fuori formato dell\'agente Aiuto, niente eseguito:', grezzo.slice(0, 200));
+      } else if (azioniMancate.length) {
+        const D = global.SN_AZIONI_DICHIARATE;
+        appendChatMessage('avviso', D.avvisoPerUtente(azioniMancate));
+        console.warn('[Filo] #517 azione dichiarata e mai emessa nell\'Aiuto:',
+          azioniMancate.map((f) => `${f.id} ← «${f.frase}»`).join(' | '));
       }
 
       // Aggiorna la storia AI
