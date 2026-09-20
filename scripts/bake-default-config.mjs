@@ -295,7 +295,7 @@ async function avvisa(mancanti, righe) {
   if (!passphrase) return;
   const nomi = (mancanti || []).map((c) => c.nome).join(', ');
   const testo = testoEntroIlTetto([
-    'La costruzione non ha trovato nessuna chiave di default, e la pubblicazione è stata fermata: meglio nessuna versione nuova che una che arriva agli utenti senza niente di preimpostato.',
+    'La costruzione non ha trovato nessuna chiave di default e ha fermato la pubblicazione: meglio nessuna versione nuova che una che arriva agli utenti senza niente di preimpostato.',
     '',
     ...(righe || []),
   ].join('\n'));
