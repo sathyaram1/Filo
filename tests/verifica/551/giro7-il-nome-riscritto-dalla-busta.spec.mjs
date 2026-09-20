@@ -20,6 +20,13 @@
 // in arabo, tolti dalla stessa busta — e l'ha chiusa insegnando al confronto fra
 // nomi a togliere esattamente quelli. Questa è la stessa porta, per i caratteri
 // che la busta non toglie ma SOSTITUISCE.
+//
+// PORTA APERTA DI PROPOSITO. Il server ha mandato questo rilievo a un feedback
+// derivato, che ha una coda sua: in questo giro non si corregge. Le due prove
+// che la aprono restano qui, perché sono la memoria del giro, ma sono marchiate
+// come «deve fallire»: finché la porta è aperta non fanno rumore, e il giorno in
+// cui verrà chiusa diventeranno rosse. Allora si toglie il marchio e restano
+// prove normali.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { writeFileSync, rmSync } from 'node:fs';
