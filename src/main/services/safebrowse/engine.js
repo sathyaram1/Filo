@@ -142,7 +142,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return { level: 'safe', reasons: ['unparsable'], norm: null, message: null, needsLlm: false };
   }
   // Schemi/URL non navigabili o host locali: nessun avviso.
-  if (norm.single || norm.suffixOnly) {
+  if (norm.single || norm.suffixOnly || isHostPrivato(norm.host)) {
     return { level: 'safe', reasons: ['local_host'], norm, message: null, needsLlm: false };
   }
 
