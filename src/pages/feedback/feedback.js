@@ -546,13 +546,27 @@
           const wrap = document.createElement('div');
           wrap.className = 'fb-attach-thumb';
           const im = document.createElement('img');
-          im.src = a.url; im.alt = '';
+          im.alt = '';
           im.title = 'Clic per ingrandire';
-          im.addEventListener('click', () => { lightboxImg.src = a.url; lightbox.classList.add('open'); });
+          // Mai `a.url` come sorgente: nel deposito ci sono byte cifrati (#602).
+          mostraAnteprimaAllegato(im, a.url);
+          // E l'ingrandimento apre quello che si sta guardando, non l'indirizzo
+          // del deposito: altrimenti il riquadro grande resta vuoto.
+          im.addEventListener('click', () => {
+            const piena = im.dataset.full;
+            if (!piena) return;
+            lightboxImg.src = piena;
+            lightbox.classList.add('open');
+          });
           const x = document.createElement('button');
           x.type = 'button'; x.className = 'fb-attach-x'; x.textContent = '×';
           x.setAttribute('aria-label', 'Rimuovi');
-          x.addEventListener('click', () => { attachments.splice(i, 1); renderThumbs(); if (typeof onChange === 'function') onChange(); });
+          x.addEventListener('click', () => {
+            const via = attachments.splice(i, 1)[0];
+            if (via && via.url) dimenticaAnteprimaLocale(via.url);
+            renderThumbs();
+            if (typeof onChange === 'function') onChange();
+          });
           wrap.appendChild(im); wrap.appendChild(x);
           thumbs.appendChild(wrap);
         } else {
