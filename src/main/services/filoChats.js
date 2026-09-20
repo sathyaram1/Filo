@@ -216,7 +216,7 @@
   }
 
   global.SN_FILO_CHATS = {
-    list, listIndex, get, open, append, close, setTriage,
+    list, listIndex, get, open, append, close, setTriage, needsTriage,
     remove, listDangling, listUntriaged, clear, uuid,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
