@@ -169,8 +169,21 @@
     } else {
       chat.kind = CA().normalizeKind(kind);
     }
+    // Quanti messaggi c'erano quando titolo e tipo sono stati decisi. Serve a
+    // `needsTriage`: una chat riaperta e continuata per mezz'ora non può
+    // restare col titolo (e soprattutto col TIPO) di quando era due battute —
+    // un «comando» diventato discussione resterebbe nascosto sotto il filtro.
+    chat.triagedCount = Array.isArray(chat.messages) ? chat.messages.length : 0;
     await save(items);
     return chat;
+  }
+
+  // Va (ri)classificata? Sì se non lo è mai stata, e sì se da allora la
+  // conversazione è andata avanti.
+  function needsTriage(chat) {
+    if (!chat || !chat.kind || !chat.title) return true;
+    const n = Array.isArray(chat.messages) ? chat.messages.length : 0;
+    return Number(chat.triagedCount) !== n;
   }
 
   async function remove(id) {
