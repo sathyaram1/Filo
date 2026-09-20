@@ -245,6 +245,35 @@ test('la shell scelta vale su TUTTE E DUE le strade: i comandi dell\'assistente 
     'ipc.js confronta la shell CHIESTA invece di quella vera: fuori da Windows la sessione si ricreerebbe a ogni comando, perdendo la cartella');
 });
 
+// La prova vera: si apre una sessione e si guarda chi risponde. Solo fuori da
+// Windows (là la voce "Bash" significa WSL, che non c'è su ogni macchina).
+// NON è logica pura — spawna una shell — ma è deterministico: `/bin/sh` e
+// `bash` ci sono su qualunque Linux e su qualunque Mac.
+test('chi sceglie Bash ottiene davvero Bash, e chi non sceglie niente la shell di sistema', { skip: process.platform === 'win32' && 'su Windows "bash" vuol dire WSL' }, async () => {
+  const { createSession } = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
+
+  const chiedi = (shell) => new Promise((risolvi, rifiuta) => {
+    const sessione = createSession({ shell });
+    let uscita = '';
+    const stop = setTimeout(() => { try { sessione.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, 15000);
+    // `$BASH_VERSION` è vuota in sh e piena in bash: è la shell stessa a dire
+    // chi è, invece di fidarsi di quello che abbiamo chiesto noi.
+    sessione.exec('echo "sono:${BASH_VERSION:-non-bash}"', {
+      onData: ({ chunk }) => { uscita += chunk; },
+      onExit: () => { clearTimeout(stop); try { sessione.kill(); } catch (_) {} risolvi({ uscita, shell: sessione.shell }); },
+      onError: ({ message }) => { clearTimeout(stop); try { sessione.kill(); } catch (_) {} rifiuta(new Error(message)); },
+    });
+  });
+
+  const conBash = await chiedi('bash');
+  assert.equal(conBash.shell, 'bash', 'la sessione non si è nemmeno accorta della scelta');
+  assert.ok(!/sono:non-bash/.test(conBash.uscita),
+    `chi ha scelto Bash sta parlando con un'altra shell: ${conBash.uscita.trim()}`);
+
+  const senzaScelta = await chiedi(undefined);
+  assert.equal(senzaScelta.shell, 'sh', 'fuori da Windows la shell predefinita deve essere quella di sistema');
+});
+
 // ── Il prompt dell'assistente sa cos'è un Linux ─────────────────────────────
 
 test("su Linux l'assistente non propone comandi e percorsi di Windows", () => {
