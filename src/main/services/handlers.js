@@ -996,6 +996,7 @@ async function applySettingsUpdate(partial) {
     try { await globalThis.SN_WALLET_MAIN?.ownKeyChanged?.(); } catch (_) {}
   }
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
+  avvisaSeLaProntezzaCambia().catch(() => {});
   try {
     const { nativeTheme } = require('electron');
     const t = merged.theme;
