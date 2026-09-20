@@ -235,6 +235,21 @@
     return await P.lookupServedBy({ apiKey, generationId });
   }
 
+  // ─── Quanto resta su una chiave ───────────────────────────────────────────
+  // Nemmeno questa è una chiamata a un modello: nessun token, nessuna spesa,
+  // nessun tetto da rispettare. Passa da qui lo stesso perché il fornitore non
+  // si raggiunge da nessun'altra parte — e una porta lasciata aperta «tanto
+  // quella non costa» è la porta da cui rientra tutto il resto: chi la trova
+  // scritta la copia per la chiamata successiva, che invece costa.
+  // Fornitore assente o che non sa rispondere → null, così chi chiama
+  // distingue «non si può chiedere» da «la richiesta è andata male».
+  async function keyInfo({ provider, apiKey }) {
+    let P = null;
+    try { P = providers().getProvider(provider); } catch (_) { P = null; }
+    if (!P || typeof P.keyInfo !== 'function') return null;
+    return await P.keyInfo({ apiKey });
+  }
+
   const API = {
     configure,
     ensureUnderLimit,
