@@ -99,6 +99,33 @@ test('nell\'Aiuto la seconda segnalazione raccontata e mai partita non resta mut
   expect(turni > 1 || AVVISATO.test(testo)).toBe(true);
 });
 
+test('nell\'Aiuto un turno che emette un\'azione viene guardato lo stesso', async ({ openTab }) => {
+  // Il pannello emette UNA azione per turno. Se l'utente ne chiede due, la
+  // seconda il modello la racconta e basta — e in un turno con un'azione il
+  // controllo non parte affatto.
+  test.setTimeout(60_000);
+  const page = await openTab(NEWTAB);
+  await agenteASequenza(page, [
+    JSON.stringify({
+      text: 'Ho mandato la segnalazione agli sviluppatori e ti ho messo la sveglia alle 19:00 per stasera.',
+      action: 'filo',
+      filo: { type: 'INVIA_FEEDBACK', testo: 'la barra in alto sparisce' },
+      status: 'done',
+    }),
+  ]);
+  await apriAiuto(page);
+  await page.evaluate(() => { window.__turni = []; window.__azioni = []; });
+
+  await chiedi(page, 'manda un feedback: la barra in alto sparisce, e mettimi la sveglia alle 19', 1);
+
+  // Di sveglie non ne nasce nessuna: è partita solo la segnalazione.
+  const tipi = await page.evaluate(() => window.__azioni.map((a) => a && a.type));
+  expect(tipi).toEqual(['INVIA_FEEDBACK']);
+  const turni = await page.evaluate(() => window.__turni.length);
+  const testo = await testoChat(page);
+  expect(turni > 1 || /non l'ha fatto|non è partito|la sveglia non c'è/i.test(testo)).toBe(true);
+});
+
 test('nell\'Aiuto la conferma col pronome non resta muta', async ({ openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab(NEWTAB);
