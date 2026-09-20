@@ -722,3 +722,88 @@ test('le altre due buste con cui un modello scrive una chiamata invece di farla'
   assert.equal(AD.formatoSospetto('[{"name":"Mario","arguments":{"x":1}}]'), false);
   assert.equal(AD.formatoSospetto('La funzione f(x) = 2x è lineare.'), false);
 });
+
+// ─── giro 8 ──────────────────────────────────────────────────────────────────
+
+test('un documento che Filo ha già davanti non si «apre»: non c\'è niente da smentire', () => {
+  // Il giro 2 e il giro 7 hanno stabilito che una foto mandata in chat, un
+  // testo incollato nel messaggio e i file dell'editor arrivano al modello
+  // senza nessuno strumento. Detto con «ho letto» era già vero; detto con «ho
+  // aperto», che è la parola più comune, la risposta veniva buttata, rifatta
+  // con un'altra chiamata al modello e poi smentita.
+  assert.deepEqual(AD.rileva('Ho aperto la bolletta che mi hai mandato: sono 84 euro.',
+    new Set(['CONTESTO_IMMAGINE'])), []);
+  assert.deepEqual(AD.rileva('Ho aperto il contratto che hai incollato: la penale è del 5%.',
+    new Set(['CONTESTO_TESTO'])), []);
+  assert.deepEqual(AD.rileva('Ho aperto il tuo appunto della spesa: dice pane, uova e latte.',
+    new Set(['CONTESTO_FILE'])), []);
+  // Senza niente davanti resta una dichiarazione da verificare…
+  assert.deepEqual(ids(AD.rileva('Ho aperto il tuo documento.', new Set())), ['apertura-documento']);
+  // …e un'apertura vera continua a non essere smentita, in tutte e due le
+  // famiglie.
+  assert.deepEqual(AD.rileva('Ho aperto il documento.', new Set(['APRI_FILE'])), []);
+  assert.deepEqual(AD.rileva('Ho aperto il blocco note.', new Set(['ESEGUI_COMANDO'])), []);
+  // Un appunto aperto nell'editor non zittisce l'apertura di un PROGRAMMA:
+  // quello Filo lo apre solo con un comando.
+  assert.deepEqual(ids(AD.rileva('Ho aperto il blocco note.', new Set(['CONTESTO_FILE']))), ['apertura']);
+});
+
+test('una cosa già smentita non torna vera perché il modello la ripete guardando indietro', () => {
+  // È la strada di chi preme «Fallo adesso»: il modello ripete la stessa cosa
+  // con un «già» davanti, e un appunto scritto prima nella conversazione
+  // tornava a coprirla.
+  const dopoUnAppunto = {
+    titoliAppunti: ['riunione di lunedì'],
+    tipiPrecedenti: new Set(['SALVA_APPUNTO']),
+    famiglieGiaMancate: new Set(['appunto']),
+  };
+  assert.deepEqual(ids(AD.rileva('Te l\'ho già salvato l\'appunto con la lista della spesa.',
+    new Set(), dopoUnAppunto)), ['appunto']);
+  // Senza un avviso prima, la conferma di una cosa fatta davvero resta muta.
+  assert.deepEqual(AD.rileva('Te l\'ho già salvato l\'appunto con la lista della spesa.',
+    new Set(), { titoliAppunti: ['lista della spesa'], tipiPrecedenti: new Set(['SALVA_APPUNTO']) }), []);
+  assert.deepEqual(AD.rileva('Sì, te l\'avevo già salvata negli appunti.',
+    new Set(), { domandaUtente: true, tipiPrecedenti: new Set(['SALVA_APPUNTO']) }), []);
+});
+
+test('una scrittura sola nei turni prima non regge due appunti raccontati adesso', () => {
+  const due = 'Te l\'ho già salvato l\'appunto della spesa e ti ho già segnato quello del lavoro.';
+  assert.deepEqual(ids(AD.rileva(due, new Set(), {
+    tipiPrecedenti: new Set(['SALVA_APPUNTO']), contiPrecedenti: { SALVA_APPUNTO: 1 },
+  })), ['appunto']);
+  // Due scritture ne reggono due.
+  assert.deepEqual(AD.rileva(due, new Set(), {
+    tipiPrecedenti: new Set(['SALVA_APPUNTO']), contiPrecedenti: { SALVA_APPUNTO: 2 },
+  }), []);
+  // E il conto lo sa fare la cronologia.
+  const crono = [
+    { role: 'filo', actions: [{ type: 'SALVA_APPUNTO', _executed: true }] },
+    { role: 'filo', actions: [{ type: 'SALVA_APPUNTO', _executed: true }] },
+  ];
+  assert.equal(AD.contiDallaCronologia(crono).SALVA_APPUNTO, 2);
+  assert.deepEqual([...AD.famiglieMancateDallaCronologia([
+    { role: 'filo', azioniMancate: [{ id: 'appunto', frase: 'x' }] },
+  ])], ['appunto']);
+});
+
+test('i modi di dire che restavano muti, e la famiglia giusta', () => {
+  assert.deepEqual(ids(AD.rileva('Ho aggiunto la riunione al tuo calendario.', [])), ['calendario']);
+  assert.deepEqual(ids(AD.rileva('Ho messo la riunione in agenda.', [])), ['calendario']);
+  // «Ti ho segnato la riunione sulla tua agenda» diceva «l'appunto non c'è» a
+  // chi aveva chiesto un evento.
+  assert.deepEqual(ids(AD.rileva('Ti ho segnato la riunione sulla tua agenda.', [])), ['calendario']);
+  assert.deepEqual(ids(AD.rileva('Ho passato la segnalazione agli sviluppatori.', [])), ['segnalazione']);
+  assert.deepEqual(ids(AD.rileva('Ho avvisato gli sviluppatori del problema.', [])), ['segnalazione']);
+  // …e «ho aperto una segnalazione» non è più «non si è aperto niente».
+  assert.deepEqual(ids(AD.rileva('Ho aperto una segnalazione.', [])), ['segnalazione']);
+  assert.deepEqual(ids(AD.rileva('Ho svuotato la cronologia.', [])), ['schede']);
+  assert.deepEqual(ids(AD.rileva('Ti ho disattivato le notifiche.', [])), ['impostazione']);
+  assert.deepEqual(ids(AD.rileva('Ho ridotto la dimensione del testo.', [])), ['impostazione']);
+  assert.deepEqual(ids(AD.rileva('Ti ho preparato la sveglia per le 19.', [])), ['sveglia']);
+  // La conferma più corta di tutte.
+  assert.deepEqual(ids(AD.rileva('Ecco fatto: sveglia alle 19.', [])), ['sveglia']);
+  // E quelle vere restano mute.
+  assert.deepEqual(AD.rileva('Ho aggiunto la riunione al tuo calendario.', new Set(['EVENTO_CALENDARIO'])), []);
+  assert.deepEqual(AD.rileva('Ti ho disattivato le notifiche.', new Set(['IMPOSTA_PREFERENZA'])), []);
+  assert.deepEqual(AD.rileva('Ecco fatto: sveglia alle 19.', new Set(['SVEGLIA'])), []);
+});
