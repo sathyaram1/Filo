@@ -2703,7 +2703,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
   if (proposal) {
-    const res = await executeFiloAction(proposal, { sender });
+    if (task) proposal._compito = task.id;
+    const res = await executeFiloAction(proposal, { sender, compito: task });
     if (res.kept) {
       const rendered = res.needsConfirm
         ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
