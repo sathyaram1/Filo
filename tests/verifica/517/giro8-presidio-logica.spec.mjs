@@ -67,14 +67,25 @@ test('un appunto scritto prima non copre un appunto diverso raccontato dopo', ()
   // la scrive, l'avviso compare e l'utente preme «Fallo adesso». Il modello
   // ripete la stessa cosa guardando indietro — «te l'ho già salvato» — e da lì
   // in poi non lo dice più nessuno: della spesa non esiste nessun appunto.
+  // Il fatto che conta: su questa famiglia l'avviso è GIÀ comparso nel turno
+  // prima. Una cosa smentita una volta non torna vera perché il modello la
+  // ripete con un «già» davanti.
   const dopoUnAppunto = STATO({
     titoliAppunti: ['riunione di lunedì'],
     tipiPrecedenti: new Set(['SALVA_APPUNTO']),
+    famiglieGiaMancate: new Set(['appunto']),
   });
   expect(D.rileva('Te l\'ho già salvato l\'appunto con la lista della spesa.',
     new Set(), dopoUnAppunto).length).toBeGreaterThan(0);
   expect(D.rileva('Come ti dicevo, ti ho salvato l\'appunto con la lista della spesa.',
     new Set(), dopoUnAppunto).length).toBeGreaterThan(0);
+
+  // E una scrittura sola nei turni prima non ne regge due raccontate adesso.
+  expect(D.rileva('Te l\'ho già salvato l\'appunto della spesa e ti ho già segnato quello del lavoro.',
+    new Set(), STATO({
+      tipiPrecedenti: new Set(['SALVA_APPUNTO']),
+      contiPrecedenti: { SALVA_APPUNTO: 1 },
+    })).length).toBeGreaterThan(0);
 
   // Per le sveglie questa porta è chiusa dal giro 5: l'ora nominata decide
   // anche contro una sveglia messa prima nella conversazione.
