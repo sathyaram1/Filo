@@ -492,11 +492,75 @@
     ]);
   }
 
-  function openChatCtxMenu(x, y, c) {
+  // Il titolo e il tipo di una chat li sceglie un modello economico, e sbaglia.
+  // Il titolo è l'unica cosa per cui una chat si riconosce in elenco, e una
+  // discussione finita fra i comandi resta nascosta sotto l'interruttore: se
+  // l'utente non può correggerli, l'errore del modello diventa definitivo.
+  // Stessa strada dell'Editor, dove un titolo scritto da Filo si rinomina dal
+  // menu del tasto destro.
+  function openChatCtxMenu(x, y, c, row) {
+    const versoComando = c.kind !== 'comando';
     openMenuAt(x, y, [
       { label: 'Riapri la chat', run: () => reopenChat(c) },
+      { label: 'Rinomina', run: () => rinominaChat(c, row) },
+      {
+        label: versoComando ? 'Sposta fra i comandi' : 'Sposta fra le conversazioni',
+        run: () => spostaChat(c, versoComando ? 'comando' : 'conversazione'),
+      },
       { label: 'Elimina la chat', run: () => removeChat(c) },
     ]);
+  }
+
+  // Rinomina sul posto: il titolo diventa un campo, Invio salva, Esc lascia
+  // com'era. Niente finestra di sistema — è la stessa regola per cui i menu di
+  // Filo non sono quelli del browser.
+  function rinominaChat(c, row) {
+    const titleEl = row && row.querySelector('.arc-chat-title');
+    if (!titleEl || row.querySelector('.arc-chat-rename')) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'arc-chat-rename';
+    input.value = c.title || '';
+    input.setAttribute('aria-label', 'Nuovo titolo della chat');
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let chiuso = false;
+    const ripristina = () => {
+      if (chiuso) return;
+      chiuso = true;
+      input.replaceWith(titleEl);
+    };
+    const salva = async () => {
+      if (chiuso) return;
+      const nuovo = input.value.replace(/\s+/g, ' ').trim();
+      // Un campo svuotato non cancella il titolo: la riga resterebbe senza
+      // niente da leggere. Vale come rinuncia.
+      if (!nuovo || nuovo === (c.title || '')) { ripristina(); return; }
+      chiuso = true;
+      try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_UPDATE, id: c.id, title: nuovo }); } catch (_) {}
+      c.title = nuovo;
+      titleEl.textContent = nuovo;
+      input.replaceWith(titleEl);
+      renderChats();
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); salva(); }
+      else if (e.key === 'Escape') { e.preventDefault(); ripristina(); }
+    });
+    input.addEventListener('blur', () => salva());
+    // Un clic dentro il campo non deve riaprire la chat.
+    input.addEventListener('click', (e) => e.stopPropagation());
+  }
+
+  // Sposta una chat fra le conversazioni e i comandi. Da qui in poi il
+  // classificatore non la rimette dov'era: l'ha detto l'utente.
+  async function spostaChat(c, kind) {
+    try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_UPDATE, id: c.id, kind }); } catch (_) {}
+    c.kind = kind;
+    renderChats();
   }
 
   function renderTab(t, { showScore = false } = {}) {
