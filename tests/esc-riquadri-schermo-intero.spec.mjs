@@ -293,3 +293,41 @@ test('una pagina di Filo che si prende OGNI Esc non chiude dentro: il secondo es
   await expect.poll(async () => (await stato(app)).cf, { timeout: 8000 }).toBe(false);
   await page.evaluate(() => document.removeEventListener('keydown', window.__mangiaEsc, true));
 });
+
+// Arrivato al tetto delle rivendicazioni Filo smette di credere alla pagina ed
+// esce. Smettere di crederle però non è autorizzazione a scavalcarla: se si
+// riprendesse l'Esc, il riquadro in cima resterebbe aperto sopra una pagina che
+// nessuno aveva chiesto di lasciare, cioè il danno di #514 rifatto da noi nel
+// punto in cui ci difendiamo (#648). Una pila più alta del tetto è l'unico modo
+// di arrivarci senza una pagina ostile.
+test('al tetto Filo esce ma non si prende l\'Esc: non resta nessun riquadro aperto', async ({ app }) => {
+  test.setTimeout(180_000);
+  const ALTA = 12;
+  const page = await nuovaSchedaInPrimoPiano(app);
+  await preparaProvider(app);
+  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 15_000 });
+  await entra(app);
+  await page.evaluate((n) => {
+    for (let i = 1; i <= n; i += 1) {
+      window.SN_POPUP.openStreaming({
+        action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
+        payload: { selection: 'r' + i, sentence: 'una frase con r' + i + ' dentro' },
+        anchor: { x: 120, y: 300 },
+        title: 'r' + i,
+      });
+    }
+  }, ALTA);
+  await expect.poll(() => page.locator('.sn-popup').count(), { timeout: 10_000 }).toBe(ALTA);
+  await new Promise((r) => setTimeout(r, 400));
+
+  let uscita = 0;
+  for (let i = 1; i <= ALTA && !uscita; i += 1) {
+    await esc(app);
+    if (!(await stato(app)).cf) uscita = i;
+  }
+  expect(uscita, `dopo ${ALTA} Esc la modalità non si è mai spenta`).toBeGreaterThan(0);
+  expect(
+    await page.locator('.sn-popup').count(),
+    `all'Esc numero ${uscita} la modalità se n'è andata scavalcando i riquadri ancora aperti`,
+  ).toBeLessThanOrEqual(ALTA - uscita);
+});

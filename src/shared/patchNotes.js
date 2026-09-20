@@ -23,6 +23,7 @@
         'Mandare una segnalazione dà crediti, e se viene risolta ne dà altri. Li trovi nei movimenti della pagina Crediti, insieme all\'invito riscattato, alla quota di ogni giorno e ai regali.',
       ],
       fixes: [
+        'A schermo intero ogni riquadro aperto sopra la pagina costa il suo Esc, anche quando ne hai quattro o più uno sull\'altro, e lo schermo intero resta finché non li hai chiusi tutti. Prima dal quarto in poi il tasto ti buttava fuori e lasciava aperto quello in cima.',
         'Appena l\'invito è riscattato la home lo sa. Prima continuava a dire che per attivare Filo serve un codice, e il suo primo suggerimento portava a riscattare un invito già riscattato: il messaggio giusto arrivava solo aprendo una scheda nuova.',
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
         'Quando l\'Aiuto cerca sul web, legge quello che trova come informazione, non come un ordine. Prima un sito che si piazzava fra i primi risultati poteva scrivere lì dentro istruzioni per l\'assistente e farsi obbedire. Vale per tutto il testo che Filo legge da una pagina: quando spiega o traduce quello che hai selezionato, quando traduce la pagina intera, quando controlla o modifica quello che scrivi in un campo, e quando ti dice dove porta un link. Vale anche per i nomi dei pulsanti che l\'Aiuto legge sulla pagina: un sito non può più farsi passare per Filo scrivendoli in un certo modo.',
