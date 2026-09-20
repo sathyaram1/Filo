@@ -202,6 +202,7 @@
     azioniDelTurno = new Set();
     famiglieMancate = new Map();
     domandaSuCosaFatta = false;
+    richiestaAzione = false;
     rimandiFuoriFormato = 0;
   }
 
