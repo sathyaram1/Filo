@@ -379,7 +379,7 @@ function decodeText(buf) {
   if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) b = b.subarray(3);
   const utf8 = b.toString('utf8');
   const bad = (utf8.match(/�/g) || []).length;
-  if (bad > 0 && bad / Math.max(utf8.length, 1) > 0.001) return b.toString('latin1');
+  if (bad > 0 && bad / Math.max(utf8.length, 1) > 0.001) return daCp1252(b);
   return utf8;
 }
 
