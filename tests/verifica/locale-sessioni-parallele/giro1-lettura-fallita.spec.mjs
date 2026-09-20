@@ -61,7 +61,6 @@ test('«Salvato.» e intanto il campo torna a 1: la seconda porta dello stesso g
   await page.locator('#mgMaxSessionsSave').click();
   await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
 
-  // Dice «Salvato.» e mostra 1: nessuna delle due cose è quella che è successa.
-  test.fail(true, 'la rilettura fallita si traveste da valore salvato (rilievo del giro 1)');
+  // Tornare a 1 direbbe che la scrittura non c'è stata, e invece c'è stata.
   await expect(page.locator('#mgMaxSessions')).not.toHaveValue('1');
 });
