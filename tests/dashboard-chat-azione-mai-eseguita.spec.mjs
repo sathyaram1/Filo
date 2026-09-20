@@ -488,3 +488,55 @@ test('un testo incollato in chat non fa accusare Filo di non averlo letto', asyn
   // E la risposta non viene buttata e rifatta con una seconda chiamata.
   expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
 });
+
+test('un documento incollato non fa accusare Filo di non averlo aperto', async ({ app, shell }) => {
+  // Lo stesso fatto detto con l'altro verbo. «Aprire» è la parola più comune
+  // per un documento che l'utente ha appena messo davanti a Filo, e lì non
+  // c'è niente da aprire: la risposta veniva buttata, rifatta e poi smentita.
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: 'Ho aperto il contratto che hai incollato: la penale è del 5%.' },
+  ]);
+  const contratto = `quanto è la penale?\n${'CONDIZIONI GENERALI DI FORNITURA — consegna entro trenta giorni dall\'ordine. '.repeat(8)}`;
+  await page.locator('#input').fill(contratto);
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
+});
+
+test('dopo «Fallo adesso» la stessa cosa mai fatta non diventa muta', async ({ app, shell }) => {
+  // Il tasto che Filo offre per rimediare portava dentro l'ultimo buco: il
+  // modello ripete la stessa cosa con un «già» davanti, e un appunto scritto
+  // prima nella conversazione tornava a coprirla.
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"lunedì alle 10","contesto":"riunione"}' }] },
+    { text: 'Fatto, te l\'ho scritto.' },
+    { text: 'Ti ho salvato l\'appunto con la lista della spesa.' },
+    { text: 'Ti ho salvato l\'appunto con la lista della spesa.' },
+    { text: 'Te l\'ho già salvato l\'appunto con la lista della spesa.' },
+  ]);
+
+  await page.locator('#input').fill('segnami che la riunione è lunedì alle 10');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  await page.locator('#input').fill('segnami anche la lista della spesa: pane, uova, latte');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
+
+  await page.getByRole('button', { name: /Fallo adesso/ }).last().click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(2);
+});
