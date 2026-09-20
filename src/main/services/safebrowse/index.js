@@ -50,6 +50,7 @@ class TtlCache {
   }
   has(k) { return this.get(k) !== undefined; }
   delete(k) { this.m.delete(k); }
+  clear() { this.m.clear(); }
 }
 
 const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
