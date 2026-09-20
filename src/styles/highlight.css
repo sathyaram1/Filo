@@ -40,7 +40,6 @@
   }
 }
 
-/* Riflesso che gira attorno al bordo: gradiente conico mascherato a solo bordo. */
 .sn-highlight-frame::before {
   content: '';
   position: absolute;

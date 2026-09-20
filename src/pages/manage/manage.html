@@ -6,8 +6,7 @@
   <link rel="icon" href="filo://asset/icons/icon-32.png" />
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="filo://style/pages.css" />
-  <!-- Avviso delle fusioni in attesa: stesso foglio della gemella nella prima
-       schermata, così le due superfici non possono divergere. -->
+  <!-- Stesso foglio della gemella nella prima schermata, così le due superfici non possono divergere. -->
   <link rel="stylesheet" href="filo://style/mergeApprovals.css" />
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
@@ -34,25 +33,15 @@
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
        di un pezzo le usa e una copia rimasta indietro si vede (#498). */
     :root {
-      /* Aria fra la barra delle sezioni e ciò che le sta sotto. */
       --mg-tabs-gap: 14px;
-      /* Aria fra la barra delle sezioni e la barra di ricerca, che le
-         appartiene: più stretta, perché le due si leggono come una cosa sola. */
+      /* Più stretta: la barra di ricerca appartiene a quella delle sezioni e le due si leggono come una cosa sola. */
       --mg-search-gap: 8px;
-      /* Il minimo delle tre aree. Su una finestra normale sono 300 pixel; su
-         una bassa cedono anche loro, invece di uscire dal fondo. */
+      /* Il minimo delle tre aree: 300 pixel su una finestra normale, meno su una bassa, invece di uscire dal fondo. */
       --mg-aree-min: min(300px, 60vh);
     }
 
-    /* La dashboard di gestione sfrutta tutta la larghezza: override locale del
-       limite globale `.sn-page { max-width: 960px }` di pages.css (che serve alle
-       altre pagine, quindi NON si tocca lì).
-
-       E anche tutta l'ALTEZZA (#498): la pagina è una colonna alta quanto la
-       finestra, così le schede partono vicino al bordo e le tre aree del
-       pannello-lista si prendono ciò che avanza fino in fondo. Il margine sopra
-       è ridotto rispetto alle pagine di lettura: qui la prima cosa utile è la
-       barra delle sezioni, non un titolo da far respirare. */
+    /* La dashboard sfrutta tutta la larghezza e tutta l'altezza: override locale del `.sn-page { max-width: 960px }`
+       di pages.css, che serve alle altre pagine e quindi NON si tocca lì. */
     .sn-page {
       max-width: none;
       box-sizing: border-box;
@@ -62,29 +51,14 @@
       padding: 14px 24px 18px;
     }
 
-    /* Sulle schede-lista la colonna è alta ESATTAMENTE la finestra, non "almeno".
-       È la metà che mancava al tetto del riquadro delle fusioni: un tetto dice
-       quanto un blocco può CHIEDERE, ma se la colonna può crescere oltre la
-       finestra nessuno lo obbliga a rinunciare a niente, e la somma (testata +
-       tetto + minimo delle aree) esce dal fondo lo stesso. Succedeva con lo
-       zoom di Filo alzato o su una finestra bassa: due fusioni in attesa a zoom
-       +2 e delle aree restava la sola intestazione "RICEVUTI" (#498).
-       Con l'altezza fissa la pressione esiste, e a cedere è il riquadro sopra
-       (che scorre dentro di sé) invece delle aree.
-       Solo sulle schede-lista: Statistiche, Modelli, Automazioni e Log hanno
-       contenuti più alti della finestra e devono far scorrere la pagina. */
+    /* Sulle schede-lista la colonna è alta ESATTAMENTE la finestra, non "almeno": senza quella pressione il tetto
+       del riquadro delle fusioni non morde. Perché: patterns/unarea-che-si-prende-quello-che-avanza-pretende-un-tetto.md */
     .sn-page:has(> #panel-list.mg-panel--active) { height: 100vh; }
     /* Testata: altezza sua, non si lascia stringere dalla pressione qui sopra. */
     .mg-banner, .mg-tabs, .mg-no-sections, .mg-searchbar { flex: 0 0 auto; }
 
-    /* ── Switch "Modalità automatica" (tab Automazioni, owner-only) ─────── */
-    /* `.sn-page label` (pages.css) impone `display: block` + colore smorzato a
-       OGNI label di una pagina filo://, e con specificità 0-1-1 batteva
-       `.mg-switch`: la levetta finiva `display: inline`, quindi larghezza e
-       altezza non si applicavano e del pill si vedeva solo la pallina bianca
-       (che è in posizione assoluta e sopravvive al collasso). Da qui il selettore
-       più specifico: è l'unico modo di vincere senza toccare pages.css, che
-       serve a tutte le altre pagine. */
+    /* `.sn-page label` (pages.css) impone `display: block` a OGNI label di una pagina filo:// e con specificità 0-1-1
+       batteva `.mg-switch`: della levetta restava la sola pallina. Vincere senza toccare pages.css costa questo selettore. */
     .sn-page label.mg-switch {
       display: inline-flex; align-items: center; gap: 10px;
       margin: 0;
@@ -93,13 +67,11 @@
     }
     .mg-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
     .mg-switch-track {
-      /* `inline-block` esplicito: la levetta non deve dipendere dal fatto che il
-         genitore sia rimasto flex. */
+      /* `inline-block` esplicito: la levetta non deve dipendere dal fatto che il genitore sia rimasto flex. */
       display: inline-block;
       position: relative; width: 40px; height: 22px; border-radius: 999px;
-      /* A riposo un grigio marcato e theme-aware: `--sn-border` sul tema chiaro
-         è quasi bianco e non leggeva come switch. `--sn-muted` è visibile su
-         chiaro e scuro; da acceso passa a `--sn-accent`. */
+      /* A riposo un grigio theme-aware: `--sn-border` sul tema chiaro è quasi bianco e non si leggeva come switch.
+         `--sn-muted` si vede su entrambi i temi; da acceso passa a `--sn-accent`. */
       background: var(--sn-muted); transition: background 0.15s; flex: 0 0 auto;
     }
     .mg-switch-thumb {
@@ -117,10 +89,8 @@
       min-width: 22px; text-align: left;
     }
     .mg-switch.mg-switch--disabled { cursor: not-allowed; opacity: 0.5; }
-    /* Variante piccola: gli interruttori figli sotto quello master. Il testo a
-       sinistra e la levetta incolonnata a destra — con quattro voci di lunghezza
-       diversa, allineare le levette rende leggibile a colpo d'occhio quali sono
-       accese. */
+    /* Variante piccola per gli interruttori figli: le levette incolonnate a destra, perché con quattro voci di
+       lunghezza diversa si veda a colpo d'occhio quali sono accese. */
     .sn-page label.mg-switch--sm {
       display: flex; justify-content: space-between; width: 100%;
       font-weight: 500; gap: 8px;
@@ -132,8 +102,7 @@
       margin: 14px 0 0; padding: 12px 0 0;
       border-top: 1px solid var(--sn-border);
       display: flex; flex-direction: column; gap: 10px;
-      /* Più stretto del blocco: con la levetta all'estremo destro di 800px il
-         legame fra etichetta e interruttore si perde. */
+      /* Più stretto del blocco: con la levetta all'estremo destro di 800px il legame fra etichetta e interruttore si perde. */
       max-width: 380px;
     }
     .mg-auto-sub-title {
@@ -141,26 +110,18 @@
     }
     /* Automatica spenta: i figli non decidono niente, e si vede. */
     .mg-auto-sub--off { opacity: 0.45; }
-    /* Routine spente: le impostazioni che valgono SOLO per loro sono inerti.
-       Stessa resa dei sotto-interruttori qui sopra, applicata al blocco intero. */
+    /* Con le routine spente le impostazioni che valgono solo per loro sono inerti, come i sotto-interruttori qui sopra. */
     .mg-auto-block--off { opacity: 0.45; }
 
-    /* ── Tab bar (pattern fb-tabs di feedback.html) ───────────────────── */
     .mg-tabs {
       display: flex;
-      /* Finestra stretta: vanno a capo le schede INTERE, come nella pagina dei
-         feedback (.fb-tabs). Senza, i bottoni si stringono e spezzano le parole:
-         "In" / "coda" / "(0)" su tre righe, e il numero smette di leggersi come
-         parte del nome. */
+      /* Su finestra stretta vanno a capo le schede INTERE, come in .fb-tabs: stringendole si spezzavano le parole
+         ("In" / "coda" / "(0)" su tre righe) e il numero smetteva di leggersi come parte del nome. */
       flex-wrap: wrap;
       gap: 2px;
       border-bottom: 1px solid var(--sn-border);
-      /* Niente margine sopra: la barra è la prima cosa della pagina e parte
-         dal bordo (#498). Sotto resta l'aria che la stacca dal contenuto, e
-         quella misura è UNA (`--mg-tabs-gap`): la barra di ricerca si tira su
-         partendo da lì invece di ricopiarla a mano. Quando questo numero è
-         cambiato (20 → 14) la copia nella barra di ricerca è rimasta indietro
-         e il campo è finito appiccicato alla barra, a due pixel. */
+      /* Niente margine sopra: la barra è la prima cosa della pagina. L'aria sotto è UNA misura (`--mg-tabs-gap`) e la
+         barra di ricerca si tira su partendo da lì: quando il numero è cambiato, la copia a mano era rimasta indietro. */
       margin: 0 0 var(--mg-tabs-gap);
     }
     .mg-tab {
@@ -175,9 +136,8 @@
       white-space: nowrap;
     }
     .mg-tab:hover { color: var(--sn-fg); }
-    /* Quante ne contiene la scheda (#495): accanto al nome, più tenue del nome
-       stesso — è un'informazione, non un'etichetta. Cifre a larghezza fissa
-       così la barra non balla mentre i numeri cambiano. */
+    /* Quante ne contiene la scheda: più tenue del nome, perché è un'informazione e non un'etichetta. Cifre a
+       larghezza fissa, così la barra non balla mentre i numeri cambiano. */
     .mg-tab-count {
       color: var(--sn-muted);
       font-weight: 400;
@@ -191,34 +151,25 @@
       border-bottom-color: var(--sn-accent);
     }
     .mg-tab[hidden] { display: none; }
-    /* Stato illeggibile (nessuna chiave su questo computer): le SEZIONI non si
-       disegnano e una riga dice perché, come nella gemella. Le schede che non
-       sono sezioni (Statistiche, Modelli, Automazioni, Log) restano dove sono:
+    /* Le schede che sezioni non sono (Statistiche, Modelli, Automazioni, Log) restano anche senza chiave:
        non dipendono dallo stato delle segnalazioni. */
     .mg-no-sections {
       margin: -6px 0 12px; font-size: 12px; color: var(--sn-muted);
     }
     .mg-no-sections[hidden] { display: none; }
     .mg-panel { display: none; }
-    /* `flex: 0 0 auto`: dentro la colonna della pagina un pannello vale la sua
-       altezza naturale e non si lascia stringere. L'unico che cresce è quello
-       della lista, qui sotto. */
+    /* `flex: 0 0 auto`: dentro la colonna della pagina un pannello vale la sua altezza naturale e non si lascia
+       stringere. L'unico che cresce è quello della lista, qui sotto. */
     .mg-panel--active { display: block; flex: 0 0 auto; }
-    /* Pannello-lista: assorbe tutta l'altezza che avanza sotto le schede,
-       qualunque cosa ci sia sopra (banner di sola lettura, riga di stato
-       illeggibile, barra di ricerca, schede andate a capo). Prima era la
-       griglia a tenere un `calc(100vh - 180px)` scritto a mano: senza banner
-       avanzavano quasi cento pixel vuoti in fondo, col banner la pagina
-       scrollava di quel tanto (#498). */
+    /* Il pannello-lista assorbe tutta l'altezza che avanza sotto le schede, qualunque cosa ci sia sopra: con un
+       `calc(100vh - …)` scritto a mano avanzavano cento pixel vuoti, o la pagina scorreva di altrettanto. */
     #panel-list.mg-panel--active {
       display: flex; flex-direction: column;
       flex: 1 1 auto; min-height: 0;
     }
 
-    /* ── Ricerca "a senso" (semantica) ─────────────────────────────────────
-       La lente vive in fondo alla barra delle schede, spinta a destra: cliccarla
-       apre la barra di ricerca sotto le schede. I risultati (da QUALUNQUE scheda)
-       rimpiazzano la lista a sinistra; il dettaglio al centro resta il solito. */
+    /* La lente vive in fondo alla barra delle schede e apre la barra di ricerca sotto: i risultati, da QUALUNQUE
+       scheda, rimpiazzano la lista a sinistra, mentre il dettaglio al centro resta il solito. */
     .mg-search-toggle {
       all: unset; cursor: pointer;
       margin-left: auto; align-self: center;
@@ -232,11 +183,8 @@
     .mg-search-toggle--active { color: var(--sn-accent); }
     .mg-search-toggle svg { display: block; }
 
-    /* La barra di ricerca appartiene alla barra delle sezioni (la apre la lente
-       che sta lì dentro), quindi le sta più vicina di quanto stia al contenuto:
-       `--mg-search-gap` sopra, 20px sotto. Il margine negativo RIASSORBE l'aria
-       della barra delle sezioni invece di ripeterne il numero, così se quella
-       cambia lo stacco resta questo. */
+    /* La barra di ricerca appartiene alla barra delle sezioni — la apre la lente che sta lì dentro — quindi le sta
+       più vicina che al contenuto. Il margine negativo RIASSORBE quell'aria invece di ripeterne il numero. */
     .mg-searchbar {
       display: flex; align-items: center; gap: 8px;
       margin: calc(var(--mg-search-gap) - var(--mg-tabs-gap)) 0 20px;
@@ -253,8 +201,7 @@
       font: inherit; font-size: 14px; color: var(--sn-fg);
     }
     .mg-search-input::placeholder { color: var(--sn-muted); }
-    /* Il campo type=search del browser aggiunge una "x" nativa (blu di sistema)
-       che stona col tema: la togliamo, resta solo la nostra "x" tematizzata. */
+    /* Il type=search del browser aggiunge una "x" nativa blu che stona col tema: resta solo la nostra. */
     .mg-search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
     .mg-search-msg { font-size: 12px; color: var(--sn-muted); flex: 0 0 auto; }
     .mg-search-msg.mg-err { color: #c0392b; }
@@ -265,11 +212,9 @@
       justify-content: center; border-radius: 50%;
     }
     .mg-search-close:hover { background: var(--sn-hover); color: var(--sn-fg); }
-    /* Un risultato di ricerca: come una card di lista, ma il "perché è pertinente"
-       vive nel tooltip (title) invece che nel colore del bordo. */
+    /* Un risultato di ricerca è una card di lista, ma il "perché è pertinente" vive nel title, non nel colore del bordo. */
     .mg-item--result { border-left-color: var(--sn-accent); }
 
-    /* ── Banner sola lettura (pattern fb-admin-banner) ─────────────────── */
     .mg-banner {
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 16px; padding: 10px 14px;
@@ -279,7 +224,6 @@
     .mg-banner[hidden] { display: none; }
     .mg-banner button { margin-left: auto; }
 
-    /* ── Placeholder "In arrivo" ────────────────────────────────────────── */
     .mg-coming {
       display: flex; flex-direction: column; align-items: center;
       justify-content: center; padding: 80px 0;
@@ -287,7 +231,6 @@
     }
     .mg-coming-icon { font-size: 32px; opacity: 0.4; }
 
-    /* ── Tab Log (worker delle routine) ───────────────────────────────── */
     .mg-log { max-width: 720px; }
     .mg-log h2 { font-size: 18px; margin: 0 0 4px; }
     .mg-log-intro { font-size: 13px; color: var(--sn-muted); margin: 0 0 16px; }
@@ -295,9 +238,8 @@
       font-size: 13px; color: var(--sn-muted); padding: 24px 0;
     }
     .mg-log-list { list-style: none; margin: 0; padding: 0; }
-    /* Una riga = un worker. Ruolo a sinistra (colonna fissa, allineamento a
-       colpo d'occhio), poi l'istante d'avvio: relativo in evidenza, assoluto
-       in sottotono. */
+    /* Una riga = un worker. Ruolo a sinistra in colonna fissa, per allineare a colpo d'occhio, poi l'istante
+       d'avvio: relativo in evidenza, assoluto in sottotono. */
     .mg-log-row {
       display: flex; align-items: baseline; gap: 12px;
       padding: 9px 4px;
@@ -311,24 +253,20 @@
     }
     .mg-log-when { color: var(--sn-fg); }
     .mg-log-abs { margin-left: auto; color: var(--sn-muted); font-size: 12px; }
-    /* Secondo blocco della stessa scheda: il canale autenticato delle routine.
-       Stessa griglia delle righe dei worker; cambia solo il colore del ruolo,
-       che qui segnala un tentativo respinto. */
+    /* Il canale autenticato delle routine, stessa griglia delle righe dei worker: cambia solo il colore del
+       ruolo, che qui segnala un tentativo respinto. */
     .mg-log-section { margin-top: 32px; }
     .mg-log-section h3 { font-size: 15px; margin: 0 0 4px; }
     .mg-log-role--deny { color: var(--sn-error); }
 
-    /* ── Layout 3 colonne della sezione Revisione ──────────────────────── */
-    /* Le due colonne esterne hanno larghezza fissa, decisa dall'utente
-       trascinando i divisori (JS riscrive grid-template-columns e persiste le
-       misure); la colonna centrale assorbe il resto. I 12px dei divisori
-       fanno anche da spaziatura fra le colonne → gap: 0. */
+    /* Le colonne esterne hanno la larghezza che l'utente ha trascinato (il JS riscrive grid-template-columns e la
+       ricorda), la centrale assorbe il resto. I 12px dei divisori fanno da spaziatura, quindi gap: 0. */
     .mg-review {
       display: grid;
       grid-template-columns: 220px 12px minmax(0, 1fr) 12px 280px;
       gap: 0;
-      /* L'altezza la decide la colonna della pagina (#panel-list): qui si dice
-         solo "prendi quello che avanza", mai una misura in pixel. */
+      /* L'altezza la decide la colonna della pagina (#panel-list): qui si dice solo "prendi quello che avanza",
+         mai una misura in pixel. */
       flex: 1 1 auto;
       min-height: var(--mg-aree-min);
     }
@@ -338,9 +276,8 @@
       overflow: hidden;
       min-width: 0;
     }
-    /* Divisore trascinabile: invisibile a riposo (le colonne hanno già il loro
-       bordo, una terza linea sarebbe rumore) e tinto d'accento all'hover o
-       mentre lo si trascina, così l'utente vede che è una presa. */
+    /* Il divisore è invisibile a riposo — le colonne hanno già il loro bordo, una terza linea sarebbe rumore — e
+       si tinge d'accento all'hover o mentre lo si trascina, così si vede che è una presa. */
     .mg-divider {
       cursor: col-resize;
       background: transparent;
@@ -362,8 +299,7 @@
       border-bottom: 1px solid var(--sn-border);
       flex: 0 0 auto;
     }
-    /* Intestazione della lista: titolo a sinistra, glifo di ordinamento a
-       destra. Il tasto destro sull'intera riga apre il menu di riordino. */
+    /* Titolo a sinistra, glifo di ordinamento a destra; il tasto destro sull'intera riga apre il menu di riordino. */
     .mg-list-head-row {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
@@ -375,8 +311,7 @@
       transition: background 0.1s, color 0.1s;
     }
     .mg-sort-btn:hover { background: var(--sn-hover); color: var(--sn-fg); }
-    /* Ordinamento non predefinito attivo: il glifo si tinge d'accento così è
-       chiaro che la lista è riordinata. */
+    /* Ordinamento non predefinito: il glifo si tinge d'accento, così è chiaro che la lista è riordinata. */
     .mg-sort-btn--active { color: var(--sn-accent); }
     /* Menu contestuale di ordinamento (sn-select-pop appeso al body). */
     .mg-ctxmenu { position: fixed; right: auto; top: auto; min-width: 180px; }
@@ -384,10 +319,8 @@
       flex: 1 1 0; overflow-y: auto; padding: 8px;
     }
 
-    /* ── Lista feedback (colonna sinistra) ─────────────────────────────── */
     .mg-list { display: flex; flex-direction: column; gap: 4px; }
-    /* Una riga sola: #N · titolo con ellissi. Il motivo (attacco/spam/…) resta
-       implicito nel colore del border-left, non più in una label testuale. */
+    /* Una riga sola: #N · titolo con ellissi. Il motivo resta implicito nel colore del border-left. */
     .mg-item {
       display: flex; flex-direction: row; align-items: baseline; gap: 6px;
       padding: 8px 10px; border-radius: 6px; cursor: pointer;
@@ -404,13 +337,11 @@
       border-left-color: #ffffff;
       box-shadow: inset 4px 0 0 -1px rgba(127, 127, 127, 0.5);
     }
-    /* "Allineato": tutti i giudici d'accordo, nessun blocco → bordo BLU (lo
-       stesso dei pallini --mg-dot--aligned). Il colore esatto è impostato inline
-       da JS (MR.ALIGNED_COLOR); qui lasciamo solo un fallback. */
+    /* "Allineato" (tutti i giudici d'accordo, nessun blocco) è il BLU dei pallini --mg-dot--aligned. Il colore
+       esatto lo mette inline il JS da MR.ALIGNED_COLOR: qui c'è solo un ripiego. */
     .mg-item--aligned { border-left-color: #5b6ee0; }
-    /* Feedback in valutazione dai giudici (ri-valutazione uno alla volta): il
-       bordo pulsa col colore d'accento e a destra compaiono tre pallini animati
-       ("i giudici stanno votando"). Solo sulla card di turno, non sulle altre. */
+    /* Feedback in ri-valutazione: il bordo pulsa e a destra compaiono tre pallini animati, «i giudici stanno
+       votando». Solo sulla card di turno, non sulle altre. */
     .mg-item--evaluating {
       border-left-color: var(--sn-accent);
       animation: mg-eval-pulse 1.2s ease-in-out infinite;
@@ -432,8 +363,7 @@
       0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
       40%           { opacity: 1;   transform: scale(1); }
     }
-    /* Rispetta chi preferisce meno movimento: niente pulsazioni, restano i dot
-       fissi come indicatore di stato. */
+    /* Chi preferisce meno movimento non vede pulsazioni: restano i dot fissi come indicatore di stato. */
     @media (prefers-reduced-motion: reduce) {
       .mg-item--evaluating { animation: none; }
       .mg-eval-dots i { animation: none; opacity: 0.8; }
@@ -446,28 +376,22 @@
       flex: 1 1 auto; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    /* Aperta/Chiusa: l'unica cosa che si sa di una segnalazione il cui stato
-       fine è cifrato. Stesse parole e stesso peso visivo di .fb-state nella
-       gemella. */
+    /* Aperta/Chiusa è l'unica cosa che si sa di una segnalazione il cui stato fine è cifrato: stesse parole e
+       stesso peso visivo di .fb-state nella gemella. */
     .mg-state {
       flex: 0 0 auto; align-self: center;
       font-size: 11px; color: var(--sn-muted);
       white-space: nowrap;
     }
-    /* L'etichetta di stato non sta più nel dettaglio (scelta owner
-       2026-09-13): lo stato lo dicono il colore della scheda in lista e le
-       forme; le decisioni già prese si leggono nel pannello del triangolo. */
-    /* Priorità (1-3 pallini) sulle card "In coda"/"Ricevuti": indicatore a colpo
-       d'occhio e, per l'owner, modificabile col click (pieno = priorità). */
+    /* Lo stato non ha più un'etichetta nel dettaglio: lo dicono il colore della scheda in lista e le forme. */
+    /* Priorità a pallini sulle card "In coda" e "Ricevuti": per l'owner si cambia col click, pieno = priorità. */
     .mg-priority {
       margin-left: auto; flex: 0 0 auto;
       display: inline-flex; gap: 4px; align-items: center;
       align-self: center;
     }
-    /* Scoped su .mg-priority: la classe .mg-dot è riusata dalla riga giudici
-       del dettaglio (più sotto), che dichiara background:transparent DOPO
-       queste regole — senza lo scope vincerebbe sulla .mg-dot--on e i pallini
-       resterebbero sempre vuoti anche con la priorità impostata. */
+    /* Scoped su .mg-priority perché .mg-dot è riusata dalla riga giudici del dettaglio, che dichiara
+       background:transparent DOPO: senza lo scope i pallini della priorità resterebbero sempre vuoti. */
     .mg-priority .mg-dot {
       width: 12px; height: 12px; padding: 0; border-radius: 50%;
       border: 1px solid var(--sn-muted); background: transparent;
@@ -477,10 +401,8 @@
     .mg-priority .mg-dot:hover { border-color: var(--sn-accent); }
     .mg-priority .mg-dot--on { background: var(--sn-accent); border-color: var(--sn-accent); }
 
-    /* ── Card "in lavorazione" (pinnata in cima a In coda) ─────────────────
-       Due righe: la riga normale (#N · titolo · priorità) sopra, lo stato
-       dell'iter sotto (✓ Implementazione · ● Controllo funzionalità · ○
-       Controllo sicurezza + istanza attiva/in attesa). */
+    /* Card "in lavorazione", pinnata in cima a In coda: la riga normale sopra, lo stato dell'iter sotto
+       (implementazione, controllo funzionalità, controllo sicurezza, più l'istanza attiva o in attesa). */
     .mg-item--staged { flex-direction: column; align-items: stretch; gap: 4px; }
     .mg-item--staged .mg-item-row {
       display: flex; flex-direction: row; align-items: baseline; gap: 6px;
@@ -508,7 +430,6 @@
     @media (prefers-reduced-motion: reduce) {
       .mg-work-live i { animation: none; }
     }
-    /* Striscia di stato nel dettaglio: stessa riga, sotto la riga giudici. */
     .mg-work-state {
       padding: 8px 12px; border-bottom: 1px solid var(--sn-border);
       flex: 0 0 auto;
@@ -520,13 +441,11 @@
       text-align: center; padding: 30px 8px;
     }
 
-    /* ── Filtro ⭐ della tab Archiviati (DB2) ───────────────────────────── */
     .mg-list-filter {
       padding: 8px 12px; border-bottom: 1px solid var(--sn-border);
       flex: 0 0 auto;
     }
     .mg-list-filter[hidden] { display: none; }
-    /* Barra "Ri-valuta i non filtrati" (solo Ricevuti, quando ci sono bianchi). */
     .mg-reeval-bar {
       padding: 8px 12px; border-bottom: 1px solid var(--sn-border);
       flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
@@ -539,7 +458,6 @@
     }
     .mg-star-filter input { cursor: pointer; }
 
-    /* ── Pannello centrale (dettaglio) ──────────────────────────────────── */
     .mg-detail-empty {
       display: flex; align-items: center; justify-content: center;
       flex: 1; color: var(--sn-muted); font-size: 13px; font-style: italic;
@@ -554,27 +472,19 @@
       font-weight: 600;
     }
     .mg-sender-link:hover { text-decoration: underline; }
-    /* ── La fila dei cinque livelli ──────────────────────────────────────
-       Una segnalazione attraversa cinque controlli e la pagina ne mostrava
-       due. Adesso sono cinque forme in fila, sempre le stesse e sempre nello
-       stesso ordine: triangolo (filtro d'ingresso), cerchi (giudici), rombo
-       (segnalazione di Claude), pentagono (audit di sicurezza), quadrato
-       (fusione). Un livello che non ha dato un parere resta al suo posto,
-       grigio: la fila ha sempre la stessa lunghezza, e un buco si vede. */
+    /* Le cinque forme in fila — triangolo, cerchi, rombo, pentagono, quadrato — stanno sempre nello stesso ordine.
+       Un livello senza parere resta al suo posto, grigio: la fila ha sempre la stessa lunghezza e un buco si vede. */
     .mg-livelli-row {
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
       padding: 8px 12px; border-bottom: 1px solid var(--sn-border);
       flex: 0 0 auto; font-size: 12px; color: var(--sn-muted);
     }
-    /* L'attributo `hidden` di default è display:none, ma la regola sopra impone
-       display:flex e lo sovrascrive: serve una regola più specifica. */
+    /* `hidden` vale display:none, ma la regola sopra impone display:flex: serve una regola più specifica. */
     .mg-livelli-row[hidden] { display: none; }
-    /* Le forme stanno insieme; i giudici sono un gruppo dentro la fila, con un
-       filo d'aria in più ai lati perché si legga come "un livello solo". */
+    /* I giudici sono un gruppo dentro la fila: un filo d'aria in più ai lati perché si legga come un livello solo. */
     .mg-forme { display: flex; align-items: center; gap: 6px; }
     .mg-forme-gruppo { display: flex; align-items: center; gap: 6px; margin: 0 2px; }
-    /* Stessa misura dei pallini dei giudici qui sotto (14px): la fila si legge
-       come una cosa sola, non come forme di pesi diversi. */
+    /* Stessa misura dei pallini dei giudici (14px): la fila si legge come una cosa sola, non come pesi diversi. */
     .mg-forma {
       all: unset;
       width: 14px; height: 14px; flex: 0 0 auto;
@@ -586,21 +496,18 @@
     .mg-forma svg { width: 14px; height: 14px; display: block; overflow: visible; }
     .mg-forma svg path { fill: currentColor; stroke: currentColor; stroke-width: 1.5;
       stroke-linejoin: round; }
-    /* Livello che non ha (ancora) dato un parere: contorno tratteggiato, come
-       il pallino di un giudice che non ha votato. Resta cliccabile — cliccarlo
-       dice PERCHÉ è grigio. */
+    /* Livello che non ha ancora dato un parere: contorno tratteggiato, come il pallino di un giudice che non ha
+       votato. Resta cliccabile, perché è il click a dire PERCHÉ è grigio. */
     .mg-forma--vuota svg path {
       fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 3 2;
     }
     .mg-forma--vuota { opacity: 0.65; }
-    /* Stessa scala di severità dei pallini dei giudici qui sotto: il rosso
-       vuol dire la stessa cosa in tutta la pagina. */
+    /* Stessa scala di severità dei pallini dei giudici: il rosso vuol dire la stessa cosa in tutta la pagina. */
     .mg-forma--attack  { color: #c0392b; }
     .mg-forma--spam    { color: #e08e0b; }
     .mg-forma--design  { color: #2e9e5b; }
     .mg-forma--aligned { color: #5b6ee0; }
-    /* La forma scelta: un anello attorno, così si sa cosa sta guardando il
-       pannello di destra. */
+    /* Un anello attorno alla forma scelta, così si sa cosa sta guardando il pannello di destra. */
     .mg-forma--scelta { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 3px; }
     .mg-dot {
       width: 14px; height: 14px; border-radius: 50%;
@@ -613,20 +520,16 @@
       cursor: pointer;
     }
     .mg-dot--clickable:hover { transform: scale(1.2); }
-    /* Colori giudici: scala di severità coerente rosso → giallo → verde → blu
-       (attacco → spam → design → allineato). DEVONO combaciare col bordo della
-       card (REASONS in manageReview.js) e coi badge di classe qui sotto. */
+    /* Scala di severità rosso → giallo → verde → blu (attacco, spam, design, allineato). DEVE combaciare col bordo
+       della card (REASONS in manageReview.js) e coi badge di classe qui sotto. */
     .mg-dot--attack { background: #c0392b; border-color: #c0392b; }
     .mg-dot--spam   { background: #e08e0b; border-color: #e08e0b; }
     .mg-dot--design { background: #2e9e5b; border-color: #2e9e5b; }
     .mg-dot--aligned { background: #5b6ee0; border-color: #5b6ee0; }
-    /* Giudice che non ha emesso un verdetto in quella run: anello tratteggiato. */
     .mg-dot--empty { border-style: dashed; opacity: 0.6; }
-    /* Frase accanto ai pallini: PERCHÉ il feedback è in questo stato (il colore
-       arriva inline da judgesNote e combacia col bordo della card). */
+    /* La frase accanto ai pallini dice PERCHÉ il feedback è in questo stato; il colore arriva inline da judgesNote. */
     .mg-judge-note { margin-left: 6px; font-weight: 600; }
 
-    /* ── Bolle chat (stile fb-bubble) ───────────────────────────────────── */
     .mg-thread {
       flex: 1 1 0; overflow-y: auto;
       display: flex; flex-direction: column; gap: 10px;
@@ -655,8 +558,7 @@
       max-width: 200px; max-height: 200px; border-radius: 6px;
       border: 1px solid var(--sn-border); cursor: zoom-in; object-fit: cover;
     }
-    /* Immagine allegata cifrata: finché il main non la decifra mostriamo un
-       riquadro segnaposto (l'attesa è attrito → si vede che sta arrivando). */
+    /* Finché il main non decifra l'immagine si mostra un segnaposto: l'attesa è attrito, si vede che sta arrivando. */
     .mg-bubble-imgs img.mg-img-loading,
     .mg-bubble-imgs img.mg-img-failed {
       width: 120px; height: 90px; object-fit: contain;
@@ -679,7 +581,6 @@
     .mg-bubble-file a.mg-img-failed:hover { text-decoration: none; }
     .mg-file-note { color: var(--sn-muted); font-style: italic; }
 
-    /* ── Lightbox ────────────────────────────────────────────────────────── */
     .mg-lightbox {
       position: fixed; inset: 0; background: rgba(0,0,0,0.85);
       display: none; align-items: center; justify-content: center;
@@ -688,7 +589,6 @@
     .mg-lightbox.open { display: flex; }
     .mg-lightbox img { max-width: 95vw; max-height: 95vh; }
 
-    /* ── Pannello laterale variabile (destra) ───────────────────────────── */
     .mg-side { display: flex; flex-direction: column; height: 100%; }
     .mg-side--hidden { display: none; }
     .mg-side-head {
@@ -716,7 +616,6 @@
       flex: 1; color: var(--sn-muted); font-size: 13px; font-style: italic;
     }
 
-    /* Badge classe giudice */
     .mg-class-badge {
       display: inline-block; padding: 2px 9px; border-radius: 999px;
       font-size: 11px; font-weight: 600; text-transform: uppercase;
@@ -733,47 +632,39 @@
       margin-top: 10px;
     }
     .mg-reasoning em { color: var(--sn-muted); font-style: italic; }
-    /* Riga "Modello" (solo owner): quale modello ha emesso questo verdetto. */
     .mg-judge-model {
       font-size: 12px; color: var(--sn-muted); margin-top: 8px;
       word-break: break-all;
     }
     .mg-judge-model em { font-style: italic; }
-    /* Dettaglio giudice nel pannello destro: badge classe sopra, reasoning sotto. */
     .mg-judge-detail { display: flex; flex-direction: column; align-items: flex-start; }
 
-    /* ── Pannello di un livello (la forma cliccata) ───────────────────────── */
     .mg-liv-righe { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; }
     .mg-liv-riga { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.5; }
     .mg-liv-riga strong { color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
     .mg-liv-riga span { color: var(--sn-text); word-break: break-word; }
-    /* Il testo lungo (la segnalazione di Claude, il resoconto dell'audit):
-       arriva come markdown breve, si legge a capo come l'ha scritto chi ha
-       lavorato. */
+    /* Il testo lungo (la segnalazione di Claude, il resoconto dell'audit) arriva come markdown breve e va a capo
+       come l'ha scritto chi ha lavorato. */
     .mg-liv-testo {
       font-size: 13px; line-height: 1.6; white-space: pre-wrap;
       word-break: break-word; color: var(--sn-text);
     }
     .mg-liv-testo em { color: var(--sn-muted); font-style: italic; }
-    /* La segnalazione e la nota dell'audit arrivano in markdown: i titoli
-       («## Problema») e le voci a trattino si vedono come tali, il resto è
-       testo. Niente HTML dal testo. */
+    /* Markdown in arrivo: titoli e voci a trattino si vedono come tali, il resto è testo. Niente HTML dal testo. */
     .mg-liv-titolo { font-weight: 600; margin: 10px 0 4px; }
     .mg-liv-titolo:first-child { margin-top: 0; }
     .mg-liv-par { margin: 0 0 6px; }
     .mg-liv-elenco { margin: 0 0 6px 18px; padding: 0; }
     .mg-liv-elenco li { margin: 2px 0; }
-    /* Il tasto che scavalca l'audit: è un'eccezione, non un'azione di tutti i
-       giorni, e si arma con un secondo clic (come l'approvazione di una
-       fusione) perché il primo non basti. */
+    /* Il tasto che scavalca l'audit è un'eccezione, non un'azione di tutti i giorni: si arma con un secondo clic,
+       come l'approvazione di una fusione, perché il primo non basti. */
     .mg-liv-azioni { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
     .mg-liv-esito { font-size: 12px; }
     .mg-liv-esito[data-kind="ok"]   { color: #2e9e5b; }
     .mg-liv-esito[data-kind="err"]  { color: #c0392b; }
     .mg-liv-esito[data-kind="wait"] { color: var(--sn-muted); }
 
-    /* Toast discreto in basso a destra: stesso pattern dell'editor e dei
-       mazzi. Serve quando l'esito di un'azione conta anche se l'owner ha già
+    /* Toast in basso a destra, come nell'editor e nei mazzi: serve quando l'esito conta anche se l'owner ha già
        spostato lo sguardo dal pannello. */
     .mg-toast {
       position: fixed; right: 18px; bottom: 18px; max-width: 360px;
@@ -788,7 +679,6 @@
     .mg-toast[data-kind="err"] { border-left-color: #c0392b; }
     .mg-toast[data-kind="ok"]  { border-left-color: #2e9e5b; }
 
-    /* ── Azioni di revisione (accetta + commento), owner-only ─────────────── */
     .mg-actions {
       flex: 0 0 auto; border-top: 1px solid var(--sn-border);
       padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
@@ -803,29 +693,22 @@
     .mg-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .mg-action-msg { font-size: 12px; color: var(--sn-muted); }
 
-    /* ── La barra dell'owner: tutti i tasti su una riga ───────────────────── */
-    /* Un contenitore solo per i tre gruppi che prima erano tre blocchi
-       impilati. I gruppi restano DIVISI (ognuno compare e sparisce per conto
-       suo: le azioni di stato spariscono su una segnalazione illeggibile, il
-       preferito no) ma stanno sulla stessa riga. */
+    /* Un contenitore solo per i tre gruppi di tasti, che però restano DIVISI: ognuno compare e sparisce per conto
+       suo (le azioni di stato spariscono su una segnalazione illeggibile, il preferito no). */
     .mg-owner {
       flex: 0 0 auto; border-top: 1px solid var(--sn-border);
       padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
     }
     .mg-owner[hidden] { display: none; }
     .mg-owner-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-    /* Gli esiti (azione di stato, preferito) stanno sotto la riga: dentro, un
-       messaggio lungo si prendeva lo spazio dei tasti e li mandava a capo. Da
-       vuoto non occupa niente. */
     .mg-owner-msgs { display: flex; flex-wrap: wrap; gap: 10px; }
     .mg-owner-msgs[hidden] { display: none; }
     /* Gruppo di tasti dentro la riga: niente bordo né padding suoi, li dà la
        barra. `[hidden]` va riaffermato o `display:flex` se lo mangia. */
     .mg-actions-group { display: flex; align-items: center; min-width: 0; }
     .mg-actions-group[hidden] { display: none; }
-    /* Il tasto della frase: stesso vestito del preferito, con la freccia che
-       dice da che parte va. Acceso quando una frase c'è già — altrimenti, da
-       chiusa, la sezione non direbbe da nessuna parte che è stata scritta. */
+    /* Il tasto della frase è acceso quando una frase c'è già: da chiusa, la sezione non direbbe da nessuna parte
+       che è stata scritta. */
     .mg-usernote-toggle::after {
       content: '▾'; display: inline-block; margin-left: 6px;
       font-size: 11px; color: var(--sn-muted);
@@ -845,20 +728,12 @@
     .mg-action-msg.mg-ok  { color: #2e9e5b; }
     .mg-action-msg.mg-err { color: #c0392b; }
 
-    /* ── Frase per chi ha segnalato, owner-only ─────────────────────────── */
-    /* Il modulo vero: si apre sotto la barra quando lo si chiede col tasto. */
     .mg-usernote { display: block; }
     .mg-usernote[hidden] { display: none; }
     .mg-usernote-label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--sn-fg); }
     .mg-usernote-hint { color: var(--sn-muted); font-size: 12px; }
     #mgUserNoteText { margin-bottom: 8px; }
 
-    /* ── Preferito ⭐, owner-only ────────────────────────────────────────── */
-    /* Archivia/Ripristina non sta qui: è un'azione di STATO e vive nella riga
-       generata da renderActions, che sparisce insieme alle altre quando lo
-       stato non si legge (il bottone DICE dov'è la segnalazione, e senza chiave
-       direbbe sempre "Archivia"). Il preferito invece è un flag in chiaro e
-       resta, accanto alle azioni sulla stessa riga. */
     .mg-star-btn {
       all: unset; cursor: pointer;
       padding: 7px 12px; border-radius: 8px;
@@ -867,16 +742,12 @@
       transition: background 0.1s, border-color 0.1s;
     }
     .mg-star-btn:hover { background: var(--sn-hover); }
-    /* Acceso = preferito attivo: bordo e testo color "stella". */
     .mg-star-btn[aria-pressed="true"] {
       border-color: #e0a30b; color: #b9770a;
       background: color-mix(in srgb, #e0a30b 12%, var(--sn-bg, transparent));
     }
-    /* Acceso = il server fonde senza chiedere: tinta dell'accento, non della
-       stella — è una delega, non un preferito. Vale in tutti e due i temi
-       perché parte dai token. */
-    /* `all: unset` del tasto azzera anche il display di [hidden]: senza questa
-       riga un tasto nascosto resta visibile. */
+    /* Acceso = il server fonde senza chiedere: tinta d'accento e non della stella, perché è una delega. */
+    /* `all: unset` azzera anche il display di [hidden]: senza questa riga un tasto nascosto resta visibile. */
     .mg-preapprove-btn[hidden] { display: none; }
     .mg-preapprove-btn[aria-pressed="true"] {
       border-color: var(--sn-accent); color: var(--sn-accent);
@@ -888,8 +759,7 @@
       font-size: 12px;
       color: var(--sn-muted);
     }
-    /* Il segno in lista: piccolo, prima dei pallini di priorità (che si
-       spingono a destra da soli). */
+    /* Il segno in lista è piccolo e sta prima dei pallini di priorità, che si spingono a destra da soli. */
     .mg-preapproved {
       flex: none;
       font-size: 10.5px;
@@ -901,9 +771,8 @@
       white-space: nowrap;
     }
 
-    /* Una fusione ferma sulla scheda: stessa forma del segno qui sopra, tinta
-       del blocco di sicurezza. È una decisione che aspetta l'owner, e senza
-       questo segno non si distinguerebbe scorrendo la lista. */
+    /* Una fusione ferma sulla scheda: stessa forma del segno qui sopra, tinta del blocco di sicurezza. Senza, una
+       decisione che aspetta l'owner non si distinguerebbe scorrendo la lista. */
     .mg-fusione-badge {
       flex: none;
       font-size: 10.5px; line-height: 1;
@@ -913,7 +782,6 @@
       white-space: nowrap;
     }
 
-    /* Mittente */
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
     .mg-sender-stat { font-size: 13px; color: var(--sn-muted); }
     .mg-sender-stat strong { color: var(--sn-text); }
@@ -930,13 +798,11 @@
       flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
 
-    /* Spinner di caricamento */
     .mg-loading {
       color: var(--sn-muted); font-size: 13px;
       text-align: center; padding: 40px 0;
     }
 
-    /* ── Sezione "Automazioni" ──────────────────────────────────────────── */
     .mg-automation { max-width: 640px; padding: 24px 0 32px; }
     .mg-automation h2 {
       font-size: 15px; font-weight: 700; margin: 0 0 4px; color: var(--sn-fg);
@@ -963,8 +829,7 @@
       color: var(--sn-fg); text-align: center;
     }
     .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
-    /* Il testo in coda alla risposta (istruzioni per chi corregge): stessa pelle del
-       campo numerico, ma largo e a più righe. */
+    /* Le istruzioni per chi corregge hanno la stessa pelle del campo numerico, ma larghe e a più righe. */
     .mg-auto-field-row--stack { flex-direction: column; align-items: stretch; gap: 8px; }
     .mg-auto-textarea {
       width: 100%; max-width: 720px; min-height: 120px; resize: vertical;
@@ -975,14 +840,11 @@
     }
     .mg-auto-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Fusioni ferme senza una segnalazione alle spalle: l'aspetto sta tutto in
-       mergeApprovals.css, qui solo la spaziatura. Non serve più un tetto: le
-       fusioni non stanno più sopra le tre aree dei Ricevuti (dove rubavano
-       altezza, #498) ma in Automazioni, che scorre da sé. */
+    /* Fusioni ferme senza una segnalazione alle spalle: l'aspetto sta tutto in mergeApprovals.css, qui solo la
+       spaziatura. Niente tetto: stanno in Automazioni, che scorre da sé. */
     .mg-merge-approvals { margin: 0 0 20px; }
     .mg-merge-approvals-recent { margin: 0 0 20px; }
 
-    /* ── Sezione "Modelli di supporto" (DD1) ────────────────────────────── */
     .mg-support-models {
       max-width: 760px;
       padding: 24px 0 32px;
@@ -995,8 +857,7 @@
       font-size: 13px; color: var(--sn-muted);
       margin: 0 0 20px;
     }
-    /* Blocchi "Chiave dei giudici" e "Modelli dei giudici": riquadri leggeri
-       per separarli visivamente dai selettori per-giudice. */
+    /* Riquadri leggeri attorno a "Chiave dei giudici" e "Modelli dei giudici", per separarli dai selettori per-giudice. */
     .mg-sm-block {
       margin: 0 0 24px; padding: 16px 18px;
       border: 1px solid var(--sn-border); border-radius: 10px;
@@ -1016,8 +877,7 @@
       width: 100%; max-width: 420px; box-sizing: border-box;
     }
     .mg-sm-key-state { font-weight: 400; color: var(--sn-muted); font-size: 12px; }
-    /* Righe del registro giudici: nickname stretto, modello largo, "Rimuovi"
-       quanto basta (la griglia base .sn-model-row ha 5 colonne, qui sono 3). */
+    /* Righe del registro giudici: la griglia base .sn-model-row ha cinque colonne, qui sono tre. */
     .mg-sm-reg-row { grid-template-columns: 160px 1fr auto; }
     .mg-sm-slots-title {
       margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--sn-fg);
@@ -1053,9 +913,8 @@
     .mg-sm-denied {
       font-size: 13px; color: var(--sn-muted); padding: 20px 0;
     }
-    /* nicknames-list è usato da modelChainEditor per popolare il dropdown;
-       nella manage page viene popolato dal main tramite SUPPORT_MODELS_GET.
-       Hidden come nelle altre pagine che usano modelChainEditor. */
+    /* nicknames-list la legge modelChainEditor per il dropdown; qui la popola il main via SUPPORT_MODELS_GET,
+       nascosta come nelle altre pagine che usano modelChainEditor. */
     #mgSmNicknamesList { display: none; }
   </style>
 </head>
@@ -1067,7 +926,6 @@
       <button type="button" class="sn-btn" id="mgSignIn">Accedi</button>
     </div>
 
-    <!-- Tab bar (dashboard unificata DB1, owner-only) -->
     <nav class="mg-tabs" id="mgTabs" role="tablist">
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
@@ -1077,20 +935,15 @@
       <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab">Log</button>
-      <!-- Lente di ricerca "a senso": in fondo alla barra, spinta a destra.
-           Cerca un feedback per SIGNIFICATO tra TUTTE le schede. -->
+      <!-- Lente di ricerca "a senso": cerca un feedback per SIGNIFICATO fra TUTTE le schede. -->
       <button type="button" class="mg-search-toggle" id="mgSearchToggle"
         title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
     </nav>
 
-    <!-- Lo stato delle segnalazioni viaggia cifrato: su un computer senza la
-         chiave dell'owner non si legge, e allora le quattro sezioni non si
-         disegnano (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md:
-         "se il criterio non si legge, le sezioni non si disegnano").
-         Questa riga dice perché, esattamente come la gemella. -->
+    <!-- Lo stato viaggia cifrato: senza la chiave dell'owner non si legge, e allora le quattro sezioni non si
+       disegnano. Questa riga dice perché (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md). -->
     <p class="mg-no-sections" id="mgNoSections" hidden></p>
 
-    <!-- Barra di ricerca semantica (nascosta finché non apri la lente). -->
     <div class="mg-searchbar" id="mgSearchBar" hidden>
       <span class="mg-search-ico" id="mgSearchIco" aria-hidden="true"></span>
       <input type="search" class="mg-search-input" id="mgSearchInput"
@@ -1101,23 +954,15 @@
         title="Chiudi ricerca" aria-label="Chiudi ricerca">×</button>
     </div>
 
-    <!-- ═══ TAB LISTA (Ricevuti / In coda / Risolti / Archiviati) ════════ -->
-    <!-- Layout condiviso a 3 colonne: la lista a sinistra è filtrata per tab,
-         il dettaglio al centro e il pannello laterale a destra sono comuni. -->
+    <!-- Layout condiviso: la lista a sinistra è filtrata per tab, dettaglio e pannello laterale sono comuni. -->
     <section class="mg-panel mg-panel--active" id="panel-list" data-panel="list">
-      <!-- Le fusioni fermate dai controlli NON stanno più qui: una fusione ferma
-           È una segnalazione col quadrato rosso, e si approva dal pannello del
-           quadrato. Quelle che non nascono da una segnalazione (un ramo locale
-           senza numero) restano in Automazioni. -->
+      <!-- Una fusione fermata dai controlli non sta qui: è una segnalazione col quadrato rosso; senza numero resta in Automazioni. -->
 
-      <!-- Le larghezze delle colonne si trascinano dai due divisori e vengono
-           ricordate; doppio clic su un divisore ripristina la misura iniziale. -->
+      <!-- Le larghezze delle colonne si trascinano e vengono ricordate; doppio clic su un divisore le ripristina. -->
       <div class="mg-review" id="mgReviewGrid">
 
-        <!-- Colonna sinistra: lista feedback della tab corrente -->
         <div class="mg-col" id="mgListCol">
-          <!-- Intestazione: il tasto destro (o il glifo ⇅) apre il menu di
-               riordino dei feedback (numero / priorità / creatore). -->
+          <!-- Il tasto destro, o il glifo ⇅, apre il menu di riordino (numero / priorità / creatore). -->
           <div class="mg-col-head mg-list-head-row" id="mgListHeadRow">
             <div id="mgListHead">Ricevuti</div>
             <button type="button" class="mg-sort-btn" id="mgSortBtn"
@@ -1130,22 +975,19 @@
               <input type="checkbox" id="mgStarFilter" />
               <span>⭐ Solo preferiti</span>
             </label>
-            <!-- Attacchi/spam confermati dall'owner: fuori dai Ricevuti (macchina
-                 a stati), restano ispezionabili qui come storico. -->
+            <!-- Attacchi e spam confermati: fuori dai Ricevuti per la macchina a stati, ispezionabili qui come storico. -->
             <label class="mg-star-filter">
               <input type="checkbox" id="mgConfirmedFilter" />
               <span>Bloccati confermati</span>
             </label>
           </div>
-          <!-- Ri-valuta i feedback "non filtrati" (bianchi): ri-prova SOLO i
-               giudici mancanti. Visibile solo nei Ricevuti quando ce n'è almeno uno. -->
+          <!-- Ri-prova SOLO i giudici mancanti dei feedback non filtrati. Visibile nei Ricevuti quando ce n'è almeno uno. -->
           <div class="mg-reeval-bar" id="mgReevalBar" hidden>
             <button type="button" class="sn-btn sn-btn-secondary" id="mgReevalBtn">Ri-valuta i non filtrati</button>
             <span class="mg-reeval-msg" id="mgReevalMsg"></span>
           </div>
-          <!-- Approvazione in blocco degli allineati (blu): scrive `todo` su
-               tutti — è QUESTA l'approvazione, la modalità automatica di oggi
-               non sposta più nulla. Visibile solo nei Ricevuti quando ce n'è. -->
+          <!-- Approvazione in blocco degli allineati: scrive `todo` su tutti, ed è QUESTA l'approvazione — la modalità
+             automatica di oggi non sposta più nulla. Visibile nei Ricevuti quando ce n'è. -->
           <div class="mg-reeval-bar" id="mgAlignedBar" hidden>
             <button type="button" class="sn-btn" id="mgAlignedBtn">Approva tutti gli allineati</button>
             <span class="mg-reeval-msg" id="mgAlignedMsg"></span>
@@ -1162,30 +1004,21 @@
              title="Trascina per ridimensionare — doppio clic per la misura iniziale"
              aria-label="Ridimensiona lista e dettaglio"></div>
 
-        <!-- Colonna centrale: dettaglio -->
         <div class="mg-col" id="mgDetailCol">
           <div class="mg-detail-empty" id="mgDetailEmpty">
             Seleziona un feedback dalla lista
           </div>
           <div class="mg-detail" id="mgDetail" hidden>
             <div class="mg-detail-head" id="mgDetailHead"></div>
-            <!-- I cinque livelli di sicurezza, in fila: triangolo, cerchi,
-                 rombo, pentagono, quadrato. Ogni forma cliccata si apre nel
-                 pannello di destra. Nient'altro: lo stato lo dicono il colore
-                 della scheda a sinistra e le forme, e le decisioni prese
-                 (attacco confermato, bocciatura della sicurezza) si leggono
-                 nel pannello del triangolo. -->
+            <!-- Ogni forma cliccata si apre nel pannello di destra, e le decisioni già prese si leggono in quello del triangolo. -->
             <div class="mg-livelli-row" id="mgLivelliRow">
               <span class="mg-forme" id="mgForme"></span>
             </div>
-            <!-- Avanzamento della lavorazione (solo working/revision_*): i tre
-                 passaggi dell'iter + se un'istanza ci lavora in questo momento. -->
+            <!-- Avanzamento della lavorazione: i tre passaggi dell'iter e se un'istanza ci sta lavorando adesso. -->
             <div class="mg-work-state" id="mgWorkState" hidden></div>
             <div class="mg-thread" id="mgThread"></div>
-            <!-- Risposta ai chiarimenti (owner-only): per i feedback in stato
-                 `clarify`, l'owner risponde alle domande di Filo; la risposta
-                 si aggiunge alle note e il feedback rientra in coda (todo).
-                 Sta sopra la barra perché risponde alla conversazione. -->
+            <!-- Risposta ai chiarimenti: sui feedback in `clarify` l'owner risponde alle domande di Filo, la risposta si
+               aggiunge alle note e il feedback rientra in coda. Sta sopra la barra perché risponde alla conversazione. -->
             <div class="mg-actions" id="mgClarify" hidden>
               <textarea id="mgClarifyText" class="mg-accept-comment" rows="3"
                 placeholder="Rispondi alle domande di Filo qui sopra…"></textarea>
@@ -1195,46 +1028,27 @@
               </div>
             </div>
 
-            <!-- ── La barra dell'owner: UNA riga per tutti i tasti ───────────
-                 Prima erano tre blocchi impilati (azioni di stato, frase per
-                 chi ha segnalato, preferito) e il dettaglio ci finiva sotto:
-                 la conversazione — la cosa che si legge — restava schiacciata
-                 in alto. Ora i tasti stanno tutti sulla stessa riga e i moduli
-                 che ne dipendono (riapertura, frase) si aprono sotto solo
-                 quando li si chiede. -->
+            <!-- Tutti i tasti dell'owner su UNA riga: impilati in tre blocchi schiacciavano in alto la conversazione. -->
             <div class="mg-owner" id="mgOwnerBar" hidden>
-              <!-- Il commento di revisione accompagna le decisioni sui
-                   Ricevuti: sta SOPRA la riga, perché è ciò che il tasto
-                   spedisce. Altrove è nascosto. -->
+              <!-- Il commento di revisione sta SOPRA la riga, perché è ciò che il tasto spedisce. Altrove è nascosto. -->
               <textarea id="mgAcceptComment" class="mg-accept-comment" rows="2"
                 placeholder="Commento (opzionale): perché lo sblocchi…" hidden></textarea>
 
               <div class="mg-owner-row">
-                <!-- Azioni di stato (owner-only): quali siano lo dice la
-                     tabella condivisa (MR.ownerActions), non questa pagina. Il
-                     gruppo sparisce quando lo stato non si legge: i pulsanti
-                     nascono dallo stato, e su una segnalazione cifrata la
-                     macchina se lo inventa. I pulsanti li GENERA la pagina
-                     dentro mgActionsRow; il messaggio d'esito resta in coda. -->
+                <!-- Quali siano le azioni di stato lo dice la tabella condivisa MR.ownerActions, non questa pagina. Il gruppo
+                   sparisce quando lo stato non si legge: su una segnalazione cifrata la macchina se lo inventerebbe. -->
                 <div class="mg-actions-group" id="mgActions" hidden>
                   <div class="mg-actions-row" id="mgActionsRow"></div>
                 </div>
 
-                <!-- Preferito ⭐ e frase: flag e testo in CHIARO, indipendenti
-                     dallo stato — per questo restano anche quando le azioni di
-                     stato spariscono. Archivia/Ripristina invece è un'azione di
-                     stato e vive nella riga generata qui accanto. -->
+                <!-- Preferito e frase sono flag e testo in CHIARO, indipendenti dallo stato: restano anche quando le azioni
+                   di stato spariscono. Archivia/Ripristina invece è un'azione di stato e vive nella riga qui accanto. -->
                 <div class="mg-actions-group" id="mgManage" hidden>
                   <div class="mg-actions-row">
                     <button type="button" class="mg-star-btn" id="mgStarBtn"
                       aria-pressed="false" title="Aggiungi ai preferiti">☆ Preferito</button>
-                    <!-- Apre/chiude la frase per chi ha segnalato. Di base è
-                         chiusa: si scrive una volta sola, e da aperta occupava
-                         una fetta di dettaglio su ogni segnalazione aperta.
-                         Il nome per esteso stava largo il doppio di ogni altro
-                         tasto e mandava a capo la riga sulle segnalazioni con
-                         quattro azioni: qui c'è la parola, e cosa sia lo dicono
-                         l'hover e la riga dentro la sezione. -->
+                    <!-- La frase si scrive una volta sola, quindi di base è chiusa: da aperta occupava una fetta di dettaglio su
+                       ogni segnalazione. Il nome per esteso mandava a capo la riga: qui c'è la parola, il resto è nell'hover. -->
                     <button type="button" class="mg-star-btn mg-usernote-toggle" id="mgUserNoteToggle"
                       aria-expanded="false" aria-controls="mgUserNote"
                       title="Scrivi la riga che leggerà chi ha segnalato">Frase</button>
@@ -1242,31 +1056,22 @@
                 </div>
               </div>
 
-              <!-- Gli esiti stanno SOTTO la riga, non dentro: un messaggio
-                   lungo (una scrittura rifiutata, una chiave scaduta) si
-                   prendeva il posto dei tasti e li mandava a capo finché
-                   restava lì. -->
+              <!-- Gli esiti stanno SOTTO la riga: un messaggio lungo (una scrittura rifiutata, una chiave scaduta) si
+                 prendeva il posto dei tasti e li mandava a capo finché restava lì. -->
               <div class="mg-owner-msgs" id="mgOwnerMsgs" hidden>
                 <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
                 <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
               </div>
 
-              <!-- «Fondi senza chiedermelo»: il segno che dice al server di
-                   fondere il lavoro delle automazioni su questa pratica anche
-                   quando i controlli lo fermerebbero, senza aspettare il click.
-                   Sta su una riga SUA, sotto i tasti: nella riga dei tasti un
-                   nome per esteso mandava a capo tutto sulle segnalazioni con
-                   quattro azioni (è il caso della «Frase»), e qui il nome
-                   intero serve. Il testo e l'hover li compone il JS; la riga
-                   sparisce sulle pratiche chiuse, dove il segno non conta. -->
+              <!-- «Fondi senza chiedermelo» sta su una riga sua perché qui il nome intero serve, e nella riga dei tasti un
+                 nome per esteso manda a capo tutto. Testo e hover li compone il JS; sulle pratiche chiuse sparisce. -->
               <div class="mg-preapprove-line" id="mgPreapproveLine" hidden>
                 <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
                   aria-pressed="false" hidden>Fondi senza chiedermelo</button>
                 <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
               </div>
 
-              <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo
-                   appende alla conversazione, come la gemella. -->
+              <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo appende alla conversazione, come la gemella. -->
               <div class="mg-reopen" id="mgReopen" hidden>
                 <label class="mg-usernote-label" for="mgReopenText">Cosa non va / cosa manca</label>
                 <textarea id="mgReopenText" class="mg-accept-comment" rows="3"
@@ -1277,16 +1082,10 @@
                 </div>
               </div>
 
-              <!-- La frase per chi ha mandato il feedback (owner-only). È
-                   l'unico testo che il mittente legge quando il suo feedback
-                   viene risolto: il resto della conversazione è cifrato e la
-                   chiave ce l'ha solo l'owner. Si può scrivere su QUALUNQUE
-                   segnalazione — anche su una già chiusa, per correggerla
-                   dopo. Il tasto qui sopra la apre. -->
+              <!-- L'unico testo che il mittente legge quando il suo feedback viene risolto: il resto della conversazione è
+                 cifrato. Si può scrivere su QUALUNQUE segnalazione, anche su una già chiusa, per correggerla dopo. -->
               <div class="mg-usernote" id="mgUserNote" hidden>
-                <!-- Il nome per esteso vive qui, perché sulla riga il tasto è
-                     solo "Frase": aperta, la sezione dice di che frase si
-                     tratta e chi la leggerà. -->
+                <!-- Il nome per esteso vive qui, perché sulla riga il tasto è solo "Frase". -->
                 <label class="mg-usernote-label mg-usernote-hint" for="mgUserNoteText">Frase per chi
                   ha segnalato: è quello che legge quando il feedback si chiude</label>
                 <input type="text" id="mgUserNoteText" class="mg-accept-comment" maxlength="500"
@@ -1305,7 +1104,6 @@
              title="Trascina per ridimensionare — doppio clic per la misura iniziale"
              aria-label="Ridimensiona dettaglio e pannello laterale"></div>
 
-        <!-- Colonna destra: pannello variabile -->
         <div class="mg-col" id="mgSideCol">
           <div class="mg-side-empty" id="mgSideEmpty">
             Clicca una forma o il mittente
@@ -1322,7 +1120,6 @@
       </div>
     </section>
 
-    <!-- ═══ TAB STATISTICHE RED TEAM ════════════════════════════════════ -->
     <section class="mg-panel" id="panel-stats" data-panel="stats">
       <div class="mg-coming">
         <div class="mg-coming-icon">📊</div>
@@ -1330,22 +1127,16 @@
       </div>
     </section>
 
-    <!-- ═══ TAB MODELLI DI SUPPORTO (DD1) ═══════════════════════════════ -->
-    <!-- Un selettore a catena (modelChainEditor) per ciascuno slot di
-         supporto: sanitizer, giudici 1/2/3, giudice dinamico, giudice red-team,
-         giudice priorità.
-         La scelta viene salvata nel doc Firestore config/supportModels (owner-
-         gated) così è leggibile anche dal backend filo-security (DD3). -->
+    <!-- Un selettore a catena per ciascuno slot di supporto. La scelta va nel doc Firestore config/supportModels,
+       owner-gated, così la legge anche il backend filo-security. -->
     <section class="mg-panel" id="panel-models" data-panel="models">
       <div class="mg-support-models" id="mgSmSection">
 
-        <!-- Stato di caricamento / accesso negato -->
         <div class="mg-sm-loading" id="mgSmLoading">Caricamento…</div>
         <div class="mg-sm-denied" id="mgSmDenied" hidden>
           Questa sezione è riservata all'owner.
         </div>
 
-        <!-- Editor vero (nascosto finché non caricato) -->
         <div id="mgSmEditor" hidden>
           <h2>Modelli di supporto</h2>
           <p class="mg-sm-intro">
@@ -1355,7 +1146,7 @@
             tutto viene salvato nel cloud e letto dal backend di sicurezza.
           </p>
 
-          <!-- ── Chiave dei giudici (separata dal resto di Filo) ──────────── -->
+          <!-- Chiave dei giudici: separata dal resto di Filo. -->
           <section class="mg-sm-block" id="mgSmKeys">
             <h3>Chiave dei giudici</h3>
             <p class="mg-sm-block-desc">
@@ -1369,7 +1160,6 @@
             <input type="password" id="mgSmKeyOpenrouter" placeholder="sk-or-v1-…" autocomplete="off" />
           </section>
 
-          <!-- ── Registro modelli dei giudici (nickname → modello OpenRouter) ─ -->
           <section class="mg-sm-block" id="mgSmRegistry">
             <h3>Modelli dei giudici</h3>
             <p class="mg-sm-block-desc">
@@ -1382,13 +1172,11 @@
             </div>
           </section>
 
-          <!-- datalist dei nickname per i dropdown del modelChainEditor (id letto
-               da SN_MODEL_CHAIN). Popolata da manage.js dal registro giudici. -->
+          <!-- Datalist dei nickname per i dropdown del modelChainEditor, popolata da manage.js dal registro giudici. -->
           <datalist id="nicknames-list"></datalist>
 
           <h3 class="mg-sm-slots-title">Modello per ogni giudice</h3>
           <div class="mg-sm-slots" id="mgSmSlots">
-            <!-- Slot 1: sanitizer -->
             <div class="mg-sm-slot" data-slot="sanitizer">
               <label>Sanitizer feedback</label>
               <div class="mg-sm-chain-host" id="mgSmChain-sanitizer"></div>
@@ -1397,7 +1185,6 @@
               </span>
             </div>
 
-            <!-- Slot 2: judge1 -->
             <div class="mg-sm-slot" data-slot="judge1">
               <label>Giudice 1</label>
               <div class="mg-sm-chain-host" id="mgSmChain-judge1"></div>
@@ -1406,7 +1193,6 @@
               </span>
             </div>
 
-            <!-- Slot 3: judge2 -->
             <div class="mg-sm-slot" data-slot="judge2">
               <label>Giudice 2</label>
               <div class="mg-sm-chain-host" id="mgSmChain-judge2"></div>
@@ -1415,7 +1201,6 @@
               </span>
             </div>
 
-            <!-- Slot 4: judge3 -->
             <div class="mg-sm-slot" data-slot="judge3">
               <label>Giudice 3</label>
               <div class="mg-sm-chain-host" id="mgSmChain-judge3"></div>
@@ -1424,7 +1209,6 @@
               </span>
             </div>
 
-            <!-- Slot 5: judgeDynamic -->
             <div class="mg-sm-slot" data-slot="judgeDynamic">
               <label>Giudice dinamico</label>
               <div class="mg-sm-chain-host" id="mgSmChain-judgeDynamic"></div>
@@ -1433,7 +1217,6 @@
               </span>
             </div>
 
-            <!-- Slot 6: judgeRedTeam -->
             <div class="mg-sm-slot" data-slot="judgeRedTeam">
               <label>Giudice red-team</label>
               <div class="mg-sm-chain-host" id="mgSmChain-judgeRedTeam"></div>
@@ -1442,7 +1225,6 @@
               </span>
             </div>
 
-            <!-- Slot 7: judgePriority -->
             <div class="mg-sm-slot" data-slot="judgePriority">
               <label>Giudice priorità</label>
               <div class="mg-sm-chain-host" id="mgSmChain-judgePriority"></div>
@@ -1461,10 +1243,7 @@
       </div>
     </section>
 
-    <!-- ═══ TAB AUTOMAZIONI ══════════════════════════════════════════════ -->
-    <!-- Impostazioni dell'operatività automatica di Filo (owner-only). Qui vive
-         lo switch "Modalità automatica" (spostato dalla barra in alto) e i
-         parametri delle automazioni. Le altre impostazioni si aggiungono qui. -->
+    <!-- Operatività automatica di Filo: lo switch master e i parametri delle automazioni. -->
     <section class="mg-panel" id="panel-automation" data-panel="automation">
       <div class="mg-automation">
         <h2>Automazioni</h2>
@@ -1473,18 +1252,15 @@
           regola i parametri delle routine.
         </p>
 
-        <!-- Le fusioni ferme che NON nascono da una segnalazione (un ramo
-             locale chiuso con `npm run finish`, senza numero): non hanno una
-             scheda dove vivere, e senza questo elenco sparirebbero. Stessi
-             tasti Approva / Scarta delle altre. -->
+        <!-- Le fusioni ferme che NON nascono da una segnalazione (un ramo locale chiuso con `npm run finish`) non
+           hanno una scheda dove vivere: senza questo elenco sparirebbero. -->
         <div class="mg-merge-approvals" id="mgMergeApprovalsOrphans" hidden></div>
 
         <!-- La traccia delle fusioni già decise. -->
         <div class="mg-merge-approvals-recent" id="mgMergeApprovalsRecent" hidden></div>
 
-        <!-- Le fusioni avvenute SENZA chiedere: l'owner aveva messo il segno
-             sulla pratica, il server ha fuso da solo quando i controlli hanno
-             bloccato. È il controllo a posteriori, con l'elenco intero. -->
+        <!-- Fusioni avvenute SENZA chiedere, perché l'owner aveva messo il segno sulla pratica: è il controllo a
+           posteriori, con l'elenco intero. -->
         <div class="mg-merge-approvals-recent" id="mgMergeApprovalsPreapproved" hidden></div>
 
         <!-- Interruttore master delle routine autonome. -->
@@ -1503,7 +1279,6 @@
           </p>
         </section>
 
-        <!-- Modalità automatica: lo switch master (era nella barra in alto). -->
         <section class="mg-auto-block">
           <label class="mg-switch" id="mgAutoSwitch" title="Attiva o disattiva la modalità automatica di Filo">
             <span class="mg-switch-text">Modalità automatica</span>
@@ -1517,8 +1292,7 @@
             <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
           </p>
 
-          <!-- Chi può entrare in coda da solo, per categoria di mittente. Inerti
-               con l'automatica spenta: la classe li smorza e il JS li disabilita. -->
+          <!-- Chi può entrare in coda da solo, per categoria di mittente. Con l'automatica spenta sono inerti, e si vede. -->
           <div class="mg-auto-sub" id="mgAutoApproveBlock">
             <p class="mg-auto-sub-title">Entrano in coda da soli</p>
             <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
@@ -1569,8 +1343,7 @@
           </div>
         </section>
 
-        <!-- Esplorazione automatica a coda vuota (#448). Riguarda solo le
-             routine: con l'interruttore master spento è inerte, e si vede. -->
+        <!-- Esplorazione automatica a coda vuota: riguarda solo le routine, e col master spento è inerte. -->
         <section class="mg-auto-block" id="mgProberIdleBlock">
           <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
             <span class="mg-switch-text">Esplora quando la coda è vuota</span>
@@ -1584,9 +1357,7 @@
           </p>
         </section>
 
-        <!-- I tre bilanci dei giri di correzione (feedback #561): quanti
-             giri di correzione si pagano per livello di rilievo. Valgono solo se
-             le routine lavorano. -->
+        <!-- Quanti giri di correzione si pagano per livello di rilievo. Valgono solo se le routine lavorano. -->
         <section class="mg-auto-block" id="mgCap2Block">
           <label class="mg-auto-field-label" for="mgCap2">Correzioni per i difetti gravi (livello 3 e 2)</label>
           <p class="mg-auto-block-desc">
@@ -1668,10 +1439,8 @@
       </div>
     </section>
 
-    <!-- ═══ TAB LOG (worker delle routine) ══════════════════════════════ -->
-    <!-- Elenco degli ultimi worker spawnati dalle routine cloud: per ciascuno
-         il ruolo e quando è partito. Sola lettura; la fonte è config/automation
-         (campo workerLog), scritto da scripts/dispatch.mjs a ogni spawn. -->
+    <!-- Gli ultimi worker spawnati dalle routine cloud, in sola lettura: la fonte è config/automation (campo
+       workerLog), che scrive scripts/dispatch.mjs a ogni spawn. -->
     <section class="mg-panel" id="panel-log" data-panel="log">
       <div class="mg-log">
         <h2>Log dei worker</h2>
@@ -1688,12 +1457,8 @@
         </div>
         <ul class="mg-log-list" id="mgLogList" hidden></ul>
 
-        <!-- Il canale autenticato delle routine. Due registri:
-             · i RIFIUTI — una richiesta fuori dal perimetro del biglietto è il
-               segnale che qualcuno ha manipolato un lavoratore, ed è
-               esattamente ciò che si vuole scoprire;
-             · i CONFRONTI — finché il canale affianca il vecchio cammino, qui si
-               vede se il server e le routine scelgono lo stesso lavoro. -->
+        <!-- Due registri: i RIFIUTI, cioè le richieste fuori dal perimetro del biglietto, segnale che qualcuno ha
+           manipolato un lavoratore; e i CONFRONTI fra la scelta del server e quella delle routine. -->
         <div class="mg-log-section" id="mgChannelSection" hidden>
           <h3>Canale delle routine</h3>
           <p class="mg-log-intro">
@@ -1710,7 +1475,6 @@
 
   </main>
 
-  <!-- Lightbox -->
   <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
 
   <script src="manage.js"></script>

@@ -51,8 +51,6 @@
   flex: 1;
 }
 
-/* Icona SVG opzionale a sinistra dell'etichetta di un item. Box fisso 18px,
-   colore attenuato come le scorciatoie, allineata al testo. */
 .sn-menu-item-icon {
   flex: 0 0 auto;
   display: inline-flex;
@@ -128,7 +126,6 @@
 }
 .sn-menu-row-btn:disabled { cursor: not-allowed; }
 
-/* Sezione inline (es. spiegazione AI direttamente nel menu) */
 .sn-menu-inline {
   padding: 8px 12px;
   font-size: 12px;
@@ -138,8 +135,7 @@
   word-break: break-word;
   max-width: 320px;
 }
-/* Variante "explain" della sezione inline: testo a sinistra + freccetta a destra
-   che apre l'approfondimento. Il padding-right è ridotto per fare spazio. */
+/* Il padding-right è ridotto per fare spazio alla freccetta che apre l'approfondimento. */
 .sn-menu-inline.sn-menu-inline-explain {
   display: flex;
   align-items: flex-start;
@@ -178,7 +174,6 @@
   color: var(--sn-error);
 }
 
-/* Item "Incolla" con freccetta dropdown a destra */
 .sn-menu-paste {
   display: flex;
   align-items: stretch;
@@ -223,8 +218,7 @@
   color: var(--sn-fg);
 }
 
-/* Item "Split" generico (main + freccetta che apre subItems). Usato per
-   Spiega ▸ approfondisci, Detta ▸ scegli modello, ecc. */
+/* Item "split" generico: main più freccetta che apre i subItems (Spiega ▸ approfondisci, Detta ▸ modello). */
 .sn-menu-split {
   display: flex;
   align-items: stretch;
@@ -275,7 +269,6 @@
   color: var(--sn-fg);
 }
 
-/* Riga icone globali (overflow button distinto) */
 .sn-menu-row-btn.sn-menu-row-overflow {
   border-left: 1px solid var(--sn-border);
   color: var(--sn-muted);
@@ -286,8 +279,6 @@
   pointer-events: none;
 }
 
-/* Item "Correzione" (parola corretta + freccetta sotto-menu).
-   Stessa struttura visuale dell'item Incolla, con un accento sulla parola corretta. */
 .sn-menu-correction {
   display: flex;
   align-items: stretch;
@@ -340,13 +331,11 @@
   color: var(--sn-muted);
 }
 
-/* Sotto-menu cronologia */
 .sn-menu-sub {
   min-width: 200px;
   max-width: 320px;
 }
 
-/* Cronologia incolla: lista scorrevole + barra di ricerca in basso */
 .sn-menu-history-sub {
   display: flex;
   flex-direction: column;
@@ -384,7 +373,6 @@
 .sn-menu-history-search-input:focus {
   border-color: var(--sn-accent);
 }
-/* Voce della cronologia: riga con zona "incolla" (flessibile) + "×" rimuovi. */
 .sn-menu-history-item {
   display: flex;
   align-items: stretch;
@@ -398,8 +386,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* "×" per rimuovere una singola voce. Sempre visibile (scopribile anche al
-   tocco), attenuato, si accende in hover. */
+/* Sempre visibile, così si scopre anche al tocco; attenuato, si accende in hover. */
 .sn-menu-history-remove {
   all: unset;
   box-sizing: border-box;
@@ -417,7 +404,6 @@
   color: var(--sn-fg);
   background: rgba(var(--sn-accent-rgb), 0.35);
 }
-/* Footer "Svuota cronologia": azione distruttiva, separata da un bordo. */
 .sn-menu-history-clear {
   flex: 0 0 auto;
   border-top: 1px solid var(--sn-border);
@@ -435,9 +421,7 @@
   font-style: italic;
   font-size: 12px;
 }
-/* Riga informativa nei sotto-menu (es. spiegazione errore blu).
-   È un commento/spiegazione, non un'azione: lo rendiamo in corsivo per
-   distinguerlo visivamente dalle voci cliccabili del menu. */
+/* Una riga informativa non è un'azione: il corsivo la distingue dalle voci cliccabili del menu. */
 .sn-menu-info {
   padding: 8px 12px;
   font-size: 12px;
@@ -449,7 +433,6 @@
   max-width: 280px;
 }
 
-/* Avviso link sospetto dentro l'inline "Spiega link" */
 .sn-menu-link-warn {
   color: var(--sn-error, #b94a48);
   font-weight: 600;
@@ -461,9 +444,7 @@
   word-break: break-word;
 }
 
-/* ===========================================================================
-   Box "Modifica" — overlay modale per editing testo con diff + conferma.
-   =========================================================================== */
+/* Box "Modifica": overlay modale per editing testo con diff e conferma. */
 .sn-editbox-overlay {
   position: fixed;
   inset: 0;
@@ -594,7 +575,6 @@
   filter: brightness(1.05);
 }
 
-/* Diff inline (parola per parola) */
 .sn-diff-add {
   background: rgba(56, 161, 105, 0.18);
   color: var(--sn-fg);
@@ -614,7 +594,6 @@
   text-align: center;
 }
 
-/* Griglia icone "Altro…" (overflow) come sotto-menu della riga icone */
 .sn-menu-icon-grid {
   display: grid;
   grid-template-columns: repeat(var(--sn-icon-cols, 4), 36px);
@@ -647,7 +626,6 @@
 }
 .sn-menu-icon-btn:disabled { cursor: not-allowed; }
 
-/* Drag & drop (pointer-based) */
 .sn-menu-row-btn[data-sn-draggable="1"],
 .sn-menu-icon-btn[data-sn-draggable="1"] {
   cursor: grab;
@@ -682,7 +660,6 @@
   transition: transform 80ms ease-out;
 }
 
-/* Tooltip custom, stile coerente con il menu */
 .sn-tooltip {
   position: fixed;
   z-index: 2147483647;
@@ -702,7 +679,6 @@
   animation: sn-fade-in 80ms ease-out;
 }
 
-/* Scrollbar Filo nei componenti iniettati (menu, editbox, submenu) */
 .sn-editbox-original,
 .sn-editbox-proposed,
 .sn-menu-sub,
