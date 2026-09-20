@@ -73,9 +73,50 @@ const BLOCCHI = new Set([
   'tbody', 'tfoot', 'tr', 'form', 'fieldset', 'address', 'hr', 'details', 'summary',
 ]);
 
-// `[^>]*` e non un'alternativa con le virgolette: su HTML di sconosciuti un
-// gruppo ripetuto con rami sovrapposti può costare un tempo esponenziale.
-const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9:_-]*)([^>]*?)(\/?)>/g;
+const LETTERA = /[a-zA-Z]/;
+
+/**
+ * Il prossimo tag a partire da `da`, cercato con due indexOf. PURA.
+ *
+ * Con una regex un `<` senza il suo `>` costringeva a riscandire fino in fondo
+ * a ogni tentativo: una coda di tag mai chiusi faceva crescere il costo col
+ * QUADRATO della pagina, e 256 KB scritti così tenevano ferma l'app per quasi
+ * un minuto (#553). Qui ogni carattere si guarda una volta sola.
+ *
+ * `salta` è un commento o una dichiarazione: non è testo e non è un elemento.
+ * `troncato` è un tag che non chiude mai: da lì in poi la pagina è dentro di
+ * lui, come per un browser, e non va consegnata al modello come se fosse testo.
+ */
+function prossimoTag(src, da) {
+  let i = da;
+  for (;;) {
+    const apre = src.indexOf('<', i);
+    if (apre < 0) return null;
+    if (src[apre + 1] === '!' || src[apre + 1] === '?') {
+      if (src.startsWith('<!--', apre)) {
+        const fine = src.indexOf('-->', apre + 4);
+        if (fine < 0) return { inizio: apre, troncato: true };
+        i = fine + 3;
+        return { inizio: apre, fine: i, salta: true };
+      }
+      const chiude = src.indexOf('>', apre + 2);
+      if (chiude < 0) return { inizio: apre, troncato: true };
+      return { inizio: apre, fine: chiude + 1, salta: true };
+    }
+    const chiusura = src[apre + 1] === '/';
+    const primo = src[apre + (chiusura ? 2 : 1)];
+    if (!primo || !LETTERA.test(primo)) { i = apre + 1; continue; }
+    const chiude = src.indexOf('>', apre + 1);
+    if (chiude < 0) return { inizio: apre, troncato: true };
+    const corpo = src.slice(apre + (chiusura ? 2 : 1), chiude);
+    const m = /^([a-zA-Z][a-zA-Z0-9:_-]*)([\s\S]*)$/.exec(corpo);
+    if (!m) { i = apre + 1; continue; }
+    return {
+      inizio: apre, fine: chiude + 1, chiusura, nome: m[1].toLowerCase(),
+      attrsRaw: m[2], autochiuso: /\/\s*$/.test(m[2]),
+    };
+  }
+}
 
 function attributi(raw) {
   const out = {};
