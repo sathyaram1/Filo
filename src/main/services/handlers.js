@@ -1347,11 +1347,6 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
         + 'Non era fra le cose che gli hai chiesto. Permetteglielo solo se te l’aspettavi.\n\n';
     }
   }
-  // Il sì dell'utente allarga il perimetro di QUELLA uscita e solo per QUESTO
-  // compito: il turno può proseguire senza richiedere un permesso già dato.
-  if (confirmed && !verdettoPerimetro.ok && task && Compiti) {
-    Compiti.allarga(task, verdettoPerimetro.uscita, 'confermata dall’utente');
-  }
   // PULISCI_TAB e CANCELLA_ARCHIVIO hanno già un flusso di conferma dedicato
   // lato client (bottone → RUN_TAB_TRIAGE / pannello eliminazione): restano
   // `kept` come prima e la conferma la gestisce la loro UI specifica.
