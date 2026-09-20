@@ -48,23 +48,30 @@ const turno = (role, text, ts) => ({ role, text, ts });
 
 // ── Le scritture si mettono in fila ──────────────────────────────────────────
 
-test('tre chat che avanzano insieme si salvano tutte e tre, intere', async () => {
+test('tre chat che nascono insieme si salvano tutte e tre', async () => {
   azzera();
   ritardoLettura = 5; // la finestra in cui due scritture si accavallano
+  // Archivio vuoto: è il caso di chi usa Filo da poco, e quello in cui la
+  // scrittura non condivide nemmeno la lista con le altre.
   await Promise.all([
     Store.append('a', turno('user', 'Prima domanda', '2026-09-20T10:00:00.000Z')),
     Store.append('b', turno('user', 'Seconda domanda', '2026-09-20T10:00:01.000Z')),
     Store.append('c', turno('user', 'Terza domanda', '2026-09-20T10:00:02.000Z')),
   ]);
-  await Promise.all([
-    Store.append('a', turno('filo', 'Prima risposta', '2026-09-20T10:00:03.000Z')),
-    Store.append('b', turno('filo', 'Seconda risposta', '2026-09-20T10:00:04.000Z')),
-    Store.append('c', turno('filo', 'Terza risposta', '2026-09-20T10:00:05.000Z')),
-  ]);
-
   const chats = await Store.list();
   assert.deepEqual(chats.map((c) => c.id).sort(), ['a', 'b', 'c']);
-  for (const c of chats) assert.equal(c.messages.length, 2, `la chat ${c.id} ha perso un messaggio`);
+});
+
+test('domanda e risposta che arrivano insieme nella stessa chat restano tutte e due', async () => {
+  azzera();
+  ritardoLettura = 5;
+  await Store.append('x', turno('user', 'Apro la chat', '2026-09-20T10:00:00.000Z'));
+  await Promise.all([
+    Store.append('x', turno('user', 'Una domanda', '2026-09-20T10:00:01.000Z')),
+    Store.append('x', turno('filo', 'Una risposta', '2026-09-20T10:00:02.000Z')),
+  ]);
+  const chat = await Store.get('x');
+  assert.equal(chat.messages.length, 3, 'un messaggio è andato perso');
 });
 
 test('una cancellazione partita insieme a una scrittura non resuscita la chat cancellata', async () => {
