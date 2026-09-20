@@ -738,25 +738,42 @@
     el.classList.toggle('mg-err', kind === 'err');
   }
 
-  function reflectSessions(raw) {
+  function reflectSessions(raw, letto) {
     if (!RS) return;
     sessionsState = RS.leggiDoc(raw);
-    if (mgMaxSessions) mgMaxSessions.value = String(sessionsState.maxSessions);
-    for (const r of mgPriorityRadios) r.checked = r.value === sessionsState.priorityAccount;
+    sessionsLetto = letto !== false;
+    // Non letto = campo vuoto, come i bilanci qui sotto: un numero scritto lì
+    // dentro verrebbe preso per quello del server.
+    if (mgMaxSessions) mgMaxSessions.value = sessionsLetto ? String(sessionsState.maxSessions) : '';
+    for (const r of mgPriorityRadios) r.checked = sessionsLetto && r.value === sessionsState.priorityAccount;
     if (mgAccountA) mgAccountA.checked = !sessionsState.accountAOff;
     if (mgAccountB) mgAccountB.checked = !sessionsState.accountBOff;
-    // Escludere il prioritario va bene (il server passa all'altro); escluderli
-    // tutti e due ferma tutto, ed è l'unico caso che va detto.
-    if (mgAccountsWarn) mgAccountsWarn.hidden = !RS.nessunAccount(sessionsState);
+    // Esclusi tutti e due non parte niente; escluso il solo prioritario si
+    // lavora sull'altro. Due stati che a guardare gli interruttori non si
+    // capiscono, quindi si scrivono.
+    const resta = RS.prioritarioIgnorato(sessionsState);
+    if (mgAccountsWarn) mgAccountsWarn.hidden = !sessionsLetto || !RS.nessunAccount(sessionsState);
+    if (mgPriorityWarn) {
+      mgPriorityWarn.hidden = !sessionsLetto || !resta;
+      if (resta) mgPriorityWarn.textContent = `L'account ${sessionsState.priorityAccount} è escluso: le sessioni partono da ${resta}.`;
+    }
+  }
+
+  function sessionsNonLette() {
+    reflectSessions({}, false);
+    for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
+      setSessionsMsg(el, SESSIONS_NON_LETTO, 'err');
+    }
   }
 
   async function loadSessions() {
     if (!RS) return;
     try {
       const r = await sendToMain({ type: SESSIONS_GET });
-      reflectSessions(r && r.ok ? r : {});
+      if (r && r.ok) reflectSessions(r);
+      else sessionsNonLette();
     } catch (_) {
-      reflectSessions({});
+      sessionsNonLette();
     }
   }
 
