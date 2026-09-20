@@ -61,7 +61,11 @@ test('la cosa dichiarata accanto a una che è stata fatta non sparisce', () => {
   // nessuno lo dice. È la stessa porta del giro 3, con il verbo senza pronome.
   const conSveglia = [{ type: 'SVEGLIA', _executed: true }];
   expect(ids('Ti ho messo la sveglia alle 19 e ti ho segnato la spesa.', conSveglia)).not.toEqual([]);
-  expect(ids('Ho messo la sveglia alle 19 e ti ho scritto la lista della spesa.', conSveglia)).not.toEqual([]);
+  expect(ids('Ti ho appuntato la spesa e ti ho messo la sveglia alle 19.', conSveglia)).not.toEqual([]);
+  // «Ti ho scritto la lista della spesa» resta fuori, per scelta: è la stessa
+  // frase di «ti ho scritto la mail di scuse», che il giro 2 ha chiuso come
+  // falso allarme. Fra tacere e avere torto, si tace.
+  expect(ids('Ti ho scritto la mail di scuse.', conSveglia)).toEqual([]);
 });
 
 test('una congiunzione non è una negazione: la dichiarazione dopo si guarda', () => {
