@@ -66,8 +66,9 @@
     }
     /* Una chat non è una chip: ha un titolo e un frammento da leggere, quindi è una riga a tutta larghezza.
        Le conversazioni si vedono, i comandi stanno sotto l'interruttore: non è per quelli che si apre la pagina. */
-    /* Un `display` in una classe batte il display:none di [hidden]: senza questa riga la sezione resta a schermo
-       anche quando la pagina la nasconde. Vedi patterns/una-classe-che-scrive-display-deve-lasciarsi-nascondere.md */
+
+    /* Senza questa riga la sezione resta a schermo anche quando la pagina la nasconde:
+       patterns/una-classe-che-scrive-display-deve-lasciarsi-nascondere.md */
     .arc-section[hidden] { display: none; }
     .arc-section {
       display: flex; align-items: baseline; gap: 12px;
