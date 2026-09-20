@@ -175,7 +175,7 @@ export function descriviEsitoServer(esito) {
   const e = esito || {};
   switch (e.stato) {
     case 'passphrase-assente':
-      return 'Il server non è stato nemmeno interrogato: FILO_BUILD_PASSPHRASE è assente dal job.';
+      return 'La costruzione non ha nemmeno interrogato il server: FILO_BUILD_PASSPHRASE è assente dal job.';
     case 'rifiutato':
       return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata.`;
     case 'http':
