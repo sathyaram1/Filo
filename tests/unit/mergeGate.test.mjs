@@ -91,10 +91,19 @@ function fintoServer(risposta, status = 200) {
  */
 function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
   const casa = cartellaTemporanea('filo-mg-client-');
+  // Un deposito vero, con un commit: la richiesta di fusione dichiara il
+  // COMMIT da fondere e si ferma se non riesce a leggerlo o se la directory
+  // ha roba fuori dai commit (#485). Una cartella qualunque non è più un
+  // ambiente in cui il gate possa lavorare, e non lo è nemmeno nel giro vero.
+  const g = (a) => execFileSync('git', a, { cwd: casa, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  g(['init', '-q', '--initial-branch=main']);
+  g(['config', 'user.email', 't@t']);
+  g(['config', 'user.name', 't']);
+  g(['commit', '-q', '--allow-empty', '-m', 'base']);
   const env = {
     ...process.env,
     FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
-    FILO_REPO_ROOT: casa, // il biglietto si cerca qui: cartella pulita
+    FILO_REPO_ROOT: casa, // il biglietto si cerca qui: deposito pulito
   };
   if (ticket) env.FILO_ROUTINE_TICKET = ticket;
   else delete env.FILO_ROUTINE_TICKET;
