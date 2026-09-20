@@ -699,6 +699,9 @@
     const oraDecide = (fam, d) => {
       const creazione = fam.oreProva || (fam.pronome && VERBI_CHE_CREANO.has(d.verbo));
       if (!fam.orari || !creazione) return null;
+      // Le sveglie vere non le sappiamo: l'ora non è una prova né in un senso
+      // né nell'altro.
+      if (!sveglieNote) return null;
       // Un'azione di questa famiglia sta aspettando l'utente: l'effetto non
       // c'è ancora, e l'ora non può fare da prova.
       if (attesa.size && (fam.pronome || fam.tipi.some((x) => attesa.has(x)))) return null;
