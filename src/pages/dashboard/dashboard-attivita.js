@@ -237,12 +237,27 @@
   // Come si chiama la pagina che Filo sta leggendo: il titolo se è già
   // arrivato, altrimenti il dominio — «Leggo la pagina: …» senza niente dopo
   // non dice all'utente dove Filo sia andato a leggere.
+  // Il titolo lo scrive chi possiede il sito, quindi da solo non dice dove Filo
+  // sia andato a leggere e può anche fingersi una pagina di Filo: davanti va
+  // sempre il nome del sito.
   function etichettaPagina(a) {
+    const url = indirizzoLetto(a);
+    const sito = nomeSito(url);
     const titolo = String((a && a._output && a._output.title) || '').trim();
-    if (titolo) return titolo.length > 70 ? `${titolo.slice(0, 67)}…` : titolo;
-    const url = String((a && (a.url || a.href || a.link)) || '').trim();
-    if (!url) return 'una pagina';
-    try { return new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`).host; } catch (_) { return url; }
+    const breve = titolo.length > 60 ? `${titolo.slice(0, 57)}…` : titolo;
+    if (sito && breve) return `${sito} · ${breve}`;
+    return sito || breve || 'una pagina';
+  }
+
+  function indirizzoLetto(a) {
+    const dal = String((a && a._output && a._output.pageRead) || '').trim();
+    if (dal) return dal;
+    return (self.SN_URL_NAV && self.SN_URL_NAV.indirizzoAzione(a)) || '';
+  }
+
+  function nomeSito(url) {
+    if (!url) return '';
+    try { return new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`).host.replace(/^www\./, ''); } catch (_) { return url.slice(0, 60); }
   }
 
   // «Ha cercato sul web, impostato una sveglia e letto un documento»: il
@@ -657,10 +672,11 @@
   // niente pill né bordo, così l'unica cosa cliccabile nella conversazione resta
   // il risultato vero (il link aperto). Prima queste tracce avevano la stessa
   // forma dei bottoni e l'utente ne contava due per una singola azione.
-  function stepTrace(text) {
+  function stepTrace(text, titolo = '') {
     const el = document.createElement('div');
     el.className = 'dash-action-step';
     el.textContent = String(text || '').trim();
+    if (titolo) el.title = String(titolo);
     return el;
   }
 
@@ -859,7 +875,9 @@
       // Traccia del passo intermedio: Filo scarica una pagina web e ne legge il
       // testo. Il contenuto rientra nel turno successivo (auto-continue), dove
       // compare la risposta col dato vero.
-      return stepTrace(`📄 Leggo la pagina: ${etichettaPagina(a)}`);
+      // L'indirizzo per intero sotto il puntatore: la riga nomina il sito, ma
+      // due pagine dello stesso sito hanno lo stesso nome.
+      return stepTrace(`📄 Leggo la pagina: ${etichettaPagina(a)}`, indirizzoLetto(a));
     }
     if (type === 'CAPACITA_DETTAGLIO') {
       // Traccia del passo intermedio: Filo sta consultando il proprio manifesto

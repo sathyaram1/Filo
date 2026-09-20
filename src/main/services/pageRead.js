@@ -15,9 +15,17 @@ const { safeFetch } = require('./safe-fetch');
 // tabella di prezzi intera ci stanno. Oltre, si tronca e lo si DICHIARA.
 const MAX_TEXT_CHARS = 16000;
 
-// Tetto sullo SCARICAMENTO: una pagina vera sta in pochi MB, e un file enorme
-// dietro un indirizzo qualunque non deve poter bloccare il processo main.
-const MAX_BYTES = 5 * 1024 * 1024;
+// Tetto sullo SCARICAMENTO, lo stesso dei documenti letti dal disco: un
+// manuale o un contratto scansionato pesano più di qualche MB, e chi chiede
+// «leggi questo PDF» non deve avere due risposte diverse a seconda di dove
+// sta il file. Oltre il tetto si taglia e lo si DICHIARA: in silenzio il
+// modello risponderebbe sicuro su mezza pagina (#553).
+const MAX_BYTES = 25 * 1024 * 1024;
+
+// Tetto sull'HTML preso da una scheda già aperta. Lo stesso motivo del tetto
+// sullo scaricamento: l'estrazione costa circa un decimo di secondo per MB nel
+// processo main, e senza tetto una pagina enorme lo blocca.
+const MAX_HTML_CHARS = MAX_BYTES;
 
 const TIMEOUT_MS = 15000;
 
@@ -34,6 +42,15 @@ const TAG_FUORI = new Set([
 const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|sidebar|side-?bar|footer|site-?footer|page-?footer|header|site-?header|masthead|topbar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|banner|promo|promotion|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|comments?|comment-?list|disqus|related|related-?posts|recommended|widget|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
 
 const ROLE_RUMORE = /^(navigation|banner|contentinfo|complementary|search|dialog|alertdialog|menu|menubar|toolbar|tablist)$/i;
+
+// Intestazione e coda: del SITO sono cornice, dell'ARTICOLO sono contenuto (la
+// data, l'ora e la firma stanno lì su quasi ogni blog), e in una tabella sono i
+// nomi delle colonne, senza i quali i numeri sotto non si leggono più.
+const CORNICE_SITO = /^(header|site-?header|masthead|footer|site-?footer|page-?footer|banner|contentinfo|topbar|top-?nav)$/i;
+
+const TAG_TABELLA = new Set(['table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup', 'col']);
+
+const TAG_ZONA = new Set(['article', 'main']);
 
 const VUOTI = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 
@@ -60,14 +77,15 @@ function attributi(raw) {
 }
 
 /** Questo elemento è cornice del sito, non contenuto? PURA. */
-function daScartare(nome, attrs) {
-  if (TAG_FUORI.has(nome)) return true;
+function daScartare(nome, attrs, inZona = false) {
   if ('hidden' in attrs) return true;
   if (attrs['aria-hidden'] === 'true') return true;
-  if (attrs.role && ROLE_RUMORE.test(attrs.role)) return true;
   if (/display\s*:\s*none/i.test(attrs.style || '')) return true;
+  const esente = (t) => (inZona || TAG_TABELLA.has(nome)) && CORNICE_SITO.test(t);
+  if (TAG_FUORI.has(nome) && !esente(nome)) return true;
+  if (attrs.role && ROLE_RUMORE.test(attrs.role) && !esente(attrs.role)) return true;
   const token = `${attrs.class || ''} ${attrs.id || ''}`.split(/[\s]+/).filter(Boolean);
-  return token.some((t) => TOKEN_RUMORE.test(t));
+  return token.some((t) => TOKEN_RUMORE.test(t) && !esente(t));
 }
 
 const ENTITA = {
@@ -98,17 +116,18 @@ function decodeEntita(s) {
  * contenuto, tiene i confini fra blocchi e trasforma le voci di elenco in
  * righe. PURA.
  */
-function htmlATesto(html) {
-  const potato = passaggio(html, true);
+function htmlATesto(html, dentroZona = false) {
+  const potato = passaggio(html, true, dentroZona);
   // SE POTARE NON LASCIA NIENTE, NON SI POTA. L'HTML vero è pieno di tag mai
   // chiusi: un `<nav>` che non chiude si porta via tutta la pagina che viene
   // dopo, e il modello riceve il vuoto senza sapere che c'era del testo.
-  return potato || passaggio(html, false);
+  return potato || passaggio(html, false, dentroZona);
 }
 
-function passaggio(html, pota) {
+function passaggio(html, pota, dentroZona = false) {
   const src = String(html == null ? '' : html).replace(/<!--[\s\S]*?-->/g, '');
   const fuori = []; // pila degli elementi di cornice ancora aperti
+  const zone = []; // pila delle zone di contenuto (article/main) ancora aperte
   const pila = [];
   const pezzi = [];
   let i = 0;
@@ -127,7 +146,9 @@ function passaggio(html, pota) {
         continue;
       }
       pila.push(nome);
-      if (!fuori.length && pota && daScartare(nome, attributi(m[3]))) { fuori.push(pila.length); continue; }
+      const attrs = pota ? attributi(m[3]) : null;
+      if (!fuori.length && pota && daScartare(nome, attrs, dentroZona || zone.length > 0)) { fuori.push(pila.length); continue; }
+      if (!fuori.length && (TAG_ZONA.has(nome) || (attrs && attrs.role === 'main'))) zone.push(pila.length);
       if (fuori.length) continue;
       if (nome === 'li') pezzi.push('\n• ');
       else if (BLOCCHI.has(nome)) pezzi.push('\n');
@@ -140,6 +161,7 @@ function passaggio(html, pota) {
     if (dove >= 0) {
       pila.length = dove;
       while (fuori.length && fuori[fuori.length - 1] > pila.length) fuori.pop();
+      while (zone.length && zone[zone.length - 1] > pila.length) zone.pop();
     }
     if (fuori.length) continue;
     if (BLOCCHI.has(nome)) pezzi.push('\n');
@@ -213,7 +235,10 @@ function estraiContenuto(html) {
   const corpo = sottoalbero(src, (n) => n === 'body') ?? src;
   const zona = sottoalbero(corpo, (n, a) => n === 'main' || a.role === 'main')
     ?? sottoalbero(corpo, (n) => n === 'article');
-  let testo = htmlATesto(zona ?? corpo);
+  // Dentro la zona di contenuto già isolata l'intestazione è dell'articolo:
+  // il tag che la racchiudeva non c'è più, e senza questo il filtro la
+  // scambierebbe per quella del sito.
+  let testo = htmlATesto(zona ?? corpo, zona != null);
   // Sotto una ventina di caratteri la zona principale non è contenuto: è un
   // guscio che il JavaScript del sito riempirà. Il corpo intero contiene
   // comunque la zona, quindi ripiegare non perde niente: aggiunge rumore.
@@ -279,7 +304,7 @@ function stessoIndirizzo(a, b) {
 }
 
 const BASE = {
-  ok: false, url: '', title: '', text: '', truncated: false, bytes: 0,
+  ok: false, url: '', title: '', text: '', truncated: false, partial: false, bytes: 0,
   source: '', kind: '', empty: false, error: null, detail: '',
 };
 
@@ -288,8 +313,8 @@ const BASE = {
  * perché è qui che sta tutta la logica: gli unit test la esercitano per intero
  * senza aprire una connessione.
  */
-async function daContenuto({ url = '', contentType = '', buffer = null, status = 200 } = {}) {
-  const base = { ...BASE, url, source: 'rete', bytes: buffer ? buffer.length : 0 };
+async function daContenuto({ url = '', contentType = '', buffer = null, status = 200, partial = false } = {}) {
+  const base = { ...BASE, url, source: 'rete', bytes: buffer ? buffer.length : 0, partial: !!partial };
   if (status >= 400) {
     return { ...base, error: 'http_error', detail: `il sito ha risposto ${status}` };
   }
@@ -309,6 +334,12 @@ async function daContenuto({ url = '', contentType = '', buffer = null, status =
       const capped = tronca(testo);
       return { ...base, ok: true, kind: 'pdf', title: '', text: capped.text, truncated: capped.truncated };
     } catch (_) {
+      if (partial) {
+        return {
+          ...base, kind: 'pdf', error: 'too_large',
+          detail: `quel documento supera i ${Math.round(MAX_BYTES / (1024 * 1024))} MB e ne è arrivata solo una parte, troppo poco per leggerlo`,
+        };
+      }
       return { ...base, kind: 'pdf', error: 'pdf_failed', detail: 'il PDF è danneggiato o protetto da password' };
     }
   }
@@ -348,14 +379,31 @@ const MOTIVI_RETE = {
   'dns-empty': 'quel dominio non esiste',
 };
 
+// Con che faccia Filo bussa. Senza, parte il nome di serie di node, che i
+// filtri anti-bot riconoscono per primo e bloccano: Filo È un browser e nelle
+// sue schede si presenta già così (#553).
+function nomeBrowser() {
+  try {
+    const { session, app } = require('electron');
+    return String(session.defaultSession.getUserAgent() || app.userAgentFallback || '');
+  } catch (_) { return ''; }
+}
+
 async function scarica(url) {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
   try {
-    const r = await safeFetch(url, { signal: ac.signal, headers: { Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5' } });
+    const ua = nomeBrowser();
+    const headers = {
+      Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
+      'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
+      ...(ua ? { 'User-Agent': ua } : {}),
+    };
+    const r = await safeFetch(url, { signal: ac.signal, headers });
     const contentType = r.headers.get('content-type') || '';
     const pezzi = [];
     let totale = 0;
+    let tagliato = false;
     const reader = r.body?.getReader?.();
     if (reader) {
       for (;;) {
@@ -363,14 +411,17 @@ async function scarica(url) {
         if (done) break;
         pezzi.push(Buffer.from(value));
         totale += value.byteLength;
-        if (totale >= MAX_BYTES) { try { await reader.cancel(); } catch (_) {} break; }
+        if (totale >= MAX_BYTES) { tagliato = true; try { await reader.cancel(); } catch (_) {} break; }
       }
     } else {
       const ab = await r.arrayBuffer();
       pezzi.push(Buffer.from(ab));
       totale = pezzi[0].length;
+      tagliato = totale > MAX_BYTES;
     }
-    return { status: r.status, contentType, buffer: Buffer.concat(pezzi).subarray(0, MAX_BYTES) };
+    // `partial` viaggia con i byte: chi legge non ha altro modo di sapere che
+    // la pagina finisce perché è finito il tetto, non perché è finita lei.
+    return { status: r.status, contentType, buffer: Buffer.concat(pezzi).subarray(0, MAX_BYTES), partial: tagliato };
   } finally {
     clearTimeout(t);
   }
@@ -410,14 +461,19 @@ async function readPage(input, { leggiScheda = null } = {}) {
   if (typeof leggiScheda === 'function') {
     try {
       const reso = await leggiScheda(url);
-      const estratto = reso && reso.html ? estraiContenuto(reso.html) : null;
+      // Anche qui il tetto, e dichiarato: una scheda può contenere una pagina
+      // enorme quanto un file scaricato.
+      const grezzo = String((reso && reso.html) || '');
+      const mozzo = grezzo.length > MAX_HTML_CHARS;
+      const estratto = grezzo ? estraiContenuto(mozzo ? grezzo.slice(0, MAX_HTML_CHARS) : grezzo) : null;
       const testo = estratto ? estratto.testo : normalizzaTesto(reso && reso.text);
       if (testo) {
         const capped = tronca(testo);
+        const parziale = mozzo || !!(reso && reso.partial);
         return {
           ...BASE, ok: true, url, source: 'scheda', kind: 'html',
           title: String((reso && reso.title) || (estratto && estratto.titolo) || '').trim(),
-          text: capped.text, truncated: capped.truncated,
+          text: capped.text, truncated: capped.truncated, partial: parziale,
         };
       }
     } catch (_) {}
@@ -454,4 +510,5 @@ module.exports = {
   tronca,
   MAX_TEXT_CHARS,
   MAX_BYTES,
+  MAX_HTML_CHARS,
 };

@@ -1048,11 +1048,17 @@ async function testoDaSchedaAperta(url) {
         // L'HTML RESO, non `innerText`: così passa dalla stessa estrazione del
         // testo scaricato (fuori menu, pubblicità e piè di pagina) e intanto
         // porta dentro quello che ha costruito il JavaScript del sito.
+        // Il taglio lo fa la PAGINA, non il main: una pagina enorme non deve
+        // nemmeno attraversare il canale, e chi la scrive può decidere lei
+        // quanto è grande il proprio HTML.
+        const tetto = PR.MAX_HTML_CHARS;
         const html = await t.view.webContents.executeJavaScript(
-          '(function(){try{return document.documentElement.outerHTML||"";}catch(e){return "";}})()',
+          `(function(){try{return String(document.documentElement.outerHTML||"").slice(0, ${tetto + 1});}catch(e){return "";}})()`,
           true,
         );
-        if (typeof html === 'string' && html.trim()) return { html, title: t.title || '' };
+        if (typeof html === 'string' && html.trim()) {
+          return { html: html.slice(0, tetto), title: t.title || '', partial: html.length > tetto };
+        }
       } catch (_) {}
     }
   }
@@ -1345,7 +1351,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
         // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
         // cliccabile per riaprirlo (kept:true).
-        const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+        const url = globalThis.SN_URL_NAV.indirizzoAzione(action);
         if (!url) return { executed: false, kept: false };
         // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
         // iniettare istruzioni nel modello (prompt injection) per fargli aprire
@@ -1587,7 +1593,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // una clausola dentro la pagina poteva solo indovinare. Il testo torna
         // come `output` e rientra nel contesto nello stesso turno.
         // Sola lettura: non apre schede, non scrive, non esegue.
-        const url = action.url ?? action.href ?? action.link ?? action.indirizzo ?? action.pagina;
+        const url = globalThis.SN_URL_NAV.indirizzoAzione(action);
         let r = null;
         try {
           const PR = require('./pageRead');
@@ -1613,6 +1619,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             source: r.source || '',
             empty: !!r.empty,
             truncated: !!r.truncated,
+            partial: !!r.partial,
             text: r.text || '',
             error: r.error || null,
             detail: r.detail || '',
@@ -2145,6 +2152,17 @@ function documentReadsForPrompt(actions) {
 // leggeranno, e ci arriva perché un motore di ricerca l'ha messa in cima. La
 // cornice non può essere una riga fra parentesi quadre: quella la sa scrivere
 // anche la pagina.
+// Dove Filo si è fermato, e perché. Un taglio taciuto fa rispondere il modello
+// con sicurezza su mezza pagina, e nessuno se ne accorge (#553).
+function avvisoTaglio(out, cap) {
+  if (out.partial) {
+    return '\n…(pagina troppo grande: Filo ne ha letta solo la prima parte, il resto non l\'ha visto. '
+      + 'Dillo all\'utente se la risposta dipende da quello che manca.)';
+  }
+  if (out.truncated) return `\n…(pagina troncata${cap ? `: letto fino a qui, i primi ${cap} caratteri` : ''})`;
+  return '';
+}
+
 function pageReadsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   let cap = 0;
@@ -2178,7 +2196,7 @@ function pageReadsForPrompt(actions) {
     blocks.push(
       `[Pagina "${dove}"${titolo ? ` — ${titolo}` : ''}]\n`
       + E.imbusta({ tipo: 'PAGINA_WEB', testo: out.text, conIntestazione: true })
-      + (out.truncated ? `\n…(pagina troncata${cap ? `: letto fino a qui, i primi ${cap} caratteri` : ''})` : ''),
+      + avvisoTaglio(out, cap),
     );
   }
   return blocks.join('\n\n').trim();

@@ -50,8 +50,12 @@ function isPrivateAddr(ip) {
 }
 
 async function assertPublicHost(hostname) {
-  if (net.isIP(hostname)) {
-    if (isPrivateAddr(hostname)) throw new Error('blocked-private-address');
+  // URL tiene le parentesi quadre attorno a un IPv6: senza toglierle il
+  // controllo non lo riconosce come indirizzo e finisce a chiedere al DNS un
+  // nome che non esiste, bloccando per sbaglio anche gli IPv6 pubblici.
+  const nudo = String(hostname || '').replace(/^\[|\]$/g, '');
+  if (net.isIP(nudo)) {
+    if (isPrivateAddr(nudo)) throw new Error('blocked-private-address');
     return;
   }
   const h = String(hostname || '').toLowerCase();
