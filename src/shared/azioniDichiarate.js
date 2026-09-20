@@ -166,7 +166,8 @@
       tipi: ['EVENTO_CALENDARIO', 'SVEGLIA'],
       avviso: 'l\'evento non è in calendario',
       frasi: [
-        /\bho (?:aggiunto|messo|creato|segnato|inserito)\b[^.!?\n]{0,32}\b(?:in calendario|nel calendario|l'evento|un evento)\b/i,
+        new RegExp(`\\bho (?:aggiunto|messo|creato|segnato|inserito)\\b[^.!?\\n]{0,32}\\b(?:in calendario|nel calendario|l${AP}evento|un evento)\\b`, 'i'),
+        new RegExp(`\\b(?:te |ve )?l${AP}ho (?:aggiunt|mess|segnat|inserit)[oa]\\b[^.!?\\n]{0,32}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
       ],
     },
     {
