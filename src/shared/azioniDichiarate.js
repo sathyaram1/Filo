@@ -136,9 +136,13 @@
     {
       id: 'appunto',
       tipi: ['SALVA_APPUNTO', 'SALVA_LEZIONE'],
+      // Un appunto che ESISTE già, salvato in una sessione precedente, regge la
+      // frase che lo racconta — se la frase lo nomina. Senza, in ogni chat
+      // nuova «l'ho salvato fra gli appunti della spesa» era un'accusa.
+      appunti: true,
       avviso: 'l\'appunto non c\'è',
       frasi: [
-        new RegExp(`${HO}(?:salvato|scritto|creato|aggiunto|annotato|preso|buttato\\s+giù)\\b${PONTE(48)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
+        new RegExp(`${HO}(?:salvato|scritto|creato|aggiunto|annotato|segnato|messo|preso|buttato\\s+giù)\\b${PONTE(48)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
         /\bme (?:lo|la|ne) sono (?:segnat|appuntat|annotat)[oa]\b/i,
         new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:salvat|scritt|annotat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
       ],
