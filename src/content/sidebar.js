@@ -638,6 +638,40 @@
     return `azione Filo: ${type.toLowerCase().replace(/_/g, ' ')}`;
   }
 
+  // Esito di LEGGI_PAGINA nella forma che il prompt si aspetta, qualunque cosa
+  // sia successa: l'agente deve poter dire all'utente perché non ha letto.
+  function esitoLettura(out, url, detail) {
+    const o = out || {};
+    return {
+      url: o.pageRead || url, title: o.title || '', text: o.text || '',
+      truncated: !!o.truncated, partial: !!o.partial, empty: !!o.empty,
+      error: o.error || (detail ? 'blocked' : null), detail: o.detail || detail || '',
+    };
+  }
+
+  async function leggiPaginaConFreno(url) {
+    const action = { type: 'LEGGI_PAGINA', url };
+    let res = null;
+    try { res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action }); } catch (_) {}
+    if (!res || !res.ok) return esitoLettura(null, url, 'la lettura è fallita per un errore di rete');
+    if (!res.needsConfirm) return esitoLettura(res.output, url);
+
+    const Ui = global.SN_CONFIRM_UI;
+    const opts = { title: 'Filo chiede conferma', text: res.describe || '' };
+    let ok = false;
+    try {
+      ok = Ui ? await (res.needsConfirm >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
+    } catch (_) { ok = false; }
+    if (!ok) {
+      appendActionLog('lettura pagina: annullata');
+      return esitoLettura(null, url, 'l\'utente non ha consentito questa lettura');
+    }
+    let c = null;
+    try { c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action }); } catch (_) {}
+    if (!c || !c.ok) return esitoLettura(null, url, 'la lettura è fallita per un errore di rete');
+    return esitoLettura(c.output, url);
+  }
+
   async function runFiloAction(action) {
     const label = filoActionLabel(action);
     let res = null;
@@ -1018,13 +1052,11 @@
         }
         if (session) session.pageReadCount += 1;
         appendActionLog(`leggo la pagina: ${Esterno.perCanaleSistema(parsed.url)}`);
-        let paginaLetta = null;
-        try {
-          const r = await chrome.runtime.sendMessage({ type: MSG.READ_PAGE, url: parsed.url });
-          paginaLetta = { ...(r || {}), url: (r && r.url) || parsed.url };
-        } catch (_) {
-          paginaLetta = { url: parsed.url, text: '', detail: 'la lettura è fallita per un errore di rete' };
-        }
+        // Dalla STESSA porta delle altre azioni di Filo (#553): il registro dei
+        // livelli e il freno anti-esfiltrazione valgono anche qui, e un
+        // indirizzo che porta fuori i dati dell'utente passa dal popup di
+        // conferma invece di partire da solo.
+        const paginaLetta = await leggiPaginaConFreno(parsed.url);
         // Il testo della pagina NON passa dal canale di sistema: la nota dice
         // soltanto che Filo è andato a leggere, e il testo viaggia a parte per
         // essere imbustato (#593).

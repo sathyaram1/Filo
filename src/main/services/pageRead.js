@@ -45,7 +45,9 @@ const TAG_FUORI = new Set([
 
 // Classi e id del rumore, confrontati come TOKEN INTERI: per sottostringa
 // `class="header-price"` contiene «header», e il prezzo sparirebbe in silenzio.
-const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|sidebar|side-?bar|footer|site-?footer|page-?footer|header|site-?header|masthead|topbar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|banner|promo|promotion|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|comments?|comment-?list|disqus|related|related-?posts|recommended|widget|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
+// I blocchi di commenti NON stanno qui: su una discussione o su una domanda con
+// le risposte sotto, il dato che l'utente cerca esiste solo lì (#553).
+const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|sidebar|side-?bar|footer|site-?footer|page-?footer|header|site-?header|masthead|topbar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|banner|promo|promotion|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|related|related-?posts|recommended|widget|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
 
 const ROLE_RUMORE = /^(navigation|banner|contentinfo|complementary|search|dialog|alertdialog|menu|menubar|toolbar|tablist)$/i;
 
@@ -74,6 +76,36 @@ const BLOCCHI = new Set([
 ]);
 
 const LETTERA = /[a-zA-Z]/;
+
+/**
+ * Dove finisce il tag aperto in `da`. PURA. Torna -1 se non finisce mai.
+ *
+ * Un `>` dentro un valore fra virgolette non chiude il tag: prenderlo per la
+ * fine spezzava l'elemento e faceva sbucare il resto dei suoi attributi in
+ * mezzo al testo consegnato al modello (#553). Come un browser, si entra fra
+ * le virgolette solo dove può esserci un valore, cioè dopo un `=`.
+ */
+function fineTag(src, da) {
+  let q = '';
+  let valore = false;
+  // Una virgoletta che non si chiude mai porterebbe via tutta la pagina: se il
+  // tag non finisce, vale il primo `>` incontrato dentro le virgolette.
+  let ripiego = -1;
+  for (let i = da; i < src.length; i++) {
+    const c = src[i];
+    if (q) {
+      if (c === q) q = '';
+      else if (c === '>' && ripiego < 0) ripiego = i;
+      continue;
+    }
+    if (c === '>') return i;
+    if (c === '=') { valore = true; continue; }
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f') continue;
+    if (valore && (c === '"' || c === '\'')) q = c;
+    valore = false;
+  }
+  return ripiego;
+}
 
 /**
  * Il prossimo tag a partire da `da`, cercato con due indexOf. PURA.
@@ -106,7 +138,7 @@ function prossimoTag(src, da) {
     const chiusura = src[apre + 1] === '/';
     const primo = src[apre + (chiusura ? 2 : 1)];
     if (!primo || !LETTERA.test(primo)) { i = apre + 1; continue; }
-    const chiude = src.indexOf('>', apre + 1);
+    const chiude = fineTag(src, apre + 1);
     if (chiude < 0) return { inizio: apre, troncato: true };
     const corpo = src.slice(apre + (chiusura ? 2 : 1), chiude);
     const m = /^([a-zA-Z][a-zA-Z0-9:_-]*)([\s\S]*)$/.exec(corpo);
@@ -149,13 +181,31 @@ function daScartare(nome, attrs, { inZona = false, primoLivello = false } = {}) 
   return token.some((t) => TOKEN_RUMORE.test(t) && !esente(t));
 }
 
+// I nomi delle entità dei caratteri 160-255, in ordine di codice. Senza questi
+// una pagina che scrive gli accenti in questa forma, e sono tante, arrivava al
+// modello con «Fran&ccedil;ois» al posto di «François» (#553).
+const LATIN1 = ('nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr '
+  + 'deg plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest '
+  + 'Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml '
+  + 'Igrave Iacute Icirc Iuml ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times '
+  + 'Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig '
+  + 'agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml '
+  + 'igrave iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide '
+  + 'oslash ugrave uacute ucirc uuml yacute thorn yuml').split(' ');
+
 const ENTITA = {
-  amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ', ndash: '–', mdash: '—',
-  laquo: '«', raquo: '»', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', hellip: '…',
-  euro: '€', pound: '£', yen: '¥', cent: '¢', deg: '°', middot: '·', bull: '•',
-  times: '×', divide: '÷', plusmn: '±', frac12: '½', copy: '©', reg: '®', trade: '™',
-  eacute: 'é', egrave: 'è', agrave: 'à', igrave: 'ì', ograve: 'ò', ugrave: 'ù',
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'',
+  ndash: '–', mdash: '—', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’',
+  sbquo: '‚', bdquo: '„', hellip: '…', bull: '•', dagger: '†', Dagger: '‡',
+  permil: '‰', lsaquo: '‹', rsaquo: '›', OElig: 'Œ', oelig: 'œ', Scaron: 'Š',
+  scaron: 'š', circ: 'ˆ', tilde: '˜', trade: '™', prime: '′', Prime: '″',
+  minus: '−', ne: '≠', le: '≤', ge: '≥', infin: '∞', rarr: '→', larr: '←',
+  euro: '€', ensp: ' ', emsp: ' ', thinsp: ' ', zwnj: '', zwj: '', shy: '',
 };
+LATIN1.forEach((nome, i) => { ENTITA[nome] = String.fromCharCode(160 + i); });
+// Lo spazio unificatore e il trattino morbido: nel testo valgono uno spazio e niente.
+ENTITA.nbsp = ' ';
+ENTITA.shy = '';
 
 /** Entità HTML → caratteri. PURA. */
 function decodeEntita(s) {
@@ -167,7 +217,8 @@ function decodeEntita(s) {
       if (!Number.isFinite(n) || n < 9 || n > 0x10ffff) return tutto;
       try { return String.fromCodePoint(n); } catch (_) { return tutto; }
     }
-    const v = ENTITA[corpo.toLowerCase()];
+    // Prima esatto: `&Eacute;` e `&eacute;` sono due lettere diverse.
+    const v = ENTITA[corpo] ?? ENTITA[corpo.toLowerCase()];
     return v === undefined ? tutto : v;
   });
 }

@@ -1603,7 +1603,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         let r = null;
         try {
           const PR = require('./pageRead');
-          r = await PR.readPage(url, { leggiScheda: testoDaSchedaAperta });
+          r = await PR.readPage(url, { leggiScheda: leggiSchedaPer(sender) });
         } catch (e) {
           console.warn('[Filo] lettura pagina fallita', e?.message || e);
         }
@@ -2147,6 +2147,19 @@ function documentReadsForPrompt(actions) {
     );
   }
   return blocks.join('\n\n').trim();
+}
+
+// Da una pagina web si legge dalla scheda solo QUELLA pagina: lì l'indirizzo lo
+// sceglie un modello che ha appena letto parole di altri, e di lì si arrivava al
+// contenuto di qualsiasi scheda aperta, posta e conti compresi (#553).
+function leggiSchedaPer(sender) {
+  // Senza mittente la richiesta non viene da una pagina: è Filo stesso.
+  if (!sender) return testoDaSchedaAperta;
+  const origin = String(sender.tab?.url || sender.url || '');
+  if (origin.startsWith('filo://')) return testoDaSchedaAperta;
+  if (!/^https?:/i.test(origin)) return null;
+  const PR = require('./pageRead');
+  return (url) => (PR.stessoIndirizzo(origin, url) ? testoDaSchedaAperta(url) : null);
 }
 
 // Re-immissione del TESTO di una pagina letta con LEGGI_PAGINA in un turno
@@ -3047,7 +3060,6 @@ const handlerCtx = {
   auditServedByLater,
   maybeCategorizeAsync,
   searchArchivedTabs,
-  testoDaSchedaAperta,
   handleFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
