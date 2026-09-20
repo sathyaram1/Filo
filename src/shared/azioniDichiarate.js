@@ -1112,6 +1112,11 @@
     // oppure una domanda dell'utente a cui sta rispondendo. Detta come una
     // cosa appena fatta, un'azione vecchia non la prova.
     const domanda = !!(stato && stato.domandaUtente);
+    // Giro 9 — l'utente ha chiesto ADESSO una cosa che solo uno strumento può
+    // fare? Tre valori: sì, no, e «non lo so» (chi non passa il messaggio).
+    // Vedi `richiestaDiAzione`.
+    const chiesto = (stato && typeof stato.richiestaAzione === 'boolean')
+      ? stato.richiestaAzione : null;
     const copertaDalPassato = (fam, d) => {
       // Giro 8: su questa famiglia l'avviso è già comparso in questa
       // conversazione. Quella cosa non è stata fatta, e nessuna azione
