@@ -18,7 +18,14 @@ test('scuro', async ({ app, shell }) => {
   await expect(page.locator('#input')).toBeVisible();
   await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
   await page.evaluate(() => {
-    const host = document.querySelector('#bubbles') || document.body;
+    document.body.dataset.state = 'thread';
+    document.getElementById('homeView').hidden = true;
+    document.getElementById('threadView').hidden = false;
+    const bolla = document.createElement('div');
+    bolla.className = 'dash-bubble dash-bubble-filo';
+    bolla.textContent = 'Ecco cosa ho fatto.';
+    document.getElementById('bubbles').appendChild(bolla);
+    const host = bolla;
     window.__filoDashActions.renderActions(host, [
       { type: 'ESEGUI_COMANDO', _executed: false, _output: { command: 'ls -la', blocked: 'disabled' } },
       { type: 'EVENTO_CALENDARIO', _executed: false, _output: { proposta: true, evento: { titolo: 'Riunione team', data: '2026-09-24', ora: '15:00', quando: '24/09/2026 alle 15:00' } } },
