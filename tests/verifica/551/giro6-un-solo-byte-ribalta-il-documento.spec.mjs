@@ -46,7 +46,7 @@ test('un estratto conto quasi tutto in UTF-8 non perde gli accenti per una riga 
     // una volta. Il file è per il 99,99% UTF-8 corretto.
     const righe = ['Data;Descrizione;Importo'];
     for (let i = 0; i < 150; i++) {
-      righe.push(`0${(i % 9) + 1}/03/2026;Rimborso — pratica ${100 + i};${(i * 3.5).toFixed(2)} €`);
+      righe.push(`0${(i % 9) + 1}/03/2026;Rimborso — pratica ${100 + i};${(i * 3.5).toFixed(2).replace('.', ',')} €`);
     }
     righe.push('30/03/2026;Commissione attività;-1,50 €');
     const buono = Buffer.from(`${righe.join('\n')}\n`, 'utf8');
