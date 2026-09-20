@@ -116,6 +116,14 @@ function decodeEntita(s) {
  * righe. PURA.
  */
 function htmlATesto(html) {
+  const potato = passaggio(html, true);
+  // SE POTARE NON LASCIA NIENTE, NON SI POTA. L'HTML vero è pieno di tag mai
+  // chiusi: un `<nav>` che non chiude si porta via tutta la pagina che viene
+  // dopo, e il modello riceve il vuoto senza sapere che c'era del testo.
+  return potato || passaggio(html, false);
+}
+
+function passaggio(html, pota) {
   const src = String(html == null ? '' : html).replace(/<!--[\s\S]*?-->/g, '');
   const fuori = []; // pila degli elementi di cornice ancora aperti
   const pila = [];
@@ -136,7 +144,7 @@ function htmlATesto(html) {
         continue;
       }
       pila.push(nome);
-      if (!fuori.length && daScartare(nome, attributi(m[3]))) { fuori.push(pila.length); continue; }
+      if (!fuori.length && pota && daScartare(nome, attributi(m[3]))) { fuori.push(pila.length); continue; }
       if (fuori.length) continue;
       if (nome === 'li') pezzi.push('\n• ');
       else if (BLOCCHI.has(nome)) pezzi.push('\n');
@@ -223,7 +231,10 @@ function estraiContenuto(html) {
   const zona = sottoalbero(corpo, (n, a) => n === 'main' || a.role === 'main')
     ?? sottoalbero(corpo, (n) => n === 'article');
   let testo = htmlATesto(zona ?? corpo);
-  if (zona != null && testo.length < 200) {
+  // Sotto una ventina di caratteri la zona principale non è contenuto: è un
+  // guscio che il JavaScript del sito riempirà. Il corpo intero contiene
+  // comunque la zona, quindi ripiegare non perde niente: aggiunge rumore.
+  if (zona != null && testo.length < 20) {
     const tutto = htmlATesto(corpo);
     if (tutto.length > testo.length) testo = tutto;
   }
