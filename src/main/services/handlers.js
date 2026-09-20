@@ -1231,10 +1231,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   // fallback strutturale (solo da origine non fidata) copre i dati cifrati. Se
   // sospetto, iniettiamo `_exfil` PRIMA del gate (mai dall'LLM): NAVIGA sale a
   // livello 2 e l'utente conferma vedendo l'URL completo. Vedi src/shared/urlExfil.js.
-  if (type === 'NAVIGA') {
+  // LEGGI_PAGINA passa dalla stessa guardia: la richiesta parte comunque, e un
+  // indirizzo che porta fuori dei dati li porta fuori anche senza aprire una
+  // scheda. Due cammini che fanno la stessa richiesta devono avere lo stesso
+  // freno.
+  if (type === 'NAVIGA' || type === 'LEGGI_PAGINA') {
     try {
       const Exfil = globalThis.SN_URL_EXFIL;
-      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+      const url = String(action.url ?? action.href ?? action.link ?? action.indirizzo ?? '').trim();
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
         const fromUntrusted = /^https?:/i.test(origin);
