@@ -224,3 +224,123 @@ test('il manifesto delle capacità dichiara che Filo legge i documenti', () => {
   // Il confine dichiarato: sulle scansioni non c'è testo da leggere.
   assert.match(cap.doesNot, /scansione|foto/i);
 });
+
+// ───────────── il nome QUASI giusto: trattini, accenti, maiuscole ────────────
+//
+// #551. Visto dal vivo: il terminale di Windows scriveva i nomi nella tabella
+// OEM, il modello ricopiava «SPECIFICHE SEO E METADATI - singolarita.txt» al
+// posto di «… — singolarita.txt» (trattino lungo) e la lettura falliva in modo
+// onesto su un nome mai esistito. Il guasto è chiuso a monte (terminal.js), ma
+// la stessa svista la fa un utente che il nome lo scrive a mano. La filosofia
+// di Filo è esplicita: un typo ogni tre parole non deve essere un problema.
+
+test('la chiave tollerante appiattisce trattini, accenti, maiuscole e spazi doppi', () => {
+  const atteso = DR.chiaveTollerante('SPECIFICHE SEO E METADATI - singolarita.txt');
+  // Trattino lungo, medio, «figura» e meno matematico: tutti lo stesso nome.
+  for (const trattino of ['—', '–', '‒', '−', '‐']) {
+    assert.equal(
+      DR.chiaveTollerante(`SPECIFICHE SEO E METADATI ${trattino} singolarita.txt`),
+      atteso,
+      `il trattino «${trattino}» doveva contare come «-»`,
+    );
+  }
+  // Maiuscole, accenti, spazi doppi.
+  assert.equal(DR.chiaveTollerante('Perché Più Caro.txt'), DR.chiaveTollerante('perche piu caro.txt'));
+  assert.equal(DR.chiaveTollerante('nota   di  credito.pdf'), DR.chiaveTollerante('nota di credito.pdf'));
+  // Due nomi davvero diversi restano diversi: la tolleranza non è un colabrodo.
+  assert.notEqual(DR.chiaveTollerante('bolletta.pdf'), DR.chiaveTollerante('bollette.pdf'));
+  assert.notEqual(DR.chiaveTollerante('conto.pdf'), DR.chiaveTollerante('conto.txt'));
+});
+
+test('un carattere di sostituzione vale come jolly, non come lettera', () => {
+  // «Singolarit<27>.txt» è com'è arrivato il nome dal terminale: sotto quel
+  // carattere c'era una «à» che nessuno può più ricostruire.
+  assert.equal(DR.nomiCombaciano('SPECIFICHE TIPOGRAFICHE - Singolarit�.txt',
+    'SPECIFICHE TIPOGRAFICHE — Singolarità.txt'), true);
+  assert.equal(DR.nomiCombaciano('Singolarit�.txt', 'Singolarità.txt'), true);
+  // Ma non deve mangiarsi mezzo nome fino a un file diverso.
+  assert.equal(DR.nomiCombaciano('Singolarit�.txt', 'Singolarità.pdf'), false);
+  assert.equal(DR.nomiCombaciano('Singolarit�.txt', 'Altro.txt'), false);
+});
+
+test('il file col trattino lungo si ritrova anche chiedendolo col trattino breve', async () => {
+  const dir = join(TMP, 'seo');
+  mkdirSync(dir, { recursive: true });
+  const vero = join(dir, 'SPECIFICHE SEO E METADATI — singolarita.txt');
+  writeFileSync(vero, 'titolo: la singolarità\nmeta: 155 caratteri\n', 'utf8');
+
+  // Il percorso esattamente com'era uscito storpiato dal terminale.
+  const r = await DR.readDocument(join(dir, 'SPECIFICHE SEO E METADATI - singolarita.txt'));
+  assert.equal(r.ok, true, `doveva ritrovarlo: ${r.detail}`);
+  assert.match(r.text, /155 caratteri/);
+  // E deve DIRE quale file ha aperto davvero, col nome vero.
+  assert.equal(r.name, 'SPECIFICHE SEO E METADATI — singolarita.txt');
+  assert.equal(r.path, vero);
+  assert.ok(r.requested.endsWith('SPECIFICHE SEO E METADATI - singolarita.txt'));
+});
+
+test('il file con la «à» si ritrova anche dal nome col carattere di sostituzione', async () => {
+  const dir = join(TMP, 'tipo');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'SPECIFICHE TIPOGRAFICHE — Singolarità.txt'), 'font: serif\n', 'utf8');
+  const r = await DR.readDocument(join(dir, 'SPECIFICHE TIPOGRAFICHE - Singolarit�.txt'));
+  assert.equal(r.ok, true, `doveva ritrovarlo: ${r.detail}`);
+  assert.match(r.text, /font: serif/);
+  assert.equal(r.name, 'SPECIFICHE TIPOGRAFICHE — Singolarità.txt');
+});
+
+test('anche la CARTELLA può avere il nome storpiato', async () => {
+  // La storpiatura non risparmia i nomi delle cartelle: fermarsi all'ultimo
+  // pezzo del percorso lascerebbe fuori metà dei casi veri.
+  const dir = join(TMP, 'Progetto — città');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'note.txt'), 'appunti del progetto', 'utf8');
+  const r = await DR.readDocument(join(TMP, 'Progetto - citta', 'note.txt'));
+  assert.equal(r.ok, true, `doveva ritrovarlo: ${r.detail}`);
+  assert.match(r.text, /appunti del progetto/);
+});
+
+test('quando il nome quasi giusto è giusto per DUE file, non si indovina', async () => {
+  const dir = join(TMP, 'ambigui');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'Relazione — città.txt'), 'primo', 'utf8');
+  writeFileSync(join(dir, 'RELAZIONE - CITTA.txt'), 'secondo', 'utf8');
+  const r = await DR.readDocument(join(dir, 'Relazione - citta.txt'));
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'not_found');
+  // Dirlo è la parte utile: il modello può chiedere all'utente quale intende.
+  assert.match(r.detail, /quasi uguale/);
+  assert.match(r.detail, /Relazione — città\.txt/);
+});
+
+test('un file che esiste davvero non passa mai dalla ricerca tollerante', async () => {
+  // Il percorso esatto vince sempre, anche se nella cartella c'è un omonimo
+  // che combacerebbe a meno degli accenti.
+  const dir = join(TMP, 'esatto');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'conto.txt'), 'quello giusto', 'utf8');
+  writeFileSync(join(dir, 'Cónto.txt'), 'quello sbagliato', 'utf8');
+  const r = await DR.readDocument(join(dir, 'conto.txt'));
+  assert.equal(r.ok, true);
+  assert.equal(r.text, 'quello giusto');
+  // Nessuna sostituzione avvenuta → niente da dichiarare.
+  assert.equal(r.requested, '');
+});
+
+test('un nome che non somiglia a niente resta un onesto «non c\'è»', async () => {
+  const dir = join(TMP, 'vuoto-quasi');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'bolletta.pdf'), 'x', 'utf8');
+  const r = await DR.readDocument(join(dir, 'contratto-affitto.pdf'));
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'not_found');
+  assert.equal(r.detail, 'a quel percorso non c\'è nessun file');
+});
+
+test('la ricerca tollerante non trasforma una cartella in un documento', async () => {
+  const dir = join(TMP, 'come-cartella');
+  mkdirSync(join(dir, 'Archivio — 2026'), { recursive: true });
+  const r = await DR.readDocument(join(dir, 'Archivio - 2026'));
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'is_directory');
+});
