@@ -191,7 +191,7 @@ test.describe('#533 giro 4 — quello che resta di una lettura, seconda mano', (
       });
       try {
         const r = await globalThis.SN_HANDLE_MESSAGE(
-          { type: globalThis.SN_MSG.FILO_GENERATE_DASHBOARD, force: true },
+          { type: globalThis.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true },
           null,
         );
         return (r && r.suggestions) || [];
