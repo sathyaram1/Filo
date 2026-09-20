@@ -58,6 +58,18 @@
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
+  // Come partono le sessioni delle routine: quante insieme, da quale account
+  // per prima, quali account sono esclusi.
+  const mgMaxSessions     = document.getElementById('mgMaxSessions');
+  const mgMaxSessionsSave = document.getElementById('mgMaxSessionsSave');
+  const mgMaxSessionsMsg  = document.getElementById('mgMaxSessionsMsg');
+  const mgPriorityAccountMsg = document.getElementById('mgPriorityAccountMsg');
+  const mgPriorityRadios  = Array.from(document.querySelectorAll('input[name="mgPriorityAccount"]'));
+  const mgAccountA        = document.getElementById('mgAccountA');
+  const mgAccountB        = document.getElementById('mgAccountB');
+  const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
+  const mgAccountsWarn    = document.getElementById('mgAccountsWarn');
+  const mgPriorityWarn    = document.getElementById('mgPriorityWarn');
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
@@ -542,6 +554,11 @@
       if (el) el.disabled = !isAdmin || !routinesOn;
     }
     if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
+    // Le sessioni NON dipendono dalle routine accese: escludere un account, o
+    // ridurre il parallelismo, si decide prima di riaccendere.
+    for (const el of [mgMaxSessions, mgMaxSessionsSave, mgAccountA, mgAccountB, ...mgPriorityRadios]) {
+      if (el) el.disabled = !isAdmin;
+    }
     if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
     if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
     applyAutoApproveGate();
@@ -692,6 +709,137 @@
   }
   if (mgFixInstructionsSave) mgFixInstructionsSave.addEventListener('click', saveFixInstructions);
   if (mgFixInstructions) mgFixInstructions.addEventListener('input', () => setCapMsg('fixInstructions', '', null));
+
+  // ── Come partono le sessioni delle routine ────────────────────────────────
+  // Quattro campi su config/routines che legge il server quando accende le
+  // sessioni. Restano manovrabili a routine spente: escludere un account è una
+  // cosa che si decide PRIMA di riaccendere.
+  const SESSIONS_GET = (window.SN_MSG?.MSG?.AUTOMATION_SESSIONS_GET) || 'automation_sessions_get';
+  const SESSIONS_SET = (window.SN_MSG?.MSG?.AUTOMATION_SESSIONS_SET) || 'automation_sessions_set';
+  const RS = window.SN_ROUTINE_SESSIONI;
+  // I limiti del campo vengono dal registro, non dall'HTML: scritti in due
+  // posti divergono e vince quello sbagliato.
+  if (mgMaxSessions && RS) {
+    const { min, max } = RS.limiti();
+    mgMaxSessions.min = String(min);
+    mgMaxSessions.max = String(max);
+  }
+
+  let sessionsState = RS ? RS.leggiDoc({}) : null;
+  // Finché non si è letto dal server, quello che si vede non è quello che c'è:
+  // la pagina lo dice invece di far passare i valori di partenza per veri.
+  let sessionsLetto = false;
+  const SESSIONS_NON_LETTO = 'Non ho potuto leggere dal server: quello che vedi qui non viene da lì.';
+
+  function setSessionsMsg(el, text, kind) {
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('mg-ok', kind === 'ok');
+    el.classList.toggle('mg-err', kind === 'err');
+  }
+
+  function reflectSessions(raw, letto) {
+    if (!RS) return;
+    sessionsState = RS.leggiDoc(raw);
+    sessionsLetto = letto !== false;
+    // Non letto = campo vuoto, come i bilanci qui sotto: un numero scritto lì
+    // dentro verrebbe preso per quello del server.
+    if (mgMaxSessions) mgMaxSessions.value = sessionsLetto ? String(sessionsState.maxSessions) : '';
+    for (const r of mgPriorityRadios) r.checked = sessionsLetto && r.value === sessionsState.priorityAccount;
+    if (mgAccountA) mgAccountA.checked = !sessionsState.accountAOff;
+    if (mgAccountB) mgAccountB.checked = !sessionsState.accountBOff;
+    // Esclusi tutti e due non parte niente; escluso il solo prioritario si
+    // lavora sull'altro. Due stati che a guardare gli interruttori non si
+    // capiscono, quindi si scrivono.
+    const resta = RS.prioritarioIgnorato(sessionsState);
+    if (mgAccountsWarn) mgAccountsWarn.hidden = !sessionsLetto || !RS.nessunAccount(sessionsState);
+    if (mgPriorityWarn) {
+      mgPriorityWarn.hidden = !sessionsLetto || !resta;
+      if (resta) mgPriorityWarn.textContent = `L'account ${sessionsState.priorityAccount} è escluso: le sessioni partono da ${resta}.`;
+    }
+  }
+
+  function sessionsNonLette() {
+    reflectSessions({}, false);
+    for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
+      setSessionsMsg(el, SESSIONS_NON_LETTO, 'err');
+    }
+  }
+
+  async function loadSessions() {
+    if (!RS) return;
+    try {
+      const r = await sendToMain({ type: SESSIONS_GET });
+      if (r && r.ok) reflectSessions(r);
+      else sessionsNonLette();
+    } catch (_) {
+      sessionsNonLette();
+    }
+  }
+
+  async function saveSessions(patch, msgEl) {
+    const esito = RS.valida(patch);
+    if (!esito.ok) {
+      setSessionsMsg(msgEl, esito.testo, 'err');
+      return false;
+    }
+    try {
+      const r = await sendToMain(Object.assign({ type: SESSIONS_SET }, esito.valori));
+      if (!r || !r.ok) {
+        // Non scritto = non cambiato: la pagina rimette quello che c'è sul
+        // server invece di mostrare una scelta che non è mai arrivata.
+        reflectSessions(sessionsState, sessionsLetto);
+        setSessionsMsg(msgEl, 'Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
+        if (r?.error) console.error('[manage] salvataggio sessioni:', r.error);
+        return false;
+      }
+      if (r.letto === false) {
+        // Scritto sì, riletto no: si tiene quello che è appena partito e si
+        // dice che il resto non si è potuto ricontrollare. Rimettere i valori
+        // di partenza qui spegnerebbe sullo schermo una scelta già salvata.
+        reflectSessions(Object.assign({}, sessionsState, esito.valori), sessionsLetto);
+        setSessionsMsg(msgEl, 'Salvato. Il resto non l\'ho potuto rileggere dal server.', 'ok');
+        return true;
+      }
+      reflectSessions(r);
+      setSessionsMsg(msgEl, 'Salvato.', 'ok');
+      return true;
+    } catch (err) {
+      reflectSessions(sessionsState, sessionsLetto);
+      setSessionsMsg(msgEl, 'Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
+      console.error('[manage] salvataggio sessioni fallito:', err);
+      return false;
+    }
+  }
+
+  if (mgMaxSessions) {
+    // Un campo numerico che contiene qualcosa che numero non è risponde
+    // `value === ''`: senza `badInput` si direbbe «vuoto» a chi ha scritto «tre».
+    const letto = () => (mgMaxSessions.validity && mgMaxSessions.validity.badInput ? 'NaN' : mgMaxSessions.value);
+    const salva = () => saveSessions({ maxSessions: letto() }, mgMaxSessionsMsg);
+    if (mgMaxSessionsSave) mgMaxSessionsSave.addEventListener('click', salva);
+    mgMaxSessions.addEventListener('input', () => setSessionsMsg(mgMaxSessionsMsg, '', null));
+    mgMaxSessions.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || mgMaxSessions.disabled) return;
+      e.preventDefault();
+      salva();
+    });
+  }
+
+  for (const radio of mgPriorityRadios) {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      saveSessions({ priorityAccount: radio.value }, mgPriorityAccountMsg);
+    });
+  }
+
+  for (const [el, campo] of [[mgAccountA, 'accountAOff'], [mgAccountB, 'accountBOff']]) {
+    if (!el) continue;
+    el.addEventListener('change', () => {
+      // Acceso = in uso, quindi l'interruttore e il campo dicono l'opposto.
+      saveSessions({ [campo]: !el.checked }, mgAccountsMsg);
+    });
+  }
 
 
   // ── Timeout dei giudici ────────────────────────────────────────────────────
@@ -3873,6 +4021,8 @@
     setAdmin(v) { setIsAdmin(!!v); applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
     loadCaps,
+    // Ri-legge le scelte sulle sessioni delle routine (IPC) — per i test.
+    loadSessions,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
@@ -4332,7 +4482,7 @@
     applyAutoModeGate();
     // In parallelo e senza che una fallita fermi le altre (ognuna gestisce già
     // il proprio errore; allSettled è la cintura).
-    await Promise.allSettled([loadAutoMode(), loadSortMode(), loadCaps(), loadJudgeTimeout(), loadMergeApprovals()]);
+    await Promise.allSettled([loadAutoMode(), loadSortMode(), loadCaps(), loadSessions(), loadJudgeTimeout(), loadMergeApprovals()]);
     await loadData();
     startLive();
   }

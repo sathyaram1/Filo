@@ -29,6 +29,7 @@
   <script src="filo://shared/manageSearch.js"></script>
   <script src="filo://shared/boardArchive.js"></script>
   <script src="filo://shared/mergeApprovals.js"></script>
+  <script src="filo://shared/routineSessioni.js"></script>
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
        di un pezzo le usa e una copia rimasta indietro si vede (#498). */
@@ -112,6 +113,35 @@
     .mg-auto-sub--off { opacity: 0.45; }
     /* Con le routine spente le impostazioni che valgono solo per loro sono inerti, come i sotto-interruttori qui sopra. */
     .mg-auto-block--off { opacity: 0.45; }
+
+    /* Scelta fra poche alternative: pillole affiancate, una sola accesa. */
+    .mg-auto-choice { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    /* `.sn-page label` (pages.css, 0-1-1) appiattirebbe la pillola a `display: block`: serve 0-2-1 (PATTERNS). */
+    .sn-page label.mg-auto-choice-item {
+      display: inline-flex; align-items: center; margin: 0;
+      cursor: pointer; user-select: none;
+    }
+    .mg-auto-choice-item input { position: absolute; opacity: 0; width: 0; height: 0; }
+    /* `inline-flex` esplicito: la pillola non deve dipendere dal display del genitore. */
+    .mg-auto-choice-text {
+      display: inline-flex; align-items: center;
+      padding: 7px 14px; border-radius: 999px;
+      border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
+      font-size: 13px; font-weight: 600; color: var(--sn-muted);
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .mg-auto-choice-item:hover .mg-auto-choice-text { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-auto-choice-item input:checked + .mg-auto-choice-text {
+      border-color: var(--sn-accent); color: var(--sn-accent); background: var(--sn-hover);
+    }
+    .mg-auto-choice-item input:focus-visible + .mg-auto-choice-text {
+      outline: 2px solid var(--sn-accent); outline-offset: 2px;
+    }
+    .mg-auto-choice-item input:disabled + .mg-auto-choice-text { opacity: 0.5; }
+    /* L'owner ha escluso tutti e due gli account: permesso, ma non deve passare inosservato. */
+    .mg-auto-warn {
+      margin: 12px 0 0; font-size: 12px; font-weight: 600; color: #c0392b;
+    }
 
     .mg-tabs {
       display: flex;
@@ -1355,6 +1385,69 @@
             nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
             <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
           </p>
+        </section>
+
+        <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un
+           account è una cosa che si decide PRIMA di riaccendere. -->
+        <section class="mg-auto-block" id="mgMaxSessionsBlock">
+          <label class="mg-auto-field-label" for="mgMaxSessions">Sessioni in parallelo</label>
+          <p class="mg-auto-block-desc">
+            Quante sessioni possono lavorare insieme. Più sessioni svuotano la
+            coda prima e consumano crediti più in fretta.
+          </p>
+          <div class="mg-auto-field-row">
+            <input type="number" id="mgMaxSessions" class="mg-auto-number"
+              min="1" max="20" step="1" inputmode="numeric" />
+            <button type="button" class="sn-btn" id="mgMaxSessionsSave">Salva</button>
+            <span class="mg-action-msg" id="mgMaxSessionsMsg" role="status"></span>
+          </div>
+        </section>
+
+        <section class="mg-auto-block" id="mgPriorityAccountBlock">
+          <span class="mg-auto-field-label">Account prioritario</span>
+          <p class="mg-auto-block-desc">
+            Si parte sempre da quello scelto finché non è esaurito o in pausa,
+            poi tocca all'altro.
+            <span class="mg-action-msg" id="mgPriorityAccountMsg" role="status"></span>
+          </p>
+          <div class="mg-auto-choice" id="mgPriorityAccountChoice" role="radiogroup" aria-label="Account prioritario">
+            <label class="mg-auto-choice-item" title="Le sessioni si distribuiscono fra i due account">
+              <input type="radio" name="mgPriorityAccount" value="" checked />
+              <span class="mg-auto-choice-text">Si alternano</span>
+            </label>
+            <label class="mg-auto-choice-item" title="Si usa l'account A finché regge">
+              <input type="radio" name="mgPriorityAccount" value="A" />
+              <span class="mg-auto-choice-text">Prima A</span>
+            </label>
+            <label class="mg-auto-choice-item" title="Si usa l'account B finché regge">
+              <input type="radio" name="mgPriorityAccount" value="B" />
+              <span class="mg-auto-choice-text">Prima B</span>
+            </label>
+          </div>
+          <!-- Il prioritario è stato escluso: la pillola accesa direbbe il contrario dell'interruttore spento. -->
+          <p class="mg-auto-warn" id="mgPriorityWarn" hidden></p>
+        </section>
+
+        <section class="mg-auto-block" id="mgAccountsBlock">
+          <span class="mg-auto-field-label">Account in uso</span>
+          <p class="mg-auto-block-desc">
+            Escluso un account, da lì non parte più nessuna sessione. Quelle già
+            avviate finiscono il lavoro che hanno in mano.
+            <span class="mg-action-msg" id="mgAccountsMsg" role="status"></span>
+          </p>
+          <div class="mg-auto-sub">
+            <label class="mg-switch mg-switch--sm" title="Spento: dall'account A non parte nessuna sessione nuova">
+              <span class="mg-switch-text">Account A</span>
+              <input type="checkbox" id="mgAccountA" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+            <label class="mg-switch mg-switch--sm" title="Spento: dall'account B non parte nessuna sessione nuova">
+              <span class="mg-switch-text">Account B</span>
+              <input type="checkbox" id="mgAccountB" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+          </div>
+          <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
         </section>
 
         <!-- Quanti giri di correzione si pagano per livello di rilievo. Valgono solo se le routine lavorano. -->

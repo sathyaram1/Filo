@@ -32,6 +32,9 @@ const { getBuildKeys, getBuildSafeBrowsingKey } = require('../config/default-key
 // Registra SN_FEEDBACK_THREAD su globalThis: da lì viene l'elenco dei gruppi di
 // mittente dell'auto-approvazione, che deve restare uno solo (#446).
 require('../../shared/feedbackThread.js');
+// Registra SN_ROUTINE_SESSIONI: le regole su quante sessioni e da quale
+// account, le stesse che applica la pagina di gestione.
+require('../../shared/routineSessioni.js');
 
 const PROJECT_ID = 'filo-8b9cb';
 const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per design
@@ -544,6 +547,44 @@ async function setRoutineCaps(patch, idToken) {
 }
 
 
+// Come partono le sessioni delle routine (config/routines): quante insieme,
+// da quale account per prima, quali account sono esclusi. Le regole stanno in
+// SN_ROUTINE_SESSIONI (stesse per pagina e main); qui si legge il documento e
+// si scrivono i SOLI campi ricevuti.
+// `null` = non ho potuto leggere, ed è diverso da «documento senza quei campi»
+// (che invece vale come «i valori di partenza»). Confonderli faceva mostrare
+// alla pagina «una sessione, tutti e due gli account in uso» come se venisse
+// dal server, proprio a chi la apre per controllare di non bruciare crediti.
+async function getRoutineSessions(idToken) {
+  const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  if (doc === null) throw new Error('Impostazioni delle sessioni non raggiungibili.');
+  return globalThis.SN_ROUTINE_SESSIONI.leggiDoc(doc);
+}
+
+async function setRoutineSessions(patch, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare le sessioni delle routine.');
+  const esito = globalThis.SN_ROUTINE_SESSIONI.valida(patch);
+  // Un valore fuori intervallo non si aggiusta di nascosto: chi ha scritto
+  // deve sapere che sul server è rimasto quello di prima.
+  if (!esito.ok) throw new Error(esito.testo);
+  const fields = {};
+  const mask = [];
+  for (const [k, v] of Object.entries(esito.valori)) {
+    fields[k] = toFsValue(v);
+    mask.push(k);
+  }
+  if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
+  // La scrittura è andata: se la rilettura che la segue non riesce, dirlo è
+  // l'unica risposta vera. Fingere un fallimento cancellerebbe una scrittura
+  // avvenuta, e fingere una lettura rimetterebbe i valori di partenza.
+  try {
+    return Object.assign({ letto: true }, await getRoutineSessions(idToken));
+  } catch (_) {
+    return Object.assign({ letto: false }, esito.valori);
+  }
+}
+
+
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
 // Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
 // pagina. La tabella di cosa sono e quanto possono valere sta in
@@ -630,6 +671,8 @@ module.exports = {
   setRoutinesEnabled,
   getRoutineCaps,
   setRoutineCaps,
+  getRoutineSessions,
+  setRoutineSessions,
   getCreditsKnobs,
   setCreditsKnobs,
   getWorkerLog,
