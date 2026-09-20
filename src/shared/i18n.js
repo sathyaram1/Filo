@@ -415,8 +415,8 @@
     // #533 — il perimetro delle uscite: cosa Filo poteva fare, non solo cosa ha fatto.
     security_perimetro_title: 'Cosa Filo era autorizzato a fare',
     security_perimetro_desc:
-      'Quando Filo legge qualcosa scritto da altri — una pagina, un documento, dei risultati di ricerca — ' +
-      'può fare solo le cose che la tua richiesta prevedeva. Tutto il resto te lo deve chiedere. ' +
+      'Quando Filo legge qualcosa scritto da altri, per esempio una pagina web o un documento, ' +
+      'da lì in poi può fare solo le cose che gli avevi chiesto. Tutto il resto te lo deve chiedere. ' +
       'Qui sotto ci sono le ultime richieste e cosa gli era permesso in ciascuna.',
     security_perimetro_empty: 'Nessuna richiesta recente.',
     security_perimetro_nulla: 'solo rispondere e proporre',
