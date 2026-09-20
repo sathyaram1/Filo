@@ -49,6 +49,8 @@
     $('sec-safebrowse-sandbox-label').textContent = I18n.t('options_security_safebrowse_sandbox');
     $('sec-safebrowse-sandbox-desc').textContent = I18n.t('options_security_safebrowse_sandbox_desc');
     $('sec-safebrowse-key-managed').textContent = I18n.t('options_security_safebrowse_key_managed');
+    $('sec-perimetro-title').textContent = I18n.t('security_perimetro_title');
+    $('sec-perimetro-desc').textContent = I18n.t('security_perimetro_desc');
     $('sec-cookies-title').textContent = I18n.t('options_cookies_title');
     $('sec-cookies-desc').textContent = I18n.t('options_cookies_desc');
     $('cookie-mode-manual-label').textContent = I18n.t('options_cookies_mode_manual');
