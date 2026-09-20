@@ -130,12 +130,18 @@ test('il doppio clic sul pacchetto Linux avvia Filo senza la gabbia di sicurezza
     'il programma vero non è stato spostato: il lanciatore non ha niente da avviare');
   const lanciatore = leggi(join(dove, 'filo'), 'utf8');
   assert.match(lanciatore, /--no-sandbox/,
-    'il lanciatore non chiede più l\'avvio senza gabbia: su Ubuntu 24.04 il doppio clic non aprirebbe niente');
+    'il lanciatore non sa più avviare Filo senza gabbia: su Ubuntu 24.04 il doppio clic non aprirebbe niente');
   assert.match(lanciatore, /filo-bin/, 'il lanciatore non nomina il programma vero');
   // Senza `exec -a` il processo si chiamerebbe «filo-bin» e la finestra non si
   // aggancerebbe più alla sua icona nella barra (StartupWMClass=Filo).
   assert.match(lanciatore, /exec -a/,
     'il lanciatore cambia il nome del processo: la finestra non si aggancia più alla sua icona nella barra');
+  // Le tre manopole del kernel che portano a «No usable sandbox!». Filo è un
+  // browser: la gabbia si spegne dove il sistema la nega, non dappertutto.
+  for (const manopola of ['apparmor_restrict_unprivileged_userns', 'max_user_namespaces', 'unprivileged_userns_clone']) {
+    assert.ok(lanciatore.includes(manopola),
+      `il lanciatore non guarda più ${manopola}: o spegne la gabbia a chi non serve, o non la spegne a chi serve`);
+  }
 
   // Una seconda passata sulla stessa cartella non deve rifare lo spostamento,
   // altrimenti il lanciatore prenderebbe il posto del programma vero.
