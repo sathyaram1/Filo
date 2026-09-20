@@ -316,3 +316,73 @@ test('le chat si vedono anche senza nessuna scheda chiusa, e «Svuota archivio»
   await expect(page.locator('.arc-chat')).toHaveCount(1);
   expect((await leggiArchivio(app)).length).toBe(1);
 });
+
+test('con trecento chat alle spalle la Cronologia si apre e la ricerca risponde', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  // Niente si butta in automatico: l'archivio cresce per sempre. Questo è
+  // l'archivio di chi usa Filo da un anno.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const now = Date.now();
+    const chats = [];
+    for (let i = 0; i < 300; i += 1) {
+      const t = new Date(now - i * 3600_000).toISOString();
+      chats.push({
+        id: `c-${i}`,
+        startedAt: t, updatedAt: t, closedAt: t,
+        title: i === 7 ? 'La coscienza è emergente?' : `Discorso numero ${i}`,
+        kind: i % 3 === 0 ? 'comando' : 'conversazione',
+        onboarding: false,
+        triagedCount: 2,
+        messages: [
+          { role: 'user', text: i === 7 ? 'Parliamo di coscienza e di emergenza' : `Messaggio numero ${i} `.repeat(40), ts: t },
+          { role: 'filo', text: 'Va bene.', ts: t },
+        ],
+      });
+    }
+    await chrome.storage.local.set({ [C.STORAGE_KEYS.FILO_CHATS]: chats });
+  });
+
+  const t0 = Date.now();
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('#chatsSection')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.arc-chat').first()).toBeVisible({ timeout: 20_000 });
+  expect(Date.now() - t0).toBeLessThan(15_000);
+
+  await page.locator('#search').fill('coscienza emergenza');
+  await expect(page.locator('.arc-chat')).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator('.arc-chat').first()).toContainText('La coscienza è emergente?');
+});
+
+test('un turno fallito e riprovato non scrive due volte la stessa domanda', async ({ app }) => {
+  test.setTimeout(90_000);
+  await configura(app);
+  // Primo tentativo: il provider cade (rete assente, provider giù). L'utente
+  // preme «Riprova» e il secondo tentativo va a buon fine: è il caso di tutti
+  // i giorni, non un caso limite.
+  await app.evaluate(async () => {
+    globalThis.__filoCadute = 1;
+    const rispondi = ({ attempts, messages }) => {
+      const joined = messages
+        .map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)))
+        .join('\n');
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      if (joined.includes('Classifichi le conversazioni')) {
+        return { ...base, text: JSON.stringify({ tipo: 'conversazione', titolo: 'Fotosintesi' }) };
+      }
+      if (globalThis.__filoCadute > 0) { globalThis.__filoCadute -= 1; throw new Error('rete assente'); }
+      return { ...base, text: JSON.stringify({ text: 'Ecco come funziona.', actions: [] }) };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = async (o) => rispondi(o);
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => rispondi(o);
+  });
+
+  await turno(app, 'c-riprova', 'Spiegami la fotosintesi').catch(() => {});
+  await turno(app, 'c-riprova', 'Spiegami la fotosintesi');
+  await chiudi(app, 'c-riprova');
+
+  const chat = (await leggiArchivio(app)).find((c) => c.id === 'c-riprova');
+  const domande = chat.messages.filter((m) => m.role === 'user' && m.text === 'Spiegami la fotosintesi');
+  expect(domande.length).toBe(1);
+});
