@@ -3310,6 +3310,32 @@ function affidaChat(chatId, wc) {
   try { wc.once('destroyed', allaMorte); } catch (_) {}
 }
 
+// La chat non è più di nessuno: l'utente l'ha cancellata mentre qualcuno la
+// stava ancora vivendo. Senza questo, la scheda che muore dopo proverebbe a
+// chiudere una chat che non c'è più.
+function dimenticaChat(chatId) {
+  if (!chatId) return;
+  proprietariDiChat.delete(chatId);
+  codeDiChiusura.delete(chatId);
+}
+
+// La scheda che sta vivendo una chat, se c'è ancora: serve a portare l'utente
+// LÌ invece di aprirgli una seconda copia della stessa conversazione (che poi
+// non si vedono fra loro e finiscono mescolate nell'archivio).
+// Ritorna { winId, tabId } oppure null.
+function schedaDiChat(chatId) {
+  const wc = chatId ? proprietariDiChat.get(chatId) : null;
+  if (!wc) return null;
+  try { if (wc.isDestroyed()) return null; } catch (_) { return null; }
+  for (const win of BrowserWindow.getAllWindows()) {
+    const tm = win && win._filoTabs;
+    if (!tm || !Array.isArray(tm.tabs)) continue;
+    const tab = tm.tabs.find((t) => t.view && t.view.webContents === wc);
+    if (tab) return { winId: win.id, tabId: tab.id };
+  }
+  return null;
+}
+
 // L'intervista di benvenuto comincia con una domanda di Filo, che nessun turno
 // produce: il testo è fisso e viene messo nella conversazione prima ancora che
 // l'utente scriva. Senza questo, in archivio l'intervista cominciava dalla
