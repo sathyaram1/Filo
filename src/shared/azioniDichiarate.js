@@ -652,7 +652,7 @@
     + `|plurale|singolare|maiuscol[a-zà-ù]*|minuscol[a-zà-ù]*|virgolette|grassetto|corsivo`
     + `|spieg[a-zà-ù]*|spiegazion[ei]|dimmi|ditemi|raccontami|scrivimi|scrivilo|scrivila`
     + `|mail|email|lettera|bozz[ae]`
-    + `|ordin[a-zà-ù]*|riordin[a-zà-ù]*|alfabetic[oa]|elenc[a-zà-ù]*`
+    + `|ordin[a-zà-ù]*|riordin[a-zà-ù]*|alfabetic[oa]`
     + `|legg[a-zà-ù]*|rileggi|rivedi|revision[ei])${FINE}`, 'i');
 
   function richiestaDiAzione(messaggio) {

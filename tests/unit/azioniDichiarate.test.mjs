@@ -924,3 +924,89 @@ test('gli altri modi di dichiarare una cosa mai fatta che restavano muti', () =>
   assert.deepEqual(AD.rileva('Ho avviato il timer di 10 minuti.', new Set(['TIMER'])), []);
   assert.deepEqual(AD.rileva('Ho avviato il blocco note.', new Set(['ESEGUI_COMANDO'])), []);
 });
+
+// ── Giro 10 ───────────────────────────────────────────────────────────────
+
+test('una richiesta detta senza nominare la cosa resta una promessa', () => {
+  // In italiano un promemoria si chiede quasi sempre senza nominarlo. Finché
+  // la promessa doveva farsi riconoscere dalle parole dell'utente, queste
+  // tornavano mute: è il fallimento della segnalazione, per un'altra strada.
+  for (const messaggio of [
+    'domani devo chiamare il dentista, non farmelo dimenticare',
+    'fammi l\'elenco dei file e mettilo da parte',
+    'tienimelo a mente per domani',
+    'dillo a chi sviluppa l\'app: la barra in alto sparisce',
+  ]) {
+    assert.deepEqual(ids(AD.rileva('Te l\'ho segnato.', new Set(), dopo(messaggio))),
+      ['senza-nome'], messaggio);
+  }
+
+  // L'utente che CHIEDE se una cosa è stata fatta, e non è mai stata fatta
+  // da nessuna parte: la domanda non spegne il controllo.
+  assert.deepEqual(ids(AD.rileva('Sì, te l\'ho mandata.', new Set(),
+    dopo('l\'hai mandata agli sviluppatori?'))), ['senza-nome']);
+
+  // Quello che il giro 9 ha chiuso resta chiuso: un testo consegnato dentro
+  // la risposta non è una promessa.
+  const sulTesto = dopo('nella frase «il gatto grigio dorme sul divano» togli la parola grigio');
+  for (const frase of ['Te l\'ho tolta.', 'Te l\'ho messa al plurale.', 'Le ho aggiunte tutte.']) {
+    assert.deepEqual(AD.rileva(frase, new Set(), sulTesto), [], frase);
+  }
+  // …e una cosa fatta davvero in un turno prima regge la risposta alla
+  // domanda, come sempre.
+  assert.deepEqual(AD.rileva('Sì, te l\'ho mandata.', new Set(), {
+    ...dopo('l\'hai mandata agli sviluppatori?'),
+    tipiPrecedenti: new Set(['INVIA_FEEDBACK']), contiPrecedenti: { INVIA_FEEDBACK: 1 },
+  }), []);
+});
+
+test('un testo consegnato nella risposta non diventa «l\'appunto non c\'è»', () => {
+  // L'utente incolla un documento e chiede cosa conta: Filo glielo scrive
+  // nella risposta, e le frasi che non nominano l'appunto lo consegnano.
+  const sulDocumento = dopo('leggi questo contratto e dimmi cosa c\'è di importante');
+  for (const frase of [
+    'Ti ho segnato i punti principali.',
+    'Ti ho segnato le scadenze e le penali.',
+    'Ti ho appuntato le date che contano.',
+    'Ho trascritto le clausole che contano.',
+    'Ho salvato tutto.',
+  ]) assert.deepEqual(AD.rileva(frase, new Set(), sulDocumento), [], frase);
+
+  // Le stesse frasi, quando l'utente l'appunto lo ha chiesto, restano
+  // promesse da verificare.
+  const chiesto = dopo('segnami la lista della spesa: pane, uova, latte');
+  assert.deepEqual(ids(AD.rileva('Ti ho segnato la spesa.', new Set(), chiesto)), ['appunto']);
+  assert.deepEqual(ids(AD.rileva('Ho salvato tutto.', new Set(), chiesto)), ['appunto']);
+  // E una frase che nomina l'appunto resta guardata comunque: lì non c'è
+  // nessun testo da consegnare.
+  assert.deepEqual(ids(AD.rileva('Ti ho salvato l\'appunto con le scadenze.', new Set(), sulDocumento)),
+    ['appunto']);
+});
+
+test('le buste degli strumenti dei modelli aperti sono formato interno', () => {
+  const nomi = new Set(['SVEGLIA', 'SALVA_APPUNTO', 'INVIA_FEEDBACK']);
+  // I DeepSeek scrivono la barra LARGA (U+FF5C): la guardia scritta con la
+  // barra normale non poteva riconoscere niente, ed era nata spenta.
+  assert.equal(AD.formatoSospetto('<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>SVEGLIA\n{"time":"19:00"}', nomi), true);
+  assert.equal(AD.formatoSospetto('Ti ho messo la sveglia alle 19.\n<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>SVEGLIA', nomi), true);
+  // La busta «harmony» dei modelli aperti di OpenAI.
+  assert.equal(AD.formatoSospetto('<|channel|>commentary to=functions.SVEGLIA<|message|>{"time":"19:00"}', nomi), true);
+  // Il formato interno chiuso fra apici singoli in mezzo alla prosa.
+  assert.equal(AD.formatoSospetto('Fatto: `{"type":"SVEGLIA","time":"19:00"}`', nomi), true);
+  // Un nome che non è uno strumento vero non fa scattare niente.
+  assert.equal(AD.formatoSospetto('Fatto: `{"type":"RICETTA","time":"19:00"}`', nomi), false);
+  assert.equal(AD.formatoSospetto('Il segnaposto si scrive `{nome}` e basta.', nomi), false);
+  assert.equal(AD.formatoSospetto('Ti ho messo la sveglia alle 19:00 per stasera.', nomi), false);
+});
+
+test('le conferme corte che restavano mute', () => {
+  assert.deepEqual(ids(AD.rileva('Ti ho sistemato la sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ti ho annotato la lista della spesa.', [])), ['appunto']);
+  assert.deepEqual(ids(AD.rileva('Perfetto, sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ok, sveglia alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Fatto: promemoria per le 19.', [])), ['promemoria']);
+  // E quelle vere restano mute.
+  assert.deepEqual(AD.rileva('Perfetto, sveglia alle 19.', new Set(['SVEGLIA'])), []);
+  assert.deepEqual(AD.rileva('Perfetto, sveglia alle 19.', new Set(), { orariSveglie: ['19:00'] }), []);
+  assert.deepEqual(AD.rileva('Ti ho sistemato la sveglia alle 19.', new Set(['MODIFICA_SVEGLIA'])), []);
+});
