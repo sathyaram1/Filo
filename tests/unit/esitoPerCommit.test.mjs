@@ -192,11 +192,7 @@ test('esitiDecaduti: un via libera dato su un altro commit non vale per questo c
 });
 
 test('la fusione: parte dichiarando il commit esaminato, e non parte se il ramo si è mosso dopo', async () => {
-  const buste = [];
-  const { srv, port } = await (async () => {
-    const s = await fintoServer();
-    return s;
-  })();
+  const { srv, ricevuti: buste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'z'.repeat(40) });
   const { dir, g, punta } = deposito('filo-485-fusione-');
   const fuori = cartellaTemporanea('filo-485-fusione-fuori-');
   const statoDir = resolve(fuori, 'stato');
@@ -204,7 +200,7 @@ test('la fusione: parte dichiarando il commit esaminato, e non parte se il ramo 
     // Lo stato del lavoro come lo lascia il dispatcher: il ramo, e il via
     // libera del controllo di sicurezza su un commit preciso.
     const esaminato = punta();
-    execFileSync('mkdir', ['-p', statoDir]);
+    mkdirSync(statoDir, { recursive: true });
     writeFileSync(resolve(statoDir, 'ID1.json'),
       JSON.stringify({ id: 'ID1', branch: 'worker/485', secauditDone: true, secauditVerdict: 'pass', secauditSha: esaminato }), 'utf8');
     const env = {
