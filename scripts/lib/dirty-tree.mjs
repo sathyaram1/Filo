@@ -55,6 +55,17 @@ export function dirtyTreeText(lines, cosa = 'critica') {
       + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "correzione"). Poi riprova con lo stesso report.\n'
       + `${elenco}${altri}`;
   }
+  // Il verdetto del controllo di sicurezza: il danno è ancora un altro. Il
+  // verdetto vale per il diff LETTO, e quel diff è quello dell'ultimo commit;
+  // il salvataggio automatico committa il resto subito dopo la registrazione,
+  // la punta si sposta, e quello che verrebbe fuso contiene righe che il
+  // controllo non ha mai visto (feedback #485).
+  if (cosa === 'verdetto') {
+    return 'verdetto non registrato: ci sono modifiche non salvate nella directory, e il verdetto vale per il commit che hai letto: il salvataggio automatico le committerebbe DOPO, spostando la punta del ramo, e finirebbero nella fusione senza essere mai passate dal controllo. '
+      + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "pulizia"). '
+      + 'Attenzione: se quelle righe cambiano il codice, il diff da controllare non è più quello che hai letto — rileggilo prima di registrare lo stesso verdetto.\n'
+      + `${elenco}${altri}`;
+  }
   // La prima consegna del lavoro (chi risolve mette il feedback in revisione):
   // stesso danno della correzione, un giro prima. Quello che sta fuori dai
   // commit la verifica non lo vede, e boccia una cosa che era fatta (verifica
