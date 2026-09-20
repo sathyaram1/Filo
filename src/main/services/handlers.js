@@ -2250,6 +2250,12 @@ function toolResultText({ action, res, rendered }) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
+  if (type === 'DICHIARA_USCITE' && res.perimetro && !res.perimetro.ok) {
+    return res.perimetro.motivo === 'tardiva'
+      ? 'Dichiarazione RIFIUTATA: hai già letto materiale scritto da altri, e da lì in poi il perimetro non si '
+        + 'dichiara più. Ti restano rispondere e proporre; per un\'azione che cambia qualcosa usa CHIEDI_USCITA.'
+      : 'Le uscite di questa richiesta erano già fissate: non si dichiarano due volte.';
+  }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
   if (res.output && res.output.blocked === 'disabled') {
