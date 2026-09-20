@@ -356,7 +356,27 @@ test('#602 — un allegato di commento sale cifrato e la dashboard lo riapre', a
 
   await card.locator('.fb-attach-mount[data-kind="reply"] input[type="file"]')
     .setInputFiles({ name: 'screen.png', mimeType: 'image/png', buffer: PNG_1x1 });
-  await expect(card.locator('.fb-attach-mount[data-kind="reply"] .fb-attach-thumb img')).toHaveCount(1);
+  const miniatura = card.locator('.fb-attach-mount[data-kind="reply"] .fb-attach-thumb img');
+  await expect(miniatura).toHaveCount(1);
+
+  // ⓪ L'anteprima MOSTRA la schermata appena allegata (verifica #602, giro 1).
+  // Nel deposito ci sono byte cifrati: il suo indirizzo dentro un <img> è un
+  // riquadro rotto, e l'anteprima è l'unico modo di controllare di aver
+  // allegato il file giusto prima di mandarlo. Si guarda com'è dal punto di
+  // vista di chi la guarda: l'immagine si carica davvero.
+  await expect(miniatura).not.toHaveAttribute('src', /firebasestorage/);
+  await expect
+    .poll(() => miniatura.evaluate((el) => el.naturalWidth), { timeout: 10_000 })
+    .toBeGreaterThan(0);
+
+  // E l'ingrandimento apre quella stessa immagine, non un riquadro vuoto.
+  await miniatura.click();
+  const ingrandimento = page.locator('#lightboxImg');
+  await expect(page.locator('#lightbox')).toHaveClass(/open/);
+  await expect
+    .poll(() => ingrandimento.evaluate((el) => el.naturalWidth), { timeout: 10_000 })
+    .toBeGreaterThan(0);
+  await page.keyboard.press('Escape');
 
   // ① Quello che è arrivato nel deposito è un ciphertext, e l'immagine non c'è.
   const depositato = await page.evaluate(() => {
@@ -412,4 +432,38 @@ test('#602 — un allegato di commento sale cifrato e la dashboard lo riapre', a
   const img = page.locator('.fb-card .fb-imgs img').first();
   await expect(img).toHaveCount(1);
   await expect(img).toHaveAttribute('src', `data:image/png;base64,${PNG_1x1.toString('base64')}`);
+});
+
+// ── Verifica #602, giro 1 — gli allegati già salvati in una nota ────────────
+//
+// Riaprendo una scheda commentata, il compositore della nota rimette gli
+// allegati che porta già: sono nel deposito, cifrati. Se li mostrasse dal loro
+// indirizzo sarebbero riquadri rotti ogni volta, anche giorni dopo. Qui si
+// chiede che si vedano, come si vedono nella conversazione lì sotto.
+test("#602 — un allegato già salvato in una nota si rivede in anteprima", async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+
+  const urlAllegato = 'https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1780000000000_11111111-2222-3333-4444-555555555555.octetstream?alt=media&token=t';
+  const marcatore = `@@filo-attachment ${JSON.stringify({ kind: 'img', url: urlAllegato, name: 'screen.png', type: 'image/png' })}`;
+
+  await setupAdmin(app, page, {
+    _id: 'mock-att-nota',
+    status: 'todo',
+    text: 'il pulsante non risponde',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes: ['Ecco cosa ho visto.', marcatore].join('\n'),
+    createdAt: new Date().toISOString(),
+  });
+
+  await page.locator('[data-tab="queue"]').click();
+  const mount = page.locator('.fb-card .fb-attach-mount[data-kind="notes"]').first();
+  await expect(mount).toBeAttached({ timeout: 10_000 });
+
+  const miniatura = mount.locator('.fb-attach-thumb img').first();
+  await expect(miniatura).toHaveCount(1, { timeout: 10_000 });
+  await expect(miniatura).toHaveAttribute('src', /^data:image\//, { timeout: 10_000 });
+  await expect
+    .poll(() => miniatura.evaluate((el) => el.naturalWidth), { timeout: 10_000 })
+    .toBeGreaterThan(0);
 });

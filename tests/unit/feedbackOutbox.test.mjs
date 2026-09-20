@@ -111,3 +111,74 @@ test('il persistito sopravvive a un "riavvio" (nuova istanza legge la coda)', as
   assert.equal(OB.size(), 0);
   assert.ok(state.calls.some((c) => c.submissionId === 's3'), 'il feedback salvato è stato inviato');
 });
+
+// #602 — LA CODA NON PUÒ CIFRARE: SI RINUNCIA SUBITO, E SI DICE.
+//
+// Dal #602 una segnalazione che non si può cifrare non parte. La coda però
+// risponde «ricevuto» appena il feedback è al sicuro sul disco, e chi l'ha
+// mandata ha già letto «Grazie! Feedback inviato» e preso i crediti. Se la
+// cifratura si rompe FRA la messa in coda e la partenza (la copia di Filo
+// cambia, la chiave sparisce), riprovare non serve a niente: prima quella voce
+// restava in coda un giorno intero a ritentare e poi spariva senza una parola.
+//
+// Senza il fix questi due controlli sono ROSSI: la voce resta in coda e nessuno
+// viene avvisato.
+function erroreCifratura(msg) {
+  const e = new Error(msg);
+  e.cifratura = true;
+  return e;
+}
+
+test('#602 la coda rinuncia subito se non si può cifrare, e lo dice a chi ha mandato', async () => {
+  const { OB, state, store } = setup();
+  const avvisi = [];
+  OB._reset();
+  OB._setAuto(false);
+  OB.init({
+    prepare: (p) => globalThis.SN_FEEDBACK.fallbackName(p && p.text),
+    onGiveUp: (item, motivo) => avvisi.push({ id: item.id, motivo }),
+    backoffMin: 999999,
+  });
+
+  globalThis.SN_FEEDBACK.isEncryptionError = (e) => !!(e && e.cifratura === true);
+  globalThis.SN_FEEDBACK.submit = async () => {
+    state.calls.push('tentativo');
+    throw erroreCifratura('Non ho mandato niente: manca la chiave con cui si cifra.');
+  };
+
+  await OB.enqueue({ submissionId: 'c1', text: 'il pulsante non risponde' });
+  const drained = await OB.flush();
+
+  assert.equal(drained, true, 'la voce non deve restare in coda a ritentare per niente');
+  assert.equal(OB.size(), 0);
+  assert.equal((store.get('feedbackOutbox') || []).length, 0, 'e nemmeno nel persistito');
+  assert.equal(state.calls.length, 1, 'un tentativo solo: riprovare non cambierebbe niente');
+  assert.equal(avvisi.length, 1, 'chi ha mandato la segnalazione deve venirlo a sapere');
+  assert.match(avvisi[0].motivo, /non ho mandato niente/i,
+    'e il motivo deve dire che non è partito niente');
+});
+
+test('#602 un guasto di rete invece resta in coda e si riprova', async () => {
+  const { OB, state, store } = setup();
+  const avvisi = [];
+  OB._reset();
+  OB._setAuto(false);
+  OB.init({
+    prepare: (p) => globalThis.SN_FEEDBACK.fallbackName(p && p.text),
+    onGiveUp: (item, motivo) => avvisi.push({ id: item.id, motivo }),
+    backoffMin: 999999,
+  });
+
+  globalThis.SN_FEEDBACK.isEncryptionError = (e) => !!(e && e.cifratura === true);
+  globalThis.SN_FEEDBACK.submit = async () => {
+    state.calls.push('tentativo');
+    throw new Error('timeout — controlla la rete');
+  };
+
+  await OB.enqueue({ submissionId: 'c2', text: 'segnalazione offline' });
+  await OB.flush();
+
+  assert.equal(OB.size(), 1, 'senza rete la segnalazione resta in coda');
+  assert.equal((store.get('feedbackOutbox') || []).length, 1);
+  assert.equal(avvisi.length, 0, 'e non si dice a nessuno che è andata persa');
+});

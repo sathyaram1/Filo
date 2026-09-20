@@ -136,17 +136,21 @@ test("l'anteprima di un allegato appena aggiunto a un commento mostra la scherma
   expect(cifrato, "l'allegato del commento deve salire cifrato").toBe(true);
 
   // E l'anteprima deve mostrare la schermata appena allegata, non un riquadro
-  // rotto: la sorgente è il contenuto decifrato, come ovunque altro in questa
-  // pagina.
-  await expect(thumb).toHaveAttribute('src', new RegExp(`^data:image/png;base64,${PNG_1x1_B64}$`), { timeout: 10_000 });
-  expect(await thumb.evaluate((el) => el.naturalWidth), "l'anteprima deve caricarsi davvero").toBeGreaterThan(0);
+  // rotto. Non conta da dove Filo prenda l'immagine (la copia in chiaro che ha
+  // in mano, o il contenuto decifrato): conta che quella sorgente NON sia
+  // l'indirizzo del deposito, dove ci sono byte cifrati, e che l'immagine si
+  // carichi davvero.
+  await expect(thumb).not.toHaveAttribute('src', /firebasestorage/);
+  await expect
+    .poll(() => thumb.evaluate((el) => el.naturalWidth), { timeout: 10_000 })
+    .toBeGreaterThan(0);
 
   // Cliccandola si ingrandisce, e anche lì si vede.
   await thumb.click();
-  const lightbox = page.locator('#lightbox, .fb-lightbox').first();
-  await expect(lightbox).toHaveClass(/open/, { timeout: 5_000 });
-  await expect(lightbox.locator('img').first())
-    .toHaveAttribute('src', new RegExp(`^data:image/png;base64,${PNG_1x1_B64}$`));
+  await expect(page.locator('#lightbox')).toHaveClass(/open/, { timeout: 5_000 });
+  await expect
+    .poll(() => page.locator('#lightboxImg').evaluate((el) => el.naturalWidth), { timeout: 10_000 })
+    .toBeGreaterThan(0);
 });
 
 test('riaprendo una nota, gli allegati già salvati si rivedono in anteprima', async ({ app, openTab }) => {
