@@ -137,7 +137,7 @@ test('dispatch --record-secaudit: il verdetto parte con lo sha del commit contro
   }
 });
 
-test('canale deliver secaudit: lo sha lo timbra lo strumento, e resta quello dichiarato se c\'è', async () => {
+test('canale deliver secaudit: lo sha lo timbra lo strumento, e uno dichiarato può solo confermarlo', async () => {
   const { srv, ricevuti, port } = await fintoServer();
   const { dir, punta } = deposito('filo-485-canale-');
   try {
