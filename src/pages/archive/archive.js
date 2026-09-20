@@ -285,7 +285,18 @@
 
   // Riaprire una chat = aprirla nella home di Filo, per intero, pronta a
   // ricevere il messaggio successivo dentro la stessa conversazione.
-  function reopenChat(c) {
+  //
+  // Se però quella conversazione è ANCORA APERTA in una scheda, non se ne apre
+  // una seconda: si torna dov'è. Due schede sulla stessa chat non si vedono
+  // fra loro — scrivi in una e l'altra resta indietro — e nell'archivio i due
+  // fili finiscono mescolati.
+  async function reopenChat(c) {
+    if (!c.closedAt) {
+      try {
+        const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_FOCUS, id: c.id });
+        if (r && r.portato) return;
+      } catch (_) { /* nessuna scheda la sta vivendo: si apre normalmente */ }
+    }
     try { chrome.tabs.create({ url: `filo://dashboard/dashboard.html?chat=${encodeURIComponent(c.id)}` }); }
     catch (_) {}
   }
