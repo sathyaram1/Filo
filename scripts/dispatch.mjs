@@ -336,10 +336,15 @@ export function applyFixed(state) {
  * ovunque si guardi il verdetto, ma resta scritto com'è: è una decisione
  * dell'owner, e la copia locale non deve travestirla da controllo superato.
  */
-export function applySecaudit(state, verdict) {
+export function applySecaudit(state, verdict, sha = '') {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
   s.secauditDone = true;
   s.secauditVerdict = secauditPassato(verdict) ? verdict : 'fail';
+  // Lo sha del commit CONTROLLATO, come per la verifica funzionale: era
+  // l'ultimo dei due esiti ragionati a non portarselo dietro, e un «passato»
+  // legato al solo nome del ramo resta buono anche quando il contenuto cambia
+  // sotto (feedback #485).
+  if (String(sha || '')) s.secauditSha = String(sha);
   return s;
 }
 
