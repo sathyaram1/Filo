@@ -5,19 +5,22 @@
 // l'utente è davanti alla home e l'accoglienza non è ancora stata fatta: lì
 // quello che parte è l'intervista. Qui si provano le porte rimaste:
 //
-//  1. chi l'accoglienza l'ha già fatta (la stragrande maggioranza delle
-//     aperture, dalla seconda in poi) non ha nessuna intervista da far
-//     partire: quello che deve cambiare è il MESSAGGIO della home;
-//  2. la direzione opposta — Filo smette di poter rispondere mentre la home è
-//     aperta — deve dirlo dove si vede, che è la seconda metà della richiesta
-//     («se davvero non c'è nessuna chiave da nessuna parte, deve dirlo dove si
-//     vede, non limitarsi a non presentarsi»);
+//  1. chi l'accoglienza l'ha già fatta (ogni apertura dalla seconda in poi)
+//     non ha nessuna intervista da far partire: quello che deve cambiare è il
+//     MESSAGGIO della home;
+//  2. la direzione opposta — Filo SMETTE di poter rispondere mentre la home è
+//     aperta — è la seconda metà della richiesta: «se davvero non c'è nessuna
+//     chiave da nessuna parte, deve dirlo dove si vede, non limitarsi a non
+//     presentarsi». Conta soprattutto per l'invitato, perché la sua chiave
+//     arriva dal portafoglio (il riscatto dell'invito) e non dalle
+//     impostazioni;
 //  3. il fornitore dichiarato ritirato non deve spegnere la chat della home,
 //     non solo l'accoglienza.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const FRASE_DEL_MODELLO = 'Ecco la tua home su misura.';
+const CHIAVE_DELL_INVITO = 'sk-or-personale-dall-invito';
 
 async function configCondivisa(app, patch) {
   await app.evaluate(async (_electron, cfg) => {
@@ -41,12 +44,24 @@ async function stubProviders(app) {
       return r;
     };
     P.completeWithFallback = async ({ attempts }) => risposta(attempts);
-  }, FRASE_DEL_MODELLO);
+  }, frase => frase, FRASE_DEL_MODELLO);
 }
 
 async function conChiave(app, chiave = 'sk-or-vera') {
   await app.evaluate(async (_e, k) => {
     await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: k } });
+  }, chiave);
+}
+
+// Il riscatto dell'invito: la chiave che Filo userà NON finisce nelle
+// impostazioni, la tiene il portafoglio e la config effettiva se la prende a
+// ogni chiamata. Qui si riproduce quell'effetto — è la strada di ogni
+// invitato, cioè di ogni utente nuovo.
+async function invitoRiscattato(app, chiave = CHIAVE_DELL_INVITO) {
+  await app.evaluate((_e, k) => {
+    const path = require('path');
+    const mod = require(path.join(process.cwd(), 'src', 'main', 'auth', 'wallet-store.js'));
+    mod.personalKey = () => k;
   }, chiave);
 }
 
@@ -159,7 +174,15 @@ test('la chiave tolta mentre la home è aperta: la home lo dice, senza ricaricar
   await expect(page.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 30_000 });
 });
 
-test('«solo modelli a pesi aperti» acceso mentre la home è aperta: il messaggio cambia da solo', async ({ app, shell }) => {
+// ── L'invitato che poi spegne Filo da sé ────────────────────────────────────
+//
+// La chiave dell'invitato non passa dalle impostazioni: la tiene il
+// portafoglio. Da quel momento Filo può rispondere, ma chi tiene il conto di
+// «può rispondere / non può» non se n'è accorto. Se poi l'utente fa qualcosa
+// che toglie a Filo ogni modello da chiamare, la home resta sul messaggio di
+// prima e nessuno gli dice che Filo è diventato muto.
+
+test('invitato, poi «solo modelli a pesi aperti»: la home deve dire che Filo non può più rispondere', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtab(app);
@@ -172,15 +195,17 @@ test('«solo modelli a pesi aperti» acceso mentre la home è aperta: il messagg
     models: { [azioni.chat]: 'chiuso', [azioni.home]: 'chiuso' },
     modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
   });
-  await conChiave(app);
+  await invitoRiscattato(app);
   await accoglienzaGiaFatta(app);
   await stubProviders(app);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
 
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
-  await expect(page.locator('#homeMessage')).not.toContainText(/pesi aperti/i, { timeout: 20_000 });
+  await expect(page.locator('#homeMessage')).toContainText(FRASE_DEL_MODELLO, { timeout: 20_000 });
 
+  // L'interruttore si accende nelle Opzioni: da qui nessuno dei modelli
+  // configurati è più chiamabile.
   await page.evaluate(async () => {
     await chrome.runtime.sendMessage({
       type: window.SN_MSG.MSG.UPDATE_SETTINGS,
@@ -189,6 +214,32 @@ test('«solo modelli a pesi aperti» acceso mentre la home è aperta: il messagg
   });
 
   await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
+});
+
+test('invitato, poi «usa i modelli predefiniti» spento: la home deve dire che Filo non può più rispondere', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  await configCondivisa(app, { provider: 'openrouter' });
+  await invitoRiscattato(app);
+  await accoglienzaGiaFatta(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+  await expect(page.locator('#homeMessage')).toContainText(FRASE_DEL_MODELLO, { timeout: 20_000 });
+
+  // «Voglio gestirmi i modelli da solo», senza averne ancora scelto nessuno:
+  // da qui Filo non ha più niente da chiamare.
+  await page.evaluate(async () => {
+    await chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.UPDATE_SETTINGS,
+      settings: { useDefaultModels: false },
+    });
+  });
+
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello|Opzioni/i, { timeout: 30_000 });
 });
 
 test('fornitore dichiarato ritirato: la chat della home risponde, non solo l’accoglienza', async ({ app, shell }) => {
