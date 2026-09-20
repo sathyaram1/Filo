@@ -63,12 +63,13 @@
   // questa pagina esiste per non fare.
   function renderMissing(chiesto) {
     const voce = T.NAV.find((n) => n.id === chiesto);
-    const nome = voce ? voce.label : chiesto;
-    document.title = 'Filo — ' + (nome || 'Trasparenza');
-    $('title').textContent = nome || 'Sezione sconosciuta';
-    $('subtitle').textContent = voce
-      ? 'Questa sezione non è ancora scritta.'
-      : 'Questa sezione non esiste.';
+    const nome = chiesto ? (voce ? voce.label : chiesto) : 'Trasparenza';
+    document.title = 'Filo — ' + nome;
+    $('title').textContent = nome;
+    // Senza niente nell'indirizzo non c'è nessuna sezione da negare: qui non
+    // c'è proprio ancora niente di scritto, e lo dice il corpo della pagina.
+    $('subtitle').textContent = !chiesto ? ''
+      : (voce ? 'Questa sezione non è ancora scritta.' : 'Questa sezione non esiste.');
     $('meta').textContent = '';
 
     const body = $('doc-body');
