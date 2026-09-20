@@ -285,10 +285,12 @@
     if (conTutte.length) return { results: taglia(conTutte), termini: tutte, allargata: false };
 
     const forti = terminiCheDistinguono(tutte);
-    const stessaCosa = forti.length === tutte.length;
-    const conForti = stessaCosa
-      ? []
-      : candidate.filter((c) => forti.every((t) => hays.get(c.id).includes(t)));
+    // Nessuna parola restringe il campo (l'utente ha cercato «di ieri»):
+    // allargare vorrebbe dire tirare fuori mezzo archivio spacciandolo per una
+    // risposta. Meglio dire che non si è trovato niente.
+    if (forti.length === tutte.length) return { results: [], termini: tutte, allargata: false };
+
+    const conForti = candidate.filter((c) => forti.every((t) => hays.get(c.id).includes(t)));
     if (conForti.length) return { results: taglia(conForti), termini: forti, allargata: true };
 
     // Ultimo passo: almeno una parola che distingue. Ordinate per quante ne
@@ -297,7 +299,7 @@
       .map((c) => ({ c, n: forti.filter((t) => hays.get(c.id).includes(t)).length }))
       .filter((x) => x.n > 0)
       .sort((a, b) => b.n - a.n);
-    if (!punteggi.length) return { results: [], termini: forti, allargata: !stessaCosa };
+    if (!punteggi.length) return { results: [], termini: forti, allargata: true };
     return { results: taglia(punteggi.map((x) => x.c)), termini: forti, allargata: true };
   }
 

@@ -266,3 +266,82 @@ test('un turno senza azioni non porta un campo azioni vuoto', () => {
   const m = CA.toStoredMessage({ role: 'filo', text: 'Ciao' });
   assert.equal('actions' in m, false);
 });
+
+// ── Cercare con le parole con cui l'utente l'ha chiesto ──────────────────────
+//
+// «Riprendi la discussione di ieri sulla coscienza» è la frase che il feedback
+// #525 usa per descrivere la richiesta, ed è quella che arriva alla ricerca
+// quando Filo cerca con le parole dell'utente. Pretendendo che compaiano TUTTE,
+// quella frase non trovava la chat sulla coscienza e Filo rispondeva che la
+// discussione non esisteva.
+
+const CHAT_COSCIENZA = {
+  id: 'c1',
+  title: 'La coscienza e il libero arbitrio',
+  kind: 'conversazione',
+  closedAt: '2026-09-19T10:00:00.000Z',
+  messages: [
+    { role: 'user', text: 'Parliamo della coscienza: è un fenomeno emergente?' },
+    { role: 'filo', text: 'Dipende da cosa intendi per emergente.' },
+  ],
+};
+const CHAT_SVEGLIA = {
+  id: 'c2', title: 'Sveglia alle sette', kind: 'comando',
+  closedAt: '2026-09-19T11:00:00.000Z',
+  messages: [{ role: 'user', text: 'Metti una sveglia alle 7' }],
+};
+
+test('una frase intera trova la chat, e dice con quali parole l’ha trovata', () => {
+  const r = CA.searchWide([CHAT_COSCIENZA, CHAT_SVEGLIA], 'la discussione di ieri sulla coscienza');
+  assert.deepEqual(r.results.map((c) => c.id), ['c1']);
+  assert.equal(r.allargata, true, 'chi chiama deve sapere che la ricerca si è allargata');
+  assert.deepEqual(r.termini, ['coscienza']);
+});
+
+test('la ricerca stretta vince quando basta: non si allarga per niente', () => {
+  const r = CA.searchWide([CHAT_COSCIENZA, CHAT_SVEGLIA], 'coscienza emergente');
+  assert.deepEqual(r.results.map((c) => c.id), ['c1']);
+  assert.equal(r.allargata, false);
+  assert.deepEqual(r.termini, ['coscienza', 'emergente']);
+});
+
+test('con più parole che distinguono, in cima sta la chat che ne contiene di più', () => {
+  const altra = {
+    id: 'c3', title: 'Spinoza', kind: 'conversazione', closedAt: '2026-09-18T09:00:00.000Z',
+    messages: [{ role: 'user', text: 'Parliamo di Spinoza e del libero arbitrio' }],
+  };
+  const r = CA.searchWide([altra, CHAT_COSCIENZA], 'coscienza arbitrio spinoza');
+  assert.equal(r.results[0].id, 'c1', 'due parole su tre battono una su tre');
+  assert.equal(r.allargata, true);
+});
+
+test('una parola che non c’è da nessuna parte non tira fuori risultati a caso', () => {
+  const r = CA.searchWide([CHAT_COSCIENZA, CHAT_SVEGLIA], 'zabaione');
+  assert.deepEqual(r.results, []);
+});
+
+test('una richiesta fatta di sole parole che non distinguono resta stretta', () => {
+  // «di ieri» non deve diventare «tutte le chat»: senza una parola che
+  // restringa, la ricerca non si inventa un risultato.
+  const r = CA.searchWide([CHAT_COSCIENZA, CHAT_SVEGLIA], 'di ieri');
+  assert.deepEqual(r.results, []);
+});
+
+test('il frammento si costruisce attorno alla parola che c’è davvero', () => {
+  const s = CA.snippetFor(CHAT_COSCIENZA, 'la coscienza');
+  assert.ok(s.includes('coscienza'), `frammento: ${s}`);
+});
+
+// ── L'esito di un comando di terminale ──────────────────────────────────────
+
+test('un esito corto si conserva com’è', () => {
+  assert.equal(CA.clampOutput('ciao'), 'ciao');
+});
+
+test('un esito enorme si accorcia, ma dicendolo, e tiene anche la fine', () => {
+  const testo = `${'a'.repeat(30000)}ERRORE IN FONDO`;
+  const out = CA.clampOutput(testo, 1000);
+  assert.ok(out.length < 1400, `troppo lungo: ${out.length}`);
+  assert.ok(out.includes('non conservati'), 'un taglio muto toglie proprio la riga che conta');
+  assert.ok(out.endsWith('ERRORE IN FONDO'), 'la fine di un comando è la parte che si va a leggere');
+});
