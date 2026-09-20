@@ -1432,10 +1432,10 @@
       const capped = T && T.capNotes ? T.capNotes(notes) : notes;
       const C = global.SN_FEEDBACK_CRYPTO;
       let value = capped;
-      if (C && C.isEnabled && C.isEnabled() && capped && !C.isEncrypted(capped)) {
+      if (capped && !(C && C.isEncrypted && C.isEncrypted(capped))) {
         // Fail-safe: se la cifratura non riesce NON si scrive il report in
         // chiaro. Si lascia la conversazione com'era.
-        try { value = await C.encryptForOwner(capped); } catch (_) { value = undefined; }
+        try { value = await maybeEncrypt(capped); } catch (_) { value = undefined; }
       }
       if (value !== undefined) { fields.notes = toFsValue(value); mask.push('notes'); }
     }
