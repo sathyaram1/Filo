@@ -147,6 +147,3 @@ test('un documento salvato in ANSI conserva trattino lungo, apostrofo ed euro', 
     rmSync(base, { recursive: true, force: true });
   }
 });
-
-// Usato solo se la cartella temporanea non esiste ancora (difesa del test).
-export const _assicuraCartella = (p) => { try { mkdirSync(p, { recursive: true }); } catch (_) {} };
