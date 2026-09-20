@@ -75,13 +75,17 @@ test('lo stesso vale aprendo una scheda nuova, senza ricaricare niente', async (
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await configCondivisa(app, { provider: 'gemini' });
   await stubProviders(app);
-  await app.evaluate(() => {
-    const win = require('electron').BrowserWindow.getAllWindows()[0];
-    win._filoTabs.openTab('filo://newtab/newtab.html');
-  });
+  const prima = new Set(app.windows());
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/newtab.html'));
   await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 10_000 });
-  const pagine = app.windows().filter((w) => w.url().startsWith('filo://newtab'));
-  const page = pagine[pagine.length - 1];
+
+  const deadline = Date.now() + 10_000;
+  let page = null;
+  while (Date.now() < deadline && !page) {
+    page = app.windows().find((w) => !prima.has(w) && w.url().startsWith('filo://newtab'));
+    if (!page) await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!page) throw new Error('la scheda nuova non è comparsa');
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
 });
