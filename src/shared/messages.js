@@ -621,6 +621,12 @@
     // (Gli appunti non hanno più messaggi propri: sono file dell'editor, scritti
     // dall'azione SALVA_APPUNTO e letti aprendo l'editor.)
     FILO_GET_TIMERS: 'filo_get_timers',
+    // #517 — lo stato con cui il presidio delle azioni raccontate decide se
+    // una cosa esiste davvero: sveglie e conti alla rovescia attivi (col loro
+    // genere e giorno) e titoli degli appunti. Lo chiede il pannello Aiuto,
+    // che di suo vede solo la pagina; la chat della home lo legge dal main.
+    // Risposta: { ok, prove: { sveglie, orariSveglie, titoliAppunti, oggi } }
+    FILO_PROVE_AZIONI: 'filo_prove_azioni',
     FILO_ADD_TIMER: 'filo_add_timer',              // { label, seconds }
     FILO_DELETE_TIMER: 'filo_delete_timer',        // { id }
     FILO_PAUSE_TIMER: 'filo_pause_timer',          // { id } — mette in pausa un timer (congela il conto alla rovescia)

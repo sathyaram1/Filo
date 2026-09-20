@@ -2613,7 +2613,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // indietro, con dentro il motivo. Serve almeno un giro libero: al tetto
         // dei giri l'ultimo testo vale come risposta, non come tentativo.
         const rimedio = (Dichiarate && Tools && !rimandatoIndietro && round < MAX_ROUNDS)
-          ? spintaDiRimedio(Dichiarate, text, tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini), await statoDichiarazioni(renderedActions))
+          ? spintaDiRimedio(Dichiarate, text, tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini, userMessage), await statoDichiarazioni(renderedActions))
           : null;
         if (rimedio) {
           rimandatoIndietro = true;
@@ -2746,7 +2746,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // perché ogni appunto raccontato dopo passasse muto, e lo stesso per
       // l'evento in calendario, la segnalazione e l'apertura.
       const precedenti = Dichiarate.tipiDallaCronologia(threadHistory);
-      const adesso = tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini);
+      const adesso = tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini, userMessage);
       azioniMancate = Dichiarate.rileva(textReply, adesso, {
         ...(await statoDichiarazioni(renderedActions)), tipiPrecedenti: precedenti,
       });
