@@ -147,9 +147,9 @@
     const chat = items[idx];
     const prima = Array.isArray(chat.messages) ? chat.messages : [];
     const daAggiungere = senzaRiprova(prima, msgs);
-    if (!daAggiungere.length) return chat;
     chat.messages = prima.concat(daAggiungere);
-    chat.updatedAt = daAggiungere[daAggiungere.length - 1].ts || new Date().toISOString();
+    chat.updatedAt = (daAggiungere.length && daAggiungere[daAggiungere.length - 1].ts)
+      || new Date().toISOString();
     // Riaprire una chat chiusa e continuare a scrivere la rimette in vita: non
     // resta «chiusa ieri» con dentro un messaggio di oggi. La riclassificazione
     // avverrà alla prossima chiusura.
