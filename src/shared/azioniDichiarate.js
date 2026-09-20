@@ -1093,6 +1093,15 @@
       const t = tipoDichiarato(s);
       return !nomi || !t || nomi.has(t);
     }
+    // Giro 7: la LISTA di chiamate con «name» e «arguments». È la forma con
+    // cui un modello ne dichiara più di una insieme, e da sola non veniva
+    // riconosciuta: in chat restava un blocco di codice e la sveglia non
+    // c'era.
+    if (/^\[\s*\{[\s\S]*"(?:name|function|tool|tool_name)"\s*:/.test(s)
+      && /"(?:arguments|parameters|args|input)"\s*:/.test(s)) {
+      const n = nomeDichiarato(s);
+      return !nomi || !n || nomi.has(n);
+    }
     // La busta a tag dei modelli aperti. Quando finisce nel testo invece che
     // nel canale degli strumenti è lo stesso guasto: in chat resta un blocco
     // di codice e la sveglia non c'è. Il tag si nomina per esteso: un `<div>`
