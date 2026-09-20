@@ -15,7 +15,9 @@ const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
 const { MSG } = SN_MSG;
 const Storage = globalThis.SN_STORAGE;
-const Providers = globalThis.SN_PROVIDERS;
+// #591 — i fornitori NON si raggiungono da qui: si passa dal cancello unico
+// (limite di spesa, conteggio dei costi, chi ha servito). Vedi modelGate.js.
+const Gate = globalThis.SN_MODEL_GATE;
 const Costs = globalThis.SN_COSTS;
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
@@ -363,12 +365,10 @@ function openWeightsConfigError(settings, action, droppedRefs) {
   return e;
 }
 
+// Il limite di spesa ha una sola implementazione, ed è nel cancello (#591).
+// Queste due restano come nomi storici per chi le importa.
 async function ensureUnderLimit(settings) {
-  if (await Costs.isOverLimit(settings.monthlyLimitEur)) {
-    const e = new Error(I18n.t('err_limit_reached'));
-    e.code = 'LIMIT_REACHED';
-    throw e;
-  }
+  return Gate.ensureUnderLimit(settings);
 }
 
 // Oltre il limite di spesa nessun tentativo parte: non esiste più un fornitore
@@ -520,6 +520,16 @@ function noteServedProvider(settings, action, result) {
   return { servedBy, violation };
 }
 
+// #591 — il cancello unico riceve qui quello che sa fare handlers.js. Da questo
+// momento ogni chiamata a un fornitore passa da lui: chi lo salta non trova
+// nessun altro modo di arrivare a SN_PROVIDERS (sentinella negli unit test).
+Gate.configure({
+  modelForAction,
+  buildAttemptChain,
+  providerRouting,
+  noteServedProvider,
+});
+
 // ─── Chi ha servito, a posteriori (voce e dettatura) ─────────────────────────
 // Per le chiamate audio il router non mette il fornitore nella risposta; lo si
 // chiede dopo con l'id della generazione, che diventa leggibile qualche secondo
@@ -530,8 +540,7 @@ function noteServedProvider(settings, action, result) {
 // riporta lì (la lettura ad alta voce non lo dice nella risposta).
 function auditServedByLater({ settings, action, provider, model, apiKey, generationId, historyId, recordCost, keySource = '' }) {
   if (!generationId) return;
-  const P = Providers.getProvider(provider);
-  if (!P || typeof P.lookupServedBy !== 'function') return;
+  if (!Gate.canLookupServedBy(provider)) return;
   const delays = [4000, 10000, 25000];
   let i = 0;
   const schedule = () => {
@@ -541,7 +550,7 @@ function auditServedByLater({ settings, action, provider, model, apiKey, generat
   };
   const tick = async () => {
     let r = null;
-    try { r = await P.lookupServedBy({ apiKey, generationId }); } catch (_) { r = null; }
+    try { r = await Gate.lookupServedBy({ provider, apiKey, generationId }); } catch (_) { r = null; }
     if (!r || !r.servedBy) { schedule(); return; }
     const { servedBy, violation } = noteServedProvider(settings, action, { servedBy: r.servedBy });
     if (historyId) {
@@ -565,10 +574,6 @@ function auditServedByLater({ settings, action, provider, model, apiKey, generat
 // nella forma vecchia, { dataUrl, lang }.
 async function handleTranscription({ settings, payload, origin, signal }) {
   const p = payload || {};
-  const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
-  const attempts = await applyLimitToChain(
-    settings, buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO),
-  );
   let audioBase64 = typeof p.audioBase64 === 'string' ? p.audioBase64 : '';
   let format = typeof p.format === 'string' && p.format ? p.format : 'wav';
   if (!audioBase64 && typeof p.dataUrl === 'string') {
@@ -587,54 +592,45 @@ async function handleTranscription({ settings, payload, origin, signal }) {
   const Voices = globalThis.SN_TTS_VOICES;
   const language = Voices ? Voices.langOf(p.lang) : '';
   const routing = providerRouting(settings);
-  let lastErr = null;
-  for (const a of attempts) {
-    const P = Providers.getProvider(a.provider);
-    if (!P || typeof P.transcribe !== 'function' || !a.model) continue;
+  // Il limite di spesa, la catena di ripiego e il conteggio del costo stanno nel
+  // cancello (#591): qui resta la sola chiamata di trascrizione. `pricing: null`
+  // perché la dettatura non si conta a token — il costo lo dice il router.
+  const { result: r, attempt: a, servedBy, violation, costEur } = await Gate.capability({
+    settings, action: ACTIONS.TRANSCRIBE_AUDIO, method: 'transcribe', pricing: null,
+    noneError: 'Nessun modello di dettatura disponibile',
+    onAttemptError: (e, att) => {
+      console.warn(`[SN] dettatura ${att.provider}/${att.model} fallita:`, e.message || e);
+    },
+    run: (P, att) => P.transcribe({
+      apiKey: att.apiKey, model: att.model, audioBase64, format,
+      language: language || undefined, providerRouting: routing, signal,
+    }),
+  });
+  const text = String(r.text || '').trim();
+  // Le trascrizioni PROVVISORIE della dettatura in diretta non vanno in
+  // cronologia: ne arriverebbe una al secondo, tutte sostituite dalla
+  // definitiva. Il costo però si registra sempre (lo fa il cancello).
+  let historyId = null;
+  if (!p.interim) {
     try {
-      const r = await P.transcribe({
-        apiKey: a.apiKey, model: a.model, audioBase64, format,
-        language: language || undefined, providerRouting: routing, signal,
+      const h = await History.append({
+        action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model, servedBy,
+        policyViolation: violation,
+        input: { lang: p.lang || '', seconds: (r.usage && r.usage.seconds) || 0 },
+        output: text, origin, costEur, usage: r.usage,
       });
-      const text = String(r.text || '').trim();
-      const { servedBy, violation } = noteServedProvider(settings, ACTIONS.TRANSCRIBE_AUDIO, r);
-      let costEur = 0;
-      try {
-        costEur = await Costs.record({
-          action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
-          usage: r.usage, pricing: null, usdToEur: settings.usdToEur,
-        });
-      } catch (_) {}
-      // Le trascrizioni PROVVISORIE della dettatura in diretta non vanno in
-      // cronologia: ne arriverebbe una al secondo, tutte sostituite dalla
-      // definitiva. Il costo però si registra sempre.
-      let historyId = null;
-      if (!p.interim) {
-        try {
-          const h = await History.append({
-            action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model, servedBy,
-            policyViolation: violation,
-            input: { lang: p.lang || '', seconds: (r.usage && r.usage.seconds) || 0 },
-            output: text, origin, costEur, usage: r.usage,
-          });
-          historyId = h && h.id;
-        } catch (_) {}
-      }
-      if (!servedBy) {
-        // La generazione si rilegge con la chiave che l'ha fatta: dopo un
-        // ripiego (#629) non è più quella con cui si era partiti.
-        auditServedByLater({
-          settings, action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
-          apiKey: r.keyUsed || a.apiKey, generationId: r.generationId, historyId,
-        });
-      }
-      return { text, model: a.model, provider: a.provider, costEur, usage: r.usage };
-    } catch (e) {
-      lastErr = e;
-      console.warn(`[SN] dettatura ${a.provider}/${a.model} fallita:`, e.message || e);
-    }
+      historyId = h && h.id;
+    } catch (_) {}
   }
-  throw lastErr || new Error('Nessun modello di dettatura disponibile');
+  if (!servedBy) {
+    // La generazione si rilegge con la chiave che l'ha fatta: dopo un
+    // ripiego (#629) non è più quella con cui si era partiti.
+    auditServedByLater({
+      settings, action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
+      apiKey: r.keyUsed || a.apiKey, generationId: r.generationId, historyId,
+    });
+  }
+  return { text, model: a.model, provider: a.provider, costEur, usage: r.usage };
 }
 
 // Il testo della risposta in diretta. Il campo "text" dentro il JSON di
@@ -728,9 +724,6 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
-  const attemptsRaw = buildAttemptChain(settings, model, action);
-  const attempts = await applyLimitToChain(settings, attemptsRaw);
-
   // Se il caller vuole il RAGIONAMENTO in diretta (es. la chat della home, #priorità1)
   // o la RISPOSTA in diretta (#420) usiamo il cammino in streaming, che espone i
   // thought summary del modello via onReasoning e il testo della risposta via
@@ -750,8 +743,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   const result = (onReasoning || onText || onToolCall)
     ? await (async () => {
         let acc = '';
-        const r = await Providers.streamCompleteWithFallback({
-          attempts, messages, tools, toolChoice, signal,
+        const r = await Gate.stream({
+          settings, action, messages, tools, toolChoice, signal,
           onDelta: (d) => {
             acc += d;
             mark('firstTextMs');
@@ -771,18 +764,15 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
         if (textStreamer) textStreamer.flush();
         return { ...r, text: r.text != null ? r.text : acc };
       })()
-    : await Providers.completeWithFallback({ attempts, messages, tools, toolChoice, signal });
+    : await Gate.complete({ settings, action, messages, tools, toolChoice, signal });
   timing.totalMs = Date.now() - t0;
   const toolCalls = Array.isArray(result.toolCalls) ? result.toolCalls : [];
   const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  const { servedBy, violation } = noteServedProvider(settings, action, result);
-  const pricing = settings.pricing?.[concreteModel];
-  const costEur = await Costs.record({
-    action, provider: usedProvider, model: concreteModel,
-    usage: result.usage, pricing, usdToEur: settings.usdToEur,
-  });
+  // Fornitore servente, chi ha davvero servito e costo li ha già risolti il
+  // cancello (#591): qui si legge soltanto il risultato.
+  const usedProvider = result.provider;
+  const concreteModel = result.model;
+  const { servedBy, violation, costEur } = result;
 
   if (
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
@@ -833,24 +823,16 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
 
-  await ensureUnderLimit(settings);
-  const attempts = buildAttemptChain(settings, model, action);
-
-  const result = await Providers.streamCompleteWithFallback({
-    attempts, messages, signal,
+  const result = await Gate.stream({
+    settings, action, messages, signal,
     onDelta: (delta) => { if (onDelta) onDelta(delta); },
     // Il provider è caduto DOPO aver già streamato dei delta: avvisa il
     // renderer di buttare il testo parziale prima che arrivi il fallback (#273).
     onReset: (info) => { if (onReset) onReset(info); },
   });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  const { servedBy, violation } = noteServedProvider(settings, action, result);
-  const pricing = settings.pricing?.[concreteModel];
-  const costEur = await Costs.record({
-    action, provider: usedProvider, model: concreteModel,
-    usage: result.usage, pricing, usdToEur: settings.usdToEur,
-  });
+  const usedProvider = result.provider;
+  const concreteModel = result.model;
+  const { servedBy, violation, costEur } = result;
 
   await History.append({
     action, provider: usedProvider, model: concreteModel, servedBy,
@@ -2939,9 +2921,6 @@ async function handleMessage(msg, sender = {}) {
 async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' } = {}) {
   if (!Array.isArray(tabs) || !tabs.length) return { decisions: [] };
   const settings = await getEffectiveSettings();
-  const model = modelForAction(settings, ACTIONS.FILO_TAB_TRIAGE);
-  const attemptsRaw = buildAttemptChain(settings, model, ACTIONS.FILO_TAB_TRIAGE);
-  const attempts = await applyLimitToChain(settings, attemptsRaw);
 
   const system = [
     'Sei il gestore delle schede del browser dell\'utente. Decidi quali schede',
@@ -3011,20 +2990,15 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
     { role: 'user', content: userParts.join('\n') },
   ];
 
-  const result = await Providers.completeWithFallback({ attempts, messages });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  try {
-    const pricing = settings.pricing?.[concreteModel];
-    await Costs.record({
-      action: ACTIONS.FILO_TAB_TRIAGE, provider: usedProvider, model: concreteModel,
-      usage: result.usage, pricing, usdToEur: settings.usdToEur,
-    });
-  } catch (_) {}
+  // Dal cancello unico (#591): limite di spesa, catena di ripiego, conteggio
+  // del costo e riscontro su chi ha servito, come per ogni altra chiamata.
+  const result = await Gate.complete({
+    settings, action: ACTIONS.FILO_TAB_TRIAGE, messages,
+  });
 
   const parsed = extractJson(result.text) || {};
   const decisions = Array.isArray(parsed.decisions) ? parsed.decisions : [];
-  return { decisions, model: concreteModel, provider: usedProvider };
+  return { decisions, model: result.model, provider: result.provider };
 }
 
 // ─── §3.2 ricerca semantica dell'archivio ───────────────────────────────────
@@ -3049,18 +3023,7 @@ function cosineInt(a, b) {
 // registra il costo). Ritorna il testo. Usato da riassunto, triage, re-rank.
 async function runOneShot(action, messages) {
   const settings = await getEffectiveSettings();
-  const model = modelForAction(settings, action);
-  const attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, action));
-  const result = await Providers.completeWithFallback({ attempts, messages });
-  const usedProvider = result.provider || attempts[0].provider;
-  const concreteModel = result.model || attempts[0].model;
-  try {
-    const pricing = settings.pricing?.[concreteModel];
-    await Costs.record({
-      action, provider: usedProvider, model: concreteModel,
-      usage: result.usage, pricing, usdToEur: settings.usdToEur,
-    });
-  } catch (_) {}
+  const result = await Gate.complete({ settings, action, messages });
   return result.text || '';
 }
 
@@ -3097,38 +3060,36 @@ async function summarizeTab(title, content) {
 // Ritorna { vectors, model }: il nome del modello viaggia coi vettori perché
 // vettori di modelli diversi non sono confrontabili — la ricerca confronta
 // solo quelli fatti dal modello in uso e reindicizza gli altri.
-function embedAttempt(settings) {
-  try {
-    const attempts = buildAttemptChain(
-      settings, modelForAction(settings, ACTIONS.ARCHIVE_EMBED), ACTIONS.ARCHIVE_EMBED,
-    );
-    return attempts.find((a) => {
-      const P = Providers.getProvider(a.provider);
-      return P && typeof P.embed === 'function' && a.model;
-    }) || null;
-  } catch (_) { return null; /* nessun modello configurato → niente indicizzazione */ }
+// Una funzione SCOPERTA (nessun modello, nessuna chiave, nessun equivalente a
+// pesi aperti) non è un guasto per l'indicizzazione: si sta zitti e la ricerca
+// per parole continua a funzionare. Il limite di spesa invece si propaga, come
+// prima: chi indicizza deve sapere perché si è fermato.
+function isModelConfigError(e) {
+  const c = e && e.code;
+  return c === 'NO_MODEL_FOR_ACTION' || c === 'NO_OPEN_WEIGHTS_MODEL' || c === 'NO_API_KEY'
+    || c === 'NO_CAPABLE_MODEL';
 }
 
 async function embedTexts(texts, settingsIn) {
   const settings = settingsIn || await getEffectiveSettings();
-  const a = embedAttempt(settings);
-  if (!a) return null;
-  // Stesso limite di spesa delle altre funzioni: oltre il limite niente
-  // indicizzazione (la ricerca per parole continua a funzionare).
-  await ensureUnderLimit(settings);
-  const P = Providers.getProvider(a.provider);
-  const r = await P.embed({
-    apiKey: a.apiKey, model: a.model, texts, dim: SN_CONST.EMBED_DIM,
-    providerRouting: providerRouting(settings),
-  });
-  noteServedProvider(settings, ACTIONS.ARCHIVE_EMBED, r);
+  // Dal cancello unico (#591): limite di spesa, scelta del tentativo che sa
+  // davvero indicizzare, conteggio del costo e riscontro su chi ha servito.
+  let out = null;
   try {
-    await Costs.record({
-      action: ACTIONS.ARCHIVE_EMBED, provider: a.provider, model: a.model,
-      usage: r.usage, pricing: settings.pricing?.[a.model], usdToEur: settings.usdToEur,
+    out = await Gate.capability({
+      settings, action: ACTIONS.ARCHIVE_EMBED, method: 'embed',
+      noneError: 'Nessun modello di indicizzazione disponibile', noneCode: 'NO_CAPABLE_MODEL',
+      run: (P, a) => P.embed({
+        apiKey: a.apiKey, model: a.model, texts, dim: SN_CONST.EMBED_DIM,
+        providerRouting: providerRouting(settings),
+      }),
     });
-  } catch (_) {}
-  return { vectors: r.vectors || [], model: a.model };
+  } catch (e) {
+    if (isModelConfigError(e)) return null;
+    throw e;
+  }
+  if (!out) return null;
+  return { vectors: out.result.vectors || [], model: out.attempt.model };
 }
 
 // Reindicizza in background le schede i cui vettori vengono da un altro modello
@@ -3349,8 +3310,10 @@ async function wireSafebrowse(settingsArg) {
   // modelli). Solo METADATI (mai contenuto pagina) passano da llm.judge.
   const runLlm = sb.llmJudge === false ? null : async (messages) => {
     const s = await getEffectiveSettings();
-    const attempts = buildAttemptChain(s, modelForAction(s, ACTIONS.SAFEBROWSE_JUDGE), ACTIONS.SAFEBROWSE_JUDGE);
-    const r = await Providers.completeWithFallback({ attempts, messages });
+    // #591 — dal cancello unico: questo giudizio parte da solo, a ogni
+    // indirizzo non fidato, e prima non passava né dal limite di spesa né dal
+    // conteggio dei costi. Adesso conta e si ferma come tutto il resto.
+    const r = await Gate.complete({ settings: s, action: ACTIONS.SAFEBROWSE_JUDGE, messages });
     return r.text;
   };
   SB.configure({
@@ -3379,8 +3342,11 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   if (!geoClassifierCache) geoClassifierCache = Classifier.createCache();
   const complete = async ({ messages, signal }) => {
     const s = await getEffectiveSettings();
-    const attempts = buildAttemptChain(s, modelForAction(s, ACTIONS.GEOBLOCK_CLASSIFY), ACTIONS.GEOBLOCK_CLASSIFY);
-    const r = await Providers.completeWithFallback({ attempts, messages, signal });
+    // #591 — dal cancello unico: parte a ogni caricamento di pagina ambiguo e
+    // prima non passava né dal limite di spesa né dal conteggio dei costi.
+    const r = await Gate.complete({
+      settings: s, action: ACTIONS.GEOBLOCK_CLASSIFY, messages, signal,
+    });
     return r.text;
   };
   return Classifier.classify(input, { complete, cache: geoClassifierCache });

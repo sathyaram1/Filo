@@ -111,6 +111,10 @@ require(path.join(SVC, 'providers', 'index.js'));
 require(path.join(SVC, 'feedbackOutbox.js')); // #341 — coda invio feedback offline (dipende da SN_FEEDBACK + SN_STORAGE)
 require(path.join(SVC, 'creditStore.js'));
 require(path.join(SVC, 'costTracker.js'));
+// #591 — il passaggio obbligato per ogni chiamata a un fornitore di modelli
+// (limite di spesa, conteggio dei costi, chi ha servito). Dopo i fornitori e
+// il conteggio costi, che sono le due cose che usa.
+require(path.join(SVC, 'modelGate.js'));
 require(path.join(SVC, 'savedPages.js'));
 require(path.join(SVC, 'historyStore.js'));
 require(path.join(SVC, 'archivedTabs.js'));
@@ -135,6 +139,7 @@ module.exports = {
   get SN_MSG() { return globalThis.SN_MSG; },
   get SN_STORAGE() { return globalThis.SN_STORAGE; },
   get SN_PROVIDERS() { return globalThis.SN_PROVIDERS; },
+  get SN_MODEL_GATE() { return globalThis.SN_MODEL_GATE; },
   get SN_COSTS() { return globalThis.SN_COSTS; },
   get SN_CREDITS() { return globalThis.SN_CREDITS; },
   get SN_SAVED_PAGES() { return globalThis.SN_SAVED_PAGES; },

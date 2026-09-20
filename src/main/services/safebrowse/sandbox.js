@@ -12,12 +12,92 @@
 //   - Non bloccare MAI il click su questo controllo (è sempre async/background).
 //   - Niente caccia alla perfezione anti-rilevamento.
 //
+// #591 — una finestra nascosta con JavaScript attivo è una risorsa vera, e di
+// queste non c'era né un tetto al numero né uno al tempo di vita: bastavano
+// indirizzi con sottodomini sempre nuovi per farne aprire quante se ne
+// volevano, ciascuna potenzialmente per sempre (il timer di attesa veniva
+// annullato appena la pagina finiva di caricare, e da lì in poi niente la
+// chiudeva più). Adesso ne girano al massimo MAX_CONCURRENT; le altre
+// aspettano in coda, la coda ha un fondo e un'attesa massima, e OGNI finestra
+// ha un tetto di vita che nessun cammino può disinnescare.
+//
 // Richiede Electron (BrowserWindow/session) → funziona solo a runtime nel main.
 // In ambiente senza Electron ritorna null.
 
 'use strict';
 
 const DETONATE_TIMEOUT_MS = 9000;
+// Tetto di vita della finestra, non annullabile da nessun evento: copre il
+// caricamento più il tempo di valutare l'URL finale. Scaduto questo, la
+// finestra viene distrutta comunque.
+const HARD_LIFETIME_MS = 15000;
+// Quante finestre nascoste possono esistere insieme. Due bastano a non
+// serializzare del tutto il controllo e restano poche abbastanza da non pesare.
+const MAX_CONCURRENT = 2;
+// Quante richieste possono aspettare. Oltre, si rinuncia subito invece di
+// accumulare lavoro che nessuno leggerà più.
+const MAX_QUEUE = 16;
+// Quanto può aspettare una richiesta in coda prima di rinunciare.
+const MAX_QUEUE_WAIT_MS = 30 * 1000;
+
+// ─── Tetto di concorrenza con coda ──────────────────────────────────────────
+// Logica pura (nessun Electron): si prova per quello che è negli unit test.
+// `run(task)` ritorna { refused, reason?, value? }: rifiutata vuol dire che il
+// controllo non è stato fatto, non che il sito è pulito.
+function createConcurrencyGate({
+  maxConcurrent = MAX_CONCURRENT,
+  maxQueue = MAX_QUEUE,
+  maxWaitMs = MAX_QUEUE_WAIT_MS,
+} = {}) {
+  let active = 0;
+  const waiting = [];
+
+  function acquire() {
+    if (active < maxConcurrent) { active++; return Promise.resolve('ok'); }
+    if (waiting.length >= maxQueue) return Promise.resolve('queue_full');
+    return new Promise((resolve) => {
+      const entry = { settle: null, timer: null };
+      entry.settle = (reason) => {
+        if (entry.timer) { clearTimeout(entry.timer); entry.timer = null; }
+        resolve(reason);
+      };
+      entry.timer = setTimeout(() => {
+        const i = waiting.indexOf(entry);
+        if (i >= 0) waiting.splice(i, 1);
+        entry.settle('queue_timeout');
+      }, maxWaitMs);
+      if (entry.timer && typeof entry.timer.unref === 'function') entry.timer.unref();
+      waiting.push(entry);
+    });
+  }
+
+  // Il posto liberato passa a chi aspetta, senza fare scendere il contatore:
+  // altrimenti fra il rilascio e la ripresa del chiamante in coda ci sarebbe
+  // una finestra in cui ne partono più di maxConcurrent.
+  function release() {
+    const next = waiting.shift();
+    if (next) next.settle('ok');
+    else active = Math.max(0, active - 1);
+  }
+
+  async function run(task) {
+    const slot = await acquire();
+    if (slot !== 'ok') return { refused: true, reason: slot };
+    try {
+      return { refused: false, value: await task() };
+    } finally {
+      release();
+    }
+  }
+
+  return {
+    run,
+    get active() { return active; },
+    get queued() { return waiting.length; },
+  };
+}
+
+const gate = createConcurrencyGate();
 
 let _electron = null;
 function electron() {
@@ -29,10 +109,21 @@ function electron() {
 
 // `evaluateFinal(finalUrl)` è iniettata: ri-valuta l'URL finale con l'engine
 // (segnali locali) per capire se la destinazione vera è ingannevole.
-async function detonate(url, evaluateFinal) {
-  const el = electron();
+// `opts.electron` serve agli unit test (in produzione non si passa: il modulo
+// se lo prende da sé).
+async function detonate(url, evaluateFinal, opts = {}) {
+  const el = opts.electron || electron();
   if (!el || !el.BrowserWindow || !el.session) return null;
 
+  // Oltre il tetto (o dopo troppa attesa in coda) si rinuncia: nessuna finestra
+  // viene aperta e il verdetto resta "non pervenuto" — che NON finisce in
+  // cache, così al prossimo passaggio si riprova.
+  const out = await gate.run(() => detonateNow(el, url, evaluateFinal));
+  if (out.refused) return null;
+  return out.value;
+}
+
+async function detonateNow(el, url, evaluateFinal) {
   const partition = `filo-detonate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const ses = el.session.fromPartition(partition, { cache: false });
 
@@ -74,14 +165,26 @@ async function detonate(url, evaluateFinal) {
   };
 
   return await new Promise((resolve) => {
+    let timer = null;
+    let hardTimer = null;
+
     const done = (verdict, extra = {}) => {
       if (finished) return;
       finished = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (hardTimer) { clearTimeout(hardTimer); hardTimer = null; }
       cleanup();
       resolve({ verdict, finalUrl, redirects, download: downloadStarted ? (downloadName || true) : false, ...extra });
     };
 
-    const timer = setTimeout(() => done(downloadStarted ? 'dangerous' : 'clean'), DETONATE_TIMEOUT_MS);
+    timer = setTimeout(() => done(downloadStarted ? 'dangerous' : 'clean'), DETONATE_TIMEOUT_MS);
+    // Il tetto di vita: nessun cammino lo annulla, solo `done`. Prima, appena la
+    // pagina finiva di caricare il timer di attesa veniva annullato e una
+    // valutazione dell'URL finale che non tornava mai lasciava la finestra
+    // viva, con JavaScript attivo, per tutta la sessione.
+    hardTimer = setTimeout(() => done(downloadStarted ? 'dangerous' : null, { timedOut: true }), HARD_LIFETIME_MS);
+    if (timer && typeof timer.unref === 'function') timer.unref();
+    if (hardTimer && typeof hardTimer.unref === 'function') hardTimer.unref();
 
     try {
       wc.on('did-redirect-navigation', (_e, u) => { if (u) { redirects.push(u); finalUrl = u; } });
@@ -90,7 +193,7 @@ async function detonate(url, evaluateFinal) {
       wc.setWindowOpenHandler(() => ({ action: 'deny' }));
 
       wc.on('did-stop-loading', async () => {
-        clearTimeout(timer);
+        if (timer) { clearTimeout(timer); timer = null; }
         // Verdetto: download forzato → pericoloso. Altrimenti valuta l'URL
         // finale: se la destinazione vera è impersonazione/blacklist → pericoloso.
         if (downloadStarted) return done('dangerous');
@@ -112,10 +215,15 @@ async function detonate(url, evaluateFinal) {
 
       wc.loadURL(url).catch(() => done(downloadStarted ? 'dangerous' : 'clean'));
     } catch (_) {
-      clearTimeout(timer);
       done(null);
     }
   });
 }
 
-module.exports = { detonate };
+module.exports = {
+  detonate,
+  createConcurrencyGate,
+  LIMITS: { MAX_CONCURRENT, MAX_QUEUE, MAX_QUEUE_WAIT_MS, HARD_LIFETIME_MS, DETONATE_TIMEOUT_MS },
+  // Quante finestre nascoste ci sono adesso e quante aspettano (diagnostica e test).
+  stats() { return { active: gate.active, queued: gate.queued }; },
+};

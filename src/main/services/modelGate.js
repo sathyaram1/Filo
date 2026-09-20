@@ -150,7 +150,7 @@
   // registra auditServedByLater).
   async function capability({
     settings, action, modelRef, method, run,
-    requireModel = true, record, pricing, onAttemptError, noneError,
+    requireModel = true, record, pricing, onAttemptError, noneError, noneCode,
   }) {
     const attempts = await chain({ settings, action, modelRef });
     const P0 = providers();
@@ -172,7 +172,13 @@
         if (onAttemptError) { try { onAttemptError(e, a); } catch (_) {} }
       }
     }
-    throw lastErr || new Error(noneError || 'Nessun modello disponibile');
+    if (lastErr) throw lastErr;
+    // Nessun tentativo sa fare questo mestiere: è un problema di CONFIGURAZIONE,
+    // e chi chiama deve poterlo distinguere da un guasto (l'indicizzazione, per
+    // esempio, tace e lascia lavorare la ricerca per parole).
+    const none = new Error(noneError || 'Nessun modello disponibile');
+    if (noneCode) none.code = noneCode;
+    throw none;
   }
 
   // ─── Prove dalle Opzioni e dalla pagina di amministrazione ────────────────
@@ -185,7 +191,10 @@
     await ensureUnderLimit(settings);
     const P = providers().getProvider(provider);
     const result = await run(P);
-    if (result && record !== false) {
+    // Il costo si registra solo se la chiamata è davvero arrivata al modello:
+    // un rifiuto locale ("questo fornitore non sa leggere ad alta voce") non è
+    // una riga di spesa da zero euro nel conto del mese.
+    if (result && result.usage && record !== false) {
       const C = costs();
       if (C) {
         const listino = pricing !== undefined

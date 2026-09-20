@@ -190,8 +190,10 @@ function safeImageFilename(name) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, getEffectiveSettings, modelForAction, buildAttemptChain, broadcastToTabs } = ctx;
+  const { MSG, winOf, getEffectiveSettings, broadcastToTabs } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
+  // #591 — i fornitori si raggiungono solo dal cancello unico.
+  const Gate = globalThis.SN_MODEL_GATE;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
   // dell'invio (es. "gestione segreti"). Best-effort: se la catena modelli non
@@ -203,15 +205,15 @@ module.exports = function register(on, ctx) {
     if (!t) return fallback;
     try {
       const settings = await getEffectiveSettings();
-      const attempts = buildAttemptChain(
-        settings, modelForAction(settings, ACTIONS.FEEDBACK_TITLE), ACTIONS.FEEDBACK_TITLE,
-      );
       const messages = [{
         role: 'user',
         content: 'Genera un titolo brevissimo (2-6 parole, nella stessa lingua del testo) che riassuma questo feedback su un\'app. Rispondi SOLO col titolo, senza virgolette e senza punto finale.\n\nFeedback:\n' + t.slice(0, 1500),
       }];
+      // Dal cancello unico (#591): limite di spesa e conteggio del costo come
+      // ogni altra chiamata. Oltre il limite il titolo non parte e si ripiega
+      // sulle prime parole del testo — l'invio del feedback non ne risente.
       const r = await Promise.race([
-        globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages }),
+        Gate.complete({ settings, action: ACTIONS.FEEDBACK_TITLE, messages }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout titolo (8s)')), 8000)),
       ]);
       const name = String(r?.text || '').trim()
