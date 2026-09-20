@@ -82,6 +82,21 @@ test('il «confermo» su una truffa toglie la pagina rossa a una truffa diversa 
     .toBe('pericoloso');
 });
 
+// La stessa identità sbagliata, nella direzione opposta: qui non abbassa la
+// guardia, l'alza su chi non c'entra. L'esito del certificato è ricordato per
+// dominio registrabile, quindi il certificato scaduto di UN sito ospitato
+// dichiara «connessione non protetta» su tutti i vicini — col nome della
+// piattaforma al posto del nome del sito.
+test('il certificato scaduto di un sito ospitato mette l\'avviso sui vicini', async () => {
+  pulisci();
+  expect(SB.checkSync('https://portfolio-di-marco.pages.dev/', {}).level).toBe('safe');
+
+  SB.recordCert('pages.dev', 'expired');
+
+  const v = SB.checkSync('https://portfolio-di-marco.pages.dev/', {});
+  expect(v.level, 'il certificato di un altro sito non dice niente su questo').toBe('safe');
+});
+
 test('anche l\'avviso giallo chiuso una volta non torna sui vicini', async () => {
   pulisci();
   const tm = scheda();
