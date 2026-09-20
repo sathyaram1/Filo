@@ -69,7 +69,7 @@
   // conversazione. Da lì in poi un'azione emessa prima non le copre più:
   // senza, bastava che il modello ripetesse la stessa cosa con un «già»
   // davanti perché il pannello tacesse.
-  let famiglieMancate = new Set();
+  let famiglieMancate = new Map();
   // La domanda a cui il modello sta rispondendo: «l'hai mandata?» è un'altra
   // cosa da «me la mandi?», e solo la prima lascia che un'azione di prima
   // regga la risposta.
@@ -109,7 +109,7 @@
         tipiEmessi: [...emessi],
         tipiPrecedenti: [...azioniFiloEmesse].filter((t) => !emessi.has(t)),
         domandaUtente: domandaSuCosaFatta,
-        famiglieGiaMancate: [...famiglieMancate],
+        famiglieGiaMancate: [...famiglieMancate.values()],
         // Questo turno non ha più un ritentativo davanti (o non può averlo,
         // perché porta un'azione da eseguire): quello che trova adesso è
         // definitivo, e il main lo scrive accanto al turno come fa la chat
@@ -131,7 +131,7 @@
     renderRifallo(appendChatMessage('avviso', D.avvisoPerUtente(fantasmi)));
     // #517 (giro 8) — da qui in poi, su queste famiglie, un'azione emessa
     // prima non copre più niente.
-    for (const f of fantasmi) { if (f && f.id) famiglieMancate.add(String(f.id)); }
+    for (const f of fantasmi) { if (f && f.id) famiglieMancate.set(`${f.id}|${f.verbo || ''}`, { id: String(f.id), verbo: String(f.verbo || '') }); }
     console.warn('[Filo] #517 azione dichiarata e mai emessa nell\'Aiuto:',
       fantasmi.map((f) => `${f.id} ← «${f.frase}»`).join(' | '));
   }
@@ -191,7 +191,7 @@
     // reggere le frasi di quella nuova.
     azioniFiloEmesse = new Set();
     azioniDelTurno = new Set();
-    famiglieMancate = new Set();
+    famiglieMancate = new Map();
     domandaSuCosaFatta = false;
     rimandiFuoriFormato = 0;
   }

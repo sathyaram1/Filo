@@ -203,7 +203,7 @@ module.exports = function register(on, ctx) {
       // #517 (giro 8) — le famiglie già smentite in questa conversazione: lì
       // un'azione emessa prima non copre più niente, altrimenti bastava che
       // il modello ripetesse la stessa cosa con un «già» davanti.
-      const giaMancate = new Set(Array.isArray(msg.famiglieGiaMancate) ? msg.famiglieGiaMancate : []);
+      const giaMancate = Array.isArray(msg.famiglieGiaMancate) ? msg.famiglieGiaMancate : [];
       const fantasmi = D.rileva(String(msg.testo || ''),
         new Set(Array.isArray(msg.tipiEmessi) ? msg.tipiEmessi : []),
         {
@@ -223,11 +223,11 @@ module.exports = function register(on, ctx) {
           await FiloMem.appendRaw({
             type: 'chat_aiuto',
             summary: String(msg.testo || '').slice(0, 200),
-            extra: { azioniMancate: fantasmi.map((f) => ({ id: f.id, frase: f.frase })) },
+            extra: { azioniMancate: fantasmi.map((f) => ({ id: f.id, frase: f.frase, verbo: f.verbo || '' })) },
           });
         } catch (_) {}
       }
-      return { ok: true, fantasmi: fantasmi.map((f) => ({ id: f.id, avviso: f.avviso, frase: f.frase })) };
+      return { ok: true, fantasmi: fantasmi.map((f) => ({ id: f.id, avviso: f.avviso, frase: f.frase, verbo: f.verbo || '' })) };
     } catch (_) { return { ok: true, fantasmi: [] }; }
   });
 

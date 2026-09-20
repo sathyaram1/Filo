@@ -2799,7 +2799,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // «ha detto di aver fatto X, e X non è mai stata chiamata».
     extra: (() => {
       const extra = { actions: actionsToRun };
-      if (azioniMancate.length) extra.azioniMancate = azioniMancate.map((f) => ({ id: f.id, frase: f.frase }));
+      if (azioniMancate.length) extra.azioniMancate = azioniMancate.map((f) => ({ id: f.id, frase: f.frase, verbo: f.verbo || '' }));
       if (formatoMancato) extra.formatoMancato = true;
       return extra;
     })(),

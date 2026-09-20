@@ -878,7 +878,7 @@
       // stessa cosa con un «già» davanti, e senza questa traccia un'azione
       // fatta prima nella conversazione tornava a coprirla.
       if (Array.isArray(r.azioniMancate) && r.azioniMancate.length) {
-        entry.azioniMancate = r.azioniMancate.map((f) => ({ id: f.id, frase: f.frase }));
+        entry.azioniMancate = r.azioniMancate.map((f) => ({ id: f.id, frase: f.frase, verbo: f.verbo || '' }));
       }
       if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
