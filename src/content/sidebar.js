@@ -994,6 +994,9 @@
         setTimeout(() => submit({ userAction: NUDGE_FUORI_FORMATO, preActionUrl: location.href }), 50);
         return;
       }
+      // Una risposta arrivata bene chiude il conto: il rimbalzo è uno per
+      // turno sbagliato, non uno per sessione.
+      if (!parsed.fuoriFormato) rimandiFuoriFormato = 0;
 
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
       // mostra il log in chat, poi rilancia un turno con i risultati come
