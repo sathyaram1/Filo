@@ -437,7 +437,7 @@
     // volte, non un secondo fatto mai successo.
     if (pronome && !out.length) {
       const libere = [...presenti].some((x) => !impegnati.has(x));
-      const ripete = pronome.verbo && radici.has(pronome.verbo);
+      const ripete = pronome.verbo && radiciRette.has(pronome.verbo);
       if (!libere && !ripete) {
         out.push({ id: 'senza-nome', avviso: 'non è partito niente', tipi: [], frase: pronome.frase });
       }
