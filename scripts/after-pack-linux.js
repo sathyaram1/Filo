@@ -29,15 +29,20 @@
 //   file lanciato a mano, cartella estratta, voce di menu) partono nello stesso
 //   modo.
 //
-// PERCHÉ NON SI TIENE LA GABBIA DOVE FUNZIONA
-//   Si potrebbe indovinare, leggendo le manopole del kernel, se la gabbia
-//   reggerebbe, e aggiungere `--no-sandbox` solo dove non regge. Indovinare
-//   male in un verso costa una difesa; indovinare male nell'altro costa
-//   un'applicazione che non si apre, cioè il difetto che questo passo chiude.
-//   Un sistema può negare quel permesso in modi che le manopole non dicono, e
-//   il primo avvio deve riuscire sempre. Se un giorno Filo per Linux uscirà
-//   anche in un formato che si installa davvero (un .deb), lì la gabbia resta
-//   e questo lanciatore non serve.
+// LA GABBIA SI TIENE DOVE IL SISTEMA LA LASCIA
+//   Filo è un browser: apre siti qualunque, e la gabbia di Chromium è la
+//   barriera fra quei siti e il resto del computer. Spegnerla per tutti quelli
+//   che stanno su Linux, anche dove funziona benissimo, sarebbe pagare tutta la
+//   difesa per il problema di una parte. Quindi il lanciatore guarda prima le
+//   manopole del kernel che decidono la faccenda, e aggiunge `--no-sandbox`
+//   SOLO dove dicono di no. Su Ubuntu 22.04, su Fedora, su Arch, su Debian,
+//   Filo parte protetto come prima. Le manopole sono tre e sono tutte quelle
+//   che portano a «No usable sandbox!»:
+//     · apparmor_restrict_unprivileged_userns, la restrizione di Ubuntu 23.10+;
+//     · user/max_user_namespaces a zero;
+//     · unprivileged_userns_clone a zero, la forma vecchia di Debian e Arch.
+//   Se un giorno Filo per Linux uscirà anche in un formato che si installa
+//   davvero (un .deb), lì la gabbia regge sempre e il lanciatore non serve.
 
 const fs = require('node:fs');
 const path = require('node:path');
