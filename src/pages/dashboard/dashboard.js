@@ -829,6 +829,18 @@
         note.textContent = window.SN_WALLET.ownKeyFallbackLine(r.keyFallback.status);
         bubblesEl.appendChild(note);
       }
+      // #517 — la risposta dice di aver già fatto una cosa che non è mai stata
+      // eseguita (e il turno era già stato rimandato indietro una volta): qui
+      // finiva tutto in silenzio, e l'utente lo scopriva la mattina in cui la
+      // sveglia non suonava. La riga non è un errore — la risposta c'è — ma si
+      // vede: sotto la bolla, con l'accento, e dice cosa NON è successo.
+      if (r.avvisoAzioni) {
+        const avviso = document.createElement('div');
+        avviso.className = 'dash-bubble-note dash-bubble-avviso';
+        avviso.dataset.azioniMancate = (r.azioniMancate || []).map((f) => f.id).join(',');
+        avviso.textContent = r.avvisoAzioni;
+        bubblesEl.appendChild(avviso);
+      }
       // Il ragionamento del turno entra nello storico del thread insieme al
       // messaggio. Il testo resta con la conversazione; i blocchi strutturati
       // del fornitore (reasoningDetails) tornano al modello al turno dopo,
