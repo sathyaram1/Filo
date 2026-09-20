@@ -531,6 +531,11 @@
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
 
     openMenu = menu;
+    // Il fuoco entra nel menu, non sulla prima voce: la freccia giù sceglie la
+    // prima, e finché nessuna è scelta Invio non fa partire niente per sbaglio.
+    fuocoPrimaDelMenu = document.activeElement;
+    menu.tabIndex = -1;
+    try { menu.focus(); } catch (_) {}
     // setTimeout: evita che il mousedown/click che ha aperto il menu lo chiuda
     // subito tramite il listener "outside click".
     setTimeout(() => {
