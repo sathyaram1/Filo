@@ -95,6 +95,18 @@
 
 .sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
 .sn-sidebar-msg-error   { color: var(--sn-error); }
+/* #517 — «l'ha detto e non l'ha fatto»: la riga che dice all'utente che in
+   questo turno non è stato eseguito niente. Segue l'accento scelto
+   dall'utente, come la riga gemella nella chat della home. */
+.sn-sidebar-msg-avviso {
+  align-self: flex-start;
+  max-width: 100%;
+  color: var(--sn-accent);
+  border-left: 2px solid var(--sn-accent);
+  padding-left: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
 
 /* Markdown leggero nelle risposte di Filo (#418): il contenuto e' HTML, quindi
    togliamo il pre-wrap (che renderebbe letterali gli a-capo tra i blocchi) e
