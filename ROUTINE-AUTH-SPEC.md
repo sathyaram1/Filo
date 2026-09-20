@@ -557,14 +557,31 @@ La regola, uguale per tutti e due:
   controllo di sicurezza su macchine diverse, quindi qui una sola impronta su
   due — che è il peggiore, perché sembra controllato più degli altri;
 - **l'impronta deve descrivere quello che chi fonde andrà DAVVERO a
-  prendere.** Il server non fonde la directory: scarica il ramo da GitHub. Un
-  commit rimasto solo qui (il salvataggio automatico prova a spedire e, se non
-  ci riesce, per costruzione lo scrive nei log e prosegue) fa sì che i via
-  libera parlino di un contenuto che non atterrerà mai, e ad atterrare sia
-  quello vecchio. È il gemello del rifiuto per le modifiche non salvate — lì
-  la punta si sposta in avanti dopo l'ok, qui non si è mai mossa dove conta —
-  e il citofono lo controlla prima di chiedere, con un tetto sul tempo perché
-  qui si parla con la rete.
+  prendere.** Il server non fonde la directory: scarica il ramo da GitHub e
+  fonde la sua PUNTA. Quindi il controllo è un'UGUAGLIANZA, la stessa che il
+  cammino locale pretende da sempre («su origin il ramo è a X, qui siamo a Y:
+  il server fonderebbe una versione diversa da quella controllata»), e le due
+  direzioni sono danni diversi con rimedi opposti. Se in cima c'è MENO — un
+  commit rimasto solo qui, perché il salvataggio automatico prova a spedire e,
+  se non ci riesce, per costruzione lo scrive nei log e prosegue — i via libera
+  parlano di un contenuto che non atterrerà mai e ad atterrare è quello
+  vecchio: si spedisce il ramo. Se in cima c'è DI PIÙ, spedire non c'entra: là
+  c'è lavoro che qui non c'è, sovrascriverlo lo butterebbe via, e gli esiti
+  sono decaduti come per un ramo mosso sotto i piedi, quindi si registra il
+  rientro in verifica. «Il contenuto esaminato è arrivato là» non è la domanda
+  giusta: un commit può stare nella storia del ramo senza essere quello che
+  atterra, e con il solo contenimento un ramo più avanti passava in silenzio
+  (verifica del giro 4). La punta vera si chiede a origin (`ls-remote`), non al
+  riferimento locale, che dice dov'ERA il ramo l'ultima volta che si è
+  guardato: se origin non risponde il citofono si astiene e lo dice, con un
+  tetto sul tempo perché qui si parla con la rete;
+- **il ramo nominato dev'essere quello su cui sta la directory.** Il citofono
+  legge tutto da lì: i file fuori dai commit, la punta, gli esiti registrati.
+  Con un nome di un altro ramo quei controlli parlano di uno e la richiesta ne
+  nomina un altro, e la versione dichiarata è di un ramo che non c'entra: le
+  guardie si astenevano una per una (di quel ramo non risulta niente) e la
+  richiesta partiva lo stesso. Adesso il nome e la directory devono combaciare,
+  ed è il primo controllo di tutti.
 
 Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
 `scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
