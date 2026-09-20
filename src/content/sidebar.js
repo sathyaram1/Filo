@@ -1223,6 +1223,11 @@
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
+          // #517 (giro 8) — il comando della barra parte, ma la stessa
+          // risposta raccontava anche una cosa che nessuno ha emesso:
+          // l'utente lo legge qui sotto. Il rimbalzo qui non si può fare,
+          // perché butterebbe via il comando insieme alla risposta.
+          mostraAzioniMancate(azioniMancate);
         }
         // Le azioni shell non modificano il DOM della pagina che l'agente vede
         // (o la sostituiscono del tutto, come "home"): di norma chiudono il turno.
