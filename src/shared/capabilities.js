@@ -303,9 +303,9 @@
     },
     {
       id: 'chat-archive', title: 'Ritrova le chat con Filo', category: 'save',
-      desc: 'Ogni conversazione con Filo resta sul tuo computer, per intero, e si ritrova nella stessa pagina delle schede chiuse. Le discussioni sono in vista; le chat che erano solo un comando ("metti una sveglia") stanno sotto un interruttore, e ci restano finché non le cancelli tu. Cerca una parola e ti trova la chat che la conteneva, anche a metà conversazione. Clicca una chat per riaprirla per intero e continuare a scrivere da dove eravate.',
+      desc: 'Le chat che fai con Filo nella nuova scheda restano sul tuo computer, per intero, e si ritrovano nella stessa pagina delle schede chiuse. Le discussioni sono in vista; le chat che erano solo un comando ("metti una sveglia") stanno sotto un interruttore, e ci restano finché non le cancelli tu. Cerca una parola e ti trova la chat che la conteneva, anche a metà conversazione. Clicca una chat per riaprirla per intero e continuare a scrivere da dove eravate.',
       invoke: 'Pagina filo://archive/archive.html, sezione «Chat con Filo» in alto. Clicca una chat per riaprirla; tasto destro per il menu Riapri/Elimina. La cancellazione chiede conferma.',
-      doesNot: 'Niente sparisce da solo: non c’è una pulizia automatica, e nessuna chat esce dal tuo computer. Le chat fatte in una finestra in incognito non vengono salvate.',
+      doesNot: 'Niente sparisce da solo: non c’è una pulizia automatica, e nessuna chat esce dal tuo computer. Le chat fatte in una finestra in incognito non vengono salvate. Non entrano qui le conversazioni con l’Aiuto che compare sopra le pagine web: quelle vivono finché la pagina è aperta. Le immagini che incolli in chat non si conservano; rileggendo la chat trovi scritto quante ce n’erano.',
     },
     {
       id: 'chat-archive-recall', title: 'Filo rilegge le vostre chat di prima', category: 'assistant',
