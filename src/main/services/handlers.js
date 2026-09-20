@@ -2094,7 +2094,7 @@ function transparencyDocsForPrompt(actions) {
     const out = a._output;
     if (!out || !out.text) continue;
     let body = String(out.text);
-    if (body.length > 16000) body = body.slice(0, 16000) + '\n…(documento troncato)';
+    if (body.length > 16000) body = `${tagliaInteri(body, 16000)}\n…(documento troncato)`;
     blocks.push(`[Documento di trasparenza di Filo${out.doc ? ` "${out.doc}"` : ''}]\n${body}`);
   }
   return blocks.join('\n\n').trim();
@@ -2209,7 +2209,7 @@ function fileReadsForPrompt(actions) {
       continue;
     }
     let body = String(out.text || '');
-    if (body.length > 8000) body = body.slice(0, 8000) + '\n…(contenuto troncato)';
+    if (body.length > 8000) body = `${tagliaInteri(body, 8000)}\n…(contenuto troncato)`;
     blocks.push(`[Contenuto completo del file "${out.title || out.fileRead}"]\n${body || '(vuoto)'}`);
   }
   return blocks.join('\n\n').trim();
