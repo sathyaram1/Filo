@@ -452,6 +452,7 @@
     goThread = deps.goThread;
     autoGrowInput = deps.autoGrowInput;
     refreshLive = deps.refreshLive;
+    if (deps.archiviaRiga) archiviaRiga = deps.archiviaRiga;
     if (deps.isTerminalMode) isTerminalMode = deps.isTerminalMode;
     if (deps.getShell) getShell = deps.getShell;
     if (deps.getCwd) getCwd = deps.getCwd;
