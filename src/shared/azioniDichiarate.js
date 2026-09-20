@@ -875,6 +875,11 @@
     return m ? m[1].toUpperCase() : '';
   }
 
+  function nomeDichiarato(s) {
+    const m = String(s).match(/"(?:name|function|tool|tool_name)"\s*:\s*"([A-Za-z_]{3,})"/);
+    return m ? m[1].toUpperCase() : '';
+  }
+
   function involucro(s, nomi) {
     if (!s) return false;
     // Il vecchio involucro del protocollo, o un oggetto vuoto al posto della
