@@ -2194,6 +2194,19 @@ function documentReadsForPrompt(actions) {
     }
     const meta = [];
     if (out.kind === 'pdf' && out.pages) meta.push(`${out.pages} ${out.pages === 1 ? 'pagina' : 'pagine'}`);
+    // #551 — il percorso chiesto non esisteva, ma nella cartella c'era un solo
+    // file col nome uguale a meno di accenti e trattini. È stato aperto quello:
+    // il modello deve sapere QUALE file ha in mano, e dirlo all'utente invece
+    // di far finta che il nome storpiato fosse giusto.
+    if (out.requested) {
+      const chiesto = E.perCanaleSistema(out.requested);
+      blocks.push(
+        `[Al percorso "${chiesto}" non c'era nessun file: nella stessa cartella ce n'era `
+        + `uno solo col nome uguale a meno di accenti, maiuscole e tipo di trattino, ed è quello `
+        + `che hai letto qui sotto. Il nome VERO è "${etichetta}": usa questo d'ora in poi, `
+        + `e dillo all'utente in una riga.]`,
+      );
+    }
     // #593 (terzo giro di verifica) — LA CORNICE LA SCRIVEVA IL DOCUMENTO.
     // Che il testo venga da fuori era già scritto, ma lo era in una riga fra
     // parentesi quadre come tutte le altre: un PDF che contiene quella stessa
