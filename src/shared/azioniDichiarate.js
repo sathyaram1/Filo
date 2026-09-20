@@ -366,7 +366,8 @@
       tipi: ['PULISCI_TAB', 'CANCELLA_ARCHIVIO'],
       avviso: 'le schede sono rimaste com\'erano',
       frasi: [
-        new RegExp(`${HO}(?:archiviato|chiuso|ripulito|eliminato|cancellato)\\b${PONTE(32)}\\b(?:le schede|le tab|dall'archivio|la cronologia)\\b`, 'i'),
+        // Giro 8: «svuotato», che è il verbo della cronologia.
+        new RegExp(`${HO}(?:archiviato|chiuso|ripulito|eliminato|cancellato|svuotato)\\b${PONTE(32)}\\b(?:le schede|le tab|dall'archivio|la cronologia)\\b`, 'i'),
       ],
     },
     {
