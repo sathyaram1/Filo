@@ -142,6 +142,13 @@ module.exports = function register(on, ctx) {
         // sotto fallisce a metà.
         await FB.castReopenRequest(id, uid, { idToken });
         created = await FB.submit({
+          // Un id d'invio STABILE per questa coppia (fix, persona): se la
+          // risposta si perde per strada ma il documento è nato lo stesso, un
+          // secondo tentativo non crea un doppione — il server lo riconosce e
+          // torna quello di prima. È ciò che rende sicuro rimettere a posto il
+          // segnale qui sotto quando la creazione fallisce: la porta si riapre
+          // per chi deve riprovare, e resta chiusa ai duplicati.
+          submissionId: `reopen-${id}-${uid}`,
           text: `[Riapertura #${original.seq || id}] ${text}`,
           // #583: l'URL e il titolo della pagina del feedback originale non
           // arrivano più fin qui — sono di chi l'aveva mandato, e la scheda
