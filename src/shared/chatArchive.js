@@ -246,12 +246,11 @@
     'avevamo', 'avevo', 'avevi', 'scorsa', 'scorso', 'settimana', 'fa',
   ]);
 
-  // Le parole della richiesta che davvero restringono il campo. Se non ne resta
-  // nessuna (l'utente ha cercato solo «di ieri») si tengono quelle che c'erano:
-  // meglio la ricerca stretta che una ricerca su niente.
+  // Le parole della richiesta che davvero restringono il campo: le altre le
+  // scrive chiunque, in qualunque chat.
   function terminiCheDistinguono(terms) {
-    const forti = terms.filter((t) => t.length > 3 && !PAROLE_CHE_NON_DISTINGUONO.has(t));
-    return forti.length ? forti : terms;
+    return (Array.isArray(terms) ? terms : [])
+      .filter((t) => t.length > 3 && !PAROLE_CHE_NON_DISTINGUONO.has(t));
   }
 
   function filtraPerTipo(chats, o) {
