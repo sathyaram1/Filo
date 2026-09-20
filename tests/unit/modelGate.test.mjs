@@ -200,6 +200,20 @@ test('togliere i commenti non porta via il codice che li circonda', () => {
   }
 });
 
+// La porta dell'indirizzo vale solo se l'elenco degli indirizzi si riempie
+// davvero: se la lettura dei fornitori smettesse di trovarli, la porta
+// sparirebbe in silenzio e la sentinella resterebbe verde per sempre.
+test('la porta dell\'indirizzo del fornitore esiste e non è vuota', () => {
+  const indirizzi = indirizziDeiFornitori();
+  assert.ok(indirizzi.length > 0, 'nessun indirizzo di fornitore trovato: la porta è spenta');
+  for (const h of indirizzi) {
+    assert.ok(
+      PORTE.some((p) => p.re.test(`https://${h}/api`)),
+      `l'indirizzo ${h} deve essere una porta sorvegliata`,
+    );
+  }
+});
+
 test('il cancello è caricato dal loader', () => {
   const loader = readFileSync(join(REPO, 'src/main/services/loader.js'), 'utf8');
   assert.match(loader, /modelGate\.js/, 'modelGate.js va aggiunto all\'ordine del loader');
