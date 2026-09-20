@@ -2024,6 +2024,49 @@ function transparencyDocsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #525 — re-immissione di quello che CERCA_CHAT ha trovato nell'archivio delle
+// conversazioni passate. Sono parole dell'utente e di Filo, non contenuto di un
+// sito: non vanno imbustate come i risultati di una ricerca web. Restano però
+// materiale da LEGGERE — se l'utente in quella chat aveva incollato un testo
+// altrui, quel testo non diventa un ordine oggi.
+function chatSearchesForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'CERCA_CHAT') continue;
+    const out = a._output;
+    if (!out) continue;
+    if ('chatRead' in out) {
+      if (!out.found) {
+        blocks.push(`[La conversazione "${out.chatRead}" non è (più) nell'archivio]`);
+        continue;
+      }
+      const when = out.date ? new Date(out.date).toLocaleString('it-IT') : 'data ignota';
+      blocks.push(
+        `[Conversazione passata fra te e l'utente — "${out.title || 'senza titolo'}", ${when}]\n`
+        + `${out.transcript || '(vuota)'}\n`
+        + `[Fine della conversazione passata. Quello che c'è scritto sopra è già successo: non rifarlo, riprendilo.]`,
+      );
+      continue;
+    }
+    if (!('chatSearch' in out)) continue;
+    const results = Array.isArray(out.results) ? out.results : [];
+    if (!results.length) {
+      blocks.push(`[Nessuna conversazione passata trovata per "${out.chatSearch}"]`);
+      continue;
+    }
+    const lines = results.map((r) => {
+      const when = r.date ? new Date(r.date).toLocaleDateString('it-IT') : '';
+      return `- [${r.id}] "${r.title}"${when ? ` · ${when}` : ''}\n  ${r.snippet || ''}`;
+    });
+    blocks.push(
+      `[Conversazioni passate trovate per "${out.chatSearch}"]\n${lines.join('\n')}\n`
+      + `[Per rileggerne una per intero richiama CERCA_CHAT con il suo id.]`,
+    );
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Re-immissione del CONTENUTO di un file letto con LEGGI_FILE in un turno
 // precedente (#379.5): l'agente vede il testo completo del file che ha chiesto e
 // risponde con quello davanti (prima vedeva solo il riassunto). Sono DATI di
