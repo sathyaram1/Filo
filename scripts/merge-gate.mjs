@@ -251,7 +251,7 @@ export function testoNonPubblicato(punta, suOrigin, ramo = '') {
   const r = String(ramo || '<ramo>');
   return 'fusione non chiesta: il contenuto esaminato non è arrivato su origin, e chi fonde non prende quello che c\'è in questa directory: scarica il ramo da lì.\n'
     + `  qui i via libera valgono per ${p}\n`
-    + `  su origin il ramo ${r} è fermo a ${o}\n`
+    + (o ? `  su origin il ramo ${r} è fermo a ${o}\n` : `  su origin il ramo ${r} non c'è proprio\n`)
     + 'Quello che verrebbe fuso è il contenuto vecchio, che nessuno ha esaminato, e la correzione non ci sarebbe nemmeno.\n'
     // Sorgente E destinazione, come ogni altro push del progetto: `origin <ramo>`
     // lascia scegliere l'arrivo alla configurazione locale di git, che è un file
