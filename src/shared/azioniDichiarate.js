@@ -1014,7 +1014,9 @@
   // La riga che l'utente legge sotto la risposta quando la dichiarazione è
   // rimasta senza azione anche dopo il ritentativo.
   function avvisoPerUtente(fantasmi) {
-    const lista = (Array.isArray(fantasmi) ? fantasmi : []).map((f) => f.avviso).filter(Boolean);
+    // Due dichiarazioni della stessa famiglia lasciano due voci, ma l'utente
+    // non deve leggere due volte «l'appunto non c'è».
+    const lista = [...new Set((Array.isArray(fantasmi) ? fantasmi : []).map((f) => f.avviso).filter(Boolean))];
     if (!lista.length) return '';
     const cose = lista.length === 1
       ? lista[0]
