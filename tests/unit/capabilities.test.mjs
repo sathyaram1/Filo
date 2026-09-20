@@ -105,6 +105,10 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // di memoria, che l'utente conosce già come "filo-memory". Non è una voce a
     // sé: nessuno chiede "compatta le lezioni", chiede "ricordati questo".
     'FILO_COMPACT_MEMORY',
+    // #517 — il controllo che smaschera un'azione raccontata e mai eseguita.
+    // Non è una cosa che l'utente chiede: è una guardia che gira da sola su
+    // ogni risposta, e quello che produce è la riga d'avviso sotto la bolla.
+    'FILO_AZIONI_RACCONTATE',
   ]);
 
   // Mappa handler → id della capacità che lo descrive nel manifesto. Più handler
