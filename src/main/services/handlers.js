@@ -2922,6 +2922,9 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   maybeRunCompactor,
+  // Archivio delle chat (#525)
+  closeAndTriageChat,
+  sweepPendingChats,
   // Intervista di benvenuto (#524)
   saveOnboarding,
   finishOnboarding,
