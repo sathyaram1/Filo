@@ -308,7 +308,7 @@ test('la ricerca stretta vince quando basta: non si allarga per niente', () => {
 test('con più parole che distinguono, in cima sta la chat che ne contiene di più', () => {
   const altra = {
     id: 'c3', title: 'Spinoza', kind: 'conversazione', closedAt: '2026-09-18T09:00:00.000Z',
-    messages: [{ role: 'user', text: 'Parliamo di Spinoza e del libero arbitrio' }],
+    messages: [{ role: 'user', text: 'Parliamo di Spinoza e della sostanza' }],
   };
   const r = CA.searchWide([altra, CHAT_COSCIENZA], 'coscienza arbitrio spinoza');
   assert.equal(r.results[0].id, 'c1', 'due parole su tre battono una su tre');
