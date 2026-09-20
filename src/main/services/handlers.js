@@ -952,6 +952,27 @@ async function maybeRunCompactor() {
 // safebrowse, cookie). È lo stesso percorso usato dal salvataggio dalla pagina
 // Preferenze: condividerlo garantisce che una modifica fatta da Filo via chat
 // si comporti esattamente come una fatta a mano (es. il tema cambia live).
+// Filo passa da «non ho un modello da chiamare» a «ce l'ho», o viceversa. Le
+// home già aperte lo devono sapere: l'accoglienza che aspettava parte e il
+// cartello sparisce, senza che l'utente ricarichi o apra una scheda nuova.
+// Le sorgenti sono due e arrivano in momenti diversi: la configurazione
+// condivisa (dalla rete, dopo l'avvio) e le impostazioni (chiave, modelli,
+// interruttore dei pesi aperti). Un solo avviso per tutte e due (#663).
+let _potevaRispondere = null;
+async function avvisaSeLaProntezzaCambia() {
+  let ora = false;
+  try {
+    const s = await getEffectiveSettings();
+    ora = SN_CONST.canServeAction(s, ACTIONS.FILO_CHAT)
+      || SN_CONST.canServeAction(s, ACTIONS.FILO_DASHBOARD);
+  } catch (_) { return; }
+  if (_potevaRispondere === ora) return;
+  const primaVolta = _potevaRispondere === null;
+  _potevaRispondere = ora;
+  if (primaVolta && !ora) return; // all'avvio nessuno aspetta un avviso di «no»
+  broadcastToTabs({ type: MSG.FILO_READY_CHANGED, ready: ora });
+}
+
 async function applySettingsUpdate(partial) {
   // Gli override dei token estetici finiscono dentro <style> iniettati in
   // tutte le superfici (incluse pagine web esterne): qui, nel choke point
