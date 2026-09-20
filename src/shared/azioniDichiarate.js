@@ -88,8 +88,8 @@
       orari: true,
       avviso: 'la sveglia non c\'è',
       frasi: [
-        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(48)}\\bsvegli[ae]\\b`, 'i'),
-        new RegExp(`\\bfatto[,:!]?\\s+(?:la |una )?svegli[ae]\\b${PONTE(24)}\\b(?:impostat|programmat|messa|fissat|pronta)`, 'i'),
+        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(48)}\\b${SVEGLIA}\\b`, 'i'),
+        new RegExp(`\\bfatto[,:!]?\\s+(?:la |una |l['’])?${SVEGLIA}\\b${PONTE(24)}\\b(?:impostat|programmat|messa|fissat|pronta)`, 'i'),
       ],
     },
     {
