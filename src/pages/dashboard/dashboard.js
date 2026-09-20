@@ -1695,11 +1695,21 @@
     // segno "già accolto" NON si scrive qui — si scrive quando l'intervista
     // finisce, altrimenti chi chiude la finestra adesso non la rivede più.
     const onbState = await Accoglienza.fetchOnboarding();
+    // #525 — una chat archiviata da riaprire (?chat=<id>). L'intervista di
+    // benvenuto ha comunque la precedenza: è la PRIMA conversazione e va
+    // finita, e durante l'intervista in archivio non c'è ancora niente.
+    const reopenId = onbState ? null : chatIdFromUrl();
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
-      onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      (onbState || reopenId) ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
+    // Una chat che non c'è più (cancellata da un'altra scheda) non deve
+    // lasciare una pagina vuota: si ricade sulla home normale.
+    if (reopenId) {
+      const opened = await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
+      if (!opened) await loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e));
+    }
     if (onbState) await Accoglienza.openOnboarding(onbState);
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
