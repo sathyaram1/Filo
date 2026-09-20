@@ -153,17 +153,26 @@ function analyze(url, ctx = {}, onUpdate) {
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
+  // Il segno "già in volo" si toglie SEMPRE, anche se il provider salta subito:
+  // un segno rimasto lì spegnerebbe il controllo su quel dominio per sempre.
+  const inVolo = (insieme, avvia, salva) => {
+    insieme.add(reg);
+    tasks.push((async () => {
+      try {
+        const r = await avvia();
+        if (r) salva(r);
+      } catch (_) {
+        /* best-effort: uno stadio profondo che non risponde non ferma il resto */
+      } finally {
+        insieme.delete(reg);
+      }
+    })());
+  };
   if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(reg)) {
-    llmInFlight.add(reg);
-    tasks.push(Promise.resolve(providers.llm(buildLlmMeta(norm, ctx, first))).then((r) => {
-      if (r) llmCache.set(reg, r);
-    }).catch(() => {}).finally(() => { llmInFlight.delete(reg); }));
+    inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first)), (r) => llmCache.set(reg, r));
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(reg)) {
-    sandboxInFlight.add(reg);
-    tasks.push(Promise.resolve(providers.sandbox(url, norm)).then((r) => {
-      if (r) sandboxCache.set(reg, r);
-    }).catch(() => {}).finally(() => { sandboxInFlight.delete(reg); }));
+    inVolo(sandboxInFlight, () => providers.sandbox(url, norm), (r) => sandboxCache.set(reg, r));
   }
 
   if (tasks.length && typeof onUpdate === 'function') {
