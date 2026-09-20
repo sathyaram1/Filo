@@ -2913,24 +2913,32 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   return { settings, canServe, payload, signature, saved };
 }
 
-// Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
+// Home senza AI: istantanea, dalle pagine salvate. Niente LLM. Il messaggio
+// dice PERCHÉ Filo non parla e dove si sistema: un'assenza muta è
+// indistinguibile da un guasto, e per giorni ha fatto sembrare senza crediti
+// chi i crediti li aveva (#663).
 function buildNoKeyDashboard(settings, saved) {
   const suggestions = saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
+  const senzaChiave = !SN_CONST.modelProvidersWithKey(settings.apiKeys).length;
   // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
-  if (!settings.apiKeys?.openrouter) {
-    suggestions.unshift({
+  suggestions.unshift(senzaChiave
+    ? {
       icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
       action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
       importance: 3,
+    }
+    : {
+      icon: 'options', text: 'Scegli un modello in Opzioni',
+      action: { type: 'NAVIGA', url: 'filo://options/options.html', label: 'Opzioni' },
+      importance: 3,
     });
-  }
-  const message = settings.apiKeys?.openrouter
-    ? 'Buongiorno. Filo è qui.'
-    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
+  const message = senzaChiave
+    ? 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.'
+    : 'I crediti ci sono, ma nessun modello configurato può rispondere: la configurazione dei modelli è vuota o cita modelli che non esistono più. Puoi sceglierne uno tu in Opzioni. Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 
