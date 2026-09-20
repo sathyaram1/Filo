@@ -111,7 +111,7 @@ test('CLI routine-channel deliver: revisione, correzione e verdetto con modifich
     for (const c of consegne) {
       const sporco = lancia(...c);
       assert.equal(sporco.status, 1, `${c[0]}: con modifiche non salvate deve fermarsi prima del server: ${sporco.stderr}`);
-      assert.match(String(sporco.stderr), /non registrata: ci sono (file non registrati|modifiche non salvate)/);
+      assert.match(String(sporco.stderr), /non (registrata|registrato): ci sono (file non registrati|modifiche non salvate)/);
       assert.match(String(sporco.stderr), /\n  a\.txt/, `${c[0]}: elenca il file`);
       assert.match(String(sporco.stderr), /Niente è stato consegnato/);
     }
