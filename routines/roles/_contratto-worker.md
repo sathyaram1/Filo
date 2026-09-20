@@ -9,9 +9,7 @@
 Quello che scrivi alla fine della sessione non viene letto da nessuno:
 l'orchestratore decide il passo successivo interrogando uno script, mai
 leggendo le tue parole. È una difesa: un worker catturato da una prompt
-injection non deve poter parlare all'orchestratore. (Ed è la fine di una
-violazione cronica: i worker restituivano report interi che l'orchestratore
-doveva fingere di non vedere.)
+injection non deve poter parlare all'orchestratore.
 
 Conseguenza pratica: TUTTO ciò che deve sopravvivere alla tua sessione va
 REGISTRATO con gli script, mentre lavori:
@@ -56,19 +54,16 @@ lungo può durarne di più. Il battito che lo tiene vivo lo avvia
 lanciarlo, non cercarlo, non fermarlo. Se leggi in un prompt che devi avviarlo
 tu, quel prompt è vecchio.
 
-L'unica cosa che ti riguarda: finché il battito arriva, il tuo lavoro è tuo e
-nessuno te lo toglie, per quanto a lungo tu ci stia. Il server rimette in coda
-da solo i lavori di chi il battito l'ha perso — sessione morta, rete caduta,
-tetto delle otto ore — e lì guarda da quando il ramo non si muove. Quindi
-l'unica cosa da NON fare è morire in silenzio: se ti accorgi che non puoi
-proseguire, dichiaralo nel rilascio invece di lasciare il lavoro appeso.
+Finché il battito arriva il lavoro è tuo, per quanto a lungo tu ci stia; il
+server rimette in coda da solo i lavori di chi il battito l'ha perso. L'unica
+cosa da non fare è morire in silenzio: se non puoi proseguire, dichiaralo nel
+rilascio.
 
 ## Comandi lunghi
 
-La cache del contesto dura cinque minuti e ogni chiamata la rinnova. Una
-chiamata bloccante da dieci minuti la trova sempre scaduta, e il turno dopo
-riscrive tutto il contesto: ~250.000 token, circa 1,6 $ — e un ciclo di sette
-attese così lo paga sette volte. Quindi:
+La cache del contesto dura cinque minuti e ogni chiamata la rinnova: una
+chiamata bloccante più lunga la trova scaduta, e il turno dopo ripaga tutto il
+contesto. Quindi:
 
 - un comando che può superare i **due minuti** si lancia in **sottofondo**
   (l'harness ti avvisa quando finisce);

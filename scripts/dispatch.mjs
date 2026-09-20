@@ -1024,7 +1024,7 @@ export function verifierReplyText(reply) {
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
-      'Rilievi da correggere in questo giro (solo questi):',
+      'Rilievi da correggere in questo giro:',
       fmt(r.phase2.findings),
       'Rilievi messi da parte (fuori da questo giro: li apre il server come feedback derivato):',
       fmt(r.phase2.derived),

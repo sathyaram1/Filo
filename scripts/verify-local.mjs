@@ -686,7 +686,7 @@ export function codaText({ findings, derived, budgets, branch, instructions }) {
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
-    'Rilievi da correggere in questo giro (solo questi):',
+    'Rilievi da correggere in questo giro:',
     fmt(findings),
     'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     fmt(derived),
