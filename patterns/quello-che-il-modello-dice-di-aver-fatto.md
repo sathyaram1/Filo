@@ -94,7 +94,9 @@ Tre cose imparate dal primo giro di verifica:
   preambolo e chiude con un oggetto» era il secondo sintomo della segnalazione,
   e guardando solo l'inizio del testo bastava una frase davanti perché il turno
   passasse intero. Si guarda ogni riga che potrebbe aprirlo, fuori dai blocchi
-  recintati coi tre apici (lì dentro è un esempio per l'utente, non un guasto);
+  recintati coi tre apici (lì dentro è un esempio per l'utente, non un guasto),
+  e nemmeno quando la riga prima annuncia un esempio: chi chiede «fammi vedere
+  com'è fatta un'azione» deve poterla vedere;
 - **una regola con una vocale accentata davanti a `\b` non scatta mai.** In
   JavaScript `\b` guarda solo l'ASCII: dopo la à di «modalità» non c'è nessun
   confine, e la regola nasce spenta, verde e inutile. Tre erano scritte così.
