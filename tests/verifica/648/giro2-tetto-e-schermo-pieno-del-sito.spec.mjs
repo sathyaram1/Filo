@@ -165,6 +165,70 @@ test('sito a schermo pieno suo che si prende ogni Esc: l\'utente esce lo stesso'
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 1b. La pila alta SOPRA LO SCHERMO PIENO DEL SITO.
+//
+// È la combinazione che nessuna prova tocca: al tetto Filo esce E consegna il
+// tasto alla pagina nello stesso colpo (qui il tasto se lo prende per forza,
+// altrimenti il browser se lo mangerebbe per uscire dal suo fullscreen). Se la
+// consegna saltasse, la modalità se ne andrebbe lasciando il riquadro in cima
+// aperto sopra un sito: il danno di #514, nel punto in cui ci difendiamo.
+const SITO_LUNGO = `<!doctype html><html><body style="margin:0;height:2400px">
+<h1 id="t">un sito con un video</h1>
+<button id="fs" style="font-size:20px">schermo intero</button>
+${Array.from({ length: 14 }, (_, i) => `<p id="p${i}">parola${i} dentro una frase qualunque</p>`).join('\n')}
+<script>
+  document.getElementById('fs').addEventListener('click', function () {
+    try { document.documentElement.requestFullscreen(); } catch (_) {}
+  });
+</script>
+</body></html>`;
+
+test('pila alta sopra lo schermo pieno del sito: quando la modalità se ne va, non lascia riquadri aperti', async ({ app, openTab, testServer }) => {
+  test.setTimeout(300_000);
+  const page = await testServer.openReady(openTab, SITO_LUNGO);
+  await preparaProvider(app);
+
+  await page.locator('#fs').click();
+  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(true);
+  expect((await stato(app)).pageFs, 'lo schermo pieno doveva essere della pagina').toBe(true);
+
+  // Una risposta per volta, come le apre l'utente: selezione + scorciatoia.
+  // Nessun clic, così il conto delle rivendicazioni non riparte da zero.
+  for (let i = 0; i < 14; i += 1) {
+    await page.evaluate((q) => {
+      const p = document.querySelector(q);
+      const range = document.createRange();
+      range.selectNodeContents(p);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(range);
+    }, `#p${i}`);
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      globalThis.__filoShortcuts.dispatch('explain-selection', win);
+    });
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  const aperti = await page.locator('.sn-popup').count();
+  console.log(`[#648 giro2] sopra lo schermo pieno del sito si sono impilate ${aperti} risposte`);
+  expect(aperti, 'sopra lo schermo pieno del sito non si è impilato niente: la prova non direbbe nulla')
+    .toBeGreaterThan(1);
+
+  for (let i = 1; i <= aperti + 2; i += 1) {
+    await esc(app);
+    if (await schermoIntero(app)) continue;
+    const rimasti = await page.locator('.sn-popup').count();
+    console.log(`[#648 giro2] la modalità si è spenta all'Esc numero ${i}, con ${rimasti} riquadri ancora aperti`);
+    expect(
+      rimasti,
+      `all'Esc numero ${i} la modalità se n'è andata scavalcando i riquadri ancora aperti`,
+    ).toBeLessThanOrEqual(Math.max(aperti - i, 0));
+    return;
+  }
+  throw new Error(`dopo ${aperti + 2} Esc la modalità non si è mai spenta`);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 2. La volta dopo è una volta nuova.
 test('dopo che il tetto è scattato, la sessione dopo riparte da zero', async ({ app }) => {
   test.setTimeout(300_000);
