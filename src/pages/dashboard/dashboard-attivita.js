@@ -493,6 +493,9 @@
   function motivoFallimento(a) {
     const o = a && a._output;
     if (!o) return '';
+    if (o.blocked === 'disabled') return 'la modalità terminale è spenta';
+    if (o.blocked === 'empty') return 'comando vuoto';
+    if (o.event === 'invalid') return 'data o ora non valide';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
