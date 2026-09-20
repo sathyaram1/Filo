@@ -425,6 +425,22 @@ function quotaNonTesto(s) {
   return rumore / n;
 }
 
+// Quanti caratteri non-testo tollerare in un documento prima di rifiutarlo.
+// Abbondante di proposito (CLAUDE.md § Limiti): un file scritto in una codifica
+// che Filo non riconosce ne ha centinaia o migliaia, non otto. Otto coprono il
+// registro chiuso male, il salvataggio interrotto, il file recuperato dalla
+// chiavetta staccata: file sani con qualche byte perso per strada.
+const RUMORE_TOLLERATO = 8;
+
+/** I caratteri che non sono testo, contati e tolti. PURA. → { text, persi } */
+function senzaRumore(s) {
+  let persi = 0;
+  const text = s.replace(/[\u0000-\u0008\u000B\u000E-\u001A\u001C-\u001F]/g, () => {
+    persi++;
+    return '';
+  });
+  return { text, persi };
+}
 
 /** Legge il buffer come testo a due byte nel verso dato. PURA. */
 function leggiDueByte(buf, verso, conFirma) {
