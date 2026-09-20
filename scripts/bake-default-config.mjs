@@ -225,13 +225,18 @@ async function main() {
   // che arriva agli utenti senza niente di preimpostato, e nessuno se ne
   // accorgerebbe finché non prova a usarla. Degradare va bene finché resta
   // qualcosa.
+  const mancanti = CHIAVI_DEL_PACCHETTO.filter((c) => !apiKeys[c.nome]);
+
   if (!Object.values(apiKeys).some(Boolean)) {
-    console.error('::error::Nessuna chiave di default da nessuna fonte: la versione uscirebbe senza chiavi.');
+    const righe = spiegaChiaviMancanti(mancanti, esitoServer);
+    // Tutto su una riga: un comando di annotazione spezzato su più righe perde
+    // dalla seconda in poi, e con essa il nome della chiave che manca.
+    console.error(`::error::La versione uscirebbe senza chiavi di default, la pubblicazione si ferma. ${righe.join(' ')}`);
     // Si prova comunque ad avvisare — ma è un di più: nel caso peggiore (parola
     // d'ordine mancante del tutto) l'allarme non può suonare, perché si apre con
     // quella stessa parola d'ordine. È il motivo per cui serve fermarsi: una
     // pubblicazione che fallisce si vede, una riga rossa in un registro no.
-    await avvisa();
+    await avvisa(mancanti, righe);
     process.exit(1);
   }
 
