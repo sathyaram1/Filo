@@ -12,6 +12,10 @@
   --dash-line-strong: rgba(34, 30, 25, 0.18);
   --dash-accent: #c0552b;       /* terracotta */
   --dash-accent-2: #e8a06a;     /* sabbia calda */
+  /* #517 — il colore dell'avviso «l'ha detto e non l'ha fatto»: terracotta sul
+     chiaro, sabbia sullo scuro, dove la terracotta su carta scura si legge a
+     fatica. Personalizzabile come gli altri token. */
+  --dash-avviso: #a8461f;
   --dash-blue: #2f5d7a;
   --dash-green: #4a7a3a;
   --dash-radius: 18px;
@@ -26,6 +30,7 @@
   --dash-ink-mute: #7e7567;
   --dash-line: rgba(236, 230, 218, 0.10);
   --dash-line-strong: rgba(236, 230, 218, 0.20);
+  --dash-avviso: #e8a06a;
 }
 
 html, body {
@@ -1325,8 +1330,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-bubble-avviso {
   font-style: normal;
   font-size: 13px;
-  color: var(--dash-accent);
-  border-left: 2px solid var(--dash-accent);
+  color: var(--dash-avviso);
+  border-left: 2px solid var(--dash-avviso);
   padding: 2px 12px;
   margin-left: 2px;
   max-width: 100%;

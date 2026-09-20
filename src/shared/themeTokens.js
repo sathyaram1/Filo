@@ -48,7 +48,10 @@
       // token: senza `dashCss` un "rendi l'accento verde" non si vedeva lì
       // (feedback #164). Emettiamo le gemelle --dash-* SOLO per i token che
       // l'utente sovrascrive davvero, così l'estetica "carta" di default resta.
-      dashCss: ['--dash-accent'],
+      // #517 — l'avviso «l'ha detto e non l'ha fatto» nasce color terracotta come
+      // l'accento: se l'utente sceglie il suo, segue quello invece di restare
+      // l'unica cosa rimasta arancione.
+      dashCss: ['--dash-accent', '--dash-avviso'],
       // Emette anche la tripletta r,g,b usata dalle tinte rgba(…)
       rgbCss: '--sn-accent-rgb',
       shellRgbCss: '--accent-rgb',
