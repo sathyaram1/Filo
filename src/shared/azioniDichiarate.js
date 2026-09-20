@@ -358,11 +358,27 @@
     return prima.slice(taglio + 1);
   }
 
+  // Una domanda alternativa: il punto interrogativo è di là dalla virgola, ma
+  // la domanda riguarda ancora la cosa dichiarata («ho aperto la pagina
+  // giusta, o mi sono sbagliato?»).
+  const ALTERNATIVA = /(?:^|[\s,;])(?:o|oppure|o no|vero|giusto)(?:[\s,;]|$)/i;
+
   // La dichiarazione è dentro una domanda? («Ho aperto la pagina giusta?»)
+  //
+  // Giro 5: si guardava fino al primo `.!?\n`, e la virgola non contava. Così
+  // «Ti ho messo la sveglia alle 19, va bene?» passava per una domanda e il
+  // presidio taceva, mentre la stessa frase col punto veniva vista. La virgola
+  // stacca già la proposizione PRIMA della dichiarazione: deve staccare anche
+  // quella dopo. Resta domanda ciò che lo è davvero: il punto interrogativo
+  // nella stessa proposizione, o una domanda alternativa di là dalla virgola.
   function dentroUnaDomanda(testo, indice) {
     const dopo = testo.slice(indice);
     const fine = dopo.search(/[.!?\n]/);
-    return fine >= 0 && dopo[fine] === '?';
+    if (fine < 0 || dopo[fine] !== '?') return false;
+    const corpo = dopo.slice(0, fine);
+    const stacco = corpo.search(/[,;:—]/);
+    if (stacco < 0) return true;
+    return ALTERNATIVA.test(corpo.slice(stacco));
   }
 
   // La cosa dichiarata sta nella risposta stessa? Si guarda il resto della
