@@ -6,7 +6,8 @@ Sopra la risposta finale di Filo nella chat della home c'è un blocco smorzato
 che raccoglie tutto ciò che Filo fa **prima di rispondere** (#521). Filo non
 «ragiona e basta»: agisce, in più giri dentro lo stesso turno (ragiona, cerca,
 legge, ragiona ancora). Per l'utente è un lavoro solo, e il blocco è uno solo
-(`createActivity()` in `src/pages/dashboard/dashboard.js`; stili
+(`createActivity()` in `src/pages/dashboard/dashboard-attivita.js`, che la home
+chiama come `SN_DASH_ATTIVITA.create(container)`; stili
 `.dash-activity*` in `dashboard.css`).
 
 **Chi guida i giri è il main, non la scheda.** Le azioni sono strumenti nativi
