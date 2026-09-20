@@ -781,9 +781,21 @@ test('una scrittura sola nei turni prima non regge due appunti raccontati adesso
     { role: 'filo', actions: [{ type: 'SALVA_APPUNTO', _executed: true }] },
   ];
   assert.equal(AD.contiDallaCronologia(crono).SALVA_APPUNTO, 2);
-  assert.deepEqual([...AD.famiglieMancateDallaCronologia([
-    { role: 'filo', azioniMancate: [{ id: 'appunto', frase: 'x' }] },
-  ])], ['appunto']);
+  // Col rilievo viaggia anche il VERBO: la conferma col pronome non dice di
+  // cosa parla, e senza il verbo «te l'ho già mandata» dopo «la segnalazione
+  // non è partita» tornava muta.
+  assert.deepEqual(AD.famiglieMancateDallaCronologia([
+    { role: 'filo', azioniMancate: [{ id: 'segnalazione', frase: 'x', verbo: 'mandat' }] },
+  ]), [{ id: 'segnalazione', verbo: 'mandat' }]);
+  assert.deepEqual(ids(AD.rileva('Te l\'ho già mandata, come ti dicevo.', new Set(), {
+    tipiPrecedenti: new Set(['INVIA_FEEDBACK']),
+    famiglieGiaMancate: [{ id: 'segnalazione', verbo: 'mandat' }],
+  })), ['senza-nome']);
+  // Un verbo diverso resta coperto: è un'altra cosa.
+  assert.deepEqual(AD.rileva('Te l\'ho già salvata, come ti dicevo.', new Set(), {
+    tipiPrecedenti: new Set(['SALVA_APPUNTO']),
+    famiglieGiaMancate: [{ id: 'segnalazione', verbo: 'mandat' }],
+  }), []);
 });
 
 test('i modi di dire che restavano muti, e la famiglia giusta', () => {
