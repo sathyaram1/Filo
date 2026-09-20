@@ -272,10 +272,10 @@ function passaggio(html, modo, dentroZona = false) {
         continue;
       }
       pila.push(nome);
-      const attrs = pota ? attributi(t.attrsRaw) : null;
-      const dove = { inZona: dentroZona || zone.length > 0, primoLivello: pila.length === 1 };
-      if (!fuori.length && pota && daScartare(nome, attrs, dove)) { fuori.push(pila.length); continue; }
-      if (!fuori.length && (TAG_ZONA.has(nome) || (attrs && attrs.role === 'main'))) zone.push(pila.length);
+      const attrs = attributi(t.attrsRaw);
+      const dove = { inZona: dentroZona || zone.length > 0, primoLivello: pila.length === 1, soloIlleggibile };
+      if (!fuori.length && daScartare(nome, attrs, dove)) { fuori.push(pila.length); continue; }
+      if (!fuori.length && (TAG_ZONA.has(nome) || attrs.role === 'main')) zone.push(pila.length);
       if (fuori.length) continue;
       if (nome === 'li') pezzi.push('\n• ');
       else if (BLOCCHI.has(nome)) pezzi.push('\n');
