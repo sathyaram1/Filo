@@ -220,7 +220,7 @@
   function emptyState() {
     return {
       done: false, ticked: [], thread: [], past: [],
-      startedAt: null, closedAt: null, notice: '',
+      startedAt: null, closedAt: null, notice: '', compito: '',
     };
   }
 
