@@ -658,8 +658,20 @@
     wrap.className = 'dash-cmd-result';
     if (!out) return wrap;
     if (out.blocked === 'disabled') {
+      // Chi non sa che quell'interruttore esiste non ha modo di capire perché
+      // il comando non è partito: il riquadro lo dice e porta dov'è.
       wrap.classList.add('dash-cmd-blocked');
-      wrap.textContent = 'Modalità terminale disattivata: attivala nelle impostazioni perché Filo possa eseguire comandi.';
+      const testo = document.createElement('div');
+      testo.textContent = out.command
+        ? `«${out.command}» non è partito: la modalità terminale è spenta, e finché lo è Filo non esegue comandi sul tuo computer.`
+        : 'Il comando non è partito: la modalità terminale è spenta, e finché lo è Filo non esegue comandi sul tuo computer.';
+      const apri = document.createElement('button');
+      apri.type = 'button';
+      apri.className = 'dash-action-btn dash-cmd-blocked-btn';
+      apri.textContent = 'Apri Preferenze';
+      apri.title = 'Preferenze → Modalità terminale';
+      apri.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#terminalEnabled' }));
+      wrap.append(testo, apri);
       return wrap;
     }
     if (out.blocked === 'empty') {
