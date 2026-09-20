@@ -458,7 +458,7 @@
     },
     {
       id: 'autonomy-level', title: 'Quanto Filo fa da solo', category: 'settings',
-      desc: 'Un livello solo decide quanto Filo agisce senza chiederti niente. Filo fa da sé quello che si disfa (una sveglia, il tema, una scheda archiviata) e chiede per quello che resta. E guarda anche cosa ha letto in quella conversazione: se ha appena letto una pagina web, una ricerca o un documento di qualcun altro, chiede di più — perché quel testo potrebbe essere lui a chiedere, non tu. Quando chiede, ti dice anche perché.',
+      desc: 'Un livello decide quanto Filo agisce senza chiederti niente. Fa da sé quello che si disfa (una sveglia, il tema, una scheda archiviata) e chiede per quello che resta. Conta anche quello che ha letto in quella conversazione. Se ha appena letto una pagina web, una ricerca o un documento scritto da qualcun altro, chiede più spesso, perché quella richiesta potrebbe averla scritta chi ha scritto la pagina. Quando chiede, ti dice perché.',
       invoke: 'Preferenze → «Quanto Filo fa da solo». Il livello attivo si vede sempre nella home, in alto: un clic ti porta lì. Alzarlo chiede di scrivere «conferma»; abbassarlo è immediato.',
       doesNot: 'Alcune cose non le fa a nessun livello: far uscire una password o un codice, scrivere a molte persone insieme, cambiare le credenziali di un servizio, cancellare dati per sempre, e cambiare queste stesse regole. Quelle restano tue. Il livello non lo può cambiare Filo: lo sposti solo tu, da qui.',
     },

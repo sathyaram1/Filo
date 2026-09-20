@@ -1016,6 +1016,30 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   align-items: center;
   gap: 2px;
 }
+/* #530 — il livello di autonomia attivo, in alto a destra accanto ai comandi.
+   Una parola, non un'icona: è un nome che si legge, e cliccandola si apre dove
+   si cambia. */
+.dash-autonomia {
+  height: 34px;
+  padding: 0 10px;
+  margin-right: 4px;
+  border: 1px solid var(--dash-line, rgba(127, 127, 127, 0.28));
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dash-ink-soft);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  -webkit-app-region: no-drag;
+}
+.dash-autonomia:hover {
+  background: var(--dash-card);
+  color: var(--dash-ink);
+  border-color: var(--dash-ink-soft);
+}
+
 .dash-ctrl {
   width: 34px;
   height: 34px;

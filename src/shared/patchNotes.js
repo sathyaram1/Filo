@@ -18,6 +18,9 @@
     {
       version: '0.2.228', date: '2026-09-11',
       features: [
+        'Scegli tu quanto Filo fa da solo. In Preferenze c\'è un livello: al minimo ti chiede prima di quasi tutto quello che dura, al massimo fa da sé anche quando ha letto cose scritte da altri. Il livello attivo si vede sempre nella home, in alto a destra, e un clic ti porta dov\'è. Alzarlo chiede di scrivere «conferma»; abbassarlo no.',
+        'Filo tiene conto di quello che ha letto in quella conversazione. Dopo una pagina web, una ricerca o un documento scritto da qualcun altro, prima di fare qualcosa che dura ti chiede il permesso, e ti dice perché lo chiede. Prima leggere una pagina non cambiava niente, e chi l\'aveva scritta poteva farsi dare gli stessi poteri che avevi dato tu.',
+        'Cancellare quello che Filo sa di te adesso si fa in Preferenze, alla voce «Memoria di Filo», scrivendo «conferma». Non lo fa più Filo su richiesta in chat: è una cancellazione definitiva, e quelle restano nelle tue mani.',
         'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta. La pagina Crediti ricorda l’ultimo rifiuto finché la chiave non torna a funzionare.',
         'Un invito adesso è un link. Chi lo apre scarica Filo e al primo avvio si ritrova i crediti già dentro, senza ricopiare il codice. Ogni tuo link vale per tre persone, e nella pagina Crediti vedi quanti sono entrati e quanti posti restano.',
         'Mandare una segnalazione dà crediti, e se viene risolta ne dà altri. Li trovi nei movimenti della pagina Crediti, insieme all\'invito riscattato, alla quota di ogni giorno e ai regali.',

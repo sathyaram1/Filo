@@ -88,10 +88,20 @@ module.exports = function register(on, ctx) {
     // toccare le chiavi API: le strippiamo prima del merge, così una pagina
     // ostile non può iniettare/sovrascrivere una apiKey (es. dirottare i
     // prompt su una chiave attaccante). Dalle pagine interne filo:// passa tutto.
+    // #530 — `autonomia` (il livello, le classi delle fonti, le manopole dei
+    // campi) è la regola che decide cosa Filo può fare da solo: la sposta solo
+    // l'utente, dalle Preferenze. Una pagina web che potesse scriverla si
+    // alzerebbe da sé il livello e poi chiederebbe il resto senza che nessuno
+    // veda un popup. Stessa strippata delle chiavi API.
+    const SOLO_UTENTE = ['apiKeys', 'autonomia'];
     let incoming = msg.settings;
-    if (!isFilo(origin) && incoming && typeof incoming === 'object' && 'apiKeys' in incoming) {
-      incoming = { ...incoming };
-      delete incoming.apiKeys;
+    if (!isFilo(origin) && incoming && typeof incoming === 'object') {
+      for (const k of SOLO_UTENTE) {
+        if (k in incoming) {
+          if (incoming === msg.settings) incoming = { ...incoming };
+          delete incoming[k];
+        }
+      }
     }
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato

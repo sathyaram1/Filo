@@ -1094,6 +1094,13 @@
         applyHomeMessageVisibility();
       }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
+      // Il livello di autonomia cambiato dalle Preferenze si vede subito qui:
+      // una home che mostra il livello di prima è peggio di una che non lo
+      // mostra affatto.
+      if (msg.settings && msg.settings.autonomia) {
+        livelloAutonomia = msg.settings.autonomia.livello;
+        renderControls();
+      }
       // Aggiorna suoneria in live se l'utente la cambia dalle opzioni.
       if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
         _timerRingTone = msg.settings.timerRingtone;
@@ -1134,6 +1141,30 @@
   // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
   let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
 
+  // #530 — il livello di autonomia attivo, sempre visibile: è la cosa che
+  // decide quanto Filo fa senza chiedere, e non si legge da nessun'altra parte
+  // senza aprire le Preferenze. Un clic ci porta.
+  let livelloAutonomia = null;
+
+  function renderAutonomiaChip(host) {
+    const A = self.SN_AUTONOMIA;
+    if (!A || !host) return;
+    const liv = A.livello(A.livelloValido(livelloAutonomia));
+    if (!liv) return;
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'dash-autonomia';
+    chip.id = 'dashAutonomia';
+    chip.dataset.livello = liv.id;
+    chip.textContent = liv.label;
+    chip.title = `Quanto Filo fa da solo. Livello ${liv.label.toLowerCase()}. ${liv.frase} Clicca per cambiarlo.`;
+    chip.setAttribute('aria-label', `Autonomia di Filo: ${liv.label}`);
+    chip.addEventListener('click', () => send({
+      type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#autonomiaSection',
+    }));
+    host.appendChild(chip);
+  }
+
   function renderControls() {
     const host = $('dashControls');
     if (!host) return;
@@ -1159,6 +1190,7 @@
     ];
     host.replaceChildren();
     accountCtrlBtn = null;
+    renderAutonomiaChip(host);
     for (const it of items) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -1600,6 +1632,8 @@
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
       showHomeMessage = settings?.showHomeMessage !== false;
+      livelloAutonomia = settings?.autonomia?.livello || null;
+      renderControls();
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
       // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.

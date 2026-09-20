@@ -248,6 +248,90 @@
     setTimeout(() => { try { location.reload(); } catch (_) {} }, 350);
   }
 
+  // ── Quanto Filo fa da solo (#530) ────────────────────────────────────────
+  // Il selettore del livello di autonomia. I livelli, le loro frasi e l'ordine
+  // (dal più prudente al più permissivo) NON stanno qui: li dà la regola,
+  // src/shared/autonomia.js, che è lo stesso posto da cui li legge il motore.
+  // Qui si disegna e si salva.
+  //
+  // ALZARE il livello è allentare una difesa: si scrive «conferma», come per
+  // ogni altra difesa che si abbassa. Abbassarlo no: stringere è sempre libero.
+  let livelloAttuale = null;
+
+  function renderAutonomia() {
+    const A = window.SN_AUTONOMIA;
+    const box = $('autonomiaLivelli');
+    if (!A || !box) return;
+    $('autonomiaFrasi').textContent = A.FRASI_SELETTORE.join(' ');
+    box.innerHTML = '';
+    for (const liv of A.livelliSelezionabili()) {
+      const riga = document.createElement('label');
+      riga.className = 'aut-riga';
+      riga.dataset.livello = liv.id;
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'autonomia';
+      radio.value = liv.id;
+      radio.checked = liv.id === livelloAttuale;
+      riga.dataset.attivo = radio.checked ? '1' : '0';
+      const nome = document.createElement('span');
+      nome.className = 'aut-nome';
+      nome.textContent = liv.label;
+      const frase = document.createElement('span');
+      frase.className = 'aut-frase';
+      frase.textContent = liv.frase;
+      riga.appendChild(radio);
+      riga.appendChild(nome);
+      riga.appendChild(frase);
+      riga.title = liv.frase;
+      radio.addEventListener('change', () => { if (radio.checked) scegliLivello(liv.id); });
+      box.appendChild(riga);
+    }
+    const attivo = A.livello(livelloAttuale);
+    $('autonomiaNota').textContent = attivo
+      ? `Adesso: ${attivo.label}. Lo vedi sempre anche nella home, in alto.`
+      : '';
+  }
+
+  async function scegliLivello(nuovo) {
+    const A = window.SN_AUTONOMIA;
+    if (!A || nuovo === livelloAttuale) return;
+    // Alzare il livello: la parola digitata, come ogni difesa che si allenta.
+    if (A.alzaLivello(livelloAttuale, nuovo)) {
+      const Ui = window.SN_CONFIRM_UI;
+      const liv = A.livello(nuovo);
+      const text = `Stai dando a Filo più autonomia: ${liv.label.toLowerCase()}. ${liv.frase} `
+        + 'Da qui in poi ti chiederà meno spesso il permesso. Puoi tornare indietro quando vuoi, senza scrivere niente.';
+      const ok = Ui
+        ? await Ui.confirmTyped({ title: 'Più autonomia a Filo', text })
+        : window.confirm(text);
+      if (!ok) { renderAutonomia(); return; }
+    }
+    livelloAttuale = nuovo;
+    await chrome.runtime.sendMessage({
+      type: MSG.UPDATE_SETTINGS,
+      settings: { autonomia: { livello: nuovo } },
+    });
+    renderAutonomia();
+    flashSaved('autonomiaSavedHint');
+  }
+
+  // ── Cancellare la memoria di Filo (#530) ─────────────────────────────────
+  // È una cancellazione definitiva: l'elenco fisso dei livelli di autonomia
+  // dice che non la fa Filo su richiesta in chat, a nessun livello. La fa
+  // l'utente, qui, scrivendo «conferma».
+  async function clearMemory() {
+    const Ui = window.SN_CONFIRM_UI;
+    const text = 'Filo dimenticherà tutto quello che ha imparato su di te: chi sei, come preferisci '
+      + 'le cose, le regole che gli hai dato. Non si può annullare, e ripartirà come al primo giorno.';
+    const ok = Ui
+      ? await Ui.confirmTyped({ title: 'Cancella la memoria di Filo', text, okLabel: 'Cancella' })
+      : window.confirm(`${text} Procedo?`);
+    if (!ok) return;
+    const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CLEAR_MEMORY });
+    if (r && r.ok) flashSaved('clearMemoryHint');
+  }
+
   // ── Rilancio dell'intervista di benvenuto (#524) ─────────────────────────
   // Azzera spunte e conversazione e riporta l'utente dove l'intervista vive:
   // una scheda nuova. Non tocca né la memoria né le impostazioni già applicate
@@ -765,6 +849,13 @@
     $('textScale').value = opt ? scale : '1';
     $('showHomeMessage').checked = settings.showHomeMessage !== false;
 
+    // #530 — il livello di autonomia: quello salvato, o il normale. Un valore
+    // che non si può scegliere (yolo, finché non c'è il guardiano) ricade sul
+    // normale: lo decide la regola, non questa pagina.
+    const A = window.SN_AUTONOMIA;
+    livelloAttuale = A ? A.livelloValido(settings.autonomia?.livello) : 'default';
+    renderAutonomia();
+
     buildPresetOptions();
     $('agentStyleText').value = settings.agentStyle || '';
     syncPresetSelect();
@@ -869,6 +960,7 @@
     // Al blur riallinea il campo al valore realmente salvato (clampato), così
     // un numero fuori scala non resta a schermo a mentire sul valore in uso.
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
+    $('clearMemory').addEventListener('click', clearMemory);
     $('terminalEnabled').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 

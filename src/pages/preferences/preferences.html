@@ -18,6 +18,7 @@
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/onboarding.js"></script>
+  <script src="filo://shared/autonomia.js"></script>
   <style>
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -40,6 +41,26 @@
     .onb-line { display: flex; gap: 8px; line-height: 1.45; }
     .onb-who { flex: 0 0 auto; font-weight: 600; opacity: 0.75; }
     .onb-what { white-space: pre-wrap; }
+
+    /* «Quanto Filo fa da solo»: una riga per livello, cliccabile tutta. */
+    .aut-livelli { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+    .aut-riga {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--sn-border, rgba(127, 127, 127, 0.28));
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      margin: 0;
+    }
+    .aut-riga:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
+    .aut-riga[data-attivo="1"] { border-color: var(--sn-accent, #c77d3a); }
+    .aut-riga input { margin: 0; flex: 0 0 auto; }
+    .aut-nome { font-weight: 600; flex: 0 0 auto; }
+    .aut-frase { opacity: 0.75; line-height: 1.4; }
+    .aut-attivo { margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -54,6 +75,14 @@
         <option value="light">Chiaro</option>
         <option value="dark">Scuro</option>
       </select>
+    </section>
+
+    <section id="autonomiaSection">
+      <h2>Quanto Filo fa da solo</h2>
+      <p class="sn-muted" id="autonomiaFrasi"></p>
+      <div class="aut-livelli" id="autonomiaLivelli"></div>
+      <p class="sn-muted aut-attivo" id="autonomiaNota"></p>
+      <span id="autonomiaSavedHint" class="sn-saved-indicator">Salvato</span>
     </section>
 
     <section>
@@ -113,6 +142,15 @@
         <span id="onboardingHint" class="sn-saved-indicator">Filo ti aspetta nella scheda nuova</span>
       </div>
       <div id="onboardingArchive" class="onb-archive" hidden></div>
+    </section>
+
+    <section>
+      <h2>Memoria di Filo</h2>
+      <p class="sn-muted">Quello che Filo ha imparato su di te mentre parlavate: chi sei, come preferisci le cose, le regole che gli hai dato. Cancellarla è definitivo, e Filo non può farlo da sé: da qui, con le tue mani.</p>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <button type="button" class="sn-btn sn-btn-secondary" id="clearMemory">Cancella tutto quello che Filo sa di me</button>
+        <span id="clearMemoryHint" class="sn-saved-indicator">Cancellata</span>
+      </div>
     </section>
 
     <section>
