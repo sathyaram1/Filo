@@ -1702,6 +1702,34 @@
     return entry;
   }
 
+  // RETE: toglie la PROPRIA richiesta di riapertura (cancella
+  // `reopenRequests.<uid>`), stessa forma di `clearVote`.
+  //
+  // Serve quando la riapertura non arriva in fondo. Il segnale si scrive PRIMA
+  // di creare il feedback collegato, ed è lui a chiudere la porta ai duplicati;
+  // ma se il feedback non è nato, di duplicati non ce n'è nessuno da temere, e
+  // quel segnale rimasto lì dice a chi ha provato a riaprire che il fix è «già
+  // stato segnalato»: la spiegazione appena scritta non ha più dove andare, e
+  // non c'è modo di rimandarla. Toglierlo rimette la porta com'era.
+  async function clearReopenRequest(id, uid, opts = {}) {
+    if (!id) throw new Error('id mancante');
+    if (!uid) throw new Error('uid mancante');
+    const fieldPath = `reopenRequests.\`${uid}\``;
+    const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
+    const endpoint = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    // Nessun valore per quel campo nel corpo: con la maschera d'aggiornamento è
+    // così che Firestore lo cancella. Le regole lo prevedono — un utente tocca
+    // solo la propria chiave, e la propria chiave può anche non esserci più.
+    const res = await fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields: {} }) });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore clearReopenRequest fallito (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return true;
+  }
+
   global.SN_FEEDBACK = {
     submit,
     list,
