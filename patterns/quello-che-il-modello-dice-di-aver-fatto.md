@@ -38,10 +38,24 @@ allarmi, e si perdono facilmente riscrivendo le espressioni:
   la frase, e «non ho messo nessuna sveglia» o «se ho aperto la pagina
   sbagliata» non contano.
 
-I tipi che reggono una famiglia sono generosi apposta: basta un'azione
-plausibilmente collegata nel turno perché la frase sia coperta. Quando
-un'azione c'è, l'utente la vede nel diario del lavoro e giudica da sé; il
-presidio serve al caso in cui nel turno non c'è NIENTE.
+I tipi che reggono una famiglia sono generosi DENTRO la famiglia: tutte le
+strade che Filo ha per fare quella cosa. Fuori dalla famiglia no, e il secondo
+giro di verifica ha spiegato perché: finché una sveglia reggeva anche l'appunto
+e l'evento in calendario, una cosa fatta ne assolveva tre mai fatte, e la frase
+che le dichiarava tutte insieme passava intera. L'eccezione è «promemoria», che
+in italiano è tutte e tre.
+
+**Un'azione conta se ha fatto nascere qualcosa.** La sveglia chiesta con un
+orario che Filo non sa leggere viene chiamata e non crea niente: lì il presidio
+taceva, e l'utente restava senza sveglia e senza avviso, cioè esattamente la
+lamentela della segnalazione con una porta diversa. Restano buone le azioni che
+hanno prodotto un output (una ricerca senza risultati è comunque partita) e
+quelle in attesa dell'OK dell'utente, che in chat si vedono.
+
+**Un'azione sola non regge due dichiarazioni diverse.** Se la sveglia sta già
+reggendo la frase sulla sveglia, la frase accanto («e te l'ho segnata») non ha
+più niente che la regga, a meno che non ripeta lo stesso verbo: lì è lo stesso
+fatto detto due volte.
 
 **Generosi non basta: devono essere COMPLETI.** Un avviso che accusa Filo di
 non aver fatto una cosa che ha fatto si smette di leggere, e il presidio torna
