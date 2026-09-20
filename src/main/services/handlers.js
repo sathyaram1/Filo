@@ -1675,7 +1675,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         let r = null;
         try {
           const DR = require('./documentRead');
-          r = await DR.readDocument(percorso);
+          // La cartella in cui Filo sta guardando col terminale. Un elenco
+          // stampa i NOMI, non i percorsi: se quel nome arrivasse qui senza
+          // cartella verrebbe cercato dove sta il programma Filo, che con la
+          // domanda dell'utente non c'entra niente (#551, terzo giro).
+          r = await DR.readDocument(percorso, { cwd: getAssistantCwd(sender) });
         } catch (e) {
           console.warn('[Filo] lettura documento fallita', e?.message || e);
         }
