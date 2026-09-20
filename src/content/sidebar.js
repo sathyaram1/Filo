@@ -129,6 +129,9 @@
     const D = global.SN_AZIONI_DICHIARATE;
     if (!D) return;
     renderRifallo(appendChatMessage('avviso', D.avvisoPerUtente(fantasmi)));
+    // #517 (giro 8) — da qui in poi, su queste famiglie, un'azione emessa
+    // prima non copre più niente.
+    for (const f of fantasmi) { if (f && f.id) famiglieMancate.add(String(f.id)); }
     console.warn('[Filo] #517 azione dichiarata e mai emessa nell\'Aiuto:',
       fantasmi.map((f) => `${f.id} ← «${f.frase}»`).join(' | '));
   }
