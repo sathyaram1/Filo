@@ -142,7 +142,12 @@ test('invitato, poi i modelli propri e nessuno scelto: la home dice che Filo non
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
   await expect(page.locator('#homeMessage')).toContainText(FRASE_DEL_MODELLO, { timeout: 20_000 });
 
-  await impostazioni(page, { useDefaultModels: false });
+  const vuoti = await page.evaluate(() => {
+    const out = {};
+    for (const a of Object.values(window.SN_CONST.ACTIONS)) out[a] = '';
+    return out;
+  });
+  await impostazioni(page, { useDefaultModels: false, models: vuoti });
   await expect(page.locator('#homeMessage')).toContainText(/nessun modello|Opzioni/i, { timeout: 30_000 });
 });
 
