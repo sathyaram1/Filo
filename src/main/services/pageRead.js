@@ -453,7 +453,10 @@ function decodifica(buffer, contentType) {
   const bom = b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf ? 'utf-8'
     : (b[0] === 0xff && b[1] === 0xfe ? 'utf-16le' : (b[0] === 0xfe && b[1] === 0xff ? 'utf-16be' : ''));
   const m = String(contentType || '').match(/charset\s*=\s*["']?([\w-]+)/i);
-  const enc = (bom || (m ? m[1] : '') || charsetDaHtml(b) || 'utf-8').toLowerCase();
+  let enc = (bom || (m ? m[1] : '') || charsetDaHtml(b) || 'utf-8').toLowerCase();
+  // Chi dichiara «iso-8859-1» quasi sempre spedisce windows-1252, e i browser
+  // lo leggono così: senza questo il simbolo dell'euro sparisce dal prezzo.
+  if (/^(iso-8859-1|latin1|ascii|us-ascii|iso8859-1|iso_8859-1)$/.test(enc)) enc = 'windows-1252';
   try { return new TextDecoder(enc, { fatal: false }).decode(b); } catch (_) {}
   try { return new TextDecoder('utf-8', { fatal: false }).decode(b); } catch (_) {}
   return b.toString('utf8');

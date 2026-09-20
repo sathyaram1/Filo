@@ -246,3 +246,45 @@ test('C — un indirizzo che porta fuori i dati non si legge senza conferma, com
   expect(await app.evaluate(() => globalThis.__contattati)).toEqual([]);
   await app.evaluate(() => { try { globalThis.__restore3?.(); } catch (_) {} });
 });
+
+test('D — una scheda che non risponde non tiene appeso il turno: si scarica', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const url = testServer.html(PAGINA);
+  await openTab(url);
+
+  const out = await app.evaluate(async (electron, u) => {
+    // Il JavaScript della pagina è inchiodato: la richiesta del main non torna
+    // mai. Senza tempo massimo il turno della chat restava appeso in silenzio.
+    const viste = [];
+    for (const win of electron.BrowserWindow.getAllWindows()) {
+      for (const t of (win._filoTabs?.tabs || [])) {
+        if (!t.view?.webContents || t.isInternal) continue;
+        const wc = t.view.webContents;
+        viste.push([wc, wc.executeJavaScript]);
+        wc.executeJavaScript = () => new Promise(() => {});
+      }
+    }
+    const orig = globalThis.fetch;
+    globalThis.fetch = async () => new Response(
+      '<html><body><main><p>Arrivato dalla rete: 77,70 euro.</p></main></body></html>',
+      { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+    );
+    const t0 = Date.now();
+    try {
+      const r = await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'LEGGI_PAGINA', url: u });
+      return { ms: Date.now() - t0, output: r.output };
+    } finally {
+      globalThis.fetch = orig;
+      for (const [wc, f] of viste) wc.executeJavaScript = f;
+    }
+  }, url);
+
+  // Senza tempo massimo questa chiamata non tornerebbe mai. Torna, dopo
+  // l'attesa dichiarata, e con un esito: qui la pagina sta sul mini server
+  // locale, quindi lo scaricamento la rifiuta come indirizzo privato e il
+  // motivo arriva al modello invece del silenzio.
+  expect(out.ms).toBeGreaterThan(4000);
+  expect(out.ms).toBeLessThan(20_000);
+  expect(out.output).toBeTruthy();
+  expect(String(out.output.detail || out.output.error)).not.toBe('');
+});

@@ -18,7 +18,7 @@
     {
       version: '0.2.228', date: '2026-09-11',
       features: [
-        'Filo adesso legge le pagine web. Quando cerchi qualcosa e il riassunto dei risultati non basta, apre le pagine più promettenti e ti risponde con il dato che c’è scritto dentro: un prezzo, un orario, un punteggio, una clausola. Prima poteva solo rimandarti a leggere da te.',
+        'Filo adesso legge le pagine web. Quando cerchi qualcosa e il riassunto dei risultati non basta, apre le pagine più promettenti e ti risponde con il dato che c’è scritto dentro: un prezzo, un orario, un punteggio, una clausola, la data e la firma di un articolo. Prima poteva solo rimandarti a leggere da te. Lo fa anche l’assistente laterale, quando cerca sul web per aiutarti su un sito.',
         'La tua chiave OpenRouter si mette e si toglie dalla pagina Crediti, dove vedi quanto ha speso e quanto le resta. Se OpenRouter la rifiuta, Filo risponde lo stesso coi tuoi crediti e te lo scrive sotto la risposta. La pagina Crediti ricorda l’ultimo rifiuto finché la chiave non torna a funzionare.',
         'Un invito adesso è un link. Chi lo apre scarica Filo e al primo avvio si ritrova i crediti già dentro, senza ricopiare il codice. Ogni tuo link vale per tre persone, e nella pagina Crediti vedi quanti sono entrati e quanti posti restano.',
         'Mandare una segnalazione dà crediti, e se viene risolta ne dà altri. Li trovi nei movimenti della pagina Crediti, insieme all\'invito riscattato, alla quota di ogni giorno e ai regali.',
