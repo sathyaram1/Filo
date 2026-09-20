@@ -153,6 +153,7 @@ test('sito a schermo pieno suo che si prende ogni Esc: l\'utente esce lo stesso'
     if (!(await schermoIntero(app))) usciti = i;
   }
   expect(usciti, 'sedici Esc e il sito tiene ancora l\'utente dentro allo schermo pieno').toBeGreaterThan(0);
+  console.log(`[#648 giro2] sito ladro a schermo pieno suo: uscito all'Esc numero ${usciti}`);
   // E l'uscita è davvero un'uscita: anche lo schermo pieno del SITO se n'è
   // andato, altrimenti resterebbe un documento convinto di essere a schermo
   // pieno dentro una view tornata sotto la barra.
