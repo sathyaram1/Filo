@@ -71,5 +71,20 @@
     return s.accountAOff === true && s.accountBOff === true;
   }
 
-  global.SN_ROUTINE_SESSIONI = { CHIAVI, ACCOUNT, limiti, leggiDoc, valida, nessunAccount };
+  /**
+   * Il prioritario è stato escluso: la priorità scelta non vale più e si lavora
+   * sull'altro. Due controlli che dicono il contrario vanno spiegati, o chi
+   * guarda non sa più quale account sta consumando.
+   * @returns {''|'A'|'B'} l'account che resta, vuoto se la priorità vale ancora.
+   */
+  function prioritarioIgnorato(stato) {
+    const s = leggiDoc(stato);
+    if (!s.priorityAccount || nessunAccount(s)) return '';
+    const escluso = s.priorityAccount === 'A' ? s.accountAOff : s.accountBOff;
+    return escluso ? (s.priorityAccount === 'A' ? 'B' : 'A') : '';
+  }
+
+  global.SN_ROUTINE_SESSIONI = {
+    CHIAVI, ACCOUNT, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
