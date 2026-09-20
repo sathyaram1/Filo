@@ -129,6 +129,17 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       flex: 0 1 auto; max-width: 46%;
     }
+    /* Rinomina sul posto: il campo prende il posto del titolo e ne tiene la
+       misura, così la riga non salta mentre si scrive. Colori del tema di
+       Filo, non quelli di serie del browser. */
+    .arc-chat-rename {
+      font: inherit; font-size: 13px; font-weight: 500;
+      flex: 0 1 auto; max-width: 46%; min-width: 180px;
+      padding: 1px 6px; margin: -2px 0;
+      color: var(--sn-fg); background: var(--sn-surface);
+      border: 1px solid var(--sn-accent); border-radius: var(--sn-radius);
+      outline: none;
+    }
     .arc-chat-excerpt {
       font-size: 12px; color: var(--sn-muted);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
