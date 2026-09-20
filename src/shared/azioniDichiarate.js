@@ -565,7 +565,8 @@
   // detta da due regole diverse, e contano per una.
   function dichiarazioni(testo, famiglia) {
     const out = [];
-    const viste = new Set();
+    const presi = [];
+    const sovrapposta = (a, b) => presi.some(([x, y]) => a < y && b > x);
     for (const re of famiglia.frasi) {
       const rx = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
       let m;
