@@ -66,6 +66,18 @@ export function dirtyTreeText(lines, cosa = 'critica') {
       + 'Attenzione: se quelle righe cambiano il codice, il diff da controllare non è più quello che hai letto — rileggilo prima di registrare lo stesso verdetto.\n'
       + `${elenco}${altri}`;
   }
+  // La richiesta di fusione: il passo dopo il verdetto, e l'ultimo del giro.
+  // Qui il danno è il più grave dei tre, perché non c'è più nessun controllo
+  // dopo: quei file il salvataggio automatico li committa e li spinge, il
+  // server risolve la punta vera del ramo e fonde QUELLA, e righe che nessuno
+  // ha letto atterrano su main, da dove l'aggiornamento automatico le porta a
+  // tutti (feedback #485).
+  if (cosa === 'fusione') {
+    return 'fusione non chiesta: ci sono modifiche non salvate nella directory, e i via libera valgono per il commit che verifica e controllo di sicurezza hanno esaminato. Il salvataggio automatico le committerebbe e le spedirebbe, il server fonderebbe la punta NUOVA del ramo, e quelle righe arriverebbero agli utenti senza essere passate da nessun controllo. '
+      + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "pulizia"). '
+      + 'Attenzione: se quelle righe cambiano il codice, i via libera non parlano più di questo contenuto e il giro va rifatto, non ripulito.\n'
+      + `${elenco}${altri}`;
+  }
   // La prima consegna del lavoro (chi risolve mette il feedback in revisione):
   // stesso danno della correzione, un giro prima. Quello che sta fuori dai
   // commit la verifica non lo vede, e boccia una cosa che era fatta (verifica
