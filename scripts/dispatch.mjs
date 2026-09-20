@@ -957,6 +957,10 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   // Il testo parte con gli a capo veri (una barra-n scritta come a capo vale
   // come a capo): è quello che il server conserva per il verificatore dopo.
   const critiqueNorm = typeof VERIFIER_ROUND.normalizeCritique === 'function' ? VERIFIER_ROUND.normalizeCritique(critiqueText) : String(critiqueText || '');
+  // Il commit PROVATO: va al server col verdetto e resta scritto nello stato
+  // locale accanto all'esito. Uno solo, letto una volta: leggerlo due volte
+  // vorrebbe dire poter mandare al server uno sha e scriverne un altro qui.
+  const shaProvato = headSha(ROOT) || '';
   const sent = await deliverToChannel('verdict', {
     findings: parsed.findings,
     summary: parsed.summary,
