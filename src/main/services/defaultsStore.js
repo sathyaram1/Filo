@@ -695,6 +695,7 @@ async function getWorkerLog(idToken) {
 module.exports = {
   get,
   getPublicForAdmin,
+  onChanged,
   refresh,
   refreshIfStale,
   update,
