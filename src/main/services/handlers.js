@@ -2898,9 +2898,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // Il compito viaggia con l'azione: quando torna dal popup di conferma
         // il motore deve ritrovare QUELLO, non aprirne uno nuovo e più largo.
         if (task) a._compito = task.id;
+        // #533 (sesto giro) — con un allegato ancora in attesa l'unica cosa
+        // ammessa è la dichiarazione: l'elenco degli strumenti è quello che il
+        // motore ACCETTA, non un consiglio. Quello che il modello chiede fuori
+        // turno non si esegue e non finisce in chat; glielo diciamo, e se gli
+        // serve davvero lo richiede quando avrà le immagini davanti.
+        const fuoriTurno = immaginiInAttesa && String(a.type || '').toUpperCase() !== 'DICHIARA_USCITE';
         const res = a._argsError
           ? { executed: false, kept: false, rejected: true, error: a._argsError }
-          : await executeFiloAction(a, { sender, compito: task });
+          : fuoriTurno
+            ? { executed: false, kept: false, rejected: true, error: 'Non ancora: prima dichiara le uscite con DICHIARA_USCITE. Le immagini allegate dall\'utente arrivano subito dopo, e da lì in poi valgono solo le uscite dichiarate.' }
+            : await executeFiloAction(a, { sender, compito: task });
         // Le letture si segnano a FINE giro, non qui: quello che il modello ha
         // chiesto in questo giro l'ha deciso prima di vederne un solo esito,
         // quindi nessuna lettura di questo giro può averlo influenzato. Segnarle
