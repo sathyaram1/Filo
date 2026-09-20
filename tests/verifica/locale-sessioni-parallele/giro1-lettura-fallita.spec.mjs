@@ -47,7 +47,7 @@ test('«Salvato.» e intanto il campo torna a 1: la seconda porta dello stesso g
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       if (msg && msg.type === 'automation_sessions_get') return { ok: true, maxSessions: 6, priorityAccount: '', accountAOff: false, accountBOff: false };
-      if (msg && msg.type === 'automation_sessions_set') return { ok: true, maxSessions: 1, priorityAccount: '', accountAOff: false, accountBOff: false };
+      if (msg && msg.type === 'automation_sessions_set') return { ok: true, letto: false, maxSessions: 12 };
       return orig(msg);
     };
   });
