@@ -233,11 +233,17 @@
       // faceva comparire all'utente «non si è aperto niente».
       tipi: ['NAVIGA', 'APRI_FILE', 'COMANDO_FINESTRA', 'ESEGUI_COMANDO', 'LEGGI_DOCUMENTO', 'LEGGI_FILE', 'PROXY_TAB', 'REGOLA_PROXY_DOMINIO'],
       avviso: 'non si è aperto niente',
-      frasi: [
-        new RegExp(`${HO}apert[oa]\\b`, 'i'),
-        new RegExp(`\\b${PRON}apert[oa]\\b`, 'i'),
-        new RegExp(`\\bte (?:l${AP}|lo |la )ho\\s+apert[oa]\\b`, 'i'),
-      ],
+      // «Ti ho aperto gli occhi», «ti ho aperto un mondo»: non si apre niente
+      // sullo schermo, e l'avviso lì aveva torto.
+      frasi: (() => {
+        const NON_SI_APRE = '(?!\\s+(?:gli occhi|un mondo|le porte|la porta|la mente|il cuore'
+          + '|una parentesi|un dibattito|un discorso|gli orizzonti|la strada))';
+        return [
+          new RegExp(`${HO}apert[oa]\\b${NON_SI_APRE}`, 'i'),
+          new RegExp(`\\b${PRON}apert[oa]\\b${NON_SI_APRE}`, 'i'),
+          new RegExp(`\\bte (?:l${AP}|lo |la )ho\\s+apert[oa]\\b${NON_SI_APRE}`, 'i'),
+        ];
+      })(),
     },
     {
       id: 'ricerca',
