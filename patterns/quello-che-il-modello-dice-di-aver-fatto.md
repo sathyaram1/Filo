@@ -182,4 +182,5 @@ dichiara e il codice che deve verificare. Stessa radice: un invariante non può
 dipendere dall'umore di un LLM.
 
 Il giro sta in `handleFiloChat` (`src/main/services/handlers.js`), l'avviso
-sotto la bolla in `src/pages/dashboard/dashboard.js`.
+sotto la bolla in `src/pages/dashboard/dashboard.js`. Il gemello dell'Aiuto sta
+in `src/content/sidebar.js`, accanto a `parseAssistantOutput`.
