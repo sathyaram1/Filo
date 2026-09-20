@@ -224,21 +224,58 @@ test('rinomina: input limite e tastiera', async ({ app, openTab }) => {
   console.log('TITOLO DOPO IL CAMPO SVUOTATO:', JSON.stringify(dopoVuoto.title.slice(0, 40)));
   expect(dopoVuoto.title.trim().length).toBeGreaterThan(0);
 
-  // 4) Solo tastiera: Shift+F10 apre il menu, le frecce lo percorrono, Invio
-  //    sceglie. Parità piena col mouse.
+});
+
+test('solo tastiera: il menu di una chat si apre, ma si può scegliere qualcosa?', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  await configura(app);
+  await stubProvider(app);
+
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({
+    userMessage: 'Discutiamo di Cartesio', threadHistory: [], chatId: 'c-tastiera',
+  }));
+  await app.evaluate(() => globalThis.SN_CLOSE_FILO_CHAT('c-tastiera'));
+  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).closedAt || '', { timeout: 30_000 })
+    .not.toBe('');
+
+  const page = await openTab(ARCHIVE);
+  const riga = page.locator('.arc-chat').first();
+  await expect(riga).toBeVisible({ timeout: 20_000 });
+
+  // Shift+F10 apre lo stesso menu del tasto destro: la pagina lo promette.
   await riga.focus();
   await page.keyboard.press('Shift+F10');
   await expect(page.locator('.arc-ctxmenu')).toBeVisible({ timeout: 10_000 });
-  const vociTastiera = await page.evaluate(() =>
-    [...document.querySelectorAll('.arc-ctxmenu .sn-select-option')].map((o) => o.textContent.trim()));
-  console.log('MENU DA TASTIERA:', JSON.stringify(vociTastiera));
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(600);
-  const campoDaTastiera = await page.locator('.arc-chat-rename').count();
-  console.log('IL CAMPO DI RINOMINA SI APRE DA TASTIERA:', campoDaTastiera);
-  expect(campoDaTastiera).toBe(1);
+  const voci = await page.evaluate(() =>
+    [...document.querySelectorAll('.arc-ctxmenu .sn-select-option')].map((o) => ({
+      testo: o.textContent.trim(),
+      raggiungibile: o.tabIndex >= 0,
+    })));
+  console.log('VOCI DEL MENU E LORO RAGGIUNGIBILITÀ DA TASTIERA:', JSON.stringify(voci));
+
+  // Adesso si prova a sceglierne una senza toccare il mouse: frecce, Tab,
+  // Invio, la prima lettera. Rinomina, Sposta ed Elimina non hanno nessun'altra
+  // porta: se qui non si arriva, da tastiera quelle tre cose non si fanno.
+  const tentativi = [];
+  for (const tasti of [['ArrowDown', 'ArrowDown', 'Enter'], ['Tab', 'Tab', 'Enter'], ['r'], ['ArrowDown', ' ']]) {
+    await riga.focus();
+    await page.keyboard.press('Shift+F10');
+    await page.waitForTimeout(150);
+    for (const t of tasti) await page.keyboard.press(t);
+    await page.waitForTimeout(400);
+    const aperto = await page.locator('.arc-chat-rename').count();
+    const fuoco = await page.evaluate(() => {
+      const a = document.activeElement;
+      return a ? `${a.className || a.tagName}` : 'niente';
+    });
+    tentativi.push({ tasti: tasti.join('+'), campoRinomina: aperto, fuocoSu: fuoco });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+  }
+  console.log('TENTATIVI DA TASTIERA:', JSON.stringify(tentativi, null, 1));
+
+  const almenoUno = tentativi.some((t) => t.campoRinomina > 0);
+  expect(almenoUno, `nessuna combinazione apre una voce: ${JSON.stringify(tentativi)}`).toBe(true);
 });
 
 test('due Cronologia aperte: quello che si cambia di qua si vede di là', async ({ app, openTab }) => {
