@@ -208,7 +208,7 @@ test('una chat si cancella a mano, con la conferma delle cose irreversibili', as
 
   // La conferma di Filo (non quella del browser): finché non si accetta, niente
   // si cancella.
-  const conferma = page.locator('.sn-confirm, .sn-modal, [role="dialog"]').first();
+  const conferma = page.locator('.sn-confirm-box').first();
   await expect(conferma).toBeVisible();
   expect((await leggiArchivio(app)).length).toBe(2);
 
