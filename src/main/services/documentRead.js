@@ -399,6 +399,61 @@ function bomDueByte(buf) {
   return '';
 }
 
+/**
+ * Lo stesso file, ma SENZA la firma in testa. PURA. → 'le' | 'be' | ''
+ *
+ * #551, quinto giro. La firma è una cortesia, non un obbligo: chi scrive un
+ * file a due byte può ometterla, e allora letto come UTF-8 torna una fila di
+ * caratteri nulli fra le lettere — e Filo dichiarava di averlo letto. Un testo
+ * a due byte si riconosce lo stesso: metà dei suoi byte sono nulli, e stanno
+ * tutti dalla stessa parte delle coppie (in fondo per il verso piccolo, in
+ * testa per l'altro). Un testo normale di byte nulli non ne ha nemmeno uno.
+ */
+function pareDueByte(buf) {
+  if (!buf || buf.length < 8) return '';
+  const n = Math.min(buf.length - (buf.length % 2), 4096);
+  let nulliDispari = 0; // byte alto delle coppie nel verso piccolo
+  let nulliPari = 0;
+  for (let i = 0; i < n; i += 2) {
+    if (buf[i] === 0x00) nulliPari++;
+    if (buf[i + 1] === 0x00) nulliDispari++;
+  }
+  const coppie = n / 2;
+  if (!coppie) return '';
+  // Una soglia alta apposta: qui non si tira a indovinare fra due codifiche
+  // plausibili, si riconosce una forma che il testo normale non ha mai.
+  if (nulliDispari / coppie > 0.3 && nulliPari / coppie < 0.05) return 'le';
+  if (nulliPari / coppie > 0.3 && nulliDispari / coppie < 0.05) return 'be';
+  return '';
+}
+
+/**
+ * Questi byte sono UTF-8 valido? PURA.
+ *
+ * #551, quinto giro di verifica. Prima la domanda era «quanti rombi vengono
+ * fuori leggendoli come UTF-8?», e si ripiegava sulla tabella di Windows sopra
+ * un rombo ogni mille caratteri. Una percentuale sbaglia in tutte e due le
+ * direzioni, e sbagliava su casi normalissimi:
+ *   • un documento salvato in ANSI con pochi segni speciali rispetto alla sua
+ *     lunghezza — la specifica della segnalazione, un estratto conto esportato
+ *     dal foglio di calcolo — restava letto come UTF-8, e euro, trattino lungo,
+ *     apostrofo tipografico e accenti diventavano rombi;
+ *   • un documento scritto BENE in UTF-8 che contiene davvero qualche rombo —
+ *     gli appunti in cui l'utente ha ricopiato i nomi storpiati dal terminale,
+ *     un registro di errori — veniva riletto tutto con la tabella di Windows, e
+ *     allora si storpiavano tutti gli accenti che erano giusti.
+ * «Sono UTF-8 valido?» invece è una domanda con una risposta esatta, e non ha
+ * soglie da tarare.
+ */
+function eUtf8Valido(buf) {
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(buf);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 // I 32 caratteri in cui la tabella di Windows si discosta da latin1 (da 0x80 a
 // 0x9F). Non è una fascia qualunque: è proprio dove stanno i SEGNI TIPOGRAFICI
 // — trattino lungo e medio, virgolette e apostrofi curvi, il simbolo dell'euro,
