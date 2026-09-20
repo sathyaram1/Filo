@@ -258,8 +258,15 @@
     return [];
   }
 
+  // Fuori escono le letture così come sono e le scritture MESSE IN FILA (vedi
+  // `inCoda` in cima): chi chiama non deve sapere niente di tutto questo.
   global.SN_FILO_CHATS = {
-    list, listIndex, get, open, append, close, setTriage, needsTriage,
-    remove, listDangling, listUntriaged, clear, uuid,
+    list, listIndex, get, needsTriage, listDangling, listUntriaged, uuid,
+    open: (...a) => inCoda(() => open(...a)),
+    append: (...a) => inCoda(() => append(...a)),
+    close: (...a) => inCoda(() => close(...a)),
+    setTriage: (...a) => inCoda(() => setTriage(...a)),
+    remove: (...a) => inCoda(() => remove(...a)),
+    clear: (...a) => inCoda(() => clear(...a)),
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
