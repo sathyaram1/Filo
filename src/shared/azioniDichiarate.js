@@ -1275,7 +1275,10 @@
     let pronome = null;
     for (const fam of FAMIGLIE) {
       if (ammesse && !fam.pronome && !ammesse.has(fam.id)) continue;
-      const trovate = dichiarazioni(t, fam);
+      // Giro 10: se l'utente ha chiesto di lavorare su un testo, le frasi che
+      // non nominano la cosa consegnano la risposta, non promettono niente.
+      const trovate = dichiarazioni(t, fam)
+        .filter((d) => !(d.senzaOggetto && chiesto === false));
       if (!trovate.length) continue;
       if (fam.pronome) { [pronome] = trovate; continue; }
       // Le azioni di questa famiglia partite adesso: ognuna regge UNA
