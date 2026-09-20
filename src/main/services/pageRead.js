@@ -554,13 +554,9 @@ async function readPage(input, { leggiScheda = null } = {}) {
   // Siti pericolosi: la stessa valutazione che protegge una scheda protegge
   // anche una lettura. Una pagina di phishing letta dall'agente è testo scritto
   // per ingannare chi la legge, e chi la legge qui decide cosa fare dopo.
-  try {
-    const SB = globalThis.SN_SAFEBROWSE;
-    const v = SB && SB.analyze(url, {});
-    if (v && v.level === 'pericoloso') {
-      return { ...BASE, url, error: 'blocked_dangerous', detail: 'quel sito è segnalato come pericoloso: Filo non lo legge' };
-    }
-  } catch (_) {}
+  if (pericoloso(url)) {
+    return { ...BASE, url, error: 'blocked_dangerous', detail: MOTIVI_RETE['blocked-dangerous'] };
+  }
 
   if (typeof leggiScheda === 'function') {
     try {
