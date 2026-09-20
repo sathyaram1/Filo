@@ -171,11 +171,15 @@
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
       // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
+      // A lavoro già finito il riassunto si rifà: la riga di un'impostazione
+      // confermata nel popup arriva DOPO, e senza questo il blocco restava
+      // intitolato «Come ha lavorato» mentre dentro l'impostazione c'era.
       addRow(type, rowIcon, text, failed = false) {
         closeTurnReasoning();
         if (!failed) doneTypes.push(String(type || '').toUpperCase());
         append(makeActivityRow(rowIcon, text));
         if (phase !== 'done') setPhase('act', text);
+        else renderSummary();
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
       // output, nella cronologia — non nella bolla della risposta.
