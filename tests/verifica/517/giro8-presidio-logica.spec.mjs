@@ -11,14 +11,14 @@
 //      bolletta», «ho aperto il contratto che hai incollato» — cade nella
 //      famiglia «apertura», che quei tre segni non li guarda: la risposta
 //      viene buttata, rifatta con un'altra chiamata al modello e poi smentita.
-//   2. L'APPUNTO CHE ESISTE NON DECIDE, MENTRE L'ORA DELLA SVEGLIA SÌ. Per le
-//      sveglie il giro 5 ha stabilito che l'ora nominata è la prova: anche con
-//      una sveglia già messa prima nella conversazione, «te l'ho già messa
-//      alle 19» senza la sveglia delle 19 viene vista. Per gli appunti no: i
-//      titoli Filo ce li ha sotto gli occhi, ma basta un appunto scritto in un
-//      turno qualunque di prima perché ogni appunto raccontato dopo con una
-//      frase che guarda indietro passi muto — anche quando fra i titoli quel
-//      nome non c'è. È la strada in cui finisce chi preme «Fallo adesso».
+//   2. UNA COSA GIÀ SMENTITA CHE TORNA VERA. Per le sveglie il giro 5 ha
+//      stabilito che l'ora nominata decide anche contro un'azione passata.
+//      Fuori dalle sveglie no: basta un'azione di quella specie fatta in un
+//      turno qualunque di prima perché ogni cosa raccontata dopo con una
+//      frase che guarda indietro passi muta, all'infinito e senza conto. È la
+//      strada in cui finisce chi preme «Fallo adesso»: il modello ripete la
+//      stessa cosa con un «già» davanti, che è proprio la parola che scrive
+//      quando gli si dice di rifarla.
 //
 // I test sono scritti per essere ROSSI finché le porte sono aperte.
 
