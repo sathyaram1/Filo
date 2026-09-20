@@ -270,6 +270,50 @@
     threadView.hidden = false;
   }
 
+  // #525 — riapertura di una chat archiviata (filo://archive → clic su una
+  // chat, oppure un link con ?chat=<id>). La conversazione torna per intero e
+  // si continua a scrivere DENTRO la stessa chat: i messaggi nuovi si
+  // accodano a quelli di prima, non aprono una chat gemella.
+  //
+  // Quello che NON torna sono i bottoni delle azioni: un'azione in attesa di
+  // conferma non si può ri-offrire tre giorni dopo come se fosse di adesso.
+  // Al loro posto resta la riga che racconta cosa Filo aveva fatto.
+  function chatIdFromUrl() {
+    try { return new URLSearchParams(self.location.search).get('chat') || null; }
+    catch (_) { return null; }
+  }
+
+  async function reopenChat(id) {
+    const r = await send({ type: MSG.FILO_CHAT_GET, id });
+    const chat = r && r.ok && r.chat;
+    if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
+    chatId = chat.id;
+    threadHistory = [];
+    bubblesEl.innerHTML = '';
+    goThread();
+    for (const m of chat.messages) {
+      const isUser = m.role === 'user';
+      const text = String(m.text || '');
+      const types = Array.isArray(m.actions) ? m.actions : [];
+      if (text.trim()) {
+        bubblesEl.appendChild(makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser }));
+      }
+      if (!isUser && types.length) {
+        const note = document.createElement('div');
+        note.className = 'dash-bubble-note';
+        note.dataset.replay = '1';
+        note.textContent = Att.summarizeActivity(types, false);
+        bubblesEl.appendChild(note);
+      }
+      threadHistory.push(isUser
+        ? { role: 'user', text }
+        : { role: 'filo', text, actions: types.map((t) => ({ type: t })) });
+    }
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    inputEl.focus();
+    return true;
+  }
+
   // ===== Suggerimenti (colonna sinistra) =====
   function iconLabel(icon) {
     const map = {
