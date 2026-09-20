@@ -977,7 +977,7 @@
     // click, una ricerca, un comando) sono lo stesso turno e se lo portano
     // dietro, altrimenti due risposte fuori formato di fila si rimbalzerebbero
     // all'infinito.
-    if (userMessage) rimandiFuoriFormato = 0;
+    if (userMessage) { rimandiFuoriFormato = 0; rimandiAzioneRaccontata = 0; }
 
     if (userMessage) {
       appendChatMessage('user', userMessage);
