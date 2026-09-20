@@ -16,10 +16,14 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const ARCHIVE = 'filo://archive/archive.html';
 
-// Modelli di prova + chiave finta: senza, la chat non parte nemmeno.
+// Modelli di prova + chiave finta: senza, la chat non parte nemmeno. E
+// l'intervista di benvenuto chiusa: su un profilo appena nato è APERTA, e
+// finché lo è ogni chat è l'intervista — cioè sempre una conversazione (#524,
+// ed è il comportamento giusto). Qui vogliamo provare le chat normali.
 async function configura(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
