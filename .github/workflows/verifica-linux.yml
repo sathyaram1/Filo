@@ -1,0 +1,120 @@
+# Prova che il pacchetto per Linux si costruisca ancora — senza pubblicare niente.
+#
+# PERCHE' ESISTE
+#   Gemello di verifica-mac.yml, e per lo stesso motivo. Filo si sviluppa e si
+#   prova su Windows: la ricetta del pacchetto Linux (package.json →
+#   build.linux) puo' rompersi senza che nessuno se ne accorga, perche' l'unico
+#   momento in cui viene eseguita e' DENTRO la pubblicazione vera — dove un
+#   errore arriva quando ormai la release e' fuori, e dove provare a mano costa
+#   un numero di versione bruciato.
+#
+#   Questo lavoro fa girare la costruzione su una macchina Linux e si ferma
+#   prima di pubblicare: e' il modo per rispondere a "l'AppImage si costruisce?"
+#   senza toccare niente di vivo.
+#
+# QUANDO GIRA
+#   · a mano, dalla tab "Actions" → "Run workflow" (su qualunque ramo);
+#   · da solo, quando si tocca uno dei file che DEFINISCONO il pacchetto Linux.
+#
+# COSA NON PROVA
+#   Che l'app PARTA su un Linux desktop, con la sua sessione grafica, il suo
+#   gestore di notifiche e il suo gestore di file. Quello lo puo' dire solo un
+#   Linux vero con dentro una persona: qui si controlla che il pacchetto esista,
+#   che si chiami come il sito si aspetta, che porti con se' il file da cui
+#   l'aggiornamento automatico riparte e che la voce di menu dichiari il
+#   protocollo filo:// (senza, il link d'invito non apre Filo).
+
+name: Verifica build Linux
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/verifica-linux.yml'
+      - 'assets/icons/icon-1024.png'
+      # Il primo passo di questo lavoro E' la sentinella: se cambia lei, cambia
+      # cosa questo lavoro controlla, e va rifatto girare.
+      - 'tests/unit/linuxSupport.test.mjs'
+      # La ricetta del pacchetto sta qui dentro (build.linux). Il commit che
+      # alza il numero di versione porta `[skip ci]` e non fa scattare niente.
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  verifica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        run: npm ci
+
+      # La sentinella guarda la CONFIGURAZIONE (che il pacchetto Linux sia
+      # ancora previsto, coi nomi giusti). Gira prima della costruzione: se la
+      # ricetta e' gia' sbagliata sulla carta, si scopre in dieci secondi
+      # invece che in dieci minuti.
+      #
+      # Solo questo file, non l'intera suite: la suite completa gira nel lavoro
+      # di pubblicazione, dov'e' il suo posto.
+      - name: Sentinella Linux
+        run: node --test tests/unit/linuxSupport.test.mjs
+
+      # Niente `--publish`: si costruisce e basta. Il file delle chiavi di
+      # default non serve (qui non si consegna niente a nessuno) e cosi' questo
+      # lavoro non ha bisogno di vedere nessun segreto.
+      - name: Costruisci il pacchetto per Linux
+        run: npm run build:linux
+
+      - name: I file attesi ci sono?
+        shell: bash
+        run: |
+          set -e
+          ls -la dist
+          for ATTESO in Filo-Linux.AppImage latest-linux.yml; do
+            test -f "dist/$ATTESO" || {
+              echo "::error::manca dist/$ATTESO"
+              exit 1
+            }
+          done
+          # latest-linux.yml e' il file che l'aggiornamento automatico legge su
+          # Linux: deve nominare l'AppImage, altrimenti l'app trova
+          # l'aggiornamento e non sa da dove scaricarlo.
+          grep -q 'Filo-Linux.AppImage' dist/latest-linux.yml || {
+            echo "::error::latest-linux.yml non nomina Filo-Linux.AppImage"
+            cat dist/latest-linux.yml
+            exit 1
+          }
+          cat dist/latest-linux.yml
+
+      # Dentro l'AppImage c'e' la voce di menu (.desktop) che il sistema legge
+      # quando l'utente integra il file: e' li' che vivono il nome, l'icona, la
+      # categoria e — la parte che si rompe in silenzio — la dichiarazione del
+      # protocollo filo://, senza la quale il link d'invito non apre Filo.
+      - name: La voce di menu dentro l'AppImage dice le cose giuste
+        shell: bash
+        run: |
+          set -e
+          PUNTO=$(mktemp -d)
+          cp dist/Filo-Linux.AppImage "$PUNTO/Filo.AppImage"
+          chmod +x "$PUNTO/Filo.AppImage"
+          # --appimage-extract non ha bisogno di FUSE (lo fa il runtime
+          # dell'AppImage), quindi gira anche su un runner senza /dev/fuse.
+          (cd "$PUNTO" && ./Filo.AppImage --appimage-extract '*.desktop' >/dev/null)
+          VOCE=$(find "$PUNTO/squashfs-root" -maxdepth 1 -name '*.desktop' -print -quit)
+          test -n "$VOCE" || { echo "::error::nell'AppImage non c'e' nessuna voce di menu"; exit 1; }
+          cat "$VOCE"
+          grep -q 'x-scheme-handler/filo' "$VOCE" || {
+            echo "::error::la voce di menu non dichiara filo://: su Linux il link d'invito non aprirebbe Filo"
+            exit 1
+          }
+          grep -q '^StartupWMClass=' "$VOCE" || {
+            echo "::error::manca StartupWMClass: la finestra non si aggancia alla sua icona nella barra"
+            exit 1
+          }
