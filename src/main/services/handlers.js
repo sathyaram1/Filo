@@ -2700,6 +2700,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // al modello al turno dopo.
     notes, reasoningDetails,
     ...(keyFallback ? { keyFallback } : {}),
+    // #517 — la risposta dichiara un'azione che non è mai stata eseguita: la
+    // scheda lo scrive sotto la bolla. `avvisoAzioni` è la riga da mostrare,
+    // `azioniMancate` il dettaglio (a cosa si riferisce, con quale frase).
+    ...(avvisoAzioni ? { avvisoAzioni, azioniMancate } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
     ...(onboardingClosed ? { onboardingClosed: true } : {}),
