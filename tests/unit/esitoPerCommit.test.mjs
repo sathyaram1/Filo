@@ -396,3 +396,143 @@ test('la fusione fermata dal decadimento dice quale passo registrare, col ramo d
   assert.ok(!/chi ha cambiato il ramo lo rimette in verifica/.test(testo),
     'non si nomina una persona che non esiste al posto di un passo da registrare');
 });
+
+// ─── Chi si ricorda su quale contenuto è stato dato l'ok (giro 3 su #485) ────
+//
+// Il rifiuto che ferma la fusione si regge su uno specchio locale: «la verifica
+// ha dato l'ok su X, il controllo di sicurezza su Y». Tre porte lo aggiravano,
+// tutte della stessa famiglia — la memoria scritta da una strada sola, mai
+// confrontata con quello che chi fonde andrà davvero a prendere, e un'astensione
+// che parlava solo quando non sapeva proprio niente.
+//
+// Senza il fix: lo specchio lo scrive solo dispatch, la nota esce solo a
+// memoria del tutto vuota, e la pubblicazione su origin non la guarda nessuno.
+
+test('lo specchio locale lo scrivono tutte e due le strade, e una correzione lo svuota', () => {
+  const dir = cartellaTemporanea('filo-485-specchio-');
+  const statoDir = cartellaTemporanea('filo-485-specchio-stato-');
+  const precedente = process.env.FILO_DISPATCH_STATE_DIR;
+  process.env.FILO_DISPATCH_STATE_DIR = statoDir;
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    g(['init', '-q', '--initial-branch=main']);
+    g(['config', 'user.email', 't@t']);
+    g(['config', 'user.name', 't']);
+    writeFileSync(resolve(dir, 'a.txt'), 'esaminato\n', 'utf8');
+    g(['add', '-A']);
+    g(['commit', '-qm', 'base']);
+    g(['checkout', '-qb', 'worker/485']);
+    writeFileSync(resolve(statoDir, 'ID485.json'), JSON.stringify({ id: 'ID485', branch: 'worker/485' }) + '\n', 'utf8');
+    const letto = () => JSON.parse(readFileSync(resolve(statoDir, 'ID485.json'), 'utf8'));
+
+    const A = 'a'.repeat(40);
+    assert.equal(ricordaEsitoSuCommit(dir, 'verdict', A).scritto, true);
+    assert.equal(letto().verifierSha, A, 'la verifica lascia scritto su quale contenuto ha dato l\'ok');
+
+    const B = 'b'.repeat(40);
+    assert.equal(ricordaEsitoSuCommit(dir, 'secaudit', B).scritto, true);
+    assert.equal(letto().secauditSha, B);
+    assert.equal(letto().verifierSha, A, 'e non si porta via quello dell\'altro esito');
+
+    // Una correzione è contenuto nuovo: gli esiti dati su quello vecchio se ne
+    // vanno con lui, o resterebbe la firma di un controllo fatto altrove.
+    assert.equal(ricordaEsitoSuCommit(dir, 'fixed', '').scritto, true);
+    assert.equal(letto().verifierSha, '');
+    assert.equal(letto().secauditSha, '');
+
+    // Senza uno stato per questo ramo non si inventa niente, e si DICE che non
+    // si è scritto: è così che il cancello può astenersi ad alta voce.
+    rmSync(resolve(statoDir, 'ID485.json'), { force: true });
+    const muto = ricordaEsitoSuCommit(dir, 'verdict', A);
+    assert.equal(muto.scritto, false);
+    assert.ok(muto.why, 'il motivo c\'è: un silenzio non si distingue da un successo');
+  } finally {
+    if (precedente === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
+    else process.env.FILO_DISPATCH_STATE_DIR = precedente;
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(statoDir, { recursive: true, force: true });
+  }
+});
+
+test('gli intenti che valgono per un commit sono dichiarati, non indovinati', () => {
+  assert.deepEqual([...CAMPI_ESITO.verdict], ['verifierSha']);
+  assert.deepEqual([...CAMPI_ESITO.secaudit], ['secauditSha']);
+  assert.deepEqual([...CAMPI_ESITO.fixed], ['verifierSha', 'secauditSha']);
+  assert.equal(CAMPI_ESITO.status, undefined, 'un passaggio di stato non è un esito ragionato');
+});
+
+test('l\'astensione parla anche quando di UNO solo dei due ok non si sa il contenuto', () => {
+  const A = 'a'.repeat(40);
+  assert.deepEqual(esitiSenzaCommit({ verifierSha: A, secauditSha: A }), []);
+  assert.deepEqual(esitiSenzaCommit({ verifierSha: '', secauditSha: A }), ['la verifica']);
+  assert.deepEqual(esitiSenzaCommit(null), ['la verifica', 'il controllo di sicurezza']);
+
+  assert.equal(testoEsitiSenzaCommit([]), '', 'quando si sa tutto non si dice niente');
+
+  const meta = testoEsitiSenzaCommit(['la verifica']);
+  assert.match(meta, /non risulta/, 'il caso peggiore dei tre non può passare in silenzio');
+  assert.match(meta, /la verifica/);
+  assert.match(meta, /il controllo di sicurezza/, 'e si dice quale dei due invece è stato controllato');
+
+  assert.match(testoEsitiSenzaCommit(['la verifica', 'il controllo di sicurezza']), /i via libera/);
+});
+
+test('il contenuto esaminato deve stare dove chi fonde andrà a prenderlo', () => {
+  const P = 'p'.repeat(40);
+  const O = 'o'.repeat(40);
+  // Si sceglie sul PRIMO argomento: «refs/remotes/origin/…» contiene la parola
+  // «remote», e un finto che guardasse tutta la riga risponderebbe a rev-parse
+  // con la lista dei remoti.
+  const finto = (risposte) => (args) => {
+    const val = risposte[String(args[0] || '')];
+    return val === undefined ? { ok: true, out: '' } : val;
+  };
+
+  assert.equal(statoPubblicazione(finto({ remote: { ok: true, out: 'upstream' } }), 'worker/485', P).stato,
+    'senza_origine', 'senza un origin la domanda non si pone');
+
+  assert.equal(statoPubblicazione(finto({ remote: { ok: false, out: '' } }), 'worker/485', P).stato,
+    'sconosciuto', 'git che non risponde non vale «tutto a posto»');
+
+  assert.equal(statoPubblicazione(finto({
+    remote: { ok: true, out: 'origin' },
+    'rev-parse': { ok: false, out: '' },
+  }), 'worker/485', P).stato, 'sconosciuto', 'senza il ramo su origin non si conclude niente');
+
+  assert.equal(statoPubblicazione(finto({
+    remote: { ok: true, out: 'origin' },
+    'rev-parse': { ok: true, out: O },
+    'merge-base': { ok: true, out: '' },
+  }), 'worker/485', P).stato, 'pubblicato');
+
+  const assente = statoPubblicazione(finto({
+    remote: { ok: true, out: 'origin\nbackup' },
+    'rev-parse': { ok: true, out: O },
+    'merge-base': { ok: false, out: '' },
+  }), 'worker/485', P);
+  assert.equal(assente.stato, 'assente', 'un commit rimasto solo qui non è pubblicato');
+  assert.equal(assente.suOrigin, O);
+
+  const testo = testoNonPubblicato(P, O, 'worker/485-xyz');
+  assert.match(testo, new RegExp(`${'p'.repeat(12)}`), 'quale contenuto è stato esaminato');
+  assert.match(testo, new RegExp(`${'o'.repeat(12)}`), 'e a cosa è fermo il ramo dove si va a prenderlo');
+  assert.ok(testo.includes('worker/485-xyz'), 'col ramo dentro: il comando si copia, non si ricostruisce');
+  assert.match(testo, /git push/, 'e il rimedio, non solo il no');
+});
+
+test('i comandi del rifiuto puntano agli attrezzi del giro, non a quelli del ramo', () => {
+  const A = 'a'.repeat(40);
+  const B = 'b'.repeat(40);
+  const crudo = testoEsitiDecaduti(esitiDecaduti({ secauditSha: A }, B), B, 'worker/485');
+  assert.match(crudo, /node scripts\/routine-channel\.mjs/, 'la ricetta si scrive come si legge');
+
+  // In un giro vero gli attrezzi stanno fuori dal deposito: `scripts/…` qui
+  // dentro riporterebbe alla copia che il ramo si porta dietro, vecchia di
+  // giorni e senza dirlo. È la stessa riscrittura che riceve ogni file-ruolo.
+  const fissato = absolutizeRecipe(crudo, '/strumenti/del-giro', '/il/deposito');
+  assert.match(fissato, /node "\/strumenti\/del-giro\/scripts\/routine-channel\.mjs"/);
+  assert.ok(!/node scripts\//.test(fissato), 'e non resta nemmeno una scorciatoia dentro il ramo');
+
+  // In locale le due radici coincidono e il testo non si tocca.
+  assert.equal(absolutizeRecipe(crudo, '/il/deposito', '/il/deposito'), crudo);
+});
