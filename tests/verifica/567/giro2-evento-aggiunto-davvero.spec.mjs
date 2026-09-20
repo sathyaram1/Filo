@@ -107,7 +107,9 @@ test('a «l\'hai aggiunto?» Filo deve sapere che l\'utente l\'ha aggiunto', asy
     globalThis.__v567g2c_msg = [];
     let n = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
-      globalThis.__v567g2c_msg.push(JSON.stringify(messages));
+      globalThis.__v567g2c_msg.push(JSON.stringify(
+        (messages || []).filter((m) => m.role === 'assistant').map((m) => String(m.content || '')),
+      ));
       n += 1;
       const calls = n === 1 ? [{ id: 'g2c', name: 'EVENTO_CALENDARIO', arguments: EV }] : [];
       for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
