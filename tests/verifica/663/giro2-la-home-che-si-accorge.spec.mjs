@@ -57,11 +57,14 @@ async function conChiave(app, chiave = 'sk-or-vera') {
 // impostazioni, la tiene il portafoglio e la config effettiva se la prende a
 // ogni chiamata. Qui si riproduce quell'effetto — è la strada di ogni
 // invitato, cioè di ogni utente nuovo.
+// `require` nudo non esiste dentro app.evaluate (il codice ci arriva come
+// eval): serve il createRequire ancorato al main, come in tests/wallet-credits.
 async function invitoRiscattato(app, chiave = CHIAVE_DELL_INVITO) {
   await app.evaluate((_e, k) => {
-    const path = require('path');
-    const mod = require(path.join(process.cwd(), 'src', 'main', 'auth', 'wallet-store.js'));
-    mod.personalKey = () => k;
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    req('./auth/wallet-store').personalKey = () => k;
   }, chiave);
 }
 
