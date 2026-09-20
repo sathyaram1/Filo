@@ -254,7 +254,12 @@
       // sullo schermo, e l'avviso lì aveva torto.
       frasi: (() => {
         const NON_SI_APRE = '(?!\\s+(?:gli occhi|un mondo|le porte|la porta|la mente|il cuore'
-          + '|una parentesi|un dibattito|un discorso|gli orizzonti|la strada))';
+          + '|una parentesi|un dibattito|un discorso|gli orizzonti|la strada))'
+          // Giro 8: quello che si «apre» è un documento che Filo ha già
+          // davanti, oppure una segnalazione: sono due famiglie loro, con le
+          // loro prove e il loro avviso. Qui resterebbero solo per dire la
+          // cosa sbagliata.
+          + `(?![^.!?]{0,24}\\b(?:${DOCUMENTO}|segnalazione|feedback)\\b)`;
         return [
           new RegExp(`${HO}apert[oa]\\b${NON_SI_APRE}`, 'i'),
           new RegExp(`\\b${PRON}apert[oa]\\b${NON_SI_APRE}`, 'i'),
