@@ -94,7 +94,7 @@ test('nell\'Aiuto un comando della barra non mette in ombra quello che il modell
   expect(turni > 1 || AVVISATO.test(testo)).toBe(true);
 });
 
-test('nell\'Aiuto un comando della barra raccontato per intero resta muto', async ({ openTab }) => {
+test('nell\'Aiuto la stessa frase, senza comando della barra, viene vista', async ({ openTab }) => {
   // La controprova che la porta è quella e non un'altra: la STESSA frase,
   // senza il comando della barra, viene vista.
   test.setTimeout(90_000);
