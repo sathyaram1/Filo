@@ -56,14 +56,18 @@ test('l\'evento di calendario proposto come bottone non è un\'azione mancata', 
   // Così arriva l'azione al presidio quando l'evento è stato chiamato davvero:
   // il main la tiene (`kept`), il bottone è in chat, ma non l'ha «eseguita»
   // perché tocca all'utente premerlo.
-  const bottone = [{ type: 'EVENTO_CALENDARIO', _executed: false }];
+  const bottone = [{ type: 'EVENTO_CALENDARIO', _executed: false, _kept: true }];
   expect(ids('Ti ho aggiunto l\'evento in calendario per domani alle 10.', bottone)).toEqual([]);
   expect(ids('Te l\'ho aggiunta al calendario.', bottone)).toEqual([]);
+  // E la porta del giro 2 resta chiusa: una sveglia chiamata e non riuscita
+  // non tiene niente in chat, e non copre la frase che la dà per fatta.
+  expect(ids('Ti ho messo una sveglia alle 19:00.',
+    [{ type: 'SVEGLIA', _executed: false, _kept: false }])).toEqual(['sveglia']);
 });
 
 test('la pulizia delle schede proposta come bottone non è un\'azione mancata', async () => {
-  expect(ids('Ho chiuso le schede che non usavi.', [{ type: 'PULISCI_TAB', _executed: false }])).toEqual([]);
-  expect(ids('Ho cancellato la cronologia.', [{ type: 'CANCELLA_ARCHIVIO', _executed: false }])).toEqual([]);
+  expect(ids('Ho chiuso le schede che non usavi.', [{ type: 'PULISCI_TAB', _executed: false, _kept: true }])).toEqual([]);
+  expect(ids('Ho cancellato la cronologia.', [{ type: 'CANCELLA_ARCHIVIO', _executed: false, _kept: true }])).toEqual([]);
 });
 
 // ── B bis. un'azione LIBERA qualunque zittisce la conferma col pronome ───────
