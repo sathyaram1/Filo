@@ -1204,15 +1204,24 @@ function compitoPerChiave(chiave) {
 // contaminato, e il suo perimetro non lo dichiara il modello (non ha un passo
 // per farlo) ma la superficie, che di uscite ne offre una sola.
 const PERIMETRO_PAGINA = ['segnalazioni'];
+// Il sito da cui arriva l'azione, non la scheda. #533 (primo giro di verifica):
+// con la scheda come chiave un permesso dato su un sito restava valido quando
+// quella stessa scheda apriva un altro sito — cioè un sì dato a qualcuno finiva
+// in mano a chiunque venisse dopo, per mezz'ora. Un compito di pagina muore con
+// la pagina: cambia il sito, cambia il compito.
+function sitoDi(url) {
+  try { return new URL(String(url)).origin; } catch (_) { return ''; }
+}
 function compitoDiPagina(sender) {
   const Compiti = globalThis.SN_COMPITI;
-  const origin = String(sender?.tab?.url || sender?.url || '');
-  if (!Compiti || !/^https?:/i.test(origin)) return null;
-  const chiave = `pagina::${sender?.tab?.id ?? origin}`;
+  const url = String(sender?.tab?.url || sender?.url || '');
+  if (!Compiti || !/^https?:/i.test(url)) return null;
+  const sito = sitoDi(url) || url;
+  const chiave = `pagina::${sender?.tab?.id ?? '?'}::${sito}`;
   const gia = compitoPerChiave(chiave);
   if (gia) return gia;
-  const c = Compiti.nuovo({ origine: 'chat', dichiarazione: 'fissa', perimetro: PERIMETRO_PAGINA });
-  Compiti.registraLettura(c, { type: 'PAGINA', fonte: 'esterno', dettaglio: origin });
+  const c = Compiti.nuovo({ origine: 'chat', dichiarazione: 'fissa', perimetro: PERIMETRO_PAGINA, richiesta: sito });
+  Compiti.registraLettura(c, { type: 'PAGINA', fonte: 'esterno', dettaglio: sito });
   return ricordaCompito(c, chiave);
 }
 
@@ -1236,9 +1245,21 @@ function compitiRecenti(max = 30) {
 
 // Il compito di questa azione: quello del turno che la sta eseguendo, quello
 // citato dall'azione che torna da un popup, o quello della pagina da cui arriva.
+// Un'azione che arriva da una pagina web non può NOMINARE un compito: il nome
+// è una chiave che apre i permessi di quel compito, e chi sta dentro un sito
+// non deve poter dire di appartenere a un'altra richiesta (#533, primo giro di
+// verifica). Fidati sono il main (nessun mittente) e le pagine interne.
+function mittenteFidato(sender) {
+  if (!sender) return true;
+  if (sender.isShell) return true;
+  const url = String(sender?.tab?.url || sender?.url || '');
+  if (!url) return true;
+  return url.startsWith('filo://');
+}
 function compitoDi(action, sender, compito) {
   if (compito) return compito;
-  return compitoPerChiave(action && action._compito) || compitoDiPagina(sender);
+  const nominato = mittenteFidato(sender) ? compitoPerChiave(action && action._compito) : null;
+  return nominato || compitoDiPagina(sender);
 }
 
 async function executeFiloAction(action, { confirmed = false, sender = null, compito = null } = {}) {
@@ -1662,6 +1683,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
           return { executed: false, kept: true, output: { search: query, results: [], error: e?.message || String(e) } };
         }
       }
+      case 'LEGGI_SCHEDE': {
+        // #533 (primo giro di verifica) — i titoli delle schede li scrivono i
+        // siti. Prima stavano nello stato che il modello riceve a ogni
+        // messaggio, cioè arrivavano prima che il perimetro esistesse; adesso
+        // sono una lettura come le altre: gratis, ma da lì in poi valgono solo
+        // le uscite dichiarate.
+        const FS = globalThis.SN_FILO_STATE;
+        let tabs = [];
+        try { tabs = FS ? await FS.listTabs() : []; } catch (_) { tabs = []; }
+        return { executed: true, kept: true, output: { schede: FS ? FS.schedeImbustate(tabs) : '', quante: tabs.length } };
+      }
       case 'LEGGI_TRASPARENZA': {
         // I documenti di trasparenza (transparency/*.md → SN_TRANSPARENCY) sono
         // le scelte dell'owner messe per iscritto: quando l'utente chiede perché
@@ -2075,6 +2107,21 @@ function webSearchResultsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Re-immissione dei TITOLI DELLE SCHEDE chiesti con LEGGI_SCHEDE. Li scrivono i
+// siti: arrivano già imbustati da SN_FILO_STATE, dentro la stessa busta con cui
+// entravano nello stato (#593), e Filo scrive solo la riga intorno.
+function openTabsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_SCHEDE') continue;
+    const out = a._output;
+    if (!out || !('schede' in out)) continue;
+    blocks.push(`[Schede aperte: ${Number(out.quante) || 0}]\n${out.schede}`);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Re-immissione del DOCUMENTO DI TRASPARENZA chiesto con LEGGI_TRASPARENZA in un
 // turno precedente: l'agente risponde sul perché di una scelta (quali modelli,
 // quali aziende escluse, che fine fanno i dati) leggendo il testo scritto
@@ -2190,6 +2237,7 @@ function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
+    openTabsForPrompt(actions),
     confirmedActionsForPrompt(actions),
   ].filter(Boolean).join('\n\n');
 }
@@ -2448,7 +2496,7 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, sender = null, compitoRipreso = null }) {
+async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, sender = null, compitoRipreso = null, compitoPrecedente = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
 
@@ -2485,7 +2533,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble();
+  // #533 (primo giro di verifica) — lo stato che l'agente riceve a ogni
+  // messaggio NON porta più i titoli delle schede: li scrivono i siti, e
+  // arrivavano prima che ci fosse un perimetro da rispettare. Restano il
+  // numero e lo strumento per chiederli (LEGGI_SCHEDE), che è una lettura.
+  const { stateText } = await FiloState.assemble({ conEsterno: false });
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
@@ -2570,7 +2622,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (!task && Compiti) {
     // L'accoglienza è contabilità di Filo su una conversazione sua: il permesso
     // glielo dà l'intervista aperta, non la richiesta dell'utente.
-    task = ricordaCompito(Compiti.nuovo({ origine: 'chat', sempre: onbActive ? ['accoglienza'] : [] }));
+    // #533 (primo giro di verifica) — se il messaggio prima aveva letto roba
+    // scritta da altri, quel testo è ancora in chat (Filo l'ha riportato nella
+    // sua risposta): il compito nuovo eredita la contaminazione e il perimetro
+    // già concesso, invece di ricominciare a mani libere. Dopo un messaggio
+    // pulito non cambia niente.
+    const prec = compitoPrecedente ? compitoPerChiave(compitoPrecedente) : null;
+    task = ricordaCompito(Compiti.erede(prec, {
+      richiesta: userMessage,
+      sempre: onbActive ? ['accoglienza'] : [],
+    }));
   }
   const payloadBase = {
     profilo, preferenze, espansioni, lezioni, stato: stateText, capacita,
@@ -2781,6 +2842,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
   return {
     text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
+    // #533 — il compito di questo messaggio. La scheda lo rimanda col messaggio
+    // dopo, così una conversazione già contaminata non riparte a mani libere.
+    compito: task ? task.id : null,
     // Le note scritte a metà lavoro e il ragionamento strutturato dell'ultimo
     // giro: la scheda li tiene con la conversazione, e il ragionamento torna
     // al modello al turno dopo.

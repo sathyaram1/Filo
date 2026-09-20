@@ -24,6 +24,11 @@
 (function (global) {
   'use strict';
 
+  // Quanto del motivo scritto dal modello entra nel riquadro di conferma. Una
+  // frase ci sta larga; oltre, il testo che la pagina gli ha dettato spinge
+  // fuori dal bordo quello che Filo ha da dire (#533, primo giro di verifica).
+  const MAX_MOTIVO = 300;
+
   function prefBuilt(action) {
     const P = global.SN_PREF;
     if (!P) return null;
@@ -255,6 +260,13 @@
         return `Leggere il documento ${p || ''}`.trim();
       },
     },
+    LEGGI_SCHEDE: {
+      // Sola lettura dei titoli delle schede già aperte dall'utente: niente
+      // esce e niente cambia → 1. Quello che CAMBIA, dopo averli letti, lo
+      // decide il perimetro delle uscite (#533).
+      level: 1,
+      describe: () => 'Guardare i titoli delle schede aperte',
+    },
     LEGGI_TRASPARENZA: {
       // Filo rilegge i propri documenti di trasparenza per rispondere a "perché
       // usi questo modello?", "che fine fanno i miei dati?". Sola lettura di
@@ -444,14 +456,20 @@
         const u = String((a && a.uscita) || '').trim();
         return (!C || C.USCITE_DICHIARABILI.includes(u)) ? 2 : null;
       },
+      // #533 (primo giro di verifica) — l'ordine conta, e il motivo ha un tetto.
+      // Il motivo lo scrive il modello, che a quel punto ha già letto la pagina:
+      // chi l'ha scritta può dettarglielo. Messo in fondo e accorciato, la riga
+      // con cui Filo mette in guardia resta la prima cosa che si legge, invece
+      // di finire sotto il bordo del riquadro.
       describe: (a) => {
         const C = global.SN_COMPITI;
         const et = C ? C.etichettaUscita(a && a.uscita) : String((a && a.uscita) || '');
-        const motivo = String((a && (a.motivo ?? a.reason)) || '').trim();
+        let motivo = String((a && (a.motivo ?? a.reason)) || '').replace(/\s+/g, ' ').trim();
+        if (motivo.length > MAX_MOTIVO) motivo = `${motivo.slice(0, MAX_MOTIVO - 1)}…`;
         return `Per questa richiesta avevi chiesto altro, e intanto Filo ha letto testo scritto da altri.\n\n`
           + `Adesso vuole anche: ${et}.\n\n`
-          + `Dice che gli serve perché: “${motivo || '(non l’ha detto)'}”\n\n`
-          + 'Permetteglielo solo se torna con quello che gli hai chiesto tu. Vale solo per questa richiesta.';
+          + 'Permetteglielo solo se torna con quello che gli hai chiesto tu. Vale solo per questa richiesta.\n\n'
+          + `Il motivo che dà (lo scrive lui, e la pagina che ha letto può averglielo suggerito): “${motivo || 'non l’ha detto'}”`;
       },
       describeDone: (a) => {
         const C = global.SN_COMPITI;

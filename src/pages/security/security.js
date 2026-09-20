@@ -454,28 +454,41 @@
   // #533 — la riga di un compito dice il PERIMETRO, cioè cosa gli era
   // permesso: cosa ha poi fatto si legge già nel diario della chat.
   function rigaCompito(c) {
+    const C = window.SN_COMPITI;
     const riga = document.createElement('div');
     riga.className = 'sn-toggle-row';
     riga.style.display = 'block';
     const quando = document.createElement('div');
-    quando.textContent = new Date(c.ts).toLocaleString();
+    // All'italiana come in tutto il resto di Filo: senza dirlo, la data usciva
+    // nel formato della lingua del computer (#533, primo giro di verifica).
+    quando.textContent = new Date(c.ts).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+    // Qual era la richiesta. Senza, due richieste diverse sono due righe
+    // identiche e «cosa poteva fare in ciascuna» non ha un «ciascuna».
+    const quale = document.createElement('div');
+    if (c.dichiarazione === 'fissa') {
+      quale.textContent = c.richiesta
+        ? `${I18n.t('security_perimetro_pagina')}: ${c.richiesta}`
+        : I18n.t('security_perimetro_pagina');
+    } else {
+      quale.textContent = c.richiesta || I18n.t('security_perimetro_senza_testo');
+    }
     const cosa = document.createElement('div');
     cosa.className = 'sn-muted';
     if (!c.contaminato) {
       cosa.textContent = I18n.t('security_perimetro_pulito');
     } else {
-      const C = window.SN_COMPITI;
-      const uscite = (c.perimetro || []).concat(c.sempre || []);
+      // La contabilità interna di Filo (l'intervista di benvenuto) non è un
+      // permesso che l'utente ha dato: in un elenco di permessi mente.
+      const uscite = (c.perimetro || []).concat(c.sempre || [])
+        .filter((u) => !(C && C.uscitaInterna(u)));
       const voci = C ? uscite.map((u) => C.etichettaUscita(u)) : uscite;
-      const dove = c.origine === 'chat' && c.dichiarato && !voci.length
-        ? I18n.t('security_perimetro_nulla') : (voci.join('; ') || I18n.t('security_perimetro_nulla'));
+      const dove = voci.join('; ') || I18n.t('security_perimetro_nulla');
       cosa.textContent = `${I18n.t('security_perimetro_letto')} → ${dove}`;
     }
-    riga.append(quando, cosa);
+    riga.append(quando, quale, cosa);
     if (c.allargamenti && c.allargamenti.length) {
       const piu = document.createElement('div');
       piu.className = 'sn-muted';
-      const C = window.SN_COMPITI;
       piu.textContent = `${I18n.t('security_perimetro_allargato')}: `
         + c.allargamenti.map((a) => (C ? C.etichettaUscita(a.uscita) : a.uscita)).join('; ');
       riga.append(piu);
@@ -503,6 +516,13 @@
   document.addEventListener('DOMContentLoaded', () => {
     load();
     loadCompiti();
+    // L'elenco si muove mentre l'utente usa Filo in un'altra scheda: fermo a
+    // com'era all'apertura racconta il passato e basta (#533, primo giro di
+    // verifica). Si rinfresca quando la pagina torna davanti, e intanto a
+    // intervalli, che è quanto basta per una pagina che si guarda di rado.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadCompiti(); });
+    window.addEventListener('focus', () => loadCompiti());
+    setInterval(() => { if (!document.hidden) loadCompiti(); }, 10000);
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);

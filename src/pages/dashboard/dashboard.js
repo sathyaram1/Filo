@@ -36,6 +36,10 @@
   let sending = false;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
+  // #533 — il compito dell'ultimo messaggio di questa conversazione. Torna
+  // indietro col messaggio dopo: se quello prima aveva letto roba scritta da
+  // altri, il nuovo non riparte con tutti gli strumenti in mano.
+  let ultimoCompito = null;
 
   // Il turno che riparte dopo un permesso dato (#533): è una nota nostra al
   // modello, non parole dell'utente, e viaggia con `internal: true`.
@@ -109,7 +113,7 @@
     stepTrace: (text) => Att.stepTrace(text),
     goHome: () => goHome(),
     goThread: () => goThread(),
-    resetHistory: () => { threadHistory = []; },
+    resetHistory: () => { threadHistory = []; ultimoCompito = null; },
     pushHistory: (m) => { threadHistory.push(m); },
     isSending: () => sending,
     beginSending: () => { sending = true; sendBtn.disabled = true; },
@@ -238,6 +242,7 @@
     homeView.hidden = false;
     threadView.hidden = true;
     threadHistory = [];
+    ultimoCompito = null;
     bubblesEl.innerHTML = '';
     inputEl.value = '';
     autoGrowInput();
@@ -616,6 +621,7 @@
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
+    LEGGI_SCHEDE: 'Guardo che schede hai aperte…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     ESEGUI_COMANDO: 'Eseguo un comando…',
@@ -742,6 +748,8 @@
       // #533 — il permesso che l'utente ha appena dato vale per QUEL compito:
       // il turno che riprende deve riprendere lui, non aprirne uno nuovo.
       compito,
+      // #533 — il messaggio prima, nella stessa conversazione.
+      compitoPrecedente: ultimoCompito,
     };
     if (images.length) {
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
@@ -854,6 +862,8 @@
       // così riprende da dove aveva lasciato.
       const turn = pending.endTurn();
       if (ownsActivity) pending.finish();
+      // #533 — il compito di questo messaggio, che il prossimo eredita.
+      if (r.compito) ultimoCompito = r.compito;
       const entry = { role: 'filo', text: r.text || '', actions: r.actions || [] };
       if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;

@@ -17,11 +17,22 @@ module.exports = function register(on, ctx) {
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
-  on(MSG.FILO_CHAT, async (msg, sender) => {
+  on(MSG.FILO_CHAT, async (msg, sender, origin) => {
     try {
       // `compitoRipreso` (#533) tiene in vita il perimetro appena allargato
       // dall'utente: senza, il sì morirebbe col turno in cui l'ha dato.
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, compitoRipreso: msg.compito || null, sender });
+      // `compitoPrecedente` è il messaggio prima della stessa conversazione: se
+      // quello aveva letto roba scritta da altri, questo non riparte a mani
+      // libere. Il nome di un compito è una chiave che apre dei permessi:
+      // lo accettiamo solo dalle pagine interne, mai da un sito.
+      const fidato = isFilo(origin) || !!sender?.isShell;
+      const r = await handleFiloChat({
+        userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images,
+        reasoningReqId: msg.reasoningReqId, internal: !!msg.internal,
+        compitoRipreso: fidato ? (msg.compito || null) : null,
+        compitoPrecedente: fidato ? (msg.compitoPrecedente || null) : null,
+        sender,
+      });
       return { ok: true, ...r };
     } catch (e) {
       // #360 — la chat non è un log: se il turno fallisce (rete assente, provider

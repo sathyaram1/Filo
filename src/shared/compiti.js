@@ -36,6 +36,7 @@
     CERCA_WEB: { classe: 'ingresso', fonte: 'esterno' },
     LEGGI_DOCUMENTO: { classe: 'ingresso', fonte: 'esterno' },
     LEGGI_FILE: { classe: 'ingresso', fonte: 'utente' },
+    LEGGI_SCHEDE: { classe: 'ingresso', fonte: 'esterno' },
     LEGGI_TRASPARENZA: { classe: 'ingresso', fonte: 'filo' },
     CAPACITA_DETTAGLIO: { classe: 'ingresso', fonte: 'filo' },
 
@@ -91,6 +92,25 @@
     return c.classe === 'uscita' ? c.uscita : null;
   }
 
+  // Un'uscita interna non l'ha autorizzata l'utente: è contabilità di Filo, e
+  // in un elenco di permessi si legge come una cosa che lui ha concesso.
+  function uscitaInterna(uscita) {
+    const u = USCITE[String(uscita || '')];
+    return !!(u && u.interna);
+  }
+
+  // La richiesta così come l'ha scritta l'utente, su una riga sola e corta:
+  // serve a riconoscere una riga fra le altre, non a rileggere la chat.
+  const MAX_RICHIESTA = 120;
+  function etichettaRichiesta(testo) {
+    const t = String(testo == null ? '' : testo)
+      .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!t) return '';
+    return t.length > MAX_RICHIESTA ? `${t.slice(0, MAX_RICHIESTA - 1)}…` : t;
+  }
+
   function etichettaUscita(uscita) {
     const u = USCITE[String(uscita || '')];
     return u ? u.label : `un’azione che Filo non sa descrivere (${uscita})`;
@@ -102,12 +122,15 @@
    * perimetro lo scrive la superficie (l'assistente di pagina) e a chiedere per
    * conto suo è il motore.
    */
-  function nuovo({ id, origine = 'chat', dichiarazione = 'modello', perimetro = null, sempre = null, livello } = {}) {
+  function nuovo({ id, origine = 'chat', dichiarazione = 'modello', perimetro = null, sempre = null, livello, richiesta = '' } = {}) {
     const dich = dichiarazione === 'fissa' ? 'fissa' : 'modello';
     const fissato = dich === 'fissa';
     return {
       id: String(id || `c${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
       origine: String(origine) === 'automazione' ? 'automazione' : 'chat',
+      // Com'era scritta la richiesta: senza, il registro è una fila di righe
+      // identiche e «cosa poteva fare in ciascuna» non ha un «ciascuna».
+      richiesta: etichettaRichiesta(richiesta),
       dichiarazione: dich,
       livello: livello || null,
       perimetro: Array.isArray(perimetro) ? perimetro.filter((u) => u in USCITE) : (fissato ? [] : null),
@@ -121,6 +144,27 @@
       registro: [],
       omesse: 0,
     };
+  }
+
+  /**
+   * Il compito del messaggio DOPO, nella stessa conversazione. Se quello prima
+   * aveva letto roba scritta da altri, quel testo è ancora davanti al modello
+   * (Filo l'ha riportato nella sua risposta, che resta in chat): ricominciare a
+   * mani libere vorrebbe dire che basta un messaggio qualunque dell'utente per
+   * riavere tutto. Il nuovo compito eredita la contaminazione e il perimetro
+   * già concesso, e per un'uscita in più passa dall'utente come sempre.
+   * Se il compito prima era pulito, questo nasce pulito: niente cambia.
+   */
+  function erede(prec, { richiesta = '', sempre = null, livello } = {}) {
+    const fresco = nuovo({ origine: (prec && prec.origine) || 'chat', richiesta, sempre, livello });
+    if (!prec || !prec.contaminato) return fresco;
+    fresco.contaminato = true;
+    fresco.fonte = prec.fonte || FONTE_PEGGIORE;
+    fresco.perimetro = Array.isArray(prec.perimetro) ? prec.perimetro.slice() : [];
+    fresco.dichiarato = true;
+    fresco.ereditato = true;
+    scrivi(fresco, { tipo: 'eredita', da: prec.id, uscite: fresco.perimetro.slice() });
+    return fresco;
   }
 
   function scrivi(c, riga) {
@@ -223,10 +267,13 @@
     return {
       id: c.id,
       origine: c.origine,
+      richiesta: c.richiesta || '',
+      dichiarazione: c.dichiarazione,
       perimetro: Array.isArray(c.perimetro) ? c.perimetro.slice() : null,
       sempre: c.sempre.slice(),
       dichiarato: !!c.dichiarato,
       contaminato: !!c.contaminato,
+      ereditato: !!c.ereditato,
       fonte: c.fonte,
       allargamenti: c.allargamenti.slice(),
       registro: c.registro.slice(),
@@ -236,8 +283,8 @@
 
   global.SN_COMPITI = {
     FONTI, USCITE, USCITE_DICHIARABILI, CLASSI, MAX_RIGHE,
-    classeDi, uscitaDi, etichettaUscita,
-    nuovo, dichiara, allarga, registraLettura, registraAzione,
+    classeDi, uscitaDi, etichettaUscita, uscitaInterna, etichettaRichiesta, MAX_RICHIESTA,
+    nuovo, erede, dichiara, allarga, registraLettura, registraAzione,
     consentito, strumentiPermessi, riassunto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

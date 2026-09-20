@@ -35,6 +35,7 @@
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',
     LEGGI_DOCUMENTO: 'readDocument',
+    LEGGI_SCHEDE: 'tabs',
     LEGGI_TRASPARENZA: 'transparency',
     EVENTO_CALENDARIO: 'calendar',
     PULISCI_TAB: 'broom',
