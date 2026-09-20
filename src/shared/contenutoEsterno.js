@@ -407,6 +407,13 @@
     imbusta,
     imbustaCampi,
     neutralizza,
+    // Gli invisibili di formattazione che la busta TOGLIE, per chi deve
+    // ritrovare nel mondo reale qualcosa che il modello ha letto imbustato: un
+    // nome di file in arabo o in ebraico se li porta dietro, e al modello
+    // arriva senza. Chi confronta quel nome con i file veri deve togliere
+    // esattamente questi, e chiederlo qui è l'unico modo perché resti
+    // esattamente questi (#551, quarto giro di verifica).
+    invisibiliTolti: (s) => String(s == null ? '' : s).replace(FORMATTAZIONE_RE, ''),
     perCanaleSistema,
     contieneMarcatura,
     promemoria,
