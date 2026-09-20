@@ -202,7 +202,7 @@ test.describe('#533 giro 3 — quello che una lettura lascia scritto in giro', (
       giri: [
         [{ name: 'DICHIARA_USCITE', args: { uscite: ['sveglie'], motivo: 'mi ha chiesto una sveglia' } }],
         [{ name: 'CERCA_WEB', args: { query: 'esame di fisica' } }],
-        [{ name: 'TIMER', args: { minuti: 90, label: VELENO } }],
+        [{ name: 'TIMER', args: { secondi: 5400, etichetta: VELENO } }],
         [],
       ],
       userMessage: 'Cerca quando è l\'esame di fisica e mettimi un timer.',
