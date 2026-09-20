@@ -2574,14 +2574,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // pronome («te l'ho tolta») non dice di cosa parla, e la differenza fra una
   // promessa e la consegna di un testo sta nella richiesta. Serve anche a non
   // far reggere da un appunto vecchio quello che l'utente ha appena dettato.
-  const richiestaAzione = !!(Dichiarate && Dichiarate.richiestaDiAzione(userMessage));
+  // #517 (giro 10) — senza un messaggio dell'utente non si sa niente, e «non
+  // lo so» non è «no»: si lascia stare, e il presidio guarda tutto.
+  const richiestaAzione = (Dichiarate && String(userMessage || '').trim())
+    ? !!Dichiarate.richiestaDiAzione(userMessage) : null;
   const statoDichiarazioni = async (azioniDelTurno) => ({
     ...(await provePerIlPresidio(Dichiarate, fileList)),
     // Quante azioni di ciascun tipo sono partite adesso: due dichiarazioni
     // della stessa specie vogliono due azioni, non una che le copre tutte.
     contiAzioni: contaTipi(azioniDelTurno),
     domandaUtente,
-    richiestaAzione,
+    ...(typeof richiestaAzione === 'boolean' ? { richiestaAzione } : {}),
   });
   const conImmagini = imageList.length > 0;
   try {
