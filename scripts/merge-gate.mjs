@@ -211,7 +211,11 @@ export function testoNonPubblicato(punta, suOrigin, ramo = '') {
     + `  qui i via libera valgono per ${p}\n`
     + `  su origin il ramo ${r} è fermo a ${o}\n`
     + 'Quello che verrebbe fuso è il contenuto vecchio, che nessuno ha esaminato, e la correzione non ci sarebbe nemmeno.\n'
-    + `Spedisci il ramo e rilancia lo stesso comando: git push origin ${r}\n`
+    // Sorgente E destinazione, come ogni altro push del progetto: `origin <ramo>`
+    // lascia scegliere l'arrivo alla configurazione locale di git, che è un file
+    // non versionato — e un comando che si copia da un rifiuto vale quanto uno
+    // scritto in uno script.
+    + `Spedisci il ramo e rilancia lo stesso comando: git push origin ${r}:${r}\n`
     + 'Se il push non riesce, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
 }
 
