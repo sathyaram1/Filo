@@ -138,7 +138,7 @@ test('un voto che non arriva al server non resta contato', async ({ openTab }) =
 // (annullato, credenziali sbagliate, rete giù), la pagina deve rispondere
 // qualcosa — è la seconda strada per lo stesso gesto, e la prima che incontra
 // un utente nuovo, che di default anonimo lo è.
-test('il voto di chi non è connesso risponde anche se l’accesso non va', async ({ openTab }) => {
+test('il voto di chi non è connesso apre l’accesso e non conta niente se salta', async ({ openTab }) => {
   const page = await apri(openTab, [scheda({ _id: 'fb-anon', name: 'Un fix da votare' })]);
   await expect(page.locator('.bd-card')).toHaveCount(1);
   await expect(page.locator('#bdSignIn')).toBeVisible();
