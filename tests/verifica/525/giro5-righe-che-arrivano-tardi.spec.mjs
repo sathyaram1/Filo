@@ -95,11 +95,11 @@ test('terminale: un comando che finisce dopo il ritorno alla home', async ({ app
   console.log('STATO DELLA PAGINA QUANDO IL COMANDO FINISCE:', statoDopo);
 
   // L'esito appartiene alla conversazione in cui il comando è stato dato.
-  const conEsito = chats.find((c) => (c.messages || []).some((m) => String(m.text).includes('esito-del-comando-lento')));
-  const conComando = chats.find((c) => (c.messages || []).some((m) => String(m.text).includes('sleep 4')));
+  const conEsito = chats.find((c) => (c.messages || []).some((m) => String(m.text).includes('ESITO-TARDIVO')));
+  const conComando = chats.find((c) => (c.messages || []).some((m) => String(m.text).includes('sleep 5')));
   console.log('CHAT CON IL COMANDO:', conComando && conComando.id.slice(0, 8),
-    '· CHAT CON L’ESITO:', conEsito && conEsito.id.slice(0, 8));
-  expect(chats.length, `chat in archivio: ${chats.length}`).toBe(1);
+    '· CHAT CON L’ESITO:', conEsito ? conEsito.id.slice(0, 8) : 'DA NESSUNA PARTE');
+  expect(conEsito, 'l’esito del comando non è in nessuna chat').toBeTruthy();
   expect(conEsito && conEsito.id).toBe(conComando && conComando.id);
 });
 
