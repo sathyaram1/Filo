@@ -370,7 +370,7 @@
       id: 'filo-memory', title: 'Memoria di Filo', category: 'assistant',
       desc: 'Filo ricorda nel tempo chi sei e come preferisci le cose (un profilo e le preferenze che impara dalle conversazioni), così le risposte diventano più su misura.',
       invoke: 'Si costruisce da sola mentre usi l’assistente; puoi anche fissare tu una regola a parole («ricordati che…», «d’ora in poi…»): Filo la salva fra le sue lezioni e vale da subito in tutte le conversazioni. Per farle dimenticare tutto chiedi a Filo di cancellare la memoria (ti chiederà di digitare "conferma").',
-      doesNot: 'Resta solo sul tuo computer. Ricorda ciò che emerge dalle conversazioni con l’assistente, non il contenuto delle pagine che visiti.',
+      doesNot: 'Resta solo sul tuo computer. Ricorda ciò che emerge dalle conversazioni con l’assistente, non il contenuto delle pagine che visiti. Da una richiesta in cui Filo ha letto qualcosa scritto da altri (una pagina, un documento, dei risultati di ricerca, quello che gli stampa un comando) non impara niente da solo: scrivere in memoria è una delle azioni che una richiesta così non ha se non gliel’hai chiesta, e così le parole di una pagina non entrano in memoria passando per quello che Filo ha risposto.',
     },
     {
       id: 'filo-notes', title: 'Appunti di Filo', category: 'assistant',
