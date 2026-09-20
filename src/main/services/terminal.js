@@ -177,8 +177,10 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
       return;
     }
     // Con trackCwd appendiamo la sonda che riporta exit code + cwd risultante,
-    // così un `cd` persiste tra i comandi dell'assistente.
-    const toRun = trackCwd ? withCwdProbe(usedShell, cmd) : cmd;
+    // così un `cd` persiste tra i comandi dell'assistente. Davanti a tutto il
+    // preludio che mette la shell in UTF-8 (#551), altrimenti i nomi con
+    // accenti e trattini lunghi tornano storpiati.
+    const toRun = encodingPrelude(usedShell) + (trackCwd ? withCwdProbe(usedShell, cmd) : cmd);
     const { file, args } = shellInvocation(usedShell, toRun);
     let stdout = '';
     let stderr = '';
