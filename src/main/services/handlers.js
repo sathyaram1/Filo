@@ -2988,7 +2988,7 @@ function dashboardScheduler() {
       // Ri-raccoglie gli input ORA: accorpa tutte le modifiche della finestra.
       await FiloMem.gcTimers();
       const inputs = await gatherDashboardInputs({ openTabsCount: openTabsCount || 0 });
-      if (!inputs.hasKey) return;
+      if (!inputs.canServe) return;
       const cached = await FiloMem.getDashboardCache();
       // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
       if (cached && cached.signature === inputs.signature) return;
