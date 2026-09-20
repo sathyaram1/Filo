@@ -978,5 +978,10 @@
     tellActionInActivity,
     stepTrace,
     isType,
+    // #525 — «Ha aperto una pagina e avviato un timer»: la stessa frase del
+    // diario del turno, per chi RIAPRE una chat archiviata. Lì i bottoni non
+    // si rimettono (un'azione da confermare non si può ri-offrire giorni
+    // dopo): resta il racconto di cosa Filo ha fatto.
+    summarizeActivity,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
