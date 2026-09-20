@@ -243,6 +243,20 @@
   // scritta la copia per la chiamata successiva, che invece costa.
   // Fornitore assente o che non sa rispondere → null, così chi chiama
   // distingue «non si può chiedere» da «la richiesta è andata male».
+  // ─── Il catalogo dei modelli ──────────────────────────────────────────────
+  // Nemmeno questo è una chiamata a un modello: sono metadati pubblici, nessun
+  // token, nessuna spesa. Passa da qui per la stessa ragione di keyInfo, e
+  // perché finché la richiesta di rete al fornitore restava scritta a mano
+  // altrove era l'esempio già pronto da copiare per la chiamata successiva,
+  // che invece si paga.
+  // Fornitore assente o che non sa rispondere → null.
+  async function listCatalog({ provider, apiKey }) {
+    let P = null;
+    try { P = providers().getProvider(provider); } catch (_) { P = null; }
+    if (!P || typeof P.listCatalog !== 'function') return null;
+    return await P.listCatalog({ apiKey });
+  }
+
   async function keyInfo({ provider, apiKey }) {
     let P = null;
     try { P = providers().getProvider(provider); } catch (_) { P = null; }
