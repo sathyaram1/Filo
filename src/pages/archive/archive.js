@@ -15,14 +15,22 @@
   // Quando valorizzato, mostriamo i risultati della ricerca semantica (lista
   // piatta ordinata per pertinenza) invece dell'archivio raggruppato per giorno.
   let semanticResults = null;
+  // #525 — le chat con Filo: voci d'elenco (titolo, date, tipo, estratto),
+  // senza i messaggi. Il testo intero si chiede solo quando si riapre una chat.
+  let chats = [];
+  let showCommands = false;
 
   async function load() {
     const settings = await Storage.getSettings();
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
 
-    const r = await chrome.runtime.sendMessage({ type: MSG.GET_ARCHIVED_TABS });
+    const [r, rc] = await Promise.all([
+      chrome.runtime.sendMessage({ type: MSG.GET_ARCHIVED_TABS }),
+      chrome.runtime.sendMessage({ type: MSG.FILO_CHATS_LIST }).catch(() => null),
+    ]);
     tabs = (r && r.tabs) || [];
+    chats = (rc && rc.chats) || [];
     render();
   }
 
