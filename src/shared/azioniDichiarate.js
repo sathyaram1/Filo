@@ -728,6 +728,7 @@
     // segnalazione, l'apertura e l'impostazione.
     const prima = stato && stato.tipiPrecedenti;
     const precedenti = new Set(prima ? (prima instanceof Set ? [...prima] : prima) : []);
+    if (daCronologia) for (const x of azioni) precedenti.add(x);
     // Quante azioni di ciascun tipo sono partite in QUESTO turno: due
     // dichiarazioni della stessa specie vogliono due azioni.
     const conti = (stato && stato.contiAzioni && typeof stato.contiAzioni === 'object')
