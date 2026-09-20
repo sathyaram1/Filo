@@ -1270,7 +1270,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     // dall'LLM, e mai usata per decidere il livello. Il prefisso `_` la tiene
     // fuori dalla firma dell'azione (actionSignature), così RUN e CONFIRM
     // continuano a combaciare.
-    action._cwd = displayCwd(getAssistantCwd(sender));
+    // Se quella cartella nel frattempo è sparita, il comando girerà nella home:
+    // il popup deve dire QUELLA, altrimenti promette una cartella e ne usa
+    // un'altra (#551, quarto giro). Stessa domanda che si fa il comando quando
+    // parte, fatta nello stesso posto.
+    action._cwd = displayCwd(cartellaDelComando(getAssistantCwd(sender)));
   }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
