@@ -4,14 +4,14 @@
 // Il giro 5 ha guardato COSA si porta dietro una chiamata che parte da sola, e
 // ha chiuso la porta sul riconoscimento del blocco geografico (indirizzi della
 // rete di casa, finestre in incognito). La stessa domanda, sullo stadio che
-// parte prima del giudizio del modello, dà la risposta opposta: quello stadio
-// manda fuori l'indirizzo INTERO — percorso e parametri compresi — e non ha né
+// parte prima del giudizio del modello, dava la risposta opposta: quello stadio
+// manda fuori l'indirizzo INTERO, percorso e parametri compresi, e non aveva né
 // l'esclusione della rete di casa (che gli stadi profondi hanno dal giro 2) né
 // l'astensione in incognito (che la funzione gemella ha dal giro 5).
 //
 // Logica pura: le chiamate di rete sono finte. L'ultima prova monta i metodi
 // veri della scheda su un oggetto finto, per chiedere alla scheda in incognito
-// se si astiene.
+// se lo dice al controllo.
 
 import { test, expect } from '@playwright/test';
 import { resolve, dirname, join } from 'node:path';
@@ -28,8 +28,7 @@ const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
 function banco() {
   const b = { gsb: [], rdap: [], ct: [], llm: [], sandbox: [] };
   for (const c of Object.values(SB._caches)) c.clear();
-  SB._inFlight.llm.clear();
-  SB._inFlight.sandbox.clear();
+  for (const v of Object.values(SB._inFlight)) v.clear();
   SB.setProviders({
     gsb: async (url) => { b.gsb.push(url); return { listed: false }; },
     rdap: async (reg) => { b.rdap.push(reg); return 400; },
@@ -51,7 +50,7 @@ const CASA = [
   'http://stampante.lan/',
 ];
 
-test('gli indirizzi della rete di casa escono di casa lo stesso', async () => {
+test('gli indirizzi della rete di casa non escono di casa', async () => {
   const b = banco();
   for (const u of CASA) SB.analyze(u, {});
   await attendi(200);
@@ -68,64 +67,52 @@ test('caso di riscontro: gli stadi profondi quell\'esclusione ce l\'hanno', asyn
   expect(b.sandbox, 'e la finestra nascosta pure').toEqual([]);
 });
 
-test('di ogni pagina esce l\'indirizzo intero, con i suoi parametri', async () => {
+test('in incognito non esce niente della pagina', async () => {
   const b = banco();
-  SB.analyze('https://ospedale-esempio-xyz.it/referti/12345?paziente=mario.rossi&token=abc', {});
+  SB.analyze('https://pagina-in-incognito-xyz.com/qualcosa?q=privato', { incognito: true });
   await attendi(200);
-  const uscito = b.gsb[0] || '';
-  expect(uscito.includes('paziente=mario.rossi'),
-    `fuori è andato l'indirizzo intero: ${uscito}`).toBe(false);
+  expect(b.gsb, 'in incognito Filo si astiene da tutto il resto: anche da qui').toEqual([]);
+  expect(b.rdap, 'nemmeno il nome del sito').toEqual([]);
+  expect(b.ct, 'nemmeno alla seconda domanda').toEqual([]);
+  expect(b.llm.length + b.sandbox.length, 'e nemmeno gli stadi profondi').toBe(0);
 });
 
-test('esce anche l\'indirizzo delle pagine dei siti fidati', async () => {
-  const b = banco();
-  SB.analyze('https://www.google.com/search?q=una+ricerca+imbarazzante', {});
-  SB.analyze('https://wikipedia.org/wiki/Una_malattia', {});
-  await attendi(200);
-  expect(b.gsb,
-    'un sito nella lista dei fidati non ha niente da verificare').toEqual([]);
+test('in incognito il verdetto locale continua a lavorare', async () => {
+  banco();
+  const v = SB.analyze('https://paypa1-sicurezza-conto.com/login', { incognito: true });
+  expect(v && v.level, 'il controllo che non manda niente a nessuno resta acceso')
+    .not.toBe('safe');
 });
 
-test('in incognito la scheda non si astiene', async () => {
-  const chiamate = [];
+test('la scheda in incognito lo dice al controllo', async () => {
+  const visti = [];
   const precedente = globalThis.SN_SAFEBROWSE;
   globalThis.SN_SAFEBROWSE = {
-    analyze: (url) => { chiamate.push(url); return { level: 'safe', message: null, norm: null }; },
+    analyze: (url, ctx) => { visti.push(ctx); return { level: 'safe', message: null, norm: null }; },
     normalize: () => null,
     proprietario: (h) => h,
   };
   try {
     class SchedaFinta {}
     installSafebrowse(SchedaFinta);
-    const scheda = new SchedaFinta();
-    scheda.incognito = true;
-    scheda.tabs = [];
     const tab = { id: 1, view: { webContents: { send() {} } } };
-    scheda._sbOnNavigate(tab, 'https://pagina-in-incognito-xyz.com/qualcosa?q=privato');
-    expect(chiamate,
-      'in incognito Filo si astiene da tutto il resto: qui no').toEqual([]);
-  } finally {
-    globalThis.SN_SAFEBROWSE = precedente;
-  }
-});
 
-test('caso di riscontro: fuori dall\'incognito la stessa navigazione parte', async () => {
-  const chiamate = [];
-  const precedente = globalThis.SN_SAFEBROWSE;
-  globalThis.SN_SAFEBROWSE = {
-    analyze: (url) => { chiamate.push(url); return { level: 'safe', message: null, norm: null }; },
-    normalize: () => null,
-    proprietario: (h) => h,
-  };
-  try {
-    class SchedaFinta2 {}
-    installSafebrowse(SchedaFinta2);
-    const scheda = new SchedaFinta2();
-    scheda.incognito = false;
-    scheda.tabs = [];
-    const tab = { id: 1, view: { webContents: { send() {} } } };
-    scheda._sbOnNavigate(tab, 'https://pagina-normale-xyz.com/qualcosa');
-    expect(chiamate.length, 'in una finestra normale il controllo deve partire').toBe(1);
+    const incognita = new SchedaFinta();
+    incognita.incognito = true;
+    incognita.tabs = [tab];
+    incognita._sbOnNavigate(tab, 'https://pagina-xyz.com/a?q=privato');
+    incognita.safebrowseGet(1, 'https://pagina-xyz.com/a?q=privato', { incognito: false });
+
+    const normale = new SchedaFinta();
+    normale.incognito = false;
+    normale.tabs = [tab];
+    normale._sbOnNavigate(tab, 'https://pagina-xyz.com/a');
+
+    expect(visti.length).toBe(3);
+    expect(visti[0].incognito, 'la scheda in incognito lo dice').toBe(true);
+    expect(visti[1].incognito,
+      'e non si fida di quello che le manda lo script della pagina').toBe(true);
+    expect(visti[2].incognito, 'una scheda normale no').toBe(false);
   } finally {
     globalThis.SN_SAFEBROWSE = precedente;
   }

@@ -335,8 +335,14 @@
   // slot nell'editor (non c'è niente da scegliere) e quindi non sta in ACTIONS.
   // Ha però bisogno di un nome suo, perché la sua spesa deve comparire nel
   // conto del mese invece di restare invisibile.
+  //
+  // #591, sesto giro. Lo stesso vale per l'elenco dei siti di truffa: la
+  // verifica dei siti pericolosi lo interroga da sola, a ogni pagina, con una
+  // chiave di fabbrica che paga l'owner. Non è un modello e non ha uno slot,
+  // ma la sua spesa e il suo tetto sono quelli di tutti gli altri.
   const SERVIZI = {
     WEB_SEARCH: 'web_search',
+    SAFE_BROWSING: 'safe_browsing_lookup',
   };
 
   // Raggruppamento azione → "tipo d'uso" mostrato nel grafico a torta dei crediti
@@ -366,6 +372,8 @@
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
     [SERVIZI.WEB_SEARCH]: 'Ricerca sul web',
+    [SERVIZI.SAFE_BROWSING]: 'Siti pericolosi',
+    [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi',
   };
 
   function creditUsageGroup(action) {
@@ -416,6 +424,7 @@
     [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
     [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
     [SERVIZI.WEB_SEARCH]: 'Ricerca sul web',
+    [SERVIZI.SAFE_BROWSING]: 'Siti pericolosi — elenco dei siti di truffa',
   };
 
   function actionLabel(action) {

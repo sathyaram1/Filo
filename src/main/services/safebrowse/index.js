@@ -153,19 +153,44 @@ const sandboxRaffica = creaConto(RAFFICA_MS);
 // rinuncia e basta) o 'raffica' (in questo momento se ne stanno facendo
 // troppe in tutto: si riprova fra poco, perché la rinuncia non è colpa di
 // questo sito). Niente si ricorda in nessuno dei due casi.
-function prendiGettone(conto, raffica, chi, max = DEEP_MAX_PER_OWNER) {
-  if (raffica.valore(CHIAVE_TUTTI) >= DEEP_MAX_RAFFICA) return 'raffica';
+function prendiGettone(conto, raffica, chi, max = DEEP_MAX_PER_OWNER, maxRaffica = DEEP_MAX_RAFFICA) {
+  if (raffica.valore(CHIAVE_TUTTI) >= maxRaffica) return 'raffica';
   if (!conto.prendi(chi, max)) return 'suo';
-  raffica.prendi(CHIAVE_TUTTI, DEEP_MAX_RAFFICA);
+  raffica.prendi(CHIAVE_TUTTI, maxRaffica);
   return 'ok';
 }
 
+
+// #591, sesto giro — il primo stadio, quello che parte PRIMA dei due profondi.
+// La ricerca dell'indirizzo nell'elenco dei siti di truffa (chiave di fabbrica
+// dell'owner) e le due domande sull'età del dominio a due servizi pubblici non
+// avevano nessun freno: la frase peggiore della segnalazione — «l'unico freno è
+// una cache per host, che si aggira con sottodomini sempre nuovi» — era ancora
+// vera qui dentro, un piano sotto ai due stadi che il freno l'avevano ricevuto.
+// Duecento sottodomini facevano duecento richieste sulla chiave dell'owner e
+// duecento domande, tutte per lo STESSO dominio, a servizi pubblici che non le
+// hanno chieste a nessuno. Lo stesso conto dei due stadi profondi, con lo stesso
+// ragionamento (di chi possiede il sito, più una raffica corta comune) ma più
+// largo: questo stadio è il segnale più affidabile che Filo ha, e strozzarlo
+// costa protezione.
+const LOOKUP_MAX_PER_OWNER = 20;
+const LOOKUP_MAX_RAFFICA = 12;
+const lookupSpesa = creaConto(30 * MIN);
+const lookupRaffica = creaConto(RAFFICA_MS);
 
 // Chiamate già in volo, per proprietario del sito. La cache si riempie solo
 // quando la risposta arriva: senza questo, cinquanta sottodomini aperti insieme
 // facevano partire cinquanta chiamate prima che la prima rispondesse.
 const llmInFlight = new Set();
 const sandboxInFlight = new Set();
+// #591, sesto giro — lo stesso segno mancava agli stadi di rete, e lì costava
+// due volte: i due cammini che a ogni navigazione chiedono il verdetto (la
+// scheda che ha finito di navigare e lo script della pagina) partivano tutti e
+// due, e cinquanta sottodomini chiedevano cinquanta volte l'età dello stesso
+// dominio. L'elenco dei siti di truffa si ricorda per indirizzo, l'età per
+// dominio: i due segni seguono quelle due chiavi.
+const gsbInFlight = new Set();
+const ageInFlight = new Set();
 
 // Fetcher di rete iniettabili (default: assenti = best-effort no-op).
 let providers = { gsb: null, rdap: null, ct: null, sandbox: null, llm: null };
@@ -176,10 +201,18 @@ function setProviders(fns) { providers = { ...providers, ...(fns || {}) }; }
 //   opts.runLlm       funzione (messages) → testo, per il giudice LLM
 //   opts.enableSandbox  abilita la detonation (default true se Electron c'è)
 //   opts.enableNetwork  abilita RDAP/CT (default true)
+// `runGsb(rawUrl)` — #591, sesto giro: la ricerca nell'elenco dei siti di truffa
+// si paga sulla chiave di fabbrica dell'owner, quindi non la fa più questo
+// modulo per conto suo: la inietta handlers.js dopo averla fatta passare dal
+// cancello unico (tetto di spesa e conteggio, come per ogni altra chiamata a un
+// fornitore). Senza iniezione si ricade sulla chiamata diretta, che è quello
+// che serve ai test di questo modulo.
 function configure(opts = {}) {
-  const { gsbKey, runLlm, enableSandbox = true, enableNetwork = true } = opts;
+  const { gsbKey, runGsb, runLlm, enableSandbox = true, enableNetwork = true } = opts;
   setProviders({
-    gsb: gsbKey ? ((rawUrl) => net.safeBrowsingLookup(rawUrl, gsbKey)) : null,
+    gsb: typeof runGsb === 'function'
+      ? ((rawUrl) => runGsb(rawUrl))
+      : (gsbKey ? ((rawUrl) => net.safeBrowsingLookup(rawUrl, gsbKey)) : null),
     rdap: enableNetwork ? ((reg) => net.rdapAgeDays(reg)) : null,
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
     llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
@@ -231,30 +264,63 @@ function analyze(url, ctx = {}, onUpdate) {
     return first;
   }
 
+  // #591, sesto giro — gli indirizzi della rete di casa e le finestre in
+  // incognito. Fin qui l'esclusione della rete di casa fermava i due stadi
+  // PROFONDI (il verdetto locale dice «local_host» e non c'è niente da
+  // approfondire), ma gli stadi di rete partivano lo stesso: aprendo il
+  // pannello del router usciva di casa l'indirizzo INTERO, percorso e parametri
+  // compresi — e su quelle pagine i parametri sono spesso il codice della
+  // sessione — più il nome della macchina, chiesto a due servizi pubblici.
+  // In incognito valeva identico, mentre Filo in incognito si astiene da tutto
+  // il resto: niente sessione salvata, niente archivio, niente cronologia,
+  // niente riordino automatico. Il verdetto LOCALE, che non manda niente a
+  // nessuno, continua a lavorare in tutti e due i casi.
+  if (psl.isHostPrivato(norm.host) || norm.single || norm.suffixOnly) return first;
+  if (ctx && ctx.incognito) return first;
+
   const reg = norm.registrable;
   // Chi possiede il sito: il conto delle verifiche profonde e il segno "già in
   // volo" stanno qui, non sul dominio (vedi il commento sulle cache).
   const prop = psl.proprietario(norm.host);
   const tasks = [];
   const need = assembleCached(norm);
+  let rimandare = false;
 
-  if (providers.gsb && need.gsb === undefined) {
-    tasks.push(Promise.resolve(providers.gsb(url, norm)).then((r) => {
-      if (r) gsbCache.set('u:' + norm.host, r);
-    }).catch(() => {}));
-  }
-  if (providers.rdap && need.ageDays === undefined) {
-    tasks.push(Promise.resolve(providers.rdap(reg, norm)).then((days) => {
-      if (typeof days === 'number') ageCache.set(reg, days);
-    }).catch(() => {}));
-  }
-  if (providers.ct && need.ageDays === undefined && !need.cert) {
-    tasks.push(Promise.resolve(providers.ct(reg, norm)).then((r) => {
-      // CT dà l'età del PRIMO certificato: usala solo se RDAP non ha risposto.
-      if (r && typeof r.firstSeenDays === 'number' && ageCache.get(reg) === undefined) {
-        ageCache.set(reg, r.firstSeenDays);
+  // Il primo stadio: un gettone per tutte e tre le domande di rete, preso una
+  // volta sola. Sono lo stesso stadio e partono insieme: due conti separati
+  // darebbero a chi attacca due raffiche invece di una.
+  const serveGsb = providers.gsb && need.gsb === undefined && !gsbInFlight.has(norm.host);
+  const serveEta = need.ageDays === undefined
+    && !ageInFlight.has(reg)
+    && ((providers.rdap) || (providers.ct && !need.cert));
+  if (serveGsb || serveEta) {
+    const g = prendiGettone(lookupSpesa, lookupRaffica, prop, LOOKUP_MAX_PER_OWNER, LOOKUP_MAX_RAFFICA);
+    if (g === 'ok') {
+      if (serveGsb) {
+        gsbInFlight.add(norm.host);
+        tasks.push(Promise.resolve(providers.gsb(url, norm)).then((r) => {
+          if (r) gsbCache.set('u:' + norm.host, r);
+        }).catch(() => {}).finally(() => { gsbInFlight.delete(norm.host); }));
       }
-    }).catch(() => {}));
+      if (serveEta) {
+        ageInFlight.add(reg);
+        const eta = [];
+        if (providers.rdap) {
+          eta.push(Promise.resolve(providers.rdap(reg, norm)).then((days) => {
+            if (typeof days === 'number') ageCache.set(reg, days);
+          }).catch(() => {}));
+        }
+        if (providers.ct && !need.cert) {
+          eta.push(Promise.resolve(providers.ct(reg, norm)).then((r) => {
+            // CT dà l'età del PRIMO certificato: usala solo se RDAP non ha risposto.
+            if (r && typeof r.firstSeenDays === 'number' && ageCache.get(reg) === undefined) {
+              ageCache.set(reg, r.firstSeenDays);
+            }
+          }).catch(() => {}));
+        }
+        tasks.push(Promise.allSettled(eta).finally(() => { ageInFlight.delete(reg); }));
+      }
+    } else if (g === 'raffica') rimandare = true;
   }
   // LLM e sandbox solo se c'è un sospetto non conclusivo (mai su pulito/whitelist).
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
@@ -276,7 +342,6 @@ function analyze(url, ctx = {}, onUpdate) {
   // `prendiGettone` va per ultimo: è l'unico con un effetto: il gettone si
   // consuma solo quando la chiamata parte davvero. Se a dire di no è il conto
   // comune, la verifica si rimanda invece di perderla.
-  let rimandare = false;
   if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(prop)) {
     const g = prendiGettone(llmSpesa, llmRaffica, prop);
     if (g === 'ok') {
@@ -349,6 +414,7 @@ const API = {
   _caches: {
     gsbCache, ageCache, certCache, sandboxCache, llmCache,
     llmSpesa, sandboxSpesa, llmRaffica, sandboxRaffica,
+    lookupSpesa, lookupRaffica,
   },
   // Quante verifiche profonde può far partire chi possiede un sito, quante se
   // ne possono fare in tutto in pochi secondi, e quanto dura quella finestra
@@ -356,10 +422,14 @@ const API = {
   DEEP_MAX_PER_OWNER,
   DEEP_MAX_RAFFICA,
   RAFFICA_MS,
+  // Quante domande di rete del primo stadio può far partire chi possiede un
+  // sito, e quante se ne possono fare in tutto in pochi secondi.
+  LOOKUP_MAX_PER_OWNER,
+  LOOKUP_MAX_RAFFICA,
   // Chi possiede il sito (test e diagnostica).
   proprietario: psl.proprietario,
   // Chiamate in volo per proprietario del sito (test e diagnostica).
-  _inFlight: { llm: llmInFlight, sandbox: sandboxInFlight },
+  _inFlight: { llm: llmInFlight, sandbox: sandboxInFlight, gsb: gsbInFlight, eta: ageInFlight },
   // sotto-moduli (per test)
   normalize: normalizeMod.normalize,
   parseHost: normalizeMod.parseHost,

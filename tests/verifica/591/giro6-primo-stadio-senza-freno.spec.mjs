@@ -10,7 +10,8 @@
 // domande sull'età del dominio a due servizi pubblici — è rimasto come lo
 // descrive la segnalazione: nessun gettone, nessun conto, nessun tetto.
 //
-// Tre porte, tutte sulla stessa causa:
+// Tre porte, tutte sulla stessa causa — queste prove erano rosse quando il giro
+// è cominciato:
 //   1. sottodomini sempre nuovi → una chiamata a testa, all'infinito;
 //   2. le due domande sull'età partono per lo STESSO dominio a ogni
 //      sottodomino, perché non c'è né un segno «già in volo» né un ricordo
@@ -37,8 +38,7 @@ const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
 function banco({ lento = 0 } = {}) {
   const b = { gsb: [], rdap: [], ct: [], llm: [], sandbox: [] };
   for (const c of Object.values(SB._caches)) c.clear();
-  SB._inFlight.llm.clear();
-  SB._inFlight.sandbox.clear();
+  for (const v of Object.values(SB._inFlight)) v.clear();
   SB.setProviders({
     gsb: async (url) => { if (lento) await attendi(lento); b.gsb.push(url); return { listed: false }; },
     rdap: async (reg) => { if (lento) await attendi(lento); b.rdap.push(reg); return 400; },
@@ -49,7 +49,7 @@ function banco({ lento = 0 } = {}) {
   return b;
 }
 
-test('sottodomini sempre nuovi fanno partire una chiamata a testa, senza tetto', async () => {
+test('sottodomini sempre nuovi non fanno partire una richiesta a testa', async () => {
   const b = banco();
   for (let i = 0; i < 200; i++) {
     SB.analyze(`http://s${i}.esca-di-chi-attacca.com/pagina?u=${i}`, {});
@@ -58,12 +58,12 @@ test('sottodomini sempre nuovi fanno partire una chiamata a testa, senza tetto',
   // Gli stadi profondi il freno ce l'hanno: uno solo su duecento.
   expect(b.llm.length + b.sandbox.length,
     'gli stadi profondi hanno il loro freno').toBeLessThanOrEqual(2);
-  // Il primo stadio no.
+  // E adesso ce l'ha anche il primo.
   expect(b.gsb.length,
     'duecento sottodomini non devono fare duecento richieste sulla chiave dell\'owner').toBeLessThan(200);
 });
 
-test('le domande sull\'età ripartono per lo stesso dominio a ogni sottodominio', async () => {
+test('le domande sull\'età non ripartono per lo stesso dominio a ogni sottodominio', async () => {
   const b = banco({ lento: 30 });
   for (let i = 0; i < 50; i++) {
     SB.analyze(`http://n${i}.un-solo-dominio-xyz.com/`, {});
@@ -77,7 +77,7 @@ test('le domande sull\'età ripartono per lo stesso dominio a ogni sottodominio'
     'idem per la seconda domanda sull\'età').toBeLessThan(10);
 });
 
-test('la stessa pagina si paga due volte: i due cammini della navigazione non si vedono', async () => {
+test('la stessa pagina non si paga due volte: i due cammini della navigazione si vedono', async () => {
   const b = banco({ lento: 60 });
   // Quello che succede a ogni navigazione: la scheda ha finito di navigare e
   // lo script della pagina chiede il verdetto. Stesso indirizzo, stesso istante.

@@ -3317,8 +3317,31 @@ async function wireSafebrowse(settingsArg) {
     const r = await Gate.complete({ settings: s, action: ACTIONS.SAFEBROWSE_JUDGE, messages });
     return r.text;
   };
+  // #591, sesto giro — la ricerca dell'indirizzo nell'elenco dei siti di truffa
+  // si paga sulla chiave di fabbrica dell'owner e parte da sola a ogni pagina,
+  // ma non passava dal cancello unico: nessun tetto, nessuna riga nel conto del
+  // mese. Adesso ci passa, come la ricerca sul web e come il giudizio del
+  // modello qui sopra — che al mese esaurito si ferma già, quindi il primo
+  // stadio che fa lo stesso è coerenza, non un buco nuovo.
+  // Le due domande sull'età del dominio (RDAP e i registri dei certificati)
+  // NON passano di qui di proposito: sono servizi pubblici anonimi, non
+  // toccano nessuna chiave dell'owner e non costano niente, quindi legarle al
+  // tetto di spesa spegnerebbe un segnale senza risparmiare un centesimo. Il
+  // loro abuso lo ferma il freno, insieme a quello del primo stadio.
+  const chiaveGsb = sb.safeBrowsingKey || '';
+  const runGsb = !chiaveGsb ? null : async (rawUrl) => {
+    const s = await getEffectiveSettings();
+    return await Gate.service({
+      settings: s,
+      action: SN_CONST.SERVIZI.SAFE_BROWSING,
+      provider: 'google_safe_browsing',
+      run: () => SB.net.safeBrowsingLookup(rawUrl, chiaveGsb),
+      costoUsd: 0,
+    });
+  };
   SB.configure({
-    gsbKey: sb.safeBrowsingKey || '',
+    gsbKey: chiaveGsb,
+    runGsb,
     runLlm,
     enableSandbox: sb.sandbox !== false,
     enableNetwork: sb.networkSignals !== false,

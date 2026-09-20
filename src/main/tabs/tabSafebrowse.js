@@ -19,6 +19,18 @@ const SB_RINVII_MAX = 3;
 const SB_RINVIO_MS = 5250;
 
 const safebrowseMethods = {
+  // #591, sesto giro. In incognito Filo si astiene da tutto il resto — niente
+  // sessione salvata, niente archivio, niente cronologia, niente riordino
+  // automatico — mentre gli stadi di RETE della verifica dei siti pericolosi
+  // partivano lo stesso, e portavano fuori l'indirizzo intero di ogni pagina
+  // guardata lì, parametri compresi. Il verdetto LOCALE non manda niente a
+  // nessuno e continua a lavorare anche in incognito: è solo la rete che si
+  // ferma. Il contesto che arriva dallo script della pagina non è fidato, e
+  // questo campo lo decide la scheda: si sovrascrive sempre.
+  _sbCtx(ctx) {
+    return { ...(ctx || {}), incognito: !!this.incognito };
+  },
+
   _sbState(tab) {
     if (!tab.sbBypass) tab.sbBypass = new Set();      // siti confermati su "pericoloso"
     if (!tab.sbDismissed) tab.sbDismissed = new Set(); // banner "sospetto" già chiuso
@@ -110,10 +122,11 @@ const safebrowseMethods = {
   // Richiesto dal content script (SAFEBROWSE_GET) quando la pagina parte. Ritorna
   // SUBITO il verdetto sincrono (rispettando bypass/dismiss) e, se ci sono
   // segnali di rete da approfondire, li avvia: a verdetto cambiato fa broadcast.
-  safebrowseGet(tabId, url, ctx = {}) {
+  safebrowseGet(tabId, url, ctxIn = {}) {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
     if (!SB || !tab) return { ok: true, level: 'safe', message: null };
+    const ctx = this._sbCtx(ctxIn);
     let verdict;
     try {
       verdict = SB.analyze(url, ctx, (next) => {
@@ -137,12 +150,13 @@ const safebrowseMethods = {
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!SB || !tab || !url || /^filo:\/\//i.test(url)) return;
+    const ctx = this._sbCtx({});
     try {
-      const verdict = SB.analyze(url, {}, (next) => {
+      const verdict = SB.analyze(url, ctx, (next) => {
         this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
       });
       this._sbBroadcast(tab, url, this._sbApplyState(tab, verdict));
-      if (verdict && verdict.rimandato) this._sbRimanda(tab, url, {});
+      if (verdict && verdict.rimandato) this._sbRimanda(tab, url, ctx);
     } catch (_) {}
   },
 
