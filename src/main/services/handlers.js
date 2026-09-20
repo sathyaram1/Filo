@@ -2732,9 +2732,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // La cronologia si guarda INTERA, non solo i venti messaggi che vanno al
       // modello: una sveglia messa trenta messaggi fa è comunque messa, e da lì
       // in poi «sì, te l'ho già messa» diventava un'accusa.
-      const coperti = Dichiarate.tipiDallaCronologia(threadHistory);
-      for (const t of tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini)) coperti.add(t);
-      azioniMancate = Dichiarate.rileva(textReply, coperti, await statoDichiarazioni());
+      // #517 (giro 6) — i turni di prima restano SEPARATI da questo. Messi
+      // insieme, bastava un appunto scritto all'inizio della conversazione
+      // perché ogni appunto raccontato dopo passasse muto, e lo stesso per
+      // l'evento in calendario, la segnalazione e l'apertura.
+      const precedenti = Dichiarate.tipiDallaCronologia(threadHistory);
+      const adesso = tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini);
+      azioniMancate = Dichiarate.rileva(textReply, adesso, {
+        ...(await statoDichiarazioni(renderedActions)), tipiPrecedenti: precedenti,
+      });
       avvisoAzioni = Dichiarate.avvisoPerUtente(azioniMancate);
       if (avvisoAzioni) {
         console.warn('[Filo] #517 azione dichiarata e mai eseguita:',
