@@ -3111,6 +3111,9 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   maybeRunCompactor,
+  // #517 — il presidio delle azioni raccontate confronta le frasi con i
+  // titoli degli appunti, e quel confronto sta nel main anche per l'Aiuto.
+  editorFileSummariesList,
   // Intervista di benvenuto (#524)
   saveOnboarding,
   finishOnboarding,
