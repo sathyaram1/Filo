@@ -44,7 +44,7 @@ async function stubProviders(app) {
       return r;
     };
     P.completeWithFallback = async ({ attempts }) => risposta(attempts);
-  }, frase => frase, FRASE_DEL_MODELLO);
+  }, FRASE_DEL_MODELLO);
 }
 
 async function conChiave(app, chiave = 'sk-or-vera') {
