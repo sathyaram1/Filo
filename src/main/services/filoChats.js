@@ -202,12 +202,13 @@
     return items.filter((c) => c && !c.closedAt && Array.isArray(c.messages) && c.messages.length);
   }
 
-  // Le chat chiuse ma senza tipo: la classificazione non è riuscita (niente
-  // chiave, limite di spesa, rete assente). Si ritenta alla partenza dopo.
-  // Restano intanto visibili fra le conversazioni.
+  // Le chat chiuse che aspettano ancora titolo e tipo: la classificazione non
+  // è riuscita (niente chiave, limite di spesa, rete assente) oppure la
+  // conversazione è andata avanti dopo. Si ritenta alla partenza dopo; intanto
+  // restano visibili fra le conversazioni.
   async function listUntriaged() {
     const items = await list();
-    return items.filter((c) => c && c.closedAt && !c.kind);
+    return items.filter((c) => c && c.closedAt && needsTriage(c));
   }
 
   async function clear() {
