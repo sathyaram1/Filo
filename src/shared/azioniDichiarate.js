@@ -655,9 +655,24 @@
     + `|ordin[a-zà-ù]*|riordin[a-zà-ù]*|alfabetic[oa]`
     + `|legg[a-zà-ù]*|rileggi|rivedi|revision[ei])${FINE}`, 'i');
 
+  // Il modo più comune di far leggere qualcosa a Filo è INCOLLARLO nel
+  // messaggio, e in un documento incollato ci può stare qualunque parola: un
+  // contratto che dice «si rinnova salvo disdetta» faceva leggere «salva»
+  // come una richiesta di salvare. Sopra questa lunghezza il messaggio è un
+  // documento con una richiesta attaccata, e la richiesta sta all'inizio o in
+  // fondo: si guarda lì, non in mezzo al testo di qualcun altro.
+  const DOCUMENTO_INCOLLATO = 400;
+  const BORDO = 300;
+  function soloLaRichiesta(s) {
+    if (s.length < DOCUMENTO_INCOLLATO) return s;
+    const primo = s.split(/\n\s*\n/)[0].slice(0, BORDO);
+    return `${primo}\n${s.slice(-BORDO)}`;
+  }
+
   function richiestaDiAzione(messaggio) {
-    const s = String(messaggio || '');
-    if (!s.trim()) return false;
+    const grezzo = String(messaggio || '');
+    if (!grezzo.trim()) return false;
+    const s = soloLaRichiesta(grezzo);
     // Una cosa nominata per nome è una promessa comunque, anche dentro una
     // domanda: «l'hai mandata agli sviluppatori?» senza che sia mai partito
     // niente resta una cosa da dire all'utente. Che una cosa fatta PRIMA
