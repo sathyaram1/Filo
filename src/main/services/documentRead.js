@@ -446,6 +446,46 @@ function quotaNonTestoByte(buf, fino) {
   return rumore / n;
 }
 
+/**
+ * La stessa domanda su UN SOLO LATO delle coppie di byte. PURA.
+ * `salto` è 0 per i byte in posizione pari, 1 per quelli in posizione dispari.
+ *
+ * #551, ottavo giro di verifica. Prima la domanda «questi byte sono già testo?»
+ * si faceva su TUTTO il file, e la risposta era una percentuale: sopra il due
+ * per cento di rumore il file passava per un testo a due byte per carattere.
+ * Due file normalissimi stanno sopra quella soglia senza essere niente del
+ * genere:
+ *   • un file CORTO. In un promemoria di quaranta caratteri un byte nullo solo
+ *     vale il due e mezzo per cento;
+ *   • un file che contiene già qualche carattere di controllo suo. Il registro
+ *     di un programma che disegna una barra di avanzamento torna indietro di un
+ *     carattere per volta per riscrivere la riga: lì il conto sta sopra la
+ *     soglia da solo, e allora un nullo qualunque, in un file di qualunque
+ *     lunghezza, faceva rileggere tutto a coppie di byte. Quello che ne usciva
+ *     erano ideogrammi cinesi — stampabili, quindi nemmeno la rete finale se ne
+ *     accorgeva — e Filo dichiarava di aver letto l'estratto conto.
+ *
+ * Guardare un lato solo non è una soglia più fine: è una domanda diversa, e la
+ * risposta non dipende più dalla lunghezza del file né da quanti caratteri di
+ * controllo ci siano nel testo vero. In un file scritto a due byte il lato alto
+ * delle coppie non è fatto di caratteri per costruzione, in qualunque alfabeto:
+ * è nullo in italiano, ed è un carattere di controllo in russo e in greco. In un
+ * testo a 8 bit quel lato è testo, perché è testo come tutto il resto del file.
+ * Fra i due conteggi vince la maggioranza, come già fa il bilancio dell'UTF-8.
+ */
+function quotaLatoNonTesto(buf, fino, salto) {
+  const n = Math.min(buf.length, fino || 8192);
+  let quanti = 0;
+  let rumore = 0;
+  for (let i = salto; i < n; i += 2) {
+    quanti++;
+    const b = buf[i];
+    if (b >= 32 || b === 9 || b === 10 || b === 13 || b === 12 || b === 27) continue;
+    rumore++;
+  }
+  return quanti ? rumore / quanti : 0;
+}
+
 /** Legge il buffer come testo a due byte nel verso dato. PURA. */
 function leggiDueByte(buf, verso, conFirma) {
   let corpo = conFirma ? buf.subarray(2) : buf;
