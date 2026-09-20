@@ -408,8 +408,10 @@
       return { icon: '👋', text: `Accoglienza · ${ids.join(', ') || 'passo fatto'}` };
     },
     IMPOSTA_ESTETICA: (a) => {
-      const tok = a.token || a.nome || a.name || a.chiave || a.elemento || '';
-      const val = a.valore ?? a.value ?? a.val ?? a.colore;
+      const label = pulito(a._output && a._output.estetica);
+      if (label) return { icon: '🎨', text: `Aspetto · ${label}` };
+      const tok = pulito(a.token || a.nome || a.name || a.chiave || a.elemento);
+      const val = pulito(a.valore ?? a.value ?? a.val ?? a.colore);
       return { icon: '🎨', text: `Aspetto · ${tok}${val ? ` = ${val}` : ''}` };
     },
     PROXY_TAB: (a) => ({ icon: '🌍', text: `Scheda aperta da · ${String(a.country || a.paese || '').toUpperCase()}` }),
