@@ -27,7 +27,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
-import { rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
