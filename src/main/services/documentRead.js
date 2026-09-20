@@ -375,6 +375,10 @@ module.exports = {
   readDocument,
   // esportati per gli unit test e per chi formatta l'osservazione
   normalizePath,
+  chiaveTollerante,
+  nomiCombaciano,
+  risolviTollerante,
+  dettaglioNonTrovato,
   kindFromExtension,
   looksLikeText,
   decodeText,
