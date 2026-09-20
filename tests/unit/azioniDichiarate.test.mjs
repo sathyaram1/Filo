@@ -819,3 +819,108 @@ test('i modi di dire che restavano muti, e la famiglia giusta', () => {
   assert.deepEqual(AD.rileva('Ti ho disattivato le notifiche.', new Set(['IMPOSTA_PREFERENZA'])), []);
   assert.deepEqual(AD.rileva('Ecco fatto: sveglia alle 19.', new Set(['SVEGLIA'])), []);
 });
+
+// ── Giro 9 ────────────────────────────────────────────────────────────────
+
+// Lo stato come lo costruiscono le due chat quando l'utente ha scritto QUESTO.
+const dopo = (messaggio, extra = {}) => ({
+  domandaUtente: AD.domandaSuCosaFatta(messaggio),
+  richiestaAzione: AD.richiestaDiAzione(messaggio),
+  ...extra,
+});
+
+test('di cosa parla il pronome lo dice la richiesta dell\'utente', () => {
+  // Chiedere di sistemare un testo è fra le prime cose che si fanno in chat.
+  // Il testo è nella risposta: non esiste nessuno strumento che possa averlo
+  // scritto, e la risposta veniva buttata, rifatta e poi smentita.
+  const sulTesto = dopo('nella frase «il gatto grigio dorme sul divano» togli la parola grigio');
+  for (const frase of [
+    'Te l\'ho tolta.',
+    'Te l\'ho messa al plurale.',
+    'Te l\'ho messa in inglese.',
+    'Te l\'ho spostata in cima.',
+    'Le ho aggiunte tutte.',
+  ]) assert.deepEqual(AD.rileva(frase, new Set(), sulTesto), [], frase);
+
+  // Quando la richiesta nomina una cosa che passa da uno strumento, la
+  // conferma col pronome resta una promessa da verificare.
+  assert.deepEqual(ids(AD.rileva('Sì, te l\'ho mandata.', new Set(),
+    dopo('manda un feedback: la barra in alto sparisce'))), ['senza-nome']);
+  // Una richiesta scritta come domanda è sempre una richiesta (giro 7).
+  assert.deepEqual(ids(AD.rileva('Te l\'ho segnata.', new Set(),
+    dopo('mi segni anche la lista della spesa: pane, uova, latte?'))), ['senza-nome']);
+  // Il tasto «Fallo adesso» manda questa frase: deve riaccendere il controllo.
+  assert.deepEqual(ids(AD.rileva('Te l\'ho già mandata.', new Set(),
+    dopo('Non l\'hai fatto davvero: fallo adesso.'))), ['senza-nome']);
+  // L'ora promessa decide comunque, qualunque cosa avesse chiesto l'utente.
+  assert.deepEqual(ids(AD.rileva('Te l\'ho messa alle 19.', new Set(),
+    { ...sulTesto, orariSveglie: [] })), ['senza-nome']);
+  // Chi non passa il messaggio non cambia niente: resta il comportamento di prima.
+  assert.deepEqual(ids(AD.rileva('Sì, te l\'ho mandata.', new Set(), {})), ['senza-nome']);
+});
+
+test('un appunto che esiste non prova un appunto appena chiesto', () => {
+  // I titoli sono quelli dei file dell'editor: uno che si chiami «lista»
+  // compariva in quasi ogni frase che racconta un appunto, e zittiva tutto.
+  const chiesto = dopo('segnami la lista della spesa: pane, uova, latte',
+    { titoliAppunti: ['lista'] });
+  assert.deepEqual(ids(AD.rileva('Ti ho salvato l\'appunto con la lista della spesa.',
+    new Set(), chiesto)), ['appunto']);
+  // Ma a chi chiede se una cosa è stata fatta, l'appunto che c'è resta la
+  // prova (giro 3): in una chat nuova è l'unica disponibile.
+  assert.deepEqual(AD.rileva('Sì, l\'ho salvato fra gli appunti della spesa.', new Set(),
+    dopo('hai salvato l\'appunto della spesa?', { titoliAppunti: ['spesa'] })), []);
+  // E l'appunto scritto ADESSO regge la frase come sempre.
+  assert.deepEqual(AD.rileva('Ti ho salvato l\'appunto con la lista della spesa.',
+    new Set(['SALVA_APPUNTO']), chiesto), []);
+});
+
+test('la conferma senza «ho» non la copre una cosa fatta in un turno prima', () => {
+  // Il giro 6 pretende che la frase guardi indietro perché un'azione vecchia
+  // la regga. La forma corta saltava quel controllo, e «Appunto salvato.»
+  // dopo un appunto scritto all'inizio passava muto.
+  for (const [frase, tipo] of [
+    ['Appunto salvato.', 'SALVA_APPUNTO'],
+    ['Segnalazione inviata.', 'INVIA_FEEDBACK'],
+    ['Evento aggiunto al calendario.', 'EVENTO_CALENDARIO'],
+    ['Sveglia impostata.', 'SVEGLIA'],
+    ['Timer avviato.', 'TIMER'],
+  ]) {
+    assert.ok(AD.rileva(frase, new Set(), {
+      tipiPrecedenti: new Set([tipo]), contiPrecedenti: { [tipo]: 1 },
+    }).length > 0, frase);
+  }
+  // Quello che resta vero: una cosa fatta ADESSO la regge, e una frase che
+  // guarda indietro può appoggiarsi a un turno di prima.
+  assert.deepEqual(AD.rileva('Appunto salvato.', new Set(['SALVA_APPUNTO']), {}), []);
+  assert.deepEqual(AD.rileva('Te l\'avevo già salvato l\'appunto della spesa.', new Set(), {
+    tipiPrecedenti: new Set(['SALVA_APPUNTO']), contiPrecedenti: { SALVA_APPUNTO: 1 },
+  }), []);
+  // …e la constatazione di uno stato vero resta muta (giro 7).
+  assert.deepEqual(AD.rileva('La sveglia delle 7 è già impostata, ne vuoi un\'altra?', new Set()), []);
+});
+
+test('una frase citata non è una dichiarazione di Filo', () => {
+  assert.deepEqual(AD.rileva('Hai scritto: «ti ho messo la sveglia alle 19».', new Set()), []);
+  assert.deepEqual(AD.rileva('Un esempio di risposta sbagliata: «Ti ho messo la sveglia alle 19».', new Set()), []);
+  // Le virgolette da sole non bastano: senza il verbo di chi riporta, quella
+  // è la frase di Filo.
+  assert.deepEqual(ids(AD.rileva('«Ti ho messo la sveglia alle 19».', new Set())), ['sveglia']);
+});
+
+test('gli altri modi di dichiarare una cosa mai fatta che restavano muti', () => {
+  assert.deepEqual(ids(AD.rileva('Ho avviato il blocco note.', [])), ['apertura']);
+  assert.deepEqual(ids(AD.rileva('Ti ho lanciato il blocco note.', [])), ['apertura']);
+  assert.deepEqual(ids(AD.rileva('Ho fatto una segnalazione agli sviluppatori.', [])), ['segnalazione']);
+  assert.deepEqual(ids(AD.rileva('Ho riportato il problema agli sviluppatori.', [])), ['segnalazione']);
+  assert.deepEqual(ids(AD.rileva('Ho abilitato il tema scuro.', [])), ['impostazione']);
+  assert.deepEqual(ids(AD.rileva('Ti ho tolto le notifiche.', [])), ['impostazione']);
+  assert.deepEqual(ids(AD.rileva('Ho calendarizzato la riunione.', [])), ['calendario']);
+  assert.deepEqual(ids(AD.rileva('Ho messo la suoneria alle 19.', [])), ['sveglia']);
+  assert.deepEqual(ids(AD.rileva('Ho trascritto la lista della spesa.', [])), ['appunto']);
+  // I verbi nuovi restano alle loro famiglie: un timer si avvia, e non è
+  // «non si è aperto niente».
+  assert.deepEqual(ids(AD.rileva('Ho avviato il timer di 10 minuti.', [])), ['timer']);
+  assert.deepEqual(AD.rileva('Ho avviato il timer di 10 minuti.', new Set(['TIMER'])), []);
+  assert.deepEqual(AD.rileva('Ho avviato il blocco note.', new Set(['ESEGUI_COMANDO'])), []);
+});

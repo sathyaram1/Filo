@@ -540,3 +540,52 @@ test('dopo «Fallo adesso» la stessa cosa mai fatta non diventa muta', async ({
 
   await expect(page.locator('.dash-bubble-avviso')).toHaveCount(2);
 });
+
+test('un testo sistemato dentro la risposta non viene buttato né smentito', async ({ app, shell }) => {
+  // La conferma col pronome non dice di cosa parla: a dirlo è la richiesta.
+  // Qui l'utente ha chiesto di sistemare un testo, e il testo è nella
+  // risposta. Prima la risposta veniva cancellata, rifatta con una seconda
+  // chiamata al modello e poi smentita, col tasto «Fallo adesso» per una
+  // cosa che Filo aveva fatto.
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: 'Ecco la frase senza quella parola:\n\nIl gatto dorme sul divano.\n\nTe l\'ho tolta.' },
+  ]);
+  await page.locator('#input').fill('nella frase «il gatto grigio dorme sul divano» togli la parola grigio');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-filo').last()).toContainText('Il gatto dorme sul divano');
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
+  expect(await app.evaluate(() => globalThis.__captured.length)).toBe(1);
+});
+
+test('la conferma più corta non diventa muta dopo una cosa fatta prima', async ({ app, shell }) => {
+  // «Appunto salvato.» dopo un appunto scritto all'inizio della
+  // conversazione passava senza una parola, mentre la stessa cosa detta per
+  // esteso veniva vista. È il turno di prosecuzione della segnalazione.
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: '', toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"lunedì alle 10","contesto":"riunione"}' }] },
+    { text: 'Fatto.' },
+    { text: 'Appunto salvato.' },
+    { text: 'Appunto salvato.' },
+  ]);
+
+  await page.locator('#input').fill('segnami che la riunione è lunedì alle 10');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+  await page.locator('#input').fill('segnami anche la lista della spesa: pane, uova, latte');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 25_000 });
+
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
+});

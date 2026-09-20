@@ -223,3 +223,57 @@ test('una cosa già smentita non torna vera perché il modello la ripete', async
   const dopo = await page.evaluate(() => document.querySelectorAll('.sn-sidebar-msg-avviso').length);
   expect(dopo).toBeGreaterThan(primi);
 });
+
+test('un\'azione emessa e non riuscita non copre la frase che la dà per fatta', async ({ openTab }) => {
+  // Nella chat della home un'azione chiamata che non ha fatto nascere niente
+  // non prova niente. Nel pannello bastava che partisse: se il registro la
+  // rifiutava, se non riusciva o se l'utente premeva Annulla al popup, la
+  // frase che la dava per fatta non la smentiva nessuno, e da lì in poi quel
+  // tipo restava fra le cose fatte per tutta la sessione.
+  test.setTimeout(90_000);
+  const page = await openTab(NEWTAB);
+  await page.evaluate(() => {
+    window.__turni = [];
+    window.__azioni = [];
+    const risposte = [
+      JSON.stringify({
+        action: 'filo',
+        filo: { type: 'INVIA_FEEDBACK', testo: 'la barra in alto sparisce' },
+        text: 'Ho mandato la segnalazione agli sviluppatori.',
+        status: 'done',
+      }),
+      JSON.stringify({ text: 'Te l\'ho già mandata agli sviluppatori.', status: 'done' }),
+    ];
+    let i = 0;
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, ...rest) => {
+      if (msg && msg.type === 'ai_request') {
+        window.__turni.push(1);
+        return Promise.resolve({ ok: true, text: risposte[Math.min(i++, risposte.length - 1)] });
+      }
+      if (msg && (msg.type === 'filo_run_action' || msg.type === 'filo_confirm_action')) {
+        window.__azioni.push(msg.action);
+        // Il registro la rifiuta: non parte niente.
+        return Promise.resolve({ ok: true, executed: false, kept: false });
+      }
+      if (msg && msg.type === 'capture_visible_tab') return Promise.resolve({ ok: false });
+      return orig(msg, ...rest);
+    };
+  });
+  await apriAiuto(page);
+
+  await chiedi(page, 'manda un feedback: la barra in alto sparisce');
+  // Il primo turno lo dice già: l'azione non è andata.
+  expect(AVVISATO.test(await testoChat(page))).toBe(true);
+
+  await page.fill('.sn-sidebar-input textarea', 'mandala davvero, per favore');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await page.waitForFunction(() => (window.__turni || []).length >= 2, null, { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Di segnalazioni ne è partita una sola, e non è andata: l'utente non può
+  // restare convinto di aver segnalato.
+  expect(await page.evaluate(() => window.__azioni.length)).toBe(1);
+  const turni = await page.evaluate(() => window.__turni.length);
+  expect(turni > 2 || AVVISATO.test(await testoChat(page))).toBe(true);
+});
