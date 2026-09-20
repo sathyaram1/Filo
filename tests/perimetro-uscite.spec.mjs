@@ -94,6 +94,20 @@ function lezioni(app) {
   return app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
 }
 
+// I file dell'editor: è lì che finirebbe un appunto scritto da Filo. Dal
+// quarto giro di verifica le prove che mettono alla prova un PERMESSO usano
+// l'appunto e non la lezione: una regola nella memoria, dopo una lettura, non
+// si ottiene più per nessuna strada, quindi non distingue più un permesso dato
+// da uno non dato.
+function appunti(app) {
+  return app.evaluate(async () => {
+    try {
+      const EF = require('./editorFiles');
+      return await EF.listFileSummaries();
+    } catch (_) { return []; }
+  });
+}
+
 // Gli indirizzi delle schede aperte: è lì che comparirebbe un «apri questo sito».
 function schede(app) {
   return app.evaluate(({ BrowserWindow }) => {
@@ -235,15 +249,15 @@ test.describe('il perimetro delle uscite', () => {
     const { azioni } = await turno(app, [
       [{ name: 'DICHIARA_USCITE', args: { uscite: ['sveglie'] } }],
       [{ name: 'CERCA_WEB', args: { query: 'notizie' } }],
-      [{ name: 'CHIEDI_USCITA', args: { uscita: 'memoria', motivo: 'vorrei ricordare la data' } }],
+      [{ name: 'CHIEDI_USCITA', args: { uscita: 'appunti', motivo: 'vorrei segnarmi la data' } }],
     ]);
 
     // La richiesta non esegue niente da sé: apre un popup e aspetta.
     const chiesta = azioni.find((a) => String(a.type) === 'CHIEDI_USCITA');
     expect(chiesta, 'la richiesta deve arrivare in chat come domanda').toBeTruthy();
     expect(chiesta._confirm.level).toBe(2);
-    expect(chiesta._confirm.text).toContain('memoria');
-    expect(chiesta._confirm.text).toContain('vorrei ricordare la data');
+    expect(chiesta._confirm.text).toContain('appunti');
+    expect(chiesta._confirm.text).toContain('vorrei segnarmi la data');
     expect(chiesta._executed).toBe(false);
     expect(await lezioni(app)).toEqual(lezioniPrima);
 
@@ -251,7 +265,7 @@ test.describe('il perimetro delle uscite', () => {
     const dopoIlSi = await app.evaluate(async (_e, azione) => {
       const r = await globalThis.SN_EXECUTE_FILO_ACTION(azione, { confirmed: true });
       const dopo = await globalThis.SN_EXECUTE_FILO_ACTION(
-        { type: 'SALVA_LEZIONE', testo: 'La data è il 12.', _compito: azione._compito },
+        { type: 'SALVA_APPUNTO', text: 'La data è il 12.', _compito: azione._compito },
       );
       const altra = await globalThis.SN_EXECUTE_FILO_ACTION(
         { type: 'ESEGUI_COMANDO', comando: 'rm -rf /', _compito: azione._compito },
@@ -272,7 +286,7 @@ test.describe('il perimetro delle uscite', () => {
     // Il finto mittente dell'assistente di pagina: una scheda su un sito.
     const esito = await app.evaluate(async () => {
       const sender = { tab: { id: 4242, url: 'https://ostile.example/pagina' } };
-      const memoria = await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'SALVA_LEZIONE', testo: 'roba' }, { sender });
+      const memoria = await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'SALVA_APPUNTO', text: 'roba' }, { sender });
       const apri = await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: 'https://esfiltrazione.example/x' }, { sender });
       const segnala = await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'INVIA_FEEDBACK', testo: 'non va', titolo: 'bug' }, { sender });
       return { memoria, apri, segnala };
@@ -324,14 +338,14 @@ test.describe('il perimetro delle uscite', () => {
       const prima = { tab: { id: 33, url: 'https://sito-fidato.example/a' } };
       const stessoSito = { tab: { id: 33, url: 'https://sito-fidato.example/altra-pagina' } };
       const altroSito = { tab: { id: 33, url: 'https://ostile.example/b' } };
-      const a = { type: 'SALVA_LEZIONE', testo: 'concesso sul sito fidato' };
+      const a = { type: 'SALVA_APPUNTO', text: 'concesso sul sito fidato' };
       const chiesto = await globalThis.SN_EXECUTE_FILO_ACTION(a, { sender: prima });
       const ok = await globalThis.SN_EXECUTE_FILO_ACTION(a, { sender: prima, confirmed: true });
       const dentro = await globalThis.SN_EXECUTE_FILO_ACTION(
-        { type: 'SALVA_LEZIONE', testo: 'altra pagina dello stesso sito' }, { sender: stessoSito },
+        { type: 'SALVA_APPUNTO', text: 'altra pagina dello stesso sito' }, { sender: stessoSito },
       );
       const fuori = await globalThis.SN_EXECUTE_FILO_ACTION(
-        { type: 'SALVA_LEZIONE', testo: 'scritto dopo il cambio di sito' }, { sender: altroSito },
+        { type: 'SALVA_APPUNTO', text: 'scritto dopo il cambio di sito' }, { sender: altroSito },
       );
       return { chiesto, ok, dentro, fuori };
     });
@@ -341,7 +355,7 @@ test.describe('il perimetro delle uscite', () => {
     expect(esito.dentro.executed, 'sullo stesso sito il permesso resta').toBe(true);
     // Su un altro sito no: quel sì non era per lui.
     expect(esito.fuori.executed, 'il permesso non segue la scheda su un altro sito').toBe(false);
-    expect(JSON.stringify(await lezioni(app))).not.toContain('scritto dopo il cambio di sito');
+    expect(JSON.stringify(await appunti(app))).not.toContain('scritto dopo il cambio di sito');
   });
 
   test('un\'azione che arriva da un sito non può nominare il compito di un altro', async ({ app }) => {
@@ -349,18 +363,18 @@ test.describe('il perimetro delle uscite', () => {
     const esito = await app.evaluate(async () => {
       const buona = { tab: { id: 11, url: 'https://sito-fidato.example/a' } };
       const ostile = { tab: { id: 22, url: 'https://ostile.example/b' } };
-      const chiesta = { type: 'SALVA_LEZIONE', testo: 'roba della scheda buona' };
+      const chiesta = { type: 'SALVA_APPUNTO', text: 'roba della scheda buona' };
       await globalThis.SN_EXECUTE_FILO_ACTION(chiesta, { sender: buona });
       const ok = await globalThis.SN_EXECUTE_FILO_ACTION(chiesta, { sender: buona, confirmed: true });
       const rubato = await globalThis.SN_EXECUTE_FILO_ACTION(
-        { type: 'SALVA_LEZIONE', testo: 'scritto dal sito ostile', _compito: 'pagina::11::https://sito-fidato.example' },
+        { type: 'SALVA_APPUNTO', text: 'scritto dal sito ostile', _compito: 'pagina::11::https://sito-fidato.example' },
         { sender: ostile },
       );
       return { ok, rubato };
     });
     expect(esito.ok.executed).toBe(true);
     expect(esito.rubato.executed, 'il nome di un compito non è una chiave che apre i permessi di un altro').toBe(false);
-    expect(JSON.stringify(await lezioni(app))).not.toContain('scritto dal sito ostile');
+    expect(JSON.stringify(await appunti(app))).not.toContain('scritto dal sito ostile');
   });
 
   test('nella stessa conversazione il messaggio dopo non riparte a mani libere', async ({ app }) => {
