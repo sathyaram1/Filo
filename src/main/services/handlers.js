@@ -2581,6 +2581,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // della stessa specie vogliono due azioni, non una che le copre tutte.
     contiAzioni: contaTipi(azioniDelTurno),
     domandaUtente,
+    richiestaAzione,
   });
   const conImmagini = imageList.length > 0;
   try {
