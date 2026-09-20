@@ -151,8 +151,17 @@ async function detonate(url, evaluateFinal, opts = {}) {
 async function detonateNow(el, url, evaluateFinal, opts = {}) {
   const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : DETONATE_TIMEOUT_MS;
   const lifetimeMs = Number(opts.hardLifetimeMs) > 0 ? Number(opts.hardLifetimeMs) : HARD_LIFETIME_MS;
-  const partition = `filo-detonate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const ses = el.session.fromPartition(partition, { cache: false });
+  const partition = prendiPartizione();
+  let ses;
+  try {
+    ses = el.session.fromPartition(partition, { cache: false });
+  } catch (e) {
+    rendiPartizione(partition);
+    throw e;
+  }
+  // Svuotata prima dell'uso: la memoria è riusata, e il turno precedente non
+  // deve poter lasciare niente a questo.
+  try { await ses.clearStorageData(); } catch (_) {}
 
   let downloadStarted = false;
   let downloadName = '';
@@ -164,7 +173,97 @@ async function detonateNow(el, url, evaluateFinal, opts = {}) {
     });
   } catch (_) {}
 
-  const win = new el.BrowserWindow({
+  let win;
+  try {
+    win = creaFinestra(el, ses);
+  } catch (e) {
+    rendiPartizione(partition);
+    throw e;
+  }
+
+  const wc = win.webContents;
+  const redirects = [];
+  let finalUrl = url;
+  let finished = false;
+  let ripulito = false;
+
+  const cleanup = () => {
+    if (ripulito) return;
+    ripulito = true;
+    try { if (!win.isDestroyed()) win.destroy(); } catch (_) {}
+    // Svuota i dati effimeri della memoria e la rimette nel giro.
+    try { Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) {}
+    rendiPartizione(partition);
+  };
+
+  return await new Promise((resolve) => {
+    let timer = null;
+    let hardTimer = null;
+
+    const done = (verdict, extra = {}) => {
+      if (finished) return;
+      finished = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (hardTimer) { clearTimeout(hardTimer); hardTimer = null; }
+      cleanup();
+      resolve({ verdict, finalUrl, redirects, download: downloadStarted ? (downloadName || true) : false, ...extra });
+    };
+
+    timer = setTimeout(() => done(downloadStarted ? 'dangerous' : 'clean'), timeoutMs);
+    // Il tetto di vita: nessun cammino lo annulla, solo `done`. Prima, appena la
+    // pagina finiva di caricare il timer di attesa veniva annullato e una
+    // valutazione dell'URL finale che non tornava mai lasciava la finestra
+    // viva, con JavaScript attivo, per tutta la sessione.
+    // Scaduto il tetto: se un download era già partito il verdetto è certo e
+    // vale; altrimenti si esce senza verdetto (null), che index.js NON mette in
+    // cache — al prossimo passaggio si riprova, invece di ricordarsi per mezz'ora
+    // un "pulito" che nessuno ha mai stabilito.
+    hardTimer = setTimeout(() => {
+      if (downloadStarted) return done('dangerous', { timedOut: true });
+      if (finished) return;
+      finished = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      hardTimer = null;
+      cleanup();
+      resolve(null);
+    }, lifetimeMs);
+
+    try {
+      wc.on('did-redirect-navigation', (_e, u) => { if (u) { redirects.push(u); finalUrl = u; } });
+      wc.on('did-navigate', (_e, u) => { if (u) finalUrl = u; });
+      wc.on('did-create-window', (child) => { try { child.destroy(); } catch (_) {} }); // niente popup
+      wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+      wc.on('did-stop-loading', async () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        // Verdetto: download forzato → pericoloso. Altrimenti valuta l'URL
+        // finale: se la destinazione vera è impersonazione/blacklist → pericoloso.
+        if (downloadStarted) return done('dangerous');
+        let verdict = 'clean';
+        if (typeof evaluateFinal === 'function' && finalUrl && finalUrl !== url) {
+          try {
+            const v = await evaluateFinal(finalUrl);
+            if (v && v.level === 'pericoloso') verdict = 'dangerous';
+            else if (v && v.level === 'sospetto') verdict = 'suspicious';
+          } catch (_) {}
+        }
+        done(verdict);
+      });
+
+      wc.on('did-fail-load', (_e, code) => {
+        // -3 = ABORTED (spesso per un download intercettato): non è un errore.
+        if (code === -3 && downloadStarted) return; // lascia decidere will-download/timer
+      });
+
+      wc.loadURL(url).catch(() => done(downloadStarted ? 'dangerous' : 'clean'));
+    } catch (_) {
+      done(null);
+    }
+  });
+}
+
+function creaFinestra(el, ses) {
+  return new el.BrowserWindow({
     show: false,
     width: 1024,
     height: 768,
