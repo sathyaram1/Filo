@@ -1387,6 +1387,67 @@
           </p>
         </section>
 
+        <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un
+           account è una cosa che si decide PRIMA di riaccendere. -->
+        <section class="mg-auto-block" id="mgMaxSessionsBlock">
+          <label class="mg-auto-field-label" for="mgMaxSessions">Sessioni in parallelo</label>
+          <p class="mg-auto-block-desc">
+            Quante sessioni possono lavorare insieme. Più sessioni finiscono
+            prima la coda e consumano più in fretta.
+          </p>
+          <div class="mg-auto-field-row">
+            <input type="number" id="mgMaxSessions" class="mg-auto-number"
+              min="1" max="20" step="1" inputmode="numeric" />
+            <button type="button" class="sn-btn" id="mgMaxSessionsSave">Salva</button>
+            <span class="mg-action-msg" id="mgMaxSessionsMsg" role="status"></span>
+          </div>
+        </section>
+
+        <section class="mg-auto-block" id="mgPriorityAccountBlock">
+          <span class="mg-auto-field-label">Account prioritario</span>
+          <p class="mg-auto-block-desc">
+            Si parte sempre da quello scelto finché non è esaurito o in pausa,
+            poi tocca all'altro.
+            <span class="mg-action-msg" id="mgPriorityAccountMsg" role="status"></span>
+          </p>
+          <div class="mg-auto-choice" id="mgPriorityAccountChoice" role="radiogroup" aria-label="Account prioritario">
+            <label class="mg-auto-choice-item" title="Le sessioni si distribuiscono fra i due account">
+              <input type="radio" name="mgPriorityAccount" value="" checked />
+              <span class="mg-auto-choice-text">Si alternano</span>
+            </label>
+            <label class="mg-auto-choice-item" title="Si usa l'account A finché regge">
+              <input type="radio" name="mgPriorityAccount" value="A" />
+              <span class="mg-auto-choice-text">Prima A</span>
+            </label>
+            <label class="mg-auto-choice-item" title="Si usa l'account B finché regge">
+              <input type="radio" name="mgPriorityAccount" value="B" />
+              <span class="mg-auto-choice-text">Prima B</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="mg-auto-block" id="mgAccountsBlock">
+          <span class="mg-auto-field-label">Account in uso</span>
+          <p class="mg-auto-block-desc">
+            Escluso un account, da lì non parte più nessuna sessione; quelle già
+            avviate finiscono il lavoro che hanno in mano.
+            <span class="mg-action-msg" id="mgAccountsMsg" role="status"></span>
+          </p>
+          <div class="mg-auto-sub">
+            <label class="mg-switch mg-switch--sm" title="Spento: dall'account A non parte nessuna sessione nuova">
+              <span class="mg-switch-text">Account A</span>
+              <input type="checkbox" id="mgAccountA" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+            <label class="mg-switch mg-switch--sm" title="Spento: dall'account B non parte nessuna sessione nuova">
+              <span class="mg-switch-text">Account B</span>
+              <input type="checkbox" id="mgAccountB" checked />
+              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            </label>
+          </div>
+          <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
+        </section>
+
         <!-- Quanti giri di correzione si pagano per livello di rilievo. Valgono solo se le routine lavorano. -->
         <section class="mg-auto-block" id="mgCap2Block">
           <label class="mg-auto-field-label" for="mgCap2">Correzioni per i difetti gravi (livello 3 e 2)</label>
