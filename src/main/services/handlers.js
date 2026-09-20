@@ -2184,6 +2184,25 @@ function toolResultText({ action, res, rendered }) {
   return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
 
+// #517 — La spinta da rimandare al modello quando la sua risposta non può
+// andare all'utente così com'è: dichiara un'azione che in questo turno nessuno
+// strumento ha eseguito («ti ho messo la sveglia» e di sveglie non ne è nata
+// nessuna), oppure è arrivata in formato macchina invece che in prosa. Ritorna
+// null quando il testo va bene, e allora il turno si chiude come sempre.
+//
+// Qui si guarda SOLO questo turno, apposta: se l'azione era stata fatta in un
+// turno precedente il modello lo sa e la spinta gli dice di scriverlo, senza
+// rifare niente. L'avviso all'utente, che è molto più caro di un giro in più,
+// guarda invece tutta la conversazione (vedi sotto).
+function spintaDiRimedio(Dichiarate, text, renderedActions) {
+  try {
+    const fantasmi = Dichiarate.rileva(text, renderedActions);
+    if (fantasmi.length) return Dichiarate.spintaAzioniMancanti(fantasmi);
+    if (Dichiarate.formatoSospetto(text)) return Dichiarate.spintaFormato();
+  } catch (_) {}
+  return null;
+}
+
 // #360 — Filo propone LUI la segnalazione quando ammette una mancanza.
 // Prima toccava all'utente accorgersene e chiedere ("mandane una segnalazione"):
 // se non lo faceva, il buco non arrivava a nessuno. Ora, quando la risposta dice
