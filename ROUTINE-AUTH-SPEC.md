@@ -532,7 +532,15 @@ La regola, uguale per tutti e due:
   NUOVA), e non la chiede se un via libera registrato su questa macchina parla
   di un altro commit. Se su questa macchina non risulta su quale commit sono
   stati dati, lo **dice** e prosegue: astenersi in silenzio è la classe di
-  guasto che questa spec toglie dappertutto.
+  guasto che questa spec toglie dappertutto;
+- **il decadimento si registra, non si stampa e basta.** Il rifiuto della
+  fusione dice quale passo lo mette a registro: il rientro in verifica
+  (`revision_security` → `revision_capability`, la stessa strada del
+  riallineamento), col comando già scritto e il ramo dentro, e il rilascio con
+  `--guasto` come via d'uscita se il server rifiuta quel passaggio. Fermarsi e
+  basta lascia la notizia su una macchina sola, mentre sul canale i due via
+  libera continuano a risultare buoni per quel ramo: la segnalazione #485
+  spostata di un passo.
 
 Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
 `scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
