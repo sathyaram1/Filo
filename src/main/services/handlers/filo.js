@@ -143,7 +143,14 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_CHAT_DELETE, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     await FiloChats.remove(msg.id);
-    annunciaChat();
+    // #525 — la conversazione cancellata può essere ancora a schermo in
+    // un'altra scheda. Se nessuno glielo dice, quella scheda continua a
+    // scrivere sulla stessa targa e la chat RINASCE: stessa targa, i messaggi
+    // di prima persi, e di nuovo in Cronologia. L'utente aveva chiesto il
+    // contrario. La scheda che la sta vivendo se ne libera e il messaggio dopo
+    // apre una conversazione nuova, con una targa sua.
+    ctx.dimenticaChat(msg.id);
+    try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, cancellata: msg.id }); } catch (_) {}
     return { ok: true, chats: await FiloChats.listIndex() };
   });
 
