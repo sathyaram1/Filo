@@ -793,6 +793,11 @@
       if (Array.isArray(r?.actions) && r.actions.length) {
         threadHistory.push({ role: 'filo', text: '', actions: r.actions, interrotto: true });
       }
+      // #533 (quinto giro di verifica) — un turno caduto a metà lascia in
+      // conversazione quello che aveva già letto: il messaggio dopo eredita
+      // da lui, esattamente come da un turno finito bene. Senza, «Riprova»
+      // ripartiva con tutti gli strumenti e il testo del sito ancora davanti.
+      if (r?.compito) ultimoCompito = r.compito;
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
