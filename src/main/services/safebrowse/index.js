@@ -194,11 +194,15 @@ function analyze(url, ctx = {}, onUpdate) {
       }
     })());
   };
-  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(reg)) {
-    inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first)), (r) => llmCache.set(reg, r));
+  // `prendiGettone` va per ultimo: è l'unico con un effetto: il gettone si
+  // consuma solo quando la chiamata parte davvero.
+  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(reg)
+      && prendiGettone(llmSpesa, reg)) {
+    inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first)), (r) => llmCache.set(norm.host, r));
   }
-  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(reg)) {
-    inVolo(sandboxInFlight, () => providers.sandbox(url, norm), (r) => sandboxCache.set(reg, r));
+  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(reg)
+      && prendiGettone(sandboxSpesa, reg)) {
+    inVolo(sandboxInFlight, () => providers.sandbox(url, norm), (r) => sandboxCache.set(norm.host, r));
   }
 
   if (tasks.length && typeof onUpdate === 'function') {
