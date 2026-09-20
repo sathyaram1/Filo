@@ -78,7 +78,7 @@ test('dirtyTreeText per la consegna: dice che la correzione starebbe fuori da og
 // consegne dirette della correzione e del verdetto passavano con modifiche non
 // salvate: la verifica dopo provava il ramo senza di esse. Le strade gemelle
 // passate da dispatch respingevano già.
-test('CLI routine-channel deliver: revisione, correzione e verdetto con modifiche non salvate respingono PRIMA del server; a commit fatto vanno al server', async () => {
+test('CLI routine-channel deliver: revisione, correzione, critica e verdetto di sicurezza con modifiche non salvate respingono PRIMA del server; a commit fatto vanno al server', async () => {
   const { spawnSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
   const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
