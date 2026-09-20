@@ -620,8 +620,15 @@
     const out = [];
     const presi = [];
     const sovrapposta = (a, b) => presi.some(([x, y]) => a < y && b > x);
-    for (const re of famiglia.frasi) {
+    for (const voce of famiglia.frasi) {
       if (out.length >= MAX_DICHIARAZIONI) break;
+      // Una voce può essere la sola espressione, oppure l'espressione più il
+      // segno che la frase è scritta SENZA «ho» (giro 7: «Sveglia impostata
+      // per le 19»). Lì non c'è un tempo verbale che dica se la cosa è appena
+      // successa o è successa prima, quindi un'azione di un turno passato la
+      // regge senza pretendere che la frase guardi indietro.
+      const re = (voce instanceof RegExp) ? voce : voce.re;
+      const senzaHo = !(voce instanceof RegExp) && !!voce.senzaHo;
       const rx = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
       let m;
       while ((m = rx.exec(testo))) {
