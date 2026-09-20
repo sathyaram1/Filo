@@ -356,20 +356,57 @@
     return { fineStatus, publicStatus };
   }
 
-  // Cifra i byte di un'immagine prima dell'upload su Storage.
-  // Ritorna un Blob con contentType application/octet-stream (il contenuto è
-  // opaco: ciphertext Uint8Array). Guard: senza pubkey ritorna il blob originale.
-  async function maybeEncryptBlob(blob) {
+  // L'errore che dice «questo non si è potuto cifrare». Ha una classe sua
+  // perché chi invia lo tratta diversamente da un caricamento andato storto:
+  // un caricamento fallito lascia partire il resto della segnalazione, una
+  // cifratura mancata ferma tutto.
+  class ErroreCifratura extends Error {
+    constructor(message) { super(message); this.name = 'ErroreCifratura'; this.cifratura = true; }
+  }
+  function isEncryptionError(e) { return !!(e && e.cifratura === true); }
+
+  // Cifra i byte di un allegato prima dell'upload su Storage. Ritorna un Blob
+  // con contentType application/octet-stream (il contenuto è opaco: ciphertext
+  // Uint8Array). Se non si può cifrare LANCIA un ErroreCifratura: il blob
+  // originale da qui non esce (#602).
+  async function sealForUpload(blob) {
+    const motivo = encryptionUnavailable();
+    if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
     const C = global.SN_FEEDBACK_CRYPTO;
-    if (!C || !C.isEnabled()) return blob; // dormiente finché il cutover non accende SN_FEEDBACK_ENC_ENABLED
+    let sealed;
     try {
       const ab = await blob.arrayBuffer();
-      const plain = new Uint8Array(ab);
-      const sealed = await C.encryptBytesForOwner(plain);
-      return new Blob([sealed], { type: 'application/octet-stream' });
+      sealed = await C.encryptBytesForOwner(new Uint8Array(ab));
     } catch (e) {
-      console.warn('[SN feedback] cifratura bytes fallita:', e?.message || e);
-      return blob;
+      throw new ErroreCifratura(encryptionBlockedMessage(
+        `la cifratura dell'allegato non è riuscita (${e?.message || e})`));
+    }
+    if (!C.isEncryptedBytes(sealed)) {
+      throw new ErroreCifratura(encryptionBlockedMessage("l'allegato non risulta cifrato"));
+    }
+    return new Blob([sealed], { type: 'application/octet-stream' });
+  }
+
+  // Il controllo all'imbocco del deposito: i byte che stanno per partire devono
+  // essere un ciphertext. Legge solo l'intestazione (78 byte), non l'allegato
+  // intero. Un `Blob` senza `slice` (i finti dei test) viene letto per intero.
+  async function assertSealed(blob) {
+    const C = global.SN_FEEDBACK_CRYPTO;
+    if (!C || !C.isEncryptedBytes) {
+      throw new ErroreCifratura(encryptionBlockedMessage(encryptionUnavailable()
+        || 'la parte di Filo che cifra non è stata caricata'));
+    }
+    const HEAD = 1 + 65 + 12; // versione + chiave effimera + nonce
+    let testa;
+    try {
+      const pezzo = (blob && typeof blob.slice === 'function') ? blob.slice(0, HEAD) : blob;
+      testa = new Uint8Array(await pezzo.arrayBuffer());
+    } catch (e) {
+      throw new ErroreCifratura(encryptionBlockedMessage(
+        `non ho potuto controllare che l'allegato fosse cifrato (${e?.message || e})`));
+    }
+    if (!C.isEncryptedBytes(testa)) {
+      throw new ErroreCifratura(encryptionBlockedMessage("l'allegato non risulta cifrato"));
     }
   }
 
@@ -378,10 +415,18 @@
   // (#190.3). Su feedback/* chiunque può CREARE un allegato nuovo senza login
   // (storage.rules), ma nessuno può sovrascriverne uno: niente token da passare
   // di qui. Ritorna { kind:'img'|'file', url, name, type }.
+  //
+  // #602: qui si cifra come nell'invio di un feedback. Gli allegati dei commenti
+  // salivano in chiaro, ed è il caso peggiore — nei commenti finiscono proprio
+  // le schermate e i log del lavoro. `kind` e `type` restano quelli del file
+  // VERO (non dell'involucro cifrato): sono il modo in cui la dashboard sa se
+  // mostrare un'immagine o un collegamento, e con che tipo riaprire il file
+  // dopo averlo decifrato.
   async function uploadAttachment(blob, name) {
-    const u = await uploadImage(blob); // upload generico (usa blob.type)
     const type = (blob && blob.type) || '';
     const kind = type.startsWith('image/') ? 'img' : 'file';
+    const sealed = await sealForUpload(blob);
+    const u = await uploadImage(sealed);
     return {
       kind,
       url: u.url,
