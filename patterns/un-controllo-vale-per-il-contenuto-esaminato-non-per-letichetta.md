@@ -40,8 +40,30 @@ La forma giusta, ogni volta che un esito attraversa il tempo:
   fuori dai commit il salvataggio automatico li committa subito dopo, la punta
   si sposta, e l'esito nasce già decaduto. Chi registra pretende una directory
   pulita e lo dice con l'elenco.
-- **Chi non può fare il confronto lo DICE.** Un controllo che tace quando non
-  sa rispondere è peggio di uno assente: chi legge crede di essere protetto.
+- **Chi non può fare il confronto lo DICE, e lo dice per ogni esito.**
+  Un controllo che tace quando non sa rispondere è peggio di uno assente: chi
+  legge crede di essere protetto. E l'astensione si dichiara **uno per uno**:
+  dirla solo quando non si sa niente lascia passare in silenzio il caso in cui
+  si sa metà, che è il peggiore dei tre — sembra controllato più degli altri.
+- **La memoria su cui il confronto si regge la scrive OGNI strada che registra
+  un esito.** Se la scrive una strada sola, l'altra non è una scorciatoia: è
+  l'interruttore della difesa. Ci si arriva senza forzare niente, scegliendo
+  l'ingresso documentato che quella riga non ha. La forma giusta è una porta
+  unica, chiamata da tutte le strade, e un solo posto dove sta scritto quali
+  esiti valgono per un commit.
+- **L'impronta deve descrivere quello che chi legge andrà DAVVERO a
+  prendere.** Se l'esaminato sta qui e il lettore scarica da un'altra parte,
+  l'impronta è giusta e il contenuto no: si controlla che sia arrivato là,
+  prima di chiedere. È il gemello del rifiuto per i file fuori dai commit — lì
+  la punta si sposta in avanti dopo l'ok, qui non si è mai mossa dove conta —
+  e il controllo che parla con la rete ha un tetto sul tempo, perché «non
+  risponde» deve diventare «non l'ho potuto controllare», non un comando
+  appeso.
+- **I comandi che un rifiuto detta puntano agli attrezzi di chi lo legge.**
+  Un rimedio scritto con un percorso relativo riporta dentro la cosa da cui il
+  lettore era stato mandato via — e un comando che si copia da un rifiuto vale
+  quanto uno scritto in uno script: se il progetto pretende
+  `origin sorgente:destinazione`, lo pretende anche lì.
 
 Lo stesso difetto è tornato quattro volte, un piano più in alto ogni volta, e
 ogni volta era già stato chiuso di sotto:
