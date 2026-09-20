@@ -86,6 +86,38 @@ test('la prontezza usa lo stesso ordine dei fornitori delle chiamate vere', () =
   assert.equal(attempts[0].provider, 'openrouter');
 });
 
+// Chi tace deve dire il motivo giusto: mandare a rivedere i modelli chi ne ha
+// di buoni, e li esclude l'interruttore, lascia senza spiegazione.
+test('il motivo del silenzio distingue la chiave, l’interruttore e i modelli', () => {
+  const AZIONI = [C.ACTIONS.FILO_DASHBOARD, C.ACTIONS.FILO_CHAT];
+  assert.equal(C.whyCannotServe(CONFIG_ROTTA, AZIONI), '');
+  assert.equal(C.whyCannotServe({ ...CONFIG_ROTTA, apiKeys: { tavily: 'tvly-x' } }, AZIONI), 'chiave');
+  assert.equal(C.whyCannotServe({ ...CONFIG_ROTTA, models: {} }, AZIONI), 'modelli');
+  assert.equal(
+    C.whyCannotServe({ ...CONFIG_ROTTA, models: { [C.ACTIONS.FILO_CHAT]: 'scomparso' } }, AZIONI),
+    'modelli',
+  );
+
+  const soloProprietari = {
+    provider: 'openrouter',
+    models: { [C.ACTIONS.FILO_CHAT]: 'chiuso', [C.ACTIONS.FILO_DASHBOARD]: 'chiuso' },
+    modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    apiKeys: { openrouter: 'sk-or-vera' },
+  };
+  assert.equal(C.whyCannotServe(soloProprietari, AZIONI), '');
+  assert.equal(C.whyCannotServe({ ...soloProprietari, openWeightsOnly: true }, AZIONI), 'pesi-aperti');
+  // Senza chiave l'interruttore non c'entra: il primo ostacolo è la chiave.
+  assert.equal(
+    C.whyCannotServe({ ...soloProprietari, openWeightsOnly: true, apiKeys: {} }, AZIONI),
+    'chiave',
+  );
+  // Basta una funzione servita perché non ci sia niente da spiegare.
+  assert.equal(
+    C.whyCannotServe({ ...CONFIG_ROTTA, models: { [C.ACTIONS.FILO_CHAT]: 'testo' } }, AZIONI),
+    '',
+  );
+});
+
 // Sentinella: il controllo di prontezza non deve tornare a guardare il campo
 // `provider`. Se ricompare `apiKeys[...provider]` in un cammino che decide se
 // Filo può rispondere, l'incidente rientra dalla stessa porta.
