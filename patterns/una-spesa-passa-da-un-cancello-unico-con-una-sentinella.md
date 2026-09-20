@@ -134,11 +134,32 @@ piattaforma multi-utente.
 
 Quell'elenco di piattaforme invecchia, e dare a ogni sotto-indirizzo il suo
 conto rimetterebbe in piedi la spruzzata sulle piattaforme che non conosce
-ancora. Quindi accanto al conto per proprietario ne va tenuto uno COMPLESSIVO,
-largo: quante verifiche costose in tutto nella stessa finestra di tempo.
+ancora. Quindi accanto al conto per proprietario ne va tenuto uno COMPLESSIVO.
 Entrambi i conti vogliono una finestra FISSA, che parte al primo gettone e
 scade da sola. Una cache con TTL non va bene: rimanda la scadenza a ogni
 scrittura, e chi tiene caldo il contatore tiene spento il controllo per sempre.
+
+**Il conto comune è una raffica, non un fondo, e chi rinuncia per colpa sua
+riprova.** Il conto complessivo largo che il paragrafo qui sopra chiedeva era
+un fondo da sessanta per mezz'ora, e un fondo condiviso lo svuota chi ha
+interesse a svuotarlo: una pagina ostile si portava da sola su sessanta
+indirizzi di seguito (su una piattaforma di siti ospitati ognuno è un
+proprietario diverso, quindi ognuno aveva il suo gettone da spendere lì
+dentro) e da quel momento nessun ALTRO sito riceveva più la verifica profonda.
+La truffa vera arrivava a fondo vuoto. Due regole insieme lo chiudono:
+
+1. il conto comune si misura in pochi secondi, non in ore. Così una raffica
+   viene strozzata mentre avviene, e chi vuole tenere il conto vuoto deve
+   continuare a navigare per sempre, cioè tenere l'utente su pagine sue invece
+   che su quella dove voleva portarlo. Il tetto vero alla spesa resta il limite
+   mensile del cancello unico;
+2. una verifica rinunciata per il conto COMUNE non si butta: chi la rinuncia lo
+   dichiara a chi ha chiesto il verdetto, e la scheda la richiede finché
+   l'utente è rimasto su quella pagina. Il rinvio vive nella scheda, non nel
+   modulo che conta: solo la scheda sa se l'utente è ancora lì, e le pagine
+   della raffica, che ha già lasciato, non tornano in fila a rubare il posto a
+   quella dove l'utente è davvero. Una rinuncia per il conto DI QUEL SITO
+   invece resta una rinuncia: quel conto è suo e l'ha speso lui.
 
 **Lo stesso freno vale per ogni chiamata che parte da sola.** Il giudizio sui
 siti pericolosi aveva i suoi freni; il riconoscimento del blocco geografico,
