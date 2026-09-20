@@ -1724,6 +1724,9 @@
     // benvenuto ha comunque la precedenza: è la PRIMA conversazione e va
     // finita, e durante l'intervista in archivio non c'è ancora niente.
     const reopenId = onbState ? null : chatIdFromUrl();
+    // #525 — l'intervista in corso riprende la SUA chat, non ne apre una nuova
+    // a ogni caricamento della scheda.
+    if (onbState) chatId = chatIdOnboarding(onbState);
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
       (onbState || reopenId) ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
