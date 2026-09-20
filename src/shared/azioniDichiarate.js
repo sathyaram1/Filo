@@ -134,7 +134,10 @@
     },
     {
       id: 'lettura',
-      tipi: ['LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'ESEGUI_COMANDO', 'CERCA_WEB'],
+      // CONTESTO_FILE non è uno strumento: è il segno che in questo turno il
+      // modello aveva già in mano i riassunti dei file dell'editor. Con quelli
+      // davanti, «ho letto il file della bolletta» è vero senza nessuna azione.
+      tipi: ['LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'ESEGUI_COMANDO', 'CERCA_WEB', 'CONTESTO_FILE'],
       avviso: 'il documento non l\'ha letto',
       frasi: [
         /\bho lett[oa]\b[^.!?\n]{0,48}\b(?:documento|file|pdf|bolletta|contratto|estratto conto|fattura|appunto)\b/i,
@@ -145,7 +148,8 @@
       tipi: ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'COMANDO_FINESTRA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'],
       avviso: 'l\'impostazione è rimasta com\'era',
       frasi: [
-        /\bho (?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo)\b[^.!?\n]{0,48}\b(?:tema|impostazione|preferenza|modalità|opzione|carattere|font|zoom|limite di spesa|colore|sfondo)\b/i,
+        new RegExp('\\bho (?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo)\\b[^.!?\\n]{0,48}'
+          + `\\b(?:tema|impostazione|preferenza|modalità|opzione|carattere|font|zoom|limite di spesa|colore|sfondo)${FINE}`, 'i'),
       ],
     },
     {
