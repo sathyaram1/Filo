@@ -1448,7 +1448,17 @@
     // Mistral e quella fra barre verticali. Da sole non venivano riconosciute,
     // e in chat restava un blocco di codice con dentro la sveglia che non c'è.
     if (/^\[TOOL_CALLS\]/i.test(s)) return true;
-    if (/^<\|[^|>]{0,32}tool[^|>]{0,32}\|>/i.test(s)) return true;
+    // La barra si scrive in due modi. I DeepSeek — i modelli con cui Filo
+    // parla di serie — usano quella LARGA (｜, U+FF5C): scritta con la barra
+    // normale questa guardia non ha mai potuto riconoscere niente, ed era
+    // nata spenta come le parole accentate del giro 1.
+    if (/^<[|｜][^|｜>]{0,40}tool[^|｜>]{0,40}[|｜]>/i.test(s)) return true;
+    // La busta «harmony» dei modelli aperti di OpenAI, che scrive il nome
+    // dello strumento dopo «to=». Il nome si confronta con quelli veri.
+    {
+      const h = s.match(/^(?:<\|[a-z_]{2,20}\|>[\s\S]{0,160}?)?\bto\s*=\s*(?:functions?|tools?)\s*\.\s*([A-Za-z_][A-Za-z0-9_]{2,})/i);
+      if (h) return !nomi || nomi.has(h[1].toUpperCase());
+    }
     // Giro 7: la busta dei Llama, che scrive il nome dentro il tag stesso.
     // Il nome si confronta con quelli veri, come per le altre.
     {
