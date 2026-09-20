@@ -78,11 +78,16 @@ test('PORTA: i titoli delle schede aperte stanno nel contesto di ogni turno', as
   expect(stato, 'il riepilogo di stato non nomina le schede aperte').toMatch(/127\.0\.0\.1|PROMEMORIA DI FILO/i);
 });
 
-test('un\'immagine allegata alla chat non sporca il compito', async ({ app }) => {
+test('un\'immagine passata in chat conta come qualcosa che Filo ha letto', async ({ app }) => {
   // La regola nasce dal caso «leggo una mail e salvo una lezione». Uno
   // screenshot di quella mail incollato in chat è lo stesso testo, per gli
-  // occhi del modello: qui si guarda se il motore lo sa.
-  const s = chat(9330);
-  const r = await exec(app, { type: 'SALVA_LEZIONE', testo: 'da uno screenshot' }, { sender: s });
-  expect(r.executed, 'nessuna fonte dichiarata per le immagini: il compito resta pulito').toBe(true);
+  // occhi del modello: il motore deve saperlo.
+  const A = await app.evaluate(() => ({
+    classe: globalThis.SN_AUTONOMIA.classeFonte('immagine'),
+    prudente: globalThis.SN_AUTONOMIA.statoPerFonti(['immagine'], 'conservativo'),
+    normale: globalThis.SN_AUTONOMIA.statoPerFonti(['immagine'], 'default'),
+  }));
+  expect(A.classe, 'le immagini non hanno una classe: il compito le ignora').toBeLessThanOrEqual(4);
+  expect(A.prudente).toBe('contaminato');
+  expect(A.normale).toBe('pulito');
 });
