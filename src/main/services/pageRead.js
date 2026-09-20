@@ -35,13 +35,18 @@ const TIMEOUT_MS = 15000;
 // finirebbe mai (sullo scaricamento un tempo massimo c'era già).
 const MAX_ATTESA_SCHEDA_MS = 5000;
 
-// Elementi che non sono MAI contenuto: illeggibili (script, stili) o cornice del
-// sito. Il titolo torna a parte, quindi togliere anche `header` non perde nulla.
-const TAG_FUORI = new Set([
+// Elementi che non sono TESTO: il loro contenuto è codice o non si legge. Non
+// escono mai, nemmeno nel ripiego senza potatura: consegnarli al modello gli fa
+// rispondere sul codice di un sito invece di dire che non c'è niente da
+// leggere, e con loro rientrerebbe anche ciò che la pagina tiene nascosto.
+const TAG_ILLEGGIBILI = new Set([
   'script', 'style', 'noscript', 'svg', 'iframe', 'template', 'canvas',
-  'object', 'embed', 'video', 'audio', 'map', 'dialog', 'datalist',
-  'nav', 'aside', 'footer', 'header',
+  'object', 'embed', 'video', 'audio', 'map', 'datalist',
 ]);
+
+// Cornice del sito. Il titolo torna a parte, quindi togliere anche `header` non
+// perde nulla.
+const TAG_FUORI = new Set([...TAG_ILLEGGIBILI, 'dialog', 'nav', 'aside', 'footer', 'header']);
 
 // Classi e id del rumore, confrontati come TOKEN INTERI: per sottostringa
 // `class="header-price"` contiene «header», e il prezzo sparirebbe in silenzio.
