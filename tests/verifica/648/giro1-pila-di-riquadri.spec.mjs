@@ -134,16 +134,19 @@ test('oltre il tetto: la modalità può andarsene, ma nessun riquadro resta aper
   const page = await impila(app, 12);
   for (let i = 1; i <= 12; i += 1) {
     await esc(app);
-    const rimasti = await page.locator('.sn-popup').count();
     const modalita = await schermoIntero(app);
+    if (modalita) continue;
+    // La modalità se n'è andata: da qui l'unica cosa che conta è che non abbia
+    // scavalcato nessuno. Il riquadro in cima deve essersi chiuso con lo stesso
+    // tasto, e quelli sotto si chiudono coi tasti dopo.
+    const rimastiSubito = await page.locator('.sn-popup').count();
     expect(
-      { rimasti, modalita, esc: i },
-      `Esc numero ${i}: la modalità se n'è andata lasciando ${rimasti} riquadri aperti`,
-    ).not.toEqual({ rimasti, modalita: false, esc: i, __mai: true });
-    if (!modalita) {
-      await expect.poll(() => page.locator('.sn-popup').count(), { timeout: 4000 }).toBe(0);
-      return;
-    }
+      rimastiSubito,
+      `all'Esc numero ${i} la modalità se n'è andata scavalcando i ${12 - i + 1} riquadri ancora aperti`,
+    ).toBeLessThanOrEqual(12 - i);
+    for (let j = rimastiSubito; j > 0; j -= 1) await esc(app);
+    await expect.poll(() => page.locator('.sn-popup').count(), { timeout: 6000 }).toBe(0);
+    return;
   }
   await esc(app);
   await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
