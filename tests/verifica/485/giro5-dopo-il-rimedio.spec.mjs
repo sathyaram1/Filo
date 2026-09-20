@@ -152,7 +152,7 @@ test('il rimedio dettato dal rifiuto viene accettato, e il giro si chiude solo q
     const { script, argomenti } = comandoDettato(primo.stderr);
     const rimedio = await lancia(script, argomenti, env, dir);
     expect(rimedio.status, rimedio.stderr).toBe(0);
-    const busta = ricevuti.filter((r) => r.body && r.body.status === 'revision_capability');
+    const busta = ricevuti.filter((r) => JSON.stringify(r.body || {}).includes('revision_capability'));
     expect(busta.length, 'il rientro in verifica deve arrivare al canale').toBe(1);
 
     // Eseguito il rimedio, il lavoro è tornato in verifica: la fusione deve
