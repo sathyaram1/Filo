@@ -2427,8 +2427,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // non si era ancora letto.
   if (chatId && !internal) {
     // Da adesso questa chat è di questa scheda: quando la scheda sparisce, la
-    // chat è finita (vedi `affidaChat`).
-    if (sender && sender.wc) affidaChat(chatId, sender.wc);
+    // chat è finita (vedi `affidaChat`). L'intervista di benvenuto fa
+    // eccezione, come già fa la pagina: chiusa a metà non è finita, riprende
+    // dov'era alla prossima apertura, e classificarla adesso vorrebbe dire
+    // pagare un titolo a ogni ricaricamento per una conversazione in corso.
+    if (sender && sender.wc && !onbActive) affidaChat(chatId, sender.wc);
     if (onbActive) await archiviaAperturaAccoglienza(chatId, onbBefore);
     await appendToChatArchive(chatId, {
       role: 'user',
