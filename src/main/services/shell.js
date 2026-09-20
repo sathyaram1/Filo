@@ -444,4 +444,9 @@ async function commandExists({ shell, cwd, command } = {}) {
 // ("firebase rosso"): l'ordine dei probe — `where.exe` prima di Get-Command —
 // è ciò che tiene veloci gli shim npm, e un assert sul cronometro era rumore
 // su una macchina carica.
-module.exports = { createSession, defaultCwd, commandExists, existenceProbes };
+module.exports = {
+  createSession, defaultCwd, commandExists, existenceProbes,
+  // esportata per la guardia di regressione di #551: il comando che l'utente
+  // digita non deve mai arrivare a PowerShell con byte fuori dall'ASCII.
+  comandoPerPowerShell,
+};
