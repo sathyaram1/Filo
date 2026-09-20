@@ -704,6 +704,32 @@ jobs:
           EP_GH_IGNORE_TIME: "true"
         run: npm run release:linux
 
+      # LE ISTRUZIONI DEL PRIMO AVVIO, ALLEGATE A PARTE
+      #   Su Linux l'utente si blocca PRIMA di aver visto Filo, e per due
+      #   motivi che valgono per chiunque scarichi. Un file scaricato da un
+      #   browser arriva senza il permesso di essere eseguito, e senza quel
+      #   permesso il doppio clic non lo avvia. E un AppImage, per montarsi,
+      #   apre libfuse.so.2, che Ubuntu dalla 22.04, Debian 12 e le Fedora
+      #   recenti non installano piu' di serie: dove manca, il doppio clic
+      #   muore con un errore che a un utente non dice niente.
+      #
+      #   E' lo stesso problema del Mac senza certificato Apple, dove il
+      #   foglietto sta dentro il disco che l'utente ha appena aperto. Un
+      #   AppImage e' un file solo e non ha un "dentro": il foglietto sale
+      #   come allegato a se', con un nome FISSO, cosi' il sito puo' metterlo
+      #   accanto al bottone "Scarica per Linux" con un collegamento che non
+      #   cambia mai
+      #   (.../releases/latest/download/Se-Filo-non-si-apre-Linux.txt).
+      - name: Allega le istruzioni del primo avvio
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -e
+          gh release upload "${{ needs.release.outputs.version }}" \
+            "build/Se-Filo-non-si-apre-Linux.txt" \
+            --repo "${{ github.repository }}" --clobber
+
       # Come per il Mac: il passo sopra puo' finire verde senza aver allegato
       # niente. Qui si guarda la release VERA. `latest-linux.yml` e' il file che
       # l'aggiornamento automatico legge su Linux: senza, chi ha scaricato
