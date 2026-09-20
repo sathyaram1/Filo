@@ -137,3 +137,26 @@ test('nessun controllo di prontezza legge apiKeys[settings.provider]', async () 
     );
   }
 });
+
+// Il portafoglio è la terza sorgente della prontezza, e per chi entra con un
+// invito è l'unica: la sua chiave non passa dalle impostazioni. Se depositarla
+// o toglierla non avvisa nessuno, il conto di «Filo può rispondere» resta fermo
+// su com'era prima del riscatto, e l'avviso alle home aperte — che parte solo
+// quando quel conto cambia — non parte più in nessuna direzione (#663).
+test('il portafoglio avvisa chi tiene il conto della prontezza', () => {
+  const wallet = require(join(ROOT, 'src', 'main', 'auth', 'wallet-store.js'));
+  const prima = globalThis.SN_PRONTEZZA_CAMBIATA;
+  let avvisi = 0;
+  globalThis.SN_PRONTEZZA_CAMBIATA = () => { avvisi += 1; };
+  try {
+    wallet.save({ key: 'sk-or-personale', pseudonym: 'prova' });
+    assert.equal(avvisi, 1, 'la chiave depositata deve avvisare');
+    assert.equal(wallet.personalKey(), 'sk-or-personale');
+    wallet.clear();
+    assert.equal(avvisi, 2, 'la chiave tolta deve avvisare');
+    assert.equal(wallet.personalKey(), '');
+  } finally {
+    globalThis.SN_PRONTEZZA_CAMBIATA = prima;
+    wallet.clear();
+  }
+});

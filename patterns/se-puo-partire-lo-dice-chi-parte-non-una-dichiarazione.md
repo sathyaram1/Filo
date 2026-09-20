@@ -32,6 +32,14 @@ settimane nessuno se n'è accorto, perché l'unica cosa visibile era un'assenza
   l'accoglienza rimasta in attesa; i crediti no, e chi entrava con un invito la
   vedeva solo alla scheda dopo. Ogni evento che rende Filo capace di rispondere
   chiama lo stesso risveglio.
+- **Censisci le sorgenti, non i casi che ti vengono in mente.** Se l'avviso
+  parte solo quando la capacità CAMBIA, una sorgente dimenticata non perde un
+  caso: fa mentire il conto da lì in avanti, e l'avviso non parte più in
+  nessuna direzione. Le sorgenti della prontezza di Filo sono tre — le
+  impostazioni, la configurazione condivisa e il portafoglio, dove vive la
+  chiave di chi entra con un invito — e la terza non passa dalle prime due.
+  L'avviso si chiama dal punto in cui il dato cambia, non dal chiamante di
+  turno, che si dimentica.
 - **Dove:** `canServeAction` e `PROVIDER_ORDER` in `src/shared/constants.js`,
   usati da `gatherDashboardInputs`/`buildAttemptChain`
   (`src/main/services/handlers.js`), dalla porta dell'accoglienza

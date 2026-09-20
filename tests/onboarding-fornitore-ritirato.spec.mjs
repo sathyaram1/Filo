@@ -233,3 +233,94 @@ test('«solo modelli a pesi aperti» senza sostituti: la home nomina l’interru
   await expect(messaggio).toContainText(/pesi aperti/i, { timeout: 15_000 });
   await expect(messaggio).not.toContainText(/codice d.invito/i);
 });
+
+// ── La chiave che non passa dalle impostazioni ──────────────────────────────
+//
+// Chi entra con un invito non ha una chiave nelle impostazioni: la sua vive nel
+// portafoglio. Se il conto di «Filo può rispondere» si aggiorna solo quando
+// cambiano impostazioni e configurazione condivisa, per un invitato resta fermo
+// su com'era prima del riscatto, e l'avviso che sveglia le home aperte — che
+// parte solo quando quel conto CAMBIA — non parte più in nessuna direzione.
+// Senza il fix tutti e due questi test sono rossi.
+
+// Il riscatto vero deposita la chiave qui: sostituire la funzione che la legge
+// salterebbe proprio il momento che conta.
+async function chiaveNelPortafoglio(app, chiave) {
+  await app.evaluate((_e, k) => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    const w = req('./auth/wallet-store');
+    if (k) w.save({ key: k, pseudonym: 'prova' }); else w.clear();
+  }, chiave);
+}
+
+async function accoglienzaGiaFatta(app) {
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    const O = globalThis.SN_ONBOARDING;
+    await M.setOnboarding(O.close(O.emptyState(), new Date().toISOString()));
+  });
+}
+
+test('riscattato l’invito, la home già aperta smette di mandare a riscattarlo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await app.evaluate(async () => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({ ...origGet(), provider: 'openrouter' });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' } });
+  });
+  await accoglienzaGiaFatta(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 20_000 });
+
+  await chiaveNelPortafoglio(app, 'sk-or-personale-dall-invito');
+
+  await expect(page.locator('#homeMessage')).not.toContainText(/codice d.invito/i, { timeout: 30_000 });
+});
+
+test('l’invitato che accende «solo modelli a pesi aperti»: la home lo dice subito', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  const azioni = await page.evaluate(() => {
+    const A = window.SN_CONST.ACTIONS;
+    return { chat: A.FILO_CHAT, home: A.FILO_DASHBOARD };
+  });
+  await app.evaluate(async (_e, a) => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { [a.chat]: 'chiuso', [a.home]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' } });
+  }, azioni);
+  await chiaveNelPortafoglio(app, 'sk-or-personale-dall-invito');
+  await accoglienzaGiaFatta(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+  await expect(page.locator('#homeMessage')).not.toContainText(/pesi aperti/i, { timeout: 20_000 });
+
+  await page.evaluate(async () => {
+    await chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { openWeightsOnly: true },
+    });
+  });
+
+  await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
+});
