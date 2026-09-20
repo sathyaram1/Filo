@@ -50,7 +50,7 @@ test('si scrivono SOLO i campi ricevuti', () => {
 });
 
 test('le sessioni fuori intervallo si rifiutano dicendo l\'intervallo, senza correggere', () => {
-  for (const storto of [0, -3, 21, 100, 1.5, '', '   ', 'tre', '1e400', null === undefined ? 0 : NaN]) {
+  for (const storto of [0, -3, 21, 100, 1.5, '', '   ', 'tre', '1e400', NaN, true]) {
     const esito = RS.valida({ maxSessions: storto });
     assert.equal(esito.ok, false, `${String(storto)} non deve passare`);
     assert.match(esito.testo, /da 1 a 20/, 'il rifiuto dice qual è l\'intervallo');
