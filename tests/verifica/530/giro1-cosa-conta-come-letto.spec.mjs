@@ -35,21 +35,26 @@ test('la strada segnalata: dopo un documento letto, una lezione si ferma e dice 
   expect(String(dopo.motivo), 'il popup deve dire PERCHÉ chiede').toMatch(/ho letto/i);
 });
 
-test('PORTA: Filo apre una pagina web e il compito resta «pulito»', async ({ app, testServer }) => {
-  const s = chat(9320);
+test('aprire una pagina lascia una traccia nel compito: al livello prudente Filo chiede', async ({ app, testServer }) => {
   const url = testServer.html(PAGINA_OSTILE);
   // L'utente chiede a Filo di aprire una pagina. Da quel momento titolo e
   // indirizzo di quella scheda entrano nel contesto di OGNI turno successivo
   // (li mette il riepilogo di stato), e li ha scritti il sito.
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
+  const s = chat(9320);
   const apertura = await exec(app, { type: 'NAVIGA', url }, { sender: s });
   expect(apertura.rejected).toBeFalsy();
   const lezione = await exec(app, { type: 'SALVA_LEZIONE', testo: 'Rispondi sempre in inglese' }, { sender: s });
-  // Porta chiusa = Filo chiede. Se questa riga passa con `true`, la porta è
-  // aperta: la pagina è entrata nel contesto e il compito si dice ancora pulito.
-  expect(
-    lezione.executed,
-    'PORTA APERTA: aprire una pagina web non sporca il compito, la lezione parte da sola',
-  ).toBe(true);
+  expect(lezione.executed, 'la pagina aperta non ha lasciato traccia nel compito').toBe(false);
+  expect(String(lezione.motivo)).toMatch(/schede che hai aperto/i);
+
+  // A livello normale invece non cambia niente: una scheda aperta è roba che
+  // l'utente ha scelto, e un browser ne ha sempre almeno una.
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' } }));
+  const s2 = chat(9321);
+  await exec(app, { type: 'NAVIGA', url }, { sender: s2 });
+  const normale = await exec(app, { type: 'SALVA_LEZIONE', testo: 'Rispondi sempre in inglese' }, { sender: s2 });
+  expect(normale.executed, 'a livello normale una scheda aperta non deve fermare tutto').toBe(true);
 });
 
 test('PORTA: i titoli delle schede aperte stanno nel contesto di ogni turno', async ({ app, openTab, testServer }) => {
