@@ -57,11 +57,13 @@ function randSid() {
 // da inviare all'avvio, e come "incartare" un comando utente perché stampi il
 // marcatore di fine (exit code + cwd) su una riga propria.
 function shellConfig(shell, sid, startCwd) {
-  // Fuori da Windows (routine cloud Linux, macOS): /bin/sh persistente. Letto
-  // da pipe è non-interattivo → nessun prompt da ripulire.
+  // Fuori da Windows (Linux, macOS): shell POSIX persistente, letta da pipe →
+  // non-interattiva, nessun prompt da ripulire. `bash` se l'utente l'ha scelto
+  // nelle Preferenze, altrimenti la shell di sistema. I marcatori sono gli
+  // stessi: `printf`, `$?` e `$PWD` valgono in entrambe.
   if (process.platform !== 'win32') {
     return {
-      file: '/bin/sh',
+      file: shell === 'bash' ? 'bash' : '/bin/sh',
       args: [],
       options: { cwd: startCwd || undefined, windowsHide: true },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
