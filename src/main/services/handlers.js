@@ -1731,7 +1731,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             output: { pageRead: String(url == null ? '' : url), ok: false, error: 'network', detail: 'lettura non disponibile' },
           };
         }
-        ricordaLetto(r.text);
+        // Solo la pagina letta dalla SCHEDA dell'utente: lì dentro c'è il suo
+        // accesso. Una pagina pubblica scaricata dal web chiunque se la prende
+        // da sé, e tenerla faceva suonare l'allarme sul pezzo dopo (#553).
+        if (r.source === 'scheda') ricordaLetto(r.text, r.url || url);
         return {
           executed: !!r.ok,
           kept: true,
