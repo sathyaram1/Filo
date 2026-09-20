@@ -238,7 +238,7 @@
   // si legge come una risposta qualunque — l'agente chiedeva «privacy», riceveva
   // «disponibili: models» e rispondeva lo stesso, a memoria (#515).
   function asText(id) {
-    const key = String(id == null ? '' : id).trim().toLowerCase();
+    const key = String(id == null ? '' : id).replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 120);
     const doc = get(key);
     if (doc) return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\n\n' + doc.text;
     const elenco = DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ');

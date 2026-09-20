@@ -1579,7 +1579,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // non una ricostruzione a memoria dell'agente. Stesso schema di
         // CAPACITA_DETTAGLIO: sola lettura, l'output rientra nel contesto.
         const T = globalThis.SN_TRANSPARENCY;
-        const doc = String(action.doc ?? action.documento ?? action.id ?? '').trim();
+        // Il nome del documento lo sceglie il MODELLO, e torna nel prompt in
+        // due posti (questo esito e l'etichetta del blocco reimmesso nel giro
+        // dopo). Una riga sola e di lunghezza sensata: un nome con dentro degli
+        // a capo saprebbe fingere l'inizio di un altro blocco di sistema.
+        let doc = String(action.doc ?? action.documento ?? action.id ?? '').replace(/\s+/g, ' ').trim();
+        if (doc.length > 120) doc = doc.slice(0, 120) + '…';
         const text = T ? T.asText(doc) : '';
         // Un documento chiesto per nome che non esiste NON è una lettura
         // riuscita: il testo torna lo stesso (dice all'agente che non c'è, così
