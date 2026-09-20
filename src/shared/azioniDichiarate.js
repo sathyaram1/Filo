@@ -1126,7 +1126,12 @@
         }
         // Nessuna azione adesso: la cosa può esistere lo stesso, o essere
         // stata fatta in un turno precedente e raccontata come tale.
-        if (esisteGia(fam, d) || copertaDalPassato(fam, d)) {
+        if (esisteGia(fam, d)) {
+          if (d.verbo) radiciRette.add(d.verbo);
+          continue;
+        }
+        if (dalPrima > 0 && copertaDalPassato(fam, d)) {
+          dalPrima -= 1;
           if (d.verbo) radiciRette.add(d.verbo);
           continue;
         }
