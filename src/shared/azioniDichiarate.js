@@ -145,6 +145,7 @@
         new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(72)}\\b${SVEGLIA}\\b`, 'i'),
         new RegExp(`\\bfatto[,:!]?\\s+(?:la |una |l['’])?${SVEGLIA}\\b${PONTE(24)}\\b(?:impostat|programmat|messa|fissat|pronta)`, 'i'),
         new RegExp(`${PERIFRASI}${PONTE(48)}\\b${SVEGLIA}\\b`, 'i'),
+        { re: participio(SVEGLIA, 'impostat[ao]|programmat[ao]|messa|fissat[ao]|creat[ao]|attivat[ao]|settat[ao]|puntat[ao]|pronta'), senzaHo: true },
       ],
     },
     {
