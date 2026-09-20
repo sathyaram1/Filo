@@ -367,6 +367,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
+    [ACTIONS.FILO_CHAT_TRIAGE]: 'Chat con Filo',
   };
 
   function creditUsageGroup(action) {
@@ -403,6 +404,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Riassunto scheda',
     [ACTIONS.FILO_TAB_SEARCH]: 'Ricerca schede',
+    [ACTIONS.FILO_CHAT_TRIAGE]: 'Titolo e tipo di una chat',
     [ACTIONS.DECKS_CHAT]: 'Mazzi — ricerca carte',
     [ACTIONS.DECKS_OPINION]: 'Mazzi — parere carta',
     [ACTIONS.DECKS_AUTOTAG]: 'Mazzi — etichette',
@@ -476,6 +478,7 @@
     [ACTIONS.FILO_TAB_TRIAGE]: '',
     [ACTIONS.FILO_TAB_SUMMARY]: '',
     [ACTIONS.FILO_TAB_SEARCH]: '',
+    [ACTIONS.FILO_CHAT_TRIAGE]: '',
     [ACTIONS.TTS]: '',
     [ACTIONS.SAFEBROWSE_JUDGE]: '',
     [ACTIONS.GEOBLOCK_CLASSIFY]: '',
@@ -2340,6 +2343,13 @@
   // quindi nessuno poteva vederlo né cambiarlo).
   const EMBED_DIM = 256;
   const ARCHIVED_EMBED_LIMIT = 2000;
+  // #525 — quanta parte della trascrizione di una chat viene mandata al
+  // modello che le assegna titolo e tipo. Non è un tetto su ciò che si
+  // CONSERVA (una chat si salva sempre intera): è solo quanto basta a
+  // riconoscere «discussione» da «comando». Il taglio prende testa e coda
+  // della conversazione, così anche una chat lunghissima resta riconoscibile
+  // (vedi SN_CHAT_ARCHIVE.transcriptForTriage).
+  const FILO_CHAT_TRIAGE_CHARS = 4000;
   const HISTORY_ITEMS_HARD_CAP = 5000;
   const AI_CACHE_MAX_ENTRIES = 200;
   const CLIPBOARD_HISTORY_MAX = 50;
