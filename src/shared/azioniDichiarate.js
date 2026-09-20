@@ -812,6 +812,7 @@
     const domanda = !!(stato && stato.domandaUtente);
     const copertaDalPassato = (fam, d) => {
       if (!fam.tipi.some((x) => precedenti.has(x))) return false;
+      if (d.senzaHo) return true;
       return domanda || GUARDA_INDIETRO.test(d.frase || '');
     };
     // La cosa dichiarata ESISTE già, anche se in questo turno non è partito
