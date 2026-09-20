@@ -137,19 +137,29 @@
   // racconta all'utente PERCHÉ sta chiedendo. La frase sta qui accanto alla
   // classe perché le due cose devono cambiare insieme: una fonte nuova senza
   // la sua frase lascerebbe il popup muto sul motivo.
+  // `campo` è il campo da cui quella fonte arriva: è la SUA manopola della
+  // fiducia ad abbassarla di una classe, non quella del campo in cui si sta
+  // per agire (leggere una mail e poi scrivere un file sono due campi diversi,
+  // e la manopola della posta deve valere sulla mail).
   const FONTI = {
     chat: { classe: 1, frase: 'quello che mi hai scritto tu' },
     memoria: { classe: 1, frase: 'le mie memorie' },
     impostazioni: { classe: 1, frase: 'le tue impostazioni' },
     capacita: { classe: 1, frase: 'il mio manifesto' },
     trasparenza: { classe: 1, frase: 'i miei documenti di trasparenza' },
-    editor: { classe: 2, frase: 'un documento del tuo editor' },
-    documento: { classe: 4, frase: 'un documento dal tuo computer' },
-    comando: { classe: 5, frase: 'quello che ha stampato un comando' },
-    ricerca: { classe: 5, frase: 'una ricerca sul web' },
-    web: { classe: 5, frase: 'una pagina web' },
-    scaricato: { classe: 5, frase: 'un file scaricato' },
+    editor: { classe: 2, frase: 'un documento del tuo editor', campo: 'file' },
+    documento: { classe: 4, frase: 'un documento dal tuo computer', campo: 'file' },
+    comando: { classe: 5, frase: 'quello che ha stampato un comando', campo: 'terminale' },
+    ricerca: { classe: 5, frase: 'una ricerca sul web', campo: 'web' },
+    web: { classe: 5, frase: 'una pagina web', campo: 'web' },
+    scaricato: { classe: 5, frase: 'un file scaricato', campo: 'web' },
   };
+  // Il campo di una fonte, o null se non ne ha uno (le cose di Filo e
+  // dell'utente non vengono da un campo).
+  function campoFonte(id) {
+    const k = String(id == null ? '' : id).trim().toLowerCase();
+    return (FONTI[k] && FONTI[k].campo) || null;
+  }
 
   // Classe di una fonte, tenendo conto degli spostamenti dell'utente
   // (`fonti` = mappa id→classe salvata nelle impostazioni). Alzare una fonte
@@ -357,7 +367,9 @@
 
     // Stato del compito: o lo dice il chiamante, o lo calcoliamo dalle fonti.
     const fonti = Array.isArray(o.fonti) ? o.fonti : null;
-    const classi = fonti ? fonti.map((f) => classeConManopole(classeFonte(f, o.fontiSpostate), campo, manopole)) : null;
+    const classi = fonti
+      ? fonti.map((f) => classeConManopole(classeFonte(f, o.fontiSpostate), campoFonte(f), manopole))
+      : null;
     const soglia = (livello(liv) || {}).soglia || 1;
     let stato;
     let peggiore = null;
@@ -449,11 +461,11 @@
 
   // Stato del compito da un elenco di fonti lette (comodo per chi non deve
   // decidere ma solo mostrare): la classe meno fidata contro la soglia.
-  function statoPerFonti(fonti, liv, { campo = null, manopole = null, fontiSpostate = null } = {}) {
+  function statoPerFonti(fonti, liv, { manopole = null, fontiSpostate = null } = {}) {
     const soglia = (livello(livelloNoto(liv)) || {}).soglia || 1;
     let mass = CLASSE_MIN;
     for (const f of (Array.isArray(fonti) ? fonti : [])) {
-      const c = classeConManopole(classeFonte(f, fontiSpostate), campo, manopole);
+      const c = classeConManopole(classeFonte(f, fontiSpostate), campoFonte(f), manopole);
       if (c > mass) mass = c;
     }
     return mass <= soglia ? 'pulito' : 'contaminato';
@@ -475,7 +487,7 @@
     ELENCO_FISSO, ORIGINI,
     // lettura
     livello, livelloNoto, livelloValido, livelliSelezionabili, indiceLivello, alzaLivello,
-    classeFonte, fraseFonte, campoValido, manopolaAccesa, classeConManopole,
+    classeFonte, fraseFonte, campoFonte, campoValido, manopolaAccesa, classeConManopole,
     costoConManopole, costoValido, origineValida, risolviGuardiano, vocefissa,
     statoPerFonti, manopoleDiSerie, piuStretta,
     // decisione

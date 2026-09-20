@@ -233,8 +233,20 @@ test('i campi non hanno un livello proprio: due manopole, e solo restringono', (
   assert.equal(A.classeConManopole(2, 'web', manopole), 3);
   assert.equal(A.classeConManopole(5, 'web', manopole), 5, 'la classe non sfonda il fondo');
   assert.equal(A.classeConManopole(2, 'terminale', manopole), 2);
+  // La manopola della fiducia vale sul campo della FONTE, non su quello in cui
+  // si sta per agire: una ricerca sul web resta roba del web anche mentre Filo
+  // scrive un file.
+  assert.equal(A.campoFonte('ricerca'), 'web');
+  assert.equal(A.campoFonte('documento'), 'file');
+  assert.equal(A.campoFonte('chat'), null);
+  // Con la fiducia del web abbassata, una ricerca scende di una classe: a
+  // livello automatico (soglia 3) una fonte già a 5 resta contaminata, mentre
+  // una fonte dell'editor portata giù di uno passa da 2 a 3, che è ancora
+  // dentro la soglia.
+  assert.equal(A.statoPerFonti(['editor'], 'default', { manopole: { file: { fiducia: true } } }), 'contaminato');
+  assert.equal(A.statoPerFonti(['editor'], 'default'), 'pulito');
   // E si vede nella decisione: a livello normale un'azione di costo 1 nel
-  // terminale, col compito pulito, diventa costo 2 — che resta un sì; a
+  // terminale, col compito pulito, diventa costo 2, che resta un sì; a
   // conservativo invece passa da sì a chiede.
   assert.equal(A.decide({ livello: 'conservativo', stato: 'pulito', costo: 1, campo: 'terminale', manopole }), 'chiede');
   assert.equal(A.decide({ livello: 'conservativo', stato: 'pulito', costo: 1, campo: 'terminale' }), 'si');
