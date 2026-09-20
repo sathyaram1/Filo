@@ -477,13 +477,18 @@
   // quindi deve costare poco: la lista è corta per costruzione (MAX_HIDDEN) e
   // la maggior parte degli elementi esce alla prima riga.
   function hasRevealedText(list) {
-    for (const el of (list || [])) {
+    for (const voce of (list || [])) {
       try {
+        // Due forme nella stessa lista: un sottoalbero rimandato, oppure il solo
+        // testo proprio di un elemento che si vede (la fisarmonica chiusa senza
+        // riquadro attorno alla risposta).
+        const own = !!(voce && voce.own);
+        const el = own ? voce.el : voce;
         if (!el || !el.isConnected) continue;
-        if (isVisibilityHidden(el)) continue;
-        const txt = (el.textContent || '');
-        if (!HAS_LETTER.test(txt)) continue;
         if (el.dataset && el.dataset.snTranslated) continue;
+        if (own ? isOwnTextHidden(el) : isVisibilityHidden(el)) continue;
+        const txt = own ? ownTextOf(el) : (el.textContent || '');
+        if (!HAS_LETTER.test(txt)) continue;
         return true;
       } catch (_) {}
     }
