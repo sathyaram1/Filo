@@ -8,8 +8,13 @@
 // settings personali dell'utente.
 //
 // L'handler è registrato via register(on, ctx): qui lo carichiamo con `on` e
-// `ctx` finti, e stubbiamo SN_PROVIDERS.streamComplete per catturare con quale
+// `ctx` finti, e stubbiamo il fornitore per catturare con quale
 // provider/modello/chiave verrebbe chiamata l'API. Niente rete, niente Electron.
+//
+// #591 — il fornitore non si raggiunge più direttamente: anche una prova passa
+// dal cancello unico (SN_MODEL_GATE), che le applica limite di spesa e
+// conteggio del costo. Qui il cancello è quello VERO, con dietro un fornitore
+// e un conteggio costi finti.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,6 +37,7 @@ const { MSG } = globalThis.SN_MSG;
 
 // ── harness: registra l'handler con dipendenze finte ────────────────────────
 
+const Gate = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'modelGate.js'));
 const registerAi = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers', 'ai.js'));
 
 // Stato manipolato dai singoli test.
@@ -40,19 +46,35 @@ const state = {
   defaults: { modelRegistry: {}, apiKeys: {} },
   effective: { modelRegistry: {}, apiKeys: {} },
   calls: [],            // chiamate catturate a streamComplete
+  costs: [],            // costi registrati dal cancello
+  overLimit: false,     // limite di spesa mensile esaurito
   streamError: null,    // se valorizzato, streamComplete lancia
   emptyStream: false,   // se true, lo stream finisce senza contenuto
 };
 
 globalThis.SN_PROVIDERS = {
-  streamComplete: async ({ provider, apiKey, model, messages, providerRouting, onDelta }) => {
-    state.calls.push({ provider, apiKey, model, providerRouting });
-    if (state.streamError) throw new Error(state.streamError);
-    if (state.emptyStream) return { usage: { completionTokens: 0 } };
-    onDelta('1, 2, 3');
-    return { usage: { completionTokens: 7 } };
-  },
+  getProvider: (provider) => ({
+    streamComplete: async ({ apiKey, model, messages, providerRouting, onDelta }) => {
+      state.calls.push({ provider, apiKey, model, providerRouting });
+      if (state.streamError) throw new Error(state.streamError);
+      if (state.emptyStream) return { usage: { completionTokens: 0 } };
+      onDelta('1, 2, 3');
+      return { usage: { completionTokens: 7 } };
+    },
+  }),
 };
+
+globalThis.SN_COSTS = {
+  isOverLimit: async () => state.overLimit,
+  record: async (r) => { state.costs.push(r); return 0.0001; },
+};
+
+Gate.configure({
+  modelForAction: (s, action) => ((s && s.models) || {})[action] || '',
+  buildAttemptChain: () => [],
+  providerRouting: () => null,
+  noteServedProvider: () => ({ servedBy: null, violation: false }),
+});
 
 const handlers = new Map();
 registerAi((type, fn) => handlers.set(type, fn), {
@@ -89,6 +111,8 @@ beforeEach(() => {
   state.defaults = { modelRegistry: {}, apiKeys: {} };
   state.effective = { modelRegistry: {}, apiKeys: {} };
   state.calls = [];
+  state.costs = [];
+  state.overLimit = false;
   state.streamError = null;
   state.emptyStream = false;
 });
@@ -283,4 +307,25 @@ test('la prova porta con sé chi NON deve servirla (lista di esclusione)', async
   assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
   const ignore = (state.calls[0].providerRouting || {}).ignore || [];
   assert.ok(ignore.length, 'la prova partiva senza dire chi è escluso');
+});
+
+// ── #591: una prova è una richiesta vera, e come tale conta ─────────────────
+
+test('col limite di spesa esaurito la prova non parte', async () => {
+  state.admin = true;
+  state.overLimit = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  const r = await testModel({ nickname: 'riga-nuova', model: 'vendor/modello-x' });
+  assert.equal(r.ok, false, 'oltre il limite la prova deve fermarsi');
+  assert.deepEqual(state.calls, [], 'il fornitore non deve essere stato chiamato');
+  assert.deepEqual(state.costs, [], 'niente costo per una chiamata mai partita');
+});
+
+test('la prova riuscita finisce nel conteggio dei costi', async () => {
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  const r = await testModel({ nickname: 'riga-nuova', model: 'vendor/modello-x' });
+  assert.equal(r.ok, true);
+  assert.equal(state.costs.length, 1, 'le chiavi le paga qualcuno: la prova va contata');
+  assert.equal(state.costs[0].model, 'vendor/modello-x');
 });
