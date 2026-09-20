@@ -22,12 +22,18 @@ const MAX_TEXT_CHARS = 16000;
 // modello risponderebbe sicuro su mezza pagina (#553).
 const MAX_BYTES = 25 * 1024 * 1024;
 
-// Tetto sull'HTML preso da una scheda già aperta. Lo stesso motivo del tetto
-// sullo scaricamento: l'estrazione costa circa un decimo di secondo per MB nel
-// processo main, e senza tetto una pagina enorme lo blocca.
-const MAX_HTML_CHARS = MAX_BYTES;
+// Tetto sull'HTML che si ATTRAVERSA, scaricato o preso da una scheda aperta.
+// L'estrazione gira nel processo main: finché non ha finito, nessuna finestra
+// risponde. Otto megabyte di markup sono dieci volte la pagina più pesante che
+// si incontri e costano mezzo secondo; oltre, si taglia e lo si DICHIARA.
+const MAX_HTML_CHARS = 8 * 1024 * 1024;
 
 const TIMEOUT_MS = 15000;
+
+// Quanto si aspetta la pagina già aperta prima di scaricarla lo stesso. È già
+// caricata: o risponde subito, o il suo JavaScript è inchiodato e l'attesa non
+// finirebbe mai (sullo scaricamento un tempo massimo c'era già).
+const MAX_ATTESA_SCHEDA_MS = 5000;
 
 // Elementi che non sono MAI contenuto: illeggibili (script, stili) o cornice del
 // sito. Il titolo torna a parte, quindi togliere anche `header` non perde nulla.
