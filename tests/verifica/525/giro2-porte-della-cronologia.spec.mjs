@@ -125,7 +125,7 @@ test('la scheda della home chiusa col suo tasto: la chat non resta senza nome', 
 test('la home portata su un altro indirizzo: la chat che resta indietro ha un nome', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await configura(app);
-  await stubProvider(app, { hume: { tipo: 'conversazione', titolo: 'Hume' } });
+  await stubProvider(app, { Hume: { tipo: 'conversazione', titolo: 'Hume' } });
 
   const dash = await openTab(DASH);
   await dash.locator('#input').fill('Parlami di Hume');
