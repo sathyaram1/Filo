@@ -6,19 +6,16 @@
 // avvio. Qui si guarda la seconda.
 //
 // Le due prove vanno lette in coppia:
-//   1. l'invitato riceve i crediti e aspetta: Filo non si presenta mai, né
-//      sulla home aperta né su una scheda nuova, e la home resta quella col
-//      messaggio fisso invece di quella costruita su misura;
-//   2. sulla STESSA installazione, appena si spegne «usa i modelli
-//      predefiniti», Filo si presenta all'istante. È il controllo: dice che
-//      l'accoglienza qui funziona, e che a tenerla spenta è la configurazione
-//      condivisa dei modelli, non l'invito.
+//   1. l'invitato riceve i crediti e Filo si presenta, sulla home aperta come
+//      su una scheda nuova;
+//   2. sulla STESSA installazione, spegnendo «usa i modelli predefiniti», si
+//      presenta lo stesso. È il controllo: la configurazione condivisa non
+//      deve fare differenza.
 //
-// Quella configurazione dichiara ancora un fornitore che Filo non usa più, e
-// la chiave che Filo ha davvero è di un altro: da lì in poi Filo si comporta
-// come se non avesse nessuna chiave. Non è roba di questo ramo, e tocca
-// chiunque, non solo chi entra con un invito; si vede qui perché il primo
-// avvio dell'invitato è la scena che questo lavoro consegna.
+// Quando questo giro è stato scritto la prima prova era rossa: la
+// configurazione condivisa dichiarava un fornitore che Filo non usa più, e il
+// controllo di prontezza cercava una chiave intestata a quel nome. Chiuso col
+// #663, che ha fatto guardare a quel controllo i modelli che la chiamata usa.
 //
 // Scritto da chi verifica, non da chi ha fatto il lavoro. Server finto: un
 // codice vero a usi contati non si brucia per una prova.
