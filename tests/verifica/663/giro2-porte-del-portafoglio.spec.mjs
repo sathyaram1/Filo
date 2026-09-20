@@ -127,6 +127,7 @@ test('invitato, poi «usa i modelli predefiniti» spento: la home dice che Filo 
   const page = await newtab(app);
   await configCondivisa(app, { provider: 'openrouter' });
   await chiaveNelPortafoglio(app);
+  await avvisoCreditiCambiati(app);
   await accoglienzaGiaFatta(app);
   await stubProviders(app);
   await page.reload();
