@@ -357,13 +357,22 @@
       const list = (a._output && Array.isArray(a._output.updated)) ? a._output.updated : [];
       return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
     },
-    EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
+    // Nel calendario l'evento ci entra col bottone: qui si racconta la
+    // proposta, e chiamarla «creata» era una promessa che nessuno manteneva.
+    EVENTO_CALENDARIO: (a) => {
+      const ev = (a._output && a._output.evento) || null;
+      const quando = ev && ev.quando ? ` · ${ev.quando}` : '';
+      return { icon: '📅', text: `Evento proposto · ${(ev && ev.titolo) || a.titolo || a.title || ''}${quando}` };
+    },
     // Impostazione applicata subito (livello 1, es. il tema): prima non
-    // lasciava traccia in chat, come se non fosse successo niente.
+    // lasciava traccia in chat, come se non fosse successo niente. La frase in
+    // italiano la manda il main con l'esito: qui non si ricostruisce.
     IMPOSTA_PREFERENZA: (a) => {
-      const k = a.chiave || a.key || '';
-      const v = a.valore ?? a.value;
-      return { icon: '⚙', text: `Impostato · ${k}${v !== undefined && v !== '' ? ` = ${v}` : ''}` };
+      const label = pulito(a._output && a._output.preferenza);
+      if (label) return { icon: '⚙', text: `Impostato · ${label}` };
+      const k = pulito(a.chiave || a.key);
+      const v = pulito(a.valore ?? a.value);
+      return { icon: '⚙', text: `Impostato · ${k}${v ? ` = ${v}` : ''}` };
     },
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
