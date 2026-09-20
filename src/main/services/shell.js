@@ -104,11 +104,17 @@ function shellConfig(shell, sid, startCwd) {
   // incrementale, senza prompt. Azzeriamo $LASTEXITCODE prima di ogni comando
   // così i cmdlet (che non lo toccano) riportano 0 invece dell'ultimo codice
   // nativo rimasto appeso.
+  // La prima cosa che scriviamo è il preludio UTF-8 (#551): la console di
+  // Windows scrive di suo nella tabella OEM, dove il trattino lungo diventa
+  // «-» e la «à» un byte che qui arriva come «<27>». Gemello del preludio in
+  // terminal.js, che fa lo stesso per i comandi one-shot dell'assistente.
   return {
     file: 'powershell.exe',
     args: ['-NoLogo', '-NoProfile', '-Command', '-'],
     options: { cwd: startCwd || undefined, windowsHide: true },
-    ready: `"FILO_RDY_${sid}"\n`,
+    ready: 'try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}\n'
+      + '$OutputEncoding = New-Object System.Text.UTF8Encoding $false\n'
+      + `"FILO_RDY_${sid}"\n`,
     wrap: (command) =>
       `$global:LASTEXITCODE=0\n${command}\n` +
       `"FILO_META_${sid}:$($LASTEXITCODE):$((Get-Location).Path)"\n`,
