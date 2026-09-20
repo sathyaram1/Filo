@@ -1048,16 +1048,35 @@ function refreshProxyRulesAllWindows() {
 // STESSA mostrata nella barra della home → percorso mostrato e cartella reale
 // coincidono. La shell PERSISTENTE della modalità terminale (src/main/services/
 // shell.js) resta separata e off-limits all'LLM: qui non la tocchiamo.
+// ⚠️ La cartella NON si appunta sul "mittente" del messaggio: quello è un
+// oggetto costruito da capo a ogni messaggio che arriva da una pagina (vedi
+// senderInfo in ipc.js). Appuntarcela sopra vuol dire dimenticarla appena
+// l'utente scrive di nuovo — e, peggio, appena CONFERMA: la conferma di un
+// comando è per forza un messaggio nuovo, quindi il comando che l'utente ha
+// approvato leggendo «scriverò in questa cartella» girava nella sua cartella
+// personale (#551, terzo giro di verifica). Quello che dura è la SCHEDA, cioè
+// i suoi webContents: la teniamo lì, con una mappa debole, così l'appunto muore
+// con la scheda come prima.
+const _assistantCwdByTab = new WeakMap();
 let _assistantCwdFallback = '';
+// La scheda dietro a un mittente, se c'è. `wc` è il webContents grezzo che
+// senderInfo porta con sé; un mittente costruito a mano dai test o dalle
+// chiamate interne non ce l'ha, e allora si ripiega sul deposito condiviso.
+function assistantCwdTab(sender) {
+  const wc = sender && sender.wc;
+  return wc && typeof wc === 'object' ? wc : null;
+}
 function getAssistantCwd(sender) {
   const { defaultCwd } = require('./shell');
-  if (sender) return sender._filoAssistantCwd || defaultCwd();
+  const tab = assistantCwdTab(sender);
+  if (tab) return _assistantCwdByTab.get(tab) || defaultCwd();
   return _assistantCwdFallback || defaultCwd();
 }
 function setAssistantCwd(sender, cwd) {
   if (!cwd) return;
-  if (sender) { try { sender._filoAssistantCwd = cwd; } catch (_) {} }
-  else _assistantCwdFallback = cwd;
+  const tab = assistantCwdTab(sender);
+  if (tab) { try { _assistantCwdByTab.set(tab, cwd); return; } catch (_) {} }
+  _assistantCwdFallback = cwd;
 }
 
 // Cartella di lavoro come va MOSTRATA nel popup di conferma: la home abbreviata
