@@ -14,12 +14,12 @@
 //  3. un blocco che si appende sempre nello stesso posto perché se lo pesca da
 //     solo, invece di ricevere da chi lo crea il posto dove va.
 
-import { test, expect, chiudiApp } from '../../fixtures/electron.mjs';
+import { test, expect } from '../../fixtures/electron.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
-// Accende la modalità terminale su tutte le home aperte (e nello storage, per
-// quelle che si apriranno dopo).
+// Accende (o spegne) la modalità terminale su tutte le home aperte, e nello
+// storage per quelle che si apriranno dopo.
 async function accendiTerminale(app, acceso = true) {
   await app.evaluate(async ({ webContents }, on) => {
     for (const wc of webContents.getAllWebContents()) {
@@ -36,10 +36,10 @@ async function accendiTerminale(app, acceso = true) {
   }, acceso);
 }
 
-test('la home si apre intera: nessun errore, e ognuna delle sue parti risponde', async ({ app, openTab }) => {
+test('la home si apre intera: nessun errore, e ognuna delle sue parti risponde', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   const guasti = [];
-  page.on('pageerror', (e) => guasti.push(String(e && e.message || e)));
+  page.on('pageerror', (e) => guasti.push(String((e && e.message) || e)));
   page.on('console', (m) => { if (m.type() === 'error') guasti.push(m.text()); });
 
   // Quello che l'utente vede: barra di scrittura, controlli in alto a destra,
@@ -89,7 +89,7 @@ test('la cartella corrente è una sola: quella che Filo cambia è quella che la 
     window.__cwdChiesti = [];
     window.filo = window.filo || {};
     window.filo.shellWhich = async (opts) => {
-      window.__cwdChiesti.push(String(opts && opts.cwd || ''));
+      window.__cwdChiesti.push(String((opts && opts.cwd) || ''));
       return { exists: true };
     };
   });
@@ -131,20 +131,32 @@ test('i comandi con lo slash rispondono ancora, e quello inventato resta rosso',
   await expect(input).toHaveValue('');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('input');
 
-  // Un comando inventato: rosso, e all'invio non succede niente di strano.
+  // Un comando inventato: rosso.
   await input.fill('/questo-non-esiste-635');
   await expect(input).toHaveClass(/is-cmd-unknown/);
 
-  // Casi limite della barra: vuoto, soli spazi, diecimila caratteri, emoji e
-  // marcatura ostile. Nessuno di questi deve uccidere la pagina.
-  for (const testo of ['', '   ', '/', '/   ', '😀🧵 /help', '<script>window.__rotto=1</script>', 'a'.repeat(10_000)]) {
+  // Casi limite della barra: vuoto, soli spazi, la sola barra, emoji,
+  // marcatura ostile, diecimila caratteri. La colorazione deve rispondere
+  // senza far morire la pagina, e niente di quello che si scrive diventa
+  // parte della pagina.
+  const limiti = ['', '   ', '/', '/   ', '😀🧵', '<script>window.__rotto=1</script>',
+    '/\u0000help', `/${'a'.repeat(10_000)}`];
+  for (const testo of limiti) {
     await input.fill(testo);
-    await input.press('Enter');
+    const classe = await page.evaluate((t) => {
+      const c = window.SN_DASH_COMANDI.classifyInput(t);
+      return typeof c === 'string' ? c : null;
+    }, testo);
+    expect(classe, `classificazione di ${JSON.stringify(testo.slice(0, 40))}`).not.toBeNull();
   }
+  // Invio a barra vuota e a soli spazi: non deve succedere niente di strano.
+  await input.fill('');
+  await input.press('Enter');
+  await input.fill('   ');
+  await input.press('Enter');
   await expect(input).toBeVisible();
   expect(await page.evaluate(() => window.__rotto === undefined)).toBe(true);
-  // La pagina è ancora viva: i suoi pezzi rispondono.
-  expect(await page.evaluate(() => typeof window.SN_DASH_COMANDI.classifyInput('/help'))).toBe('string');
+  expect(await page.evaluate(() => document.querySelectorAll('script[data-iniettato]').length)).toBe(0);
 });
 
 test('il blocco di attività si appende dove glielo si dice, e il testo ostile resta testo', async ({ openTab }) => {
@@ -178,19 +190,22 @@ test('il blocco di attività si appende dove glielo si dice, e il testo ostile r
   expect(esito.testo).toContain('onerror');
 });
 
-test('la home si legge in tema chiaro e in tema scuro', async ({ app, openTab }) => {
+test('la home si legge in tema chiaro e in tema scuro', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  const visti = {};
   for (const tema of ['light', 'dark']) {
     await page.evaluate((t) => { document.documentElement.dataset.snTheme = t; }, tema);
     await expect(page.locator('#dash')).toBeVisible();
-    const colori = await page.evaluate(() => {
+    visti[tema] = await page.evaluate(() => {
       const cs = getComputedStyle(document.body);
       const inp = getComputedStyle(document.getElementById('input'));
       return { sfondo: cs.backgroundColor, testo: inp.color };
     });
-    expect(colori.sfondo).not.toBe(colori.testo);
+    // Testo e sfondo non collassano sullo stesso colore (scritta invisibile).
+    expect(visti[tema].sfondo).not.toBe(visti[tema].testo);
     await page.screenshot({ path: `tests/.shots/verifica-635-home-${tema}.png` }).catch(() => {});
   }
-  await chiudiApp(app);
+  // I due temi sono davvero due: se la home non reagisce al tema, qui è rossa.
+  expect(visti.light.sfondo).not.toBe(visti.dark.sfondo);
 });
