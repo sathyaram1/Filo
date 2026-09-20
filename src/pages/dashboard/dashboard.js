@@ -99,6 +99,7 @@
     goThread: () => goThread(),
     updateInputClass: () => Comandi.updateInputClass(),
     archiviaRiga,
+    chatDellaRiga,
   });
   Comandi.init({
     send,
