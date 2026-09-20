@@ -126,6 +126,25 @@
 
   function remove(id) { queue = queue.filter((it) => it.id !== id); }
 
+  // #602 — DIRLO È PARTE DEL BUTTARE VIA.
+  //
+  // Una segnalazione che non si può cifrare non partirà mai, e chi l'ha mandata
+  // ha già letto «inviato». L'unica cosa che le resta è l'avviso: finché quello
+  // non è arrivato a qualcuno, la voce NON si toglie dalla coda (che è
+  // persistita, quindi regge anche un riavvio). Prima l'avviso partiva una
+  // volta sola, verso chi c'era in quel momento: all'avvio, o con Filo in
+  // secondo piano, non lo vedeva nessuno e la segnalazione spariva in silenzio.
+  //
+  // Chi riceve l'avviso risponde `false` quando non c'era nessuno a cui dirlo.
+  // Tutto il resto (nessun avvisatore, un valore qualunque, un'eccezione)
+  // conta come detto: una coda che non si svuota più per un avvisatore rotto
+  // sarebbe un guasto peggiore di quello che cura.
+  function annunciaRinuncia(it) {
+    if (!onGiveUpFn) return true;
+    try { return onGiveUpFn(it, it.motivoRinuncia) !== false; }
+    catch (_) { return true; }
+  }
+
   // Tenta di inviare TUTTA la coda una volta. Ritorna true se la coda è vuota
   // dopo il tentativo. Su fallimento (offline) le voci restano in coda e, se
   // `auto`, viene pianificato un nuovo tentativo con backoff crescente.
