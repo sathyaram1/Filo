@@ -617,7 +617,18 @@
     });
     $('semantic').addEventListener('click', runSemanticSearch);
     $('clear').addEventListener('click', async () => {
-      if (!tabs.length) return;
+      // Il tasto sta in cima a una pagina che adesso contiene anche le chat, e
+      // svuota solo le schede chiuse. Senza schede da svuotare restava muto:
+      // premuto, non succedeva niente e nessuno spiegava perché — su una
+      // pagina piena di conversazioni sembra che non funzioni.
+      if (!tabs.length) {
+        const note = $('searchNote');
+        note.hidden = false;
+        note.textContent = chatsTotal
+          ? 'Non c’è nessuna scheda chiusa da svuotare. Le chat con Filo restano: si cancellano una alla volta, col tasto destro.'
+          : 'Non c’è nessuna scheda chiusa da svuotare.';
+        return;
+      }
       const text = 'Cancella per sempre tutte le tab archiviate. '
         + 'L’operazione non si può annullare.';
       const ok = window.SN_CONFIRM_UI
