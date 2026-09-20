@@ -12,7 +12,8 @@
 //   - src/shared/filoMemory.js: persistenza dello stato (una chiave sola);
 //   - src/main/services/handlers.js: azione ONBOARDING, iniezione nel prompt,
 //     compattazione forzata + prima dashboard alla chiusura;
-//   - src/pages/dashboard/dashboard.js: la chat che l'utente vede.
+//   - src/pages/dashboard/dashboard-onboarding.js: la chat che l'utente vede
+//     (una delle quattro parti della home, #635).
 //
 // REGOLA: il segno "già accolto" si scrive alla FINE. Chi chiude la finestra a
 // metà intervista, riaprendo, ritrova la conversazione dov'era — prima veniva
