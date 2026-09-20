@@ -195,7 +195,32 @@
         /\bho instradato\b/i,
       ],
     },
+    // ULTIMA, e senza tipi: la conferma col PRONOME. Quando la cosa l'ha appena
+    // nominata l'utente, in italiano si risponde «l'ho messa alle 19», non «ho
+    // messo la sveglia alle 19»: è la forma più probabile subito dopo la
+    // richiesta, ed era l'unica che passava intera.
+    // Il pronome però non dice COSA: attribuirlo a una famiglia (e scrivere «la
+    // sveglia non c'è» su un appunto) sarebbe peggio di tacere. Quindi `tipi`
+    // vuoto vuol dire «la regge QUALUNQUE azione del turno»: scatta solo nel
+    // caso muto della segnalazione, dove nel turno non è partito niente, e
+    // l'avviso resta generico. Sta in fondo perché una famiglia che sa dire di
+    // cosa si tratta deve vincere su questa.
+    {
+      id: 'senza-nome',
+      tipi: [],
+      avviso: 'quello che ha detto di aver fatto non è stato fatto',
+      frasi: [
+        new RegExp(`\\b(?:te |ve |me )?l${AP}ho (?:mess|impostat|programmat|fissat|creat|aggiunt|salvat|scritt|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[oa]\\b`, 'i'),
+        /\b(?:te |ve )?l[ei] ho (?:mess|impostat|programmat|fissat|creat|aggiunt|salvat|scritt|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[ei]\b/i,
+      ],
+    },
   ];
+
+  // I `tipi` che non sono strumenti ma SEGNI di contesto: chi chiama il
+  // presidio li aggiunge quando quel contesto c'era. Elencati qui perché la
+  // sentinella degli unit test, che pretende che ogni tipo sia uno strumento
+  // vero, sappia distinguerli da un nome scritto male.
+  const TIPI_DI_CONTESTO = ['CONTESTO_FILE'];
 
   // Negazioni e ipotesi: se stanno nella stessa proposizione, PRIMA della
   // dichiarazione, non c'è nessuna rivendicazione da verificare.
