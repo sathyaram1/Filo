@@ -302,6 +302,18 @@
       invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu Riapri/Elimina.',
     },
     {
+      id: 'chat-archive', title: 'Ritrova le chat con Filo', category: 'save',
+      desc: 'Ogni conversazione con Filo resta sul tuo computer, per intero, e si ritrova nella stessa pagina delle schede chiuse. Le discussioni sono in vista; le chat che erano solo un comando ("metti una sveglia") stanno sotto un interruttore, e ci restano finché non le cancelli tu. Cerca una parola e ti trova la chat che la conteneva, anche a metà conversazione. Clicca una chat per riaprirla per intero e continuare a scrivere da dove eravate.',
+      invoke: 'Pagina filo://archive/archive.html, sezione «Chat con Filo» in alto. Clicca una chat per riaprirla; tasto destro per il menu Riapri/Elimina. La cancellazione chiede conferma.',
+      doesNot: 'Niente sparisce da solo: non c’è una pulizia automatica, e nessuna chat esce dal tuo computer. Le chat fatte in una finestra in incognito non vengono salvate.',
+    },
+    {
+      id: 'chat-archive-recall', title: 'Filo rilegge le vostre chat di prima', category: 'assistant',
+      desc: 'Puoi dire "riprendi la discussione di ieri sulla coscienza" o "cosa mi avevi detto su quella cosa?": Filo cerca fra le vostre conversazioni passate, rilegge quella giusta e riparte da lì invece di ricominciare da capo.',
+      invoke: 'Chiediglielo a parole nella nuova scheda, nominando l’argomento o quando ne avevate parlato.',
+      doesNot: 'Rilegge solo le conversazioni con te, salvate sul tuo computer: niente di quello che scrivi finisce altrove.',
+    },
+    {
       id: 'history', title: 'Cronologia delle richieste AI', category: 'save',
       desc: 'L’elenco delle richieste fatte all’AI (spiegazioni, traduzioni, aiuto…), filtrabile e ricercabile, con il costo di ogni richiesta e quanta parte del testo mandato al modello è stata riusata da una richiesta precedente invece di essere rielaborata; puoi rimuovere una singola voce oppure svuotarla del tutto.',
       invoke: 'Pagina filo://history/history.html. Passa il mouse su una voce e clicca «Rimuovi» per toglierla; «Cancella tutto» svuota l’intera cronologia.',
