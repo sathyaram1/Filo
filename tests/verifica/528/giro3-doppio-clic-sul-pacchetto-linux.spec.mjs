@@ -58,7 +58,7 @@ function pacchettoPronto() {
 // Estrae il pacchetto in una cartella temporanea e torna il percorso della
 // cartella estratta. `--appimage-extract` non ha bisogno di FUSE.
 function estrai() {
-  const dove = fs.mkdtempSync(path.join(os.tmpdir(), 'filo verifica 528 '));
+  const dove = cartellaTemporanea('filo-verifica-528-');
   const copia = path.join(dove, 'Filo-Linux.AppImage');
   fs.copyFileSync(PACCHETTO, copia);
   fs.chmodSync(copia, 0o755);
