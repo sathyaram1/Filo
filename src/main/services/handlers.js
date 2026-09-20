@@ -2199,15 +2199,37 @@ function toolResultText({ action, res, rendered }) {
 // arrivano al modello a ogni turno, quindi per dire cosa c'è scritto in un file
 // non gli serve nessuna azione, e accusarlo di non averlo letto è un falso
 // allarme (un avviso che sbaglia si smette di leggere).
-function tipiDelTurno(Dichiarate, renderedActions, fileSummaries) {
+// Un'immagine mandata in chat arriva al modello dentro il messaggio: per dire
+// cosa c'è scritto sulla bolletta fotografata non gli serve nessuno strumento,
+// e «il documento non l'ha letto» era un'accusa falsa.
+function tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini) {
   const tipi = Dichiarate.insiemeDiTipi(renderedActions);
   if (String(fileSummaries || '').trim()) tipi.add('CONTESTO_FILE');
+  if (conImmagini) tipi.add('CONTESTO_IMMAGINE');
   return tipi;
 }
 
-function spintaDiRimedio(Dichiarate, text, coperti) {
+// Gli orari delle sveglie e dei timer che ESISTONO adesso. Una sveglia messa in
+// una sessione precedente non lascia nessuna azione in questa conversazione:
+// senza questo, «sì, l'ho messa alle 19» diventava un'accusa a ogni riavvio.
+async function orariDelleSveglie() {
   try {
-    const fantasmi = Dichiarate.rileva(text, coperti);
+    const lista = await FiloMem.listTimers();
+    const out = [];
+    for (const t of (Array.isArray(lista) ? lista : [])) {
+      if (t && t.atTime) { out.push(String(t.atTime)); continue; }
+      const d = t && t.endsAt ? new Date(t.endsAt) : null;
+      if (d && !Number.isNaN(d.getTime())) {
+        out.push(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+      }
+    }
+    return out;
+  } catch (_) { return []; }
+}
+
+function spintaDiRimedio(Dichiarate, text, coperti, stato) {
+  try {
+    const fantasmi = Dichiarate.rileva(text, coperti, stato);
     if (fantasmi.length) return { spinta: Dichiarate.spintaAzioniMancanti(fantasmi), motivo: 'azioni' };
     if (Dichiarate.formatoSospetto(text)) return { spinta: Dichiarate.spintaFormato(), motivo: 'formato' };
   } catch (_) {}
