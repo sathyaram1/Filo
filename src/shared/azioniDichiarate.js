@@ -904,6 +904,39 @@
     return out;
   }
 
+  // Giro 8 — QUANTE azioni di ciascun tipo sono uscite nei turni precedenti.
+  // Il conto di adesso c'era già (`contiAzioni`), quello del passato no: una
+  // sola scrittura fatta all'inizio della conversazione reggeva tutti gli
+  // appunti raccontati dopo, uno via l'altro.
+  function contiDallaCronologia(cronologia) {
+    const out = {};
+    for (const m of (Array.isArray(cronologia) ? cronologia : [])) {
+      if (!m || m.role !== 'filo') continue;
+      for (const a of (Array.isArray(m.actions) ? m.actions : [])) {
+        if (!haFattoQualcosa(a)) continue;
+        const t = String((a && (a.type || a.tipo)) || '').toUpperCase();
+        if (t) out[t] = (out[t] || 0) + 1;
+      }
+    }
+    return out;
+  }
+
+  // Giro 8 — le famiglie su cui il presidio ha GIÀ avvisato in questa
+  // conversazione. Una dichiarazione smentita una volta non può tornare vera
+  // solo perché la volta dopo il modello la racconta guardando indietro:
+  // «te l'ho già salvato» dopo un «l'appunto non c'è» è la stessa cosa mai
+  // fatta, ed è la strada in cui finisce chi preme «Fallo adesso».
+  function famiglieMancateDallaCronologia(cronologia) {
+    const out = new Set();
+    for (const m of (Array.isArray(cronologia) ? cronologia : [])) {
+      for (const f of (Array.isArray(m && m.azioniMancate) ? m.azioniMancate : [])) {
+        const id = String((f && (f.id || f)) || '').trim();
+        if (id) out.add(id);
+      }
+    }
+    return out;
+  }
+
   // rileva(testo, azioni | Set di tipi, stato) → [{ id, avviso, tipi, frase }]
   // Una voce per famiglia dichiarata e non retta da niente.
   // `stato.orariSveglie`: gli orari delle sveglie e dei timer che ESISTONO
