@@ -2525,6 +2525,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // niente, questo resta l'unica risposta che c'era — meglio mostrarla con
   // l'avviso che lasciare la bolla vuota.
   let testoScartato = '';
+  // Le sveglie che c'erano PRIMA di questo turno: quelle nate adesso sono già
+  // coperte dalla loro azione.
+  const statoSveglie = { orariSveglie: Dichiarate ? await orariDelleSveglie() : [] };
+  const conImmagini = imageList.length > 0;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       r = await handleAIRequest({
