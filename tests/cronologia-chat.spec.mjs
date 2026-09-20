@@ -523,3 +523,98 @@ test('la sezione delle chat non compare quando non c’è ancora nessuna chat', 
   await expect(page.locator('#chatsSection')).toBeHidden();
   await expect(page.locator('#tabsSection')).toBeHidden();
 });
+
+// Verifica #525, giro 1 — le tre cose che l'archivio si lasciava sfuggire.
+
+test('l’intervista di benvenuto si archivia con la domanda di apertura e col congedo', async ({ app }) => {
+  test.setTimeout(90_000);
+  // L'intervista aperta, con il benvenuto già nella conversazione: è lo stato
+  // in cui la trova chi apre Filo la prima volta.
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const O = globalThis.SN_ONBOARDING;
+    await globalThis.SN_FILO_MEMORY.setOnboarding(
+      O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE }),
+    );
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: {
+        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_LESSON]: 'deepseek-flash',
+        [C.ACTIONS.FILO_COMPACT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
+        [C.ACTIONS.FILO_CHAT_TRIAGE]: 'deepseek-flash',
+      },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  await stubProvider(app, {});
+
+  const id = await app.evaluate(async () => {
+    const stato = await globalThis.SN_FILO_MEMORY.getOnboarding();
+    return globalThis.SN_ONBOARDING.chatId(stato);
+  });
+
+  await turno(app, id, 'Mi chiamo Ada');
+  // «basta così» chiude l'intervista senza passare dal modello: il congedo è
+  // l'ultima cosa che l'utente legge, e deve restare.
+  await turno(app, id, 'basta così');
+
+  const chat = (await leggiArchivio(app)).find((c) => c.id === id);
+  const benvenuto = await app.evaluate(() => globalThis.SN_ONBOARDING.WELCOME_MESSAGE);
+  const congedo = await app.evaluate(() => globalThis.SN_ONBOARDING.CLOSING_MESSAGE);
+  expect(chat.messages[0].role).toBe('filo');
+  expect(chat.messages[0].text).toBe(benvenuto);
+  expect(chat.messages[chat.messages.length - 1].text).toBe(congedo);
+  expect(chat.onboarding).toBe(true);
+});
+
+test('un’accoglienza aperta e mai risposta non lascia una chat con dentro la sola domanda', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    const O = globalThis.SN_ONBOARDING;
+    await globalThis.SN_FILO_MEMORY.setOnboarding(
+      O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE }),
+    );
+  });
+  expect((await leggiArchivio(app)).length).toBe(0);
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('#chatsSection')).toBeHidden();
+});
+
+test('un’immagine incollata: la chat riaperta dice quante ce n’erano', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await configura(app);
+  await stubProvider(app, { grafico: { tipo: 'conversazione', titolo: 'Il grafico' } });
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  await app.evaluate((_e, { png }) => globalThis.SN_HANDLE_FILO_CHAT({
+    userMessage: 'Cosa vedi in questo grafico?', threadHistory: [], chatId: 'c-img', images: [png],
+  }), { png });
+  await chiudi(app, 'c-img');
+
+  const dash = await openTab('filo://dashboard/dashboard.html?chat=c-img');
+  await expect(dash.locator('.dash-bubble').first()).toContainText('Cosa vedi in questo grafico?');
+  await expect(dash.locator('.dash-thread')).toContainText('1 immagine');
+});
+
+test('la Cronologia aperta si accorge di una chat finita in un’altra scheda', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await configura(app);
+  await stubProvider(app, { vulcani: { tipo: 'conversazione', titolo: 'I vulcani' } });
+  // La pagina si apre quando di chat non ce n'è ancora nessuna.
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('#chatsSection')).toBeHidden();
+
+  // Intanto, altrove, una chat comincia e finisce.
+  await turno(app, 'c-altrove', 'Parliamo di vulcani');
+  // La chiusura vera passa dal messaggio che manda la home, perché è quello
+  // che annuncia il cambiamento alle altre schede.
+  await page.evaluate(async () => {
+    await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_CHAT_CLOSE, id: 'c-altrove' });
+  });
+
+  // Senza ricaricare niente, la sezione compare con la chat appena finita.
+  await expect(page.locator('#chatsSection')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.arc-chat')).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator('.arc-chat').first()).toContainText('I vulcani');
+});
