@@ -1690,7 +1690,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           // stampa i NOMI, non i percorsi: se quel nome arrivasse qui senza
           // cartella verrebbe cercato dove sta il programma Filo, che con la
           // domanda dell'utente non c'entra niente (#551, terzo giro).
-          r = await DR.readDocument(percorso, { cwd: getAssistantCwd(sender) });
+          // Se quella cartella è sparita, un nome senza percorso si cerca da
+          // dove il terminale riparte — la home — non in un posto che non
+          // esiste (#551, quarto giro).
+          r = await DR.readDocument(percorso, { cwd: cartellaDelComando(getAssistantCwd(sender)) });
         } catch (e) {
           console.warn('[Filo] lettura documento fallita', e?.message || e);
         }
