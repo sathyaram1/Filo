@@ -151,7 +151,7 @@
         new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(72)}\\b${SVEGLIA}\\b`, 'i'),
         new RegExp(`\\bfatto[,:!]?\\s+(?:la |una |l['’])?${SVEGLIA}\\b${PONTE(24)}\\b(?:impostat|programmat|messa|fissat|pronta)`, 'i'),
         new RegExp(`${PERIFRASI}${PONTE(48)}\\b${SVEGLIA}\\b`, 'i'),
-        { re: participio(SVEGLIA, 'impostat[ao]|programmat[ao]|messa|fissat[ao]|creat[ao]|attivat[ao]|settat[ao]|puntat[ao]|pronta'), senzaHo: true },
+        participio(SVEGLIA, 'impostat[ao]|programmat[ao]|messa|fissat[ao]|creat[ao]|attivat[ao]|settat[ao]|puntat[ao]|pronta'),
       ],
     },
     {
@@ -163,7 +163,7 @@
       frasi: [
         new RegExp(`${HO}(?:avviato|fatto\\s+partire|messo|impostato|acceso|creato|lanciato|fatto\\s+scattare)\\b${PONTE(72)}\\b(?:timer|conto alla rovescia)\\b`, 'i'),
         new RegExp(`\\bfatto[,:!]?\\s+(?:il |un )?timer\\b${PONTE(24)}\\b(?:avviat|partit|impostat|in corso|acceso)`, 'i'),
-        { re: participio('timer', 'avviato|partito|impostato|acceso|lanciato|in corso'), senzaHo: true },
+        participio('timer', 'avviato|partito|impostato|acceso|lanciato|in corso'),
       ],
     },
     {
@@ -199,7 +199,7 @@
       frasi: [
         new RegExp(`${HO}(?:messo|salvato|scritto|creato|aggiunto|annotato|impostato|segnato|preso|fissato)\\b${PONTE(72)}\\bpromemoria\\b`, 'i'),
         new RegExp(`\\b${PRON}(?:mess|salvat|scritt|annotat|segnat)[oa]\\b${PONTE(32)}\\bpromemoria\\b`, 'i'),
-        { re: participio('promemoria', 'creato|impostato|salvato|messo|pronto|segnato'), senzaHo: true },
+        participio('promemoria', 'creato|impostato|salvato|messo|pronto|segnato'),
       ],
     },
     {
@@ -218,7 +218,7 @@
         // parte da solo dopo il turno, ed è per questo che «l'ho memorizzato»
         // non ha famiglia. Detto con l'altro verbo è la stessa cosa vera.
         new RegExp(`\\b${PRON}(?:salvat|scritt|annotat|segnat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
-        { re: participio('(?:appunt[oi]|not[ae])', 'salvat[oaie]|scritt[oaie]|creat[oaie]|aggiunt[oaie]|annotat[oaie]|pront[oaie]'), senzaHo: true },
+        participio('(?:appunt[oi]|not[ae])', 'salvat[oaie]|scritt[oaie]|creat[oaie]|aggiunt[oaie]|annotat[oaie]|pront[oaie]'),
         // «Ti ho segnato la spesa»: il verbo del prendere nota, col pronome di
         // chi lo riceve e senza la parola «appunto». Accanto a una sveglia
         // partita davvero questa restava l'unica cosa mai fatta, e nessuno lo
@@ -301,7 +301,7 @@
       frasi: [
         new RegExp(`${HO}(?:inviato|mandato|spedito|girato|inoltrato|trasmesso)\\b${PONTE(32)}\\b(?:segnalazione|feedback)\\b`, 'i'),
         new RegExp(`${HO}segnalato\\b${PONTE(32)}\\b(?:agli sviluppatori|al team|a chi sviluppa)\\b`, 'i'),
-        { re: participio('(?:segnalazione|feedback)', 'inviat[oa]|mandat[oa]|spedit[oa]|partit[oa]|inoltrat[oa]|trasmess[oa]'), senzaHo: true },
+        participio('(?:segnalazione|feedback)', 'inviat[oa]|mandat[oa]|spedit[oa]|partit[oa]|inoltrat[oa]|trasmess[oa]'),
       ],
     },
     {
@@ -313,7 +313,7 @@
         // italiano, e «al calendario» si dice quanto «in calendario».
         new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito|fissato|preso|programmato)\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario|sul calendario|l${AP}evento|un evento|l${AP}appuntamento|un appuntamento)\\b`, 'i'),
         new RegExp(`\\b${PRON}(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
-        { re: participio('(?:evento|appuntamento|riunione)', 'aggiunt[oa]|creat[oa]|inserit[oa]|fissat[oa]|messo|messa|segnat[oa]|in calendario', 40), senzaHo: true },
+        participio('(?:evento|appuntamento|riunione)', 'aggiunt[oa]|creat[oa]|inserit[oa]|fissat[oa]|messo|messa|segnat[oa]|in calendario', 40),
       ],
     },
     {
@@ -717,15 +717,13 @@
     const out = [];
     const presi = [];
     const sovrapposta = (a, b) => presi.some(([x, y]) => a < y && b > x);
-    for (const voce of famiglia.frasi) {
+    for (const re of famiglia.frasi) {
       if (out.length >= MAX_DICHIARAZIONI) break;
-      // Una voce può essere la sola espressione, oppure l'espressione più il
-      // segno che la frase è scritta SENZA «ho» (giro 7: «Sveglia impostata
-      // per le 19»). Lì non c'è un tempo verbale che dica se la cosa è appena
+      // Giro 7: la conferma scritta SENZA «ho» («Sveglia impostata per le
+      // 19»). Lì non c'è un tempo verbale che dica se la cosa è appena
       // successa o è successa prima, quindi un'azione di un turno passato la
       // regge senza pretendere che la frase guardi indietro.
-      const re = (voce instanceof RegExp) ? voce : voce.re;
-      const senzaHo = !(voce instanceof RegExp) && !!voce.senzaHo;
+      const senzaHo = SENZA_HO.has(re);
       const rx = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
       let m;
       while ((m = rx.exec(testo))) {
