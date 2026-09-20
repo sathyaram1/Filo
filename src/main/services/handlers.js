@@ -1500,7 +1500,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
         await applySettingsUpdate(built.partial);
-        return { executed: true, kept: true };
+        // La frase in italiano dell'impostazione («Tema → Scuro») viaggia con
+        // l'esito: è la stessa che l'utente legge nel popup di conferma, e il
+        // diario del lavoro non deve ricostruirla né mostrare il nome interno.
+        return { executed: true, kept: true, output: { preferenza: built.label } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
