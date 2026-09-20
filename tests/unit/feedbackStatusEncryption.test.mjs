@@ -160,7 +160,11 @@ test('senza cifratura lo stato NON si scrive in chiaro: la scrittura si ferma (#
     assert.ok(!C.isEnabled(), 'gate deve essere OFF per questo test');
     await assert.rejects(
       () => FB.updateStatus('doc-gate-off', { status: 'blocked' }),
-      /cifratura non disponibile/i,
+      (e) => {
+        assert.equal(FB.isEncryptionError(e), true, 'va riconosciuto come errore di cifratura');
+        assert.match(String(e.message), /non è partito niente/i);
+        return true;
+      },
     );
     assert.equal(toccataLaRete, false, 'niente doveva partire verso il database');
     // `statusPublic`, il valore grossolano, resta quello di sempre: è in chiaro
