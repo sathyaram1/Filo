@@ -241,13 +241,20 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
     await page.waitForTimeout(150);
     fondi.push(await page.evaluate(() => getComputedStyle(document.body).backgroundColor));
     misure[tema] = await page.locator('.bd-card .bd-vote-works').evaluate((el) => {
-      // Il fondo effettivo del pulsante premuto: il suo colore semitrasparente
-      // steso sopra il fondo della scheda.
+      // Il fondo VERO sotto il pulsante premuto: il suo colore semitrasparente
+      // steso sopra il primo antenato che un colore pieno ce l'ha davvero (la
+      // scheda può essere trasparente, e prenderla per bianca falserebbe il
+      // conto nel tema scuro).
       const num = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+      const opaco = (n) => (n.length < 4 || n[3] >= 1);
+      let sotto = [255, 255, 255];
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        const n = num(getComputedStyle(p).backgroundColor);
+        if (n.length >= 3 && opaco(n)) { sotto = n.slice(0, 3); break; }
+      }
       const suo = num(getComputedStyle(el).backgroundColor);
-      const sotto = num(getComputedStyle(el.closest('.bd-card')).backgroundColor);
       const a = suo.length > 3 ? suo[3] : 1;
-      const misto = [0, 1, 2].map((i) => Math.round(suo[i] * a + (sotto[i] ?? 255) * (1 - a)));
+      const misto = [0, 1, 2].map((i) => Math.round(suo[i] * a + sotto[i] * (1 - a)));
       return { testo: num(getComputedStyle(el).color).slice(0, 3), fondo: misto };
     });
     await page.screenshot({ path: `tests/.shots/verifica-478-bacheca-${tema}.png` });
