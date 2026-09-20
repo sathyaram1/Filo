@@ -1346,8 +1346,13 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // spento le risponderebbe per primo «proponi di attivarlo», che è proprio la
   // strada che un'istruzione ostile vorrebbe farle prendere.
   const verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type) : { ok: true };
-  if (!verdettoPerimetro.ok && verdettoPerimetro.puoChiedere) {
-    Compiti.registraAzione(task, { type, esito: 'rifiutata: fuori perimetro' });
+  // `secco` è il rifiuto che non conosce permessi: vale anche dove a chiedere
+  // per conto del modello sarebbe il motore (#533, quarto giro di verifica).
+  if (!verdettoPerimetro.ok && (verdettoPerimetro.secco || verdettoPerimetro.puoChiedere)) {
+    Compiti.registraAzione(task, {
+      type,
+      esito: verdettoPerimetro.secco ? 'rifiutata: mai da testo esterno' : 'rifiutata: fuori perimetro',
+    });
     return { executed: false, kept: false, rejected: true, fuoriPerimetro: verdettoPerimetro };
   }
 
