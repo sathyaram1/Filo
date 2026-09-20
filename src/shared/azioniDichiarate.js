@@ -311,6 +311,18 @@
   // un'altra parte. Non c'è nessuno strumento che possa averla fatta, quindi
   // non c'è niente da avvisare.
   const NELLA_RISPOSTA = /\b(?:qui sotto|qua sotto|qui sopra|qua sopra|qui di seguito|di seguito|nella risposta|qui in chat|eccol[aoie])\b/i;
+  // …e la stessa cosa detta senza dire dov'è. Quando la frase racconta la
+  // FORMA che Filo ha dato a un testo («te l'ho messa in ordine alfabetico»,
+  // «te l'ho aggiunta alla lista»), la cosa è la risposta: non esiste nessuno
+  // strumento che mette in ordine alfabetico, e smentirla era un'accusa su un
+  // cammino che un utente nuovo percorre subito. Il prezzo è che una lista
+  // davvero salvata fra gli appunti, raccontata così, non viene più smentita:
+  // meglio tacere che avere torto.
+  const FORMA_DEL_TESTO = new RegExp(
+    `\\b(?:in ordine|in colonna|in tabella|in elenco|in punti|in grassetto|in corsivo`
+    + `|per data|per nome|per prezzo|per ordine`
+    + `|alla lista|nella lista|all${AP}elenco|nell${AP}elenco`
+    + `|più (?:breve|corta|corto|lunga|lungo|chiara|chiaro|semplice|semplici))\\b`, 'i');
 
   function proposizionePrima(testo, indice) {
     const prima = testo.slice(0, indice);
