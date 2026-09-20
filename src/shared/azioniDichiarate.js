@@ -608,6 +608,76 @@
     return out;
   }
 
+  // Giro 7 — la prova che una sveglia esiste guardava SOLO l'ora: non il
+  // giorno, non se la sveglia è in pausa, e nemmeno se quello che c'è a
+  // quell'ora è un conto alla rovescia invece di una sveglia. Così una sveglia
+  // delle 7 di oggi reggeva «ti ho messo la sveglia alle 7 per domani», e un
+  // timer che finisce alle 19 reggeva «ti ho messo la sveglia alle 19».
+  //
+  // `stato.sveglie` è l'elenco preciso: `{ ora, giorno, tipo }`, con `giorno`
+  // vuoto per le sveglie che si ripetono (valgono per qualunque giorno) e
+  // `tipo` 'alarm' o 'timer'. Chi non ce l'ha continua a passare
+  // `stato.orariSveglie`, e allora si guarda solo l'ora come prima.
+  const GIORNI_NOMINATI = [
+    [/\b(?:stanotte|stasera|stamattina|oggi|in giornata)\b/i, 0],
+    [/\b(?:domani|domattina|domani sera|domani mattina)\b/i, 1],
+    [/\bdopodomani\b/i, 2],
+  ];
+  function dataISO(base, piu) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + piu);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function giornoNominato(frase, oraDiRiferimento) {
+    const s = String(frase || '');
+    for (const [re, piu] of GIORNI_NOMINATI) {
+      if (re.test(s)) return dataISO(oraDiRiferimento, piu);
+    }
+    return '';
+  }
+  // I tipi di sveglia che possono reggere una famiglia: una sveglia non è un
+  // conto alla rovescia, e viceversa.
+  function tipiSveglia(fam) {
+    if (fam.id === 'timer') return new Set(['timer']);
+    if (fam.id === 'sveglia' || fam.id === 'sveglia-tolta' || fam.id === 'sveglia-spostata') return new Set(['alarm']);
+    return null;
+  }
+
+  // Lo stato che il presidio confronta con le frasi, costruito una volta sola
+  // e uguale per le due chat di Filo: le sveglie e i timer che esistono
+  // DAVVERO (niente in pausa, niente che ha già suonato) coi loro giorni, e i
+  // titoli degli appunti.
+  function statoDaTimerEFile(timers, files, adesso) {
+    const ora = Number.isFinite(adesso) ? adesso : Date.now();
+    const sveglie = [];
+    for (const t of (Array.isArray(timers) ? timers : [])) {
+      if (!t || typeof t !== 'object') continue;
+      // Una sveglia in pausa non suona, e una che ha già suonato non suonerà
+      // di nuovo: non provano niente.
+      if (t.paused || t.ringing) continue;
+      const tipo = t.kind === 'alarm' ? 'alarm' : 'timer';
+      const ripetuta = Array.isArray(t.repeat) && t.repeat.length > 0;
+      if (t.atTime) {
+        sveglie.push({ ora: String(t.atTime), giorno: ripetuta ? '' : '', tipo });
+        continue;
+      }
+      const d = t.endsAt ? new Date(t.endsAt) : null;
+      if (!d || Number.isNaN(d.getTime())) continue;
+      if (d.getTime() <= ora) continue;
+      sveglie.push({
+        ora: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+        giorno: dataISO(d.getTime(), 0),
+        tipo,
+      });
+    }
+    const titoliAppunti = [];
+    for (const f of (Array.isArray(files) ? files : [])) {
+      const titolo = f && typeof f === 'object' ? f.title : f;
+      if (titolo) titoliAppunti.push(String(titolo));
+    }
+    return { sveglie, orariSveglie: sveglie.map((s) => s.ora), titoliAppunti, oggi: ora };
+  }
+
   // La frase nomina un appunto che ESISTE già? Si confrontano i titoli dei
   // file e degli appunti che Filo ha davanti a ogni turno: un appunto salvato
   // ieri non lascia nessuna azione in questa conversazione, e senza questo
