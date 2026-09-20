@@ -492,9 +492,10 @@
     }
     const fn = ACTIVITY_ROWS[type];
     if (fn) return fn(a);
-    // Azione eseguita di cui la tabella non sa niente: meglio una riga generica
-    // che il silenzio — il diario deve dire tutto quello che Filo ha fatto.
-    if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
+    if (SOLO_BOTTONE.includes(type)) return null;
+    // Rete di sicurezza per un'azione che la tabella non copre: una riga
+    // generica invece del silenzio, e mai il nome interno dell'azione.
+    if (a._traccia || a._executed) return { icon: '•', text: 'Azione eseguita' };
     return null;
   }
   // La ragione del fallimento, quando il main la conosce.
