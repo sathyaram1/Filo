@@ -2652,12 +2652,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         const res = a._argsError
           ? { executed: false, kept: false, rejected: true, error: a._argsError }
           : await executeFiloAction(a, { sender, compito: task });
-        // La contaminazione si segna appena la lettura è partita, non a esito
-        // noto: dentro lo stesso giro un'uscita dopo una lettura è già dopo.
-        if (task && Compiti) {
-          const k = Compiti.classeDi(a.type);
-          if (k.classe === 'ingresso') Compiti.registraLettura(task, { type: a.type });
-          else if (k.classe === 'uscita') Compiti.registraAzione(task, { type: a.type, esito: res.executed ? 'fatta' : 'no' });
+        // Le letture si segnano a FINE giro, non qui: quello che il modello ha
+        // chiesto in questo giro l'ha deciso prima di vederne un solo esito,
+        // quindi nessuna lettura di questo giro può averlo influenzato. Segnarle
+        // subito rifiuterebbe «leggi il pdf e apri il link» sul secondo pezzo.
+        if (task && Compiti && Compiti.classeDi(a.type).classe === 'uscita') {
+          Compiti.registraAzione(task, { type: a.type, esito: res.executed ? 'fatta' : 'no' });
         }
         const rendered = { ...a };
         delete rendered._argsError;
