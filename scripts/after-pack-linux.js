@@ -101,5 +101,5 @@ exports.default = async function afterPackLinux(context) {
   }
   fs.accessSync(programma, fs.constants.X_OK);
   fs.accessSync(vero, fs.constants.X_OK);
-  console.log(`[after-pack-linux] lanciatore installato: ${programma} → ${nome}${SUFFISSO} --no-sandbox`);
+  console.log(`[after-pack-linux] lanciatore installato: ${programma} → ${nome}${SUFFISSO}, senza gabbia solo dove il kernel la nega`);
 };
