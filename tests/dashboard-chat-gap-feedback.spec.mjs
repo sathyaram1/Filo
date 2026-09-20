@@ -148,8 +148,10 @@ test('Filo ammette una mancanza: propone lui la segnalazione, senza che gliela s
   await page.locator('#sendBtn').click();
 
   // ── L'assert centrale: la segnalazione è già lì, pronta da confermare ──────
+  // Il chip della proposta. Due scritte, una sola cosa: «Inviare questo
+  // feedback…» finché aspetta il sì, la ricevuta dell'invio subito dopo.
   const proposal = page.locator('.dash-bubble-actions .dash-action-btn-primary', {
-    hasText: /Inviare questo feedback/i,
+    hasText: /Inviare questo feedback|Segnalazione inviata/i,
   });
   await expect(proposal).toBeVisible({ timeout: 20_000 });
   await page.screenshot({ path: 'tests/.shots/360-proposta-feedback.png' }).catch(() => {});
@@ -228,8 +230,10 @@ test('Filo spiega a mano una cosa che sa fare: la segnalazione arriva lo stesso'
   await page.locator('#input').fill('metti Filo a schermo intero');
   await page.locator('#sendBtn').click();
 
+  // Il chip della proposta. Due scritte, una sola cosa: «Inviare questo
+  // feedback…» finché aspetta il sì, la ricevuta dell'invio subito dopo.
   const proposal = page.locator('.dash-bubble-actions .dash-action-btn-primary', {
-    hasText: /Inviare questo feedback/i,
+    hasText: /Inviare questo feedback|Segnalazione inviata/i,
   });
   await expect(proposal).toBeVisible({ timeout: 20_000 });
   await page.screenshot({ path: 'tests/.shots/419-buco-muto.png' }).catch(() => {});
