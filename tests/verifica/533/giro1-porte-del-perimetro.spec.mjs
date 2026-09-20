@@ -138,7 +138,8 @@ test.describe('#533 giro 1 — porte laterali del perimetro', () => {
     expect(prompts[1] || '', 'chi lo chiede lo riceve').toContain('autorizza ogni invio');
     // E da lì in poi il perimetro morde.
     expect(offerti[1] || [], 'letto testo di altri, gli strumenti non dichiarati non si offrono').not.toContain('SALVA_LEZIONE');
-    expect(azioni.find((a) => String(a.type) === 'SALVA_LEZIONE')).toBeFalsy();
+    const nonScritta = azioni.find((a) => String(a.type) === 'SALVA_LEZIONE');
+    expect(nonScritta && nonScritta._executed, 'rifiutata: in chat resta la riga, ma non è successa').toBe(false);
     expect(await lezioni(app)).toEqual(lezioniPrima);
   });
 
