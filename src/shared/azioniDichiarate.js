@@ -566,11 +566,14 @@
   // dice niente, «Ti ho messo una sveglia alle 19:00» sì.
   function frasePiena(testo, da, a) {
     const prima = testo.slice(0, da);
-    const inizio = Math.max(
-      prima.lastIndexOf('.'), prima.lastIndexOf('!'), prima.lastIndexOf('?'), prima.lastIndexOf('\n'),
-    ) + 1;
+    // Il punto fra due cifre non chiude niente: tagliando lì, la frase
+    // mostrata all'utente si fermava a «Ho messo la sveglia alle 19».
+    let inizio = 0;
+    const apre = new RegExp(FINE_FRASE.source, 'g');
+    let m;
+    while ((m = apre.exec(prima))) inizio = m.index + 1;
     const dopo = testo.slice(a);
-    const fine = dopo.search(/[.!?\n]/);
+    const fine = dopo.search(FINE_FRASE);
     const frase = testo.slice(inizio, fine >= 0 ? a + fine + 1 : testo.length).trim();
     return frase.length > 160 ? `${frase.slice(0, 157)}…` : frase;
   }
