@@ -80,9 +80,12 @@ server un verdetto raccontato non lo legge).
    Anche la richiesta di fusione parla del commit, non del ramo: dichiara la
    punta della directory, e prima di partire rifà i due controlli del passo 1.
    Se ti risponde che il ramo si è mosso dopo i via libera, non insistere e
-   non ricontrollare da solo il pezzo nuovo: l'esito è decaduto, il giro va
-   rifatto da capo su quel contenuto, e chi ha cambiato il ramo lo rimette in
-   verifica.
+   non ricontrollare da solo il pezzo nuovo: l'esito è decaduto e il giro va
+   rifatto da capo su quel contenuto. Non fermarti lì: finché la notizia resta
+   sulla tua macchina, sul canale i due via libera continuano a risultare
+   buoni per quel ramo. Registrala col comando che il rifiuto ti scrive già
+   pronto, che rimette il lavoro in verifica sul contenuto nuovo; se il server
+   rifiuta quel passaggio, dichiaralo nel rilascio con `--guasto`.
    Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
    verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
    sul diff che scarica da GitHub, e fonde con la sua identità. Qui non gira
