@@ -157,6 +157,29 @@ test('il foglietto del primo avvio su Linux esiste e dice le due cose che servon
     'il foglietto non nomina libfuse2: su Ubuntu 22.04 e successive il doppio clic muore lì');
 });
 
+// La terza cosa che su Linux si rompe in silenzio, e che su Windows e Mac non
+// si rompe: il link d'invito. La dichiarazione che lega i filo:// a Filo vive
+// nella voce di menu DENTRO il pacchetto, e il sistema la legge solo se il
+// pacchetto è installato fra le applicazioni. Chi tiene il file singolo e lo
+// apre col doppio clic clicca il link e non vede succedere niente. La strada
+// che funziona c'è (incollare il link nella pagina Crediti) ma nessuno gliela
+// indica nel momento in cui il link gli muore in mano.
+test('il foglietto dice cosa fare quando il link d\'invito non apre Filo', () => {
+  const testo = readFileSync(join(ROOT, 'build', FOGLIETTO), 'utf8');
+  assert.match(testo, /invito/i,
+    'il foglietto non nomina l\'invito: su Linux il link non apre Filo e il tester resta fermo lì, senza crediti');
+  assert.match(testo, /Crediti/,
+    'il foglietto non dice dove si incolla il link d\'invito quando il clic non apre niente');
+});
+
+test('il recap degli aggiornamenti dice anche la faccenda del link d\'invito', () => {
+  const notes = readFileSync(join(ROOT, 'src', 'shared', 'patchNotes.js'), 'utf8');
+  const riga = notes.split('\n').find((r) => /anche per Linux/.test(r)) || '';
+  assert.ok(riga, 'la riga del changelog sulla versione Linux è sparita');
+  assert.match(riga, /invito/,
+    'il changelog racconta la versione Linux senza dire che il link d\'invito non apre Filo da solo');
+});
+
 test('il foglietto sale nella release, con un nome fisso che il sito può linkare', () => {
   const job = linuxJob();
   assert.match(job, /gh release upload/,
