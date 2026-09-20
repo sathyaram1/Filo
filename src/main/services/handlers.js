@@ -972,9 +972,11 @@ async function avvisaSeLaProntezzaCambia() {
   broadcastToTabs({ type: MSG.FILO_READY_CHANGED, ready: ora });
 }
 
-// La configurazione condivisa è una delle due sorgenti: si ascolta da subito,
-// perché arriva mentre la prima home è già aperta.
+// La configurazione condivisa si ascolta da subito, perché arriva mentre la
+// prima home è già aperta. Il portafoglio chiama da sé: sta sotto, e non può
+// richiedere questo modulo senza chiudere il cerchio.
 try { Defaults.onChanged(() => { avvisaSeLaProntezzaCambia().catch(() => {}); }); } catch (_) {}
+globalThis.SN_PRONTEZZA_CAMBIATA = () => { avvisaSeLaProntezzaCambia().catch(() => {}); };
 
 async function applySettingsUpdate(partial) {
   // Gli override dei token estetici finiscono dentro <style> iniettati in
