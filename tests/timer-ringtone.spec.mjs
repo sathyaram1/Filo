@@ -257,3 +257,48 @@ test('la finestra incognito fa sentire le sue scadenze, e da sola', async ({ app
   await incog.waitForTimeout(1200);
   expect(await incog.evaluate(() => window.SN_SOUNDS.isRinging())).toBe(false);
 });
+
+// Due finestre della stessa vista vedono la stessa scadenza. Se suonassero tutte
+// e due sarebbero due copie dello stesso motivo, sfasate fra loro: ne suona una
+// sola, e il turno passa se quella che suona se ne va.
+test('due finestre, una sola suoneria, e il turno passa a chi resta', async ({ app, shell }) => {
+  test.setTimeout(150_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await shell.evaluate(() => window.filoShell.openIncognito());
+
+  const incognite = () => app.windows().filter((p) => {
+    try { return p.url().includes('incognito=1'); } catch (_) { return false; }
+  });
+  const limite = Date.now() + 20_000;
+  let due = incognite();
+  while (Date.now() < limite && due.length < 2) {
+    await new Promise((r) => setTimeout(r, 150));
+    due = incognite();
+  }
+  expect(due.length, 'due finestre incognito devono potersi aprire').toBe(2);
+  for (const p of due) await p.waitForLoadState('domcontentloaded').catch(() => {});
+
+  const tipo = await due[0].evaluate(() => window.SN_MSG.MSG.FILO_ADD_TIMER);
+  await due[0].evaluate((t) => window.filoShell.message({ type: t, label: 'Riso', seconds: 2 }), tipo);
+
+  // Il pulsante che ferma sta in tutte e due: l'utente può essere davanti a una
+  // qualunque, e un rumore senza interruttore a portata è la lamentela di prima.
+  await expect(due[0].locator('#ring-indicator')).toBeVisible({ timeout: 15_000 });
+  await expect(due[1].locator('#ring-indicator')).toBeVisible({ timeout: 15_000 });
+
+  await due[0].waitForTimeout(1500);
+  const suona = async (p) => p.evaluate(() => window.SN_SOUNDS.isRinging());
+  const stato = [await suona(due[0]), await suona(due[1])];
+  expect(stato.filter(Boolean).length, 'una scadenza sola, una suoneria sola').toBe(1);
+
+  const [chiSuona, altra] = stato[0] ? [due[0], due[1]] : [due[1], due[0]];
+  await chiSuona.evaluate(() => window.filoShell.window.close());
+  // Chi resta prende il turno: la scadenza è ancora viva, e nessuno l'ha fermata.
+  await expect.poll(() => suona(altra), { timeout: 20_000 }).toBe(true);
+
+  await altra.locator('#ring-indicator').click();
+  await expect(altra.locator('#ring-indicator')).toBeHidden({ timeout: 6_000 });
+  await altra.waitForTimeout(1200);
+  expect(await suona(altra)).toBe(false);
+});

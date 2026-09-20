@@ -47,6 +47,11 @@ function wireWindowCommon(win, tabs) {
   } catch (_) {}
 
   win.on('resize', () => tabs.layout());
+  // Se si chiude la finestra che stava suonando, il turno passa a un'altra:
+  // senza questo avviso il rumore morirebbe con la finestra, scadenza viva.
+  win.on('closed', () => {
+    try { require('./services/handlers').broadcastLiveUpdate(); } catch (_) {}
+  });
   // Se la finestra va a tutto schermo per una strada che non è quella di Filo
   // (gesto o scorciatoia del sistema, gestore finestre), adottiamo la modalità
   // invece di limitarci al layout: altrimenti resterebbe uno schermo intero che

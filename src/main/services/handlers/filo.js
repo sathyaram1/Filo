@@ -307,7 +307,24 @@ module.exports = function register(on, ctx) {
   // file dell'editor, ci scrive l'azione SALVA_APPUNTO e si leggono/modificano
   // aprendo l'editor come qualsiasi altro documento.
 
-  on(MSG.FILO_GET_TIMERS, async () => ({ ok: true, timers: await FiloMem.gcTimers() }));
+  // Una scadenza la vedono tutte le finestre della stessa vista (le incognito
+  // condividono l'overlay in RAM): se suonassero tutte sarebbero due copie dello
+  // stesso motivo, sfasate fra loro. Suona la più anziana, e quando si chiude il
+  // turno passa alla successiva; il pulsante che ferma resta invece in tutte.
+  const suonaQui = (win) => {
+    try {
+      if (!win || win.isDestroyed()) return false;
+      const pari = require('electron').BrowserWindow.getAllWindows().filter((w) => {
+        try { return !w.isDestroyed() && w._filoTabs && !!w._filoIncognito === !!win._filoIncognito; } catch (_) { return false; }
+      });
+      if (!pari.length) return false;
+      return pari.reduce((a, b) => (a.id <= b.id ? a : b)).id === win.id;
+    } catch (_) { return true; }
+  };
+
+  on(MSG.FILO_GET_TIMERS, async (msg, sender) => ({
+    ok: true, timers: await FiloMem.gcTimers(), suona: suonaQui(winOf(sender)),
+  }));
 
   on(MSG.FILO_ADD_TIMER, async (msg) => {
     const t = await FiloMem.addTimer({ label: msg.label, seconds: msg.seconds });

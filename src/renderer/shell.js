@@ -148,7 +148,10 @@
     ringWake = setTimeout(refreshRinging, Math.min(60000, Math.max(250, primo + 150)));
   }
 
-  function applyRinging(timers) {
+  // `mio` lo decide il main: fra le finestre che vedono la stessa scadenza ne
+  // suona una sola. Il pulsante invece sta in tutte, perché l'utente può essere
+  // davanti a una qualunque e il gesto per far smettere non si cerca.
+  function applyRinging(timers, mio) {
     const tutti = Array.isArray(timers) ? timers : [];
     programmaRisveglio(tutti);
     const list = tutti.filter((t) => t && t.ringing);
@@ -158,7 +161,7 @@
     if (acceso && ringLabel) ringLabel.textContent = testoSuoneria(list);
     const S = window.SN_SOUNDS;
     if (!S) return;
-    if (acceso) S.ring(ringTone); else S.silence();
+    if (acceso && mio !== false) S.ring(ringTone); else S.silence();
   }
 
   // Ogni finestra chiede le SUE scadenze: quella incognito vede solo le proprie
@@ -168,7 +171,7 @@
     const type = MSG_FILO.FILO_GET_TIMERS;
     if (!type) return;
     api.message({ type })
-      .then((r) => applyRinging(r && r.ok ? r.timers : []))
+      .then((r) => applyRinging(r && r.ok ? r.timers : [], !r || r.suona !== false))
       .catch(() => {});
   }
 
@@ -184,7 +187,7 @@
       const ids = ringingIds.slice();
       // Zittisci subito: l'attesa della risposta è attrito su un gesto che
       // esiste per far smettere un rumore.
-      applyRinging([]);
+      applyRinging([], false);
       if (!type) return;
       Promise.all(ids.map((id) => api.message({ type, id }).catch(() => {})))
         .then(refreshRinging);
