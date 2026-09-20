@@ -2715,7 +2715,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // sua risposta): il compito nuovo eredita la contaminazione e il perimetro
     // già concesso, invece di ricominciare a mani libere. Dopo un messaggio
     // pulito non cambia niente.
-    const prec = compitoPrecedente ? await compitoPrecedenteDi(compitoPrecedente) : null;
+    // #533 (quinto giro di verifica) — se la scheda non nomina nessuna
+    // richiesta ma la conversazione è l'intervista di benvenuto, il nome ce
+    // l'ha l'intervista: è l'unica conversazione che Filo rimette a schermo da
+    // capo (altra scheda, riavvio, ripresa automatica), e lì la scheda riparte
+    // senza niente in mano mentre le parole lette prima sono ancora nelle
+    // bolle.
+    const chiavePrec = compitoPrecedente || (onbActive ? (onbBefore.compito || null) : null);
+    const prec = chiavePrec ? await compitoPrecedenteDi(chiavePrec) : null;
     task = ricordaCompito(Compiti.erede(prec, {
       richiesta: userMessage,
       sempre: onbActive ? ['accoglienza'] : [],
