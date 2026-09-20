@@ -618,10 +618,13 @@ module.exports = function register(on, ctx) {
   on(MSG.WALLET_OWN_KEY_INFO, filoOnly(async () => {
     const key = await ownKey();
     if (!key) return { ok: false, status: 'no_own_key' };
-    const P = globalThis.SN_PROVIDER_OPENROUTER;
-    if (!P || typeof P.keyInfo !== 'function') return { ok: false, status: 'internal' };
+    // Dal cancello unico (#591): al fornitore non si arriva da nessun'altra
+    // parte, nemmeno per una domanda che non costa niente.
+    const Gate = globalThis.SN_MODEL_GATE;
+    if (!Gate) return { ok: false, status: 'internal' };
     try {
-      const info = await P.keyInfo({ apiKey: key });
+      const info = await Gate.keyInfo({ provider: 'openrouter', apiKey: key });
+      if (!info) return { ok: false, status: 'internal' };
       return { ok: true, ...info, line: W.ownKeyBalanceLine(info) };
     } catch (e) {
       const st = Number(e && e.status) || 0;
