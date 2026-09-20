@@ -218,11 +218,19 @@
       return node;
     };
 
+    // L'esito ripulito dalle sequenze di colore, come lo legge chi guarda: è
+    // quello che finisce nell'archivio della chat quando il comando ha finito.
+    let testoEsito = '';
     const appendOut = (chunk, isErr) => {
       const data = ansi.tail + chunk;
       ansi.tail = '';
       let i = 0, plain = '';
-      const flushPlain = () => { if (plain) { pre.appendChild(styledSpan(plain, isErr)); plain = ''; } };
+      const flushPlain = () => {
+        if (!plain) return;
+        pre.appendChild(styledSpan(plain, isErr));
+        testoEsito += plain;
+        plain = '';
+      };
       while (i < data.length) {
         const esc = data.indexOf('\x1b', i);
         if (esc === -1) { plain += data.slice(i); break; }
