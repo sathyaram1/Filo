@@ -405,17 +405,11 @@ test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app,
 
   // L'evento è davvero uscito da Filo: il file che il calendario apre esiste e
   // contiene quello che l'utente ha chiesto.
-  const dir = join(await app.evaluate(({ app: electronApp }) => electronApp.getPath('temp')), 'filo-eventi');
-  const ics = await expect.poll(() => {
-    const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.ics')) : [];
-    if (!files.length) return '';
-    const ultimo = files.map((f) => ({ f, t: statSync(join(dir, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0].f;
-    return readFileSync(join(dir, ultimo), 'utf8');
-  }, { timeout: 10_000 }).toContain('SUMMARY:Riunione team').then(() => {
-    const files = readdirSync(dir).filter((f) => f.endsWith('.ics'));
-    const ultimo = files.map((f) => ({ f, t: statSync(join(dir, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0].f;
-    return readFileSync(join(dir, ultimo), 'utf8');
-  });
+  const dir = join(await app.evaluate(({ app: elApp }) => elApp.getPath('temp')), 'filo-eventi');
+  const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.ics')) : [];
+  expect(files.length).toBeGreaterThan(0);
+  const ultimo = files.map((f) => ({ f, t: statSync(join(dir, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0].f;
+  const ics = readFileSync(join(dir, ultimo), 'utf8');
   expect(ics).toContain('SUMMARY:Riunione team');
   expect(ics).toContain('DTSTART:20260924T150000');
   expect(ics).toContain('DTEND:20260924T153000');
