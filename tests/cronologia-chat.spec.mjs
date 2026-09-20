@@ -1032,3 +1032,118 @@ test('cercare una frase intera trova la chat, e la pagina dice con quali parole'
   // E lo dice: i risultati rispondono a meno parole di quelle scritte.
   await expect(page.locator('#chatsCount')).toContainText('coscienza', { timeout: 10_000 });
 });
+
+// ── Una riga che arriva tardi appartiene alla chat che l'ha chiesta ──────────
+//
+// Il comando lo dai qui e l'esito arriva fra dieci secondi: se intanto sei
+// tornato alla home, la riga chiedeva «qual è la chat di adesso?» e finiva in
+// una conversazione nuova, mai fatta, o peggio in quella dopo. Vale per tutto
+// quello che parla in ritardo — il terminale e i comandi con lo slash.
+
+test('l’esito di un comando lento resta nella chat in cui il comando è stato dato', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  await configura(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } });
+  });
+  await stubProvider(app, { Kant: { tipo: 'conversazione', titolo: 'Kant' } });
+
+  const dash = await openTab('filo://dashboard/dashboard.html');
+  await dash.locator('#input').fill('Parlami di Kant');
+  await dash.locator('#input').press('Enter');
+  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
+
+  // Un comando che ci mette qualche secondo, e l'utente se ne va prima.
+  await dash.locator('#input').fill('/sleep 4; echo "ESIT""O-TARDIVO"');
+  await dash.locator('#input').press('Enter');
+  await dash.waitForTimeout(700);
+  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').press('Enter');
+  await expect.poll(async () => dash.evaluate(() => document.body.dataset.state), { timeout: 10_000 })
+    .toBe('home');
+
+  await expect.poll(async () => {
+    const c = (await leggiArchivio(app))[0];
+    return c ? c.messages.map((m) => m.text).join('\n') : '';
+  }, { timeout: 40_000 }).toContain('ESITO-TARDIVO');
+
+  const chats = await leggiArchivio(app);
+  // Una conversazione sola: l'esito è tornato dove il comando era stato dato.
+  expect(chats.length).toBe(1);
+  const testi = chats[0].messages.map((m) => m.text).join('\n');
+  expect(testi).toContain('sleep 4');
+  // E non ti riporta dentro la chat che avevi chiuso.
+  expect(await dash.evaluate(() => document.body.dataset.state)).toBe('home');
+});
+
+test('il resoconto di un comando con lo slash non riapre la chat che hai chiuso', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  await configura(app);
+  await stubProvider(app, { Epicuro: { tipo: 'conversazione', titolo: 'Epicuro' } });
+
+  const dash = await openTab('filo://dashboard/dashboard.html');
+  // Il riordino delle schede ci mette qualche secondo: qui lo si rallenta
+  // dalla pagina, senza toccare il codice in prova.
+  await dash.evaluate(() => {
+    window.SN_CONFIRM_UI = { confirm: async () => true };
+    const vero = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, cb) => {
+      if (msg && msg.type === 'run_tab_triage') {
+        setTimeout(() => { if (typeof cb === 'function') cb({ ok: true, archived: 2 }); }, 5000);
+        return undefined;
+      }
+      return vero(msg, cb);
+    };
+  });
+  await dash.locator('#input').fill('Parlami di Epicuro');
+  await dash.locator('#input').press('Enter');
+  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
+
+  await dash.locator('#input').fill('/pulisci');
+  await dash.locator('#input').press('Enter');
+  await expect.poll(async () => dash.evaluate(() => document.body.innerText), { timeout: 20_000 })
+    .toContain('Riordino in corso');
+
+  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').press('Enter');
+  await expect.poll(async () => dash.evaluate(() => document.body.dataset.state), { timeout: 10_000 })
+    .toBe('home');
+
+  await expect.poll(async () => {
+    const c = (await leggiArchivio(app))[0];
+    return c ? c.messages.map((m) => m.text).join('\n') : '';
+  }, { timeout: 40_000 }).toContain('Archiviate 2');
+
+  // La home resta la home, e la conversazione è una sola.
+  expect(await dash.evaluate(() => document.body.dataset.state)).toBe('home');
+  expect((await leggiArchivio(app)).length).toBe(1);
+});
+
+test('il menu di una chat si percorre e si sceglie da tastiera', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaDueChat(app);
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.title).length, { timeout: 30_000 }).toBe(2);
+
+  const page = await openTab(ARCHIVE);
+  const riga = page.locator('.arc-chat').first();
+  await expect(riga).toBeVisible({ timeout: 20_000 });
+
+  await riga.focus();
+  await page.keyboard.press('Shift+F10');
+  await expect(page.locator('.arc-ctxmenu')).toBeVisible({ timeout: 10_000 });
+  // Riapri la chat, Rinomina, Sposta, Elimina: la seconda voce è Rinomina.
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.arc-chat-rename')).toBeVisible({ timeout: 10_000 });
+
+  // Rinunciare e riprovare con la prima lettera porta sulla stessa voce.
+  await page.locator('.arc-chat-rename').press('Escape');
+  await riga.focus();
+  await page.keyboard.press('Shift+F10');
+  await page.keyboard.press('e');
+  const scelta = await page.evaluate(() => (document.activeElement || {}).textContent || '');
+  expect(scelta.trim()).toContain('Elimina');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.arc-ctxmenu')).toHaveCount(0, { timeout: 10_000 });
+});

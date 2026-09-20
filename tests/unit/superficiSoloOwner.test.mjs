@@ -56,7 +56,7 @@ test('l\'icona «Feedback» del menu del tasto destro esiste solo per l\'owner',
 test('il comando /feedback della home è riservato all\'owner e dice l\'altra strada', () => {
   // I comandi con lo slash vivono accanto alla home, in dashboard-comandi.js.
   const dash = leggi('src', 'pages', 'dashboard', 'dashboard-comandi.js');
-  const handler = dash.match(/'\/feedback':\s*\(\)\s*=>\s*\{([\s\S]*?)\n    \},/)?.[1];
+  const handler = dash.match(/'\/feedback':\s*\([^)]*\)\s*=>\s*\{([\s\S]*?)\n    \},/)?.[1];
   assert.ok(handler, 'non trovo il comando /feedback nella home');
   assert.match(handler, /if \(!isOwner\)/, '/feedback aprirebbe la posta a chiunque');
   assert.match(handler, /Invia feedback/,
