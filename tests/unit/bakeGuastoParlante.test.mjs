@@ -135,6 +135,23 @@ test('una risposta di rifiuto del server non passa in silenzio', async () => {
   }
 });
 
+test('le chiavi del server continuano a passare, con o senza il campo ok', async () => {
+  // La guardia sul rifiuto non deve mangiare la strada buona: qui il server
+  // risponde davvero, ed è la sola strada che porta agli utenti una chiave
+  // ruotata dall'owner.
+  for (const json of [{ ok: true, apiKeys: { tavily: 'dal-server' } }, { apiKeys: { tavily: 'dal-server' } }]) {
+    const srv = await serverFinto({ '/buildKeys': { stato: 200, json } });
+    try {
+      const r = await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: 'giusta' });
+      assert.equal(r.uscita, 0, `con le chiavi dal server la costruzione deve passare: ${r.registro}`);
+      assert.doesNotMatch(r.registro, /::error::/);
+      assert.doesNotMatch(r.registro, /Manca tavily/);
+    } finally {
+      await srv.chiudi();
+    }
+  }
+});
+
 test('l’allarme porta le stesse informazioni del registro', async () => {
   const srv = await serverFinto({
     '/buildKeys': { stato: 200, json: { ok: false, reason: 'bad_passphrase' } },
