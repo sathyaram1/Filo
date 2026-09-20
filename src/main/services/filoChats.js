@@ -156,9 +156,19 @@
     if (idx < 0) return null;
     const chat = items[idx];
     if (title) chat.title = CA().clampTitle(title);
-    // L'intervista di benvenuto resta una conversazione qualunque cosa dica il
-    // modello.
-    chat.kind = chat.onboarding ? CA().KIND_TALK : CA().normalizeKind(kind);
+    if (chat.onboarding) {
+      // L'intervista di benvenuto resta una conversazione qualunque cosa dica
+      // il modello: lo dice il feedback, e non dipende da come è andata.
+      chat.kind = CA().KIND_TALK;
+    } else if (kind == null) {
+      // Il classificatore non ha risposto (niente chiave, limite di spesa,
+      // rete assente): il tipo resta IGNOTO, non «conversazione». Sono due
+      // cose diverse — ignoto significa «riprova alla partenza dopo»
+      // (listUntriaged), e intanto la chat si vede lo stesso.
+      chat.kind = null;
+    } else {
+      chat.kind = CA().normalizeKind(kind);
+    }
     await save(items);
     return chat;
   }
