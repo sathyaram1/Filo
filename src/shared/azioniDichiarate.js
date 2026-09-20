@@ -583,20 +583,41 @@
   // né quando la riga prima dice che è un esempio («ecco com'è fatta
   // un'azione:»). Buttare via quella risposta e rifarla lasciava l'utente senza
   // la cosa che aveva chiesto di vedere.
+  // Il nome dello strumento dentro un involucro JSON, quando c'è.
+  function tipoDichiarato(s) {
+    const m = String(s).match(/"type"\s*:\s*"([A-Za-z_]{3,})"/);
+    return m ? m[1].toUpperCase() : '';
+  }
+
   function involucro(s, nomi) {
     if (!s) return false;
     // Il vecchio involucro del protocollo, o un oggetto vuoto al posto della
     // risposta: in chat sono un blocco di codice e basta. La graffa di chiusura
     // non si pretende: un involucro tagliato a metà è comunque un turno buttato.
-    if (/^\{/.test(s) && /"(?:text|actions|type)"\s*:/.test(s)) return true;
+    if (/^\{/.test(s)) {
+      if (/"(?:text|actions)"\s*:/.test(s)) return true;
+      // Il solo `"type"` non basta: un JSON qualunque può averlo, e l'utente
+      // che chiede «scrivimi un JSON» si vedeva buttare la risposta. Il nome
+      // si confronta con quelli veri quando li abbiamo.
+      const t = tipoDichiarato(s);
+      if (t) return !nomi || nomi.has(t);
+    }
     if (/^\{\s*\}$/.test(s)) return true;
     // Una lista di azioni scritta invece che chiamata.
-    if (/^\[\s*\{[\s\S]*"type"\s*:/.test(s)) return true;
+    if (/^\[\s*\{[\s\S]*"type"\s*:/.test(s)) {
+      const t = tipoDichiarato(s);
+      return !nomi || !t || nomi.has(t);
+    }
     // La busta a tag dei modelli aperti. Quando finisce nel testo invece che
     // nel canale degli strumenti è lo stesso guasto: in chat resta un blocco
     // di codice e la sveglia non c'è. Il tag si nomina per esteso: un `<div>`
     // dentro una risposta non è una chiamata.
     if (/^<\s*\/?\s*(?:tool_call|tool▁call|tool_use|function_call|function_calls|invoke|antml:invoke)\b/i.test(s)) return true;
+    // Le altre due buste dei modelli aperti: quella a parentesi quadre dei
+    // Mistral e quella fra barre verticali. Da sole non venivano riconosciute,
+    // e in chat restava un blocco di codice con dentro la sveglia che non c'è.
+    if (/^\[TOOL_CALLS\]/i.test(s)) return true;
+    if (/^<\|[^|>]{0,32}tool[^|>]{0,32}\|>/i.test(s)) return true;
     // Il nome di uno strumento con i suoi argomenti, anche preceduto dallo
     // spazio dei nomi che alcuni modelli ci mettono davanti
     // («functions.SVEGLIA({…})»). Il nome si confronta con quelli VERI quando
