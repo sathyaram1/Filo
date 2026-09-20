@@ -163,6 +163,29 @@ test.describe('il perimetro delle uscite', () => {
     expect(primoGiro).toContain('ESEGUI_COMANDO');
   });
 
+  test('la lettura morde dal giro dopo: quello che il modello ha già chiesto non poteva saperlo', async ({ app }) => {
+    await configura(app);
+    // Lettura e apertura nello STESSO giro: il modello ha deciso di aprire il
+    // link prima di vedere una riga del documento, quindi il documento non può
+    // averlo influenzato. È la forma di «leggi il pdf e apri il link».
+    const insieme = await turno(app, [
+      [
+        { name: 'LEGGI_DOCUMENTO', args: { percorso: '~/non-esiste-12345.pdf' } },
+        { name: 'NAVIGA', args: { url: 'https://example.org/buono' } },
+      ],
+    ], 'Leggi il pdf e apri il link.');
+    const aperta = insieme.azioni.find((a) => String(a.type) === 'NAVIGA');
+    expect(aperta, 'un\'azione decisa prima della lettura non va rifiutata').toBeTruthy();
+
+    // Il giro DOPO invece sì: lì il testo del documento è nel contesto.
+    const dopo = await turno(app, [
+      [{ name: 'LEGGI_DOCUMENTO', args: { percorso: '~/non-esiste-12345.pdf' } }],
+      [{ name: 'NAVIGA', args: { url: 'https://esfiltrazione.example/x' } }],
+    ], 'Leggi il pdf.');
+    expect(dopo.azioni.find((a) => String(a.type) === 'NAVIGA')).toBeFalsy();
+    expect(dopo.offerti[1] || []).not.toContain('NAVIGA');
+  });
+
   test('un\'uscita in più passa dall\'utente, e il suo sì vale per quella sola', async ({ app }) => {
     await configura(app);
     const lezioniPrima = await lezioni(app);
