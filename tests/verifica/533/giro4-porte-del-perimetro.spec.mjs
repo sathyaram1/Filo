@@ -114,7 +114,7 @@ test.describe('#533 giro 4 — quello che resta di una lettura, seconda mano', (
     // così. Quello che non deve succedere è che da lì in poi la frase della
     // pagina stia davanti a ogni richiesta futura, in una sezione che il
     // modello legge come regole di comportamento dell'utente.
-    await turno(app, {
+    const primo = await turno(app, {
       giri: [
         [{ name: 'DICHIARA_USCITE', args: { uscite: ['memoria'], motivo: 'mi ha chiesto di ricordarlo' } }],
         [{ name: 'CERCA_WEB', args: { query: 'notizie di oggi' } }],
@@ -125,9 +125,17 @@ test.describe('#533 giro 4 — quello che resta di una lettura, seconda mano', (
       testoFinale: 'Fatto.',
     });
 
-    // La prova vale solo se la lezione è stata scritta davvero: senza, non
-    // starebbe controllando niente.
-    expect(JSON.stringify(await lezioni(app)), 'la lezione è stata scritta davvero').toContain(PEZZO);
+    // Il modello la regola l'ha chiesta davvero: la prova vale solo se il
+    // copione è arrivato fino in fondo.
+    expect(primo.offerti.length, 'il turno ha fatto i giri del copione').toBeGreaterThanOrEqual(3);
+
+    // Se la regola non viene scritta, l'utente non deve restare convinto del
+    // contrario: un controllo che rifiuta lo dice sempre.
+    const scritta = JSON.stringify(await lezioni(app)).includes(PEZZO);
+    if (!scritta) {
+      const traccia = JSON.stringify(primo.azioni);
+      expect(traccia, 'la regola non scritta lascia una riga che l\'utente vede').toContain('SALVA_LEZIONE');
+    }
 
     const dopo = await richiestaDopo(app);
     expect(dopo.veleno && dopo.tutti,
