@@ -362,9 +362,9 @@ function kindFromExtension(filePath) {
 function looksLikeText(buf) {
   if (!buf || !buf.length) return true; // un file vuoto è testo vuoto, non binario
   // Un file a due byte per carattere è pieno di byte nulli per costruzione: il
-  // conteggio qui sotto lo scarterebbe come binario. La firma in testa dice che
-  // è testo, e decodeText sa leggerlo.
-  if (bomDueByte(buf)) return true;
+  // conteggio qui sotto lo scarterebbe come binario. Lo riconosciamo dalla
+  // firma in testa o dalla sua forma, e decodeText sa leggerlo.
+  if (bomDueByte(buf) || pareDueByte(buf)) return true;
   const n = Math.min(buf.length, 8192);
   let controls = 0;
   for (let i = 0; i < n; i++) {
