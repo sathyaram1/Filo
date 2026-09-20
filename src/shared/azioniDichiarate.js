@@ -541,6 +541,49 @@
     return CHIEDE_DEL_PASSATO.test(s);
   }
 
+  // Giro 9 — L'UTENTE HA CHIESTO UNA COSA CHE SOLO UNO STRUMENTO PUÒ FARE?
+  //
+  // È il pezzo che mancava, e senza di lui due porte restavano aperte dalle
+  // due parti opposte.
+  //  - La conferma col PRONOME non dice di cosa parla. Quando l'utente ha
+  //    chiesto una sveglia, «te l'ho messa» è una promessa da verificare;
+  //    quando ha chiesto di togliere una parola da una frase, «te l'ho
+  //    tolta» consegna la frase che sta lì sopra, e smentirla era un'accusa
+  //    su un cammino che un utente nuovo percorre subito. Il giro 3 aveva
+  //    provato a distinguerle dalla coda della frase («in ordine», «alla
+  //    lista»), ma «te l'ho tolta» una coda non ce l'ha: la differenza sta
+  //    nella richiesta, non nella risposta.
+  //  - Il titolo di un appunto che ESISTE regge la frase che lo racconta
+  //    (giro 3), ma non può reggere un appunto che l'utente ha appena
+  //    chiesto: chi tiene un file intitolato «lista» non veniva più avvisato
+  //    di nessuna lista mai salvata.
+  //
+  // L'elenco è di COSE, non di verbi generici: «cerca», «apri» o «esegui» da
+  // soli si dicono anche di un testo. Quando il messaggio non dice niente, la
+  // risposta è `false` e il presidio tace: sulla prova più debole che ha, il
+  // silenzio è il lato giusto dove sbagliare. Chi non passa il messaggio
+  // affatto lascia `undefined`, e allora niente cambia.
+  const COSE_DA_STRUMENTO = new RegExp(
+    `${INIZIO}(?:svegli[a-zà-ù]*|allarm[ei]|suoneri[ae]|timer|conto\\s+alla\\s+rovescia`
+    + `|promemoria|appunt[a-zà-ù]*|not[ae]|segn[a-zà-ù]*|annot[a-zà-ù]*|ricord[a-zà-ù]*`
+    + `|salv[a-zà-ù]*|avvis[a-zà-ù]*|feedback|sviluppator[ie]`
+    + `|calendario|agenda|event[oi]|appuntament[oi]|riunion[ei]`
+    + `|memori[a-zà-ù]*|sched[ae]|tab|cronologia|archivi[a-zà-ù]*|proxy`
+    + `|tema|impostazion[ei]|preferenz[ae]|zoom|font|carattere|notifiche|sfondo`
+    + `|luminosit[àa]|modalit[àa]`
+    + `|apri|aprimi|aprire|apra`
+    // Il tasto «Fallo adesso» manda esattamente questa frase: senza, premerlo
+    // spegneva il controllo invece di riaccenderlo.
+    + `|fallo|falla|rifallo|rifai|davvero)${FINE}`, 'i');
+  function richiestaDiAzione(messaggio) {
+    const s = String(messaggio || '');
+    if (!s.trim()) return false;
+    // «L'hai già mandata?» non chiede di farlo adesso: chiede se è fatto, e
+    // lì una cosa fatta prima è la risposta giusta.
+    if (domandaSuCosaFatta(s)) return false;
+    return COSE_DA_STRUMENTO.test(s);
+  }
+
   // La dichiarazione è dentro una domanda? («Ho aperto la pagina giusta?»)
   //
   // Giro 5: si guardava fino al primo `.!?\n`, e la virgola non contava. Così
