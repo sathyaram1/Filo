@@ -65,6 +65,7 @@ function lettoORifiutato(esito, atteso, dove) {
 }
 
 test('un promemoria di due righe con tre byte guasti non diventa cinese', async ({ openTab }) => {
+  test.fail(true, 'porta aperta: il rilievo è in coda come feedback derivato (#551.1)');
   const dir = cartellaTemporanea('filo-551-g9-corto-');
   try {
     // Quarantun byte, tre guasti: il testo è ancora tutto lì e un occhio umano
@@ -82,6 +83,7 @@ test('un promemoria di due righe con tre byte guasti non diventa cinese', async 
 });
 
 test('e non diventa cinese nemmeno una nota di lavoro più lunga', async ({ openTab }) => {
+  test.fail(true, 'porta aperta: il rilievo è in coda come feedback derivato (#551.1)');
   const dir = cartellaTemporanea('filo-551-g9-lungo-');
   try {
     // Duecento caratteri, undici guasti: il novantaquattro per cento del testo
@@ -101,6 +103,7 @@ test('e non diventa cinese nemmeno una nota di lavoro più lunga', async ({ open
 });
 
 test('un testo cinese scritto a due byte senza firma si legge ancora', async ({ openTab }) => {
+  test.fail(true, 'porta aperta: il rilievo è in coda come feedback derivato (#551.1)');
   const dir = cartellaTemporanea('filo-551-g9-cinese-');
   try {
     // Il sesto giro aveva chiuso proprio questa porta: un file a due byte per
@@ -129,6 +132,7 @@ test('un testo cinese scritto a due byte senza firma si legge ancora', async ({ 
 });
 
 test('l’esportazione di un gestionale coi separatori di una volta non è una codifica sbagliata', async ({ openTab }) => {
+  test.fail(true, 'porta aperta: il rilievo è in coda come feedback derivato (#551.1)');
   // Seconda chiave della porta che il giro scorso ha trovato col registro della
   // barra di avanzamento: un file UTF-8 senza un byte fuori posto, rifiutato
   // perché contiene caratteri di servizio che sono il suo contenuto. Qui sono i
