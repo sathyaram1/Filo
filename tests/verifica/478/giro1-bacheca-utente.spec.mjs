@@ -213,14 +213,18 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
     [scheda({ _id: 'fb-tema', name: 'Un miglioramento', votes: undefined })],
     { signedIn: 'uid-tema' },
   );
-  // Un voto già dato, così si guarda anche lo stato «premuto».
-  await page.evaluate(() => window.__boardTest.setData([{
-    _id: 'fb-tema', name: 'Un miglioramento', seq: 478, subSeq: 0,
-    status: 'done', statusPublic: 'closed', resolvedInVersion: '0.2.70',
-    createdAt: '2026-08-17T07:33:44.390Z',
-    votes: { 'uid-tema': { vote: 'works', at: '2026-09-02T10:00:00.000Z', credibilitySnapshot: 1 } },
-  }]));
-  await expect(page.locator('.bd-card')).toHaveCount(1);
+  // Due voti già dati, uno per verso: lo stato «premuto» ha due colori scritti
+  // a mano, e vanno guardati tutti e due.
+  await page.evaluate(() => {
+    const base = (id, seq, voto) => ({
+      _id: id, name: `Miglioramento ${seq}`, seq, subSeq: 0,
+      status: 'done', statusPublic: 'closed', resolvedInVersion: '0.2.70',
+      createdAt: '2026-08-17T07:33:44.390Z',
+      votes: { 'uid-tema': { vote: voto, at: '2026-09-02T10:00:00.000Z', credibilitySnapshot: 1 } },
+    });
+    window.__boardTest.setData([base('fb-works', 1, 'works'), base('fb-broken', 2, 'broken')]);
+  });
+  await expect(page.locator('.bd-card')).toHaveCount(2);
 
   const contrasto = (a, b) => {
     const lum = (c) => {
@@ -261,7 +265,7 @@ test('la bacheca si legge nel tema chiaro e nel tema scuro', async ({ openTab })
   }
   expect(fondi[0], 'i due temi devono dare fondi diversi').not.toBe(fondi[1]);
 
-  for (const tema of ['light', 'dark']) {
+  for (const tema of ['dark', 'light']) {
     const { testo, fondo } = misure[tema];
     const r = contrasto(testo, fondo);
     expect(r, `voto già dato, tema ${tema}: contrasto ${r.toFixed(2)} (testo ${testo}, fondo ${fondo})`)
