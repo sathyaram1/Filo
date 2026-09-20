@@ -115,3 +115,73 @@ test('l\'aggancio dei test della home non cambia forma', () => {
   assert.deepEqual(chiavi, ['applyCommandCwd', 'getCwd', 'refreshAccountControl', 'renderActions'],
     'la superficie dell\'aggancio è cambiata: gli spec che la usano si romperebbero tutti insieme');
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Chi spiega la home non deve mandare nel file sbagliato.
+//
+// Le schede di PATTERNS.md e i commenti in testa ai moduli dicono DOVE sta una
+// cosa, e si aprono proprio quando qualcuno sta per toccarla: è il momento in
+// cui un'indicazione vecchia costa di più. Al taglio del #635 quattro di quelle
+// indicazioni continuavano a mandare in `dashboard.js` roba che era appena
+// finita in una delle parti, e nessuno se ne sarebbe accorto: un cartello
+// sbagliato non rompe niente, fa solo perdere tempo a chi legge.
+//
+// Qui il controllo è meccanico: se un documento nomina `dashboard.js` e nella
+// stessa riga cita una funzione o un comando con lo slash che oggi vive in una
+// parte, il documento va aggiornato — e il messaggio dice in quale parte.
+
+// Nome → parte che lo definisce, per le funzioni di primo livello e per i
+// comandi con lo slash.
+function cosaVivaNelleParti() {
+  const mappa = new Map();
+  for (const f of parti) {
+    const src = readFileSync(join(DIR, f), 'utf8');
+    for (const m of src.matchAll(/^ {2}(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) {
+      if (!mappa.has(m[1])) mappa.set(m[1], f);
+    }
+    for (const m of src.matchAll(/^\s*'(\/[a-z][\w -]*)':/gm)) {
+      if (!mappa.has(m[1])) mappa.set(m[1], f);
+    }
+  }
+  return mappa;
+}
+
+// I documenti e i commenti che possono parlare della home. I test non li
+// guardiamo: lì un nome vecchio si vede subito, perché il test diventa rosso.
+function documentiDaControllare() {
+  const fuori = [];
+  const salta = new Set(['node_modules', '.git', 'tests', 'dist', 'release', 'assets']);
+  const cammina = (dir) => {
+    for (const voce of readdirSync(dir)) {
+      if (salta.has(voce) || voce.startsWith('.')) continue;
+      const p = join(dir, voce);
+      let st;
+      try { st = statSync(p); } catch (_) { continue; }
+      if (st.isDirectory()) { cammina(p); continue; }
+      if (/\.(md|js|mjs)$/.test(voce)) fuori.push(p);
+    }
+  };
+  cammina(ROOT);
+  return fuori.filter((p) => !p.startsWith(DIR));
+}
+
+test('nessun documento manda in dashboard.js una cosa che ora vive in una parte', () => {
+  const vive = cosaVivaNelleParti();
+  assert.ok(vive.size > 20, `mi aspetto le funzioni delle parti, ne ho trovate ${vive.size}`);
+  const sbagliate = [];
+  for (const p of documentiDaControllare()) {
+    const righe = readFileSync(p, 'utf8').split('\n');
+    righe.forEach((riga, i) => {
+      if (!riga.includes('dashboard.js')) return;
+      const citati = new Set();
+      for (const m of riga.matchAll(/`([A-Za-z_$][\w$]*)\(\)`/g)) citati.add(m[1]);
+      for (const m of riga.matchAll(/`(\/[a-z][\w -]*)`/g)) citati.add(m[1]);
+      for (const nome of citati) {
+        if (!vive.has(nome)) continue;
+        sbagliate.push(`${p.slice(ROOT.length + 1)}:${i + 1} cita ${nome}, che oggi sta in ${vive.get(nome)}`);
+      }
+    });
+  }
+  assert.deepEqual(sbagliate, [],
+    'un cartello manda nel file sbagliato:\n  ' + sbagliate.join('\n  '));
+});
