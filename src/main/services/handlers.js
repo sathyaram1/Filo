@@ -2661,7 +2661,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     }
   }
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
-  await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
+  await FiloMem.appendRaw({
+    type: 'chat_filo',
+    summary: textReply.slice(0, 200),
+    // #517 — la traccia dell'anomalia sta accanto al turno che l'ha prodotta:
+    // «ha detto di aver fatto X, e X non è mai stata chiamata».
+    extra: azioniMancate.length
+      ? { actions: actionsToRun, azioniMancate: azioniMancate.map((f) => ({ id: f.id, frase: f.frase })) }
+      : { actions: actionsToRun },
+  });
   // #524 — chiusura dell'intervista di benvenuto: la sequenza sta in
   // `finishOnboarding`. Se invece l'intervista prosegue, il turno di Filo viene
   // messo da parte per la ripresa.
