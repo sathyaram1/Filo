@@ -832,7 +832,11 @@
       if (ora === true) return out;
       const libere = [...presenti].some((x) => !impegnati.has(x) && !NON_REGGONO_IL_PRONOME.has(x));
       const ripete = pronome.verbo && radiciRette.has(pronome.verbo);
-      if (!libere && !ripete && !esisteGia(PRONOME, pronome)) out.push(manca);
+      // Il pronome non dice di cosa si tratta, quindi qualunque azione dei
+      // turni prima può reggerlo: ma solo se la frase guarda indietro.
+      const daPrima = [...precedenti].some((x) => !NON_REGGONO_IL_PRONOME.has(x))
+        && (domanda || GUARDA_INDIETRO.test(pronome.frase || ''));
+      if (!libere && !ripete && !daPrima && !esisteGia(PRONOME, pronome)) out.push(manca);
     }
     return out;
   }
