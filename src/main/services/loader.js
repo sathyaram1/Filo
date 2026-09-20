@@ -66,6 +66,7 @@ require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'feedbackClientIdHash.js')); // prima di feedbackPublicView: l'impronta della scheda (#583)
 require(path.join(SHARED, 'feedbackPublicView.js')); // #583 — quali feedback hanno una scheda pubblica, e con quali campi (dopo manageReview: la usa)
 require(path.join(SHARED, 'preferences.js'));
+require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .ics per il calendario del computer
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'urlExfil.js'));
