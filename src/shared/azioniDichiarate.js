@@ -142,6 +142,17 @@
   // tutte le altre (la sentinella degli unit test le controlla una per una):
   // il fatto che siano «senza ho» sta qui accanto.
   const SENZA_HO = new Set();
+  // Giro 10 — le regole che NON nominano la cosa: «ti ho segnato i punti
+  // principali», «ho trascritto la lista della spesa». Dicono che qualcosa è
+  // stato preso nota, ma non dove. Quando l'utente ha chiesto di lavorare su
+  // un TESTO, quella frase consegna la risposta che sta lì sopra: buttarla,
+  // rifarla con un'altra chiamata al modello e poi smentirla era l'accusa più
+  // frequente di tutte, su un cammino che un utente nuovo percorre subito.
+  // Il giro 9 ha chiuso lo stesso caso per la conferma col pronome; qui la
+  // frase cade in una famiglia che sa dire di cosa parla, e la richiesta
+  // dell'utente non veniva guardata affatto.
+  const SENZA_OGGETTO = new Set();
+  function senzaOggetto(re) { SENZA_OGGETTO.add(re); return re; }
   function participio(nome, participi, n = 24) {
     const re = new RegExp(`${APRE}(?:l[ae] |un[ao] |il |un |l['’])?${nome}\\b${SENZA_NON(n)}`
       + `${PONTE(n)}\\b(?:è\\s+|e['’]\\s+|già\\s+)?(?:${participi})\\b`, 'i');
