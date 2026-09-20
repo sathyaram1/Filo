@@ -310,12 +310,10 @@
     return String(parola || '').toLowerCase().replace(/[aeio]+$/, '');
   }
 
-  function radiciDichiarate(testo) {
-    const out = new Set();
-    const rx = /\bho\s+([a-zàèéìíòóùú]{3,})\b/gi;
-    let m;
-    while ((m = rx.exec(testo))) out.add(radice(m[1]));
-    return out;
+  // Il participio di una dichiarazione, preso dal pezzo che ha fatto match.
+  function verboDi(pezzo) {
+    const m = String(pezzo || '').match(/\bho\s+([a-zàèéìíòóùú]{3,})/i);
+    return m ? radice(m[1]) : '';
   }
 
   // Gli orari nominati in una frase: «alle 19:00», «alle 19», «alle 7.30».
