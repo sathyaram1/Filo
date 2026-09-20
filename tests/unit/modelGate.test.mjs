@@ -150,6 +150,32 @@ test('nessuno arriva ai fornitori fuori dal cancello unico', () => {
   );
 });
 
+// La sentinella statica vale quanto vale il suo modo di togliere i commenti:
+// se lì dentro sparisce del codice, sparisce in silenzio. Questi casi tengono
+// la promessa «dai commenti non si perde niente, dal codice nemmeno».
+test('togliere i commenti non porta via il codice che li circonda', () => {
+  const casi = [
+    ['// SN_PROVIDERS di cui si parla e basta\n', false, 'un commento di riga'],
+    ['/* SN_PROVIDERS in un blocco */\n', false, 'un commento di blocco'],
+    ['const s = "http://x"; // SN_PROVIDERS\n', false, 'un indirizzo web davanti a un commento'],
+    ['SN_PROVIDERS.completeWithFallback({});\n', true, 'una chiamata nuda'],
+    ['const t = "a//b"; SN_PROVIDERS.completeWithFallback({});\n', true,
+      'una stringa con due barre non nasconde la chiamata che segue'],
+    ['const re = /a\\/\\/b/; SN_PROVIDERS.completeWithFallback({});\n', true,
+      'due barre dentro un\'espressione regolare non nascondono la chiamata che segue'],
+    ['const t = `x//y`; SN_PROVIDERS.completeWithFallback({});\n', true,
+      'due barre dentro un template non nascondono la chiamata che segue'],
+    ['/* a */ SN_PROVIDERS.completeWithFallback({});\n', true,
+      'un blocco chiuso non nasconde la chiamata che segue'],
+    ['const s = "/*"; SN_PROVIDERS.completeWithFallback({});\n', true,
+      'un inizio di blocco dentro una stringa non apre nessun blocco'],
+  ];
+  for (const [codice, atteso, perche] of casi) {
+    const visto = /\bSN_PROVIDERS\b/.test(senzaCommenti(codice));
+    assert.equal(visto, atteso, perche);
+  }
+});
+
 test('il cancello è caricato dal loader', () => {
   const loader = readFileSync(join(REPO, 'src/main/services/loader.js'), 'utf8');
   assert.match(loader, /modelGate\.js/, 'modelGate.js va aggiunto all\'ordine del loader');
