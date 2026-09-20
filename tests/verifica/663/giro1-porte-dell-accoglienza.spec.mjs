@@ -153,3 +153,35 @@ test('il modello scelto nelle Opzioni mentre la home è aperta: l’accoglienza 
   await expect(page.locator('.dash-bubble-filo').first())
     .toContainText('Ciao, sono Filo', { timeout: 10_000 });
 });
+
+test('«solo modelli a pesi aperti» senza sostituti: la home dice perché Filo tace', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  const azioni = await page.evaluate(() => {
+    const A = window.SN_CONST.ACTIONS;
+    return { chat: A.FILO_CHAT, home: A.FILO_DASHBOARD };
+  });
+  // Crediti a posto, modelli configurati ed esistenti: l'unica cosa che spegne
+  // Filo è l'interruttore «solo modelli a pesi aperti», acceso su una
+  // configurazione fatta di soli modelli proprietari.
+  await configCondivisa(app, {
+    provider: 'openrouter',
+    models: { [azioni.chat]: 'chiuso', [azioni.home]: 'chiuso' },
+    modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+  });
+  await conChiave(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ openWeightsOnly: true });
+  });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+  const messaggio = page.locator('#homeMessage');
+  // Quello che l'utente deve poter capire: è l'interruttore che ha acceso, non
+  // una configurazione dei modelli vuota o che cita modelli inesistenti.
+  await expect(messaggio).not.toContainText(/codice d.invito/i, { timeout: 15_000 });
+  await expect(messaggio).toContainText(/pesi aperti/i, { timeout: 15_000 });
+});
