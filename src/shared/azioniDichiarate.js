@@ -564,10 +564,17 @@
     if (/^\{\s*\}$/.test(s)) return true;
     // Una lista di azioni scritta invece che chiamata.
     if (/^\[\s*\{[\s\S]*"type"\s*:/.test(s)) return true;
-    // Il nome di uno strumento con i suoi argomenti. Il nome si confronta con
-    // quelli VERI quando li abbiamo: senza, una parola tutta maiuscola con una
-    // parentesi dietro passerebbe per una chiamata.
-    const m = s.match(/^([A-Z][A-Z_]{3,})\s*(?:\{|\()/);
+    // La busta a tag dei modelli aperti. Quando finisce nel testo invece che
+    // nel canale degli strumenti è lo stesso guasto: in chat resta un blocco
+    // di codice e la sveglia non c'è. Il tag si nomina per esteso: un `<div>`
+    // dentro una risposta non è una chiamata.
+    if (/^<\s*\/?\s*(?:tool_call|tool▁call|tool_use|function_call|function_calls|invoke|antml:invoke)\b/i.test(s)) return true;
+    // Il nome di uno strumento con i suoi argomenti, anche preceduto dallo
+    // spazio dei nomi che alcuni modelli ci mettono davanti
+    // («functions.SVEGLIA({…})»). Il nome si confronta con quelli VERI quando
+    // li abbiamo: senza, una parola tutta maiuscola con una parentesi dietro
+    // passerebbe per una chiamata.
+    const m = s.match(/^(?:(?:functions?|tools?)\s*\.\s*)?([A-Z][A-Z_]{3,})\s*(?:\{|\()/);
     if (m) return !nomi || nomi.has(m[1]);
     return false;
   }
