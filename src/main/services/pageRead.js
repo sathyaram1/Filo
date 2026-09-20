@@ -1,55 +1,36 @@
 // Lettura del TESTO di una pagina web (azione LEGGI_PAGINA).
+// Sola lettura: non scrive, non esegue lo JavaScript della pagina, non tocca il
+// disco. Il testo che esce da qui lo scrive chi possiede il sito.
 //
-// Il buco che chiude: la chat poteva cercare sul web (titolo, indirizzo e un
-// riassunto di 240 caratteri) e aprire una scheda, ma il contenuto della pagina
-// non tornava mai al modello. Per qualunque dato che sta DENTRO una pagina — un
-// prezzo, un punteggio, un orario, una clausola — Filo poteva solo indovinare
-// dal riassunto o rimandare l'utente a leggere da sé.
-//
-// SOLA LETTURA: scarica e basta. Non esegue lo JavaScript della pagina, non
-// manda niente e non tocca il disco.
-//
-// DUE STRADE, e la prima vince. Se la pagina è già aperta in una scheda di
-// Filo si legge il TESTO RESO di quella scheda: copre i siti che si
-// costruiscono in JavaScript (dove l'HTML scaricato è un guscio vuoto), non
-// ripaga un secondo scaricamento e vede la pagina esattamente come la vede
-// l'utente — comprese quelle dietro a un login. Altrimenti si scarica, con le
-// stesse guardie anti-SSRF delle altre richieste del main (safe-fetch.js).
-//
-// IL TESTO CHE ESCE DA QUI È DI SCONOSCIUTI. Lo scrive chi possiede il sito, ed
-// entra nel prompt imbustato come ogni altro contenuto esterno (handlers.js →
-// SN_ESTERNO). Qui dentro non si decide niente su quel testo: si estrae e si
-// tronca dichiarandolo.
+// DUE STRADE, E LA PRIMA VINCE. Se la pagina è già aperta in una scheda di Filo
+// si legge l'HTML RESO di quella scheda: copre i siti che si costruiscono in
+// JavaScript, dove l'HTML scaricato è un guscio vuoto. Altrimenti si scarica,
+// con le guardie anti-SSRF di safe-fetch.js.
 
 'use strict';
 
 const { safeFetch } = require('./safe-fetch');
 
-// Tetto sul TESTO restituito, come per i documenti dal disco: abbastanza per un
-// articolo lungo o una tabella di prezzi intera, poco abbastanza da non far
-// esplodere il prompt. Oltre il tetto si tronca e lo si DICHIARA.
+// Tetto sul TESTO, come per i documenti dal disco: un articolo lungo o una
+// tabella di prezzi intera ci stanno. Oltre, si tronca e lo si DICHIARA.
 const MAX_TEXT_CHARS = 16000;
 
-// Tetto sullo SCARICAMENTO, prima ancora di convertire: una pagina vera sta in
-// pochi MB, e un file enorme dietro un indirizzo che sembra una pagina non deve
-// poter bloccare il processo main.
+// Tetto sullo SCARICAMENTO: una pagina vera sta in pochi MB, e un file enorme
+// dietro un indirizzo qualunque non deve poter bloccare il processo main.
 const MAX_BYTES = 5 * 1024 * 1024;
 
 const TIMEOUT_MS = 15000;
 
-// Elementi che non sono MAI contenuto: o non si leggono (script, stili) o sono
-// la cornice del sito (menu, piè di pagina, colonne laterali). Il titolo
-// dell'articolo torna a parte, quindi togliere anche `header` non perde niente.
+// Elementi che non sono MAI contenuto: illeggibili (script, stili) o cornice del
+// sito. Il titolo torna a parte, quindi togliere anche `header` non perde nulla.
 const TAG_FUORI = new Set([
   'script', 'style', 'noscript', 'svg', 'iframe', 'template', 'canvas',
   'object', 'embed', 'video', 'audio', 'map', 'dialog', 'datalist',
   'nav', 'aside', 'footer', 'header',
 ]);
 
-// Classi e id del rumore, confrontati come TOKEN INTERI. Un confronto per
-// sottostringa qui è un disastro silenzioso: `class="header-price"` contiene
-// «header» e il prezzo — cioè proprio il dato che l'utente sta chiedendo —
-// sparirebbe senza che nessuno se ne accorga.
+// Classi e id del rumore, confrontati come TOKEN INTERI: per sottostringa
+// `class="header-price"` contiene «header», e il prezzo sparirebbe in silenzio.
 const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|sidebar|side-?bar|footer|site-?footer|page-?footer|header|site-?header|masthead|topbar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|banner|promo|promotion|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|comments?|comment-?list|disqus|related|related-?posts|recommended|widget|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
 
 const ROLE_RUMORE = /^(navigation|banner|contentinfo|complementary|search|dialog|alertdialog|menu|menubar|toolbar|tablist)$/i;
@@ -64,11 +45,8 @@ const BLOCCHI = new Set([
   'tbody', 'tfoot', 'tr', 'form', 'fieldset', 'address', 'hr', 'details', 'summary',
 ]);
 
-// `[^>]*` e non un'alternativa con le virgolette: il testo qui viene da
-// sconosciuti, e un gruppo ripetuto con rami che si sovrappongono può
-// impiegare un tempo esponenziale su una riga scritta apposta. Un valore di
-// attributo che contiene `>` chiude il tag un po' prima e il resto finisce
-// nel testo: un difetto di estrazione, non un processo bloccato.
+// `[^>]*` e non un'alternativa con le virgolette: su HTML di sconosciuti un
+// gruppo ripetuto con rami sovrapposti può costare un tempo esponenziale.
 const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9:_-]*)([^>]*?)(\/?)>/g;
 
 function attributi(raw) {
@@ -262,8 +240,8 @@ function tipoDaContentType(ct) {
   return null;
 }
 
-// Perché non «formato non supportato»: chi legge la risposta è il modello, che
-// deve poterlo spiegare all'utente in italiano senza inventarselo.
+// Non «formato non supportato»: chi legge è il modello, e deve poterlo dire
+// all'utente in italiano senza inventarselo.
 const SPIEGA_TIPO = {
   image: 'è un\'immagine, non una pagina di testo',
   video: 'è un video, non una pagina di testo',
@@ -360,8 +338,8 @@ function decodifica(buffer, contentType) {
   return Buffer.from(buffer).toString('utf8');
 }
 
-// Perché i motivi di safe-fetch si traducono qui: il modello deve poter dire
-// all'utente COSA non è andato, e «blocked-private-address» non è italiano.
+// I motivi di safe-fetch si traducono qui: il modello deve dire all'utente cosa
+// non è andato, e «blocked-private-address» non è una frase.
 const MOTIVI_RETE = {
   'blocked-private-address': 'quell\'indirizzo non è un sito pubblico: è il tuo computer o la tua rete locale, e Filo non ci va a leggere',
   'blocked-scheme': 'non è un indirizzo web (http o https)',
