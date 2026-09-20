@@ -129,8 +129,23 @@
       ]
     },
     "linux": {
-      "target": "AppImage",
-      "icon": "assets/icons/icon-256.png"
+      "target": [
+        "AppImage"
+      ],
+      "artifactName": "Filo-Linux.${ext}",
+      "icon": "assets/icons/icon-1024.png",
+      "category": "Network",
+      "desktop": {
+        "StartupWMClass": "Filo"
+      },
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "sathyaram1",
+          "repo": "Filo",
+          "releaseType": "release"
+        }
+      ]
     },
     "publish": [
       {
