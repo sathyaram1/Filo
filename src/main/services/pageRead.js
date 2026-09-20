@@ -611,4 +611,5 @@ module.exports = {
   MAX_TEXT_CHARS,
   MAX_BYTES,
   MAX_HTML_CHARS,
+  MAX_ATTESA_SCHEDA_MS,
 };
