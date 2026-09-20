@@ -487,6 +487,196 @@ test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano sp
   await expect(page.locator('#mgRoutinesMsg')).toContainText('NON');
 });
 
+// Stub dell'IPC delle sessioni delle routine: simula i quattro campi di
+// config/routines senza rete né main. `__sessionsSets` raccoglie ciò che la
+// pagina MANDA: è la prova che la scelta arriva dove il server la legge.
+async function stubSessions(page, initial = {}) {
+  await page.evaluate((init) => {
+    window.__sessions = Object.assign({
+      maxSessions: 1, priorityAccount: '', accountAOff: false, accountBOff: false,
+    }, init);
+    window.__sessionsSets = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_sessions_get') {
+        return Object.assign({ ok: true }, window.__sessions);
+      }
+      if (msg && msg.type === 'automation_sessions_set') {
+        const sent = {};
+        for (const campo of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff']) {
+          if (msg[campo] === undefined) continue;
+          window.__sessions[campo] = msg[campo];
+          sent[campo] = msg[campo];
+        }
+        window.__sessionsSets.push(sent);
+        return Object.assign({ ok: true }, window.__sessions);
+      }
+      return orig(msg);
+    };
+  }, initial);
+}
+
+async function apriAutomazioni(openTab) {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  return page;
+}
+
+test('le sessioni in parallelo si leggono dalla config e il salvataggio manda il solo campo toccato', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+
+  // Non-admin: sola lettura, come il resto della tab.
+  await expect(page.locator('#mgMaxSessions')).toBeDisabled();
+
+  await stubSessions(page, { maxSessions: 6 });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  const campo = page.locator('#mgMaxSessions');
+  await expect(campo).toBeEnabled();
+  await expect(campo).toHaveValue('6');
+  // I limiti vengono dal registro, non dall'HTML.
+  await expect(campo).toHaveAttribute('max', '20');
+
+  await campo.fill('12');
+  await page.locator('#mgMaxSessionsSave').click();
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+  await expect.poll(() => page.evaluate(() => window.__sessionsSets)).toEqual([{ maxSessions: 12 }]);
+  await expect.poll(() => page.evaluate(() => window.__sessions.maxSessions)).toBe(12);
+
+  // Invio salva come il pulsante: due strade, una cosa sola.
+  await campo.fill('3');
+  await campo.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.__sessions.maxSessions)).toBe(3);
+});
+
+test('un numero di sessioni fuori intervallo non parte, e il rifiuto dice l\'intervallo', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubSessions(page, { maxSessions: 4 });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  for (const storto of ['0', '21', '2,5', '']) {
+    await page.locator('#mgMaxSessions').fill(storto);
+    await page.locator('#mgMaxSessionsSave').click();
+    await expect(page.locator('#mgMaxSessionsMsg')).toContainText('da 1 a 20');
+  }
+  // Niente è partito: sul server è rimasto il valore di prima.
+  expect(await page.evaluate(() => window.__sessionsSets)).toEqual([]);
+  expect(await page.evaluate(() => window.__sessions.maxSessions)).toBe(4);
+});
+
+test('l\'account prioritario si legge e si salva al cambio', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubSessions(page, { priorityAccount: 'B' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  // La pillola si vede davvero (il radio è nascosto per costruzione).
+  await expect(page.locator('#mgPriorityAccountChoice .mg-auto-choice-text').first()).toBeVisible();
+  await expect(page.locator('input[name="mgPriorityAccount"][value="B"]')).toBeChecked();
+
+  await page.evaluate(() => {
+    const el = document.querySelector('input[name="mgPriorityAccount"][value=""]');
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgPriorityAccountMsg')).toHaveText('Salvato.');
+  await expect.poll(() => page.evaluate(() => window.__sessionsSets)).toEqual([{ priorityAccount: '' }]);
+});
+
+test('escludere un account manda il solo campo suo; esclusi tutti e due, la pagina lo dice', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubSessions(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  // Acceso = in uso: è il comportamento senza i campi.
+  await expect(page.locator('#mgAccountA')).toBeChecked();
+  await expect(page.locator('#mgAccountB')).toBeChecked();
+  await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAccountA');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.__sessionsSets)).toEqual([{ accountAOff: true }]);
+  // Uno solo escluso: il lavoro continua sull'altro, niente da segnalare.
+  await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAccountB');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.__sessions.accountBOff)).toBe(true);
+  await expect(page.locator('#mgAccountsWarn')).toBeVisible();
+  await expect(page.locator('#mgAccountsWarn')).toContainText('non parte nessuna sessione');
+
+  // Riacceso uno, l'avviso se ne va.
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAccountB');
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+});
+
+test('se il salvataggio delle sessioni fallisce, la pagina NON mostra la scelta come fatta', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubSessions(page, { maxSessions: 2, priorityAccount: 'A' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_sessions_set') return { ok: false, error: 'niente rete' };
+      return orig(msg);
+    };
+  });
+
+  await page.locator('#mgMaxSessions').fill('9');
+  await page.locator('#mgMaxSessionsSave').click();
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('NON è cambiata');
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('2');
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAccountA');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgAccountsMsg')).toContainText('NON è cambiata');
+  await expect(page.locator('#mgAccountA')).toBeChecked();
+  await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+});
+
+test('le scelte sulle sessioni restano manovrabili anche a routine spente', async ({ openTab }) => {
+  // Escludere un account è una cosa che si decide PRIMA di riaccendere: se
+  // fossero inerti come i bilanci, si potrebbe solo riaccendere e sperare.
+  const page = await apriAutomazioni(openTab);
+  await stubAutomation(page);
+  await stubSessions(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgRoutinesToggle');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgCap2')).toBeDisabled();  // i bilanci sì, inerti
+
+  for (const id of ['#mgMaxSessions', '#mgMaxSessionsSave', '#mgAccountA', '#mgAccountB']) {
+    await expect(page.locator(id)).toBeEnabled();
+  }
+  await expect(page.locator('input[name="mgPriorityAccount"][value="A"]')).toBeEnabled();
+});
+
 // Stub dell'IPC dei contatori del verificatore: simula il doc Firestore
 // config/routines senza rete/main. Cattura ogni `set` per provare che il valore
 // LASCIA il client (è la config che il server dei verdetti legge → "il
