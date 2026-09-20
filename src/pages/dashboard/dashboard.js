@@ -37,6 +37,12 @@
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
 
+  // Il turno che riparte dopo un permesso dato (#533): è una nota nostra al
+  // modello, non parole dell'utente, e viaggia con `internal: true`.
+  const RIPRESA_PERMESSO = 'L\'utente ha concesso il permesso che avevi chiesto. '
+    + 'Prosegui da dove eri rimasto e completa la richiesta di partenza; non chiedere altri permessi '
+    + 'che non ti servano davvero.';
+
   // ===== Le parti della home =====
   //
   // Qui restano chat e turni, la home (messaggio centrale e suggerimenti), la
