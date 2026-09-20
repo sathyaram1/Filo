@@ -611,6 +611,11 @@
     // Ricerca per testo dentro tutte le chat. { query, kind?, limit? }
     // Risposta: { ok, chats } (voci d'elenco, con il frammento che combacia).
     FILO_CHATS_SEARCH: 'filo_chats_search',
+    // ANNUNCIO (dal main a tutte le schede): l'elenco delle chat è cambiato —
+    // una si è chiusa e ha preso titolo e tipo, oppure è stata cancellata.
+    // La Cronologia aperta si riallinea invece di restare ferma a com'era
+    // quando l'hanno aperta.
+    FILO_CHATS_UPDATED: 'filo_chats_updated',
 
     // CRUD memoria/contenuti dashboard
     FILO_GET_MEMORY: 'filo_get_memory',
