@@ -58,25 +58,17 @@ const TAG_CORNICE = new Set(['header', 'footer', 'aside']);
 // `class="header-price"` contiene «header», e il prezzo sparirebbe in silenzio.
 // I blocchi di commenti NON stanno qui: su una discussione o su una domanda con
 // le risposte sotto, il dato che l'utente cerca esiste solo lì (#553).
-const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|footer|site-?footer|page-?footer|header|site-?header|masthead|topbar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|related|related-?posts|recommended|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
+const TOKEN_RUMORE = /^(nav|navbar|navigation|menu|menubar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|subscribe|subscription|paywall|related|related-?posts|recommended|skip-?link|screen-?reader-?text|sr-only|visually-hidden|modal|popup|overlay|toolbar|search-?form)$/i;
 
-// «promo» è il riquadro del prezzo scontato, «banner» spesso il titolo col suo
-// giorno: buttarli dava il prezzo di listino, cioè la risposta sbagliata (#553).
-const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero)$/i;
+// Contorno che può contenere il dato chiesto, quindi va in coda e non nel
+// cestino: l'orario sta nel piè di pagina, il prezzo scontato nel «promo», il
+// titolo col suo giorno nel «banner». Qui stanno anche i nomi che i programmi
+// per fare siti scrivono da soli, che sono quelli dei siti veri (#553).
+const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero|header|site-?header|page-?header|masthead|footer|site-?footer|page-?footer|colophon|topbar|top-?bar|bottom-?bar)$/i;
 
 const ROLE_RUMORE = /^(navigation|search|dialog|alertdialog|menu|menubar|toolbar|tablist)$/i;
 
 const ROLE_CORNICE = /^(banner|contentinfo|complementary)$/i;
-
-// Intestazione e coda: del SITO sono cornice, dell'ARTICOLO sono contenuto (la
-// data, l'ora e la firma stanno lì su quasi ogni blog), e in una tabella sono i
-// nomi delle colonne, senza i quali i numeri sotto non si leggono più.
-const CORNICE_SITO = /^(header|site-?header|masthead|footer|site-?footer|page-?footer|topbar|top-?nav)$/i;
-
-// Chi DICE di essere la cornice del sito: quello si butta dovunque stia. Un
-// `header` e basta no: fuori da `main` o `article` è quasi sempre il titolo del
-// pezzo con la sua data, e buttarlo via era il buco del giro prima (#553).
-const CORNICE_DICHIARATA = /^(site-?header|masthead|site-?footer|page-?footer|topbar|top-?nav)$/i;
 
 const TAG_TABELLA = new Set(['table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup', 'col']);
 
