@@ -160,24 +160,37 @@ function scherma(s) {
 
 /**
  * Due nomi di file sono lo stesso nome, a meno delle sviste? PURA.
- * Un carattere di sostituzione vale come jolly su uno o più caratteri veri:
- * è l'unico modo di ritrovare «Singolarità.txt» partendo da «Singolarit<27>.txt».
+ * Un carattere perso vale come jolly su POCHI caratteri veri: è l'unico modo di
+ * ritrovare «Singolarità.txt» partendo da «Singolarit<27>.txt».
  */
 function nomiCombaciano(a, b) {
   const ka = chiaveTollerante(a);
   const kb = chiaveTollerante(b);
   if (!ka || !kb) return false;
   if (ka === kb) return true;
-  const conJolly = ka.includes(IGNOTO) ? ka : (kb.includes(IGNOTO) ? kb : '');
+  const conJolly = IGNOTI.test(ka) ? ka : (IGNOTI.test(kb) ? kb : '');
   if (!conJolly) return false;
   const altro = conJolly === ka ? kb : ka;
-  // Un nome fatto (quasi) di soli caratteri ignoti non è un nome: combacerebbe
+  // Un nome fatto (quasi) di soli caratteri persi non è un nome: combacerebbe
   // con qualunque cosa, e in una cartella con un file solo aprirebbe quello
-  // senza che nessuno abbia riconosciuto niente. Serve del nome VERO sotto.
-  if (conJolly.split(IGNOTO).join('').trim().length < 3) return false;
-  // Ogni sequenza di caratteri ignoti vale «uno o più caratteri qualsiasi»,
-  // mai un separatore di percorso: qui si confronta un singolo nome.
-  const pattern = conJolly.split(/�+/).map(scherma).join('[^\\\\/]+?');
+  // senza che nessuno abbia riconosciuto niente. Serve del nome VERO sotto, e
+  // l'estensione non conta come nome.
+  if (parteRiconosciuta(conJolly).length < 3) return false;
+  // Ogni carattere perso vale UN carattere vero, non un pezzo di nome lungo a
+  // piacere: con «uno o più» bastava perdere la «o» di «Bilancio» per aprire
+  // «Bilancio 2019 definitivo riservato». Il carattere in più che si concede
+  // copre le tabelle a due byte, dove un carattere solo può averne persi due.
+  // Mai un separatore di percorso: qui si confronta un singolo nome.
+  let pattern = '';
+  let da = 0;
+  const run = new RegExp(IGNOTI_RUN.source, 'g');
+  let m;
+  while ((m = run.exec(conJolly)) !== null) {
+    pattern += scherma(conJolly.slice(da, m.index));
+    pattern += `[^\\\\/]{1,${m[0].length + 1}}`;
+    da = m.index + m[0].length;
+  }
+  pattern += scherma(conJolly.slice(da));
   let re;
   try { re = new RegExp(`^${pattern}$`); } catch (_) { return false; }
   return re.test(altro);
