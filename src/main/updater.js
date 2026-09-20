@@ -91,8 +91,12 @@ const AGGIORNAMENTO_BLOCCATO = {
   },
   linux: {
     tipo: 'aggiornamento-linux',
+    // Il file nuovo arriva dal browser senza il permesso di essere eseguito,
+    // esattamente come il primo: se l'avviso non lo dice, l'utente sbatte
+    // contro lo stesso muro una seconda volta e stavolta senza foglietto.
     testo: (v) => `C'è la versione ${v} di Filo, ma su Linux non riesce a installarsi da sola.\n`
-      + 'Scaricala da filo.red e sostituisci il file di Filo con quello nuovo. Ci vuole un minuto.',
+      + 'Scaricala da filo.red, sostituisci il file di Filo con quello nuovo e ridagli il permesso '
+      + 'di esecuzione (tasto destro, Proprietà, «Consenti l\'esecuzione»). Ci vuole un minuto.',
   },
 };
 
