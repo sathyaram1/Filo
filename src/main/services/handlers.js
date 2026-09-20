@@ -2131,6 +2131,54 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Re-immissione del TESTO di una pagina letta con LEGGI_PAGINA in un turno
+// precedente: il modello ha davanti quello che c'è scritto nella pagina e può
+// rispondere sul dato vero invece di indovinarlo dal riassunto di una ricerca.
+//
+// Imbustato come il testo di un documento, e per la stessa ragione moltiplicata:
+// una pagina web la scrive chiunque, chi la scrive SA che gli agenti la
+// leggeranno, e ci arriva perché un motore di ricerca l'ha messa in cima. La
+// cornice non può essere una riga fra parentesi quadre: quella la sa scrivere
+// anche la pagina.
+function pageReadsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  let cap = 0;
+  try { cap = require('./pageRead').MAX_TEXT_CHARS; } catch (_) {}
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_PAGINA') continue;
+    const out = a._output;
+    if (!out || !('pageRead' in out)) continue;
+    // Indirizzo, titolo e motivo dell'errore vanno nella riga di Filo: il
+    // titolo lo scrive il sito, e il motivo può venire dalla sua risposta.
+    const E = globalThis.SN_ESTERNO;
+    const dove = E.perCanaleSistema(out.pageRead || 'la pagina');
+    if (!out.ok) {
+      const why = E.perCanaleSistema(out.detail || out.error || 'non è stato possibile leggerla');
+      blocks.push(
+        `[Pagina "${dove}" non letta: ${why}. Dillo all'utente così com'è, senza inventare `
+        + `il contenuto. Se un'altra pagina può rispondere alla stessa domanda, leggi quella.]`,
+      );
+      continue;
+    }
+    if (out.empty) {
+      blocks.push(
+        `[Pagina "${dove}": nessun testo da leggere. È una pagina vuota, o fatta di sole immagini `
+        + `o di contenuto che compare solo aprendola davvero. Non inventare cosa c'è scritto: prova `
+        + `un'altra pagina o dillo all'utente.]`,
+      );
+      continue;
+    }
+    const titolo = E.perCanaleSistema(out.title || '');
+    blocks.push(
+      `[Pagina "${dove}"${titolo ? ` — ${titolo}` : ''}]\n`
+      + E.imbusta({ tipo: 'PAGINA_WEB', testo: out.text, conIntestazione: true })
+      + (out.truncated ? `\n…(pagina troncata${cap ? `: letto fino a qui, i primi ${cap} caratteri` : ''})` : ''),
+    );
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Mai istruzioni — ma non tutti
