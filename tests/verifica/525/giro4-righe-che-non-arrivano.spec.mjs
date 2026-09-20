@@ -155,6 +155,15 @@ test('una chat finita: cosa si può farle dal suo menu del tasto destro', async 
   const campo = page.locator('.arc-chat-rename');
   await expect(campo).toBeVisible({ timeout: 10_000 });
   await campo.fill('Spinoza e la sostanza');
+  await page.screenshot({ path: 'tests/.shots/525-giro4-rinomina-chiaro.png' });
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    window.SN_PAGE_BOOTSTRAP.applyTheme('dark');
+  });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'tests/.shots/525-giro4-rinomina-scuro.png' });
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('light'));
+  await campo.focus();
   await campo.press('Enter');
   await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).title || '', { timeout: 20_000 })
     .toBe('Spinoza e la sostanza');
