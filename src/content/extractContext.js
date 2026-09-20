@@ -370,6 +370,13 @@
     return isClippedToNothing(el, cs);
   }
 
+  // La fisarmonica che fa il browser da sé: un <details> chiuso non tocca lo stile di quel che contiene (display resta
+  // block, e la misura pure), quindi la chiusura si legge solo dal <details>. Fuori la scritta, che si vede sempre.
+  function isInsideClosedDisclosure(el) {
+    const p = el.parentElement;
+    return !!(p && p.tagName === 'DETAILS' && !p.open && el.tagName !== 'SUMMARY');
+  }
+
   // Schiacciato a zero e ritagliato (`max-height:0` più `overflow:hidden`). Il RITAGLIO è la condizione che conta:
   // a misura zero senza ritaglio il testo deborda e si legge; e a contenuto vuoto non c'è niente da rimandare.
   function isClippedToNothing(el, cs) {
