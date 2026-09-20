@@ -1,0 +1,135 @@
+// Unit test del magazzino delle chat con Filo (#525,
+// src/main/services/filoChats.js): quello che scrive davvero su disco.
+//
+// Due cose che il magazzino deve garantire e che la logica pura non può:
+//   • due scritture che partono insieme non si mangiano a vicenda (ogni
+//     scrittura rilegge tutto e riscrive tutto: senza una fila, la seconda
+//     cancella la prima);
+//   • una domanda riprovata dopo un errore non finisce scritta due volte.
+//
+// Niente Electron: `chrome.storage.local` è un finto in memoria, con una
+// lettura volutamente lenta per allargare la finestra in cui due scritture si
+// accavallano. Senza quel ritardo la prova passerebbe per fortuna.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import '../../src/shared/chatArchive.js';
+
+const require = createRequire(import.meta.url);
+
+globalThis.SN_CONST = { STORAGE_KEYS: { FILO_CHATS: 'filo_chats' } };
+
+let disco = {};
+let ritardoLettura = 0;
+globalThis.chrome = {
+  storage: {
+    local: {
+      async get(key) {
+        if (ritardoLettura) await new Promise((r) => setTimeout(r, ritardoLettura));
+        return { [key]: disco[key] };
+      },
+      async set(obj) {
+        Object.assign(disco, obj);
+      },
+    },
+  },
+};
+
+require('../../src/main/services/filoChats.js');
+const Store = globalThis.SN_FILO_CHATS;
+
+function azzera() {
+  disco = {};
+  ritardoLettura = 0;
+}
+
+const turno = (role, text, ts) => ({ role, text, ts });
+
+// ── Le scritture si mettono in fila ──────────────────────────────────────────
+
+test('tre chat che avanzano insieme si salvano tutte e tre, intere', async () => {
+  azzera();
+  ritardoLettura = 5; // la finestra in cui due scritture si accavallano
+  await Promise.all([
+    Store.append('a', turno('user', 'Prima domanda', '2026-09-20T10:00:00.000Z')),
+    Store.append('b', turno('user', 'Seconda domanda', '2026-09-20T10:00:01.000Z')),
+    Store.append('c', turno('user', 'Terza domanda', '2026-09-20T10:00:02.000Z')),
+  ]);
+  await Promise.all([
+    Store.append('a', turno('filo', 'Prima risposta', '2026-09-20T10:00:03.000Z')),
+    Store.append('b', turno('filo', 'Seconda risposta', '2026-09-20T10:00:04.000Z')),
+    Store.append('c', turno('filo', 'Terza risposta', '2026-09-20T10:00:05.000Z')),
+  ]);
+
+  const chats = await Store.list();
+  assert.deepEqual(chats.map((c) => c.id).sort(), ['a', 'b', 'c']);
+  for (const c of chats) assert.equal(c.messages.length, 2, `la chat ${c.id} ha perso un messaggio`);
+});
+
+test('una cancellazione partita insieme a una scrittura non resuscita la chat cancellata', async () => {
+  azzera();
+  ritardoLettura = 5;
+  await Store.append('viva', turno('user', 'Resto qui', '2026-09-20T10:00:00.000Z'));
+  await Store.append('morta', turno('user', 'Vado via', '2026-09-20T10:00:01.000Z'));
+  await Promise.all([
+    Store.remove('morta'),
+    Store.append('viva', turno('filo', 'Va bene', '2026-09-20T10:00:02.000Z')),
+  ]);
+
+  const chats = await Store.list();
+  assert.deepEqual(chats.map((c) => c.id), ['viva']);
+  assert.equal(chats[0].messages.length, 2);
+});
+
+// ── «Riprova» dopo un errore ─────────────────────────────────────────────────
+
+test('la stessa domanda riprovata subito dopo un turno fallito si scrive una volta sola', async () => {
+  azzera();
+  await Store.append('r', turno('user', 'Spiegami la fotosintesi', '2026-09-20T10:00:00.000Z'));
+  // Il turno è fallito: nessuna risposta. L'utente preme «Riprova».
+  await Store.append('r', turno('user', 'Spiegami la fotosintesi', '2026-09-20T10:00:09.000Z'));
+  await Store.append('r', turno('filo', 'Ecco come funziona.', '2026-09-20T10:00:12.000Z'));
+
+  const chat = await Store.get('r');
+  assert.deepEqual(chat.messages.map((m) => m.text), [
+    'Spiegami la fotosintesi',
+    'Ecco come funziona.',
+  ]);
+});
+
+test('la stessa frase ripetuta DOPO una risposta è un messaggio nuovo e resta', async () => {
+  azzera();
+  await Store.append('r', turno('user', 'continua', '2026-09-20T10:00:00.000Z'));
+  await Store.append('r', turno('filo', 'Vado avanti.', '2026-09-20T10:00:01.000Z'));
+  await Store.append('r', turno('user', 'continua', '2026-09-20T10:00:02.000Z'));
+  await Store.append('r', turno('filo', 'Ancora avanti.', '2026-09-20T10:00:03.000Z'));
+
+  const chat = await Store.get('r');
+  assert.deepEqual(chat.messages.map((m) => m.text), [
+    'continua', 'Vado avanti.', 'continua', 'Ancora avanti.',
+  ]);
+});
+
+test('due domande diverse di fila restano due', async () => {
+  azzera();
+  await Store.append('r', turno('user', 'Prima', '2026-09-20T10:00:00.000Z'));
+  await Store.append('r', turno('user', 'Seconda', '2026-09-20T10:00:01.000Z'));
+  const chat = await Store.get('r');
+  assert.deepEqual(chat.messages.map((m) => m.text), ['Prima', 'Seconda']);
+});
+
+// ── La targa dell'intervista di benvenuto ────────────────────────────────────
+
+test('la targa dell’intervista la dice un posto solo, e non cambia a ogni lettura', async () => {
+  const Onb = require('../../src/shared/onboarding.js') || globalThis.SN_ONBOARDING;
+  const O = globalThis.SN_ONBOARDING;
+  assert.equal(typeof O.chatId, 'function');
+  const stato = { startedAt: '2026-09-20T09:00:00.000Z' };
+  assert.equal(O.chatId(stato), O.chatId({ ...stato }));
+  // Intervista mai cominciata: una targa c'è lo stesso, e non è "undefined".
+  assert.equal(O.chatId({}), 'onb-prima');
+  assert.equal(O.chatId(null), 'onb-prima');
+  assert.notEqual(O.chatId(stato), O.chatId({ startedAt: '2026-09-21T09:00:00.000Z' }));
+  void Onb;
+});
