@@ -60,10 +60,27 @@ function toFsValue(v) {
 // utensile a sé, e la sentinella tests/unit/storageRulesAllegati.test.mjs prova
 // anche la variante con etichetta.
 async function uploadImage(buffer, mime = 'image/png') {
+  // Cifratura obbligatoria, come nell'app (#602): se non si può cifrare non si
+  // carica. Chi chiama (`pushIssue`) tratta l'errore come «niente immagine» e
+  // la segnalazione parte lo stesso, senza lo screenshot.
+  if (!CRYPTO.isEnabled()) {
+    throw new Error('cifratura non disponibile: non carico lo screenshot in chiaro');
+  }
+  const sealed = await CRYPTO.encryptBytesForOwner(new Uint8Array(buffer));
+  if (!CRYPTO.isEncryptedBytes(sealed)) {
+    throw new Error('cifratura non riuscita: lo screenshot non risulta cifrato');
+  }
+  // Il contenuto cifrato è opaco: viaggia come octet-stream (è il tipo che
+  // storage.rules ammette per i blob cifrati) e la dashboard ne indovina il
+  // formato dai primi byte dopo averlo decifrato.
   const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
   const name = `${COLLECTION}/agent_${Date.now()}_${randomUUID()}.${ext}`;
   const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': mime }, body: buffer });
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: sealed,
+  });
   if (!res.ok) throw new Error(`upload storage ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
   const json = await res.json();
   const token = json.downloadTokens || json.metadata?.downloadTokens || '';
