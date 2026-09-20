@@ -644,6 +644,8 @@ module.exports = {
   looksLikeText,
   decodeText,
   bomDueByte,
+  pareDueByte,
+  eUtf8Valido,
   capText,
   MAX_TEXT_CHARS,
   MAX_FILE_BYTES,
