@@ -103,7 +103,7 @@
       orari: true,
       avviso: 'la sveglia non c\'è',
       frasi: [
-        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(48)}\\b${SVEGLIA}\\b`, 'i'),
+        new RegExp(`${HO}(?:messo|impostato|programmato|fissato|creato|aggiunto|piazzato|attivato|settato|puntato)\\b${PONTE(72)}\\b${SVEGLIA}\\b`, 'i'),
         new RegExp(`\\bfatto[,:!]?\\s+(?:la |una |l['’])?${SVEGLIA}\\b${PONTE(24)}\\b(?:impostat|programmat|messa|fissat|pronta)`, 'i'),
       ],
     },
@@ -113,7 +113,7 @@
       orari: true,
       avviso: 'il timer non è partito',
       frasi: [
-        new RegExp(`${HO}(?:avviato|fatto\\s+partire|messo|impostato|acceso|creato|lanciato|fatto\\s+scattare)\\b${PONTE(48)}\\b(?:timer|conto alla rovescia)\\b`, 'i'),
+        new RegExp(`${HO}(?:avviato|fatto\\s+partire|messo|impostato|acceso|creato|lanciato|fatto\\s+scattare)\\b${PONTE(72)}\\b(?:timer|conto alla rovescia)\\b`, 'i'),
         new RegExp(`\\bfatto[,:!]?\\s+(?:il |un )?timer\\b${PONTE(24)}\\b(?:avviat|partit|impostat|in corso|acceso)`, 'i'),
       ],
     },
@@ -122,7 +122,7 @@
       tipi: ['CANCELLA_SVEGLIA', 'MODIFICA_SVEGLIA'],
       avviso: 'la sveglia (o il timer) c\'è ancora',
       frasi: [
-        new RegExp(`${HO}(?:cancellato|tolto|rimosso|eliminato|annullato|disattivato|spento|levato)\\b${PONTE(48)}\\b(?:${SVEGLIA}|timer)\\b`, 'i'),
+        new RegExp(`${HO}(?:cancellato|tolto|rimosso|eliminato|annullato|disattivato|spento|levato)\\b${PONTE(72)}\\b(?:${SVEGLIA}|timer)\\b`, 'i'),
       ],
     },
     {
@@ -131,7 +131,7 @@
       orari: true,
       avviso: 'la sveglia è rimasta com\'era',
       frasi: [
-        new RegExp(`${HO}(?:spostato|anticipato|posticipato|cambiato|modificato|rimandato)\\b${PONTE(48)}\\b(?:${SVEGLIA}|timer)\\b`, 'i'),
+        new RegExp(`${HO}(?:spostato|anticipato|posticipato|cambiato|modificato|rimandato)\\b${PONTE(72)}\\b(?:${SVEGLIA}|timer)\\b`, 'i'),
       ],
     },
     {
@@ -148,8 +148,8 @@
       appunti: true,
       avviso: 'il promemoria non c\'è',
       frasi: [
-        new RegExp(`${HO}(?:messo|salvato|scritto|creato|aggiunto|annotato|impostato|segnato|preso|fissato)\\b${PONTE(48)}\\bpromemoria\\b`, 'i'),
-        new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:mess|salvat|scritt|annotat|segnat)[oa]\\b${PONTE(32)}\\bpromemoria\\b`, 'i'),
+        new RegExp(`${HO}(?:messo|salvato|scritto|creato|aggiunto|annotato|impostato|segnato|preso|fissato)\\b${PONTE(72)}\\bpromemoria\\b`, 'i'),
+        new RegExp(`\\b${PRON}(?:mess|salvat|scritt|annotat|segnat)[oa]\\b${PONTE(32)}\\bpromemoria\\b`, 'i'),
       ],
     },
     {
@@ -161,15 +161,15 @@
       appunti: true,
       avviso: 'l\'appunto non c\'è',
       frasi: [
-        new RegExp(`${HO}(?:salvato|scritto|creato|aggiunto|annotato|segnato|messo|preso|buttato\\s+giù)\\b${PONTE(48)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
+        new RegExp(`${HO}(?:salvato|scritto|creato|aggiunto|annotato|segnato|messo|preso|buttato\\s+giù)\\b${PONTE(72)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
         /\bme (?:lo|la|ne) sono (?:segnat|appuntat|annotat)[oa]\b/i,
-        new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:salvat|scritt|annotat|segnat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
+        new RegExp(`\\b${PRON}(?:salvat|scritt|annotat|segnat|mess)[oa]\\b${PONTE(32)}\\b(?:appunt[oi]|not[ae])\\b`, 'i'),
         // «Ti ho segnato la spesa»: il verbo del prendere nota, col pronome di
         // chi lo riceve e senza la parola «appunto». Accanto a una sveglia
         // partita davvero questa restava l'unica cosa mai fatta, e nessuno lo
         // diceva. Fuori dal calendario, dove «segnare» vuol dire un'altra cosa
         // e la famiglia giusta è un'altra.
-        new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+(?:segnat|appuntat)[oa]\\b(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|evento)\\b)`, 'i'),
+        new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+${AVV}(?:segnat|appuntat|salvat)[oa]\\b(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|evento)\\b)`, 'i'),
       ],
     },
     {
@@ -181,7 +181,7 @@
       avviso: 'non si è aperto niente',
       frasi: [
         new RegExp(`${HO}apert[oa]\\b`, 'i'),
-        new RegExp(`\\bl${AP}ho\\s+apert[oa]\\b`, 'i'),
+        new RegExp(`\\b${PRON}apert[oa]\\b`, 'i'),
         new RegExp(`\\bte (?:l${AP}|lo |la )ho\\s+apert[oa]\\b`, 'i'),
       ],
     },
@@ -212,7 +212,7 @@
       tipi: ['LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'ESEGUI_COMANDO', 'CERCA_WEB', 'CONTESTO_FILE', 'CONTESTO_IMMAGINE'],
       avviso: 'il documento non l\'ha letto',
       frasi: [
-        new RegExp(`${HO}lett[oa]\\b${PONTE(48)}\\b(?:documento|file|pdf|bolletta|contratto|estratto conto|fattura|appunto)\\b`, 'i'),
+        new RegExp(`${HO}lett[oa]\\b${PONTE(72)}\\b(?:documento|file|pdf|bolletta|contratto|estratto conto|fattura|appunto)\\b`, 'i'),
       ],
     },
     {
@@ -220,7 +220,7 @@
       tipi: ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'COMANDO_FINESTRA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'],
       avviso: 'l\'impostazione è rimasta com\'era',
       frasi: [
-        new RegExp(`${HO}(?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo)\\b${PONTE(48)}`
+        new RegExp(`${HO}(?:impostato|attivato|disattivato|acceso|spento|cambiato|modificato|applicato|messo)\\b${PONTE(72)}`
           + `\\b(?:tema|impostazione|preferenza|modalità|opzione|carattere|font|zoom|limite di spesa|colore|sfondo)${FINE}`, 'i'),
       ],
     },
@@ -239,7 +239,7 @@
       avviso: 'l\'evento non è in calendario',
       frasi: [
         new RegExp(`${HO}(?:aggiunto|messo|creato|segnato|inserito)\\b${PONTE(32)}\\b(?:in calendario|nel calendario|l${AP}evento|un evento)\\b`, 'i'),
-        new RegExp(`\\b(?:te |ve )?l${AP}ho\\s+(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
+        new RegExp(`\\b${PRON}(?:aggiunt|mess|segnat|inserit)[oa]\\b${PONTE(32)}\\b(?:in calendario|nel calendario|al calendario)\\b`, 'i'),
       ],
     },
     {
@@ -291,8 +291,8 @@
       appunti: true,
       avviso: 'non è partito niente',
       frasi: [
-        new RegExp(`\\b(?:te |ve |me )?l${AP}ho\\s+(mess|impostat|programmat|fissat|aggiunt|salvat|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[oa]\\b`, 'i'),
-        /\b(?:te |ve )?l[ei] ho\s+(mess|impostat|programmat|fissat|aggiunt|salvat|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[ei]\b/i,
+        new RegExp(`\\b${PRON}(mess|impostat|programmat|fissat|aggiunt|salvat|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[oa]\\b`, 'i'),
+        new RegExp(`\\b(?:te |ve |glie)?l[ei] ho\\s+${AVV}(mess|impostat|programmat|fissat|aggiunt|salvat|annotat|cancellat|tolt|rimoss|spostat|attivat|disattivat|inviat|mandat|segnat|avviat)[ei]\\b`, 'i'),
       ],
     },
   ];
@@ -320,7 +320,11 @@
   // raccontano quando la cosa è stata fatta, non che non è stata fatta, e
   // zittivano il presidio su frasi vere come «non ho trovato l'evento, invece
   // ti ho messo la sveglia alle 19». «Se» resta: introduce un'ipotesi.
-  const SMENTITE = /\b(?:non|senza|nessun\w*|mai|se|vuoi|vorresti|posso|potrei|dovrei|devo|volevo|avrei|potevo)\b/i;
+  // Giro 5: «volevo» era qui dentro, e zittiva «Volevo dirti che ti ho messo la
+  // sveglia alle 19». Lì non nega niente: introduce la frase. L'ipotesi che
+  // «volevo» doveva coprire («volevo metterti la sveglia ma non ci sono
+  // riuscito») non ha nessun «ho + participio» da coprire.
+  const SMENTITE = /\b(?:non|senza|nessun\w*|mai|se|vuoi|vorresti|posso|potrei|dovrei|devo|avrei|potevo)\b/i;
   // Dove finisce la proposizione che precede un punto del testo. Le
   // congiunzioni accentate («però», «perché», «così») vogliono i confini
   // scritti a mano: con `\b` non avrebbero mai staccato niente, e «non ho
