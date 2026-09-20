@@ -276,6 +276,7 @@
     canLookupServedBy,
     lookupServedBy,
     keyInfo,
+    listCatalog,
   };
 
   global.SN_MODEL_GATE = API;
