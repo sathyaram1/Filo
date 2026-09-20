@@ -159,7 +159,11 @@ test('«tre» scritto a parole non passa per campo vuoto', async ({ openTab }) =
 
 test('diecimila caratteri nel campo non salvano niente e non bloccano la pagina', async ({ openTab }) => {
   const page = await apriAutomazioni(openTab, { maxSessions: 3 });
-  await page.locator('#mgMaxSessions').fill('9'.repeat(10000));
+  await page.evaluate(() => {
+    const el = document.getElementById('mgMaxSessions');
+    el.value = '9'.repeat(10000);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   await page.locator('#mgMaxSessionsSave').click();
   await expect(page.locator('#mgMaxSessionsMsg')).toContainText('Non salvato.');
   expect(await page.evaluate(() => window.__sessionsDoc.maxSessions)).toBe(3);
