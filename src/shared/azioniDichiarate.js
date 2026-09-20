@@ -376,7 +376,7 @@
   // Dove finisce la proposizione che SEGUE un punto del testo. Senza i due
   // punti: dentro «19:30» quelli sono un orario, non uno stacco, e tagliare
   // lì faceva leggere le 19 al posto delle 19:30.
-  const STACCHI_DOPO = new RegExp(`[.!?;,\\n—]|${INIZIO}(?:ma|però|invece|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
+  const STACCHI_DOPO = new RegExp(`${PUNTO}|${VIRGOLA}|[!?;\\n—]|${INIZIO}(?:ma|però|invece|mentre|quindi|così|perché|siccome)${FINE}`, 'gi');
 
   function proposizionePrima(testo, indice) {
     const prima = testo.slice(0, indice);
