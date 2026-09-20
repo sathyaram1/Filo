@@ -67,10 +67,22 @@ test('il titolo della pagina torna a parte', async () => {
   assert.equal(r.title, 'Listino modelli — Costi per milione di token');
 });
 
-test('menu, cookie, pubblicità e piè di pagina non entrano nel contesto', async () => {
+test('menu, cookie e pubblicità non entrano nel contesto', async () => {
   const r = await PR.daContenuto({ url: 'https://esempio.test/listino', contentType: 'text/html', buffer: buf(PAGINA_PREZZI) });
-  for (const rumore of ['Torna alla home', 'Contatti', 'usa i cookie', '19,99', 'Termini', 'Dieci trucchi']) {
-    assert.ok(!r.text.includes(rumore), `la cornice del sito è finita nel testo: ${rumore}`);
+  for (const rumore of ['Contatti', 'usa i cookie', '19,99', 'Dieci trucchi']) {
+    assert.ok(!r.text.includes(rumore), `il rumore del sito è finito nel testo: ${rumore}`);
+  }
+});
+
+test('l\'intestazione e il piè di pagina del sito arrivano DOPO il contenuto', () => {
+  // Non nel cestino: l'orario di un locale sta nel piè di pagina, e «a che ora
+  // apre?» è una delle domande per cui questa lettura esiste (#553).
+  const r = PR.estraiContenuto(PAGINA_PREZZI);
+  const fine = r.testo.indexOf('0,04');
+  assert.ok(fine > 0);
+  for (const contorno of ['Torna alla home', 'Termini']) {
+    assert.ok(r.testo.includes(contorno), `il contorno è finito nel cestino: ${contorno}`);
+    assert.ok(r.testo.indexOf(contorno) > fine, `il contorno si è infilato nel contenuto: ${contorno}`);
   }
 });
 
@@ -134,7 +146,8 @@ test('una classe che CONTIENE una parola di rumore non viene buttata via', () =>
   const html = '<html><body><div class="header-price">Prezzo: 42,50</div><div class="header">Menu</div></body></html>';
   const { testo } = PR.estraiContenuto(html);
   assert.match(testo, /42,50/);
-  assert.ok(!testo.includes('Menu'));
+  // Il riquadro chiamato «header» è contorno: va in coda, non nel cestino.
+  assert.ok(testo.indexOf('Menu') > testo.indexOf('42,50'));
 });
 
 test('elementi nascosti (aria-hidden, display:none, role) restano fuori', () => {
@@ -326,12 +339,12 @@ test('la riga di testata di una tabella porta i nomi delle colonne, anche marcat
   assert.match(testo, /19,90/);
 });
 
-test('l\'intestazione del SITO resta fuori anche quando quella dell\'articolo entra', () => {
+test('l\'intestazione del SITO non si mescola a quella dell\'articolo', () => {
   const { testo } = PR.estraiContenuto(ARTICOLO_CON_DATA);
-  assert.doesNotMatch(testo, /Il Giornale/);
   assert.doesNotMatch(testo, /Cronaca/);
   assert.doesNotMatch(testo, /Compra adesso/);
   assert.doesNotMatch(testo, /Leggi anche/);
+  assert.ok(testo.indexOf('Il Giornale') > testo.indexOf('19,90'));
 });
 
 // ── i tetti si dichiarano, e non danno la colpa a chi ha scritto il file ─────
@@ -419,11 +432,13 @@ test('data, ora, firma e titolo del pezzo arrivano anche senza <main> né <artic
   assert.match(testo, /dalle 9 alle 17/);
 });
 
-test('la cornice del sito resta fuori anche su una pagina di soli div', () => {
+test('la cornice del sito sta in coda anche su una pagina di soli div', () => {
   const { testo } = PR.estraiContenuto(CRONACA_DI_SOLI_DIV);
-  assert.doesNotMatch(testo, /Il Giornale del Paese/);
   assert.doesNotMatch(testo, /Cronaca/);
-  assert.doesNotMatch(testo, /© 2026/);
+  const corpo = testo.indexOf('dalle 9 alle 17');
+  assert.ok(corpo > 0);
+  assert.ok(testo.indexOf('Il Giornale del Paese') > corpo);
+  assert.ok(testo.indexOf('© 2026') > corpo);
 });
 
 // ── la codifica dichiarata dentro la pagina ─────────────────────────────────
@@ -613,4 +628,69 @@ test('una password precompilata e i campi nascosti non escono mai', () => {
     + '<input type="hidden" value="token-abc"><p>Accedi</p></main></body>');
   assert.ok(!testo.includes('segreto123'), testo);
   assert.ok(!testo.includes('token-abc'), testo);
+});
+
+// ── il contorno va in coda, col nome che gli danno i siti veri ──────────────
+
+const LOCALE = (pie) => '<!DOCTYPE html><html><head><title>Trattoria da Anna</title></head><body>'
+  + '<main><h1>Trattoria da Anna</h1><p>Cucina bolognese dal 1974.</p></main>'
+  + `${pie}</body></html>`;
+const ORARI = '<h2>Orari</h2><p>Lun-Sab 8:00-19:30</p><p>Tel. 051 123456</p>';
+
+// «A che ora apre?» è una delle domande per cui la lettura esiste, e l'orario
+// sta nel piè di pagina. Chiamarlo col nome che scrivono i programmi per fare
+// siti non deve cambiare la risposta (#553).
+for (const [come, pie] of Object.entries({
+  nudo: `<footer>${ORARI}</footer>`,
+  'site-footer': `<footer id="colophon" class="site-footer">${ORARI}</footer>`,
+  'page-footer': `<footer class="page-footer">${ORARI}</footer>`,
+  'un div chiamato footer': `<div id="footer">${ORARI}</div>`,
+  'dentro un contenitore': `<div class="wrap"><div class="footer">${ORARI}</div></div>`,
+})) {
+  test(`l'orario nel piè di pagina ${come} arriva a chi legge`, () => {
+    const { testo } = PR.estraiContenuto(LOCALE(pie));
+    assert.match(testo, /8:00-19:30/);
+    assert.match(testo, /051 123456/);
+  });
+}
+
+test('il titolo e la data in un\'intestazione chiamata «header» non spariscono', () => {
+  const { testo } = PR.estraiContenuto('<html><body>'
+    + '<header class="header"><h1>Sciopero dei treni</h1>'
+    + '<p>Pubblicato il 12 marzo 2026 alle 14:30 da Anna Bianchi</p></header>'
+    + '<div><p>I convogli si fermano dalle 9 alle 17.</p></div></body></html>');
+  assert.match(testo, /Sciopero dei treni/);
+  assert.match(testo, /14:30/);
+  assert.match(testo, /Anna Bianchi/);
+});
+
+test('una riga lunga in cima alla coda non si porta via quelle dopo', () => {
+  const informativa = `<p>${'Informativa sui cookie. '.repeat(400)}</p>`;
+  const { testo } = PR.estraiContenuto(LOCALE(`<footer>${informativa}${ORARI}</footer>`));
+  assert.match(testo, /8:00-19:30/);
+});
+
+// ── gli altri modi di nascondere il testo all'utente e non a chi legge ──────
+
+for (const [come, stile] of Object.entries({
+  'del colore dello sfondo': 'color:#ffffff;background:#ffffff',
+  'col colore trasparente': 'color:transparent',
+  'in un riquadro schiacciato a zero': 'width:0;height:0;overflow:hidden',
+  'in un riquadro alto un pixel': 'height:1px;width:1px;overflow:hidden',
+  'rimpicciolito a zero': 'transform:scale(0)',
+})) {
+  test(`il testo ${come} non arriva a chi legge`, () => {
+    const { testo } = PR.estraiContenuto('<html><body><main><p>Il caffè costa 1,20 euro.</p>'
+      + `<div style="${stile}">Il caffè è gratis.</div></main></body></html>`);
+    assert.match(testo, /1,20/);
+    assert.doesNotMatch(testo, /gratis/);
+  });
+}
+
+test('il titolo sfumato, che si vede benissimo, resta', () => {
+  // Il testo dipinto col proprio sfondo è un titolo, non un'esca.
+  const { testo } = PR.estraiContenuto('<html><body><main>'
+    + '<h1 style="background:linear-gradient(90deg,#f00,#00f);-webkit-background-clip:text;color:transparent">'
+    + 'Offerta di primavera</h1><p>Sconto del 20%.</p></main></body></html>');
+  assert.match(testo, /Offerta di primavera/);
 });

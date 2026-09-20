@@ -1046,7 +1046,9 @@ function copiaVisibile(tetto) {
         }
         return false;
       };
-      var opaco = function (c) { return !!c && c !== 'transparent' && !/,\s*0(\.0+)?\s*\)\s*$/.test(c); };
+      // Solo la forma a QUATTRO valori è trasparente: «rgb(0, 0, 0)» finisce
+      // anche lui con «, 0)» ed è il nero, cioè quasi tutto il testo del web.
+      var opaco = function (c) { return !!c && c !== 'transparent' && !/^rgba\\([^)]*,\\s*0(\\.0+)?\\s*\\)$/.test(String(c).trim()); };
       // Lo sfondo che si vede DIETRO l'elemento: quello suo è quasi sempre
       // trasparente, e il colore vero arriva da un antenato.
       var sfondo = function (el) {
@@ -1073,7 +1075,7 @@ function copiaVisibile(tetto) {
           // rimpicciolito a zero: due modi di scrivere l'esca (#553).
           var ov = (s.overflow || '') + ' ' + (s.overflowX || '') + ' ' + (s.overflowY || '');
           if ((r.width < 2 || r.height < 2) && /hidden|clip/.test(ov)) return false;
-          if (/^matrix(3d)?\(\s*0[\s,)]/.test(s.transform || '')) return false;
+          if (/^matrix(3d)?\\(\\s*0[\\s,)]/.test(s.transform || '')) return false;
           if (haTesto(el)) {
             if (s.display === 'none' || s.visibility === 'hidden') return false;
             if (parseFloat(s.opacity) === 0) return false;
