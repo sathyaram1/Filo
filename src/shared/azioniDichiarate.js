@@ -269,7 +269,11 @@
       // in questo turno il modello aveva già in mano i riassunti dei file
       // dell'editor, o l'immagine che l'utente ha mandato in chat. Con quelli
       // davanti, «ho letto la bolletta» è vero senza nessuna azione.
-      tipi: ['LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'ESEGUI_COMANDO', 'CERCA_WEB', 'CONTESTO_FILE', 'CONTESTO_IMMAGINE'],
+      // Giro 7: CONTESTO_TESTO è il terzo segno della stessa specie. Il modo
+      // più comune di far leggere qualcosa a Filo è INCOLLARLO nel messaggio:
+      // il testo arriva al modello dentro la domanda, senza passare da nessuno
+      // strumento, e «ho letto il documento: sono 84 euro» era un'accusa.
+      tipi: ['LEGGI_DOCUMENTO', 'LEGGI_FILE', 'LEGGI_TRASPARENZA', 'ESEGUI_COMANDO', 'CERCA_WEB', 'CONTESTO_FILE', 'CONTESTO_IMMAGINE', 'CONTESTO_TESTO'],
       avviso: 'il documento non l\'ha letto',
       frasi: [
         new RegExp(`${HO}lett[oa]\\b${PONTE(72)}\\b(?:documento|file|pdf|bolletta|contratto|estratto conto|fattura|appunto)\\b`, 'i'),
