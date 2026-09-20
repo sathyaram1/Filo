@@ -39,8 +39,11 @@ const {
   defaultState,
 } = await import('../../scripts/dispatch.mjs');
 
+const { esitiDecaduti } = await import('../../scripts/merge-gate.mjs');
+
 const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
 const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
+const GATE = fileURLToPath(new URL('../../scripts/merge-gate.mjs', import.meta.url));
 
 // ─── Lo specchio locale: l'esito e il commit che ha esaminato ────────────────
 
