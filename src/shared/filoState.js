@@ -142,7 +142,11 @@
     };
 
     const stateText = renderForPrompt(state);
-    return { state, stateText };
+    // Che cosa di ALTRI questo riepilogo ha appena messo nel contesto (#530):
+    // i titoli delle schede li scrivono i siti, e chi decide se il compito è
+    // ancora pulito deve saperlo da qui — non indovinarlo dalle azioni.
+    const fonti = state.tabs.length ? ['schede'] : [];
+    return { state, stateText, fonti };
   }
 
   // #593 (terzo giro di verifica) — la busta del contenuto esterno, e la
