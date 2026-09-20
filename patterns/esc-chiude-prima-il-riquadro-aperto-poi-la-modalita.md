@@ -130,9 +130,12 @@ smettiamo di credere alla pagina (#648). Non crederle vuol dire uscire lo
 stesso, non scavalcarla: l'uscita parte subito e il tasto prosegue verso il
 documento, così il riquadro si chiude comunque. La regola generale: **un limite
 dice quando smetti di aspettare, non ti autorizza a prenderti quello che stavi
-aspettando.** Che i due tetti non si scollino — quello del main sotto quello
-della pagina rifà il danno da solo, perché il main esce mentre la pagina
-rivendica ancora — lo tiene `tests/unit/escTetti.test.mjs`.
+aspettando.** La prova sta in `tests/esc-riquadri-schermo-intero.spec.mjs` (una
+pila più alta del tetto: quando la modalità si spegne, sullo schermo non resta
+un riquadro in più di quelli che l'utente non ha ancora chiuso). Che i due
+tetti non si scollino — quello del main sotto quello della pagina rifà il danno
+da solo, perché il main esce mentre la pagina rivendica ancora — lo tiene
+`tests/unit/escTetti.test.mjs`.
 
 **Un tasto che serve a USCIRE non vale come gesto per ENTRARE.** Dal momento in
 cui l'Esc arriva al documento — e ci deve arrivare, è il tasto che chiude i
