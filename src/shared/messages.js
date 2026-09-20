@@ -521,6 +521,9 @@
     // ci sono nomi di rami e percorsi di file.
     MERGE_APPROVALS_CHANGED: 'merge_approvals_changed', // { pending:[…], failed:[…], recent:[…], ttlMs }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
+    // Il testo di una pagina web per l'Aiuto laterale: lo snippet di una
+    // ricerca è di 240 caratteri e quasi mai contiene il dato che serve.
+    READ_PAGE: 'read_page',                        // { url } → { ok, title, text, truncated, partial, error, detail }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
     // Il content script chiede il verdetto per la URL corrente (+ indizi di
