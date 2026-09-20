@@ -49,9 +49,14 @@ test('il preludio di PowerShell mette in UTF-8 sia la console sia la pipeline', 
   assert.match(p, /\$OutputEncoding\s*=/);
   // UTF-8 senza BOM: col BOM la prima riga di ogni output inizierebbe con «ï»¿».
   assert.match(p, /UTF8Encoding \$false/);
-  // Il setter di [Console] può rifiutare senza una console vera attaccata: il
-  // comando dell'utente deve girare lo stesso, non morire sul preludio.
-  assert.match(p, /try \{[^}]*\[Console\]::OutputEncoding[^}]*\} catch \{\}/);
+  // Il setter di [Console] può rifiutare senza una console vera attaccata, e
+  // `New-Object` è vietato in modalità ristretta: il comando dell'utente deve
+  // girare lo stesso, non morire sul preludio. Nessuna riga fuori da try/catch.
+  const righe = p.split('\n').filter((r) => r.trim());
+  assert.ok(righe.length > 0);
+  for (const r of righe) {
+    assert.match(r, /^try \{.*\} catch \{\}$/, `riga del preludio non protetta: ${r}`);
+  }
   // Va anteposto a stdin e a righe di comando: deve finire con un a-capo.
   assert.ok(p.endsWith('\n'), 'il preludio deve finire con un a-capo');
 });
