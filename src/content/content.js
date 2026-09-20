@@ -247,7 +247,7 @@
     // Entrambi i conteggi tornano a zero appena l'utente fa qualcos'altro (un
     // clic, un altro tasto): a quel punto la volta dopo è una volta nuova, e
     // riaprire un'immagine le ridà il suo tasto.
-    const TETTO_PROVE_FORTI = 3;
+    const TETTO_PROVE_FORTI = 10;
     const TETTO_PROVE_DEBOLI = 1;
     let escFortiDiFila = 0;
     let escDeboliDiFila = 0;
