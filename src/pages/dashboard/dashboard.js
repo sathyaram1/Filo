@@ -694,7 +694,10 @@
   async function risvegliaHome() {
     await Accoglienza.maybeOpenOnboardingLater();
     if (Accoglienza.isActive() || document.body.dataset.state !== 'home') return;
-    await loadDashboard({ force: true });
+    // Senza `force`: chi sa rispondere serve subito il saluto d'attesa e si
+    // rifà il messaggio nel giro in background, invece di far aspettare
+    // l'utente davanti a una chiamata al modello.
+    await loadDashboard();
   }
 
   // ===== Bolle conversazione =====
