@@ -315,8 +315,11 @@ async function main() {
   const senzaCommit = testoEsitiSenzaCommit(esitiSenzaCommit(statoRamo));
   if (senzaCommit) console.error(senzaCommit);
 
-  // Il contenuto esaminato deve stare dove chi fonde andrà a prenderlo.
-  const pubblicazione = statoPubblicazione(gitIn(ROOT), source, punta);
+  // Il contenuto esaminato deve stare dove chi fonde andrà a prenderlo. Il
+  // tetto sul tempo c'è perché qui dentro si parla con la rete, e questo è
+  // l'ultimo passo del giro: una rete che non risponde deve diventare «non l'ho
+  // potuto controllare» in mezzo minuto, non un comando appeso.
+  const pubblicazione = statoPubblicazione(gitConTetto(ROOT), source, punta);
   if (pubblicazione.stato === 'assente') {
     console.error(testoNonPubblicato(punta, pubblicazione.suOrigin, source));
     process.exit(1);
