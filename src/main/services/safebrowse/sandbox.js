@@ -98,6 +98,32 @@ function createConcurrencyGate({
 
 const gate = createConcurrencyGate();
 
+// ─── Le memorie isolate, a turno ────────────────────────────────────────────
+// Ogni finestra nascosta ha bisogno di una memoria di navigazione tutta sua
+// (niente cookie né dati dell'utente). Fabbricarne una NUOVA a ogni controllo,
+// con un nome che non si ripete mai, lasciava dietro di sé una memoria per
+// ogni sito sospetto incontrato: la finestra ha un tetto e muore, quella no —
+// resta registrata in Electron finché Filo resta aperto, e una lunga sessione
+// di navigazione se ne lasciava dietro a decine. È l'altra metà della stessa
+// risorsa, e il tetto di concorrenza la rende gratis da chiudere: se insieme
+// ne girano al massimo MAX_CONCURRENT, bastano altrettanti nomi riusati a
+// turno. Si svuota PRIMA dell'uso (e di nuovo dopo, come già si faceva): così
+// l'isolamento fra un controllo e il successivo non dipende da quando è
+// arrivato lo svuotamento del precedente.
+const partizioniLibere = [];
+let partizioniFatte = 0;
+
+function prendiPartizione() {
+  const libera = partizioniLibere.pop();
+  if (libera) return libera;
+  partizioniFatte += 1;
+  return `filo-detonate-${partizioniFatte}`;
+}
+
+function rendiPartizione(nome) {
+  if (nome && !partizioniLibere.includes(nome)) partizioniLibere.push(nome);
+}
+
 let _electron = null;
 function electron() {
   if (_electron === null) {
