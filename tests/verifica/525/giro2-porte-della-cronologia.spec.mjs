@@ -111,8 +111,28 @@ test('la scheda della home chiusa col suo tasto: la chat non resta senza nome', 
     return c ? `${c.title}|${c.kind}|${c.messages.length}` : 'niente';
   }, { timeout: 25_000 }).toBe('Spinoza|conversazione|2');
 
+  // E in Cronologia si legge il titolo, non «Chat senza titolo».
   const page = await openTab(ARCHIVE);
   await expect(page.locator('.arc-chat').first()).toContainText('Spinoza');
+});
+
+test('la home portata su un altro indirizzo: la chat che resta indietro ha un nome', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  await stubProvider(app, { hume: { tipo: 'conversazione', titolo: 'Hume' } });
+
+  const dash = await openTab(DASH);
+  await dash.locator('#input').fill('Parlami di Hume');
+  await dash.locator('#input').press('Enter');
+  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 20_000 });
+
+  // Stessa scheda, un altro indirizzo: la chat di prima è finita comunque.
+  await dash.evaluate(() => { window.location.href = 'filo://history/history.html'; });
+
+  await expect.poll(async () => {
+    const c = (await leggiArchivio(app))[0];
+    return c ? `${c.title}|${c.kind}` : 'niente';
+  }, { timeout: 25_000 }).toBe('Hume|conversazione');
 });
 
 test('la risposta che arriva dopo la chiusura: la chat resta ritrovabile da Filo', async ({ app }) => {
