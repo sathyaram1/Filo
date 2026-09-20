@@ -732,6 +732,12 @@
         // sotto», «te l'ho messa in ordine alfabetico»), non esiste nessuno
         // strumento che possa averla fatta e non c'è niente da smentire.
         if (puntaAllaRisposta(testo, fine)) continue;
+        // Una frase senza «ho» che GUARDA INDIETRO racconta uno stato, non
+        // una cosa appena fatta: «la sveglia delle 7 è già impostata, ne vuoi
+        // un'altra?» è una constatazione vera, e smentirla sarebbe l'accusa
+        // di sempre. Col verbo alla prima persona il tempo lo dice il verbo,
+        // qui no: l'unico indizio è quella parolina.
+        if (senzaHo && GUARDA_INDIETRO.test(clausolaDi(testo, m.index, fine))) continue;
         // Due regole che pescano lo stesso pezzo di frase raccontano la
         // stessa cosa: conta per una. Due pezzi diversi sono due cose.
         if (sovrapposta(m.index, fine)) continue;
