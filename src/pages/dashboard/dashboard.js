@@ -312,6 +312,21 @@
       if (text.trim()) {
         bubblesEl.appendChild(makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser }));
       }
+      // Le immagini incollate non stanno nell'archivio (sono data URL da
+      // centinaia di KB l'una), ma il loro NUMERO sì: va detto. Senza, chi
+      // rilegge trova «cosa vedi in questo grafico?» riferito al nulla e non
+      // capisce più di cosa si parlasse — un taglio silenzioso su quello che
+      // aveva mandato lui.
+      const quante = Number(m.images) || 0;
+      if (quante > 0) {
+        const nota = document.createElement('div');
+        nota.className = 'dash-bubble-note';
+        nota.dataset.replay = '1';
+        nota.textContent = quante === 1
+          ? '1 immagine, non conservata'
+          : `${quante} immagini, non conservate`;
+        bubblesEl.appendChild(nota);
+      }
       if (!isUser && types.length) {
         const note = document.createElement('div');
         note.className = 'dash-bubble-note';
