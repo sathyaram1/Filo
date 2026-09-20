@@ -959,10 +959,11 @@
       if (attesa.size && (fam.pronome || fam.tipi.some((x) => attesa.has(x)))) return null;
       const nominati = orariNelTesto(d.clausola || d.frase);
       if (!nominati.size) return null;
+      const buone = oreCheReggono(fam, d.clausola || d.frase);
       // TUTTE le ore nominate, non una: «ti ho messo la sveglia alle 19 e
       // quella alle 21» con una sola sveglia chiamata lasciava la seconda
       // senza niente e senza una parola.
-      return [...nominati].every((o) => orari.has(o));
+      return [...nominati].every((o) => buone.has(o));
     };
     const out = [];
     // I tipi che stanno già reggendo una dichiarazione: un'azione sola non può
