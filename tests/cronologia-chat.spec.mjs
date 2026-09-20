@@ -46,7 +46,7 @@ async function stubProvider(app, triage) {
     if (!globalThis.__filoOrigComplete) {
       globalThis.__filoOrigComplete = globalThis.SN_PROVIDERS.completeWithFallback;
     }
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+    const rispondi = ({ attempts, messages }) => {
       const joined = messages
         .map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)))
         .join('\n');
@@ -60,6 +60,11 @@ async function stubProvider(app, triage) {
       }
       return { ...base, text: JSON.stringify({ text: 'Va bene, ci penso.', actions: [] }) };
     };
+    globalThis.SN_PROVIDERS.completeWithFallback = async (o) => rispondi(o);
+    // Un turno che arriva dalla HOME passa dallo streaming, non da
+    // completeWithFallback: stubbare solo quello faceva fallire il turno con
+    // «chiave rifiutata» e la prova non provava niente.
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => rispondi(o);
   }, { triage });
 }
 
