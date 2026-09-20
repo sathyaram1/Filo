@@ -1973,6 +1973,14 @@ function commandOutputsForPrompt(actions) {
     const meta = [];
     if (typeof out.code === 'number') meta.push(`uscita ${out.code}`);
     if (out.cwd) meta.push(`cartella ${out.cwd}`);
+    // La cartella dove stavi guardando non c'è più (rinominata, cancellata,
+    // chiavetta staccata): il comando è girato nella home. Va detto, o il
+    // modello continua a ragionare su una cartella che non esiste e all'utente
+    // racconta un guasto che non c'è (#551, quarto giro).
+    if (out.cwdPersa) {
+      meta.push('la cartella di prima non esiste più (rinominata, spostata o cancellata): '
+        + 'il comando è girato nella cartella personale, dillo all\'utente');
+    }
     if (out.timedOut) meta.push('interrotto per timeout');
     // #593 (terzo giro di verifica) — IL COMANDO È DI FILO, QUELLO CHE STAMPA
     // NO. Un `curl`, un `cat` di un file appena scaricato, la risposta di un
