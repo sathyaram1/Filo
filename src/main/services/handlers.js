@@ -1079,6 +1079,13 @@ function setAssistantCwd(sender, cwd) {
   _assistantCwdFallback = cwd;
 }
 
+// La cartella in cui un comando girerà davvero: quella appuntata se c'è ancora,
+// la home se è sparita (#551, quarto giro). La risposta la dà shell.js, perché
+// sia la stessa che si dà il comando quando parte.
+function cartellaDelComando(cwd) {
+  try { return require('./shell').cartellaPerComando(cwd).cwd || cwd; } catch (_) { return cwd; }
+}
+
 // Cartella di lavoro come va MOSTRATA nel popup di conferma: la home abbreviata
 // in `~`. Più corta da leggere (`~/.ssh` invece di `/home/mario/.ssh`) e senza
 // il nome utente, che altrimenti finirebbe nel testo del popup — popup che
