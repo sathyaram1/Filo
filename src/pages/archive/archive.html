@@ -135,6 +135,11 @@
       flex: 1 1 auto; min-width: 0;
     }
     .arc-chat-date { font-size: 11px; color: var(--sn-muted); flex: 0 0 auto; margin-left: auto; }
+    /* Una conversazione ancora aperta: «In corso» al posto della data. Non è
+       una data sbiadita, è uno stato — e cliccandola si torna dov'è aperta. */
+    .arc-chat[data-incorso] .arc-chat-date {
+      color: var(--sn-accent); font-weight: 500;
+    }
 
     /* Menu contestuale (tasto destro): stesse classi .sn-select-pop/-option del
        resto di Filo, ma posizionato "fixed" alle coordinate del click (non
