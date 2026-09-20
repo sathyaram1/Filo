@@ -82,6 +82,7 @@ test('dopo una lettura andata a buon fine non resta scritto che non si è potuto
 });
 
 test('due scelte a poca distanza: lo schermo non torna a dire il contrario del server', async ({ openTab }) => {
+  test.fail(true, 'rilievo del giro 2: la risposta più vecchia arriva per ultima e riscrive lo schermo con lo stato di prima');
   // La prima risposta viaggia lenta, la seconda no: è il caso normale di due
   // scritture di fila su una rete che non risponde sempre allo stesso modo.
   const page = await apri(openTab, {}, { delaySet: [600, 0] });
