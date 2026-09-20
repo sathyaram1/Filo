@@ -480,3 +480,58 @@ test('un file di testo scritto a due byte per carattere si legge, non torna spaz
   // Un UTF-8 normale continua a leggersi come prima.
   assert.equal(DR.decodeText(Buffer.from(testo, 'utf8')), testo);
 });
+
+// ── I segni tipografici di un file salvato in «ANSI» (#551, 4° giro) ─────────
+
+test('un documento salvato come lo salva Windows conserva trattino lungo, apostrofo ed euro', async () => {
+  // È il modo normale di salvare un testo su Windows fino a ieri, e quello che
+  // Excel usa esportando un CSV. Letta come latin1, la fascia dove stanno i
+  // segni tipografici diventava caratteri di controllo invisibili: gli accenti
+  // tornavano giusti e il resto spariva senza lasciare nemmeno un rombo. Il
+  // modello leggeva «12 » al posto di «12 €» e rispondeva su un testo bucato.
+  // È il danno della segnalazione spostato dal nome del file al contenuto.
+  const ansi = Buffer.from([
+    0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49, 0x43, 0x48, 0x45, 0x20,
+    0x97, 0x20,
+    0x73, 0x69, 0x6e, 0x67, 0x6f, 0x6c, 0x61, 0x72, 0x69, 0x74, 0xe0,
+    0x20, 0x64, 0x65, 0x6c, 0x6c, 0x92, 0x6f, 0x66, 0x66, 0x65, 0x72, 0x74, 0x61,
+    0x3a, 0x20, 0x31, 0x32, 0x20, 0x80, 0x0a,
+  ]);
+  const f = join(TMP, 'specifiche-ansi.txt');
+  writeFileSync(f, ansi);
+  const r = await DR.readDocument(f);
+  assert.equal(r.ok, true);
+  assert.ok(r.text.includes('singolarità'), `accenti persi: ${JSON.stringify(r.text)}`);
+  assert.ok(r.text.includes('—'), `trattino lungo perso: ${JSON.stringify(r.text)}`);
+  assert.ok(r.text.includes('’'), `apostrofo tipografico perso: ${JSON.stringify(r.text)}`);
+  assert.ok(r.text.includes('€'), `simbolo dell'euro perso: ${JSON.stringify(r.text)}`);
+  // Un UTF-8 normale non deve passare di lì: resta com'è.
+  assert.equal(DR.decodeText(Buffer.from('attività — 12 €', 'utf8')), 'attività — 12 €');
+});
+
+test('il taglio di un documento lungo non lascia mezzo carattere in fondo', () => {
+  // Il taglio cade dove capita e un'emoji occupa due unità di testo: la prima
+  // metà da sola non è nessun carattere e si mostra come un rombo. Stessa cura
+  // già messa al taglio dell'output dei comandi: è lo stesso taglio.
+  const r = DR.capText(`${'a'.repeat(DR.MAX_TEXT_CHARS - 1)}😀e poi altro`);
+  assert.equal(r.truncated, true);
+  const ultimo = r.text.charCodeAt(r.text.length - 1);
+  assert.ok(!(ultimo >= 0xD800 && ultimo <= 0xDBFF), 'il testo finisce con mezzo carattere');
+});
+
+test('un nome con i caratteri invisibili del verso di lettura si ritrova lo stesso', async () => {
+  // I nomi in arabo o in ebraico si portano dietro le marche che dicono da che
+  // parte si legge la riga. La busta con cui ogni contenuto esterno entra nel
+  // prompt le toglie, e deve continuare a toglierle: il nome che il modello
+  // legge è quindi diverso da quello sul disco, e chiedere quel documento non
+  // apriva più niente.
+  const dir = join(TMP, 'nomi-con-direzione');
+  mkdirSync(dir, { recursive: true });
+  const vero = 'RELAZIONE ‫تقرير‬.txt';
+  writeFileSync(join(dir, vero), 'la relazione vera\n', 'utf8');
+  const comeLoLegge = 'RELAZIONE تقرير.txt';
+  const r = await DR.readDocument(join(dir, comeLoLegge));
+  assert.equal(r.ok, true, `il file non si ritrova: ${r.detail}`);
+  assert.ok(r.text.includes('la relazione vera'));
+  assert.equal(r.name, vero, 'il nome vero non torna a chi legge');
+});
