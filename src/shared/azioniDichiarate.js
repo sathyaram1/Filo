@@ -583,10 +583,11 @@
   //    di nessuna lista mai salvata.
   //
   // L'elenco è di COSE, non di verbi generici: «cerca», «apri» o «esegui» da
-  // soli si dicono anche di un testo. Quando il messaggio non dice niente, la
-  // risposta è `false` e il presidio tace: sulla prova più debole che ha, il
-  // silenzio è il lato giusto dove sbagliare. Chi non passa il messaggio
-  // affatto lascia `undefined`, e allora niente cambia.
+  // soli si dicono anche di un testo. Chi non passa il messaggio affatto
+  // lascia `undefined`, e allora niente cambia.
+  // Giro 10: questo elenco non decide più da solo. Una cosa nominata qui è
+  // una promessa; quello che non è nominato lo decide `SU_UN_TESTO` più
+  // sotto, e nel dubbio è una promessa lo stesso.
   const COSE_DA_STRUMENTO = new RegExp(
     `${INIZIO}(?:svegli[a-zà-ù]*|allarm[ei]|suoneri[ae]|timer|conto\\s+alla\\s+rovescia`
     + `|promemoria|appunt[a-zà-ù]*|not[ae]|segn[a-zà-ù]*|annot[a-zà-ù]*|ricord[a-zà-ù]*`
