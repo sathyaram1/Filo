@@ -260,7 +260,11 @@
   // Va (ri)classificata? Sì se non lo è mai stata, e sì se da allora la
   // conversazione è andata avanti.
   function needsTriage(chat) {
-    if (!chat || !chat.kind || !chat.title) return true;
+    if (!chat) return true;
+    // Titolo e tipo li ha scelti l'utente: non c'è niente da chiedere a un
+    // modello, e chiederglielo lo stesso sarebbe pagare per un esito buttato.
+    if (chat.titleByUser && chat.kindByUser) return false;
+    if (!chat.kind || !chat.title) return true;
     const n = Array.isArray(chat.messages) ? chat.messages.length : 0;
     return Number(chat.triagedCount) !== n;
   }
