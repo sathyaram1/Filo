@@ -338,7 +338,8 @@ test('E — un tentativo fallito lo dice in riga; un’impostazione applicata su
   await expect(ok).toHaveCount(1);
   await expect(ok.locator('.dash-activity-label')).toHaveText(/^Ha cambiato un'impostazione · \d+ s$/);
   await ok.locator('.dash-activity-head').click();
-  await expect(ok.locator('.dash-activity-row', { hasText: 'Impostato · tema = scuro' })).toBeVisible();
+  // L'impostazione si legge in italiano, non con la chiave interna (#567.4).
+  await expect(ok.locator('.dash-activity-row', { hasText: 'Impostato · Tema → Scuro' })).toBeVisible();
   await page.screenshot({ path: 'tests/agent/.out/attivita-fallito-e-riprova.png' });
 
   await app.evaluate(() => { try { globalThis.__restoreProvider5?.(); } catch (_) {} });
