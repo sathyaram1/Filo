@@ -81,6 +81,7 @@ test('il foglio sostituito: dopo un esito registrato il contenuto cambia, e la f
   try {
     const NOTA = resolve(fuori, 'nota.md');
     writeFileSync(NOTA, 'Letto il diff riga per riga: un test e un commento. Niente comandi di sistema, niente chiavi, niente regole del database.', 'utf8');
+    seminaStato(resolve(fuori, 'stato'), 'ID485', 'worker/485');
     const env = {
       ...process.env,
       FILO_REPO_ROOT: dir,
