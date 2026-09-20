@@ -1102,7 +1102,21 @@ async function recordSecaudit(id, verdict, testo = '') {
   // per chi chiama la funzione da un altro strumento.
   const ferma = secauditSenzaNota(verdict, testo);
   if (ferma) return { rejected: true, formatRejected: true, message: ferma };
-  const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict);
+  // Il verdetto vale per il commit che il controllo ha letto (stessa regola,
+  // stessa fonte della critica e della consegna: lib/dirty-tree.mjs). Era
+  // l'unico dei tre a non guardare la directory: con file fuori dai commit il
+  // salvataggio automatico li committa DOPO la registrazione, la punta si
+  // sposta, e quello che verrebbe fuso contiene righe mai controllate
+  // (feedback #485).
+  const stato = statoDirectory(ROOT);
+  if (!stato.ok) {
+    return { rejected: true, formatRejected: true, message: statoIllegibileText(stato.motivo, 'verdetto') };
+  }
+  if (stato.lines.length) {
+    return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'verdetto') };
+  }
+  const shaControllato = headSha(ROOT) || '';
+  const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict, shaControllato);
   next.id = id;
 
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
