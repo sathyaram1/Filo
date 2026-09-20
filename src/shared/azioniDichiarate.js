@@ -662,7 +662,13 @@
     const ammesse = opzioni && opzioni.famiglie
       ? new Set(opzioni.famiglie instanceof Set ? [...opzioni.famiglie] : opzioni.famiglie)
       : null;
-    const orari = new Set(Array.isArray(stato?.orariSveglie) ? stato.orariSveglie : []);
+    // Giro 6: «non lo so» e «non ce n'è nessuna» sono due cose diverse. Chi
+    // non passa l'elenco delle sveglie (l'Aiuto, che di Filo vede solo la
+    // pagina) non sta dicendo che di sveglie non ce ne sono: lì l'ora non può
+    // decidere niente, o ogni frase con un'ora diventa un'accusa — anche
+    // quella che racconta la sveglia appena messa da quel pannello.
+    const sveglieNote = Array.isArray(stato?.orariSveglie);
+    const orari = new Set(sveglieNote ? stato.orariSveglie : []);
     const attesaDaStato = stato && stato.tipiInAttesa;
     const attesa = new Set(attesaDaStato
       ? (attesaDaStato instanceof Set ? [...attesaDaStato] : attesaDaStato)
