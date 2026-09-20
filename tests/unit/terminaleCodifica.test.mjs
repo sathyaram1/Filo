@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { writeFileSync, rmSync, readFileSync, mkdirSync } from 'node:fs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
@@ -277,4 +277,37 @@ test('la cartella in cui il comando è finito torna anche con un output enorme',
     : `mkdir -p "${sotto}"; cd "${sotto}"; for i in $(seq 1 ${righe}); do echo riga-di-elenco; done`;
   const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 60_000, trackCwd: true });
   assert.equal(out.cwd, sotto, `dopo un output lungo Filo crede di essere altrove: ${out.cwd}`);
+});
+
+// ── La cartella in cui il comando gira può essere sparita (#551, 4° giro) ────
+
+test('se la cartella di prima non c\'è più, il comando gira lo stesso e lo dice', async () => {
+  // L'utente rinomina la cartella dal gestore dei file, stacca la chiavetta, o
+  // la cancella Filo perché gliel'ha chiesto. Avviare una shell lì dentro non
+  // fa fallire il comando: fa fallire la SHELL prima di leggerlo, con un motivo
+  // che parla del programma («spawn … ENOENT») e non della cartella.
+  const sparita = join(TMP, 'cartella-che-sparisce');
+  mkdirSync(sparita, { recursive: true });
+  const prima = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true });
+  assert.ok(prima.stdout.includes('ciao'), 'il comando non gira nemmeno a cartella viva');
+  rmSync(sparita, { recursive: true, force: true });
+
+  const dopo = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true });
+  assert.ok(
+    dopo.stdout.includes('ciao'),
+    `il comando non gira più: ${JSON.stringify(dopo.stderr.slice(0, 120))}`,
+  );
+  assert.equal(dopo.cwdPersa, true, 'la cartella sparita non viene dichiarata a chi legge');
+  assert.notEqual(dopo.cwd, sparita, 'Filo resta appuntato su una cartella che non esiste');
+});
+
+test('da una cartella sparita si può ancora andare altrove', async () => {
+  // La via d'uscita ovvia. Se nemmeno questa passa, in quella scheda il
+  // terminale è finito finché l'utente non la chiude, e nessuno glielo dice.
+  const sparita = join(TMP, 'cartella-senza-uscita');
+  mkdirSync(sparita, { recursive: true });
+  rmSync(sparita, { recursive: true, force: true });
+  const dove = process.platform === 'win32' ? `Set-Location "${TMP}"` : `cd "${TMP}"`;
+  const out = await T.runCommand(dove, { cwd: sparita, trackCwd: true });
+  assert.equal(out.cwd, TMP, `non si riesce ad andarsene: ${out.cwd} (${out.stderr.slice(0, 120)})`);
 });
