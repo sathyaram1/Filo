@@ -152,6 +152,17 @@
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
+          // #602 — una cifratura che non si può fare NON è la rete che manca.
+          // Riprovare non cambia niente finché quella copia di Filo resta com'è,
+          // e intanto chi ha mandato la segnalazione ha già letto «inviato»:
+          // restava in coda un giorno intero e poi spariva senza una parola.
+          // Qui si smette subito e glielo si dice.
+          if (fb.isEncryptionError && fb.isEncryptionError(e)) {
+            remove(it.id);
+            logFn('rinuncio, la cifratura non si può fare:', it.id, e?.message || e);
+            try { onGiveUpFn && onGiveUpFn(it, e?.message || String(e)); } catch (_) {}
+            continue;
+          }
           it.attempts = (it.attempts || 0) + 1;
           anyFail = true;
           logFn('invio fallito (riprovo):', it.id, e?.message || e);
