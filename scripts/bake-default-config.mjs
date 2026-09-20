@@ -25,6 +25,10 @@
 //                                    chiavi arriva agli utenti muta, e nessuno se
 //                                    ne accorgerebbe finché non prova a usarla
 //
+// Quando si ferma dice QUALE chiave manca, da quali fonti l'ha cercata e dove
+// si mette; e ciò che cambia quel che arriva agli utenti va in EVIDENZA, non in
+// coda al registro: la sentinella tests/unit/bakeGuastoParlante.test.mjs lo tiene fermo.
+//
 // SICUREZZA
 //   - Lo script NON stampa mai i valori delle chiavi (solo "presente/assente").
 //   - Il file generato è gitignorato: non torna mai nel repo pubblico.
@@ -38,6 +42,9 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync } from 'node:fs';
+// Il tetto del testo che il server accetta vive in un posto solo: là sta anche
+// la regola che un taglio si dichiara invece di mangiare la parte che contava.
+import { testoEntroIlTetto } from './build-alarm.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -48,11 +55,6 @@ const OUT_PATH = process.env.FILO_BAKE_OUT
   ? resolve(process.env.FILO_BAKE_OUT)
   : resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
 
-// Chiede al server le chiavi di default. Ritorna
-// { openrouter?, gemini?, tavily?, safeBrowsing? } oppure {} se non disponibili.
-// Non lancia: in caso di problemi degrada ai segreti del job, perché una
-// versione con quelle chiavi è meglio di nessuna versione. Se non resta nemmeno
-// quello, decide main — e si ferma.
 const CANALE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
@@ -75,8 +77,21 @@ function pickSafeBrowsing(json) {
   return '';
 }
 
+// Il motivo del rifiuto arriva sotto nomi diversi a seconda di com'è scritta la
+// funzione; un oggetto interpolato diventa «[object Object]» e non spiega niente.
+function primaStringa(...valori) {
+  for (const v of valori) {
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return '';
+}
+
+// Ritorna `{ apiKeys, esito }`: le chiavi e PERCHÉ non ci sono, che è quello
+// che serve a chi legge il guasto — degradare in silenzio non è degradare.
+// Non lancia: si ripiega sui segreti del job, perché una versione con quelle
+// chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
 async function fetchRemoteKeys(passphrase) {
-  if (!passphrase) return {};
+  if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
   try {
     const res = await fetch(`${CANALE}/buildKeys`, {
       method: 'POST',
@@ -84,17 +99,37 @@ async function fetchRemoteKeys(passphrase) {
       body: JSON.stringify({ passphrase }),
     });
     if (!res.ok) {
-      console.warn(`[bake] chiavi dal server non disponibili (${res.status}); uso i secret d'ambiente.`);
-      return {};
+      const esito = { stato: 'http', status: res.status };
+      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+      return { apiKeys: {}, esito };
     }
-    const j = await res.json();
+    const j = await res.json().catch(() => null);
+    if (!j || typeof j !== 'object') {
+      const esito = { stato: 'illeggibile' };
+      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+      return { apiKeys: {}, esito };
+    }
+    // Il rifiuto arriva con HTTP 200 e `ok:false`: finiva in un `{}`
+    // indistinguibile da «il documento non ha quella chiave», e non diceva niente.
+    if (j.ok === false) {
+      const esito = { stato: 'rifiutato', reason: primaStringa(j.reason, j.error, j.message) };
+      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+      return { apiKeys: {}, esito };
+    }
     const apiKeys = (j && j.apiKeys && typeof j.apiKeys === 'object') ? { ...j.apiKeys } : {};
     const sb = pickSafeBrowsing(j);
     if (sb) apiKeys.safeBrowsing = sb;
-    return apiKeys;
+    const esito = Object.values(apiKeys).some((v) => typeof v === 'string' && v.trim())
+      ? { stato: 'ok' }
+      : { stato: 'senza-chiavi' };
+    if (esito.stato === 'senza-chiavi') {
+      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+    }
+    return { apiKeys, esito };
   } catch (e) {
-    console.warn(`[bake] server non raggiungibile (${e.message}); uso i secret d'ambiente.`);
-    return {};
+    const esito = { stato: 'rete', messaggio: e.message };
+    console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
+    return { apiKeys: {}, esito };
   }
 }
 
@@ -121,9 +156,57 @@ function envKey(name) {
 // Se un giorno l'applicazione torna a leggere una chiave nuova, va aggiunta
 // qui: la sentinella `tests/unit/bakeChiaviLette.test.mjs` diventa rossa se le
 // due parti divergono.
+//
+// `server` è il campo ESATTO del documento dei segreti: un guasto che dice
+// «manca» senza dire dove si rimedia costa a chi legge un giro d'indagine (#642).
 const CHIAVI_DEL_PACCHETTO = [
-  { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY' },
+  { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' },
 ];
+
+// Fuori dalla lista sopra perché non è una chiave di provider e la sua assenza
+// non ferma la pubblicazione: qui serve solo a spiegarla con le stesse parole.
+const FONTE_SAFE_BROWSING = {
+  nome: 'safeBrowsing',
+  env: 'FILO_DEFAULT_SAFEBROWSING_KEY',
+  server: 'config/secrets.safeBrowsingKey',
+};
+
+/** Perché il server non ha dato la chiave, in una frase. PURA. */
+export function descriviEsitoServer(esito) {
+  const e = esito || {};
+  switch (e.stato) {
+    case 'passphrase-assente':
+      return 'La costruzione non ha nemmeno interrogato il server: FILO_BUILD_PASSPHRASE è assente dal job.';
+    case 'rifiutato':
+      return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata.`;
+    case 'http':
+      return `Il server ha risposto HTTP ${e.status}.`;
+    case 'rete':
+      return `Il server non era raggiungibile (${e.messaggio || 'motivo ignoto'}).`;
+    case 'illeggibile':
+      return 'Il server ha risposto qualcosa che non è JSON: non è detto che sia il server giusto.';
+    case 'senza-chiavi':
+      return 'Il server ha risposto, ma il documento config/secrets non porta nessuna chiave.';
+    case 'ok':
+      return 'Il server ha risposto, ma senza questa chiave nel documento config/secrets.';
+    default:
+      return 'Il server non ha dato questa chiave, per un motivo non registrato.';
+  }
+}
+
+/**
+ * Le righe che spiegano quali chiavi mancano, da quali fonti sono state
+ * cercate e dove si mettono. PURA: la stessa spiegazione va nel registro della
+ * costruzione e nel feedback dell'allarme, e devono dire la stessa cosa.
+ */
+export function spiegaChiaviMancanti(mancanti, esitoServer) {
+  const righe = (mancanti || []).map(
+    (c) => `Manca ${c.nome}: né dal server (${c.server}) né dal segreto ${c.env} del job.`
+  );
+  righe.push(descriviEsitoServer(esitoServer));
+  righe.push('Dove si mette: la chiave del server la scrive l\'owner in Gestione → Modelli predefiniti; il segreto di riserva sta nelle impostazioni del repo, Settings → Secrets and variables → Actions.');
+  return righe;
+}
 
 async function main() {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
@@ -131,7 +214,7 @@ async function main() {
     console.warn('[bake] FILO_BUILD_PASSPHRASE assente: uso solo i secret d\'ambiente FILO_DEFAULT_*.');
   }
 
-  const remote = await fetchRemoteKeys(passphrase);
+  const { apiKeys: remote, esito: esitoServer } = await fetchRemoteKeys(passphrase);
 
   const pick = (remoteKey, envName) => {
     const r = typeof remote[remoteKey] === 'string' ? remote[remoteKey].trim() : '';
@@ -162,13 +245,18 @@ async function main() {
   // che arriva agli utenti senza niente di preimpostato, e nessuno se ne
   // accorgerebbe finché non prova a usarla. Degradare va bene finché resta
   // qualcosa.
+  const mancanti = CHIAVI_DEL_PACCHETTO.filter((c) => !apiKeys[c.nome]);
+
   if (!Object.values(apiKeys).some(Boolean)) {
-    console.error('::error::Nessuna chiave di default da nessuna fonte: la versione uscirebbe senza chiavi.');
+    const righe = spiegaChiaviMancanti(mancanti, esitoServer);
+    // Tutto su una riga: un comando di annotazione spezzato su più righe perde
+    // dalla seconda in poi, e con essa il nome della chiave che manca.
+    console.error(`::error::La versione uscirebbe senza chiavi di default, la pubblicazione si ferma. ${righe.join(' ')}`);
     // Si prova comunque ad avvisare — ma è un di più: nel caso peggiore (parola
     // d'ordine mancante del tutto) l'allarme non può suonare, perché si apre con
     // quella stessa parola d'ordine. È il motivo per cui serve fermarsi: una
     // pubblicazione che fallisce si vede, una riga rossa in un registro no.
-    await avvisa();
+    await avvisa(mancanti, righe);
     process.exit(1);
   }
 
@@ -185,33 +273,69 @@ async function main() {
       .map(([k, v]) => [k, v ? 'presente' : 'assente'])
   );
   console.log(`[bake] scritto ${OUT_PATH}:`, JSON.stringify(summary));
+
+  // Il ripiego sui segreti del job non ferma la pubblicazione, ma vuol dire che
+  // una chiave appena cambiata dall'owner NON è arrivata a nessuno: va in evidenza.
+  if (esitoServer.stato !== 'ok') {
+    console.warn(`::warning::Le chiavi di questa versione non vengono dal server ma dai segreti di riserva del job: una chiave cambiata di recente in Modelli predefiniti non è arrivata agli utenti. ${descriviEsitoServer(esitoServer)}`);
+  }
+
+  // Qualcuna c'è, quindi si pubblica — ma una chiave che l'applicazione legge e
+  // che nel pacchetto non c'è resterebbe muta all'utente senza dirlo a nessuno.
+  if (mancanti.length) {
+    console.warn(`::warning::Questa versione esce senza una delle chiavi che l'applicazione legge. ${spiegaChiaviMancanti(mancanti, esitoServer).join(' ')}`);
+  }
+
   // La Safe Browsing assente non ferma la pubblicazione (è un contorno: senza,
   // il primo stadio si salta e restano giudice LLM, sandbox e segnali di rete),
   // ma NON deve sparire in silenzio: da quando il documento dei segreti è
   // admin-only, questa è l'unica strada che porta la chiave agli utenti.
   if (!safeBrowsingKey) {
-    console.warn('::warning::Nessuna chiave Google Safe Browsing: il primo stadio del rilevamento siti pericolosi resterà spento in questa versione.');
+    console.warn(`::warning::Nessuna chiave Google Safe Browsing: il primo stadio del rilevamento siti pericolosi resterà spento in questa versione. ${spiegaChiaviMancanti([FONTE_SAFE_BROWSING], esitoServer).join(' ')}`);
   }
 }
 
-/** Apre un feedback quando la costruzione sta per produrre una versione monca. */
-async function avvisa() {
+// Apre un feedback quando la costruzione sta per produrre una versione monca,
+// con le STESSE righe del registro: da lì si deve poter agire senza cercare i log.
+async function avvisa(mancanti, righe) {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
-  if (!passphrase) return;
+  if (!passphrase) {
+    console.warn('::warning::Nessun feedback aperto per questa pubblicazione ferma: l\'allarme si apre con FILO_BUILD_PASSPHRASE, che qui manca. Resta solo il guasto qui sopra.');
+    return;
+  }
+  const nomi = (mancanti || []).map((c) => c.nome).join(', ');
+  const testo = testoEntroIlTetto([
+    'La costruzione non ha trovato nessuna chiave di default e ha fermato la pubblicazione: meglio nessuna versione nuova che una che arriva agli utenti senza niente di preimpostato.',
+    '',
+    ...(righe || []),
+  ].join('\n'));
   try {
-    await fetch(`${CANALE}/buildAlarm`, {
+    const res = await fetch(`${CANALE}/buildAlarm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         passphrase,
-        name: 'Versione costruita senza chiavi di default',
-        text: 'La costruzione non ha trovato nessuna chiave di default: né dal server (parola d\'ordine assente, sbagliata o revocata) né fra i segreti del job. La pubblicazione e\' stata fermata: meglio nessuna versione nuova che una che arriva senza chiavi preimpostate. Controlla la parola d\'ordine della costruzione e i segreti di riserva del job.',
+        name: nomi
+          ? `Pubblicazione ferma: manca la chiave di default ${nomi}`
+          : 'Pubblicazione ferma: nessuna chiave di default',
+        text: testo,
       }),
     });
-  } catch (_) { /* se non si riesce ad avvisare, resta l'errore nei log */ }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) {
+      console.warn(`::warning::Feedback dell'allarme non consegnato (${res.status}${body.reason ? ` ${body.reason}` : ''}): di questa pubblicazione ferma resta solo il guasto qui sopra.`);
+    }
+  } catch (e) {
+    console.warn(`::warning::Feedback dell'allarme non consegnato (${e.message}): di questa pubblicazione ferma resta solo il guasto qui sopra.`);
+  }
 }
 
-main().catch((e) => {
+// La spiegazione del guasto è logica pura e va provata senza scrivere niente:
+// l'esecuzione parte solo quando lo script è il comando, non quando è importato.
+const eseguitoDirettamente = process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (eseguitoDirettamente) main().catch((e) => {
   // Un errore INATTESO (rete strana, disco pieno) non deve far saltare la
   // pubblicazione: si scrive un file valido e si prosegue. Il caso "nessuna
   // chiave da nessuna fonte" NON passa di qui — lo gestisce main, che si ferma.
