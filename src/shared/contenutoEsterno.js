@@ -316,7 +316,19 @@
   function tagliaDichiarando(testo, max) {
     const tetto = Number.isFinite(max) && max > 0 ? max : MAX_CHARS;
     if (testo.length <= tetto) return testo;
-    const utile = Math.max(0, tetto - RIGA_TAGLIO.length - 1);
+    let utile = Math.max(0, tetto - RIGA_TAGLIO.length - 1);
+    // Il taglio cade dove capita, e un'emoji occupa DUE unità di testo:
+    // tagliando per numero di unità si resta con la prima metà, che da sola non
+    // è nessun carattere e arriva come un rombo. Se in fondo resta una metà di
+    // coppia la si lascia fuori: un carattere in meno, nessun carattere rotto.
+    // È lo stesso taglio già curato dove il terminale tiene l'uscita di un
+    // comando e dove il lettore tiene il testo di un documento; questo è quello
+    // che conta davvero, perché è l'ultimo prima del modello (#551, secondo e
+    // sesto giro di verifica).
+    if (utile > 0) {
+      const ultimo = testo.charCodeAt(utile - 1);
+      if (ultimo >= 0xD800 && ultimo <= 0xDBFF) utile -= 1;
+    }
     return `${testo.slice(0, utile)}\n${RIGA_TAGLIO}`;
   }
 
