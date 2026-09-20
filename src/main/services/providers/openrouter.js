@@ -604,7 +604,7 @@
   }
 
   global.SN_PROVIDER_OPENROUTER = {
-    listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
+    listModels, listCatalog, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
     ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
