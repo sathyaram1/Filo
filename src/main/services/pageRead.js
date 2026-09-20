@@ -275,11 +275,19 @@ function sottoalbero(html, vale) {
 /** Il titolo della pagina: <title>, poi og:title, poi il primo <h1>. PURA. */
 function titoloDa(html) {
   const src = String(html == null ? '' : html);
-  const pick = (re) => { const m = src.match(re); return m ? decodeEntita(m[1]).trim() : ''; };
+  let og = '';
+  let i = 0;
+  for (;;) {
+    const t = prossimoTag(src, i);
+    if (!t || t.troncato || (!t.salta && t.nome === 'body')) break;
+    i = t.fine;
+    if (t.salta || t.chiusura || t.nome !== 'meta') continue;
+    const a = attributi(t.attrsRaw);
+    if (/^og:title$/i.test(a.property || a.name || '') && a.content) { og = a.content; break; }
+  }
   return normalizzaTesto(
-    pick(/<title[^>]*>([\s\S]*?)<\/title>/i)
-    || pick(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)["']/i)
-    || pick(/<meta[^>]+content=["']([^"']*)["'][^>]+property=["']og:title["']/i)
+    decodeEntita(sottoalbero(src, (n) => n === 'title') || '').trim()
+    || decodeEntita(og).trim()
     || htmlATesto(sottoalbero(src, (n) => n === 'h1') || ''),
   ).split('\n')[0].slice(0, 300);
 }
