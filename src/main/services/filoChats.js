@@ -32,6 +32,27 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
   }
 
+  // ── Una scrittura alla volta ──────────────────────────────────────────────
+  //
+  // Ogni scrittura qui dentro è "rileggi tutto, cambia una cosa, riscrivi
+  // tutto". Due che partono insieme leggono la stessa lista e la seconda
+  // riscrive sopra la prima: il messaggio della prima sparisce. Succede quando
+  // due chat vanno avanti nello stesso istante (due schede di Filo aperte), e
+  // buttare via un messaggio è esattamente ciò che questo archivio esiste per
+  // non fare.
+  //
+  // Le scritture si mettono quindi in fila: una parte solo quando la
+  // precedente ha finito di salvare. È la stessa medicina che il salvataggio
+  // su disco usa già per il suo guasto gemello (src/main/shim/storage.js,
+  // `flushChain`). Le letture restano libere: non riscrivono niente.
+  let coda = Promise.resolve();
+  function inCoda(fn) {
+    const risultato = coda.then(fn, fn);
+    // La coda non si deve fermare su un errore di chi sta davanti.
+    coda = risultato.then(() => {}, () => {});
+    return risultato;
+  }
+
   async function list() {
     try {
       const res = await chrome.storage.local.get(KEY);
