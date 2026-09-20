@@ -87,6 +87,7 @@ test('fornitore dichiarato ritirato: Filo si presenta, e la home dopo l’accogl
   const messaggio = page.locator('#homeMessage');
   await expect(messaggio).not.toContainText(/codice d.invito/i, { timeout: 20_000 });
   await expect(messaggio).toContainText(FRASE_DEL_MODELLO, { timeout: 20_000 });
+  await page.screenshot({ path: 'tests/.shots/663-home-dopo-accoglienza.png' });
 });
 
 test('la chiave OpenRouter propria, incollata mentre la home è aperta: l’accoglienza parte', async ({ app, shell }) => {
