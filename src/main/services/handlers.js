@@ -3075,6 +3075,7 @@ const handlerCtx = {
   archiviaCongedoAccoglienza,
   dimenticaChat,
   portaAllaChat,
+  affidaChat,
   // Intervista di benvenuto (#524)
   saveOnboarding,
   finishOnboarding,
