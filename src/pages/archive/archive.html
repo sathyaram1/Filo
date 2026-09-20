@@ -129,6 +129,14 @@
     /* Stesse classi .sn-select-pop del resto di Filo, ma fixed alle coordinate del click e non ancorato a un host
        relative: da qui il reset di right/top, che il JS imposta esplicitamente. */
     .arc-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
+    /* La voce sotto il mouse o sotto il fuoco della tastiera si deve vedere: senza, chi percorre il menu con le
+       frecce non sa dove si trova. Il menu appena aperto invece non si segna: a dirlo è che è comparso. */
+    .arc-ctxmenu:focus { outline: none; }
+    .arc-ctxmenu .sn-select-option:hover,
+    .arc-ctxmenu .sn-select-option:focus {
+      background-color: rgba(var(--sn-accent-rgb), 0.18);
+      outline: none;
+    }
   </style>
 </head>
 <body>
