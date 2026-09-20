@@ -156,7 +156,9 @@ async function refresh() {
   // schermo quando arriva: chi decide se Filo può rispondere deve poterlo
   // rifare adesso, invece di lasciare l'utente sul cartello «non posso
   // rispondere» finché non ricarica (#663).
-  if (JSON.stringify(prima) !== JSON.stringify(dopo)) {
+  let adesso = null;
+  try { adesso = JSON.stringify(dopo); } catch (_) { adesso = null; }
+  if (prima !== adesso) {
     for (const fn of ascoltatori) { try { fn(dopo); } catch (_) {} }
   }
   return dopo;
