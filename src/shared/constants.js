@@ -221,6 +221,10 @@
     FILO_TAB_TRIAGE: 'filo_tab_triage',
     // §3.1/§3.2 — riassunto di una pagina alla chiusura (per archivio + embedding).
     FILO_TAB_SUMMARY: 'filo_tab_summary',
+    // #525 — alla chiusura di una chat con Filo: titolo breve + tipo
+    // ('conversazione' da rileggere oppure 'comando' di servizio). Una sola
+    // chiamata a un modello economico per entrambe le cose.
+    FILO_CHAT_TRIAGE: 'filo_chat_triage',
     // §3.2 — re-rank LLM dei top-K risultati della ricerca semantica.
     FILO_TAB_SEARCH: 'filo_tab_search',
     // Deck builder (DECK-BUILDER-SPEC.md §3-§4): chat unificata del Builder.
