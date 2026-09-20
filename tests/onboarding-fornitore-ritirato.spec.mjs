@@ -90,6 +90,26 @@ test('lo stesso vale aprendo una scheda nuova, senza ricaricare niente', async (
   await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
 });
 
+test('arrivati i crediti, l’accoglienza parte sulla home già aperta', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
+
+  // Il riscatto dell'invito visto da qui: la chiave compare e il main avvisa
+  // le pagine. Chi è già sulla home non deve aspettare la scheda dopo.
+  await stubProviders(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' } });
+    globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED });
+  });
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 20_000 });
+  await expect(page.locator('.dash-bubble-filo').first())
+    .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+});
+
 test('se davvero non c’è nessun modello da chiamare, la home lo dice invece di tacere', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
