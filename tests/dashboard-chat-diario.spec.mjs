@@ -219,11 +219,21 @@ test('C — un\'impostazione confermata entra nel diario e il modello lo sa al t
   await clickConfirm(page, 'ok');
   await expect(host).toHaveCount(0, { timeout: 5_000 });
 
-  // La conferma lascia la sua riga nel diario (prima: niente).
+  // La conferma lascia la sua riga nel diario (prima: niente), e la riga dice
+  // l'impostazione in italiano, non la chiave interna col valore grezzo.
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
-  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'modalita_terminale' }))
-    .toHaveCount(1, { timeout: 5_000 });
+  const riga = activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Impostato' });
+  await expect(riga).toHaveCount(1, { timeout: 5_000 });
+  await expect(riga).toContainText('Modalità terminale → attiva');
+  await expect(riga).not.toContainText('modalita_terminale');
+
+  // E il riassunto in cima si rifà: la conferma arriva a risposta già scritta,
+  // e prima il blocco restava intitolato «Come ha lavorato» con dentro
+  // l'impostazione cambiata.
+  const label = activity.locator('.dash-activity-label');
+  await expect(label).toContainText('impostazione', { timeout: 5_000 });
+  await expect(label).not.toContainText('Come ha lavorato');
 
   // E al turno dopo il modello SA che è stata confermata.
   await page.locator('#input').fill('è attivo?');
