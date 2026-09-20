@@ -618,3 +618,100 @@ test('la Cronologia aperta si accorge di una chat finita in un’altra scheda', 
   await expect(page.locator('.arc-chat')).toHaveCount(1, { timeout: 15_000 });
   await expect(page.locator('.arc-chat').first()).toContainText('I vulcani');
 });
+
+// ── Una chat finisce anche quando la pagina se ne va senza dirlo ────────────
+//
+// Tornare alla home e aprire una chat nuova sono gesti che la pagina annuncia.
+// Chiudere la scheda no: l'avviso partirebbe da una pagina che sta morendo, e
+// non parte. La chat restava «in corso» per sempre — senza il titolo breve, e
+// invisibile a Filo, che quando gli si chiede di riprendere una discussione
+// guarda solo le chat finite. Adesso la fine la constata il main, che la
+// scheda la vede sparire.
+
+test('chiudere la scheda della home finisce la chat come tornare alla home', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  await stubProvider(app, { Spinoza: { tipo: 'conversazione', titolo: 'Spinoza' } });
+
+  const dash = await openTab('filo://dashboard/dashboard.html');
+  await dash.locator('#input').fill('Parlami di Spinoza');
+  await dash.locator('#input').press('Enter');
+  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 20_000 });
+
+  const id = await shell.evaluate(async () => {
+    const snap = await window.filoShell.tabs.snapshot();
+    const t = (snap.tabs || snap).find((x) => String(x.url || '').includes('dashboard'));
+    return t && t.id;
+  });
+  await shell.evaluate((tabId) => window.filoShell.tabs.close(tabId), id);
+
+  await expect.poll(async () => {
+    const c = (await leggiArchivio(app))[0];
+    return c ? `${c.title}|${c.kind}|${!!c.closedAt}` : 'niente';
+  }, { timeout: 25_000 }).toBe('Spinoza|conversazione|true');
+});
+
+test('la risposta che arriva a chat già chiusa non lascia la chat aperta per sempre', async ({ app }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  // Il provider di chat resta fermo finché non lo liberiamo: è l'attesa in cui
+  // l'utente si stufa e se ne va.
+  await app.evaluate(async () => {
+    globalThis.__filoTriage = { coscienza: { tipo: 'conversazione', titolo: 'La coscienza' } };
+    globalThis.__filoAttesa = new Promise((r) => { globalThis.__filoLibera = r; });
+    const rispondi = async ({ attempts, messages }) => {
+      const joined = messages
+        .map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)))
+        .join('\n');
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      if (joined.includes('Classifichi le conversazioni')) {
+        for (const [ago, risposta] of Object.entries(globalThis.__filoTriage)) {
+          if (joined.includes(ago)) return { ...base, text: JSON.stringify(risposta) };
+        }
+        return { ...base, text: JSON.stringify({ tipo: 'conversazione', titolo: 'Senza etichetta' }) };
+      }
+      await globalThis.__filoAttesa;
+      return { ...base, text: JSON.stringify({ text: 'Va bene, ci penso.', actions: [] }) };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = rispondi;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = rispondi;
+  });
+
+  const inVolo = turno(app, 'chat-tardi', 'Secondo te la coscienza è emergente?');
+  await expect.poll(async () => {
+    const c = (await leggiArchivio(app)).find((x) => x.id === 'chat-tardi');
+    return c ? c.messages.length : 0;
+  }, { timeout: 20_000 }).toBe(1);
+  await chiudi(app, 'chat-tardi');
+  await app.evaluate(() => { globalThis.__filoLibera(); });
+  await inVolo;
+
+  // Le due battute ci sono, la chat è finita, e Filo la ritrova.
+  await expect.poll(async () => {
+    const c = (await leggiArchivio(app)).find((x) => x.id === 'chat-tardi');
+    return c ? `${c.messages.length}|${!!c.closedAt}` : 'niente';
+  }, { timeout: 20_000 }).toBe('2|true');
+  const trovate = await app.evaluate(
+    () => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'coscienza' }),
+  );
+  expect((trovate.output.results || []).map((r) => r.id)).toContain('chat-tardi');
+});
+
+test('la ricerca dice dov’è finita la chat, invece di dire che non c’è', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await preparaDueChat(app);
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('.arc-chat')).toHaveCount(1);
+
+  // «sveglia» sta solo nella chat classificata come comando, che è nascosta
+  // sotto l'interruttore ma esiste: dire che non c'è niente è falso, e falso
+  // proprio nel caso per cui i comandi si conservano.
+  await page.locator('#search').fill('sveglia');
+  await expect(page.locator('#chatEmpty')).toContainText(/chat di comando/i, { timeout: 10_000 });
+  await expect(page.locator('#chatEmpty')).not.toContainText('Nessuna chat per');
+
+  // E accendendo l'interruttore la chat compare davvero.
+  await page.locator('#showCommands').check();
+  await expect(page.locator('.arc-chat')).toHaveCount(1);
+  await expect(page.locator('.arc-chat').first()).toContainText('Sveglia alle sette');
+});
