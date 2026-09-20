@@ -168,6 +168,64 @@ test('finita l’accoglienza la home si riempie: il messaggio in mezzo e i sugge
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home');
 });
 
+test('quello che disegnano le parti si legge, in chiaro e in scuro', async ({ app, openTab }) => {
+  // Il blocco di attività e la finestra di output del terminale sono i due
+  // pezzi di schermo che il taglio ha spostato di file. Qui si guarda che
+  // arrivino a schermo interi e leggibili nei due temi: un colore rimasto
+  // indietro in un foglio di stile si vedrebbe qui.
+  const page = await openTab(NEWTAB);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await page.evaluate(() => {
+    window.filo = window.filo || {};
+    window.filo.shellWhich = async () => ({ exists: true });
+    window.filo.shellExec = ({ onData, onExit }) => {
+      onData({ chunk: 'primo\n\u001b[31mrosso\u001b[0m\nultimo\n', stream: 'stdout' });
+      setTimeout(() => onExit({ code: 0, cwd: '/tmp/filo-verifica-635' }), 10);
+      return { abort() {}, sendInput() {} };
+    };
+  });
+  await annuncia(app, terminale(true));
+  await expect(page.locator('#input')).toHaveAttribute('placeholder', /comando per la shell/, { timeout: 8_000 });
+  await page.locator('#input').fill('/echo prova');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('#bubbles .dash-term-out')).toContainText('rosso', { timeout: 8_000 });
+  // La cartella che il comando ha lasciato compare nella riga sopra la barra.
+  await expect(page.locator('#dashDir')).toHaveText('/tmp/filo-verifica-635', { timeout: 8_000 });
+
+  // E un blocco di attività, disegnato dall'altra parte, nelle stesse bolle.
+  await page.evaluate(() => {
+    const act = window.SN_DASH_ATTIVITA.create(document.getElementById('bubbles'));
+    act.addRow('CERCA_WEB', '🔎', 'orari dei treni');
+    act.finish({ failed: false });
+  });
+  await expect(page.locator('#bubbles .dash-activity')).toHaveCount(1, { timeout: 8_000 });
+
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate((t) => { document.documentElement.dataset.snTheme = t; }, tema);
+    const colori = await page.evaluate(() => {
+      const out = document.querySelector('#bubbles .dash-term-out');
+      const att = document.querySelector('#bubbles .dash-activity');
+      const cs = (el) => {
+        const s = getComputedStyle(el);
+        return { colore: s.color, sfondo: s.backgroundColor };
+      };
+      return {
+        terminale: cs(out),
+        attivita: cs(att),
+        altezzaTerminale: out.getBoundingClientRect().height,
+        altezzaAttivita: att.getBoundingClientRect().height,
+      };
+    });
+    // Niente scritte invisibili, niente blocchi schiacciati a zero.
+    expect(colori.terminale.colore).not.toBe(colori.terminale.sfondo);
+    expect(colori.attivita.colore).not.toBe(colori.attivita.sfondo);
+    expect(colori.altezzaTerminale).toBeGreaterThan(10);
+    expect(colori.altezzaAttivita).toBeGreaterThan(10);
+    await page.screenshot({ path: `tests/.shots/verifica-635-giro2-parti-${tema}.png` }).catch(() => {});
+  }
+  await annuncia(app, terminale(false));
+});
+
 test('la barra di scrittura sotto pressione non porta giù nessuna parte', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   const input = page.locator('#input');
