@@ -1362,8 +1362,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
       // si dicono con lo stesso popup: cambia solo chi lo vede e quando.
       livelloEffettivo = Math.max(level, 2);
       uscitaDaAllargare = verdettoPerimetro.uscita;
-      premessaPerimetro = 'Filo ha letto testo scritto da altri — una pagina, un documento, dei risultati di '
-        + `ricerca — e adesso vuole ${verdettoPerimetro.etichetta}.\n\n`
+      premessaPerimetro = 'Filo ha letto testo scritto da altri, per esempio una pagina web o dei risultati '
+        + `di ricerca. Adesso vuole ${verdettoPerimetro.etichetta}.\n\n`
         + 'Non era fra le cose che gli hai chiesto. Permetteglielo solo se te l’aspettavi.\n\n';
     }
   }
