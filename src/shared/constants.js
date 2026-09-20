@@ -1029,6 +1029,25 @@
     return buildModelAttempts(refs, registry, PROVIDER_ORDER, s.apiKeys || {}).length > 0;
   }
 
+  // PERCHÉ Filo non può servire queste funzioni: 'chiave' (nessuna chiave da
+  // nessuna parte), 'pesi-aperti' (i modelli ci sono e sono validi, li esclude
+  // tutti l'interruttore) o 'modelli' (nessun modello, o solo scorciatoie che
+  // il registro non conosce). Stringa vuota se Filo può servirne almeno una.
+  // Chi tace deve dire il motivo GIUSTO: mandare a rivedere la configurazione
+  // dei modelli chi ne ha una buona lascia senza spiegazione (#663). PURA.
+  function whyCannotServe(settings, actions) {
+    const s = settings || {};
+    const lista = (actions || []).filter(Boolean);
+    if (lista.some((a) => canServeAction(s, a))) return '';
+    if (!modelProvidersWithKey(s.apiKeys).length) return 'chiave';
+    const registry = s.modelRegistry || {};
+    const bloccaLInterruttore = s.openWeightsOnly === true && lista.some((a) => {
+      const refs = usableModelRefs(parseModelRefs((s.models || {})[a] || ''), registry);
+      return refs.length > 0 && applyOpenWeightsPolicy(refs, registry, a).refs.length === 0;
+    });
+    return bloccaLInterruttore ? 'pesi-aperti' : 'modelli';
+  }
+
   // ─── IL SISTEMA SU CUI GIRA FILO, DETTO AL MODELLO ─────────────────────────
   // Filo lancia comandi da terminale e legge file per percorso: due cose che
   // hanno una forma DIVERSA su Windows, Mac e Linux. Finché il prompt non lo
