@@ -186,29 +186,32 @@ function htmlATesto(html, dentroZona = false) {
 }
 
 function passaggio(html, pota, dentroZona = false) {
-  const src = String(html == null ? '' : html).replace(/<!--[\s\S]*?-->/g, '');
+  const src = String(html == null ? '' : html);
   const fuori = []; // pila degli elementi di cornice ancora aperti
   const zone = []; // pila delle zone di contenuto (article/main) ancora aperte
   const pila = [];
   const pezzi = [];
   let i = 0;
-  TAG_RE.lastIndex = 0;
-  let m;
   const testo = (s) => { if (!fuori.length && s) pezzi.push(decodeEntita(s)); };
-  while ((m = TAG_RE.exec(src))) {
-    testo(src.slice(i, m.index));
-    i = TAG_RE.lastIndex;
-    const chiusura = m[1] === '/';
-    const nome = m[2].toLowerCase();
-    const autochiuso = m[4] === '/' || VUOTI.has(nome);
+  for (;;) {
+    const t = prossimoTag(src, i);
+    if (!t) { testo(src.slice(i)); break; }
+    testo(src.slice(i, t.inizio));
+    if (t.troncato) break;
+    i = t.fine;
+    if (t.salta) continue;
+    const chiusura = t.chiusura;
+    const nome = t.nome;
+    const autochiuso = t.autochiuso || VUOTI.has(nome);
     if (!chiusura) {
       if (autochiuso) {
         if (!fuori.length && (nome === 'br' || nome === 'hr')) pezzi.push('\n');
         continue;
       }
       pila.push(nome);
-      const attrs = pota ? attributi(m[3]) : null;
-      if (!fuori.length && pota && daScartare(nome, attrs, dentroZona || zone.length > 0)) { fuori.push(pila.length); continue; }
+      const attrs = pota ? attributi(t.attrsRaw) : null;
+      const dove = { inZona: dentroZona || zone.length > 0, primoLivello: pila.length === 1 };
+      if (!fuori.length && pota && daScartare(nome, attrs, dove)) { fuori.push(pila.length); continue; }
       if (!fuori.length && (TAG_ZONA.has(nome) || (attrs && attrs.role === 'main'))) zone.push(pila.length);
       if (fuori.length) continue;
       if (nome === 'li') pezzi.push('\n• ');
