@@ -1370,13 +1370,18 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // richiesta di conferma (RUN → popup → CONFIRM). Le pagine interne filo://
   // sono fidate per origine. Un FILO_CONFIRM_ACTION forgiato "a freddo" da fuori
   // non ha un pending corrispondente → rifiutato (l'azione non si esegue).
-  if (level >= 2 && confirmed && !hasBespokeConfirm) {
+  if (livelloEffettivo >= 2 && confirmed && !hasBespokeConfirm) {
     const origin = sender?.tab?.url || sender?.url || '';
     const trusted = String(origin).startsWith('filo://');
     if (!trusted && !consumePendingConfirm(sender, action)) {
       console.warn('[Filo] FILO_CONFIRM_ACTION senza conferma legittima: rifiutata', type);
       return { executed: false, kept: false, rejected: true };
     }
+  }
+  // Il sì allarga il perimetro di QUELLA uscita e solo per QUESTO compito.
+  // Dopo il controllo #250: una conferma forgiata non deve allargare niente.
+  if (confirmed && uscitaDaAllargare && task && Compiti) {
+    Compiti.allarga(task, uscitaDaAllargare, 'confermata dall’utente');
   }
 
   try {
