@@ -212,3 +212,70 @@ test('se da questa macchina non risulta su quale contenuto è stato dato l\'ok, 
     rmSync(fuori, { recursive: true, force: true });
   }
 });
+
+// I due rilievi del giro 2, corretti nello stesso giro: qui restano come
+// memoria, così il giro dopo li ritrova provati invece di ripagarli.
+
+test('confermare la versione con la forma corta che gli strumenti stampano non viene respinto', async () => {
+  const { srv, ricevuti, port } = await fintoServer(RISPOSTE);
+  const { dir, punta } = deposito('filo-485-forma-corta-');
+  try {
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: dir,
+      FILO_TOOLS_ROOT: dir,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+    };
+    const vero = punta();
+    const corto = await lancia(CANALE,
+      ['deliver', 'biglietto-finto', 'secaudit', '--verdict', 'pass', '--sha', vero.slice(0, 12)], env, dir);
+    expect(corto.status, `una conferma nella forma corta si è vista rispondere:\n${corto.stderr}`).toBe(0);
+    expect(String(ricevuti[ricevuti.length - 1]?.body?.data?.sha || ''),
+      'e al server arriva comunque l\'impronta intera, timbrata dallo strumento').toBe(vero);
+
+    // Un'altra versione resta un rifiuto: confermare non è sostituire.
+    const quanti = ricevuti.length;
+    const altra = await lancia(CANALE,
+      ['deliver', 'biglietto-finto', 'secaudit', '--verdict', 'pass', '--sha', 'f'.repeat(40)], env, dir);
+    expect(altra.status).not.toBe(0);
+    expect(ricevuti.length).toBe(quanti);
+  } finally {
+    srv.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('la fusione fermata perché il ramo si è mosso dice quale passo registrare, non chi chiamare', async () => {
+  const { srv, port } = await fintoServer(RISPOSTE);
+  const { dir, g, punta } = deposito('filo-485-registrare-');
+  const fuori = cartellaTemporanea('filo-485-registrare-fuori-');
+  try {
+    const NOTA = resolve(fuori, 'nota.md');
+    writeFileSync(NOTA, 'Letto il diff: nessun comando di sistema, nessuna chiave, nessuna regola del database toccata.', 'utf8');
+    seminaStato(resolve(fuori, 'stato'), 'ID485', 'worker/485');
+    const env = ambiente(dir, fuori, port);
+
+    const verdetto = await lancia(DISPATCH, ['--record-secaudit', 'ID485', 'pass', '--nota', NOTA], env, dir);
+    expect(verdetto.status, verdetto.stderr).toBe(0);
+    writeFileSync(resolve(dir, 'a.txt'), 'contenuto MAI guardato da nessuno\n', 'utf8');
+    g(['add', '-A']);
+    g(['commit', '-qm', 'sostituito dopo il via libera']);
+
+    const gate = await lancia(GATE, ['worker/485'], env, dir);
+    const detto = `${gate.stdout}\n${gate.stderr}`;
+    expect(gate.status).not.toBe(0);
+    // Fermarsi e basta lascia la notizia su questa macchina: sul canale i due
+    // via libera continuano a risultare buoni per questo ramo.
+    expect(detto, 'il rifiuto non dice quale passo registra la decadenza').toContain('revision_capability');
+    expect(detto, 'il comando deve nominare il ramo, per copiarlo invece di ricostruirlo').toContain('worker/485');
+    expect(detto).toContain('--guasto');
+    expect(detto, 'nominare una persona che non c\'è non è un passo da registrare')
+      .not.toContain('chi ha cambiato il ramo lo rimette in verifica');
+    expect(punta()).toBeTruthy();
+  } finally {
+    srv.close();
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(fuori, { recursive: true, force: true });
+  }
+});
