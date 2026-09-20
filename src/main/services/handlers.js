@@ -2527,7 +2527,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let testoScartato = '';
   // Le sveglie che c'erano PRIMA di questo turno: quelle nate adesso sono già
   // coperte dalla loro azione.
-  const statoSveglie = { orariSveglie: Dichiarate ? await orariDelleSveglie() : [] };
+  // …e i titoli dei file e degli appunti che ESISTONO: un appunto salvato ieri
+  // non lascia nessuna azione in questa conversazione, e senza guardarli «l'ho
+  // salvato fra gli appunti della spesa» era un'accusa in ogni chat nuova.
+  const statoSveglie = {
+    orariSveglie: Dichiarate ? await orariDelleSveglie() : [],
+    titoliAppunti: Dichiarate ? (fileList || []).map((f) => f && f.title).filter(Boolean) : [],
+  };
   const conImmagini = imageList.length > 0;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
