@@ -102,6 +102,9 @@ test('CLI routine-channel deliver: revisione, correzione e verdetto con modifich
       ['status', '--status', 'revision_capability', '--notes', REPORT, '--frase', 'ok', '--branch', 'claude/lavoro'],
       ['fixed', '--report', REPORT],
       ['verdict', '--critique', REPORT, '--sha', 'abc'],
+      // Il verdetto del controllo di sicurezza era l'unico rimasto fuori: vale
+      // per il commit letto come gli altri (feedback #485).
+      ['secaudit', '--verdict', 'pass'],
     ];
 
     writeFileSync(resolve(sandbox, 'a.txt'), 'base\nfix\n', 'utf8');
