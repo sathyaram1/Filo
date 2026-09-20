@@ -1508,20 +1508,12 @@
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
-      // S1.priority: con cifratura attiva, `priority` va scritto come stringValue
-      // (ciphertext FENC1:). Senza cifratura, integerValue come prima (retrocompat).
-      const C = global.SN_FEEDBACK_CRYPTO;
-      if (C && C.isEnabled()) {
-        try {
-          const encPriority = await C.encryptForOwner(String(p));
-          fields.priority = { stringValue: encPriority };
-        } catch (e) {
-          console.warn('[SN feedback] cifratura priority fallita, scrivo in chiaro:', e?.message || e);
-          fields.priority = { integerValue: String(p) };
-        }
-      } else {
-        fields.priority = { integerValue: String(p) };
-      }
+      // S1.priority: `priority` va scritto come stringValue (ciphertext FENC1:).
+      // #602 — niente più ripiego su `integerValue` in chiaro quando la
+      // cifratura non riesce: la priorità dice quanto ci tiene chi lavora un
+      // feedback, e su un documento pubblico in chiaro è un'informazione
+      // regalata. Se non si può cifrare la scrittura si ferma qui.
+      fields.priority = { stringValue: await maybeEncrypt(String(p)) };
       mask.push('priority');
     }
     // priorityManual: flag booleano, non cifrato (indica che l'owner ha fissato
