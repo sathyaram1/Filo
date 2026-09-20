@@ -455,10 +455,7 @@ class TabManager {
     // La pagina si è già presa gli ultimi Esc uno dopo l'altro, senza che
     // l'utente facesse nient'altro in mezzo: da qui in avanti non le crediamo
     // più e usciamo noi. È il tetto che nessun sito può azzerare.
-    if ((this._escRivendicazioni || 0) >= ESC_RIVENDICAZIONI_MAX) {
-      this.setContentFullscreen(false);
-      return true;
-    }
+    const sfiduciata = (this._escRivendicazioni || 0) >= ESC_RIVENDICAZIONI_MAX;
     // Lo schermo pieno se l'è preso la PAGINA (il pulsante del lettore video) e
     // il tasto arriva da lei. Qui il tasto NON si può lasciar passare: il
     // browser lo consuma per uscire dal suo fullscreen e il documento non lo
