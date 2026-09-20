@@ -231,10 +231,11 @@ const USO = [
   '  i controlli e fonde con la sua identità. Qui non ci sono opzioni.',
   '  Serve il biglietto del giro, che si rilegge da solo dal promemoria.',
   '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo i via libera,',
-  '  o se nella directory c\'è qualcosa fuori dai commit, non parte.',
+  '  se nella directory c\'è qualcosa fuori dai commit, o se il contenuto',
+  '  esaminato non è arrivato su origin (da dove il server lo prende), non parte.',
   '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
   '        20 conflitto · 1 uso sbagliato, ramo mosso dopo i via libera,',
-  '           o rifiuto del server',
+  '           contenuto non pubblicato, o rifiuto del server',
 ].join('\n');
 
 async function main() {
