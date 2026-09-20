@@ -198,6 +198,33 @@
     return chat;
   }
 
+  // Titolo e tipo scelti DALL'UTENTE. Un titolo generato può essere sbagliato o
+  // non dire niente, e in elenco il titolo è l'unica cosa per cui una chat si
+  // riconosce; una discussione finita fra i comandi, allo stesso modo, la
+  // rimette dove va chi l'ha fatta. Quello che sceglie l'utente vince e non
+  // viene più riscritto: senza il marchio, la prima riclassificazione (una chat
+  // riaperta e continuata) rimetterebbe il titolo del modello al suo posto.
+  async function setUserTriage(id, { title, kind } = {}) {
+    if (!id) return null;
+    const items = await list();
+    const idx = items.findIndex((c) => c && c.id === id);
+    if (idx < 0) return null;
+    const chat = items[idx];
+    if (title != null) {
+      const pulito = String(title).replace(/\s+/g, ' ').trim();
+      if (pulito) { chat.title = CA().clampTitle(pulito); chat.titleByUser = true; }
+    }
+    if (kind != null) {
+      chat.kind = CA().normalizeKind(kind);
+      chat.kindByUser = true;
+      // Un tipo scelto a mano vale anche sull'intervista di benvenuto: è
+      // l'utente, non il modello, a dire dove va la sua conversazione.
+    }
+    chat.triagedCount = Array.isArray(chat.messages) ? chat.messages.length : 0;
+    await save(items);
+    return chat;
+  }
+
   // Scrive titolo e tipo (li calcola chi ha il modello: handlers.js).
   async function setTriage(id, { title, kind } = {}) {
     if (!id) return null;
@@ -205,8 +232,10 @@
     const idx = items.findIndex((c) => c && c.id === id);
     if (idx < 0) return null;
     const chat = items[idx];
-    if (title) chat.title = CA().clampTitle(title);
-    if (chat.onboarding) {
+    if (title && !chat.titleByUser) chat.title = CA().clampTitle(title);
+    if (chat.kindByUser) {
+      // L'utente ha già detto dove va questa chat: il modello non lo smentisce.
+    } else if (chat.onboarding) {
       // L'intervista di benvenuto resta una conversazione qualunque cosa dica
       // il modello: lo dice il feedback, e non dipende da come è andata.
       chat.kind = CA().KIND_TALK;
