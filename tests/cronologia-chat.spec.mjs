@@ -199,7 +199,7 @@ test('una chat si riapre per intero e ci si continua a scrivere dentro', async (
   expect(chats.find((c) => c.id === 'chat-discussione').messages[2].text).toBe('E il libero arbitrio?');
 });
 
-test('una chat ripresa si riclassifica: il titolo di due battute fa non vale per mezz’ora di discussione', async ({ app }) => {
+test('una chat ripresa si riclassifica: il titolo di due battute non vale per mezz’ora di discussione', async ({ app }) => {
   await configura(app);
   // Alla prima chiusura è un comando; dopo la ripresa diventa una discussione.
   await stubProvider(app, { arbitrio: { tipo: 'conversazione', titolo: 'Libero arbitrio' }, sveglia: { tipo: 'comando', titolo: 'Sveglia' } });
