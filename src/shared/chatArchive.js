@@ -284,14 +284,16 @@
     const conTutte = candidate.filter((c) => tutte.every((t) => hays.get(c.id).includes(t)));
     if (conTutte.length) return { results: taglia(conTutte), termini: tutte, allargata: false };
 
-    const forti = terminiCheDistinguono(tutte);
+    const forti = tutte.filter((t) => t.length > 3 && !PAROLE_CHE_NON_DISTINGUONO.has(t));
     // Nessuna parola restringe il campo (l'utente ha cercato «di ieri»):
     // allargare vorrebbe dire tirare fuori mezzo archivio spacciandolo per una
     // risposta. Meglio dire che non si è trovato niente.
-    if (forti.length === tutte.length) return { results: [], termini: tutte, allargata: false };
+    if (!forti.length) return { results: [], termini: tutte, allargata: false };
 
-    const conForti = candidate.filter((c) => forti.every((t) => hays.get(c.id).includes(t)));
-    if (conForti.length) return { results: taglia(conForti), termini: forti, allargata: true };
+    if (forti.length < tutte.length) {
+      const conForti = candidate.filter((c) => forti.every((t) => hays.get(c.id).includes(t)));
+      if (conForti.length) return { results: taglia(conForti), termini: forti, allargata: true };
+    }
 
     // Ultimo passo: almeno una parola che distingue. Ordinate per quante ne
     // combaciano, così la chat più pertinente resta in cima.
