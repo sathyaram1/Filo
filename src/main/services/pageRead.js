@@ -397,9 +397,11 @@ async function scarica(url) {
  * Legge una pagina web e ne restituisce il TESTO.
  *
  * `leggiScheda(url)` è la strada preferita: se la pagina è già aperta in una
- * scheda di Filo deve tornare `{ text, title }` del testo RESO, altrimenti
- * niente. Esito sempre nella stessa forma, anche in caso di rifiuto: chi
- * formatta l'osservazione per il modello non deve indovinare niente.
+ * scheda di Filo deve tornare l'HTML RESO (`{ html, title }`), che passa dalla
+ * stessa estrazione dell'HTML scaricato — così la cornice del sito resta fuori
+ * per tutte e due le strade. Esito sempre nella stessa forma, anche in caso di
+ * rifiuto: chi formatta l'osservazione per il modello non deve indovinare
+ * niente.
  */
 async function readPage(input, { leggiScheda = null } = {}) {
   const url = normalizzaUrl(input);
@@ -425,12 +427,13 @@ async function readPage(input, { leggiScheda = null } = {}) {
   if (typeof leggiScheda === 'function') {
     try {
       const reso = await leggiScheda(url);
-      const testo = reso && normalizzaTesto(reso.text);
+      const estratto = reso && reso.html ? estraiContenuto(reso.html) : null;
+      const testo = estratto ? estratto.testo : normalizzaTesto(reso && reso.text);
       if (testo) {
         const capped = tronca(testo);
         return {
           ...BASE, ok: true, url, source: 'scheda', kind: 'html',
-          title: String((reso && reso.title) || '').trim(),
+          title: String((reso && reso.title) || (estratto && estratto.titolo) || '').trim(),
           text: capped.text, truncated: capped.truncated,
         };
       }

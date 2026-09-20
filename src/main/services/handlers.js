@@ -1045,11 +1045,14 @@ async function testoDaSchedaAperta(url) {
       if (!t || t.isInternal || !/^https?:\/\//i.test(t.url || '')) continue;
       if (!PR.stessoIndirizzo(t.url, url)) continue;
       try {
-        const text = await t.view.webContents.executeJavaScript(
-          '(function(){try{return (document.body&&document.body.innerText)||"";}catch(e){return "";}})()',
+        // L'HTML RESO, non `innerText`: così passa dalla stessa estrazione del
+        // testo scaricato (fuori menu, pubblicità e piè di pagina) e intanto
+        // porta dentro quello che ha costruito il JavaScript del sito.
+        const html = await t.view.webContents.executeJavaScript(
+          '(function(){try{return document.documentElement.outerHTML||"";}catch(e){return "";}})()',
           true,
         );
-        if (typeof text === 'string' && text.trim()) return { text, title: t.title || '' };
+        if (typeof html === 'string' && html.trim()) return { html, title: t.title || '' };
       } catch (_) {}
     }
   }

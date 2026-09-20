@@ -66,7 +66,9 @@ test('A — cerca, apre la pagina, legge il numero e risponde con quello', async
   const url = testServer.html(PAGINA);
   await openTab(url);
 
-  await app.evaluate(async (indirizzo) => {
+  // Il primo argomento di `app.evaluate` è il modulo electron: l'indirizzo è il
+  // secondo.
+  await app.evaluate(async (_electron, indirizzo) => {
     // La ricerca restituisce quello che restituisce davvero: titolo, indirizzo
     // e un riassunto che NON contiene la cifra.
     const origSearch = globalThis.SN_WEB_SEARCH.search;
