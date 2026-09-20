@@ -2081,6 +2081,16 @@ function webSearchResultsForPrompt(actions) {
 // dall'owner invece di ricostruirlo a memoria — che su queste cose è il modo
 // tipico di attribuire a Filo posizioni che non ha. Sono DATI di sistema
 // affidabili, non istruzioni dell'utente.
+//
+// Il tetto è la rete contro un documento fuori misura, non una misura: a 16.000
+// caratteri tagliava l'unico documento che esiste (20.001) e gli portava via i
+// punti deboli della scelta e TUTTO l'elenco delle fonti, cioè proprio la parte
+// che lo strumento ordina all'agente di citare. Ora è dimensionato sul caso
+// peggiore realistico con margine (CLAUDE.md § Limiti: quattro documenti come
+// quello di oggi, e ognuno può quadruplicare), e quando scatta dice quanto è
+// arrivato invece di tagliare in silenzio.
+const TRANSPARENCY_DOC_CAP = 80000;
+
 // Taglia un testo al tetto senza spezzare un carattere. Un'emoji occupa DUE
 // unità di testo: tagliando per numero di unità si resta con la prima metà, che
 // da sola non è nessun carattere e arriva al modello come un rombo. Le stesse
@@ -2104,7 +2114,10 @@ function transparencyDocsForPrompt(actions) {
     const out = a._output;
     if (!out || !out.text) continue;
     let body = String(out.text);
-    if (body.length > 16000) body = `${tagliaInteri(body, 16000)}\n…(documento troncato)`;
+    if (body.length > TRANSPARENCY_DOC_CAP) {
+      const tenuto = tagliaInteri(body, TRANSPARENCY_DOC_CAP);
+      body = `${tenuto}\n…(documento troncato: qui sopra ci sono i primi ${tenuto.length} caratteri su ${body.length}. Dillo all'utente invece di completare a memoria.)`;
+    }
     blocks.push(`[Documento di trasparenza di Filo${out.doc ? ` "${out.doc}"` : ''}]\n${body}`);
   }
   return blocks.join('\n\n').trim();
