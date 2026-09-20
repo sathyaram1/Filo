@@ -425,24 +425,48 @@
   const POMERIGGIO = /^[\s,]*(?:di|del|della|nel|nella)?\s*(?:sera|serata|pomeriggio)\b/i;
   const MATTINO = /^[\s,]*(?:di|del|della|al|nella)?\s*(?:mattina|mattino|notte)\b/i;
 
+  // Le preposizioni con cui in italiano si dice l'ora. Giro 5: si leggeva
+  // solo «alle», quindi «ti ho messo la sveglia per le 19» e «la sveglia
+  // delle 19» non venivano lette affatto, e la sveglia delle 19 che esisteva
+  // veniva smentita.
+  const PREP_ORA = `(?:alle|all${AP}|a|per\\s+le|per\\s+l${AP}|entro\\s+le|dalle|delle|sulle|verso\\s+le|verso\\s+l${AP})`
+    + '(?:\\s+ore)?';
+  // La mezz'ora e il quarto d'ora, che in italiano si dicono così e basta.
+  // «Alle 7 e mezza», con la sveglia delle 7:30 che c'è, veniva smentita
+  // perché l'ora si leggeva 7:00.
+  const MEZZA = /^[\s,]*e\s+mezz[ao]\b/i;
+  const UN_QUARTO = /^[\s,]*e\s+un\s+quarto\b/i;
+  const MENO_UN_QUARTO = /^[\s,]*meno\s+un\s+quarto\b/i;
+  const E_MINUTI = /^[\s,]*e\s+([0-5]?\d)\b/i;
+
   // Gli orari nominati in una frase: «alle 19:00», «alle 19», «alle 7.30»,
-  // «alle sette», «alle 7 di sera», «a mezzogiorno».
+  // «per le 19», «alle sette», «alle 7 e mezza», «alle 7 di sera»,
+  // «a mezzogiorno».
   function orariNelTesto(frase) {
     const out = new Set();
     const s = String(frase || '');
     const metti = (ora, minuti, dopo) => {
       let h = Number(ora);
       if (!Number.isFinite(h) || h < 0 || h > 23) return;
-      const coda = String(dopo || '');
+      let coda = String(dopo || '');
+      let min = Number(minuti) || 0;
+      // I minuti detti a parole valgono solo se l'ora era secca.
+      if (!min) {
+        let q;
+        if (MEZZA.test(coda)) { min = 30; coda = coda.replace(MEZZA, ''); }
+        else if (UN_QUARTO.test(coda)) { min = 15; coda = coda.replace(UN_QUARTO, ''); }
+        else if (MENO_UN_QUARTO.test(coda)) { min = 45; h = (h + 23) % 24; coda = coda.replace(MENO_UN_QUARTO, ''); }
+        else if ((q = coda.match(E_MINUTI))) { min = Number(q[1]); coda = coda.slice(q[0].length); }
+      }
       if (h >= 1 && h <= 11 && !MATTINO.test(coda) && POMERIGGIO.test(coda)) h += 12;
-      out.add(`${String(h).padStart(2, '0')}:${String(minuti || '00').padStart(2, '0')}`);
+      out.add(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
     };
     let m;
     const conMinuti = /\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/g;
     while ((m = conMinuti.exec(s))) metti(m[1], m[2], s.slice(m.index + m[0].length));
-    const soloOra = /\balle\s+([01]?\d|2[0-3])\b(?![:.]\d)/gi;
+    const soloOra = new RegExp(`${INIZIO}${PREP_ORA}\\s+([01]?\\d|2[0-3])\\b(?![:.]\\d)`, 'gi');
     while ((m = soloOra.exec(s))) metti(m[1], '00', s.slice(m.index + m[0].length));
-    const aParole = new RegExp(`${INIZIO}(?:alle|all${AP}|a)\\s+(${Object.keys(ORE_A_PAROLE).join('|')})${FINE}`, 'gi');
+    const aParole = new RegExp(`${INIZIO}${PREP_ORA}\\s+(${Object.keys(ORE_A_PAROLE).join('|')})${FINE}`, 'gi');
     while ((m = aParole.exec(s))) {
       metti(ORE_A_PAROLE[m[1].toLowerCase()], '00', s.slice(m.index + m[0].length));
     }
