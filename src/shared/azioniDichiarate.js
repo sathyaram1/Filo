@@ -290,10 +290,20 @@
           // loro prove e il loro avviso. Qui resterebbero solo per dire la
           // cosa sbagliata.
           + `(?![^.!?]{0,24}\\b(?:${DOCUMENTO}|segnalazione|feedback)\\b)`;
+        // Giro 9: un programma si «avvia» e si «lancia» quanto si «apre».
+        // Qui il verbo da solo non basta, perché si avvia anche un timer e
+        // si lancia anche una ricerca: le cose delle altre famiglie restano
+        // alle altre famiglie, e i modi di dire («ho avviato un dibattito»)
+        // non promettono niente sullo schermo.
+        const ALTRE_FAMIGLIE = `(?![^.!?]{0,32}\\b(?:timer|conto alla rovescia|${SVEGLIA}`
+          + '|ricerca|ricerche|comand[oi]|segnalazione|feedback|promemoria|appunt[oi]'
+          + '|discussione|dibattito|discorso|collaborazione|percorso|trattativa)\\b)';
         return [
           new RegExp(`${HO}apert[oa]\\b${NON_SI_APRE}`, 'i'),
           new RegExp(`\\b${PRON}apert[oa]\\b${NON_SI_APRE}`, 'i'),
           new RegExp(`\\bte (?:l${AP}|lo |la )ho\\s+apert[oa]\\b${NON_SI_APRE}`, 'i'),
+          new RegExp(`${HO}(?:avviato|lanciato|fatto\\s+partire)\\b${ALTRE_FAMIGLIE}`, 'i'),
+          new RegExp(`\\b${PRON}(?:avviat|lanciat)[oa]\\b${ALTRE_FAMIGLIE}`, 'i'),
         ];
       })(),
     },
