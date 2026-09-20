@@ -540,7 +540,31 @@ La regola, uguale per tutti e due:
   `--guasto` come via d'uscita se il server rifiuta quel passaggio. Fermarsi e
   basta lascia la notizia su una macchina sola, mentre sul canale i due via
   libera continuano a risultare buoni per quel ramo: la segnalazione #485
-  spostata di un passo.
+  spostata di un passo. I comandi del rifiuto si stampano con gli **attrezzi
+  del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
+  copia che il ramo si porta dietro;
+- **la memoria del confronto la scrive OGNI strada che registra un esito.**
+  Il rifiuto del citofono si regge sullo specchio locale («la verifica ha dato
+  l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
+  `dispatch --record-*`, bastava registrare lo stesso esito dal canale
+  (`deliver verdict|secaudit`) perché lo specchio restasse vuoto e la fusione
+  ripartisse a foglio sostituito: la difesa si spegneva scegliendo l'ingresso.
+  La porta unica è `ricordaEsitoSuCommit` (`scripts/lib/branch-integrity.mjs`),
+  e una consegna `fixed` svuota i due campi, perché una correzione è contenuto
+  nuovo (verifica del giro 3);
+- **l'astensione si dichiara PER CIASCUNO dei due esiti.** Dirlo solo quando
+  non si sa niente lasciava passare in silenzio il caso normale — verifica e
+  controllo di sicurezza su macchine diverse, quindi qui una sola impronta su
+  due — che è il peggiore, perché sembra controllato più degli altri;
+- **l'impronta deve descrivere quello che chi fonde andrà DAVVERO a
+  prendere.** Il server non fonde la directory: scarica il ramo da GitHub. Un
+  commit rimasto solo qui (il salvataggio automatico prova a spedire e, se non
+  ci riesce, per costruzione lo scrive nei log e prosegue) fa sì che i via
+  libera parlino di un contenuto che non atterrerà mai, e ad atterrare sia
+  quello vecchio. È il gemello del rifiuto per le modifiche non salvate — lì
+  la punta si sposta in avanti dopo l'ok, qui non si è mai mossa dove conta —
+  e il citofono lo controlla prima di chiedere, con un tetto sul tempo perché
+  qui si parla con la rete.
 
 Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
 `scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
