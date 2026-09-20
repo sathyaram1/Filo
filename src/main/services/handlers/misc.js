@@ -510,17 +510,16 @@ module.exports = function register(on, ctx) {
       // segnalazione ha già letto «inviato» e ha già preso i crediti: se non
       // glielo diciamo, quella segnalazione sparisce e non lo sa nessuno. Il
       // motivo arriva già scritto per chi legge (dice cosa manca e che non è
-      // partito niente), e dura un po' di più di un avviso qualunque perché
-      // chiede di rimandarla.
-      onGiveUp: (_item, motivo) => {
-        try {
-          broadcastToTabs({
-            type: MSG.SHOW_TOAST,
-            text: String(motivo || 'La tua segnalazione non è partita.'),
-            duration: 9000,
-          });
-        } catch (_) {}
-      },
+      // partito niente).
+      //
+      // Non passa dagli avvisi delle pagine: quelli li mostra solo una pagina
+      // web che in quel momento è davanti E a fuoco, quindi con Filo in
+      // secondo piano, su una pagina interna o appena avviato non li vedeva
+      // nessuno, e la segnalazione spariva in silenzio lo stesso. Va nella
+      // cornice della finestra, dove resta finché non la si chiude.
+      onGiveUp: (_item, motivo) => avvisoNellaFinestra(
+        String(motivo || 'La tua segnalazione non è partita.'),
+      ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
