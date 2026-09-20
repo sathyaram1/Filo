@@ -341,14 +341,20 @@
 
   const NAMES = Object.keys(TOOLS);
 
-  // Le definizioni nel formato che OpenRouter (stile OpenAI) capisce.
-  function definitions({ sistema, onboarding = false } = {}) {
-    const ctx = { sistema };
+  // Le definizioni nel formato che OpenRouter (stile OpenAI) capisce. Con
+  // `compito` l'elenco è già filtrato dal perimetro (#533): uno strumento fuori
+  // perimetro non è sconsigliato al modello, è assente: non esiste da chiamare.
+  function definitions({ sistema, onboarding = false, compito = null } = {}) {
+    const ctx = { sistema, compito };
+    const C = global.SN_COMPITI;
+    const ammessi = (C && compito) ? new Set(C.strumentiPermessi(compito, NAMES)) : null;
     const out = [];
     for (const name of NAMES) {
       const t = TOOLS[name];
       if (t.soloOnboarding && !onboarding) continue;
+      if (ammessi && !ammessi.has(name)) continue;
       const description = typeof t.description === 'function' ? t.description(ctx) : t.description;
+      const properties = typeof t.properties === 'function' ? t.properties(ctx) : (t.properties || {});
       out.push({
         type: 'function',
         function: {
@@ -356,7 +362,7 @@
           description,
           parameters: {
             type: 'object',
-            properties: t.properties || {},
+            properties,
             required: Array.isArray(t.required) ? t.required : [],
           },
         },
