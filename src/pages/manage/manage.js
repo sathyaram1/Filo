@@ -553,6 +553,11 @@
       if (el) el.disabled = !isAdmin || !routinesOn;
     }
     if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
+    // Le sessioni NON dipendono dalle routine accese: escludere un account, o
+    // ridurre il parallelismo, si decide prima di riaccendere.
+    for (const el of [mgMaxSessions, mgMaxSessionsSave, mgAccountA, mgAccountB, ...mgPriorityRadios]) {
+      if (el) el.disabled = !isAdmin;
+    }
     if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
     if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
     applyAutoApproveGate();
