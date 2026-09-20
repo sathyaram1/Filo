@@ -1553,8 +1553,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const text = T ? T.asText(doc) : '';
         return { executed: true, kept: true, output: { doc: doc || null, text } };
       }
-      case 'EVENTO_CALENDARIO':
-        return { executed: false, kept: true };
+      case 'EVENTO_CALENDARIO': {
+        // Filo PROPONE l'evento: nel calendario ci entra quando l'utente
+        // clicca. `proposta` lo dice alla chat, che senza lo racconterebbe
+        // come un'azione non riuscita — e un bottone spento non è una
+        // proposta. Data e ora si controllano qui: un 31 febbraio inventato
+        // dal modello va detto adesso, non scoperto dal calendario.
+        const C = globalThis.SN_CALENDAR;
+        const evento = C ? C.normalize(action) : null;
+        if (!evento) return { executed: false, kept: false, output: { event: 'invalid' } };
+        return { executed: false, kept: true, output: { proposta: true, evento } };
+      }
       case 'CAPACITA_DETTAGLIO': {
         // Lookup del manifesto delle capacità (F2): l'agente chiede il dettaglio
         // di una o più voci per id; glielo restituiamo come output, che il client
