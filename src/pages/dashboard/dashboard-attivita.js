@@ -436,9 +436,9 @@
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
-      // La home chiesta dalla home non ricarica niente: butterebbe via il
-      // lavoro e la risposta appena scritti.
-      if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home' };
+      // La home chiesta dalla home non ricarica niente (butterebbe via lavoro e
+      // risposta), e `failed` tiene fuori dal riassunto un comando che non ha agito.
+      if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home', failed: true };
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
   };
