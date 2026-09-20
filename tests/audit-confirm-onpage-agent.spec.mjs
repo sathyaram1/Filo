@@ -11,7 +11,7 @@
 // esposto al mondo principale (è proprio l'isolamento su cui poggia la barriera),
 // quindi non è pilotabile via page.evaluate. Qui verifichiamo la LOGICA del gate:
 //   • CONFIRM a freddo da origine esterna → rifiutato (nessuna esecuzione);
-//   • RUN (livello 2) → needsConfirm, niente esecuzione, registra il pending;
+//   • RUN → needsConfirm, niente esecuzione, registra il pending;
 //   • CONFIRM dopo il RUN dallo STESSO mittente → esegue davvero;
 //   • la conferma è ONE-TIME: un secondo CONFIRM senza nuovo RUN → rifiutato.
 //
@@ -30,7 +30,7 @@ const exec = (app, action, opts) =>
 
 const fbCalls = (app) => app.evaluate(() => globalThis.__fbCalls.length);
 
-test('on-page agent (origine esterna): RUN→CONFIRM esegue livello 2; il CONFIRM a freddo no', async ({ app }) => {
+test('on-page agent (origine esterna): RUN→CONFIRM esegue; il CONFIRM a freddo no', async ({ app }) => {
   // Stub del submit feedback nel main: registra le chiamate senza toccare la rete.
   await app.evaluate(() => {
     const FB = globalThis.SN_FEEDBACK;
@@ -49,10 +49,13 @@ test('on-page agent (origine esterna): RUN→CONFIRM esegue livello 2; il CONFIR
   expect(cold.rejected).toBe(true);
   expect(await fbCalls(app)).toBe(0);
 
-  // 2) RUN legittimo: livello 2 → il main non esegue, chiede conferma.
+  // 2) RUN legittimo: il main non esegue, chiede conferma. Dal #530 la
+  //    segnalazione costa 3 (parte a nome dell'utente e non si ritira) e il
+  //    compito, vivendo dentro una pagina web, è contaminato: la conferma è
+  //    quella con la parola digitata.
   const run = await exec(app, action, { sender: extSender });
   expect(run.executed).toBe(false);
-  expect(run.needsConfirm).toBe(2);
+  expect(run.needsConfirm).toBe(3);
   expect(await fbCalls(app)).toBe(0);
 
   // 3) CONFIRM dopo il RUN, STESSO mittente → esegue davvero (il feedback parte).
