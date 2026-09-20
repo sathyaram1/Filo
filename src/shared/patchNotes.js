@@ -42,6 +42,8 @@
         'Nell\'elenco dei feedback l\'indirizzo della pagina segnalata dice su che sito porta, anche quando è lungo. Prima si leggevano i primi caratteri e basta, e un indirizzo scritto apposta poteva sembrare di Filo e portare altrove.',
         'Allegare un .tsv o un .yaml a una segnalazione funziona sempre: prima, a seconda di come il computer riconosceva quel file, poteva venire rifiutato senza motivo.',
         'Le schermate e i file che alleghi a una segnalazione partono sempre cifrati. Se Filo non riesce a cifrarli non manda niente e te lo dice: prima li caricava lo stesso in chiaro, e li leggeva chiunque avesse il link. Vale anche per gli allegati che chi lavora la segnalazione aggiunge ai commenti, che finora salivano sempre in chiaro.',
+        'Se una segnalazione rimasta in attesa non riesce a partire, l\'avviso ti aspetta nella finestra finché non lo chiudi. Prima passava mentre guardavi altrove, e quella segnalazione spariva senza che nessuno lo sapesse.',
+        'Quando segnali dalla bacheca che un fix è ancora rotto e l\'invio non riesce, puoi riprovare subito: quello che hai scritto resta nel riquadro. Prima Filo rispondeva che l\'avevi già segnalato, e la tua spiegazione non arrivava a nessuno.',
       ],
     },
     {
