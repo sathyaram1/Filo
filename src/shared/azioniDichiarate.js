@@ -118,7 +118,9 @@
   // risposta veniva buttata, rifatta con un'altra chiamata al modello e poi
   // smentita, su un cammino che un utente nuovo percorre subito.
   const DOCUMENTO = '(?:documento|documenti|file|pdf|bolletta|contratto|estratto conto|fattura'
-    + '|allegat[oi]|scontrino|ricevuta|foto|immagine|appunt[oi]|not[ae])';
+    // «note» resta fuori: «ho aperto il blocco note» è un programma, non un
+    // documento che Filo ha davanti.
+    + '|allegat[oi]|scontrino|ricevuta|foto|immagine|appunt[oi])';
 
   // Giro 7 — la conferma SENZA «ho», che è il modo più corto di dirlo:
   // «Sveglia impostata per le 19», «Appunto salvato», «Evento aggiunto al
