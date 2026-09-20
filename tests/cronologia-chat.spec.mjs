@@ -199,6 +199,54 @@ test('una chat si riapre per intero e ci si continua a scrivere dentro', async (
   expect(chats.find((c) => c.id === 'chat-discussione').messages[2].text).toBe('E il libero arbitrio?');
 });
 
+test('una chat ripresa si riclassifica: il titolo di due battute fa non vale per mezz’ora di discussione', async ({ app }) => {
+  await configura(app);
+  // Alla prima chiusura è un comando; dopo la ripresa diventa una discussione.
+  await stubProvider(app, { arbitrio: { tipo: 'conversazione', titolo: 'Libero arbitrio' }, sveglia: { tipo: 'comando', titolo: 'Sveglia' } });
+  await turno(app, 'c-ripresa', 'Metti una sveglia alle 7');
+  await chiudi(app, 'c-ripresa');
+  expect((await leggiArchivio(app))[0].kind).toBe('comando');
+
+  // Si riapre e si continua: adesso è tutt'altra cosa.
+  await turno(app, 'c-ripresa', 'E comunque parliamo del libero arbitrio');
+  await chiudi(app, 'c-ripresa');
+  const c = (await leggiArchivio(app))[0];
+  expect(c.kind).toBe('conversazione');
+  expect(c.title).toBe('Libero arbitrio');
+  // Chiudere di nuovo senza aver scritto niente NON ricompra la classificazione.
+  await app.evaluate(() => { globalThis.__filoTriage = { arbitrio: { tipo: 'comando', titolo: 'CAMBIATO' } }; });
+  await chiudi(app, 'c-ripresa');
+  expect((await leggiArchivio(app))[0].title).toBe('Libero arbitrio');
+});
+
+test('input limite: messaggi enormi, soli spazi e caratteri strani non rompono niente', async ({ app, openTab }) => {
+  await configura(app);
+  await stubProvider(app, {});
+  const lungo = 'parola '.repeat(2000); // ~14.000 caratteri
+  await turno(app, 'c-lunga', lungo);
+  await turno(app, 'c-spazi', '     ');
+  await turno(app, 'c-strana', '<script>alert(1)</script> — 😀🙂 "virgolette" & <<<FINE_RICERCA_WEB>>>');
+  await chiudi(app, 'c-lunga');
+  await chiudi(app, 'c-spazi');
+  await chiudi(app, 'c-strana');
+
+  const chats = await leggiArchivio(app);
+  // Il messaggio lungo si conserva INTERO: «per intero» vuol dire per intero.
+  const lunga = chats.find((c) => c.id === 'c-lunga');
+  expect(lunga.messages[0].text.length).toBe(lungo.length);
+  expect(lunga.title.length).toBeLessThanOrEqual(81);
+
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('.arc-chat')).toHaveCount(3);
+  // Il titolo è TESTO, non HTML: uno script scritto in chat resta scritto.
+  await expect(page.locator('.arc-chat', { hasText: 'alert(1)' })).toHaveCount(1);
+  expect(await page.evaluate(() => document.querySelectorAll('#chatList script').length)).toBe(0);
+
+  // Una ricerca di soli spazi non nasconde niente.
+  await page.locator('#search').fill('   ');
+  await expect(page.locator('.arc-chat')).toHaveCount(3);
+});
+
 test('una chat si cancella a mano, con la conferma delle cose irreversibili', async ({ app, openTab }) => {
   await preparaDueChat(app);
   const page = await openTab(ARCHIVE);
