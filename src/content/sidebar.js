@@ -1284,11 +1284,17 @@
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
+        }
+        const fatta = await runFiloAction(parsed.filoAction);
+        if (parsed.display) {
           // #517 — l'azione parte, ma la risposta ne raccontava anche un'altra
           // che nessuno ha emesso: l'utente lo legge qui sotto.
-          mostraAzioniMancate(azioniMancate);
+          // #517 (giro 9) — e se l'azione NON è andata, la riga si rifà senza
+          // contarla: era l'ultima cosa che poteva coprire la frase che la
+          // dava per fatta.
+          mostraAzioniMancate(fatta ? azioniMancate
+            : await azioniRaccontate(parsed, { contaLAzione: false }));
         }
-        await runFiloAction(parsed.filoAction);
         expand({ ai: true });
         return;
       }
