@@ -116,13 +116,14 @@ test('una richiesta scritta come domanda non spegne il controllo sui turni prima
   // «Mi segni anche la lista della spesa?» è una richiesta, non la domanda
   // «l'hai già fatto?». Con il punto interrogativo, qualunque azione dei turni
   // precedenti copre la dichiarazione di adesso.
-  const precedenti = new Set(['SALVA_APPUNTO']);
-  const conDomanda = D.rileva('Ti ho salvato l\'appunto con la lista della spesa.',
-    [], STATO({ tipiPrecedenti: precedenti, domandaUtente: true }));
-  const senzaDomanda = D.rileva('Ti ho salvato l\'appunto con la lista della spesa.',
-    [], STATO({ tipiPrecedenti: precedenti, domandaUtente: false }));
-  expect(senzaDomanda.length).toBeGreaterThan(0);
-  expect(conDomanda.length).toBeGreaterThan(0);
+  expect(D.domandaSuCosaFatta('mi segni anche la lista della spesa: pane, uova, latte?')).toBe(false);
+  expect(D.domandaSuCosaFatta('me la metti la sveglia alle 19?')).toBe(false);
+  expect(D.domandaSuCosaFatta('puoi mandare un feedback?')).toBe(false);
+  // La controprova: una domanda su una cosa già fatta resta tale.
+  expect(D.domandaSuCosaFatta('hai salvato la lista della spesa?')).toBe(true);
+  expect(D.domandaSuCosaFatta('l\'hai mandata?')).toBe(true);
+  expect(D.domandaSuCosaFatta('la segnalazione è stata mandata?')).toBe(true);
+  expect(D.domandaSuCosaFatta('hai salvato la lista')).toBe(false);
 });
 
 test('una domanda vera dell\'utente regge ancora la risposta che guarda indietro', () => {
