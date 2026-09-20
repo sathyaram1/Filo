@@ -72,7 +72,7 @@ function lancia(script, args, env, cwd) {
     (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
 }
 
-test('il foglio sostituito: dopo un esito registrato il contenuto cambia, e la fusione parte lo stesso senza dire su cosa era stato dato l\'ok', async () => {
+test('il foglio sostituito: cambiato il contenuto dopo il via libera, la fusione o si ferma o dice su quale versione era stato dato l\'ok', async () => {
   const { srv, ricevuti, port } = await fintoServer((url) => (url.includes('routineMerge')
     ? { ok: true, result: 'merged', sha: 'x'.repeat(40) }
     : { ok: true, id: 'ID485', num: '#485' }));
@@ -125,7 +125,7 @@ test('il foglio sostituito: dopo un esito registrato il contenuto cambia, e la f
   }
 });
 
-test('lo sha del verdetto lo può dettare chi consegna: basta dichiararne un altro e lo strumento non lo timbra più', async () => {
+test('l\'impronta del verdetto non si detta: o combacia con la directory, o la consegna si ferma', async () => {
   const { srv, ricevuti, port } = await fintoServer(() => ({ ok: true, id: 'ID485', num: '#485' }));
   const { dir, punta } = deposito('filo-485-dettato-');
   try {
@@ -153,7 +153,7 @@ test('lo sha del verdetto lo può dettare chi consegna: basta dichiararne un alt
   }
 });
 
-test('la fusione non guarda nemmeno se nella directory è rimasto qualcosa fuori dai commit', async () => {
+test('la fusione guarda se nella directory è rimasto qualcosa fuori dai commit, come il passo prima', async () => {
   const { srv, ricevuti, port } = await fintoServer((url) => (url.includes('routineMerge')
     ? { ok: true, result: 'merged', sha: 'x'.repeat(40) }
     : { ok: true, id: 'ID485', num: '#485' }));

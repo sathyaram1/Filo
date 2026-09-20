@@ -501,6 +501,12 @@ La regola, uguale per tutti e due:
   porta da adesso (`secaudit` → campo `sha`, sempre presente). Un verdetto
   senza commit non si distingue da uno dato su un contenuto qualunque, ed è
   respinto prima di scrivere qualsiasi cosa (§5.3);
+- **lo sha lo timbra lo strumento, e uno dichiarato può solo CONFERMARLO.**
+  È la stessa regola che il canale applica già al nome del ramo (nominarne un
+  altro è un rifiuto messo a registro, non una correzione silenziosa).
+  Dichiararne uno diverso dalla punta della directory ferma la consegna:
+  altrimenti la difesa si spegne scrivendo un argomento in più, e l'esito
+  nasce intestato a un contenuto che su quella macchina non c'è;
 - **se il contenuto cambia, l'esito decade** e quel controllo va rifatto — la
   stessa cosa che già succede alle richieste di fusione in attesa. Al passo 2
   del cancello i PASS si leggono sullo **sha** risolto al passo 3, non sul nome
