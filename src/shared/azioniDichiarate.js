@@ -240,7 +240,10 @@
         new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+${AVV}(?:segnat|appuntat|salvat)[oa]\\b`
           + '(?!\\s+(?:la vita|(?:molto |un po\' di |un po’ di |parecchio |tanto |del )?tempo'
           + '|un sacco|la giornata|la serata|la situazione|la pelle|la faccia|le spese|la fatica))'
-          + `(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|evento)\\b)`, 'i'),
+          // Giro 8: «agenda» accanto a «calendario». «Ti ho segnato la
+          // riunione sulla tua agenda» faceva comparire «l'appunto non c'è»
+          // a chi aveva chiesto un evento.
+          + `(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|agenda|evento)\\b)`, 'i'),
       ],
     },
     {
