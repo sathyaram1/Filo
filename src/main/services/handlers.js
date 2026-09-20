@@ -2613,9 +2613,19 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const results = [];
       for (const a of actions) {
         rawActions.push(a);
+        // Il compito viaggia con l'azione: quando torna dal popup di conferma
+        // il motore deve ritrovare QUELLO, non aprirne uno nuovo e più largo.
+        if (task) a._compito = task.id;
         const res = a._argsError
           ? { executed: false, kept: false, rejected: true, error: a._argsError }
-          : await executeFiloAction(a, { sender });
+          : await executeFiloAction(a, { sender, compito: task });
+        // La contaminazione si segna appena la lettura è partita, non a esito
+        // noto: dentro lo stesso giro un'uscita dopo una lettura è già dopo.
+        if (task && Compiti) {
+          const k = Compiti.classeDi(a.type);
+          if (k.classe === 'ingresso') Compiti.registraLettura(task, { type: a.type });
+          else if (k.classe === 'uscita') Compiti.registraAzione(task, { type: a.type, esito: res.executed ? 'fatta' : 'no' });
+        }
         const rendered = { ...a };
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
