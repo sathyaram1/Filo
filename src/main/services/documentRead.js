@@ -492,6 +492,58 @@ function eUtf8Valido(buf) {
   }
 }
 
+/**
+ * Quante sequenze a più byte sono scritte BENE e quanti byte sono rotti. PURA.
+ *
+ * #551, sesto giro di verifica. «I byte sono UTF-8 valido?» è una domanda
+ * esatta, ma la risposta è tutto o niente: un byte guasto in mezzo a
+ * cinquantamila faceva rileggere l'INTERO documento con la tabella di Windows,
+ * e allora tutti gli accenti che erano giusti arrivavano al modello storpiati
+ * («città» → «cittÃ », «—» → «â€”», «€» → «â‚¬»). Capita per davvero: un export
+ * che mescola righe vecchie e righe nuove, un registro di un programma, un file
+ * messo insieme da due fonti.
+ *
+ * La domanda giusta non è «c'è un errore?» ma «di che tipo è questo file?», e
+ * si risponde guardando le sequenze a più byte invece che i byte singoli:
+ *   • un documento scritto in UTF-8 ne ha tante scritte bene e, se è
+ *     danneggiato, qualche byte rotto;
+ *   • un documento scritto nella tabella di Windows non ne ha NESSUNA scritta
+ *     bene: lì «à» e «—» sono byte singoli, che in UTF-8 non vogliono dire
+ *     niente. Un file italiano in quella tabella ha zero sequenze valide e
+ *     tante rotte quante sono le lettere accentate.
+ * Niente percentuali da tarare: vince la maggioranza fra due conteggi che
+ * misurano la stessa cosa.
+ */
+function bilancioUtf8(buf) {
+  let valide = 0;
+  let rotte = 0;
+  const n = buf.length;
+  let i = 0;
+  while (i < n) {
+    const b = buf[i];
+    if (b < 0x80) { i++; continue; }
+    // Quanti byte pretende questo capofila? C0 e C1 sarebbero sempre scritture
+    // sovralunghe, F5 e oltre sono fuori dall'intervallo dei caratteri.
+    let lung = 0;
+    if (b >= 0xC2 && b <= 0xDF) lung = 2;
+    else if (b >= 0xE0 && b <= 0xEF) lung = 3;
+    else if (b >= 0xF0 && b <= 0xF4) lung = 4;
+    let ok = lung > 0 && i + lung <= n;
+    for (let k = 1; ok && k < lung; k++) {
+      const c = buf[i + k];
+      if (c < 0x80 || c > 0xBF) ok = false;
+    }
+    // Le scritture sovralunghe e i mezzi caratteri di coppia: valgono rotte
+    // anche se la forma della sequenza tornerebbe.
+    if (ok && lung === 3 && b === 0xE0 && buf[i + 1] < 0xA0) ok = false;
+    if (ok && lung === 3 && b === 0xED && buf[i + 1] > 0x9F) ok = false;
+    if (ok && lung === 4 && b === 0xF0 && buf[i + 1] < 0x90) ok = false;
+    if (ok && lung === 4 && b === 0xF4 && buf[i + 1] > 0x8F) ok = false;
+    if (ok) { valide++; i += lung; } else { rotte++; i++; }
+  }
+  return { valide, rotte };
+}
+
 // I 32 caratteri in cui la tabella di Windows si discosta da latin1 (da 0x80 a
 // 0x9F). Non è una fascia qualunque: è proprio dove stanno i SEGNI TIPOGRAFICI
 // — trattino lungo e medio, virgolette e apostrofi curvi, il simbolo dell'euro,
