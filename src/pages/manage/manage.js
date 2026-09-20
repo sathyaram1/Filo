@@ -788,16 +788,24 @@
       if (!r || !r.ok) {
         // Non scritto = non cambiato: la pagina rimette quello che c'è sul
         // server invece di mostrare una scelta che non è mai arrivata.
-        reflectSessions(sessionsState);
+        reflectSessions(sessionsState, sessionsLetto);
         setSessionsMsg(msgEl, 'Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
         if (r?.error) console.error('[manage] salvataggio sessioni:', r.error);
         return false;
+      }
+      if (r.letto === false) {
+        // Scritto sì, riletto no: si tiene quello che è appena partito e si
+        // dice che il resto non si è potuto ricontrollare. Rimettere i valori
+        // di partenza qui spegnerebbe sullo schermo una scelta già salvata.
+        reflectSessions(Object.assign({}, sessionsState, esito.valori), sessionsLetto);
+        setSessionsMsg(msgEl, 'Salvato. Il resto non l\'ho potuto rileggere dal server.', 'ok');
+        return true;
       }
       reflectSessions(r);
       setSessionsMsg(msgEl, 'Salvato.', 'ok');
       return true;
     } catch (err) {
-      reflectSessions(sessionsState);
+      reflectSessions(sessionsState, sessionsLetto);
       setSessionsMsg(msgEl, 'Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
       console.error('[manage] salvataggio sessioni fallito:', err);
       return false;
