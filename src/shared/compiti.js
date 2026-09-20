@@ -15,7 +15,15 @@
   const USCITE = {
     sveglie: { label: 'mettere e togliere sveglie e timer' },
     appunti: { label: 'scrivere appunti' },
-    memoria: { label: 'scrivere nella memoria di Filo' },
+    // Una regola nella memoria non è un contenuto: è un'istruzione su come
+    // Filo deve comportarsi d'ora in poi, che entra in ogni conversazione
+    // futura come roba dell'utente e che la compattazione porta dentro il suo
+    // profilo per sempre. Ricavata da testo scritto da altri è l'attacco, non
+    // un caso d'uso, e nessun permesso la rende buona: `maiDaEsterno` dice che
+    // un compito contaminato questa uscita non la ottiene per nessuna strada
+    // (#533, quarto giro di verifica). Un contenuto trovato leggendo si salva
+    // come appunto.
+    memoria: { label: 'scrivere nella memoria di Filo', maiDaEsterno: true },
     // Cancellare tutta la memoria non è «scrivere nella memoria»: chi legge
     // «scrivere» e dice sì non sta concedendo di buttare via il profilo di
     // anni (#533, secondo giro di verifica). Famiglia sua, frase sua.
@@ -55,15 +63,7 @@
     CANCELLA_SVEGLIA: { classe: 'uscita', uscita: 'sveglie' },
     MODIFICA_SVEGLIA: { classe: 'uscita', uscita: 'sveglie' },
     SALVA_APPUNTO: { classe: 'uscita', uscita: 'appunti' },
-    // Una LEZIONE non è un contenuto: è una regola su come Filo deve
-    // comportarsi d'ora in poi, che entra in ogni conversazione futura come
-    // roba dell'utente e che la compattazione porta dentro il suo profilo per
-    // sempre. Una regola ricavata da testo scritto da altri è l'attacco, non
-    // un caso d'uso: nessun permesso la rende buona, nemmeno un sì dell'utente
-    // (#533, quarto giro di verifica). Quindi da un compito che ha letto roba
-    // esterna questo strumento non esiste, punto; il contenuto trovato
-    // leggendo si salva con SALVA_APPUNTO, che ha la sua cura.
-    SALVA_LEZIONE: { classe: 'uscita', uscita: 'memoria', maiDaEsterno: true },
+    SALVA_LEZIONE: { classe: 'uscita', uscita: 'memoria' },
     CANCELLA_MEMORIA: { classe: 'uscita', uscita: 'oblio' },
     NAVIGA: { classe: 'uscita', uscita: 'schede' },
     PULISCI_TAB: { classe: 'uscita', uscita: 'schede' },
@@ -114,6 +114,13 @@
   function uscitaInterna(uscita) {
     const u = USCITE[String(uscita || '')];
     return !!(u && u.interna);
+  }
+
+  // Un'uscita che un compito contaminato non ottiene per nessuna strada: né
+  // dichiarandola prima di leggere, né con un sì dell'utente durante.
+  function maiDaEsterno(uscita) {
+    const u = USCITE[String(uscita || '')];
+    return !!(u && u.maiDaEsterno);
   }
 
   // La richiesta così come l'ha scritta l'utente, su una riga sola e corta:
@@ -223,6 +230,13 @@
     if (!c) return { ok: false, motivo: 'nessun-compito' };
     const u = String(uscita || '').trim();
     if (!(u in USCITE)) return { ok: false, motivo: 'sconosciuta' };
+    // Chiedere all'utente un'uscita che comunque non si otterrebbe vuol dire
+    // fargli premere un bottone che non serve a niente: si risponde di no
+    // prima di disturbarlo (#533, quarto giro di verifica).
+    if (c.contaminato && maiDaEsterno(u)) {
+      scrivi(c, { tipo: 'allargamento-rifiutato', uscita: u, motivo: 'mai-da-esterno' });
+      return { ok: false, motivo: 'mai-da-esterno', uscita: u, etichetta: etichettaUscita(u) };
+    }
     if (!Array.isArray(c.perimetro)) c.perimetro = [];
     c.dichiarato = true;
     if (!c.allargamenti.some((a) => a.uscita === u)) {
@@ -273,7 +287,7 @@
     // Uscite che da un compito contaminato non si ottengono per nessuna
     // strada: né dichiarandole prima, né chiedendole all'utente durante.
     // `secco` dice a chi applica di rifiutare e basta, senza popup.
-    if (k.maiDaEsterno) {
+    if (maiDaEsterno(k.uscita)) {
       return {
         ok: false,
         motivo: 'mai-da-esterno',
@@ -349,7 +363,7 @@
 
   global.SN_COMPITI = {
     FONTI, USCITE, USCITE_DICHIARABILI, CLASSI, MAX_RIGHE,
-    classeDi, uscitaDi, etichettaUscita, uscitaInterna, etichettaRichiesta, MAX_RICHIESTA, usciteVive,
+    classeDi, uscitaDi, etichettaUscita, uscitaInterna, maiDaEsterno, etichettaRichiesta, MAX_RICHIESTA, usciteVive,
     nuovo, erede, dichiara, allarga, registraLettura, registraAzione, letture, rifiutate,
     consentito, strumentiPermessi, riassunto,
   };

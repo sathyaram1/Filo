@@ -1385,6 +1385,25 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
     return { executed: false, kept: false, rejected: true, fuoriPerimetro: verdettoPerimetro };
   }
 
+  // Chiedere all'utente un'uscita che comunque non si otterrebbe è fargli
+  // premere un bottone che non serve a niente, e per una pagina ostile è un
+  // modo di farlo cliccare (#533, quarto giro di verifica): si risponde di no
+  // prima del popup.
+  if (type === 'CHIEDI_USCITA' && Compiti && task && task.contaminato
+      && Compiti.maiDaEsterno(action && action.uscita)) {
+    const uscita = String(action.uscita || '');
+    Compiti.registraAzione(task, { type, esito: 'rifiutata: mai da testo esterno' });
+    return {
+      executed: false,
+      kept: false,
+      rejected: true,
+      fuoriPerimetro: {
+        motivo: 'mai-da-esterno', secco: true, uscita,
+        etichetta: Compiti.etichettaUscita(uscita), puoChiedere: false,
+      },
+    };
+  }
+
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
   // Filo non può eseguire ALCUN comando se l'utente non ha attivato la modalità
   // terminale nelle impostazioni. Controllo PRIMA del gate dei livelli: così un

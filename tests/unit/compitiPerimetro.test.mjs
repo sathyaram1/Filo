@@ -68,13 +68,41 @@ test('finché non ha letto niente di esterno il perimetro non morde', () => {
 test('uno strumento non dichiarato viene rifiutato anche se il modello lo chiede', () => {
   const c = contaminato(['sveglie']);
   assert.equal(C.consentito(c, 'SVEGLIA').ok, true, 'la sveglia era dichiarata');
-  const v = C.consentito(c, 'SALVA_LEZIONE');
+  const v = C.consentito(c, 'SALVA_APPUNTO');
   assert.equal(v.ok, false);
   assert.equal(v.motivo, 'fuori-perimetro');
-  assert.equal(v.uscita, 'memoria');
+  assert.equal(v.uscita, 'appunti');
   assert.ok(v.etichetta.length > 0, 'il rifiuto deve poter essere detto all\'utente');
   // …e non è «sconsigliato»: non compare proprio nella lista che il motore accetta.
-  assert.ok(!C.strumentiPermessi(c, Tools.NAMES).includes('SALVA_LEZIONE'));
+  assert.ok(!C.strumentiPermessi(c, Tools.NAMES).includes('SALVA_APPUNTO'));
+});
+
+test('una regola in memoria non si ottiene da un compito che ha letto, per nessuna strada', () => {
+  // #533 (quarto giro di verifica) — una LEZIONE non è un contenuto: è una
+  // regola su come Filo deve comportarsi, che sta davanti a ogni conversazione
+  // futura come roba dell'utente e che la compattazione porta dentro il suo
+  // profilo per sempre. Ricavata da testo scritto da altri è l'attacco, non un
+  // caso d'uso: non la salva né chi l'aveva dichiarata prima di leggere, né chi
+  // ottiene un sì dall'utente durante. Il contenuto trovato leggendo si salva
+  // con SALVA_APPUNTO, che ha la sua cura.
+  const dichiarata = contaminato(['memoria']);
+  const v = C.consentito(dichiarata, 'SALVA_LEZIONE');
+  assert.equal(v.ok, false);
+  assert.equal(v.motivo, 'mai-da-esterno');
+  assert.equal(v.secco, true, 'è un rifiuto, non una domanda da girare all\'utente');
+  assert.equal(v.puoChiedere, false);
+  assert.ok(v.etichetta.length > 0, 'il rifiuto deve poter essere detto all\'utente');
+  assert.ok(!C.strumentiPermessi(dichiarata, Tools.NAMES).includes('SALVA_LEZIONE'));
+
+  const concessa = contaminato(['sveglie']);
+  C.allarga(concessa, 'memoria', 'l\'utente ha detto sì');
+  assert.equal(C.consentito(concessa, 'SALVA_LEZIONE').ok, false, 'nemmeno un sì dell\'utente la rende buona');
+
+  // Prima di qualunque lettura resta quella di sempre: lì l'unica autorità in
+  // gioco è l'utente che ha scritto.
+  assert.equal(C.consentito(C.nuovo({}), 'SALVA_LEZIONE').ok, true);
+  // E l'appunto, che è la strada giusta per un contenuto, passa se dichiarato.
+  assert.equal(C.consentito(contaminato(['appunti']), 'SALVA_APPUNTO').ok, true);
 });
 
 test('chi legge senza aver dichiarato resta con «solo chat»: risponde e propone', () => {
@@ -109,9 +137,9 @@ test('gli ingressi restano liberi anche a compito contaminato', () => {
 test('l\'allargamento accettato vale per un compito solo', () => {
   const uno = contaminato(['sveglie']);
   const due = contaminato(['sveglie']);
-  C.allarga(uno, 'memoria', 'me l\'ha chiesto l\'utente');
-  assert.equal(C.consentito(uno, 'SALVA_LEZIONE').ok, true);
-  assert.equal(C.consentito(due, 'SALVA_LEZIONE').ok, false, 'il permesso non deve passare a un altro compito');
+  C.allarga(uno, 'appunti', 'me l\'ha chiesto l\'utente');
+  assert.equal(C.consentito(uno, 'SALVA_APPUNTO').ok, true);
+  assert.equal(C.consentito(due, 'SALVA_APPUNTO').ok, false, 'il permesso non deve passare a un altro compito');
   // E solo di QUELLA uscita: il resto resta fuori.
   assert.equal(C.consentito(uno, 'ESEGUI_COMANDO').ok, false);
 });
@@ -255,10 +283,10 @@ test('il permesso dato dall\'utente vale per quella richiesta, non per quelle do
   // vuol dire che un «ok grazie» rinnova da solo un permesso che l'utente
   // aveva dato una volta, col testo della pagina ancora lì davanti.
   const prima = contaminato(['sveglie']);
-  C.allarga(prima, 'memoria', 'l\'utente ha detto sì');
-  assert.equal(C.consentito(prima, 'SALVA_LEZIONE').ok, true, 'nella sua richiesta il sì vale');
+  C.allarga(prima, 'appunti', 'l\'utente ha detto sì');
+  assert.equal(C.consentito(prima, 'SALVA_APPUNTO').ok, true, 'nella sua richiesta il sì vale');
   const dopo = C.erede(prima, { richiesta: 'e adesso segnati anche questo' });
-  assert.equal(C.consentito(dopo, 'SALVA_LEZIONE').ok, false, 'nella richiesta dopo va richiesto');
+  assert.equal(C.consentito(dopo, 'SALVA_APPUNTO').ok, false, 'nella richiesta dopo va richiesto');
   // Quello che la richiesta di partenza aveva DICHIARATO invece si eredita:
   // quello non gliel'ha concesso un popup, lo comportava la richiesta.
   assert.equal(C.consentito(dopo, 'SVEGLIA').ok, true);
@@ -285,9 +313,13 @@ test('cancellare tutta la memoria non è «scrivere nella memoria»', () => {
   assert.equal(C.uscitaDi('SALVA_LEZIONE'), 'memoria');
   assert.equal(C.uscitaDi('CANCELLA_MEMORIA'), 'oblio');
   const c = contaminato(['memoria']);
-  assert.equal(C.consentito(c, 'SALVA_LEZIONE').ok, true);
   assert.equal(C.consentito(c, 'CANCELLA_MEMORIA').ok, false,
     'chi concede «scrivere» non sta concedendo di buttare via tutto');
+  // E prima di qualunque lettura le due restano due: una richiesta pulita che
+  // dichiara «memoria» scrive, non cancella.
+  const pulito = C.nuovo({});
+  C.dichiara(pulito, ['memoria']);
+  assert.equal(C.consentito(pulito, 'SALVA_LEZIONE').ok, true);
   assert.match(C.etichettaUscita('oblio'), /cancellare/);
 });
 
