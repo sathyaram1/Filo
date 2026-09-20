@@ -108,3 +108,50 @@ test('assess torna anche una reason leggibile quando rileva esfiltrazione', () =
 test('corpus vuoto + origine fidata → nessun falso positivo', () => {
   assert.equal(E.assess('https://attaccante.com/?d=qualcosa', { corpus: '', fromUntrusted: false }).exfil, false);
 });
+
+// ── Quello che Filo ha LETTO (#553) ───────────────────────────────────────────
+// Una pagina, un documento o l'uscita di un comando che Filo legge per il
+// modello sono dati dell'utente quanto la memoria: se ripartono dentro un
+// indirizzo, la partenza si ferma e l'utente vede cosa sta uscendo.
+
+const LETTO = 'Estratto conto di marzo. Saldo del conto corrente 12.482,50 euro, '
+  + 'IBAN IT60X0542811101000000123456, ultimo movimento il 12 marzo.';
+
+test('un pezzo di quello che Filo ha letto dentro un indirizzo è esfiltrazione', () => {
+  const url = `https://raccolta.example/c?d=${encodeURIComponent(
+    'Saldo del conto corrente 12.482,50 euro, IBAN IT60X0542811101000000123456',
+  )}`;
+  const v = E.assess(url, { corpus: '', letto: LETTO });
+  assert.equal(v.exfil, true);
+  assert.match(v.reason, /letto/);
+});
+
+test('lo stesso pezzo codificato in base64 non sfugge', () => {
+  const pezzo = Buffer.from('Saldo del conto corrente 12.482,50 euro, IBAN IT60X0542811101000000123456')
+    .toString('base64');
+  assert.equal(E.assess(`https://raccolta.example/c?p=${pezzo}`, { letto: LETTO }).exfil, true);
+});
+
+test('un indirizzo qualunque non diventa sospetto perché Filo ha letto qualcosa', () => {
+  for (const url of [
+    'https://www.esempio.it/cronaca/26_marzo_12/sciopero-treni-nord-italia-a1b2c3d4-e5f6.shtml',
+    'https://example.com/conto/marzo',
+    'https://example.com/ricerca?q=saldo+conto+corrente',
+  ]) {
+    assert.equal(E.assess(url, { corpus: CORPUS, letto: LETTO }).exfil, false, url);
+  }
+});
+
+test('senza niente di letto il freno resta quello di prima', () => {
+  assert.equal(E.assess('https://example.com/x?a=1', { letto: '' }).exfil, false);
+});
+
+test('per la lettura il carico si conta nella coda, non nel percorso', () => {
+  const percorsoLungo = 'https://www.esempio.it/cronaca/26_marzo_12/sciopero-treni-nord-italia-a1b2c3d4-e5f6-7890-abcd-ef1234567890.shtml';
+  assert.equal(E.assess(percorsoLungo, { fromUntrusted: true, soloCoda: true }).exfil, false);
+  // Lo stesso indirizzo aperto in una scheda resta sospetto: lì il percorso conta.
+  assert.equal(E.assess(percorsoLungo, { fromUntrusted: true }).exfil, true);
+  // E una coda gonfia si ferma su tutte e due le strade.
+  const codaLunga = `https://raccolta.example/c?d=${'a1b2c3d4'.repeat(12)}`;
+  assert.equal(E.assess(codaLunga, { fromUntrusted: true, soloCoda: true }).exfil, true);
+});

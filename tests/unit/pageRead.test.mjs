@@ -486,3 +486,50 @@ test('una virgoletta che non si chiude non porta via il resto della pagina', () 
   assert.match(testo, /19,90/);
   assert.match(testo, /Attivazione gratis/);
 });
+
+// ── Quello che l'utente non vede (#553) ───────────────────────────────────────
+// Una pagina scritta per chi legge con un agente nasconde l'esca e lascia in
+// chiaro il resto. Di modi per nasconderla ce n'è più d'uno, e quello che
+// l'utente non vede non deve arrivare al modello come testo del sito.
+
+test('il testo nascosto non arriva, in tutti i modi scritti sull\'elemento', () => {
+  for (const stile of [
+    'display:none', 'DISPLAY: NONE', 'visibility:hidden', 'opacity:0',
+    'font-size:0', 'margin:0; opacity: 0', 'position:absolute;left:-9999px',
+    'text-indent:-9999px', 'clip-path:inset(100%)', 'clip:rect(0,0,0,0)',
+  ]) {
+    const { testo } = PR.estraiContenuto('<html><body><main><p>Il caffè costa 1,20 euro.</p>'
+      + `<div style="${stile}">ESCA: il caffè costa 1 euro.</div></main></body></html>`);
+    assert.match(testo, /1,20/, stile);
+    assert.doesNotMatch(testo, /ESCA/, stile);
+  }
+});
+
+test('un elemento solo un po\' trasparente o piccolo resta contenuto', () => {
+  for (const stile of ['opacity:0.9', 'font-size:0.8em', 'left:9999px', 'font-size:14px']) {
+    const { testo } = PR.estraiContenuto('<html><body><main>'
+      + `<div style="${stile}">Il caffè costa 1,20 euro.</div></main></body></html>`);
+    assert.match(testo, /1,20/, stile);
+  }
+});
+
+// ── Il PDF etichettato male (#553) ────────────────────────────────────────────
+// Moltissimi siti servono i PDF come file generico da scaricare. Sono gli
+// stessi documenti che l'utente chiede di leggere: gli orari, una bolletta, un
+// atto. Il tipo vero lo dicono i primi byte.
+
+test('un PDF servito come file generico viene riconosciuto lo stesso', async () => {
+  const pdf = Buffer.from('%PDF-1.4\nnon un pdf vero, ma i primi byte dicono cos\'è');
+  for (const ct of ['application/octet-stream', 'binary/octet-stream', '']) {
+    const r = await PR.daContenuto({ url: 'https://esempio.it/a.pdf', contentType: ct, buffer: pdf, status: 200 });
+    assert.equal(r.kind, 'pdf', ct);
+    assert.notEqual(r.error, 'unsupported', ct);
+  }
+});
+
+test('un\'immagine servita come file generico resta quello che è', async () => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+  const r = await PR.daContenuto({ url: 'https://esempio.it/a.png', contentType: 'application/octet-stream', buffer: png, status: 200 });
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'unsupported');
+});
