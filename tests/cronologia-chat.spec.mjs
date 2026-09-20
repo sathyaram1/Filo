@@ -918,3 +918,117 @@ test('«Svuota archivio» senza schede chiuse dice perché non succede niente', 
   // E le chat restano: quel tasto non le ha mai riguardate.
   await expect(page.locator('.arc-chat')).toHaveCount(1);
 });
+
+// ── Il terminale scrive dentro la chat, e nell'archivio deve arrivarci ───────
+//
+// Col terminale acceso, il comando e il suo esito compaiono dentro la
+// conversazione con Filo, in mezzo alle battute. Restavano solo a schermo:
+// riaprendo la chat da Cronologia si rileggeva una conversazione col buco
+// dentro, proprio dove c'era la riga che si torna a cercare.
+
+test('un comando di terminale e il suo esito restano nella chat che li conteneva', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  await configura(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } });
+  });
+  await stubProvider(app, { Kant: { tipo: 'conversazione', titolo: 'Kant' } });
+
+  const dash = await openTab('filo://dashboard/dashboard.html');
+  await dash.locator('#input').fill('Parlami di Kant');
+  await dash.locator('#input').press('Enter');
+  await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
+
+  await dash.locator('#input').fill('/echo ciao-dal-terminale');
+  await dash.locator('#input').press('Enter');
+  await expect.poll(
+    async () => dash.evaluate(() => document.body.innerText),
+    { timeout: 40_000 },
+  ).toContain('ciao-dal-terminale');
+
+  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').press('Enter');
+  await expect.poll(async () => {
+    const c = (await leggiArchivio(app))[0];
+    return c && c.closedAt ? 'chiusa' : 'aperta';
+  }, { timeout: 40_000 }).toBe('chiusa');
+
+  const testi = (await leggiArchivio(app))[0].messages.map((m) => `${m.role}: ${m.text}`).join('\n');
+  // Il comando che l'utente ha scritto e l'esito che ha letto: tutti e due.
+  expect(testi).toContain('echo ciao-dal-terminale');
+  expect(testi).toContain('ciao-dal-terminale');
+});
+
+// ── Il titolo e il tipo li sceglie un modello: l'utente deve poterli cambiare ─
+
+test('una chat si rinomina e si sposta fra conversazioni e comandi, e ci resta', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  await stubProvider(app, { Spinoza: { tipo: 'comando', titolo: 'Sveglia impostata' } });
+
+  // Il classificatore sbaglia: una discussione finisce fra i comandi.
+  await turno(app, 'chat-sbagliata', 'Discutiamo a lungo di Spinoza e della sostanza');
+  await chiudi(app, 'chat-sbagliata');
+  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).kind || '', { timeout: 30_000 }).toBe('comando');
+
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('#showCommandsLabel')).toBeVisible({ timeout: 20_000 });
+  await page.locator('#showCommands').check();
+  const riga = page.locator('.arc-chat').first();
+  await expect(riga).toBeVisible({ timeout: 20_000 });
+
+  await riga.click({ button: 'right' });
+  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Sposta fra le conversazioni' }).click();
+  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).kind || '', { timeout: 20_000 }).toBe('conversazione');
+
+  await riga.click({ button: 'right' });
+  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
+  const campo = page.locator('.arc-chat-rename');
+  await expect(campo).toBeVisible({ timeout: 10_000 });
+  await campo.fill('Spinoza e la sostanza');
+  await campo.press('Enter');
+  await expect.poll(async () => ((await leggiArchivio(app))[0] || {}).title || '', { timeout: 20_000 })
+    .toBe('Spinoza e la sostanza');
+
+  // La conversazione va avanti e viene riclassificata: quello che ha scelto
+  // l'utente non si riscrive.
+  await turno(app, 'chat-sbagliata', 'Un altro pezzo di discussione');
+  await chiudi(app, 'chat-sbagliata');
+  await page.waitForTimeout(2500);
+  const dopo = (await leggiArchivio(app)).find((c) => c.id === 'chat-sbagliata');
+  expect(dopo.title).toBe('Spinoza e la sostanza');
+  expect(dopo.kind).toBe('conversazione');
+});
+
+test('rinominare con un campo vuoto non lascia una riga senza niente da leggere', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaDueChat(app);
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.title).length, { timeout: 30_000 }).toBe(2);
+
+  const page = await openTab(ARCHIVE);
+  const riga = page.locator('.arc-chat').first();
+  await expect(riga).toBeVisible({ timeout: 20_000 });
+  const primaTitolo = await riga.locator('.arc-chat-title').textContent();
+
+  await riga.click({ button: 'right' });
+  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
+  const campo = page.locator('.arc-chat-rename');
+  await expect(campo).toBeVisible({ timeout: 10_000 });
+  await campo.fill('   ');
+  await campo.press('Enter');
+  await expect(page.locator('.arc-chat-title').first()).toHaveText(primaTitolo, { timeout: 10_000 });
+});
+
+test('cercare una frase intera trova la chat, e la pagina dice con quali parole', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaDueChat(app);
+  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.kind).length, { timeout: 30_000 }).toBe(2);
+
+  const page = await openTab(ARCHIVE);
+  await expect(page.locator('.arc-chat').first()).toBeVisible({ timeout: 20_000 });
+  await page.locator('#search').fill('la discussione di ieri sulla coscienza');
+  await expect(page.locator('.arc-chat')).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator('.arc-chat-title').first()).toContainText('coscienza');
+  // E lo dice: i risultati rispondono a meno parole di quelle scritte.
+  await expect(page.locator('#chatsCount')).toContainText('coscienza', { timeout: 10_000 });
+});
