@@ -172,11 +172,16 @@ function attributi(raw) {
  * lì sono la data del pezzo o i nomi delle colonne. Fuori si butta solo ciò
  * che si dichiara cornice del sito o che sta in cima al corpo: più in dentro,
  * un `header` è l'intestazione dell'articolo anche senza `main` attorno.
+ *
+ * `soloIlleggibile` è il passaggio di ripiego: cade la cornice, mai il codice
+ * e mai quello che la pagina nasconde all'utente.
  */
-function daScartare(nome, attrs, { inZona = false, primoLivello = false } = {}) {
+function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIlleggibile = false } = {}) {
+  if (TAG_ILLEGGIBILI.has(nome)) return true;
   if ('hidden' in attrs) return true;
   if (attrs['aria-hidden'] === 'true') return true;
   if (/display\s*:\s*none/i.test(attrs.style || '')) return true;
+  if (soloIlleggibile) return false;
   const esente = (t) => CORNICE_SITO.test(t)
     && !CORNICE_DICHIARATA.test(t)
     && (inZona || TAG_TABELLA.has(nome) || !primoLivello);
