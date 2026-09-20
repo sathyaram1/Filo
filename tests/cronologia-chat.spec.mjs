@@ -206,13 +206,26 @@ test('una chat si cancella a mano, con la conferma delle cose irreversibili', as
   await page.locator('.arc-chat').first().click({ button: 'right' });
   await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina la chat' }).click();
 
-  // La conferma di Filo (non quella del browser): finché non si accetta, niente
-  // si cancella.
-  const conferma = page.locator('.sn-confirm-box').first();
-  await expect(conferma).toBeVisible();
+  // La conferma di Filo (non quella del browser): vive in uno shadow root
+  // chiuso, quindi si ispeziona dagli hook del modulo. Finché non si accetta,
+  // niente si cancella.
+  await expect.poll(
+    () => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null),
+  ).toBe('Elimina la chat');
   expect((await leggiArchivio(app)).length).toBe(2);
 
-  await page.getByRole('button', { name: 'Elimina' }).click();
+  // Prima si prova a rinunciare: annullare NON deve cancellare niente.
+  expect(await page.evaluate(() => window.SN_CONFIRM_UI._test.click('cancel'))).toBe(true);
+  await expect(page.locator('.arc-chat')).toHaveCount(1);
+  expect((await leggiArchivio(app)).length).toBe(2);
+
+  // E adesso davvero.
+  await page.locator('.arc-chat').first().click({ button: 'right' });
+  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina la chat' }).click();
+  await expect.poll(
+    () => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null),
+  ).toBe('Elimina la chat');
+  expect(await page.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'))).toBe(true);
   await expect(page.locator('.arc-chat')).toHaveCount(0);
   await expect.poll(async () => (await leggiArchivio(app)).length).toBe(1);
 });
