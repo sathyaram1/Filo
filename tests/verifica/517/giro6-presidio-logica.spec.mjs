@@ -98,4 +98,15 @@ test('qualche modo normale di dichiarare una cosa mai fatta', () => {
     .toEqual(['segnalazione']);
   // La perifrasi con l'infinito: «ho provveduto a metterti la sveglia».
   expect(AD.rileva('Ho provveduto a metterti la sveglia alle 19.', [], {})).not.toEqual([]);
+  expect(AD.rileva('Sono riuscito a metterti la sveglia alle 19.', [], {})).not.toEqual([]);
+  // Il calendario si nomina anche così, e «al calendario» non è fra le forme.
+  expect(ids(AD.rileva('Ho aggiunto la riunione al calendario di domani.', [], {})))
+    .toEqual(['calendario']);
+  // Il trapassato, che è il tempo con cui si dice «l'avevo già fatto».
+  expect(AD.rileva('Ti avevo messo la sveglia alle 19.', [], {})).not.toEqual([]);
+  expect(AD.rileva('Te l\'avevo messa alle 19.', [], {})).not.toEqual([]);
+  // Il grassetto in mezzo alla dichiarazione: i modelli scrivono in markdown.
+  expect(AD.rileva('Ti ho **messo** la sveglia alle 19.', [], {})).not.toEqual([]);
+  // L'apostrofo al posto dell'accento, che i modelli usano di continuo.
+  expect(AD.rileva('Ti ho gia\' messo la sveglia alle 19.', [], {})).not.toEqual([]);
 });
