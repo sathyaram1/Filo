@@ -199,20 +199,26 @@
     return null;
   }
 
-  // Verdetto: { exfil, reason }. corpus = materiale sensibile che era nel
-  // contesto del modello (memoria, appunti, output comandi). fromUntrusted =
+  // Verdetto: { exfil, reason }. corpus = materiale sensibile dell'utente
+  // (memoria, profilo, appunti); letto = il testo che Filo ha LETTO su richiesta
+  // del modello (pagine, documenti, uscita dei comandi), che nel corpus non può
+  // stare perché è troppo grande per il confronto a token. fromUntrusted =
   // l'azione nasce da una superficie non fidata (agente su pagina web).
-  function assess(url, { corpus = '', fromUntrusted = false } = {}) {
+  function assess(url, { corpus = '', letto = '', fromUntrusted = false, soloCoda = false } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
     const t = taint(link, corpus);
     if (t) return { exfil: true, reason: t.reason };
+    const r = readTaint(link, letto);
+    if (r) return { exfil: true, reason: r.reason };
     if (fromUntrusted) {
-      const s = structural(link);
+      const s = structural(link, { soloCoda });
       if (s) return { exfil: true, reason: s.reason };
     }
     return { exfil: false, reason: '' };
   }
 
-  global.SN_URL_EXFIL = { assess, taint, structural, exposedAlnum, corpusTokens };
+  global.SN_URL_EXFIL = {
+    assess, taint, readTaint, structural, exposedAlnum, corpusTokens, alnum, READ_RUN,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
