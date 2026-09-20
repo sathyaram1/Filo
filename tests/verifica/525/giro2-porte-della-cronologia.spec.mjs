@@ -111,9 +111,15 @@ test('la scheda della home chiusa col suo tasto: la chat non resta senza nome', 
     return c ? `${c.title}|${c.kind}|${c.messages.length}` : 'niente';
   }, { timeout: 25_000 }).toBe('Spinoza|conversazione|2');
 
-  // E in Cronologia si legge il titolo, non «Chat senza titolo».
+  // E in Cronologia si legge il titolo generato, non la domanda com'era
+  // scritta.
   const page = await openTab(ARCHIVE);
   await expect(page.locator('.arc-chat').first()).toContainText('Spinoza');
+
+  // …e Filo la ritrova, che è l'altra metà di ciò che il feedback chiede.
+  const trovate = await cercaComeFilo(app, 'Spinoza');
+  const risultati = (trovate && trovate.output && trovate.output.results) || [];
+  expect(risultati.length).toBeGreaterThan(0);
 });
 
 test('la home portata su un altro indirizzo: la chat che resta indietro ha un nome', async ({ app, openTab }) => {
