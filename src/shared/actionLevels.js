@@ -203,6 +203,26 @@
       level: 1,
       describe: (a) => `Cercare sul web "${a.query || ''}"`,
     },
+    LEGGI_PAGINA: {
+      // Filo scarica una pagina web e ne legge il testo. Livello 1 per le
+      // stesse ragioni di LEGGI_DOCUMENTO: non modifica niente, non esegue
+      // niente, il testo entra solo nel contesto del modello — ed è una
+      // richiesta pubblica, la stessa che farebbe il browser aprendo il link.
+      // ECCEZIONE, la stessa di NAVIGA: un indirizzo che PORTA FUORI dati che
+      // il modello aveva nel contesto è un'esfiltrazione anche se nessuna
+      // scheda si apre, perché la richiesta parte lo stesso. Il flag `_exfil`
+      // lo calcola il main (src/shared/urlExfil.js); mai l'LLM.
+      level: (a) => (a && a._exfil ? 2 : 1),
+      describe: (a) => {
+        const url = (a && (a.url ?? a.href ?? a.link ?? a.indirizzo)) || 'una pagina';
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
+          return `Filo sta per scaricare un indirizzo che${why}:\n${url}\n\n`
+            + 'Potrebbe inviare tuoi dati a un sito esterno. Consenti solo se l\'hai chiesto tu.';
+        }
+        return `Leggere il testo della pagina ${url}`;
+      },
+    },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
       // le cose che ha scoperto o detto e dichiara quando l'intervista è
