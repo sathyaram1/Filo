@@ -135,3 +135,16 @@ codice — `tests/unit/terminaleCodifica.test.mjs`. Il giro vero —
 creare un file con un trattino lungo e una `à`, elencarlo con la shell della
 piattaforma, pretendere il nome identico — gira ovunque: `Get-ChildItem` su
 Windows, `ls` altrove.
+
+## Anche un FILE dichiara la sua codifica
+
+Stessa regola, dall'altra parte del disco. Un file di testo non è «UTF-8 finché
+non si dimostra il contrario»: la codifica la dichiara lui, nei primi byte, e su
+Windows quella a due byte per carattere sta dappertutto — Windows PowerShell 5.1
+la usa per ogni file prodotto mandando l'uscita di un comando in un file (cioè
+per i file che Filo stesso crea col terminale), e il Blocco note la offre come
+«Unicode». Letto come UTF-8 un file così diventa una fila di caratteri vuoti
+alternati alle lettere: non un errore, un testo. Il lettore dichiara di aver
+letto, il modello riceve spazzatura e risponde sul nulla. Si guarda la firma in
+testa prima di decidere (`bomDueByte` in `src/main/services/documentRead.js`), e
+un file pieno di byte nulli che quella firma ce l'ha non è binario.
