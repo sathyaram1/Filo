@@ -922,7 +922,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
 async function maybeRunCompactor() {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider]) return false;
+    if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPACT)) return false;
     const memory = await FiloMem.getMemory();
     const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
     const buf = await FiloMem.getLessonsBuffer();
