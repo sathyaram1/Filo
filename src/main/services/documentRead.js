@@ -95,6 +95,127 @@ function normalizePath(input) {
   return path.resolve(p);
 }
 
+// ── Quando il nome è QUASI giusto ────────────────────────────────────────────
+//
+// #551. Un percorso può arrivare qui leggermente sbagliato senza che sia colpa
+// di nessuno: il terminale di Windows scriveva i nomi nella tabella OEM, e il
+// modello ricopiava «SPECIFICHE SEO E METADATI - singolarita.txt» al posto di
+// «… — singolarita.txt» (trattino lungo) o «Singolarit<27>.txt» al posto di
+// «Singolarità.txt». Quel guasto è chiuso a monte (terminal.js), ma la stessa
+// svista la può fare un utente che il nome lo scrive a mano, o un PDF il cui
+// nome gli è stato dettato al telefono. La filosofia di Filo è esplicita: «un
+// typo ogni tre parole non deve essere un problema». Quindi, prima di
+// arrendersi, si guarda se nella cartella c'è UN SOLO file che combacia a meno
+// di maiuscole, accenti, tipo di trattino e spazi doppi. Uno solo: se sono due
+// non si indovina, si dice che sono due.
+
+// Trattini di ogni foggia (breve, unicode, cifre, medio, lungo, barra, meno
+// matematico, le forme larghe/compatte del giapponese) → tutti «-».
+const TRATTINI = /[‐‑‒–—―−⁃﹘﹣－]/g;
+// Il carattere di sostituzione: è quello che compare al posto di un byte che in
+// UTF-8 non vuol dire niente. Nel confronto vale come jolly, perché sotto ci
+// stava un carattere vero che nessuno può più ricostruire.
+const IGNOTO = '�';
+
+/**
+ * Chiave con cui due nomi di file si confrontano «a meno delle sviste». PURA.
+ * Minuscole, accenti tolti, trattini e apostrofi normalizzati, spazi collassati.
+ */
+function chiaveTollerante(nome) {
+  let s = String(nome == null ? '' : nome);
+  s = s.replace(TRATTINI, '-');
+  // Apici e virgolette tipografiche → forma dritta (l'altra metà dei segni che
+  // un programma di scrittura sostituisce da solo mentre si dà il nome).
+  s = s.replace(/[‘’ʼ′´]/g, '\'').replace(/[“”″]/g, '"');
+  // Accenti: si scompone e si buttano i segni diacritici. «à» → «a».
+  s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // Spazi di ogni tipo (compreso quello unificatore), collassati.
+  s = s.replace(/[\s ]+/g, ' ').trim();
+  return s.toLowerCase();
+}
+
+/** Scherma i metacaratteri di un'espressione regolare. PURA. */
+function scherma(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Due nomi di file sono lo stesso nome, a meno delle sviste? PURA.
+ * Un carattere di sostituzione vale come jolly su uno o più caratteri veri:
+ * è l'unico modo di ritrovare «Singolarità.txt» partendo da «Singolarit<27>.txt».
+ */
+function nomiCombaciano(a, b) {
+  const ka = chiaveTollerante(a);
+  const kb = chiaveTollerante(b);
+  if (!ka || !kb) return false;
+  if (ka === kb) return true;
+  const conJolly = ka.includes(IGNOTO) ? ka : (kb.includes(IGNOTO) ? kb : '');
+  if (!conJolly) return false;
+  const altro = conJolly === ka ? kb : ka;
+  // Ogni sequenza di caratteri ignoti vale «uno o più caratteri qualsiasi»,
+  // mai un separatore di percorso: qui si confronta un singolo nome.
+  const pattern = conJolly.split(/�+/).map(scherma).join('[^\\\\/]+?');
+  let re;
+  try { re = new RegExp(`^${pattern}$`); } catch (_) { return false; }
+  return re.test(altro);
+}
+
+/** Il percorso esiste? (file o cartella, non importa). */
+async function esiste(p) {
+  try { await fsp.stat(p); return true; } catch (_) { return false; }
+}
+
+/** I nomi nella cartella che combaciano col segmento chiesto. */
+async function candidatiNellaCartella(dir, nome, soloCartelle) {
+  let voci;
+  try { voci = await fsp.readdir(dir, { withFileTypes: true }); } catch (_) { return []; }
+  const out = [];
+  for (const v of voci) {
+    // Un segmento intermedio DEVE essere una cartella: senza questo filtro un
+    // file omonimo a metà percorso farebbe fallire la risoluzione più avanti.
+    if (soloCartelle && !v.isDirectory()) continue;
+    if (nomiCombaciano(v.name, nome)) out.push(v.name);
+  }
+  return out;
+}
+
+/**
+ * Risolve un percorso che NON esiste così com'è scritto, segmento per segmento:
+ * ogni pezzo che non c'è viene cercato tollerante nella cartella che lo
+ * contiene. La storpiatura del terminale colpisce anche i nomi delle CARTELLE,
+ * quindi fermarsi all'ultimo pezzo lascerebbe fuori metà dei casi.
+ * → { path: '' se non si è capito quale, ambigui: [nomi] se erano più d'uno }
+ */
+async function risolviTollerante(full) {
+  const root = path.parse(String(full || '')).root;
+  if (!root) return { path: '', ambigui: [] };
+  const segs = String(full).slice(root.length).split(/[\\/]+/).filter(Boolean);
+  if (!segs.length) return { path: '', ambigui: [] };
+  let cur = root;
+  for (let i = 0; i < segs.length; i++) {
+    const ultimo = i === segs.length - 1;
+    const diretto = path.join(cur, segs[i]);
+    if (await esiste(diretto)) { cur = diretto; continue; }
+    const cand = await candidatiNellaCartella(cur, segs[i], !ultimo);
+    // Zero: non c'è niente di simile. Due o più: non si tira a indovinare su un
+    // file dell'utente — si dice che sono più d'uno e li si elenca.
+    if (cand.length !== 1) return { path: '', ambigui: ultimo ? cand : [] };
+    cur = path.join(cur, cand[0]);
+  }
+  return { path: cur, ambigui: [] };
+}
+
+/** Il motivo da dare a chi legge quando il file non si trova. PURA. */
+function dettaglioNonTrovato(ambigui) {
+  if (!Array.isArray(ambigui) || ambigui.length < 2) {
+    return 'a quel percorso non c\'è nessun file';
+  }
+  const mostrati = ambigui.slice(0, 5).map((n) => `"${n}"`).join(', ');
+  const resto = ambigui.length > 5 ? ` e altri ${ambigui.length - 5}` : '';
+  return `a quel percorso non c'è nessun file, e nella cartella ce ne sono ${ambigui.length} `
+    + `con un nome quasi uguale (${mostrati}${resto}): serve sapere quale`;
+}
+
 /**
  * Che tipo di file è, dalla sola estensione. PURA.
  * → 'pdf' | 'text' | { binary: 'spiegazione' } | 'unknown'
