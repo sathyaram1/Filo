@@ -336,8 +336,9 @@
   function involucro(s, nomi) {
     if (!s) return false;
     // Il vecchio involucro del protocollo, o un oggetto vuoto al posto della
-    // risposta: in chat sono un blocco di codice e basta.
-    if (/^\{[\s\S]*\}$/.test(s) && /"(?:text|actions|type)"\s*:/.test(s)) return true;
+    // risposta: in chat sono un blocco di codice e basta. La graffa di chiusura
+    // non si pretende: un involucro tagliato a metà è comunque un turno buttato.
+    if (/^\{/.test(s) && /"(?:text|actions|type)"\s*:/.test(s)) return true;
     if (/^\{\s*\}$/.test(s)) return true;
     // Una lista di azioni scritta invece che chiamata.
     if (/^\[\s*\{[\s\S]*"type"\s*:/.test(s)) return true;
