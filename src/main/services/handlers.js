@@ -1299,6 +1299,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
     } catch (_) {}
   }
 
+  // ── il perimetro delle uscite, prima di tutto il resto (#533) ─────────────
+  // Un'uscita fuori perimetro non esiste per questo compito: si risponde di no
+  // prima di qualsiasi altra cosa. Se arrivasse più in basso, un terminale
+  // spento le risponderebbe per primo «proponi di attivarlo», che è proprio la
+  // strada che un'istruzione ostile vorrebbe farle prendere.
+  const verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type) : { ok: true };
+  if (!verdettoPerimetro.ok && verdettoPerimetro.puoChiedere) {
+    Compiti.registraAzione(task, { type, esito: 'rifiutata: fuori perimetro' });
+    return { executed: false, kept: false, rejected: true, fuoriPerimetro: verdettoPerimetro };
+  }
+
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
   // Filo non può eseguire ALCUN comando se l'utente non ha attivato la modalità
   // terminale nelle impostazioni. Controllo PRIMA del gate dei livelli: così un
