@@ -1722,6 +1722,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
             output: { documentRead: String(percorso == null ? '' : percorso), ok: false, error: 'unreadable', detail: 'lettura non disponibile' },
           };
         }
+        ricordaLetto(r.text);
         return {
           executed: !!r.ok,
           kept: true,
