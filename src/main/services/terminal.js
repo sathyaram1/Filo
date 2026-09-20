@@ -111,6 +111,18 @@ const PRELUDI_CODIFICA = {
   // 65001 = UTF-8. `>nul` perché `chcp` stampa una riga ("Tabella codici
   // attiva: 65001") che finirebbe in testa all'output del comando.
   cmd: 'chcp 65001>nul\r\n',
+  // `chcp` PRIMA delle due righe .NET, e per due motivi distinti:
+  //   • cambia la tabella della CONSOLE, quella che i programmi esterni usano
+  //     sia per scrivere sia per LEGGERE. Senza, dire a PowerShell «i programmi
+  //     esterni parlano UTF-8» (la riga dopo) è una bugia quando il programma
+  //     scrive ancora in OEM;
+  //   • è anche l'unica cura per il verso opposto: quello che l'utente digita
+  //     nella casella di risposta a un programma in corso arriva a quel
+  //     programma come byte grezzi, e con la tabella vecchia una parola
+  //     accentata gli arrivava diversa (#551, terzo giro di verifica). Con
+  //     `cmd` questo non succedeva perché lì `chcp` c'era già.
+  // In try/catch e con l'uscita buttata via: se non c'è una console vera
+  // attaccata `chcp` fallisce, e deve fallire in silenzio senza fermare niente.
   // Due codifiche, due lavori diversi, servono entrambe:
   //   [Console]::OutputEncoding → con cosa la console scrive su stdout (è
   //     questa che rovinava i nomi);

@@ -381,7 +381,7 @@ async function extractPdf(buf) {
  * Esito sempre nella stessa forma, anche in caso di rifiuto: chi formatta
  * l'osservazione per il modello non deve indovinare niente.
  */
-async function readDocument(input) {
+async function readDocument(input, { cwd } = {}) {
   const base = {
     ok: false, path: '', name: '', kind: '', text: '', truncated: false,
     pages: 0, empty: false, bytes: 0, error: null, detail: '',
@@ -390,7 +390,7 @@ async function readDocument(input) {
     // file, e l'utente deve vederselo dire (#551).
     requested: '',
   };
-  let full = normalizePath(input);
+  let full = normalizePath(input, cwd);
   if (!full) return { ...base, error: 'no_path', detail: 'nessun percorso indicato' };
   base.path = full;
   base.name = path.basename(full);
@@ -479,6 +479,7 @@ module.exports = {
   kindFromExtension,
   looksLikeText,
   decodeText,
+  bomDueByte,
   capText,
   MAX_TEXT_CHARS,
   MAX_FILE_BYTES,
