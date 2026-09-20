@@ -56,7 +56,19 @@ const SUFFISSO = '-bin';
 const LANCIATORE = (nome) => `#!/bin/bash
 # Generato da scripts/after-pack-linux.js. Vedi lì il perché.
 QUI="$(dirname "$(readlink -f "\${BASH_SOURCE[0]}")")"
-exec -a "$QUI/${nome}" "$QUI/${nome}${SUFFISSO}" --no-sandbox "$@"
+
+# La gabbia di sicurezza di Chromium ha bisogno degli spazi dei nomi utente non
+# privilegiati. Dove il sistema li nega, Chromium non parte affatto: lì, e solo
+# lì, Filo si avvia senza la gabbia invece di non avviarsi.
+manopola() { [ -r "$1" ] && cat "$1" 2>/dev/null; }
+SENZA_GABBIA=()
+if [ "$(manopola /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = "1" ] \\
+  || [ "$(manopola /proc/sys/user/max_user_namespaces)" = "0" ] \\
+  || [ "$(manopola /proc/sys/kernel/unprivileged_userns_clone)" = "0" ]; then
+  SENZA_GABBIA=(--no-sandbox)
+fi
+
+exec -a "$QUI/${nome}" "$QUI/${nome}${SUFFISSO}" "\${SENZA_GABBIA[@]}" "$@"
 `;
 
 exports.default = async function afterPackLinux(context) {
