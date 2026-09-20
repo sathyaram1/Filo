@@ -2162,7 +2162,7 @@ function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
-    confirmedActionsForPrompt(actions),
+    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions),
   ].filter(Boolean).join('\n\n');
 }
 
