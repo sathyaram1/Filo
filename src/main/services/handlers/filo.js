@@ -187,6 +187,27 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_GET_TIMERS, async () => ({ ok: true, timers: await FiloMem.gcTimers() }));
 
+  // #517 (giro 7) — il presidio delle azioni raccontate per il pannello
+  // Aiuto. Il confronto lo fa QUI, non nel pannello: le sveglie e i titoli
+  // degli appunti sono roba dell'utente e il pannello vive dentro le pagine
+  // web, quindi di là passano solo il testo che il modello ha scritto e le
+  // righe da mostrare. Prima il pannello guardava solo le ore delle sveglie:
+  // un appunto che esisteva davvero veniva smentito, e nessuno gli diceva
+  // cosa era stato fatto nei turni precedenti.
+  on(MSG.FILO_AZIONI_RACCONTATE, async (msg) => {
+    const D = globalThis.SN_AZIONI_DICHIARATE;
+    if (!D) return { ok: true, fantasmi: [] };
+    try {
+      const prove = D.statoDaTimerEFile(await FiloMem.listTimers(), await ctx.editorFileSummariesList());
+      const precedenti = new Set(Array.isArray(msg.tipiPrecedenti) ? msg.tipiPrecedenti : []);
+      const fantasmi = D.rileva(String(msg.testo || ''),
+        new Set(Array.isArray(msg.tipiEmessi) ? msg.tipiEmessi : []),
+        { ...prove, tipiPrecedenti: precedenti, domandaUtente: !!msg.domandaUtente },
+        { famiglie: D.FAMIGLIE_AIUTO });
+      return { ok: true, fantasmi: fantasmi.map((f) => ({ id: f.id, avviso: f.avviso, frase: f.frase })) };
+    } catch (_) { return { ok: true, fantasmi: [] }; }
+  });
+
   on(MSG.FILO_ADD_TIMER, async (msg) => {
     const t = await FiloMem.addTimer({ label: msg.label, seconds: msg.seconds });
     if (t) broadcastLiveUpdate();
