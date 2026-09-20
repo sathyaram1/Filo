@@ -175,7 +175,9 @@
         // partita davvero questa restava l'unica cosa mai fatta, e nessuno lo
         // diceva. Fuori dal calendario, dove «segnare» vuol dire un'altra cosa
         // e la famiglia giusta è un'altra.
-        new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+${AVV}(?:segnat|appuntat|salvat)[oa]\\b(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|evento)\\b)`, 'i'),
+        new RegExp(`\\b(?:te |ve |ti |mi )ho\\s+${AVV}(?:segnat|appuntat|salvat)[oa]\\b`
+          + '(?!\\s+(?:la vita|molto tempo|tempo|un sacco|la giornata|la serata|la situazione))'
+          + `(?![^.!?]{0,40}\\b(?:in calendario|nel calendario|sul calendario|al calendario|evento)\\b)`, 'i'),
       ],
     },
     {
@@ -436,7 +438,9 @@
   // delle 19» non venivano lette affatto, e la sveglia delle 19 che esisteva
   // veniva smentita.
   // Col numero la preposizione nuda «a» resta fuori: «a 3» non è un'ora.
-  const PREP_ORA_NUM = `(?:alle|all${AP}|per\\s+le|per\\s+l${AP}|entro\\s+le|dalle|delle|sulle|verso\\s+le|verso\\s+l${AP})`
+  // «Dalle» ed «entro le» restano fuori: aprono un intervallo o una scadenza
+  // («dormi dalle 22»), non promettono una sveglia a quell'ora.
+  const PREP_ORA_NUM = `(?:alle|all${AP}|per\\s+le|per\\s+l${AP}|delle|verso\\s+le|verso\\s+l${AP})`
     + '(?:\\s+ore)?';
   const PREP_ORA = `(?:${PREP_ORA_NUM}|a)`;
   // La mezz'ora e il quarto d'ora, che in italiano si dicono così e basta.

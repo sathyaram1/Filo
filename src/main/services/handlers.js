@@ -2538,10 +2538,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // …e i titoli dei file e degli appunti che ESISTONO: un appunto salvato ieri
   // non lascia nessuna azione in questa conversazione, e senza guardarli «l'ho
   // salvato fra gli appunti della spesa» era un'accusa in ogni chat nuova.
-  const statoSveglie = {
+  // #517 (giro 5) — lo stato si rilegge OGNI VOLTA che il presidio lo guarda,
+  // non una volta prima del turno. Adesso l'ora nominata nella frase è la
+  // prova che la sveglia c'è: letta prima delle azioni, la sveglia appena
+  // messa non ci sarebbe e Filo verrebbe smentito su una cosa che ha fatto.
+  const statoDichiarazioni = async () => ({
     orariSveglie: Dichiarate ? await orariDelleSveglie() : [],
     titoliAppunti: Dichiarate ? (fileList || []).map((f) => f && f.title).filter(Boolean) : [],
-  };
+  });
   const conImmagini = imageList.length > 0;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
