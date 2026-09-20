@@ -20,10 +20,7 @@ async function fingiApertura(app, esito = '') {
     shell.openPath = async (p) => { globalThis.__v567aperti.push(p); return e; };
   }, esito);
 }
-const cartellaEventi = (app) => app.evaluate(({ app: a }) => {
-  const path = require('node:path');
-  return path.join(a.getPath('temp'), 'filo-eventi');
-});
+const cartellaEventi = async (app) => join(await app.evaluate(({ app: a }) => a.getPath('temp')), 'filo-eventi');
 
 const EVENTO = '{"titolo":"Riunione col dentista","data":"2026-09-21","ora":"10:00","durata_min":45,"luogo":"Studio Rossi"}';
 
