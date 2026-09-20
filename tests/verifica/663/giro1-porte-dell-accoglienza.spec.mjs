@@ -162,7 +162,15 @@ test('la configurazione condivisa arriva dalla rete a home già aperta: l’acco
   // Il primissimo avvio: i crediti ci sono, ma la configurazione condivisa dei
   // modelli non è ancora arrivata (è una lettura di rete che parte con l'app e
   // finisce dopo). Nell'app, senza di lei, non esiste nessun modello.
-  await configCondivisa(app, { models: {}, modelRegistry: {} });
+  await app.evaluate(() => {
+    const Defaults = globalThis.__filoDefaults;
+    const orig = globalThis.__filoDefaultsOrigGet || Defaults.get;
+    globalThis.__filoDefaultsOrigGet = orig;
+    globalThis.__filoConfigArrivata = false;
+    Defaults.get = () => (globalThis.__filoConfigArrivata
+      ? orig()
+      : { ...orig(), models: {}, modelRegistry: {} });
+  });
   await conChiave(app);
   await stubProviders(app);
   await page.reload();
@@ -170,10 +178,11 @@ test('la configurazione condivisa arriva dalla rete a home già aperta: l’acco
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
   await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 15_000 });
 
-  // La risposta della rete arriva: da adesso Filo ha di che rispondere.
-  await app.evaluate(() => {
-    const Defaults = globalThis.__filoDefaults;
-    Defaults.get = globalThis.__filoDefaultsOrigGet;
+  // La lettura di rete della configurazione condivisa finisce, ed è quella che
+  // porta i modelli: da adesso Filo ha di che rispondere.
+  await app.evaluate(async () => {
+    globalThis.__filoConfigArrivata = true;
+    await globalThis.__filoDefaults.refresh().catch(() => {});
   });
 
   // L'utente è ancora lì, sulla stessa home aperta: Filo deve presentarsi,
