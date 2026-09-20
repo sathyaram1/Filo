@@ -451,20 +451,57 @@
   // menu di Filo, vedi
   // patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md).
   let openMenu = null;
+  let fuocoPrimaDelMenu = null;
   function closeCtxMenu() {
     if (!openMenu) return;
+    const eraDentro = openMenu.contains(document.activeElement);
     openMenu.remove();
     openMenu = null;
     document.removeEventListener('mousedown', onOutsideClick, true);
     document.removeEventListener('keydown', onMenuKeydown, true);
     window.removeEventListener('scroll', closeCtxMenu, true);
     window.removeEventListener('resize', closeCtxMenu);
+    // Chi era arrivato al menu da tastiera torna sulla riga da cui è partito,
+    // invece di ritrovarsi il fuoco in fondo alla pagina.
+    if (eraDentro && fuocoPrimaDelMenu && document.contains(fuocoPrimaDelMenu)) {
+      try { fuocoPrimaDelMenu.focus(); } catch (_) {}
+    }
+    fuocoPrimaDelMenu = null;
   }
   function onOutsideClick(e) {
     if (openMenu && !openMenu.contains(e.target)) closeCtxMenu();
   }
+  const vociMenu = () => (openMenu ? [...openMenu.querySelectorAll('.sn-select-option')] : []);
+  function muoviFuocoMenu(passo) {
+    const voci = vociMenu();
+    if (!voci.length) return;
+    const i = voci.indexOf(document.activeElement);
+    voci[i < 0 ? (passo > 0 ? 0 : voci.length - 1) : (i + passo + voci.length) % voci.length].focus();
+  }
+  // Un menu che si apre da tastiera si deve anche percorrere da tastiera:
+  // Rinomina, Sposta ed Elimina non hanno nessun'altra porta, e senza questo
+  // chi non usa il mouse quelle tre cose non le fa.
   function onMenuKeydown(e) {
-    if (e.key === 'Escape') closeCtxMenu();
+    if (!openMenu) return;
+    const voci = vociMenu();
+    const sopra = voci.includes(document.activeElement) ? document.activeElement : null;
+    const giu = e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey);
+    const su = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey);
+    if (e.key === 'Escape') { e.preventDefault(); closeCtxMenu(); return; }
+    if (giu || su) { e.preventDefault(); muoviFuocoMenu(giu ? 1 : -1); return; }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      if (voci.length) voci[e.key === 'Home' ? 0 : voci.length - 1].focus();
+      return;
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && sopra) { e.preventDefault(); sopra.click(); return; }
+    if (e.key.length === 1 && e.key.trim()) {
+      const lettera = e.key.toLowerCase();
+      const da = voci.indexOf(document.activeElement) + 1;
+      const trovata = voci.slice(da).concat(voci.slice(0, da))
+        .find((o) => o.textContent.trim().toLowerCase().startsWith(lettera));
+      if (trovata) { e.preventDefault(); trovata.focus(); }
+    }
   }
   // `items`: [{ label, run }]. Una sola implementazione del menu — clamp alla
   // finestra, chiusura al clic fuori, Esc — per le schede e per le chat: due

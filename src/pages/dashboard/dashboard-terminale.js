@@ -21,9 +21,10 @@
   let makeBubble = null;
   let goThread = null;
   let updateInputClass = () => {};
-  // #525 — mette una riga di questa conversazione nell'archivio della chat in
-  // corso (la targa la sa la pagina, che è la stessa che manda i turni).
+  // #525 — mette una riga nell'archivio della chat a cui appartiene: la targa
+  // la dà la pagina quando l'utente lancia il comando, non quando l'esito arriva.
   let archiviaRiga = () => {};
+  let chatDellaRiga = () => null;
 
   // ===== Stato del terminale (fonte unica) =====
   let terminalMode = false;          // attivabile da Preferenze
@@ -318,6 +319,7 @@
     goThread = deps.goThread;
     if (deps.updateInputClass) updateInputClass = deps.updateInputClass;
     if (deps.archiviaRiga) archiviaRiga = deps.archiviaRiga;
+    if (deps.chatDellaRiga) chatDellaRiga = deps.chatDellaRiga;
   }
 
   global.SN_DASH_TERMINALE = {
