@@ -104,3 +104,24 @@ test('nell\'Aiuto una sveglia raccontata senza ora e mai messa resta vista', asy
   const avvisato = /non l'ha fatto|non è partito|non ha eseguito|la sveglia non c'è/i.test(testo);
   expect(turni > 1 || avvisato).toBe(true);
 });
+
+test('nell\'Aiuto l\'avviso offre lo stesso tasto della chat della home', async ({ openTab }) => {
+  // Nella chat della home, sotto l'avviso, c'è un tasto che rimanda la
+  // richiesta da solo: Filo sa già cosa era rimasto senza azione. Qui
+  // l'avviso lascia all'utente il lavoro di riscriverla.
+  test.setTimeout(60_000);
+  const page = await openTab(NEWTAB);
+  await agenteASequenza(page, [
+    JSON.stringify({ text: 'Ti ho messo una sveglia alle 19:00 per stasera.', status: 'done' }),
+  ]);
+  await apriAiuto(page);
+  await page.evaluate(() => { window.__turni = []; window.__azioni = []; });
+
+  await chiedi(page, 'mettimi una sveglia alle 19 per stasera', 1);
+  await page.waitForSelector('.sn-sidebar-msg-avviso', { timeout: 10_000 });
+
+  const tasti = await page.evaluate(() => Array.from(
+    document.querySelectorAll('.sn-sidebar-chat button'),
+  ).map((b) => (b.textContent || '').trim()).filter(Boolean));
+  expect(tasti.some((t) => /fallo adesso|rifallo|riprova/i.test(t))).toBe(true);
+});
