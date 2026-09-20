@@ -202,10 +202,20 @@
 
     list.innerHTML = '';
     if (!visible.length) {
-      // Tre vuoti diversi, tre frasi diverse: dire "nessuna chat" mentre una
-      // ricerca è attiva fa credere che l'archivio sia stato cancellato.
+      // Vuoti diversi, frasi diverse: dire "nessuna chat" mentre una ricerca è
+      // attiva fa credere che l'archivio sia stato cancellato.
+      //
+      // E soprattutto: se la parola cercata sta in una chat di comando, quella
+      // chat C'È. Dire «Nessuna chat per "sveglia"» è falso, e falso proprio
+      // nel caso per cui i comandi si conservano — ritrovare la discussione
+      // che il classificatore aveva messo nel posto sbagliato. Qui si dice
+      // dov'è finita e come vederla.
       empty.hidden = false;
-      if (q) empty.textContent = `Nessuna chat per "${q}".`;
+      if (q && commands.length) {
+        empty.textContent = commands.length === 1
+          ? `Nessuna conversazione per "${q}": la parola è in 1 chat di comando, accendi l’interruttore per vederla.`
+          : `Nessuna conversazione per "${q}": la parola è in ${commands.length} chat di comando, accendi l’interruttore per vederle.`;
+      } else if (q) empty.textContent = `Nessuna chat per "${q}".`;
       else if (commands.length) empty.textContent = 'Solo chat di comando: accendi l’interruttore per vederle.';
       else empty.textContent = 'Nessuna chat, per ora.';
       return;
