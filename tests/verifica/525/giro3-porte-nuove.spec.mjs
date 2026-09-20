@@ -120,8 +120,8 @@ test('un comando con lo slash detto nella stessa chat si ritrova rileggendola', 
   }, { timeout: 25_000 }).toBe('chiusa');
 
   const c = (await leggiArchivio(app))[0];
-  const testi = c.messages.map((m) => `${m.role}: ${m.text.slice(0, 60)}`);
-  console.log('IN ARCHIVIO:', JSON.stringify(testi, null, 1));
+  const testi = c.messages.map((m) => `${m.role}: ${m.text}`);
+  console.log('IN ARCHIVIO:', JSON.stringify(testi.map((t) => t.slice(0, 60)), null, 1));
   // Quello che l'utente ha letto a schermo dev'esserci: una riga che c'era e
   // che rileggendo non c'è più è una riga persa.
   expect(testi.join('\n')).toContain('lista comandi');
