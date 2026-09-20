@@ -201,6 +201,10 @@
 
   const HAS_LETTER = /\p{L}/u;
 
+  // Valori di overflow che TAGLIANO quel che esce dal riquadro: con uno di
+  // questi, misura zero vuol dire che dentro non si vede niente.
+  const CLIPPING_OVERFLOW = new Set(['hidden', 'clip', 'scroll', 'auto']);
+
   // ---------------------------------------------------------------------------
   // Testo che si legge sullo schermo ma non sta nella pagina: sta negli
   // ATTRIBUTI (#407). Il grigio dentro un campo di ricerca (`placeholder`), il
