@@ -2604,7 +2604,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // indietro, con dentro il motivo. Serve almeno un giro libero: al tetto
         // dei giri l'ultimo testo vale come risposta, non come tentativo.
         const rimedio = (Dichiarate && Tools && !rimandatoIndietro && round < MAX_ROUNDS)
-          ? spintaDiRimedio(Dichiarate, text, tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini), await statoDichiarazioni())
+          ? spintaDiRimedio(Dichiarate, text, tipiDelTurno(Dichiarate, renderedActions, fileSummaries, conImmagini), await statoDichiarazioni(renderedActions))
           : null;
         if (rimedio) {
           rimandatoIndietro = true;
