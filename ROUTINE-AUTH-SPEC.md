@@ -181,7 +181,10 @@ Punti non negoziabili del flusso:
    (l'esito si calcola dal TESTO registrato, letto dal server con lo stesso
    lettore dello strumento; l'elenco può solo confermarlo), e una critica su
    un feedback che non è in verifica (già a decidere). Un risolutore
-   consegna, non si auto-approva.
+   consegna, non si auto-approva. Lo stesso vale per il verdetto del
+   controllo di sicurezza: porta lo sha del commit controllato, e senza
+   quello è un «passato» che parla di un ramo invece che di un contenuto
+   (vedi "un esito vale per la versione esaminata", §11).
 4. **Il ramo combacia** con quello legato al biglietto.
 5. **La macchina a stati** autorizza il passaggio, letto dallo stato **vero**
    (il server la chiave ce l'ha: è il controllo che oggi non gira mai).
