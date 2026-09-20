@@ -72,6 +72,37 @@ jolly» va fatto sul nome SENZA estensione, altrimenti `.txt` da sola gli basta
 e un nome sparito del tutto apre l'unico file di testo della cartella. Trovati
 al primo giro di verifica di #551.
 
+## La codifica giusta non basta: conta anche DOVE cade la lettura
+
+Il preludio chiude il guasto dentro la shell. Fra la shell e Filo ne resta un
+altro, e non ha niente a che fare con Windows: l'output di un processo non
+arriva in un pezzo solo. Arriva man mano, e ogni pezzo finisce dove capita.
+Una `à` occupa due byte, un'emoji quattro: se la lettura cade nel mezzo e ogni
+pezzo viene trasformato in testo per conto suo, quei byte non vogliono dire
+niente né di qua né di là e diventano rombi di sostituzione. Il nome torna
+storpiato esattamente come prima del preludio, su ogni sistema.
+
+Non è un caso di laboratorio: capita su ogni comando che scrive un po' alla
+volta invece che in un colpo, cioè su una ricerca dentro una cartella grande —
+proprio quello che Filo fa quando non sa ancora dove sta il file che gli hanno
+chiesto. E da lì non si torna indietro: il perdono sui nomi quasi giusti vale
+per la lettura di un documento, non per la shell, quindi il comando dopo cerca
+un nome che non esiste.
+
+**Regola: un flusso che porta testo si dichiara `setEncoding('utf8')`, mai
+`chunk.toString()` pezzo per pezzo.** `setEncoding` mette davanti allo stream
+il decodificatore che tiene da parte i byte di un carattere ancora incompleto e
+li riattacca al pezzo dopo. La shell persistente del terminale della dashboard
+lo faceva da sempre e infatti non ha mai avuto questo guasto; i comandi
+one-shot dell'assistente no, ed era l'unica differenza fra due strade che
+l'utente vede come la stessa cosa. Trovato al secondo giro di verifica di #551.
+
+Stessa famiglia, un passo più in là: anche **tagliare** un testo lo può
+rompere. Il tetto sull'output si conta in unità di testo, e un'emoji ne occupa
+due: tagliare a numero tondo lascia in fondo una metà di coppia, che da sola
+non è nessun carattere. Se l'ultima unità è la prima metà di una coppia, si
+lascia fuori tutta la coppia.
+
 ## Vale anche nel verso opposto: quello che TU scrivi al processo
 
 Il preludio sistema la codifica in scrittura. In lettura no, e il guasto è

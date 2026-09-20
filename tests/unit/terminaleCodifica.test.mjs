@@ -166,3 +166,65 @@ test('il marcatore della cartella corrente sopravvive al preludio', async () => 
   assert.equal(out.cwd, TMP);
   assert.ok(!out.stdout.includes('__FILO_ONESHOT_CWD'), 'il marcatore non va mostrato all\'utente');
 });
+
+// ───────── l'altra metà: il nome non si rompe FRA una lettura e l'altra ──────
+//
+// #551, secondo giro di verifica. Il preludio chiude il guasto dentro la
+// shell; questo chiude quello che sta fra la shell e Filo. L'output di un
+// comando non arriva in un pezzo solo: arriva man mano, e ogni pezzo finisce
+// dove capita. Una «à» occupa due byte e un'emoji quattro: se la lettura cade
+// in mezzo e ogni pezzo diventa testo per conto suo, quei byte non vogliono
+// dire niente né di qua né di là e diventano rombi di sostituzione. Il nome
+// torna storpiato come prima, su Windows come su Linux, perché qui la shell
+// non c'entra: c'entra dove cade la lettura. Succede su ogni comando che
+// scrive un po' alla volta invece che in un colpo, cioè su una ricerca dentro
+// una cartella grande: esattamente quello che Filo fa per trovare un file.
+
+test('il nome non si rompe se l\'output del comando arriva in due pezzi', async () => {
+  // I due byte della «à» (0xC3 0xA0) stampati in due momenti diversi: fra
+  // l'uno e l'altro Filo legge, e si trova in mano mezzo carattere.
+  const comando = process.platform === 'win32'
+    ? '[Console]::Out.Write("RELAZIONE $([char]0x2014) attivit"); Start-Sleep -Milliseconds 500; '
+      + '[Console]::Out.Write("$([char]0xE0) finale.txt`n")'
+    : `printf 'RELAZIONE \\342\\200\\224 attivit\\303'; sleep 0.5; printf '\\240 finale.txt\\n'`;
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+  assert.ok(
+    !out.stdout.includes('�'),
+    `un carattere si è perso fra una lettura e l'altra: ${JSON.stringify(out.stdout)}`,
+  );
+  assert.ok(
+    out.stdout.includes(NOME_DIFFICILE),
+    `il nome è tornato storpiato.\nAtteso: ${NOME_DIFFICILE}\nRicevuto: ${JSON.stringify(out.stdout)}`,
+  );
+});
+
+test('anche un messaggio di errore spezzato a metà carattere arriva intero', async () => {
+  // Stessa causa, altra porta: gli errori dei comandi passano dalla stessa
+  // lettura dell'output normale.
+  const comando = process.platform === 'win32'
+    ? '[Console]::Error.Write("citt"); Start-Sleep -Milliseconds 500; [Console]::Error.Write("$([char]0xE0) non trovata")'
+    : `printf 'citt\\303' >&2; sleep 0.5; printf '\\240 non trovata\\n' >&2`;
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+  assert.ok(
+    !out.stderr.includes('�'),
+    `un carattere si è perso nel messaggio di errore: ${JSON.stringify(out.stderr)}`,
+  );
+  assert.ok(out.stderr.includes('città non trovata'), `errore storpiato: ${JSON.stringify(out.stderr)}`);
+});
+
+test('il taglio dell\'output enorme non lascia mezza emoji in fondo', async () => {
+  // L'output oltre il tetto viene tagliato, e il taglio cade dove capita: se
+  // cade fra le due metà di un'emoji, in fondo resta una metà che da sola non
+  // è nessun carattere. Un carattere in meno è meglio di uno rotto.
+  const riempimento = 'a'.repeat(T.MAX_OUTPUT_CHARS - 1);
+  const comando = process.platform === 'win32'
+    ? `[Console]::Out.Write("${riempimento}"); [Console]::Out.Write([char]::ConvertFromUtf32(0x1F4C4) + " finale")`
+    : `printf '%s' '${riempimento}'; printf '\\360\\237\\223\\204 finale\\n'`;
+  const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: 30_000 });
+  assert.equal(out.truncated, true, 'l\'output doveva essere tagliato');
+  const mezzoCarattere = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  assert.ok(
+    !mezzoCarattere.test(out.stdout),
+    `il taglio ha lasciato mezzo carattere: ${JSON.stringify(out.stdout.slice(-4))}`,
+  );
+});

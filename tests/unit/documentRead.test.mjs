@@ -399,3 +399,33 @@ test('la ricerca tollerante non trasforma una cartella in un documento', async (
   assert.equal(r.ok, false);
   assert.equal(r.error, 'is_directory');
 });
+
+test('quando ad essere ambiguo è il nome della CARTELLA, Filo dice quali sono', async () => {
+  // #551, secondo giro di verifica. A storpiarsi può essere un pezzo di
+  // percorso in mezzo, non solo il nome del file. Se lì accanto ci sono due
+  // cartelle che gli somigliano Filo giustamente non indovina, ma prima
+  // taceva anche quali fossero: l'utente restava davanti a «non c'è nessun
+  // file» senza niente da scegliere, mentre sul nome del file gliele elencava.
+  // Stessa domanda, stessa risposta.
+  const dir = join(TMP, 'cartelle-ambigue');
+  mkdirSync(join(dir, 'Città vecchia'), { recursive: true });
+  mkdirSync(join(dir, 'Citta vecchia'), { recursive: true });
+  writeFileSync(join(dir, 'Città vecchia', 'nota.txt'), 'appunti', 'utf8');
+  const r = await DR.readDocument(join(dir, 'Citt� vecchia', 'nota.txt'));
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'not_found');
+  assert.match(r.detail, /cartelle/);
+  assert.match(r.detail, /Città vecchia/);
+  assert.match(r.detail, /Citta vecchia/);
+});
+
+test('una cartella sola col nome quasi giusto si attraversa senza domande', async () => {
+  // Il rovescio del test qui sopra: con UNA sola candidata non c'è niente da
+  // chiedere e il file arriva.
+  const dir = join(TMP, 'cartella-sola');
+  mkdirSync(join(dir, 'Città nuova'), { recursive: true });
+  writeFileSync(join(dir, 'Città nuova', 'nota.txt'), 'appunti veri', 'utf8');
+  const r = await DR.readDocument(join(dir, 'Citt� nuova', 'nota.txt'));
+  assert.equal(r.ok, true, `doveva ritrovarlo: ${r.detail}`);
+  assert.match(r.text, /appunti veri/);
+});
