@@ -684,7 +684,9 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK'];
+      // CHIEDI_USCITA (#533) è una DOMANDA di Filo: lasciarla come chip da
+      // cliccare vuol dire nasconderla proprio quando conta saperlo.
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'CHIEDI_USCITA'];
       if (AUTO_CONFIRM_TYPES.includes(type) && a._confirm.level === 2) {
         btn.dataset.autoConfirm = '1';
       }
