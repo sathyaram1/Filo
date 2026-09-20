@@ -1688,7 +1688,16 @@
   // messaggio può non partire: la rete di sicurezza vera è il giro di riordino
   // all'avvio successivo (main.js → sweepPendingChats), che chiude e classifica
   // le chat rimaste appese.
-  self.addEventListener('pagehide', () => { try { closeCurrentChat(); } catch (_) {} });
+  self.addEventListener('pagehide', () => {
+    try {
+      // Mentre l'intervista di benvenuto è in corso la scheda che sparisce non
+      // chiude niente: l'intervista riprende dov'era alla prossima apertura, e
+      // chiuderla qui vorrebbe dire pagare un titolo e un tipo a ogni
+      // ricaricamento per una conversazione che non è finita.
+      if (Accoglienza.isActive()) return;
+      closeCurrentChat();
+    } catch (_) {}
+  });
 
   (async function init() {
     renderControls();
