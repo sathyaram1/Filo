@@ -92,7 +92,11 @@ ogni volta era già stato chiuso di sotto:
 5. chiuse quelle, il confronto restava disarmabile da sotto: la memoria di
    quale contenuto avesse l'ok la scriveva una sola delle due strade, chi
    sapeva metà taceva, e nessuno guardava se l'esaminato fosse arrivato dove
-   chi fonde va a prenderlo (2026-09-20, stesso feedback, terza verifica).
+   chi fonde va a prenderlo (2026-09-20, stesso feedback, terza verifica);
+6. e il controllo appena nato chiedeva se l'esaminato fosse ARRIVATO là, non
+   se fosse QUELLO che chi fonde trova: un ramo più avanti su origin passava
+   in silenzio, e ad atterrare era il commit in cima (2026-09-20, stesso
+   feedback, quarta verifica).
 
 Dove vive: `ROUTINE-AUTH-SPEC.md` §11 («Un esito vale per la versione
 esaminata»), `scripts/dispatch.mjs`, `scripts/routine-channel.mjs`,
