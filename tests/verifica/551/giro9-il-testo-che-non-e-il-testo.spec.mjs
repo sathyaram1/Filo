@@ -128,6 +128,33 @@ test('un testo cinese scritto a due byte senza firma si legge ancora', async ({ 
   }
 });
 
+test('l’esportazione di un gestionale coi separatori di una volta non è una codifica sbagliata', async ({ openTab }) => {
+  // Seconda chiave della porta che il giro scorso ha trovato col registro della
+  // barra di avanzamento: un file UTF-8 senza un byte fuori posto, rifiutato
+  // perché contiene caratteri di servizio che sono il suo contenuto. Qui sono i
+  // separatori di campo e di record che i gestionali usano da sempre al posto
+  // del punto e virgola.
+  const dir = cartellaTemporanea('filo-551-g9-gestionale-');
+  try {
+    let righe = '';
+    for (let i = 0; i < 120; i++) righe += `01/0${1 + (i % 9)}/2026\u001FRimborso pratica ${i}\u001F12,50\u001E\n`;
+    righe += 'TOTALE\u001F\u001F-931,50\u001E\n';
+    const f = join(dir, 'movimenti.csv');
+    writeFileSync(f, Buffer.from(righe, 'utf8'));
+
+    const page = await openTab(HOME);
+    const r = await leggiDocumento(page, f);
+    expect(
+      r?.output?.ok,
+      'Filo rifiuta un file scritto bene e dà la colpa alla codifica: '
+      + JSON.stringify(String(r?.output?.detail || '')),
+    ).toBe(true);
+    expect(String(r?.output?.text || '')).toContain('-931,50');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('un documento sano con un byte guasto continua a leggersi', async ({ openTab }) => {
   // La guardia dell'altra direzione: chiudendo le porte qui sopra non si deve
   // tornare a rifiutare (o a storpiare) i file che i giri sette e otto hanno
