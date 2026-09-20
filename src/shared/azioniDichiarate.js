@@ -333,8 +333,11 @@
       tipi: ['INVIA_FEEDBACK'],
       avviso: 'la segnalazione non è partita',
       frasi: [
-        new RegExp(`${HO}(?:inviato|mandato|spedito|girato|inoltrato|trasmesso)\\b${PONTE(32)}\\b(?:segnalazione|feedback)\\b`, 'i'),
-        new RegExp(`${HO}segnalato\\b${PONTE(32)}\\b(?:agli sviluppatori|al team|a chi sviluppa)\\b`, 'i'),
+        // Giro 8: «passato», «creato» e «aperto» sono i verbi che restavano
+        // fuori, e «ho aperto una segnalazione» finiva perfino nella famiglia
+        // sbagliata («non si è aperto niente»).
+        new RegExp(`${HO}(?:inviato|mandato|spedito|girato|inoltrato|trasmesso|passato|creato|aperto|scritto)\\b${PONTE(32)}\\b(?:segnalazione|feedback)\\b`, 'i'),
+        new RegExp(`${HO}(?:segnalato|avvisato)\\b${PONTE(32)}\\b(?:agli sviluppatori|al team|a chi sviluppa|gli sviluppatori|il team)\\b`, 'i'),
         participio('(?:segnalazione|feedback)', 'inviat[oa]|mandat[oa]|spedit[oa]|partit[oa]|inoltrat[oa]|trasmess[oa]'),
       ],
     },
