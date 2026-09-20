@@ -299,12 +299,6 @@
       avviso: 'il documento non l\'ha letto',
       frasi: [
         new RegExp(`${HO}lett[oa]\\b${PONTE(72)}\\b(?:documento|file|pdf|bolletta|contratto|estratto conto|fattura|appunto)\\b`, 'i'),
-        // Giro 8: «ho aperto la bolletta che mi hai mandato: sono 84 euro».
-        // Un documento che l'utente ha messo davanti a Filo non si apre: si
-        // legge, ed è la stessa cosa detta con l'altra parola. Sta qui perché
-        // qui ci sono le prove giuste (la foto, il testo incollato, i file
-        // dell'editor), che la famiglia dell'apertura non guarda.
-        new RegExp(`${HO}apert[oa]\\b${PONTE(24)}\\b${DOCUMENTO}\\b`, 'i'),
       ],
     },
     {
