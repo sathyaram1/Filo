@@ -180,6 +180,37 @@ test('aperta la sezione, il menu offre di tradurre solo quella — per ogni form
   expect(mancate, `forme che, una volta aperte, non fanno offrire la traduzione: ${mancate.join(' | ')}`).toEqual([]);
 });
 
+// Il rimando tiene d'occhio solo le prime sezioni ripiegate che incontra: oltre
+// quel tetto una sezione aperta non fa più offrire niente. Qui si misura dove
+// cade il tetto, con una pagina che di sezioni ne ha molte.
+const TANTE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <p id="intro">A visible paragraph that every reader sees without clicking anything at all.</p>
+  ${Array.from({ length: 260 }, (_, i) => `<details id="d${i}"><summary>Question number ${i}</summary><div id="a${i}">Answer number ${i} to a question nobody has opened yet on this long page.</div></details>`).join('\n  ')}
+</body></html>`;
+
+test('una pagina con tante sezioni ripiegate: le ultime, se aperte, non fanno offrire niente', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, TANTE);
+  await watchToasts(page);
+  await traduci(page);
+  await expect(page.locator('#intro')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 60000 }).toBe(true);
+
+  // Una delle prime: il menu se ne accorge.
+  await page.evaluate(() => { document.getElementById('d3').open = true; });
+  await page.waitForTimeout(150);
+  await expect(await apriMenu(page, '#intro')).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => { document.getElementById('d3').open = false; });
+  await page.waitForTimeout(150);
+
+  // Una delle ultime: stesso gesto dell'utente, e il menu non offre più niente.
+  await page.evaluate(() => { document.getElementById('d255').open = true; });
+  await page.waitForTimeout(150);
+  const label = await (await apriMenu(page, '#intro')).getAttribute('aria-label');
+  expect(label, 'la sezione aperta oltre il tetto non fa offrire la traduzione').toBe('Traduci il testo nuovo');
+});
+
 // Il rovescio del rimando: quello che si VEDE deve continuare a tradursi. Un
 // riquadro che scorre, uno alto ma non schiacciato, una riga che sborda: nessuno
 // di questi è ripiegato, e scambiarne uno per tale lascerebbe testo in inglese
