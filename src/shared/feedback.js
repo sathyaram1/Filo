@@ -674,6 +674,14 @@
   // proprio), `parentId` serve solo a far comparire "collegato a #N" in
   // dashboard e a far risalire chi triagia all'originale.
   async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }) {
+    // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
+    // qualunque caricamento e prima di creare il documento: così «non è partito
+    // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
+    // Chi chiama trasforma questo errore in una frase per l'utente.
+    {
+      const motivo = encryptionUnavailable();
+      if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
+    }
     // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
     // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
     // silenzio e il feedback partiva senza il file, senza alcun segnale).
