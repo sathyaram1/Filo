@@ -745,7 +745,7 @@ jobs:
             --jq '.assets[].name')
           echo "Allegati nella release:"
           echo "$ELENCO"
-          for ATTESO in Filo-Linux.AppImage latest-linux.yml; do
+          for ATTESO in Filo-Linux.AppImage latest-linux.yml Se-Filo-non-si-apre-Linux.txt; do
             echo "$ELENCO" | grep -qx "$ATTESO" || {
               echo "::error::manca $ATTESO nella release ${{ needs.release.outputs.version }}"
               exit 1
