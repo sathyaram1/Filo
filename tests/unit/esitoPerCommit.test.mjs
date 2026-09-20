@@ -172,6 +172,130 @@ test('canale deliver secaudit: lo sha lo timbra lo strumento, e resta quello dic
   }
 });
 
+// ─── L'ultimo passo: la richiesta di fusione ────────────────────────────────
+//
+// Timbrare l'impronta sugli esiti non chiude niente se poi la fusione si
+// chiede per NOME del ramo. Il cammino locale (`npm run finish`) da sempre fa
+// due cose: si ferma se il contenuto si è mosso dopo il via libera, e dichiara
+// a chi fonde su cosa giravano i controlli. Il cammino delle routine non ne
+// faceva nessuna delle due (verifica del giro 1 su #485).
+
+test('esitiDecaduti: un via libera dato su un altro commit non vale per questo contenuto', () => {
+  const A = 'a'.repeat(40);
+  const B = 'b'.repeat(40);
+  assert.deepEqual(esitiDecaduti({ verifierSha: A, secauditSha: A }, A), [], 'ramo fermo: niente decade');
+  assert.equal(esitiDecaduti({ verifierSha: A, secauditSha: A }, B).length, 2, 'ramo mosso: decadono tutti e due');
+  assert.equal(esitiDecaduti({ verifierSha: '', secauditSha: A }, B).length, 1,
+    'un esito senza commit scritto accanto non decade: viene da uno strumento vecchio, e a giudicarlo resta il server');
+  assert.deepEqual(esitiDecaduti(null, B), [], 'nessuno stato locale: non si inventa un decadimento');
+  assert.deepEqual(esitiDecaduti({ secauditSha: A }, ''), [], 'punta sconosciuta: il confronto non si fa qui');
+});
+
+test('la fusione: parte dichiarando il commit esaminato, e non parte se il ramo si è mosso dopo', async () => {
+  const buste = [];
+  const { srv, port } = await (async () => {
+    const s = await fintoServer();
+    return s;
+  })();
+  const { dir, g, punta } = deposito('filo-485-fusione-');
+  const fuori = cartellaTemporanea('filo-485-fusione-fuori-');
+  const statoDir = resolve(fuori, 'stato');
+  try {
+    // Lo stato del lavoro come lo lascia il dispatcher: il ramo, e il via
+    // libera del controllo di sicurezza su un commit preciso.
+    const esaminato = punta();
+    execFileSync('mkdir', ['-p', statoDir]);
+    writeFileSync(resolve(statoDir, 'ID1.json'),
+      JSON.stringify({ id: 'ID1', branch: 'worker/485', secauditDone: true, secauditVerdict: 'pass', secauditSha: esaminato }), 'utf8');
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: dir,
+      FILO_TOOLS_ROOT: dir,
+      FILO_DISPATCH_STATE_DIR: statoDir,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-finto',
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+    };
+    const lancia = () => new Promise((r) => execFile(process.execPath, [GATE, 'worker/485'], { env, cwd: dir },
+      (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
+
+    const primo = await lancia();
+    assert.equal(primo.status, 0, `la fusione doveva partire: ${primo.stderr}`);
+    const richiesta = buste.find((x) => x.url.includes('routineMerge'));
+    assert.ok(richiesta, 'la richiesta deve arrivare al server');
+    assert.equal(richiesta.body.sha, esaminato, 'la richiesta dice su quale contenuto giravano i controlli');
+
+    // Il foglio sostituito: chi lavora può spingere sul proprio ramo, e da qui
+    // in poi il via libera parla di un contenuto che non c'è più.
+    g(['commit', '-q', '--allow-empty', '-m', 'sostituito dopo il via libera']);
+    const quante = buste.length;
+    const secondo = await lancia();
+    assert.equal(secondo.status, 1, 'il ramo si è mosso: la fusione non si chiede');
+    assert.match(secondo.stderr, /si è mosso dopo i via libera/);
+    assert.equal(buste.length, quante, 'e il server non viene nemmeno chiamato');
+  } finally {
+    srv.close();
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(fuori, { recursive: true, force: true });
+  }
+
+  async function fintoServer() {
+    const s = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => { body += c; });
+      req.on('end', () => {
+        let j = {};
+        try { j = body ? JSON.parse(body) : {}; } catch (_) { /* lo scoprono gli assert */ }
+        buste.push({ url: String(req.url || ''), body: j });
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: true, result: 'merged', sha: 'z'.repeat(40) }));
+      });
+    });
+    return new Promise((r) => s.listen(0, '127.0.0.1', () => r({ srv: s, port: s.address().port })));
+  }
+});
+
+test('la fusione non si chiede con roba fuori dai commit: il salvataggio automatico sposterebbe la punta subito dopo', async () => {
+  const buste = [];
+  const s = createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      buste.push({ url: String(req.url || '') });
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: true, result: 'merged', sha: 'z'.repeat(40) }));
+    });
+  });
+  const port = await new Promise((r) => s.listen(0, '127.0.0.1', () => r(s.address().port)));
+  const { dir, punta } = deposito('filo-485-fusione-sporca-');
+  const fuori = cartellaTemporanea('filo-485-fusione-sporca-fuori-');
+  const statoDir = resolve(fuori, 'stato');
+  try {
+    execFileSync('mkdir', ['-p', statoDir]);
+    writeFileSync(resolve(statoDir, 'ID1.json'),
+      JSON.stringify({ id: 'ID1', branch: 'worker/485', secauditDone: true, secauditVerdict: 'pass', secauditSha: punta() }), 'utf8');
+    writeFileSync(resolve(dir, 'aggiunto-dopo.js'), 'module.exports = 1;\n', 'utf8');
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: dir,
+      FILO_TOOLS_ROOT: dir,
+      FILO_DISPATCH_STATE_DIR: statoDir,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-finto',
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+    };
+    const r = await new Promise((res2) => execFile(process.execPath, [GATE, 'worker/485'], { env, cwd: dir },
+      (err, so, se) => res2({ status: err ? (err.code ?? 1) : 0, stderr: String(se || '') })));
+    assert.equal(r.status, 1, `doveva fermarsi: ${r.stderr}`);
+    assert.match(r.stderr, /fusione non chiesta/);
+    assert.equal(buste.length, 0, 'il server non deve nemmeno essere chiamato');
+  } finally {
+    s.close();
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(fuori, { recursive: true, force: true });
+  }
+});
+
 test('lo stato della directory non si può leggere: il verdetto non si registra (il silenzio non vale «pulita»)', async () => {
   const { srv, ricevuti, port } = await fintoServer();
   // Nessun deposito git: git non risponde, e senza quella risposta non si sa
