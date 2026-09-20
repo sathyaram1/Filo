@@ -91,7 +91,12 @@
   // log: il fallimento muto della segnalazione, dopo un comando.
   const KIND_DA_GUARDARE = new Set(['filo_action', 'page_action', 'shell']);
 
-  async function azioniRaccontate(parsed) {
+  // `contaLAzione` a false toglie dal conto l'azione di questo turno: si usa
+  // quando l'azione è già partita e NON è andata (rifiutata dal registro,
+  // non riuscita, annullata dall'utente al popup). Prima contava comunque, e
+  // la frase che la dava per fatta non la smentiva nessuno: nella chat della
+  // home quella porta è chiusa dal giro 2.
+  async function azioniRaccontate(parsed, { contaLAzione = true } = {}) {
     const D = global.SN_AZIONI_DICHIARATE;
     // Un turno che emette un'azione va guardato come gli altri: il pannello
     // ne emette UNA per turno, quindi se l'utente ne chiede due la seconda il
@@ -102,7 +107,7 @@
     // L'azione che sta per partire in questo turno conta come partita: il
     // controllo gira prima di eseguirla.
     const emessi = new Set(azioniDelTurno);
-    if (parsed.kind === 'filo_action' && parsed.filoAction && parsed.filoAction.type) {
+    if (contaLAzione && parsed.kind === 'filo_action' && parsed.filoAction && parsed.filoAction.type) {
       emessi.add(String(parsed.filoAction.type).toUpperCase());
     }
     try {
@@ -112,6 +117,7 @@
         tipiEmessi: [...emessi],
         tipiPrecedenti: [...azioniFiloEmesse].filter((t) => !emessi.has(t)),
         domandaUtente: domandaSuCosaFatta,
+        richiestaAzione,
         famiglieGiaMancate: [...famiglieMancate.values()],
         // Questo turno non ha più un ritentativo davanti (o non può averlo,
         // perché porta un'azione da eseguire): quello che trova adesso è
