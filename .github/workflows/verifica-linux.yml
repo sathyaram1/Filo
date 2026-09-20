@@ -126,14 +126,14 @@ jobs:
       #   vuole un permesso del kernel negato di serie su Ubuntu dalla 23.10 in
       #   avanti: dove manca, Filo muore prima di disegnare la finestra.
       #
-      #   Qui si toglie al pacchetto quella stessa strada
-      #   (`--disable-namespace-sandbox`) e lo si avvia: se il lanciatore dentro
-      #   il pacchetto fa il suo lavoro, Filo parte lo stesso e resta su. Se
-      #   qualcuno lo toglie, questo passo diventa rosso qui invece che dal
-      #   tester.
+      #   Qui si nega quel permesso davvero, con la manopola del kernel che lo
+      #   conta (`user.max_user_namespaces`), e si avvia il pacchetto passando
+      #   dalla stessa porta del doppio clic. Se il lanciatore dentro il
+      #   pacchetto fa il suo lavoro, Filo parte lo stesso e resta su. Se
+      #   qualcuno lo toglie, il rosso arriva qui invece che dal tester.
       #
-      #   Non si usa ELECTRON_DISABLE_SANDBOX: spegnerebbe la gabbia da fuori e
-      #   la prova non proverebbe più niente.
+      #   Non si usa ELECTRON_DISABLE_SANDBOX né `--no-sandbox` a mano:
+      #   spegnerebbero la gabbia da fuori e la prova non proverebbe più niente.
       - name: Filo si apre anche dove il sistema nega la gabbia di sicurezza
         shell: bash
         run: |
@@ -144,11 +144,16 @@ jobs:
           cp dist/Filo-Linux.AppImage "$PUNTO/Filo.AppImage"
           chmod +x "$PUNTO/Filo.AppImage"
           (cd "$PUNTO" && ./Filo.AppImage --appimage-extract >/dev/null)
+
+          PRIMA=$(cat /proc/sys/user/max_user_namespaces)
+          sudo sysctl -q -w user.max_user_namespaces=0
           set +e
           APPDIR="$PUNTO/squashfs-root" timeout 60 xvfb-run -a \
-            "$PUNTO/squashfs-root/AppRun" --disable-namespace-sandbox > "$PUNTO/avvio.log" 2>&1
+            "$PUNTO/squashfs-root/AppRun" > "$PUNTO/avvio.log" 2>&1
           ESITO=$?
           set -e
+          sudo sysctl -q -w user.max_user_namespaces="$PRIMA"
+
           echo "--- avvio ---"
           tail -40 "$PUNTO/avvio.log"
           # 124 = il tetto di tempo ha ucciso un Filo ancora vivo: è il successo.
@@ -160,4 +165,4 @@ jobs:
             echo "::error::Filo si ferma sulla gabbia di sicurezza: manca il lanciatore dentro il pacchetto"
             exit 1
           fi
-          echo "Filo si è aperto ed è rimasto su."
+          echo "Filo si è aperto ed è rimasto su, col permesso negato."
