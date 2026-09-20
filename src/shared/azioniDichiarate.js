@@ -471,6 +471,13 @@
   const UN_QUARTO = /^[\s,]*e\s+un\s+quarto\b/i;
   const MENO_UN_QUARTO = /^[\s,]*meno\s+un\s+quarto\b/i;
   const E_MINUTI = /^[\s,]*e\s+([0-5]?\d)\b/i;
+  // I minuti detti a parole. «Alle 19 e trenta», con la sveglia delle 19:30
+  // che esiste, veniva smentita: si leggevano solo «e mezza» e «e un quarto».
+  const MINUTI_A_PAROLE = {
+    cinque: 5, dieci: 10, quindici: 15, venti: 20, venticinque: 25, trenta: 30,
+    trentacinque: 35, quaranta: 40, quarantacinque: 45, cinquanta: 50, cinquantacinque: 55,
+  };
+  const E_MINUTI_A_PAROLE = new RegExp(`^[\\s,]*e\\s+(${Object.keys(MINUTI_A_PAROLE).join('|')})${FINE}`, 'i');
 
   // Gli orari nominati in una frase: «alle 19:00», «alle 19», «alle 7.30»,
   // «per le 19», «alle sette», «alle 7 e mezza», «alle 7 di sera»,
