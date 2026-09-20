@@ -242,16 +242,25 @@
     excerpt.textContent = c.excerpt || '';
     row.appendChild(excerpt);
 
+    // Una chat ancora APERTA non è un ricordo: è la conversazione che stai
+    // facendo adesso, in un'altra scheda. Sta in elenco (si salva tutto, e
+    // sparire mentre la fai sarebbe peggio), ma si vede per quello che è:
+    // niente titolo generato, niente tipo, e al posto della data «In corso».
+    // Senza questa riga si leggeva come una chat finita, e cliccarla apriva
+    // una seconda copia della stessa conversazione.
+    const inCorso = !c.closedAt;
+    if (inCorso) row.dataset.incorso = '1';
+
     const date = document.createElement('div');
     date.className = 'arc-chat-date';
-    date.textContent = chatDateLabel(c.closedAt || c.updatedAt || c.startedAt);
+    date.textContent = inCorso ? 'In corso' : chatDateLabel(c.closedAt || c.updatedAt || c.startedAt);
     row.appendChild(date);
 
     row.title = [
       c.title || '',
       `${c.messageCount || 0} messaggi`,
-      c.kind === 'comando' ? 'Comando' : 'Conversazione',
-      'Clic per riaprirla e continuare a scrivere',
+      inCorso ? 'Conversazione ancora aperta' : (c.kind === 'comando' ? 'Comando' : 'Conversazione'),
+      inCorso ? 'Clic per tornare dov’è aperta' : 'Clic per riaprirla e continuare a scrivere',
     ].filter(Boolean).join('\n');
 
     row.addEventListener('click', () => reopenChat(c));
