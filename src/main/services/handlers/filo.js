@@ -102,6 +102,57 @@ module.exports = function register(on, ctx) {
     return { ok: true, compacted: !!compacted, memory: await FiloMem.getMemory() };
   });
 
+  // ── Archivio delle chat con Filo (#525) ──────────────────────────────────
+  //
+  // Le conversazioni dell'utente sono private come la memoria: solo pagine
+  // filo://, mai i content script dei siti visitati (vedi
+  // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
+  on(MSG.FILO_CHATS_LIST, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, chats: await FiloChats.listIndex() };
+  });
+
+  on(MSG.FILO_CHAT_GET, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, chat: await FiloChats.get(msg.id) };
+  });
+
+  // Chiusura di una chat. La risposta NON aspetta il classificatore: chi ha
+  // appena premuto "nuova chat" non deve stare fermo mentre un modello legge
+  // la conversazione di prima. Titolo e tipo arrivano in Cronologia poco dopo.
+  on(MSG.FILO_CHAT_CLOSE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const id = msg.id;
+    if (!id) return { ok: false, error: 'id mancante' };
+    closeAndTriageChat(id).catch((e) => console.warn('[Filo] chiusura chat:', e?.message || e));
+    return { ok: true };
+  });
+
+  on(MSG.FILO_CHAT_DELETE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    await FiloChats.remove(msg.id);
+    return { ok: true, chats: await FiloChats.listIndex() };
+  });
+
+  on(MSG.FILO_CHATS_SEARCH, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const all = await FiloChats.list();
+    const found = ChatArchive.search(all, msg.query, {
+      kind: msg.kind || null,
+      onlyVisible: !!msg.onlyVisible,
+      limit: Number(msg.limit) || 0,
+    });
+    // L'estratto diventa il frammento attorno a ciò che si cercava: è quello
+    // che spiega perché la chat è nel risultato.
+    const q = String(msg.query || '').trim();
+    const chats = found.map((c) => {
+      const entry = ChatArchive.toIndexEntry(c);
+      if (entry && q) entry.excerpt = ChatArchive.snippetFor(c, q);
+      return entry;
+    }).filter(Boolean);
+    return { ok: true, chats };
+  });
+
   // ── Micro-intervista di benvenuto (#524) ─────────────────────────────────
   //
   // La dashboard chiede lo stato all'apertura: se l'intervista è aperta e non è
