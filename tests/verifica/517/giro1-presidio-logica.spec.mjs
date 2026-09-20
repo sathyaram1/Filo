@@ -47,8 +47,13 @@ test('le frasi con cui un assistente conferma davvero in italiano vengono viste'
   // Quando invece la frase dice anche di cosa si tratta, lo dice anche l'avviso.
   expect(ids("L'ho aggiunta al calendario.")).toEqual(['calendario']);
   expect(ids("Fatto! L'ho salvata fra gli appunti.")).toEqual(['appunto']);
-  // E appena nel turno un'azione c'è, il pronome non accusa nessuno.
-  expect(ids("L'ho messa alle 19.", [{ type: 'SVEGLIA' }])).toEqual([]);
+  // E quando la sveglia delle 19 è nata davvero in questo turno, il pronome
+  // non accusa nessuno. (Giro 5: la prova non è più «è partita una SVEGLIA»,
+  // è «la sveglia a quell'ora c'è». Chi chiama il presidio rilegge le
+  // sveglie DOPO le azioni, quindi qui lo stato è quello di fine turno.)
+  expect(ids("L'ho messa alle 19.", [{ type: 'SVEGLIA' }], { orariSveglie: ['19:00'] })).toEqual([]);
+  // …e se l'azione è partita per un'altra ora, la frase resta falsa.
+  expect(ids("L'ho messa alle 19.", [{ type: 'SVEGLIA' }], { orariSveglie: ['07:00'] })).toEqual(['senza-nome']);
 });
 
 test('nessuna regola del presidio è scritta in modo da non poter mai scattare', async () => {
