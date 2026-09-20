@@ -309,14 +309,22 @@
     const messages = Array.isArray(chat && chat.messages) ? chat.messages : [];
     const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean);
     if (!terms.length) return excerptOf(messages);
+    // La parola da mostrare è la prima della richiesta che COMPARE davvero, non
+    // la prima scritta: cercando «la coscienza», un frammento costruito attorno
+    // a «la» non dice niente a chi legge l'elenco.
     for (const m of messages) {
       const text = String((m && m.text) || '');
       if (!text.trim()) continue;
       const hay = normalizeForSearch(text);
-      const at = hay.indexOf(terms[0]);
+      let termine = '';
+      let at = -1;
+      for (const t of terms) {
+        const i = hay.indexOf(t);
+        if (i >= 0 && (at < 0 || t.length > termine.length)) { at = i; termine = t; }
+      }
       if (at < 0) continue;
       const from = Math.max(0, at - r);
-      const to = Math.min(text.length, at + terms[0].length + r);
+      const to = Math.min(text.length, at + termine.length + r);
       const body = text.slice(from, to).replace(/\s+/g, ' ').trim();
       return `${from > 0 ? '…' : ''}${body}${to < text.length ? '…' : ''}`;
     }
