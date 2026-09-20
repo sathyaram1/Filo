@@ -340,15 +340,9 @@
     let stato;
     let peggiore = null;
     if (classi && classi.length) {
-      let min = CLASSE_MAX;
-      for (let i = 0; i < classi.length; i += 1) {
-        if (classi[i] >= min) { // la classe più BASSA è la più fidata: cerchiamo la peggiore
-          min = Math.max(min, classi[i]);
-        }
-      }
-      // La regola dice: «lo stato è la classe più bassa fra tutto ciò che il
-      // compito ha letto». Più bassa = meno fidata = numero più ALTO nella
-      // scala 1-5 (1 = Filo e le tue cose). Prendiamo quindi il massimo.
+      // «Lo stato è la classe più bassa fra tutto ciò che il compito ha
+      // letto»: più bassa = meno fidata = numero più ALTO nella scala 1-5,
+      // dove 1 è Filo e le cose dell'utente. Quindi si prende il massimo.
       let mass = CLASSE_MIN;
       for (let i = 0; i < classi.length; i += 1) {
         if (classi[i] > mass) { mass = classi[i]; peggiore = fonti[i]; }
