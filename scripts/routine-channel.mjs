@@ -937,10 +937,26 @@ if (isMain) {
     // strumento delle routine (dispatch --record-*) respingeva già; da qui,
     // che è la strada della ricetta per il primo passaggio, no (verifica del
     // giro 3 su questo lavoro). Stessa regola, stessa fonte (lib/dirty-tree).
-    const passaAllaVerifica = intento === 'verdict' || intento === 'fixed'
+    // I due esiti RAGIONATI (la verifica funzionale e il controllo di
+    // sicurezza) valgono per il commit esaminato, non per il nome del ramo:
+    // lo sha si timbra qui, da solo, come la versione di `done`. Chiederlo a
+    // chi consegna è la scommessa già persa sul biglietto e sulla firma dei
+    // feedback — e un esito senza commit torna a essere una firma su una
+    // cartella, buona anche dopo che il foglio è stato sostituito (#485).
+    if ((intento === 'verdict' || intento === 'secaudit') && !data.sha) {
+      const punta = headSha(ROOT);
+      if (punta) data.sha = punta;
+    }
+    // Le consegne che valgono per UN COMMIT: la messa in revisione, la
+    // correzione, la critica e il verdetto del controllo di sicurezza. Con
+    // modifiche non salvate la punta si sposta dopo la registrazione e l'esito
+    // finisce a parlare di un contenuto diverso da quello esaminato.
+    const passaAllaVerifica = intento === 'verdict' || intento === 'fixed' || intento === 'secaudit'
       || (intento === 'status' && data.status === 'revision_capability');
     if (passaAllaVerifica) {
-      const cosa = intento === 'verdict' ? 'critica' : intento === 'fixed' ? 'consegna' : 'revisione';
+      const cosa = intento === 'verdict' ? 'critica'
+        : intento === 'fixed' ? 'consegna'
+          : intento === 'secaudit' ? 'verdetto' : 'revisione';
       const stato = statoDirectory(ROOT);
       if (!stato.ok) {
         console.error(statoIllegibileText(stato.motivo, cosa));
