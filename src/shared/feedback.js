@@ -1736,6 +1736,15 @@
     castReopenRequest,
     uploadImage,
     uploadAttachment,
+    // #602 — la cifratura degli allegati non ha più un ripiego in chiaro.
+    // `encryptionUnavailable()` dice in una frase perché non si può cifrare
+    // ('' se si può): il main la chiede PRIMA di accodare un invio, così chi
+    // manda si sente dire subito che non è partito niente invece di ricevere
+    // un «grazie» e vedere la segnalazione riprovare in eterno nella coda.
+    encryptionUnavailable,
+    encryptionBlockedMessage,
+    isEncryptionError,
+    sealForUpload,
     // #582 — il confine degli allegati: la forma del nome (che storage.rules
     // pretende), il riconoscimento di un URL del bucket e le intestazioni con
     // cui l'owner lo scarica. Pure, e usate anche dal main.
