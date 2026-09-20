@@ -2912,14 +2912,24 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   return { settings, canServe, payload, signature, saved };
 }
 
-// Home senza AI: istantanea, dalle pagine salvate. Dice PERCHÉ Filo non parla,
-// perché un'assenza muta faceva credere senza crediti chi li aveva (#663).
-function buildNoKeyDashboard(settings, saved) {
-  const suggestions = saved.slice(0, 5).map((p) => ({
+function savedSuggestions(saved) {
+  return saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
+}
+
+// Saluto neutro mentre la home vera si calcola: Filo può rispondere, il
+// messaggio su misura no. La nuova scheda non aspetta mai l'LLM.
+function buildWaitingDashboard(saved) {
+  return { message: 'Buongiorno. Filo è qui.', suggestions: savedSuggestions(saved) };
+}
+
+// Home senza AI: istantanea, dalle pagine salvate. Dice PERCHÉ Filo non parla,
+// perché un'assenza muta faceva credere senza crediti chi li aveva (#663).
+function buildNoKeyDashboard(settings, saved) {
+  const suggestions = savedSuggestions(saved);
   const senzaChiave = !SN_CONST.modelProvidersWithKey(settings.apiKeys).length;
   // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
   suggestions.unshift(senzaChiave
