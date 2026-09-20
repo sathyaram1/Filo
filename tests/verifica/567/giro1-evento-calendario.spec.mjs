@@ -56,6 +56,8 @@ test('l\'evento proposto si aggiunge al calendario, e fino ad allora il diario l
   expect(testoRiga).toContain('21/09/2026 alle 10:00');
 
   // Il bottone c'è, è acceso, e fa quello che dice.
+  const dir = await cartellaEventi(app);
+  const prima = elencoIcs(dir);
   const btn = page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' });
   await expect(btn).toBeVisible();
   await expect(btn).toBeEnabled();
@@ -63,11 +65,9 @@ test('l\'evento proposto si aggiunge al calendario, e fino ad allora il diario l
   await btn.click();
   await expect(page.locator('.dash-action-btn', { hasText: 'Aperto nel calendario' })).toBeVisible({ timeout: 10_000 });
 
-  const dir = await cartellaEventi(app);
-  expect(existsSync(dir)).toBe(true);
-  const file = readdirSync(dir).find((f) => f.endsWith('.ics'));
-  expect(file, 'un file .ics è stato scritto').toBeTruthy();
-  const ics = readFileSync(join(dir, file), 'utf8');
+  const nati = nuoviIcs(dir, prima);
+  expect(nati.length, 'un file .ics è stato scritto').toBe(1);
+  const ics = readFileSync(join(dir, nati[0]), 'utf8');
   expect(ics).toContain('BEGIN:VEVENT');
   expect(ics).toContain('SUMMARY:Riunione col dentista');
   expect(ics).toContain('DTSTART:20260921T100000');
