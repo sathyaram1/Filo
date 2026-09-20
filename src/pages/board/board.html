@@ -24,7 +24,6 @@
     .bd-head h1 { font-size: 22px; margin: 0 0 4px; }
     .bd-head p { margin: 0; color: var(--sn-muted); font-size: 13px; }
 
-    /* Barra accesso (login per votare). Anonimi leggono; per votare serve login. */
     .bd-auth {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       margin: 10px 0 16px; font-size: 13px; color: var(--sn-muted);
@@ -37,12 +36,10 @@
     .bd-auth button:hover { border-color: var(--sn-accent); }
 
     .bd-loading, .bd-empty { color: var(--sn-muted); font-size: 14px; padding: 24px 4px; }
-    /* Segno visibile che il caricamento è in corso (design: quando non si può
-       stimare il tempo, una rotella). Prima la pagina restava muta a "Caricamento…". */
+    /* Quando non si può stimare il tempo, una rotella: la pagina non deve restare muta a "Caricamento…". */
     .bd-loading { display: flex; align-items: center; gap: 10px; }
-    /* `display: flex` (regola d'autore) vince sull'attributo `hidden` (UA
-       [hidden]{display:none}): senza questo, `el.hidden = true` NON nasconde più
-       il loader/errore. Stesso trucco di .fb-admin-banner[hidden] nella dashboard. */
+    /* `display: flex` (regola d'autore) vince sull'attributo `hidden`: senza questo, `el.hidden = true` non
+       nasconde più il loader. Stesso trucco di .fb-admin-banner[hidden] nella dashboard. */
     .bd-loading[hidden], .bd-error[hidden] { display: none; }
     .bd-spinner {
       width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%;
@@ -52,9 +49,8 @@
     @keyframes bdSpin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .bd-spinner { animation-duration: 2s; } }
 
-    /* Stato d'errore: distinto dal vuoto. Quando il caricamento fallisce (rete
-       assente/caduta) la bacheca lo DICE e offre un modo per riprovare, invece
-       di fingere che non ci sia nulla da votare. */
+    /* Se il caricamento fallisce la bacheca lo DICE e offre un modo per riprovare, invece di fingere che non
+       ci sia nulla da votare. */
     .bd-error {
       display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
       padding: 20px; margin-top: 4px;
@@ -84,9 +80,7 @@
     }
     .bd-card-sub { margin-top: 3px; font-size: 12px; color: var(--sn-muted); }
 
-    /* Voti: due pulsanti funziona/non-funziona + conteggi. Persistiti su
-       Firestore (DC2) tramite l'handler IPC; il conteggio riflette il tally
-       reale dei voti, non solo la scelta locale dell'utente. */
+    /* I conteggi riflettono il tally reale su Firestore, non solo la scelta locale dell'utente. */
     .bd-vote { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
     .bd-vote-btn[disabled] { opacity: .6; cursor: default; }
     .bd-vote-btn {
@@ -104,8 +98,7 @@
     }
     .bd-vote-count { font-variant-numeric: tabular-nums; }
 
-    /* Riapertura a pagamento (DC4): link discreto sotto i voti, form inline
-       in stile Filo (niente window.prompt nativo, vedi PATTERNS.md). */
+    /* Form inline in stile Filo, mai un window.prompt nativo (PATTERNS.md). */
     .bd-reopen { flex: 1 1 100%; }
     .bd-reopen-link {
       font: inherit; font-size: 12px; color: var(--sn-muted); cursor: pointer;

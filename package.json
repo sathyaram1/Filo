@@ -37,7 +37,8 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.9.3"
   },
   "build": {
     "appId": "ai.filo.desktop",

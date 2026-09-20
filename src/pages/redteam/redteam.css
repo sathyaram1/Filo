@@ -1,10 +1,7 @@
-/* Pagina Red Team (filo://redteam/). Riusa i token di tema (--sn-*); gli unici
-   colori "fissi" sono quelli dei 4 livelli/giudici (rosso/giallo/arancio/verde),
-   che — come la palette del grafico Crediti — devono restare distinguibili su
-   tema chiaro E scuro. Vengono passati per-elemento via --rt-cell-color /
-   --rt-judge-color / --rt-badge-color da redteam.js. */
+/* Pagina Red Team (filo://redteam/). Riusa i token di tema; gli unici colori fissi sono quelli dei quattro
+   livelli e giudici, che come la palette del grafico Crediti devono restare distinguibili su tema chiaro E scuro.
+   Arrivano per-elemento da redteam.js via --rt-cell-color / --rt-judge-color / --rt-badge-color. */
 
-/* ---- Tabs ---------------------------------------------------------------- */
 .rt-tabs {
   display: flex;
   gap: 2px;
@@ -33,7 +30,6 @@
 .rt-panel { margin-top: 4px; }
 .rt-panel h2 { font-size: 15px; }
 
-/* ---- Gate (non loggato / non verificato) -------------------------------- */
 .rt-gate {
   border: 1px solid var(--sn-border);
   background: var(--sn-hover);
@@ -54,7 +50,6 @@
 .rt-redeem-msg--ok { color: var(--sn-fg); background: rgba(46, 158, 91, 0.16); }
 .rt-redeem-msg--err { color: var(--sn-error); background: rgba(var(--sn-accent-rgb), 0.10); }
 
-/* ---- Card "Diventa red teamer verificato" (riscatto codice) ------------- */
 .rt-verify-title { margin: 0 0 6px; font-size: 17px; }
 .rt-verify-intro { margin: 0; font-size: 14px; color: var(--sn-muted); max-width: 460px; }
 .rt-verify-intro strong { color: var(--sn-fg); }
@@ -66,7 +61,6 @@
 }
 .rt-redeem-hint { margin: 10px 0 0; font-size: 12px; }
 
-/* ---- Griglia record 4×3 ------------------------------------------------- */
 .rt-grid {
   display: flex;
   flex-direction: column;
@@ -131,7 +125,7 @@
   color: var(--rt-cell-color, var(--sn-accent));
   font-weight: 700;
 }
-/* Sblocco appena rivelato (touch celebrativo, spec §8.4). */
+/* Sblocco appena rivelato: un tocco celebrativo. */
 .rt-cell--justunlocked {
   animation: rt-pop 600ms ease;
 }
@@ -144,7 +138,6 @@
   .rt-cell--justunlocked { animation: none; }
 }
 
-/* ---- Milestone aggregati ----------------------------------------------- */
 .rt-badges {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -172,7 +165,6 @@
 .rt-badge--off .rt-badge-cr { color: var(--sn-muted); }
 .rt-badge-cond { font-size: 11px; color: var(--sn-muted); margin-top: 6px; }
 
-/* ---- Riepilogo numerico ------------------------------------------------- */
 .rt-summary { margin-top: 12px; }
 .rt-summary-row {
   display: flex;
@@ -201,7 +193,6 @@
 .rt-judge-icon { font-size: 14px; }
 .rt-summary-plus { color: var(--sn-muted); }
 
-/* ---- Storico tentativi (spec §6.1) -------------------------------------- */
 .rt-history-section { margin-top: 24px; }
 .rt-history-scroll {
   max-height: 320px;
@@ -265,7 +256,6 @@
 /* Tentativo non valido: punteggio/punti in grigio (non contano, spec §6.1). */
 .rt-hist-muted { color: var(--sn-muted); }
 
-/* ---- Dettaglio tentativo: attacco, spiegazione, motivazioni (#295) ------- */
 /* Riga dello storico espandibile: cursore + evidenziazione, caret rotante. Il
    caret è un pseudo-elemento (non entra nel testo della cella). */
 .rt-hist-row--expandable { cursor: pointer; }
@@ -336,7 +326,6 @@
   overflow-wrap: anywhere;
 }
 
-/* ---- Pannello owner: gestione codici ------------------------------------ */
 .rt-owner-gen .sn-row { margin-top: 8px; align-items: center; }
 .rt-owner-gen #genCount { width: 90px; }
 .rt-owner-gen .sn-muted { font-size: 13px; margin: 4px 0 0; }
@@ -410,7 +399,6 @@
 }
 .rt-code-copy { padding: 3px 10px; font-size: 12px; }
 
-/* ---- Live reveal -------------------------------------------------------- */
 .rt-reveal {
   border: 1px solid var(--sn-accent);
   border-radius: 8px;
@@ -466,7 +454,6 @@
 .rt-reveal-validity--invalid { color: var(--sn-muted); }
 .rt-reveal-summary--invalid .rt-reveal-total { color: var(--sn-muted); }
 
-/* ---- Leaderboard -------------------------------------------------------- */
 .rt-lb {
   width: 100%;
   border-collapse: collapse;
@@ -495,7 +482,6 @@
 .rt-lb-attempts { font-variant-numeric: tabular-nums; color: var(--sn-muted); width: 90px; }
 .rt-lb-badges .rt-lb-badge-icon { font-size: 14px; margin-right: 2px; }
 
-/* ---- Regole ------------------------------------------------------------- */
 .rt-rules {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -527,9 +513,7 @@
 .rt-scale-name { color: var(--sn-fg); }
 .rt-scale-cond { color: var(--sn-muted); font-size: 11px; }
 .rt-scale-pt { color: var(--sn-muted); font-variant-numeric: tabular-nums; text-align: right; }
-/* Righe "Traguardi": niente colonna icona — nome+condizione a sinistra, cr a destra. */
 .rt-scale-row--ms { grid-template-columns: 1fr auto; }
 .rt-ms-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
-/* ---- Stati neutri ------------------------------------------------------- */
 .rt-empty, .rt-error { margin-top: 16px; }

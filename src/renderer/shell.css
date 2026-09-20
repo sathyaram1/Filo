@@ -32,8 +32,7 @@ html, body {
   margin: 0; padding: 0;
   background: var(--bg-deep);
   color: var(--fg);
-  /* --font è il token estetico `font` (#146.1): di default non è definito e
-     vale il fallback; un override utente lo emette via shell.js. */
+  /* --font è il token estetico `font`: senza un override utente (emesso da shell.js) vale il fallback qui sotto. */
   font-family: var(--font, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
   font-size: 14px;
   height: 100%;
@@ -47,13 +46,8 @@ html, body {
   height: 88px;
 }
 
-/* ── Chrome compatto (fuori dalla home di Filo) ─────────────────────────────
-   shell.js mette data-chrome-compact sul <html> quando la pagina attiva non è
-   la home: la barra indirizzi (icone di navigazione + campo URL) sparisce e
-   resta solo la fila di tab + i controlli finestra. La shell si riduce a 40px
-   (la sola tab-row) e il main fa risalire la WebContentsView a coprire lo
-   spazio liberato. Sulla home Filo il chrome torna esteso e tutte le icone
-   ricompaiono. */
+/* Chrome compatto: shell.js mette data-chrome-compact sul <html> fuori dalla home di Filo, la shell scende
+   a 40px (la sola fila di tab) e il main fa risalire la WebContentsView sullo spazio liberato. */
 html[data-chrome-compact="1"] .shell {
   height: 40px;
 }
@@ -61,7 +55,6 @@ html[data-chrome-compact="1"] .addr {
   display: none;
 }
 
-/* ── tab bar ──────────────────────────────────────────────────────────── */
 .tab-row {
   display: flex;
   align-items: flex-end;
@@ -69,35 +62,29 @@ html[data-chrome-compact="1"] .addr {
   padding: 8px 0 0 8px;
   flex: 0 0 40px;
   overflow: hidden;
-  /* L'intera tab-row è draggabile come una title bar nativa. I figli
-     interattivi (tab, +, controlli finestra) ripristinano `no-drag`. */
+  /* L'intera tab-row è draggabile come una title bar nativa: i figli interattivi
+     (tab, +, controlli finestra) devono ripristinare `no-drag`. */
   -webkit-app-region: drag;
   app-region: drag;
 }
 .tabs {
   display: flex;
   align-items: flex-end;
-  /* Stile Chrome: le tab si toccano (niente gap) e sono separate da una
-     sottile linea verticale (vedi .tab::after) invece che da uno spazio. */
+  /* Stile Chrome: niente gap fra le tab, la separazione è una linea verticale (.tab::after). */
   gap: 0;
   flex: 0 1 auto;
   min-width: 0;
-  /* §6 — overflow con molte tab (30+): le schede si restringono fino al loro
-     min-width, poi la striscia diventa SCROLLABILE orizzontalmente invece di
-     clippare le tab fuori vista. La rotellina del mouse scrolla in orizzontale
-     (vedi shell.js) e la scheda attiva viene sempre portata in vista. La
-     scrollbar è nascosta (stile Chrome): si scrolla con rotellina/trackpad. */
+  /* Con molte tab (30+) le schede si stringono fino al min-width e poi la striscia SCROLLA, invece di
+     clippare fuori vista quelle in fondo. Scrollbar nascosta: si scorre con rotellina e trackpad. */
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: none;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
-.tabs::-webkit-scrollbar { height: 0; width: 0; display: none; } /* Chromium */
+.tabs::-webkit-scrollbar { height: 0; width: 0; display: none; }
 
-/* Notifiche/toast in basso a DESTRA (spec #170.1). Le card si impilano
-   nell'angolo; durata e suono sono configurabili in Preferenze. Le infinite
-   restano finché non si preme la X. Base riusata dai blocchi #170.2/#170.3. */
+/* Le notifiche si impilano in basso a destra. Quelle infinite restano finché non si preme la X. */
 .shell-notifs {
   position: fixed;
   right: 16px;
@@ -108,17 +95,15 @@ html[data-chrome-compact="1"] .addr {
   gap: 8px;
   z-index: 9999;
   pointer-events: none;
-  /* Non superare mai l'altezza della finestra: se lo stack cresce troppo
-     (finestra bassa) il contenitore scrolla invece di spingere le card più
-     vecchie fuori schermo, dove la loro X sparirebbe con loro. */
+  /* Mai più alto della finestra: su finestre basse lo stack scorre invece di spingere le card vecchie
+     fuori schermo, dove la loro X sparirebbe con loro. */
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
 }
-/* Attivo solo quando c'è davvero overflow (vedi syncOverflow): serve a poter
-   afferrare la scrollbar; senza overflow il contenitore resta "trasparente" ai
-   click così le aree vuote lasciano passare al contenuto sotto. */
+/* Acceso solo quando c'è davvero overflow (syncOverflow), per poter afferrare la scrollbar: senza,
+   il contenitore resta trasparente ai click e le aree vuote lasciano passare al contenuto sotto. */
 .shell-notifs.scrolling { pointer-events: auto; padding-right: 4px; }
 .shell-notifs::-webkit-scrollbar { width: 6px; }
 .shell-notifs::-webkit-scrollbar-thumb {
@@ -173,9 +158,8 @@ html[data-chrome-compact="1"] .addr {
   cursor: pointer;
 }
 .shell-notif-action:hover { background: var(--border); }
-/* Bagliore pulsante per tab con audio in riproduzione. L'animazione "sfuma
-   perdendo di intensità" come richiesto: parte da un'intensità percepibile e
-   scende quasi a zero, poi torna, con una transizione morbida (ease-in-out). */
+/* Il bagliore "sfuma perdendo di intensità": parte percepibile e scende quasi a zero, poi torna,
+   con una transizione morbida. */
 @keyframes tab-glow-pulse {
   0%   { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
   35%  { box-shadow: 0 0 10px 2px var(--tab-glow-eff); }
@@ -191,18 +175,16 @@ html[data-chrome-compact="1"] .addr {
   height: 32px;
   flex: 1 1 0;
   min-width: 40px;
-  /* Tab leggermente più larghe rispetto a prima: dà spazio al titolo e
-     all'icona audio a fine riga senza stringere troppo. */
+  /* Larghezza scelta per far stare il titolo e l'icona audio a fine riga senza stringere troppo. */
   max-width: 260px;
   padding: 0 8px 0 10px;
-  /* --tab-bg-eff = sfondo effettivo della tab. Di default il neutro del tab bar;
-     le tab inattive lo sovrascrivono inline con la tinta identità del sito
-     (§1.2). Passa dalla variabile così l'hover sotto resta coerente col tint. */
+  /* Sfondo effettivo della tab: di default il neutro della barra, ma le tab inattive lo sovrascrivono
+     inline con la tinta identità del sito. Passa da una variabile così l'hover sotto resta coerente. */
   --tab-bg-eff: var(--tab-bg);
-  /* --tab-glow-color: colore base del bagliore audio (impostato inline da shell.js
-     con il colore identità del sito). Se non disponibile, fallback sull'accento Filo. */
+  /* Colore base del bagliore audio, messo inline da shell.js col colore identità del sito;
+     dove non c'è, ripiega sull'accento Filo. */
   --tab-glow-color: var(--accent);
-  /* Desatura e abbassa l'opacità: il bagliore è un suggerimento, non un grido. */
+  /* Il bagliore è un suggerimento, non un grido. */
   --tab-glow-eff: color-mix(in srgb, var(--tab-glow-color) 30%, transparent);
   background: var(--tab-bg-eff);
   border: none;
@@ -215,13 +197,11 @@ html[data-chrome-compact="1"] .addr {
   app-region: no-drag;
 }
 
-/* Tab che sta suonando: bagliore pulsante col colore del sito. */
 .tab.audible {
   animation: tab-glow-pulse 2.4s ease-in-out infinite;
 }
 .tab:hover { background: color-mix(in srgb, var(--tab-bg-eff) 85%, var(--bg)); }
-/* Tab in trascinamento (riordino drag & drop): sollevata e semitrasparente, con
-   la transizione di sfondo disattivata così segue il puntatore senza scatti. */
+/* Transizione di sfondo spenta durante il trascinamento: così la tab segue il puntatore senza scatti. */
 .tab.dragging {
   opacity: 0.7;
   z-index: 5;
@@ -234,20 +214,17 @@ html[data-chrome-compact="1"] .addr {
   color: var(--fg);
   margin-bottom: 0;
   z-index: 1;
-  /* La tab selezionata è un po' più larga delle altre (richiesta esplicita) e
-     "stacca" leggermente, in stile Chrome. */
+  /* La scheda selezionata è più larga e "stacca" leggermente, in stile Chrome (richiesta esplicita). */
   flex-grow: 1.8;
   min-width: 110px;
   max-width: 320px;
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
 }
 
-/* Tab attiva + suonante: il bagliore è visibile sopra la box-shadow esistente. */
 .tab.active.audible {
   animation: tab-glow-pulse 2.4s ease-in-out infinite;
 }
 
-/* Separatore verticale sottile fra tab inattive (la "divisione" di Chrome). */
 .tab::after {
   content: "";
   position: absolute;
@@ -258,8 +235,8 @@ html[data-chrome-compact="1"] .addr {
   background: var(--border);
   pointer-events: none;
 }
-/* Il separatore scompare: dopo l'ultima tab, sulla tab attiva e su quella che
-   la precede, e attorno alla tab in hover — esattamente come fa Chrome. */
+/* Il separatore sparisce dopo l'ultima tab, sull'attiva e su quella che la precede, e attorno
+   alla tab in hover — esattamente come fa Chrome. */
 .tab:last-child::after,
 .tab.active::after,
 .tab:hover::after,
@@ -268,13 +245,8 @@ html[data-chrome-compact="1"] .addr {
   display: none;
 }
 
-/* Curve "a goccia" in stile Chrome: la scheda attiva si allarga verso il basso
-   con due piedini che curvano all'infuori per fondersi con la barra sottostante.
-   Ogni piedino è uno pseudo-elemento 8×8 appena fuori dall'angolo inferiore
-   della scheda: un radial-gradient lascia trasparente il quarto di cerchio
-   esterno (si vede la barra) e riempie il resto col colore della scheda,
-   creando l'arco concavo caratteristico delle tab di Chrome. Riusiamo ::after
-   (che per la scheda attiva fa già da none) e introduciamo ::before. */
+/* Piedini "a goccia" della scheda attiva: uno pseudo-elemento 8×8 fuori dall'angolo, dove un
+   radial-gradient lascia trasparente il quarto di cerchio esterno e riempie il resto. */
 .tab.active::before,
 .tab.active::after {
   content: "";
@@ -348,9 +320,8 @@ html[data-chrome-compact="1"] .addr {
 .tab .mute-ind svg { display: block; }
 .tab .mute-ind:hover { opacity: 0.7; }
 
-/* Slot favicon quando la tab sta suonando: l'icona audio SOSTITUISCE la
-   favicon (unico indicatore, nessun overlay sotto). Lo slot è a larghezza
-   fissa, quindi l'icona resta sempre visibile a qualsiasi larghezza di tab. */
+/* Quando la tab suona l'icona audio SOSTITUISCE la favicon: unico indicatore, nessun overlay.
+   Lo slot è a larghezza fissa, così l'icona resta visibile a qualsiasi larghezza di tab. */
 .tab .favicon.favicon-audible {
   display: inline-flex;
   align-items: center;
@@ -362,8 +333,8 @@ html[data-chrome-compact="1"] .addr {
 .tab .favicon.favicon-audible svg { display: block; }
 .tab .favicon.favicon-audible:hover { opacity: 0.7; }
 
-/* Indicatore "aperta da un altro paese" (proxy per-tab): globo + codice paese
-   in accento Filo, discreto — un segnale di viaggio, non di sicurezza. */
+/* Indicatore "aperta da un altro paese" (proxy per-tab): discreto di proposito, è un segnale
+   di viaggio, non di sicurezza. */
 .tab .proxy-ind {
   flex: 0 0 auto;
   display: inline-flex;
@@ -397,15 +368,13 @@ html[data-chrome-compact="1"] .addr {
 .tab-new:hover { background: var(--tab-bg); color: var(--fg); }
 .tab-new svg { display: block; }
 
-/* Riempie lo spazio tra il + e i controlli finestra. Resta draggabile
-   così l'utente può afferrare lì la finestra in stile Chrome. */
+/* Resta draggabile: è lì che si afferra la finestra, in stile Chrome. */
 .tab-drag-spacer {
   flex: 1 1 auto;
   align-self: stretch;
   min-width: 8px;
 }
 
-/* ── controlli finestra (min / max / close) ────────────────────────────── */
 .window-controls {
   display: flex;
   align-items: stretch;
@@ -431,7 +400,6 @@ html[data-chrome-compact="1"] .addr {
 .win-btn:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); }
 .win-btn.win-close:hover { background: #e81123; color: #fff; }
 
-/* ── barra indirizzi ──────────────────────────────────────────────────── */
 .addr {
   display: flex;
   align-items: center;
@@ -458,7 +426,6 @@ html[data-chrome-compact="1"] .addr {
 .nav-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.12); color: var(--fg); }
 .nav-btn:disabled { opacity: 0.35; }
 
-/* Account: quando loggato l'icona è l'avatar Google, ritagliato a cerchio. */
 .nav-account.signed-in { color: var(--fg); }
 .account-avatar {
   width: 22px;
@@ -468,19 +435,16 @@ html[data-chrome-compact="1"] .addr {
   display: block;
 }
 
-/* Spaziatore flessibile al posto del vecchio campo URL: tiene i tasti di
-   navigazione (indietro/avanti/ricarica) a sinistra e le icone home/impostazioni/
-   app/account a destra. La barra dell'URL è stata rimossa: l'indirizzo si digita
-   dalla home di Filo (box "Chiedi qualsiasi cosa" con /sito.com). */
+/* Spaziatore al posto del campo URL, che non c'è più: l'indirizzo si digita dalla home di Filo.
+   Tiene i tasti di navigazione a sinistra e home/impostazioni/app/account a destra. */
 .addr-spacer {
   flex: 1 1 auto;
   min-width: 8px;
   align-self: stretch;
 }
 
-/* Tooltip custom della shell — stile coerente con il menu tasto destro
-   (.sn-tooltip in src/styles/menu.css), così l'hover su nav-btn/tab-new
-   mostra un riquadro Filo invece del tooltip nativo bianco e squadrato. */
+/* Tooltip della shell, in pendant con .sn-tooltip di src/styles/menu.css: senza, l'hover su
+   nav-btn e tab-new mostrerebbe il tooltip nativo bianco e squadrato. */
 .shell-tooltip {
   position: fixed;
   z-index: 2147483647;
@@ -498,15 +462,12 @@ html[data-chrome-compact="1"] .addr {
   backdrop-filter: blur(4px);
 }
 
-/* ── modalità incognito ───────────────────────────────────────────────────
-   La finestra incognito carica shell.html?incognito=1 → <html data-incognito="1">.
-   Vira l'intera shell verso un viola scuro (distinta a colpo d'occhio dalla
-   finestra normale) e mostra il badge "Incognito" nella barra indirizzi. */
+/* Incognito: la finestra carica shell.html?incognito=1 → <html data-incognito="1">. Vira tutta la
+   shell verso un viola scuro, distinguibile a colpo d'occhio da una finestra normale. */
 .incognito-badge {
   display: inline-flex;
   align-items: center;
-  /* Vive nella fila di tab (la barra indirizzi è nascosta): centrato in
-     verticale e staccato dai controlli finestra. */
+  /* Vive nella fila di tab, perché in incognito la barra indirizzi è nascosta. */
   align-self: center;
   flex: 0 0 auto;
   margin: -8px 6px 0 0;
@@ -537,25 +498,15 @@ html[data-incognito="1"] {
   --border: #46395f;
 }
 
-/* ── Penombra "modalità annotazione" del box feedback ──────────────────────
-   shell.js mette/toglie data-feedback-dim sul <html> quando il box feedback
-   entra/esce dalla modalità annotazione (evento `shell:feedback-dim` dal main).
-   La barra in alto è l'unica parte di shell non coperta dalla WebContentsView,
-   ed è in gran parte una regione draggabile (-webkit-app-region: drag) che il
-   compositore disegna SOPRA qualsiasi overlay web: per oscurarla davvero non si
-   può sovrapporre un velo, va scurita alla fonte con un filtro brightness.
-   Così tutto Filo va in penombra leggera, in pendant con l'ombra che il box
-   applica all'area pagina. */
+/* La barra in alto è l'unica parte di shell non coperta dalla WebContentsView, ed è in gran parte
+   regione draggabile, che il compositore disegna SOPRA ogni velo: si scurisce solo col filtro. */
 html[data-feedback-dim="1"] .shell {
   filter: brightness(0.82);
   transition: filter 120ms ease-out;
 }
 
-/* Tela di disegno sopra la barra in alto: durante l'annotazione si può
-   disegnare a mano libera anche su tab e barra indirizzi (non solo sulla
-   pagina). Copre solo la barra (il resto della finestra è la WebContentsView)
-   e intercetta i puntatori — incluso -webkit-app-region:no-drag, altrimenti la
-   regione draggabile della finestra mangerebbe gli eventi del mouse. */
+/* Durante l'annotazione si disegna a mano libera anche su tab e barra indirizzi. Serve il no-drag,
+   altrimenti la regione draggabile della finestra si mangia gli eventi del mouse. */
 #feedback-draw {
   position: fixed;
   left: 0;
@@ -567,9 +518,7 @@ html[data-feedback-dim="1"] .shell {
 }
 #feedback-draw[hidden] { display: none; }
 
-/* ── Scaricamenti (#410.1) ─────────────────────────────────────────────────
-   Indicatore nella fila di tab (sempre visibile: la fila non è coperta dalla
-   view nativa della pagina) + pannello espandibile. */
+/* L'indicatore sta nella fila di tab perché quella non è mai coperta dalla view nativa della pagina. */
 .dl-indicator {
   position: relative;
   align-self: center;
@@ -709,7 +658,6 @@ html[data-feedback-dim="1"] .shell {
 .dl-row-btn:hover { background: var(--tab-active); }
 .dl-row[data-state="interrupted"] .dl-row-name,
 .dl-row[data-state="cancelled"] .dl-row-name { color: var(--fg-soft); }
-/* Scaricato, ma il file non è più al suo posto: la riga si attenua (e con lei
-   il nome barrato) così si vede prima ancora di cliccare. */
+/* Scaricato ma non più al suo posto: la riga si attenua, così si vede prima ancora di cliccare. */
 .dl-row[data-missing="1"] .dl-row-name { color: var(--fg-soft); text-decoration: line-through; }
 .dl-row[data-missing="1"] .dl-row-meta { opacity: 0.8; }

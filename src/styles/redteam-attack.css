@@ -28,7 +28,6 @@
   overflow: hidden;
 }
 
-/* Maniglia per spostare il box. */
 .sn-rt-drag {
   flex: 0 0 auto;
   height: 16px;
@@ -117,7 +116,6 @@
   padding: 8px 12px;
   border-top: 1px solid var(--sn-border);
 }
-/* Invia ultimo, primario, a destra. */
 .sn-rt-send { margin-left: auto; }
 
 .sn-rt-btn,

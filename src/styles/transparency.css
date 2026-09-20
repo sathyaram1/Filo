@@ -1,13 +1,6 @@
-/* Documenti di trasparenza — foglio UNICO per le due superfici.
- *
- * Dentro Filo i colori arrivano dai token del tema (theme.css). Sul sito quei
- * token non esistono: per questo ogni var() porta un fallback, e il blocco
- * :root qui sotto ridefinisce i token SOLO se non sono già stati impostati
- * (sulla pagina pubblica) tramite prefers-color-scheme. Un foglio solo, così
- * la pagina pubblica e quella interna non divergono a ogni ritocco.
- *
- * Il CORSIVO è riservato alle glosse del glossario: nel testo dei documenti non
- * si usa per nient'altro, altrimenti l'affordance mente. */
+/* Documenti di trasparenza — foglio UNICO per le due superfici, così la pagina pubblica e quella interna
+   non divergono: dentro Filo i colori vengono dai token del tema, sul sito da fallback e da :root qui sotto.
+   Il CORSIVO è riservato alle glosse del glossario: altrove mentirebbe sull'affordance. */
 
 .sn-doc {
   --doc-measure: 34rem;
@@ -20,7 +13,6 @@
   line-height: 1.65;
 }
 
-/* Intestazione: marchio a sinistra, le quattro sezioni a destra. */
 .sn-doc-head {
   display: flex;
   align-items: baseline;
@@ -204,10 +196,8 @@
   .sn-doc h1 { font-size: 1.55rem; }
 }
 
-/* ── Solo pagina pubblica ────────────────────────────────────────────────────
- * Dentro Filo il body è già vestito dal tema. Sul sito no: queste regole danno
- * sfondo e schema chiaro/scuro senza toccare la resa dentro l'app (dove
- * data-sn-theme è sempre presente su <html>). */
+/* Dentro Filo il body è già vestito dal tema (data-sn-theme è sempre su <html>). Sul sito no: queste
+   regole danno sfondo e schema chiaro/scuro senza toccare la resa dentro l'app. */
 html:not([data-sn-theme]) body {
   margin: 0;
   background: var(--sn-bg, #f8f6f0);

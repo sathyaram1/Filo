@@ -78,9 +78,8 @@ html, body {
 
 .sn-page button.sn-btn:hover:not(:disabled) { opacity: 0.85; }
 
-/* Bottone spento da una regola (non da un'attesa): deve VEDERSI che è spento,
-   altrimenti sembra un bottone rotto — ci si clicca sopra e non succede niente.
-   Il motivo per cui è spento sta nel suo hover nativo (title). */
+/* Un bottone spento da una regola deve VEDERSI spento, altrimenti sembra rotto: ci si clicca e non
+   succede niente. Il motivo per cui è spento sta nel suo title. */
 .sn-page button.sn-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -93,8 +92,6 @@ html, body {
 }
 .sn-page button.sn-btn-secondary:hover:not(:disabled) { background: var(--sn-hover); }
 
-/* Variante "azione distruttiva" (es. ripristino completo delle impostazioni):
-   bordo e testo rossi, sfondo trasparente finché non ci passi sopra. */
 .sn-page button.sn-btn-danger {
   background: transparent;
   color: #c0392b;
@@ -117,9 +114,6 @@ html, body {
 
 .sn-page .sn-muted { color: var(--sn-muted); font-size: 12px; }
 
-/* Box informativo (banner di spiegazione, tipo "cosa succede se..."): contorno
-   morbido + sfondo leggermente accentuato, usato nella sezione Sicurezza per
-   spiegare gli effetti collaterali dei toggle privacy. */
 .sn-page .sn-info-box {
   border: 1px solid var(--sn-border);
   background: var(--sn-hover);
@@ -161,10 +155,6 @@ html, body {
 }
 .sn-page .sn-saved-indicator.sn-show { opacity: 1; }
 
-/* Sezione "token estetici" (#146.3): config "a codice" con tutti i token e i
-   loro valori. Aspetto da blocco di codice (monospace, sfondo soffuso), righe
-   `nome: valore` allineate. I valori personalizzati sono evidenziati; ogni riga
-   ha un ↺ per il reset del singolo token. */
 .sn-page .sn-token-code {
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
@@ -260,8 +250,7 @@ html, body {
   transform: translateY(-1px);
   box-shadow: var(--sn-shadow);
 }
-/* Evidenziazione della scheda appena salvata (#252): un alone d'accento che
-   pulsa una volta e sfuma, per dire "è finita qui" senza restare invadente. */
+/* La scheda appena salvata pulsa una volta e sfuma: dice "è finita qui" senza restare invadente. */
 .sn-card-highlight {
   animation: sn-card-highlight 2.4s ease-out 1;
 }
@@ -362,17 +351,16 @@ html, body {
   gap: 10px;
 }
 
-/* Richiesta servita da un fornitore escluso dalla politica sui modelli (#461).
-   Sta accanto al nome di chi ha servito, perché è quel nome a essere il problema. */
+/* Richiesta servita da un fornitore escluso dalla politica sui modelli. Sta accanto al nome di chi
+   ha servito, perché è quel nome a essere il problema. */
 .sn-history-policy-warn {
   margin-left: 8px;
   color: var(--sn-error);
   font-weight: 600;
 }
 
-/* Quota di testo in ingresso riusata da una richiesta precedente (#422).
-   Dato di servizio: resta discreto accanto al costo, si spiega al passaggio del
-   mouse (pagina consultata di rado → l'hover ci sta). */
+/* Quota di testo in ingresso riusata da una richiesta precedente: dato di servizio, discreto accanto
+   al costo, si spiega al passaggio del mouse (pagina consultata di rado). */
 .sn-history-reuse {
   white-space: nowrap;
   cursor: help;
@@ -383,8 +371,7 @@ html, body {
   color: var(--sn-fg);
 }
 
-/* Tempi del turno (ragiona · scrive · fine): stesso trattamento del riuso,
-   dato di servizio che si spiega al passaggio del mouse. */
+/* Tempi del turno: come il riuso, dato di servizio che si spiega al passaggio del mouse. */
 .sn-history-timing {
   white-space: nowrap;
   cursor: help;
@@ -438,7 +425,6 @@ html, body {
   flex-wrap: wrap;
 }
 
-/* Tile categorie */
 .sn-cat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -498,7 +484,6 @@ html, body {
 .sn-back-btn[hidden] { display: none; }
 .sn-back-btn:hover { color: var(--sn-fg); }
 
-/* Pannello gestione categorie nelle opzioni */
 .sn-cat-list {
   display: flex;
   flex-direction: column;
@@ -523,7 +508,6 @@ html, body {
   text-align: right;
 }
 
-/* Pagina Correttore: tabelle autocorrect e dizionario */
 .sn-spell-table {
   display: flex;
   flex-direction: column;
@@ -565,10 +549,8 @@ html, body {
 .sn-spell-word {
   font-size: 13px;
   padding: 6px 4px;
-  /* Token lunghi senza spazi (indirizzi, codici) devono andare a capo dentro
-     la cella della griglia invece di sforare e spingere "Rimuovi" fuori dal
-     viewport (feedback #214). min-width:0 permette alla cella 1fr di
-     restringersi sotto la min-content del contenuto. */
+  /* I token lunghi senza spazi (indirizzi, codici) devono andare a capo dentro la cella invece di
+     spingere "Rimuovi" fuori dal viewport; min-width:0 fa scendere la cella 1fr sotto la min-content. */
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -585,9 +567,6 @@ section:has(#dictList) .sn-spell-add-row {
   grid-template-columns: 1fr auto;
 }
 
-/* Registry modelli (editor in pagina Opzioni). Una riga per nickname:
-   nickname | provider | stringa modello | Prova | Rimuovi, con i dati di
-   test (latenza/token-sec) su una seconda riga a tutta larghezza. */
 .sn-model-row {
   display: grid;
   grid-template-columns: 120px 150px 1fr auto auto;
@@ -601,17 +580,14 @@ section:has(#dictList) .sn-spell-add-row {
 }
 .sn-model-row input[type="text"],
 .sn-model-row select { width: 100%; font-size: 12px; }
-/* Righe dei "Modelli predefiniti" (admin): colonna extra per il livello di
-   reasoning per-modello (#369). Solo qui, non nelle righe registry delle
-   Opzioni utente (che restano a 5 colonne). */
+/* La colonna in più per il livello di reasoning vale solo nei Modelli predefiniti dell'owner:
+   le righe del registry nelle Opzioni utente restano a cinque colonne. */
 .sn-model-row.sn-model-row-reason {
   grid-template-columns: 110px 130px 1fr 92px auto auto;
 }
 /* Campo "stringa modello": wrapper position:relative perché il popup custom
    (.sn-select-pop) si ancora lì sotto, al posto della datalist nativa. */
 .sn-model-id-wrap { position: relative; }
-/* Opzioni del combobox custom (classi generiche di SN_COMBOBOX): id del modello
-   in evidenza, categoria attenuata accanto. */
 .sn-combo-opt-name { font-weight: 600; }
 .sn-combo-opt-label { color: var(--sn-muted); margin-left: 8px; }
 .sn-model-row .sn-btn { padding: 4px 8px; font-size: 12px; }
@@ -633,8 +609,7 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 2px;
 }
 
-/* Riga scartata dal salvataggio (nickname mancante o duplicato, #216): bordo +
-   messaggio inline a tutta larghezza, niente alert bloccante. */
+/* Riga scartata dal salvataggio (nickname mancante o duplicato): messaggio inline, niente alert bloccante. */
 .sn-model-row.sn-row-invalid { border-color: var(--sn-error); }
 .sn-model-row input.sn-input-invalid { border-color: var(--sn-error); }
 .sn-model-row-msg {
@@ -643,13 +618,10 @@ section:has(#dictList) .sn-spell-add-row {
   color: var(--sn-error);
 }
 .sn-model-row-msg:empty { display: none; }
-/* Indicatore "Salvato" quando una riga è stata scartata: stesso posto, colore
-   d'allerta invece del verde/accento, per non affermare un salvataggio totale
-   che non c'è stato. */
+/* Quando una riga è stata scartata l'indicatore prende il colore d'allerta: un "Salvato" verde
+   affermerebbe un salvataggio totale che non c'è stato. */
 .sn-page .sn-saved-indicator.sn-hint-warn { color: var(--sn-error); }
 
-/* Lista read-only dei modelli predefiniti: 4 colonne (nickname, provider,
-   stringa modello, Prova) — senza Rimuovi né input editabili. */
 .sn-default-model-row {
   grid-template-columns: 120px 110px 1fr auto;
 }
@@ -660,16 +632,12 @@ section:has(#dictList) .sn-spell-add-row {
   white-space: nowrap;
 }
 
-/* Fornitori esclusi (admin): una riga per nome, nome | Rimuovi. Stessa cornice
-   delle righe del registry, due sole colonne. */
 .sn-excluded-row {
   grid-template-columns: 1fr auto;
 }
 
-/* Censimento (sola lettura) degli altri punti in cui Filo usa un modello:
-   quelli che girano sui suoi server e quelli che un modello non lo usano.
-   Due colonne — cosa è, dove si imposta — senza cornice: è un elenco, non una
-   tabella di controlli. */
+/* Censimento in sola lettura degli altri punti in cui Filo usa un modello: senza cornice, perché è
+   un elenco e non una tabella di controlli. */
 .sn-usage-h {
   margin: 22px 0 4px;
   font-size: 13px;
@@ -698,9 +666,7 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-usage-where { color: var(--sn-muted); font-size: 12px; text-align: right; }
 .sn-usage-note { grid-column: 1 / -1; color: var(--sn-muted); font-size: 11px; }
 
-/* Editor a segmenti della catena di modelli per azione (Modelli per azione).
-   Una "pillola" con un segmento per modello in ordine di priorità, separati da
-   un divisore accentato; "+" aggiunge un fallback, "×" rimuove un segmento. */
+/* Catena di modelli per azione: una pillola con un segmento per modello, in ordine di priorità. */
 .sn-chain {
   display: flex;
   flex-wrap: wrap;
@@ -721,7 +687,6 @@ section:has(#dictList) .sn-spell-add-row {
   color: var(--sn-fg);
 }
 .sn-chain-input:focus { outline: none; }
-/* Divisore fra un modello e il successivo (la "linea rossa" della richiesta). */
 .sn-chain-sep {
   width: 2px;
   align-self: stretch;
@@ -751,9 +716,8 @@ section:has(#dictList) .sn-spell-add-row {
   margin-left: 4px;
 }
 .sn-chain-add:hover { color: var(--sn-fg); border-color: var(--sn-fg); }
-/* Dropdown custom del segmento (al posto del popup nativo della datalist):
-   riusa le classi .sn-select-pop/.sn-select-option (theme.css) ma posizionato
-   sotto al segmento, abbastanza largo da mostrare nickname + etichetta. */
+/* Dropdown del segmento al posto del popup nativo della datalist: riusa le classi .sn-select-* di
+   theme.css, ma ancorato al segmento e largo abbastanza per nickname + etichetta. */
 .sn-chain-pop {
   left: 0;
   right: auto;
@@ -762,8 +726,6 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-chain-opt-nick { font-weight: 600; }
 .sn-chain-opt-label { color: var(--sn-muted); margin-left: 8px; }
 
-/* Selettore modalità cookie: tre "card" radio impilate (Manuale/Automatico/
-   Privacy). La card selezionata si evidenzia con bordo accentato. */
 .sn-page .sn-cookie-modes {
   display: flex;
   flex-direction: column;

@@ -1,9 +1,8 @@
 /* Sidebar Aiuto (Fase 2) — overlay laterale destro full-height. */
 
 .sn-sidebar {
-  /* Ancorata al bottom: la barra di input resta fissa lì sotto e la chat
-     "cresce" verso l'alto quando si espande. Al collasso scompare solo la
-     parte superiore (header + conv + meta), l'input non si sposta. */
+  /* Ancorata al bottom: la barra di input resta fissa e la chat cresce verso l'alto. Al collasso sparisce
+     solo la parte superiore, l'input non si sposta. */
   position: fixed;
   bottom: 16px;
   right: 16px;
@@ -96,9 +95,8 @@
 .sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
 .sn-sidebar-msg-error   { color: var(--sn-error); }
 
-/* Markdown leggero nelle risposte di Filo (#418): il contenuto e' HTML, quindi
-   togliamo il pre-wrap (che renderebbe letterali gli a-capo tra i blocchi) e
-   diamo agli elementi la stessa resa delle altre superfici. */
+/* Il markdown leggero delle risposte è già HTML: via il pre-wrap, che renderebbe letterali gli a-capo
+   fra i blocchi, e stessa resa delle altre superfici. */
 .sn-sidebar-msg-assistant { white-space: normal; }
 .sn-sidebar-msg-assistant p { margin: 0 0 8px 0; }
 .sn-sidebar-msg-assistant p:last-child { margin-bottom: 0; }
@@ -129,8 +127,7 @@
 }
 .sn-sidebar-msg-assistant a.filo-md-link:hover { text-decoration: none; }
 
-/* Bottoni "choices" sotto al messaggio dell'assistente: percorsi alternativi
-   che l'utente può cliccare per indirizzare l'AI senza scrivere. */
+/* Percorsi alternativi da cliccare per indirizzare Filo senza scrivere. */
 .sn-sidebar-choices {
   align-self: flex-start;
   display: flex;
@@ -164,7 +161,6 @@
   border-color: var(--sn-border);
 }
 
-/* Log azioni utente: riga grigia compatta, un solo rigo */
 .sn-sidebar-log {
   align-self: flex-start;
   color: var(--sn-muted);
@@ -252,8 +248,7 @@
 .sn-sidebar-input button:hover { transform: translateY(-1px); }
 .sn-sidebar-input button:active { transform: translateY(0); opacity: 0.85; }
 
-/* Indicatore "sta pensando": 3 righe di reasoning che scorrono.
-   La riga top è quasi trasparente (sta uscendo), la bottom è piena (è entrata).
+/* Tre righe di ragionamento che scorrono: la prima quasi trasparente sta uscendo, l'ultima è piena.
    Le frasi cambiano ogni ~900ms con uno shift verso l'alto. */
 .sn-sidebar-thinking {
   align-self: flex-start;
@@ -285,7 +280,7 @@
   to   { opacity: 0.95; transform: translateY(0); }
 }
 
-/* Popup feedback fine-task: appare in chat quando l'AI dichiara "done". */
+/* Popup di fine lavoro: appare in chat quando Filo dichiara di aver finito. */
 .sn-sidebar-feedback {
   align-self: stretch;
   display: flex;

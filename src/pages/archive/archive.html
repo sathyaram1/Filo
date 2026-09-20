@@ -15,27 +15,16 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <style>
-    /* §3.3 — la cronologia come "diario visivo": UN giorno per RIGA (mai a capo),
-       dentro ogni giorno le schede in ordine cromatico rese come le tab in alto —
-       sfondo tinto col colore identità del sito, larghezza variabile che riempie
-       tutta la riga; se sono troppe per starci al minimo la riga SCORRE in
-       orizzontale (come la barra delle tab) invece di andare a capo. Le azioni
-       (riapri/elimina) stanno nel menu contestuale (tasto destro), non in bottoni
-       sempre visibili — coerente con l'estetica minimale. */
+    /* La cronologia è un diario visivo: UN giorno per RIGA, mai a capo, con le schede rese come le tab in alto.
+       Le azioni stanno nel menu del tasto destro, non in bottoni sempre visibili. */
     .arc-day { margin: 22px 0 8px; }
     .arc-day-label {
       font-size: 13px; font-weight: 600; color: var(--sn-muted);
       text-transform: capitalize; padding-bottom: 6px;
       border-bottom: 1px solid var(--sn-border);
     }
-    /* Una sola riga per giorno: niente wrap. Le chip crescono (flex:1) per
-       riempire la larghezza; quando sono troppe scorrono in orizzontale —
-       stessa logica della barra delle tab in alto (rotellina verticale →
-       scroll orizzontale, vedi archive.js). A differenza della barra chrome in
-       alto qui la scrollbar NON è nascosta: la Cronologia è una pagina che si
-       consulta, non un elemento di chrome sempre presente, quindi lasciamo la
-       scrollbar sottile globale (theme.css) come affordance trascinabile col
-       mouse — compare solo quando c'è davvero overflow (overflow-x:auto). */
+    /* Le chip crescono per riempire la riga e, quando sono troppe, la riga scorre in orizzontale come la barra
+       delle tab. La scrollbar però resta visibile: questa è una pagina che si consulta, non chrome. */
     .arc-tabs {
       display: flex; flex-wrap: nowrap; gap: 3px; margin-top: 10px;
       overflow-x: auto; overflow-y: hidden;
@@ -43,16 +32,12 @@
     }
     .arc-tab {
       display: inline-flex; align-items: center; gap: 7px;
-      /* Larghezza variabile che sfrutta tutta la riga (nessun max-width qui:
-         poche schede si allargano fino a riempire lo spazio disponibile). Il
-         min-width tiene la chip LEGGIBILE anche quando sono tante: sotto questa
-         soglia il titolo si riduceva a una sola lettera ("S…"). Oltre la
-         soglia la riga scorre invece di comprimere ancora. */
+      /* Nessun max-width: poche schede si allargano a riempire la riga. Il min-width tiene la chip LEGGIBILE quando
+         sono tante — sotto quella soglia il titolo si riduceva a una lettera — e oltre la riga scorre. */
       flex: 1 1 0; min-width: 132px;
       padding: 7px 12px; border-radius: var(--sn-radius);
       border: 1px solid color-mix(in srgb, var(--arc-color, var(--sn-border)) 40%, var(--sn-border));
-      /* Sfondo = tinta identità del sito (attenuata, calcolata in JS) mescolata
-         al neutro di superficie, come le tab in alto (§1.2). Le schede senza
+      /* Sfondo: tinta identità del sito, attenuata e mescolata al neutro come le tab in alto. Le schede senza
          colore ricadono sul solo neutro. */
       background: color-mix(in srgb, var(--arc-tint, var(--sn-hover)) 55%, var(--sn-hover));
       color: var(--sn-fg);
@@ -63,8 +48,8 @@
       background: color-mix(in srgb, var(--arc-tint, var(--sn-hover)) 55%, var(--sn-bg));
     }
     .arc-tab:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
-    /* Risultati della ricerca semantica: lista piatta ordinata per pertinenza →
-       chip compatte che vanno a capo (non una riga infinita da scorrere). */
+    /* I risultati della ricerca sono una lista piatta per pertinenza: chip compatte che vanno a capo, non una
+       riga infinita da scorrere. */
     .arc-results { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .arc-results .arc-tab { flex: 0 0 auto; max-width: 320px; }
     .arc-fav {
@@ -79,10 +64,8 @@
     .arc-score {
       font-size: 10px; color: var(--sn-muted); flex: 0 0 auto;
     }
-    /* Menu contestuale (tasto destro): stesse classi .sn-select-pop/-option del
-       resto di Filo, ma posizionato "fixed" alle coordinate del click (non
-       ancorato a un host relative come i dropdown normali) — resetta
-       right/top ereditati da .sn-select-pop, che JS imposta esplicitamente. */
+    /* Stesse classi .sn-select-pop del resto di Filo, ma fixed alle coordinate del click e non ancorato a un host
+       relative: da qui il reset di right/top, che il JS imposta esplicitamente. */
     .arc-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
   </style>
 </head>

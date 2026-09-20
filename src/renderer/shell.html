@@ -12,9 +12,8 @@
       <button class="tab-new" id="tab-new" data-tip="Nuova scheda" aria-label="Nuova scheda"></button>
       <div class="tab-drag-spacer"></div>
       <span class="incognito-badge" id="incognito-badge" hidden data-tip="Sessione incognito: niente cronologia né dati salvati su questo computer" aria-label="Finestra incognito"></span>
-      <!-- Indicatore scaricamenti (#410.1): compare solo se c'è almeno un
-           download attivo o recente. Icona + contatore + barra di avanzamento
-           aggregata; il click apre il pannello con i singoli download. -->
+      <!-- Indicatore scaricamenti: compare solo con almeno un download attivo o recente, e il click apre il
+         pannello con i singoli download. -->
       <button class="dl-indicator" id="dl-indicator" hidden data-tip="Scaricamenti" aria-label="Scaricamenti">
         <span class="dl-ind-icon" id="dl-ind-icon"></span>
         <span class="dl-ind-count" id="dl-ind-count" hidden></span>
@@ -26,10 +25,8 @@
         <button class="win-btn win-close" id="win-close" data-tip="Chiudi" aria-label="Chiudi"></button>
       </div>
     </div>
-    <!-- Barra indirizzi: sempre nascosta (vedi applyChrome). Gli elementi
-         restano nel DOM perché shell.js ne aggancia i gestori, ma le icone
-         visibili sono state spostate: indietro/avanti/ricarica nel menu tasto
-         destro, home/impostazioni/app/profilo dentro la pagina home. -->
+    <!-- Barra indirizzi sempre nascosta (vedi applyChrome): gli elementi restano nel DOM perché shell.js ne
+       aggancia i gestori, ma le icone visibili sono altrove. -->
     <nav class="addr">
       <button class="nav-btn" id="nav-back" data-tip="Indietro" aria-label="Indietro"></button>
       <button class="nav-btn" id="nav-forward" data-tip="Avanti" aria-label="Avanti"></button>
@@ -41,9 +38,8 @@
       <button class="nav-btn nav-account" id="nav-account" data-tip="Accedi" aria-label="Accedi"></button>
     </nav>
   </header>
-  <!-- Tela di disegno per annotare la barra in alto di Filo durante un feedback.
-       Sta FUORI da .shell così il filtro brightness della penombra non la tocca
-       (i tratti restano a piena luminosità). Nascosta finché non si annota. -->
+  <!-- Sta FUORI da .shell così il filtro brightness della penombra non la tocca e i tratti restano a piena
+     luminosità. Nascosta finché non si annota. -->
   <canvas id="feedback-draw" hidden></canvas>
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/tasti.js"></script>

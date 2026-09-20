@@ -19,12 +19,10 @@
   <script src="filo://shared/deckStats.js"></script>
   <script src="filo://shared/scryfallQuery.js"></script>
   <style>
-    /* App deck builder Commander (DECK-BUILDER-SPEC.md). Tre schermate su hash
-       routing: #/ libreria mazzi · #/deck/<id> builder · #/game partita (stub).
-       Solo una .dk-screen è visibile alla volta. */
+    /* App deck builder Commander (DECK-BUILDER-SPEC.md): tre schermate su hash routing — libreria, builder,
+       partita — e una sola .dk-screen visibile alla volta. */
     .dk-screen[hidden] { display: none; }
 
-    /* ── Libreria (§10): griglia di card, art crop del commander come thumb ── */
     .dk-thumb {
       aspect-ratio: 626 / 457; /* proporzione dell'art crop Scryfall */
       background: var(--sn-hover);
@@ -36,9 +34,8 @@
       display: flex; align-items: center; gap: 8px;
       font-size: 12px; color: var(--sn-muted);
     }
-    /* Pip dei colori identity del commander (palette WUBRG fissa: come per i
-       grafici, i token di tema non bastano — servono 5 colori distinguibili
-       su tema chiaro E scuro). */
+    /* Palette WUBRG fissa: come per i grafici, i token di tema non bastano, servono cinque colori
+       distinguibili su tema chiaro E scuro. */
     .dk-pips { display: inline-flex; gap: 3px; }
     .dk-pip {
       width: 10px; height: 10px; border-radius: 50%;
@@ -49,39 +46,23 @@
     .dk-pip[data-c="B"] { background: #4a4550; }
     .dk-pip[data-c="R"] { background: #d4644a; }
     .dk-pip[data-c="G"] { background: #5f9663; }
-    /* Menu contestuale della card mazzo: stesse classi .sn-select-pop del resto
-       di Filo, posizionato fixed alle coordinate del click (come in archivio). */
+    /* Stesse classi .sn-select-pop del resto di Filo, ma fixed alle coordinate del click, come in archivio. */
     .dk-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
 
-    /* Il builder è un'app a piena larghezza E a piena pagina: esce dal max-width
-       di .sn-page (pensato per le pagine di impostazioni, non per un'area di
-       lavoro) e ne azzera anche il padding, così usa TUTTO lo spazio della
-       finestra senza box né margini vuoti ai bordi (feedback #342: il contenuto
-       vive direttamente nella pagina, gli unici divisori sono quelli verticali
-       fra le colonne). La classe è messa sul body dal JS solo mentre il builder
-       è a schermo. */
+    /* Il builder è un'area di lavoro, non una pagina di impostazioni: esce dal max-width di .sn-page e ne azzera
+       il padding, così usa tutta la finestra. La classe la mette il JS sul body solo mentre è a schermo. */
     body.dk-full .sn-page { max-width: none; padding: 0; }
 
-    /* ── Builder (§2): tre colonne con due divisori trascinabili A MANO
-       (deliberato, mai su hover/click); le larghezze persistono e le imposta
-       il JS in grid-template-columns. Le due colonne esterne (chat e dettaglio)
-       hanno larghezza fissa; la colonna centrale del MAZZO è quella flessibile
-       che assorbe lo spazio in più (è l'artefatto centrale dell'app, come nei
-       deck builder reali) — così il dettaglio resta di dimensione sana e la
-       carta in anteprima non esplode oltre l'altezza dello schermo. ── */
+    /* Tre colonne con due divisori che si trascinano A MANO, mai su hover o click; le larghezze le scrive il JS in
+       grid-template-columns. Flessibile è la colonna del MAZZO, così il dettaglio resta di dimensione sana. */
     .dk-builder {
       display: grid; grid-template-columns: 340px 6px 1fr 6px 340px;
       gap: 0; height: 100vh; min-height: 320px;
       overflow: hidden;
     }
-    /* min-height: 0 è OBBLIGATORIO: senza, questo flex/grid item eredita
-       min-height: auto e NON si comprime sotto l'altezza del contenuto — così
-       il .dk-col-body qui sotto (flex:1 + overflow:auto) cresce fino al
-       contenuto invece di scrollare, la colonna sfonda l'altezza fissa del
-       builder (clippata da overflow:hidden) e in chat l'input in fondo finisce
-       fuori dal riquadro ("non vedo dove scrivere", scroll rotto). */
+    /* `min-height: 0` è OBBLIGATORIO: senza, l'item eredita min-height auto e non si comprime, il .dk-col-body
+       cresce invece di scorrere e in chat l'input in fondo finisce fuori dal riquadro. */
     .dk-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-    /* Divisore: linea sottile al centro, zona di presa larga 6px. */
     .dk-divider {
       cursor: col-resize;
       background: var(--sn-border);
@@ -93,9 +74,8 @@
       padding: 10px 12px; border-bottom: 1px solid var(--sn-border);
       font-size: 13px; font-weight: 600;
     }
-    /* Testata della colonna chat: il ritorno ai Mazzi è un'icona SULLO STESSO
-       livello del titolo di colonna (niente più riga-bottone sopra il builder,
-       che sprecava spazio verticale e stava nel margine vuoto a sinistra). */
+    /* Il ritorno ai Mazzi è un'icona sullo STESSO livello del titolo di colonna: una riga-bottone sopra il builder
+       sprecava spazio verticale. */
     .dk-col-head-chat { display: flex; align-items: center; gap: 8px; }
     .dk-head-back {
       flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
@@ -110,9 +90,8 @@
     }
     .dk-col-body { flex: 1; overflow: auto; padding: 12px; }
     .dk-placeholder { color: var(--sn-muted); font-size: 13px; }
-    /* Header identità del documento (§8.2): nome mazzo + commander, sempre
-       visibili. Il click sul nome apre lo SWITCHER (gestione mazzi); la
-       rinomina è una voce dello switcher che scambia il bottone con l'input. */
+    /* Nome mazzo e commander sempre visibili. Il click sul nome apre lo switcher; la rinomina è una sua voce,
+       che scambia il bottone con l'input. */
     .dk-head-center { position: relative; }
     #deckName {
       font: inherit; font-size: 15px; font-weight: 600;
@@ -138,7 +117,6 @@
     .dk-commander-line { font-size: 12px; color: var(--sn-muted); padding: 0 6px 6px; }
     .dk-count { font-size: 12px; color: var(--sn-muted); }
 
-    /* ── Colonna mazzo (§8.1): righe compatte, gruppi collassabili ── */
     .dk-deck-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
     .dk-groupby {
       font: inherit; font-size: 12px; color: var(--sn-muted);
@@ -161,8 +139,7 @@
       font-size: 13px;
     }
     .dk-row:hover, .dk-row:focus-visible { background: var(--sn-hover); }
-    /* Trascinamento di una carta su una categoria (#344): la riga presa si
-       affievolisce, il gruppo sotto il cursore prende un fondo d'accento. */
+    /* Trascinando una carta la riga presa si affievolisce e il gruppo sotto il cursore prende un fondo d'accento. */
     .dk-row[draggable="true"] { cursor: grab; }
     .dk-row.dk-dragging { opacity: 0.45; cursor: grabbing; }
     .dk-group.dk-drop-target {
@@ -174,7 +151,6 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       min-width: 0;
     }
-    /* Costo di mana destro-allineato, simboli SVG ufficiali (§3.4). */
     .dk-row-mana { margin-left: auto; display: inline-flex; gap: 1px; flex: 0 0 auto; }
     .dk-mana { width: 13px; height: 13px; display: block; }
     /* Info extra per riga (prezzo) SOLO con l'attenzione sulla colonna (§8.1):
@@ -185,7 +161,6 @@
     }
     #colDeck:hover .dk-row-price, #colDeck:focus-within .dk-row-price { visibility: visible; }
 
-    /* ── Colonna Chat/Risultati (§3): chat unificata, bolle tipizzate ── */
     .dk-chat-body { display: flex; flex-direction: column; gap: 8px; }
     .dk-msg { max-width: 100%; font-size: 13px; }
     .dk-msg-user {
@@ -197,9 +172,8 @@
     .dk-msg-text { white-space: pre-wrap; overflow-wrap: break-word; margin: 0 0 4px; }
     .dk-msg-pending, .dk-msg-error { color: var(--sn-muted); font-size: 12px; }
     .dk-msg-error { color: var(--sn-danger, #c0392b); }
-    /* Ragionamento del modello (CoT, #331): blocco collassabile cliccabile in
-       testa alla bolla. Aperto mentre Filo pensa (scorre in diretta), poi
-       collassato a una riga discreta riespandibile. */
+    /* Il ragionamento del modello è aperto mentre Filo pensa, perché scorre in diretta, e poi si collassa a una
+       riga discreta riespandibile. */
     .dk-cot {
       display: block; font-size: 12px; color: var(--sn-muted);
       border-left: 2px solid var(--sn-border);
@@ -218,9 +192,8 @@
       color: var(--sn-accent); cursor: default;
       text-decoration: underline dotted; text-underline-offset: 2px;
     }
-    /* Carta ATTUALMENTE nel carosello (#343): evidenziata ovunque appaia.
-       Il nome in prosa perde la sottolineatura e prende un fondo d'accento;
-       le righe carta (chat e mazzo) lo stesso fondo, più tenue. */
+    /* La carta attualmente nel carosello è evidenziata ovunque appaia: il nome in prosa perde la sottolineatura
+       e prende un fondo d'accento, le righe carta lo stesso fondo più tenue. */
     .dk-prose-card.dk-carousel-current {
       text-decoration: none;
       background: color-mix(in srgb, var(--sn-accent) 22%, transparent);
@@ -233,8 +206,7 @@
     .dk-row.dk-carousel-current:focus-visible {
       background: color-mix(in srgb, var(--sn-accent) 20%, transparent);
     }
-    /* CardList (§3.2-§3.4): ultima bolla ~10 righe con scroll interno; le
-       precedenti collassate a una riga di sintesi riespandibile (§3.3). */
+    /* Solo l'ultima CardList resta aperta con scroll interno; le precedenti si collassano a una riga di sintesi. */
     .dk-cardlist { max-height: 232px; overflow: auto; }
     .dk-list-summary {
       display: flex; align-items: center; gap: 6px;
@@ -244,7 +216,6 @@
       border-radius: 5px;
     }
     .dk-list-summary:hover { background: var(--sn-hover); }
-    /* Toggle aggiungi-al-mazzo per riga (§3.4). */
     .dk-add {
       flex: 0 0 auto; width: 20px; height: 20px;
       display: inline-flex; align-items: center; justify-content: center;
@@ -264,18 +235,15 @@
     }
     #chatInput:focus { border-color: var(--sn-accent); }
 
-    /* ── Pannello destro a tre stati (§5): statistiche / preview / carosello.
-       Il contenuto cambia, la GEOMETRIA mai: stessa colonna, stessa larghezza.
-       La carta è portrait 63:88 e si renderizza nella larghezza corrente del
-       pannello; l'aspect-ratio fissa evita salti di layout mentre carica. ── */
+    /* Il pannello destro ha tre stati — statistiche, preview, carosello — e il contenuto cambia ma la GEOMETRIA no.
+       La carta è portrait 63:88: l'aspect-ratio fissa evita salti di layout mentre l'immagine carica. */
     .dk-detail-state[hidden] { display: none; }
     .dk-card-img {
       display: block; width: 100%; aspect-ratio: 63 / 88;
       object-fit: cover; border-radius: 4.75% / 3.5%;
       background: var(--sn-hover);
     }
-    /* Cornice della carta: ospita l'immagine e il tasto "gira" delle bifronte
-       (transform / modal DFC). Il tasto compare solo se la carta ha un retro. */
+    /* Il tasto "gira" delle bifronte compare solo se la carta ha un retro. */
     .dk-card-frame { position: relative; }
     .dk-card-frame.dk-has-back .dk-card-img { cursor: pointer; }
     .dk-flip {
@@ -292,7 +260,6 @@
     .dk-flip:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
     .dk-flip:active { transform: rotate(180deg); }
     .dk-card-frame.dk-flipped .dk-flip { border-color: var(--sn-accent); color: var(--sn-accent); }
-    /* Riga di contesto del detail (§5.2): prezzo + tag + "già nel mazzo". */
     .dk-detail-ctx {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
       font-size: 12px; color: var(--sn-muted); padding: 8px 2px;
@@ -302,9 +269,7 @@
       border: 1px solid var(--sn-border); border-radius: 999px;
       padding: 0 7px; font-size: 11px;
     }
-    /* Box modulare (§5.2): slot del sistema moduli; il contenuto si sceglie
-       col tasto destro → i moduli veri arrivano con un task successivo,
-       oggi c'è il default (dati carta). */
+    /* Slot del sistema moduli: il contenuto si sceglie col tasto destro, oggi c'è solo il default. */
     .dk-detail-module {
       border: 1px solid var(--sn-border); border-radius: 8px;
       padding: 10px; font-size: 12px; color: var(--sn-muted);
@@ -313,9 +278,8 @@
     .dk-detail-module .dk-module-title {
       font-weight: 600; color: var(--sn-text); margin: 0 0 4px; font-size: 12px;
     }
-    /* Mini curva di mana (modulo §5.2): versione compatta della curva delle
-       statistiche, con la colonna della carta evidenziata e un segmento
-       "fantasma" (+1) dove la carta cadrebbe se aggiunta. */
+    /* Versione compatta della curva delle statistiche, con la colonna della carta evidenziata e un segmento
+       "fantasma" dove la carta cadrebbe se venisse aggiunta. */
     .dk-curve-mini { height: 56px; margin: 4px 0; }
     .dk-curve-mini .dk-curve-bar { min-height: 0; }
     .dk-curve-hit .dk-curve-label { color: var(--sn-accent); font-weight: 600; }
@@ -324,8 +288,7 @@
       width: 100%; border-radius: 3px 3px 0 0;
       background: var(--sn-accent); opacity: .3;
     }
-    /* Parere di Filo (modulo §6): testo del parere + barra "stantio" col
-       pallino DISCRETO (mai un muro) e il refresh on-demand. */
+    /* Il pallino della barra "stantio" resta DISCRETO, mai un muro, e il refresh è su richiesta. */
     .dk-op-text { margin: 0; color: var(--sn-text); white-space: pre-wrap; }
     .dk-stale-dot {
       display: inline-block; flex: 0 0 auto; width: 7px; height: 7px;
@@ -343,8 +306,7 @@
     .dk-mod-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
     /* Nel carosello il box modulare sta tra la barra e l'hint tastiera. */
     #carouselModule { margin-top: 2px; }
-    /* Carosello (§5.3): immagine piena, barra con indicatore + frecce +
-       toggle. Occhi sull'immagine, mano sulla tastiera. */
+    /* Carosello: immagine piena, barra con indicatore, frecce e toggle. Occhi sull'immagine, mano sulla tastiera. */
     .dk-carousel-bar { display: flex; align-items: center; gap: 6px; padding: 8px 0; }
     .dk-carousel-pos { font-size: 12px; color: var(--sn-muted); margin-right: auto; }
     .dk-car-btn {
@@ -356,9 +318,8 @@
     #carouselToggle[data-in="1"] { color: var(--sn-accent); border-color: var(--sn-accent); }
     .dk-carousel-hint { font-size: 11px; color: var(--sn-muted); margin: 4px 0 0; }
 
-    /* ── Statistiche (§9): card verticali nello stato di riposo. Grafici in
-       puro HTML/CSS (niente librerie, come da PATTERNS.md): la curva è una
-       riga di colonnine flex, i colori righe con pip + barra. ── */
+    /* Grafici in puro HTML/CSS, niente librerie (PATTERNS.md): la curva è una riga di colonnine flex, i colori
+       sono righe con pip e barra. */
     .dk-stat-card {
       border: 1px solid var(--sn-border); border-radius: 8px;
       padding: 10px; margin-bottom: 10px; font-size: 12px;
@@ -378,8 +339,7 @@
     }
     .dk-curve-col[data-n="0"] .dk-curve-bar { background: var(--sn-border); opacity: .6; }
     .dk-curve-label { font-size: 10px; color: var(--sn-muted); line-height: 1; }
-    /* Colori: una riga per colore — pip, richiesto (pip nei costi) e prodotto
-       (fonti). Barre proporzionali al massimo della colonna. */
+    /* Una riga per colore: pip, richiesto (pip nei costi) e prodotto (fonti), con barre proporzionali al massimo. */
     .dk-color-head, .dk-color-row {
       display: grid; grid-template-columns: 14px 1fr 1fr; gap: 6px;
       align-items: center; margin-bottom: 4px;
@@ -390,29 +350,23 @@
     .dk-color-n { font-size: 10px; color: var(--sn-muted); flex: 0 0 auto; }
     .dk-type-row { display: flex; justify-content: space-between; padding: 1px 0; }
     .dk-type-row .dk-type-n { color: var(--sn-muted); }
-    /* Legalità (§9.1): riga per check, ✓ ok / ✗ con l'elenco dei problemi. */
     .dk-leg-row { display: flex; gap: 6px; padding: 1px 0; }
     .dk-leg-row[data-ok="1"] .dk-leg-mark { color: var(--sn-accent); }
     .dk-leg-row[data-ok="0"] { color: var(--sn-danger, #c0392b); }
-    /* Budget (§9.2): totale/residuo sempre visibili; residuo negativo in rosso. */
     .dk-budget-row { display: flex; justify-content: space-between; padding: 1px 0; }
     .dk-budget-row .dk-budget-n { font-weight: 600; }
     .dk-budget-row[data-over="1"] .dk-budget-n { color: var(--sn-danger, #c0392b); }
-    /* Calcolatore di probabilità (§9.3). */
     .dk-prob-row {
       display: flex; align-items: center; justify-content: space-between;
       gap: 8px; padding: 2px 0;
     }
-    /* L'etichetta (categoria/tag) prende lo spazio della riga; se troppo lunga
-       si tronca con l'ellissi su UNA riga. La casella numerica resta piccola. */
+    /* L'etichetta prende lo spazio della riga e si tronca con l'ellissi; la casella numerica resta piccola. */
     .dk-prob-row label {
       flex: 1 1 auto; min-width: 0;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    /* Il selettore [type="number"] alza la specificità sopra la regola generica
-       `.sn-page input[type="number"] { width: 100% }` di pages.css: senza questo
-       la casella si gonfiava a tutta la riga e schiacciava il nome della
-       categoria fino a renderlo illeggibile. Max 2 cifre → basta un campo fisso. */
+    /* Il selettore [type="number"] alza la specificità sopra `.sn-page input[type="number"] { width: 100% }` di
+       pages.css: senza, la casella si gonfiava a tutta la riga e il nome della categoria diventava illeggibile. */
     .dk-prob-row input[type="number"] {
       flex: 0 0 auto; width: 56px; box-sizing: border-box;
       font: inherit; font-size: 12px; text-align: right;
@@ -423,8 +377,7 @@
     .dk-prob-row input[type="number"]:focus { border-color: var(--sn-accent); }
     .dk-prob-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .dk-prob-result { font-weight: 600; }
-    /* Mentre la stima si sta ancora raffinando (feedback #354) un puntino accanto
-       al risultato pulsa piano: segnala "sto convergendo", sparisce a fine. */
+    /* Finché la stima si raffina un puntino pulsa piano accanto al risultato, e sparisce quando ha finito. */
     .dk-prob-result.dk-prob-refining::after {
       content: ''; display: inline-block; margin-left: 6px;
       width: 6px; height: 6px; border-radius: 50%;
@@ -436,8 +389,7 @@
       .dk-prob-result.dk-prob-refining::after { animation: none; opacity: 0.6; }
     }
 
-    /* Import via chat (§11.2): bottone "aggiungi tutte" in testa alla CardList,
-       affianca (non sostituisce) il toggle per riga già esistente. */
+    /* Il bottone "aggiungi tutte" affianca, non sostituisce, il toggle per riga già esistente. */
     .dk-import-all {
       display: block; width: 100%; margin-bottom: 6px; padding: 6px 8px;
       font: inherit; font-size: 12px; border: 1px solid var(--sn-border);
@@ -447,8 +399,7 @@
     .dk-import-all:hover { border-color: var(--sn-accent); }
     .dk-import-all[disabled] { opacity: 0.6; cursor: default; }
 
-    /* ── Import/Export rigido (§11), via switcher: overlay minimale, stesso
-       linguaggio visivo dei popup di conferma (SN_CONFIRM_UI). ── */
+    /* Import/Export rigido via switcher: overlay minimale, stesso linguaggio visivo di SN_CONFIRM_UI. */
     .dk-io-overlay {
       position: fixed; inset: 0; z-index: 2147483000;
       display: flex; align-items: center; justify-content: center;
@@ -487,7 +438,6 @@
     .dk-io-btn-ok:hover { opacity: 0.85; }
     .dk-io-btn[disabled] { opacity: 0.5; cursor: default; }
 
-    /* Toast discreto (conferme non bloccanti di import/export). */
     .dk-toast {
       position: fixed; right: 18px; bottom: 18px; max-width: 320px;
       background: var(--sn-bg); border: 1px solid var(--sn-border);
@@ -504,7 +454,6 @@
 </head>
 <body>
   <main class="sn-page">
-    <!-- ── Schermata Mazzi (libreria, home dell'app) ─────────────────────── -->
     <section id="screenLibrary" class="dk-screen">
       <h1>Deck builder MTG</h1>
       <div class="sn-toolbar">
@@ -517,7 +466,6 @@
       </div>
     </section>
 
-    <!-- ── Schermata Builder (§2) ────────────────────────────────────────── -->
     <section id="screenBuilder" class="dk-screen" hidden>
       <div class="dk-builder" id="builderGrid">
         <div class="dk-col" id="colChat">
@@ -548,10 +496,8 @@
               <span class="dk-caret">▾</span>
             </button>
             <input id="deckNameEdit" type="text" aria-label="Rinomina il mazzo" hidden />
-            <!-- type=text + inputmode=decimal, NON type=number: l'input numerico
-                 di Chromium scarta la virgola alla digitazione («40,50»→«4050»,
-                 tetto gonfiato x100 in silenzio). Il parse con virgola/punto
-                 sta in SN_DECKS.parseBudgetInput. -->
+            <!-- type=text con inputmode=decimal, NON type=number: l'input numerico di Chromium scarta la virgola alla
+               digitazione («40,50» → «4050», tetto gonfiato x100 in silenzio). Il parse sta in SN_DECKS.parseBudgetInput. -->
             <input id="deckBudgetEdit" type="text" inputmode="decimal"
                    aria-label="Budget del mazzo in euro" placeholder="Budget in € (vuoto = nessuno)" hidden />
             <div class="dk-commander-line" id="commanderLine"></div>
@@ -574,7 +520,6 @@
         <div class="dk-col" id="colDetail">
           <div class="dk-col-head" id="detailTitle">Statistiche</div>
           <div class="dk-col-body">
-            <!-- Stato di riposo (§5, §9): card verticali di statistiche. -->
             <div class="dk-detail-state" id="stateStats">
               <p class="dk-placeholder" id="statsEmpty">
                 Aggiungi carte al mazzo per vedere le statistiche (curva di
@@ -604,9 +549,8 @@
                   <div class="dk-stat-title">Budget</div>
                   <div id="statBudget"></div>
                 </div>
-                <!-- Calcolatore di probabilità (§9.3): sotto-pannello. Le
-                     categorie sono i tag del mazzo + "terre"; il motore è la
-                     simulazione Monte Carlo locale (millisecondi, zero costi). -->
+                <!-- Le categorie sono i tag del mazzo più le terre; il motore è una simulazione Monte Carlo locale,
+                   che costa millisecondi e zero crediti. -->
                 <div class="dk-stat-card" id="probCard">
                   <div class="dk-stat-title">Probabilità</div>
                   <p class="dk-stat-sub">Quante carte di ogni categoria vuoi avere pescato, e a che turno?</p>
@@ -624,7 +568,6 @@
                 </div>
               </div>
             </div>
-            <!-- Preview su hover (§5.1-§5.2): carta nel contesto del mazzo. -->
             <div class="dk-detail-state" id="statePreview" hidden>
               <div class="dk-card-frame">
                 <img class="dk-card-img" id="previewImg" alt="" />
@@ -635,7 +578,6 @@
               <div class="dk-detail-module" id="previewModule"
                    title="Tasto destro per scegliere il modulo"></div>
             </div>
-            <!-- Carosello su click (§5.3): flusso di triage, pinnato. -->
             <div class="dk-detail-state" id="stateCarousel" hidden>
               <div class="dk-card-frame">
                 <img class="dk-card-img" id="carouselImg" alt="" />
@@ -652,8 +594,7 @@
                 <button class="dk-car-btn" id="carouselClose" title="Chiudi (Esc)"
                         aria-label="Chiudi il carosello">✕</button>
               </div>
-              <!-- Stesso box modulare della preview (§5.2): tasto destro per
-                   scegliere il modulo, vale anche qui nel carosello. -->
+              <!-- Stesso box modulare della preview: il tasto destro per scegliere il modulo vale anche nel carosello. -->
               <div class="dk-detail-module" id="carouselModule"
                    title="Tasto destro per scegliere il modulo"></div>
               <p class="dk-carousel-hint">←/→ scorri · Invio o Spazio aggiungi/rimuovi · Esc chiudi</p>
@@ -663,7 +604,6 @@
       </div>
     </section>
 
-    <!-- ── Schermata Partita (stub, §12) ─────────────────────────────────── -->
     <section id="screenGame" class="dk-screen" hidden>
       <div class="dk-back">
         <button class="sn-btn sn-btn-secondary" id="gameBack">← Mazzi</button>

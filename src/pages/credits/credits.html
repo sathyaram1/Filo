@@ -20,9 +20,8 @@
   <main class="sn-page">
     <h1 id="title">Crediti</h1>
 
-    <!-- Crediti sul server (#598): si entra con un codice d'invito. Sta in
-         cima: per chi non ha ancora un portafoglio è l'unica cosa da fare, e
-         un saldo locale sopra sarebbe una promessa vuota. -->
+    <!-- I crediti sul server stanno in cima: per chi non ha ancora un portafoglio entrare col codice d'invito è
+       l'unica cosa da fare, e un saldo locale sopra sarebbe una promessa vuota. -->
     <section class="sn-wallet" id="wallet" hidden>
       <form class="sn-wallet-redeem" id="redeemForm" autocomplete="off" hidden>
         <label for="inviteCode">Hai un invito?</label>
@@ -50,11 +49,8 @@
       Accedi col tuo account per sincronizzare i crediti su tutti i dispositivi.
     </p>
 
-    <!-- La chiave OpenRouter propria (#629): stesso campo delle Impostazioni
-         (settings.apiKeys.openrouter), gestito da qui perché è qui che si
-         decide con cosa si paga. Con la chiave: gli ultimi sei caratteri,
-         spesa e residuo che dice OpenRouter, l'ultimo rifiuto se c'è stato,
-         il pulsante per toglierla (con conferma). Senza: il campo. -->
+    <!-- Stesso campo delle Impostazioni (settings.apiKeys.openrouter), gestito da qui perché è qui che si decide
+       con cosa si paga: con la chiave si vedono spesa, residuo e ultimo rifiuto; senza, solo il campo. -->
     <section class="sn-wallet-section sn-ownkey" id="ownKeySection" hidden>
       <h2>La tua chiave OpenRouter</h2>
       <form id="ownKeyForm" class="sn-ownkey-form" autocomplete="off" hidden>
@@ -87,8 +83,7 @@
       <ul id="invites" class="sn-wallet-invites"></ul>
     </section>
 
-    <!-- Solo owner: la gestione (codici, regali, utenti) sta in una pagina
-         sua, owner.html. Qui resta il rimando. -->
+    <!-- La gestione owner (codici, regali, utenti) sta in owner.html: qui resta il rimando. -->
     <p class="sn-muted" id="ownerLink" hidden><a href="owner.html">Inviti e utenti →</a></p>
 
     <section class="sn-credits-usage" id="usageSection" hidden>

@@ -4,19 +4,12 @@
   position: fixed;
   /* z-index gestito inline da popup.js per stacking deterministico */
   z-index: 2147483600;
-  /* Larghezza naturale in una variabile: la posa la legge da qui (invece di
-     ricopiarla in JS) e `width` sotto resta clampata da `max-width` senza che
-     la lettura ne risenta. */
+  /* La larghezza naturale sta in una variabile perché la posa la legga da qui invece di ricopiarla
+     in JS: così `width` resta clampata da `max-width` senza falsare la lettura. */
   --sn-popup-w: 380px;
   width: var(--sn-popup-w);
-  /* Stessa storia del tetto d'altezza, sull'altro asse (#502): dentro un
-     riquadro incorporato lo "schermo" è il riquadro, e i box dei commenti sono
-     spesso STRETTI. Con una larghezza fissa il riquadro sborda a destra e il
-     tasto di invio finisce tagliato via — non lo si raggiunge né scorrendo né
-     trascinando. Qui non serve far cedere nessuno: basta che la larghezza si
-     stringa allo spazio che c'è, come già fa lo stack dei toast. Rete di
-     sicurezza in px di layout; la posa la rifinisce inline tenendo conto della
-     scala della compensazione zoom. */
+  /* Dentro un riquadro incorporato lo "schermo" è il riquadro, spesso STRETTO: con una larghezza fissa
+     il tasto di invio finisce tagliato fuori. Rete in px; la posa la rifinisce inline. */
   max-width: calc(100vw - 16px);
   max-height: 480px;
   display: flex;
@@ -40,7 +33,7 @@
   border-bottom: 1px solid var(--sn-border);
   cursor: move;
   user-select: none;
-  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
+  flex: 0 0 auto; /* non cede: patterns/un-riquadro-che-si-riempie-dopo-si-ancora-dal-lato.md */
 }
 .sn-popup-header.sn-popup-dragging { cursor: grabbing; }
 
@@ -51,8 +44,7 @@
   text-transform: uppercase;
   color: var(--sn-muted);
   pointer-events: none; /* il drag funziona ovunque sull'header */
-  /* In un riquadro stretto il titolo si accorcia invece di spingere fuori la
-     × di chiusura. */
+  /* In un riquadro stretto il titolo si accorcia invece di spingere fuori la × di chiusura. */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -72,8 +64,8 @@
 .sn-popup-body {
   padding: 10px 12px;
   overflow-y: auto;
-  /* Arrivati in fondo alla risposta il giro di rotella successivo non deve
-     passare alla pagina sotto: si sta leggendo qui. */
+  /* Arrivati in fondo alla risposta il giro di rotella successivo non deve passare alla pagina
+     sotto: si sta leggendo qui. */
   overscroll-behavior: contain;
   flex: 1;
   min-height: 60px;
@@ -84,31 +76,12 @@
   user-select: text;
 }
 
-/* ── Chi cede quando lo spazio si stringe (#502) ───────────────────────────
-   Stringere il tetto d'altezza del riquadro funziona finché il tetto resta
-   sopra la somma dei minimi dei pezzi interni. Sotto quella soglia il riquadro
-   non si accorcia più: i pezzi ESCONO dal suo bordo. In pagina si vedono
-   comunque; dentro un riquadro incorporato — un box commenti, un lettore
-   video, l'anteprima di un articolo, dove per un elemento `position: fixed`
-   lo "schermo" È il riquadro — il browser li taglia via, e non si raggiungono
-   né scorrendo né trascinando il popup altrove.
-   L'unico pezzo che può cedere è il CORPO della risposta: si accorcia e scorre,
-   fino a sparire. Poi, se ancora non basta, va la riga del costo (che resta
-   leggibile passando sopra l'intestazione). Intestazione e riga per scrivere
-   restano sempre: sono ciò che tiene viva la conversazione.
-   I due stati li mette `attachPose()` in src/content/popup.js.
-
-   Attenzione al residuo: `min-height: 0` porta a zero il CONTENUTO del corpo,
-   non il suo ingombro — l'imbottitura resta, e sono una ventina di pixel che
-   il riquadro continua a occupare quando ormai non mostra più niente. Nello
-   stato più stretto, dove del corpo non si vede comunque nulla, cede anche
-   quella: senza, il conto della posa promette un riquadro più basso di quello
-   che il browser sa disegnare e a uscire dal bordo è la riga per scrivere. */
+/* Chi cede quando lo spazio si stringe, e il residuo di imbottitura che il conto dimentica:
+   patterns/un-riquadro-che-si-riempie-dopo-si-ancora-dal-lato.md. Gli stati li accende attachPose(). */
 .sn-popup-tight .sn-popup-body { min-height: 0; }
 .sn-popup-bare .sn-popup-footer { display: none; }
 .sn-popup-bare .sn-popup-body { padding-top: 0; padding-bottom: 0; }
 
-/* Bolle conversazione */
 .sn-msg {
   margin: 0 0 10px 0;
   display: flex;
@@ -137,7 +110,6 @@
 .sn-msg-muted .sn-msg-text { color: var(--sn-muted); font-style: italic; }
 .sn-msg-error .sn-msg-text { color: var(--sn-error); }
 
-/* Markdown rendering nei messaggi e nel menu inline */
 .sn-msg-text p,
 .sn-menu-inline p { margin: 0 0 8px 0; }
 .sn-msg-text p:last-child,
@@ -174,7 +146,6 @@
   background: transparent;
   padding: 0;
 }
-/* Link scritti da Filo (#418): cliccabili, aprono in nuova scheda. */
 .sn-msg-text a.filo-md-link, .sn-menu-inline a.filo-md-link {
   color: var(--sn-link, var(--sn-accent, #3b82f6));
   text-decoration: underline;
@@ -194,10 +165,9 @@
   border-top: 1px solid var(--sn-border);
   font-size: 11px;
   color: var(--sn-muted);
-  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
-  /* La riga nasce VUOTA e si riempie quando il modello risponde: senza un
-     minimo passerebbe da 12px a 25px a metà risposta, e la posa l'avrebbe
-     misurata bassa. Con questo, l'altezza che avrà è già quella di adesso. */
+  flex: 0 0 auto; /* non cede: patterns/un-riquadro-che-si-riempie-dopo-si-ancora-dal-lato.md */
+  /* La riga nasce VUOTA e si riempie quando il modello risponde: senza un minimo passerebbe da 12px
+     a 25px a metà risposta, e la posa l'avrebbe misurata bassa. */
   min-height: 1.2em;
 }
 
@@ -209,20 +179,18 @@
   line-height: 1.2; /* pari al minimo della riga: riempiendosi non la fa crescere */
 }
 
-/* Composer per follow-up */
 .sn-popup-compose {
   display: flex;
   gap: 6px;
   align-items: flex-end;
   padding: 6px 8px 8px 8px;
   border-top: 1px solid var(--sn-border);
-  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
+  flex: 0 0 auto; /* non cede: patterns/un-riquadro-che-si-riempie-dopo-si-ancora-dal-lato.md */
 }
 .sn-popup-input {
   flex: 1;
-  /* Senza questo la casella non scende sotto la sua larghezza naturale (un
-     textarea ne ha una tutta sua) e in un riquadro stretto spinge fuori il
-     tasto di invio, che è proprio quello che deve restare. */
+  /* Un textarea ha una larghezza naturale tutta sua: senza questo, in un riquadro stretto spinge
+     fuori il tasto di invio, che è proprio quello che deve restare. */
   min-width: 0;
   resize: none;
   border: 1px solid var(--sn-border);
@@ -239,9 +207,8 @@
   min-height: 30px;
 }
 .sn-popup-input::placeholder { color: var(--sn-muted); opacity: 1; }
-/* outline/box-shadow reset con !important: alcune pagine ospite (es. claude.ai)
-   applicano un focus ring blu agli elementi della pagina, e i nostri input,
-   essendo veri nodi del DOM ospite, lo ereditavano (feedback alpha). */
+/* Alcune pagine ospite applicano un focus ring blu a tutti gli elementi, e i nostri input sono veri
+   nodi del DOM ospite: lo ereditavano. Da qui l'!important. */
 .sn-popup-input:focus {
   border-color: var(--sn-accent);
   outline: none !important;
@@ -263,11 +230,8 @@
 }
 .sn-popup-send:hover { filter: brightness(1.1); }
 
-/* Stack degli avvisi in pagina (#409). Ogni riquadro che Filo ancora nell'angolo
-   in basso a destra della pagina visitata (toast, pill della dettatura,
-   conferma di "Salva per dopo") sta QUI DENTRO e si impila: prima erano tutti
-   `position: fixed` sullo stesso punto e due avvisi ravvicinati si coprivano a
-   vicenda. Il più recente resta in basso, vicino all'angolo. */
+/* Ogni riquadro che Filo ancora nell'angolo in basso a destra sta QUI DENTRO e si impila: da soli
+   erano tutti `position: fixed` sullo stesso punto e due avvisi ravvicinati si coprivano. */
 .sn-toasts {
   position: fixed;
   bottom: 20px;
@@ -294,13 +258,11 @@
 .sn-toasts::-webkit-scrollbar-track { background: transparent; }
 .sn-toasts::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 3px; }
 
-/* Toast */
 .sn-toast {
   flex: none;
   padding: 10px 14px;
-  /* I toast non sono tutti "Copiato": alcuni spiegano cosa manca e dove si
-     imposta. Senza un tetto, una frase lunga diventa una riga sola larga quanto
-     la finestra. Va a capo e resta dentro il viewport. */
+  /* I toast non sono tutti "Copiato": alcuni spiegano cosa manca e dove si imposta. Senza un tetto
+     una frase lunga diventa una riga sola larga quanto la finestra. */
   max-width: 100%;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -322,13 +284,11 @@
   transform: translateY(0);
 }
 
-/* Pill cliccabile mostrato durante la dettatura audio. Si comporta come un
-   toast ma è interattivo: cliccandolo si ferma la registrazione. */
+/* Pill della dettatura: si comporta come un toast ma è interattiva, cliccandola si ferma la registrazione. */
 .sn-dictate-pill {
   flex: none;
   max-width: 100%;
-  /* Lo stack è trasparente ai click: questa pill invece va cliccata per fermare
-     la registrazione. */
+  /* Lo stack è trasparente ai click, questa pill no: va cliccata. */
   pointer-events: auto;
   padding: 10px 16px;
   background: var(--sn-overlay-bg);
@@ -353,7 +313,6 @@
   animation: sn-dictate-pulse 1.2s ease-in-out infinite;
 }
 .sn-dictate-pill:hover { border-color: var(--sn-accent); }
-/* Frase in corso (trascrizione provvisoria), accanto all'etichetta. */
 .sn-dictate-pill-live {
   opacity: 0.75;
   max-width: 420px;

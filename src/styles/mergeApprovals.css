@@ -1,15 +1,6 @@
 /* Avviso delle fusioni in attesa di approvazione (src/shared/mergeApprovals.js).
- *
- * Vive nella dashboard di gestione: l'avviso da decidere in cima ai Ricevuti,
- * la traccia delle decisioni passate in Automazioni. Un foglio solo per
- * entrambe le rese, così non possono divergere.
- *
- * Tutto passa dai token del tema (`--sn-*`): niente colori sparsi, così gli
- * override estetici dell'utente valgono anche qui e il blocco resta leggibile
- * sul tema chiaro E su quello scuro. Le tinte "carta" della home non si usano
- * (esistono solo là): l'avviso si posa sopra qualunque fondo con una sua
- * superficie propria.
- */
+   Un foglio solo per le due rese — l'avviso in cima ai Ricevuti e la traccia in Automazioni — così non divergono.
+   Solo token `--sn-*`: gli override estetici valgono anche qui e il blocco regge il tema chiaro e quello scuro. */
 
 .sn-mac {
   box-sizing: border-box;
@@ -17,10 +8,8 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px 16px;
-  /* Fondo tinto d'accento a bassissima opacità + banda laterale piena: si vede
-     subito che è un avviso, senza urlare, e il contrasto col testo resta quello
-     del tema (non si dipinge il fondo di un colore pieno che poi sul tema
-     scuro rende il testo illeggibile). */
+  /* Fondo d'accento a bassissima opacità più banda laterale: si vede che è un avviso senza urlare, e il
+     contrasto col testo resta quello del tema invece di un colore pieno illeggibile sullo scuro. */
   background: color-mix(in srgb, var(--sn-accent) 8%, var(--sn-bg));
   border: 1px solid color-mix(in srgb, var(--sn-accent) 34%, var(--sn-border));
   border-left: 3px solid var(--sn-accent);
@@ -52,7 +41,6 @@
   color: var(--sn-muted);
 }
 
-/* ── Una richiesta ─────────────────────────────────────────────────────── */
 
 .sn-mac-card {
   display: flex;
@@ -78,9 +66,8 @@
   color: var(--sn-fg);
   overflow-wrap: anywhere;
 }
-/* La provenienza: prima cosa della riga, perché cambia con che occhio si legge
-   tutto il resto. Pastiglia, non testo in sottotono — le due provenienze si
-   devono distinguere a colpo d'occhio in un elenco che le mescola. */
+/* La provenienza apre la riga perché cambia con che occhio si legge tutto il resto, ed è una pastiglia
+   e non testo in sottotono: in un elenco che le mescola si devono distinguere a colpo d'occhio. */
 .sn-mac-origin {
   font-size: 11px;
   font-weight: 600;
@@ -118,9 +105,8 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-when,
 .sn-mac-who,
 .sn-mac-expiry { color: var(--sn-muted); font-size: 11.5px; }
-/* Chi ha chiesto: è il motivo per cui questa superficie esiste (chi chiede non
-   è chi approva), quindi non deve sparire nel sottotono — resta accanto al
-   commit, un filo più marcato del resto dei metadati. */
+/* Chi ha chiesto è il motivo per cui questa superficie esiste — chi chiede non è chi approva — quindi
+   non sparisce nel sottotono: resta accanto al commit, un filo più marcato degli altri metadati. */
 .sn-mac-who { color: color-mix(in srgb, var(--sn-fg) 72%, var(--sn-muted)); }
 /* La scadenza è l'unica cosa che scade: si distingue dal resto del sottotono. */
 .sn-mac-expiry { color: var(--sn-accent); }
@@ -130,9 +116,8 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
   font-size: 12px;
   color: var(--sn-muted);
 }
-/* La riga di una richiesta nata da un riallineamento del server: l'owner
-   l'aveva già approvata, sotto ci sono SOLO i blocchi nuovi. In tinta
-   d'accento e non in sottotono, perché cambia come si leggono i blocchi. */
+/* Richiesta nata da un riallineamento del server: l'owner l'aveva già approvata e sotto ci sono SOLO i
+   blocchi nuovi. In tinta d'accento, perché cambia come si leggono i blocchi. */
 .sn-mac-realigned {
   margin: 0;
   font-size: 12px;
@@ -174,7 +159,6 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
   overflow-wrap: anywhere;
 }
 
-/* ── Esito ─────────────────────────────────────────────────────────────── */
 
 .sn-mac-status {
   margin: 0;
@@ -186,7 +170,6 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-status[data-kind='warn'] { color: var(--sn-fg); }
 .sn-mac-status[data-kind='err']  { color: var(--sn-error); }
 
-/* ── Comandi ───────────────────────────────────────────────────────────── */
 
 .sn-mac-actions {
   display: flex;
@@ -233,7 +216,6 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
   color: #fff;
 }
 
-/* ── Traccia delle decisioni passate (solo in Gestione) ────────────────── */
 
 .sn-mac-recent-title {
   margin: 14px 0 6px;
@@ -265,7 +247,6 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-recent-row[data-outcome='riallineata, chiede di nuovo'] .sn-mac-recent-what,
 .sn-mac-recent-row[data-outcome='decaduta'] .sn-mac-recent-what { color: var(--sn-fg); }
 
-/* ── Approvata ma mai avvenuta (conflitto) ─────────────────────────────── */
 
 /* Stessa grammatica dell'avviso, ma in tinta d'errore: qui un sì già dato non
    ha prodotto niente, e deve saltare all'occhio più di una richiesta nuova. */
@@ -277,11 +258,9 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac.sn-mac-failed .sn-mac-title-text { color: var(--sn-error); }
 .sn-mac-card-failed .sn-mac-why { color: var(--sn-fg); }
 
-/* ── Fuse senza chiedere (solo in Gestione → Automazioni) ──────────────── */
 
-/* Il controllo a posteriori: qui l'elenco di ciò che era stato segnalato si
-   legge per intero, una voce per riga. Stessa grammatica della scheda, ma
-   senza tasti: non c'è più niente da decidere. */
+/* Il controllo a posteriori: l'elenco di ciò che era stato segnalato si legge per intero, una voce per
+   riga. Stessa grammatica della scheda ma senza tasti: non c'è più niente da decidere. */
 .sn-mac-preapproved-intro {
   margin: 0 0 8px;
   font-size: 12px;
