@@ -49,6 +49,14 @@ nel testo viene ancora letto (`legacyEnvelope`), senza ritentativi.
   «i passi intermedi sono tracce, i risultati sono bottoni». Una bolla
   intermedia che contiene bottoni NON viene assorbita nel blocco (contenuto
   nascosto: rivelalo, non toccarlo di nascosto).
+- **Un'azione che ricarica la pagina dove vive la conversazione la cancella.**
+  «Portami alla home» chiesto DALLA home ricaricava la scheda e si portava via
+  il blocco e la risposta prima che l'utente li leggesse (#567.3): se chi chiede
+  è già lì, non si ricarica niente, lo si dice, e il ritorno alla home vuota è
+  un bottone che l'utente clicca quando ha finito di leggere.
+- **Il riassunto in testa si rifà anche dopo la fine**: una conferma data nel
+  popup arriva a risposta già scritta, e la sua riga deve entrare anche nel
+  titolo, non solo nella cronologia.
 - Perché una riga compaia il main deve RESTITUIRE l'azione (`kept: true`):
   timer e sveglie prima venivano scartati dopo l'esecuzione e non arrivavano
   mai alla chat.
