@@ -71,12 +71,11 @@ test('il nome storpiato non apre più niente col terminale', async ({ app, openT
     const page = await openTab(HOME);
     await accendiTerminale(page);
 
-    const elenco = await execAction(app, {
-      type: 'ESEGUI_COMANDO',
-      comando: `cd "${dir}"; printf 'RELAZIONE \\342\\200\\224 attivit\\303'; sleep 0.5; printf '\\240 finale.txt\\n'`,
-    });
+    const elenco = await execAction(app, { type: 'ESEGUI_COMANDO', comando: A_META });
+    expect(elenco.executed, `il comando non è partito: ${JSON.stringify(elenco).slice(0, 400)}`).toBe(true);
     const nomeLetto = String(elenco.output?.stdout || '')
       .split(/\r?\n/).map((s) => s.trim()).find((s) => s.endsWith('.txt')) || '';
+    expect(nomeLetto, 'dall’output non è uscito nessun nome di file').not.toBe('');
 
     const riuso = await execAction(app, {
       type: 'ESEGUI_COMANDO',
