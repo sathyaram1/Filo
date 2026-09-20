@@ -311,6 +311,7 @@
     makeBubble = deps.makeBubble;
     goThread = deps.goThread;
     if (deps.updateInputClass) updateInputClass = deps.updateInputClass;
+    if (deps.archiviaRiga) archiviaRiga = deps.archiviaRiga;
   }
 
   global.SN_DASH_TERMINALE = {
