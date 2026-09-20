@@ -261,6 +261,14 @@
         out.appendChild(tag);
       }
       bubblesEl.scrollTop = bubblesEl.scrollHeight;
+      // L'esito va nell'archivio quando è finito, non a pezzi: un comando che
+      // scrive per un minuto riscriverebbe la chat a ogni riga. Un esito
+      // enorme si accorcia, ma dicendolo (SN_CHAT_ARCHIVE.clampOutput): un
+      // taglio muto toglie proprio l'errore in fondo.
+      const CA = global.SN_CHAT_ARCHIVE;
+      const corpo = `${testoEsito}${label ? `\n${label}` : ''}`.replace(/\s+$/, '');
+      const daScrivere = corpo.trim() ? corpo : '(nessun esito)';
+      archiviaRiga(CA ? CA.clampOutput(daScrivere) : daScrivere, 'filo');
     };
 
     const handle = window.filo.shellExec({
