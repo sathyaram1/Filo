@@ -789,12 +789,14 @@
         // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
+        let fatto = '';
         if (r && r.executed) {
           a._confirmed = true;
           a._executed = true;
           delete a._confirm;
           if (r.output) a._output = r.output;
           const row = activityRowFor(a);
+          if (row) fatto = row.text;
           if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
         }
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
