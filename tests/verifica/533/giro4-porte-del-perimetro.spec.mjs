@@ -149,9 +149,10 @@ test.describe('#533 giro 4 — quello che resta di una lettura, seconda mano', (
 
     // Ora passa il tempo: la conversazione resta aperta sullo schermo (il
     // testo della pagina è ancora lì, nelle bolle), ma il compito del turno
-    // prima è scaduto e il motore non lo ritrova più. È quello che succede a
-    // chi lascia la chat aperta e torna a scrivere dopo una pausa: la scheda
-    // cita comunque il compito di prima, che però non esiste più.
+    // prima è stato buttato via — il registro dei compiti vivi si svuota dopo
+    // mezz'ora, e la pulizia scatta appena Filo viene usato da un'altra parte.
+    // La scheda cita comunque il compito di prima, che però il motore non
+    // conosce più: qui si simula proprio quello, un nome che non risulta.
     const storia = [
       { role: 'user', text: 'Riassumimi le notizie di oggi.' },
       { role: 'filo', text: `La pagina dice: «${VELENO}»` },
