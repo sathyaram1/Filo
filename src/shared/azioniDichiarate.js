@@ -614,10 +614,10 @@
   function clausolaDi(testo, da, a) {
     const pre = proposizionePrima(testo, da);
     const inizio = Math.max(0, da - pre.length);
-    const dopo = testo.slice(a);
+    const dopo = testo.slice(a, a + FINESTRA);
     STACCHI_DOPO.lastIndex = 0;
     const m = STACCHI_DOPO.exec(dopo);
-    return testo.slice(inizio, m ? a + m.index : testo.length);
+    return testo.slice(inizio, m ? a + m.index : Math.min(testo.length, a + FINESTRA));
   }
 
   // Dalla dichiarazione alla frase intera in cui sta: «ho messo» da solo non
