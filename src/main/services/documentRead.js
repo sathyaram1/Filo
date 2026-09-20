@@ -399,32 +399,70 @@ function bomDueByte(buf) {
   return '';
 }
 
+// Quanta parte di un testo NON è testo: byte nulli, caratteri di controllo non
+// stampabili, caratteri persi. PURA. Tabulazione, a capo, ritorno a capo,
+// avanzamento pagina ed escape restano fuori dal conto: in un registro o in un
+// testo formattato sono contenuto vero. È la stessa domanda che `looksLikeText`
+// fa sui byte, e qui serve sul testo già decodificato.
+const QUOTA_NON_TESTO = 0.02;
+
+function quotaNonTesto(s) {
+  const n = Math.min(s.length, 8192);
+  if (!n) return 1;
+  let rumore = 0;
+  for (let i = 0; i < n; i++) {
+    const c = s.charCodeAt(i);
+    if (c === 0xFFFD) { rumore++; continue; }
+    if (c >= 32 || c === 9 || c === 10 || c === 13 || c === 12 || c === 27) continue;
+    rumore++;
+  }
+  return rumore / n;
+}
+
+/** Legge il buffer come testo a due byte nel verso dato. PURA. */
+function leggiDueByte(buf, verso, conFirma) {
+  let corpo = conFirma ? buf.subarray(2) : buf;
+  // Un byte spaiato in fondo (file troncato) non deve far morire la lettura:
+  // si scarta, come si scarta mezza coppia in coda.
+  if (corpo.length % 2) corpo = corpo.subarray(0, corpo.length - 1);
+  if (verso === 'be') {
+    // Node sa leggere solo il verso piccolo: si scambiano i byte a coppie.
+    const girato = Buffer.from(corpo);
+    try { girato.swap16(); } catch (_) { return corpo.toString('utf8'); }
+    corpo = girato;
+  }
+  return corpo.toString('utf16le');
+}
+
 /**
  * Lo stesso file, ma SENZA la firma in testa. PURA. → 'le' | 'be' | ''
  *
  * #551, quinto giro. La firma è una cortesia, non un obbligo: chi scrive un
  * file a due byte può ometterla, e allora letto come UTF-8 torna una fila di
- * caratteri nulli fra le lettere — e Filo dichiarava di averlo letto. Un testo
- * a due byte si riconosce lo stesso: metà dei suoi byte sono nulli, e stanno
- * tutti dalla stessa parte delle coppie (in fondo per il verso piccolo, in
- * testa per l'altro). Un testo normale di byte nulli non ne ha nemmeno uno.
+ * caratteri nulli fra le lettere — e Filo dichiarava di averlo letto.
+ *
+ * #551, sesto giro. Prima il riconoscimento contava i byte NULLI e pretendeva
+ * che fossero metà: vero finché le lettere sono latine, perché lì il byte alto
+ * di ogni coppia è zero. In russo, in greco o in cinese quel byte non è zero,
+ * il file non veniva riconosciuto, e Filo dichiarava di averlo letto
+ * consegnando al modello una fila di caratteri nulli. La domanda giusta è in
+ * due passi, e nessuno dei due ha soglie da tarare sulla lingua:
+ *   • un testo a 8 bit non contiene MAI un byte nullo. Se c'è, o il file è a
+ *     due byte per carattere o non è testo;
+ *   • allora lo si legge nei due versi e si tiene quello che dà del testo. Il
+ *     verso sbagliato produce ideogrammi a caso e caratteri di controllo, e si
+ *     vede subito.
  */
 function pareDueByte(buf) {
   if (!buf || buf.length < 8) return '';
-  const n = Math.min(buf.length - (buf.length % 2), 4096);
-  let nulliDispari = 0; // byte alto delle coppie nel verso piccolo
-  let nulliPari = 0;
-  for (let i = 0; i < n; i += 2) {
-    if (buf[i] === 0x00) nulliPari++;
-    if (buf[i + 1] === 0x00) nulliDispari++;
-  }
-  const coppie = n / 2;
-  if (!coppie) return '';
-  // Una soglia alta apposta: qui non si tira a indovinare fra due codifiche
-  // plausibili, si riconosce una forma che il testo normale non ha mai.
-  if (nulliDispari / coppie > 0.3 && nulliPari / coppie < 0.05) return 'le';
-  if (nulliPari / coppie > 0.3 && nulliDispari / coppie < 0.05) return 'be';
-  return '';
+  const n = Math.min(buf.length, 8192);
+  let nullo = false;
+  for (let i = 0; i < n; i++) { if (buf[i] === 0x00) { nullo = true; break; } }
+  if (!nullo) return '';
+  const le = quotaNonTesto(leggiDueByte(buf, 'le', false));
+  const be = quotaNonTesto(leggiDueByte(buf, 'be', false));
+  if (le <= be) return le < QUOTA_NON_TESTO ? 'le' : '';
+  return be < QUOTA_NON_TESTO ? 'be' : '';
 }
 
 /**
