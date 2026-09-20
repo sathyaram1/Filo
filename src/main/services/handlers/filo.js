@@ -7,6 +7,7 @@ module.exports = function register(on, ctx) {
     executeFiloAction, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
+  const { SN_CONST } = globalThis;
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
   const Onboarding = globalThis.SN_ONBOARDING;
