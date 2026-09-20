@@ -308,6 +308,22 @@ test('un mestiere che nessun tentativo sa fare si distingue da un guasto', async
   );
 });
 
+// «Quanto resta su questa chiave» non costa niente e non ha un tetto da
+// rispettare, ma è pur sempre una domanda AL FORNITORE: passa dal cancello,
+// perché è l'unico posto da cui il fornitore si raggiunge.
+test('anche una domanda che non costa passa dal cancello', async () => {
+  const b = banco();
+  const info = await Gate.keyInfo({ provider: 'finto', apiKey: 'k' });
+  assert.deepEqual(info, { limit: 10, usage: 3 });
+  assert.deepEqual(b.tocchi, [{ metodo: 'keyInfo' }]);
+  assert.deepEqual(b.registrate, [], 'nessun token, nessuna riga di spesa');
+});
+
+test('un fornitore che non sa dire quanto resta non è un guasto', async () => {
+  banco();
+  assert.equal(await Gate.keyInfo({ provider: 'inesistente', apiKey: 'k' }), null);
+});
+
 test('un problema di configurazione resta leggibile anche a limite esaurito', async () => {
   banco({ oltreIlLimite: true });
   Gate.configure({
