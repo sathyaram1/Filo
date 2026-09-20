@@ -41,7 +41,8 @@ test('la richiesta si presenta come un browser, non come uno script', async ({ a
   // Il nome con cui Filo apre le pagine nelle sue schede.
   expect(browser).toContain('Chrome');
 
-  // Chi legge per conto dell'utente si presenta come il browser che è.
+  // Chi legge per conto dell'utente si presenta come il browser che è: se Filo
+  // non scrive niente, parte «node» e i filtri anti-bot chiudono la porta.
   const ua = String(inviati['user-agent'] || '');
   expect(ua).not.toBe('node');
   expect(ua).not.toBe('');
