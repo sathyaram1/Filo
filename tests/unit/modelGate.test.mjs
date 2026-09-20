@@ -63,12 +63,73 @@ function fileJs(dir, out = []) {
 
 // Un riferimento dentro un commento non è una chiamata: il difetto era che si
 // CHIAMAVA il fornitore, non che se ne parlasse.
+//
+// Una sentinella che difende una spesa però deve sbagliare SEMPRE dalla parte
+// del rosso, e la versione a colpi di espressione regolare sbagliava dall'altra:
+// tagliava la riga alla prima coppia di barre e, se quelle barre stavano dentro
+// una stringa (un'etichetta come "a//b"), portava via anche la chiamata al
+// fornitore scritta dopo, sulla stessa riga. Qui si scorre il testo carattere
+// per carattere tenendo il conto di dove ci si trova — codice, stringa,
+// template, espressione regolare, commento — e si cancella SOLO quello che sta
+// dentro un commento: dal resto non si perde niente.
+const APRE_REGEX = /[([{,;:=!&|?+\-*%~^<>]/;
+
 function senzaCommenti(testo) {
-  return testo
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .split('\n')
-    .map((r) => r.replace(/(^|[^:'"`\\])\/\/.*$/, '$1'))
-    .join('\n');
+  const out = [];
+  let stato = 'codice';
+  let chiusura = '';
+  let inClasse = false; // dentro [...] di un'espressione regolare
+  let prima = '';       // ultimo carattere non bianco visto nel codice
+  const bianco = (c) => out.push(c === '\n' ? '\n' : ' ');
+
+  for (let i = 0; i < testo.length; i++) {
+    const c = testo[i];
+    const d = testo[i + 1];
+
+    if (stato === 'codice') {
+      if (c === '/' && d === '/') { stato = 'riga'; out.push(' ', ' '); i++; continue; }
+      if (c === '/' && d === '*') { stato = 'blocco'; out.push(' ', ' '); i++; continue; }
+      if (c === '"' || c === '\'' || c === '`') { stato = 'stringa'; chiusura = c; out.push(c); prima = c; continue; }
+      // Una barra apre un'espressione regolare solo dove una divisione non
+      // avrebbe senso: senza questa distinzione le due barre dentro /a\/\/b/
+      // verrebbero lette come l'inizio di un commento.
+      if (c === '/' && (prima === '' || APRE_REGEX.test(prima))) {
+        stato = 'regex'; inClasse = false; out.push(c); prima = c; continue;
+      }
+      out.push(c);
+      if (!/\s/.test(c)) prima = c;
+      continue;
+    }
+
+    if (stato === 'stringa') {
+      out.push(c);
+      if (c === '\\') { if (d !== undefined) { out.push(d); i++; } continue; }
+      if (c === chiusura) { stato = 'codice'; prima = c; continue; }
+      // Apici che non si chiudono sulla riga: è un'analisi andata storta, si
+      // torna al codice invece di inghiottire il resto del file.
+      if (c === '\n' && chiusura !== '`') { stato = 'codice'; prima = c; }
+      continue;
+    }
+
+    if (stato === 'regex') {
+      out.push(c);
+      if (c === '\\') { if (d !== undefined) { out.push(d); i++; } continue; }
+      if (c === '[') inClasse = true;
+      else if (c === ']') inClasse = false;
+      else if ((c === '/' && !inClasse) || c === '\n') { stato = 'codice'; prima = c; }
+      continue;
+    }
+
+    if (stato === 'riga') {
+      if (c === '\n') { stato = 'codice'; out.push('\n'); } else bianco(c);
+      continue;
+    }
+
+    // blocco
+    if (c === '*' && d === '/') { stato = 'codice'; out.push(' ', ' '); i++; continue; }
+    bianco(c);
+  }
+  return out.join('');
 }
 
 test('nessuno arriva ai fornitori fuori dal cancello unico', () => {
