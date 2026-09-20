@@ -117,4 +117,11 @@ test('anche il doppio clic sul pacchetto avvia Filo senza la scatola del sistema
     + '(Ubuntu 24.04 e successive, di serie) Filo si ferma prima di aprire la finestra e non dice niente. '
     + 'La voce di menu dentro lo stesso pacchetto invece la chiede: due strade per aprire Filo, una sola funziona.',
   ).toBe(true);
+
+  // E la chiede dove serve, non sempre: Filo e' un browser, e sulle macchine
+  // che la scatola la concedono deve restare accesa.
+  expect(
+    /apparmor_restrict_unprivileged_userns/.test(appRun) || /apparmor_restrict_unprivileged_userns/.test(bin),
+    'il pacchetto rinuncia alla scatola senza nemmeno guardare se il sistema la concede',
+  ).toBe(true);
 });
