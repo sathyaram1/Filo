@@ -551,8 +551,13 @@ async function setRoutineCaps(patch, idToken) {
 // da quale account per prima, quali account sono esclusi. Le regole stanno in
 // SN_ROUTINE_SESSIONI (stesse per pagina e main); qui si legge il documento e
 // si scrivono i SOLI campi ricevuti.
+// `null` = non ho potuto leggere, ed è diverso da «documento senza quei campi»
+// (che invece vale come «i valori di partenza»). Confonderli faceva mostrare
+// alla pagina «una sessione, tutti e due gli account in uso» come se venisse
+// dal server, proprio a chi la apre per controllare di non bruciare crediti.
 async function getRoutineSessions(idToken) {
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  if (doc === null) throw new Error('Impostazioni delle sessioni non raggiungibili.');
   return globalThis.SN_ROUTINE_SESSIONI.leggiDoc(doc);
 }
 
