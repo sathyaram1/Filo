@@ -512,11 +512,13 @@ La regola, uguale per tutti e due:
   la critica — lo respingevano già; il verdetto L4 era l'unico rimasto fuori, e
   adesso respinge come le altre (fonte unica: `scripts/lib/dirty-tree.mjs`).
 
-Nel repo pubblico stanno il lato che consegna (`scripts/dispatch.mjs`,
-`scripts/routine-channel.mjs`: lo sha si timbra da solo, non si chiede a chi
-lavora) e questa regola. Il confronto al passo 2 del cancello vive nel server
-(`filo-security`): finché non è deployato, a fermare una fusione su contenuto
-cambiato resta il solo sha della verifica funzionale.
+Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs` e
+`scripts/routine-channel.mjs`, dove lo sha si timbra da solo invece di
+chiederlo a chi lavora — e questa regola. **Il confronto al passo 2 del
+cancello vive nel server** (`filo-security`), che è il posto giusto: è
+l'ultimo livello, quello che non si può convincere. Finché lì il verdetto L4
+si legge sul nome del ramo, il campo arriva e non viene guardato: da solo il
+lato che consegna non fa decadere niente.
 
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
