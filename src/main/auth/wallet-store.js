@@ -50,7 +50,6 @@ function avvisaProntezza() {
 
 function save(wallet) {
   if (!wallet || !wallet.key) return false;
-  const primaKey = cache ? cache.key : '';
   cache = {
     key: wallet.key, pseudonym: wallet.pseudonym || '', redeemedAt: wallet.redeemedAt || new Date().toISOString(),
     // L'ultimo stato letto dal server (saldo, codici, quota): serve quando il
