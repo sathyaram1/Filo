@@ -242,10 +242,21 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     // avuto questo guasto: le due strade adesso leggono allo stesso modo.
     if (child.stdout) child.stdout.setEncoding('utf8');
     if (child.stderr) child.stderr.setEncoding('utf8');
+    // Oltre il tetto non si accumula più — ma la CODA va tenuta comunque: lì
+    // c'è il marcatore con cui la shell riporta la cartella in cui è finita e
+    // com'è andato il comando. Senza, proprio i comandi che stampano tanto (una
+    // ricerca dentro una cartella grande, cioè quello che Filo fa quando non sa
+    // ancora dove sta il file) perdevano il loro `cd` e risultavano riusciti
+    // anche quando erano falliti (#551, terzo giro di verifica). Il marcatore
+    // più un percorso lungo stanno in poche centinaia di caratteri: la finestra
+    // è larga con abbondanza, e costa quanto una riga di testo.
+    const CODA_CHARS = 8192;
     const cap = (chunk, which) => {
       const s = String(chunk);
-      if (which === 'out') { if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += s; }
-      else if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += s;
+      if (which === 'out') {
+        codaOut = codaOut.length + s.length > CODA_CHARS ? (codaOut + s).slice(-CODA_CHARS) : codaOut + s;
+        if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += s;
+      } else if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += s;
     };
     if (child.stdout) child.stdout.on('data', (c) => cap(c, 'out'));
     if (child.stderr) child.stderr.on('data', (c) => cap(c, 'err'));
