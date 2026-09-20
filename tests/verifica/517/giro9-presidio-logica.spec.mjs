@@ -119,17 +119,19 @@ test('la conferma corta non viene coperta da una cosa fatta in un turno prima', 
 test('un appunto che esiste non zittisce un appunto diverso raccontato adesso', () => {
   // I titoli sono quelli dei file dell'editor. Uno che si chiami «lista» o
   // «spesa» compare dentro quasi ogni frase che racconta un appunto.
-  const conLista = STATO({ titoliAppunti: ['lista'] });
+  const chiesta = 'segnami la lista della spesa: pane, uova, latte';
+  const conLista = DOPO(chiesta, { titoliAppunti: ['lista'] });
   expect(D.rileva('Ti ho salvato l\'appunto con la lista della spesa.', new Set(), conLista).length)
     .toBeGreaterThan(0);
-  const conSpesa = STATO({ titoliAppunti: ['spesa'] });
+  const conSpesa = DOPO(chiesta, { titoliAppunti: ['spesa'] });
   expect(D.rileva('Ti ho salvato l\'appunto con la lista della spesa.', new Set(), conSpesa).length)
     .toBeGreaterThan(0);
 
-  // Quello che deve restare vero: la frase che GUARDA INDIETRO a un appunto
-  // che c'è davvero non è un'accusa — è la porta chiusa dal giro 3, e in
-  // una chat nuova è l'unica prova disponibile.
-  expect(D.rileva('Sì, te l\'avevo già salvato l\'appunto della spesa.', new Set(), conSpesa).length)
+  // Quello che deve restare vero: in una chat nuova, a chi chiede se una cosa
+  // è stata fatta, l'appunto che c'è è l'unica prova disponibile. È la porta
+  // chiusa dal giro 3.
+  const domanda = DOPO('hai salvato l\'appunto della spesa?', { titoliAppunti: ['spesa'] });
+  expect(D.rileva('Sì, l\'ho salvato fra gli appunti della spesa.', new Set(), domanda).length)
     .toBe(0);
 });
 
