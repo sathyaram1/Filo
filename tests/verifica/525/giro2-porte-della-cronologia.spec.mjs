@@ -242,11 +242,11 @@ test('cercare una parola detta solo in una chat di comando: la pagina non dice c
   test.setTimeout(90_000);
   await configura(app);
   await stubProvider(app, {
-    sveglia: { tipo: 'comando', titolo: 'Sveglia alle 7' },
+    zabaione: { tipo: 'comando', titolo: 'Sveglia per lo zabaione' },
     coscienza: { tipo: 'conversazione', titolo: 'La coscienza' },
   });
 
-  await turno(app, 'c-cmd', 'Metti una sveglia alle sette');
+  await turno(app, 'c-cmd', 'Metti una sveglia per lo zabaione');
   await chiudi(app, 'c-cmd');
   await turno(app, 'c-talk', 'Secondo te la coscienza è emergente?');
   await chiudi(app, 'c-talk');
@@ -254,9 +254,11 @@ test('cercare una parola detta solo in una chat di comando: la pagina non dice c
   const page = await openTab(ARCHIVE);
   await expect(page.locator('.arc-chat')).toHaveCount(1);
 
-  await page.locator('#search').fill('sveglia');
+  await page.locator('#search').fill('zabaione');
   // La parola c'è, in una chat che esiste e non è stata buttata. Dire
-  // «Nessuna chat per "sveglia"» è falso: la chat c'è, è solo sotto il filtro.
+  // «Nessuna chat per "zabaione"» è falso: la chat c'è, è solo sotto il
+  // filtro — e ritrovare una chat finita sotto il filtro per sbaglio è il
+  // motivo per cui i comandi si conservano.
   await expect.poll(
     async () => (await page.locator('#chatEmpty').textContent()) || '',
     { timeout: 10_000 },
