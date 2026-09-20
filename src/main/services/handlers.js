@@ -426,9 +426,8 @@ function buildAttemptChain(settings, modelRef, action) {
     usable = pol.refs;
   }
 
-  // L'ordine dei fornitori è uno solo, condiviso con il controllo che decide se
-  // Filo è pronto (SN_CONST.canServeAction): le due cose devono guardare la
-  // stessa lista, o «pronto» e «servibile» divergono in silenzio (#663).
+  // Stesso ordine di fornitori di SN_CONST.canServeAction: se le due liste
+  // divergono, «pronto» e «servibile» si contraddicono in silenzio (#663).
   const out = SN_CONST.buildModelAttempts(usable, registry, SN_CONST.PROVIDER_ORDER, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
