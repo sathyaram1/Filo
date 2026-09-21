@@ -79,6 +79,28 @@ test('nessuna regola scritta due volte in due testi di ruolo', () => {
   assert.deepEqual(doppie, [], 'un pezzo condiviso si scrive una volta sola');
 });
 
+// La rete qui sopra vede solo le copie identiche. Una regola RISCRITTA con
+// altre parole le passa sotto, e si è già ripresentata così. Qui si conta,
+// dentro il testo che ogni ruolo riceve davvero, quante volte viene spiegata
+// la stessa cosa: due spiegazioni sono due regole che divergeranno.
+test('dentro un testo di ruolo la stessa regola non viene spiegata due volte', () => {
+  const RUOLI_LAVORANTI = ['verifier', 'new-work', 'fixer', 'secaudit', 'prober'];
+  // Ogni voce: il segno che riconosce la spiegazione, e cosa spiega.
+  const UNA_VOLTA = [
+    [/rombo/g, 'dove l\'owner apre un trade-off segnalato'],
+    [/testo di ritorno/gi, 'il testo di ritorno non è un canale'],
+  ];
+  const doppie = [];
+  for (const ruolo of RUOLI_LAVORANTI) {
+    const t = readRoleInstructions(ruolo);
+    for (const [segno, cosa] of UNA_VOLTA) {
+      const n = (t.match(segno) || []).length;
+      if (n > 1) doppie.push(`${ruolo}: ${cosa}, ${n} volte`);
+    }
+  }
+  assert.deepEqual(doppie, [], 'la spiegazione sta nel pezzo condiviso, e il ruolo lo richiama');
+});
+
 test('i criteri di consegna sono gli stessi in locale e nelle routine', () => {
   const comune = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8');
   assert.ok(comune.includes('_criteri-verifica.md'),
