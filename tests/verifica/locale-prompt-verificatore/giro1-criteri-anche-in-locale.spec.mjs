@@ -17,7 +17,6 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 test('in locale chi fa il primo lavoro usa gli stessi criteri di chi verifica', () => {
-  test.fail(true, 'rilievo aperto: il documento comune del progetto tiene un secondo elenco, più corto, dei criteri di consegna');
   const comune = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8');
   const condivisi = readFileSync(join(ROOT, 'routines', 'roles', '_criteri-verifica.md'), 'utf8');
 
@@ -33,7 +32,6 @@ test('in locale chi fa il primo lavoro usa gli stessi criteri di chi verifica', 
 });
 
 test('nessuna regola scritta due volte in due testi di ruolo', () => {
-  test.fail(true, 'rilievo aperto: l\'avvertenza sul testo scritto da altri è copiata in due testi di ruolo');
   const dir = join(ROOT, 'routines', 'roles');
   const doppie = [];
   const visto = new Map();

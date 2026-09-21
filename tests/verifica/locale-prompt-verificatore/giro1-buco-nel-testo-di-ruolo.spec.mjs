@@ -23,14 +23,12 @@ function cartellaConPezzi() {
 }
 
 test('un pezzo condiviso richiamato dentro un altro arriva davvero a chi lavora', () => {
-  test.fail(true, 'rilievo aperto: il richiamo annidato non viene espanso e non ferma: il ruolo parte con un buco');
   const d = cartellaConPezzi();
   const testo = espandiInclusioni('<!-- includi: _esterno.md -->', d);
   expect(testo).toContain('LE REGOLE CHE CONTANO');
 });
 
 test('un richiamo che lo strumento non sa espandere ferma invece di passare', () => {
-  test.fail(true, 'rilievo aperto: un richiamo non a inizio riga passa intatto nel testo consegnato');
   const d = cartellaConPezzi();
   let fermato = false;
   let testo = '';

@@ -10,7 +10,6 @@ import { test, expect } from '@playwright/test';
 import { readRoleInstructions } from '../../../scripts/dispatch.mjs';
 
 test('chiedere invece di indovinare: il testo dice anche come si fa', () => {
-  test.fail(true, 'rilievo aperto: il contrassegno per chiedere è nominato senza il comando che lo porta');
   const primo = readRoleInstructions('new-work');
   expect(primo, 'la via d\'uscita non c\'è più: questa prova va riscritta').toContain('--reason clarify');
 
