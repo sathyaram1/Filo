@@ -80,6 +80,7 @@ import {
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
@@ -609,64 +610,10 @@ export function serialAwarenessNote(role, history, dropped = 0) {
   return '';
 }
 
-// L'ambito della verifica (payload.scope) sceglie il testo del ruolo. Un valore
-// che non conosco vale «pieno»: mai meno verifica per un valore storto.
-const VERIFIER_SCOPE_FILE = {
-  pieno: 'verifier.md',
-  riallineamento: 'verifier-riallineamento.md',
-  chiusura: 'verifier-chiusura.md',
-};
-
-/** L'ambito riconosciuto, e se quello ricevuto era sconosciuto. PURA. */
-export function verifierScope(raw) {
-  const s = String(raw ?? '').trim();
-  if (!s || s === 'pieno') return { scope: 'pieno', sconosciuto: false };
-  if (Object.hasOwn(VERIFIER_SCOPE_FILE, s)) return { scope: s, sconosciuto: false };
-  return { scope: 'pieno', sconosciuto: true };
-}
-
-const unaRiga = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
-
-/**
- * Il perimetro di un giro stretto, scritto come testo in coda al compito: un
- * JSON nel payload si può non guardare, un'istruzione no. '' per il giro
- * pieno. PURA.
- */
+// L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
+export { verifierScope };
 export function perimetroNote(scope, perimetro) {
-  const p = perimetro && typeof perimetro === 'object' ? perimetro : {};
-  if (scope === 'chiusura') {
-    const rilievi = Array.isArray(p.rilievi) ? p.rilievi.filter((r) => r && unaRiga(r.text)) : [];
-    const sha = unaRiga(p.shaPrima);
-    return [
-      '## Perimetro di questo giro',
-      '',
-      'Rilievi corretti nel giro prima:',
-      rilievi.length
-        ? VERIFIER_ROUND.formatFindings(rilievi)
-        : '  (il server non li ha mandati: ricavali dall\'ultima critica in `payload.history`, e dillo nella tua)',
-      '',
-      sha
-        ? `Commit di partenza della correzione: \`${sha}\` — il diff da leggere è \`git diff ${sha}..HEAD\`.`
-        : 'Commit di partenza della correzione: non comunicato.',
-    ].join('\n');
-  }
-  if (scope === 'riallineamento') {
-    const sha = unaRiga(p.shaVerificato);
-    const report = String(p.reportRebase ?? '').trim();
-    return [
-      '## Perimetro di questo giro',
-      '',
-      sha
-        ? `Commit che aveva passato la verifica: \`${sha}\` — il diff da leggere è \`git diff ${sha}..HEAD\`.`
-        : 'Commit che aveva passato la verifica: non comunicato.',
-      '',
-      'Cosa ha scritto chi ha risolto il conflitto (dove c\'erano i conflitti, e se ha toccato la logica):',
-      report
-        ? report.split('\n').map((l) => `> ${l}`).join('\n')
-        : '  (nessun report: le zone in conflitto le ricavi dal diff; senza nemmeno quello, dichiaralo nella critica)',
-    ].join('\n');
-  }
-  return '';
+  return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l));
 }
 
 export function readRoleInstructions(role, { scope } = {}) {

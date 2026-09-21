@@ -19,6 +19,9 @@ export function verifierScope(raw) {
 
 export const unaRiga = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 
+// Lo sha finisce dentro un comando da copiare: solo esadecimale, o niente.
+const soloSha = (v) => (/^[0-9a-f]{7,40}$/i.test(unaRiga(v)) ? unaRiga(v) : '');
+
 const formatoMinimo = (list) => list.map((f) => `- [${f.level}${f.decision ? '?' : ''}] ${unaRiga(f.text)}`).join('\n');
 
 /**
@@ -30,7 +33,7 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo) 
   const p = perimetro && typeof perimetro === 'object' ? perimetro : {};
   if (scope === 'chiusura') {
     const rilievi = Array.isArray(p.rilievi) ? p.rilievi.filter((r) => r && unaRiga(r.text)) : [];
-    const sha = unaRiga(p.shaPrima);
+    const sha = soloSha(p.shaPrima);
     return [
       '## Perimetro di questo giro',
       '',
@@ -45,7 +48,7 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo) 
     ].join('\n');
   }
   if (scope === 'riallineamento') {
-    const sha = unaRiga(p.shaVerificato);
+    const sha = soloSha(p.shaVerificato);
     const report = String(p.reportRebase ?? '').trim();
     return [
       '## Perimetro di questo giro',

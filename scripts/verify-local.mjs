@@ -66,6 +66,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifier-scope.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
@@ -112,7 +113,7 @@ export function numeroFirestore(campo) {
 /**
  * I tre bilanci come stanno nel documento del server. Lancia con un messaggio
  * che dice cosa manca; mai un numero al posto di quello dell'owner.
- * @returns {Promise<{cap2:number, cap1:number, cap0:number, fixInstructions:string}>}
+ * @returns {Promise<{cap2:number, cap1:number, cap0:number, fixInstructions:string, giroStretto:boolean}>}
  */
 export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.env, trovaRefresh = null } = {}) {
   const fa = await import('./lib/firestore-auth.mjs');
@@ -148,6 +149,8 @@ export async function leggiBilanciDalServer({ fetchImpl = fetch, env = process.e
     throw new Error(`config/routines sul server non ha ${mancanti.join(', ')}: l'owner li imposta in Gestione → Automazioni (un numero, 0 compreso), poi si riprova. Non c'è un default.`);
   }
   if (fields.fixInstructions && typeof fields.fixInstructions.stringValue === 'string') out.fixInstructions = fields.fixInstructions.stringValue;
+  // Solo un true esplicito accende il giro stretto: assente o storto = spento.
+  out.giroStretto = !!(fields.giroStretto && fields.giroStretto.booleanValue === true);
   return out;
 }
 
@@ -274,6 +277,9 @@ export function withRequest(state, branch, { request, sha, at }) {
     derived: Array.isArray(prev.derived) ? prev.derived : [],
     rounds: Array.isArray(prev.rounds) ? prev.rounds : [],
   };
+  // Il perimetro della chiusura vale per la verifica subito dopo una
+  // correzione (anche rilanciata), e per nessun'altra.
+  if (prev.chiusura && (prev.verdict === 'fixed' || !prev.verdict)) s[branch].chiusura = prev.chiusura;
   return s;
 }
 
@@ -462,7 +468,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
     return { ok: true, state: s, outcome: 'pass', derived: pending };
   }
   if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
-  s[branch] = { ...base, verdict: 'fixed', rounds };
+  s[branch] = { ...base, verdict: 'fixed', rounds, chiusura: { rilievi: pending, shaPrima: prev.pending.sha || '' } };
   return { ok: true, state: s, outcome: 'fixed' };
 }
 
@@ -908,7 +914,8 @@ function contenutoAl(sha, path, root = ROOT) {
  * ramo; NON il diff, NON i file toccati, NON il report di chi ha lavorato.
  * PURA (testata): è il punto in cui l'isolamento o c'è o non c'è.
  */
-export function buildVerifierBrief({ request, branch, recipe, history }) {
+export function buildVerifierBrief({ request, branch, recipe, history, scope, perimetro }) {
+  const stretto = verifierScope(scope).scope === 'chiusura';
   const past = Array.isArray(history) && history.length
     ? ['', 'CRITICHE DEI GIRI PASSATI su questo stesso lavoro (dalla più vecchia): le porte già',
       'trovate vanno RI-PROVATE, non ri-scoperte come rilievi nuovi.',
@@ -930,6 +937,8 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     `(\`git diff --stat main...${branch}\`). I nomi sì, il contenuto no: una`,
     'bocciatura per assenza data guardando la cartella sbagliata è già costata',
     'un’intera implementazione rifatta da capo.',
+    ...(stretto ? ['IN QUESTO GIRO c’è una seconda eccezione, e la spiega la ricetta: il diff della sola',
+      'correzione (dal commit di partenza scritto in fondo) si legge.'] : []),
     '',
     'COSA ERA STATO CHIESTO (l’unica cosa che sai):',
     String(request || '').split('\n').map((l) => `  ${l}`).join('\n'),
@@ -937,8 +946,11 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     '',
     `RAMO DA PROVARE: ${branch} (è già quello su cui sei: non cambiarlo)`,
     '',
-    'IL TUO COMPITO: prova a far fallire la cosa chiesta usandola davvero, come la',
-    'userebbe l’owner. Non ti basta che i test passino: apri l’app e prova.',
+    ...(stretto
+      ? ['IL TUO COMPITO: un giro prima ha trovato dei rilievi e sono stati corretti. Controlla',
+        'la chiusura, dentro il perimetro scritto in fondo: usando l’app, non solo leggendo.']
+      : ['IL TUO COMPITO: prova a far fallire la cosa chiesta usandola davvero, come la',
+        'userebbe l’owner. Non ti basta che i test passino: apri l’app e prova.']),
     '',
     '',
     'LE TUE PROVE RESTANO NEL RAMO, e qui non c\'è un numero di feedback: la cartella',
@@ -975,12 +987,19 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     '',
     '─── recipe della verifica (la stessa delle routine) ───',
     String(recipe || '(file-ruolo non trovato)'),
+    ...(stretto ? ['', perimetroNote('chiusura', perimetro, (l) => ROUND.formatFindings(l))] : []),
   ].join('\n');
 }
 
-export function readRecipe(root = ROOT) {
+/** Giro stretto solo con l'interruttore acceso E una correzione appena consegnata. PURA. */
+export function ambitoLocale(config, entry) {
+  const c = entry && entry.chiusura;
+  return config && config.giroStretto === true && c && Array.isArray(c.rilievi) && c.rilievi.length ? 'chiusura' : 'pieno';
+}
+
+export function readRecipe(root = ROOT, scope = 'pieno') {
   const dir = resolve(root, 'routines', 'roles');
-  const f = resolve(dir, 'verifier.md');
+  const f = resolve(dir, VERIFIER_SCOPE_FILE[verifierScope(scope).scope]);
   return existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), dir) : '';
 }
 
@@ -1087,11 +1106,16 @@ if (isMain) {
     const b = currentBranch();
     const state = withRequest(readState(), b, { request, sha: headSha() });
     writeState(state);
-    console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe(), history: historyFromRounds(state[b].rounds) }));
+    const scope = ambitoLocale(capsStart, state[b]);
+    console.log(buildVerifierBrief({
+      request, branch: b, recipe: readRecipe(ROOT, scope), history: historyFromRounds(state[b].rounds),
+      scope, perimetro: state[b].chiusura,
+    }));
     // I bilanci servono a chi guida, non a chi verifica: sapere prima quanti
     // giri restano per livello orienta il livello che si scrive. Vanno
     // sull'altro canale, fuori dal compito che si consegna.
     console.error(bilanciText(capsStart));
+    console.error('Ambito della verifica: ' + (scope === 'chiusura' ? 'chiusura (giro stretto acceso, e il giro prima è stato corretto)' : 'pieno'));
     process.exit(0);
   }
 
