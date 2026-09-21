@@ -1919,8 +1919,12 @@ if (isMainModule) {
             process.exit(3);
           }
           const tools = pin.dir;
-          const f = resolve(tools, 'routines', 'roles', 'orchestrator.md');
-          const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
+          const dirRuoli = resolve(tools, 'routines', 'roles');
+          const f = resolve(dirRuoli, 'orchestrator.md');
+          // Anche qui i richiami ai pezzi condivisi si espandono: letto grezzo,
+          // un richiamo arrivava all'orchestratore come una riga di commento
+          // vuota, al posto delle regole che doveva portare.
+          const brief = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), dirRuoli) : '';
           const da = pinnedOrigin(tools);
           console.log(`[dispatch] prontezza OK. Strumenti fissati${da ? ` da ${da}` : ''}.`);
           if (nonVerificato) {
