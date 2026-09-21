@@ -48,15 +48,19 @@ async function openEditor(openTab) {
   return page;
 }
 
-const riga = (page, nick) => page
-  .locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')
-  .filter({ has: page.locator(`.sn-model-nick[value="${nick}"]`) });
+// Il nome sta nella proprietà `value` del campo, non nell'attributo: la riga si trova per posizione.
+async function riga(page, nick) {
+  const righe = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+  const nomi = await righe.locator('.sn-model-nick').evaluateAll((els) => els.map((el) => el.value));
+  expect(nomi).toContain(nick);
+  return righe.nth(nomi.indexOf(nick));
+}
 
 test('scelgo l’ordinamento su una riga, salvo, riapro: è ancora lì, e la richiesta di quel modello lo porta', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   const page = await openEditor(openTab);
 
-  const svelto = riga(page, 'deepseek-flash');
+  const svelto = await riga(page, 'deepseek-flash');
   const sort = svelto.locator('.sn-model-sort');
   await expect(sort).toBeVisible();
   await expect(sort).toHaveValue('auto');
@@ -85,11 +89,11 @@ test('scelgo l’ordinamento su una riga, salvo, riapro: è ancora lì, e la ric
 
   await page.reload();
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
-  await expect(riga(page, 'deepseek-flash').locator('.sn-model-sort')).toHaveValue('throughput');
-  await expect(riga(page, 'gemma-lite').locator('.sn-model-sort')).toHaveValue('auto');
+  await expect((await riga(page, 'deepseek-flash')).locator('.sn-model-sort')).toHaveValue('throughput');
+  await expect((await riga(page, 'gemma-lite')).locator('.sn-model-sort')).toHaveValue('auto');
 
   // Si può togliere: tornando su Automatico il campo sparisce dalla voce salvata.
-  await riga(page, 'deepseek-flash').locator('.sn-model-sort').selectOption('auto');
+  await (await riga(page, 'deepseek-flash')).locator('.sn-model-sort').selectOption('auto');
   await page.click('#saveBtn');
   const tolto = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
   expect('sort' in tolto.config.modelRegistry['deepseek-flash']).toBe(false);
