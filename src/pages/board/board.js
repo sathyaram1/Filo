@@ -52,6 +52,9 @@
   // da una lista vuota e scriverebbe "Nessun miglioramento…" al posto
   // dell'errore, portandosi via il tasto "Riprova" (#495).
   let dataLoaded = false;
+  // Schede messe dentro da fuori (hook di prova): un caricamento partito prima
+  // e arrivato dopo è vecchio, e non deve sostituirle a metà interazione.
+  let schedeImposteDaFuori = false;
   let lastLoadError = null;
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
