@@ -866,6 +866,29 @@ function realignBeforeStart(root = ROOT) {
   return true;
 }
 
+/**
+ * Il commit di partenza della chiusura com'è ADESSO nel ramo. Un riallineamento
+ * a main riscrive i commit: quello vecchio non è più un antenato, e il diff da
+ * lì alla punta porterebbe dentro tutto main. Si cerca il gemello per patch-id;
+ * '' se non si trova (il testo del ruolo sa cosa fare senza).
+ */
+export function shaPrimaAllineato(shaPrima, root = ROOT, base = `origin/${MAIN}`) {
+  const sha = String(shaPrima || '').trim();
+  if (!/^[0-9a-f]{7,40}$/i.test(sha)) return '';
+  if (tryGit(['merge-base', '--is-ancestor', sha, 'HEAD'], root).ok) return sha;
+  const patchIds = (args) => {
+    try {
+      const diff = execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+      const out = execFileSync('git', ['patch-id', '--stable'], { cwd: root, input: diff, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+      return out.split('\n').filter(Boolean).map((l) => l.trim().split(/\s+/));
+    } catch (_) { return []; }
+  };
+  const [mio] = patchIds(['show', sha]);
+  if (!mio) return '';
+  const gemello = patchIds(['log', '-p', `${base}..HEAD`]).find(([id]) => id === mio[0]);
+  return gemello ? gemello[1] : '';
+}
+
 export function currentBranch(root = ROOT) { return git(['rev-parse', '--abbrev-ref', 'HEAD'], root); }
 export function headSha(root = ROOT) { return git(['rev-parse', 'HEAD'], root); }
 /** Ci sono modifiche non salvate (anche solo nell'area di stage)? */
