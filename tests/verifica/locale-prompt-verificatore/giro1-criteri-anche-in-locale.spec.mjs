@@ -10,7 +10,7 @@
 // il motivo per cui i pezzi condivisi dei ruoli vivono in un file solo.
 
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
