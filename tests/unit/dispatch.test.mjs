@@ -189,12 +189,12 @@ test('buildPayload: senza storico dal server (o malformato) arriva un elenco vuo
 
 test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e chi verifica', () => {
   const due = [{ critique: 'a' }, { critique: 'b' }];
-  assert.equal(serialAwarenessNote('fixer', []), '', 'primo passaggio: niente avvertenza');
-  assert.equal(serialAwarenessNote('fixer', [{ critique: 'a' }]), '', 'una sola bocciatura non è una serie');
-  assert.match(serialAwarenessNote('fixer', due), /inventario/, 'dalla seconda: inventario delle strade, non l\'ultima porta');
+  assert.equal(serialAwarenessNote('verifier', []), '', 'primo giro: niente avvertenza');
+  assert.equal(serialAwarenessNote('verifier', [{ critique: 'a' }]), '', 'una sola bocciatura non è una serie');
   assert.match(serialAwarenessNote('verifier', due), /stessa critica/i, 'il verifier deve elencare le porte tutte insieme');
   assert.equal(serialAwarenessNote('secaudit', due), '', 'il controllo di sicurezza non c\'entra con la serie');
-  assert.equal(serialAwarenessNote('fixer', null), '', 'storico assente ≠ guasto');
+  assert.equal(serialAwarenessNote('fixer', due), '', 'il riallineamento dopo un conflitto non corregge niente');
+  assert.equal(serialAwarenessNote('verifier', null), '', 'storico assente ≠ guasto');
 });
 
 // ─── Stato su disco ───────────────────────────────────────────────────────────
