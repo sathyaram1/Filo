@@ -168,6 +168,10 @@ test('buildVerifierBrief: niente che non serva a criticare', () => {
   assert.match(brief, /verify-local\.mjs critica/);
   assert.ok(!/corretto "/.test(brief), 'il comando della correzione non si annuncia prima');
   assert.ok(!/FASE 2/.test(brief));
+  // La ricetta in coda al compito dice di allegare alla critica un file con le
+  // scelte e i loro costi; in locale lo strumento non accetta opzioni. Chi
+  // verifica deve saperlo prima di scrivere quel file, non dal rifiuto.
+  assert.match(brief, /non c'è\s*\n?\s*`--segnala`/);
 });
 
 // L'isolamento è il motivo per cui questa verifica vale qualcosa: se al
