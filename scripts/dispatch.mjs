@@ -985,8 +985,10 @@ export function verifierReplyText(reply) {
       '',
       String(r.phase2.instructions || ''),
       '',
+      FERMA_NOTE,
+      '',
       'A giro chiuso, rilascia il biglietto.',
-    ].filter((l, i) => l !== '' || i === 6).join('\n');
+    ].filter((l, i) => l !== '' || i === 6 || i === 8 || i === 10).join('\n');
   }
   if (r.outcome === 'stop') {
     return [
