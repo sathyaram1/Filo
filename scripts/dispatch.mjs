@@ -257,8 +257,12 @@ export function defaultState(id, branch) {
     improvableCount: 0,
     verifierVerdict: null,
     verifierCritique: '',
+    // Il commit su cui ciascun esito è stato dato: un esito vale per il
+    // contenuto esaminato, non per il nome del ramo (feedback #485).
+    verifierSha: '',
     secauditDone: false,
     secauditVerdict: null,
+    secauditSha: '',
   };
 }
 
@@ -296,8 +300,15 @@ export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
  * La critica si
  * conserva com'è stata scritta (coi livelli), per il fogliettino locale.
  */
-export function applyVerifierVerdict(state, outcome, critique = '') {
+export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
+  // Un esito vale per il CONTENUTO esaminato, non per il nome del ramo: lo sha
+  // del commit provato viaggia col verdetto e resta scritto qui accanto
+  // (feedback #485). Senza, «verificato» è una firma su una cartella, e basta
+  // sostituire il foglio perché resti buona su un contenuto che nessuno ha
+  // guardato — chi lavora ha per costruzione il permesso di spingere sul
+  // proprio ramo, quindi la finestra si apre da sé.
+  if (String(sha || '')) s.verifierSha = String(sha);
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'blocked';
@@ -312,8 +323,13 @@ export function applyFixed(state) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
   s.verifierVerdict = null;
   s.verifierCritique = '';
+  s.verifierSha = '';
   s.secauditDone = false;
   s.secauditVerdict = null;
+  // Gli sha degli esiti se ne vanno con gli esiti: una correzione è contenuto
+  // nuovo, e tenerli vorrebbe dire lasciare in giro la firma di un controllo
+  // fatto su un'altra versione (feedback #485).
+  s.secauditSha = '';
   return s;
 }
 
@@ -324,10 +340,15 @@ export function applyFixed(state) {
  * ovunque si guardi il verdetto, ma resta scritto com'è: è una decisione
  * dell'owner, e la copia locale non deve travestirla da controllo superato.
  */
-export function applySecaudit(state, verdict) {
+export function applySecaudit(state, verdict, sha = '') {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
   s.secauditDone = true;
   s.secauditVerdict = secauditPassato(verdict) ? verdict : 'fail';
+  // Lo sha del commit CONTROLLATO, come per la verifica funzionale: era
+  // l'ultimo dei due esiti ragionati a non portarselo dietro, e un «passato»
+  // legato al solo nome del ramo resta buono anche quando il contenuto cambia
+  // sotto (feedback #485).
+  if (String(sha || '')) s.secauditSha = String(sha);
   return s;
 }
 
@@ -377,9 +398,18 @@ export function fixedPayload({ report, frase, branch, segnalazione } = {}) {
   return p;
 }
 
-/** Il payload del verdetto L4, con la nota se c'è. PURA. */
-export function secauditPayload({ verdict, branch, testo } = {}) {
-  const p = { verdict: String(verdict || ''), branch: String(branch || '') };
+/**
+ * Il payload del verdetto L4, con la nota se c'è. PURA.
+ *
+ * Porta lo `sha` del commit CONTROLLATO, come il verdetto della verifica
+ * funzionale: senza, l'esito è legato al solo nome del ramo — una firma su
+ * «il documento nella cartella X» invece che su quella esatta versione — e
+ * resta buono anche dopo che il contenuto è stato sostituito (feedback #485).
+ * Il campo c'è sempre: un verdetto senza il commit controllato non si
+ * distingue da uno dato su un contenuto qualunque.
+ */
+export function secauditPayload({ verdict, branch, testo, sha } = {}) {
+  const p = { verdict: String(verdict || ''), branch: String(branch || ''), sha: String(sha || '') };
   if (String(testo || '').trim()) p.testo = String(testo).trim();
   return p;
 }
@@ -927,6 +957,10 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   // Il testo parte con gli a capo veri (una barra-n scritta come a capo vale
   // come a capo): è quello che il server conserva per il verificatore dopo.
   const critiqueNorm = typeof VERIFIER_ROUND.normalizeCritique === 'function' ? VERIFIER_ROUND.normalizeCritique(critiqueText) : String(critiqueText || '');
+  // Il commit PROVATO: va al server col verdetto e resta scritto nello stato
+  // locale accanto all'esito. Uno solo, letto una volta: leggerlo due volte
+  // vorrebbe dire poter mandare al server uno sha e scriverne un altro qui.
+  const shaProvato = headSha(ROOT) || '';
   const sent = await deliverToChannel('verdict', {
     findings: parsed.findings,
     summary: parsed.summary,
@@ -936,7 +970,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
     // «elenco che non combacia». Tosa lui, per la storia, dopo aver letto.
     critique: critiqueNorm.trim(),
     branch: base.branch || '',
-    sha: headSha(ROOT) || '',
+    sha: shaProvato,
     // L3: la segnalazione per l'owner, se c'è (un trade-off vero trovato
     // verificando). Il server la cifra in `livelli.l3`.
     ...(String(segnalazione || '').trim() ? { segnalazione: String(segnalazione).trim() } : {}),
@@ -962,7 +996,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   // il biglietto» anche con un rilievo di livello 2 nella critica (verifica
   // del giro 3 su questo lavoro).
   const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'non comunicato';
-  const next = applyVerifierVerdict(base, outcome, critiqueText);
+  const next = applyVerifierVerdict(base, outcome, critiqueText, shaProvato);
   next.id = id;
   sealTransition(next, `verifier:${outcome}`);
   next.reply = reply;
@@ -1072,13 +1106,27 @@ async function recordSecaudit(id, verdict, testo = '') {
   // per chi chiama la funzione da un altro strumento.
   const ferma = secauditSenzaNota(verdict, testo);
   if (ferma) return { rejected: true, formatRejected: true, message: ferma };
-  const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict);
+  // Il verdetto vale per il commit che il controllo ha letto (stessa regola,
+  // stessa fonte della critica e della consegna: lib/dirty-tree.mjs). Era
+  // l'unico dei tre a non guardare la directory: con file fuori dai commit il
+  // salvataggio automatico li committa DOPO la registrazione, la punta si
+  // sposta, e quello che verrebbe fuso contiene righe mai controllate
+  // (feedback #485).
+  const stato = statoDirectory(ROOT);
+  if (!stato.ok) {
+    return { rejected: true, formatRejected: true, message: statoIllegibileText(stato.motivo, 'verdetto') };
+  }
+  if (stato.lines.length) {
+    return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'verdetto') };
+  }
+  const shaControllato = headSha(ROOT) || '';
+  const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict, shaControllato);
   next.id = id;
 
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
   // La nota (L4) va nel payload: il server la cifra in `livelli.l4`, anche su
   // pass, così il pentagono in dashboard ha qualcosa da mostrare.
-  const sent = await deliverToChannel('secaudit', secauditPayload({ verdict, branch: next.branch || '', testo }));
+  const sent = await deliverToChannel('secaudit', secauditPayload({ verdict, branch: next.branch || '', testo, sha: shaControllato }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${motivoRifiuto(sent)})` };
   }

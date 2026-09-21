@@ -91,10 +91,24 @@ function fintoServer(risposta, status = 200) {
  */
 function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
   const casa = cartellaTemporanea('filo-mg-client-');
+  // Un deposito vero, con un commit: la richiesta di fusione dichiara il
+  // COMMIT da fondere e si ferma se non riesce a leggerlo o se la directory
+  // ha roba fuori dai commit (#485). Una cartella qualunque non è più un
+  // ambiente in cui il gate possa lavorare, e non lo è nemmeno nel giro vero.
+  const g = (a) => execFileSync('git', a, { cwd: casa, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  g(['init', '-q', '--initial-branch=main']);
+  g(['config', 'user.email', 't@t']);
+  g(['config', 'user.name', 't']);
+  g(['commit', '-q', '--allow-empty', '-m', 'base']);
+  // E POSIZIONATO sul ramo che si sta per far fondere, com'è nel giro vero: il
+  // gate legge tutto dalla directory, e un nome di un altro ramo lo ferma
+  // prima di ogni altra cosa (#485, verifica del giro 4).
+  const ramo = String((args || [])[0] || '');
+  if (/^[A-Za-z0-9._/-]+$/.test(ramo) && !ramo.startsWith('-') && !ramo.includes('..')) g(['checkout', '-q', '-b', ramo]);
   const env = {
     ...process.env,
     FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
-    FILO_REPO_ROOT: casa, // il biglietto si cerca qui: cartella pulita
+    FILO_REPO_ROOT: casa, // il biglietto si cerca qui: deposito pulito
   };
   if (ticket) env.FILO_ROUTINE_TICKET = ticket;
   else delete env.FILO_ROUTINE_TICKET;
@@ -110,7 +124,7 @@ function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
   });
 }
 
-test('merged → exit 0, e al server arrivano SOLO biglietto e branch', async () => {
+test('merged → exit 0, e al server arrivano biglietto, branch e il COMMIT da fondere', async () => {
   const { srv, richieste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'abc123def456' });
   try {
     const r = await gate(port, ['worker/7']);
@@ -120,9 +134,12 @@ test('merged → exit 0, e al server arrivano SOLO biglietto e branch', async ()
     assert.ok(richieste[0].url.endsWith('/routineMerge'));
     // Il contratto che chiude il buco: nessun verdetto viaggia nel corpo. Se
     // un giorno qualcuno reinfilasse un FILO_L4_VERDICT, questo diventa rosso.
-    assert.deepEqual(Object.keys(richieste[0].body).sort(), ['branch', 'ticket']);
+    // Lo `sha` invece c'è, e non è un verdetto: dice su quale contenuto
+    // giravano i controlli, come fa il cammino locale (#485).
+    assert.deepEqual(Object.keys(richieste[0].body).sort(), ['branch', 'sha', 'ticket']);
     assert.equal(richieste[0].body.ticket, 'biglietto-di-prova');
     assert.equal(richieste[0].body.branch, 'worker/7');
+    assert.match(String(richieste[0].body.sha), /^[0-9a-f]{40}$/);
   } finally { srv.close(); }
 });
 
