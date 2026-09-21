@@ -319,6 +319,7 @@
       .then((r) => {
         if (r && r.ok) {
           fb.reopenRequests = { ...(fb.reopenRequests || {}), [uid]: { at: new Date().toISOString() } };
+          bozzeRiapertura.delete(id);
           renderList();
         } else {
           errEl.textContent = (r && r.error) || 'Invio non riuscito, riprova.';
