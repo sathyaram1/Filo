@@ -28,9 +28,8 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 
 Correggilo: leggi tutte le critiche in `payload.history`, e se lo stesso danno
 rientra da strade diverse fai l'inventario delle strade e scrivi una regola
-sola che le copra. Prima di consegnare applica i criteri di chi ti verifica.
-
-<!-- includi: _criteri-verifica.md -->
+sola che le copra. Prima di consegnare applica i criteri di chi ti verifica
+(`routines/roles/_criteri-verifica.md`, CLAUDE.md § Verifica).
 
 
 <!-- includi: _segnala.md -->
