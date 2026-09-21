@@ -666,6 +666,23 @@ export function testoRossiAttesi(branch) {
   ].join('\n');
 }
 
+// La fase 2 è UN testo, quello del server (config/routines, lo stesso del
+// cloud): in locale gli si accoda solo ciò che qui è diverso. PURA.
+export function codaDalServer(testoServer) {
+  const testo = String(testoServer || '').trim();
+  if (!testo) return '';
+  return [
+    testo,
+    '',
+    'IN LOCALE, tre differenze da quanto scritto qui sopra:',
+    '- le prove del giro stanno nella cartella indicata più su, non in `tests/verifica/<numero>`;',
+    '- non c\'è `--segnala`: un trade-off vero si scrive nel report, con le strade e i loro costi, e lo porta',
+    '  all\'owner chi guida il giro;',
+    '- la consegna è `node scripts/verify-local.mjs corretto "<report della correzione>"`, e non c\'è un biglietto',
+    '  da rilasciare. Dopo serve un\'altra verifica, di un\'altra istanza: la lancia chi guida.',
+  ].join('\n');
+}
+
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
