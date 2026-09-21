@@ -16,10 +16,11 @@
 //     (checkEnvelope: ruolo conosciuto, ramo presente per i ruoli dell'iter,
 //     feedback non vuoto) — mezza busta è peggio di nessuna busta. Senza
 //     biglietto: GUASTO, nessun cammino alternativo.
-//   - RUOLO UNICO DI LAVORAZIONE (`resolver`): il server distingue ancora
-//     `new-work` (primo passaggio) e `fixer` (correzione), ma il worker riceve
-//     le stesse istruzioni (resolver.md) e il caso nel payload (`case`). I due
-//     nomi restano nel protocollo del canale finché il server non li fonde.
+//   - DUE CASI DI LAVORAZIONE, due testi: `new-work` è il primo passaggio,
+//     `fixer` è il riallineamento del ramo dopo un conflitto di fusione. I
+//     rilievi di una verifica NON passano più di qui: li corregge chi li ha
+//     scritti, con le istruzioni che il server gli stampa dopo la critica.
+//     Una busta `fixer` che porta ancora una critica è un guasto dichiarato.
 //   - A ogni ruolo LAVORANTE viene ACCODATO il contratto comune
 //     (routines/roles/_contratto-worker.md): il testo di ritorno del worker
 //     non è un canale, tutto va registrato via script.
