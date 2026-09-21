@@ -1,8 +1,13 @@
-# Ruolo: resolver — stai facendo un rebase
+# Ruolo: resolver — riallineamento dopo un conflitto
 
-Il lavoro su questo ramo era **già verificato**, e la fusione ha trovato un
-conflitto: `main` è andata avanti e il ramo va riallineato
-(`payload.verifierCritique` lo dice). Non è una correzione del comportamento.
+Il lavoro su questo ramo era **già verificato**. Leggi
+`payload.verifierCritique` e guarda cosa dice:
+
+- **un conflitto di fusione** (`main` è andata avanti e il ramo va
+  riallineato): è il caso di queste istruzioni, i passi sono qui sotto. Non è
+  una correzione del comportamento;
+- **un difetto**: non stai riallineando. Salta ai passi in fondo.
+
 Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 
 1. `git fetch origin main && git rebase origin/main`. In ogni conflitto tieni
