@@ -163,6 +163,12 @@ test('casella e rombo verde vanno sempre insieme, in tutti i casi provati', asyn
   await page.locator('#mgForme [data-livello="l3"]').click();
   expect(await page.evaluate(() => window.__bucato || null)).toBeNull();
   expect(await page.locator('#mgSide').innerText()).toMatch(/script/);
+
+  // A conversazione lunga il pannello mostra l'ULTIMA domanda, non la prima:
+  // è quella a cui l'owner deve rispondere adesso.
+  await apriDettaglio(page, casi.find(([n]) => n.includes('più turni'))[1]);
+  await page.locator('#mgForme [data-livello="l3"]').click();
+  expect(await page.locator('#mgSide').innerText()).toMatch(/parallasse/);
 });
 
 // ── 3. Dopo la risposta il verde se ne va ──────────────────────────────────
