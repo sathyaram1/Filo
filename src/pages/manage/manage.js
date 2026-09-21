@@ -644,6 +644,12 @@
     }
     if (mgFixInstructions && typeof remote.fixInstructions === 'string') mgFixInstructions.value = remote.fixInstructions;
     if (mgGiroStretto && lettoDalServer) mgGiroStretto.checked = giroStrettoRemoto;
+    // Non letto: l'interruttore resta com'era, e l'owner deve sapere che non è la parola del server.
+    if (mgGiroStrettoMsg && isAdmin) {
+      mgGiroStrettoMsg.textContent = lettoDalServer ? '' : 'Non letto dal server: lo stato vero può essere diverso.';
+      mgGiroStrettoMsg.classList.toggle('mg-err', !lettoDalServer);
+      mgGiroStrettoMsg.classList.remove('mg-ok');
+    }
   }
 
   async function saveCap(field) {
