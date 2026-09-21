@@ -645,7 +645,8 @@ export function readRoleInstructions(role) {
  * Costruisce il payload che il worker riceve, rispettando l'ISOLAMENTO:
  *   - secaudit: SOLO il diff, MAI il feedback (isolamento strutturale).
  *   - verifier: il feedback (sintomo), MAI il diff (isolamento comportamentale).
- *   - fixer    (resolver, caso `correzione`): feedback + critica del verifier.
+ *   - fixer    (caso `riallineamento`): il feedback, per capire le intenzioni
+ *              in conflitto. Nessuna critica: qui non si corregge niente.
  *   - new-work (resolver, caso `primo-passaggio`): il feedback decifrato.
  *   - prober:   niente.
  *
