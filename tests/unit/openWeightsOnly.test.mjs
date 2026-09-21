@@ -209,11 +209,14 @@ test('i produttori ammessi dal documento sono gli stessi che l\'interruttore spe
   const riga = documento.split('\n').find((r) => /\*\*Ammessi oggi:\*\*/.test(r));
   assert.ok(riga, 'il documento deve elencare i modelli stretti ammessi dopo «Ammessi oggi:»');
 
-  // Forma attesa: «Nome (Produttore), da <mese> <anno>. <motivo>». Il produttore
-  // sta fra parentesi, ed è l'unica parentesi della riga.
-  const nelDocumento = [...riga.matchAll(/\(([^)]+)\)/g)].map((m) => m[1].trim());
+  // Forma attesa: «Nome (Produttore), da <mese> <anno>». Il «, da » dopo la
+  // parentesi è ciò che distingue un produttore da un inciso qualunque: senza,
+  // un «(o prima se escono equivalenti)» diventerebbe un produttore inesistente
+  // e il rosso manderebbe fuori strada chi lo legge.
+  const nelDocumento = [...riga.matchAll(/\(([^)]+)\)\s*,\s*da\s/g)].map((m) => m[1].trim());
   assert.ok(nelDocumento.length,
-    'nessun produttore fra parentesi: se oggi non ne è ammesso nessuno, toglila anche dall\'interruttore');
+    'nessun produttore nella forma «Nome (Produttore), da <mese> <anno>»: se oggi non ne è '
+    + 'ammesso nessuno toglilo anche dall\'interruttore, altrimenti scrivilo in quella forma');
 
   const norma = (x) => C.normalizeProviderName(x);
   const spenti = C.effectiveExcludedProviders([], true).map(norma);
