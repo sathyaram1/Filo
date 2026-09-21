@@ -119,6 +119,14 @@
       showLoadError(lastLoadError);
       return;
     }
+    // Chi stava scrivendo in un form "Ancora rotto?" deve ritrovarsi dove era:
+    // il testo lo tiene `bozzeRiapertura`, qui si salvano cursore e fuoco, che
+    // muoiono con il nodo.
+    const attivo = document.activeElement;
+    const scrivevaIn = attivo && attivo.classList && attivo.classList.contains('bd-reopen-text')
+      ? { id: attivo.dataset.fbId, inizio: attivo.selectionStart, fine: attivo.selectionEnd }
+      : null;
+
     const items = MR.listBoardTab(allFeedbacks, { releasedVersion });
     bdLoading.hidden = true;
     if (bdError) bdError.hidden = true;
