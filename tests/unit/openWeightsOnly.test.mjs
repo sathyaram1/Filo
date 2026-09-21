@@ -200,3 +200,33 @@ test('l\'effetto dell\'interruttore è dichiarabile PRIMA di accenderlo', () => 
   // Una funzione non può stare in tutt'e due gli elenchi.
   assert.deepEqual(cambiano.filter((a) => ferme.includes(a)), []);
 });
+
+// La politica elenca per nome i modelli stretti ammessi e promette che
+// l'interruttore spegne anche quelli. Il nome del produttore vive in due posti
+// — il documento e il codice — e questa sentinella li tiene insieme: alla
+// revisione si cambia l'elenco e l'altra metà non resta indietro in silenzio.
+test('i produttori ammessi dal documento sono gli stessi che l\'interruttore spegne', () => {
+  const { readFileSync } = require('node:fs');
+  const documento = readFileSync(join(ROOT, 'transparency', 'models.md'), 'utf8');
+  const riga = documento.split('\n').find((r) => /\*\*Ammessi oggi:\*\*/.test(r));
+  assert.ok(riga, 'il documento deve elencare i modelli stretti ammessi dopo «Ammessi oggi:»');
+
+  // Forma attesa: «Nome (Produttore), da <mese> <anno>. <motivo>». Il produttore
+  // sta fra parentesi, ed è l'unica parentesi della riga.
+  const nelDocumento = [...riga.matchAll(/\(([^)]+)\)/g)].map((m) => m[1].trim());
+  assert.ok(nelDocumento.length,
+    'nessun produttore fra parentesi: se oggi non ne è ammesso nessuno, toglila anche dall\'interruttore');
+
+  const norma = (x) => C.normalizeProviderName(x);
+  const spenti = C.effectiveExcludedProviders([], true).map(norma);
+  for (const produttore of nelDocumento) {
+    assert.ok(spenti.includes(norma(produttore)),
+      `il documento ammette un modello stretto di «${produttore}», ma l'interruttore non lo spegne`);
+  }
+
+  // E al contrario: l'interruttore non spegne produttori che il documento non
+  // nomina più (Anthropic a parte, che non è un modello stretto).
+  const inPiu = spenti.filter((x) => x !== 'anthropic' && !nelDocumento.map(norma).includes(x));
+  assert.deepEqual(inPiu, [],
+    'l\'interruttore spegne produttori che il documento non elenca più fra gli ammessi');
+});
