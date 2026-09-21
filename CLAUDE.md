@@ -324,10 +324,10 @@ indipendente, che costa un agente intero. Nei giri di agosto e settembre il
 primo giro trovava un rilievo grave in 15 lavori su 17, quasi sempre su
 qualcosa che chi aveva lavorato poteva vedere da sé. Quindi, prima della
 consegna, apri **`routines/roles/_criteri-verifica.md`** e applica quei
-criteri, uno per uno. Sono nove voci, mezza pagina, ed è la **stessa identica lista** che riceve
-chi ti verifica: in locale come nelle routine, i due lati del giro giudicano
-con lo stesso metro — un elenco più corto qui significa farsi bocciare su
-qualcosa che nessuno ti aveva chiesto.
+criteri, uno per uno. Sono nove voci, mezza pagina, ed è la **stessa lista**
+che riceve chi ti verifica: in locale come nelle routine i due lati del giro
+giudicano con lo stesso metro, e un elenco più corto da questa parte vuol dire
+farsi bocciare su qualcosa che nessuno ti aveva chiesto.
 
 Il criterio della prova, in più: quale prova lo dicono i minimi qui sopra. Se
 non c'è niente da aprire (logica pura, testi, strumenti da riga di comando) è
