@@ -160,10 +160,6 @@
     // server, che oltre taglia. La dashboard rifiuta il testo più lungo invece
     // di salvarlo mozzato in silenzio.
     FIX_INSTRUCTIONS_MAX: 8000,
-    // Nomi storici del giro a tre esiti, letti ancora da qualche strumento.
-    LOOP_CAP_MIN: 1,
-    IMPROVABLE_CAP_MIN: 0,
-    LOOP_CAP_MAX: 10,
     // Timeout di ogni giudice di sicurezza (secondi). I modelli "thinking"
     // ragionano per qualche secondo prima del verdetto: troppo basso e quel
     // giudice non risponde mai → panel parziale ("non filtrato"). Salvato in

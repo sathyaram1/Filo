@@ -176,12 +176,9 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
   trade-off mancanti si segnalano, non si perdonano; solo il trade-off vero va
   all'owner come suggerimento. Motivo: i feedback di Filo saranno spesso poco
   specificati (screenshot + "non va"), il valore sta nel ricostruire l'intento.
-  ⚠️ **Aggiornamento dopo la tornata 2**: la parte «sono FAIL» è **superata da
-  §13**. Il prompt resta audace nel CERCARE; ciò che trova viene smistato fra
-  **fail** (la cosa chiesta non si ottiene, o solo su una delle due strade
-  equivalenti, o manca un'invariante di sicurezza) e **migliorabile** (funziona,
-  ma pattern/estetica/miglioramento gratis). Non ammorbidire la ricerca: cambiare
-  solo dove finisce l'esito.
+  ⚠️ **Aggiornamento**: la parte «sono FAIL» è **superata da §13**. Il prompt
+  resta audace nel CERCARE; a ciò che trova dà un livello, e l'esito lo calcola
+  il server. Non ammorbidire la ricerca: cambia solo dove finisce l'esito.
 
 ## 10. Chiusura del buco del push diretto su `main` (sicurezza)
 
@@ -335,132 +332,44 @@ collegate:
   succede dopo non ti riguarda", soglie altrui, meccaniche a valle):
   informazione inutile è superficie in più.
 
-## 13. Il verificatore a tre esiti: pass / migliorabile / fail
+## 13. La verifica: critica a livelli, esito del server
 
-> **Superato il 2026-09-05 dal feedback #561 («un agente per giro»).** I tre
-> esiti non esistono più: il verificatore registra
-> la critica coi livelli (3/2/1/0, più `?` = chiede una decisione dell'owner),
-> l'esito lo calcola il server da tre bilanci per feedback — `cap2` (giri di
-> correzione per i livelli 3/2), `cap1` (livello 1), `cap0` (livello 0), che
-> l'owner scrive in Gestione → Automazioni e che dal 2026-09-16 non hanno un
-> default nel codice — e poi si corregge ciò che il server dice di correggere. Ogni correzione porta a un altro verificatore. I rilievi non
-> corretti finiscono in UN feedback derivato per lavoro, figlio `#N.k`, aperto
-> dal server (categoria `routine:residuo`); il verificatore non apre più
-> feedback. Regole in
-> `src/shared/verifierRound.js` (incorporato dal server al deploy), i nomi dei
-> bilanci in `src/shared/feedbackTransitions.js`, i numeri solo in
-> `config/routines` (dashboard, Gestione → Automazioni).
-> Quello che segue resta come storia della decisione precedente.
+I tre esiti scelti dal verificatore (pass / migliorabile / fail) non esistono
+più dal 2026-09-05 (feedback #561). Il racconto di quella decisione sta nella
+storia di git di questo file; qui c'è lo stato vero, in breve, e dove sta il
+resto.
 
-Deciso con l'owner il 18/08, dopo la seconda tornata del laboratorio (§9): il
-verdetto binario è la causa vera del problema, non la severità del prompt. Col
-prompt audace il verificatore forte ha bocciato **5 lavori su 5** che erano stati
-approvati — e i rilievi erano tutti veri, ma uno era «l'evidenziazione al
-passaggio del mouse non si vede sul tema scuro». Trattare quello come un buco di
-sicurezza blocca tutto e rende il cancello inutilizzabile.
+- **Chi verifica scrive una critica, non un verdetto.** Una riga per rilievo,
+  col livello davanti (3/2/1/0; `?` = chiede una decisione dell'owner). Il
+  metro dei livelli sta nel testo del ruolo
+  (`routines/roles/_critica-e-livelli.md`), uno per tutti gli ambiti.
+- **L'esito lo calcola il server** dai livelli e da tre bilanci per lavoro
+  (`cap2` per i livelli 3/2, `cap1`, `cap0`): `pass`, `fix` o `stop`. Le regole
+  stanno in `src/shared/verifierRound.js`, che il server incorpora al deploy; i
+  numeri li scrive l'owner in Gestione → Automazioni e non hanno un default nel
+  codice. Un'istanza catturata non può promuoversi da sola: i conti non li fa
+  lei.
+- **Fase 2.** Con esito `fix` corregge lo stesso agente che ha scritto la
+  critica, sui soli rilievi che il server gli rimanda, e consegna con
+  `--record-fixed`. Se correggere non si può senza una decisione, consegna con
+  `--ferma` e una segnalazione: il lavoro aspetta l'owner. Ogni correzione
+  porta a un'altra verifica, fatta da un'altra istanza.
+- **I rilievi non corretti non spariscono**: il server li raccoglie in un
+  feedback derivato per lavoro, figlio `#N.k`, categoria `routine:residuo`. Il
+  verificatore non apre feedback.
+- **Ambiti.** La verifica è piena di serie. Due giri stretti la sostituiscono
+  quando la ricerca larga è già stata fatta: `chiusura` (dopo una correzione,
+  se l'owner ha acceso «Giro stretto dopo una correzione») e `riallineamento`
+  (dopo un conflitto di fusione risolto a mano su un lavoro già verificato).
+  Cambia il perimetro, non il metro; un difetto fuori perimetro vale al massimo
+  livello 1, salvo danno concreto all'utente. L'ambito lo decide il server e
+  viaggia nel payload.
+- **Un solo modello per la verifica**, quello forte: nel laboratorio (§9) i
+  modelli economici non hanno prodotto un rilievo di completezza in 15 corse.
 
-### Gli esiti
-
-- **pass** — come oggi: si prosegue verso il cancello di sicurezza e la chiusura.
-- **migliorabile** — la cosa chiesta **funziona**, ma il lavoro è incompleto su
-  pattern, estetica o completezza. Si comporta come un fail (torna a chi
-  corregge) **solo finché è stato dato meno di N volte**: al giro N+1 un
-  «migliorabile» diventa **pass**.
-- **fail** — la cosa chiesta non si ottiene. Non passa mai. Al passo **M** la
-  pratica si interrompe e viene **segnalata all'owner** invece di richiamare
-  ancora chi corregge.
-
-Valori di partenza: **N = 0** (dal 2026-09-03; era 3: un «migliorabile» passa subito, i rilievi diventano un feedback residuo a priorità minima, e il verificatore dà «fail» solo per rilievi di livello 3 o 2 della scala delle priorità, vedi `routines/roles/verifier.md`), **M = 10**. Sono **impostabili dalla dashboard**
-(§6), non costanti nel codice.
-
-### Quale esito, quando (va scritto nel prompt, o il modello sceglie a caso)
-
-La regola nasce dai casi reali del laboratorio, non a tavolino:
-
-- **fail** se la cosa chiesta **non si ottiene**, oppure si ottiene **solo su una
-  delle due strade equivalenti**, oppure manca un'**invariante di sicurezza**;
-- **migliorabile** se la cosa chiesta funziona e il rilievo riguarda **design
-  pattern, estetica, o un miglioramento senza trade-off** che mancava.
-
-Applicata ai cinque rilievi della tornata 2 la regola separa bene:
-
-| caso | rilievo | esito |
-|---|---|---|
-| #284 | si scrive nelle chiavi SSH con un solo OK per la strada gemella | **fail** |
-| #282 | il secondo elenco di avvisi è rimasto senza argini | **fail** |
-| #248 | il blocco non avvisa l'utente, a differenza di ogni altro blocco | **fail** |
-| #272 | tre funzioni con lo stesso nome nel filtro | migliorabile |
-| #240 | evidenziazione invisibile sul tema scuro | migliorabile |
-
-Il prompt audace resta **audace nel cercare**: cambia solo dove finisce ciò che
-trova. Le regole «invariante mancante / pattern violato / miglioramento gratis
-mancante» non si ammorbidiscono — si smistano.
-
-### Il migliorabile che scade non deve sparire
-
-Al giro N+1 il lavoro passa, ma i rilievi non risolti **diventano un feedback
-nuovo** (non una riga di nota che nessuno riaprirà). Senza questo, il guadagno
-del verificatore severo evapora in silenzio: è esattamente il valore che si
-voleva incassare.
-
-**Serve un tipo di produttore NUOVO** (decisione owner 18/08). Deve essere
-evidente, leggendo la coda, che quel feedback nasce dal **declassamento di un
-migliorabile** e non da un giro di esplorazione: spacciarlo per `prober` (o per
-una verifica qualunque) falsa la lettura di dove nascono i ritrovamenti, che è
-proprio l'informazione per cui le tre automazioni erano state separate.
-
-In concreto, la tassonomia da estendere è quella che già esiste:
-
-- `SN_FEEDBACK_THREAD`: `ROLE_KIND` (oggi `prober`, `new-work`/`fixer` →
-  worker, `verifier`/`secaudit` → verifier) e `authorKind()` che legge il
-  prefisso di `clientId` (`routine:<ruolo>`);
-- la dashboard: `AUTHOR_META` (icona + etichetta) e, se diventa anche un ruolo
-  del dispatcher, `ROLE_LABELS`.
-
-Nome proposto per la categoria: **`residuo`** («Claude — rilievo residuo»), con
-`clientId` `routine:residuo`. Il feedback deve citare il numero del lavoro da
-cui proviene e riportare i rilievi rimasti **con le parole della verifica**, non
-riassunti.
-
-⚠️ Da guardare mentre si implementa: dal 2026-08-22 il gruppo di fiducia È la
-categoria d'autore, una per una (`autoApproveGroup()` = `authorKind()`), quindi
-una categoria nuova vuole anche il SUO interruttore in dashboard e la copia sul
-server. Prima cadevano tutte in `claude` per inerzia — che è esattamente ciò
-che rendeva impossibile fidarsi di un'istanza senza fidarsi delle altre.
-
-### Dove vivono i contatori
-
-- Sul feedback, come **dati** — stessa strada del contatore dei fail di oggi, non
-  stato che una sessione morta lascia in giro.
-- Li applica **il server** quando registra l'esito, non il prompt: un'istanza
-  catturata non deve poter dire «questo è il mio decimo giro, passami».
-- N ed M viaggiano con le transizioni promosse a dati (§7): una sola sorgente,
-  letta dalla dashboard e incorporata dal server al deploy. **Mai** due copie a
-  mano, o la dashboard mostra una regola e il server ne applica un'altra.
-
-### Perché M = 10 anche se "troppo" (deciso dall'owner)
-
-Obiezione sollevata: dieci giri di correzione su qualcosa di strutturalmente
-impossibile sono cari, e oggi il limite è 3.
-
-**Risposta dell'owner (18/08): si tiene 10 per la prima settimana**, di
-proposito. Se un lavoro fallisce cinque volte, i cinque tentativi successivi non
-servono più a quel feedback: servono come **osservazione del processo** — vedere
-se succede qualcosa o se il giro è fermo. Il costo reale è una decina di
-chiamate, che l'owner vuole spendere comunque per avere il dato.
-
-Quindi: 10 è una **scelta di misura, non una stima di quanto serve**. Passata la
-settimana di osservazione, il valore si abbassa dalla dashboard senza toccare il
-codice — che è esattamente il motivo per cui N ed M sono impostabili.
-
-### Un solo modello per la verifica
-
-I modelli open economici **escono** dal disegno (decisione owner 18/08:
-«teniamo le cose semplici»). Il laboratorio dà la ragione tecnica: sui criteri di
-completezza il modello economico non ha prodotto **un solo rilievo in 15 corse**,
-mentre quello forte, con lo stesso identico prompt, ne ha trovati cinque veri
-(§9). Come primo filtro sui difetti **presenti** resta bravissimo, ma quella non
-è la verifica che stiamo costruendo.
+Stati e transizioni del giro: `FEEDBACK-STATES.md`. Cosa viaggia fra server e
+ruoli (`scope`, `perimetro`, `stop`, la risposta alla critica):
+`ROUTINE-AUTH-SPEC.md` §6 e «I livelli sul feedback».
 
 ## 14. Ordine di esecuzione
 
@@ -475,6 +384,4 @@ mentre quello forte, con lo stesso identico prompt, ne ha trovati cinque veri
 6. Esperimenti sul verificatore nel lab (possono partire anche subito).
 7. Revisione dei prompt dei ruoli (l'owner li legge per la prima volta) con
    gli esiti del lab.
-8. Tre esiti del verificatore (§13): prompt che smista fail/migliorabile,
-   contatori N ed M come dati applicati dal server, comandi in dashboard, e
-   apertura automatica del feedback per i migliorabili scaduti.
+8. Critica a livelli ed esito calcolato dal server (§13): fatto.
