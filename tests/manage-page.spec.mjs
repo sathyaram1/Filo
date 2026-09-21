@@ -697,7 +697,12 @@ async function stubCaps(page, initial = { cap2: 5, cap1: 2, cap0: 0, fixInstruct
         return { ok: true, ...window.__capsValue };
       }
       if (msg && msg.type === 'automation_caps_set') {
-        const clamp = (n) => Math.min(10, Math.max(0, Math.round(Number(n))));
+        if (window.__capsFail) return { ok: false, error: 'finto guasto' };
+        if (typeof msg.giroStretto === 'boolean') {
+          window.__capsValue.giroStretto = msg.giroStretto;
+          window.__capsSets.push({ giroStretto: msg.giroStretto });
+        }
+        const clamp =(n) => Math.min(10, Math.max(0, Math.round(Number(n))));
         for (const field of ['cap2', 'cap1', 'cap0']) {
           if (msg[field] != null) {
             window.__capsValue[field] = clamp(msg[field]);
