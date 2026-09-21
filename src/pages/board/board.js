@@ -254,12 +254,14 @@
         return;
       }
       form.hidden = !form.hidden;
-      if (!form.hidden) textarea.focus();
+      if (form.hidden) bozzeRiapertura.delete(fb._id);
+      else { bozzeRiapertura.set(fb._id, { testo: textarea.value }); textarea.focus(); }
     });
     cancelBtn.addEventListener('click', () => {
       form.hidden = true;
       err.hidden = true;
       textarea.value = '';
+      bozzeRiapertura.delete(fb._id);
     });
     sendBtn.addEventListener('click', () => onReopen(fb, textarea, sendBtn, err));
 
