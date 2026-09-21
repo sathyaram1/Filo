@@ -681,3 +681,18 @@ describe('un commit che non riesce, e i guai delle altre cartelle, arrivano alla
     assert.doesNotMatch(ctx, /NON committo/);
   });
 });
+
+describe('gli agganci arrivano a chi clona il repo adesso', () => {
+  // Un hook che nessun file registrato accende non gira sulle macchine che il
+  // repo lo clonano (i contenitori delle routine), e nessuno se ne accorge.
+  test('un file tracciato registra il salvataggio automatico e la guardia del ramo', () => {
+    const tracciati = git(ROOT, ['ls-files']).split('\n').filter((f) => /\.json$/.test(f));
+    const testi = tracciati.map((f) => {
+      try { return readFileSync(resolve(ROOT, f), 'utf8'); } catch (_) { return ''; }
+    });
+    for (const hook of [...HOOKS, 'branch-guard.sh']) {
+      assert.ok(testi.some((t) => t.includes(hook)),
+        `nessun file registrato in git accende ${hook}: su un clone nuovo non parte, in silenzio`);
+    }
+  });
+});
