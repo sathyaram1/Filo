@@ -804,7 +804,7 @@ test('withCritique senza i bilanci lancia: non c\'è un default con cui rimpiazz
   assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
 });
 
-test('CLI: status e start stampano i bilanci letti dal server; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
+test('CLI: status stampa i bilanci letti dal server, start li tiene fuori dal compito; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
   const casa = depositoUsaEGetta();
   const st = vl(casa, 'status');
   assert.match(st.out, /Bilanci del giro \(dal server, config\/routines\): cap2 5 · cap1 2 · cap0 0/);
