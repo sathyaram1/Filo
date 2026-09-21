@@ -26,11 +26,20 @@ test('debug registry persistence', async ({ openTab }) => {
 
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
-  const stored = await page.evaluate(async () => {
+  const subito = await page.evaluate(async () => {
     const s = await window.SN_STORAGE.getSettings();
-    return { useDefaultModels: s.useDefaultModels, reg: s.modelRegistry };
+    const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+    return { nickDom: row.querySelector('.sn-model-nick').value, ha: !!(s.modelRegistry || {}).provatm };
   });
-  console.log('STORAGE DOPO SAVE:', JSON.stringify(stored).slice(0, 2000));
+  console.log('SUBITO DOPO hint:', JSON.stringify(subito));
+
+  await page.waitForTimeout(2000);
+  const dopo2s = await page.evaluate(async () => {
+    const s = await window.SN_STORAGE.getSettings();
+    const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+    return { nickDom: row.querySelector('.sn-model-nick').value, provatm: (s.modelRegistry || {}).provatm };
+  });
+  console.log('DOPO 2s:', JSON.stringify(dopo2s));
 
   await page.reload();
   await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
