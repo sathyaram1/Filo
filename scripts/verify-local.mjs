@@ -1126,6 +1126,16 @@ if (isMain) {
     // verdetto deve legarsi al contenuto vero.
     const b = currentBranch();
     const state = withRequest(readState(), b, { request, sha: headSha() });
+    const partenza = state[b].chiusura && state[b].chiusura.shaPrima;
+    if (partenza) {
+      const adesso = shaPrimaAllineato(partenza);
+      if (adesso !== partenza) {
+        state[b].chiusura = { ...state[b].chiusura, shaPrima: adesso };
+        console.error(adesso
+          ? `Il ramo è stato riallineato dopo la critica: il commit di partenza della correzione ora è ${adesso.slice(0, 8)}.`
+          : 'Il ramo è stato riallineato dopo la critica e il commit di partenza della correzione non si ritrova: il compito lo dice.');
+      }
+    }
     writeState(state);
     const scope = ambitoLocale(capsStart, state[b]);
     console.log(buildVerifierBrief({
