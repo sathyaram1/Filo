@@ -158,6 +158,17 @@ test('--ferma: parte solo con una segnalazione vera, e solo sulla consegna della
   expect(d.fixedReplyText('abc', {}, true)).toContain('ATTENZIONE');
 });
 
+test('senza rete l’app non dà per letto «giro stretto spento»', async () => {
+  const { createRequire } = await import('node:module');
+  const D = createRequire(import.meta.url)(resolve(ROOT, 'src/main/services/defaultsStore.js'));
+  const vero = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('offline'); };
+  let letto = null;
+  try { letto = await D.getRoutineCaps('tok'); } catch (_) { letto = null; } finally { globalThis.fetch = vero; }
+  // O si rifiuta di rispondere, o dice «non lo so»: mai un false che sembra del server.
+  expect(letto === null || letto.giroStretto !== false).toBe(true);
+});
+
 test('chi corregge viene a sapere che può fermarsi: la risposta alla critica nomina --ferma', async () => {
   const d = await carica('scripts/dispatch.mjs');
   // Il testo della fase 2 è quello che l'owner ha salvato in Gestione → Automazioni
