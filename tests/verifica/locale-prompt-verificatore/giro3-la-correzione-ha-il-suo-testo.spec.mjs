@@ -30,12 +30,13 @@ test('niente istruzioni accodate che ordinino il contrario del testo di ruolo', 
   expect(coda, 'al riallineamento viene ordinato di rileggere le critiche e curare la causa').toBe('');
 });
 
-test('una busta di riallineamento con dentro una critica ferma il giro', () => {
+test('il riallineamento arriva SEMPRE con la critica del server, e si lavora lo stesso', () => {
+  // Il server scrive una critica sua a ogni conflitto di fusione («va
+  // RIALLINEATO il ramo»): una guardia che ferma la busta perché «c'è una
+  // critica» fermerebbe tutti i riallineamenti.
   const busta = {
     role: 'fixer', id: 'abc', num: '700', branch: 'claude/x',
-    payload: { role: 'fixer', feedback, critique: '[2] il pulsante non salva' },
+    payload: { role: 'fixer', feedback, critique: 'FAIL tecnico, non di qualità: la fusione su main è fallita per un CONFLITTO' },
   };
-  expect(checkEnvelope(busta), 'passa, e chi la riceve fa il lavoro sbagliato senza che si veda').toBeTruthy();
-  // Senza la critica la stessa busta è un lavoro buono.
-  expect(checkEnvelope({ ...busta, payload: { role: 'fixer', feedback } })).toBeNull();
+  expect(checkEnvelope(busta)).toBeNull();
 });

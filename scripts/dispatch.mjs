@@ -20,7 +20,8 @@
 //     `fixer` è il riallineamento del ramo dopo un conflitto di fusione. I
 //     rilievi di una verifica NON passano più di qui: li corregge chi li ha
 //     scritti, con le istruzioni che il server gli stampa dopo la critica.
-//     Una busta `fixer` che porta ancora una critica è un guasto dichiarato.
+//     Il server accompagna OGNI riallineamento con una critica sua (dice che è
+//     un conflitto): non è un rilievo, e qui non si consegna a chi riallinea.
 //   - A ogni ruolo LAVORANTE viene ACCODATO il contratto comune
 //     (routines/roles/_contratto-worker.md): il testo di ritorno del worker
 //     non è un canale, tutto va registrato via script.
@@ -1573,13 +1574,6 @@ export function checkEnvelope(w) {
     // niente è ancora niente.
     const testo = testoDentroCornice(((w && w.payload && w.payload.feedback) || {}).text).trim();
     if (!testo) return `lavoro "${role}" con il feedback vuoto: non c'è niente su cui lavorare`;
-  }
-  // Una busta `fixer` con dentro una critica viene dal giro vecchio, in cui i
-  // rilievi li correggeva un worker a parte. Quel testo qui non c'è più, e
-  // consegnare il riallineamento al posto della correzione farebbe fare il
-  // lavoro sbagliato senza che nessuno lo veda.
-  if (role === 'fixer' && String((w && w.payload && w.payload.critique) || '').trim()) {
-    return 'lavoro "fixer" con dentro una critica: qui si riallinea un ramo dopo un conflitto di fusione, i rilievi di una verifica li corregge chi li ha scritti';
   }
   return null;
 }
