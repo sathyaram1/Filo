@@ -36,6 +36,8 @@ test('le istruzioni accodate alla correzione non contraddicono il testo del ruol
   // La coda ordina di rileggere le critiche e di curare la causa: se il testo
   // sopra vieta di toccare qualunque cosa, le due metà si annullano.
   expect(coda).toMatch(/Leggile TUTTE prima di toccare codice/);
-  expect(`${testo}\n\n${coda}`, 'il testo vieta proprio ciò che la coda ordina')
-    .not.toMatch(/ogni riga cambiata oltre il conflitto/);
+  // Il testo di ruolo va a capo dove capita: si confronta a righe unite.
+  const unito = `${testo}\n\n${coda}`.replace(/\s+/g, ' ');
+  expect(unito, 'il testo vieta proprio ciò che la coda ordina')
+    .not.toContain('ogni riga cambiata oltre il conflitto');
 });
