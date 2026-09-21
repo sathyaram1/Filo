@@ -1574,6 +1574,13 @@ export function checkEnvelope(w) {
     const testo = testoDentroCornice(((w && w.payload && w.payload.feedback) || {}).text).trim();
     if (!testo) return `lavoro "${role}" con il feedback vuoto: non c'è niente su cui lavorare`;
   }
+  // Una busta `fixer` con dentro una critica viene dal giro vecchio, in cui i
+  // rilievi li correggeva un worker a parte. Quel testo qui non c'è più, e
+  // consegnare il riallineamento al posto della correzione farebbe fare il
+  // lavoro sbagliato senza che nessuno lo veda.
+  if (role === 'fixer' && String((w && w.payload && w.payload.critique) || '').trim()) {
+    return 'lavoro "fixer" con dentro una critica: qui si riallinea un ramo dopo un conflitto di fusione, i rilievi di una verifica li corregge chi li ha scritti';
+  }
   return null;
 }
 
