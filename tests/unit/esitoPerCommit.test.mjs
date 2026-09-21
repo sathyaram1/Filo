@@ -574,7 +574,8 @@ test('i comandi del rifiuto puntano agli attrezzi del giro, non a quelli del ram
   // dentro riporterebbe alla copia che il ramo si porta dietro, vecchia di
   // giorni e senza dirlo. È la stessa riscrittura che riceve ogni file-ruolo.
   const fissato = absolutizeRecipe(crudo, '/strumenti/del-giro', '/il/deposito');
-  assert.match(fissato, /node "\/strumenti\/del-giro\/scripts\/routine-channel\.mjs"/);
+  // Su Windows il percorso prende davanti la lettera del disco.
+  assert.match(fissato, /node "(?:[A-Za-z]:)?\/strumenti\/del-giro\/scripts\/routine-channel\.mjs"/);
   assert.ok(!/node scripts\//.test(fissato), 'e non resta nemmeno una scorciatoia dentro il ramo');
 
   // In locale le due radici coincidono e il testo non si tocca.

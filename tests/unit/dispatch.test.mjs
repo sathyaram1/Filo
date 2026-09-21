@@ -147,11 +147,11 @@ test('buildPayload verifier: vede il feedback (sintomo), MAI il diff', () => {
   assert.ok(!JSON.stringify(p).includes('DIFF'));
 });
 
-test('buildPayload fixer: feedback + critica del verifier', () => {
+test('buildPayload fixer: il feedback, e nessuna critica da correggere', () => {
   const bucket = { role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', loopCount: 1, state: { verifierCritique: 'rotto X' } };
   const p = buildPayload(bucket, { feedback: { text: 'lamentela' } });
   assert.equal(p.feedback.text, 'lamentela');
-  assert.equal(p.verifierCritique, 'rotto X');
+  assert.equal(p.verifierCritique, undefined, 'qui si riallinea un ramo, non si corregge');
   assert.equal(p.loopCount, 1);
 });
 
@@ -168,7 +168,7 @@ test('buildPayload prober: payload vuoto', () => {
 
 // ─── Lo storico delle critiche (caso #502: sei giri per un difetto da due) ────
 
-test('buildPayload verifier e fixer: lo storico delle critiche arriva nel payload', () => {
+test('buildPayload: lo storico delle critiche arriva a chi verifica, e a nessun altro', () => {
   const history = [
     { verdict: 'fail', critique: 'esce con lo zoom' },
     { verdict: 'fail', critique: 'esce col ridimensionamento' },
@@ -177,25 +177,24 @@ test('buildPayload verifier e fixer: lo storico delle critiche arriva nel payloa
   assert.deepEqual(v.history, history, 'il verifier vede le porte già trovate dai giri passati');
   assert.equal(v.loopCount, 2, 'e sa a che giro è');
   const f = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', serverCritique: 'ultima' }, { feedback: { text: 's' }, history });
-  assert.deepEqual(f.history, history, 'chi corregge vede la SERIE, non solo l\'ultima critica');
-  assert.equal(f.verifierCritique, 'ultima');
+  assert.equal(f.history, undefined, 'il riallineamento non corregge niente: la serie non gli serve');
 });
 
 test('buildPayload: senza storico dal server (o malformato) arriva un elenco vuoto', () => {
   const v = buildPayload({ role: 'verifier', id: 'A', branch: 'worker/A' }, { feedback: { text: 's' } });
   assert.deepEqual(v.history, [], 'un server vecchio non manda lo storico: elenco vuoto, non un buco');
   const f = buildPayload({ role: 'fixer', id: 'A', branch: 'worker/A' }, { feedback: { text: 's' }, history: 'non-un-array' });
-  assert.deepEqual(f.history, []);
+  assert.equal(f.history, undefined);
 });
 
 test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e chi verifica', () => {
   const due = [{ critique: 'a' }, { critique: 'b' }];
-  assert.equal(serialAwarenessNote('fixer', []), '', 'primo passaggio: niente avvertenza');
-  assert.equal(serialAwarenessNote('fixer', [{ critique: 'a' }]), '', 'una sola bocciatura non è una serie');
-  assert.match(serialAwarenessNote('fixer', due), /inventario/, 'dalla seconda: inventario delle strade, non l\'ultima porta');
+  assert.equal(serialAwarenessNote('verifier', []), '', 'primo giro: niente avvertenza');
+  assert.equal(serialAwarenessNote('verifier', [{ critique: 'a' }]), '', 'una sola bocciatura non è una serie');
   assert.match(serialAwarenessNote('verifier', due), /stessa critica/i, 'il verifier deve elencare le porte tutte insieme');
   assert.equal(serialAwarenessNote('secaudit', due), '', 'il controllo di sicurezza non c\'entra con la serie');
-  assert.equal(serialAwarenessNote('fixer', null), '', 'storico assente ≠ guasto');
+  assert.equal(serialAwarenessNote('fixer', due), '', 'il riallineamento dopo un conflitto non corregge niente');
+  assert.equal(serialAwarenessNote('verifier', null), '', 'storico assente ≠ guasto');
 });
 
 // ─── Stato su disco ───────────────────────────────────────────────────────────
@@ -458,17 +457,15 @@ test('preflightExitCode: il contratto 0 / 2 / 3 dell\'orchestratore', () => {
 
 // ─── Ruolo unico resolver + contratto comune (SPEC-RIDISEGNO-MAX.md §12) ──────
 
-test('buildPayload: new-work e fixer dichiarano il caso del resolver', () => {
-  // Il server distingue ancora i due nomi nel protocollo; il worker riceve le
-  // stesse istruzioni (resolver.md) e capisce da `case` da dove parte.
+test('buildPayload: ogni caso di lavorazione si dichiara, e combacia col testo che riceve', () => {
   const nw = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' } });
   assert.equal(nw.case, 'primo-passaggio');
   const fx = buildPayload(
     { role: 'fixer', id: 'a', num: '7', branch: 'worker/a', serverCritique: 'si rompe X' },
     { feedback: { text: 't' } },
   );
-  assert.equal(fx.case, 'correzione');
-  assert.equal(fx.verifierCritique, 'si rompe X');
+  assert.equal(fx.case, 'riallineamento');
+  assert.equal(fx.verifierCritique, undefined, 'la consegna non può dire il contrario del testo di ruolo');
 });
 
 test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comune', () => {
@@ -477,13 +474,16 @@ test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comun
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, 'resolver.md'), '# ruolo resolver\ncorpo del ruolo\n');
+  writeFileSync(resolve(dir, 'resolver-rebase.md'), '# ruolo rebase\n<!-- includi: _pezzo.md -->\n');
+  writeFileSync(resolve(dir, '_pezzo.md'), 'pezzo condiviso\n');
   writeFileSync(resolve(dir, 'halt.md'), '# guasto\nfermati\n');
   writeFileSync(resolve(dir, '_contratto-worker.md'), '# Contratto comune dei worker\nregole\n');
   const nw = readRoleInstructions('new-work');
   assert.ok(nw.includes('# ruolo resolver'), 'new-work riceve le istruzioni del resolver');
   assert.ok(nw.includes('# Contratto comune dei worker'), 'col contratto accodato in fondo');
   const fx = readRoleInstructions('fixer');
-  assert.ok(fx.includes('# ruolo resolver'), 'fixer riceve le STESSE istruzioni (caso nel payload)');
+  assert.ok(fx.includes('# ruolo rebase') && !fx.includes('# ruolo resolver'), 'fixer riceve SOLO il testo del suo caso');
+  assert.ok(fx.includes('pezzo condiviso') && !fx.includes('includi:'), 'i pezzi condivisi vengono espansi');
   assert.ok(fx.includes('# Contratto comune dei worker'));
   // Il guasto non è un ruolo lavorante: niente contratto.
   const halt = readRoleInstructions('halt');
@@ -499,7 +499,7 @@ test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', (
   // Il preflight consegna orchestrator.md, dispatch consegna gli altri: un file
   // spostato o svuotato è un ruolo che parte senza istruzioni.
   const realDir = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  for (const f of ['orchestrator.md', 'resolver.md', 'verifier.md', 'secaudit.md', 'prober.md', 'halt.md', '_contratto-worker.md']) {
+  for (const f of ['orchestrator.md', 'resolver.md', 'resolver-rebase.md', '_criteri-verifica.md', '_segnala.md', 'verifier.md', 'secaudit.md', 'prober.md', 'halt.md', '_contratto-worker.md']) {
     const p = resolve(realDir, f);
     assert.ok(existsSync(p), `${f} deve esistere`);
     assert.ok(readFileSync(p, 'utf8').length > 300, `${f} non deve essere uno stub`);

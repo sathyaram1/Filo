@@ -323,20 +323,14 @@ locale: da tutte e due le parti il lavoro passa poi da una verifica
 indipendente, che costa un agente intero. Nei giri di agosto e settembre il
 primo giro trovava un rilievo grave in 15 lavori su 17, quasi sempre su
 qualcosa che chi aveva lavorato poteva vedere da sé. Quindi, prima della
-consegna:
+consegna, applica uno per uno i criteri di
+**`routines/roles/_criteri-verifica.md`**: sono gli stessi che userà chi ti
+verifica. Nelle routine li hai già nel testo del tuo ruolo; in locale apri il
+file (nove voci).
 
-- le **strade equivalenti** — menu, scorciatoia, tasto destro, chat, l'altra
-  pagina che ha la stessa funzione — fanno tutte la stessa cosa;
-- **tema scuro e tema chiaro**, se hai toccato qualcosa che si vede;
-- **input limite**: vuoto, soli spazi, 10.000 caratteri, caratteri speciali,
-  azioni ripetute in fretta;
-- le **invarianti UX** del § Iniziativa: se si può aggiungere si può togliere,
-  cammini equivalenti si comportano allo stesso modo;
-- una **prova sul cammino segnalato**, che asserisce il successo dal punto di
-  vista dell'utente. Quale prova lo dicono i minimi qui sopra: se non c'è
-  niente da aprire (logica pura, testi, strumenti da riga di comando) è il
-  controllo veloce in `tests/unit/`, non una spec che apre Filo per non
-  guardarci niente.
+Quale prova scrivere lo dicono i minimi qui sopra: se non c'è niente da aprire
+(logica pura, testi, strumenti da riga di comando) è il controllo veloce in
+`tests/unit/`, non una spec che apre Filo per non guardarci niente.
 
 Quello che trovi lo correggi adesso, non lo lasci a chi verifica.
 

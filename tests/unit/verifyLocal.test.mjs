@@ -168,6 +168,10 @@ test('buildVerifierBrief: niente che non serva a criticare', () => {
   assert.match(brief, /verify-local\.mjs critica/);
   assert.ok(!/corretto "/.test(brief), 'il comando della correzione non si annuncia prima');
   assert.ok(!/FASE 2/.test(brief));
+  // La ricetta in coda al compito dice di allegare alla critica un file con le
+  // scelte e i loro costi; in locale lo strumento non accetta opzioni. Chi
+  // verifica deve saperlo prima di scrivere quel file, non dal rifiuto.
+  assert.match(brief, /non c'è\s*\n?\s*`--segnala`/);
 });
 
 // L'isolamento è il motivo per cui questa verifica vale qualcosa: se al
@@ -804,13 +808,20 @@ test('withCritique senza i bilanci lancia: non c\'è un default con cui rimpiazz
   assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
 });
 
-test('CLI: status e start stampano i bilanci letti dal server; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
+test('CLI: né status né start mettono i bilanci davanti a chi verifica; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
   const casa = depositoUsaEGetta();
+  // `status` è il primo comando che prova chi verifica: legge il documento del
+  // server (così un token mancante si scopre subito) ma i numeri non li mostra
+  // — sapere quanti giri restano per un livello orienta il livello.
   const st = vl(casa, 'status');
-  assert.match(st.out, /Bilanci del giro \(dal server, config\/routines\): cap2 5 · cap1 2 · cap0 0/);
+  assert.equal(st.code === 0 || st.code === 1, true, st.out);
+  assert.doesNotMatch(st.out, /cap2|cap1|cap0|Bilanci/);
+  assert.match(st.out, /Server raggiunto/);
   const start = vl(casa, 'start', 'richiesta di prova');
   assert.equal(start.code, 0, start.out);
-  assert.match(start.out, /cap2 5 · cap1 2 · cap0 0/);
+  // Il compito consegnato a chi verifica (l'uscita normale) NON porta i
+  // bilanci: sapere prima quanti giri restano orienta il livello che scrive.
+  assert.doesNotMatch(start.out, /cap2 5|Bilanci del giro/);
   // Un giro con la critica: i bilanci residui sono quelli del server (5 → 4).
   const cr = vl(casa, 'critica', LUNGA_FIX);
   assert.equal(cr.code, 0, cr.out);
@@ -833,4 +844,18 @@ test('CLI: status e start stampano i bilanci letti dal server; con un server irr
     assert.match(r.stderr, /Gestione → Automazioni/);
   } finally { parziale.kill(); }
 
+});
+
+test('la coda locale è il testo del server più le sole differenze locali', async () => {
+  const { codaDalServer } = await import('../../scripts/verify-local.mjs');
+  assert.equal(codaDalServer(''), '', 'senza testo dal server non si inventa niente: decide il ripiego');
+  assert.equal(codaDalServer('   '), '');
+  const t = codaDalServer('FASE 2 — adesso correggi tu.\n8. Consegna: node scripts/dispatch.mjs --record-fixed <id>');
+  assert.ok(t.startsWith('FASE 2 — adesso correggi tu.'), 'il testo del server arriva intero e per primo');
+  assert.match(t, /IN LOCALE/);
+  assert.match(t, /verify-local\.mjs corretto/, 'la consegna locale è detta per esteso');
+  assert.match(t, /non c'è un biglietto/);
+  const coda = codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/x', instructions: t });
+  assert.match(coda, /FASE 2 — adesso correggi tu\./);
+  assert.match(coda, /verify-local\.mjs corretto/);
 });

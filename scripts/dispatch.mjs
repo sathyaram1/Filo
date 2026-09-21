@@ -16,10 +16,12 @@
 //     (checkEnvelope: ruolo conosciuto, ramo presente per i ruoli dell'iter,
 //     feedback non vuoto) — mezza busta è peggio di nessuna busta. Senza
 //     biglietto: GUASTO, nessun cammino alternativo.
-//   - RUOLO UNICO DI LAVORAZIONE (`resolver`): il server distingue ancora
-//     `new-work` (primo passaggio) e `fixer` (correzione), ma il worker riceve
-//     le stesse istruzioni (resolver.md) e il caso nel payload (`case`). I due
-//     nomi restano nel protocollo del canale finché il server non li fonde.
+//   - DUE CASI DI LAVORAZIONE, due testi: `new-work` è il primo passaggio,
+//     `fixer` è il riallineamento del ramo dopo un conflitto di fusione. I
+//     rilievi di una verifica NON passano più di qui: li corregge chi li ha
+//     scritti, con le istruzioni che il server gli stampa dopo la critica.
+//     Il server accompagna OGNI riallineamento con una critica sua (dice che è
+//     un conflitto): non è un rilievo, e qui non si consegna a chi riallinea.
 //   - A ogni ruolo LAVORANTE viene ACCODATO il contratto comune
 //     (routines/roles/_contratto-worker.md): il testo di ritorno del worker
 //     non è un canale, tutto va registrato via script.
@@ -77,6 +79,7 @@ import {
   writeExpectation, clearExpectation, stateDir,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
+import { espandiInclusioni } from './lib/role-text.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
@@ -463,10 +466,9 @@ export function clearState(id) {
 const ROLE_FILE = {
   secaudit: 'secaudit.md',
   verifier: 'verifier.md',
-  // new-work e fixer sono lo stesso mestiere con un punto di partenza diverso
-  // (SPEC-RIDISEGNO-MAX.md §12): il server distingue ancora i due nomi nel
-  // protocollo, il worker riceve UN ruolo (resolver) e il caso nel payload.
-  fixer: 'resolver.md',
+  // Ogni caso riceve solo il suo testo: il riallineamento dopo un conflitto
+  // (fixer) non si porta dietro le istruzioni del primo passaggio.
+  fixer: 'resolver-rebase.md',
   'new-work': 'resolver.md',
   resolver: 'resolver.md',
   prober: 'prober.md',
@@ -607,20 +609,9 @@ export function serialAwarenessNote(role, history, dropped = 0) {
   const tolte = d > 0
     ? [`${d === 1 ? 'Una critica più vecchia NON è' : `${d} critiche più vecchie NON sono`} nel fascicolo (la serie tiene solo le ultime): le porte di quei giri non si possono ri-provare da qui, e non vanno date per chiuse.`, '']
     : [];
-  if (role === 'fixer' || role === 'resolver') {
-    return [
-      `## ⚠️ Avvertenza di serie: questo lavoro è già stato rimandato indietro ${n + d} volte`,
-      '',
-      ...tolte,
-      'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
-      'Leggile TUTTE prima di toccare codice. Se raccontano lo stesso danno che',
-      'rientra da porte diverse, il rimedio giusto non è chiudere l\'ultima porta',
-      'segnalata: è fare l\'inventario di TUTTE le strade che possono riprodurre',
-      'il sintomo (cosa può cambiare lo stato da cui il difetto nasce, in ogni',
-      'direzione) e scrivere una regola sola che le copra. Prima di consegnare,',
-      'ripercorri l\'inventario e verifica ogni voce.',
-    ].join('\n');
-  }
+  // Solo chi verifica: è lui che vede la serie e che poi corregge. Al
+  // riallineamento dopo un conflitto la serie non serve, e un'avvertenza che
+  // ordina di curare la causa contraddirebbe il suo testo.
   if (role === 'verifier') {
     return [
       `## ⚠️ Avvertenza di serie: sei al giro ${n + d + 1} di verifica su questo lavoro`,
@@ -639,7 +630,7 @@ export function readRoleInstructions(role) {
   const name = ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
-  const base = existsSync(f) ? readFileSync(f, 'utf8') : '';
+  const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
   if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
   const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
   const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
@@ -655,7 +646,8 @@ export function readRoleInstructions(role) {
  * Costruisce il payload che il worker riceve, rispettando l'ISOLAMENTO:
  *   - secaudit: SOLO il diff, MAI il feedback (isolamento strutturale).
  *   - verifier: il feedback (sintomo), MAI il diff (isolamento comportamentale).
- *   - fixer    (resolver, caso `correzione`): feedback + critica del verifier.
+ *   - fixer    (caso `riallineamento`): il feedback, per capire le intenzioni
+ *              in conflitto. Nessuna critica: qui non si corregge niente.
  *   - new-work (resolver, caso `primo-passaggio`): il feedback decifrato.
  *   - prober:   niente.
  *
@@ -680,25 +672,15 @@ export function buildPayload(bucket, ctx = {}) {
         loopCount: bucket.loopCount || 0,
       };
     case 'fixer':
+      // Riallineamento del ramo dopo un conflitto di fusione. Il lavoro era
+      // già verificato: niente critica e niente serie, o la consegna direbbe
+      // il contrario del testo di ruolo (che vieta di toccare altro).
       return {
-        // È il resolver nel caso `correzione`: stesse istruzioni del primo
-        // passaggio, ma parte dalla critica di chi ha bocciato.
-        case: 'correzione',
+        case: 'riallineamento',
         branch: bucket.branch,
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
-        // La critica del SERVER viene prima di quella del fogliettino locale:
-        // è il server che registra i verdetti, e il fogliettino sparirà con la
-        // coda. Sta sul bucket e non nello stato perché lo stato viene
-        // riscritto quando ci si posiziona sul ramo — ed è così che la critica
-        // spariva senza che nessuno se ne accorgesse.
-        verifierCritique: bucket.serverCritique || bucket.state?.verifierCritique || '',
-        // TUTTE le critiche dei giri passati, dalla più vecchia: la singola
-        // critica dice cosa correggere, la serie dice se stai tappando porte
-        // una alla volta invece di chiudere la causa.
-        history: Array.isArray(ctx.history) ? ctx.history : [],
-        historyDropped: Number(ctx.historyDropped) || 0,
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
@@ -1024,7 +1006,7 @@ export function verifierReplyText(reply) {
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
-      'Rilievi da correggere in questo giro (solo questi):',
+      'Rilievi da correggere in questo giro:',
       fmt(r.phase2.findings),
       'Rilievi messi da parte (fuori da questo giro: li apre il server come feedback derivato):',
       fmt(r.phase2.derived),
@@ -1442,17 +1424,8 @@ export async function run() {
     // divergono in silenzio.
     const prev = readState(bucket.id) || defaultState(bucket.id, bucket.branch);
     bucket.state = { ...prev, id: bucket.id, branch: bucket.branch || prev.branch || '' };
-    // La critica di chi ha bocciato la tiene il SERVER: è lui che registra i
-    // verdetti. Il fogliettino su git resta come tappabuchi finché esiste —
-    // ma quando sparirà, se non si leggesse quella del server la correzione
-    // partirebbe alla cieca senza che nessuno se ne accorga.
-    //
-    // Va tenuta sul bucket, NON nello stato: lo stato viene riscritto da capo
-    // quando la cartella si posiziona sul ramo, e lì la critica del server si
-    // perdeva in silenzio.
-    if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
-      bucket.serverCritique = w.payload.critique;
-    }
+    // La critica che accompagna la busta NON si passa a nessuno: i rilievi li
+    // corregge chi li ha scritti, e al riallineamento direbbe il contrario.
   }
   // La busta si passa COM'È: incartarla in un altro oggetto ha già fatto
   // arrivare al lavoratore un pacchetto vuoto, con il giro che usciva
@@ -1607,7 +1580,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
     // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
     // che da qui è stato tolto. Lo storico delle critiche viaggia accanto al
-    // feedback, per chi lo riceve (verifier e fixer); un server vecchio non lo
+    // feedback per chi lo riceve (solo il verifier); un server vecchio non lo
     // manda e qui arriva semplicemente vuoto.
     return {
       feedback: (payload && payload.feedback) || null,
@@ -1919,8 +1892,12 @@ if (isMainModule) {
             process.exit(3);
           }
           const tools = pin.dir;
-          const f = resolve(tools, 'routines', 'roles', 'orchestrator.md');
-          const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
+          const dirRuoli = resolve(tools, 'routines', 'roles');
+          const f = resolve(dirRuoli, 'orchestrator.md');
+          // Anche qui i richiami ai pezzi condivisi si espandono: letto grezzo,
+          // un richiamo arrivava all'orchestratore come una riga di commento
+          // vuota, al posto delle regole che doveva portare.
+          const brief = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), dirRuoli) : '';
           const da = pinnedOrigin(tools);
           console.log(`[dispatch] prontezza OK. Strumenti fissati${da ? ` da ${da}` : ''}.`);
           if (nonVerificato) {

@@ -41,7 +41,10 @@ describe('il repo non si porta dietro avanzi', () => {
   test('nessun file tracciato che .gitignore dice di escludere', () => {
     // `.gitignore` non tocca ciò che è già registrato: senza questo controllo
     // una regola di esclusione resta lì a dire una cosa che non è vera.
-    const ignorati = git('ls-files', '-i', '-c', '--exclude-standard')
+    // Contano SOLO i `.gitignore` del repo: le esclusioni personali di una
+    // macchina non sono una regola del progetto, e il repo non può obbedirle.
+    const ignorati = git('-c', 'core.excludesFile=/dev/null',
+      'ls-files', '-i', '-c', '--exclude-per-directory=.gitignore')
       .split('\n').filter(Boolean);
     assert.deepEqual(ignorati, [],
       'questi file sono tracciati anche se .gitignore li esclude: o non dovevano entrare '

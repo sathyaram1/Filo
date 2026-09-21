@@ -62,6 +62,6 @@ il dispatcher: `--role` non va passato a mano).
 
 ## Come riporti
 
-Ciò che conta è quello che hai DEPOSITATO via canale: il tuo testo di ritorno
-non viene letto. Se dopo l'audit non c'è nulla di utile, termina senza fare
-nulla — non inventare feedback per riempire la coda.
+Ciò che conta è quello che hai DEPOSITATO via canale. Se dopo l'audit non c'è
+nulla di utile, termina senza fare nulla — non inventare feedback per riempire
+la coda.

@@ -65,6 +65,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { espandiInclusioni } from './lib/role-text.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
@@ -665,6 +666,23 @@ export function testoRossiAttesi(branch) {
   ].join('\n');
 }
 
+// La fase 2 è UN testo, quello del server (config/routines, lo stesso del
+// cloud): in locale gli si accoda solo ciò che qui è diverso. PURA.
+export function codaDalServer(testoServer) {
+  const testo = String(testoServer || '').trim();
+  if (!testo) return '';
+  return [
+    testo,
+    '',
+    'IN LOCALE, tre differenze da quanto scritto qui sopra:',
+    '- le prove del giro stanno nella cartella indicata più su, non in `tests/verifica/<numero>`;',
+    '- non c\'è `--segnala`: un trade-off vero si scrive nel report, con le strade e i loro costi, e lo porta',
+    '  all\'owner chi guida il giro;',
+    '- la consegna è `node scripts/verify-local.mjs corretto "<report della correzione>"`, e non c\'è un biglietto',
+    '  da rilasciare. Dopo serve un\'altra verifica, di un\'altra istanza: la lancia chi guida.',
+  ].join('\n');
+}
+
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
@@ -686,7 +704,7 @@ export function codaText({ findings, derived, budgets, branch, instructions }) {
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
-    'Rilievi da correggere in questo giro (solo questi):',
+    'Rilievi da correggere in questo giro:',
     fmt(findings),
     'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     fmt(derived),
@@ -948,9 +966,11 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     'Boccia per ciò che non si ottiene, non per differenze di gusto: un trade-off vero',
     'si segna con `?` e lo decide l’owner.',
     '',
-    'DUE PASSI DELLA RICETTA QUI SOTTO IN LOCALE NON VALGONO, e sono gli ultimi che',
+    'TRE PASSI DELLA RICETTA QUI SOTTO IN LOCALE NON VALGONO, e sono gli ultimi che',
     'leggerai: la critica NON si registra con lo strumento delle routine (non c\'è un',
-    'numero di pratica: si usa `verify-local.mjs critica`, qui sopra), e non c\'è nessun',
+    'numero di pratica: si usa `verify-local.mjs critica`, qui sopra); non c\'è',
+    '`--segnala`, e nemmeno un\'altra opzione (un trade-off vero si segna col `?` e le',
+    'scelte coi loro costi si scrivono nella riga del rilievo); non c\'è nessun',
     'biglietto da rilasciare alla fine. Tutto il resto della ricetta vale.',
     '',
     '─── recipe della verifica (la stessa delle routine) ───',
@@ -959,8 +979,9 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
 }
 
 export function readRecipe(root = ROOT) {
-  const f = resolve(root, 'routines', 'roles', 'verifier.md');
-  return existsSync(f) ? readFileSync(f, 'utf8') : '';
+  const dir = resolve(root, 'routines', 'roles');
+  const f = resolve(dir, 'verifier.md');
+  return existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), dir) : '';
 }
 
 // ─── CLI ────────────────────────────────────────────────────────────────────
@@ -1067,7 +1088,10 @@ if (isMain) {
     const state = withRequest(readState(), b, { request, sha: headSha() });
     writeState(state);
     console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe(), history: historyFromRounds(state[b].rounds) }));
-    console.log(bilanciText(capsStart));
+    // I bilanci servono a chi guida, non a chi verifica: sapere prima quanti
+    // giri restano per livello orienta il livello che si scrive. Vanno
+    // sull'altro canale, fuori dal compito che si consegna.
+    console.error(bilanciText(capsStart));
     process.exit(0);
   }
 
@@ -1114,7 +1138,7 @@ if (isMain) {
     const e = r.state[branch];
     if (r.outcome === 'fix') {
       if (r.replayed) console.log('(critica già registrata su questo giro: ristampo la fase 2, il giro non si ripaga)');
-      console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: leggiCoda() }));
+      console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: codaDalServer(caps.fixInstructions) || leggiCoda() }));
     } else if (r.outcome === 'stop') {
       console.log(`══ ESITO: il lavoro si ferma ══\nRilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
     } else {
@@ -1171,9 +1195,13 @@ if (isMain) {
   }
 
   if (cmd === 'status' || !cmd) {
-    // I bilanci veri, dal server: `status` è il modo di vederli senza aprire
-    // un giro, e di scoprire subito se il token manca.
-    console.log(bilanciText(await bilanciOStop()));
+    // I NUMERI qui non si stampano. Sapere quanti giri restano per un livello
+    // orienta il livello mentre lo si sceglie, e `status` è il primo comando
+    // che prova chi verifica: li aveva davanti prima di scrivere un rigo. La
+    // lettura resta, perché dice subito se il token manca; i numeri li vede
+    // chi guida, quando apre il giro, e in Gestione → Automazioni.
+    await bilanciOStop();
+    console.log('Server raggiunto, impostazioni del giro lette.');
     const r = verdictForCurrentBranch();
     console.log(`${r.branch}: ${r.reason}`);
     // A correzione in sospeso si dice anche COSA c'è da correggere, e come
