@@ -1375,7 +1375,7 @@ export function usageText() {
     '                         col loro trade-off / Cosa ho fatto nel frattempo); è quello',
     '                         che l\'owner legge cliccando il rombo in dashboard',
     '  --ferma                solo con --record-fixed e insieme a --segnala: il lavoro non',
-    '                         torna in verifica, si ferma e aspetta chi possiede il progetto',
+    '                         torna in verifica, si ferma e aspetta l’owner',
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
     '',
