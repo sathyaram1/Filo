@@ -139,3 +139,62 @@ test('anonimo: invito ad accedere; loggato (lato renderer): il voto passa dal ma
   await expect(works).toHaveAttribute('aria-pressed', 'false');
   await expect(works.locator('.bd-vote-count')).toHaveText('1');
 });
+
+// ── Il voto dato si legge anche col tema scuro (verifica #478) ──────────────
+//
+// I due colori del voto «premuto» stavano scritti a mano una volta sola e
+// valevano per tutti e due i temi. Nel tema scuro il conteggio finiva a 2,86
+// volte il fondo per «funziona» e 2,77 per «non funziona», sotto il minimo di
+// 3: il numero spariva proprio dopo aver votato, cioè dopo il gesto per cui la
+// bacheca esiste. La guardia sta qui, dove la suite la rilancia sempre.
+test('il conteggio del voto dato resta leggibile nei due temi', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await seed(page, { signedIn: 'me@example.com' });
+
+  // Un voto per verso, dati da QUESTO utente, così i due pulsanti premuti
+  // esistono tutti e due in pagina.
+  await page.evaluate(() => {
+    const voto = (v) => ({ 'me@example.com': { vote: v, at: '2026-09-02T10:00:00Z', credibilitySnapshot: 1 } });
+    window.__boardTest.setData([
+      { _id: 'fb-si', name: 'Fix votato bene', status: 'done', seq: 51, subSeq: 0,
+        resolvedInVersion: '0.2.70', createdAt: '2026-06-20T10:00:00Z', votes: voto('works') },
+      { _id: 'fb-no', name: 'Fix votato male', status: 'done', seq: 52, subSeq: 0,
+        resolvedInVersion: '0.2.70', createdAt: '2026-06-20T11:00:00Z', votes: voto('broken') },
+    ]);
+  });
+  await expect(page.locator('.bd-card')).toHaveCount(2);
+
+  // Rapporto di contrasto WCAG fra il colore del testo e il fondo VERO sotto di
+  // lui: il fondo del pulsante premuto è semitrasparente, quindi va steso sopra
+  // il primo antenato con un colore pieno.
+  const rapporto = async (sel) => page.locator(sel).evaluate((el) => {
+    const num = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+    let sotto = [255, 255, 255];
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const n = num(getComputedStyle(p).backgroundColor);
+      if (n.length >= 3 && (n.length < 4 || n[3] >= 1)) { sotto = n.slice(0, 3); break; }
+    }
+    const suo = num(getComputedStyle(el).backgroundColor);
+    const a = suo.length > 3 ? suo[3] : 1;
+    const fondo = [0, 1, 2].map((i) => suo[i] * a + sotto[i] * (1 - a));
+    const lum = (c) => {
+      const v = c.map((x) => {
+        const s = x / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+    };
+    const a1 = lum(num(getComputedStyle(el).color).slice(0, 3));
+    const a2 = lum(fondo);
+    return (Math.max(a1, a2) + 0.05) / (Math.min(a1, a2) + 0.05);
+  });
+
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    const si = await rapporto('[data-id="fb-si"] .bd-vote-works');
+    const no = await rapporto('[data-id="fb-no"] .bd-vote-broken');
+    expect(si, `voto «funziona», tema ${tema}: contrasto ${si.toFixed(2)}`).toBeGreaterThan(3);
+    expect(no, `voto «non funziona», tema ${tema}: contrasto ${no.toFixed(2)}`).toBeGreaterThan(3);
+  }
+});

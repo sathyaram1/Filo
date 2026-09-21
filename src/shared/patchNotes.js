@@ -39,6 +39,7 @@
         'I siti che apri non possono più agire al posto tuo dentro Filo: votare in bacheca, spendere i tuoi crediti per riaprire un fix, farti uscire dall\'account o leggere con che indirizzo sei entrato.',
         'Se una tua segnalazione viene risolta dopo mesi, l\'annuncio e i crediti arrivano lo stesso. Prima Filo guardava solo le segnalazioni più recenti, e chi aveva aspettato di più non riceveva niente.',
         'In bacheca ci sono tutti i fix usciti, anche i più vecchi: prima l\'elenco si fermava ai cinquecento più recenti.',
+        'Col tema scuro, il voto che dai in bacheca si legge: prima, appena votavi, il numero accanto al pulsante finiva verde scuro su verde scuro e spariva. Il colore delle conferme adesso è fra quelli che puoi cambiare in Preferenze.',
         'Gli allegati che mandi con una segnalazione, quando la riapri, dicono che li apre solo chi riceve le segnalazioni, invece di sembrare rotti. Vale sia per gli screenshot sia per i file.',
         'Nell\'elenco dei feedback si aprono solo gli allegati veri, e Filo non dichiara arrivato niente che non abbia visto. Prima una segnalazione poteva dichiarare un finto allegato, mandarti sul sito scelto da chi l\'aveva scritta e farselo pure presentare da Filo come consegnato.',
         'Nell\'elenco dei feedback l\'indirizzo della pagina segnalata dice su che sito porta, anche quando è lungo. Prima si leggevano i primi caratteri e basta, e un indirizzo scritto apposta poteva sembrare di Filo e portare altrove.',

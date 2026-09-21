@@ -90,11 +90,21 @@
       font-size: 13px; font-weight: 600;
     }
     .bd-vote-btn:hover { border-color: var(--sn-accent); }
+    /* Il voto GIÀ DATO. I due colori erano scritti a mano, uguali nei due temi:
+       sul fondo scuro il conteggio scendeva a 2,9 volte il fondo (il minimo è
+       3) e il numero spariva proprio dopo aver votato. Adesso vengono dai token
+       del tema, che hanno la loro variante scura e l'utente può cambiare; la
+       tinta di riempimento nasce dallo stesso colore, come fa theme.css per la
+       selezione, così restano d'accordo anche se lo cambi. */
     .bd-vote-btn[aria-pressed="true"].bd-vote-works {
-      background: rgba(39, 174, 96, 0.15); border-color: #27ae60; color: #1e8449;
+      background: color-mix(in srgb, var(--sn-success) 15%, transparent);
+      border-color: var(--sn-success);
+      color: var(--sn-success);
     }
     .bd-vote-btn[aria-pressed="true"].bd-vote-broken {
-      background: rgba(192, 57, 43, 0.15); border-color: #c0392b; color: #c0392b;
+      background: color-mix(in srgb, var(--sn-error) 15%, transparent);
+      border-color: var(--sn-error);
+      color: var(--sn-error);
     }
     .bd-vote-count { font-variant-numeric: tabular-nums; }
 
