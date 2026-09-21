@@ -30,9 +30,19 @@ function pratica(over = {}) {
     status: 'design',
     statusReason: 'clarify',
     statusPublic: 'open',
-    notes: '--- Filo ---\nQuale immagine intendi: quella di sfondo o quelle dentro la pagina?',
+    notes: 'Quale immagine intendi: quella di sfondo o quelle dentro la pagina?',
   }, over);
 }
+
+// Una conversazione già andata avanti: Filo chiede, l'owner risponde, Filo
+// richiede. L'ultima domanda è quella che conta.
+const CONVERSAZIONE = [
+  'Quale immagine intendi?',
+  '--- La tua risposta del 19/09/2026, 10:00 ---',
+  'Quelle dentro la pagina.',
+  '--- Filo ha risposto il 19/09/2026, 11:00 ---',
+  'Anche sulle immagini di sfondo delle pagine con parallasse?',
+].join('\n');
 
 async function apri(page, { admin = true, fbs = [] } = {}) {
   await page.waitForLoadState('domcontentloaded');
