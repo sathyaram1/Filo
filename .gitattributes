@@ -1,0 +1,47 @@
+# Fine riga: LF ovunque, in ogni copia di lavoro, Windows compreso.
+#
+# Perche' esiste questo file. Git for Windows installa di serie
+# `core.autocrlf=true`, e lo stesso vale per i contenitori `windows-latest` di
+# GitHub Actions — dove gira il cancello che pubblica le versioni. Con quella
+# impostazione ogni file di testo viene scritto nella copia di lavoro con CRLF,
+# e i byte che si leggono NON sono piu' quelli che sta in git. Da li' in avanti
+# si rompono cose che su Linux e Mac non si rompono mai, quindi nessuno le vede:
+#
+#   • gli hook di `.claude/hooks/*.sh` smettono di funzionare. Bash legge
+#     `cd /percorso\r`, non trova la cartella e prosegue: il salvataggio
+#     automatico — che e' il TRASPORTO del lavoro, non solo il paracadute — non
+#     committa e non spedisce piu' niente, ed esce 0. Un guasto invisibile,
+#     esattamente quello che CLAUDE.md dice di non lasciare in piedi;
+#   • ogni sentinella che legge un file del repo con una regex ancorata a fine
+#     riga smette di riconoscere alcunche': per una regex `\r` e' gia' fine
+#     riga, quindi `$` non ci arriva mai. E' cosi' che PATTERNS.md e' risultato
+#     «senza nessuna voce» e il cancello ha fermato la pubblicazione
+#     (feedback #565, poi di nuovo #572).
+#
+# La cura una-per-tutte e' qui, non nelle singole regex: `eol=lf` vince su
+# `core.autocrlf` qualunque cosa abbia configurato chi clona, quindi la copia di
+# lavoro nasce con gli stessi byte su tutte e tre le piattaforme. `text=auto`
+# normalizza a LF anche cio' che viene committato da Windows.
+#
+# Attenzione: questa regola vale AL CHECKOUT, quindi su un clone nuovo. Una
+# copia di lavoro che esiste gia' resta storta com'e' (una fusione riscrive solo
+# i file che cambiano), e ne' `git checkout -- .` ne' `git add --renormalize .`
+# la raddrizzano: provate tutte e due. Si rimette a posto cosi', o riclonando:
+#
+#   git rm --cached -r .   # toglie tutto dall'indice, non dal disco
+#   git reset --hard       # ATTENZIONE: butta le modifiche non committate
+#
+# In questo repo NESSUN file ha bisogno di CRLF: non ci sono .bat ne' .cmd (gli
+# unici formati che lo pretendono davvero). Se un giorno ce ne fosse uno, va
+# aggiunto qui con `eol=crlf`, non tolta la regola generale.
+* text=auto eol=lf
+
+# Gli hook vengono ESEGUITI da bash: qui un CRLF non e' una sfumatura, e' uno
+# script che non parte. Dichiarato a parte perche' si legga senza dedurlo.
+*.sh text eol=lf
+
+# Binari: niente conversione, nemmeno per sbaglio. `text=auto` li riconosce da
+# solo, ma scriverlo evita che un file "quasi testo" ci finisca dentro.
+*.png binary
+*.ico binary
+*.pdf binary

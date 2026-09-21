@@ -186,7 +186,7 @@ test('HTML, script e un messaggio enorme non rompono l’intervista', async ({ a
 
   await page.evaluate(() => { window.__xss = 0; });
   const cattivo = '<img src=x onerror="window.__xss=1"><script>window.__xss=1</script>'
-    + '<a href="javascript:window.__xss=1">clic</a>   🙂';
+    + '<a href="javascript:window.__xss=1">clic</a> \u0000 🙂';
 
   await queueChat(app, {
     text: 'Ricevuto. <img src=x onerror="window.__xss=1"><script>window.__xss=1</script>',
