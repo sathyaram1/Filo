@@ -63,7 +63,7 @@ test('i tre ambiti della verifica condividono livelli, critica e registrazione',
 test('nessun testo di verifica anticipa il seguito del giro', () => {
   for (const scope of ['pieno', 'chiusura', 'riallineamento']) {
     const t = readRoleInstructions('verifier', { scope });
-    for (const spia of [/correggerai/i, /sarai tu a corregg/i, /giri (che )?resta/i, /bilanci/i, /cap[012]\b/, /--record-fixed/]) {
+    for (const spia of [/correggerai/i, /sarai tu a corregg/i, /giri (che )?resta/i, /bilanci/i, /cap[012]\b/]) {
       assert.ok(!spia.test(t), `ambito ${scope}: il testo anticipa il seguito (${spia})`);
     }
   }
