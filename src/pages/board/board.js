@@ -143,6 +143,16 @@
     for (const fb of items) {
       bdList.appendChild(renderCard(fb));
     }
+
+    if (scrivevaIn && scrivevaIn.id) {
+      const campo = bdList.querySelector(`.bd-reopen-text[data-fb-id="${CSS.escape(scrivevaIn.id)}"]`);
+      if (campo) {
+        try {
+          campo.focus();
+          campo.setSelectionRange(scrivevaIn.inizio, scrivevaIn.fine);
+        } catch (_) {}
+      }
+    }
   }
 
   function renderCard(fb) {
