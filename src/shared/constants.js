@@ -982,6 +982,16 @@
     return REASONING_LEVELS.includes(s) ? s : null;
   }
 
+  // Ordinamento degli host scelto per una voce del registry. 'auto' (o assente, o
+  // un valore ignoto) = nessuna scelta propria: vale quello globale della config.
+  const PROVIDER_SORTS = ['auto', 'throughput', 'latency', 'price'];
+
+  function normalizeProviderSort(v) {
+    const s = String(v == null ? '' : v).toLowerCase().trim();
+    if (!s || s === 'auto') return null;
+    return PROVIDER_SORTS.includes(s) ? s : null;
+  }
+
   function buildModelAttempts(refs, registry, providerOrder, apiKeys) {
     const out = [];
     const seen = new Set();
@@ -990,6 +1000,7 @@
       // non del provider: lo stesso nickname lo porta su tutti i suoi tentativi.
       const entry = registry && registry[ref];
       const reasoning = normalizeReasoning(entry && entry.reasoning);
+      const sort = normalizeProviderSort(entry && entry.sort);
       for (const provider of providerOrder || []) {
         const apiKey = apiKeys && apiKeys[provider];
         if (!apiKey) continue;
@@ -1000,6 +1011,7 @@
         seen.add(key);
         const attempt = { provider, apiKey, model: concrete };
         if (reasoning) attempt.reasoning = reasoning;
+        if (sort) attempt.sort = sort;
         out.push(attempt);
       }
     }
@@ -2391,6 +2403,8 @@
     buildModelAttempts,
     REASONING_LEVELS,
     normalizeReasoning,
+    PROVIDER_SORTS,
+    normalizeProviderSort,
     DEFAULT_EXCLUDED_PROVIDERS,
     normalizeProviderName,
     isProviderExcluded,

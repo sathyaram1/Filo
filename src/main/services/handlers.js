@@ -444,11 +444,10 @@ function buildAttemptChain(settings, modelRef, action) {
   // campo. Se dopo l'esclusione OpenRouter non trova un host ammesso, risponde
   // con un errore: la richiesta fallisce in modo evidente invece di essere
   // servita da un fornitore escluso.
-  const routing = providerRouting(settings);
-  if (routing) {
-    for (const a of out) {
-      if (a.provider === 'openrouter') a.providerRouting = routing;
-    }
+  for (const a of out) {
+    if (a.provider !== 'openrouter') continue;
+    const routing = providerRouting(settings, a.sort);
+    if (routing) a.providerRouting = routing;
   }
   return out;
 }
