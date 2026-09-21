@@ -867,9 +867,8 @@
   let saveTimer = null;
   function saveDebounced() {
     clearTimeout(saveTimer);
-    // Il «Salvato» ancora sullo schermo parla del salvataggio di PRIMA: con una
-    // modifica in attesa mentirebbe, e chi chiude la pagina la perde credendola
-    // al sicuro.
+    // Un «Salvato» ancora sullo schermo parla del salvataggio di PRIMA: con una
+    // modifica in attesa mentirebbe, e chi chiude la pagina la perde credendola al sicuro.
     $('savedHint').classList.remove('sn-show');
     saveTimer = setTimeout(() => { saveTimer = null; save(); }, 400);
   }
