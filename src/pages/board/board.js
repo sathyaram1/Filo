@@ -268,6 +268,8 @@
     wrap.appendChild(link);
     wrap.appendChild(form);
 
+    if (reopenAfterLogin) bozzeRiapertura.set(fb._id, { testo: textarea.value });
+
     // Form riaperto da solo dopo il login: sposta il focus sulla textarea
     // appena il nodo è nel DOM (subito dopo renderList l'ha già inserito).
     if (reopenAfterLogin) {
