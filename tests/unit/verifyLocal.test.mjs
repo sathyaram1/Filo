@@ -933,3 +933,29 @@ test('CLI giro stretto: dopo «corretto», start consegna la chiusura solo con l
     assert.doesNotMatch(spento.out, /Perimetro di questo giro/);
   } finally { acceso.kill(); }
 });
+
+test('giro stretto dopo un riallineamento a main: il diff della chiusura resta la sola correzione', async () => {
+  const { shaPrimaAllineato } = await import('../../scripts/verify-local.mjs');
+  const { work } = scenario({ conflitto: false });
+  const partenza = g(work, ['rev-parse', 'HEAD']); // la critica è stata registrata qui
+  writeFileSync(resolve(work, 'correzione.txt'), 'corretto\n', 'utf8');
+  g(work, ['add', '-A']);
+  g(work, ['commit', '-q', '-m', 'correzione']);
+  g(work, ['fetch', '-q', 'origin', 'main']);
+  g(work, ['rebase', '-q', 'origin/main']);
+  const nomi = (da) => g(work, ['diff', '--name-only', `${da}..HEAD`]).split('\n').filter(Boolean).sort();
+  assert.deepEqual(nomi(partenza), ['correzione.txt', 'principale.txt'], 'dal commit vecchio il diff porta dentro anche main');
+  const adesso = shaPrimaAllineato(partenza, work);
+  assert.ok(adesso && adesso !== partenza, 'il gemello del commit di partenza si ritrova nel ramo riscritto');
+  assert.deepEqual(nomi(adesso), ['correzione.txt']);
+  assert.equal(shaPrimaAllineato(adesso, work), adesso, 'un commit che è già nel ramo resta quello');
+  assert.equal(shaPrimaAllineato('non-uno-sha', work), '');
+  assert.equal(shaPrimaAllineato('', work), '');
+});
+
+test('la coda locale dice che fermare il lavoro da lì non si può, e cosa fare al suo posto', async () => {
+  const { codaDalServer } = await import('../../scripts/verify-local.mjs');
+  const t = codaDalServer('FASE 2 — adesso correggi tu.');
+  assert.match(t, /non c'è nemmeno `--ferma`/);
+  assert.match(t, /per primo nel report/);
+});
