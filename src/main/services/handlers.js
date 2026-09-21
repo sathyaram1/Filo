@@ -590,7 +590,6 @@ async function handleTranscription({ settings, payload, origin, signal }) {
   }
   const Voices = globalThis.SN_TTS_VOICES;
   const language = Voices ? Voices.langOf(p.lang) : '';
-  const routing = providerRouting(settings);
   let lastErr = null;
   for (const a of attempts) {
     const P = Providers.getProvider(a.provider);
@@ -598,7 +597,7 @@ async function handleTranscription({ settings, payload, origin, signal }) {
     try {
       const r = await P.transcribe({
         apiKey: a.apiKey, model: a.model, audioBase64, format,
-        language: language || undefined, providerRouting: routing, signal,
+        language: language || undefined, providerRouting: providerRouting(settings, a.sort), signal,
       });
       const text = String(r.text || '').trim();
       const { servedBy, violation } = noteServedProvider(settings, ACTIONS.TRANSCRIBE_AUDIO, r);
@@ -3557,7 +3556,7 @@ async function embedTexts(texts, settingsIn) {
   const P = Providers.getProvider(a.provider);
   const r = await P.embed({
     apiKey: a.apiKey, model: a.model, texts, dim: SN_CONST.EMBED_DIM,
-    providerRouting: providerRouting(settings),
+    providerRouting: providerRouting(settings, a.sort),
   });
   noteServedProvider(settings, ACTIONS.ARCHIVE_EMBED, r);
   try {

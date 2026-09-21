@@ -205,11 +205,11 @@ module.exports = function register(on, ctx) {
       const rate = Number(ttsPrefs.rate);
       const speed = rate >= 0.5 && rate <= 2 ? rate : 1;
       const text = String(msg.text == null ? '' : msg.text);
-      const routing = providerRouting(settings);
       let lastErr = null;
       for (const a of attempts) {
         const P = Providers.getProvider(a.provider);
         if (!P || typeof P.synthesizeSpeech !== 'function') continue;
+        const routing = providerRouting(settings, a.sort);
         // La voce dipende dal MODELLO: ogni modello ha i suoi nomi, e una voce
         // scelta per un altro modello va ignorata, non spedita (sarebbe un 400
         // e la lettura ripiegherebbe sul browser senza spiegazioni).
