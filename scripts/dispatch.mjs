@@ -967,6 +967,15 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
 // Ri-esportati da qui per chi li importava da dispatch.
 export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 
+// Il testo della fase 2 lo scrive l'owner e può non nominarla: la porta per
+// fermarsi la dice lo strumento, o chi corregge non la scopre mai.
+export const FERMA_NOTE = [
+  'Se un rilievo non si può correggere senza una decisione dell\'owner (un trade-off vero, una scelta di',
+  'prodotto), non consegnare una correzione a metà: scrivi la segnalazione e ferma il lavoro con',
+  '  --record-fixed <id> "<report>" --segnala <file.md> --ferma',
+  'Il lavoro non torna in verifica: aspetta l\'owner. Senza --ferma torna in coda per un\'altra verifica.',
+].join('\n');
+
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
