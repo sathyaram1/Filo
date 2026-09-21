@@ -147,11 +147,11 @@ test('buildPayload verifier: vede il feedback (sintomo), MAI il diff', () => {
   assert.ok(!JSON.stringify(p).includes('DIFF'));
 });
 
-test('buildPayload fixer: feedback + critica del verifier', () => {
+test('buildPayload fixer: il feedback, e nessuna critica da correggere', () => {
   const bucket = { role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', loopCount: 1, state: { verifierCritique: 'rotto X' } };
   const p = buildPayload(bucket, { feedback: { text: 'lamentela' } });
   assert.equal(p.feedback.text, 'lamentela');
-  assert.equal(p.verifierCritique, 'rotto X');
+  assert.equal(p.verifierCritique, undefined, 'qui si riallinea un ramo, non si corregge');
   assert.equal(p.loopCount, 1);
 });
 
@@ -168,7 +168,7 @@ test('buildPayload prober: payload vuoto', () => {
 
 // ─── Lo storico delle critiche (caso #502: sei giri per un difetto da due) ────
 
-test('buildPayload verifier e fixer: lo storico delle critiche arriva nel payload', () => {
+test('buildPayload: lo storico delle critiche arriva a chi verifica, e a nessun altro', () => {
   const history = [
     { verdict: 'fail', critique: 'esce con lo zoom' },
     { verdict: 'fail', critique: 'esce col ridimensionamento' },
@@ -185,7 +185,7 @@ test('buildPayload: senza storico dal server (o malformato) arriva un elenco vuo
   const v = buildPayload({ role: 'verifier', id: 'A', branch: 'worker/A' }, { feedback: { text: 's' } });
   assert.deepEqual(v.history, [], 'un server vecchio non manda lo storico: elenco vuoto, non un buco');
   const f = buildPayload({ role: 'fixer', id: 'A', branch: 'worker/A' }, { feedback: { text: 's' }, history: 'non-un-array' });
-  assert.deepEqual(f.history, []);
+  assert.equal(f.history, undefined);
 });
 
 test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e chi verifica', () => {
@@ -458,17 +458,15 @@ test('preflightExitCode: il contratto 0 / 2 / 3 dell\'orchestratore', () => {
 
 // ─── Ruolo unico resolver + contratto comune (SPEC-RIDISEGNO-MAX.md §12) ──────
 
-test('buildPayload: new-work e fixer dichiarano il caso del resolver', () => {
-  // Il server distingue ancora i due nomi nel protocollo; il worker riceve le
-  // stesse istruzioni (resolver.md) e capisce da `case` da dove parte.
+test('buildPayload: ogni caso di lavorazione si dichiara, e combacia col testo che riceve', () => {
   const nw = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' } });
   assert.equal(nw.case, 'primo-passaggio');
   const fx = buildPayload(
     { role: 'fixer', id: 'a', num: '7', branch: 'worker/a', serverCritique: 'si rompe X' },
     { feedback: { text: 't' } },
   );
-  assert.equal(fx.case, 'correzione');
-  assert.equal(fx.verifierCritique, 'si rompe X');
+  assert.equal(fx.case, 'riallineamento');
+  assert.equal(fx.verifierCritique, undefined, 'la consegna non può dire il contrario del testo di ruolo');
 });
 
 test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comune', () => {
