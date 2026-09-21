@@ -583,7 +583,7 @@ section:has(#dictList) .sn-spell-add-row {
 /* Le due colonne in più (reasoning, ordinamento degli host) valgono solo nei Modelli predefiniti
    dell'owner: le righe del registry nelle Opzioni utente restano a cinque colonne. */
 .sn-model-row.sn-model-row-reason {
-  grid-template-columns: 110px 130px 1fr 92px 150px auto auto;
+  grid-template-columns: 110px 130px 1fr 92px 184px auto auto;
 }
 /* Campo "stringa modello": wrapper position:relative perché il popup custom
    (.sn-select-pop) si ancora lì sotto, al posto della datalist nativa. */

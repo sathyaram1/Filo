@@ -107,6 +107,7 @@ test('scelgo l’ordinamento su una riga, salvo, riapro: è ancora lì, e la ric
     const vero = global.fetch;
     let doc = {};
     const corpi = [];
+    let rifiutaIlPrimo = false;
     const json = (obj, status = 200) => ({
       ok: status < 400, status, json: async () => obj, text: async () => JSON.stringify(obj), clone() { return this; },
     });
@@ -117,7 +118,11 @@ test('scelgo l’ordinamento su una riga, salvo, riapro: è ancora lì, e la ric
         return json({ fields: doc });
       }
       if (u.includes('/chat/completions')) {
-        corpi.push(JSON.parse(init.body));
+        const corpo = JSON.parse(init.body);
+        corpi.push(corpo);
+        if (rifiutaIlPrimo && corpo.model === 'deepseek/deepseek-v4-flash') {
+          return json({ error: { message: 'No endpoints found' } }, 404);
+        }
         return json({ choices: [{ message: { content: 'Una spiegazione.' } }], usage: {}, provider: 'Fireworks' });
       }
       return json({}, 404);
@@ -127,18 +132,23 @@ test('scelgo l’ordinamento su una riga, salvo, riapro: è ancora lì, e la ric
       await Defaults.refresh();
       await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: true, apiKeys: { openrouter: 'k-test' } });
       const settings = await H.getEffectiveSettings();
-      const catena = H.buildAttemptChain(settings, 'deepseek-flash, gemma-lite', C.ACTIONS.EXPLAIN);
       let errore = null;
       try {
         await H.handleAIRequest({
           action: C.ACTIONS.EXPLAIN, payload: { selection: 'ciao', sentence: 'ciao mondo' }, origin: 'test', noCache: true,
         });
+        // Secondo giro: il primo modello cade, risponde quello senza ordinamento suo.
+        rifiutaIlPrimo = true;
+        await H.handleAIRequest({
+          action: C.ACTIONS.EXPLAIN, payload: { selection: 'salve', sentence: 'salve a tutti' }, origin: 'test', noCache: true,
+        });
       } catch (e) { errore = String((e && e.message) || e); }
       return {
         errore,
         letto: Defaults.get().modelRegistry['deepseek-flash'],
-        catena: catena.map((a) => ({ model: a.model, routing: a.providerRouting, reasoning: a.reasoning })),
+        catena: settings.models[C.ACTIONS.EXPLAIN],
         corpo: corpi[0] || null,
+        ripiego: corpi.find((c) => c.model === 'google/gemma-4-26b-a4b-it') || null,
         ignoreAtteso: C.providerIgnoreList(settings.excludedProviders),
       };
     } finally {
@@ -154,7 +164,7 @@ test('scelgo l’ordinamento su una riga, salvo, riapro: è ancora lì, e la ric
   // La politica sui fornitori non si sposta di una virgola.
   expect(esito.ignoreAtteso.length).toBeGreaterThan(0);
   expect(esito.corpo.provider.ignore).toEqual(esito.ignoreAtteso);
-  const [conSort, senzaSort] = esito.catena;
-  expect(conSort.routing).toEqual({ ignore: esito.ignoreAtteso, sort: 'throughput' });
-  expect(senzaSort.routing).toEqual({ ignore: esito.ignoreAtteso });
+  expect(esito.ripiego, `catena: ${esito.catena}`).not.toBeNull();
+  expect(esito.ripiego.provider).toEqual({ ignore: esito.ignoreAtteso });
+  expect('reasoning' in esito.ripiego).toBe(false);
 });

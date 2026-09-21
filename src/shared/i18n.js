@@ -398,7 +398,7 @@
     reasoning_high: 'Alto',
     admin_defaults_sort: 'host',
     admin_defaults_sort_desc:
-      'Quale host serve il modello. «Automatico» segue la scelta generale, che senza indicazioni è il prezzo. La lista dei fornitori esclusi vale sempre.',
+      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale, che di serie è il prezzo. I fornitori esclusi restano esclusi.',
     provider_sort_auto: 'Automatico',
     provider_sort_throughput: 'Più veloce',
     provider_sort_latency: 'Risposta più pronta',
