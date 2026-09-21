@@ -992,6 +992,19 @@
     return PROVIDER_SORTS.includes(s) ? s : null;
   }
 
+  // Istruzioni di routing per una chiamata al router. L'ordinamento della voce
+  // vince su quello globale; `ignore` non dipende mai dall'ordinamento. PURA.
+  function providerRoutingFor(settings, entrySort) {
+    const ignore = providerIgnoreList((settings && settings.excludedProviders) || []);
+    const globalSort = typeof (settings && settings.providerSort) === 'string' ? settings.providerSort : '';
+    const sort = normalizeProviderSort(entrySort) || globalSort;
+    if (!ignore.length && !sort) return null;
+    const routing = {};
+    if (ignore.length) routing.ignore = ignore;
+    if (sort) routing.sort = sort;
+    return routing;
+  }
+
   function buildModelAttempts(refs, registry, providerOrder, apiKeys) {
     const out = [];
     const seen = new Set();
@@ -2405,6 +2418,7 @@
     normalizeReasoning,
     PROVIDER_SORTS,
     normalizeProviderSort,
+    providerRoutingFor,
     DEFAULT_EXCLUDED_PROVIDERS,
     normalizeProviderName,
     isProviderExcluded,

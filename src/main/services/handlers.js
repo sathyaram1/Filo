@@ -458,17 +458,9 @@ function buildAttemptChain(settings, modelRef, action) {
 // una richiesta vera che finisce su un host, e senza queste istruzioni sarebbe
 // l'unica richiesta di Filo libera di essere servita da un fornitore escluso.
 // Ritorna null se non c'è niente da dire.
-// `entrySort` è l'ordinamento scelto sulla voce del modello: vince su quello
-// globale, e non tocca mai `ignore` (la lista di esclusione non dipende da lui).
+// La regola (la voce vince sul globale, `ignore` resta com'è) sta in SN_CONST.
 function providerRouting(settings, entrySort) {
-  const ignore = SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
-  const globalSort = typeof (settings && settings.providerSort) === 'string' ? settings.providerSort : '';
-  const sort = SN_CONST.normalizeProviderSort(entrySort) || globalSort;
-  if (!ignore.length && !sort) return null;
-  const routing = {};
-  if (ignore.length) routing.ignore = ignore;
-  if (sort) routing.sort = sort;
-  return routing;
+  return SN_CONST.providerRoutingFor(settings, entrySort);
 }
 
 // Cancello della politica per le chiamate che NON passano da buildAttemptChain:

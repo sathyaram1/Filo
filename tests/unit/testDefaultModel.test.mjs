@@ -45,8 +45,8 @@ const state = {
 };
 
 globalThis.SN_PROVIDERS = {
-  streamComplete: async ({ provider, apiKey, model, messages, providerRouting, onDelta }) => {
-    state.calls.push({ provider, apiKey, model, providerRouting });
+  streamComplete: async ({ provider, apiKey, model, messages, providerRouting, reasoning, onDelta }) => {
+    state.calls.push({ provider, apiKey, model, providerRouting, reasoning });
     if (state.streamError) throw new Error(state.streamError);
     if (state.emptyStream) return { usage: { completionTokens: 0 } };
     onDelta('1, 2, 3');
@@ -75,10 +75,7 @@ registerAi((type, fn) => handlers.set(type, fn), {
     );
     return kind ? `bloccato: ${kind}` : null;
   },
-  providerRouting: (settings) => {
-    const ignore = globalThis.SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
-    return ignore.length ? { ignore } : null;
-  },
+  providerRouting: (settings, entrySort) => globalThis.SN_CONST.providerRoutingFor(settings, entrySort),
 });
 
 const testModel = (msg) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg);
@@ -283,4 +280,40 @@ test('la prova porta con sé chi NON deve servirla (lista di esclusione)', async
   assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
   const ignore = (state.calls[0].providerRouting || {}).ignore || [];
   assert.ok(ignore.length, 'la prova partiva senza dire chi è escluso');
+});
+
+// ── La prova misura la velocità: deve girare come girerebbe la voce ─────────
+
+test('riga dell'editor: la prova parte con l'ordinamento e il reasoning scritti sulla riga', async () => {
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google'], providerSort: 'price' };
+  const res = await testModel({
+    provider: 'openrouter', model: 'vendor/aperto', sort: 'throughput', reasoning: 'low',
+  });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'throughput' });
+  assert.equal(state.calls[0].reasoning, 'low');
+});
+
+test('nickname salvato: la prova prende ordinamento e reasoning dalla voce del registry', async () => {
+  state.defaults = {
+    modelRegistry: { svelto: { provider: 'openrouter', model: 'vendor/aperto', sort: 'latency', reasoning: 'off' } },
+    apiKeys: { openrouter: 'sk-or-default' },
+  };
+  state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google'] };
+  const res = await testModel({ nickname: 'svelto' });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'latency' });
+  assert.equal(state.calls[0].reasoning, 'off');
+});
+
+test('prova dalle Opzioni: vale l'ordinamento della voce personale', async () => {
+  state.effective = {
+    modelRegistry: { mio: { provider: 'openrouter', model: 'vendor/aperto', sort: 'throughput' } },
+    apiKeys: {}, excludedProviders: ['Google'], providerSort: 'price',
+  };
+  const res = await testProvider({ provider: 'openrouter', apiKey: 'sk-mia', model: 'vendor/aperto', nickname: 'mio' });
+  assert.equal(res.ok, true, res.error);
+  assert.deepEqual(state.calls[0].providerRouting, { ignore: ['Google'], sort: 'throughput' });
 });
