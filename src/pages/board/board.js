@@ -191,7 +191,8 @@
     const form = document.createElement('div');
     form.className = 'bd-reopen-form';
     const reopenAfterLogin = openReopenAfterLogin === fb._id;
-    form.hidden = !reopenAfterLogin;
+    const bozza = bozzeRiapertura.get(fb._id) || null;
+    form.hidden = !reopenAfterLogin && !bozza;
 
     const hint = document.createElement('p');
     hint.className = 'bd-reopen-hint';
