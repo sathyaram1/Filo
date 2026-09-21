@@ -873,7 +873,7 @@ test('giro stretto: l\'interruttore si legge coi bilanci, e solo un true esplici
 });
 
 test('giro stretto: il perimetro nasce dalla correzione consegnata e vale solo per la verifica subito dopo', () => {
-  const giro = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'Provato.\n[2] Salva non salva col titolo vuoto\n[0] caso raro', sha: SHA });
+  const giro = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'Provato.\n[2] Salva non salva col titolo vuoto\n[1?] bordo caldo o freddo', sha: SHA });
   const corretto = withFixed(giro.state, 'r', { report: 'corretto il salvataggio', sha: ALTRO_SHA });
   assert.equal(corretto.outcome, 'fixed');
   const dopo = withRequest(corretto.state, 'r', { request: 'fai X', sha: ALTRO_SHA });
