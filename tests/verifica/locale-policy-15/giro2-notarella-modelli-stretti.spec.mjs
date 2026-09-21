@@ -12,6 +12,10 @@ import { test, expect } from '../../fixtures/electron.mjs';
 const URL_PAGINA = 'filo://transparency/transparency.html';
 
 async function passaSopra(page, termine) {
+  // Il puntatore riparte sempre da lontano: fermo dov'era, il secondo giro non
+  // produrrebbe nessun movimento e quindi nessun passaggio sopra da misurare.
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(80);
   const el = page.locator('#doc-body .sn-gloss', { hasText: termine }).first();
   await el.scrollIntoViewIfNeeded();
   await page.waitForTimeout(250);
