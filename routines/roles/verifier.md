@@ -162,12 +162,11 @@ node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 [0] …" [--segnala <file.md>]
 ```
 
-`--segnala` accompagna un rilievo col `?`: la riga nella critica resta una
-riga, le scelte e i loro costi vanno nel file, che l'owner apre dal rombo nella
-scheda. Tre parti: `## Problema` (due o tre righe), `## Scelte` (una voce per
-strada, col suo trade-off), `## Cosa ho fatto nel frattempo`. Breve, senza nomi
-di file o funzioni. Il file si scrive **fuori dal repo** (per esempio
-`../segnala-<numero>.md`). Un difetto non va qui: è un rilievo col suo livello.
+<!-- includi: _segnala.md -->
+
+Qui il file accompagna un rilievo col `?`: la riga nella critica resta una
+riga, le scelte e i loro costi stanno nel file. Un difetto non va lì: è un
+rilievo col suo livello.
 
 La critica registrata non si modifica più.
 
