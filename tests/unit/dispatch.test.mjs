@@ -177,8 +177,7 @@ test('buildPayload: lo storico delle critiche arriva a chi verifica, e a nessun 
   assert.deepEqual(v.history, history, 'il verifier vede le porte già trovate dai giri passati');
   assert.equal(v.loopCount, 2, 'e sa a che giro è');
   const f = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', serverCritique: 'ultima' }, { feedback: { text: 's' }, history });
-  assert.deepEqual(f.history, history, 'chi corregge vede la SERIE, non solo l\'ultima critica');
-  assert.equal(f.verifierCritique, 'ultima');
+  assert.equal(f.history, undefined, 'il riallineamento non corregge niente: la serie non gli serve');
 });
 
 test('buildPayload: senza storico dal server (o malformato) arriva un elenco vuoto', () => {
