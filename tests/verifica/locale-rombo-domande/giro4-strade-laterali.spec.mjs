@@ -154,7 +154,9 @@ test('nell’elenco la pratica che aspetta una risposta si riconosce, e dopo la 
   const fb = pratica();
   await apri(page, { fbs: [fb] });
   await apriDettaglio(page, fb);
-  await expect(page.locator('#mgList')).toContainText('domande per te');
+  // Nell'elenco la cosa si dice fermando il puntatore sulla riga.
+  const riga = page.locator('#mgList .mg-item').first();
+  await expect(riga).toHaveAttribute('title', /domande per te/);
 
   await page.locator('#mgClarifyText').fill('Senza accento.');
   await page.locator('#mgClarifyBtn').click();
@@ -162,5 +164,8 @@ test('nell’elenco la pratica che aspetta una risposta si riconosce, e dopo la 
 
   // Risposta data: l'elenco non può continuare a dire che aspetta una
   // risposta, o l'owner torna su una pratica che non gli chiede più niente.
-  await expect(page.locator('#mgList')).not.toContainText('domande per te');
+  const titoli = await page.locator('#mgList .mg-item').evaluateAll(
+    (els) => els.map((el) => el.getAttribute('title') || '')
+  );
+  expect(titoli.join(' | ')).not.toContain('domande per te');
 });
