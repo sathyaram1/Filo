@@ -201,10 +201,8 @@ test('l\'effetto dell\'interruttore è dichiarabile PRIMA di accenderlo', () => 
   assert.deepEqual(cambiano.filter((a) => ferme.includes(a)), []);
 });
 
-// La politica elenca per nome i modelli stretti ammessi e promette che
-// l'interruttore spegne anche quelli. Il nome del produttore vive in due posti
-// — il documento e il codice — e questa sentinella li tiene insieme: alla
-// revisione si cambia l'elenco e l'altra metà non resta indietro in silenzio.
+// Il produttore di un modello stretto ammesso vive in due posti, il documento e
+// il codice: alla revisione l'altra metà non deve restare indietro in silenzio.
 test('i produttori ammessi dal documento sono gli stessi che l\'interruttore spegne', () => {
   const { readFileSync } = require('node:fs');
   const documento = readFileSync(join(ROOT, 'transparency', 'models.md'), 'utf8');
