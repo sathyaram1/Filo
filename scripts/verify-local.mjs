@@ -1086,7 +1086,10 @@ if (isMain) {
     const state = withRequest(readState(), b, { request, sha: headSha() });
     writeState(state);
     console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe(), history: historyFromRounds(state[b].rounds) }));
-    console.log(bilanciText(capsStart));
+    // I bilanci servono a chi guida, non a chi verifica: sapere prima quanti
+    // giri restano per livello orienta il livello che si scrive. Vanno
+    // sull'altro canale, fuori dal compito che si consegna.
+    console.error(bilanciText(capsStart));
     process.exit(0);
   }
 
