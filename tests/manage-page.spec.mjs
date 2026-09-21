@@ -2471,3 +2471,31 @@ test('un bilancio salvato col campo vuoto NON si salva (non c\'è un default, e 
   await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato.');
   expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(4);
 });
+
+test('giro stretto: se la config non si legge l’interruttore resta com’era e lo dice, e alla lettura dopo il messaggio sparisce', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubCaps(page, { cap2: 5, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  const giro = page.locator('#mgGiroStretto');
+  await expect(giro).toBeChecked();
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('');
+
+  // Il main risponde «non raggiungibile» (senza rete): niente «spento» finto.
+  await page.evaluate(() => {
+    const prima = window.filo.message;
+    window.filo.message = async (msg) => (msg && msg.type === 'automation_caps_get'
+      ? { ok: false, error: 'Impostazioni del giro di verifica non raggiungibili.' } : prima(msg));
+    window.__ripristina = () => { window.filo.message = prima; };
+  });
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeChecked();
+  await expect(page.locator('#mgGiroStrettoMsg')).toContainText('Non letto dal server');
+
+  await page.evaluate(() => window.__ripristina());
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('');
+});
