@@ -855,6 +855,46 @@ test('i tre bilanci dei giri di correzione e le loro istruzioni sono editabili e
   expect(cached).toEqual([5, 3, 1]);
 });
 
+test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella config delle routine, e un guasto lo rimette dov\'era', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  const giro = page.locator('#mgGiroStretto');
+  const etichetta = page.locator('#mgGiroStrettoSwitch');
+  await expect(etichetta).toBeVisible();
+  await expect(etichetta).toContainText('Giro stretto dopo una correzione');
+  // La spiegazione sta nell'hover, non in un sottotitolo.
+  expect((await etichetta.getAttribute('title')) || '').toMatch(/rilievi corretti/);
+  await expect(giro).toBeDisabled();
+
+  // Documento senza il campo: spento. Non dipende dalle routine accese.
+  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeEnabled();
+  await expect(giro).not.toBeChecked();
+
+  await etichetta.click();
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('Salvato.');
+  await expect(giro).toBeChecked();
+  await etichetta.click();
+  await expect(giro).not.toBeChecked();
+  await expect.poll(() => page.evaluate(() => window.__capsSets)).toEqual([{ giroStretto: true }, { giroStretto: false }]);
+
+  // Acceso sul server: alla rilettura si vede acceso.
+  await page.evaluate(() => { window.__capsValue.giroStretto = true; });
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeChecked();
+
+  // Salvataggio fallito: l'interruttore torna dov'era e lo dice.
+  await page.evaluate(() => { window.__capsFail = true; });
+  await etichetta.click();
+  await expect(page.locator('#mgGiroStrettoMsg')).toContainText('NON è cambiata');
+  await expect(giro).toBeChecked();
+});
+
 test('i bilanci dei giri di correzione vengono clampati nel range [0, 10] al salvataggio', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
