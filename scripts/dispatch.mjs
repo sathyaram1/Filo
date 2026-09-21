@@ -712,6 +712,8 @@ export function buildPayload(bucket, ctx = {}) {
         feedback: ctx.feedback || null,
         history: Array.isArray(ctx.history) ? ctx.history : [],
         historyDropped: Number(ctx.historyDropped) || 0,
+        scope: verifierScope(ctx.scope).scope,
+        ...(ctx.perimetro && typeof ctx.perimetro === 'object' ? { perimetro: ctx.perimetro } : {}),
       };
     case 'fixer':
       // Riallineamento del ramo dopo un conflitto di fusione. Il lavoro era
@@ -1609,6 +1611,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
       // nell'avvertenza, così i giri mancanti non passano per inesistenti.
       historyDropped: Number(payload && payload.historyDropped) || 0,
+      ...(role === 'verifier' ? { scope: payload && payload.scope, perimetro: (payload && payload.perimetro) || null } : {}),
     };
   }
   return {};
@@ -1710,8 +1713,14 @@ export function emit(bucket, ctx) {
   const payload = buildPayload(bucket, ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
-  const serial = serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
-  const base = readRoleInstructions(bucket.role);
+  const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
+  if (ambito.sconosciuto) process.stderr.write(`[dispatch] ambito di verifica sconosciuto («${unaRiga(ctx.scope).slice(0, 40)}»): consegno la verifica piena\n`);
+  // Nei giri stretti la serie non si consegna: inviterebbe alla ricerca larga
+  // che il testo del ruolo dice di non rifare.
+  const serial = ambito.scope && ambito.scope !== 'pieno'
+    ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
+    : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
+  const base = readRoleInstructions(bucket.role, { scope: ambito.scope });
   const out = {
     role: bucket.role,
     payload,
