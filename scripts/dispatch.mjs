@@ -1424,17 +1424,8 @@ export async function run() {
     // divergono in silenzio.
     const prev = readState(bucket.id) || defaultState(bucket.id, bucket.branch);
     bucket.state = { ...prev, id: bucket.id, branch: bucket.branch || prev.branch || '' };
-    // La critica di chi ha bocciato la tiene il SERVER: è lui che registra i
-    // verdetti. Il fogliettino su git resta come tappabuchi finché esiste —
-    // ma quando sparirà, se non si leggesse quella del server la correzione
-    // partirebbe alla cieca senza che nessuno se ne accorga.
-    //
-    // Va tenuta sul bucket, NON nello stato: lo stato viene riscritto da capo
-    // quando la cartella si posiziona sul ramo, e lì la critica del server si
-    // perdeva in silenzio.
-    if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
-      bucket.serverCritique = w.payload.critique;
-    }
+    // La critica che accompagna la busta NON si passa a nessuno: i rilievi li
+    // corregge chi li ha scritti, e al riallineamento direbbe il contrario.
   }
   // La busta si passa COM'È: incartarla in un altro oggetto ha già fatto
   // arrivare al lavoratore un pacchetto vuoto, con il giro che usciva
