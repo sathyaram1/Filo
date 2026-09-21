@@ -58,6 +58,9 @@
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
+  const mgGiroStretto       = document.getElementById('mgGiroStretto');
+  const mgGiroStrettoSwitch = document.getElementById('mgGiroStrettoSwitch');
+  const mgGiroStrettoMsg    = document.getElementById('mgGiroStrettoMsg');
   // Come partono le sessioni delle routine: quante insieme, da quale account
   // per prima, quali account sono esclusi.
   const mgMaxSessions     = document.getElementById('mgMaxSessions');
@@ -554,6 +557,9 @@
       if (el) el.disabled = !isAdmin || !routinesOn;
     }
     if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
+    // Vale anche per la verifica locale, che gira a routine spente.
+    if (mgGiroStretto) mgGiroStretto.disabled = !isAdmin;
+    if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     // Le sessioni NON dipendono dalle routine accese: escludere un account, o
     // ridurre il parallelismo, si decide prima di riaccendere.
     for (const el of [mgMaxSessions, mgMaxSessionsSave, mgAccountA, mgAccountB, ...mgPriorityRadios]) {
@@ -607,12 +613,14 @@
     // riesce, quello che dice il server vale anche quando un campo MANCA: la
     // cache locale serve solo a chi non ha potuto leggere.
     let lettoDalServer = false;
+    let giroStrettoRemoto = false;
     try {
       const r = await sendToMain({ type: CAPS_GET });
       if (r && r.ok) {
         lettoDalServer = true;
         for (const k of Object.keys(CAP_FIELDS)) if (r[k] != null) remote[k] = r[k];
         if (typeof r.fixInstructions === 'string') remote.fixInstructions = r.fixInstructions;
+        giroStrettoRemoto = r.giroStretto === true;
       }
     } catch (_) {}
     for (const [field, f] of Object.entries(CAP_FIELDS)) {
@@ -635,6 +643,7 @@
       else if (val !== null) setCapMsg(field, '', null);
     }
     if (mgFixInstructions && typeof remote.fixInstructions === 'string') mgFixInstructions.value = remote.fixInstructions;
+    if (mgGiroStretto && lettoDalServer) mgGiroStretto.checked = giroStrettoRemoto;
   }
 
   async function saveCap(field) {
@@ -706,6 +715,30 @@
         saveCap(field);
       });
     }
+  }
+  // Il giro stretto: stessa strada dei bilanci (config/routines via main). Un
+  // salvataggio fallito rimette l'interruttore dov'era, e lo dice.
+  if (mgGiroStretto) {
+    mgGiroStretto.addEventListener('change', async () => {
+      const want = mgGiroStretto.checked;
+      const esito = (text, kind) => {
+        if (!mgGiroStrettoMsg) return;
+        mgGiroStrettoMsg.textContent = text;
+        mgGiroStrettoMsg.classList.toggle('mg-ok', kind === 'ok');
+        mgGiroStrettoMsg.classList.toggle('mg-err', kind === 'err');
+      };
+      esito('', null);
+      try {
+        const r = await sendToMain({ type: CAPS_SET, giroStretto: want });
+        if (!r || !r.ok) throw new Error(r?.error || 'errore sconosciuto');
+        mgGiroStretto.checked = r.giroStretto === true;
+        esito('Salvato.', 'ok');
+      } catch (err) {
+        mgGiroStretto.checked = !want;
+        esito('Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
+        console.error('[manage] salvataggio giro stretto fallito:', err);
+      }
+    });
   }
   if (mgFixInstructionsSave) mgFixInstructionsSave.addEventListener('click', saveFixInstructions);
   if (mgFixInstructions) mgFixInstructions.addEventListener('input', () => setCapMsg('fixInstructions', '', null));
