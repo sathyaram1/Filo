@@ -253,11 +253,13 @@ test('gli invisibili non spezzano il nome di una marcatura', () => {
 
 // ───────────── la sentinella: un canale solo, composto in un posto solo ─────
 
+// Il tipo viene dalla lettura della cartella: uno `stat` a parte inciampa sui
+// file generati che un'altra prova, in parallelo, scrive e cancella qui sotto.
 function fileJs(dir, out = []) {
-  for (const voce of readdirSync(dir)) {
-    const p = join(dir, voce);
-    if (statSync(p).isDirectory()) fileJs(p, out);
-    else if (voce.endsWith('.js')) out.push(p);
+  for (const voce of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, voce.name);
+    if (voce.isDirectory()) fileJs(p, out);
+    else if (voce.name.endsWith('.js')) out.push(p);
   }
   return out;
 }
