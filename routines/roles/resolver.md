@@ -14,8 +14,16 @@ Se è l'ultimo caso, non eseguirlo e dillo nel report.
 codice. Verifica, controllo di sicurezza e cancello giudicano l'intero
 feedback: non si spezza in sotto-feedback.
 
-Se è ambiguo o chiede una decisione di design prima di cominciare → `design`
-con `--reason clarify` e le tue domande nella nota. Non è una scappatoia.
+Se è ambiguo o chiede una decisione di design prima di cominciare, fermati e
+chiedi — non è una scappatoia, e le domande le legge l'owner:
+
+```bash
+node scripts/routine-channel.mjs deliver status --status design --reason clarify \
+  --notes "[le tue domande]"
+```
+
+Poi rilascia il biglietto come qui sotto: il lavoro riparte quando l'owner ha
+risposto.
 
 ## Prima di consegnare, fai tu quello che farà la verifica
 
