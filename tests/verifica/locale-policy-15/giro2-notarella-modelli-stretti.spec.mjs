@@ -1,63 +1,62 @@
 // Verifica locale, giro 2: il termine nuovo della revisione («modelli stretti»)
 // deve spiegarsi da solo al lettore, come gli altri termini di gergo: non basta
 // che la notarella esista nel documento, deve comparire passandoci sopra.
+//
+// Lo stato del riquadro si legge DOPO un attimo di quiete, non con un'attesa
+// automatica sul riquadro: la pagina lo nasconde a ogni scorrimento, e
+// un'asserzione che parte mentre lo scorrimento non è finito misura la corsa
+// fra i due, non il passaggio del mouse.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const URL_PAGINA = 'filo://transparency/transparency.html';
 
-test('passando sopra «modelli stretti» compare la spiegazione, e si legge in tutti e due i temi', async ({ openTab }) => {
-  const page = await openTab(URL_PAGINA);
-  const glossa = page.locator('#doc-body .sn-gloss', { hasText: 'modelli stretti' }).first();
-  await expect(glossa).toBeVisible();
-
-  // La notarella sta alla PRIMA occorrenza, dove il termine viene introdotto:
-  // una spiegazione che arriva dopo che il lettore ha già incontrato la parola
-  // arriva tardi.
-  const primaOccorrenza = await page.evaluate(() => {
-    const body = document.getElementById('doc-body');
-    const testo = body.innerText.toLowerCase();
-    const el = body.querySelector('.sn-gloss[data-gloss]');
-    const tutti = [...body.querySelectorAll('.sn-gloss')]
-      .filter((n) => /modelli stretti/i.test(n.textContent));
+async function passaSopra(page, termine) {
+  const el = page.locator('#doc-body .sn-gloss', { hasText: termine }).first();
+  await el.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(250);
+  await el.hover();
+  await page.waitForTimeout(250);
+  return page.evaluate(() => {
+    const pop = document.getElementById('gloss-pop');
+    const s = getComputedStyle(pop);
+    const r = pop.getBoundingClientRect();
     return {
-      posizioneTermine: testo.indexOf('modelli stretti'),
-      posizioneGlossa: tutti.length
-        ? body.innerText.toLowerCase().indexOf(tutti[0].textContent.toLowerCase())
-        : -1,
-      quante: tutti.length,
-      primoGloss: el ? el.getAttribute('data-gloss') : '',
+      aperta: !pop.hidden,
+      testo: (pop.textContent || '').trim(),
+      fg: s.color,
+      bg: s.backgroundColor,
+      destra: Math.round(r.right),
+      sinistra: Math.round(r.left),
+      larghezzaFinestra: document.documentElement.clientWidth,
     };
   });
-  expect(primaOccorrenza.quante).toBe(1);
+}
 
-  const pop = page.locator('#gloss-pop');
+test('passando sopra «modelli stretti» compare la spiegazione, e si legge in tutti e due i temi', async ({ openTab }) => {
+  const page = await openTab(URL_PAGINA);
+
+  // Una sola notarella per il termine, e sta dove il termine viene introdotto.
+  const quante = await page.evaluate(() => [...document.querySelectorAll('#doc-body .sn-gloss')]
+    .filter((n) => /modelli stretti/i.test(n.textContent)).length);
+  expect(quante).toBe(1);
+
   for (const schema of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: schema });
-    await glossa.scrollIntoViewIfNeeded();
-    // La pagina nasconde la notarella a ogni scorrimento (voluto: chi scorre
-    // sta leggendo, non chiedendo). Qui si aspetta che lo scorrimento sia
-    // finito, altrimenti si misura la corsa fra i due, non il passaggio sopra.
-    await page.waitForTimeout(400);
-    await glossa.hover();
-    await expect(pop).toBeVisible();
-    const testoPop = (await pop.innerText()).trim();
-    expect(testoPop.length, `spiegazione vuota in tema ${schema}`).toBeGreaterThan(20);
+    const stato = await passaSopra(page, 'modelli stretti');
+    expect(stato.aperta, `la spiegazione non compare in tema ${schema}`).toBe(true);
+    expect(stato.testo.length).toBeGreaterThan(20);
     // È la spiegazione del termine giusto, non quella di un altro.
-    expect(testoPop.toLowerCase()).toMatch(/una cosa sola|classificare|trascrivere|categoria/);
-    const colori = await pop.evaluate((el) => {
-      const s = getComputedStyle(el);
-      return { fg: s.color, bg: s.backgroundColor };
-    });
-    expect(colori.fg, `testo e sfondo uguali in tema ${schema}`).not.toBe(colori.bg);
-    // Il riquadro resta dentro la finestra, non esce a destra.
-    const box = await pop.boundingBox();
-    const larghezza = await page.evaluate(() => document.documentElement.clientWidth);
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(larghezza + 1);
+    expect(stato.testo.toLowerCase()).toMatch(/una cosa sola|categoria|trascrivere/);
+    expect(stato.fg, `testo e sfondo uguali in tema ${schema}`).not.toBe(stato.bg);
+    // Il riquadro resta dentro la finestra.
+    expect(stato.sinistra).toBeGreaterThanOrEqual(0);
+    expect(stato.destra).toBeLessThanOrEqual(stato.larghezzaFinestra + 1);
+
     // Esc lo chiude: si può tornare a leggere.
     await page.keyboard.press('Escape');
-    await expect(pop).toBeHidden();
+    const dopoEsc = await page.evaluate(() => document.getElementById('gloss-pop').hidden);
+    expect(dopoEsc).toBe(true);
   }
 });
 
@@ -65,6 +64,9 @@ test('la notarella si apre anche da tastiera, senza mouse', async ({ openTab }) 
   const page = await openTab(URL_PAGINA);
   const glossa = page.locator('#doc-body .sn-gloss', { hasText: 'modelli stretti' }).first();
   await glossa.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(250);
   await glossa.focus();
-  await expect(page.locator('#gloss-pop')).toBeVisible();
+  await page.waitForTimeout(250);
+  const aperta = await page.evaluate(() => !document.getElementById('gloss-pop').hidden);
+  expect(aperta).toBe(true);
 });
