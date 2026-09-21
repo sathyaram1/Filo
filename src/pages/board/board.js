@@ -615,7 +615,11 @@
     // la stessa che si raggiunge da `window.SN_FEEDBACK`, quindi una prova
     // non può buttarla da fuori. Il tasto "Riprova" non passa di qui: lì la
     // memoria è già vuota, perché un caricamento fallito non la riempie.
-    reload() { try { if (FB.forgetAllPublic) FB.forgetAllPublic(); } catch (_) {} return loadData(); },
+    reload() {
+      schedeImposteDaFuori = false;
+      try { if (FB.forgetAllPublic) FB.forgetAllPublic(); } catch (_) {}
+      return loadData();
+    },
     // Sostituisce la sorgente dati usata da loadData con una funzione di test
     // (che risolve o rigetta). Va scritta sulla stessa reference `FB` che
     // loadData usa: su pagine filo:// `window.SN_FEEDBACK` può essere una vista
