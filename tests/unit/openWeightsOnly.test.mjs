@@ -159,6 +159,17 @@ test('la catena di tentativi passa solo dal router, con modelli a pesi aperti', 
   assert.ok(!attempts.some((a) => /claude/.test(a.model)), 'Anthropic esce dalla catena');
 });
 
+test('i modelli stretti ammessi dalla politica sono proprietari: l\'interruttore li spegne', () => {
+  for (const id of ['typesafe/jev-1.13', '~typesafe/jev-latest', 'typesafe/jev-1.13-20260917']) {
+    assert.equal(C.isOpenWeightsModelId(id), false, `${id} ha i pesi chiusi`);
+    assert.equal(C.openWeightsBlockKind(true, { provider: 'openrouter', model: id }), 'model');
+    assert.equal(C.openWeightsBlockKind(false, { provider: 'openrouter', model: id }), '', 'a interruttore spento è ammesso');
+  }
+  const base = C.DEFAULT_EXCLUDED_PROVIDERS;
+  assert.equal(C.isProviderExcluded('TypeSafe', base), false, 'a interruttore spento il produttore è ammesso');
+  assert.equal(C.isProviderExcluded('TypeSafe', C.effectiveExcludedProviders(base, true)), true);
+});
+
 test('a interruttore acceso Anthropic entra fra i fornitori esclusi', () => {
   const base = C.DEFAULT_EXCLUDED_PROVIDERS;
   assert.equal(C.isProviderExcluded('Anthropic', base), false, 'a interruttore spento Anthropic è ammessa');
