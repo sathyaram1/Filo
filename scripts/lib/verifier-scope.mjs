@@ -45,6 +45,9 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo) 
       sha
         ? `Commit di partenza della correzione: \`${sha}\` — il diff da leggere è \`git diff ${sha}..HEAD\`.`
         : 'Commit di partenza della correzione: non comunicato.',
+      // Un ramo riallineato fuori da qui (in cloud, o a mano) porta main nel diff: va detto.
+      ...(sha ? ['Se in quel diff trovi modifiche che non c\'entrano coi rilievi, dopo la correzione il ramo è stato',
+        'riallineato a `main`: ti interessano solo dove toccano la correzione.'] : []),
     ].join('\n');
   }
   if (scope === 'riallineamento') {
