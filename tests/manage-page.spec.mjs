@@ -895,13 +895,17 @@ test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella
   await expect(giro).toBeChecked();
 
   // Nei due temi l'etichetta resta leggibile sullo sfondo della pagina.
+  const sfondi = [];
   for (const tema of ['light', 'dark']) {
-    await page.evaluate((t) => { document.documentElement.setAttribute('data-theme', t); }, tema);
-    const colori = await etichetta.locator('.mg-switch-text').evaluate((el) => {
-      const c = getComputedStyle(el).color;
-      const sfondo = getComputedStyle(document.body).backgroundColor;
-      return { c, sfondo };
-    });
+    await page.evaluate(async (t) => {
+      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } });
+    }, tema);
+    const leggi = () => etichetta.locator('.mg-switch-text').evaluate((el) => ({
+      c: getComputedStyle(el).color, sfondo: getComputedStyle(document.body).backgroundColor,
+    }));
+    if (tema === 'dark') await expect.poll(async () => (await leggi()).sfondo).not.toBe(sfondi[0]);
+    const colori = await leggi();
+    sfondi.push(colori.sfondo);
     expect(colori.c, `tema ${tema}`).not.toBe(colori.sfondo);
     await page.locator('#mgGiroStrettoBlock').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `tests/.shots/giro-stretto-${tema}.png` });
