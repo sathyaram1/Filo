@@ -1198,6 +1198,21 @@ test('livelli L3: grigio senza segnalazione, verde con il testo di chi ha lavora
   assert.match(righe, /2026-09-12/);
 });
 
+test('livelli L3: chi aspetta una risposta ha il rombo verde anche senza segnalazione salvata', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
+  const fb = { status: 'design', statusReason: 'clarify', notes: 'Due domande: A o B?' };
+  const l3 = MR.livelloL3(fb);
+  assert.notEqual(l3.vuoto, true);
+  assert.equal(l3.esito, 'domande');
+  assert.equal(l3.colore, MR.REASONS.design.color);
+  assert.match(l3.pannello.testo, /A o B/);
+
+  assert.equal(MR.livelloL3({ status: 'clarify' }).esito, 'domande', 'vale anche lo stato storico');
+  assert.equal(MR.livelloL3({ status: 'design', statusReason: 'judges' }).esito, 'nessuna');
+  assert.equal(MR.livelloL3({ status: 'todo', notes: 'Due domande: A o B?' }).esito, 'nessuna', 'dopo la risposta torna grigio');
+  assert.equal(MR.livelloL3({ status: 'design', statusReason: 'clarify', notes: CIFRATO }).pannello.illeggibile, true);
+});
+
 test('livelli L3: testo cifrato → dichiarato, mai mostrato come blob', () => {
   const l3 = MR.livelloL3({ livelli: { l3: { esito: 'segnalato', testo: CIFRATO } } });
   assert.equal(l3.pannello.illeggibile, true);

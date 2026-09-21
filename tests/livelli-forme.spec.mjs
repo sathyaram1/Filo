@@ -285,6 +285,25 @@ test('il rombo apre la segnalazione di Claude: problema, scelte, ruolo e data', 
   await expect(corpo).toContainText('12/09/2026');
 });
 
+test('domande nelle sole note: rombo verde, e dentro ci sono le domande', async ({ openTab }) => {
+  const fb = {
+    _id: 'fb-livelli-domande', text: 'Fiducia nei mittenti.', name: 'Fiducia nei mittenti',
+    seq: 701, subSeq: 0, status: 'design', statusReason: 'clarify',
+    clientId: 'local:claude', createdAt: '2026-09-08T10:00:00Z', images: [],
+    notes: 'Prima di procedere: i prefissi riservati vanno decisi voce per voce?',
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  await expect(page.locator('#mgClarify')).toBeVisible();
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).toHaveClass(/mg-forma--design/);
+  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  await rombo.click();
+  await expect(page.locator('#mgSideBody')).toContainText('decisi voce per voce');
+});
+
 test('il pentagono verde dice cosa ha controllato l’audit, e non offre di saltarlo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_COMPLETO]);
