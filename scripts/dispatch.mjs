@@ -6,7 +6,7 @@
 //   e QUESTO script lo traduce in una consegna eseguibile, senza mai leggere
 //   testi liberi — così la scelta non è pilotabile via prompt-injection. Il
 //   worker (general-purpose) lancia `node scripts/dispatch.mjs --ticket <b>`,
-//   riceve un JSON { role, payload, claim, loopCount, instructions } e DIVENTA
+//   riceve un JSON { role, payload, claim, instructions } e DIVENTA
 //   quel ruolo.
 //
 // CONTRATTO (era in ROUTINES.md, abolito col ridisegno SPEC-RIDISEGNO-MAX.md;
@@ -49,7 +49,7 @@
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
 //   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--segnala <file.md>] [--ticket <b>]
-//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md> [--ferma]] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
@@ -117,15 +117,6 @@ const ROUTINES_DOC = 'config/routines';
 // del default con un paracadute 5/2/0, e un numero che nessuno applica è un
 // numero che mente). I bilanci residui si stampano come arrivano nella
 // risposta del server (verifierReplyText).
-//
-// `resolveLoopCap` (override d'ambiente FILO_LOOP_CAP > valore remoto > default,
-// range [1, 10]) è la regola di precedenza del tetto delle bocciature del giro
-// VECCHIO: resta per gli strumenti e per i test che la usano ancora.
-const LOOP_CAP_MIN = 1;
-const LOOP_CAP_MAX = 10;
-// Il tetto delle bocciature del giro VECCHIO (verdetto a tre valori): resta
-// solo per resolveLoopCap, che gli strumenti e i test usano ancora.
-const LOOP_CAP_DEFAULT = 10;
 
 // Le regole del giro (feedback #561): il parser della critica coi livelli e
 // la decisione su cosa si corregge. Dagli
@@ -152,20 +143,6 @@ export const VERIFIER_ROUND = (() => {
 })();
 
 /**
- * Risolve il cap EFFETTIVO data la precedenza env > remoto > default, con clamp
- * nel range valido. Funzione pura (testata in tests/unit/dispatch.test.mjs).
- * @param {{ envRaw?: string|number, remote?: number|null }} src
- */
-export function resolveLoopCap({ envRaw, remote } = {}) {
-  const clamp = (n) => Math.min(LOOP_CAP_MAX, Math.max(LOOP_CAP_MIN, Math.round(n)));
-  const env = Number(envRaw);
-  if (Number.isFinite(env) && env > 0) return clamp(env);
-  const rem = Number(remote);
-  if (Number.isFinite(rem) && rem > 0) return clamp(rem);
-  return LOOP_CAP_DEFAULT;
-}
-
-/**
  * Legge le impostazioni che l'owner detta alle routine dalla tab Automazioni.
  *
  * PERCHÉ NON È PIÙ UNA LETTURA "BEST-EFFORT" (2026-08-13)
@@ -189,7 +166,7 @@ export function resolveLoopCap({ envRaw, remote } = {}) {
  *   Documento mai scritto (404) NON è un dubbio: è "l'owner non ha mai toccato
  *   niente" ⇒ comportamento storico (routine accese, coi default).
  *
- * @returns {Promise<{enabled?:boolean, proberWhenIdle?:boolean, loopCap?:number}>}
+ * @returns {Promise<{enabled?:boolean, proberWhenIdle?:boolean}>}
  * @throws {Error} con `faultKind` se il documento non è leggibile.
  */
 async function fetchRoutineConfig() {
@@ -223,11 +200,6 @@ export function parseRoutineConfig(fields) {
   const out = {};
   if (f.enabled && typeof f.enabled.booleanValue === 'boolean') out.enabled = f.enabled.booleanValue;
   if (f.proberWhenIdle && f.proberWhenIdle.booleanValue === false) out.proberWhenIdle = false;
-  const lc = f.loopCap;
-  if (lc) {
-    if (lc.integerValue != null) out.loopCap = Number(lc.integerValue);
-    else if (lc.doubleValue != null) out.loopCap = Number(lc.doubleValue);
-  }
   return out;
 }
 
@@ -256,8 +228,6 @@ export function defaultState(id, branch) {
   return {
     id,
     branch: branch || '',
-    loopCount: 0,
-    improvableCount: 0,
     verifierVerdict: null,
     verifierCritique: '',
     // Il commit su cui ciascun esito è stato dato: un esito vale per il
@@ -314,14 +284,14 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   if (String(sha || '')) s.verifierSha = String(sha);
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
-  else if (outcome === 'stop') s.verifierVerdict = 'blocked';
+  else if (outcome === 'stop') s.verifierVerdict = 'stop';
   else s.verifierVerdict = String(outcome || '') || null;
   if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, MAX_CRITIQUE_CHARS);
   else if (outcome === 'pass') s.verifierCritique = '';
   return s;
 }
 
-/** Il fixer ha corretto: si ri-mette in coda per il verifier (loop invariato). */
+/** La correzione è consegnata: si torna in coda per un'altra verifica. */
 export function applyFixed(state) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
   s.verifierVerdict = null;
@@ -395,10 +365,23 @@ export function stripFileArg(list, nome) {
 }
 
 /** Il payload della consegna «corretto», con la segnalazione se c'è. PURA. */
-export function fixedPayload({ report, frase, branch, segnalazione } = {}) {
+export function fixedPayload({ report, frase, branch, segnalazione, ferma } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
   if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
+  if (ferma === true) p.stop = true;
   return p;
+}
+
+/**
+ * `--ferma` senza segnalazione non parte: l'owner si troverebbe un lavoro
+ * fermo senza sapere cosa deve decidere. Ritorna la frase che ferma, o ''. PURA.
+ */
+export function fermaSenzaSegnalazione(ferma, segnalazione) {
+  if (!ferma || String(segnalazione || '').trim()) return '';
+  return [
+    '--ferma vuole anche --segnala <file.md>: non ho consegnato niente.',
+    'Fermare il lavoro chiama l\'owner, e senza la segnalazione non saprebbe cosa decidere: scrivi nel file il problema, le scelte e cosa hai fatto nel frattempo, poi rilancia con tutte e due le opzioni.',
+  ].join('\n');
 }
 
 /**
@@ -669,7 +652,6 @@ export function buildPayload(bucket, ctx = {}) {
         feedback: ctx.feedback || null,
         history: Array.isArray(ctx.history) ? ctx.history : [],
         historyDropped: Number(ctx.historyDropped) || 0,
-        loopCount: bucket.loopCount || 0,
       };
     case 'fixer':
       // Riallineamento del ramo dopo un conflitto di fusione. Il lavoro era
@@ -681,7 +663,6 @@ export function buildPayload(bucket, ctx = {}) {
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
-        loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
       return { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
@@ -828,25 +809,6 @@ async function deliverToChannel(intent, data) {
     process.stderr.write(`[dispatch] canale non utilizzabile (${e?.message || e}): la decisione NON è stata registrata\n`);
     return { outcome: 'fault', reason: String(e?.message || e) };
   }
-}
-
-/**
- * Nota per la chat del feedback con l'esito del verifier. PURA (testata in
- * tests/unit/dispatch.test.mjs). Prima l'esito viveva SOLO nel file di stato su
- * git e l'owner non lo vedeva mai in dashboard: ora ogni verdetto (pass e fail)
- * finisce nelle note, così la conversazione del feedback racconta l'intero iter.
- */
-export function verifierNoteText(verdict, critique = '') {
-  // Il ruolo scrive la critica come "PASS — …"/"MIGLIORABILE — …"/"FAIL — …":
-  // il prefisso è ridondante col nostro incipit, toglilo (resta la sostanza).
-  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '').slice(0, MAX_CRITIQUE_CHARS);
-  if (verdict === 'pass') {
-    return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
-  }
-  if (verdict === 'migliorabile') {
-    return c ? `Verifica: funziona, ma migliorabile — ${c}` : 'Verifica: funziona, ma migliorabile.';
-  }
-  return c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
 }
 
 /**
@@ -1416,7 +1378,6 @@ export async function run() {
     id: w.id || undefined,
     num: w.num || '',
     branch: w.branch || '',
-    loopCount: Number(w.payload && w.payload.loopCount) || 0,
   };
   if (bucket.id) {
     // Lo stato locale resta il ripiego quando il server non risponde: si
@@ -1695,7 +1656,6 @@ export function emit(bucket, ctx) {
     role: bucket.role,
     payload,
     claim: bucket.id || null,
-    loopCount: bucket.loopCount || 0,
     instructions: serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base,
   };
   lastEmitted = { role: bucket.role, num: bucket.num || '' };

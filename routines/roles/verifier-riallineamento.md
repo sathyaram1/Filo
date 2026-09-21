@@ -28,11 +28,6 @@ fondo a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
    prova che prima era verde e ora è rossa è un rilievo di livello 2.
 3. **I controlli automatici**, descritti più sotto.
 
-## Fuori dal perimetro
-
-Un difetto che incontri fuori dal perimetro lo scrivi lo stesso, ma vale al
-massimo livello 1. Fa eccezione il danno concreto all'utente (dati persi o
-portati fuori, un'azione pericolosa senza conferma): quello è livello 3
-ovunque.
+<!-- includi: _fuori-perimetro.md -->
 
 <!-- includi: _critica-e-livelli.md -->
