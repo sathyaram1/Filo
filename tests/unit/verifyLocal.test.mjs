@@ -804,10 +804,15 @@ test('withCritique senza i bilanci lancia: non c\'è un default con cui rimpiazz
   assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
 });
 
-test('CLI: status stampa i bilanci letti dal server, start li tiene fuori dal compito; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
+test('CLI: né status né start mettono i bilanci davanti a chi verifica; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
   const casa = depositoUsaEGetta();
+  // `status` è il primo comando che prova chi verifica: legge il documento del
+  // server (così un token mancante si scopre subito) ma i numeri non li mostra
+  // — sapere quanti giri restano per un livello orienta il livello.
   const st = vl(casa, 'status');
-  assert.match(st.out, /Bilanci del giro \(dal server, config\/routines\): cap2 5 · cap1 2 · cap0 0/);
+  assert.equal(st.code === 0 || st.code === 1, true, st.out);
+  assert.doesNotMatch(st.out, /cap2|cap1|cap0|Bilanci/);
+  assert.match(st.out, /Server raggiunto/);
   const start = vl(casa, 'start', 'richiesta di prova');
   assert.equal(start.code, 0, start.out);
   // Il compito consegnato a chi verifica (l'uscita normale) NON porta i
