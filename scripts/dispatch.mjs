@@ -1064,7 +1064,15 @@ export function verifierReplyText(reply) {
     'L\'esito vero sta in dashboard, nella chat del feedback: leggilo lì prima di rilasciare il biglietto.',
   ].join('\n');
 }
-async function recordFixed(id, report = '', frase = '', segnalazione = '') {
+/** Cosa si stampa a consegna accettata: il lavoro si è fermato, o torna in verifica. PURA. */
+export function fixedReplyText(id, reply, ferma = false) {
+  const fermato = reply && reply.outcome === 'stop';
+  if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
+  // Un server che non conosce ancora «stop» rimette in coda: dirlo, o chi ha fermato crede di averlo fatto.
+  if (ferma) return `stato ${id}: ATTENZIONE, avevi chiesto di fermare ma il server non l'ha confermato: il lavoro è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
+  return `stato ${id}: consegnato, torna in coda per la verifica`;
+}
+async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
@@ -1088,7 +1096,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '') {
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
   // La segnalazione (L3) viaggia nello stesso payload: il server la cifra e la
   // scrive in `livelli.l3`, e la appende alle note come storia della chat.
-  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione }));
+  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
@@ -1102,6 +1110,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '') {
   // Il marcatore locale del ruolo dice chi sta consegnando; il server lo sa
   // dal biglietto, ed è lui che ha accettato o rifiutato.
   sealTransition(next, `${readRole(ROOT) || 'fixer'}:consegna`);
+  next.reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
   return next;
 }
 async function recordSecaudit(id, verdict, testo = '') {
@@ -1355,7 +1364,7 @@ export function usageText() {
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
-    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
+    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md> [--ferma]] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
     '                         la nota dice cosa hai controllato e cosa hai trovato;',
@@ -1365,6 +1374,8 @@ export function usageText() {
     '                         lavorando: NON deciderlo, segnalalo (Problema / Scelte',
     '                         col loro trade-off / Cosa ho fatto nel frattempo); è quello',
     '                         che l\'owner legge cliccando il rombo in dashboard',
+    '  --ferma                solo con --record-fixed e insieme a --segnala: il lavoro non',
+    '                         torna in verifica, si ferma e aspetta chi possiede il progetto',
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
     '',
@@ -1827,8 +1838,11 @@ if (isMainModule) {
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
       if (seg.error) { console.error(seg.error); process.exit(1); }
-      const [, id, ...rest] = seg.args;
-      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
+      const ferma = seg.args.includes('--ferma');
+      const [, id, ...rest] = seg.args.filter((a) => a !== '--ferma');
+      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md> [--ferma]]'); process.exit(1); }
+      const senza = fermaSenzaSegnalazione(ferma, seg.file);
+      if (senza) { console.error(senza); process.exit(1); }
       // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
       // resto è il report per l'owner, che il server cifra.
       const fi = rest.indexOf('--frase');
@@ -1845,7 +1859,7 @@ if (isMainModule) {
       }
       const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => SEMBRA_OPZIONE(a));
       if (altra) {
-        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui c'è solo --frase "…"; il resto è il report, un testo solo fra virgolette.`);
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
       }
       // Anche di qui esce un esito — il lavoro torna in coda a un'altra
@@ -1858,9 +1872,9 @@ if (isMainModule) {
       }
       const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
-      const s = await recordFixed(id, report, frase, segnalazione.testo);
+      const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
+      console.log(fixedReplyText(id, s.reply, ferma));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.
