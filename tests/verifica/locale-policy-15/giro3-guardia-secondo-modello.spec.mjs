@@ -36,8 +36,9 @@ test('cambiare il produttore sulla riga degli ammessi fa diventare rossa la guar
   expect(esito, 'un produttore che l\'interruttore non spegne deve fermare tutto').toBe('rossa');
 });
 
-test.fail(true, 'la guardia guarda solo la prima riga: un secondo ammesso scritto sotto le sfugge');
 test('un secondo modello stretto ammesso in elenco fa diventare rossa la guardia', () => {
+  // Attesa rossa: la guardia legge solo la riga degli ammessi, non il blocco.
+  test.fail(true, 'un secondo ammesso scritto nella riga sotto le sfugge');
   const esito = conDocumentoMutato((s) => {
     const riga = s.split('\n').find((r) => r.includes(RIGA_AMMESSI));
     expect(riga, 'la riga degli ammessi deve esistere').toBeTruthy();
