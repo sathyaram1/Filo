@@ -136,10 +136,12 @@ test('casella e rombo verde vanno sempre insieme, in tutti i casi provati', asyn
     ['domande, forma vecchia',          pratica({ _id: 'c2', status: 'clarify', statusReason: undefined })],
     ['domande senza conversazione',     pratica({ _id: 'c3', notes: '' })],
     ['domande, conversazione cifrata',  pratica({ _id: 'c4', notes: 'FENC:xxxxxxxxxxxx' })],
-    ['domande lunghissime',             pratica({ _id: 'c5', notes: '--- Filo ---\n' + 'a'.repeat(10000) })],
-    ['domande con HTML ostile',         pratica({ _id: 'c6', notes: '--- Filo ---\n<script>window.__bucato=1</script><img src=x onerror="window.__bucato=1">' })],
+    ['domande lunghissime',             pratica({ _id: 'c5', notes: 'a'.repeat(10000) })],
+    ['domande con HTML ostile',         pratica({ _id: 'c6', notes: '<script>window.__bucato=1</script><img src=x onerror="window.__bucato=1">' })],
+    ['conversazione a più turni',       pratica({ _id: 'c10', notes: CONVERSAZIONE })],
+    ['note di soli spazi',              pratica({ _id: 'c11', notes: '   \n  \t ' })],
     ['niente domande (giudici)',        pratica({ _id: 'c7', status: 'design', statusReason: 'judges', notes: '' })],
-    ['niente domande (in coda)',        pratica({ _id: 'c8', status: 'todo', statusReason: undefined, notes: '--- Filo ---\nDomanda vecchia, già risposta.' })],
+    ['niente domande (in coda)',        pratica({ _id: 'c8', status: 'todo', statusReason: undefined, notes: 'Domanda vecchia, già risposta.' })],
     ['niente domande (risolta)',        pratica({ _id: 'c9', status: 'done', statusReason: undefined, notes: '' })],
   ];
 
