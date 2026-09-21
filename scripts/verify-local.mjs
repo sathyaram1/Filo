@@ -1199,7 +1199,7 @@ if (isMain) {
     // lettura resta, perché dice subito se il token manca; i numeri li vede
     // chi guida, quando apre il giro, e in Gestione → Automazioni.
     await bilanciOStop();
-    console.log('Bilanci del giro: letti dal server.');
+    console.log('Server raggiunto, impostazioni del giro lette.');
     const r = verdictForCurrentBranch();
     console.log(`${r.branch}: ${r.reason}`);
     // A correzione in sospeso si dice anche COSA c'è da correggere, e come
