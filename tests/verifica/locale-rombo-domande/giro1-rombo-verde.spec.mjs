@@ -211,5 +211,9 @@ test('il verde del rombo si distingue dal grigio nei due temi', async ({ openTab
     const g = await rombo(page);
     expect(v.riempimento, `tema ${tema}`).not.toBe(g.riempimento);
     expect(v.riempimento, `tema ${tema}`).not.toMatch(/none/);
+
+    // Traccia da guardare a occhio (cartella ignorata da git).
+    await apriDettaglio(page, verde);
+    await page.locator('#mgDetail').screenshot({ path: `tests/.shots/rombo-domande-${tema}.png` });
   }
 });
