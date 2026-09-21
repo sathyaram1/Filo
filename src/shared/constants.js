@@ -717,7 +717,9 @@
   // Fornitori esclusi in più quando l'interruttore è acceso. Anthropic non è
   // nella lista base (la politica ammette i suoi modelli): qui ci finisce perché
   // il punto dell'interruttore è poter rifiutare anche quella scelta.
-  const OPEN_WEIGHTS_EXTRA_EXCLUDED = ['Anthropic'];
+  // I produttori dei «modelli stretti» ammessi dalla politica stanno qui per lo
+  // stesso motivo: pesi chiusi comprati dal produttore, l'interruttore li spegne.
+  const OPEN_WEIGHTS_EXTRA_EXCLUDED = ['Anthropic', 'TypeSafe'];
 
   // Lista di esclusione EFFETTIVA da usare per una richiesta. PURA.
   function effectiveExcludedProviders(excluded, openWeightsOnly) {
