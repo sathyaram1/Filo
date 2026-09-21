@@ -893,6 +893,19 @@ test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella
   await etichetta.click();
   await expect(page.locator('#mgGiroStrettoMsg')).toContainText('NON è cambiata');
   await expect(giro).toBeChecked();
+
+  // Nei due temi l'etichetta resta leggibile sullo sfondo della pagina.
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate((t) => { document.documentElement.setAttribute('data-theme', t); }, tema);
+    const colori = await etichetta.locator('.mg-switch-text').evaluate((el) => {
+      const c = getComputedStyle(el).color;
+      const sfondo = getComputedStyle(document.body).backgroundColor;
+      return { c, sfondo };
+    });
+    expect(colori.c, `tema ${tema}`).not.toBe(colori.sfondo);
+    await page.locator('#mgGiroStrettoBlock').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `tests/.shots/giro-stretto-${tema}.png` });
+  }
 });
 
 test('i bilanci dei giri di correzione vengono clampati nel range [0, 10] al salvataggio', async ({ openTab }) => {
