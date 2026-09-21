@@ -166,8 +166,11 @@ test('chiusura dopo un riallineamento a main: chi verifica sa che il diff porta 
     request: 'x', branch: 'claude/prova', recipe: v.readRecipe(ROOT, 'chiusura'), history: [], scope: 'chiusura',
     perimetro: { rilievi: [{ level: 2, text: 'Il pulsante non salva' }], shaPrima: 'a'.repeat(40) },
   });
-  const dopoIlDiff = brief.slice(brief.indexOf('Il codice cambiato dalla correzione'));
-  expect(dopoIlDiff).toMatch(/\bmain\b/);
+  // I due punti dove si parla di quel diff: il passo 3 del perimetro e la nota in fondo.
+  const passo3 = brief.slice(brief.indexOf('Il codice cambiato dalla correzione'), brief.indexOf('**La lamentela.**'));
+  const nota = brief.slice(brief.lastIndexOf('## Perimetro di questo giro'));
+  expect(passo3.length).toBeGreaterThan(50);
+  expect(`${passo3}\n${nota}`).toMatch(/\bmain\b/);
 });
 
 test('senza rete l’app non dà per letto «giro stretto spento»', async () => {
