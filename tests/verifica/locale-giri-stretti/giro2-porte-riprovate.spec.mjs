@@ -213,9 +213,10 @@ test.describe('fermarsi nella fase 2: chi corregge lo viene a sapere, su tutte l
     };
     // Senza segnalazione, con un valore, o su un'altra consegna: non parte.
     for (const args of [
-      ['deliver', 'segreto-finto', 'fixed', '--ticket', 'b', '--report', 'r', '--stop'],
-      ['deliver', 'segreto-finto', 'fixed', '--ticket', 'b', '--report', 'r', '--segnala', seg, '--stop', 'forse'],
-      ['deliver', 'segreto-finto', 'verifier', '--ticket', 'b', '--segnala', seg, '--stop'],
+      ['deliver', 'biglietto-finto', 'fixed', '--report', 'r', '--stop'],
+      ['deliver', 'biglietto-finto', 'fixed', '--report', 'r', '--segnala', seg, '--stop', 'forse'],
+      ['deliver', 'biglietto-finto', 'verdict', '--verdict', 'pass', '--segnala', seg, '--stop'],
+      ['deliver', 'biglietto-finto', 'status', '--status', 'review', '--segnala', seg, '--stop'],
     ]) {
       const r = canale(args);
       expect(r.code, args.join(' ')).toBe(1);
