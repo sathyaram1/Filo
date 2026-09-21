@@ -1109,8 +1109,10 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   }
   // Il marcatore locale del ruolo dice chi sta consegnando; il server lo sa
   // dal biglietto, ed è lui che ha accettato o rifiutato.
-  sealTransition(next, `${readRole(ROOT) || 'fixer'}:consegna`);
-  next.reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
+  const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
+  if (reply.outcome === 'stop') next.verifierVerdict = 'stop';
+  sealTransition(next, `${readRole(ROOT) || 'fixer'}:${reply.outcome === 'stop' ? 'ferma' : 'consegna'}`);
+  next.reply = reply;
   return next;
 }
 async function recordSecaudit(id, verdict, testo = '') {
