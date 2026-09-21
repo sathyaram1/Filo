@@ -403,7 +403,7 @@ test('fixedPayload: stop viaggia solo se chiesto, e mai come valore falso', () =
   assert.ok(!('stop' in fixedPayload({ report: 'r', ferma: 'sì' })), 'solo il true vero ferma un lavoro');
 });
 
-test('--ferma senza segnalazione non parte: l'owner non saprebbe cosa decidere', () => {
+test('--ferma senza segnalazione non parte: chi decide non saprebbe cosa decidere', () => {
   assert.match(fermaSenzaSegnalazione(true, ''), /--segnala/);
   assert.match(fermaSenzaSegnalazione(true, '   '), /non ho consegnato niente/);
   assert.equal(fermaSenzaSegnalazione(true, 'file.md'), '');
@@ -414,6 +414,18 @@ test('fixedReplyText: un fermo non confermato dal server si dice, non si dà per
   assert.match(fixedReplyText('A', { outcome: 'stop' }, true), /FERMATO/);
   assert.match(fixedReplyText('A', {}, true), /ATTENZIONE/);
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
+});
+
+test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server', () => {
+  const script = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
+  const report = 'Non si può correggere senza una decisione: le due strade hanno costi diversi e le spiego nel file.';
+  let uscita = 0;
+  let testo = '';
+  try {
+    execFileSync(process.execPath, [script, '--record-fixed', 'fid-x', report, '--ferma'], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, FILO_ROUTINE_TICKET: '' } });
+  } catch (e) { uscita = e.status; testo = `${e.stdout || ''}${e.stderr || ''}`; }
+  assert.equal(uscita, 1);
+  assert.match(testo, /--ferma vuole anche --segnala/);
 });
 
 // ─── L'ambito della verifica (pieno / riallineamento / chiusura) ─────────────
@@ -429,36 +441,31 @@ test('verifierScope: un valore sconosciuto vale pieno, e lo dice', () => {
 
 test('perimetroNote: il perimetro si legge come testo, non come JSON', () => {
   const c = perimetroNote('chiusura', { rilievi: [{ level: 2, text: 'Salva non salva' }, { level: 1, text: 'bordo freddo', decision: true }], shaPrima: 'abc1234' });
-  assert.match(c, /[2] Salva non salva/);
-  assert.match(c, /[1?] bordo freddo/);
-  assert.match(c, /git diff abc1234..HEAD/);
+  assert.match(c, /\[2\] Salva non salva/);
+  assert.match(c, /\[1\?\] bordo freddo/);
+  assert.match(c, /git diff abc1234\.\.HEAD/);
   assert.ok(!c.includes('{'), 'niente JSON grezzo nel compito');
-  const r = perimetroNote('riallineamento', { reportRebase: 'conflitto nelle schede
-solo meccanico', shaVerificato: 'def5678' });
-  assert.match(r, /> conflitto nelle schede
-> solo meccanico/);
-  assert.match(r, /git diff def5678..HEAD/);
+  const r = perimetroNote('riallineamento', { reportRebase: 'conflitto nelle schede\nsolo meccanico', shaVerificato: 'def5678' });
+  assert.match(r, /> conflitto nelle schede\n> solo meccanico/);
+  assert.match(r, /git diff def5678\.\.HEAD/);
   assert.equal(perimetroNote('pieno', { rilievi: [] }), '');
   // Lo sha finisce in un comando da copiare: uno storto non ci entra.
   assert.ok(!perimetroNote('chiusura', { shaPrima: 'abc; rm -rf .' }).includes('rm -rf'));
   assert.match(perimetroNote('chiusura', {}), /non comunicati/);
 });
 
-test('emit: l'ambito sceglie il testo del ruolo e accoda il perimetro', () => {
+test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro', () => {
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(resolve(dir, 'verifier.md'), '# verifica piena
-');
-  writeFileSync(resolve(dir, 'verifier-chiusura.md'), '# verifica di chiusura
-');
-  writeFileSync(resolve(dir, 'verifier-riallineamento.md'), '# verifica dopo il riallineamento
-');
+  writeFileSync(resolve(dir, 'verifier.md'), '# verifica piena\n');
+  writeFileSync(resolve(dir, 'verifier-chiusura.md'), '# verifica di chiusura\n');
+  writeFileSync(resolve(dir, 'verifier-riallineamento.md'), '# verifica dopo il riallineamento\n');
   const consegna = (payload) => {
     const bucket = { role: 'verifier', id: 'x', num: '#9', branch: 'worker/x' };
     let out = '';
+    let err = '';
     const real = process.stdout.write;
     const realErr = process.stderr.write;
-    let err = '';
     process.stdout.write = (s) => { out += s; return true; };
     process.stderr.write = (s) => { err += s; return true; };
     try { emit(bucket, serverCtx(bucket, { payload })); } finally { process.stdout.write = real; process.stderr.write = realErr; }
@@ -473,7 +480,7 @@ test('emit: l'ambito sceglie il testo del ruolo e accoda il perimetro', () => {
 
   const chiusura = consegna({ feedback: { text: 't' }, history: storia, scope: 'chiusura', perimetro: { rilievi: [{ level: 2, text: 'Salva non salva' }], shaPrima: 'abc1234' } });
   assert.match(chiusura.instructions, /# verifica di chiusura/);
-  assert.match(chiusura.instructions, /Perimetro di questo giro[sS]*[2] Salva non salva/);
+  assert.match(chiusura.instructions, /Perimetro di questo giro[\s\S]*\[2\] Salva non salva/);
   assert.ok(!/Avvertenza di serie/.test(chiusura.instructions), 'il giro stretto non invita alla ricerca larga');
   assert.equal(chiusura.payload.scope, 'chiusura');
 
