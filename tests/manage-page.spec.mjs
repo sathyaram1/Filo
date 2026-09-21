@@ -1690,10 +1690,11 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgActions')).toBeVisible();
   await expect(page.locator('#mgAcceptBtn')).toHaveText('→ In coda');
   // La fila dei livelli c'e' comunque, e dice la verita': un feedback mai
-  // passato dal pipeline ha tutte e cinque le forme grigie — la fila ha
-  // sempre la stessa lunghezza, e un buco si vede.
+  // passato dal pipeline ha le forme grigie, tranne il rombo. Chi aspetta una
+  // risposta HA una segnalazione di Claude, e dalla fila si deve vedere.
   await expect(page.locator('#mgLivelliRow')).toBeVisible();
-  await expect(page.locator('#mgLivelliRow .mg-forma--vuota')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow [data-livello="l3"]')).toHaveClass(/mg-forma--design/);
+  await expect(page.locator('#mgLivelliRow .mg-forma--vuota')).toHaveCount(3);
   await expect(page.locator('#mgLivelliRow .mg-dot--empty')).toHaveCount(4);
 
   // Rispondi: il patch rimette in coda (todo) e appende la risposta alle note.
