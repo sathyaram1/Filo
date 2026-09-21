@@ -660,6 +660,13 @@ fila delle forme della scheda):
   ruolo, at, testo }`. Il ruolo lo dice il biglietto, mai il messaggio. È un
   trade-off vero che decide l'owner; il server la appende anche alle note,
   per la storia della chat. Sulla riga di comando: `--segnala <file.md>`.
+- `fixed` accetta `stop: true`, solo insieme a `segnalazione`: chi corregge
+  dichiara che non può andare avanti senza una decisione. Il server risponde
+  `{ outcome: 'stop' }` e porta il feedback in attesa dell'owner invece che a
+  un'altra verifica. Sulla riga di comando: `--record-fixed … --segnala
+  <file.md> --ferma`; senza `--segnala` dispatch si ferma prima di consegnare.
+  Se la risposta non porta `stop` (server non aggiornato) dispatch lo dice:
+  il lavoro è tornato in coda.
 - `secaudit` accetta `testo` (accettato anche il nome storico `notes`) →
   `livelli.l4 = { esito: pass|fail, at, testo }`, **sempre**, anche su pass. Un
   `pass` senza testo è respinto (`malformed`): un controllo passato senza dire
