@@ -837,7 +837,7 @@ test('CLI: status stampa i bilanci letti dal server, start li tiene fuori dal co
 
 });
 
-test('la fase 2 locale è il testo del server più le sole differenze locali', async () => {
+test('la coda locale è il testo del server più le sole differenze locali', async () => {
   const { codaDalServer } = await import('../../scripts/verify-local.mjs');
   assert.equal(codaDalServer(''), '', 'senza testo dal server non si inventa niente: decide il ripiego');
   assert.equal(codaDalServer('   '), '');
