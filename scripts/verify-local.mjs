@@ -866,12 +866,8 @@ function realignBeforeStart(root = ROOT) {
   return true;
 }
 
-/**
- * Il commit di partenza della chiusura com'è ADESSO nel ramo. Un riallineamento
- * a main riscrive i commit: quello vecchio non è più un antenato, e il diff da
- * lì alla punta porterebbe dentro tutto main. Si cerca il gemello per patch-id;
- * '' se non si trova (il testo del ruolo sa cosa fare senza).
- */
+// Un riallineamento a main riscrive i commit: dal vecchio commit di partenza il diff porterebbe
+// dentro tutto main. Si cerca il gemello per patch-id; '' se non c'è (il ruolo sa farne a meno).
 export function shaPrimaAllineato(shaPrima, root = ROOT, base = `origin/${MAIN}`) {
   const sha = String(shaPrima || '').trim();
   if (!/^[0-9a-f]{7,40}$/i.test(sha)) return '';
