@@ -834,3 +834,17 @@ test('CLI: status e start stampano i bilanci letti dal server; con un server irr
   } finally { parziale.kill(); }
 
 });
+
+test('la fase 2 locale è il testo del server più le sole differenze locali', async () => {
+  const { codaDalServer } = await import('../../scripts/verify-local.mjs');
+  assert.equal(codaDalServer(''), '', 'senza testo dal server non si inventa niente: decide il ripiego');
+  assert.equal(codaDalServer('   '), '');
+  const t = codaDalServer('FASE 2 — adesso correggi tu.\n8. Consegna: node scripts/dispatch.mjs --record-fixed <id>');
+  assert.ok(t.startsWith('FASE 2 — adesso correggi tu.'), 'il testo del server arriva intero e per primo');
+  assert.match(t, /IN LOCALE/);
+  assert.match(t, /verify-local\.mjs corretto/, 'la consegna locale è detta per esteso');
+  assert.match(t, /non c'è un biglietto/);
+  const coda = codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/x', instructions: t });
+  assert.match(coda, /FASE 2 — adesso correggi tu\./);
+  assert.match(coda, /verify-local\.mjs corretto/);
+});
