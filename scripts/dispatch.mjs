@@ -1595,7 +1595,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
     // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
     // che da qui è stato tolto. Lo storico delle critiche viaggia accanto al
-    // feedback, per chi lo riceve (verifier e fixer); un server vecchio non lo
+    // feedback per chi lo riceve (solo il verifier); un server vecchio non lo
     // manda e qui arriva semplicemente vuoto.
     return {
       feedback: (payload && payload.feedback) || null,
