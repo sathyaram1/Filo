@@ -1193,9 +1193,13 @@ if (isMain) {
   }
 
   if (cmd === 'status' || !cmd) {
-    // I bilanci veri, dal server: `status` è il modo di vederli senza aprire
-    // un giro, e di scoprire subito se il token manca.
-    console.log(bilanciText(await bilanciOStop()));
+    // I NUMERI qui non si stampano. Sapere quanti giri restano per un livello
+    // orienta il livello mentre lo si sceglie, e `status` è il primo comando
+    // che prova chi verifica: li aveva davanti prima di scrivere un rigo. La
+    // lettura resta, perché dice subito se il token manca; i numeri li vede
+    // chi guida, quando apre il giro, e in Gestione → Automazioni.
+    await bilanciOStop();
+    console.log('Bilanci del giro: letti dal server.');
     const r = verdictForCurrentBranch();
     console.log(`${r.branch}: ${r.reason}`);
     // A correzione in sospeso si dice anche COSA c'è da correggere, e come
