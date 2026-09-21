@@ -570,6 +570,7 @@
       // Il guasto resta in `lastLoadError`: i ridisegni successivi lo rileggono
       // invece di ripiegare sul vuoto.
       console.error('[board] errore caricamento:', err);
+      if (schedeImposteDaFuori) return;
       lastLoadError = err;
       showLoadError(err);
       return;
