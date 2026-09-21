@@ -368,9 +368,11 @@ module.exports = function register(on, ctx) {
       if (modelBlocked) return { ok: false, error: modelBlocked };
       // Riga di un modello che non è di testo (voce, dettatura, indicizzazione):
       // si prova nel suo mestiere.
-      const kind = modelKind(provider, model, (s.modelRegistry || {})[msg.nickname] || null);
+      const rowEntry = (s.modelRegistry || {})[msg.nickname] || null;
+      const routing = providerRouting(s, rowEntry && rowEntry.sort);
+      const kind = modelKind(provider, model, rowEntry);
       if (kind !== 'text') {
-        return await probeNonText({ kind, provider, apiKey, model, routing: providerRouting(s), nickname: msg.nickname || '' });
+        return await probeNonText({ kind, provider, apiKey, model, routing, nickname: msg.nickname || '' });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
@@ -378,9 +380,10 @@ module.exports = function register(on, ctx) {
       let charCount = 0;
       const result = await Providers.streamComplete({
         provider, apiKey, model, messages,
-        // Anche la prova porta con sé chi NON deve servirla: senza, sarebbe
-        // l'unica richiesta di Filo che un fornitore escluso può servire.
-        providerRouting: providerRouting(s),
+        // La prova misura la velocità: ha senso solo con l'ordinamento degli
+        // host e il livello di reasoning che la voce userebbe davvero.
+        reasoning: SN_CONST.normalizeReasoning(rowEntry && rowEntry.reasoning) || undefined,
+        providerRouting: routing,
         onDelta: (delta) => {
           if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
           charCount += (delta || '').length;
@@ -485,6 +488,8 @@ module.exports = function register(on, ctx) {
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const d = Defaults.get();
       let provider; let modelId; let regEntry = null;
+      // Riga non ancora salvata: ordinamento e reasoning sono quelli scritti lì.
+      let tuning = { sort: msg.sort, reasoning: msg.reasoning };
       if (explicitModel) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
@@ -506,6 +511,7 @@ module.exports = function register(on, ctx) {
         const entry = registry[nickname];
         if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
         regEntry = entry;
+        tuning = { sort: entry.sort, reasoning: entry.reasoning };
         const single = registryEntryToSingle(entry);
         provider = single.provider || 'openrouter';
         modelId = single.model || '';
@@ -528,8 +534,9 @@ module.exports = function register(on, ctx) {
       // dell'uso reale.
       const model = modelId;
       const kind = modelKind(provider, model, regEntry);
+      const routing = providerRouting(eff, tuning.sort);
       if (kind !== 'text') {
-        return await probeNonText({ kind, provider, apiKey, model, routing: providerRouting(eff), nickname });
+        return await probeNonText({ kind, provider, apiKey, model, routing, nickname });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
@@ -538,7 +545,8 @@ module.exports = function register(on, ctx) {
       const result = await Providers.streamComplete({
         provider, apiKey, model, messages,
         // Come per le richieste vere: chi è escluso non serve nemmeno una prova.
-        providerRouting: providerRouting(eff),
+        reasoning: SN_CONST.normalizeReasoning(tuning.reasoning) || undefined,
+        providerRouting: routing,
         onDelta: (delta) => {
           if (firstTokenMs == null) firstTokenMs = performance.now() - startMs;
           charCount += (delta || '').length;
