@@ -516,10 +516,12 @@ async function getRoutineCaps(idToken) {
   // mostrare un valore pescato altrove significa mostrare una regola che
   // nessuno applica (vedi il commento in getAutomationProberIdle).
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '' };
+  const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
   for (const k of CAP_KEYS) {
     if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
   }
+  // Spento di serie: solo un true esplicito nel documento lo accende.
+  out.giroStretto = !!doc && doc.giroStretto === true;
   if (doc && typeof doc.fixInstructions === 'string') out.fixInstructions = doc.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX);
   return out;
 }
@@ -541,6 +543,10 @@ async function setRoutineCaps(patch, idToken) {
   if (typeof p.fixInstructions === 'string') {
     fields.fixInstructions = toFsValue(p.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX));
     mask.push('fixInstructions');
+  }
+  if (typeof p.giroStretto === 'boolean') {
+    fields.giroStretto = toFsValue(p.giroStretto);
+    mask.push('giroStretto');
   }
   if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
   return getRoutineCaps(idToken);
