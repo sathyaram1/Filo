@@ -35,6 +35,10 @@ test('passando sopra «modelli stretti» compare la spiegazione, e si legge in t
   for (const schema of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: schema });
     await glossa.scrollIntoViewIfNeeded();
+    // La pagina nasconde la notarella a ogni scorrimento (voluto: chi scorre
+    // sta leggendo, non chiedendo). Qui si aspetta che lo scorrimento sia
+    // finito, altrimenti si misura la corsa fra i due, non il passaggio sopra.
+    await page.waitForTimeout(400);
     await glossa.hover();
     await expect(pop).toBeVisible();
     const testoPop = (await pop.innerText()).trim();
