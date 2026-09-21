@@ -671,25 +671,15 @@ export function buildPayload(bucket, ctx = {}) {
         loopCount: bucket.loopCount || 0,
       };
     case 'fixer':
+      // Riallineamento del ramo dopo un conflitto di fusione. Il lavoro era
+      // già verificato: niente critica e niente serie, o la consegna direbbe
+      // il contrario del testo di ruolo (che vieta di toccare altro).
       return {
-        // È il resolver nel caso `correzione`: stesse istruzioni del primo
-        // passaggio, ma parte dalla critica di chi ha bocciato.
-        case: 'correzione',
+        case: 'riallineamento',
         branch: bucket.branch,
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
-        // La critica del SERVER viene prima di quella del fogliettino locale:
-        // è il server che registra i verdetti, e il fogliettino sparirà con la
-        // coda. Sta sul bucket e non nello stato perché lo stato viene
-        // riscritto quando ci si posiziona sul ramo — ed è così che la critica
-        // spariva senza che nessuno se ne accorgesse.
-        verifierCritique: bucket.serverCritique || bucket.state?.verifierCritique || '',
-        // TUTTE le critiche dei giri passati, dalla più vecchia: la singola
-        // critica dice cosa correggere, la serie dice se stai tappando porte
-        // una alla volta invece di chiudere la causa.
-        history: Array.isArray(ctx.history) ? ctx.history : [],
-        historyDropped: Number(ctx.historyDropped) || 0,
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
