@@ -62,5 +62,7 @@ test('la pagina si legge in tema chiaro e in tema scuro', async ({ openTab }) =>
       return { fg: s.color, bg };
     });
     expect(colori.fg).not.toBe(colori.bg);
+    await riga.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `tests/.shots/policy-15-${schema}.png` });
   }
 });
