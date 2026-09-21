@@ -557,9 +557,11 @@
       // comparire in bacheca. Il tetto per data d'invio faceva sparire dalla
       // vetrina le schede oltre la cinquecentesima, che esistevano e che nessun
       // filtro qui sotto aveva scartato.
-      allFeedbacks = FB.listAllPublic
+      const arrivate = FB.listAllPublic
         ? await FB.listAllPublic({ timeoutMs: LOAD_TIMEOUT_MS })
         : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
+      if (schedeImposteDaFuori) return;
+      allFeedbacks = arrivate;
       dataLoaded = true;
       lastLoadError = null;
     } catch (err) {
