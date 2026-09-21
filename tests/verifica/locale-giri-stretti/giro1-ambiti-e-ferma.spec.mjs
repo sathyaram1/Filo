@@ -158,6 +158,18 @@ test('--ferma: parte solo con una segnalazione vera, e solo sulla consegna della
   expect(d.fixedReplyText('abc', {}, true)).toContain('ATTENZIONE');
 });
 
+test('chiusura dopo un riallineamento a main: chi verifica sa che il diff porta anche le modifiche di main', async () => {
+  // In locale `start` riallinea il ramo a main PRIMA di consegnare il compito: il commit
+  // di partenza è quello di prima del rebase, e il diff fino a HEAD contiene anche main.
+  const v = await carica('scripts/verify-local.mjs');
+  const brief = v.buildVerifierBrief({
+    request: 'x', branch: 'claude/prova', recipe: v.readRecipe(ROOT, 'chiusura'), history: [], scope: 'chiusura',
+    perimetro: { rilievi: [{ level: 2, text: 'Il pulsante non salva' }], shaPrima: 'a'.repeat(40) },
+  });
+  const dopoIlDiff = brief.slice(brief.indexOf('Il codice cambiato dalla correzione'));
+  expect(dopoIlDiff).toMatch(/\bmain\b/);
+});
+
 test('senza rete l’app non dà per letto «giro stretto spento»', async () => {
   const { createRequire } = await import('node:module');
   const D = createRequire(import.meta.url)(resolve(ROOT, 'src/main/services/defaultsStore.js'));
