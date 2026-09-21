@@ -516,6 +516,8 @@ async function getRoutineCaps(idToken) {
   // mostrare un valore pescato altrove significa mostrare una regola che
   // nessuno applica (vedi il commento in getAutomationProberIdle).
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  // `null` = non ho potuto leggere: dirlo, o «spento» e «non impostato» sembrano parole del server.
+  if (doc === null) throw new Error('Impostazioni del giro di verifica non raggiungibili.');
   const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
   for (const k of CAP_KEYS) {
     if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
