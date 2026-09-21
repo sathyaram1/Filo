@@ -169,15 +169,27 @@ test('la presa in carico dice al server QUALE RAMO, non un ramo vuoto', async ()
   assert.ok(presa.data.branch, `il ramo deve arrivare col resto (arrivato: ${JSON.stringify(presa.data.branch)})`);
 });
 
-test('correzione: arriva anche la critica di chi aveva bocciato', async () => {
+test('riallineamento: il feedback sì, una critica da correggere no', async () => {
+  const { json } = await giro({
+    ok: true, role: 'fixer', id: 'fid-900', num: FEEDBACK.num, branch: 'worker/900',
+    payload: { role: 'fixer', feedback: FEEDBACK, loopCount: 1 },
+  });
+  assert.equal(json.role, 'fixer');
+  assert.equal(json.payload.case, 'riallineamento');
+  assert.equal(json.payload.feedback.text, FEEDBACK.text);
+  assert.equal(json.payload.verifierCritique, undefined);
+});
+
+test('una critica in una busta di riallineamento ferma il giro invece di far fare il lavoro sbagliato', async () => {
+  // Il testo che arriva a questo caso vieta di toccare qualunque riga oltre al
+  // conflitto: consegnarlo a chi ha dei rilievi in mano brucia il giro in
+  // silenzio.
   const { json } = await giro({
     ok: true, role: 'fixer', id: 'fid-900', num: FEEDBACK.num, branch: 'worker/900',
     payload: { role: 'fixer', feedback: FEEDBACK, critique: 'il pulsante compare ma non fa niente', loopCount: 1 },
   });
-  assert.equal(json.role, 'fixer');
-  assert.equal(json.payload.feedback.text, FEEDBACK.text);
-  assert.equal(json.payload.verifierCritique, 'il pulsante compare ma non fa niente',
-    'senza la critica la correzione riparte alla cieca');
+  assert.equal(json.role, 'halt');
+  assert.match(json.payload.message, /critica/);
 });
 
 test('controllo di sicurezza: ramo e differenze, MAI il feedback', async () => {
