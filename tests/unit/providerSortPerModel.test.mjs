@@ -13,7 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
 const C = globalThis.SN_CONST;
-const OpenRouter = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'providers', 'openrouter.js'));
+require(join(__dirname, '..', '..', 'src', 'main', 'services', 'providers', 'openrouter.js'));
+const OpenRouter = globalThis.SN_PROVIDER_OPENROUTER;
 
 const KEYS = { openrouter: 'k' };
 

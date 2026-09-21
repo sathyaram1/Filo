@@ -284,7 +284,7 @@ test('la prova porta con sé chi NON deve servirla (lista di esclusione)', async
 
 // ── La prova misura la velocità: deve girare come girerebbe la voce ─────────
 
-test('riga dell'editor: la prova parte con l'ordinamento e il reasoning scritti sulla riga', async () => {
+test('riga non salvata: la prova parte con ordinamento e reasoning scritti sulla riga', async () => {
   state.admin = true;
   state.defaults.apiKeys = { openrouter: 'sk-or-default' };
   state.effective = { modelRegistry: {}, apiKeys: {}, excludedProviders: ['Google'], providerSort: 'price' };
@@ -308,7 +308,7 @@ test('nickname salvato: la prova prende ordinamento e reasoning dalla voce del r
   assert.equal(state.calls[0].reasoning, 'off');
 });
 
-test('prova dalle Opzioni: vale l'ordinamento della voce personale', async () => {
+test('prova dalle Opzioni: vale anche lì la scelta fatta sulla voce personale', async () => {
   state.effective = {
     modelRegistry: { mio: { provider: 'openrouter', model: 'vendor/aperto', sort: 'throughput' } },
     apiKeys: {}, excludedProviders: ['Google'], providerSort: 'price',
