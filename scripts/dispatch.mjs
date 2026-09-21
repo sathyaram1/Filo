@@ -608,20 +608,9 @@ export function serialAwarenessNote(role, history, dropped = 0) {
   const tolte = d > 0
     ? [`${d === 1 ? 'Una critica più vecchia NON è' : `${d} critiche più vecchie NON sono`} nel fascicolo (la serie tiene solo le ultime): le porte di quei giri non si possono ri-provare da qui, e non vanno date per chiuse.`, '']
     : [];
-  if (role === 'fixer' || role === 'resolver') {
-    return [
-      `## ⚠️ Avvertenza di serie: questo lavoro è già stato rimandato indietro ${n + d} volte`,
-      '',
-      ...tolte,
-      'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
-      'Leggile TUTTE prima di toccare codice. Se raccontano lo stesso danno che',
-      'rientra da porte diverse, il rimedio giusto non è chiudere l\'ultima porta',
-      'segnalata: è fare l\'inventario di TUTTE le strade che possono riprodurre',
-      'il sintomo (cosa può cambiare lo stato da cui il difetto nasce, in ogni',
-      'direzione) e scrivere una regola sola che le copra. Prima di consegnare,',
-      'ripercorri l\'inventario e verifica ogni voce.',
-    ].join('\n');
-  }
+  // Solo chi verifica: è lui che vede la serie e che poi corregge. Al
+  // riallineamento dopo un conflitto la serie non serve, e un'avvertenza che
+  // ordina di curare la causa contraddirebbe il suo testo.
   if (role === 'verifier') {
     return [
       `## ⚠️ Avvertenza di serie: sei al giro ${n + d + 1} di verifica su questo lavoro`,
