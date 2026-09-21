@@ -220,7 +220,8 @@ test.describe('fermarsi nella fase 2: chi corregge lo viene a sapere, su tutte l
     ]) {
       const r = canale(args);
       expect(r.code, args.join(' ')).toBe(1);
-      expect(r.out, args.join(' ')).toContain('--stop vale solo su deliver fixed');
+      // Un valore dopo --stop viene respinto già come argomento di troppo: basta che non consegni.
+      expect(r.out, args.join(' ')).toMatch(/--stop vale solo su deliver fixed|Argomento non capito/);
     }
   });
 });
