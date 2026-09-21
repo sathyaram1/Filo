@@ -39,3 +39,24 @@ col valore salvato.
   `applyAction` in `src/pages/manage/manage.js`; gli ascoltatori di
   `.fb-usernote` e `.fb-notes` in `src/pages/feedback/feedback.js`, che così
   facevano già. Test: `tests/manage-frase-non-si-perde.spec.mjs`.
+
+## La stessa regola quando a ridipingere è qualcosa che arriva da fuori
+
+Nella bacheca il form «Ancora rotto?» si apriva dentro una scheda, e la lista
+delle schede si ricostruisce da zero a ogni `renderList()`. A chiamarlo non è
+solo l'utente: lo chiamano anche il caricamento dei dati che finisce, un voto
+che torna dal server e un login. Chi stava scrivendo la spiegazione si vedeva
+sparire form e testo, senza un messaggio: nessuna «uscita» era stata premuta,
+eppure il testo era perso lo stesso.
+
+- **Quello che l'utente ha aperto e scritto vive FUORI dal nodo che muore.** Un
+  form ricostruito rilegge apertura e testo da uno stato tenuto per id, e lo
+  butta solo su «Annulla» o a invio riuscito.
+- **Anche il cursore è roba dell'utente.** Ridipingere sposta il fuoco altrove:
+  si salvano fuoco e selezione prima di svuotare, e si rimettono dopo.
+- **Un caricamento partito prima e arrivato dopo è vecchio.** Se nel frattempo
+  le schede sono state decise da qualcun altro, la risposta della rete non le
+  sostituisce: vincerebbe l'ordine d'arrivo invece dell'intenzione.
+- **Dove:** `bozzeRiapertura`, `renderReopen`, `renderList` e `loadData` in
+  `src/pages/board/board.js`. Test: i due casi sul ridisegno in
+  `tests/board-reopen.spec.mjs`.

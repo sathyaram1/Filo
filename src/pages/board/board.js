@@ -52,10 +52,18 @@
   // da una lista vuota e scriverebbe "Nessun miglioramento…" al posto
   // dell'errore, portandosi via il tasto "Riprova" (#495).
   let dataLoaded = false;
+  // Schede messe dentro da fuori (hook di prova): un caricamento partito prima
+  // e arrivato dopo è vecchio, e non deve sostituirle a metà interazione.
+  let schedeImposteDaFuori = false;
   let lastLoadError = null;
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
   let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
+  // Form "Ancora rotto?" aperti e testo scritto dentro, per id: renderList()
+  // ricostruisce tutte le schede da zero, e un ridisegno che arriva mentre
+  // scrivi (i dati che finiscono di caricare, un voto che torna dal server, un
+  // login) porterebbe via il form e quello che hai scritto.
+  const bozzeRiapertura = new Map();
 
   function sendToMain(msg) {
     if (window.filo?.message)                return window.filo.message(msg);
@@ -114,6 +122,14 @@
       showLoadError(lastLoadError);
       return;
     }
+    // Chi stava scrivendo in un form "Ancora rotto?" deve ritrovarsi dove era:
+    // il testo lo tiene `bozzeRiapertura`, qui si salvano cursore e fuoco, che
+    // muoiono con il nodo.
+    const attivo = document.activeElement;
+    const scrivevaIn = attivo && attivo.classList && attivo.classList.contains('bd-reopen-text')
+      ? { id: attivo.dataset.fbId, inizio: attivo.selectionStart, fine: attivo.selectionEnd }
+      : null;
+
     const items = MR.listBoardTab(allFeedbacks, { releasedVersion });
     bdLoading.hidden = true;
     if (bdError) bdError.hidden = true;
@@ -129,6 +145,16 @@
 
     for (const fb of items) {
       bdList.appendChild(renderCard(fb));
+    }
+
+    if (scrivevaIn && scrivevaIn.id) {
+      const campo = bdList.querySelector(`.bd-reopen-text[data-fb-id="${CSS.escape(scrivevaIn.id)}"]`);
+      if (campo) {
+        try {
+          campo.focus();
+          campo.setSelectionRange(scrivevaIn.inizio, scrivevaIn.fine);
+        } catch (_) {}
+      }
     }
   }
 
@@ -186,7 +212,8 @@
     const form = document.createElement('div');
     form.className = 'bd-reopen-form';
     const reopenAfterLogin = openReopenAfterLogin === fb._id;
-    form.hidden = !reopenAfterLogin;
+    const bozza = bozzeRiapertura.get(fb._id) || null;
+    form.hidden = !reopenAfterLogin && !bozza;
 
     const hint = document.createElement('p');
     hint.className = 'bd-reopen-hint';
@@ -196,6 +223,11 @@
     textarea.className = 'bd-reopen-text';
     textarea.placeholder = 'Cosa succede ancora?';
     textarea.maxLength = 2000;
+    textarea.dataset.fbId = fb._id || '';
+    if (bozza) textarea.value = bozza.testo || '';
+    textarea.addEventListener('input', () => {
+      bozzeRiapertura.set(fb._id, { testo: textarea.value });
+    });
 
     const actions = document.createElement('div');
     actions.className = 'bd-reopen-actions';
@@ -243,17 +275,21 @@
         return;
       }
       form.hidden = !form.hidden;
-      if (!form.hidden) textarea.focus();
+      if (form.hidden) bozzeRiapertura.delete(fb._id);
+      else { bozzeRiapertura.set(fb._id, { testo: textarea.value }); textarea.focus(); }
     });
     cancelBtn.addEventListener('click', () => {
       form.hidden = true;
       err.hidden = true;
       textarea.value = '';
+      bozzeRiapertura.delete(fb._id);
     });
     sendBtn.addEventListener('click', () => onReopen(fb, textarea, sendBtn, err));
 
     wrap.appendChild(link);
     wrap.appendChild(form);
+
+    if (reopenAfterLogin) bozzeRiapertura.set(fb._id, { testo: textarea.value });
 
     // Form riaperto da solo dopo il login: sposta il focus sulla textarea
     // appena il nodo è nel DOM (subito dopo renderList l'ha già inserito).
@@ -286,6 +322,7 @@
       .then((r) => {
         if (r && r.ok) {
           fb.reopenRequests = { ...(fb.reopenRequests || {}), [uid]: { at: new Date().toISOString() } };
+          bozzeRiapertura.delete(id);
           renderList();
         } else {
           errEl.textContent = (r && r.error) || 'Invio non riuscito, riprova.';
@@ -520,9 +557,11 @@
       // comparire in bacheca. Il tetto per data d'invio faceva sparire dalla
       // vetrina le schede oltre la cinquecentesima, che esistevano e che nessun
       // filtro qui sotto aveva scartato.
-      allFeedbacks = FB.listAllPublic
+      const arrivate = FB.listAllPublic
         ? await FB.listAllPublic({ timeoutMs: LOAD_TIMEOUT_MS })
         : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
+      if (schedeImposteDaFuori) return;
+      allFeedbacks = arrivate;
       dataLoaded = true;
       lastLoadError = null;
     } catch (err) {
@@ -531,6 +570,7 @@
       // Il guasto resta in `lastLoadError`: i ridisegni successivi lo rileggono
       // invece di ripiegare sul vuoto.
       console.error('[board] errore caricamento:', err);
+      if (schedeImposteDaFuori) return;
       lastLoadError = err;
       showLoadError(err);
       return;
@@ -558,7 +598,11 @@
   // ── Hook di test (Playwright) — inerte in produzione ────────────────────
   window.__boardTest = {
     // Dati iniettati = dati arrivati: azzera anche l'eventuale guasto ricordato.
-    setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; dataLoaded = true; lastLoadError = null; renderList(); },
+    setData(fbs) {
+      allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      dataLoaded = true; lastLoadError = null; schedeImposteDaFuori = true;
+      renderList();
+    },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     // Rilancia il caricamento reale (loadData): usato dai test per esercitare il
@@ -572,7 +616,11 @@
     // la stessa che si raggiunge da `window.SN_FEEDBACK`, quindi una prova
     // non può buttarla da fuori. Il tasto "Riprova" non passa di qui: lì la
     // memoria è già vuota, perché un caricamento fallito non la riempie.
-    reload() { try { if (FB.forgetAllPublic) FB.forgetAllPublic(); } catch (_) {} return loadData(); },
+    reload() {
+      schedeImposteDaFuori = false;
+      try { if (FB.forgetAllPublic) FB.forgetAllPublic(); } catch (_) {}
+      return loadData();
+    },
     // Sostituisce la sorgente dati usata da loadData con una funzione di test
     // (che risolve o rigetta). Va scritta sulla stessa reference `FB` che
     // loadData usa: su pagine filo:// `window.SN_FEEDBACK` può essere una vista
