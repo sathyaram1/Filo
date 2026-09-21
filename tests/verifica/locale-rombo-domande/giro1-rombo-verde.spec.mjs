@@ -100,7 +100,7 @@ test('domande aperte: la casella c\'è e il rombo è verde', async ({ openTab })
 
   // E cliccandolo dice DI COSA si tratta: le domande, non una scheda vuota.
   await page.locator('#mgForme [data-livello="l3"]').click();
-  const pannello = await page.locator('#mgSidebar').innerText();
+  const pannello = await page.locator('#mgSide').innerText();
   expect(pannello).toMatch(/sfondo/);
 });
 
@@ -150,7 +150,7 @@ test('casella e rombo verde vanno sempre insieme, in tutti i casi provati', asyn
   await apriDettaglio(page, casi.find(([n]) => n.includes('HTML'))[1]);
   await page.locator('#mgForme [data-livello="l3"]').click();
   expect(await page.evaluate(() => window.__bucato || null)).toBeNull();
-  expect(await page.locator('#mgSidebar').innerText()).toMatch(/script/);
+  expect(await page.locator('#mgSide').innerText()).toMatch(/script/);
 });
 
 // ── 3. Dopo la risposta il verde se ne va ──────────────────────────────────
@@ -192,7 +192,7 @@ test('aperture ripetute e doppio clic non spengono il rombo', async ({ openTab }
   await apriDettaglio(page, a);
   await page.locator('#mgForme [data-livello="l3"]').dblclick();
   expect((await rombo(page)).verde).toBe(true);
-  await expect(page.locator('#mgSidebar')).toBeVisible();
+  await expect(page.locator('#mgSide')).toBeVisible();
 });
 
 // ── 5. Si vede? (tema chiaro e tema scuro) ─────────────────────────────────
@@ -204,7 +204,7 @@ test('il verde del rombo si distingue dal grigio nei due temi', async ({ openTab
   await apri(page, { fbs: [verde, grigio] });
 
   for (const tema of ['light', 'dark']) {
-    await page.evaluate((t) => { document.documentElement.setAttribute('data-theme', t); }, tema);
+    await page.evaluate((t) => { window.SN_PAGE_BOOTSTRAP.applyTheme(t); }, tema);
     await apriDettaglio(page, verde);
     const v = await rombo(page);
     await apriDettaglio(page, grigio);
