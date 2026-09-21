@@ -149,16 +149,18 @@ test('una domanda che contiene gli stessi titoli del pannello resta distinguibil
   await expect(body).toContainText('Serve decidere se la ricerca ignora gli accenti sempre.');
 });
 
-test('chi non è l’owner non vede un rombo verde che promette una casella che non c’è', async ({ openTab }) => {
+test('nell’elenco la pratica che aspetta una risposta si riconosce, e dopo la risposta non lo dice più', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fb = pratica();
-  await apri(page, { fbs: [fb], admin: false });
+  await apri(page, { fbs: [fb] });
   await apriDettaglio(page, fb);
+  await expect(page.locator('#mgList')).toContainText('domande per te');
+
+  await page.locator('#mgClarifyText').fill('Senza accento.');
+  await page.locator('#mgClarifyBtn').click();
   await expect(page.locator('#mgClarify')).toBeHidden();
-  const verde = await rombo(page).evaluate((el) => el.className.includes('mg-forma--design'));
-  const testo = await page.evaluate(() => {
-    const el = document.querySelector('#mgForme .mg-forma[data-livello="l3"]');
-    return el ? el.getAttribute('title') : null;
-  });
-  expect({ verde, testo }).toEqual({ verde: false, testo: 'Segnalazione di Claude' });
+
+  // Risposta data: l'elenco non può continuare a dire che aspetta una
+  // risposta, o l'owner torna su una pratica che non gli chiede più niente.
+  await expect(page.locator('#mgList')).not.toContainText('domande per te');
 });
