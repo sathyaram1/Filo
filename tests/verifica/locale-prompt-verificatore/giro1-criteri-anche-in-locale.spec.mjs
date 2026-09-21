@@ -31,3 +31,20 @@ test('in locale chi fa il primo lavoro usa gli stessi criteri di chi verifica', 
   expect(rimanda || complete,
     'il documento comune del progetto non rimanda ai criteri condivisi e ne ripete una versione più corta').toBe(true);
 });
+
+test('nessuna regola scritta due volte in due testi di ruolo', () => {
+  test.fail(true, 'rilievo aperto: l\'avvertenza sul testo scritto da altri è copiata in due testi di ruolo');
+  const dir = join(ROOT, 'routines', 'roles');
+  const doppie = [];
+  const visto = new Map();
+  for (const f of readdirSync(dir).filter((n) => n.endsWith('.md'))) {
+    const t = readFileSync(join(dir, f), 'utf8').replace(/\r/g, '');
+    for (const frase of t.split(/(?<=[.:;])\s+/)) {
+      const n = frase.replace(/\s+/g, ' ').trim();
+      if (n.length < 80 || n.startsWith('```')) continue;
+      if (visto.has(n) && visto.get(n) !== f) doppie.push(`${visto.get(n)} + ${f}: ${n.slice(0, 70)}…`);
+      else visto.set(n, f);
+    }
+  }
+  expect(doppie, 'stesse frasi in file di ruolo diversi: un pezzo condiviso si scrive una volta sola').toEqual([]);
+});
