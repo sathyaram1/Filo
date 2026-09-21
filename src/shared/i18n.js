@@ -396,6 +396,13 @@
     reasoning_low: 'Basso',
     reasoning_medium: 'Medio',
     reasoning_high: 'Alto',
+    admin_defaults_sort: 'host',
+    admin_defaults_sort_desc:
+      'Quale host serve il modello. «Automatico» segue la scelta generale, che senza indicazioni è il prezzo. La lista dei fornitori esclusi vale sempre.',
+    provider_sort_auto: 'Automatico',
+    provider_sort_throughput: 'Più veloce',
+    provider_sort_latency: 'Risposta più pronta',
+    provider_sort_price: 'Più economico',
     // Fornitori esclusi (politica sui modelli, #421 / #518)
     admin_defaults_excluded: 'Fornitori esclusi',
     admin_defaults_excluded_desc:

@@ -128,6 +128,17 @@
     return s && s !== 'auto' && REASONING_LEVELS.includes(s) ? s : null;
   }
 
+  const PROVIDER_SORTS = (window.SN_CONST && window.SN_CONST.PROVIDER_SORTS)
+    || ['auto', 'throughput', 'latency', 'price'];
+
+  function normSort(v) {
+    if (window.SN_CONST && window.SN_CONST.normalizeProviderSort) {
+      return window.SN_CONST.normalizeProviderSort(v);
+    }
+    const s = String(v == null ? '' : v).toLowerCase().trim();
+    return s && s !== 'auto' && PROVIDER_SORTS.includes(s) ? s : null;
+  }
+
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-model-row-reason';
@@ -190,6 +201,19 @@
     }
     reasonSel.value = normReasoning(entry && entry.reasoning) || 'auto';
 
+    // Con che criterio OpenRouter sceglie l'host per QUESTO modello: gemello del
+    // select del reasoning, perché sono le due manopole della velocità.
+    const sortSel = document.createElement('select');
+    sortSel.className = 'sn-model-sort';
+    sortSel.title = I18n.t('admin_defaults_sort_desc');
+    for (const val of PROVIDER_SORTS) {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = I18n.t('provider_sort_' + val);
+      sortSel.appendChild(opt);
+    }
+    sortSel.value = normSort(entry && entry.sort) || 'auto';
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
@@ -200,7 +224,7 @@
     test.type = 'button';
     test.className = 'sn-btn sn-btn-secondary';
     test.textContent = I18n.t('options_model_test');
-    test.addEventListener('click', () => runRowTest(nickIn, provSel, idIn, row, test));
+    test.addEventListener('click', () => runRowTest(nickIn, provSel, idIn, row, test, { reasonSel, sortSel }));
 
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
@@ -209,13 +233,14 @@
     row.appendChild(provSel);
     row.appendChild(idWrap);
     row.appendChild(reasonSel);
+    row.appendChild(sortSel);
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
     return row;
   }
 
-  async function runRowTest(nickIn, provSel, idIn, row, btn) {
+  async function runRowTest(nickIn, provSel, idIn, row, btn, tuning) {
     const statusEl = row.querySelector('.sn-model-row-status');
     const nickname = nickIn.value.trim();
     const provider = provSel.value;
@@ -235,6 +260,8 @@
         nickname,
         provider,
         model: modelId,
+        reasoning: normReasoning(tuning && tuning.reasonSel.value) || '',
+        sort: normSort(tuning && tuning.sortSel.value) || '',
       });
       if (!res?.ok) {
         statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
@@ -258,6 +285,7 @@
       I18n.t('options_model_provider'),
       I18n.t('options_model_id'),
       I18n.t('admin_defaults_reasoning'),
+      I18n.t('admin_defaults_sort'),
       '', '',
     ].forEach((label) => {
       const c = document.createElement('div'); c.textContent = label; head.appendChild(c);
@@ -283,6 +311,8 @@
       const label = (row.dataset.label || '').trim();
       const reasonEl = row.querySelector('.sn-model-reason');
       const reasoning = normReasoning(reasonEl && reasonEl.value);
+      const sortEl = row.querySelector('.sn-model-sort');
+      const sort = normSort(sortEl && sortEl.value);
       if (!nick && !model) continue;
       if (!nick) continue;
       if (out[nick]) continue;
@@ -291,6 +321,7 @@
       // Salviamo il livello solo se diverso da 'auto' (default): così le voci
       // integrate restano pulite e "auto" non gonfia il doc condiviso.
       if (reasoning) entry.reasoning = reasoning;
+      if (sort) entry.sort = sort;
       // Ciò che la riga non modifica ma la voce dichiara resta com'era.
       for (const k of ['weights', 'inputs', 'outputs']) {
         if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
