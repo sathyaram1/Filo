@@ -810,7 +810,9 @@ test('CLI: status e start stampano i bilanci letti dal server; con un server irr
   assert.match(st.out, /Bilanci del giro \(dal server, config\/routines\): cap2 5 · cap1 2 · cap0 0/);
   const start = vl(casa, 'start', 'richiesta di prova');
   assert.equal(start.code, 0, start.out);
-  assert.match(start.out, /cap2 5 · cap1 2 · cap0 0/);
+  // Il compito consegnato a chi verifica (l'uscita normale) NON porta i
+  // bilanci: sapere prima quanti giri restano orienta il livello che scrive.
+  assert.doesNotMatch(start.out, /cap2 5|Bilanci del giro/);
   // Un giro con la critica: i bilanci residui sono quelli del server (5 → 4).
   const cr = vl(casa, 'critica', LUNGA_FIX);
   assert.equal(cr.code, 0, cr.out);
