@@ -202,6 +202,11 @@
     textarea.className = 'bd-reopen-text';
     textarea.placeholder = 'Cosa succede ancora?';
     textarea.maxLength = 2000;
+    textarea.dataset.fbId = fb._id || '';
+    if (bozza) textarea.value = bozza.testo || '';
+    textarea.addEventListener('input', () => {
+      bozzeRiapertura.set(fb._id, { testo: textarea.value });
+    });
 
     const actions = document.createElement('div');
     actions.className = 'bd-reopen-actions';
