@@ -1097,6 +1097,22 @@
     const titolo = 'Segnalazione di Claude';
     const l = livelliOf(fb).l3;
     if (!l || !String(l.esito || '').trim()) {
+      // Le domande possono arrivare nelle sole note: chi aspetta una risposta ha comunque una segnalazione.
+      const norm = normalizeStatus(fb || {});
+      if (norm.status === 'design' && norm.statusReason === 'clarify') {
+        const note = fb && fb.notes;
+        const FT = global.SN_FEEDBACK_THREAD;
+        const turni = (FT && typeof note === 'string' && !valueUnreadable(note))
+          ? FT.splitNotes(note).filter((s) => s.role === 'model' && s.body) : [];
+        const ultimo = turni.length ? turni[turni.length - 1] : null;
+        return forma('l3', 'rombo', titolo, 'design', 'domande', {
+          titolo,
+          righe: (ultimo && ultimo.ts) ? [riga('Quando', String(ultimo.ts))] : [],
+          testo: (ultimo && ultimo.body) || 'Claude aspetta una tua risposta: le domande sono nella conversazione.',
+          illeggibile: valueUnreadable(note),
+          azioni: [],
+        });
+      }
       return forma('l3', 'rombo', titolo, null, 'nessuna', {
         titolo,
         righe: [],
