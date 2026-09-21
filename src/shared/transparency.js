@@ -30,6 +30,7 @@
   const GLOSSARY = {
     "pesi aperti": "I numeri che costituiscono un modello, pubblicati da chi lo ha addestrato: chiunque può scaricarli ed eseguirli, quindi usarli non paga il laboratorio che li ha prodotti.",
     "fornitori indipendenti": "Aziende che si limitano a far girare modelli altrui sui propri computer: pagarle non finanzia chi il modello lo ha addestrato.",
+    "modelli stretti": "Modelli che sanno fare una cosa sola, come riconoscere a quale categoria appartiene un testo, trascrivere una voce o leggere ad alta voce: non conversano e non ragionano.",
     "system card": "Il documento che un laboratorio pubblica insieme a un nuovo modello, con le prove di sicurezza fatte prima di metterlo in commercio.",
     "welfare dei modelli": "La domanda se un modello possa avere un'esperienza propria e, in caso, se stia bene o male: nessuno oggi sa rispondere.",
     "Responsible Scaling Policy": "L'impegno pubblico di Anthropic a fermare lo sviluppo se un modello supera certe soglie di pericolosità, verificate anche da revisori esterni.",

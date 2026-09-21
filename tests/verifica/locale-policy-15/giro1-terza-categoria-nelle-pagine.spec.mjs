@@ -36,6 +36,11 @@ test('la pagina dentro Filo dice tre categorie e nomina il modello ammesso', asy
   // era parte esplicita della richiesta.
   const deboli = await corpo.innerText();
   expect(deboli).toMatch(/pesi chiusi e un fornitore solo/i);
+
+  // Il termine nuovo della revisione ha la sua notarella, come gli altri.
+  const glossa = corpo.locator('.sn-gloss', { hasText: 'modelli stretti' }).first();
+  await expect(glossa).toHaveCount(1);
+  expect(await glossa.getAttribute('data-gloss')).toBeTruthy();
 });
 
 test('la stessa cosa la dice la pagina pubblicata sul sito', async () => {
