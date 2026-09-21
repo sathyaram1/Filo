@@ -2416,7 +2416,6 @@
     // pulsanti nascono dallo stato, e su una segnalazione cifrata la macchina
     // lo inventa (`unlabeled`): offrire "→ In coda" o "Conferma attacco" su una
     // pratica che potrebbe essere già chiusa è peggio che non offrire niente.
-    const normSel = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
     // La casella e il rombo verde della fila nascono dalla stessa domanda.
     const isClarify = leggibile && MR.aspettaRisposta(fb);
     renderActions(fb);
