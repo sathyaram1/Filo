@@ -155,6 +155,20 @@ test('domande in attesa e conversazione cifrata: si dice che manca la chiave, ni
   expect(await page.locator('#mgSideBody').innerText()).not.toContain('FENCv1:aa11bb22cc33dd44ee55');
 });
 
+test('il rombo verde dice, passandoci sopra e nel pannello, che ci sono domande', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  // Nessuna segnalazione registrata: il verde qui vuol dire solo «domande per te».
+  const fb = pratica();
+  await apri(page, { fbs: [fb] });
+  await apriDettaglio(page, fb);
+  await expect(rombo(page)).toHaveClass(/mg-forma--design/);
+  const hover = await rombo(page).getAttribute('title');
+  const aria = await rombo(page).getAttribute('aria-label');
+  expect(`${hover} ${aria}`.toLowerCase()).toContain('domand');
+  await rombo(page).click();
+  expect((await page.locator('#mgSideTitle').innerText()).toLowerCase()).toContain('domand');
+});
+
 test('rispondendo dalla casella la pratica esce dai chiarimenti e il rombo torna spento', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fb = pratica();
