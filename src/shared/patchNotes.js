@@ -50,6 +50,7 @@
         'Le schermate e i file che alleghi a una segnalazione partono sempre cifrati. Se Filo non riesce a cifrarli non manda niente e te lo dice: prima li caricava lo stesso in chiaro, e li leggeva chiunque avesse il link. Vale anche per gli allegati che chi lavora la segnalazione aggiunge ai commenti, che finora salivano sempre in chiaro.',
         'Se una segnalazione rimasta in attesa non riesce a partire, l\'avviso ti aspetta nella finestra finché non lo chiudi. Prima passava mentre guardavi altrove, e quella segnalazione spariva senza che nessuno lo sapesse.',
         'Quando segnali dalla bacheca che un fix è ancora rotto e l\'invio non riesce, puoi riprovare subito: quello che hai scritto resta nel riquadro. Prima Filo rispondeva che l\'avevi già segnalato, e la tua spiegazione non arrivava a nessuno.',
+        'In Preferenze la scritta «Salvato» parla dell\'ultima cosa che hai toccato, e quella modifica resta anche se chiudi la pagina o cambi scheda subito dopo. Prima quella scritta poteva essere rimasta lì dal salvataggio di prima, e l\'ultima modifica andava persa.',
       ],
     },
     {
