@@ -56,6 +56,11 @@
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
   let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
+  // Form "Ancora rotto?" aperti e testo scritto dentro, per id: renderList()
+  // ricostruisce tutte le schede da zero, e un ridisegno che arriva mentre
+  // scrivi (i dati che finiscono di caricare, un voto che torna dal server, un
+  // login) porterebbe via il form e quello che hai scritto.
+  const bozzeRiapertura = new Map();
 
   function sendToMain(msg) {
     if (window.filo?.message)                return window.filo.message(msg);
