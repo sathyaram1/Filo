@@ -24,10 +24,14 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 4. Nel report scrivi **dove c'erano i conflitti** e se per risolverli hai
    dovuto toccare la logica del lavoro, o se è stato solo meccanico.
 
-Se invece `payload.verifierCritique` descrive un difetto (uno stato vecchio),
-correggilo: leggi tutte le critiche in `payload.history`, e se lo stesso danno
+## Se invece è un difetto
+
+Correggilo: leggi tutte le critiche in `payload.history`, e se lo stesso danno
 rientra da strade diverse fai l'inventario delle strade e scrivi una regola
-sola che le copra.
+sola che le copra. Prima di consegnare applica i criteri di chi ti verifica.
+
+<!-- includi: _criteri-verifica.md -->
+
 
 <!-- includi: _segnala.md -->
 
