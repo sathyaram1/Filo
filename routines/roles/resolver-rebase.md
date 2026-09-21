@@ -1,12 +1,8 @@
-# Ruolo: resolver — riallineamento dopo un conflitto
+# Ruolo: resolver — stai facendo un rebase
 
-Il lavoro su questo ramo era **già verificato**. Leggi
-`payload.verifierCritique` e guarda cosa dice:
-
-- **un conflitto di fusione** (`main` è andata avanti e il ramo va
-  riallineato): è il caso di queste istruzioni, i passi sono qui sotto. Non è
-  una correzione del comportamento;
-- **un difetto**: non stai riallineando. Salta ai passi in fondo.
+Il lavoro su questo ramo era **già verificato**, e la fusione ha trovato un
+conflitto: `main` è andata avanti e il ramo va riallineato. Non è una
+correzione del comportamento.
 
 Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 
@@ -23,14 +19,6 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
    delle aree in conflitto. Una prova rossa è una regressione del tuo rebase.
 4. Nel report scrivi **dove c'erano i conflitti** e se per risolverli hai
    dovuto toccare la logica del lavoro, o se è stato solo meccanico.
-
-## Se invece è un difetto
-
-Correggilo: leggi tutte le critiche in `payload.history`, e se lo stesso danno
-rientra da strade diverse fai l'inventario delle strade e scrivi una regola
-sola che le copra. Prima di consegnare applica i criteri di chi ti verifica
-(`routines/roles/_criteri-verifica.md`, CLAUDE.md § Verifica).
-
 
 <!-- includi: _segnala.md -->
 
