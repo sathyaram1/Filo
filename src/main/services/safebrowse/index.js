@@ -260,12 +260,26 @@ function recordCert(host, status) {
   if (host && status) certCache.set(psl.proprietario(host) || host, { status });
 }
 
+// La domanda all'elenco dei siti di truffa è su UN indirizzo, quindi la
+// risposta si ricorda per quell'indirizzo (#591, ottavo giro). Ricordarla per
+// tutto il sito, dove i file sono di persone diverse, faceva due danni opposti:
+// un file innocuo visto prima impediva di cercare quello di truffa, e un file
+// segnalato metteva la pagina rossa su tutti gli altri.
+function chiaveIndirizzo(url, norm) {
+  let u = null;
+  const s = String(url || '');
+  try { u = new URL(s); } catch (_) {
+    try { u = new URL('http://' + s); } catch (_) { u = null; }
+  }
+  return 'u:' + norm.host + (u ? (u.pathname || '/') + (u.search || '') : '');
+}
+
 // Assembla i dati di rete già noti (da cache) per il dominio.
-function assembleCached(norm) {
+function assembleCached(norm, url) {
   if (!norm || !norm.registrable) return {};
   const reg = norm.registrable;
   return {
-    gsb: gsbCache.get('u:' + norm.host) || gsbCache.get(reg),
+    gsb: gsbCache.get(chiaveIndirizzo(url, norm)),
     ageDays: ageCache.get(reg),
     cert: certCache.get(psl.proprietario(norm.host) || reg),
     // Il verdetto è di QUESTO indirizzo, non del dominio: vedi il commento
