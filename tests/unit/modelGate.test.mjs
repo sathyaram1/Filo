@@ -257,6 +257,13 @@ test('ogni servizio a pagamento dichiara il suo indirizzo, e quell\'indirizzo è
   }
 });
 
+// Una porta che si apre cambiando l'estensione del file non è una porta.
+test('la sentinella legge ogni estensione con cui Node carica un modulo', () => {
+  for (const e of ['.js', '.mjs', '.cjs']) {
+    assert.ok(ESTENSIONI.includes(e), `i file ${e} devono essere letti dalla sentinella`);
+  }
+});
+
 test('la porta dell\'indirizzo del fornitore esiste e non è vuota', () => {
   const indirizzi = indirizziDeiFornitori();
   assert.ok(indirizzi.length > 0, 'nessun indirizzo di fornitore trovato: la porta è spenta');
