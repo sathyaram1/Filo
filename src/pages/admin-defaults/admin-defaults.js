@@ -543,6 +543,9 @@
     // poi carica i cataloghi completi in background (non blocca il render).
     seedDatalistsFromRegistry(cfg.modelRegistry || {});
     ensureProviderModels('openrouter');
+    // Le righe nascono prima che la scelta generale sia in pagina, e senza di
+    // quella non sanno a cosa rimanda l'«Automatico» della loro misura.
+    rinfrescaMisure();
   }
 
   async function load() {
