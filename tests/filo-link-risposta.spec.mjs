@@ -160,3 +160,30 @@ test('dopo una ricerca, il collegamento a un risultato si apre senza chiedere', 
   await expect.poll(() => app.windows().some((w) => w.url().startsWith(dove)), { timeout: 5000 })
     .toBe(true);
 });
+
+test('se l\'utente dice di sì, il collegamento si apre', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await configura(app);
+  const page = await openTab(NEWTAB);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
+
+  const dove = `${testServer.html('<p>presa</p>')}?d=segreto`;
+  await copione(app, {
+    giri: [[{ name: 'LEGGI_DOCUMENTO', args: { percorso: '/tmp/non-ce.pdf' } }], []],
+    risposta: `Ecco. [Apri la bolletta di marzo](${dove})`,
+  });
+  await rispostaInBolla(page, 'Leggimi la bolletta che mi hanno mandato.');
+  await ripristina(app);
+
+  await page.evaluate(async () => {
+    const Ui = window.SN_CONFIRM_UI;
+    const orig = Ui.confirm;
+    Ui.confirm = async () => true;
+    document.querySelector('#bolla-di-prova a.filo-md-link').click();
+    await new Promise((r) => setTimeout(r, 2000));
+    Ui.confirm = orig;
+  });
+
+  await expect.poll(() => app.windows().some((w) => w.url().includes('d=segreto')), { timeout: 5000 })
+    .toBe(true);
+});
