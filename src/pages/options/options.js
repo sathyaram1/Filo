@@ -554,6 +554,9 @@
     idWrap.appendChild(idIn);
     // Carica la lista del provider la prima volta che l'utente apre il campo.
     idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
+    // Riscritto il modello, la misura di prima non riguarda più questa riga:
+    // sparisce mentre si scrive, non al ricaricamento.
+    idIn.addEventListener('input', () => renderRowTest(row));
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(idWrap, idIn, {
         readOptions: () => readProviderOptions(provSel.value),
