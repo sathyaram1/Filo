@@ -285,6 +285,7 @@
     options_monthly_limit: 'Limite mensile (€)',
     options_monthly_limit_zero: 'Con 0, o lasciandolo vuoto, non c\'è nessun tetto: Filo spende finché la chiave regge.',
     options_current_spent: 'Speso questo mese',
+    options_spent_own_key: 'Con la tua chiave, fuori dal tetto: €%s',
     options_action_explain: 'Spiega (inline)',
     options_action_explain_deep: 'Approfondisci',
     options_action_translate_sel: 'Traduci selezione',
