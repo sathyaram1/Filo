@@ -453,6 +453,13 @@
       if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home', failed: true };
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
+    // Le due che finisce l'utente col bottone: la riga racconta la proposta
+    // finché il click non arriva, poi `compiuta` la riscrive con l'esito.
+    PULISCI_TAB: () => ({ icon: '🧹', text: 'Riordino delle schede da confermare' }),
+    CANCELLA_ARCHIVIO: (a) => {
+      const q = pulito((a._output && a._output.query) || a.query || a.testo);
+      return { icon: '🗑', text: `Da eliminare dall’archivio${q ? ` · ${q}` : ''}` };
+    },
   };
   // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
   // del diario resta (è successo qualcosa), ma non promette il contrario.
