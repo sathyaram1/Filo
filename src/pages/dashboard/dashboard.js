@@ -429,10 +429,10 @@
         img.src = favUrl;
         img.alt = '';
         img.referrerPolicy = 'no-referrer';
-        img.onerror = () => { img.remove(); icon.textContent = iconLabel(s.icon); };
+        img.onerror = () => { img.remove(); drawSugIcon(icon, s.icon); };
         icon.appendChild(img);
       } else {
-        icon.textContent = iconLabel(s.icon);
+        drawSugIcon(icon, s.icon);
       }
       const text = document.createElement('span');
       text.className = 'dash-sug-text';
