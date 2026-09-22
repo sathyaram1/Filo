@@ -144,6 +144,87 @@ test('la navigazione elenca tutte e quattro le aree, anche quelle non ancora scr
   assert.match(html, /is-soon/, 'le aree non ancora scritte devono comparire spente');
 });
 
+// #515 — La barra è l'unica strada per scoprire che un documento esiste senza
+// che qualcuno ti passi l'indirizzo. Era un elenco di quattro nomi scritto a
+// mano: un documento su un tema non previsto sarebbe esistito in chat, avrebbe
+// avuto la sua pagina, e sfogliando non l'avrebbe trovato nessuno.
+test('un documento scritto ha sempre la sua voce nella barra', () => {
+  const { T } = loadModules();
+  const voci = T.NAV.map((n) => n.id);
+  for (const id of T.ids()) {
+    assert.ok(voci.includes(id), `il documento "${id}" esiste ma non compare nella barra`);
+  }
+});
+
+test('nessuna voce della barra è un vicolo cieco: anche le aree non scritte hanno la loro pagina', () => {
+  const { T } = loadModules();
+  for (const n of T.NAV) {
+    const pagina = join(ROOT, 'site', 'transparency', `${n.id}.html`);
+    assert.ok(existsSync(pagina), `"${n.label}" è nella barra ma sul sito non ha nessuna pagina: 404`);
+  }
+  const vuota = readFileSync(join(ROOT, 'site', 'transparency', 'privacy.html'), 'utf8');
+  assert.match(vuota, /non è ancora scritta/, 'la pagina di un\'area non scritta non lo dice');
+  assert.match(vuota, /models\.html/, 'la pagina di un\'area non scritta non porta a quello che c\'è');
+});
+
+test('la barra si deriva dai documenti: uno nuovo e non previsto ci finisce da sé', () => {
+  // La prova gira il generatore su una COPIA, con un documento su un tema che
+  // nessuno aveva annunciato: se la barra tornasse un elenco fisso, quel
+  // documento sparirebbe dalla navigazione senza che niente lo dica.
+  const tmp = cartellaTemporanea('filo-trasparenza-');
+  mkdirSync(join(tmp, 'scripts'), { recursive: true });
+  cpSync(join(ROOT, 'scripts', 'build-transparency.mjs'), join(tmp, 'scripts', 'build-transparency.mjs'));
+  cpSync(join(ROOT, 'transparency'), join(tmp, 'transparency'), { recursive: true });
+  mkdirSync(join(tmp, 'src', 'styles'), { recursive: true });
+  cpSync(join(ROOT, 'src', 'styles', 'transparency.css'), join(tmp, 'src', 'styles', 'transparency.css'));
+  writeFileSync(join(tmp, 'transparency', 'dati.md'), [
+    '---', 'id: dati', 'title: I tuoi dati', 'nav: Dati',
+    'subtitle: Dove finiscono i dati di chi usa Filo.', 'updated: 2026-09-22', 'order: 5', '---',
+    '', 'Filo tiene i tuoi dati sul tuo computer.', '', '## Cosa esce da qui', '', 'Solo quello che chiedi tu.', '',
+  ].join('\n'), 'utf8');
+
+  execFileSync(process.execPath, [join(tmp, 'scripts', 'build-transparency.mjs')], { encoding: 'utf8' });
+
+  const modulo = readFileSync(join(tmp, 'src', 'shared', 'transparency.js'), 'utf8');
+  assert.match(modulo, /"label": "Dati"/, 'un documento nuovo non entra nella barra');
+  const barra = readFileSync(join(tmp, 'site', 'transparency', 'models.html'), 'utf8')
+    .split('<nav class="sn-nav">')[1].split('</nav>')[0];
+  assert.ok(barra.includes('dati.html'), 'sul sito la barra non porta al documento nuovo');
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+// #515 — Terza copia dello stesso elenco: il manifesto che l'assistente
+// consulta quando gli si chiede cosa sa fare. Scritto a mano, comincerebbe a
+// mentire il giorno in cui una di quelle sezioni viene scritta.
+test('il manifesto delle capacità dice in arrivo esattamente le aree che mancano', () => {
+  const { T } = loadModules();
+  delete globalThis.SN_CAPABILITIES;
+  // eslint-disable-next-line no-new-func
+  new Function(readFileSync(join(ROOT, 'src', 'shared', 'capabilities.js'), 'utf8')).call(globalThis);
+  const voce = globalThis.SN_CAPABILITIES.all().find((c) => c.id === 'transparency-docs');
+  assert.ok(voce, 'il manifesto non parla più dei documenti di trasparenza: aggiorna questo test');
+  const frase = /([^.]*\bin arrivo\b[^.]*)\./.exec(voce.desc);
+  const scritti = T.ids();
+  const mancanti = T.NAV.filter((n) => !scritti.includes(n.id));
+  if (!mancanti.length) {
+    assert.equal(frase, null, 'tutte le aree sono scritte, ma il manifesto ne annuncia ancora di "in arrivo"');
+    return;
+  }
+  assert.ok(frase, 'ci sono aree non ancora scritte e il manifesto non le dichiara');
+  // Una parola sola per area, la più caratteristica dell'etichetta: basta a
+  // beccare la divergenza senza imporre come è scritta la frase.
+  for (const n of mancanti) {
+    const parola = n.label.split(/\s+/).sort((a, b) => b.length - a.length)[0].toLowerCase();
+    assert.ok(frase[1].toLowerCase().includes(parola),
+      `il manifesto non dice che "${n.label}" è ancora da scrivere`);
+  }
+  for (const n of T.NAV.filter((v) => scritti.includes(v.id))) {
+    const parola = n.label.split(/\s+/).sort((a, b) => b.length - a.length)[0].toLowerCase();
+    assert.ok(!frase[1].toLowerCase().includes(parola),
+      `il manifesto annuncia come "in arrivo" la sezione "${n.label}", che è scritta`);
+  }
+});
+
 // #515 — La bugia non stava nella pagina (che le quattro aree le mostra, e
 // spegne quelle non scritte) ma nel PROMPT: lo strumento LEGGI_TRASPARENZA
 // dichiarava al modello quattro documenti quando ne esisteva uno. A «che fine

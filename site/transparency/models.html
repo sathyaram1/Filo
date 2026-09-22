@@ -64,12 +64,14 @@
   border-bottom-color: var(--sn-accent, #c45a3b);
 }
 
-/* Le sezioni non ancora scritte restano visibili ma spente: dire "in arrivo" è
- * più onesto che far sparire la voce. */
+/* Le sezioni non ancora scritte restano visibili e più tenui: dire "in arrivo" è
+ * più onesto che far sparire la voce. Si cliccano comunque, e la pagina che si
+ * apre spiega che non sono scritte. */
 .sn-nav-item.is-soon {
-  opacity: 0.4;
-  cursor: default;
+  opacity: 0.45;
 }
+
+.sn-nav-item.is-soon:hover { opacity: 0.75; }
 
 .sn-doc h1 {
   font-size: 1.9rem;
@@ -231,9 +233,9 @@ html:not([data-sn-theme]) body {
     <a class="sn-doc-brand" href="../">Filo</a>
     <nav class="sn-nav">
       <a class="sn-nav-item is-active" href="./models.html">Modelli</a>
-      <span class="sn-nav-item is-soon" title="in arrivo">Privacy</span>
-      <span class="sn-nav-item is-soon" title="in arrivo">Sicurezza</span>
-      <span class="sn-nav-item is-soon" title="in arrivo">Come si sostiene</span>
+      <a class="sn-nav-item is-soon" href="./privacy.html" title="in arrivo" aria-label="Privacy: non ancora scritta">Privacy</a>
+      <a class="sn-nav-item is-soon" href="./security.html" title="in arrivo" aria-label="Sicurezza: non ancora scritta">Sicurezza</a>
+      <a class="sn-nav-item is-soon" href="./business.html" title="in arrivo" aria-label="Come si sostiene: non ancora scritta">Come si sostiene</a>
     </nav>
   </header>
   <h1>Politica sui modelli</h1>
