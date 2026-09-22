@@ -83,6 +83,11 @@
     let turnMark = null;
     // Tipi delle azioni compiute, nell'ordine: da qui nasce il riassunto.
     const doneTypes = [];
+    // Le azioni che l'UTENTE ha portato a termine cliccando, e l'ultima riga di
+    // ciascun tipo: il click arriva a turno finito, e la sua riga va riscritta
+    // lì dov'è invece di aggiungersene una seconda che contraddice la prima.
+    const fatti = new Set();
+    const righePerTipo = new Map();
 
     const followBody = () => {
       const near = body.scrollHeight - body.scrollTop - body.clientHeight < 32;
