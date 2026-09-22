@@ -79,6 +79,42 @@
     return attempts;
   }
 
+  // ─── I tentativi che si sono rotti per strada ─────────────────────────────
+  // Un tentativo che fallisce dopo che il modello ha già scritto si paga lo
+  // stesso, e per anni non è comparso in nessun conto: nella spesa del mese
+  // finiva solo l'ultimo tentativo, quindi il tetto mensile — l'unico fondo
+  // vero — non lo vedeva. Il costo di quella generazione lo sa il fornitore e
+  // si chiede col suo id, come già si fa per sapere chi ha servito; la risposta
+  // non è immediata, quindi si riprova a intervalli e poi si lascia perdere.
+  const RITARDI_COSTO = [4000, 10000, 25000];
+
+  function registraFalliti({ settings, action, falliti }) {
+    const C = costs();
+    if (!C || !Array.isArray(falliti) || !falliti.length) return;
+    for (const f of falliti) {
+      if (!f || !f.generationId || !canLookupServedBy(f.provider)) continue;
+      let i = 0;
+      const riprova = () => {
+        if (i >= RITARDI_COSTO.length) return;
+        const t = setTimeout(giro, RITARDI_COSTO[i++]);
+        if (t && typeof t.unref === 'function') t.unref();
+      };
+      const giro = async () => {
+        let r = null;
+        try { r = await lookupServedBy({ provider: f.provider, apiKey: f.apiKey, generationId: f.generationId }); } catch (_) { r = null; }
+        if (!r) { riprova(); return; }
+        if (!Number.isFinite(r.costUsd) || r.costUsd <= 0) return;
+        try {
+          await C.record({
+            action, provider: f.provider, model: f.model,
+            usage: { costUsd: r.costUsd }, pricing: null, usdToEur: settings && settings.usdToEur,
+          });
+        } catch (_) {}
+      };
+      riprova();
+    }
+  }
+
   // ─── Dopo la risposta: chi ha servito, e quanto è costata ─────────────────
   async function settle({ settings, action, provider, model, result, pricing, record }) {
     const d = deps();
