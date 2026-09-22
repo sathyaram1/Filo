@@ -852,26 +852,39 @@
         // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
-        let fatto = '';
-        if (r && r.executed) {
-          a._confirmed = true;
-          a._executed = true;
-          delete a._confirm;
-          if (r.output) a._output = r.output;
-          const row = activityRowFor(a);
-          if (row) fatto = row.text;
-          if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
-        }
-        // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
+        // L'utente ha detto sì: da qui in poi lo stato dell'azione è l'ESITO,
+        // riuscito o no. La richiesta di conferma va tolta comunque, o la riga
+        // del diario continua a dire «Conferma chiesta» e di cosa sia successo
+        // non si legge niente da nessuna parte.
+        delete a._confirm;
+        a._executed = !!(r && r.executed);
+        if (r && r.output) a._output = r.output;
+        // Lo deve sapere anche il MODELLO al turno dopo: l'oggetto è lo stesso
+        // che sta nello storico della conversazione.
+        if (a._executed) a._confirmed = true;
+        const row = activityRowFor(a);
+        const fatto = (a._executed && row && !row.failed) ? row.text : '';
+        // #146.6 — comando confermato (livello 2/3): l'esito è un passo del
+        // lavoro e va nel diario, come quello di un comando di sola lettura.
+        // Sotto la risposta lo si mostrava senza che il riassunto lo contasse.
         if (isCmd) {
-          btn.textContent = (r && r.executed) ? `✓ ${short}` : `✗ ${short}`;
-          if (r && r.output) btn.after(renderCommandResult(r.output));
-          if (r && r.output) applyCommandCwd([{ _output: r.output }]);
+          btn.textContent = a._executed ? `✓ ${short}` : `✗ ${short}`;
+          const out = r && r.output;
+          if (out && !out.blocked && activity) activity.addCommand(out);
+          else if (out && !activity) btn.after(renderCommandResult(out));
+          else if (out && row && activity) { activity.addRow(a.type, row.icon, row.text, true); btn.after(renderCommandResult(out)); }
+          if (out) applyCommandCwd([{ _output: out }]);
           return;
         }
+        if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
         // A cosa fatta il bottone è una ricevuta: la spunta davanti a «Filo vuole
-        // impostare…» diceva insieme che è fatto e che deve ancora succedere.
-        btn.textContent = (r && r.executed) ? `✓ ${fatto || 'Fatto'}` : '✗ Non eseguita';
+        // impostare…» diceva insieme che è fatto e che deve ancora succedere. E
+        // quando non è riuscita dice PERCHÉ: «Non eseguita» non si può leggere.
+        const guasto = row && row.failed ? row.text : 'Non eseguita';
+        btn.title = a._executed ? '' : guasto;
+        btn.textContent = a._executed
+          ? `✓ ${fatto || 'Fatto'}`
+          : `✗ ${guasto.length > 70 ? `${guasto.slice(0, 67)}…` : guasto}`;
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
         if (r && r.executed && type === 'IMPOSTA_ESTETICA') {
