@@ -294,7 +294,7 @@ function cacheKey(host, url) {
 // niente.
 const FRENO_PER_SITO = 8;
 const FRENO_RAFFICA = 8;
-const FRENO_PER_CATENA = 4;
+const FRENO_PER_CATENA = 8;
 const FRENO_FINESTRA_MS = 60 * 60 * 1000;
 const FRENO_RAFFICA_MS = 5 * 1000;
 const CHIAVE_TUTTI = '\u0000tutti';

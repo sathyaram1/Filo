@@ -7,14 +7,12 @@
 // comune corto. Il conto comune si riapre da solo ogni pochi secondi: una
 // pagina ostile che si porta da sola su sotto-indirizzi sempre nuovi (su una
 // piattaforma che ne regala uno a testa, ogni sotto-indirizzo è un
-// proprietario diverso) non viene fermata, viene solo rallentata — e può
+// proprietario diverso) non veniva fermata, veniva solo rallentata, e poteva
 // tenere quella velocità per sempre.
 //
-// Le prove non fissano un numero «giusto»: guardano se il conto SMETTE di
-// crescere. Un freno che è un tetto dà lo stesso numero dopo quattro secondi e
-// dopo sedici; un freno che è una velocità no. La raffica arriva tutta dalla
-// stessa catena di navigazioni, che è quello che è: una pagina sola che si
-// porta in giro senza mai lasciare all'utente il tempo di guardare.
+// Le prove non fissano un numero «giusto»: fanno durare la raffica due
+// finestre uguali e guardano se la seconda aggiunge qualcosa. Un freno che è
+// un tetto non aggiunge niente; uno che è una velocità raddoppia.
 //
 // Logica pura: le chiamate di rete e al modello sono finte.
 
@@ -29,8 +27,7 @@ const SB = require_(join(REPO, 'src/main/services/safebrowse/index.js'));
 const GEO = require_(join(REPO, 'src/main/services/geoBlockClassifier.js'));
 
 const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
-const PRESTO_MS = 4000;
-const TARDI_MS = 16000;
+const FINESTRA_MS = 12000;
 // Una raffica è una catena sola: la pagina non si ferma mai.
 const CATENA = 'catena-della-pagina-ostile';
 
@@ -48,99 +45,84 @@ function bancoSafebrowse() {
   return b;
 }
 
-// Una pagina ostile che si porta da sola su indirizzi sempre nuovi. `host(i)`
-// decide se sono di proprietari diversi (sotto-indirizzi gratuiti) o dello
-// stesso sito.
-async function raffica(host, passo) {
+// Una pagina ostile che si porta da sola su indirizzi sempre nuovi, per una
+// finestra di tempo. `da` fa continuare la numerazione nella seconda finestra.
+async function raffica(passo, da = 0) {
   const t0 = Date.now();
-  let i = 0;
-  while (Date.now() - t0 < TARDI_MS) {
-    await passo(host(i), i);
+  let i = da;
+  while (Date.now() - t0 < FINESTRA_MS) {
+    await passo(i);
     i += 1;
     await attendi(15);
   }
   await attendi(300);
-  return { navigazioni: i };
+  return i;
 }
 
 test('il giudizio del modello e le finestre nascoste ripartono a ogni raffica', async () => {
   const b = bancoSafebrowse();
-  let presto = 0;
-  const t0 = Date.now();
-  await raffica(
-    (i) => `paypa1-accesso-${i}.pages.dev`,
-    async (h) => {
-      SB.analyze(`http://${h}/login`, { hasPassword: true, catena: CATENA });
-      if (!presto && Date.now() - t0 >= PRESTO_MS) presto = b.llm.length;
-    },
-  );
-  expect(presto, 'la raffica deve aver fatto partire qualcosa nei primi secondi').toBeGreaterThan(0);
+  const passo = (i) => {
+    SB.analyze(`http://paypa1-accesso-${i}.pages.dev/login`, { hasPassword: true, catena: CATENA });
+  };
+  const dopo = await raffica(passo);
+  const primaFinestra = b.llm.length;
+  const sandboxPrima = b.sandbox.length;
+  expect(primaFinestra, 'la raffica deve aver fatto partire qualcosa').toBeGreaterThan(0);
+  await raffica(passo, dopo);
   expect(
     b.llm.length,
-    'il conto delle chiamate al modello deve essere un tetto, non una velocità: dopo sedici '
-    + 'secondi non deve essere cresciuto rispetto ai primi quattro',
-  ).toBeLessThanOrEqual(presto + 2);
+    'il conto delle chiamate al modello deve essere un tetto, non una velocità: la seconda '
+    + 'finestra di raffica non deve aggiungere niente',
+  ).toBe(primaFinestra);
   expect(
     b.sandbox.length,
     'lo stesso vale per le finestre nascoste con JavaScript attivo',
-  ).toBeLessThanOrEqual(presto + 2);
-}, { timeout: 60_000 });
+  ).toBe(sandboxPrima);
+}, { timeout: 90_000 });
 
 test('anche la ricerca nell\'elenco dei siti di truffa riparte a ogni raffica', async () => {
   const b = bancoSafebrowse();
-  let presto = 0;
-  const t0 = Date.now();
-  await raffica(
-    (i) => `vetrina-${i}.pages.dev`,
-    async (h, i) => {
-      SB.analyze(`http://${h}/p${i}`, { catena: CATENA });
-      if (!presto && Date.now() - t0 >= PRESTO_MS) presto = b.gsb.length;
-    },
-  );
-  expect(presto, 'la raffica deve aver fatto partire qualcosa nei primi secondi').toBeGreaterThan(0);
+  const passo = (i) => { SB.analyze(`http://vetrina-${i}.pages.dev/p${i}`, { catena: CATENA }); };
+  const dopo = await raffica(passo);
+  const primaFinestra = b.gsb.length;
+  expect(primaFinestra, 'la raffica deve aver fatto partire qualcosa').toBeGreaterThan(0);
+  await raffica(passo, dopo);
   expect(
     b.gsb.length,
     'la chiave di fabbrica dell\'owner ha una quota giornaliera: il conto deve essere un tetto, '
     + 'non una velocità che si può tenere per sempre',
-  ).toBeLessThanOrEqual(presto + 2);
-}, { timeout: 60_000 });
+  ).toBe(primaFinestra);
+}, { timeout: 90_000 });
 
 test('il riconoscimento del blocco geografico riparte a ogni raffica', async () => {
   const cache = GEO.createCache();
   let chiamate = 0;
   const complete = async () => { chiamate += 1; return 'errore_generico'; };
-  let presto = 0;
-  const t0 = Date.now();
-  await raffica(
-    (i) => `bloccato-${i}.pages.dev`,
-    async (h, i) => {
-      await GEO.classify(
-        { title: 'Forbidden', text: 'Access denied', statusCode: 403, host: h, url: `http://${h}/p${i}`, catena: CATENA },
-        { complete, cache },
-      );
-      if (!presto && Date.now() - t0 >= PRESTO_MS) presto = chiamate;
+  const passo = (i) => GEO.classify(
+    {
+      title: 'Forbidden', text: 'Access denied', statusCode: 403,
+      host: `bloccato-${i}.pages.dev`, url: `http://bloccato-${i}.pages.dev/p${i}`, catena: CATENA,
     },
+    { complete, cache },
   );
-  expect(presto, 'la raffica deve aver fatto partire qualcosa nei primi secondi').toBeGreaterThan(0);
-  expect(
-    chiamate,
-    'anche qui il conto comune deve essere un tetto, non una velocità',
-  ).toBeLessThanOrEqual(presto + 2);
-}, { timeout: 60_000 });
+  const dopo = await raffica(passo);
+  const primaFinestra = chiamate;
+  expect(primaFinestra, 'la raffica deve aver fatto partire qualcosa').toBeGreaterThan(0);
+  await raffica(passo, dopo);
+  expect(chiamate, 'anche qui il conto comune deve essere un tetto, non una velocità').toBe(primaFinestra);
+}, { timeout: 90_000 });
 
-test('caso di riscontro: su un dominio normale il conto è davvero un tetto', async () => {
+test('caso di riscontro: chi naviga da sé riceve il suo controllo anche dopo la raffica', async () => {
   const b = bancoSafebrowse();
-  let presto = 0;
-  const t0 = Date.now();
-  await raffica(
-    (i) => `paypa1-accesso-${i}.un-solo-attaccante-xyz.com`,
-    async (h) => {
-      SB.analyze(`http://${h}/login`, { hasPassword: true, catena: CATENA });
-      if (!presto && Date.now() - t0 >= PRESTO_MS) presto = b.llm.length;
-    },
-  );
+  await raffica((i) => {
+    SB.analyze(`http://paypa1-accesso-${i}.pages.dev/login`, { hasPassword: true, catena: CATENA });
+  });
+  const dopoLaRaffica = b.llm.length;
+  // L'utente apre la truffa vera: è un'altra catena, col suo conto intero.
+  SB.analyze('http://paypa1-verifica-conto.com/login', { hasPassword: true, catena: 'catena-dell-utente' });
+  await attendi(300);
   expect(
     b.llm.length,
-    'chi ha un dominio solo è già fermato: è la prova che il conto per proprietario funziona',
-  ).toBeLessThanOrEqual(presto + 2);
-}, { timeout: 60_000 });
+    'una raffica non deve spegnere il controllo del sito che l\'utente apre da sé',
+  ).toBeGreaterThan(dopoLaRaffica);
+}, { timeout: 90_000 });

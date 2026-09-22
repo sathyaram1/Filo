@@ -156,8 +156,12 @@ const sandboxRaffica = creaConto(RAFFICA_MS);
 // lasciar passare il tempo che serve a una persona per guardare: il suo conto
 // è piccolo e non si riapre finché la catena dura. Chi naviga dopo una pausa
 // ne apre una nuova, quindi a una persona non toglie niente.
-const DEEP_MAX_PER_CATENA = 3;
-const LOOKUP_MAX_PER_CATENA = 8;
+// I numeri sono abbondanti di proposito: finché la catena dura il conto non si
+// riapre, quindi a fermare la raffica basta che esista, e stretto toglierebbe
+// il controllo a chi salta in fretta fra le pagine senza togliere niente a chi
+// attacca.
+const DEEP_MAX_PER_CATENA = 6;
+const LOOKUP_MAX_PER_CATENA = 24;
 const catenaSpesa = creaConto(HOUR);
 const catenaLookup = creaConto(HOUR);
 
