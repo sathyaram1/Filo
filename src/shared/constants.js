@@ -1006,11 +1006,10 @@
   }
 
   // L'ordinamento con cui una voce chiama DAVVERO: il suo, o quello generale
-  // finché resta su «Automatico». Le pagine lo chiedono qui invece di rifare la
-  // regola: una misura vale per l'ordine in vigore, non per metà di esso. PURA.
+  // finché resta su «Automatico». Lo chiedono qui anche le pagine. PURA.
   function ordinamentoEffettivo(entrySort, sceltaGenerale) {
-    // Anche la scelta generale passa dalla normalizzazione: scritta a mano nella
-    // config condivisa, una maiuscola o uno spazio la facevano sparire in silenzio.
+    // Anche la scelta generale si normalizza: scritta a mano nella config
+    // condivisa, una maiuscola la faceva sparire in silenzio.
     return normalizeProviderSort(entrySort) || normalizeProviderSort(sceltaGenerale);
   }
 
