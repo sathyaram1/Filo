@@ -1,0 +1,1487 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Prova della home come coda del filo: tre zone, barra dal bordo sinistro, menu del tasto destro.
+     Nessun dato vero e nessuna dipendenza; le decisioni che mostra stanno in SPEC-HOME-FILO.md. -->
+<title>Prove — la home e il filo</title>
+<style>
+:root {
+  --dash-paper: #f2ece0;
+  --dash-card: #f7f2e8;
+  --dash-ink: #221e19;
+  --dash-ink-soft: #5b554b;
+  --dash-ink-mute: #8c8273;
+  --dash-line: rgba(34, 30, 25, 0.10);
+  --dash-line-strong: rgba(34, 30, 25, 0.18);
+  --dash-accent: #c0552b;
+  --dash-accent-2: #e8a06a;
+  --dash-radius: 18px;
+  --dash-radius-pill: 28px;
+  --tab-bg: #efe3cb;
+  --tab-active: #fdf6ec;
+  --border: #e2d3b5;
+  --ombra: 0 10px 30px rgba(34, 30, 25, 0.14);
+  --morbido: 180ms cubic-bezier(.4, 0, .2, 1);
+  --lento: 320ms cubic-bezier(.4, 0, .2, 1);
+}
+body.scuro {
+  --dash-paper: #1c1916;
+  --dash-card: #25211c;
+  --dash-ink: #ece6da;
+  --dash-ink-soft: #b8b0a1;
+  --dash-ink-mute: #7e7567;
+  --dash-line: rgba(236, 230, 218, 0.10);
+  --dash-line-strong: rgba(236, 230, 218, 0.20);
+  --tab-bg: #2a241d;
+  --tab-active: #1d1a16;
+  --border: #3b332a;
+  --ombra: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden;
+  background: var(--dash-paper); color: var(--dash-ink);
+  font: 14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+button { font: inherit; }
+.ico { width: 16px; height: 16px; flex: none; display: block; }
+
+.schede {
+  height: 40px; display: flex; align-items: flex-end; gap: 2px;
+  padding: 0 10px 0 0; background: var(--tab-bg); border-bottom: 1px solid var(--border);
+}
+.maniglia {
+  width: 9px; height: 26px; margin: 0 7px 3px 4px; flex: none; cursor: pointer;
+  border-radius: 0 6px 6px 0; background: var(--dash-accent); opacity: 0.55;
+  transition: opacity var(--morbido), width var(--morbido);
+}
+.maniglia:hover { opacity: 1; width: 13px; }
+.scheda {
+  height: 32px; max-width: 190px; min-width: 0; flex: 1 1 auto;
+  display: flex; align-items: center; gap: 8px; padding: 0 10px 0 12px;
+  font-size: 13px; color: var(--dash-ink-soft); cursor: pointer;
+  border-radius: 10px 10px 0 0; border: 1px solid transparent; border-bottom: none;
+  transition: background var(--morbido), color var(--morbido);
+}
+.scheda:hover { background: rgba(253, 246, 236, 0.45); }
+body.scuro .scheda:hover { background: rgba(29, 26, 22, 0.5); }
+.scheda.attiva { background: var(--tab-active); border-color: var(--border); color: var(--dash-ink); }
+.scheda .eti { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scheda .x {
+  flex: none; width: 17px; height: 17px; border-radius: 5px; border: none; padding: 0;
+  background: transparent; color: inherit; opacity: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: opacity var(--morbido);
+}
+.scheda:hover .x { opacity: 0.6; }
+.scheda .x:hover { opacity: 1; background: var(--dash-line); }
+.scheda .x .ico { width: 11px; height: 11px; }
+.piu {
+  flex: none; width: 28px; height: 28px; margin-bottom: 2px; border: none; background: transparent;
+  color: var(--dash-ink-soft); border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: background var(--morbido);
+}
+.piu:hover { background: var(--dash-line); color: var(--dash-ink); }
+
+.corpo { position: relative; height: calc(100% - 40px); display: flex; overflow: hidden; }
+.indizio {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px; z-index: 25; cursor: pointer;
+  background: linear-gradient(var(--dash-accent-2), var(--dash-accent));
+  opacity: 0.45; transition: opacity var(--morbido), width var(--morbido);
+}
+.indizio:hover { opacity: 1; width: 5px; }
+body.barra-aperta .indizio { opacity: 0; pointer-events: none; }
+
+.home {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: 260px 1fr 260px;
+  gap: 24px; padding: 40px 40px 28px;
+}
+.col { min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.col.lato { overflow-y: auto; padding-bottom: 8px; }
+.col-tit {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--dash-ink-mute); padding: 0 2px;
+}
+
+.carta {
+  position: relative; background: var(--dash-card); border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius); padding: 11px 13px 12px;
+  transition: border-color var(--morbido), box-shadow var(--morbido), transform var(--morbido);
+}
+.carta:hover { border-color: var(--dash-line-strong); box-shadow: 0 2px 12px rgba(34, 30, 25, 0.06); }
+.carta.presa { opacity: 0.4; }
+.carta.sopra { transform: translateY(3px); border-color: var(--dash-accent); }
+.carta-testa { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.carta-testa .ico { color: var(--dash-accent); }
+.carta-tit {
+  flex: 1; min-width: 0; font-size: 13px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.carta-stato { font-size: 12px; color: var(--dash-ink-mute); margin-top: 3px; }
+.carta-stato.grande { font-size: 19px; color: var(--dash-ink); font-variant-numeric: tabular-nums; }
+.carta-piede { display: flex; gap: 6px; align-items: center; margin-top: 9px; flex-wrap: wrap; }
+.apri-filo {
+  position: absolute; top: 9px; right: 10px; z-index: 2;
+  font-size: 11px; color: var(--dash-ink-mute); background: none; border: none;
+  padding: 2px 7px; border-radius: 7px; cursor: pointer;
+  opacity: 0; transform: translateX(3px);
+  transition: opacity var(--morbido), transform var(--morbido), background var(--morbido);
+}
+.carta:hover .apri-filo { opacity: 1; transform: none; }
+.apri-filo:hover { background: var(--dash-line); color: var(--dash-ink); }
+.presa-carta {
+  position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
+  color: var(--dash-ink-mute); opacity: 0; cursor: grab; transition: opacity var(--morbido);
+}
+.carta:hover .presa-carta { opacity: 0.7; }
+.presa-carta .ico { width: 14px; height: 14px; }
+
+.az {
+  font-size: 12px; border: 1px solid var(--dash-line-strong); background: transparent;
+  color: var(--dash-ink); border-radius: 16px; padding: 3px 11px; cursor: pointer;
+  transition: background var(--morbido), color var(--morbido), transform 120ms ease;
+}
+.az:hover { background: var(--dash-ink); color: var(--dash-paper); }
+.az:active { transform: scale(0.95); }
+.az.forte { background: var(--dash-accent); border-color: var(--dash-accent); color: #fff; }
+.az.forte:hover { filter: brightness(1.1); }
+.az.nuda { border-color: transparent; color: var(--dash-ink-mute); padding: 3px 8px; }
+.az.nuda:hover { background: var(--dash-line); color: var(--dash-ink); }
+
+.bozza {
+  margin-top: 7px; padding: 6px 9px; border-left: 2px solid var(--dash-accent-2);
+  font-size: 12px; color: var(--dash-ink-soft); background: var(--dash-line); border-radius: 0 8px 8px 0;
+}
+.avanza { height: 4px; border-radius: 3px; background: var(--dash-line); overflow: hidden; margin-top: 9px; }
+.avanza > i { display: block; height: 100%; width: 0; background: var(--dash-accent); transition: width 900ms linear; }
+.elenco { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; }
+.voce {
+  display: flex; align-items: center; gap: 8px; padding: 4px 7px; margin: 0 -7px;
+  border-radius: 9px; font-size: 12.5px; color: var(--dash-ink-soft); cursor: pointer;
+  transition: background var(--morbido), color var(--morbido);
+}
+.voce:hover { background: var(--dash-line); color: var(--dash-ink); }
+.voce .ico { width: 14px; height: 14px; color: var(--dash-ink-mute); }
+.voce .coda { margin-left: auto; font-size: 11px; color: var(--dash-ink-mute); }
+.riga-alta { display: flex; align-items: center; gap: 4px; padding: 0 2px 2px; }
+.riga-alta .spazio { flex: 1; }
+.tondo {
+  width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--dash-line);
+  background: var(--dash-card); color: var(--dash-ink-soft); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--morbido), color var(--morbido), transform 120ms ease;
+}
+.tondo:hover { background: var(--dash-ink); color: var(--dash-paper); transform: translateY(-1px); }
+.sistema { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; margin-top: 8px; }
+.sist { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--dash-ink-soft); }
+.sist .ico { width: 15px; height: 15px; color: var(--dash-ink-mute); }
+.ora-grande { font-size: 21px; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+.pillole { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+.pill {
+  font-size: 12px; border: 1px solid var(--dash-line-strong); background: transparent;
+  color: var(--dash-ink-soft); border-radius: var(--dash-radius-pill); padding: 3px 11px; cursor: pointer;
+  transition: background var(--morbido), color var(--morbido), border-color var(--morbido);
+}
+.pill:hover { border-color: var(--dash-ink); color: var(--dash-ink); }
+.pill.acceso { background: var(--dash-accent); border-color: var(--dash-accent); color: #fff; }
+.altro-riga { display: flex; align-items: center; gap: 4px; padding: 2px; }
+.altro-riga .et { font-size: 11px; color: var(--dash-ink-mute); margin-right: 4px; }
+
+.centro { display: flex; flex-direction: column; min-height: 0; }
+.scorr { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.dentro { width: 100%; max-width: 610px; margin: auto auto 0; display: flex; flex-direction: column; }
+.risali { display: flex; justify-content: center; padding: 4px 0 10px; }
+.risali button {
+  font-size: 11.5px; color: var(--dash-ink-mute); background: transparent; border: 1px solid transparent;
+  border-radius: var(--dash-radius-pill); padding: 4px 14px; cursor: pointer;
+  transition: background var(--morbido), color var(--morbido), border-color var(--morbido);
+}
+.risali button:hover { background: var(--dash-line); color: var(--dash-ink); border-color: var(--dash-line-strong); }
+.risali button:disabled { cursor: default; opacity: 0.55; }
+.risali button:disabled:hover { background: transparent; border-color: transparent; color: var(--dash-ink-mute); }
+
+.giorno { display: flex; flex-direction: column; }
+.giorno.vecchio { opacity: 0.52; transition: opacity var(--lento); }
+.giorno.vecchio:hover { opacity: 1; }
+.giorno.entra { animation: cala 320ms cubic-bezier(.4, 0, .2, 1); }
+@keyframes cala { from { opacity: 0; transform: translateY(-8px); } }
+.segno {
+  display: flex; align-items: center; gap: 10px; margin: 16px 0 12px;
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dash-ink-mute);
+}
+.segno::before, .segno::after { content: ""; flex: 1; height: 1px; background: var(--dash-line); }
+
+.bolla {
+  position: relative; border-radius: var(--dash-radius); padding: 9px 14px;
+  font-size: 13.5px; max-width: 86%; margin-bottom: 12px;
+}
+.bolla-utente { align-self: flex-end; background: var(--dash-ink); color: var(--dash-paper); }
+.bolla-filo {
+  align-self: flex-start; background: var(--dash-card); border: 1px solid var(--dash-line);
+  color: var(--dash-ink); white-space: pre-wrap;
+}
+.bolla-filo:empty { display: none; }
+.segno-fatto {
+  position: absolute; right: 9px; bottom: -8px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--dash-accent); color: #fff; border: 2px solid var(--dash-paper);
+  display: flex; align-items: center; justify-content: center;
+}
+.segno-fatto .ico { width: 10px; height: 10px; stroke-width: 3.2; }
+.pop {
+  position: absolute; right: 0; bottom: calc(100% + 9px); z-index: 5;
+  display: flex; align-items: center; gap: 9px; white-space: nowrap;
+  background: var(--dash-ink); color: var(--dash-paper); border-radius: 10px;
+  padding: 5px 7px 5px 11px; font-size: 11.5px; box-shadow: var(--ombra);
+  opacity: 0; pointer-events: none; transform: translateY(5px);
+  transition: opacity var(--morbido), transform var(--morbido);
+}
+.bolla:hover .pop, .pop:hover { opacity: 1; pointer-events: auto; transform: none; }
+.pop button {
+  font-size: 11.5px; border: 1px solid currentColor; background: transparent; color: inherit;
+  border-radius: 13px; padding: 1px 9px; cursor: pointer; opacity: 0.75;
+  transition: opacity var(--morbido), background var(--morbido), color var(--morbido);
+}
+.pop button:hover { opacity: 1; background: var(--dash-paper); color: var(--dash-ink); border-color: var(--dash-paper); }
+
+.evento {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  font-size: 12px; color: var(--dash-ink-mute); padding: 5px 9px; margin: 1px 0 8px;
+  border-radius: 10px; cursor: pointer; transition: background var(--morbido), color var(--morbido);
+}
+.evento:hover { background: var(--dash-line); color: var(--dash-ink-soft); }
+.evento .ora { font-variant-numeric: tabular-nums; opacity: 0.75; flex: none; }
+.evento .ico { width: 13px; height: 13px; flex: none; }
+.evento .testo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evento .fine { margin-left: auto; opacity: 0; flex: none; transition: opacity var(--morbido); }
+.evento:hover .fine { opacity: 1; }
+.pagine { display: none; flex-direction: column; gap: 1px; padding: 0 0 10px 34px; margin-top: -4px; }
+.evento.aperto + .pagine { display: flex; }
+.pagine a {
+  font-size: 12px; color: var(--dash-ink-mute); text-decoration: none; padding: 3px 8px;
+  border-radius: 8px; transition: background var(--morbido), color var(--morbido);
+}
+.pagine a:hover { background: var(--dash-line); color: var(--dash-ink); }
+
+.scrivi {
+  margin-top: 14px; display: flex; align-items: center; gap: 10px;
+  background: var(--dash-card); border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius-pill); padding: 7px 8px 7px 16px;
+  width: 100%; max-width: 610px; margin-left: auto; margin-right: auto;
+  transition: border-color var(--morbido);
+}
+.scrivi:focus-within { border-color: var(--dash-line-strong); }
+.scrivi input {
+  flex: 1; min-width: 0; border: none; background: transparent; outline: none;
+  font: inherit; font-size: 13.5px; color: var(--dash-ink);
+}
+.scrivi input::placeholder { color: var(--dash-ink-mute); }
+.invia {
+  flex: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; padding: 0;
+  border: 1px solid var(--dash-ink); background: var(--dash-ink); color: var(--dash-paper);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 220ms ease, border-color 220ms ease, transform 160ms ease;
+}
+.invia:hover { transform: scale(1.07); }
+.invia svg { width: 12px; height: 12px; display: block; }
+body.lavora .invia { background: var(--dash-accent); border-color: var(--dash-accent); color: #fff; }
+
+.blocco {
+  align-self: flex-start; width: 100%; position: relative; padding-left: 26px;
+  color: var(--dash-ink-mute); font-size: 13px; margin-bottom: 10px;
+}
+.rail { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.rail path.filo { fill: none; stroke: var(--dash-accent); stroke-width: 1.7; stroke-linecap: round; }
+.rail circle { pointer-events: all; }
+.righe {
+  display: flex; flex-direction: column; gap: 1px; overflow: hidden;
+  transition: max-height 460ms cubic-bezier(.4, 0, .2, 1), opacity 300ms ease;
+}
+.seg { display: flex; flex-direction: column; position: relative; animation: entra 320ms ease-out; }
+@keyframes entra { from { opacity: 0; transform: translateY(-5px); } }
+.seg-testa {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 3px 4px 3px 0; border-radius: 7px; cursor: pointer; user-select: none;
+  transition: color 160ms ease;
+}
+.seg-testa:hover { color: var(--dash-ink-soft); }
+.seg-eti { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity var(--morbido); }
+.seg-corpo {
+  display: none; white-space: pre-wrap; font-size: 12.5px; line-height: 1.5;
+  padding: 3px 10px 8px 2px; color: var(--dash-ink-soft); user-select: text;
+  max-height: 240px; overflow-y: auto;
+}
+.seg.aperto .seg-corpo { display: block; }
+/* la trama: il ragionamento che scorre, illeggibile e vivo */
+.trama {
+  height: 25px; line-height: 25px; overflow: hidden; white-space: nowrap; cursor: pointer;
+  font-size: 10.5px; color: var(--dash-ink-mute); opacity: 0.5;
+  direction: rtl; text-align: left; padding-left: 2px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+}
+.seg.aperto .trama { display: none; }
+.capo { display: none; align-items: center; gap: 9px; cursor: pointer; padding: 2px 0; user-select: none; }
+.blocco.arrotolabile .capo { display: flex; }
+.capo:hover { color: var(--dash-ink-soft); }
+.capo .vuoto { width: 20px; flex: none; }
+
+.barra {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 64px; z-index: 30;
+  display: flex; flex-direction: column; padding: 6px 0;
+  background: var(--dash-card); border-right: 1px solid var(--dash-line-strong);
+  box-shadow: 6px 0 22px rgba(34, 30, 25, 0.10);
+  transform: translateX(-100%); transition: transform var(--lento);
+}
+body.barra-aperta .barra { transform: none; }
+.bgruppo { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0; }
+.bgruppo + .bgruppo { border-top: 1px solid var(--dash-line); }
+.bgruppo.scorre { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.bgruppo.mira { background: var(--dash-line); box-shadow: inset 0 0 0 1px var(--dash-accent); border-radius: 12px; }
+.bico {
+  position: relative; width: 46px; height: 40px; flex: none; border-radius: 12px; border: none;
+  background: transparent; color: var(--dash-ink-soft); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--morbido), color var(--morbido), transform 120ms ease;
+}
+.bico:hover { background: var(--dash-line); color: var(--dash-ink); }
+.bico:active { transform: scale(0.93); }
+.bico.nuovo { animation: posa 320ms cubic-bezier(.4, 0, .2, 1); }
+@keyframes posa { from { opacity: 0; transform: scale(0.6); } }
+.bico .ico { width: 18px; height: 18px; }
+.bico .eti {
+  position: absolute; left: 54px; top: 50%; transform: translateY(-50%) translateX(-4px);
+  background: var(--dash-ink); color: var(--dash-paper); font-size: 11.5px;
+  padding: 3px 9px; border-radius: 8px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity var(--morbido), transform var(--morbido); z-index: 3;
+}
+.bico:hover .eti { opacity: 1; transform: translateY(-50%); }
+.bico .punto {
+  position: absolute; top: 7px; right: 8px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--dash-accent);
+}
+.bico .punto.calmo { background: var(--dash-ink-mute); }
+.bico .resta {
+  position: absolute; bottom: 1px; left: 0; right: 0; text-align: center;
+  font-size: 9px; font-variant-numeric: tabular-nums; color: var(--dash-ink-mute);
+}
+.bora { font-size: 12px; font-variant-numeric: tabular-nums; padding: 2px 0 4px; color: var(--dash-ink-soft); }
+.bsist { display: flex; gap: 2px; }
+.bsist .bico { width: 20px; height: 24px; border-radius: 7px; }
+.bsist .bico .ico { width: 14px; height: 14px; }
+.brapide { display: flex; flex-direction: column; gap: 3px; width: 50px; margin-top: 4px; }
+.brapide .pill { padding: 2px 0; text-align: center; font-size: 10.5px; }
+
+.menu {
+  position: fixed; z-index: 60; display: none; min-width: 244px; padding: 8px;
+  background: var(--dash-card); border: 1px solid var(--dash-line-strong);
+  border-radius: 14px; box-shadow: var(--ombra);
+}
+.menu.vis { display: block; animation: apparsa 180ms cubic-bezier(.4, 0, .2, 1); }
+@keyframes apparsa { from { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+.menu-riga { display: flex; gap: 2px; justify-content: space-between; }
+.menu-ico {
+  width: 36px; height: 36px; border-radius: 10px; border: none; background: transparent;
+  color: var(--dash-ink-soft); cursor: grab; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--morbido), color var(--morbido), transform 120ms ease;
+}
+.menu-ico:hover { background: var(--dash-line); color: var(--dash-ink); transform: translateY(-2px); }
+.menu-ico .ico { width: 18px; height: 18px; }
+.menu-sep { height: 1px; background: var(--dash-line); margin: 8px 2px 7px; }
+.menu-tit { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dash-ink-mute); padding: 0 4px 6px; }
+.menu-griglia { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+.menu-voce {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center;
+  padding: 8px 2px 7px; border: none; background: transparent; border-radius: 10px;
+  font-size: 10.5px; line-height: 1.2; color: var(--dash-ink-soft); cursor: grab;
+  transition: background var(--morbido), color var(--morbido), transform 120ms ease;
+}
+.menu-voce:hover { background: var(--dash-line); color: var(--dash-ink); transform: translateY(-2px); }
+.menu-voce .ico { width: 18px; height: 18px; }
+.trascinata { opacity: 0.45; }
+
+.nodo-hint {
+  position: fixed; z-index: 90; pointer-events: none;
+  background: var(--dash-ink); color: var(--dash-paper);
+  font-size: 11.5px; padding: 4px 9px; border-radius: 7px;
+  transform: translate(-50%, -125%); opacity: 0; transition: opacity 140ms ease;
+  white-space: nowrap;
+}
+.nodo-hint.vis { opacity: 1; }
+
+.tema-prova {
+  position: fixed; right: 16px; top: 6px; z-index: 80;
+  border: 1px solid var(--border); background: var(--tab-active); color: var(--dash-ink-soft);
+  border-radius: var(--dash-radius-pill); padding: 3px 13px; font-size: 12px; cursor: pointer;
+  transition: color var(--morbido), border-color var(--morbido);
+}
+.tema-prova:hover { color: var(--dash-ink); border-color: var(--dash-ink-soft); }
+.note {
+  position: fixed; right: 14px; bottom: 14px; z-index: 70; width: 306px;
+  background: var(--dash-card); border: 1px solid var(--dash-line-strong);
+  border-radius: 14px; box-shadow: var(--ombra); font-size: 12px; color: var(--dash-ink-soft);
+}
+.note summary { list-style: none; cursor: pointer; padding: 8px 13px; color: var(--dash-ink); font-size: 12px; }
+.note summary::-webkit-details-marker { display: none; }
+.note summary::before { content: "▸ "; color: var(--dash-ink-mute); }
+.note[open] summary::before { content: "▾ "; }
+.note .corpo-note { padding: 0 13px 12px; }
+.note ul { margin: 0 0 9px; padding-left: 16px; }
+.note li { margin-bottom: 3px; }
+.note .az { margin-right: 5px; margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<button class="tema-prova" id="tema-prova">scuro</button>
+
+<div class="schede">
+  <div class="maniglia" id="maniglia" title="barra"></div>
+  <div class="scheda attiva"><span class="eti">Filo</span><button class="x"><i data-ico="close"></i></button></div>
+  <div class="scheda"><span class="eti">Trenitalia — orari</span><button class="x"><i data-ico="close"></i></button></div>
+  <div class="scheda"><span class="eti">Editor · appunti tetto</span><button class="x"><i data-ico="close"></i></button></div>
+  <div class="scheda"><span class="eti">YouTube</span><button class="x"><i data-ico="close"></i></button></div>
+  <button class="piu"><i data-ico="piu"></i></button>
+</div>
+
+<div class="corpo" id="corpo">
+  <div class="indizio" id="indizio"></div>
+
+  <aside class="barra" id="barra">
+    <div class="bgruppo" id="barra-nav">
+      <button class="bico"><i data-ico="undo"></i><span class="eti">indietro</span></button>
+      <button class="bico"><i data-ico="avanti"></i><span class="eti">avanti</span></button>
+      <button class="bico"><i data-ico="repeat"></i><span class="eti">ricarica</span></button>
+      <button class="bico"><i data-ico="home"></i><span class="eti">home</span></button>
+    </div>
+    <div class="bgruppo scorre" id="barra-carte"></div>
+    <div class="bgruppo">
+      <div class="bora" id="barra-ora">—:—</div>
+      <div class="bsist">
+        <button class="bico"><i data-ico="battery"></i><span class="eti">68%</span></button>
+        <button class="bico"><i data-ico="wifi"></i><span class="eti">casa</span></button>
+        <button class="bico"><i data-ico="bluetooth"></i><span class="eti">cuffie</span></button>
+      </div>
+      <div class="brapide">
+        <button class="pill" data-rapida="tema">tema</button>
+        <button class="pill" data-rapida="zoom">zoom</button>
+        <button class="pill" data-rapida="incognito">incognito</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="home" id="home">
+    <section class="col lato">
+      <div class="col-tit">quello che accade</div>
+
+      <article class="carta" data-accade="timer" data-eti="Timer · pasta">
+        <button class="apri-filo">apri nel filo</button>
+        <div class="carta-testa"><i data-ico="timer"></i><span class="carta-tit">Pasta</span></div>
+        <div class="carta-stato grande" id="timer-carta">4:12</div>
+        <div class="carta-piede"><button class="az">ferma</button><button class="az nuda">+1 min</button></div>
+      </article>
+
+      <article class="carta" data-accade="mail" data-eti="Mail · Giacomo Berti">
+        <button class="apri-filo">apri nel filo</button>
+        <div class="carta-testa"><i data-ico="mailOpen"></i><span class="carta-tit">Giacomo Berti</span></div>
+        <div class="carta-stato">risposta pronta</div>
+        <div class="bozza">Ciao Giacomo, per me va bene giovedì alle 15.<br>Porto io i preventivi del tetto.</div>
+        <div class="carta-piede"><button class="az forte">approva</button><button class="az">rivedi nel filo</button></div>
+      </article>
+
+      <article class="carta" data-accade="download" data-eti="Scaricato · preventivo-tetto.pdf">
+        <button class="apri-filo">apri nel filo</button>
+        <div class="carta-testa"><i data-ico="download"></i><span class="carta-tit">preventivo-tetto.pdf</span></div>
+        <div class="carta-stato">scaricato · 2,4 MB</div>
+        <div class="carta-piede"><button class="az">apri</button><button class="az nuda">cartella</button></div>
+      </article>
+
+      <article class="carta" data-accade="lavoro" data-eti="In corso · confronto preventivi">
+        <button class="apri-filo">apri nel filo</button>
+        <div class="carta-testa"><i data-ico="reasoning"></i><span class="carta-tit">Confronto i 3 preventivi</span></div>
+        <div class="carta-stato" id="lavoro-stato">2 di 3 · leggo il terzo</div>
+        <div class="avanza"><i id="lavoro-avanza"></i></div>
+        <div class="carta-piede"><button class="az">guarda</button><button class="az nuda">ferma</button></div>
+      </article>
+
+      <article class="carta" data-accade="sveglia" data-eti="Sveglia · domani 7:00">
+        <button class="apri-filo">apri nel filo</button>
+        <div class="carta-testa"><i data-ico="alarm"></i><span class="carta-tit">Sveglia</span></div>
+        <div class="carta-stato">domani, 7:00</div>
+        <div class="carta-piede"><button class="az">sposta</button><button class="az nuda">togli</button></div>
+      </article>
+    </section>
+
+    <section class="col centro">
+      <div class="scorr" id="scorr">
+        <div class="dentro" id="dentro">
+          <div class="risali"><button id="risali">risali il filo</button></div>
+          <div id="vecchi"></div>
+
+          <div class="giorno">
+            <div class="segno">oggi</div>
+
+            <div class="evento" data-pagine="no">
+              <span class="ora">8:02</span>
+              <i data-ico="zoom"></i>
+              <span class="testo">zoom 125% · dalle impostazioni</span>
+              <span class="fine az nuda">annulla</span>
+            </div>
+
+            <div class="bolla bolla-utente">tema scuro
+              <span class="segno-fatto"><i data-ico="check"></i></span>
+              <span class="pop"><span>tema: scuro</span><button class="annulla-tema">annulla</button></span>
+            </div>
+
+            <div class="bolla bolla-filo">Buongiorno. La pasta è in cottura, la mail di Giacomo aspetta una tua occhiata.</div>
+
+            <div class="bolla bolla-utente">che treni ci sono domani mattina per bologna?</div>
+            <div id="blocco-treni"></div>
+            <div class="bolla bolla-filo">Il primo utile è il Frecciarossa delle 7:10, arriva alle 8:35. Poi Italo 7:40 e Frecciarossa 8:10. Sotto le due ore solo i primi due.</div>
+          </div>
+
+          <div id="coda-viva"></div>
+        </div>
+      </div>
+      <form class="scrivi" id="scrivi">
+        <input id="campo" placeholder="Chiedi qualsiasi cosa" autocomplete="off">
+        <button class="invia" id="invia" type="submit" title="Manda"><svg id="glifo" viewBox="0 0 12 12"></svg></button>
+      </form>
+    </section>
+
+    <section class="col lato" id="col-destra">
+      <div class="riga-alta">
+        <span class="col-tit">quello che tieni</span>
+        <span class="spazio"></span>
+        <button class="tondo" title="profilo"><i data-ico="profilo"></i></button>
+        <button class="tondo" title="impostazioni"><i data-ico="options"></i></button>
+      </div>
+
+      <article class="carta" draggable="true" data-carta="sistema">
+        <span class="presa-carta"><i data-ico="presa"></i></span>
+        <div class="carta-testa"><span class="carta-tit">Sistema</span></div>
+        <div class="carta-stato ora-grande" id="ora-carta">—:—</div>
+        <div class="sistema">
+          <span class="sist"><i data-ico="battery"></i>68%</span>
+          <span class="sist"><i data-ico="wifi"></i>casa</span>
+          <span class="sist"><i data-ico="bluetooth"></i>cuffie</span>
+          <span class="sist"><i data-ico="location"></i>Milano</span>
+        </div>
+      </article>
+
+      <article class="carta" draggable="true" data-carta="rapide">
+        <span class="presa-carta"><i data-ico="presa"></i></span>
+        <div class="carta-testa"><span class="carta-tit">Impostazioni rapide</span></div>
+        <div class="pillole">
+          <button class="pill" data-rapida="tema">tema</button>
+          <button class="pill" data-rapida="zoom">zoom</button>
+          <button class="pill" data-rapida="incognito">incognito</button>
+        </div>
+      </article>
+
+      <article class="carta" draggable="true" data-carta="editor">
+        <button class="apri-filo">apri nel filo</button>
+        <span class="presa-carta"><i data-ico="presa"></i></span>
+        <div class="carta-testa"><i data-ico="pencil"></i><span class="carta-tit">Editor</span></div>
+        <div class="elenco">
+          <div class="voce"><i data-ico="note"></i>appunti tetto<span class="coda">ora</span></div>
+          <div class="voce"><i data-ico="note"></i>lista spesa<span class="coda">ieri</span></div>
+          <div class="voce"><i data-ico="note"></i>lettera al comune<span class="coda">ven</span></div>
+        </div>
+      </article>
+
+      <article class="carta" draggable="true" data-carta="mazzi">
+        <button class="apri-filo">apri nel filo</button>
+        <span class="presa-carta"><i data-ico="presa"></i></span>
+        <div class="carta-testa"><i data-ico="tabs"></i><span class="carta-tit">Mazzi</span></div>
+        <div class="elenco">
+          <div class="voce"><i data-ico="folder"></i>Muldrotha<span class="coda">99 carte</span></div>
+          <div class="voce"><i data-ico="folder"></i>Krenko<span class="coda">manca 1</span></div>
+        </div>
+      </article>
+
+      <article class="carta" draggable="true" data-carta="suggerisce">
+        <span class="presa-carta"><i data-ico="presa"></i></span>
+        <div class="carta-testa"><i data-ico="sparkles"></i><span class="carta-tit">Filo ti suggerisce</span></div>
+        <div class="elenco">
+          <div class="voce"><i data-ico="mailSend"></i>rispondi a Giacomo</div>
+          <div class="voce"><i data-ico="timer"></i>metti 10 min per il sugo</div>
+          <div class="voce"><i data-ico="globe"></i>riapri l'orario di ieri</div>
+        </div>
+      </article>
+
+      <div class="altro-riga">
+        <span class="et">altro</span>
+        <button class="tondo" title="feedback"><i data-ico="feedback"></i></button>
+        <button class="tondo" title="cronologia"><i data-ico="history"></i></button>
+        <button class="tondo" title="memorie"><i data-ico="memory"></i></button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="menu" id="menu">
+  <div class="menu-riga" id="menu-primarie">
+    <button class="menu-ico" draggable="true" data-az="translate" title="traduci"><i data-ico="translate"></i></button>
+    <button class="menu-ico" draggable="true" data-az="screenshot" title="schermata"><i data-ico="screenshot"></i></button>
+    <button class="menu-ico" draggable="true" data-az="share" title="condividi"><i data-ico="share"></i></button>
+    <button class="menu-ico" draggable="true" data-az="saveForLater" title="metti da parte"><i data-ico="clipboard"></i></button>
+    <button class="menu-ico" draggable="true" data-az="qrCode" title="codice QR"><i data-ico="qrCode"></i></button>
+    <button class="menu-ico" draggable="true" data-az="newTab" title="scheda nuova"><i data-ico="openTab"></i></button>
+  </div>
+  <div class="menu-sep"></div>
+  <div class="menu-tit">Altro…</div>
+  <div class="menu-griglia">
+    <button class="menu-voce" draggable="true" data-az="incognito"><i data-ico="incognito"></i>incognito</button>
+    <button class="menu-voce" draggable="true" data-az="fullscreen"><i data-ico="fullscreen"></i>schermo pieno</button>
+    <button class="menu-voce" draggable="true" data-az="pin"><i data-ico="pin"></i>fissa</button>
+    <button class="menu-voce" draggable="true" data-az="memory"><i data-ico="memory"></i>memorie</button>
+    <button class="menu-voce" draggable="true" data-az="note"><i data-ico="note"></i>appunti</button>
+    <button class="menu-voce" draggable="true" data-az="palette"><i data-ico="palette"></i>aspetto</button>
+    <button class="menu-voce" draggable="true" data-az="terminal"><i data-ico="terminal"></i>terminale</button>
+    <button class="menu-voce" draggable="true" data-az="apps"><i data-ico="apps"></i>app</button>
+  </div>
+</div>
+
+<div class="nodo-hint" id="hint"></div>
+
+<details class="note" id="note">
+  <summary>note della prova</summary>
+  <div class="corpo-note">
+    <ul>
+      <li>La barra si apre spingendo il cursore contro il bordo sinistro, o dalla linguetta fra le schede.</li>
+      <li>Il tasto destro su una zona vuota apre il menu; le sue icone si trascinano nel primo gruppo della barra.</li>
+      <li>Il gomitolo sotto la domanda sui treni si srotola con un clic.</li>
+      <li>Le carte di destra si riordinano trascinandole.</li>
+    </ul>
+    <button class="az" id="note-barra">apri barra</button>
+    <button class="az" id="note-scorda">scorda la disposizione</button>
+  </div>
+</details>
+
+<script>
+var ICONE = {
+  undo: '<path d="M4 10h11a5 5 0 0 1 0 10h-4"/><path d="M8 6l-4 4 4 4"/>',
+  avanti: '<path d="M20 10H9a5 5 0 0 0 0 10h4"/><path d="M16 6l4 4-4 4"/>',
+  repeat: '<path d="M17 3l3 3-3 3"/><path d="M20 6H8a4 4 0 0 0-4 4v1"/><path d="M7 21l-3-3 3-3"/><path d="M4 18h12a4 4 0 0 0 4-4v-1"/>',
+  home: '<path d="M4 11l8-6.5 8 6.5"/><path d="M6.5 9.8V20h11V9.8"/><path d="M10 20v-5h4v5"/>',
+  timer: '<circle cx="12" cy="13.5" r="7"/><path d="M12 10v3.5l2.5 1.5"/><path d="M10 3.5h4"/><path d="M12 3.5v3"/><path d="M18 7l1.5-1.5"/>',
+  alarm: '<circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 1.5"/><path d="M4 7l3-3"/><path d="M20 7l-3-3"/><path d="M7.5 19l-1.5 2"/><path d="M16.5 19l1.5 2"/>',
+  mailOpen: '<path d="M4 9.5l8-5.5 8 5.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/><path d="M4 9.5l8 5.5 8-5.5"/>',
+  mailSend: '<rect x="3" y="5.5" width="15" height="11" rx="1.5"/><path d="M3 7l7.5 5 7.5-5"/><path d="M15 19.5h6"/><path d="M18.5 17l2.5 2.5-2.5 2.5"/>',
+  download: '<path d="M12 3v11"/><path d="M8 10.5l4 4 4-4"/><path d="M4 19h16"/>',
+  options: '<path d="M18.20 13.96L20.79 13.95L20.79 10.05L18.20 10.04A6.5 6.5 0 0 0 16.79 7.61L18.08 5.36L14.71 3.42L13.41 5.65A6.5 6.5 0 0 0 10.59 5.65L9.29 3.42L5.92 5.36L7.21 7.61A6.5 6.5 0 0 0 5.80 10.04L3.21 10.05L3.21 13.95L5.80 13.96A6.5 6.5 0 0 0 7.21 16.39L5.92 18.64L9.29 20.58L10.59 18.35A6.5 6.5 0 0 0 13.41 18.35L14.71 20.58L18.08 18.64L16.79 16.39A6.5 6.5 0 0 0 18.20 13.96Z"/><circle cx="12" cy="12" r="2.5"/>',
+  pin: '<path d="M9 4h6l-1 5 3 3v1.5H7V12l3-3z"/><path d="M12 13.5V21"/>',
+  apps: '<rect x="4" y="4" width="4" height="4" rx="1"/><rect x="10" y="4" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="4" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="16" y="10" width="4" height="4" rx="1"/><rect x="4" y="16" width="4" height="4" rx="1"/><rect x="10" y="16" width="4" height="4" rx="1"/><rect x="16" y="16" width="4" height="4" rx="1"/>',
+  screenshot: '<circle cx="12" cy="12" r="3.2"/><path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c-3.5 3-3.5 14 0 17"/><path d="M12 3.5c3.5 3 3.5 14 0 17"/>',
+  memory: '<path d="M9.5 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1.5 5A3 3 0 0 0 9.5 20c1.3 0 2.5-.8 2.5-2V6a2.5 2.5 0 0 0-2.5-2z"/><path d="M14.5 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1.5 5A3 3 0 0 1 14.5 20c-1.3 0-2.5-.8-2.5-2V6a2.5 2.5 0 0 1 2.5-2z"/>',
+  history: '<path d="M3.5 12a8.5 8.5 0 1 1 2.6 6.1"/><path d="M3.5 18v-4h4"/><path d="M12 7.5V12l3 2"/>',
+  sparkles: '<path d="M11 3.5l1.8 5.2 5.2 1.8-5.2 1.8L11 17.5l-1.8-5.2L4 10.5l5.2-1.8z"/><path d="M18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',
+  check: '<path d="M4.5 12.5l5 5 10-11"/>',
+  reasoning: '<path d="M7.5 16.5h9a3.5 3.5 0 0 0 .5-7A5 5 0 0 0 7.3 8.6 4 4 0 0 0 7.5 16.5z"/><path d="M6 18.5h.01"/><path d="M3.5 21h.01"/>',
+  warning: '<path d="M12 3.5l9 16h-18z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
+  translate: '<path d="M6 2.5l-1.5 1.7"/><path d="M1 6h9"/><path d="M5 7C4 8.7 2.7 10.3 1 11.5"/><path d="M5 7L10 11.5"/><path d="M13 21.5l4.5-9.5 4.5 9.5"/><path d="M14.7 18h5.6"/>',
+  share: '<path d="M21 3L3 11l7 2.5L13 21l8-18z"/><path d="M10 13.5L21 3"/>',
+  clipboard: '<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 3.5h6v3H9z"/><path d="M9 12h6"/><path d="M9 15.5h4"/>',
+  openTab: '<path d="M13 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-7"/><path d="M14 4h6v6"/><path d="M20 4l-9 9"/>',
+  tabs: '<path d="M3 7.5h18v10.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7.5V5.5A1.5 1.5 0 0 1 4.5 4h5A1.5 1.5 0 0 1 11 5.5v2"/><path d="M3 11.5h18"/>',
+  pencil: '<path d="M4 20l4.5-1L19 8.5a2 2 0 0 0-3-3L5.5 15.5z"/><path d="M14 7.5l3 3"/>',
+  note: '<path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4"/><path d="M9 12.5h6"/><path d="M9 15.8h4"/>',
+  terminal: '<rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M7 9.5l3 2.5-3 2.5"/><path d="M12.5 15h5"/>',
+  palette: '<path d="M12 3.5c-4.7 0-8.5 3.6-8.5 8s3.8 8 8.5 8c1.2 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8h1.8c2.5 0 4.5-1.8 4.5-4.2C21 6.5 17 3.5 12 3.5z"/><circle cx="7.5" cy="12" r="1.2"/><circle cx="9.8" cy="7.8" r="1.2"/><circle cx="14.5" cy="7" r="1.2"/>',
+  location: '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  close: '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
+  folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  feedback: '<path d="M4 5.5h16v11H9l-5 4z"/><path d="M12 8.5v3.5"/><path d="M12 14h.01"/>',
+  piu: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  battery: '<rect x="2.5" y="8" width="16" height="8" rx="2.2"/><path d="M21 11v2"/><path d="M5.5 11h8"/>',
+  wifi: '<path d="M2.5 9.5a14 14 0 0 1 19 0"/><path d="M6 13a9 9 0 0 1 12 0"/><path d="M9.5 16.5a4 4 0 0 1 5 0"/><path d="M12 20h.01"/>',
+  bluetooth: '<path d="M7.5 8L16 16l-4 4V4l4 4-8.5 8"/>',
+  telefono: '<rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/>',
+  qrCode: '<rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><path d="M14.5 14.5h3v3h-3z"/><path d="M20.5 14.5v3"/><path d="M14.5 20.5h6"/>',
+  incognito: '<path d="M3 12.5h18"/><path d="M6 12.5l1.6-5.2A2 2 0 0 1 9.5 6h5a2 2 0 0 1 1.9 1.3L18 12.5"/><circle cx="7.6" cy="16" r="2.7"/><circle cx="16.4" cy="16" r="2.7"/><path d="M10.2 15.6a3 3 0 0 1 3.6 0"/>',
+  fullscreen: '<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/>',
+  profilo: '<circle cx="12" cy="8.5" r="3.8"/><path d="M4.8 20a7.4 7.4 0 0 1 14.4 0"/>',
+  zoom: '<circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L21 21"/><path d="M8.5 11h5"/><path d="M11 8.5v5"/>',
+  presa: '<path d="M9 6h.01"/><path d="M15 6h.01"/><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M9 18h.01"/><path d="M15 18h.01"/>'
+};
+function svgIco(nome) {
+  return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" ' +
+    'stroke-linecap="round" stroke-linejoin="round">' + (ICONE[nome] || '') + '</svg>';
+}
+function vestiIcone(radice) {
+  var vuote = (radice || document).querySelectorAll('[data-ico]');
+  for (var i = 0; i < vuote.length; i++) {
+    var e = vuote[i];
+    e.outerHTML = svgIco(e.getAttribute('data-ico'));
+  }
+}
+vestiIcone(document);
+
+function el(t, c, txt) {
+  var e = document.createElement(t);
+  if (c) e.className = c;
+  if (txt != null) e.textContent = txt;
+  return e;
+}
+function svgNS(t) { return document.createElementNS('http://www.w3.org/2000/svg', t); }
+function attendi(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function facile(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+// Il nome del tasto cambia su Mac, quindi non si scrive a mano da nessuna parte.
+function tastoDiSistema() { return /Mac/i.test(navigator.platform || '') ? 'Cmd' : 'Ctrl'; }
+
+function ricorda(chiave, valore) {
+  try { localStorage.setItem('filo.prova.home.' + chiave, JSON.stringify(valore)); } catch (e) { /* prova in incognito */ }
+}
+function ricordato(chiave) {
+  try {
+    var v = localStorage.getItem('filo.prova.home.' + chiave);
+    return v == null ? null : JSON.parse(v);
+  } catch (e) { return null; }
+}
+
+var hint = document.getElementById('hint');
+function legaHint(nodo, testo) {
+  nodo.addEventListener('mouseenter', function () {
+    hint.textContent = testo;
+    var r = nodo.getBoundingClientRect();
+    hint.style.left = (r.left + r.width / 2) + 'px';
+    hint.style.top = r.top + 'px';
+    hint.classList.add('vis');
+  });
+  nodo.addEventListener('mouseleave', function () { hint.classList.remove('vis'); });
+}
+
+/* La spirale del gomitolo, misurata per lunghezza d'arco: serve a mandare
+   ogni punto del filo nel punto giusto dell'avvolgimento. */
+var SPIRALE = (function () {
+  var pts = [], s = 0, prev = null;
+  for (var th = 0; th < Math.PI * 14; th += 0.04) {
+    var r = 0.6 + 0.30 * th;
+    var p = [Math.cos(th) * r, Math.sin(th) * r * 0.86];
+    if (prev) s += Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+    pts.push({ s: s, p: p });
+    prev = p;
+  }
+  return pts;
+})();
+var SPIRALE_MAX = SPIRALE[SPIRALE.length - 1].s;
+function puntoSpirale(s) {
+  s = Math.max(0, Math.min(SPIRALE_MAX, s));
+  var lo = 0, hi = SPIRALE.length - 1;
+  while (lo < hi - 1) {
+    var mid = (lo + hi) >> 1;
+    if (SPIRALE[mid].s < s) lo = mid; else hi = mid;
+  }
+  return SPIRALE[lo].p;
+}
+
+function creaBlocco(host) {
+  var blocco = el('div', 'blocco');
+  var righe = el('div', 'righe');
+  var capo = el('div', 'capo');
+  var rail = svgNS('svg');
+  rail.setAttribute('class', 'rail');
+  rail.setAttribute('width', 40);
+  var railPath = svgNS('path');
+  railPath.setAttribute('class', 'filo');
+  rail.append(railPath);
+  blocco.append(capo, righe, rail);
+  host.append(blocco);
+
+  var segmenti = [], nodi = [], apertoIdx = -1, vivo = true;
+  var onda = { fase: 0, amp: 2.4, ampObiettivo: 2.4, vel: 0.06, velObiettivo: 0.06, ultimoNodoY: 0, tagliato: false };
+  var avv = { m: 0, daA: 0, obiettivo: 0, congelato: null, lung: null, t0: 0, durata: 850 };
+
+  function puntiVivi(Hd) {
+    var pts = [], n = Math.max(12, Math.round(Hd / 3));
+    for (var i = 0; i <= n; i++) {
+      var y = (i / n) * Hd;
+      var giu = Math.max(0, Math.min(1, (y - onda.ultimoNodoY) / 34));
+      var x = onda.tagliato
+        ? 13 + giu * 3.4 * Math.min(1, (y - onda.ultimoNodoY) / 60)
+        : 13 + Math.sin(y * 0.16 + onda.fase) * onda.amp * giu;
+      pts.push([x, y]);
+    }
+    return pts;
+  }
+
+  // Il cappio che si stringe: il filo gira su sé stesso e tira.
+  function conCappi(pts) {
+    var attivi = nodi.filter(function (n) { return n.stretta < 1; });
+    if (!attivi.length) return pts;
+    var fuori = [];
+    for (var i = 0; i < pts.length; i++) {
+      fuori.push(pts[i]);
+      for (var k = 0; k < attivi.length; k++) {
+        var nd = attivi[k];
+        if (pts[i][1] <= nd.y && (i + 1 >= pts.length || pts[i + 1][1] > nd.y)) {
+          var r = 6.6 * (1 - facile(nd.stretta));
+          for (var a = 0; a <= 24; a++) {
+            var ang = -Math.PI / 2 + (a / 24) * Math.PI * 2.15;
+            fuori.push([13 + Math.cos(ang) * r * 0.95, nd.y + Math.sin(ang) * r]);
+          }
+        }
+      }
+    }
+    return fuori;
+  }
+
+  function disegna() {
+    if (!vivo) return;
+    onda.amp += (onda.ampObiettivo - onda.amp) * 0.06;
+    onda.vel += (onda.velObiettivo - onda.vel) * 0.08;
+    onda.fase += onda.vel;
+
+    if (avv.m !== avv.obiettivo) {
+      var t = Math.min(1, (Date.now() - avv.t0) / avv.durata);
+      avv.m = avv.daA + (avv.obiettivo - avv.daA) * facile(t);
+      if (t >= 1) avv.m = avv.obiettivo;
+    }
+
+    var H = Math.max(18, righe.offsetHeight);
+    var altezza = Math.max(H + 16, 46);
+    rail.setAttribute('height', altezza);
+    rail.style.height = altezza + 'px';
+
+    for (var k = 0; k < nodi.length; k++) {
+      var nd = nodi[k];
+      if (!nd.congelata) { nd.y = nd.seg.el.offsetTop + 15; nd.s = nd.y; }
+      if (nd.stretta < 1) nd.stretta = Math.min(1, (Date.now() - nd.nato) / 460);
+      var cx = 13, cy = nd.y;
+      if (avv.m > 0 && avv.lung) {
+        var sp = puntoSpirale(nd.s);
+        cx = lerp(13, 13 + sp[0], avv.m);
+        cy = lerp(nd.y, 15 + sp[1], avv.m);
+      }
+      // col cappio il punto compare solo mentre il giro si chiude
+      var q = Math.max(0, (nd.stretta - 0.55) / 0.45);
+      nd.c.setAttribute('cx', cx);
+      nd.c.setAttribute('cy', cy);
+      nd.c.setAttribute('r', (nd.raggio * Math.min(1, q)) * (1 - avv.m * 0.5));
+      if (nd.alone) {
+        nd.alone.setAttribute('cx', cx);
+        nd.alone.setAttribute('cy', cy);
+        nd.alone.setAttribute('r', nd.raggioAlone * Math.min(1, q) * (1 - avv.m * 0.6));
+        nd.alone.setAttribute('opacity', 0.35 * (1 - avv.m));
+      }
+      if (k === nodi.length - 1 && avv.m === 0) onda.ultimoNodoY = nd.y;
+    }
+
+    var pts;
+    if (avv.m > 0 && avv.congelato) {
+      pts = [];
+      for (var i = 0; i < avv.congelato.length; i++) {
+        var p0 = avv.congelato[i];
+        var sp2 = puntoSpirale(avv.lung[i]);
+        pts.push([lerp(p0[0], 13 + sp2[0], avv.m), lerp(p0[1], 15 + sp2[1], avv.m)]);
+      }
+    } else {
+      pts = conCappi(puntiVivi(H + (onda.tagliato ? 2 : 8)));
+    }
+    var d = '';
+    for (var j = 0; j < pts.length; j++) d += (j ? 'L' : 'M') + pts[j][0].toFixed(2) + ',' + pts[j][1].toFixed(2);
+    railPath.setAttribute('d', d);
+    requestAnimationFrame(disegna);
+  }
+  requestAnimationFrame(disegna);
+
+  // A sette pixel la forma non dice QUALE strumento: dice se l'azione ha toccato qualcosa fuori.
+  function formaNodo(tipo) {
+    if (!tipo) return { pieno: true, raggio: 2.7, alone: false, raggioAlone: 0 };
+    if (tipo === 'lettura') return { pieno: false, raggio: 3.4, alone: false, raggioAlone: 0 };
+    return { pieno: true, raggio: 3.6, alone: true, raggioAlone: 6.4 };
+  }
+
+  function piazzaNodo(seg, tipo, titolo, subito) {
+    var y = seg.el.offsetTop + 15;
+    var st = formaNodo(tipo);
+    var alone = null;
+    if (st.alone) {
+      alone = svgNS('circle');
+      alone.setAttribute('cx', 13);
+      alone.setAttribute('cy', y);
+      alone.setAttribute('r', 0);
+      alone.setAttribute('fill', 'none');
+      alone.setAttribute('stroke', 'var(--dash-accent)');
+      alone.setAttribute('stroke-width', 1);
+      rail.append(alone);
+    }
+    var c = svgNS('circle');
+    c.setAttribute('cx', 13);
+    c.setAttribute('cy', y);
+    c.setAttribute('r', 0);
+    c.setAttribute('fill', st.pieno ? 'var(--dash-accent)' : 'var(--dash-paper)');
+    c.setAttribute('stroke', 'var(--dash-accent)');
+    c.setAttribute('stroke-width', st.pieno ? 0 : 1.5);
+    rail.append(c);
+    legaHint(c, titolo);
+    nodi.push({
+      c: c, alone: alone, seg: seg, y: y, s: y, nato: subito ? Date.now() - 4000 : Date.now(),
+      stretta: subito ? 1 : 0, raggio: st.raggio, raggioAlone: st.raggioAlone, congelata: false
+    });
+    onda.ultimoNodoY = y;
+  }
+
+  function apri(i) {
+    if (righe.style.maxHeight && righe.style.maxHeight !== 'none' && righe.style.maxHeight !== '0px') {
+      righe.style.maxHeight = 'none';
+    }
+    apertoIdx = (apertoIdx === i) ? -1 : i;
+    segmenti.forEach(function (s, k) { s.el.classList.toggle('aperto', k === apertoIdx); });
+  }
+
+  return {
+    blocco: blocco,
+
+    apriRiga: function (conTrama) {
+      var wrap = el('div', 'seg');
+      var testa = el('div', 'seg-testa');
+      var eti = el('span', 'seg-eti');
+      testa.append(eti);
+      var trama = el('div', 'trama');
+      var corpo = el('div', 'seg-corpo');
+      wrap.append(testa, trama, corpo);
+      righe.append(wrap);
+      var idx = segmenti.length;
+      testa.addEventListener('click', function () { apri(idx); });
+      trama.addEventListener('click', function () { apri(idx); });
+      var seg = { el: wrap, testa: testa, eti: eti, trama: trama, corpo: corpo, acc: '' };
+      segmenti.push(seg);
+      if (conTrama) {
+        testa.style.display = 'none';
+        onda.ampObiettivo = 3.2;
+        onda.velObiettivo = 0.065;
+      } else {
+        trama.style.display = 'none';
+      }
+      return seg;
+    },
+
+    ragiona: function (seg, pezzo) {
+      seg.acc += pezzo;
+      seg.corpo.textContent = seg.acc;
+      seg.trama.textContent = seg.acc.replace(/\s+/g, ' ').slice(-80);
+    },
+
+    // Mentre lo strumento lavora il filo si TENDE invece di ondeggiare: il lavoro è altrove.
+    annoda: function (seg, etichetta, tipo, dettaglio, subito) {
+      seg.trama.remove();
+      seg.testa.style.display = '';
+      seg.eti.textContent = etichetta;
+      if (dettaglio) seg.corpo.textContent = (seg.acc ? seg.acc + '\n\n' : '') + dettaglio;
+      piazzaNodo(seg, tipo, etichetta, subito);
+      onda.ampObiettivo = 0.3;
+      onda.velObiettivo = 0.014;
+    },
+
+    taglia: function (seg) {
+      if (seg) {
+        seg.trama.remove();
+        seg.testa.style.display = '';
+        seg.eti.textContent = 'Fermato qui';
+      }
+      onda.tagliato = true;
+      onda.ampObiettivo = 0;
+    },
+
+    // Il filo si avvolge: sono gli stessi punti del filo, mandati sulla spirale
+    // per lunghezza d'arco. Non una figura nuova al suo posto.
+    chiudi: function (riassunto, restaAperto) {
+      onda.ampObiettivo = 0.4;
+      onda.velObiettivo = 0.012;
+      blocco.classList.add('arrotolabile');
+      capo.append(el('span', 'vuoto'), el('span', 'seg-eti', riassunto));
+
+      var chiuso = false;
+      function avvolgi(verso) {
+        avv.daA = avv.m;
+        avv.obiettivo = verso;
+        avv.t0 = Date.now();
+        if (verso === 1) {
+          var pts = puntiVivi(Math.max(18, righe.offsetHeight) + 8);
+          var lung = [0];
+          for (var i = 1; i < pts.length; i++) {
+            lung.push(lung[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+          }
+          avv.congelato = pts;
+          avv.lung = lung;
+          nodi.forEach(function (nd) {
+            nd.congelata = true;
+            var vicino = 0;
+            for (var j = 1; j < pts.length; j++) {
+              if (Math.abs(pts[j][1] - nd.y) < Math.abs(pts[vicino][1] - nd.y)) vicino = j;
+            }
+            nd.s = lung[vicino];
+          });
+        } else {
+          setTimeout(function () { nodi.forEach(function (nd) { nd.congelata = false; }); }, avv.durata + 40);
+        }
+      }
+      function mostra(v) {
+        chiuso = !v;
+        righe.style.maxHeight = righe.scrollHeight + 'px';
+        righe.style.opacity = v ? '' : '0';
+        requestAnimationFrame(function () { righe.style.maxHeight = v ? righe.scrollHeight + 'px' : '0px'; });
+        if (v) setTimeout(function () { if (!chiuso) righe.style.maxHeight = 'none'; }, 480);
+        avvolgi(v ? 0 : 1);
+      }
+      if (restaAperto) { righe.style.maxHeight = 'none'; } else { mostra(false); }
+      capo.addEventListener('click', function () { mostra(chiuso); });
+    },
+
+    ferma: function () { vivo = false; }
+  };
+}
+
+var GLIFO_INVIO = '<path d="M6 11V2M6 1.4 1.6 5.8M6 1.4l4.4 4.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+var GLIFO_STOP = '<rect x="2.6" y="2.6" width="6.8" height="6.8" rx="1.4" fill="currentColor"/>';
+function modoInvio(lavora) {
+  document.body.classList.toggle('lavora', lavora);
+  document.getElementById('glifo').innerHTML = lavora ? GLIFO_STOP : GLIFO_INVIO;
+  document.getElementById('invia').title = lavora ? 'Ferma' : 'Manda';
+}
+modoInvio(false);
+
+var PASSI_TRENI = [
+  { eti: 'Ha letto · Trenitalia', tipo: 'lettura', det: 'trenitalia.com · 9 corse fra le 6:10 e le 9:40' },
+  { eti: 'Ha letto · Italo', tipo: 'lettura', det: 'italotreno.it · 5 corse, la prima alle 6:35' },
+  { eti: 'Ha confrontato · 14 corse', tipo: 'esterna', det: 'Tolte quelle sopra le due ore e quelle con cambio a Piacenza.' }
+];
+(function bloccoTreni() {
+  var b = creaBlocco(document.getElementById('blocco-treni'));
+  PASSI_TRENI.forEach(function (p) {
+    var seg = b.apriRiga(false);
+    b.annoda(seg, p.eti, p.tipo, p.det, true);
+  });
+  requestAnimationFrame(function () { b.chiudi('Ha guardato Trenitalia e Italo · 6s', false); });
+})();
+
+var scorr = document.getElementById('scorr');
+function inFondo() { scorr.scrollTop = scorr.scrollHeight; }
+requestAnimationFrame(inFondo);
+
+var COPIONE = [
+  {
+    pensiero: 'Prima capisco cosa serve davvero, poi decido da dove partire. Se una fonte basta non ne apro tre, ' +
+      'e se il filo ha già la risposta di ieri la riuso invece di rifare tutto da capo.',
+    eti: 'Riflettuto · da dove partire', tipo: null, det: null
+  },
+  { pensiero: '', eti: 'Ha letto · la pagina aperta', tipo: 'lettura', det: 'La scheda in primo piano, per intero.' },
+  { pensiero: '', eti: 'Ha cercato · nel filo', tipo: 'esterna', det: 'Tre tratti vecchi che parlano della stessa cosa.' }
+];
+var corsaViva = null;
+document.getElementById('scrivi').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  if (corsaViva) { corsaViva.ferma(); corsaViva = null; modoInvio(false); return; }
+  var campo = document.getElementById('campo');
+  var testo = campo.value.trim();
+  if (!testo) return;
+  campo.value = '';
+  var coda = document.getElementById('coda-viva');
+  coda.append(el('div', 'bolla bolla-utente', testo));
+  inFondo();
+  modoInvio(true);
+  var b = creaBlocco(coda);
+  corsaViva = b;
+  var mio = b;
+  for (var i = 0; i < COPIONE.length; i++) {
+    var p = COPIONE[i];
+    var seg = b.apriRiga(!!p.pensiero);
+    if (p.pensiero) {
+      for (var k = 0; k < p.pensiero.length; k += 4) {
+        await attendi(26);
+        if (corsaViva !== mio) return;
+        b.ragiona(seg, p.pensiero.slice(k, k + 4));
+        inFondo();
+      }
+    } else {
+      await attendi(900);
+      if (corsaViva !== mio) return;
+    }
+    b.annoda(seg, p.eti, p.tipo, p.det, false);
+    inFondo();
+    await attendi(560);
+    if (corsaViva !== mio) return;
+  }
+  b.chiudi('Ha guardato e confrontato · 7s', false);
+  var risposta = el('div', 'bolla bolla-filo');
+  coda.append(risposta);
+  var finale = 'Qui dietro non c’è nessun modello: è una prova del filo.';
+  for (var j = 0; j < finale.length; j++) {
+    await attendi(16);
+    if (corsaViva !== mio) return;
+    risposta.textContent = finale.slice(0, j + 1);
+    inFondo();
+  }
+  corsaViva = null;
+  modoInvio(false);
+});
+
+var GIORNI = [
+  {
+    segno: 'ieri',
+    righe: [
+      { tipo: 'utente', testo: 'trova un idraulico aperto sabato' },
+      { tipo: 'navigazione', testo: '14 pagine, fra cui YouTube: orche',
+        pagine: ['idraulici-milano.it · 3 schede', 'pagine gialle · zona 4', 'YouTube · orche che cacciano in branco', 'recensioni · Rossi & figli'] },
+      { tipo: 'filo', testo: 'Due aperti sabato mattina: Rossi & figli (via Sile) e Idro24, che però chiude alle 12. Ti ho messo i numeri negli appunti.' },
+      { tipo: 'evento', ora: '22:41', ico: 'telefono', testo: 'sveglia per domani alle 7:00 · dal telefono' }
+    ]
+  },
+  {
+    segno: 'sabato',
+    righe: [
+      { tipo: 'evento', ora: '9:12', ico: 'zoom', testo: 'carattere più grande · dalle preferenze' },
+      { tipo: 'utente', testo: 'quanto costa rifare 40 metri di grondaia?' },
+      { tipo: 'filo', testo: 'Fra 1.400 e 2.600 euro secondo il materiale. Ti ho aperto tre preventivi da chiedere.' }
+    ]
+  },
+  {
+    segno: 'venerdì',
+    righe: [
+      { tipo: 'utente', testo: 'ricordami di chiamare il comune lunedì' },
+      { tipo: 'evento', ora: '17:03', ico: 'alarm', testo: 'promemoria lunedì 9:00 · dalla chat' },
+      { tipo: 'navigazione', testo: '6 pagine, fra cui Comune di Milano: edilizia',
+        pagine: ['comune.milano.it · edilizia privata', 'modulistica · CILA', 'orari sportello'] }
+    ]
+  }
+];
+
+function rigaEvento(r) {
+  var e = el('div', 'evento');
+  e.append(el('span', 'ora', r.ora || ''));
+  var i = el('span');
+  i.innerHTML = svgIco(r.ico || 'check');
+  e.append(i.firstChild);
+  e.append(el('span', 'testo', r.testo));
+  var fine = el('span', 'fine az nuda', 'annulla');
+  e.append(fine);
+  return e;
+}
+function costruisciGiorno(g, vecchio) {
+  var box = el('div', 'giorno' + (vecchio ? ' vecchio entra' : ''));
+  box.append(el('div', 'segno', g.segno));
+  g.righe.forEach(function (r) {
+    if (r.tipo === 'utente') box.append(el('div', 'bolla bolla-utente', r.testo));
+    else if (r.tipo === 'filo') box.append(el('div', 'bolla bolla-filo', r.testo));
+    else if (r.tipo === 'evento') box.append(rigaEvento(r));
+    else {
+      var e = el('div', 'evento');
+      var i = el('span');
+      i.innerHTML = svgIco('globe');
+      e.append(i.firstChild, el('span', 'testo', r.testo));
+      e.append(el('span', 'fine az nuda', 'cerca'));
+      var lista = el('div', 'pagine');
+      r.pagine.forEach(function (p) {
+        var a = el('a', null, p);
+        a.href = '#';
+        a.addEventListener('click', function (ev) { ev.preventDefault(); });
+        lista.append(a);
+      });
+      e.addEventListener('click', function () { e.classList.toggle('aperto'); });
+      box.append(e, lista);
+    }
+  });
+  return box;
+}
+
+var vecchi = document.getElementById('vecchi');
+var quantiGiorni = 0, sto = false;
+var bottoneRisali = document.getElementById('risali');
+vecchi.append(costruisciGiorno(GIORNI[0], true));
+quantiGiorni = 1;
+
+function risali() {
+  if (sto || quantiGiorni >= GIORNI.length) return;
+  sto = true;
+  bottoneRisali.textContent = 'carico…';
+  setTimeout(function () {
+    var prima = scorr.scrollHeight;
+    vecchi.prepend(costruisciGiorno(GIORNI[quantiGiorni], true));
+    quantiGiorni++;
+    scorr.scrollTop += scorr.scrollHeight - prima;
+    sto = false;
+    if (quantiGiorni >= GIORNI.length) {
+      bottoneRisali.textContent = 'l’inizio del filo';
+      bottoneRisali.disabled = true;
+    } else {
+      bottoneRisali.textContent = 'risali il filo';
+    }
+  }, 420);
+}
+bottoneRisali.addEventListener('click', risali);
+scorr.addEventListener('scroll', function () {
+  if (scorr.scrollTop < 40 && scorr.scrollHeight > scorr.clientHeight + 40) risali();
+});
+
+var corpo = document.getElementById('corpo');
+var barra = document.getElementById('barra');
+var spinta = 0, uscita = 0, ultimaX = 9999;
+function apriBarra() {
+  clearTimeout(uscita);
+  document.body.classList.add('barra-aperta');
+}
+function chiudiBarra() { document.body.classList.remove('barra-aperta'); }
+document.addEventListener('mousemove', function (e) {
+  var versoSx = e.clientX < ultimaX;
+  ultimaX = e.clientX;
+  if (document.body.classList.contains('barra-aperta')) return;
+  if (e.clientX <= 1 && e.clientY > 40) {
+    if (!spinta && versoSx) spinta = setTimeout(function () { spinta = 0; apriBarra(); }, 180);
+  } else if (e.clientX > 2) {
+    clearTimeout(spinta);
+    spinta = 0;
+  }
+});
+barra.addEventListener('mouseenter', function () { clearTimeout(uscita); });
+barra.addEventListener('mouseleave', function () {
+  clearTimeout(uscita);
+  uscita = setTimeout(chiudiBarra, 400);
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { chiudiBarra(); nascondiMenu(); }
+});
+var maniglia = document.getElementById('maniglia');
+maniglia.title = 'barra · ' + tastoDiSistema() + '+B';
+maniglia.addEventListener('click', function () {
+  document.body.classList.toggle('barra-aperta');
+});
+document.getElementById('indizio').addEventListener('click', apriBarra);
+document.getElementById('note-barra').addEventListener('click', apriBarra);
+document.addEventListener('keydown', function (e) {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+    e.preventDefault();
+    document.body.classList.toggle('barra-aperta');
+  }
+});
+
+var barraCarte = document.getElementById('barra-carte');
+var ICO_ACCADE = { timer: 'timer', mail: 'mailOpen', download: 'download', lavoro: 'reasoning', sveglia: 'alarm' };
+document.querySelectorAll('[data-accade]').forEach(function (carta) {
+  var chi = carta.getAttribute('data-accade');
+  var b = el('button', 'bico');
+  b.innerHTML = svgIco(ICO_ACCADE[chi]);
+  b.append(el('span', 'eti', carta.getAttribute('data-eti')));
+  var punto = el('span', 'punto' + (chi === 'sveglia' || chi === 'download' ? ' calmo' : ''));
+  b.append(punto);
+  if (chi === 'timer') {
+    var resta = el('span', 'resta');
+    resta.id = 'timer-barra';
+    b.append(resta);
+  }
+  b.addEventListener('click', function () { carta.scrollIntoView({ block: 'center', behavior: 'smooth' }); });
+  barraCarte.append(b);
+});
+
+var restano = 252;
+function scriviTimer() {
+  var m = Math.floor(restano / 60), s = restano % 60;
+  var t = m + ':' + (s < 10 ? '0' : '') + s;
+  document.getElementById('timer-carta').textContent = t;
+  var b = document.getElementById('timer-barra');
+  if (b) b.textContent = t;
+}
+scriviTimer();
+setInterval(function () {
+  if (restano > 0) restano--;
+  scriviTimer();
+}, 1000);
+
+function scriviOra() {
+  var d = new Date();
+  var t = d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+  document.getElementById('ora-carta').textContent = t;
+  document.getElementById('barra-ora').textContent = t;
+}
+scriviOra();
+setInterval(scriviOra, 20000);
+
+var avanzaTappe = [[62, '2 di 3 · leggo il terzo'], [78, '3 di 3 · confronto'], [92, 'quasi fatto']];
+var tappa = 0;
+document.getElementById('lavoro-avanza').style.width = '48%';
+setInterval(function () {
+  if (tappa >= avanzaTappe.length) return;
+  document.getElementById('lavoro-avanza').style.width = avanzaTappe[tappa][0] + '%';
+  document.getElementById('lavoro-stato').textContent = avanzaTappe[tappa][1];
+  tappa++;
+}, 4200);
+
+function segnaNelFilo(testo, ico) {
+  var coda = document.getElementById('coda-viva');
+  var d = new Date();
+  coda.append(rigaEvento({
+    ora: d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes(),
+    ico: ico || 'check', testo: testo
+  }));
+  inFondo();
+}
+document.querySelectorAll('.apri-filo').forEach(function (b) {
+  b.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var carta = b.closest('.carta');
+    var tit = carta.querySelector('.carta-tit').textContent;
+    var coda = document.getElementById('coda-viva');
+    coda.append(el('div', 'bolla bolla-filo', tit + ' — eccolo qui, nel filo.'));
+    inFondo();
+  });
+});
+
+function scriviTema(scuro) {
+  document.body.classList.toggle('scuro', scuro);
+  document.getElementById('tema-prova').textContent = scuro ? 'chiaro' : 'scuro';
+  document.querySelectorAll('[data-rapida="tema"]').forEach(function (p) { p.classList.toggle('acceso', scuro); });
+  ricorda('tema', scuro ? 'scuro' : 'chiaro');
+}
+scriviTema(ricordato('tema') === 'scuro');
+document.getElementById('tema-prova').addEventListener('click', function () {
+  scriviTema(!document.body.classList.contains('scuro'));
+});
+document.querySelectorAll('.annulla-tema').forEach(function (b) {
+  b.addEventListener('click', function () { scriviTema(false); });
+});
+
+var ZOOM = ['100%', '125%', '150%'];
+var zoomOra = 1;
+document.querySelectorAll('[data-rapida]').forEach(function (p) {
+  p.addEventListener('click', function () {
+    var quale = p.getAttribute('data-rapida');
+    if (quale === 'tema') {
+      var scuro = !document.body.classList.contains('scuro');
+      scriviTema(scuro);
+      segnaNelFilo('tema ' + (scuro ? 'scuro' : 'chiaro') + ' · dalle impostazioni rapide', 'palette');
+      return;
+    }
+    if (quale === 'zoom') {
+      zoomOra = (zoomOra + 1) % ZOOM.length;
+      segnaNelFilo('zoom ' + ZOOM[zoomOra] + ' · dalle impostazioni rapide', 'zoom');
+      return;
+    }
+    var acceso = !p.classList.contains('acceso');
+    document.querySelectorAll('[data-rapida="incognito"]').forEach(function (q) { q.classList.toggle('acceso', acceso); });
+    segnaNelFilo('incognito ' + (acceso ? 'acceso' : 'spento') + ' · dalle impostazioni rapide', 'incognito');
+  });
+});
+
+var menu = document.getElementById('menu');
+function nascondiMenu() { menu.classList.remove('vis'); }
+document.getElementById('home').addEventListener('contextmenu', function (e) {
+  if (e.target.closest('.carta') || e.target.closest('.scrivi') || e.target.closest('.bolla')) return;
+  e.preventDefault();
+  menu.classList.add('vis');
+  var w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = Math.min(e.clientX, window.innerWidth - w - 10) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - h - 10) + 'px';
+});
+document.addEventListener('mousedown', function (e) {
+  if (!menu.contains(e.target)) nascondiMenu();
+});
+
+var ICO_AZIONE = {
+  translate: 'translate', screenshot: 'screenshot', share: 'share', saveForLater: 'clipboard',
+  qrCode: 'qrCode', newTab: 'openTab', incognito: 'incognito', fullscreen: 'fullscreen',
+  pin: 'pin', memory: 'memory', note: 'note', palette: 'palette', terminal: 'terminal', apps: 'apps'
+};
+var ETI_AZIONE = {
+  translate: 'traduci', screenshot: 'schermata', share: 'condividi', saveForLater: 'metti da parte',
+  qrCode: 'codice QR', newTab: 'scheda nuova', incognito: 'incognito', fullscreen: 'schermo pieno',
+  pin: 'fissa', memory: 'memorie', note: 'appunti', palette: 'aspetto', terminal: 'terminale', apps: 'app'
+};
+var barraNav = document.getElementById('barra-nav');
+function posaNellaBarra(az, nuovo) {
+  if (!ICO_AZIONE[az] || barraNav.querySelector('[data-az="' + az + '"]')) return;
+  var b = el('button', 'bico' + (nuovo ? ' nuovo' : ''));
+  b.setAttribute('data-az', az);
+  b.innerHTML = svgIco(ICO_AZIONE[az]);
+  b.append(el('span', 'eti', ETI_AZIONE[az]));
+  barraNav.append(b);
+}
+(ricordato('barra') || []).forEach(function (az) { posaNellaBarra(az, false); });
+function salvaBarra() {
+  var az = [];
+  barraNav.querySelectorAll('[data-az]').forEach(function (b) { az.push(b.getAttribute('data-az')); });
+  ricorda('barra', az);
+}
+menu.querySelectorAll('[data-az]').forEach(function (v) {
+  v.addEventListener('dragstart', function (e) {
+    e.dataTransfer.setData('text/plain', 'azione:' + v.getAttribute('data-az'));
+    e.dataTransfer.effectAllowed = 'copy';
+    v.classList.add('trascinata');
+    apriBarra();
+  });
+  v.addEventListener('dragend', function () { v.classList.remove('trascinata'); });
+});
+barraNav.addEventListener('dragover', function (e) {
+  if (String(e.dataTransfer.types).indexOf('text/plain') < 0) return;
+  e.preventDefault();
+  barraNav.classList.add('mira');
+});
+barraNav.addEventListener('dragleave', function () { barraNav.classList.remove('mira'); });
+barraNav.addEventListener('drop', function (e) {
+  e.preventDefault();
+  barraNav.classList.remove('mira');
+  var dato = e.dataTransfer.getData('text/plain') || '';
+  if (dato.indexOf('azione:') !== 0) return;
+  posaNellaBarra(dato.slice(7), true);
+  salvaBarra();
+  nascondiMenu();
+});
+
+var colDestra = document.getElementById('col-destra');
+var presa = null;
+(function ordinaCarte() {
+  var ordine = ricordato('carte');
+  if (!ordine) return;
+  var dopo = colDestra.querySelector('.altro-riga');
+  ordine.forEach(function (id) {
+    var c = colDestra.querySelector('[data-carta="' + id + '"]');
+    if (c) colDestra.insertBefore(c, dopo);
+  });
+})();
+function salvaCarte() {
+  var ordine = [];
+  colDestra.querySelectorAll('[data-carta]').forEach(function (c) { ordine.push(c.getAttribute('data-carta')); });
+  ricorda('carte', ordine);
+}
+colDestra.querySelectorAll('[data-carta]').forEach(function (carta) {
+  carta.addEventListener('dragstart', function (e) {
+    presa = carta;
+    e.dataTransfer.setData('text/plain', 'carta:' + carta.getAttribute('data-carta'));
+    e.dataTransfer.effectAllowed = 'move';
+    carta.classList.add('presa');
+  });
+  carta.addEventListener('dragend', function () {
+    carta.classList.remove('presa');
+    colDestra.querySelectorAll('.sopra').forEach(function (c) { c.classList.remove('sopra'); });
+    presa = null;
+    salvaCarte();
+  });
+  carta.addEventListener('dragover', function (e) {
+    if (!presa || presa === carta) return;
+    e.preventDefault();
+    var r = carta.getBoundingClientRect();
+    var sotto = e.clientY > r.top + r.height / 2;
+    carta.classList.add('sopra');
+    colDestra.insertBefore(presa, sotto ? carta.nextSibling : carta);
+  });
+  carta.addEventListener('dragleave', function () { carta.classList.remove('sopra'); });
+  carta.addEventListener('drop', function (e) { e.preventDefault(); carta.classList.remove('sopra'); });
+});
+
+document.getElementById('note-scorda').addEventListener('click', function () {
+  ricorda('carte', null);
+  ricorda('barra', null);
+  location.reload();
+});
+
+document.querySelectorAll('.evento').forEach(function (e) {
+  var fine = e.querySelector('.fine');
+  if (fine) fine.addEventListener('click', function (ev) { ev.stopPropagation(); e.style.display = 'none'; });
+});
+</script>
+</body>
+</html>
