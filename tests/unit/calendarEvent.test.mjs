@@ -79,9 +79,9 @@ test('un evento già normalizzato ci ripassa uguale: dal bottone della chat torn
 });
 
 test('il nome del file è scrivibile su qualunque disco, e non è mai vuoto', () => {
-  assert.match(C.fileName({ titolo: 'Cena: da Anna/Luca' }), /^[a-z0-9]+-Cena-da-Anna-Luca\.ics$/);
-  assert.match(C.fileName({ titolo: '🎉' }), /^[a-z0-9]+-evento\.ics$/);
-  assert.match(C.fileName(null), /^[a-z0-9]+-evento\.ics$/);
+  assert.equal(C.fileName({ titolo: 'Cena: da Anna/Luca' }), 'Cena-da-Anna-Luca.ics');
+  assert.equal(C.fileName({ titolo: '🎉' }), 'evento.ics');
+  assert.equal(C.fileName(null), 'evento.ics');
   assert.ok(!/[\\/:*?"<>|]/.test(C.fileName({ titolo: 'a\\b:c*d?e"f<g>h|i' })));
 });
 
