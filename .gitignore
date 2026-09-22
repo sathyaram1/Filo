@@ -64,3 +64,10 @@ test-results/
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.
 .claude/routine-state/
+
+# I moduli finti che le prove dei giri di verifica piantano dentro src/ per
+# vedere se la sentinella del cancello unico li becca. Vivono pochi secondi, ma
+# il salvataggio automatico committa a ogni modifica di file e due volte se li è
+# presi: il ramo si portava dietro un modulo che chiama il fornitore fuori dal
+# cancello, e su un clone nuovo la sentinella diventava rossa (#591, giro 10).
+src/**/__prova-*
