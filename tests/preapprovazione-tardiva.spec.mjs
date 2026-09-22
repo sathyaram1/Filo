@@ -48,7 +48,8 @@ async function stubMain(page, { pending = [], approveReply = null, updateReply =
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'feedback_update') {
         window.__updates.push(msg);
-        if (cfg.updateReply) return cfg.updateReply;
+        // Il rifiuto arriva con calma: il tempo di cambiare pratica.
+        if (cfg.updateReply) { await new Promise((r) => setTimeout(r, 500)); return cfg.updateReply; }
         return msg.mergePreapproved ? { ok: true, by: 'owner@esempio' } : { ok: true };
       }
       if (t === 'merge_approvals_get') {
