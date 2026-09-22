@@ -33,8 +33,11 @@ async function setupStubs(app, { summary } = {}) {
 test('chiudere una scheda la indicizza: riassunto LLM + embedding + snippet', async ({ app, shell, openTab, testServer }) => {
   await setupStubs(app, { summary: 'Riassunto di prova: pagina sui gatti e i felini domestici.' });
 
+  // Serve un sito QUALUNQUE, non la rete di casa: l'indicizzazione manda titolo
+  // e testo al modello, e dalle pagine di casa non esce niente (#591, giro 9).
   await testServer.openReady(openTab,
-    '<!doctype html><html><head><title>Gatti</title></head><body style="margin:0">gatti felini animali domestici coccole</body></html>');
+    '<!doctype html><html><head><title>Gatti</title></head><body style="margin:0">gatti felini animali domestici coccole</body></html>',
+    { host: 'blocked.test' });
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate(async (i) => window.filoShell.tabs.close(i), id);
 
