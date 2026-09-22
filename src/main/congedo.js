@@ -50,10 +50,8 @@ function congedaPagina(webContents, { tetto = TETTO_MS } = {}) {
   });
 }
 
-// Le uscite di una pagina interna sono tre (chiusa la scheda, chiusa la
-// finestra, spento Filo) e il congedo deve valere per tutte e tre, da qui.
-// Torna null quando non c'è niente da aspettare, così chi chiama non rimanda
-// una chiusura che può avvenire subito.
+// Le uscite di una pagina interna sono tre (scheda, finestra, uscita dall'app):
+// valgono la stessa regola. Null = niente da aspettare, chiudi pure subito.
 function congedaSchedeInterne(tabs) {
   let interne = [];
   try { interne = (tabs?.tabs || []).filter((t) => t && t.isInternal && t.view); } catch (_) { return null; }
