@@ -479,10 +479,11 @@
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     ESEGUI_COMANDO: 'Comando non eseguito', CANCELLA_MEMORIA: 'Memoria non cancellata',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
+    PULISCI_TAB: 'Riordino non riuscito', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
   };
   // Si raccontano SOLO col bottone: la riga ripeterebbe ciò che l'utente ha già
   // davanti. Ogni azione sta qui o in ACTIVITY_ROWS: lo pretende una sentinella.
-  const SOLO_BOTTONE = ['APRI_FILE', 'NAVIGA', 'ESEGUI_COMANDO', 'PULISCI_TAB', 'CANCELLA_ARCHIVIO'];
+  const SOLO_BOTTONE = ['APRI_FILE', 'NAVIGA', 'ESEGUI_COMANDO'];
   function activityRowFor(a) {
     if (!a) return null;
     // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
