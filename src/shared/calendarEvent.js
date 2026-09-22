@@ -132,13 +132,12 @@
   }
 
   // Nome del file sul disco: solo caratteri che ogni sistema accetta, e mai
-  // vuoto (un titolo di soli emoji lascerebbe «.ics» e basta). Porta davanti
-  // l'identità dell'evento, così riaprirlo riscrive lo stesso file.
+  // vuoto (un titolo di soli emoji lascerebbe «.ics» e basta).
   function fileName(ev) {
     const base = String((ev && ev.titolo) || '')
       .normalize('NFKD').replace(/[̀-ͯ]/g, '')
       .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
-    return `${uidPer(ev)}-${base || 'evento'}.ics`;
+    return `${base || 'evento'}.ics`;
   }
 
   global.SN_CALENDAR = { normalize, buildIcs, fileName, uidPer, esc };
