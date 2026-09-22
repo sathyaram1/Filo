@@ -49,7 +49,7 @@
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
 //   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--segnala <file.md>] [--ticket <b>]
-//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md> [--ferma]] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
