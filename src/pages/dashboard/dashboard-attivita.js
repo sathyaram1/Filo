@@ -484,10 +484,18 @@
     },
     // Le due che finisce l'utente col bottone: la riga racconta la proposta
     // finché il click non arriva, poi `compiuta` la riscrive con l'esito.
-    PULISCI_TAB: () => ({ icon: '🧹', text: 'Riordino delle schede da confermare' }),
+    PULISCI_TAB: (a) => {
+      const o = a._output || {};
+      if (!o.fatto) return { icon: '🧹', text: 'Riordino delle schede da confermare' };
+      const n = Number(o.archiviate || 0);
+      return { icon: '🧹', text: n ? `Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}` : 'Nessuna scheda da archiviare' };
+    },
     CANCELLA_ARCHIVIO: (a) => {
-      const q = pulito((a._output && a._output.query) || a.query || a.testo);
-      return { icon: '🗑', text: `Da eliminare dall’archivio${q ? ` · ${q}` : ''}` };
+      const o = a._output || {};
+      const q = pulito(o.query || a.query || a.testo);
+      if (!o.fatto) return { icon: '🗑', text: `Da eliminare dall’archivio${q ? ` · ${q}` : ''}` };
+      const n = Number(o.eliminate || 0);
+      return { icon: '🗑', text: `Eliminate per sempre ${n} ${n === 1 ? 'scheda' : 'schede'}${q ? ` · ${q}` : ''}` };
     },
   };
   // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
