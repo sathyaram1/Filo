@@ -1206,7 +1206,12 @@
         for (const { req, msg } of await fondiCoperte(fb)) {
           const num = window.SN_MERGE_APPROVALS.feedbackNum(req);
           const dove = num ? ` su #${num}` : '';
-          setManageMsg(`Fusione ferma${dove}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`, msg.kind === 'ok' ? 'ok' : 'err');
+          const testo = `Fusione ferma${dove}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`;
+          setManageMsg(testo, msg.kind === 'ok' ? 'ok' : 'err');
+          // Questa parte da sola, di solito senza nessuna pratica aperta: la riga
+          // del dettaglio lì non è sullo schermo, e un ramo fermo resterebbe fermo
+          // senza che nessuno sappia perché.
+          toast(testo, msg.kind === 'ok' ? 'ok' : 'err');
         }
       }
     } finally {
