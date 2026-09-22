@@ -53,3 +53,23 @@ test('#496 giro25 — lo stesso dal filtro per creatore', async ({ openTab }) =>
     expect(await page.locator('[data-fs-tile="audit"]').count()).toBeGreaterThan(0);
   }
 });
+
+test('#496 giro25 — e col registro che smette di rispondere sotto «Feedback lavorati»', async ({ openTab }) => {
+  const page = await openTab(URL_GESTIONE);
+  const feedbacks = [fb({ _id: 'a1', seq: 1, createdAt: g(2), status: 'done' })];
+  const workerLog = [
+    { role: 'fixer', startedAt: g(2), num: '1' },
+    { role: 'verifier', startedAt: g(2), num: '1' },
+  ];
+  await apriStatistiche(page, { feedbacks, workerLog }, feedbacks);
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="lavorati"]').click();
+  await expect(page.locator('#mgFsTiles .mg-fs-detail')).toBeVisible();
+  // Il registro smette di rispondere al giro di aggiornamento successivo.
+  await page.evaluate(() => window.__mgTest.setFsData({ feedbacks: window.__fbs, workerLog: [], logOk: false }));
+  const dettaglio = page.locator('#mgFsTiles .mg-fs-detail');
+  console.log('REGISTRO GIU: dettaglio=%d apribile=%d', await dettaglio.count(), await page.locator('[data-fs-tile="lavorati"]').count());
+  if (await dettaglio.count()) {
+    expect(await page.locator('[data-fs-tile="lavorati"]').count(), 'il riquadro deve restare cliccabile per richiudere il pannello').toBeGreaterThan(0);
+  }
+});
