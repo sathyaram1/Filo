@@ -582,11 +582,9 @@ section:has(#dictList) .sn-spell-add-row {
 }
 .sn-model-row input[type="text"],
 .sn-model-row select { width: 100%; font-size: 12px; }
-/* Le due colonne in più (reasoning, ordinamento degli host) valgono solo nei Modelli predefiniti
-   dell'owner: le righe del registry nelle Opzioni utente restano a cinque colonne.
-   Sette colonne a misura fissa non entrano in una finestra stretta e la stringa del modello,
-   sola elastica, si riduceva a una fessura mentre i pulsanti uscivano: qui ogni colonna può
-   stringersi e la stringa del modello ha un minimo sotto cui non scende. */
+/* Le due colonne in più (reasoning, ordinamento host) valgono solo nei Modelli predefiniti dell'owner.
+   A misura fissa non entravano in una finestra stretta: ogni colonna si stringe, la stringa del modello
+   ha un minimo sotto cui non scende, e i pulsanti restano dentro lo schermo. */
 .sn-model-row.sn-model-row-reason {
   grid-template-columns:
     minmax(84px, 110px) minmax(94px, 130px) minmax(120px, 1fr)
