@@ -463,7 +463,7 @@
   global.SN_COMPITI = {
     FONTI, USCITE, USCITE_DICHIARABILI, CLASSI, MAX_RIGHE,
     classeDi, uscitaDi, etichettaUscita, uscitaInterna, maiDaEsterno, notaUscita, etichettaRichiesta, MAX_RICHIESTA, usciteVive,
-    nuovo, erede, dichiara, allarga, registraLettura, registraAzione, letture, rifiutate, usciteRifiutate,
+    nuovo, erede, dichiara, allarga, registraLettura, registraAzione, registraIndirizzi, indirizzoNoto, letture, rifiutate, usciteRifiutate,
     consentito, strumentiPermessi, riassunto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
