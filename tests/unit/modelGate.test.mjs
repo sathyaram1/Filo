@@ -114,7 +114,7 @@ function fileJs(dir, out = []) {
     if (nome === 'node_modules' || nome.startsWith('.')) continue;
     const p = join(dir, nome);
     if (statSync(p).isDirectory()) fileJs(p, out);
-    else if (nome.endsWith('.js') || nome.endsWith('.mjs')) out.push(p);
+    else if (ESTENSIONI.some((e) => nome.endsWith(e))) out.push(p);
   }
   return out;
 }
