@@ -2983,6 +2983,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           // pagina è quella pagina (#533, terzo giro di verifica). Se l'esito
           // dichiara una fonte, vince quella.
           const fonte = (res && res.fonteLetta) || null;
+          // Quello che una lettura ha portato dentro di roba dell'utente resta
+          // col compito: se il modello prova a farlo uscire dentro la domanda
+          // di una ricerca, lì lo si riconosce (#533, ottavo giro di verifica).
+          if (k.privato && res && res.output) {
+            try { Compiti.registraTestoPrivato(task, JSON.stringify(res.output)); } catch (_) {}
+          }
           if (k.classe === 'ingresso') Compiti.registraLettura(task, { type: a.type, fonte });
           // Un'uscita che RIPORTA indietro del testo conta come lettura di quel
           // testo: quello che stampa un comando è roba scritta da altri come una
