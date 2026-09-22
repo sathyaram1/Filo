@@ -74,8 +74,7 @@ test('Opzioni: portando la stessa scheda altrove subito dopo aver scritto, la mo
 // Uscita più brusca di tutte, e la più comune a fine giornata: si scrive e si
 // spegne Filo. Qui serve una cartella dati che sopravviva alla chiusura, quindi
 // l'app si apre a mano invece di usare quella della fixture.
-test('Preferenze: spegnendo Filo subito dopo aver scritto, la modifica non si perde', async () => {
-  test.setTimeout(120_000);
+async function scriviESpegni(testo, attesaMs) {
   const userData = cartellaTemporanea('filo-test-uscita-');
   const app = await electron.launch({
     args: [...argomentiScala, '.'],
@@ -87,7 +86,6 @@ test('Preferenze: spegnendo Filo subito dopo aver scritto, la modifica non si pe
       NODE_ENV: 'test',
     },
   });
-  const atteso = 'stile scritto e poi spengo Filo';
   try {
     const shell = await app.firstWindow();
     await shell.waitForLoadState('domcontentloaded');
@@ -100,9 +98,9 @@ test('Preferenze: spegnendo Filo subito dopo aver scritto, la modifica non si pe
       await new Promise((r) => setTimeout(r, 100));
     }
     expect(page, 'la scheda delle Preferenze non si è aperta').toBeTruthy();
-    await scriviStile(page, atteso);
+    await scriviStile(page, testo);
+    if (attesaMs) await page.waitForTimeout(attesaMs);
   } finally {
-    // Nessuna attesa: si spegne dentro la finestra di attesa del salvataggio.
     await chiudiApp(app);
   }
 
@@ -115,6 +113,20 @@ test('Preferenze: spegnendo Filo subito dopo aver scritto, la modifica non si pe
     salvato = `[storage illeggibile: ${e.message}]`;
   }
   try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  return salvato;
+}
 
-  expect(salvato, 'spegnendo Filo subito dopo aver scritto, l\'ultima modifica sparisce').toBe(atteso);
+// Controllo: con qualche secondo di pausa la stessa strada salva. Serve a
+// distinguere «la modifica si perde» da «il test legge nel posto sbagliato».
+test('Preferenze: aspettando un attimo prima di spegnere Filo, la modifica c\'è', async () => {
+  test.setTimeout(120_000);
+  const atteso = 'stile scritto, aspetto, poi spengo Filo';
+  expect(await scriviESpegni(atteso, 3000), 'la modifica non arriva nemmeno con la pausa').toBe(atteso);
+});
+
+test('Preferenze: spegnendo Filo subito dopo aver scritto, la modifica non si perde', async () => {
+  test.setTimeout(120_000);
+  const atteso = 'stile scritto e poi spengo Filo';
+  expect(await scriviESpegni(atteso, 0),
+    'spegnendo Filo subito dopo aver scritto, l\'ultima modifica sparisce').toBe(atteso);
 });
