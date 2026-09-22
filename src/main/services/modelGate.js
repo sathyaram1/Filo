@@ -125,6 +125,7 @@
       servedBy = noted.servedBy || null;
       violation = Boolean(noted.violation);
     } catch (_) {}
+    if (record !== false) registraFalliti({ settings, action, falliti: result && result.tentativiFalliti });
     let costEur = 0;
     if (record !== false) {
       const C = costs();
