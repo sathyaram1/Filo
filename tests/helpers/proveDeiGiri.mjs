@@ -80,15 +80,16 @@ export function asserisceQualcosa(src) {
 
 // Le parole con cui una prova nata per un giro dice di sé che è di passaggio:
 // chi la scrive lo annota sempre, ed è l'unico segnale che non dipende dal nome.
-const DICHIARAZIONI = /\b(throwaway|usa[- ]e[- ]getta|temporane[ao]|provvisori[ao]|da cancellare|delete after|per ispezione|TEMP)\b/i;
+const DICHIARAZIONI = /\b(throwaway|usa[- ]e[- ]getta|temporane[ao]|provvisori[ao]|delete after|TEMP)\b/i;
 
-/** La prova si dichiara di passaggio nella sua intestazione? PURA. */
+/**
+ * La prova si dichiara di passaggio? Si guardano le prime due righe, dove un
+ * file dice cos'è: più giù si parla di quello che fa Filo, e una prova vera
+ * che nomina un «cancella» dell'app non deve finire accusata. PURA.
+ */
 export function siDichiaraTemporanea(src) {
-  const righe = String(src || '').split('\n');
-  const testa = [];
-  for (const r of righe) {
-    if (/^\s*(\/\/|\/\*|\*)/.test(r) || !r.trim()) testa.push(r);
-    else break;
-  }
-  return DICHIARAZIONI.test(testa.join('\n'));
+  const testa = String(src || '').split('\n')
+    .filter((r) => /^\s*(\/\/|\/\*|\*)/.test(r) || !r.trim())
+    .slice(0, 2).join('\n');
+  return DICHIARAZIONI.test(testa);
 }
