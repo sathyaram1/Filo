@@ -438,8 +438,8 @@
        (implementazione, controllo funzionalità, controllo sicurezza, più l'istanza attiva o in attesa). */
     .mg-item--staged { flex-direction: column; align-items: stretch; gap: 4px; }
     .mg-item--staged .mg-item-row {
-      display: flex; flex-direction: row; align-items: baseline; gap: 6px;
-      min-width: 0;
+      display: flex; flex-direction: row; align-items: baseline; gap: 6px 6px;
+      min-width: 0; flex-wrap: wrap; width: 100%;
     }
     .mg-item--active-work { border-left-color: var(--sn-accent) !important; }
     .mg-item-state {
