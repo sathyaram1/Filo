@@ -464,6 +464,42 @@ ${UI_RUNTIME}
 `;
 }
 
+// La pagina di un'area annunciata ma non ancora scritta. Sul sito una voce
+// senza pagina sarebbe un 404; dentro Filo la stessa sezione si spiega già.
+function emitSiteSoonPage(voce, { docs }, css) {
+  const elenco = docs.length
+    ? 'Quello che c’è scritto: ' + docs.map((d) => `<a href="./${d.id}.html">${escapeHtml(d.title)}</a>`).join(', ') + '.'
+    : 'Non c’è ancora nessun documento di trasparenza.';
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Filo — ${escapeHtml(voce.label)}</title>
+<meta name="description" content="Questa sezione non è ancora scritta." />
+<style>
+${css}
+</style>
+</head>
+<body>
+<main class="sn-doc">
+  <header class="sn-doc-head">
+    <a class="sn-doc-brand" href="../">Filo</a>
+    <nav class="sn-nav">
+      ${navSito(voce.id, docs)}
+    </nav>
+  </header>
+  <h1>${escapeHtml(voce.label)}</h1>
+  <p class="sn-doc-sub">Questa sezione non è ancora scritta.</p>
+  <article id="doc-body">
+<p>${elenco}</p>
+  </article>
+</main>
+</body>
+</html>
+`;
+}
+
 function main() {
   const check = process.argv.includes('--check');
   const built = buildDocs();
