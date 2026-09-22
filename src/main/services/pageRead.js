@@ -97,7 +97,7 @@ const LETTERA = /[a-zA-Z]/;
 
 // I nomi dei colori che servono a far sparire del testo. Gli altri non
 // servono: l'esca è bianco su bianco, o nero su nero.
-const NOMI_COLORE = { white: '#ffffff', black: '#000000', '#fff': '#ffffff', '#000': '#000000' };
+const NOMI_COLORE = { white: '#ffffff', black: '#000000' };
 
 /**
  * Lo stile scritto addosso all'elemento, letto come DICHIARAZIONI. PURA.
