@@ -29,7 +29,10 @@
       },
       {
         "spec": "tests/wallet-owner-page",
-        "caso": "i moduli dell’owner rifiutano con parole di Filo zero codici, crediti con la virgola e pseudonimo vuoto; un utente si conta al singolare",
+        "caso": [
+          "i moduli dell’owner rifiutano con parole di Filo zero codici, crediti con la virgola e pseudonimo vuoto; un utente si conta al singolare",
+          "un invito con un posto occupato su tre resta da dare, col suo link e il conto di chi è entrato"
+        ],
         "perche": "la prova finge di essere l’owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema operativo. Nel contenitore delle routine quel portachiavi non c’è: misurato nel secondo giro di verifica del #581, isEncryptionAvailable() risponde false, il salvataggio torna false senza scrivere, la rilettura dà null e l’owner non viene riconosciuto, quindi la prova muore alla prima riga. Succede sempre, su qualunque ramo. Da risolvere (una via per simulare l’owner che non passi dal disco) e poi togliere la voce.",
         "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
       },
@@ -39,6 +42,8 @@
           "le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima",
           "i numeri che il server calcola si leggono in cima, e non si possono toccare",
           "la riga di una persona apre la sua scheda: movimenti, suoi inviti e ultime chiamate",
+          "un numero lasciato a metà parte da solo, si vede finché non è partito, e un rifiuto del server si spiega a parole",
+          "il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regalo",
           "manopole e numeri si leggono in tema chiaro e in tema scuro"
         ],
         "perche": "stesso motivo di tests/wallet-owner-page: la prova finge di essere l’owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c’è, l’owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo.",
