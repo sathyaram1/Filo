@@ -158,3 +158,70 @@ test('se il server non fonde, la pagina lo dice e non ritenta da sola', async ({
   await page.waitForTimeout(400);
   expect(await approvazioni(page)).toEqual(['ab12cd34ef56ab12cd34ef56']);
 });
+
+// ── Il segno che arriva da fuori, e i tentativi che non riescono ───────────
+
+test('il segno messo da fuori a pagina aperta fa partire il ramo fermo, senza riaprire Gestione', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ _updateTime: 't1' });
+  const req = richiesta();
+  await apri(page, [fb], { pending: [req] });
+  expect(await approvazioni(page)).toEqual([]);
+
+  // Lo script dell'owner, o un'altra finestra: la richiesta ferma è la stessa,
+  // quindi nessuno avvisa la pagina delle fusioni. Deve bastare il segno.
+  const conSegno = pratica({ _updateTime: 't2', mergePreapproved: { by: 'owner (script)', at: '2026-09-20T10:00:00.000Z' } });
+  await page.evaluate((doc) => window.__mgTest.setLiveSources({
+    listVersions: async () => [{ _id: doc._id, _updateTime: 't2' }],
+    getMany: async () => [doc],
+  }), conSegno);
+  await page.evaluate(() => window.__mgTest.pollNow());
+
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
+});
+
+test('fusione non riuscita: rimettere il segno la ritenta', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica();
+  const req = richiesta();
+  await apri(page, [fb], { pending: [req] });
+  // Il primo tentativo non arriva al server; il secondo sì.
+  await page.evaluate(() => {
+    const prec = window.filo.message;
+    let primo = true;
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'merge_approval_approve' && primo) {
+        primo = false;
+        window.__approvals.push(msg);
+        return { ok: false, error: 'github_502 unreachable' };
+      }
+      return prec(msg);
+    };
+  });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  const btn = page.locator('#mgPreapproveBtn');
+  await btn.click();
+  await expect(page.locator('#mgManageMsg')).toContainText('riprova');
+  expect(await approvazioni(page)).toHaveLength(1);
+
+  await btn.click();
+  await expect(btn).toHaveText('Fondi senza chiedermelo');
+  await btn.click();
+  await expect.poll(() => approvazioni(page).then((a) => a.length), { timeout: 8000 }).toBe(2);
+  await expect(page.locator('#mgManageMsg')).toContainText('su main');
+});
+
+test('una fusione partita da sola che non riesce si legge anche senza pratica aperta', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
+  const req = richiesta();
+  await apri(page, [fb], { pending: [req], approveReply: { ok: false, error: 'github_502 unreachable' } });
+  await expect.poll(() => approvazioni(page).then((a) => a.length), { timeout: 8000 }).toBe(1);
+
+  // Nessuna scheda aperta: il riquadro del dettaglio non è sullo schermo, e un
+  // ramo che non è partito deve dirlo lo stesso.
+  const toast = page.locator('#mgToast');
+  await expect(toast).toBeVisible();
+  await expect(toast).toContainText('riprova');
+});
