@@ -171,12 +171,10 @@ const safebrowseMethods = {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
     if (!SB || !tab) return { ok: true, level: 'safe', message: null };
-    const ctx = this._sbCtx(ctxIn, tab);
+    const ctx = this._sbCtx(ctxIn, tab, url);
     let verdict;
     try {
-      verdict = SB.analyze(url, ctx, (next) => {
-        this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
-      });
+      verdict = SB.analyze(url, ctx, () => { this._sbAnnuncia(tab, url); });
     } catch (_) {
       return { ok: true, level: 'safe', message: null };
     }
