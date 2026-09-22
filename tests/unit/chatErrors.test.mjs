@@ -193,9 +193,27 @@ test('chi non porta da nessuna parte col solo «Riprova» dice dove si rimedia',
   assert.equal(CE.rimedio('NO_API_KEY'), 'crediti');
   assert.equal(CE.rimedio('NO_MODEL_FOR_ACTION'), 'opzioni');
   assert.equal(CE.rimedio('NO_OPEN_WEIGHTS_MODEL'), 'opzioni');
-  assert.equal(CE.rimedio('LIMIT_REACHED'), '');
+  // Il limite mensile si alza nelle Opzioni, e la frase lo dice: senza questa
+  // riga «Riprova» restava l'unica uscita di uno stato che non cambia da sé.
+  assert.equal(CE.rimedio('LIMIT_REACHED'), 'opzioni');
   assert.equal(CE.rimedio(''), '');
   assert.equal(CE.rimedio(undefined), '');
+});
+
+// Sentinella (#663): l'indirizzo della pagina dove si rimedia sta in un posto
+// solo. Ogni riquadro che lo riscriveva a mano ne dimenticava metà, e una
+// frase che nomina la pagina Crediti senza portarci è muta per chi la legge da
+// un sito qualunque.
+test('dove si rimedia arriva già pronto: indirizzo interno ed etichetta', () => {
+  for (const code of ['NO_API_KEY', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'LIMIT_REACHED']) {
+    const p = CE.rimedioPagina(code);
+    assert.ok(p, `${code} non dice dove si rimedia`);
+    assert.equal(p.dove, CE.rimedio(code));
+    assert.match(p.url, /^filo:\/\/(credits|options)\//, code);
+    assert.ok(p.label && p.label.length > 3, code);
+  }
+  assert.equal(CE.rimedioPagina('UNKNOWN'), null);
+  assert.equal(CE.rimedioPagina(''), null);
 });
 
 // ── La risposta dell'IPC ricomposta (#663) ────────────────────────────────────
@@ -229,4 +247,38 @@ test('fromResponse: senza codice utile resta lo status, e «UNKNOWN» non divent
 test('fromResponse: risposta vuota o assente → il ripiego di chi chiama', () => {
   assert.equal(CE.fromResponse(null, 'Il provider AI ha fallito.').message, 'Il provider AI ha fallito.');
   assert.equal(CE.fromResponse({ ok: false }, 'ripiego').message, 'ripiego');
+});
+
+
+// Sentinella (#663): la frase che il main ha già scritto sapendo quale chiave
+// ha pagato (i crediti finiti) deve sopravvivere al viaggio. Senza, chi mostra
+// l'errore ricostruisce a indovinare e perde il caso giusto.
+test('fromResponse porta la frase che il main aveva già scritto', () => {
+  const scritta = 'i crediti di Filo sono finiti: puoi aspettare quelli di domani.';
+  const e = CE.fromResponse({ error: 'OpenRouter 402: {"error":{"message":"x"}}', status: 402, provider: 'openrouter', userMessage: scritta });
+  assert.equal(e.userMessage, scritta);
+  assert.equal(CE.sentence(e), scritta.charAt(0).toUpperCase() + scritta.slice(1));
+});
+
+// Sentinella (#663): lo stream d'errore dice quello che dice la risposta di
+// `filo:message`. Con i soli message e code il riquadro della spiegazione
+// stampava la riga grezza del servizio, parentesi graffe comprese; e basta un
+// preload che elenchi i campi invece di passarli tutti per rifare il danno.
+test('l’errore dello stream porta gli stessi campi della risposta dell’IPC, fino alla pagina', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const ipc = readFileSync(join(ROOT, 'src', 'main', 'ipc.js'), 'utf8');
+  const invio = /send\('error',\s*\{([\s\S]*?)\}\);/.exec(ipc);
+  assert.ok(invio, 'src/main/ipc.js non manda più un errore di stream');
+  for (const campo of ['message', 'code', 'status', 'provider', 'userMessage']) {
+    assert.match(invio[1], new RegExp(`\\b${campo}\\s*:`), `lo stream non manda più ${campo}`);
+  }
+  for (const f of ['page-preload.js', 'internal-preload.js']) {
+    const src = readFileSync(join(ROOT, 'src', 'preload', f), 'utf8');
+    const m = /onMessage\(\{\s*type:\s*'error',([^}]*)\}\)/.exec(src);
+    assert.ok(m, `${f} non inoltra più l'errore dello stream`);
+    assert.match(m[1], /\.\.\./, `${f} elenca i campi dell'errore invece di passarli tutti`);
+  }
 });

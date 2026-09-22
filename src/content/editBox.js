@@ -105,7 +105,9 @@
           payload: { original: originalText, instruction },
         });
         if (!res?.ok || !res.text) {
-          $prop.textContent = res?.error || I18n.t('edit_box_error');
+          // Perché la riscrittura non è partita, in italiano: la regola sta in
+          // SN_CHAT_ERRORS, non un elenco di casi per riquadro (#663).
+          $prop.textContent = Popup.frasePerLUtente(res);
           return;
         }
         currentResult = res.text.trim();
@@ -113,8 +115,8 @@
         renderDiff($prop, originalText, currentResult);
         $copy.disabled = false;
         $replace.disabled = false;
-      } catch (_) {
-        $prop.textContent = I18n.t('edit_box_error');
+      } catch (e) {
+        $prop.textContent = Popup.frasePerLUtente({ message: e?.message });
       } finally {
         inFlight = false;
       }
