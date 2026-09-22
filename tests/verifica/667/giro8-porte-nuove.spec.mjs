@@ -69,12 +69,12 @@ test('una protezione riaccesa a parole non si rispegne, nemmeno se è l’interr
   // Ci ripensa e lo chiede a Filo, che glielo fa confermare.
   await confermata(chat, 'blocco_popup', 'sì');
   await expect.poll(async () => (await salvate(sec)).security?.blockPopups, { timeout: 8_000 }).toBe(true);
-  await expect(sec.locator('#sec-block-popups'), 'la pagina mostra la protezione accesa').toBeChecked({ timeout: 8_000 });
 
   // Poi tocca un interruttore che col blocco dei popup non c'entra.
   await sec.locator('#sec-adblock').click();
   await expect.poll(async () => (await salvate(sec)).security?.adblock?.enabled, { timeout: 8_000 }).toBe(false);
   expect((await salvate(sec)).security.blockPopups, 'il blocco dei popup resta acceso').toBe(true);
+  await expect(sec.locator('#sec-block-popups'), 'e la pagina mostra la protezione accesa').toBeChecked();
 });
 
 test('il box per raffinare un colore non rimanda indietro gli altri colori cambiati nel frattempo', async ({ shell, openTab }) => {
