@@ -881,6 +881,10 @@
         filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true });
         bubblesEl.appendChild(filoBubble);
       }
+      // #533 (settimo giro) — la bolla si porta dietro il nome della richiesta
+      // che l'ha scritta: un collegamento qui dentro si apre con i limiti di
+      // quella richiesta, non con quelli di chi clicca mezz'ora dopo.
+      if (r.compito && filoBubble) filoBubble.dataset.compito = r.compito;
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
