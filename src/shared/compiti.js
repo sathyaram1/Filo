@@ -70,8 +70,15 @@
   // di verifica): una proposta che nomina un bersaglio non è una proposta.
   const CLASSI = {
     CERCA_WEB: { classe: 'ingresso', fonte: 'esterno' },
-    LEGGI_DOCUMENTO: { classe: 'ingresso', fonte: 'esterno' },
-    LEGGI_FILE: { classe: 'ingresso', fonte: 'utente' },
+    // `privato` segna le letture che portano dentro roba dell'utente: un
+    // documento del suo disco, un suo file, quello che stampa un comando. Non
+    // è la stessa cosa della fidatezza — un documento resta testo scritto da
+    // altri — ma è quello che non deve USCIRE dentro qualcosa che il modello
+    // compone dopo (#533, ottavo giro di verifica). Una pagina web no: è già
+    // pubblica, e il testo pubblico che rientra in una ricerca non è una
+    // fuga di dati.
+    LEGGI_DOCUMENTO: { classe: 'ingresso', fonte: 'esterno', privato: true },
+    LEGGI_FILE: { classe: 'ingresso', fonte: 'utente', privato: true },
     LEGGI_SCHEDE: { classe: 'ingresso', fonte: 'esterno' },
     LEGGI_TRASPARENZA: { classe: 'ingresso', fonte: 'filo' },
     CAPACITA_DETTAGLIO: { classe: 'ingresso', fonte: 'filo' },
