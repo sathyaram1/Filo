@@ -359,6 +359,8 @@
       background: transparent;
       transition: background 0.1s;
     }
+    /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «senza chiedere»
+       insieme non ci stanno, e tagliate a metà parola non dicono più niente. */
     .mg-item:not(.mg-item--staged) { flex-wrap: wrap; }
     .mg-item:hover { background: var(--sn-hover); }
     .mg-item--selected { background: var(--sn-hover); }
