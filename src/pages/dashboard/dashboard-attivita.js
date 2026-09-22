@@ -784,6 +784,18 @@
     return el;
   }
 
+  // Quel che l'utente porta a termine cliccando in chat va scritto in due
+  // posti, o non è successo per nessuno: nel diario, che è dove l'utente lo
+  // rilegge, e sull'azione, che è quello che il modello si ritrova nel contesto
+  // al turno dopo (`_confirmed`, come una conferma data nel popup).
+  function segnaCompiuta(a, activity, icona, testo) {
+    if (!a) return;
+    a._confirmed = true;
+    a._executed = true;
+    a._output = { ...(a._output || {}), proposta: false, fatto: true };
+    if (activity) activity.compiuta(a.type, icona, testo);
+  }
+
   function renderActionButton(a, { onAck, activity = null } = {}) {
     const type = String(a.type || '').toUpperCase();
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
