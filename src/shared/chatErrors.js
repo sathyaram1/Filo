@@ -113,6 +113,9 @@
     if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
     if (res && Number(res.status) > 0) e.status = Number(res.status);
     if (res && res.provider) e.provider = res.provider;
+    // La frase che il main ha già scritto sapendo quale chiave ha pagato e
+    // quanti crediti arrivano domani: vale più di qualsiasi ricostruzione.
+    if (res && typeof res.userMessage === 'string' && res.userMessage) e.userMessage = res.userMessage;
     return e;
   }
 
