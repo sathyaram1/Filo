@@ -197,22 +197,20 @@ let providers = { gsb: null, rdap: null, ct: null, sandbox: null, llm: null };
 function setProviders(fns) { providers = { ...providers, ...(fns || {}) }; }
 
 // Configura i provider dai moduli reali, usando le impostazioni correnti.
-//   opts.gsbKey       chiave Google Safe Browsing (se assente → stage 1 saltato)
+//   opts.runGsb       funzione (url) → esito dell'elenco dei siti di truffa
 //   opts.runLlm       funzione (messages) → testo, per il giudice LLM
 //   opts.enableSandbox  abilita la detonation (default true se Electron c'è)
 //   opts.enableNetwork  abilita RDAP/CT (default true)
 // `runGsb(rawUrl)` — #591, sesto giro: la ricerca nell'elenco dei siti di truffa
 // si paga sulla chiave di fabbrica dell'owner, quindi non la fa più questo
 // modulo per conto suo: la inietta handlers.js dopo averla fatta passare dal
-// cancello unico (tetto di spesa e conteggio, come per ogni altra chiamata a un
-// fornitore). Senza iniezione si ricade sulla chiamata diretta, che è quello
-// che serve ai test di questo modulo.
+// cancello unico. Il ripiego che chiamava il fornitore da qui è stato tolto nel
+// settimo giro: nessuno lo percorreva, ma era l'esempio pronto da copiare per
+// la chiamata successiva.
 function configure(opts = {}) {
-  const { gsbKey, runGsb, runLlm, enableSandbox = true, enableNetwork = true } = opts;
+  const { runGsb, runLlm, enableSandbox = true, enableNetwork = true } = opts;
   setProviders({
-    gsb: typeof runGsb === 'function'
-      ? ((rawUrl) => runGsb(rawUrl))
-      : (gsbKey ? ((rawUrl) => net.safeBrowsingLookup(rawUrl, gsbKey)) : null),
+    gsb: typeof runGsb === 'function' ? ((rawUrl) => runGsb(rawUrl)) : null,
     rdap: enableNetwork ? ((reg) => net.rdapAgeDays(reg)) : null,
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
     llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
