@@ -21,6 +21,7 @@ const fields = {};
 for (const [k, v] of Object.entries(caps)) {
   if (typeof v === 'number') fields[k] = { integerValue: String(v) };
   else if (typeof v === 'string') fields[k] = { stringValue: v };
+  else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
 }
 
 const server = createServer((req, res) => {

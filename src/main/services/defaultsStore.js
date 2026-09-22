@@ -516,10 +516,14 @@ async function getRoutineCaps(idToken) {
   // mostrare un valore pescato altrove significa mostrare una regola che
   // nessuno applica (vedi il commento in getAutomationProberIdle).
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '' };
+  // `null` = non ho potuto leggere: dirlo, o «spento» e «non impostato» sembrano parole del server.
+  if (doc === null) throw new Error('Impostazioni del giro di verifica non raggiungibili.');
+  const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
   for (const k of CAP_KEYS) {
     if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
   }
+  // Spento di serie: solo un true esplicito nel documento lo accende.
+  out.giroStretto = !!doc && doc.giroStretto === true;
   if (doc && typeof doc.fixInstructions === 'string') out.fixInstructions = doc.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX);
   return out;
 }
@@ -542,8 +546,20 @@ async function setRoutineCaps(patch, idToken) {
     fields.fixInstructions = toFsValue(p.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX));
     mask.push('fixInstructions');
   }
+  if (typeof p.giroStretto === 'boolean') {
+    fields.giroStretto = toFsValue(p.giroStretto);
+    mask.push('giroStretto');
+  }
   if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
-  return getRoutineCaps(idToken);
+  try {
+    return await getRoutineCaps(idToken);
+  } catch (e) {
+    // Scritto ma non riletto: un salvataggio riuscito non deve sembrare fallito. Tornano i soli campi scritti.
+    if (!mask.length) throw e;
+    const scritto = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
+    for (const k of mask) scritto[k] = k === 'fixInstructions' ? p[k].slice(0, FIX_INSTRUCTIONS_MAX) : (k === 'giroStretto' ? p[k] : clampCap(p[k]));
+    return scritto;
+  }
 }
 
 

@@ -697,7 +697,12 @@ async function stubCaps(page, initial = { cap2: 5, cap1: 2, cap0: 0, fixInstruct
         return { ok: true, ...window.__capsValue };
       }
       if (msg && msg.type === 'automation_caps_set') {
-        const clamp = (n) => Math.min(10, Math.max(0, Math.round(Number(n))));
+        if (window.__capsFail) return { ok: false, error: 'finto guasto' };
+        if (typeof msg.giroStretto === 'boolean') {
+          window.__capsValue.giroStretto = msg.giroStretto;
+          window.__capsSets.push({ giroStretto: msg.giroStretto });
+        }
+        const clamp =(n) => Math.min(10, Math.max(0, Math.round(Number(n))));
         for (const field of ['cap2', 'cap1', 'cap0']) {
           if (msg[field] != null) {
             window.__capsValue[field] = clamp(msg[field]);
@@ -848,6 +853,63 @@ test('i tre bilanci dei giri di correzione e le loro istruzioni sono editabili e
     return [d[K.AUTOMATION_CAP2], d[K.AUTOMATION_CAP1], d[K.AUTOMATION_CAP0]];
   });
   expect(cached).toEqual([5, 3, 1]);
+});
+
+test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella config delle routine, e un guasto lo rimette dov\'era', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  const giro = page.locator('#mgGiroStretto');
+  const etichetta = page.locator('#mgGiroStrettoSwitch');
+  await expect(etichetta).toBeVisible();
+  await expect(etichetta).toContainText('Giro stretto dopo una correzione');
+  // La spiegazione sta nell'hover, non in un sottotitolo.
+  expect((await etichetta.getAttribute('title')) || '').toMatch(/rilievi corretti/);
+  await expect(giro).toBeDisabled();
+
+  // Documento senza il campo: spento. Non dipende dalle routine accese.
+  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeEnabled();
+  await expect(giro).not.toBeChecked();
+
+  await etichetta.click();
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('Salvato.');
+  await expect(giro).toBeChecked();
+  await etichetta.click();
+  await expect(giro).not.toBeChecked();
+  await expect.poll(() => page.evaluate(() => window.__capsSets)).toEqual([{ giroStretto: true }, { giroStretto: false }]);
+
+  // Acceso sul server: alla rilettura si vede acceso.
+  await page.evaluate(() => { window.__capsValue.giroStretto = true; });
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeChecked();
+
+  // Salvataggio fallito: l'interruttore torna dov'era e lo dice.
+  await page.evaluate(() => { window.__capsFail = true; });
+  await etichetta.click();
+  await expect(page.locator('#mgGiroStrettoMsg')).toContainText('NON è cambiata');
+  await expect(giro).toBeChecked();
+
+  // Nei due temi l'etichetta resta leggibile sullo sfondo della pagina.
+  const sfondi = [];
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate(async (t) => {
+      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } });
+    }, tema);
+    const leggi = () => etichetta.locator('.mg-switch-text').evaluate((el) => ({
+      c: getComputedStyle(el).color, sfondo: getComputedStyle(document.body).backgroundColor,
+    }));
+    if (tema === 'dark') await expect.poll(async () => (await leggi()).sfondo).not.toBe(sfondi[0]);
+    const colori = await leggi();
+    sfondi.push(colori.sfondo);
+    expect(colori.c, `tema ${tema}`).not.toBe(colori.sfondo);
+    await page.locator('#mgGiroStrettoBlock').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `tests/.shots/giro-stretto-${tema}.png` });
+  }
 });
 
 test('i bilanci dei giri di correzione vengono clampati nel range [0, 10] al salvataggio', async ({ openTab }) => {
@@ -2408,4 +2470,32 @@ test('un bilancio salvato col campo vuoto NON si salva (non c\'è un default, e 
   await cap2.press('Enter');
   await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato.');
   expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(4);
+});
+
+test('giro stretto: se la config non si legge l’interruttore resta com’era e lo dice, e alla lettura dopo il messaggio sparisce', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubCaps(page, { cap2: 5, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  const giro = page.locator('#mgGiroStretto');
+  await expect(giro).toBeChecked();
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('');
+
+  // Il main risponde «non raggiungibile» (senza rete): niente «spento» finto.
+  await page.evaluate(() => {
+    const prima = window.filo.message;
+    window.filo.message = async (msg) => (msg && msg.type === 'automation_caps_get'
+      ? { ok: false, error: 'Impostazioni del giro di verifica non raggiungibili.' } : prima(msg));
+    window.__ripristina = () => { window.filo.message = prima; };
+  });
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeChecked();
+  await expect(page.locator('#mgGiroStrettoMsg')).toContainText('Non letto dal server');
+
+  await page.evaluate(() => window.__ripristina());
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('');
 });

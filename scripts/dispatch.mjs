@@ -6,7 +6,7 @@
 //   e QUESTO script lo traduce in una consegna eseguibile, senza mai leggere
 //   testi liberi — così la scelta non è pilotabile via prompt-injection. Il
 //   worker (general-purpose) lancia `node scripts/dispatch.mjs --ticket <b>`,
-//   riceve un JSON { role, payload, claim, loopCount, instructions } e DIVENTA
+//   riceve un JSON { role, payload, claim, instructions } e DIVENTA
 //   quel ruolo.
 //
 // CONTRATTO (era in ROUTINES.md, abolito col ridisegno SPEC-RIDISEGNO-MAX.md;
@@ -49,7 +49,7 @@
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
 //   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--segnala <file.md>] [--ticket <b>]
-//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--segnala <file.md> [--ferma]] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
@@ -80,6 +80,7 @@ import {
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
@@ -117,15 +118,6 @@ const ROUTINES_DOC = 'config/routines';
 // del default con un paracadute 5/2/0, e un numero che nessuno applica è un
 // numero che mente). I bilanci residui si stampano come arrivano nella
 // risposta del server (verifierReplyText).
-//
-// `resolveLoopCap` (override d'ambiente FILO_LOOP_CAP > valore remoto > default,
-// range [1, 10]) è la regola di precedenza del tetto delle bocciature del giro
-// VECCHIO: resta per gli strumenti e per i test che la usano ancora.
-const LOOP_CAP_MIN = 1;
-const LOOP_CAP_MAX = 10;
-// Il tetto delle bocciature del giro VECCHIO (verdetto a tre valori): resta
-// solo per resolveLoopCap, che gli strumenti e i test usano ancora.
-const LOOP_CAP_DEFAULT = 10;
 
 // Le regole del giro (feedback #561): il parser della critica coi livelli e
 // la decisione su cosa si corregge. Dagli
@@ -152,20 +144,6 @@ export const VERIFIER_ROUND = (() => {
 })();
 
 /**
- * Risolve il cap EFFETTIVO data la precedenza env > remoto > default, con clamp
- * nel range valido. Funzione pura (testata in tests/unit/dispatch.test.mjs).
- * @param {{ envRaw?: string|number, remote?: number|null }} src
- */
-export function resolveLoopCap({ envRaw, remote } = {}) {
-  const clamp = (n) => Math.min(LOOP_CAP_MAX, Math.max(LOOP_CAP_MIN, Math.round(n)));
-  const env = Number(envRaw);
-  if (Number.isFinite(env) && env > 0) return clamp(env);
-  const rem = Number(remote);
-  if (Number.isFinite(rem) && rem > 0) return clamp(rem);
-  return LOOP_CAP_DEFAULT;
-}
-
-/**
  * Legge le impostazioni che l'owner detta alle routine dalla tab Automazioni.
  *
  * PERCHÉ NON È PIÙ UNA LETTURA "BEST-EFFORT" (2026-08-13)
@@ -189,7 +167,7 @@ export function resolveLoopCap({ envRaw, remote } = {}) {
  *   Documento mai scritto (404) NON è un dubbio: è "l'owner non ha mai toccato
  *   niente" ⇒ comportamento storico (routine accese, coi default).
  *
- * @returns {Promise<{enabled?:boolean, proberWhenIdle?:boolean, loopCap?:number}>}
+ * @returns {Promise<{enabled?:boolean, proberWhenIdle?:boolean}>}
  * @throws {Error} con `faultKind` se il documento non è leggibile.
  */
 async function fetchRoutineConfig() {
@@ -223,11 +201,6 @@ export function parseRoutineConfig(fields) {
   const out = {};
   if (f.enabled && typeof f.enabled.booleanValue === 'boolean') out.enabled = f.enabled.booleanValue;
   if (f.proberWhenIdle && f.proberWhenIdle.booleanValue === false) out.proberWhenIdle = false;
-  const lc = f.loopCap;
-  if (lc) {
-    if (lc.integerValue != null) out.loopCap = Number(lc.integerValue);
-    else if (lc.doubleValue != null) out.loopCap = Number(lc.doubleValue);
-  }
   return out;
 }
 
@@ -256,8 +229,6 @@ export function defaultState(id, branch) {
   return {
     id,
     branch: branch || '',
-    loopCount: 0,
-    improvableCount: 0,
     verifierVerdict: null,
     verifierCritique: '',
     // Il commit su cui ciascun esito è stato dato: un esito vale per il
@@ -314,14 +285,14 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   if (String(sha || '')) s.verifierSha = String(sha);
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
-  else if (outcome === 'stop') s.verifierVerdict = 'blocked';
+  else if (outcome === 'stop') s.verifierVerdict = 'stop';
   else s.verifierVerdict = String(outcome || '') || null;
   if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, MAX_CRITIQUE_CHARS);
   else if (outcome === 'pass') s.verifierCritique = '';
   return s;
 }
 
-/** Il fixer ha corretto: si ri-mette in coda per il verifier (loop invariato). */
+/** La correzione è consegnata: si torna in coda per un'altra verifica. */
 export function applyFixed(state) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
   s.verifierVerdict = null;
@@ -395,10 +366,23 @@ export function stripFileArg(list, nome) {
 }
 
 /** Il payload della consegna «corretto», con la segnalazione se c'è. PURA. */
-export function fixedPayload({ report, frase, branch, segnalazione } = {}) {
+export function fixedPayload({ report, frase, branch, segnalazione, ferma } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
   if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
+  if (ferma === true) p.stop = true;
   return p;
+}
+
+/**
+ * `--ferma` senza segnalazione non parte: l'owner si troverebbe un lavoro
+ * fermo senza sapere cosa deve decidere. Ritorna la frase che ferma, o ''. PURA.
+ */
+export function fermaSenzaSegnalazione(ferma, segnalazione) {
+  if (!ferma || String(segnalazione || '').trim()) return '';
+  return [
+    '--ferma vuole anche --segnala <file.md>: non ho consegnato niente.',
+    'Fermare il lavoro chiama l\'owner, e senza la segnalazione non saprebbe cosa decidere: scrivi nel file il problema, le scelte e cosa hai fatto nel frattempo, poi rilancia con tutte e due le opzioni.',
+  ].join('\n');
 }
 
 /**
@@ -626,8 +610,14 @@ export function serialAwarenessNote(role, history, dropped = 0) {
   return '';
 }
 
-export function readRoleInstructions(role) {
-  const name = ROLE_FILE[role];
+// L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
+export { verifierScope };
+export function perimetroNote(scope, perimetro) {
+  return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l));
+}
+
+export function readRoleInstructions(role, { scope } = {}) {
+  const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope] : ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
   const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
@@ -669,7 +659,8 @@ export function buildPayload(bucket, ctx = {}) {
         feedback: ctx.feedback || null,
         history: Array.isArray(ctx.history) ? ctx.history : [],
         historyDropped: Number(ctx.historyDropped) || 0,
-        loopCount: bucket.loopCount || 0,
+        scope: verifierScope(ctx.scope).scope,
+        ...(ctx.perimetro && typeof ctx.perimetro === 'object' ? { perimetro: ctx.perimetro } : {}),
       };
     case 'fixer':
       // Riallineamento del ramo dopo un conflitto di fusione. Il lavoro era
@@ -681,7 +672,6 @@ export function buildPayload(bucket, ctx = {}) {
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
-        loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
       return { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
@@ -831,25 +821,6 @@ async function deliverToChannel(intent, data) {
 }
 
 /**
- * Nota per la chat del feedback con l'esito del verifier. PURA (testata in
- * tests/unit/dispatch.test.mjs). Prima l'esito viveva SOLO nel file di stato su
- * git e l'owner non lo vedeva mai in dashboard: ora ogni verdetto (pass e fail)
- * finisce nelle note, così la conversazione del feedback racconta l'intero iter.
- */
-export function verifierNoteText(verdict, critique = '') {
-  // Il ruolo scrive la critica come "PASS — …"/"MIGLIORABILE — …"/"FAIL — …":
-  // il prefisso è ridondante col nostro incipit, toglilo (resta la sostanza).
-  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '').slice(0, MAX_CRITIQUE_CHARS);
-  if (verdict === 'pass') {
-    return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
-  }
-  if (verdict === 'migliorabile') {
-    return c ? `Verifica: funziona, ma migliorabile — ${c}` : 'Verifica: funziona, ma migliorabile.';
-  }
-  return c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
-}
-
-/**
  * C — ogni scrittura nella macchina a stati RICALCOLA l'identità della directory
  * e rifiuta la transizione se non corrisponde al branch assegnato. Non chiede
  * all'istanza dove si trova: lo guarda.
@@ -996,6 +967,15 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
 // Ri-esportati da qui per chi li importava da dispatch.
 export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 
+// Il testo della fase 2 lo scrive l'owner e può non nominarla: la porta per
+// fermarsi la dice lo strumento, o chi corregge non la scopre mai.
+export const FERMA_NOTE = [
+  'Se un rilievo non si può correggere senza una decisione dell\'owner (un trade-off vero, una scelta di',
+  'prodotto), non consegnare una correzione a metà: scrivi la segnalazione e ferma il lavoro con',
+  '  --record-fixed <id> "<report>" --segnala <file.md> --ferma',
+  'Il lavoro non torna in verifica: aspetta l\'owner. Senza --ferma torna in coda per un\'altra verifica.',
+].join('\n');
+
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
@@ -1014,8 +994,10 @@ export function verifierReplyText(reply) {
       '',
       String(r.phase2.instructions || ''),
       '',
+      FERMA_NOTE,
+      '',
       'A giro chiuso, rilascia il biglietto.',
-    ].filter((l, i) => l !== '' || i === 6).join('\n');
+    ].filter((l, i) => l !== '' || i === 6 || i === 8 || i === 10).join('\n');
   }
   if (r.outcome === 'stop') {
     return [
@@ -1040,7 +1022,15 @@ export function verifierReplyText(reply) {
     'L\'esito vero sta in dashboard, nella chat del feedback: leggilo lì prima di rilasciare il biglietto.',
   ].join('\n');
 }
-async function recordFixed(id, report = '', frase = '', segnalazione = '') {
+/** Cosa si stampa a consegna accettata: il lavoro si è fermato, o torna in verifica. PURA. */
+export function fixedReplyText(id, reply, ferma = false) {
+  const fermato = reply && reply.outcome === 'stop';
+  if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
+  // Un server che non conosce ancora «stop» rimette in coda: dirlo, o chi ha fermato crede di averlo fatto.
+  if (ferma) return `stato ${id}: ATTENZIONE, avevi chiesto di fermare ma il server non l'ha confermato: il lavoro è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
+  return `stato ${id}: consegnato, torna in coda per la verifica`;
+}
+async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
@@ -1064,7 +1054,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '') {
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
   // La segnalazione (L3) viaggia nello stesso payload: il server la cifra e la
   // scrive in `livelli.l3`, e la appende alle note come storia della chat.
-  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione }));
+  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
@@ -1077,7 +1067,10 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '') {
   }
   // Il marcatore locale del ruolo dice chi sta consegnando; il server lo sa
   // dal biglietto, ed è lui che ha accettato o rifiutato.
-  sealTransition(next, `${readRole(ROOT) || 'fixer'}:consegna`);
+  const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
+  if (reply.outcome === 'stop') next.verifierVerdict = 'stop';
+  sealTransition(next, `${readRole(ROOT) || 'fixer'}:${reply.outcome === 'stop' ? 'ferma' : 'consegna'}`);
+  next.reply = reply;
   return next;
 }
 async function recordSecaudit(id, verdict, testo = '') {
@@ -1331,7 +1324,7 @@ export function usageText() {
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
-    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
+    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md> [--ferma]] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
     '                         la nota dice cosa hai controllato e cosa hai trovato;',
@@ -1341,6 +1334,8 @@ export function usageText() {
     '                         lavorando: NON deciderlo, segnalalo (Problema / Scelte',
     '                         col loro trade-off / Cosa ho fatto nel frattempo); è quello',
     '                         che l\'owner legge cliccando il rombo in dashboard',
+    '  --ferma                solo con --record-fixed e insieme a --segnala: il lavoro non',
+    '                         torna in verifica, si ferma e aspetta l’owner',
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
     '',
@@ -1416,7 +1411,6 @@ export async function run() {
     id: w.id || undefined,
     num: w.num || '',
     branch: w.branch || '',
-    loopCount: Number(w.payload && w.payload.loopCount) || 0,
   };
   if (bucket.id) {
     // Lo stato locale resta il ripiego quando il server non risponde: si
@@ -1588,6 +1582,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
       // nell'avvertenza, così i giri mancanti non passano per inesistenti.
       historyDropped: Number(payload && payload.historyDropped) || 0,
+      ...(role === 'verifier' ? { scope: payload && payload.scope, perimetro: (payload && payload.perimetro) || null } : {}),
     };
   }
   return {};
@@ -1689,13 +1684,18 @@ export function emit(bucket, ctx) {
   const payload = buildPayload(bucket, ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
-  const serial = serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
-  const base = readRoleInstructions(bucket.role);
+  const ambito = bucket.role === 'verifier' ? verifierScope(ctx && ctx.scope) : { scope: '', sconosciuto: false };
+  if (ambito.sconosciuto) process.stderr.write(`[dispatch] ambito di verifica sconosciuto («${unaRiga(ctx.scope).slice(0, 40)}»): consegno la verifica piena\n`);
+  // Nei giri stretti la serie non si consegna: inviterebbe alla ricerca larga
+  // che il testo del ruolo dice di non rifare.
+  const serial = ambito.scope && ambito.scope !== 'pieno'
+    ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
+    : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
+  const base = readRoleInstructions(bucket.role, { scope: ambito.scope });
   const out = {
     role: bucket.role,
     payload,
     claim: bucket.id || null,
-    loopCount: bucket.loopCount || 0,
     instructions: serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base,
   };
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
@@ -1798,8 +1798,11 @@ if (isMainModule) {
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
       if (seg.error) { console.error(seg.error); process.exit(1); }
-      const [, id, ...rest] = seg.args;
-      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
+      const ferma = seg.args.includes('--ferma');
+      const [, id, ...rest] = seg.args.filter((a) => a !== '--ferma');
+      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md> [--ferma]]'); process.exit(1); }
+      const senza = fermaSenzaSegnalazione(ferma, seg.file);
+      if (senza) { console.error(senza); process.exit(1); }
       // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
       // resto è il report per l'owner, che il server cifra.
       const fi = rest.indexOf('--frase');
@@ -1816,7 +1819,7 @@ if (isMainModule) {
       }
       const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => SEMBRA_OPZIONE(a));
       if (altra) {
-        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui c'è solo --frase "…"; il resto è il report, un testo solo fra virgolette.`);
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
       }
       // Anche di qui esce un esito — il lavoro torna in coda a un'altra
@@ -1829,9 +1832,9 @@ if (isMainModule) {
       }
       const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
-      const s = await recordFixed(id, report, frase, segnalazione.testo);
+      const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
+      console.log(fixedReplyText(id, s.reply, ferma));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.

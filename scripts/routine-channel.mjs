@@ -701,7 +701,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -733,7 +733,7 @@ if (isMain) {
   // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
   // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
   // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
-  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto']);
+  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto', 'stop']);
   const args = [];
   const flags = [];
   const data = {};
@@ -814,6 +814,16 @@ if (isMain) {
     data.segnalazione = seg.testo;
   }
   delete data.segnala;
+
+  // `--stop` ferma il lavoro e chiama l'owner: senza segnalazione non saprebbe
+  // cosa decidere. Stessa regola di dispatch --record-fixed --ferma.
+  if (data.stop !== undefined) {
+    const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
+    if (data.stop !== true || !suFixed || !data.segnalazione) {
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md>: non ho consegnato niente.');
+      process.exit(1);
+    }
+  }
 
   const usage = () => {
     // Il percorso VERO di questo strumento, non la forma corta: se sta girando

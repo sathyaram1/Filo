@@ -40,6 +40,35 @@ test('ogni ruolo riceve un testo intero, senza richiami rimasti dentro', () => {
   }
 });
 
+// I giri stretti (chiusura, riallineamento) cambiano il PERIMETRO, non il metro:
+// livelli, formato della critica, registrazione e seguito sono gli stessi del
+// giro pieno, parola per parola, o tre verificatori danno tre livelli diversi.
+test('i tre ambiti della verifica condividono livelli, critica e registrazione', () => {
+  const pieno = readRoleInstructions('verifier');
+  const coda = (t) => t.slice(t.indexOf('## Il livello di ogni rilievo'));
+  assert.ok(coda(pieno).includes('--record-verifier') && coda(pieno).includes('## Dopo la registrazione'));
+  for (const scope of ['chiusura', 'riallineamento']) {
+    const t = readRoleInstructions('verifier', { scope });
+    assert.ok(t.length > 400 && !/<!--\s*includi:/i.test(t), `testo dell'ambito ${scope} vuoto o con un richiamo dentro`);
+    assert.notEqual(t, pieno, `l'ambito ${scope} riceve il testo del giro pieno`);
+    assert.equal(coda(t), coda(pieno), `l'ambito ${scope} ha un metro suo`);
+    assert.match(t, /Perimetro di questo giro/, 'il testo dice dove trovare il perimetro');
+    assert.match(t, /massimo livello 1/, 'fuori perimetro: al massimo livello 1');
+  }
+  assert.equal(readRoleInstructions('verifier', { scope: 'inventato' }), pieno, 'un ambito sconosciuto vale pieno');
+});
+
+// Chi verifica dà i livelli con misura solo se non sa cosa ne seguirà: che poi
+// correggerà lui, o quanti giri restano, non deve leggerlo da nessuna parte.
+test('nessun testo di verifica anticipa il seguito del giro', () => {
+  for (const scope of ['pieno', 'chiusura', 'riallineamento']) {
+    const t = readRoleInstructions('verifier', { scope });
+    for (const spia of [/correggerai/i, /sarai tu a corregg/i, /giri (che )?resta/i, /bilanci/i, /cap[012]\b/]) {
+      assert.ok(!spia.test(t), `ambito ${scope}: il testo anticipa il seguito (${spia})`);
+    }
+  }
+});
+
 test('un pezzo condiviso dentro un altro viene espanso', () => {
   const d = cartellaConPezzi();
   try {
