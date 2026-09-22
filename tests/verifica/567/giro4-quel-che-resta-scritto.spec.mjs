@@ -49,7 +49,7 @@ test('l\'evento aggiunto dall\'utente resta «proposto» nella conversazione ria
     }
     return archivio(app);
   })();
-  expect(chats.length, 'la chat non è arrivata nell’archivio').toBeGreaterThan(0);
+  expect(chats.length, 'la chat non è arrivata nell\'archivio').toBeGreaterThan(0);
   const riaperta = await openTab(`filo://dashboard/dashboard.html?chat=${chats[0].id}`);
   await expect(riaperta.locator('.dash-bubble').first()).toBeVisible({ timeout: 10_000 });
   const note = (await riaperta.locator('.dash-bubble-note[data-replay="1"]').allTextContents()).join(' | ');
@@ -88,7 +88,7 @@ test('una conferma mai data torna nella conversazione riaperta come cosa fatta',
     }
     return archivio(app);
   })();
-  expect(chats.length, 'la chat non è arrivata nell’archivio').toBeGreaterThan(0);
+  expect(chats.length, 'la chat non è arrivata nell\'archivio').toBeGreaterThan(0);
 
   const riaperta = await openTab(`filo://dashboard/dashboard.html?chat=${chats[0].id}`);
   await expect(riaperta.locator('.dash-bubble').first()).toBeVisible({ timeout: 10_000 });
@@ -183,7 +183,7 @@ test('un\'impostazione che non si è potuta applicare torna come cambiata nella 
 
   const acceso = await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => !!s.terminalMode));
   expect(acceso, 'l\u2019impostazione non doveva cambiare').toBe(false);
-  expect(note, `l\u2019impostazione non è cambiata, ma la chat riaperta racconta: ${JSON.stringify(note)}`).not.toContain('cambiato un\u2019impostazione');
+  expect(note, `l\u2019impostazione non è cambiata, ma la chat riaperta racconta: ${JSON.stringify(note)}`).not.toMatch(/cambiato un.impostazione/);
 
   await restore(app, '__v567g4d');
 });
