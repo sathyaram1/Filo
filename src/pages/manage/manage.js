@@ -5168,6 +5168,9 @@
   // Tenendo la riga, si rilegge dal conto fresco a ogni ridisegno.
   let fsDrill = null;   // { tipo, chiave, gruppo } o null
   let fsDrillChiave = '';   // finestra e filtro con cui l'elenco è stato aperto
+  // Da dove l'elenco è stato aperto: chiudendolo il fuoco ci torna, invece di
+  // cadere sul corpo della pagina e far ripartire il Tab dall'inizio.
+  let fsDrillDaDove = '';
 
   // Da un elemento cliccato alla RIGA che rappresenta. Solo DOM: non guarda i
   // conti, così la stessa riga si può risolvere di nuovo più tardi.
