@@ -788,12 +788,13 @@
   // posti, o non è successo per nessuno: nel diario, che è dove l'utente lo
   // rilegge, e sull'azione, che è quello che il modello si ritrova nel contesto
   // al turno dopo (`_confirmed`, come una conferma data nel popup).
-  function segnaCompiuta(a, activity, icona, testo) {
+  function segnaCompiuta(a, activity, esito = {}) {
     if (!a) return;
     a._confirmed = true;
     a._executed = true;
-    a._output = { ...(a._output || {}), proposta: false, fatto: true };
-    if (activity) activity.compiuta(a.type, icona, testo);
+    a._output = { ...(a._output || {}), ...esito, proposta: false, fatto: true };
+    const row = activityRowFor(a);
+    if (activity && row) activity.compiuta(a.type, row.icon, row.text);
   }
 
   function renderActionButton(a, { onAck, activity = null } = {}) {
