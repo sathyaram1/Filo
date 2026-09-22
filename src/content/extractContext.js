@@ -667,6 +667,18 @@
   // superava, e la sezione aperta oltre il tetto non faceva più offrire niente se non ripagare tutto (#505).
   const MAX_HIDDEN = 5000;
 
+  // Figli della pagina e, se il componente è aperto, quelli del suo albero a parte: in ordine di lettura.
+  function pushKids(el, stack, shadowRoots) {
+    const kids = [];
+    const shadow = el.shadowRoot;
+    if (shadow) {
+      if (shadowRoots.length < 500) shadowRoots.push(shadow);
+      for (const c of shadow.children) kids.push(c);
+    }
+    for (const c of el.children) kids.push(c);
+    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+  }
+
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
     if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], mirrors: [], shadowRoots: [], frameDocs: [], hidden: [] });
