@@ -227,6 +227,30 @@ test('richiesta riaperta per blocchi nuovi: non si fonde da sola, e si vede che 
 
 // ── 6. L'esito che non è una fusione ──────────────────────────────────────
 
+// ── 7. Segno messo mentre l'elenco delle fusioni non è ancora arrivato ────
+// La scheda dice già «fusione ferma» (lo porta il documento) ma l'elenco delle
+// richieste no: il server non risponde. Il segno messo adesso non trova niente
+// da fondere; quando l'elenco arriva, il ramo deve partire lo stesso.
+
+test('segno messo prima che l’elenco delle fusioni arrivi: parte quando arriva', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ status: 'design', statusReason: 'l5' });
+  const req = richiesta();
+  await apri(page, { fbs: [fb], pending: [] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  await page.locator('#mgPreapproveBtn').click();
+  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Chiedimi prima di fondere');
+  expect(await approvazioni(page)).toEqual([]);
+
+  // L'elenco arriva adesso, con dentro il ramo fermo.
+  await page.evaluate((r) => { window.__cfg.pending = [r]; }, req);
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
+  await expect.poll(() => leggibile(page, 'su main'), { timeout: 6000 }).toBe(true);
+});
+
 test('il server risponde «conflitto»: la pagina non dice che il lavoro è su main', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fb = pratica();
