@@ -630,6 +630,7 @@
       status.textContent = I18n.t('admin_defaults_save_fail', e?.message || String(e));
     } finally {
       btn.disabled = false;
+      save._inCorso = false;
       clearTimeout(save._t);
       save._t = setTimeout(() => { status.textContent = ''; status.classList.remove('sn-error'); }, 4000);
     }
