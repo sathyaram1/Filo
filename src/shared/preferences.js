@@ -525,6 +525,9 @@
         return { partial: { notifications: { soundEnabled: b } }, label: `Suono delle notifiche → ${b ? 'attivo' : 'spento'}` };
       },
     },
+    // Il suono delle notifiche nasce spento: scegliere il motivo o alzare il
+    // volume senza accendere l'interruttore confermerebbe un cambiamento che
+    // l'utente non sentirà mai.
     {
       keys: ['tono_notifiche', 'tono notifiche', 'tono delle notifiche', 'motivo notifiche',
         'notification tone'],
@@ -532,7 +535,10 @@
       build(v) {
         const tone = parseTone(v);
         if (!tone) return null;
-        return { partial: { notifications: { sound: tone } }, label: `Tono delle notifiche → ${TONE_LABELS[tone]}` };
+        return {
+          partial: { notifications: { sound: tone, soundEnabled: true } },
+          label: `Suono delle notifiche → ${TONE_LABELS[tone]}`,
+        };
       },
     },
     {
@@ -542,7 +548,24 @@
       build(v) {
         const vol = parseVolume(v);
         if (vol === null) return null;
-        return { partial: { notifications: { soundVolume: vol } }, label: `Volume delle notifiche → ${vol}%` };
+        const notifications = vol > 0 ? { soundVolume: vol, soundEnabled: true } : { soundVolume: vol };
+        return { partial: { notifications }, label: `Volume delle notifiche → ${vol}%` };
+      },
+    },
+
+    // ── Durata delle notifiche — reversibile, innocua → livello 1 ──
+    {
+      keys: ['durata_notifiche', 'durata notifiche', 'durata delle notifiche', 'durata notifica',
+        'quanto restano le notifiche', 'notification duration'],
+      level: 1,
+      build(v) {
+        const n = parseItalianNumber(v);
+        if (!Number.isFinite(n) || n < 0) return null;
+        const sec = Math.min(120, Math.round(n));
+        return {
+          partial: { notifications: { durationSec: sec } },
+          label: sec === 0 ? 'Notifiche → restano finché non le chiudi' : `Durata delle notifiche → ${sec}s`,
+        };
       },
     },
   ];
