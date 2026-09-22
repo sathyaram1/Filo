@@ -667,16 +667,16 @@
       $('apiKey').value = '';
       $('apiKeyTavily').value = '';
       $('apiKeySafebrowse').value = '';
-      // Ridisegnare la pagina dalla risposta cancellerebbe quello che è stato
-      // scelto mentre il salvataggio viaggiava: in quel caso resta lo schermo,
-      // e la conferma dice che c'è ancora qualcosa da propagare.
-      if (save._modificatoDurante) {
+      // Ridisegnare la pagina dalla risposta cancella quello che non è dentro
+      // la risposta: la scelta fatta mentre il salvataggio viaggiava e le righe
+      // che il salvataggio ha scartato. In quei due casi resta lo schermo.
+      const scartate = missingNickRows.length + dupRows.length;
+      if (save._modificatoDurante || scartate) {
         applyStatoChiavi(res.config || {});
       } else {
         applyConfig(res.config || {});
       }
       markRegistryRowIssues(missingNickRows, dupRows);
-      const scartate = missingNickRows.length + dupRows.length;
       if (save._modificatoDurante) {
         status.textContent = I18n.t('admin_defaults_unsaved');
       } else if (scartate) {
