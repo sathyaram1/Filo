@@ -1196,8 +1196,9 @@ class TabManager {
     const T = globalThis.SN_TAB_TRIAGE;
     return this.tabs.filter((t) => {
       if (t.id === this.activeId || t.audible) return false;
-      if (T) return T.isTriageableUrl(t.url);
-      return !t.isInternal && /^https?:\/\//i.test(t.url || '');
+      // Chi è candidabile lo dice un posto solo: senza quel modulo non si
+      // manda niente a nessuno (#591, giro 8).
+      return T ? T.isTriageableUrl(t.url) : false;
     });
   }
 
