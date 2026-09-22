@@ -6,7 +6,7 @@
 import { _electron as electron } from '@playwright/test';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rmSync, readFileSync } from 'node:fs';
+import { rmSync } from 'node:fs';
 import { test, expect, argomentiScala, chiudiApp } from '../../fixtures/electron.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
