@@ -121,6 +121,31 @@ test('una sezione non ancora scritta lo dice, invece di mostrarne un\'altra al s
   await expect(page.locator('.sn-nav-item.is-active')).toHaveCount(1);
 });
 
+// Le due strade per la stessa sezione devono rispondere allo stesso modo:
+// prima, dall'indirizzo si otteneva la spiegazione e dalla barra niente.
+test('una sezione non ancora scritta si spiega anche cliccandola nella barra', async ({ app, openTab }) => {
+  const esistenti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.ids());
+  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id));
+  const mancante = previsti.find((i) => !esistenti.includes(i));
+  test.skip(!mancante, 'tutte le sezioni hanno il loro documento');
+
+  const page = await openTab(URL);
+  await expect(page.locator('#title')).toHaveText('Politica sui modelli');
+  await page.locator(`#nav a[href*="doc=${mancante}"]`).click();
+
+  await expect(page.locator('#subtitle')).toContainText('non è ancora scritta');
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+
+  // Senza mouse quelle voci erano irraggiungibili, e "in arrivo" lo diceva solo
+  // il suggerimento che compare fermandocisi sopra.
+  const tab = await page.locator('#nav .is-soon').first().evaluate((el) => ({
+    tab: el.tabIndex,
+    nome: el.getAttribute('aria-label') || '',
+  }));
+  expect(tab.tab, 'la voce non si raggiunge con il tabulatore').toBeGreaterThanOrEqual(0);
+  expect(tab.nome).toMatch(/non ancora scritta/);
+});
+
 test('un documento che non esiste per niente non diventa un altro documento', async ({ openTab }) => {
   const page = await openTab(`${URL}?doc=pippo`);
   await expect(page.locator('#title')).not.toHaveText('Politica sui modelli');
