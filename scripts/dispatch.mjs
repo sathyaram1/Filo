@@ -1727,7 +1727,7 @@ export function emit(bucket, ctx) {
   const serial = ambito.scope && ambito.scope !== 'pieno'
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
-  const base = readRoleInstructions(bucket.role, { scope: ambito.scope });
+  const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: payload && payload.case });
   const out = {
     role: bucket.role,
     payload,
