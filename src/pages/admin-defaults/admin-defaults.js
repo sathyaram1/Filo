@@ -382,9 +382,14 @@
     populateNicknames(registry);
   }
 
+  // Una riga scartata (soprannome mancante o già usato) non sparisce in
+  // silenzio: torna a chi salva, che la segnala e non annuncia un salvataggio
+  // intero. Stessa regola della pagina Opzioni.
   function collectModelRegistry() {
     const host = $('modelRegistryList');
     const out = {};
+    const missingNickRows = [];
+    const dupRows = [];
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       const nick = row.querySelector('.sn-model-nick').value.trim();
       const provider = row.querySelector('.sn-model-provider').value;
@@ -395,8 +400,8 @@
       const sortEl = row.querySelector('.sn-model-sort');
       const sort = normSort(sortEl && sortEl.value);
       if (!nick && !model) continue;
-      if (!nick) continue;
-      if (out[nick]) continue;
+      if (!nick) { missingNickRows.push(row); continue; }
+      if (out[nick]) { dupRows.push({ row, nick }); continue; }
       const entry = { provider, model };
       if (label) entry.label = label;
       // Salviamo il livello solo se diverso da 'auto' (default): così le voci
