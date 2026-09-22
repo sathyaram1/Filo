@@ -959,16 +959,22 @@ async function maybeRunCompactor() {
 // condivisa (dalla rete, dopo l'avvio), le impostazioni (chiave, modelli,
 // interruttore dei pesi aperti) e il portafoglio, dove vive la chiave di chi
 // entra con un invito. Un solo avviso per tutte e tre (#663).
-let _potevaRispondere = null;
+// Si confronta anche il MOTIVO, non solo il sì/no: la home scrive tre messaggi
+// diversi e manda in tre posti diversi, quindi «non posso» per un motivo nuovo
+// è già uno stato nuovo da mostrare. Guardando il solo sì/no restava a chiedere
+// una cosa che l'utente aveva appena fatto (#663).
+let _statoProntezza = null;
 async function avvisaSeLaProntezzaCambia() {
   let ora = false;
+  let stato = '';
   try {
     const s = await getEffectiveSettings();
     ora = SN_CONST.canServeAction(s, ACTIONS.FILO_CHAT)
       || SN_CONST.canServeAction(s, ACTIONS.FILO_DASHBOARD);
+    stato = ora ? 'ok' : `no:${SN_CONST.whyCannotServe(s, [ACTIONS.FILO_DASHBOARD, ACTIONS.FILO_CHAT])}`;
   } catch (_) { return; }
-  if (_potevaRispondere === ora) return;
-  _potevaRispondere = ora;
+  if (_statoProntezza === stato) return;
+  _statoProntezza = stato;
   broadcastToTabs({ type: MSG.FILO_READY_CHANGED, ready: ora });
 }
 

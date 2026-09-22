@@ -160,8 +160,13 @@ test('cambia solo il motivo passando dalle Opzioni: la home aperta smette di inc
   // spegnere l'interruttore spegne «usa i modelli predefiniti», senza averne
   // scelti di suoi. L'interruttore non c'entra più niente: adesso a mancare
   // sono i modelli, e la home continua a dare la colpa all'interruttore.
-  await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, models: {}, modelRegistry: {} });
+  await page.evaluate(async () => {
+    const vuoti = {};
+    for (const a of Object.values(window.SN_CONST.ACTIONS)) vuoti[a] = '';
+    await chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.UPDATE_SETTINGS,
+      settings: { useDefaultModels: false, models: vuoti },
+    });
   });
 
   expect(await motivoOra(app)).toBe('modelli'); // lo stato è cambiato davvero
@@ -187,11 +192,17 @@ test('scelto il modello che la home chiedeva, la home continua a chiederlo', asy
   // È proprietario e l'interruttore lo esclude, quindi Filo resta muto — ma
   // adesso il motivo è un altro, e la home deve smettere di chiedere una cosa
   // che l'utente ha appena fatto.
-  await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
-      models: { filo_chat: 'chiuso', filo_dashboard: 'chiuso' },
+  await page.evaluate(async () => {
+    const A = window.SN_CONST.ACTIONS;
+    const vuoti = {};
+    for (const a of Object.values(A)) vuoti[a] = '';
+    await chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.UPDATE_SETTINGS,
+      settings: {
+        useDefaultModels: false,
+        modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+        models: { ...vuoti, [A.FILO_CHAT]: 'chiuso', [A.FILO_DASHBOARD]: 'chiuso' },
+      },
     });
   });
 
