@@ -818,6 +818,19 @@ class TabManager {
     return id;
   }
 
+  // Butta via la view di una scheda dopo aver dato alla pagina il tempo di
+  // salvare (src/main/congedo.js). La scheda sparisce subito dalla barra: qui
+  // si rimanda solo la distruzione di una view già tolta dallo schermo.
+  _chiudiView(tab) {
+    const wc = tab && tab.view && tab.view.webContents;
+    if (!wc) return;
+    const chiudi = () => { try { wc.close(); } catch (_) {} };
+    // Le pagine web non hanno il preload che risponde, e un `pagehide` finto su
+    // un sito altrui non è roba nostra: per loro si chiude e basta.
+    if (!tab.isInternal) { chiudi(); return; }
+    congedaPagina(wc).then(chiudi, chiudi);
+  }
+
   closeTab(id) {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
