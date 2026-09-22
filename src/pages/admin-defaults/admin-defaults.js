@@ -638,15 +638,22 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // Una regola sola per tutta la pagina, campi di oggi e righe aggiunte dopo:
+    // ciò che cambia sullo schermo spegne la conferma dell'ultimo salvataggio.
+    for (const evento of ['input', 'change']) {
+      $('editor').addEventListener(evento, segnalaModifica);
+    }
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));
+      segnalaModifica();
     });
     $('addExcludedRow').addEventListener('click', () => {
       const row = makeExcludedRow('');
       $('excludedList').appendChild(row);
       row.querySelector('.sn-excluded-name').focus();
+      segnalaModifica();
     });
-    $('excludedDriftFix').addEventListener('click', addMissingExcluded);
+    $('excludedDriftFix').addEventListener('click', () => { addMissingExcluded(); segnalaModifica(); });
     $('providerSort').addEventListener('change', rinfrescaMisure);
     $('saveBtn').addEventListener('click', save);
   });
