@@ -127,7 +127,9 @@ module.exports = function register(on, ctx) {
     const compito = daPagina
       ? null
       : await compitoPrecedenteDi(String((msg && msg.compito) || 'collegamento-senza-richiesta'));
-    const azione = { type: 'NAVIGA', url };
+    // Il tasto centrale vuol dire «aprilo dietro, io resto qui»: passa dal
+    // motore come ogni altra apertura, ma conserva il gesto (#533, nono giro).
+    const azione = { type: 'NAVIGA', url, ...(msg && msg.sfondo ? { background: true } : {}) };
     const r = await executeFiloAction(azione, { sender, compito, daClic: true, confirmed: !!(msg && msg.conferma) });
     if (r && r.needsConfirm) return { ok: true, chiede: true, testo: r.describe || '' };
     return { ok: !!(r && r.executed) };
