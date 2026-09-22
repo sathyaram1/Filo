@@ -640,8 +640,9 @@
     if (or) apiKeys.openrouter = or;
     if (tav) apiKeys.tavily = tav;
 
+    const { registry, missingNickRows, dupRows } = collectModelRegistry();
     const config = {
-      modelRegistry: collectModelRegistry(),
+      modelRegistry: registry,
       models: collectModels(),
       providerSort: normSort($('providerSort').value) || '',
     };
