@@ -896,6 +896,7 @@
     const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
     $('notifSound').value = nsOpt ? notifSound : 'default';
     caricaVolume('notifSoundVolume', notif.soundVolume);
+    sincronizzaSuonoNotifiche();
 
     // Suoneria timer
     const ringtone = settings.timerRingtone || 'default';
