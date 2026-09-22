@@ -321,6 +321,38 @@
     scrivi(c, { tipo: 'lettura', azione: normType(type), fonte: f, dettaglio: dettaglio || '' });
   }
 
+  // Gli indirizzi che il compito ha DAVVERO incontrato leggendo: i risultati
+  // della ricerca, la pagina che ha aperto. Un collegamento che Filo scrive
+  // dopo aver letto vale come proposta a costo zero solo se porta dove Filo è
+  // stato; una destinazione che il modello si inventa dopo aver letto porta
+  // dove vuole chi ha scritto la pagina, e l'utente legge solo la scritta
+  // (#533, settimo giro di verifica).
+  const MAX_INDIRIZZI = 200;
+  function normalizzaIndirizzo(u) {
+    const s = String(u == null ? '' : u).trim();
+    if (!s) return '';
+    try {
+      const url = new URL(s);
+      url.hash = '';
+      return url.href.replace(/\/$/, '');
+    } catch (_) { return s.replace(/\/$/, ''); }
+  }
+  function registraIndirizzi(c, urls) {
+    if (!c) return;
+    if (!Array.isArray(c.indirizzi)) c.indirizzi = [];
+    for (const u of (Array.isArray(urls) ? urls : [urls])) {
+      const n = normalizzaIndirizzo(u);
+      if (!n || c.indirizzi.includes(n)) continue;
+      if (c.indirizzi.length >= MAX_INDIRIZZI) c.indirizzi.shift();
+      c.indirizzi.push(n);
+    }
+  }
+  function indirizzoNoto(c, url) {
+    const n = normalizzaIndirizzo(url);
+    if (!n) return false;
+    return Array.isArray(c && c.indirizzi) ? c.indirizzi.includes(n) : false;
+  }
+
   function registraAzione(c, { type, esito, uscita, azione } = {}) {
     scrivi(c, { tipo: 'azione', azione: normType(type), esito: String(esito || ''), uscita: uscita || uscitaDi(type, azione) });
   }
