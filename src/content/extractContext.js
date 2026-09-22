@@ -700,6 +700,9 @@
     // Sottoalberi nascosti ADESSO (#407): non entrano nel lavoro, ma se
     // l'utente li scopre il menu deve offrire di tradurli.
     const hidden = [];
+    // Le radici dei sottoalberi resi invisibili: dentro ci si scende, ma la sezione da riproporre al menu è una
+    // sola — la cima — non un elemento per ogni riga che contiene.
+    const sottoInvisibile = new WeakSet();
     let unreachable = 0;
     let truncated = 0;
     const room = () => out.length + attrs.length < maxBlocks;
