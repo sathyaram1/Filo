@@ -158,4 +158,64 @@ test.describe('#533 giro 8 — le strade che portano fuori da una richiesta che 
     expect(app.windows().length, 'il clic ha aperto una scheda nuova senza che nessuno chiedesse niente')
       .toBe(primaDelClic);
   });
+
+  test('l\'indirizzo che il motore ha rifiutato non resta in chat come pastiglia da premere', async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await configura(app);
+    const page = await openTab(NEWTAB);
+    await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
+
+    const destinazione = `${testServer.html('<p>presa</p>')}?d=segreto`;
+    // Una richiesta che legge e poi prova ad aprire un indirizzo scelto dopo la
+    // lettura: il motore dice di no. Quello che resta in chat è il diario di
+    // quel rifiuto, e il diario non deve essere una scorciatoia per fare lo
+    // stesso che il motore ha appena vietato.
+    await copione(app, {
+      giri: [
+        [{ name: 'LEGGI_DOCUMENTO', args: { percorso: '/tmp/bolletta-che-non-ce.pdf' } }],
+        [{ name: 'NAVIGA', args: { url: destinazione, label: 'Bolletta di marzo' } }],
+        [],
+      ],
+      risposta: 'Ecco quello che ho trovato.',
+    });
+
+    const azioni = await page.evaluate(async () => {
+      const res = await chrome.runtime.sendMessage({
+        type: window.SN_MSG.MSG.FILO_CHAT,
+        userMessage: 'Leggimi la bolletta che mi hanno mandato.',
+        threadHistory: [],
+      });
+      return (res && res.actions) || [];
+    });
+    await ripristina(app);
+
+    const naviga = azioni.find((a) => String(a.type).toUpperCase() === 'NAVIGA');
+    expect(naviga && naviga._executed !== true, 'sanità: il motore ha aperto l\'indirizzo da solo').toBe(true);
+    if (!naviga) return;
+
+    // Il blocco delle attività rende le azioni del turno esattamente così.
+    const pastiglia = await page.evaluate((a) => {
+      const host = document.createElement('div');
+      host.id = 'test-giro8-naviga';
+      document.body.appendChild(host);
+      window.__filoDashActions.renderActions(host, [a]);
+      const el = host.querySelector('.dash-action-link-chip');
+      if (!el) return null;
+      return {
+        href: el.getAttribute('href') || '',
+        scritta: (el.textContent || '').trim(),
+        titolo: el.getAttribute('title') || '',
+      };
+    }, naviga);
+
+    expect(pastiglia && pastiglia.href.includes('d=segreto'),
+      'l\'indirizzo che il motore ha rifiutato torna in chat come pastiglia cliccabile: il divieto si aggira premendola')
+      .toBeFalsy();
+    if (pastiglia && pastiglia.href) {
+      const host = new URL(pastiglia.href).host;
+      expect(`${pastiglia.scritta} ${pastiglia.titolo}`.includes(host),
+        `la pastiglia dice «${pastiglia.scritta}» e porta a ${pastiglia.href}: chi preme ha letto solo la scritta`)
+        .toBe(true);
+    }
+  });
 });
