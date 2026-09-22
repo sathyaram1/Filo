@@ -677,19 +677,6 @@
     const eco = $(id + 'Val');
     if (eco) eco.textContent = `${volumeDa(id)}%`;
   }
-  // Col suono spento, motivo e volume non cambiano niente e l'anteprima suona
-  // una cosa che non si sentirà mai: offrire quella scelta è offrire un nulla.
-  function sincronizzaSuonoNotifiche() {
-    const acceso = $('notifSoundEnabled').checked;
-    for (const id of ['notifSound', 'notifSoundVolume', 'notifSoundPreview']) {
-      const el = $(id);
-      if (el) el.disabled = !acceso;
-    }
-    for (const sel of ['label[for="notifSound"]', 'label[for="notifSoundVolume"]', '#notifSoundVolumeVal']) {
-      const el = document.querySelector(sel);
-      if (el) el.style.opacity = acceso ? '' : '0.5';
-    }
-  }
   // Un valore assente o storto vale «pieno»: il silenzio si sceglie.
   function caricaVolume(id, salvato) {
     const n = Number(salvato);
