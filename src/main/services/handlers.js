@@ -2981,6 +2981,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           // dichiara una fonte, vince quella.
           const fonte = (res && res.fonteLetta) || null;
           if (k.classe === 'ingresso') Compiti.registraLettura(task, { type: a.type, fonte });
+          // Dove Filo è stato davvero: i risultati che la ricerca gli ha
+          // riportato e le pagine che ha aperto. Un collegamento nella
+          // risposta che porta lì l'utente può premerlo senza che nessuno
+          // chieda niente; uno che porta altrove l'ha composto il modello dopo
+          // aver letto (#533, settimo giro di verifica).
+          const out = (res && res.output) || null;
+          if (out && Array.isArray(out.results)) {
+            Compiti.registraIndirizzi(task, out.results.map((x) => x && (x.url || x.link)).filter(Boolean));
+          }
+          if (String(a.type).toUpperCase() === 'NAVIGA' && res && res.executed) {
+            Compiti.registraIndirizzi(task, [a.url || a.href || a.link]);
+          }
           // Un'uscita che RIPORTA indietro del testo conta come lettura di quel
           // testo: quello che stampa un comando è roba scritta da altri come una
           // pagina web (#533, secondo giro di verifica).
