@@ -1113,9 +1113,15 @@
     copyToClipboard(href);
   }
 
+  // L'indirizzo che la ricerca aprirebbe. Sta qui da solo perche' chi deve
+  // FARLA APPROVARE all'utente deve mostrare esattamente quello che parte, non
+  // una copia accorciata del testo (#533, decimo giro di verifica).
+  function searchUrlFor(text) {
+    return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
+  }
+
   function searchTextOnWeb(text) {
-    const q = encodeURIComponent((text || '').slice(0, 500));
-    window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener');
+    window.open(searchUrlFor(text), '_blank', 'noopener');
   }
 
   // ------------------------------------------------------------
@@ -1908,6 +1914,7 @@
     shareCurrentPage,
     shareLink,
     searchTextOnWeb,
+    searchUrlFor,
     searchImageOnWeb,
     // video / audio
     buildMediaItems,

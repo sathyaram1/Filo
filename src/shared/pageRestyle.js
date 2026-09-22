@@ -17,12 +17,16 @@
 //   - niente graffe nel selettore o nelle dichiarazioni: impedisce di "uscire"
 //     dalla regola e iniettarne altre arbitrarie;
 //   - niente < / > : nessun tentativo di chiudere un contesto/markup;
-//   - niente @import/@charset/altre at-rule e niente expression( : impedisce di
-//     caricare fogli di stile esterni o vecchie expression IE;
-//   - niente url( : nessuna richiesta di rete dal CSS iniettato (font/img
-//     remoti, beacon); l'estetica del testo non ne ha bisogno;
+//   - niente @import/@charset/altre at-rule e nessun selettore che cominci per
+//     @ : impedisce di caricare fogli di stile esterni e di trasformare la
+//     regola in un blocco @font-face;
+//   - NESSUNA RICHIESTA DI RETE dal CSS iniettato. La regola non e' un elenco
+//     di parole vietate (`url(` era vietato e `image-set("https://...")` faceva
+//     la stessa cosa passando liscio: #533, decimo giro di verifica) ma una
+//     LISTA DI FUNZIONI AMMESSE: una notazione funzionale che non sta li' fa
+//     scartare la regola. Nessuna delle funzioni ammesse sa andare in rete;
 //   - niente backslash: gli escape CSS (\75rl( , ur\6c( ) verrebbero decodificati
-//     dal browser in un token vietato (es. url(), aggirando i divieti qui sopra;
+//     dal browser in un token ammesso, aggirando il controllo qui sopra;
 //   - limiti di lunghezza su selettore, dichiarazioni e numero di regole.
 // Una regola che non supera la sanificazione viene SCARTATA (non "aggiustata"):
 //   meglio non applicare nulla che applicare qualcosa di inatteso.
@@ -35,14 +39,51 @@
   const MAX_DECL_LEN = 600;
 
   // Token vietati ovunque (selettore o dichiarazioni): aprirebbero un vettore
-  // di iniezione o una richiesta di rete. Case-insensitive.
+  // di iniezione o uscirebbero dalla regola. Case-insensitive.
   //
   // Il backslash e' vietato di per se': gli escape CSS (\75rl( , ur\6c( ,
   // @\69mport , javascript\3a ) verrebbero decodificati dal browser in un token
-  // vietato, aggirando i controlli letterali qui sotto. L'estetica del testo non
-  // ha bisogno di sequenze di escape, quindi qualunque backslash fa scartare la
-  // regola: chiude l'intera classe di bypass senza dover normalizzare gli escape.
-  const FORBIDDEN_RE = /[<>{}\\]|@import|@charset|@namespace|expression\s*\(|url\s*\(|javascript:/i;
+  // diverso da quello scritto, aggirando i controlli qui sotto. L'estetica del
+  // testo non ha bisogno di sequenze di escape, quindi qualunque backslash fa
+  // scartare la regola: chiude l'intera classe di bypass senza dover
+  // normalizzare gli escape.
+  const FORBIDDEN_RE = /[<>{}\\]|@import|@charset|@namespace|javascript:/i;
+
+  // Le sole notazioni funzionali che una dichiarazione puo' usare: nessuna di
+  // queste sa andare in rete. Elenco di AMMESSE perche' l'elenco delle vietate
+  // non finisce mai (#533, decimo giro: `url(` era vietato, `image-set("http…")`
+  // no, e fa la stessa cosa).
+  const FUNZIONI_OK = new Set([
+    'rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color', 'color-mix',
+    'calc', 'min', 'max', 'clamp', 'round', 'mod', 'abs',
+    'linear-gradient', 'radial-gradient', 'conic-gradient',
+    'repeating-linear-gradient', 'repeating-radial-gradient', 'repeating-conic-gradient',
+    'translate', 'translatex', 'translatey', 'translatez', 'translate3d',
+    'rotate', 'rotatex', 'rotatey', 'rotatez', 'rotate3d',
+    'scale', 'scalex', 'scaley', 'scalez', 'scale3d',
+    'skew', 'skewx', 'skewy', 'matrix', 'matrix3d', 'perspective',
+    'blur', 'brightness', 'contrast', 'drop-shadow', 'grayscale', 'hue-rotate',
+    'invert', 'opacity', 'saturate', 'sepia',
+    'cubic-bezier', 'steps', 'var', 'env',
+  ]);
+
+  // Ogni "(" preceduto da un nome dev'essere una funzione ammessa. Un "("
+  // senza nome davanti e' solo una parentesi di raggruppamento dentro calc():
+  // da sola non va da nessuna parte. Il prefisso del produttore si toglie
+  // prima di cercare, cosi' -webkit-linear-gradient resta ammessa e
+  // -webkit-image-set no.
+  const FUNZIONE_RE = /([a-zA-Z_-][\w-]*)?\s*\(/g;
+  function soloFunzioniAmmesse(s) {
+    FUNZIONE_RE.lastIndex = 0;
+    let m;
+    while ((m = FUNZIONE_RE.exec(s))) {
+      if (!m[1]) continue;
+      const nome = m[1].toLowerCase().replace(/^-(?:webkit|moz|ms|o)-/, '').replace(/^-+/, '');
+      if (!FUNZIONI_OK.has(nome)) return false;
+    }
+    return true;
+  }
+
   // Caratteri di controllo (NUL..0x1f, DEL): costruiti via stringa per non
   // mettere byte di controllo nel sorgente.
   const CONTROL_RE = new RegExp('[\\u0000-\\u001f\\u007f]');
@@ -58,6 +99,9 @@
     const s = String(sel == null ? '' : sel).trim();
     if (!s || s.length > MAX_SELECTOR_LEN) return null;
     if (isBadChunk(s)) return null;
+    // Un selettore e' un selettore: con un at-rule davanti la regola diventa un
+    // blocco (@font-face { src: ... }), cioe' un'altra cosa.
+    if (s.startsWith('@')) return null;
     return s;
   }
 
@@ -71,6 +115,7 @@
     if (s.startsWith('{') && s.endsWith('}')) s = s.slice(1, -1).trim();
     if (!s || s.length > MAX_DECL_LEN) return null;
     if (isBadChunk(s)) return null;
+    if (!soloFunzioniAmmesse(s)) return null;
     // deve contenere almeno una coppia prop:valore
     if (!/[a-z-]+\s*:[^;]+/i.test(s)) return null;
     // garantisci il ; finale per concatenare in sicurezza
@@ -134,5 +179,5 @@
     return norm.map((r) => `${r.selector} { ${importantify(r.css)} }`).join('\n');
   }
 
-  global.SN_PAGE_RESTYLE = { normalizeRules, buildCss, cleanSelector, cleanDeclarations };
+  global.SN_PAGE_RESTYLE = { normalizeRules, buildCss, cleanSelector, cleanDeclarations, FUNZIONI_OK };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

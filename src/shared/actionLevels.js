@@ -435,7 +435,8 @@
     // SOLO per quella pagina (CSS iniettato live) ed è completamente reversibile
     // (basta ricaricare la pagina, o "togli le modifiche" → RIPRISTINA_STILE_PAGINA).
     // Il CSS prodotto dall'LLM viene SANIFICATO dal main (src/shared/pageRestyle.js)
-    // prima dell'iniezione: niente at-rule, url(), graffe o markup.
+    // prima dell'iniezione: niente at-rule, graffe, markup, e solo le funzioni
+    // CSS ammesse, cosi' il foglio di stile non puo' andare in rete.
     STILE_PAGINA: {
       level: 1,
       describe: (a) => {

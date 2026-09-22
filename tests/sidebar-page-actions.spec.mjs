@@ -101,28 +101,29 @@ test('testo: leggi ad alta voce invoca il TTS sul testo indicato', async ({ open
   expect(await page.evaluate(() => window.__calls.read)).toEqual(['leggimi questo']);
 });
 
-test('testo: cerca sul web chiede conferma; Annulla non cerca, OK apre la ricerca Google', async ({ openTab }) => {
+// #533 (decimo giro di verifica) — «cerca sul web» dell'agente di pagina usciva
+// da sola con window.open: la frase la sceglie il modello, che la pagina l'ha
+// gia' letta, e ne partivano fino a 500 caratteri mentre il riquadro di
+// conferma ne mostrava 80. Adesso passa dal motore come ogni altra apertura di
+// pagina: li' la conferma mostra l'indirizzo intero e vale il controllo su cio'
+// che porta fuori i dati dell'utente.
+test('testo: cerca sul web passa dal motore con la frase intera, non da window.open', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   await prep(page);
 
-  // 1) Annulla → nessuna ricerca.
-  await page.evaluate(() => { window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'gatti buffi' }); });
-  const host = page.locator(CONFIRM_HOST);
-  await expect(host).toBeVisible();
-  await clickConfirm(page, 'cancel');
-  await expect(host).toHaveCount(0);
-  expect(await page.evaluate(() => window.__opened.length)).toBe(0);
-  await expect(page.locator('.sn-sidebar-log').last()).toContainText('annullata');
+  const coda = 'IT60X0542811101000000123456';
+  const testo = `${'come si legge un estratto conto '.repeat(6)}${coda}`;
+  expect(testo.length).toBeGreaterThan(80);
 
-  // 2) OK → apre la ricerca Google con il testo.
-  await page.evaluate(() => { window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'gatti buffi' }); });
-  await expect(host).toBeVisible();
-  await clickConfirm(page, 'ok');
-  await expect(host).toHaveCount(0);
-  await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
-  const url = await page.evaluate(() => window.__opened[0]);
-  expect(url).toContain('google.com/search');
-  expect(url).toContain(encodeURIComponent('gatti buffi'));
+  await page.evaluate((t) => window.__filoSidebarTest.runPageAction({ op: 'search_text', text: t }), testo);
+
+  const azioni = await page.evaluate(() => window.__calls.navItems);
+  const naviga = azioni.find((a) => String(a.type).toUpperCase() === 'NAVIGA');
+  expect(naviga).toBeTruthy();
+  expect(naviga.url).toContain('google.com/search');
+  expect(decodeURIComponent(naviga.url)).toContain(coda);
+  // Niente esce di lato: l'unica strada e' quella del motore.
+  expect(await page.evaluate(() => window.__opened.length)).toBe(0);
 });
 
 test('immagine: cerca immagine risolve il selettore, chiede conferma e apre Lens con il src', async ({ openTab }) => {

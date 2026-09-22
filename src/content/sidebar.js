@@ -631,8 +631,8 @@
     return `azione Filo: ${type.toLowerCase().replace(/_/g, ' ')}`;
   }
 
-  async function runFiloAction(action) {
-    const label = filoActionLabel(action);
+  async function runFiloAction(action, etichetta) {
+    const label = etichetta || filoActionLabel(action);
     let res = null;
     try {
       res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
@@ -682,7 +682,11 @@
     // testo / selezione
     copy:         { target: 'text',  confirm: false, label: 'copia testo' },
     cut:          { target: 'text',  confirm: false, label: 'taglia testo' },
-    search_text:  { target: 'text',  confirm: true,  label: 'cerca testo sul web' },
+    // #533 (decimo giro) — la frase la sceglie il modello, che questa pagina
+    // l'ha gia' letta: la conferma la chiede il motore, che mostra l'indirizzo
+    // INTERO. Il riquadro di qui accorciava il testo a 80 caratteri e ne
+    // spediva 500, e non passava dal controllo delle altre strade che cercano.
+    search_text:  { target: 'text',  confirm: false, label: 'cerca testo sul web' },
     read_aloud:   { target: 'text',  confirm: false, label: 'leggi ad alta voce' },
     stop_reading: { target: 'none',  confirm: false, label: 'ferma la lettura' },
     edit_text:    { target: 'text',  confirm: false, label: 'modifica testo' },
@@ -798,7 +802,8 @@
       switch (page.op) {
         case 'copy': Actions?.copyToClipboard(text); break;
         case 'cut': Actions?.cutSelection(); break;
-        case 'search_text': Actions?.searchTextOnWeb(text); break;
+        case 'search_text':
+          return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text) }, label);
         case 'read_aloud': await Tts?.readAloud(text); break;
         case 'stop_reading': Tts?.stopReading(); break;
         case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;

@@ -290,7 +290,7 @@
       required: [],
     },
     STILE_PAGINA: {
-      description: 'Cambia l\'ASPETTO del testo/contenuto della PAGINA WEB che l\'utente sta guardando (NON l\'interfaccia di Filo: per quella usa IMPOSTA_ESTETICA). Per richieste come "scrivi in grassetto tutti i titoli", "ingrandisci il testo", "metti i link in rosso", "sfondo scuro". Scegli selettori ragionevoli per ciò che l\'utente intende (titoli → h1..h6; link → a; testo/paragrafi → p, body). Solo dichiarazioni CSS pure: niente url(), @import, niente JavaScript (il sistema le scarta). Si applica subito e SOLO a quella pagina; un reload la annulla.',
+      description: 'Cambia l\'ASPETTO del testo/contenuto della PAGINA WEB che l\'utente sta guardando (NON l\'interfaccia di Filo: per quella usa IMPOSTA_ESTETICA). Per richieste come "scrivi in grassetto tutti i titoli", "ingrandisci il testo", "metti i link in rosso", "sfondo scuro". Scegli selettori ragionevoli per ciò che l\'utente intende (titoli → h1..h6; link → a; testo/paragrafi → p, body). Solo dichiarazioni CSS pure (colori, dimensioni, pesi, gradienti): niente at-rule, niente JavaScript e nessun valore che vada a prendere qualcosa in rete, in qualunque modo sia scritto (il sistema li scarta). Si applica subito e SOLO a quella pagina; un reload la annulla.',
       properties: {
         regole: {
           type: 'array',

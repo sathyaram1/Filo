@@ -17,7 +17,6 @@ import { join } from 'node:path';
 import { createServer } from 'node:http';
 import { test, expect } from '../../fixtures/electron.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
-import { CONFIRM_HOST, clickConfirm } from '../../helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 const SEGRETO = 'IBAN-IT60X0542811101000000123456';
@@ -157,10 +156,12 @@ test.describe('#533 giro 10 — quello che esce dentro l’aspetto della pagina'
 
 // Seconda porta della stessa famiglia: l'assistente dentro una pagina ha, fra
 // le cose che sa fare sul contenuto, «cerca questa frase sul web». Quella frase
-// la scrive il modello, esce dal computer, e il riquadro che la fa approvare ne
-// mostra solo l'inizio.
+// la scrive il modello — che la pagina l'ha già letta — ed esce dal computer.
+// Prima usciva per conto suo: nessun passaggio dal motore, quindi nessun
+// controllo su cosa si porta via e nessuna riga nella pagina Sicurezza, e il
+// riquadro che la faceva approvare mostrava ottanta caratteri su cinquecento.
 test.describe('#533 giro 10 — quello che esce dentro la domanda di una ricerca dell’assistente di pagina', () => {
-  test('il riquadro mostra l’inizio, fuori va tutto', async ({ openTab }) => {
+  test('la ricerca passa dal motore, con la frase intera', async ({ openTab }) => {
     test.setTimeout(60_000);
     const page = await openTab('filo://newtab/');
     await page.waitForFunction(
@@ -168,27 +169,35 @@ test.describe('#533 giro 10 — quello che esce dentro la domanda di una ricerca
     );
     await page.evaluate(() => {
       window.SN_SIDEBAR.open();
+      // Quello che uscirebbe senza passare dal motore.
       window.__opened = [];
       window.open = (url) => { window.__opened.push(String(url)); return null; };
+      // Quello che passa dal motore.
+      window.__azioni = [];
+      const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+      chrome.runtime.sendMessage = (msg, ...resto) => {
+        if (msg && msg.type === 'filo_run_action') window.__azioni.push(msg.action);
+        return orig(msg, ...resto);
+      };
     });
 
     const CODA = 'IT60X0542811101000000123456';
     const testo = `${'come si legge un estratto conto '.repeat(6)}${CODA}`;
     expect(testo.length).toBeGreaterThan(80);
 
-    await page.evaluate((t) => { window.__filoSidebarTest.runPageAction({ op: 'search_text', text: t }); }, testo);
-    const host = page.locator(CONFIRM_HOST);
-    await expect(host).toBeVisible();
-    const mostrato = await host.innerText();
-    await clickConfirm(page, 'ok');
-    await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
-    const uscito = await page.evaluate(() => window.__opened[0]);
+    await page.evaluate((t) => window.__filoSidebarTest.runPageAction({ op: 'search_text', text: t }), testo);
 
-    expect(uscito).toContain('google.com/search');
-    expect(mostrato.includes(CODA),
-      'il riquadro con cui Filo fa approvare la ricerca mostra solo l\'inizio della frase: la coda esce senza che '
-      + 'l\'utente l\'abbia mai letta')
+    const azioni = await page.evaluate(() => window.__azioni);
+    const naviga = azioni.find((a) => String(a.type).toUpperCase() === 'NAVIGA');
+    expect(naviga,
+      'la ricerca dell\'assistente di pagina esce senza passare dal motore: nessun controllo su cosa si porta '
+      + 'dietro e niente nella pagina Sicurezza')
+      .toBeTruthy();
+    expect(decodeURIComponent(String(naviga.url)).includes(CODA),
+      'al motore arriva una frase accorciata: quello che l\'utente vede e approva non è quello che esce')
       .toBe(true);
-    expect(decodeURIComponent(uscito).includes(CODA)).toBe(true);
+    expect(await page.evaluate(() => window.__opened.length),
+      'la ricerca si apre anche per conto suo, scavalcando il motore')
+      .toBe(0);
   });
 });

