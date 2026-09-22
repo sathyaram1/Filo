@@ -1090,14 +1090,16 @@
         btn.textContent = '🧹 Riordino in corso…';
         const r = await send({ type: MSG.RUN_TAB_TRIAGE });
         const n = (r && r.archived) || 0;
-        btn.textContent = n > 0
-          ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
-          : '✓ Nessuna scheda da archiviare';
+        const esito = n > 0
+          ? `Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
+          : 'Nessuna scheda da archiviare';
+        btn.textContent = `✓ ${esito}`;
+        segnaCompiuta(a, activity, '🧹', esito);
       });
       return btn;
     }
     if (type === 'CANCELLA_ARCHIVIO') {
-      return renderDeleteArchivePanel(a.query || a.testo || '');
+      return renderDeleteArchivePanel(a.query || a.testo || '', (icona, testo) => segnaCompiuta(a, activity, icona, testo));
     }
     return null;
   }
