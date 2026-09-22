@@ -34,10 +34,42 @@ const safebrowseMethods = {
   // solo, mentre chi naviga dopo una pausa ne apre una nuova (#591, giro 7).
   // `insistito` lo scrive solo questo livello, che sa se la scheda è rimasta
   // dov'era: qui si azzera, perché il contesto arriva dalla pagina (#591, giro 8).
-  _sbCtx(ctx, tab) {
+  _sbCtx(ctx, tab, url, insistito = false) {
     return {
-      ...(ctx || {}), incognito: !!this.incognito, catena: catenaDi(tab), insistito: false,
+      ...(ctx || {}),
+      ...this._sbSegnali(tab, url, ctx),
+      incognito: !!this.incognito,
+      catena: catenaDi(tab),
+      insistito: !!insistito,
     };
+  },
+
+  // I segnali che solo la pagina conosce — il campo password, il campo della
+  // carta — arrivano DOPO la navigazione, e sono spesso l'unico motivo per cui
+  // una pagina di accesso mai vista merita il giudizio del modello. La scheda
+  // li tiene per l'indirizzo su cui si trova, così ogni richiesta che fa per
+  // quella pagina li porta con sé: senza, il rinvio ripresentava la pagina
+  // com'era prima che esistesse, e il controllo che serviva non partiva più —
+  // peggio, il verdetto più povero cancellava l'avviso già mostrato (#591,
+  // giro 9). Cambiare indirizzo li azzera: sono di quella pagina, non del tab.
+  _sbSegnali(tab, url, ctx) {
+    const chiave = String(url || '');
+    let s = tab.sbSegnali;
+    if (!s || s.url !== chiave) { s = { url: chiave, hasPassword: false, hasPayment: false }; tab.sbSegnali = s; }
+    if (ctx && ctx.hasPassword) s.hasPassword = true;
+    if (ctx && ctx.hasPayment) s.hasPayment = true;
+    return { hasPassword: s.hasPassword, hasPayment: s.hasPayment };
+  },
+
+  // Il verdetto che la scheda annuncia si ricalcola sempre coi segnali di
+  // adesso, non con quelli che aveva chi ha avviato il controllo: due cammini
+  // chiedono il verdetto della stessa pagina e il primo è quello che ne sa meno.
+  _sbAnnuncia(tab, url) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    if (!SB) return;
+    let v = null;
+    try { v = SB.checkSync(url, this._sbCtx({}, tab, url)); } catch (_) { return; }
+    this._sbBroadcast(tab, url, this._sbApplyState(tab, v));
   },
 
   _sbState(tab) {
