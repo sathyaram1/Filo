@@ -35,6 +35,9 @@
 //     La pagina dove l'utente può togliere l'ostacolo, per chi affianca un
 //     collegamento al «Riprova» (che su questi codici non porta da nessuna
 //     parte finché non si cambia qualcosa).
+//   SN_CHAT_ERRORS.rimedioPagina(code) → { dove, url, label } | null
+//     La stessa cosa già pronta da mostrare: ogni superficie usa questa, così
+//     l'indirizzo e l'etichetta non vengono riscritti uno per riquadro.
 //
 // Logica PURA: niente I/O, niente Electron → unit-testabile.
 
