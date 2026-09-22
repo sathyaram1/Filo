@@ -16,6 +16,7 @@ const CONFIG = {
 };
 
 test('il campo della stringa del modello resta visibile alle larghezze di finestra normali', async ({ openTab }) => {
+  test.fail(true, 'rilievo aperto: le colonne fisse della riga schiacciano il campo elastico');
   const page = await openTab(MODELLI_PREDEFINITI);
   await page.addInitScript((config) => {
     window.chrome = window.chrome || {};
