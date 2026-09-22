@@ -1154,6 +1154,7 @@
         del.remove();
         ul.remove();
         note.textContent = `✓ Eliminate definitivamente ${removed} ${removed === 1 ? 'scheda' : 'schede'}.`;
+        if (onFatto) onFatto('🗑', `Eliminate per sempre ${removed} ${removed === 1 ? 'scheda' : 'schede'}${query ? ` · ${query}` : ''}`);
       });
       panel.appendChild(del);
     })();
