@@ -939,6 +939,12 @@
     buildTabColorSection();
   }
 
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.SETTINGS_UPDATED) riallineaDaFuori(msg.settings);
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
 
