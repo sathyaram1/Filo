@@ -711,6 +711,65 @@
     input.value = String(clampNotifDurationSec(parseInt(input.value, 10)));
   }
 
+  // La pagina aperta non è una fotografia: ogni campo che `persist` riscrive
+  // va riallineato quando la stessa impostazione cambia da fuori (Filo a
+  // parole, un'altra finestra), o il primo tocco su una manopola qualunque
+  // rimanderebbe indietro tutte le altre. Il campo in uso adesso non si tocca.
+  function riallineaDaFuori(settings) {
+    if (!settings || typeof settings !== 'object') return;
+    const attivo = document.activeElement;
+    const set = (id, fn) => {
+      const el = $(id);
+      if (!el || el === attivo) return;
+      fn(el);
+    };
+    const opzione = (id, valore, ripiego) => set(id, (el) => {
+      const ok = [...el.options].some((o) => o.value === valore);
+      el.value = ok ? valore : ripiego;
+    });
+
+    opzione('theme', settings.theme || 'system', 'system');
+    opzione('textScale', String(settings.textScale ?? 1), '1');
+    set('showHomeMessage', (el) => { el.checked = settings.showHomeMessage !== false; });
+    set('agentStyleText', (el) => { el.value = settings.agentStyle || ''; syncPresetSelect(); });
+
+    const aa = settings.autoArchive || {};
+    set('autoArchiveEnabled', (el) => { el.checked = aa.enabled !== false; });
+    set('autoArchiveOnClose', (el) => { el.checked = aa.onClose !== false; });
+    set('autoArchiveIdleHours', (el) => { el.value = String(clampIdleHours(Number(aa.idleHours))); });
+
+    const term = settings.terminal || {};
+    set('terminalEnabled', (el) => { el.checked = term.enabled === true; });
+    if (term.shell) opzione('terminalShell', term.shell, $('terminalShell').value);
+
+    const notif = settings.notifications || {};
+    set('notifDuration', (el) => { el.value = String(clampNotifDurationSec(Number(notif.durationSec))); });
+    set('notifSoundEnabled', (el) => { el.checked = notif.soundEnabled === true; });
+    opzione('notifSound', notif.sound || 'default', 'default');
+    set('notifSoundVolume', () => caricaVolume('notifSoundVolume', notif.soundVolume));
+    sincronizzaSuonoNotifiche();
+
+    opzione('timerRingtone', settings.timerRingtone || 'default', 'default');
+    set('timerRingtoneVolume', () => caricaVolume('timerRingtoneVolume', settings.timerRingtoneVolume));
+
+    const tts = settings.tts || {};
+    set('ttsVoice', (el) => { if ([...el.options].some((o) => o.value === (tts.voice || ''))) el.value = tts.voice || ''; });
+    set('ttsRate', (el) => {
+      const r = Number(tts.rate) || 1;
+      el.value = String(r);
+      $('ttsRateVal').textContent = r.toFixed(1) + '×';
+    });
+    set('ttsPitch', (el) => {
+      const p = Number(tts.pitch) || 1;
+      el.value = String(p);
+      $('ttsPitchVal').textContent = p.toFixed(1);
+    });
+    set('ttsModelVoice', () => populateModelVoices(tts.modelVoice || ''));
+
+    Bootstrap.applyTheme(settings.theme);
+    Bootstrap.applyTextScale(settings.textScale);
+  }
+
   async function persist() {
     const theme = $('theme').value;
     const textScale = parseFloat($('textScale').value) || 1;
