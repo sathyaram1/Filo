@@ -350,6 +350,23 @@ if (IS_FILO_ORIGIN) {
   }
 }
 
+// Chiudere una scheda distrugge la view senza che la pagina veda `pagehide`:
+// chi rimanda il salvataggio perdeva l'ultima modifica. Filo avvisa qui, e
+// l'avviso arriva come `pagehide` così ogni pagina che già lo ascolta è coperta.
+if (IS_FILO_ORIGIN) {
+  ipcRenderer.on('filo:pagina-sparisce', () => {
+    try {
+      let evento;
+      try { evento = new PageTransitionEvent('pagehide', { persisted: false }); }
+      catch (_) { evento = new Event('pagehide'); }
+      window.dispatchEvent(evento);
+    } catch (_) {}
+    // Dopo il dispatch: i messaggi che la pagina ha appena spedito viaggiano
+    // sullo stesso canale, quindi il main li ha già in mano quando legge questo.
+    try { ipcRenderer.send('filo:pagina-sparita'); } catch (_) {}
+  });
+}
+
 function bootContentScripts() {
   if (!shouldInjectContentScripts()) return;
   injectContentScriptStyles();
