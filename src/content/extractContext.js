@@ -415,16 +415,42 @@
     return r.top < (vx.innerHeight || 0) && r.bottom > 0 && r.left < (vx.innerWidth || 0) && r.right > 0;
   }
 
-  // Sfilato dalla pagina in alto o a sinistra (`left:-9999px`, un cassetto traslato via): lì non si arriva scorrendo.
-  // Coordinate del DOCUMENTO, o sembrerebbe nascosto tutto ciò che si è già scorso; e solo fuori flusso, o ci
-  // finirebbero le diapositive già passate di una giostra, a cui si torna con una strisciata.
+  // Sfilato dove non si arriva scorrendo (`left:-9999px`, un cassetto traslato via). Chi è ancorato alla finestra
+  // è irraggiungibile da OGNI lato, perché lo scorrimento non lo muove; chi è appoggiato al documento solo sopra e
+  // a sinistra dell'origine, perché a destra e sotto allunga lui stesso l'area su cui si scorre (#505). Solo fuori
+  // flusso, o ci finirebbero le diapositive già passate di una giostra, a cui si torna con una strisciata.
   function isPushedOutOfPage(el, cs) {
-    if (cs.position !== 'absolute' && cs.position !== 'fixed') return false;
+    const ancorato = cs.position === 'fixed';
+    if (!ancorato && cs.position !== 'absolute') return false;
     let r;
     try { r = el.getBoundingClientRect(); } catch (_) { return false; }
     if (r.width <= 0 && r.height <= 0) return false;
     const vx = viewOf(el);
-    return (r.right + (vx.scrollX || 0)) <= 0 || (r.bottom + (vx.scrollY || 0)) <= 0;
+    if (!ancorato) return (r.right + (vx.scrollX || 0)) <= 0 || (r.bottom + (vx.scrollY || 0)) <= 0;
+    if (r.right <= 0 || r.bottom <= 0) return true;
+    // Una misura della finestra a zero vuol dire che non si sa: meglio tradurre che saltare tutta la pagina.
+    const w = vx.innerWidth || 0;
+    const h = vx.innerHeight || 0;
+    return (w > 0 && r.left >= w) || (h > 0 && r.top >= h);
+  }
+
+  // Ritagliato via del tutto da una maschera (`clip-path: inset(100%)`, il modo in cui certi siti chiudono un
+  // pannello). Sotto i quattro pixel non si guarda: lì lo stesso ritaglio è la ricetta del testo per i lettori di
+  // schermo, che nessuno apre mai e che quindi va tradotto col resto invece di restare inglese per sempre.
+  function isClippedAwayByPath(el, cs) {
+    const cp = cs.clipPath;
+    if (!cp || cp.indexOf('inset(') !== 0) return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    if (r.width < 4 || r.height < 4) return false;
+    const parti = cp.slice(6, cp.indexOf(')')).trim().split(/\s+/);
+    if (!parti.length || parti.length > 4) return false;
+    const [alto, destra = alto, basso = alto, sinistra = destra] = parti;
+    const misura = (v, base) => (v.endsWith('%') ? (parseFloat(v) / 100) * base : parseFloat(v));
+    const y = misura(alto, r.height) + misura(basso, r.height);
+    const x = misura(sinistra, r.width) + misura(destra, r.width);
+    if (!Number.isFinite(y) || !Number.isFinite(x)) return false;
+    return y >= r.height - 0.5 || x >= r.width - 0.5;
   }
 
   // Schiacciato a zero e ritagliato (`max-height:0` più `overflow:hidden`). Il RITAGLIO è la condizione che conta:
