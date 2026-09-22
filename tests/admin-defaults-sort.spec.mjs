@@ -38,10 +38,14 @@ async function openEditor(openTab) {
       }
       if (msg.type === 'test_default_model') return { ok: true, ttftMs: 100, tokensPerSec: 50 };
       if (msg.type === 'default_models_list') return { ok: true, provider: msg.provider, items: [] };
-      return { ok: true };
+      // Si finge solo la config condivisa: il resto (fra cui il salvataggio
+      // delle impostazioni) deve arrivare al main davvero.
+      return window.__veroSend ? window.__veroSend(msg) : { ok: true };
     };
-    if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
-    else window.chrome = { runtime: { sendMessage: stub } };
+    if (window.chrome && window.chrome.runtime) {
+      window.__veroSend = window.chrome.runtime.sendMessage.bind(window.chrome.runtime);
+      window.chrome.runtime.sendMessage = stub;
+    } else window.chrome = { runtime: { sendMessage: stub } };
   }, REGISTRY);
   await page.reload();
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
