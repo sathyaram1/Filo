@@ -87,7 +87,7 @@
     LEGGI_TRASPARENZA: { classe: 'ingresso', fonte: 'filo' },
     CAPACITA_DETTAGLIO: { classe: 'ingresso', fonte: 'filo' },
 
-    EVENTO_CALENDARIO: { classe: 'proposta' },
+    EVENTO_CALENDARIO: { classe: 'uscita', uscita: 'calendario' },
 
     DICHIARA_USCITE: { classe: 'motore' },
     CHIEDI_USCITA: { classe: 'motore' },
