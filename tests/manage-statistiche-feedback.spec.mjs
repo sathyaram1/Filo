@@ -1442,3 +1442,23 @@ test('#496 i numeri della scheda hanno la virgola sui decimali e il punto sulle 
   await expect(page.locator('[data-fs-id="ricevuti"] .mg-tile-n')).toHaveText('1.200');
   await expect(page.locator('#mgFsPieMid b')).toHaveText('0,5');
 });
+
+test('#496 la pasticca di un mittente apre le segnalazioni che il suo numero conta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, {
+    feedbacks: [
+      fb({ seq: 41, createdAt: g(1), name: 'di una persona' }),
+      fb({ seq: 42, createdAt: g(1), name: 'dall\'esploratore', clientId: 'agent:prober' }),
+    ],
+    workerLog: [],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+
+  await page.locator('[data-fs-creator="prober"]').click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu')).toContainText('Mostra la segnalazione contata');
+  await page.locator('.mg-ctxmenu .sn-select-option').filter({ hasText: 'Mostra' }).click();
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
+  // Il clic sulla pasticca resta il filtro: le due cose non si pestano.
+  await page.locator('[data-fs-creator="prober"]').click();
+  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['prober']);
+});

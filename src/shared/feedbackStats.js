@@ -565,6 +565,7 @@
     var perCategoria = Object.create(null);
     var perCreatore = Object.create(null);
     var perCreatoreTutti = Object.create(null);
+    var idsPerCreatoreTutti = Object.create(null);
     var vociRicevuti = [];
     var attesePresa = [];
     var attesePresaIds = [];
@@ -586,6 +587,8 @@
       var kind = creatoreDi(f);
       if (kind === CREATORE_ILLEGGIBILE) mittentiIgnoti += 1;
       conta(perCreatoreTutti, kind);
+      if (!idsPerCreatoreTutti[kind]) idsPerCreatoreTutti[kind] = [];
+      if (f && f._id) idsPerCreatoreTutti[kind].push(f._id);
       if (filtro && filtro.indexOf(kind) < 0) continue;
       ricevutiTot += 1;
       var cat = categoriaDi(f);
@@ -810,7 +813,7 @@
         ids: idsRicevuti(perCategoria),
         categorie: ordinaPerN(perCategoria),
         creatori: creatoriOrdinati(perCreatore, idsPerCreatore),
-        creatoriTutti: creatoriOrdinati(perCreatoreTutti, null),
+        creatoriTutti: creatoriOrdinati(perCreatoreTutti, idsPerCreatoreTutti),
         serie: serieTemporale(vociRicevuti, range),
         senzaData: senzaData,
         // Quante segnalazioni della finestra hanno un mittente che non si è

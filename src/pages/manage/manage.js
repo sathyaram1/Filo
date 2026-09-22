@@ -5183,6 +5183,10 @@
     if (esito) return { tipo: 'esito', chiave: esito.dataset.fsEsito };
     const tile = el.closest('[data-fs-id]');
     if (tile) return { tipo: 'tile', chiave: tile.dataset.fsId };
+    // La pasticca del mittente porta un conteggio come tutto il resto: il clic
+    // resta il filtro, ma quel numero si può aprire come gli altri.
+    const chip = el.closest('[data-fs-creator]');
+    if (chip) return { tipo: 'creatore', chiave: chip.dataset.fsCreator };
     return null;
   }
 
@@ -5240,6 +5244,19 @@
       const man = v.mancanti || [];
       if (!v.ids.length && !man.length) return null;
       return { ...desc, titolo: v.titolo, ids: v.ids, mancanti: man };
+    }
+
+    if (desc.tipo === 'creatore') {
+      // Il numero della pasticca è quello SENZA filtro, e si apre su quelle.
+      const tutti = (fsStat.ricevuti.creatoriTutti || []);
+      const gr = FS.GRUPPI_CREATORI.find((x) => x.key === chiave);
+      let ids = [];
+      let titolo = '';
+      if (chiave === '__tutti') { ids = tutti.reduce((a, c) => a.concat(c.ids || []), []); titolo = 'Tutti i mittenti'; }
+      else if (gr) { ids = tutti.filter((c) => gr.kinds.indexOf(c.kind) >= 0).reduce((a, c) => a.concat(c.ids || []), []); titolo = gr.label; }
+      else { const v = tutti.find((c) => c.kind === chiave); ids = (v && v.ids) || []; titolo = fsEtichettaCreatore(chiave); }
+      if (!ids.length) return null;
+      return { ...desc, titolo, ids };
     }
 
     if (desc.tipo === 'tile') {
@@ -5364,6 +5381,19 @@
     }, 0);
   }
 
+  // «Mostra le N segnalazioni contate», dove dietro il numero ce n'è davvero
+  // qualcuna. Una voce sola, uguale su ogni superficie che porta un conteggio.
+  function vociMostra(el, voci) {
+    const src = fsSorgente(el);
+    if (!src) return null;
+    const n = src.ids.length + ((src.mancanti || []).length);
+    voci.push({
+      label: `Mostra ${n === 1 ? 'la segnalazione contata' : `le ${fsNum(n)} segnalazioni contate`}`,
+      run: () => fsApriDrill(src),
+    });
+    return src;
+  }
+
   // Cosa può volere l'owner sopra questo pezzo di scheda.
   function fsVociMenu(el) {
     const voci = [];
@@ -5403,6 +5433,7 @@
         // bianco, mentre le sue dieci vicine avevano le loro voci.
         if (fsCreators.length) voci.push({ label: 'Togli tutti i filtri', run: () => fsImpostaCreatori([]) });
         const n = chipC.querySelector('.mg-chip-n');
+        vociMostra(chipC, voci);
         voci.push({ label: 'Copia riga e numero', run: () => fsCopia(`Tutti: ${n ? n.textContent.trim() : 0}`) });
         return voci;
       }
@@ -5415,7 +5446,8 @@
           const v = fsStat && (fsStat.ricevuti.creatoriTutti || []).find((c) => c.kind === k);
           return s + ((v && v.n) || 0);
         }, 0);
-        voci.push({ label: 'Copia riga e numero', run: () => fsCopia(`${gr.label}: ${tot}`) });
+        vociMostra(chipC, voci);
+        voci.push({ label: 'Copia riga e numero', run: () => fsCopia(`${gr.label}: ${fsNum(tot)}`) });
         return voci;
       }
       const nome = fsEtichettaCreatore(kind);
@@ -5425,17 +5457,12 @@
         ? { label: 'Togli dal filtro', run: () => fsImpostaCreatori(fsCreators.filter((k) => k !== kind)) }
         : { label: 'Aggiungi al filtro', run: () => fsImpostaCreatori(fsCreators.concat([kind])) });
       const v = fsStat && (fsStat.ricevuti.creatoriTutti || []).find((c) => c.kind === kind);
-      voci.push({ label: 'Copia riga e numero', run: () => fsCopia(`${nome}: ${(v && v.n) || 0}`) });
+      vociMostra(chipC, voci);
+      voci.push({ label: 'Copia riga e numero', run: () => fsCopia(`${nome}: ${fsNum((v && v.n) || 0)}`) });
       return voci;
     }
-    const src = fsSorgente(el);
-    if (src) {
-      const n = src.ids.length + ((src.mancanti || []).length);
-      voci.push({
-        label: `Mostra ${n === 1 ? 'la segnalazione contata' : `le ${n} segnalazioni contate`}`,
-        run: () => fsApriDrill(src),
-      });
-    } else if (el && el.querySelectorAll) {
+    const src = vociMostra(el, voci);
+    if (!src && el && el.querySelectorAll) {
       // Una FRASE che contiene dei numeri (quella sotto il titolo della torta):
       // il tasto destro sulla frase offre i conti che ci stanno dentro, uno per
       // voce, invece del menu generale della pagina. Sul numero da solo resta

@@ -62,6 +62,31 @@ aprire) e la riga piccola diventa un pulsante vero, con clic, Invio, Spazio e
 tasto destro. Prima di collegare un elenco a un riquadro, chiediti quale dei
 numeri che porta ha contato quelle righe.
 
+## Il numero apre TUTTO quello che ha contato, anche ciò che non si può aprire
+
+Il conto di un riquadro e l'elenco che apre possono divergere senza che nessuno
+lo dica, e succede quando qualcosa è stato contato ma dietro non ha una riga da
+mostrare. Nella scheda dei feedback il registro delle esecuzioni cita anche
+segnalazioni che la lista non ha più: il riquadro «Feedback lavorati» le
+contava (il lavoro è successo davvero), l'elenco le lasciava fuori, e il menu
+del tasto destro lo dichiarava da sé — sopra un 3 offriva «Mostra le 2
+segnalazioni contate».
+
+La cura non è togliere quei lavori dal conto: è farli arrivare fino all'elenco.
+Accanto agli `ids` il conto porta i **numeri** di ciò che ha contato senza un
+documento dietro (`mancanti`), e l'elenco ne fa una riga spenta che li nomina.
+Numero grande, voce del menu ed elenco tornano a dire la stessa cifra.
+
+## Anche un numero dentro una frase è un numero
+
+Sotto la torta una frase dichiara i lavori che il grafico lascia fuori: «1
+lavoro ha avuto il via libera ma le sue verifiche sono più vecchie del
+registro». È un conteggio come gli altri, e il caso non è raro — il registro
+tiene solo le ultime esecuzioni. Quel numero è un pulsante dentro la frase
+(sottolineato, con clic, Invio, Spazio e tasto destro); il tasto destro sulla
+frase intera offre i conti che contiene, uno per voce, invece del menu generale
+della pagina.
+
 ## Due trappole di resa, tutte e due invisibili a un test sui numeri
 
 **L'etichetta cercata nella tabella sbagliata.** La divisione per categoria
