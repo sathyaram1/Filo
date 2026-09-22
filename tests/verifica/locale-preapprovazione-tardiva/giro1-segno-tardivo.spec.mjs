@@ -310,6 +310,7 @@ test('pratica segnata e fusione ancora ferma: le due etichette stanno dentro la 
   // Tagliata a metà parola, l'etichetta non dice più cosa sta succedendo.
   expect(segno.x + segno.width).toBeLessThanOrEqual(scheda.x + scheda.width);
   // E la lista non deve scorrere di lato per colpa di una scheda.
+  await page.screenshot({ path: 'tests/.shots/preapprovazione-tardiva-scheda.png' });
   const debordo = await page.evaluate(() => {
     const col = document.querySelector('.mg-list') || document.querySelector('#mgList');
     return col ? col.scrollWidth - col.clientWidth : 0;
