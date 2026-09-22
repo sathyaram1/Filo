@@ -617,6 +617,13 @@ section:has(#dictList) .sn-spell-add-row {
   padding: 0 8px;
   margin-bottom: 2px;
 }
+/* Una scritta più larga della sua colonna si stampava sopra quella accanto: chi legge
+   non capiva più quale controllo descrivesse. */
+.sn-model-row-head > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Riga scartata dal salvataggio (nickname mancante o duplicato): messaggio inline, niente alert bloccante. */
 .sn-model-row.sn-row-invalid { border-color: var(--sn-error); }
