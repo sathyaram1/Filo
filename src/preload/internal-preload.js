@@ -350,9 +350,8 @@ if (IS_FILO_ORIGIN) {
   }
 }
 
-// Chiudere una scheda distrugge la view senza che la pagina veda `pagehide`:
-// chi rimanda il salvataggio perdeva l'ultima modifica. Filo avvisa qui, e
-// l'avviso arriva come `pagehide` così ogni pagina che già lo ascolta è coperta.
+// L'avviso di src/main/congedo.js arriva come `pagehide`, che una scheda
+// distrutta non riceve: così ogni pagina che già lo ascolta è coperta.
 if (IS_FILO_ORIGIN) {
   ipcRenderer.on('filo:pagina-sparisce', () => {
     try {
