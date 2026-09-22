@@ -118,7 +118,7 @@ async function scriviESpegni(testo, attesaMs, pagina = PREFERENZE, campo = 'agen
   try {
     const dati = JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8'));
     const s = dati.settings || dati;
-    salvato = (s && s.agentStyle) || '';
+    salvato = s && s[campo] != null ? String(s[campo]) : '';
   } catch (e) {
     salvato = `[storage illeggibile: ${e.message}]`;
   }
