@@ -1030,7 +1030,7 @@ function creaBlocco(host) {
         if (v) setTimeout(function () { if (!chiuso) righe.style.maxHeight = 'none'; }, 480);
         avvolgi(v ? 0 : 1);
       }
-      if (restaAperto) { righe.style.maxHeight = 'none'; } else { mostra(false); }
+      if (modo) { righe.style.maxHeight = 'none'; } else { mostra(false); }
       capo.addEventListener('click', function () { mostra(chiuso); });
     },
 
