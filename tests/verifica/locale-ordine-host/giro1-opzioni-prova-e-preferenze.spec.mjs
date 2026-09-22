@@ -111,20 +111,22 @@ test('Opzioni: la prova di una riga parte con l\'ordinamento scelto per quel mod
 
 test('Preferenze: la conferma «Salvato» non resta accesa su una modifica precedente', async ({ openTab }) => {
   const page = await openTab(PREFERENZE);
-  await page.waitForSelector('#textScale', { timeout: 15_000 });
+  await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
 
-  // Prima modifica: la conferma compare.
-  await page.selectOption('#theme', 'dark');
+  const scrivi = async (testo) => page.evaluate((t) => {
+    const el = document.getElementById('agentStyleText');
+    el.value = t;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, testo);
+
+  // Prima modifica: passata l'attesa, la conferma compare.
+  await scrivi('primo testo');
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 5_000 });
 
   // Seconda modifica, mentre la conferma di prima è ancora sullo schermo: quella
   // conferma parla di uno stato superato e deve sparire finché il nuovo non è
   // salvato, altrimenti chi chiude la pagina crede al sicuro qualcosa che non lo è.
-  await page.evaluate(() => {
-    const el = document.getElementById('textScale');
-    el.value = '1.2';
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await scrivi('secondo testo, non ancora salvato');
   const accesaSubito = await page.locator('#savedHint').evaluate((el) => el.classList.contains('sn-show'));
   expect(accesaSubito, 'la conferma «Salvato» resta accesa mentre l\'ultima modifica non è ancora salvata').toBe(false);
 });
