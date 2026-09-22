@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,7 +31,7 @@ Module._load = function (richiesta, ...resto) {
   if (richiesta === 'electron') return { ipcMain };
   return caricaVero.call(this, richiesta, ...resto);
 };
-const { congedaPagina, CANALE_AVVISO, CANALE_RISPOSTA } =
+const { congedaPagina, congedaSchedeInterne, CANALE_AVVISO, CANALE_RISPOSTA } =
   require(join(__dirname, '..', '..', 'src', 'main', 'congedo.js'));
 Module._load = caricaVero;
 
@@ -80,4 +81,28 @@ test('una pagina che tace non blocca la chiusura', async () => {
 test('una pagina già distrutta non fa aspettare nessuno', async () => {
   await congedaPagina({ isDestroyed: () => true, send: () => { throw new Error('mai'); } }, { tetto: 5000 });
   await congedaPagina(null, { tetto: 5000 });
+});
+
+test('le schede interne si congedano insieme, e senza nessuna non si aspetta', async () => {
+  const fatte = [];
+  const wc = (id) => ({ isDestroyed: () => false, send: () => { fatte.push(id); setTimeout(() => rispondi(CANALE_RISPOSTA, wcMap.get(id)), 0); } });
+  const wcMap = new Map();
+  const scheda = (id, interna) => {
+    const w = wc(id); wcMap.set(id, w);
+    return { isInternal: interna, view: { webContents: w } };
+  };
+  assert.equal(congedaSchedeInterne({ tabs: [] }), null);
+  assert.equal(congedaSchedeInterne({ tabs: [scheda('web', false)] }), null);
+  assert.equal(congedaSchedeInterne(null), null);
+  await congedaSchedeInterne({ tabs: [scheda('a', true), scheda('b', true), scheda('web', false)] });
+  assert.deepEqual(fatte.sort(), ['a', 'b']);
+});
+
+// Le tre uscite di una pagina interna devono passare tutte di qui: chiudere la
+// scheda, chiudere la finestra, spegnere Filo. Una sola scoperta = dati persi.
+test('tutte e tre le uscite chiedono il congedo', () => {
+  const leggi = (...parti) => readFileSync(join(__dirname, '..', '..', 'src', 'main', ...parti), 'utf8');
+  assert.match(leggi('tabs.js'), /congedaPagina\(/);
+  assert.match(leggi('window.js'), /on\('close'[\s\S]{0,400}congedaSchedeInterne\(/);
+  assert.match(leggi('main.js'), /on\('before-quit'[\s\S]{0,400}congedaSchedeInterne\(/);
 });
