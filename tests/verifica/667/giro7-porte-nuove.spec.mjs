@@ -25,6 +25,16 @@ const estetica = (shell, token, valore) => shell.evaluate(
   { t: token, v: valore },
 );
 
+// Un'impostazione di livello 2 passa dal popup di conferma: la conferma arriva
+// da una pagina interna, come quando l'utente preme OK nella chat.
+const confermata = (page, chiave, valore) => page.evaluate(
+  ({ c, v }) => chrome.runtime.sendMessage({
+    type: window.SN_MSG.MSG.FILO_CONFIRM_ACTION,
+    action: { type: 'IMPOSTA_PREFERENZA', chiave: c, valore: v },
+  }),
+  { c: chiave, v: valore },
+);
+
 const impostazioni = (shell) => shell.evaluate(
   () => window.filoShell.message({ type: window.SN_MSG.MSG.GET_SETTINGS }),
 );
