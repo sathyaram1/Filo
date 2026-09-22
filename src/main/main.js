@@ -413,11 +413,7 @@ app.whenReady().then(async () => {
     setTimeout(checkReady, 500);
   }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createMainWindow();
-    }
-  });
+  app.on('activate', () => { assicuraFinestraNormale(); });
 });
 
 // Alla chiusura salva sincronicamente la sessione (tab aperti) così alla
