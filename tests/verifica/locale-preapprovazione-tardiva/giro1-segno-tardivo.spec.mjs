@@ -267,9 +267,9 @@ test('fusione partita da sola e non riuscita: l’owner la legge senza aprire la
   await expect.poll(() => approvazioni(page).then((a) => a.length)).toBe(1);
 
   // La fusione non è avvenuta: deve arrivare sotto gli occhi, non in un
-  // pannello che si apre solo cliccando la scheda.
-  await expect(page.locator('#mgManageMsg')).toBeVisible();
-  await expect(page.locator('#mgManageMsg')).toContainText('riprova');
+  // pannello che si apre solo cliccando la scheda. Dove lo dica non conta:
+  // conta che si veda.
+  await expect.poll(() => leggibile(page, 'riprova'), { timeout: 8000 }).toBe(true);
 });
 
 // ── 8. Come si vede l'esito, chiaro e scuro ────────────────────────────────
