@@ -54,7 +54,7 @@ for (const tema of ['light', 'dark']) {
     await page.waitForTimeout(150);
     await page.screenshot({ path: `tests/.shots/515-giro4-barra-${tema}.png` }).catch(() => {});
 
-    const contrasto = await page.evaluate(() => {
+    const misura = await page.evaluate(() => {
       function lum(rgb) {
         const c = rgb.map((v) => {
           const s = v / 255;
