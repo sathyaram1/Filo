@@ -151,3 +151,49 @@ test('sentence(): stessa frase con l\'iniziale maiuscola, per la bolla da sola',
   assert.equal(sentence.slice(1), clause.slice(1));
   assert.equal(sentence[0], clause[0].toUpperCase());
 });
+
+// ── I codici già scritti per l'utente ─────────────────────────────────────────
+//
+// Sentinella (#663): la chat mostra invariato il messaggio degli errori che il
+// main scrive già per l'utente. La lista di quei codici sta in un posto solo;
+// se il main ne solleva uno nuovo e nessuno lo aggiunge lì, l'utente legge
+// «qualcosa è andato storto» al posto della frase che gli dice cosa fare —
+// è così che l'interruttore dei pesi aperti è rimasto muto per mesi.
+
+test('il messaggio scritto per l’utente arriva in chat, non la frase generica', () => {
+  for (const code of CE.CODICI_GIA_SCRITTI) {
+    const e = new Error('«Chat» è ferma: scegli un modello in Opzioni.');
+    e.code = code;
+    assert.equal(CE.friendly(e), '«Chat» è ferma: scegli un modello in Opzioni.', code);
+  }
+});
+
+test('ogni errore che il main scrive per l’utente è nella lista dei codici già scritti', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const righe = src.split('\n');
+  for (let i = 0; i < righe.length; i += 1) {
+    const m = /\b\w+\.code\s*=\s*'([A-Z_]+)'/.exec(righe[i]);
+    if (!m) continue;
+    // Il messaggio è scritto per l'utente quando viene da i18n: un `new Error`
+    // con testo nudo è un dettaglio tecnico e in chat NON deve passare.
+    const intorno = righe.slice(Math.max(0, i - 12), i + 1).join('\n');
+    if (!/I18n\.t\(/.test(intorno)) continue;
+    assert.ok(
+      CE.CODICI_GIA_SCRITTI.includes(m[1]),
+      `${m[1]} porta un messaggio scritto per l'utente ma la chat lo butta: aggiungilo a CODICI_GIA_SCRITTI in src/shared/chatErrors.js`,
+    );
+  }
+});
+
+test('chi non porta da nessuna parte col solo «Riprova» dice dove si rimedia', () => {
+  assert.equal(CE.rimedio('NO_API_KEY'), 'crediti');
+  assert.equal(CE.rimedio('NO_MODEL_FOR_ACTION'), 'opzioni');
+  assert.equal(CE.rimedio('NO_OPEN_WEIGHTS_MODEL'), 'opzioni');
+  assert.equal(CE.rimedio('LIMIT_REACHED'), '');
+  assert.equal(CE.rimedio(''), '');
+  assert.equal(CE.rimedio(undefined), '');
+});
