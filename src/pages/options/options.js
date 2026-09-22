@@ -871,10 +871,8 @@
   }
 
   // Questa pagina risalva TUTTO il modulo a ogni modifica, e le stesse cose si
-  // cambiano anche altrove (la chiave dalla pagina Crediti, il resto chiedendo
-  // a Filo): senza riallineamento un cambio qualunque qui le riportava com'erano
-  // all'apertura. Il campo in uso adesso non si tocca. Vedi
-  // patterns/una-pagina-di-impostazioni-aperta-non-e-una-fotografia.md
+  // cambiano anche dalla pagina Crediti o chiedendole a Filo
+  // (patterns/una-pagina-di-impostazioni-aperta-non-e-una-fotografia.md).
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;

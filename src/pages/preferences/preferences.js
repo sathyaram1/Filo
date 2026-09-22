@@ -711,10 +711,9 @@
     input.value = String(clampNotifDurationSec(parseInt(input.value, 10)));
   }
 
-  // La pagina aperta non è una fotografia: ogni campo che `persist` riscrive
-  // va riallineato quando la stessa impostazione cambia da fuori (Filo a
-  // parole, un'altra finestra), o il primo tocco su una manopola qualunque
-  // rimanderebbe indietro tutte le altre. Il campo in uso adesso non si tocca.
+  // Ogni campo che `persist` riscrive va riallineato quando quella stessa
+  // impostazione cambia da fuori, o il primo tocco su una manopola rimanda
+  // indietro tutte le altre (patterns/una-pagina-di-impostazioni-aperta-non-e-una-fotografia.md).
   function riallineaDaFuori(settings) {
     if (!settings || typeof settings !== 'object') return;
     if (!$('theme')) return;

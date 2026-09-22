@@ -525,9 +525,8 @@
         return { partial: { notifications: { soundEnabled: b } }, label: `Suono delle notifiche → ${b ? 'attivo' : 'spento'}` };
       },
     },
-    // Il suono delle notifiche nasce spento: scegliere il motivo o alzare il
-    // volume senza accendere l'interruttore confermerebbe un cambiamento che
-    // l'utente non sentirà mai.
+    // Il suono delle notifiche nasce spento: confermare un motivo o un volume
+    // senza accendere l'interruttore è promettere qualcosa che non si sentirà.
     {
       keys: ['tono_notifiche', 'tono notifiche', 'tono delle notifiche', 'motivo notifiche',
         'notification tone'],
