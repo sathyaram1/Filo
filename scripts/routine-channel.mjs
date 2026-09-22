@@ -90,7 +90,7 @@ import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
-import { isProtectedBranch } from './lib/branch-integrity.mjs';
+import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
 
@@ -599,11 +599,24 @@ export async function compare(t, mine, opts) {
  * l'owner. Va portata fin qui, o chi legge il registro crede che il ramo sia
  * perduto proprio nel caso in cui invece basta un via libera.
  *
+ * `opts.sha` è il CONTENUTO su cui i due esiti ragionati erano stati dati:
+ * viaggia con la richiesta come già fa il cammino locale (`ownerMerge`), dove
+ * il server pretende che combaci con la punta vera e altrimenti risponde
+ * `stale`. Senza, l'ultimo passo del giro continua a parlare del nome del ramo
+ * mentre tutti i passi prima parlano di un commit, e il via libera resta buono
+ * anche dopo che il foglio è stato sostituito (feedback #485). La sicurezza
+ * non dipende dal fatto che il chiamante lo dichiari: la punta vera il server
+ * se la chiede comunque. Questo è il controllo in più, e il posto dove
+ * l'informazione arriva.
+ *
  * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha?, approval? }
  *           | { ok:false, reason }}
  */
 export async function merge(t, branch, opts) {
-  const { status, body } = await call('routineMerge', { ticket: t, branch: String(branch || '') }, opts);
+  const { sha = '', ...rest } = opts && typeof opts === 'object' ? opts : {};
+  const payload = { ticket: t, branch: String(branch || '') };
+  if (String(sha || '')) payload.sha = String(sha);
+  const { status, body } = await call('routineMerge', payload, rest);
   if (status === 200 && body && body.ok && body.result) {
     return {
       ok: true,
@@ -614,6 +627,65 @@ export async function merge(t, branch, opts) {
     };
   }
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
+}
+
+// ─── L'impronta dichiarata a mano ────────────────────────────────────────────
+//
+// L'impronta del contenuto la timbra lo strumento. Una dichiarata sulla riga di
+// comando può solo CONFERMARE quella vera, mai sostituirla: è la stessa regola
+// che questo canale applica al nome del ramo (feedback #485).
+//
+// Confermare però vuol dire riconoscere la STESSA versione, non ricopiarla
+// lettera per lettera nella forma lunga. Gli strumenti stampano le impronte
+// accorciate a dodici lettere dappertutto, e git stesso tratta la forma corta
+// come il commit intero: rifiutare chi conferma con quello che ha appena letto
+// a schermo è attrito, e il rifiuto arrivava con un messaggio che si
+// contraddiceva («hai dichiarato 1774f56387b9, ma la directory è su
+// 1774f56387b9»: le stesse dodici lettere due volte, con dentro scritto che
+// sono diverse).
+
+/** Sotto questo numero di lettere un pezzo di impronta non conferma niente. */
+export const MIN_IMPRONTA_CHARS = 7;
+
+/**
+ * L'impronta dichiarata conferma quella vera? PURA.
+ *
+ * Confermano: la stessa impronta, scritta in maiuscolo o minuscolo (sono
+ * lettere esadecimali, la forma non cambia il commit), e una sua forma
+ * abbreviata di almeno `MIN_IMPRONTA_CHARS` lettere. Non conferma un pezzo più
+ * corto di così, che combacerebbe anche con commit diversi, né un'impronta che
+ * non è un inizio di quella vera.
+ *
+ * `motivo`: 'punta_sconosciuta' | 'troppo_corta' | 'altro_commit'.
+ */
+export function confermaImpronta(dichiarato, punta) {
+  const d = String(dichiarato || '').trim().toLowerCase();
+  const p = String(punta || '').trim().toLowerCase();
+  if (!d) return { ok: true, motivo: '' };
+  if (!p) return { ok: false, motivo: 'punta_sconosciuta' };
+  if (d === p) return { ok: true, motivo: '' };
+  if (p.startsWith(d)) return d.length >= MIN_IMPRONTA_CHARS ? { ok: true, motivo: '' } : { ok: false, motivo: 'troppo_corta' };
+  return { ok: false, motivo: 'altro_commit' };
+}
+
+/**
+ * Il rifiuto per un'impronta che non conferma la punta vera. PURA.
+ *
+ * Le impronte si stampano accorciate, come ovunque, TRANNE quando le due forme
+ * corte coincidono: lì mostrarle accorciate direbbe due volte la stessa cosa e
+ * manderebbe chi legge a cercare una differenza che sullo schermo non c'è.
+ */
+export function testoImprontaDiversa(quale, dichiarato, punta, motivo = 'altro_commit') {
+  const d = String(dichiarato || '');
+  const p = String(punta || '');
+  if (motivo === 'troppo_corta') {
+    return `${quale}: hai dichiarato ${d}, che è più corto di ${MIN_IMPRONTA_CHARS} lettere, e la directory è su ${p.slice(0, 12)}. Un pezzo così corto combacia anche con commit diversi, quindi non conferma niente.\n`
+      + 'Niente è stato consegnato: togli --sha e rilancia, che l\'impronta la timbra lo strumento, oppure scrivila per intero.';
+  }
+  const stessoCorto = d.slice(0, 12).toLowerCase() === p.slice(0, 12).toLowerCase();
+  const mostra = (s) => (stessoCorto ? s : s.slice(0, 12));
+  return `${quale}: hai dichiarato il commit ${mostra(d)}, ma la directory è su ${mostra(p)}.\n`
+    + 'Niente è stato consegnato: un esito vale per il contenuto che hai davvero davanti, e l\'impronta la timbra lo strumento. Togli --sha e rilancia, oppure posizionati sul commit che hai esaminato.';
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
@@ -629,7 +701,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -661,7 +733,7 @@ if (isMain) {
   // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
   // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
   // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
-  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto']);
+  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto', 'stop']);
   const args = [];
   const flags = [];
   const data = {};
@@ -742,6 +814,16 @@ if (isMain) {
     data.segnalazione = seg.testo;
   }
   delete data.segnala;
+
+  // `--stop` ferma il lavoro e chiama l'owner: senza segnalazione non saprebbe
+  // cosa decidere. Stessa regola di dispatch --record-fixed --ferma.
+  if (data.stop !== undefined) {
+    const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
+    if (data.stop !== true || !suFixed || !data.segnalazione) {
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md>: non ho consegnato niente.');
+      process.exit(1);
+    }
+  }
 
   const usage = () => {
     // Il percorso VERO di questo strumento, non la forma corta: se sta girando
@@ -937,10 +1019,27 @@ if (isMain) {
     // strumento delle routine (dispatch --record-*) respingeva già; da qui,
     // che è la strada della ricetta per il primo passaggio, no (verifica del
     // giro 3 su questo lavoro). Stessa regola, stessa fonte (lib/dirty-tree).
-    const passaAllaVerifica = intento === 'verdict' || intento === 'fixed'
+    // I due esiti RAGIONATI (la verifica funzionale e il controllo di
+    // sicurezza) valgono per il commit esaminato, non per il nome del ramo:
+    // lo sha si timbra qui, da solo, come la versione di `done`. Chiederlo a
+    // chi consegna è la scommessa già persa sul biglietto e sulla firma dei
+    // feedback — e un esito senza commit torna a essere una firma su una
+    // cartella, buona anche dopo che il foglio è stato sostituito (#485).
+    // E uno dichiarato può solo CONFERMARE la punta vera, mai sostituirla
+    // (più sotto): è la stessa regola che questo canale applica già al nome
+    // del ramo, dove nominarne un altro è un rifiuto messo a registro e non
+    // una correzione silenziosa.
+    //
+    // Le consegne che valgono per UN COMMIT: la messa in revisione, la
+    // correzione, la critica e il verdetto del controllo di sicurezza. Con
+    // modifiche non salvate la punta si sposta dopo la registrazione e l'esito
+    // finisce a parlare di un contenuto diverso da quello esaminato.
+    const passaAllaVerifica = intento === 'verdict' || intento === 'fixed' || intento === 'secaudit'
       || (intento === 'status' && data.status === 'revision_capability');
     if (passaAllaVerifica) {
-      const cosa = intento === 'verdict' ? 'critica' : intento === 'fixed' ? 'consegna' : 'revisione';
+      const cosa = intento === 'verdict' ? 'critica'
+        : intento === 'fixed' ? 'consegna'
+          : intento === 'secaudit' ? 'verdetto' : 'revisione';
       const stato = statoDirectory(ROOT);
       if (!stato.ok) {
         console.error(statoIllegibileText(stato.motivo, cosa));
@@ -952,8 +1051,48 @@ if (isMain) {
         console.error('Niente è stato consegnato: porta la directory a un commit e rilancia lo stesso comando.');
         process.exit(1);
       }
+      // Directory pulita: adesso l'impronta. Uno sha dichiarato può solo
+      // CONFERMARE la punta vera. Senza questo la difesa si spegneva
+      // scrivendo un argomento in più: bastava dichiarare l'impronta di un
+      // commit che qui non c'è perché l'esito nascesse intestato a un
+      // contenuto mai esaminato (verifica del giro 1 su questo lavoro).
+      if (intento === 'verdict' || intento === 'secaudit') {
+        const quale = intento === 'verdict' ? 'critica non registrata' : 'verdetto non registrato';
+        const punta = headSha(ROOT);
+        if (!punta) {
+          console.error(`${quale}: non riesco a farmi dire su quale commit è la directory, e un esito vale per il contenuto esaminato, non per il nome del ramo.`);
+          console.error('Niente è stato consegnato: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia lo stesso comando.');
+          process.exit(1);
+        }
+        // Confermare vuol dire riconoscere la stessa versione, non ricopiarla
+        // lettera per lettera: la forma corta che gli strumenti stampano
+        // dappertutto, e le maiuscole, sono lo stesso commit.
+        const conferma = confermaImpronta(data.sha, punta);
+        if (!conferma.ok) {
+          console.error(testoImprontaDiversa(quale, data.sha, punta, conferma.motivo));
+          process.exit(1);
+        }
+        data.sha = punta;
+      }
     }
     const r = await deliver(biglietto, intento, data);
+    // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
+    // stato dato. Non è un doppione dello sha appena spedito: è la memoria su
+    // cui si regge il rifiuto dell'ultimo passo, che prima la scriveva solo
+    // l'altra strada — e bastava registrare l'ok da qui perché la fusione
+    // ripartisse a foglio sostituito (feedback #485, giro 3). Una correzione la
+    // cancella, perché è contenuto nuovo.
+    if (r.outcome === 'ok' && ['verdict', 'secaudit', 'fixed'].includes(intento)) {
+      try {
+        const { ricordaEsitoSuCommit } = await import('./lib/branch-integrity.mjs');
+        const esito = ricordaEsitoSuCommit(ROOT, intento, String(data.sha || ''));
+        // Astenersi si dice: se qui non resta niente, chi chiude deve saperlo
+        // prima di credere che il controllo del contenuto sia stato fatto.
+        if (!esito.scritto && intento !== 'fixed') {
+          console.error(`nota: su questa macchina non resta scritto su quale commit vale questo esito (${esito.why}), quindi l'ultimo passo non potrà controllarlo da qui. Decide il server.`);
+        }
+      } catch (_) { /* best-effort: l'esito è già registrato */ }
+    }
     if (r.outcome === 'ok' && (intento === 'status' || intento === 'fixed')) {
       // La consegna è REGISTRATA dal server: da questo istante il contenuto
       // della directory è la consegna, e il punto fermo va sigillato qui

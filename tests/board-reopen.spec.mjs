@@ -144,3 +144,65 @@ test('riapertura non riuscita: il testo resta e il secondo tentativo passa', asy
   const tentativi = await page.evaluate(() => window.__tentativi.slice());
   expect(tentativi, 'la stessa spiegazione, mandata due volte').toEqual([testo, testo]);
 });
+
+// La bacheca si ridisegna da sola (i dati che finiscono di caricare, un voto
+// che torna dal server, un login): se porta via il form aperto e quello che
+// l'utente ha scritto dentro, la segnalazione è persa senza che nessuno lo
+// dica. Era anche il motivo per cui la prova qui sopra diventava rossa sotto
+// carico: il ridisegno cadeva fra lo scrivere e il premere Invia.
+test('un ridisegno mentre scrivo non porta via il form «Ancora rotto?» né il testo', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__boardTest && window.SN_MANAGE_REVIEW, null, { timeout: 15_000 });
+
+  await page.evaluate((fix) => {
+    window.__boardTest.setReleasedVersion('0.2.71');
+    window.__boardTest.setSignedIn('chi-riapre@example.com');
+    window.__boardTest.setData([fix]);
+  }, FIX_USCITO);
+
+  const card = page.locator('.bd-card').first();
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  await card.locator('.bd-reopen-link').click();
+
+  const testo = 'Stavo scrivendo questo quando la pagina si è ridisegnata.';
+  await card.locator('.bd-reopen-text').fill(testo);
+
+  // Il ridisegno che arriva da fuori, mentre il cursore è ancora nel campo.
+  await page.evaluate((fix) => window.__boardTest.setData([fix]), FIX_USCITO);
+
+  const campo = page.locator('.bd-card').first().locator('.bd-reopen-text');
+  await expect(campo).toBeVisible({ timeout: 10_000 });
+  await expect(campo).toHaveValue(testo);
+  await expect(page.locator('.bd-card').first()
+    .locator('.bd-reopen-actions button', { hasText: 'Invia' })).toBeVisible();
+  // E il cursore è tornato dov'era: si continua a scrivere senza ricliccare.
+  const scriveAncora = await page.evaluate(() => {
+    const el = document.activeElement;
+    return !!(el && el.classList && el.classList.contains('bd-reopen-text'));
+  });
+  expect(scriveAncora, 'dopo il ridisegno il cursore non è più nel campo').toBe(true);
+});
+
+test('«Annulla» butta via la bozza: un ridisegno dopo non la fa ricomparire', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__boardTest && window.SN_MANAGE_REVIEW, null, { timeout: 15_000 });
+
+  await page.evaluate((fix) => {
+    window.__boardTest.setReleasedVersion('0.2.71');
+    window.__boardTest.setSignedIn('chi-riapre@example.com');
+    window.__boardTest.setData([fix]);
+  }, FIX_USCITO);
+
+  const card = page.locator('.bd-card').first();
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  await card.locator('.bd-reopen-link').click();
+  await card.locator('.bd-reopen-text').fill('roba scritta e poi buttata');
+  await card.locator('.bd-reopen-cancel').click();
+
+  await page.evaluate((fix) => window.__boardTest.setData([fix]), FIX_USCITO);
+  const form = page.locator('.bd-card').first().locator('.bd-reopen-form');
+  await expect(form).toBeHidden();
+  await expect(page.locator('.bd-card').first().locator('.bd-reopen-text')).toHaveValue('');
+});

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 const {
   checkVerdict, withRequest, withCritique: withCritiqueRaw, withFixed, buildVerifierBrief, codaText, historyFromRounds,
   realignPlan, afterRebase, leggiBilanciDalServer, numeroFirestore, bilanciText, SENZA_TOKEN_MSG,
+  ambitoLocale, readRecipe,
 } = await import('../../scripts/verify-local.mjs');
 
 // I bilanci di QUESTI test. Dal 2026-09-16 nel codice non c'è un default: lo
@@ -168,6 +169,10 @@ test('buildVerifierBrief: niente che non serva a criticare', () => {
   assert.match(brief, /verify-local\.mjs critica/);
   assert.ok(!/corretto "/.test(brief), 'il comando della correzione non si annuncia prima');
   assert.ok(!/FASE 2/.test(brief));
+  // La ricetta in coda al compito dice di allegare alla critica un file con le
+  // scelte e i loro costi; in locale lo strumento non accetta opzioni. Chi
+  // verifica deve saperlo prima di scrivere quel file, non dal rifiuto.
+  assert.match(brief, /non c'è\s*\n?\s*`--segnala`/);
 });
 
 // L'isolamento è il motivo per cui questa verifica vale qualcosa: se al
@@ -757,7 +762,7 @@ test('leggiBilanciDalServer: i tre numeri dal documento Firestore, col token del
     return { ok: true, status: 200, json: async () => ({ fields: { cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' }, fixInstructions: { stringValue: 'TESTO' } } }) };
   };
   const caps = await leggiBilanciDalServer({ fetchImpl, env: { FILO_ADMIN_ID_TOKEN: 'tok' } });
-  assert.deepEqual(caps, { cap2: 10, cap1: 1, cap0: 0, fixInstructions: 'TESTO' });
+  assert.deepEqual(caps, { cap2: 10, cap1: 1, cap0: 0, fixInstructions: 'TESTO', giroStretto: false });
   assert.equal(chiamate.length, 1);
   assert.match(chiamate[0].url, /config\/routines/);
   assert.equal(chiamate[0].auth, 'Bearer tok');
@@ -804,13 +809,20 @@ test('withCritique senza i bilanci lancia: non c\'è un default con cui rimpiazz
   assert.throws(() => withCritiqueRaw(s, 'r', { critique: LUNGA_FIX, sha: SHA, caps: { cap2: 5, cap1: 2 } }), /senza i bilanci cap0/);
 });
 
-test('CLI: status e start stampano i bilanci letti dal server; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
+test('CLI: né status né start mettono i bilanci davanti a chi verifica; con un server irraggiungibile o un documento incompleto si fermano con l\'errore', async () => {
   const casa = depositoUsaEGetta();
+  // `status` è il primo comando che prova chi verifica: legge il documento del
+  // server (così un token mancante si scopre subito) ma i numeri non li mostra
+  // — sapere quanti giri restano per un livello orienta il livello.
   const st = vl(casa, 'status');
-  assert.match(st.out, /Bilanci del giro \(dal server, config\/routines\): cap2 5 · cap1 2 · cap0 0/);
+  assert.equal(st.code === 0 || st.code === 1, true, st.out);
+  assert.doesNotMatch(st.out, /cap2|cap1|cap0|Bilanci/);
+  assert.match(st.out, /Server raggiunto/);
   const start = vl(casa, 'start', 'richiesta di prova');
   assert.equal(start.code, 0, start.out);
-  assert.match(start.out, /cap2 5 · cap1 2 · cap0 0/);
+  // Il compito consegnato a chi verifica (l'uscita normale) NON porta i
+  // bilanci: sapere prima quanti giri restano orienta il livello che scrive.
+  assert.doesNotMatch(start.out, /cap2 5|Bilanci del giro/);
   // Un giro con la critica: i bilanci residui sono quelli del server (5 → 4).
   const cr = vl(casa, 'critica', LUNGA_FIX);
   assert.equal(cr.code, 0, cr.out);
@@ -833,4 +845,117 @@ test('CLI: status e start stampano i bilanci letti dal server; con un server irr
     assert.match(r.stderr, /Gestione → Automazioni/);
   } finally { parziale.kill(); }
 
+});
+
+test('la coda locale è il testo del server più le sole differenze locali', async () => {
+  const { codaDalServer } = await import('../../scripts/verify-local.mjs');
+  assert.equal(codaDalServer(''), '', 'senza testo dal server non si inventa niente: decide il ripiego');
+  assert.equal(codaDalServer('   '), '');
+  const t = codaDalServer('FASE 2 — adesso correggi tu.\n8. Consegna: node scripts/dispatch.mjs --record-fixed <id>');
+  assert.ok(t.startsWith('FASE 2 — adesso correggi tu.'), 'il testo del server arriva intero e per primo');
+  assert.match(t, /IN LOCALE/);
+  assert.match(t, /verify-local\.mjs corretto/, 'la consegna locale è detta per esteso');
+  assert.match(t, /non c'è un biglietto/);
+  const coda = codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/x', instructions: t });
+  assert.match(coda, /FASE 2 — adesso correggi tu\./);
+  assert.match(coda, /verify-local\.mjs corretto/);
+});
+
+// ─── Giro stretto: dopo una correzione, la verifica controlla la chiusura ────
+
+test('giro stretto: l\'interruttore si legge coi bilanci, e solo un true esplicito lo accende', async () => {
+  const conCampi = (extra) => async () => ({ ok: true, status: 200, json: async () => ({ fields: { cap2: { integerValue: '5' }, cap1: { integerValue: '2' }, cap0: { integerValue: '0' }, ...extra } }) });
+  const leggi = (extra) => leggiBilanciDalServer({ fetchImpl: conCampi(extra), env: { FILO_ADMIN_ID_TOKEN: 't' } });
+  assert.equal((await leggi({})).giroStretto, false, 'campo assente = spento');
+  assert.equal((await leggi({ giroStretto: { booleanValue: false } })).giroStretto, false);
+  assert.equal((await leggi({ giroStretto: { stringValue: 'true' } })).giroStretto, false, 'un tipo storto non accende');
+  assert.equal((await leggi({ giroStretto: { booleanValue: true } })).giroStretto, true);
+});
+
+test('giro stretto: il perimetro nasce dalla correzione consegnata e vale solo per la verifica subito dopo', () => {
+  const giro = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'Provato.\n[2] Salva non salva col titolo vuoto\n[1?] bordo caldo o freddo', sha: SHA });
+  const corretto = withFixed(giro.state, 'r', { report: 'corretto il salvataggio', sha: ALTRO_SHA });
+  assert.equal(corretto.outcome, 'fixed');
+  const dopo = withRequest(corretto.state, 'r', { request: 'fai X', sha: ALTRO_SHA });
+  assert.equal(dopo.r.chiusura.shaPrima, SHA, 'lo sha di prima è quello della critica');
+  assert.deepEqual(dopo.r.chiusura.rilievi.map((f) => f.level), [2], 'solo i rilievi che il giro doveva correggere');
+  assert.equal(ambitoLocale({ giroStretto: true }, dopo.r), 'chiusura');
+  assert.equal(ambitoLocale({ giroStretto: false }, dopo.r), 'pieno', 'interruttore spento = verifica piena');
+  assert.equal(ambitoLocale({}, dopo.r), 'pieno', 'interruttore assente = spento');
+  // Uno start rilanciato (verificatore morto a metà) resta di chiusura.
+  assert.equal(ambitoLocale({ giroStretto: true }, withRequest(dopo, 'r', { request: 'fai X', sha: ALTRO_SHA }).r), 'chiusura');
+  // Al primo giro, e dopo un pass, non c'è niente da chiudere.
+  assert.equal(ambitoLocale({ giroStretto: true }, withRequest({}, 'r', { request: 'fai X', sha: SHA }).r), 'pieno');
+  const passato = withCritique(dopo, 'r', { critique: 'Provato tutto il perimetro: regge.', sha: ALTRO_SHA });
+  assert.equal(passato.outcome, 'pass');
+  assert.equal(ambitoLocale({ giroStretto: true }, withRequest(passato.state, 'r', { request: 'fai X', sha: ALTRO_SHA }).r), 'pieno');
+});
+
+test('giro stretto: il compito consegna il testo di chiusura col perimetro leggibile; il giro pieno resta com\'era', () => {
+  const chiusura = buildVerifierBrief({
+    request: 'fai X', branch: 'claude/x', recipe: readRecipe(_ROOT, 'chiusura'), history: [], scope: 'chiusura',
+    perimetro: { rilievi: [{ level: 2, text: 'Salva non salva col titolo vuoto' }], shaPrima: 'abc1234' },
+  });
+  assert.match(chiusura, /controllo di chiusura/);
+  assert.match(chiusura, /Perimetro di questo giro[\s\S]*\[2\] Salva non salva col titolo vuoto/);
+  assert.match(chiusura, /git diff abc1234\.\.HEAD/);
+  assert.match(chiusura, /seconda eccezione/, 'il divieto del diff dichiara la sua eccezione');
+  assert.doesNotMatch(chiusura, /cap[012]|Bilanci/);
+  const pieno = buildVerifierBrief({ request: 'fai X', branch: 'claude/x', recipe: readRecipe(_ROOT), history: [] });
+  assert.doesNotMatch(pieno, /Perimetro di questo giro|seconda eccezione|controllo di chiusura/);
+  assert.match(pieno, /prova a far fallire la cosa chiesta/);
+  // Uno scope storto non restringe niente.
+  assert.equal(readRecipe(_ROOT, 'lampo'), readRecipe(_ROOT));
+});
+
+test('CLI giro stretto: dopo «corretto», start consegna la chiusura solo con l\'interruttore acceso', async () => {
+  const acceso = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify({ ...CAPS_TEST, giroStretto: true }) });
+  try {
+    const casa = depositoUsaEGetta();
+    const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_ROUTINE_CONFIG_URL: acceso.url };
+    const lancia = (...args) => spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
+    const primo = lancia('start', 'richiesta di prova');
+    assert.equal(primo.status, 0, primo.stderr);
+    assert.doesNotMatch(primo.stdout, /Perimetro di questo giro/, 'il primo giro è pieno anche a interruttore acceso');
+    assert.match(primo.stderr, /Ambito della verifica: pieno/);
+    assert.equal(lancia('critica', LUNGA_FIX).status, 0);
+    _write(resolve(casa, 'a.txt'), 'corretto', 'utf8');
+    _exec('git', ['commit', '-qam', 'correzione'], { cwd: casa, encoding: 'utf8' });
+    const consegna = lancia('corretto', 'Corretto il difetto segnalato: ora il salvataggio parte anche col titolo vuoto, provato a mano.');
+    assert.equal(consegna.status, 0, consegna.stderr);
+    const secondo = lancia('start');
+    assert.equal(secondo.status, 0, secondo.stderr);
+    assert.match(secondo.stdout, /Perimetro di questo giro[\s\S]*\[2\] rotto/);
+    assert.match(secondo.stderr, /Ambito della verifica: chiusura/);
+    // Stesso stato, interruttore spento (il server di tutto il file): pieno.
+    const spento = vl(casa, 'start');
+    assert.equal(spento.code, 0, spento.out);
+    assert.doesNotMatch(spento.out, /Perimetro di questo giro/);
+  } finally { acceso.kill(); }
+});
+
+test('giro stretto dopo un riallineamento a main: il diff della chiusura resta la sola correzione', async () => {
+  const { shaPrimaAllineato } = await import('../../scripts/verify-local.mjs');
+  const { work } = scenario({ conflitto: false });
+  const partenza = g(work, ['rev-parse', 'HEAD']); // la critica è stata registrata qui
+  writeFileSync(resolve(work, 'correzione.txt'), 'corretto\n', 'utf8');
+  g(work, ['add', '-A']);
+  g(work, ['commit', '-q', '-m', 'correzione']);
+  g(work, ['fetch', '-q', 'origin', 'main']);
+  g(work, ['rebase', '-q', 'origin/main']);
+  const nomi = (da) => g(work, ['diff', '--name-only', `${da}..HEAD`]).split('\n').filter(Boolean).sort();
+  assert.deepEqual(nomi(partenza), ['correzione.txt', 'principale.txt'], 'dal commit vecchio il diff porta dentro anche main');
+  const adesso = shaPrimaAllineato(partenza, work);
+  assert.ok(adesso && adesso !== partenza, 'il gemello del commit di partenza si ritrova nel ramo riscritto');
+  assert.deepEqual(nomi(adesso), ['correzione.txt']);
+  assert.equal(shaPrimaAllineato(adesso, work), adesso, 'un commit che è già nel ramo resta quello');
+  assert.equal(shaPrimaAllineato('non-uno-sha', work), '');
+  assert.equal(shaPrimaAllineato('', work), '');
+});
+
+test('la coda locale dice che fermare il lavoro da lì non si può, e cosa fare al suo posto', async () => {
+  const { codaDalServer } = await import('../../scripts/verify-local.mjs');
+  const t = codaDalServer('FASE 2 — adesso correggi tu.');
+  assert.match(t, /non c'è nemmeno `--ferma`/);
+  assert.match(t, /per primo nel report/);
 });

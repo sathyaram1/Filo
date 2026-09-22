@@ -318,6 +318,64 @@ export function sealCurrentWork(root, { id = '', by = 'consegna' } = {}) {
   return { sealed: true, id: fid, sha };
 }
 
+/**
+ * I campi dello specchio locale che dicono SU QUALE CONTENUTO è stato dato ogni
+ * via libera, per l'intento che lo registra. Uno solo, così le due strade non
+ * possono divergere sul nome (feedback #485).
+ */
+export const CAMPI_ESITO = Object.freeze({
+  verdict: Object.freeze(['verifierSha']),
+  secaudit: Object.freeze(['secauditSha']),
+  // Una correzione è contenuto nuovo: gli esiti dati su quello vecchio se ne
+  // vanno con lui, o resterebbe in giro la firma di un controllo fatto altrove.
+  fixed: Object.freeze(['verifierSha', 'secauditSha']),
+});
+
+/**
+ * Ricorda qui su quale contenuto è stato dato un via libera (o lo dimentica,
+ * quando arriva una correzione).
+ *
+ * PERCHÉ NON STA SOLO DOVE STAVA (feedback #485, giro 3)
+ *   Il rifiuto che ferma la fusione quando il ramo si è mosso dopo i via libera
+ *   si regge su questo fogliettino. Se lo scrive una sola delle due strade con
+ *   cui un esito si registra, basta usare l'altra perché la fusione riparta a
+ *   foglio sostituito: la difesa si spegne scegliendo l'ingresso. Qui c'è la
+ *   porta unica, e la chiamano tutte e due.
+ *
+ * Best-effort, come il sigillo: non riuscire a scrivere è un rischio per il
+ * passo dopo, non un motivo per non registrare l'esito adesso. Quando non c'è
+ * niente da scrivere (nessuno stato per questo ramo: un clone appena fatto) il
+ * fatto viene DETTO a chi legge, perché il cancello di fusione possa astenersi
+ * ad alta voce invece di tacere.
+ *
+ * @returns {{ scritto: boolean, id?: string, why?: string }}
+ */
+export function ricordaEsitoSuCommit(root, intento, sha) {
+  const campi = CAMPI_ESITO[String(intento || '')];
+  if (!campi) return { scritto: false, why: 'intento_senza_esito' };
+  const svuota = String(intento) === 'fixed';
+  if (!svuota && !String(sha || '')) return { scritto: false, why: 'senza_commit' };
+  const branch = currentBranch(root);
+  if (!branch || branch === 'HEAD' || isProtectedBranch(branch)) return { scritto: false, why: 'no_branch' };
+  let fid = '';
+  const exp = readExpectation(root);
+  if (exp && exp.branch === branch) fid = String(exp.id || '');
+  if (!fid) fid = findStateIdByBranch(root, branch);
+  if (!fid) return { scritto: false, why: 'no_id' };
+  const prev = readBranchState(root, fid);
+  // Uno stato che nomina un ALTRO branch non si tocca: stessa regola del
+  // sigillo, per lo stesso motivo.
+  if (prev && prev.branch && prev.branch !== branch) return { scritto: false, why: 'other_branch' };
+  const base = { ...(prev || {}), id: fid, branch };
+  for (const c of campi) base[c] = svuota ? '' : String(sha);
+  try {
+    writeBranchState(root, base);
+  } catch (_) {
+    return { scritto: false, why: 'write_failed' };
+  }
+  return { scritto: true, id: fid };
+}
+
 // ─── A + D: posizionare la directory sul branch giusto ───────────────────────
 
 function refExists(g, ref) {

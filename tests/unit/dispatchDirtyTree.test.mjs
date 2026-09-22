@@ -73,12 +73,25 @@ test('dirtyTreeText per la consegna: dice che la correzione starebbe fuori da og
   assert.match(t, /\n  a\.txt$/);
 });
 
+// Feedback #485: il verdetto del controllo di sicurezza era l'unico dei
+// quattro esiti a non guardare la directory. Un pass registrato con file fuori
+// dai commit parla del diff letto, mentre il salvataggio automatico sposta la
+// punta subito dopo: nella fusione finiscono righe mai controllate.
+test('dirtyTreeText per il verdetto di sicurezza: dice che le righe non controllate finirebbero nella fusione, e di rileggere il diff', () => {
+  const t = dirtyTreeText(['src/main/services/handlers/auth.js'], 'verdetto');
+  assert.match(t, /^verdetto non registrato/);
+  assert.match(t, /rileggilo prima di registrare lo stesso verdetto/, 'se quelle righe cambiano il codice, il diff letto non vale più');
+  assert.doesNotMatch(t, /critica/, 'la parola della strada sbagliata non compare');
+  assert.match(t, /git add -A && git commit/);
+  assert.match(t, /\n  src\/main\/services\/handlers\/auth\.js$/);
+});
+
 // Verifica del 2026-09-08 (giro 3): la PRIMA consegna del lavoro — chi risolve
 // mette il feedback in revisione dal canale, come dice la sua ricetta — e le
 // consegne dirette della correzione e del verdetto passavano con modifiche non
 // salvate: la verifica dopo provava il ramo senza di esse. Le strade gemelle
 // passate da dispatch respingevano già.
-test('CLI routine-channel deliver: revisione, correzione e verdetto con modifiche non salvate respingono PRIMA del server; a commit fatto vanno al server', async () => {
+test('CLI routine-channel deliver: revisione, correzione, critica e verdetto di sicurezza con modifiche non salvate respingono PRIMA del server; a commit fatto vanno al server', async () => {
   const { spawnSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
   const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
@@ -102,13 +115,16 @@ test('CLI routine-channel deliver: revisione, correzione e verdetto con modifich
       ['status', '--status', 'revision_capability', '--notes', REPORT, '--frase', 'ok', '--branch', 'claude/lavoro'],
       ['fixed', '--report', REPORT],
       ['verdict', '--critique', REPORT, '--sha', 'abc'],
+      // Il verdetto del controllo di sicurezza era l'unico rimasto fuori: vale
+      // per il commit letto come gli altri (feedback #485).
+      ['secaudit', '--verdict', 'pass'],
     ];
 
     writeFileSync(resolve(sandbox, 'a.txt'), 'base\nfix\n', 'utf8');
     for (const c of consegne) {
       const sporco = lancia(...c);
       assert.equal(sporco.status, 1, `${c[0]}: con modifiche non salvate deve fermarsi prima del server: ${sporco.stderr}`);
-      assert.match(String(sporco.stderr), /non registrata: ci sono (file non registrati|modifiche non salvate)/);
+      assert.match(String(sporco.stderr), /non (registrata|registrato): ci sono (file non registrati|modifiche non salvate)/);
       assert.match(String(sporco.stderr), /\n  a\.txt/, `${c[0]}: elenca il file`);
       assert.match(String(sporco.stderr), /Niente è stato consegnato/);
     }

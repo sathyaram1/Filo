@@ -90,11 +90,17 @@
       font-size: 13px; font-weight: 600;
     }
     .bd-vote-btn:hover { border-color: var(--sn-accent); }
+    /* Il voto già dato prende i colori dai token del tema: scritti a mano, sul fondo scuro il
+       conteggio scendeva sotto il contrasto minimo e spariva proprio dopo aver votato. */
     .bd-vote-btn[aria-pressed="true"].bd-vote-works {
-      background: rgba(39, 174, 96, 0.15); border-color: #27ae60; color: #1e8449;
+      background: color-mix(in srgb, var(--sn-success) 15%, transparent);
+      border-color: var(--sn-success);
+      color: var(--sn-success);
     }
     .bd-vote-btn[aria-pressed="true"].bd-vote-broken {
-      background: rgba(192, 57, 43, 0.15); border-color: #c0392b; color: #c0392b;
+      background: color-mix(in srgb, var(--sn-error) 15%, transparent);
+      border-color: var(--sn-error);
+      color: var(--sn-error);
     }
     .bd-vote-count { font-variant-numeric: tabular-nums; }
 

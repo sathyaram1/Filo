@@ -95,6 +95,22 @@ costano dieci riletture, in un turno solo una. Quindi:
 - **Mai committare artefatti dei test** (`tests/.shots/`, `tests/.smoke/`,
   `tests/agent/.out/`, ecc.: output rigenerato, gitignorato). Se un PNG risulta
   tracciato: `git rm --cached <file>`.
+- **Fine riga: LF ovunque, e non si tratta.** `.gitattributes` impone
+  `* text=auto eol=lf`, e vince su `core.autocrlf` — che su Windows, e nei
+  contenitori `windows-latest` dove gira il cancello che pubblica, è acceso di
+  serie. Su un checkout a CRLF gli hook di `.claude/hooks/*.sh` non partono
+  (bash legge `cd /percorso\r`, non trova la cartella ed **esce 0**: il
+  salvataggio automatico smette di funzionare in silenzio) e ogni regex
+  ancorata a fine riga smette di riconoscere i file del repo, perché per una
+  regex `\r` è già un fine riga. Conseguenze pratiche: non togliere quella
+  regola; un NUL dentro un sorgente si scrive come escape (`\u0000`), perché il
+  carattere vero fa considerare il file BINARIO a git e lo lascia fuori dalla
+  normalizzazione. La regola vale al CHECKOUT, quindi su un clone nuovo: una
+  cartella che esiste già e ha i file storti si raddrizza con `git rm --cached
+  -r .` seguito da `git reset --hard` (che butta le modifiche non committate),
+  oppure riclonando; `git checkout -- .` e `git add --renormalize .` non
+  bastano. La sentinella è `tests/unit/fineRigaLf.test.mjs`; il racconto
+  sta in `patterns/la-fine-riga-la-decide-il-repo-non-la-macchina-che-clona.md`.
 
 ## Commenti nel codice
 
@@ -307,20 +323,14 @@ locale: da tutte e due le parti il lavoro passa poi da una verifica
 indipendente, che costa un agente intero. Nei giri di agosto e settembre il
 primo giro trovava un rilievo grave in 15 lavori su 17, quasi sempre su
 qualcosa che chi aveva lavorato poteva vedere da sé. Quindi, prima della
-consegna:
+consegna, applica uno per uno i criteri di
+**`routines/roles/_criteri-verifica.md`**: sono gli stessi che userà chi ti
+verifica. Nelle routine li hai già nel testo del tuo ruolo; in locale apri il
+file (nove voci).
 
-- le **strade equivalenti** — menu, scorciatoia, tasto destro, chat, l'altra
-  pagina che ha la stessa funzione — fanno tutte la stessa cosa;
-- **tema scuro e tema chiaro**, se hai toccato qualcosa che si vede;
-- **input limite**: vuoto, soli spazi, 10.000 caratteri, caratteri speciali,
-  azioni ripetute in fretta;
-- le **invarianti UX** del § Iniziativa: se si può aggiungere si può togliere,
-  cammini equivalenti si comportano allo stesso modo;
-- una **prova sul cammino segnalato**, che asserisce il successo dal punto di
-  vista dell'utente. Quale prova lo dicono i minimi qui sopra: se non c'è
-  niente da aprire (logica pura, testi, strumenti da riga di comando) è il
-  controllo veloce in `tests/unit/`, non una spec che apre Filo per non
-  guardarci niente.
+Quale prova scrivere lo dicono i minimi qui sopra: se non c'è niente da aprire
+(logica pura, testi, strumenti da riga di comando) è il controllo veloce in
+`tests/unit/`, non una spec che apre Filo per non guardarci niente.
 
 Quello che trovi lo correggi adesso, non lo lasci a chi verifica.
 

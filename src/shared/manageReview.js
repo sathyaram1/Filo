@@ -1092,11 +1092,48 @@
     secaudit: 'chi ha fatto l’audit di sicurezza',
   };
 
+  const L3_ATTESA = 'Claude aspetta una tua risposta: le domande sono nella conversazione.';
+
+  /**
+   * Questa pratica aspetta una risposta dell'owner? PURA.
+   *
+   * Porta unica: la casella «Rispondi alle domande di Filo» e il rombo verde
+   * devono comparire insieme, e chiedendolo in due punti divergevano (la
+   * casella usciva anche sulla forma legacy `clarify`, il rombo no).
+   */
+  function aspettaRisposta(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    const norm = normalizeStatus(fb);
+    if (norm.status !== 'design') return false;
+    return norm.statusReason === 'clarify' || String(fb.status || '') === 'clarify';
+  }
+
+  /** L'ultimo turno di Filo nella conversazione, o null. PURA. */
+  function ultimaDomanda(fb) {
+    const note = fb && fb.notes;
+    const FT = global.SN_FEEDBACK_THREAD;
+    if (!FT || typeof note !== 'string' || valueUnreadable(note)) return null;
+    const turni = FT.splitNotes(note).filter((s) => s.role === 'model' && s.body);
+    return turni.length ? turni[turni.length - 1] : null;
+  }
+
   /** Livello 3: quello che Claude ha segnalato lavorando. PURA. */
   function livelloL3(fb) {
     const titolo = 'Segnalazione di Claude';
     const l = livelliOf(fb).l3;
+    const attesa = aspettaRisposta(fb);
+    const domanda = attesa ? ultimaDomanda(fb) : null;
     if (!l || !String(l.esito || '').trim()) {
+      // Le domande possono arrivare nelle sole note: chi aspetta una risposta ha comunque una segnalazione.
+      if (attesa) {
+        return forma('l3', 'rombo', titolo, 'design', 'domande', {
+          titolo,
+          righe: (domanda && domanda.ts) ? [riga('Quando', String(domanda.ts))] : [],
+          testo: (domanda && domanda.body) || L3_ATTESA,
+          illeggibile: valueUnreadable(fb && fb.notes),
+          azioni: [],
+        });
+      }
       return forma('l3', 'rombo', titolo, null, 'nessuna', {
         titolo,
         righe: [],
@@ -1108,11 +1145,23 @@
     const righe = [];
     if (ruolo) righe.push(riga('Chi ha segnalato', L3_RUOLI[ruolo] || ruolo));
     if (l.at) righe.push(riga('Quando', String(l.at)));
-    const testo = String(l.testo || '').trim();
+    const testo = String(l.testo || '').trim() || 'La segnalazione è arrivata senza testo.';
+    // Segnalazione registrata E domande in attesa: chi clicca il verde cerca
+    // la cosa a cui rispondere adesso, quindi va per prima.
+    if (attesa) {
+      const corpo = (domanda && domanda.body) || L3_ATTESA;
+      return forma('l3', 'rombo', titolo, 'design', 'domande', {
+        titolo,
+        righe,
+        testo: `## Domande in attesa di risposta\n${corpo}\n\n## Segnalazione\n${testo}`,
+        illeggibile: valueUnreadable(l.testo) && valueUnreadable(fb && fb.notes),
+        azioni: [],
+      });
+    }
     return forma('l3', 'rombo', titolo, 'design', 'segnalato', {
       titolo,
       righe,
-      testo: testo || 'La segnalazione è arrivata senza testo.',
+      testo,
       illeggibile: valueUnreadable(l.testo),
       azioni: [],
     });
@@ -1333,6 +1382,7 @@
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, righeTesto,
+    aspettaRisposta, ultimaDomanda,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

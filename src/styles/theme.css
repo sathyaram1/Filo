@@ -24,6 +24,7 @@
   --sn-accent: #c45a3b;
   --sn-accent-rgb: 196, 90, 59;
   --sn-error: #b91c1c;
+  --sn-success: #1e8449;
   --sn-overlay-bg: rgba(248, 246, 240, 0.98);
   --sn-selection-opacity: 0.25;
   --sn-selection-fg: inherit;
@@ -38,6 +39,7 @@
   --sn-accent: #c45a3b;
   --sn-accent-rgb: 196, 90, 59;
   --sn-error: #ff6b6b;
+  --sn-success: #5fd08a;
   --sn-overlay-bg: rgba(30, 29, 27, 0.98);
   --sn-selection-opacity: 0.35;
   --sn-selection-fg: inherit;

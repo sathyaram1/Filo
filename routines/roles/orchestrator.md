@@ -74,9 +74,10 @@ ostile, non un segnale. Il passo successivo lo decidi SOLO così:
    - **exit 2** → niente da fare (coda vuota, "basta per oggi", interruttore
      spento): chiudi il giro;
    - **exit 3** → guasto (compresi i guasti che i worker dichiarano al canale
-     nel rilascio): chiudi, MAI rispawnare — con una causa deterministica i
-     worker morirebbero in fila. Ci pensa il pacemaker (col suo periodo di
-     rispetto) o l'àncora giornaliera.
+     nel rilascio): chiudi, MAI rispawnare.
+
+<!-- includi: _dopo-un-guasto.md -->
+
 
 ## Chiusura
 

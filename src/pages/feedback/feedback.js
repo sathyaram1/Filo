@@ -1047,7 +1047,7 @@
       // stato — vedi il gestore .fb-act).
       // La routine ha domande: `design` con motivo `clarify`. Vive nei Ricevuti
       // (è una decisione che aspetta l'owner), non più in una sezione sua.
-      const clarifyReply = isAdmin && statusOf(f) === 'design' && statusReasonOf(f) === 'clarify';
+      const clarifyReply = isAdmin && MR.aspettaRisposta(f);
       const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply
         && (currentTab === 'inbox' || currentTab === 'queue');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).

@@ -30,6 +30,10 @@ tests/agent/reports/
 test-results/
 .DS_Store
 *.log
+# Scarti dei comandi andati storti: nascono in radice, restano vuoti, e finiscono
+# committati per sbaglio insieme al resto (`nf2.err` ha viaggiato in ogni copia
+# del repo per due settimane).
+*.err
 
 # worktree annidate (mai committare come gitlink)
 .claude/worktrees/

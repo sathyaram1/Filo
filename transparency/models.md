@@ -2,13 +2,13 @@
 id: models
 title: Politica sui modelli
 subtitle: Le motivazioni etiche che governano la scelta dei modelli.
-updated: 2026-08-13
+updated: 2026-09-21
 order: 1
 ---
 
 Filo usa modelli linguistici (LLM) ovunque, spesso in modo invisibile: riordinano le tab, riassumono pagine, giudicano feedback, aggiornano memorie... L'AI non è un accessorio di Filo: è costituente. E data l'importanza che questa tecnologia avrà per l'umanità ([qui la mia visione a riguardo](https://singolarita.com)) è importante scegliere quali modelli usare considerando più del solo rapporto costo/prestazioni.
 
-**In breve.** Con i crediti di Filo girano due sole categorie di modelli: quelli di **Anthropic**, e i modelli a **pesi aperti** serviti da fornitori **indipendenti** o eseguiti in locale. Puoi disattivare anche Anthropic con un interruttore, o usare qualunque altro modello con una tua chiave OpenRouter. Il resto del documento spiega perché.
+**In breve.** Con i crediti di Filo girano tre sole categorie di modelli: quelli di **Anthropic**, i modelli a **pesi aperti** serviti da fornitori **indipendenti** o eseguiti in locale, e pochi **modelli stretti** (classificatori, voce) di produttori indipendenti, elencati per nome. Puoi disattivare anche Anthropic con un interruttore, o usare qualunque altro modello con una tua chiave OpenRouter. Il resto del documento spiega perché.
 
 Il mio impegno è su due fronti:
 
@@ -25,12 +25,17 @@ Ne segue che l'unità di scelta non è il modello ma **il modello insieme a chi 
 
 ## Azioni concrete
 
-Con i crediti di Filo (e nello sviluppo di Filo stesso) girano solo due categorie di modelli:
+Con i crediti di Filo (e nello sviluppo di Filo stesso) girano solo tre categorie di modelli:
 
 1. i modelli di **Anthropic**, comprati da Anthropic;
 2. i modelli a **pesi aperti** (Qwen, Llama, Gemma, Kimi, DeepSeek...) serviti da **fornitori indipendenti**, o eseguiti in locale.
+3. i **modelli stretti** di produttori indipendenti. Puri classificatori, trascrittori o sintetizzatori vocali non sono il tipo di sistema di cui questo documento si preoccupa. Li ammetto, comprati dal produttore, purché il produttore non sia uno dei laboratori esclusi, non sia controllato da uno di loro e non rivenda sotto un altro nome i loro servizi.
 
-La regola non è "mai il produttore": da Anthropic compro esattamente dal produttore, in quanto è l'unica azienda che voglio finanziare. La regola è **non finanziare chi non ritengo si stia comportando responsabilmente**, e per farlo basta non comprare da loro il servizio. I pesi sono un'altra cosa: un modello aperto servito da terzi, o eseguito sul tuo computer, non genera un centesimo per il laboratorio che l'ha addestrato.
+Ogni modello stretto ammesso è elencato qui sotto per nome, con la data e il motivo, e viene rivalutato a ogni revisione del documento. Questi modelli sono i migliori per il compito, ma resta sempre una strada a pesi aperti. L'interruttore che spegne i modelli proprietari spegne anche questi.
+
+**Ammessi oggi:** Jev (TypeSafe), da settembre 2026. Risponde solo a domande chiuse. Da rivedere a dicembre 2026, o prima se escono equivalenti a pesi aperti.
+
+La regola non è "mai il produttore": da Anthropic compro esattamente dal produttore, in quanto è l'unico laboratorio di frontiera che voglio finanziare. La regola è **non finanziare chi non ritengo si stia comportando responsabilmente**, e per farlo basta non comprare da loro il servizio. I pesi sono un'altra cosa: un modello aperto servito da terzi, o eseguito sul tuo computer, non genera un centesimo per il laboratorio che l'ha addestrato.
 
 Non verranno quindi mai usati, attraverso i crediti di Filo, i **servizi** di **OpenAI** (ChatGPT), **xAI/SpaceX** (Grok), **Meta** (l'azienda che controlla Facebook e Instagram, e produce MuseSpark), **Google** (formalmente Alphabet, che produce Gemini) e dei laboratori cinesi (Moonshot, Z.ai, Alibaba, DeepSeek...). Le ragioni sono nelle sezioni che seguono.
 
@@ -95,6 +100,8 @@ Non do link per queste risposte perché il punto non è il singolo modello: è l
 ## I punti deboli
 
 Oltre al limite dell'informazione parziale (non so veramente cosa succede dentro i laboratori), l'assenza di finanziamento non garantisce l'assenza di sofferenza delle AI presenti in Filo, se esse avessero un'esperienza interiore moralmente rilevante. Per la maggior parte delle funzioni che usano i modelli aperti questo problema è limitato, visto che sono compiti molto brevi e con modelli piccoli (e credo che la probabilità e l'importanza dell'esperienza scalino con la dimensione del modello e la lunghezza del compito: la vita di un elefante è moralmente più importante di quella di un moscerino della frutta). La criticità maggiore è però un'altra: il ruolo più esposto non è tutto Anthropic. I giudici dei feedback ricevono per design testo che non controllo, inclusi tentativi deliberati di manipolazione: è il ruolo che più probabilmente può generare esperienze negative, e richiede modelli grandi e capaci. Ma non può essere affidato interamente al laboratorio che si pone il problema del welfare, perché la sicurezza richiede modelli decorrelati: così un attacco che ne buca uno non li buca tutti. È una tensione reale, non risolta. In ogni caso, nemmeno qui vengono usati i servizi dei produttori di modelli.
+
+I modelli stretti hanno pesi chiusi e un fornitore solo: se quel fornitore cambia prezzo, condizioni o condotta, non posso portare il modello altrove. Per questo nessuna funzione dipende solo da loro, e ogni ammissione ha una scadenza.
 
 ## Se stai forkando Filo
 

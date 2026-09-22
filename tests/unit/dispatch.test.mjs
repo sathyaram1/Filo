@@ -5,7 +5,7 @@
 //   - applyVerifierVerdict / applyFixed / applySecaudit: transizioni di stato
 //   - buildPayload: ISOLAMENTO (secaudit non vede il feedback; verifier non vede il diff)
 //   - readState/writeState/clearState su una STATE_DIR temporanea
-//   - preflight / interruttore master / resolveLoopCap
+//   - preflight / interruttore master
 //
 // La SCELTA del lavoro non vive più qui: la fa il server col biglietto
 // (SPEC-RIDISEGNO-MAX.md §1; la copia viva delle regole è
@@ -42,8 +42,12 @@ const {
   readState,
   writeState,
   clearState,
-  resolveLoopCap,
-  verifierNoteText,
+  fixedPayload,
+  fermaSenzaSegnalazione,
+  fixedReplyText,
+  verifierScope,
+  perimetroNote,
+  serverCtx,
   withRetry,
   emit,
   preflight,
@@ -75,7 +79,7 @@ test('applyVerifierVerdict fix: lo specchio locale registra la critica coi livel
   const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] rotto qui');
   assert.equal(s.verifierVerdict, 'fix-pending');
   assert.equal(s.verifierCritique, '[2] rotto qui');
-  assert.equal(applyVerifierVerdict(s, 'stop', '[2] ancora').verifierVerdict, 'blocked');
+  assert.equal(applyVerifierVerdict(s, 'stop', '[2] ancora').verifierVerdict, 'stop');
 });
 
 test('applyFixed: ri-mette in coda verifier e azzera la critica (i bilanci li tiene il server)', () => {
@@ -102,6 +106,9 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.match(fix, /\[0\] raro/);
   assert.match(fix, /cap2: 4 giri residui su 5/);
   assert.match(fix, /FASE 2 — correggi/);
+  // Il testo della fase 2 è dell'owner e può tacerla: la porta per fermarsi la stampa lo strumento.
+  assert.match(fix, /--record-fixed <id> "<report>" --segnala <file\.md> --ferma/);
+  assert.ok(fix.indexOf('--ferma') > fix.indexOf('FASE 2 — correggi'), 'dopo le istruzioni, non al loro posto');
   assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
   assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3\] grave/);
   // Un «ok» senza esito non è un pass: dirlo superato mandava a rilasciare il
@@ -120,7 +127,7 @@ test('applySecaudit: marca secauditDone e il verdetto', () => {
   assert.equal(sa.secauditVerdict, 'pass');
 });
 
-// ─── Il terzo esito: migliorabile (SPEC-RIDISEGNO-MAX.md §13) ────────────────
+// ─── Le parole dei vecchi verdetti si rifiutano, non si ignorano ─────────────
 
 test('la parola del vecchio verdetto è tollerata sulla riga di comando, ma non decide niente', async () => {
   const { LEGACY_VERDICT_WORDS } = await import('../../scripts/dispatch.mjs');
@@ -147,12 +154,11 @@ test('buildPayload verifier: vede il feedback (sintomo), MAI il diff', () => {
   assert.ok(!JSON.stringify(p).includes('DIFF'));
 });
 
-test('buildPayload fixer: feedback + critica del verifier', () => {
-  const bucket = { role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', loopCount: 1, state: { verifierCritique: 'rotto X' } };
+test('buildPayload fixer: il feedback, e nessuna critica da correggere', () => {
+  const bucket = { role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', state: { verifierCritique: 'rotto X' } };
   const p = buildPayload(bucket, { feedback: { text: 'lamentela' } });
   assert.equal(p.feedback.text, 'lamentela');
-  assert.equal(p.verifierCritique, 'rotto X');
-  assert.equal(p.loopCount, 1);
+  assert.equal(p.verifierCritique, undefined, 'qui si riallinea un ramo, non si corregge');
 });
 
 test('buildPayload new-work: feedback completo', () => {
@@ -168,34 +174,33 @@ test('buildPayload prober: payload vuoto', () => {
 
 // ─── Lo storico delle critiche (caso #502: sei giri per un difetto da due) ────
 
-test('buildPayload verifier e fixer: lo storico delle critiche arriva nel payload', () => {
+test('buildPayload: lo storico delle critiche arriva a chi verifica, e a nessun altro', () => {
   const history = [
     { verdict: 'fail', critique: 'esce con lo zoom' },
     { verdict: 'fail', critique: 'esce col ridimensionamento' },
   ];
-  const v = buildPayload({ role: 'verifier', id: 'A', num: '#1', branch: 'worker/A', loopCount: 2 }, { feedback: { text: 's' }, history });
+  const v = buildPayload({ role: 'verifier', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, history });
   assert.deepEqual(v.history, history, 'il verifier vede le porte già trovate dai giri passati');
-  assert.equal(v.loopCount, 2, 'e sa a che giro è');
+  assert.ok(!('loopCount' in v), 'chi verifica non deve sapere quanti giri sono passati o restano');
   const f = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', serverCritique: 'ultima' }, { feedback: { text: 's' }, history });
-  assert.deepEqual(f.history, history, 'chi corregge vede la SERIE, non solo l\'ultima critica');
-  assert.equal(f.verifierCritique, 'ultima');
+  assert.equal(f.history, undefined, 'il riallineamento non corregge niente: la serie non gli serve');
 });
 
 test('buildPayload: senza storico dal server (o malformato) arriva un elenco vuoto', () => {
   const v = buildPayload({ role: 'verifier', id: 'A', branch: 'worker/A' }, { feedback: { text: 's' } });
   assert.deepEqual(v.history, [], 'un server vecchio non manda lo storico: elenco vuoto, non un buco');
   const f = buildPayload({ role: 'fixer', id: 'A', branch: 'worker/A' }, { feedback: { text: 's' }, history: 'non-un-array' });
-  assert.deepEqual(f.history, []);
+  assert.equal(f.history, undefined);
 });
 
 test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e chi verifica', () => {
   const due = [{ critique: 'a' }, { critique: 'b' }];
-  assert.equal(serialAwarenessNote('fixer', []), '', 'primo passaggio: niente avvertenza');
-  assert.equal(serialAwarenessNote('fixer', [{ critique: 'a' }]), '', 'una sola bocciatura non è una serie');
-  assert.match(serialAwarenessNote('fixer', due), /inventario/, 'dalla seconda: inventario delle strade, non l\'ultima porta');
+  assert.equal(serialAwarenessNote('verifier', []), '', 'primo giro: niente avvertenza');
+  assert.equal(serialAwarenessNote('verifier', [{ critique: 'a' }]), '', 'una sola bocciatura non è una serie');
   assert.match(serialAwarenessNote('verifier', due), /stessa critica/i, 'il verifier deve elencare le porte tutte insieme');
   assert.equal(serialAwarenessNote('secaudit', due), '', 'il controllo di sicurezza non c\'entra con la serie');
-  assert.equal(serialAwarenessNote('fixer', null), '', 'storico assente ≠ guasto');
+  assert.equal(serialAwarenessNote('fixer', due), '', 'il riallineamento dopo un conflitto non corregge niente');
+  assert.equal(serialAwarenessNote('verifier', null), '', 'storico assente ≠ guasto');
 });
 
 // ─── Stato su disco ───────────────────────────────────────────────────────────
@@ -219,66 +224,6 @@ test('readState: id inesistente → null', () => {
 // perdeva il verdetto e dispatch re-instradava all'infinito lo stesso feedback.
 // Sotto FILO_DISPATCH_STATE_DIR (test) la persistenza deve essere un NO-OP: mai
 // toccare git col repo reale mentre gira la suite.
-
-// ─── resolveLoopCap: precedenza env > remoto > default, con clamp ─────────────
-// Il default è il LEGACY_FAIL_CAP del giro vecchio (10, SPEC-RIDISEGNO-MAX.md
-// §13): i documenti che dicevano "3" erano già stantii, e il numero non vive
-// più nei prompt. (I tre bilanci nuovi cap2/cap1/cap0 non hanno default nel
-// codice, dal 2026-09-16: li scrive l'owner in config/routines.)
-
-test('resolveLoopCap: niente env né remoto → default failCap (10)', () => {
-  assert.equal(resolveLoopCap({}), 10);
-  assert.equal(resolveLoopCap({ envRaw: undefined, remote: null }), 10);
-});
-
-test('resolveLoopCap: il valore remoto (scelto dall owner) si usa se manca l env', () => {
-  assert.equal(resolveLoopCap({ remote: 5 }), 5);
-  assert.equal(resolveLoopCap({ envRaw: '', remote: 7 }), 7);
-});
-
-test('resolveLoopCap: l env override vince sul remoto', () => {
-  assert.equal(resolveLoopCap({ envRaw: '4', remote: 9 }), 4);
-});
-
-test('resolveLoopCap: clamp nel range [1, 10] sia env sia remoto', () => {
-  assert.equal(resolveLoopCap({ remote: 99 }), 10);
-  assert.equal(resolveLoopCap({ remote: 0 }), 10);  // 0 non valido → default
-  assert.equal(resolveLoopCap({ envRaw: 50 }), 10);
-  assert.equal(resolveLoopCap({ remote: 7.4 }), 7); // arrotonda a 7
-});
-
-test('resolveLoopCap: valori non numerici → default', () => {
-  assert.equal(resolveLoopCap({ envRaw: 'abc', remote: 'xyz' }), 10);
-});
-
-// ─── verifierNoteText: l'esito del verifier nella chat del feedback ──────────
-
-test('verifierNoteText: pass con critica → incipit + sostanza (senza prefisso PASS)', () => {
-  const n = verifierNoteText('pass', "PASS — ho provato l'incolla immagine e arriva al destinatario");
-  assert.match(n, /^Controllo funzionalità superato\./);
-  assert.match(n, /incolla immagine/);
-  assert.ok(!/PASS —/.test(n)); // il prefisso ridondante viene tolto
-});
-
-test('verifierNoteText: fail con critica → incipit NON superato + passi', () => {
-  const n = verifierNoteText('fail', 'FAIL: il bottone resta disabilitato dopo il primo click');
-  assert.match(n, /^Controllo funzionalità NON superato:/);
-  assert.match(n, /bottone resta disabilitato/);
-  assert.ok(!/FAIL:/.test(n));
-});
-
-test("verifierNoteText: senza critica → solo l'esito (mai nota vuota)", () => {
-  assert.equal(verifierNoteText('pass'), 'Controllo funzionalità superato.');
-  assert.equal(verifierNoteText('fail'), 'Controllo funzionalità NON superato.');
-  assert.equal(verifierNoteText('migliorabile'), 'Verifica: funziona, ma migliorabile.');
-});
-
-test('verifierNoteText: migliorabile → incipit "funziona, ma migliorabile" (senza prefisso)', () => {
-  const n = verifierNoteText('migliorabile', "MIGLIORABILE — l'evidenziazione non si vede sul tema scuro");
-  assert.match(n, /^Verifica: funziona, ma migliorabile — /);
-  assert.match(n, /tema scuro/);
-  assert.ok(!/MIGLIORABILE —/.test(n)); // il prefisso ridondante viene tolto
-});
 
 // ─── withRetry: i guasti transitori non svuotano la coda ─────────────────────
 
@@ -399,12 +344,11 @@ test('resolveRoutinesEnabled: l\'override d\'ambiente batte il remoto', () => {
   assert.equal(resolveRoutinesEnabled({ envRaw: 'sì?', remote: false }), false); // valore ignoto → decide il remoto
 });
 
-test('parseRoutineConfig: legge interruttore, esplorazione e cap', () => {
+test('parseRoutineConfig: legge interruttore ed esplorazione', () => {
   assert.deepEqual(parseRoutineConfig({
     enabled: { booleanValue: false },
     proberWhenIdle: { booleanValue: false },
-    loopCap: { integerValue: '5' },
-  }), { enabled: false, proberWhenIdle: false, loopCap: 5 });
+  }), { enabled: false, proberWhenIdle: false });
   // Documento vuoto (mai scritto) = nessuna decisione presa.
   assert.deepEqual(parseRoutineConfig({}), {});
   // proberWhenIdle: solo il false esplicito compare (true = storico).
@@ -454,21 +398,118 @@ test('preflightExitCode: il contratto 0 / 2 / 3 dell\'orchestratore', () => {
 
 
 
+// ─── Fermare il lavoro da una correzione (--ferma) ───────────────────────────
+
+test('fixedPayload: stop viaggia solo se chiesto, e mai come valore falso', () => {
+  assert.equal(fixedPayload({ report: 'r', ferma: true, segnalazione: 's' }).stop, true);
+  assert.ok(!('stop' in fixedPayload({ report: 'r' })), 'una consegna normale non porta il campo');
+  assert.ok(!('stop' in fixedPayload({ report: 'r', ferma: 'sì' })), 'solo il true vero ferma un lavoro');
+});
+
+test('--ferma senza segnalazione non parte: chi decide non saprebbe cosa decidere', () => {
+  assert.match(fermaSenzaSegnalazione(true, ''), /--segnala/);
+  assert.match(fermaSenzaSegnalazione(true, '   '), /non ho consegnato niente/);
+  assert.equal(fermaSenzaSegnalazione(true, 'file.md'), '');
+  assert.equal(fermaSenzaSegnalazione(false, ''), '');
+});
+
+test('fixedReplyText: un fermo non confermato dal server si dice, non si dà per fatto', () => {
+  assert.match(fixedReplyText('A', { outcome: 'stop' }, true), /FERMATO/);
+  assert.match(fixedReplyText('A', {}, true), /ATTENZIONE/);
+  assert.match(fixedReplyText('A', {}, false), /torna in coda/);
+});
+
+test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server', () => {
+  const script = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
+  const report = 'Non si può correggere senza una decisione: le due strade hanno costi diversi e le spiego nel file.';
+  let uscita = 0;
+  let testo = '';
+  try {
+    execFileSync(process.execPath, [script, '--record-fixed', 'fid-x', report, '--ferma'], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, FILO_ROUTINE_TICKET: '' } });
+  } catch (e) { uscita = e.status; testo = `${e.stdout || ''}${e.stderr || ''}`; }
+  assert.equal(uscita, 1);
+  assert.match(testo, /--ferma vuole anche --segnala/);
+});
+
+// ─── L'ambito della verifica (pieno / riallineamento / chiusura) ─────────────
+
+test('verifierScope: un valore sconosciuto vale pieno, e lo dice', () => {
+  assert.deepEqual(verifierScope(undefined), { scope: 'pieno', sconosciuto: false });
+  assert.deepEqual(verifierScope('pieno'), { scope: 'pieno', sconosciuto: false });
+  assert.deepEqual(verifierScope('chiusura'), { scope: 'chiusura', sconosciuto: false });
+  assert.deepEqual(verifierScope('riallineamento'), { scope: 'riallineamento', sconosciuto: false });
+  assert.deepEqual(verifierScope('veloce'), { scope: 'pieno', sconosciuto: true });
+  assert.deepEqual(verifierScope('constructor'), { scope: 'pieno', sconosciuto: true });
+});
+
+test('perimetroNote: il perimetro si legge come testo, non come JSON', () => {
+  const c = perimetroNote('chiusura', { rilievi: [{ level: 2, text: 'Salva non salva' }, { level: 1, text: 'bordo freddo', decision: true }], shaPrima: 'abc1234' });
+  assert.match(c, /\[2\] Salva non salva/);
+  assert.match(c, /\[1\?\] bordo freddo/);
+  assert.match(c, /git diff abc1234\.\.HEAD/);
+  assert.ok(!c.includes('{'), 'niente JSON grezzo nel compito');
+  const r = perimetroNote('riallineamento', { reportRebase: 'conflitto nelle schede\nsolo meccanico', shaVerificato: 'def5678' });
+  assert.match(r, /> conflitto nelle schede\n> solo meccanico/);
+  assert.match(r, /git diff def5678\.\.HEAD/);
+  assert.equal(perimetroNote('pieno', { rilievi: [] }), '');
+  // Lo sha finisce in un comando da copiare: uno storto non ci entra.
+  assert.ok(!perimetroNote('chiusura', { shaPrima: 'abc; rm -rf .' }).includes('rm -rf'));
+  assert.match(perimetroNote('chiusura', {}), /non comunicati/);
+});
+
+test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro', () => {
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, 'verifier.md'), '# verifica piena\n');
+  writeFileSync(resolve(dir, 'verifier-chiusura.md'), '# verifica di chiusura\n');
+  writeFileSync(resolve(dir, 'verifier-riallineamento.md'), '# verifica dopo il riallineamento\n');
+  const consegna = (payload) => {
+    const bucket = { role: 'verifier', id: 'x', num: '#9', branch: 'worker/x' };
+    let out = '';
+    let err = '';
+    const real = process.stdout.write;
+    const realErr = process.stderr.write;
+    process.stdout.write = (s) => { out += s; return true; };
+    process.stderr.write = (s) => { err += s; return true; };
+    try { emit(bucket, serverCtx(bucket, { payload })); } finally { process.stdout.write = real; process.stderr.write = realErr; }
+    return { ...JSON.parse(out), err };
+  };
+  const storia = [{ critique: 'a' }, { critique: 'b' }];
+  const pieno = consegna({ feedback: { text: 't' }, history: storia });
+  assert.match(pieno.instructions, /# verifica piena/);
+  assert.match(pieno.instructions, /Avvertenza di serie/);
+  assert.equal(pieno.payload.scope, 'pieno');
+  assert.ok(!('loopCount' in pieno), 'la busta non porta più il conto dei giri');
+
+  const chiusura = consegna({ feedback: { text: 't' }, history: storia, scope: 'chiusura', perimetro: { rilievi: [{ level: 2, text: 'Salva non salva' }], shaPrima: 'abc1234' } });
+  assert.match(chiusura.instructions, /# verifica di chiusura/);
+  assert.match(chiusura.instructions, /Perimetro di questo giro[\s\S]*\[2\] Salva non salva/);
+  assert.ok(!/Avvertenza di serie/.test(chiusura.instructions), 'il giro stretto non invita alla ricerca larga');
+  assert.equal(chiusura.payload.scope, 'chiusura');
+
+  const riall = consegna({ feedback: { text: 't' }, scope: 'riallineamento', perimetro: { reportRebase: 'conflitto nelle schede' } });
+  assert.match(riall.instructions, /# verifica dopo il riallineamento/);
+  assert.match(riall.instructions, /> conflitto nelle schede/);
+
+  const storto = consegna({ feedback: { text: 't' }, scope: 'lampo', perimetro: { rilievi: [] } });
+  assert.match(storto.instructions, /# verifica piena/, 'mai meno verifica per un valore storto');
+  assert.ok(!/Perimetro di questo giro/.test(storto.instructions));
+  assert.match(storto.err, /ambito di verifica sconosciuto/);
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 // ─── Ruolo unico resolver + contratto comune (SPEC-RIDISEGNO-MAX.md §12) ──────
 
-test('buildPayload: new-work e fixer dichiarano il caso del resolver', () => {
-  // Il server distingue ancora i due nomi nel protocollo; il worker riceve le
-  // stesse istruzioni (resolver.md) e capisce da `case` da dove parte.
+test('buildPayload: ogni caso di lavorazione si dichiara, e combacia col testo che riceve', () => {
   const nw = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' } });
   assert.equal(nw.case, 'primo-passaggio');
   const fx = buildPayload(
     { role: 'fixer', id: 'a', num: '7', branch: 'worker/a', serverCritique: 'si rompe X' },
     { feedback: { text: 't' } },
   );
-  assert.equal(fx.case, 'correzione');
-  assert.equal(fx.verifierCritique, 'si rompe X');
+  assert.equal(fx.case, 'riallineamento');
+  assert.equal(fx.verifierCritique, undefined, 'la consegna non può dire il contrario del testo di ruolo');
 });
 
 test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comune', () => {
@@ -477,13 +518,16 @@ test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comun
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, 'resolver.md'), '# ruolo resolver\ncorpo del ruolo\n');
+  writeFileSync(resolve(dir, 'resolver-rebase.md'), '# ruolo rebase\n<!-- includi: _pezzo.md -->\n');
+  writeFileSync(resolve(dir, '_pezzo.md'), 'pezzo condiviso\n');
   writeFileSync(resolve(dir, 'halt.md'), '# guasto\nfermati\n');
   writeFileSync(resolve(dir, '_contratto-worker.md'), '# Contratto comune dei worker\nregole\n');
   const nw = readRoleInstructions('new-work');
   assert.ok(nw.includes('# ruolo resolver'), 'new-work riceve le istruzioni del resolver');
   assert.ok(nw.includes('# Contratto comune dei worker'), 'col contratto accodato in fondo');
   const fx = readRoleInstructions('fixer');
-  assert.ok(fx.includes('# ruolo resolver'), 'fixer riceve le STESSE istruzioni (caso nel payload)');
+  assert.ok(fx.includes('# ruolo rebase') && !fx.includes('# ruolo resolver'), 'fixer riceve SOLO il testo del suo caso');
+  assert.ok(fx.includes('pezzo condiviso') && !fx.includes('includi:'), 'i pezzi condivisi vengono espansi');
   assert.ok(fx.includes('# Contratto comune dei worker'));
   // Il guasto non è un ruolo lavorante: niente contratto.
   const halt = readRoleInstructions('halt');
@@ -499,7 +543,7 @@ test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', (
   // Il preflight consegna orchestrator.md, dispatch consegna gli altri: un file
   // spostato o svuotato è un ruolo che parte senza istruzioni.
   const realDir = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  for (const f of ['orchestrator.md', 'resolver.md', 'verifier.md', 'secaudit.md', 'prober.md', 'halt.md', '_contratto-worker.md']) {
+  for (const f of ['orchestrator.md', 'resolver.md', 'resolver-rebase.md', '_criteri-verifica.md', '_segnala.md', 'verifier.md', 'secaudit.md', 'prober.md', 'halt.md', '_contratto-worker.md']) {
     const p = resolve(realDir, f);
     assert.ok(existsSync(p), `${f} deve esistere`);
     assert.ok(readFileSync(p, 'utf8').length > 300, `${f} non deve essere uno stub`);

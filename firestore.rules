@@ -171,8 +171,19 @@ service cloud.firestore {
     //     non consegna nulla a nessuno.
     //   - `proberWhenIdle` (bool; assente = true): a coda vuota le routine
     //     esplorano l'app in cerca di problemi (#448).
-    //   - `loopCap` (int 1-10; assente = 3): quante FAIL del verifier prima del
-    //     blocco `loop`.
+    //   - `cap2`, `cap1`, `cap0` (int 0-10): giri di correzione per livello di
+    //     rilievo, e `fixInstructions` (string): il testo della fase 2. Senza
+    //     default nel codice — assenti, la verifica si ferma (#561).
+    //   - `failCap` (int): quanti fallimenti di fila prima di fermarsi.
+    //   - `routineId` / `routineIdB` (string): le routine dei due account.
+    //   - `pacemakerDailyCap` (int): tetto di giri al giorno del pacemaker.
+    //   - `accountBlockMs` (int): la pausa che si prende un account che fallisce.
+    //   - `maxSessions` (int 1-20; assente = 1): quante sessioni lavorano
+    //     insieme.
+    //   - `priorityAccount` ('A'|'B'|''; assente = ''): da quale account si
+    //     parte sempre finché regge; vuoto = si alternano.
+    //   - `accountAOff` / `accountBOff` (bool; assente = false): account
+    //     escluso — da lì non parte nessuna sessione nuova.
     //
     // LETTURA PUBBLICA, e non è una svista. Chi lo legge sono le macchine delle
     // routine, che NON hanno nessuna credenziale (né service account né token

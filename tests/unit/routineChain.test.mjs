@@ -169,15 +169,26 @@ test('la presa in carico dice al server QUALE RAMO, non un ramo vuoto', async ()
   assert.ok(presa.data.branch, `il ramo deve arrivare col resto (arrivato: ${JSON.stringify(presa.data.branch)})`);
 });
 
-test('correzione: arriva anche la critica di chi aveva bocciato', async () => {
+test('riallineamento: il feedback sì, una critica da correggere no', async () => {
   const { json } = await giro({
     ok: true, role: 'fixer', id: 'fid-900', num: FEEDBACK.num, branch: 'worker/900',
-    payload: { role: 'fixer', feedback: FEEDBACK, critique: 'il pulsante compare ma non fa niente', loopCount: 1 },
+    payload: { role: 'fixer', feedback: FEEDBACK, loopCount: 1 },
   });
   assert.equal(json.role, 'fixer');
+  assert.equal(json.payload.case, 'riallineamento');
   assert.equal(json.payload.feedback.text, FEEDBACK.text);
-  assert.equal(json.payload.verifierCritique, 'il pulsante compare ma non fa niente',
-    'senza la critica la correzione riparte alla cieca');
+  assert.equal(json.payload.verifierCritique, undefined);
+});
+
+test('il riallineamento arriva sempre con la critica del server, e parte lo stesso', async () => {
+  // Il server accompagna OGNI conflitto di fusione con una critica sua: una
+  // guardia che ferma la busta perché «c'è una critica» ferma tutti i rebase.
+  const { json } = await giro({
+    ok: true, role: 'fixer', id: 'fid-900', num: FEEDBACK.num, branch: 'worker/900',
+    payload: { role: 'fixer', feedback: FEEDBACK, critique: 'FAIL tecnico, non di qualità: la fusione su main è fallita per un CONFLITTO', loopCount: 1 },
+  });
+  assert.equal(json.role, 'fixer');
+  assert.equal(json.payload.case, 'riallineamento');
 });
 
 test('controllo di sicurezza: ramo e differenze, MAI il feedback', async () => {

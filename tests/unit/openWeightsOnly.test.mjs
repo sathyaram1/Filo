@@ -159,6 +159,17 @@ test('la catena di tentativi passa solo dal router, con modelli a pesi aperti', 
   assert.ok(!attempts.some((a) => /claude/.test(a.model)), 'Anthropic esce dalla catena');
 });
 
+test('i modelli stretti ammessi dalla politica sono proprietari: l\'interruttore li spegne', () => {
+  for (const id of ['typesafe/jev-1.13', '~typesafe/jev-latest', 'typesafe/jev-1.13-20260917']) {
+    assert.equal(C.isOpenWeightsModelId(id), false, `${id} ha i pesi chiusi`);
+    assert.equal(C.openWeightsBlockKind(true, { provider: 'openrouter', model: id }), 'model');
+    assert.equal(C.openWeightsBlockKind(false, { provider: 'openrouter', model: id }), '', 'a interruttore spento è ammesso');
+  }
+  const base = C.DEFAULT_EXCLUDED_PROVIDERS;
+  assert.equal(C.isProviderExcluded('TypeSafe', base), false, 'a interruttore spento il produttore è ammesso');
+  assert.equal(C.isProviderExcluded('TypeSafe', C.effectiveExcludedProviders(base, true)), true);
+});
+
 test('a interruttore acceso Anthropic entra fra i fornitori esclusi', () => {
   const base = C.DEFAULT_EXCLUDED_PROVIDERS;
   assert.equal(C.isProviderExcluded('Anthropic', base), false, 'a interruttore spento Anthropic è ammessa');
@@ -188,4 +199,35 @@ test('l\'effetto dell\'interruttore è dichiarabile PRIMA di accenderlo', () => 
   assert.deepEqual(ferme, [], 'nessuna funzione predefinita si ferma a interruttore acceso');
   // Una funzione non può stare in tutt'e due gli elenchi.
   assert.deepEqual(cambiano.filter((a) => ferme.includes(a)), []);
+});
+
+// Il produttore di un modello stretto ammesso vive in due posti, il documento e
+// il codice: alla revisione l'altra metà non deve restare indietro in silenzio.
+test('i produttori ammessi dal documento sono gli stessi che l\'interruttore spegne', () => {
+  const { readFileSync } = require('node:fs');
+  const documento = readFileSync(join(ROOT, 'transparency', 'models.md'), 'utf8');
+  const riga = documento.split('\n').find((r) => /\*\*Ammessi oggi:\*\*/.test(r));
+  assert.ok(riga, 'il documento deve elencare i modelli stretti ammessi dopo «Ammessi oggi:»');
+
+  // Forma attesa: «Nome (Produttore), da <mese> <anno>». Il «, da » dopo la
+  // parentesi è ciò che distingue un produttore da un inciso qualunque: senza,
+  // un «(o prima se escono equivalenti)» diventerebbe un produttore inesistente
+  // e il rosso manderebbe fuori strada chi lo legge.
+  const nelDocumento = [...riga.matchAll(/\(([^)]+)\)\s*,\s*da\s/g)].map((m) => m[1].trim());
+  assert.ok(nelDocumento.length,
+    'nessun produttore nella forma «Nome (Produttore), da <mese> <anno>»: se oggi non ne è '
+    + 'ammesso nessuno toglilo anche dall\'interruttore, altrimenti scrivilo in quella forma');
+
+  const norma = (x) => C.normalizeProviderName(x);
+  const spenti = C.effectiveExcludedProviders([], true).map(norma);
+  for (const produttore of nelDocumento) {
+    assert.ok(spenti.includes(norma(produttore)),
+      `il documento ammette un modello stretto di «${produttore}», ma l'interruttore non lo spegne`);
+  }
+
+  // E al contrario: l'interruttore non spegne produttori che il documento non
+  // nomina più (Anthropic a parte, che non è un modello stretto).
+  const inPiu = spenti.filter((x) => x !== 'anthropic' && !nelDocumento.map(norma).includes(x));
+  assert.deepEqual(inPiu, [],
+    'l\'interruttore spegne produttori che il documento non elenca più fra gli ammessi');
 });

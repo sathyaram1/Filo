@@ -78,6 +78,7 @@ test('ovunque si dica di rilanciare le prove del giro, si dice anche come va scr
     ['CLAUDE.md', leggi('CLAUDE.md')],
     ['routines/roles/verifier.md', leggi('routines/roles/verifier.md')],
     ['routines/roles/resolver.md', leggi('routines/roles/resolver.md')],
+    ['routines/roles/resolver-rebase.md', leggi('routines/roles/resolver-rebase.md')],
     ['il compito consegnato a chi verifica in locale',
       buildVerifierBrief({ request: 'fai X', branch: 'claude/giri-corti', recipe: 'RECIPE' })],
     ['la coda della fase di correzione',

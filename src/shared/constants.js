@@ -150,14 +150,16 @@
     // ferma subito la pratica.
     CAP_MIN: 0,
     CAP_MAX: 10,
+    // Quante sessioni delle routine possono lavorare insieme (config/routines,
+    // campo `maxSessions`). Intervallo SUO, non quello dei bilanci qui sopra:
+    // uno zero sarebbe un interruttore master di nascosto, e quello esiste già.
+    MAX_SESSIONS_MIN: 1,
+    MAX_SESSIONS_MAX: 20,
+    MAX_SESSIONS_DEFAULT: 1,
     // Il testo della fase 2 (istruzioni per chi corregge): stesso tetto del
     // server, che oltre taglia. La dashboard rifiuta il testo più lungo invece
     // di salvarlo mozzato in silenzio.
     FIX_INSTRUCTIONS_MAX: 8000,
-    // Nomi storici del giro a tre esiti, letti ancora da qualche strumento.
-    LOOP_CAP_MIN: 1,
-    IMPROVABLE_CAP_MIN: 0,
-    LOOP_CAP_MAX: 10,
     // Timeout di ogni giudice di sicurezza (secondi). I modelli "thinking"
     // ragionano per qualche secondo prima del verdetto: troppo basso e quel
     // giudice non risponde mai → panel parziale ("non filtrato"). Salvato in
@@ -711,7 +713,9 @@
   // Fornitori esclusi in più quando l'interruttore è acceso. Anthropic non è
   // nella lista base (la politica ammette i suoi modelli): qui ci finisce perché
   // il punto dell'interruttore è poter rifiutare anche quella scelta.
-  const OPEN_WEIGHTS_EXTRA_EXCLUDED = ['Anthropic'];
+  // I produttori dei «modelli stretti» ammessi dalla politica stanno qui per lo
+  // stesso motivo: pesi chiusi comprati dal produttore, l'interruttore li spegne.
+  const OPEN_WEIGHTS_EXTRA_EXCLUDED = ['Anthropic', 'TypeSafe'];
 
   // Lista di esclusione EFFETTIVA da usare per una richiesta. PURA.
   function effectiveExcludedProviders(excluded, openWeightsOnly) {

@@ -478,7 +478,17 @@
     //   cap0  giri per i soli rilievi di livello 0.
     // Li applica il SERVER quando registra la critica. Owner-only.
     AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap2, cap1, cap0, fixInstructions } | { ok:false, error }
-    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap2?, cap1?, cap0?, fixInstructions? } → { ok, cap2, cap1, cap0, fixInstructions } | { ok:false, error }
+    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap2?, cap1?, cap0?, fixInstructions?, giroStretto? } → { ok, cap2, cap1, cap0, fixInstructions } | { ok:false, error }
+    // Come partono le sessioni delle routine (doc config/routines):
+    //   maxSessions      quante sessioni lavorano insieme (intero 1–20;
+    //                    campo assente = 1);
+    //   priorityAccount  da quale account si parte sempre finché regge:
+    //                    'A', 'B', oppure '' = si alternano (campo assente);
+    //   accountAOff / accountBOff  account escluso: da lì non parte nessuna
+    //                    sessione nuova (campo assente = in uso).
+    // Le legge il SERVER quando accende le sessioni. Owner-only.
+    AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff } | { ok:false, error }
+    AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff? } → come sopra | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della

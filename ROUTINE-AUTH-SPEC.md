@@ -181,7 +181,10 @@ Punti non negoziabili del flusso:
    (l'esito si calcola dal TESTO registrato, letto dal server con lo stesso
    lettore dello strumento; l'elenco può solo confermarlo), e una critica su
    un feedback che non è in verifica (già a decidere). Un risolutore
-   consegna, non si auto-approva.
+   consegna, non si auto-approva. Lo stesso vale per il verdetto del
+   controllo di sicurezza: porta lo sha del commit controllato, e senza
+   quello è un «passato» che parla di un ramo invece che di un contenuto
+   (vedi "un esito vale per la versione esaminata", §11).
 4. **Il ramo combacia** con quello legato al biglietto.
 5. **La macchina a stati** autorizza il passaggio, letto dallo stato **vero**
    (il server la chiave ce l'ha: è il controllo che oggi non gira mai).
@@ -204,10 +207,29 @@ diventa un **muro**.
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
 | `new-work` | il testo del suo feedback | — |
-| `fixer` | il feedback + la critica della verifica | — |
+| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni conflitto di fusione (dispatch a chi lavora consegna solo il feedback) | i rilievi di una verifica: li corregge chi li ha scritti |
 | `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
 | `prober` | niente | la coda |
+
+**L'ambito della verifica.** Il payload del `verifier` porta `scope`, deciso dal
+server:
+
+- `pieno` (o assente): la verifica larga, col testo `verifier.md`;
+- `chiusura`, con `perimetro: { rilievi: [...], shaPrima? }`: il giro prima è
+  stato corretto e l'owner ha acceso `giroStretto` in `config/routines`
+  (Gestione → Automazioni, spento di serie). `rilievi` sono i rilievi corretti
+  in quel giro, `shaPrima` il commit su cui era stata scritta la critica;
+- `riallineamento`, con `perimetro: { shaVerificato?, reportRebase? }`: il
+  lavoro era verificato e un conflitto di fusione è stato risolto a mano.
+
+dispatch sceglie il testo del ruolo dall'ambito (`verifier-chiusura.md`,
+`verifier-riallineamento.md`) e scrive il perimetro in coda al compito, come
+testo. Nei due giri stretti il diff dal commit del perimetro a `HEAD` si
+guarda: è l'unica eccezione alla riga qui sopra. Un ambito sconosciuto vale
+`pieno`, con un avviso nel log: un valore storto non deve mai dare meno
+verifica. In locale `verify-local.mjs start` fa lo stesso per la `chiusura`,
+leggendo `giroStretto` insieme ai bilanci.
 
 La riga che conta è `secaudit`: **il controllo di sicurezza non deve leggere
 testo scritto da sconosciuti**, o il testo può convincerlo. Senza chiave sulla
@@ -322,8 +344,9 @@ Da oggi la fusione è una consegna del canale come le altre:
   1. biglietto vivo, ruolo `secaudit`, ramo = quello **del biglietto** (un
      messaggio che ne nomina un altro è respinto e registrato, non corretto);
   2. **stato vero**: PASS della verifica e PASS del controllo di sicurezza
-     **registrati** da consegne validate — e registrati su *quel* ramo. Un
-     verdetto raccontato nel corpo (il vecchio `FILO_L4_VERDICT`) non esiste
+     **registrati** da consegne validate — e registrati su *quello sha*, non
+     su quel ramo (vedi "un esito vale per la versione esaminata", più sotto).
+     Un verdetto raccontato nel corpo (il vecchio `FILO_L4_VERDICT`) non esiste
      come input: nessuno lo legge;
   3. la **punta vera** del ramo, risolta una volta sola: da qui in poi si parla
      di quello sha e mai più del nome (vedi "si esamina e si fonde lo stesso
@@ -479,6 +502,115 @@ il ramo spediva `main` su `origin` con le credenziali della macchina, prima
 ancora di parlare col server. Adesso il valore è inchiodato, e la spedizione
 rifiuta esplicitamente `main`, `master` e il ramo di default del repo.
 
+### Un esito vale per la versione esaminata (2026-09-20, feedback #485)
+
+Il paragrafo qui sopra ha chiuso la finestra *dentro* il cancello: si esamina e
+si fonde lo stesso commit. Restava aperta la finestra **un piano più sopra**,
+sui due esiti ragionati — la verifica funzionale (L3) e il controllo di
+sicurezza (L4). Erano registrati sul **nome del ramo**: firmare "il documento
+nella cartella X" invece di "questa esatta versione". Basta sostituire il
+foglio e la firma resta lì, buona, su un contenuto che nessuno ha guardato — e
+chi lavora ha per costruzione il permesso di spingere sul proprio ramo, quindi
+la finestra si apre da sé.
+
+La regola, uguale per tutti e due:
+
+- **un esito si registra con lo sha del commit esaminato.** La critica della
+  verifica lo porta dal 2026-09-13; il verdetto del controllo di sicurezza lo
+  porta da adesso (`secaudit` → campo `sha`, sempre presente). Un verdetto
+  senza commit non si distingue da uno dato su un contenuto qualunque, ed è
+  respinto prima di scrivere qualsiasi cosa (§5.3);
+- **lo sha lo timbra lo strumento, e uno dichiarato può solo CONFERMARLO.**
+  È la stessa regola che il canale applica già al nome del ramo (nominarne un
+  altro è un rifiuto messo a registro, non una correzione silenziosa).
+  Dichiararne uno diverso dalla punta della directory ferma la consegna:
+  altrimenti la difesa si spegne scrivendo un argomento in più, e l'esito
+  nasce intestato a un contenuto che su quella macchina non c'è. Confermare
+  vuol dire riconoscere la stessa versione, non ricopiarla lettera per
+  lettera: la forma abbreviata che gli strumenti stampano dappertutto e le
+  maiuscole sono lo stesso commit e passano; sotto le sette lettere no, perché
+  un pezzo così corto combacia anche con commit diversi;
+- **se il contenuto cambia, l'esito decade** e quel controllo va rifatto — la
+  stessa cosa che già succede alle richieste di fusione in attesa. Al passo 2
+  del cancello i PASS si leggono sullo **sha** risolto al passo 3, non sul nome
+  del ramo;
+- **l'esito vale per un commit, quindi si registra da un commit.** Con
+  modifiche fuori dai commit il salvataggio automatico le committa *dopo* la
+  registrazione, la punta si sposta e l'esito nasce già decaduto. Le tre
+  consegne che valgono per un commit — la messa in revisione, la correzione e
+  la critica — lo respingevano già; il verdetto L4 era l'unico rimasto fuori, e
+  adesso respinge come le altre (fonte unica: `scripts/lib/dirty-tree.mjs`).
+
+- **anche l'ULTIMO passo parla del commit.** Timbrare l'impronta sugli esiti
+  non chiude niente finché la fusione si chiede per nome del ramo. Dal
+  2026-09-20 `routineMerge` porta anche `sha`, come `ownerMerge` dal
+  2026-08-20, e il citofono (`scripts/merge-gate.mjs`) fa prima due controlli
+  che sul cammino locale c'erano da sempre e qui mancavano: non chiede la
+  fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
+  automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
+  NUOVA), e non la chiede se un via libera registrato su questa macchina parla
+  di un altro commit. Se su questa macchina non risulta su quale commit sono
+  stati dati, lo **dice** e prosegue: astenersi in silenzio è la classe di
+  guasto che questa spec toglie dappertutto;
+- **il decadimento si registra, non si stampa e basta.** Il rifiuto della
+  fusione dice quale passo lo mette a registro: il rientro in verifica
+  (`revision_security` → `revision_capability`, la stessa strada del
+  riallineamento), col comando già scritto e il ramo dentro, e il rilascio con
+  `--guasto` come via d'uscita se il server rifiuta quel passaggio. Fermarsi e
+  basta lascia la notizia su una macchina sola, mentre sul canale i due via
+  libera continuano a risultare buoni per quel ramo: la segnalazione #485
+  spostata di un passo. I comandi del rifiuto si stampano con gli **attrezzi
+  del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
+  copia che il ramo si porta dietro;
+- **la memoria del confronto la scrive OGNI strada che registra un esito.**
+  Il rifiuto del citofono si regge sullo specchio locale («la verifica ha dato
+  l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
+  `dispatch --record-*`, bastava registrare lo stesso esito dal canale
+  (`deliver verdict|secaudit`) perché lo specchio restasse vuoto e la fusione
+  ripartisse a foglio sostituito: la difesa si spegneva scegliendo l'ingresso.
+  La porta unica è `ricordaEsitoSuCommit` (`scripts/lib/branch-integrity.mjs`),
+  e una consegna `fixed` svuota i due campi, perché una correzione è contenuto
+  nuovo (verifica del giro 3);
+- **l'astensione si dichiara PER CIASCUNO dei due esiti.** Dirlo solo quando
+  non si sa niente lasciava passare in silenzio il caso normale — verifica e
+  controllo di sicurezza su macchine diverse, quindi qui una sola impronta su
+  due — che è il peggiore, perché sembra controllato più degli altri;
+- **l'impronta deve descrivere quello che chi fonde andrà DAVVERO a
+  prendere.** Il server non fonde la directory: scarica il ramo da GitHub e
+  fonde la sua PUNTA. Quindi il controllo è un'UGUAGLIANZA, la stessa che il
+  cammino locale pretende da sempre («su origin il ramo è a X, qui siamo a Y:
+  il server fonderebbe una versione diversa da quella controllata»), e le due
+  direzioni sono danni diversi con rimedi opposti. Se in cima c'è MENO — un
+  commit rimasto solo qui, perché il salvataggio automatico prova a spedire e,
+  se non ci riesce, per costruzione lo scrive nei log e prosegue — i via libera
+  parlano di un contenuto che non atterrerà mai e ad atterrare è quello
+  vecchio: si spedisce il ramo. Se in cima c'è DI PIÙ, spedire non c'entra: là
+  c'è lavoro che qui non c'è, sovrascriverlo lo butterebbe via, e gli esiti
+  sono decaduti come per un ramo mosso sotto i piedi, quindi si registra il
+  rientro in verifica. «Il contenuto esaminato è arrivato là» non è la domanda
+  giusta: un commit può stare nella storia del ramo senza essere quello che
+  atterra, e con il solo contenimento un ramo più avanti passava in silenzio
+  (verifica del giro 4). La punta vera si chiede a origin (`ls-remote`), non al
+  riferimento locale, che dice dov'ERA il ramo l'ultima volta che si è
+  guardato: se origin non risponde il citofono si astiene e lo dice, con un
+  tetto sul tempo perché qui si parla con la rete;
+- **il ramo nominato dev'essere quello su cui sta la directory.** Il citofono
+  legge tutto da lì: i file fuori dai commit, la punta, gli esiti registrati.
+  Con un nome di un altro ramo quei controlli parlano di uno e la richiesta ne
+  nomina un altro, e la versione dichiarata è di un ramo che non c'entra: le
+  guardie si astenevano una per una (di quel ramo non risulta niente) e la
+  richiesta partiva lo stesso. Adesso il nome e la directory devono combaciare,
+  ed è il primo controllo di tutti.
+
+Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
+`scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
+timbra da solo invece di chiederlo a chi lavora — e questa regola. **Il
+confronto al passo 2 del cancello vive nel server** (`filo-security`), che è
+il posto giusto: è l'ultimo livello, quello che non si può convincere. Finché
+lì il verdetto L4 si legge sul nome del ramo, il campo arriva e non viene
+guardato: quello che il repo pubblico può fare da solo è chiudere il cammino
+onesto (fatto), non il muro.
+
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
 La stessa forma — `TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"` — era rimasta nel
@@ -528,6 +660,13 @@ fila delle forme della scheda):
   ruolo, at, testo }`. Il ruolo lo dice il biglietto, mai il messaggio. È un
   trade-off vero che decide l'owner; il server la appende anche alle note,
   per la storia della chat. Sulla riga di comando: `--segnala <file.md>`.
+- `fixed` accetta `stop: true`, solo insieme a `segnalazione`: chi corregge
+  dichiara che non può andare avanti senza una decisione. Il server risponde
+  `{ outcome: 'stop' }` e porta il feedback in attesa dell'owner invece che a
+  un'altra verifica. Sulla riga di comando: `--record-fixed … --segnala
+  <file.md> --ferma`; senza `--segnala` dispatch si ferma prima di consegnare.
+  Se la risposta non porta `stop` (server non aggiornato) dispatch lo dice:
+  il lavoro è tornato in coda.
 - `secaudit` accetta `testo` (accettato anche il nome storico `notes`) →
   `livelli.l4 = { esito: pass|fail, at, testo }`, **sempre**, anche su pass. Un
   `pass` senza testo è respinto (`malformed`): un controllo passato senza dire

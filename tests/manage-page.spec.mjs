@@ -487,6 +487,202 @@ test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano sp
   await expect(page.locator('#mgRoutinesMsg')).toContainText('NON');
 });
 
+// Stub dell'IPC delle sessioni delle routine: simula i quattro campi di
+// config/routines senza rete né main. `__sessionsSets` raccoglie ciò che la
+// pagina MANDA: è la prova che la scelta arriva dove il server la legge.
+async function stubSessions(page, initial = {}) {
+  await page.evaluate((init) => {
+    window.__sessions = Object.assign({
+      maxSessions: 1, priorityAccount: '', accountAOff: false, accountBOff: false,
+    }, init);
+    window.__sessionsSets = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_sessions_get') {
+        return Object.assign({ ok: true }, window.__sessions);
+      }
+      if (msg && msg.type === 'automation_sessions_set') {
+        const sent = {};
+        for (const campo of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff']) {
+          if (msg[campo] === undefined) continue;
+          window.__sessions[campo] = msg[campo];
+          sent[campo] = msg[campo];
+        }
+        window.__sessionsSets.push(sent);
+        return Object.assign({ ok: true }, window.__sessions);
+      }
+      return orig(msg);
+    };
+  }, initial);
+}
+
+async function apriAutomazioni(openTab) {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  return page;
+}
+
+test('le sessioni in parallelo si leggono dalla config e il salvataggio manda il solo campo toccato', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+
+  // Non-admin: sola lettura, come il resto della tab.
+  await expect(page.locator('#mgMaxSessions')).toBeDisabled();
+
+  await stubSessions(page, { maxSessions: 6 });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  const campo = page.locator('#mgMaxSessions');
+  await expect(campo).toBeEnabled();
+  await expect(campo).toHaveValue('6');
+  // I limiti vengono dal registro, non dall'HTML.
+  await expect(campo).toHaveAttribute('max', '20');
+
+  await campo.fill('12');
+  await page.locator('#mgMaxSessionsSave').click();
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+  await expect.poll(() => page.evaluate(() => window.__sessionsSets)).toEqual([{ maxSessions: 12 }]);
+  await expect.poll(() => page.evaluate(() => window.__sessions.maxSessions)).toBe(12);
+
+  // Invio salva come il pulsante: due strade, una cosa sola.
+  await campo.fill('3');
+  await campo.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.__sessions.maxSessions)).toBe(3);
+});
+
+test('un numero di sessioni fuori intervallo non parte, e il rifiuto dice l\'intervallo', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubSessions(page, { maxSessions: 4 });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  for (const storto of ['0', '21', '']) {
+    await page.locator('#mgMaxSessions').fill(storto);
+    await page.locator('#mgMaxSessionsSave').click();
+    await expect(page.locator('#mgMaxSessionsMsg')).toContainText('da 1 a 20');
+  }
+  // Un campo numerico con dentro delle lettere risponde `value === ''`: se lo
+  // si leggesse così, a chi ha scritto «tre» si direbbe che il campo è vuoto.
+  await page.locator('#mgMaxSessions').fill('');
+  await page.locator('#mgMaxSessions').pressSequentially('tre');
+  await page.locator('#mgMaxSessionsSave').click();
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('da 1 a 20');
+  // Niente è partito: sul server è rimasto il valore di prima.
+  expect(await page.evaluate(() => window.__sessionsSets)).toEqual([]);
+  expect(await page.evaluate(() => window.__sessions.maxSessions)).toBe(4);
+});
+
+test('l\'account prioritario si legge e si salva al cambio', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubSessions(page, { priorityAccount: 'B' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  // La pillola si vede davvero (il radio è nascosto per costruzione).
+  await expect(page.locator('#mgPriorityAccountChoice .mg-auto-choice-text').first()).toBeVisible();
+  await expect(page.locator('input[name="mgPriorityAccount"][value="B"]')).toBeChecked();
+
+  await page.evaluate(() => {
+    const el = document.querySelector('input[name="mgPriorityAccount"][value=""]');
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgPriorityAccountMsg')).toHaveText('Salvato.');
+  await expect.poll(() => page.evaluate(() => window.__sessionsSets)).toEqual([{ priorityAccount: '' }]);
+});
+
+test('escludere un account manda il solo campo suo; esclusi tutti e due, la pagina lo dice', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubSessions(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  // Acceso = in uso: è il comportamento senza i campi.
+  await expect(page.locator('#mgAccountA')).toBeChecked();
+  await expect(page.locator('#mgAccountB')).toBeChecked();
+  await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAccountA');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.__sessionsSets)).toEqual([{ accountAOff: true }]);
+  // Uno solo escluso: il lavoro continua sull'altro, niente da segnalare.
+  await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAccountB');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.__sessions.accountBOff)).toBe(true);
+  await expect(page.locator('#mgAccountsWarn')).toBeVisible();
+  await expect(page.locator('#mgAccountsWarn')).toContainText('non parte nessuna sessione');
+
+  // Riacceso uno, l'avviso se ne va.
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAccountB');
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+});
+
+test('se il salvataggio delle sessioni fallisce, la pagina NON mostra la scelta come fatta', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubSessions(page, { maxSessions: 2, priorityAccount: 'A' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_sessions_set') return { ok: false, error: 'niente rete' };
+      return orig(msg);
+    };
+  });
+
+  await page.locator('#mgMaxSessions').fill('9');
+  await page.locator('#mgMaxSessionsSave').click();
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('NON è cambiata');
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('2');
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAccountA');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgAccountsMsg')).toContainText('NON è cambiata');
+  await expect(page.locator('#mgAccountA')).toBeChecked();
+  await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+});
+
+test('le scelte sulle sessioni restano manovrabili anche a routine spente', async ({ openTab }) => {
+  // Escludere un account è una cosa che si decide PRIMA di riaccendere: se
+  // fossero inerti come i bilanci, si potrebbe solo riaccendere e sperare.
+  const page = await apriAutomazioni(openTab);
+  await stubAutomation(page);
+  await stubSessions(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+  await page.evaluate(() => window.__mgTest.loadSessions());
+
+  await page.evaluate(() => {
+    const el = document.getElementById('mgRoutinesToggle');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#mgCap2')).toBeDisabled();  // i bilanci sì, inerti
+
+  for (const id of ['#mgMaxSessions', '#mgMaxSessionsSave', '#mgAccountA', '#mgAccountB']) {
+    await expect(page.locator(id)).toBeEnabled();
+  }
+  await expect(page.locator('input[name="mgPriorityAccount"][value="A"]')).toBeEnabled();
+});
+
 // Stub dell'IPC dei contatori del verificatore: simula il doc Firestore
 // config/routines senza rete/main. Cattura ogni `set` per provare che il valore
 // LASCIA il client (è la config che il server dei verdetti legge → "il
@@ -501,7 +697,12 @@ async function stubCaps(page, initial = { cap2: 5, cap1: 2, cap0: 0, fixInstruct
         return { ok: true, ...window.__capsValue };
       }
       if (msg && msg.type === 'automation_caps_set') {
-        const clamp = (n) => Math.min(10, Math.max(0, Math.round(Number(n))));
+        if (window.__capsFail) return { ok: false, error: 'finto guasto' };
+        if (typeof msg.giroStretto === 'boolean') {
+          window.__capsValue.giroStretto = msg.giroStretto;
+          window.__capsSets.push({ giroStretto: msg.giroStretto });
+        }
+        const clamp =(n) => Math.min(10, Math.max(0, Math.round(Number(n))));
         for (const field of ['cap2', 'cap1', 'cap0']) {
           if (msg[field] != null) {
             window.__capsValue[field] = clamp(msg[field]);
@@ -652,6 +853,63 @@ test('i tre bilanci dei giri di correzione e le loro istruzioni sono editabili e
     return [d[K.AUTOMATION_CAP2], d[K.AUTOMATION_CAP1], d[K.AUTOMATION_CAP0]];
   });
   expect(cached).toEqual([5, 3, 1]);
+});
+
+test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella config delle routine, e un guasto lo rimette dov\'era', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  const giro = page.locator('#mgGiroStretto');
+  const etichetta = page.locator('#mgGiroStrettoSwitch');
+  await expect(etichetta).toBeVisible();
+  await expect(etichetta).toContainText('Giro stretto dopo una correzione');
+  // La spiegazione sta nell'hover, non in un sottotitolo.
+  expect((await etichetta.getAttribute('title')) || '').toMatch(/rilievi corretti/);
+  await expect(giro).toBeDisabled();
+
+  // Documento senza il campo: spento. Non dipende dalle routine accese.
+  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeEnabled();
+  await expect(giro).not.toBeChecked();
+
+  await etichetta.click();
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('Salvato.');
+  await expect(giro).toBeChecked();
+  await etichetta.click();
+  await expect(giro).not.toBeChecked();
+  await expect.poll(() => page.evaluate(() => window.__capsSets)).toEqual([{ giroStretto: true }, { giroStretto: false }]);
+
+  // Acceso sul server: alla rilettura si vede acceso.
+  await page.evaluate(() => { window.__capsValue.giroStretto = true; });
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeChecked();
+
+  // Salvataggio fallito: l'interruttore torna dov'era e lo dice.
+  await page.evaluate(() => { window.__capsFail = true; });
+  await etichetta.click();
+  await expect(page.locator('#mgGiroStrettoMsg')).toContainText('NON è cambiata');
+  await expect(giro).toBeChecked();
+
+  // Nei due temi l'etichetta resta leggibile sullo sfondo della pagina.
+  const sfondi = [];
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate(async (t) => {
+      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } });
+    }, tema);
+    const leggi = () => etichetta.locator('.mg-switch-text').evaluate((el) => ({
+      c: getComputedStyle(el).color, sfondo: getComputedStyle(document.body).backgroundColor,
+    }));
+    if (tema === 'dark') await expect.poll(async () => (await leggi()).sfondo).not.toBe(sfondi[0]);
+    const colori = await leggi();
+    sfondi.push(colori.sfondo);
+    expect(colori.c, `tema ${tema}`).not.toBe(colori.sfondo);
+    await page.locator('#mgGiroStrettoBlock').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `tests/.shots/giro-stretto-${tema}.png` });
+  }
 });
 
 test('i bilanci dei giri di correzione vengono clampati nel range [0, 10] al salvataggio', async ({ openTab }) => {
@@ -1494,10 +1752,11 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgActions')).toBeVisible();
   await expect(page.locator('#mgAcceptBtn')).toHaveText('→ In coda');
   // La fila dei livelli c'e' comunque, e dice la verita': un feedback mai
-  // passato dal pipeline ha tutte e cinque le forme grigie — la fila ha
-  // sempre la stessa lunghezza, e un buco si vede.
+  // passato dal pipeline ha le forme grigie, tranne il rombo. Chi aspetta una
+  // risposta HA una segnalazione di Claude, e dalla fila si deve vedere.
   await expect(page.locator('#mgLivelliRow')).toBeVisible();
-  await expect(page.locator('#mgLivelliRow .mg-forma--vuota')).toHaveCount(4);
+  await expect(page.locator('#mgLivelliRow [data-livello="l3"]')).toHaveClass(/mg-forma--design/);
+  await expect(page.locator('#mgLivelliRow .mg-forma--vuota')).toHaveCount(3);
   await expect(page.locator('#mgLivelliRow .mg-dot--empty')).toHaveCount(4);
 
   // Rispondi: il patch rimette in coda (todo) e appende la risposta alle note.
@@ -2211,4 +2470,32 @@ test('un bilancio salvato col campo vuoto NON si salva (non c\'è un default, e 
   await cap2.press('Enter');
   await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato.');
   expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(4);
+});
+
+test('giro stretto: se la config non si legge l’interruttore resta com’era e lo dice, e alla lettura dopo il messaggio sparisce', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubCaps(page, { cap2: 5, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  const giro = page.locator('#mgGiroStretto');
+  await expect(giro).toBeChecked();
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('');
+
+  // Il main risponde «non raggiungibile» (senza rete): niente «spento» finto.
+  await page.evaluate(() => {
+    const prima = window.filo.message;
+    window.filo.message = async (msg) => (msg && msg.type === 'automation_caps_get'
+      ? { ok: false, error: 'Impostazioni del giro di verifica non raggiungibili.' } : prima(msg));
+    window.__ripristina = () => { window.filo.message = prima; };
+  });
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(giro).toBeChecked();
+  await expect(page.locator('#mgGiroStrettoMsg')).toContainText('Non letto dal server');
+
+  await page.evaluate(() => window.__ripristina());
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await expect(page.locator('#mgGiroStrettoMsg')).toHaveText('');
 });

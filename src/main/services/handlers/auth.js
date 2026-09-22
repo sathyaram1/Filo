@@ -582,7 +582,7 @@ module.exports = function register(on, ctx) {
   // (config/routines, campi `cap2`, `cap1`, `cap0`, `fixInstructions` —
   // feedback #561). Owner-only. È la fonte di verità che il server applica
   // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.
-  const capsReply = (caps) => ({ ok: true, cap2: caps.cap2, cap1: caps.cap1, cap0: caps.cap0, fixInstructions: caps.fixInstructions });
+  const capsReply = (caps) => ({ ok: true, cap2: caps.cap2, cap1: caps.cap1, cap0: caps.cap0, fixInstructions: caps.fixInstructions, giroStretto: caps.giroStretto === true });
   on(MSG.AUTOMATION_CAPS_GET, ownerOnly(async () => {
     try {
       const idToken = await auth.getIdToken();
@@ -600,7 +600,45 @@ module.exports = function register(on, ctx) {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       return capsReply(await Defaults.setRoutineCaps({
-        cap2: msg.cap2, cap1: msg.cap1, cap0: msg.cap0, fixInstructions: msg.fixInstructions,
+        cap2: msg.cap2, cap1: msg.cap1, cap0: msg.cap0, fixInstructions: msg.fixInstructions, giroStretto: msg.giroStretto,
+      }, idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  // Come partono le sessioni delle routine (config/routines): quante insieme,
+  // da quale account per prima, quali esclusi. Owner-only. Le legge il server
+  // quando accende le sessioni: cambiarle qui vale dalla prossima.
+  // `letto: false` = ho scritto ma non ho potuto rileggere, e allora tornano
+  // solo i campi scritti: gli altri restano ignoti invece di valere il default.
+  const sessionsReply = (s) => {
+    const r = { ok: true, letto: s.letto !== false };
+    for (const k of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff']) {
+      if (s[k] !== undefined) r[k] = s[k];
+    }
+    return r;
+  };
+  on(MSG.AUTOMATION_SESSIONS_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return sessionsReply(await Defaults.getRoutineSessions(idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  // Tocca SOLO i campi che riceve (come AUTOMATION_CAPS_SET).
+  on(MSG.AUTOMATION_SESSIONS_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return sessionsReply(await Defaults.setRoutineSessions({
+        maxSessions: msg.maxSessions,
+        priorityAccount: msg.priorityAccount,
+        accountAOff: msg.accountAOff,
+        accountBOff: msg.accountBOff,
       }, idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };

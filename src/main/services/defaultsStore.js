@@ -32,6 +32,9 @@ const { getBuildKeys, getBuildSafeBrowsingKey } = require('../config/default-key
 // Registra SN_FEEDBACK_THREAD su globalThis: da lì viene l'elenco dei gruppi di
 // mittente dell'auto-approvazione, che deve restare uno solo (#446).
 require('../../shared/feedbackThread.js');
+// Registra SN_ROUTINE_SESSIONI: le regole su quante sessioni e da quale
+// account, le stesse che applica la pagina di gestione.
+require('../../shared/routineSessioni.js');
 
 const PROJECT_ID = 'filo-8b9cb';
 const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per design
@@ -513,10 +516,14 @@ async function getRoutineCaps(idToken) {
   // mostrare un valore pescato altrove significa mostrare una regola che
   // nessuno applica (vedi il commento in getAutomationProberIdle).
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '' };
+  // `null` = non ho potuto leggere: dirlo, o «spento» e «non impostato» sembrano parole del server.
+  if (doc === null) throw new Error('Impostazioni del giro di verifica non raggiungibili.');
+  const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
   for (const k of CAP_KEYS) {
     if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
   }
+  // Spento di serie: solo un true esplicito nel documento lo accende.
+  out.giroStretto = !!doc && doc.giroStretto === true;
   if (doc && typeof doc.fixInstructions === 'string') out.fixInstructions = doc.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX);
   return out;
 }
@@ -539,8 +546,58 @@ async function setRoutineCaps(patch, idToken) {
     fields.fixInstructions = toFsValue(p.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX));
     mask.push('fixInstructions');
   }
+  if (typeof p.giroStretto === 'boolean') {
+    fields.giroStretto = toFsValue(p.giroStretto);
+    mask.push('giroStretto');
+  }
   if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
-  return getRoutineCaps(idToken);
+  try {
+    return await getRoutineCaps(idToken);
+  } catch (e) {
+    // Scritto ma non riletto: un salvataggio riuscito non deve sembrare fallito. Tornano i soli campi scritti.
+    if (!mask.length) throw e;
+    const scritto = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
+    for (const k of mask) scritto[k] = k === 'fixInstructions' ? p[k].slice(0, FIX_INSTRUCTIONS_MAX) : (k === 'giroStretto' ? p[k] : clampCap(p[k]));
+    return scritto;
+  }
+}
+
+
+// Come partono le sessioni delle routine (config/routines): quante insieme,
+// da quale account per prima, quali account sono esclusi. Le regole stanno in
+// SN_ROUTINE_SESSIONI (stesse per pagina e main); qui si legge il documento e
+// si scrivono i SOLI campi ricevuti.
+// `null` = non ho potuto leggere, ed è diverso da «documento senza quei campi»
+// (che invece vale come «i valori di partenza»). Confonderli faceva mostrare
+// alla pagina «una sessione, tutti e due gli account in uso» come se venisse
+// dal server, proprio a chi la apre per controllare di non bruciare crediti.
+async function getRoutineSessions(idToken) {
+  const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  if (doc === null) throw new Error('Impostazioni delle sessioni non raggiungibili.');
+  return globalThis.SN_ROUTINE_SESSIONI.leggiDoc(doc);
+}
+
+async function setRoutineSessions(patch, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare le sessioni delle routine.');
+  const esito = globalThis.SN_ROUTINE_SESSIONI.valida(patch);
+  // Un valore fuori intervallo non si aggiusta di nascosto: chi ha scritto
+  // deve sapere che sul server è rimasto quello di prima.
+  if (!esito.ok) throw new Error(esito.testo);
+  const fields = {};
+  const mask = [];
+  for (const [k, v] of Object.entries(esito.valori)) {
+    fields[k] = toFsValue(v);
+    mask.push(k);
+  }
+  if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
+  // La scrittura è andata: se la rilettura che la segue non riesce, dirlo è
+  // l'unica risposta vera. Fingere un fallimento cancellerebbe una scrittura
+  // avvenuta, e fingere una lettura rimetterebbe i valori di partenza.
+  try {
+    return Object.assign({ letto: true }, await getRoutineSessions(idToken));
+  } catch (_) {
+    return Object.assign({ letto: false }, esito.valori);
+  }
 }
 
 
@@ -630,6 +687,8 @@ module.exports = {
   setRoutinesEnabled,
   getRoutineCaps,
   setRoutineCaps,
+  getRoutineSessions,
+  setRoutineSessions,
   getCreditsKnobs,
   setCreditsKnobs,
   getWorkerLog,

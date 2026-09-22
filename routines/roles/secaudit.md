@@ -62,11 +62,37 @@ server un verdetto raccontato non lo legge).
    breve, senza nomi di file o funzioni. Il file va FUORI dal repo, nella
    cartella temporanea del sistema (per esempio `../nota-<numero>.md`): non
    deve entrare nel ramo che stai giudicando.
+
+   **Il tuo verdetto vale per il commit che hai letto, non per il ramo.** Lo
+   sha parte insieme al verdetto (non devi passarlo: lo timbra lo strumento),
+   e se il contenuto cambia dopo, l'esito decade e il controllo va rifatto.
+   Per la stessa ragione il comando si ferma se nella directory c'è qualcosa
+   fuori dai commit: il salvataggio automatico lo committerebbe subito dopo,
+   spostando la punta, e nella fusione finirebbero righe che non hai mai
+   controllato. Se ti ferma: guarda cosa sono quei file, portali a un commit,
+   e se cambiano il codice rileggi il diff prima di registrare lo stesso
+   verdetto.
 2. Su **pass**, chiedi la fusione (su **fail** non fondere: accoda `design`
    con la tua spiegazione nella nota — decide l'owner):
    ```bash
    node scripts/merge-gate.mjs <branch>
    ```
+   Anche la richiesta di fusione parla del commit, non del ramo: dichiara la
+   punta della directory, e prima di partire rifà i due controlli del passo 1.
+   Se ti risponde che il ramo si è mosso dopo i via libera, non insistere e
+   non ricontrollare da solo il pezzo nuovo: l'esito è decaduto e il giro va
+   rifatto da capo su quel contenuto. Non fermarti lì: finché la notizia resta
+   sulla tua macchina, sul canale i due via libera continuano a risultare
+   buoni per quel ramo. Registrala col comando che il rifiuto ti scrive già
+   pronto, che rimette il lavoro in verifica sul contenuto nuovo; se il server
+   rifiuta quel passaggio, dichiaralo nel rilascio con `--guasto`.
+   Il `<branch>` che nomini dev'essere quello su cui sei posizionato: il gate
+   legge tutto dalla directory, e con due rami diversi controllerebbe uno e
+   chiederebbe l'altro. Guarda anche cosa ti dice su dov'è il ramo su origin,
+   da dove il server lo prende: se là manca il contenuto che hai controllato,
+   spediscilo e rilancia; se là il ramo è più avanti, NON spedire e non
+   riportarlo indietro (sovrascriveresti lavoro che qui non c'è) — è lo stesso
+   caso del ramo mosso, e si registra allo stesso modo.
    Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
    verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
    sul diff che scarica da GitHub, e fonde con la sua identità. Qui non gira

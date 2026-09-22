@@ -12,6 +12,14 @@
 //   La regola vale su TUTTE E DUE le strade, quella delle routine
 //   (dispatch --record-verifier) e quella locale (verify-local critica): una
 //   fonte sola, così una porta chiusa da una parte non resta aperta dall'altra.
+//
+//   E vale per TUTTI gli esiti che valgono per un commit, non solo per la
+//   critica: la messa in revisione, la consegna di una correzione e — dal
+//   feedback #485 — il verdetto del controllo di sicurezza, che era l'unico
+//   rimasto fuori. Un verdetto L4 registrato con la directory sporca parla del
+//   diff che il controllo ha letto, mentre il salvataggio automatico sposta la
+//   punta subito dopo: il pentagono in dashboard dice «controllato» di un
+//   contenuto che nessuno ha guardato.
 
 import { execFileSync } from 'node:child_process';
 
@@ -45,6 +53,29 @@ export function dirtyTreeText(lines, cosa = 'critica') {
   if (cosa === 'consegna') {
     return 'consegna non registrata: ci sono modifiche non salvate nella directory, e la consegna vale per un commit: la correzione starebbe fuori da ogni commit, il server la segnerebbe come fatta, e la verifica dopo proverebbe il ramo senza di essa, ritrovando gli stessi rilievi. '
       + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "correzione"). Poi riprova con lo stesso report.\n'
+      + `${elenco}${altri}`;
+  }
+  // Il verdetto del controllo di sicurezza: il danno è ancora un altro. Il
+  // verdetto vale per il diff LETTO, e quel diff è quello dell'ultimo commit;
+  // il salvataggio automatico committa il resto subito dopo la registrazione,
+  // la punta si sposta, e quello che verrebbe fuso contiene righe che il
+  // controllo non ha mai visto (feedback #485).
+  if (cosa === 'verdetto') {
+    return 'verdetto non registrato: ci sono modifiche non salvate nella directory, e il verdetto vale per il commit che hai letto: il salvataggio automatico le committerebbe DOPO, spostando la punta del ramo, e finirebbero nella fusione senza essere mai passate dal controllo. '
+      + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "pulizia"). '
+      + 'Attenzione: se quelle righe cambiano il codice, il diff da controllare non è più quello che hai letto — rileggilo prima di registrare lo stesso verdetto.\n'
+      + `${elenco}${altri}`;
+  }
+  // La richiesta di fusione: il passo dopo il verdetto, e l'ultimo del giro.
+  // Qui il danno è il più grave dei tre, perché non c'è più nessun controllo
+  // dopo: quei file il salvataggio automatico li committa e li spinge, il
+  // server risolve la punta vera del ramo e fonde QUELLA, e righe che nessuno
+  // ha letto atterrano su main, da dove l'aggiornamento automatico le porta a
+  // tutti (feedback #485).
+  if (cosa === 'fusione') {
+    return 'fusione non chiesta: ci sono modifiche non salvate nella directory, e i via libera valgono per il commit che verifica e controllo di sicurezza hanno esaminato. Il salvataggio automatico le committerebbe e le spedirebbe, il server fonderebbe la punta NUOVA del ramo, e quelle righe arriverebbero agli utenti senza essere passate da nessun controllo. '
+      + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "pulizia"). '
+      + 'Attenzione: se quelle righe cambiano il codice, i via libera non parlano più di questo contenuto e il giro va rifatto, non ripulito.\n'
       + `${elenco}${altri}`;
   }
   // La prima consegna del lavoro (chi risolve mette il feedback in revisione):
@@ -93,8 +124,14 @@ export function statoDirectory(root) {
 
 /** Il rifiuto quando lo stato della directory non si è potuto leggere. PURA. */
 export function statoIllegibileText(motivo, cosa = 'critica') {
-  const quale = cosa === 'consegna' ? 'consegna' : cosa === 'revisione' ? 'consegna' : 'critica';
-  return `${quale} non registrata: non sono riuscito a farmi dire se ci sono file fuori dai commit (${motivo || 'git non ha risposto'}), `
+  const quale = cosa === 'consegna' ? 'consegna' : cosa === 'revisione' ? 'consegna' : cosa === 'verdetto' ? 'verdetto' : cosa === 'fusione' ? 'fusione' : 'critica';
+  if (quale === 'fusione') {
+    return `fusione non chiesta: non sono riuscito a farmi dire se ci sono file fuori dai commit (${motivo || 'git non ha risposto'}), `
+      + 'e senza quella risposta non posso garantire che i via libera valgano per il contenuto che verrebbe fuso. '
+      + 'Non tratto il silenzio come «directory pulita»: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia.';
+  }
+  const finita = quale === 'verdetto' ? 'registrato' : 'registrata';
+  return `${quale} non ${finita}: non sono riuscito a farmi dire se ci sono file fuori dai commit (${motivo || 'git non ha risposto'}), `
     + 'e senza quella risposta non posso garantire che l\'esito valga per il commit giusto. '
     + 'Non tratto il silenzio come «directory pulita»: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e riprova con lo stesso testo.';
 }

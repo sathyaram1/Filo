@@ -107,6 +107,18 @@
       css: '--sn-error',
       default: { light: '#b91c1c', dark: '#ff6b6b' },
     },
+    // Il verde delle conferme: il gemello di `error` dall'altra parte. Nasce
+    // dalla bacheca, dove il voto «funziona» aveva un verde scritto a mano,
+    // uguale nei due temi: sul fondo scuro il conteggio scendeva a 2,9 volte il
+    // fondo e il numero spariva appena votavi. Un colore che dice «è andata
+    // bene» serve in più posti, quindi è un token e non una variabile di
+    // pagina. Superficie di sola pagina, come `error`.
+    success: {
+      label: 'Colore delle conferme',
+      type: 'color',
+      css: '--sn-success',
+      default: { light: '#1e8449', dark: '#5fd08a' },
+    },
     // Sfondo al passaggio del mouse: la tinta che prendono voci di menu, righe,
     // bottoni secondari e azioni-carta in hover (theme.css `--sn-hover`). Era
     // l'unico colore di superficie delle pagine filo:// non ancora esposto come
