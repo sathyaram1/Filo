@@ -209,6 +209,7 @@
         + '• voce: nome esatto della voce di sistema ; voce_modello: nome della voce naturale ("Sara") o "automatica"\n'
         + '• suoneria_timer: "standard" | "delicata" | "urgente" | "carillon" (motivo di timer e sveglie) ; volume_suoneria: numero 0-100 (0 = muta)\n'
         + '• suono_notifiche: true | false ; tono_notifiche: come suoneria_timer ; volume_notifiche: numero 0-100\n'
+        + '• durata_notifiche: numero 0-120 secondi (0 = la notifica resta finché non la chiudi)\n'
         + '• protezione_ip: true | false [conferma] (anti-leak WebRTC)\n'
         + '• blocco_popup: true | false [conferma]\n'
         + '• navigazione_sicura: true | false [conferma] (rilevamento siti pericolosi)\n'
