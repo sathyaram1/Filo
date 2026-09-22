@@ -1180,6 +1180,7 @@
       numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
       ancheNuovi: !!(opts && opts.ancheNuovi),
     }).filter((req) => !fusioniTentate.has(req.id));
+    if (daFondere.length && opts && typeof opts.avvia === 'function') opts.avvia(daFondere.length);
     const esiti = [];
     for (const req of daFondere) {
       fusioniTentate.add(req.id);
@@ -1204,7 +1205,8 @@
         if (!preapprovedOf(fb) || !isOpenPublic(fb)) continue;
         for (const { req, msg } of await fondiCoperte(fb)) {
           const num = window.SN_MERGE_APPROVALS.feedbackNum(req);
-          setManageMsg(`Fusione ferma${num ? ` su #${num}` : ''}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`, msg.kind === 'ok' ? 'ok' : 'err');
+          const dove = num ? ` su #${num}` : '';
+          setManageMsg(`Fusione ferma${dove}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`, msg.kind === 'ok' ? 'ok' : 'err');
         }
       }
     } finally {
@@ -2619,8 +2621,8 @@
       if (next) {
         // Il segno messo con una richiesta già ferma davanti: si fonde adesso,
         // anche quella aperta per i soli blocchi nuovi, che l'owner ha sotto gli occhi.
-        setManageMsg(testo + ' Chiedo al server di fondere la richiesta ferma…', '');
-        for (const { msg } of await fondiCoperte(fb, { ancheNuovi: true })) {
+        const avvia = () => setManageMsg(testo + ' Chiedo al server di fondere la richiesta ferma…', '');
+        for (const { msg } of await fondiCoperte(fb, { ancheNuovi: true, avvia })) {
           testo += ` Fusione ferma su questa pratica: ${msg.text}`;
           if (msg.kind !== 'ok') kind = 'err';
         }
@@ -2630,7 +2632,8 @@
     } catch (e) {
       // Un rifiuto va detto anche se intanto hai aperto un'altra pratica: il
       // segno che credevi messo non c'è, e senza questa riga nessuno lo sa.
-      const dove = selectedId !== id && FB && typeof FB.formatNum === 'function' ? ` (#${FB.formatNum(fb.seq, fb.subSeq)})` : '';
+      const altrove = selectedId !== id && FB && typeof FB.formatNum === 'function';
+      const dove = altrove ? ` (#${FB.formatNum(fb.seq, fb.subSeq)})` : '';
       setManageMsg(`Segno non messo${dove}: ${e.message || 'Errore'}`, 'err');
     } finally {
       mgPreapproveBtn.disabled = false;

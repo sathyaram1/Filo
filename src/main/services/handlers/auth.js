@@ -340,7 +340,8 @@ module.exports = function register(on, ctx) {
       const raw = e?.message || String(e);
       // Nel registro, non solo nella risposta: la pagina può aver cambiato
       // pratica nel frattempo, e un 403 muto è un segno che non c'è e nessuno sa perché.
-      console.warn('[Filo] feedback_update respinto', id, Object.keys(msg || {}).filter((k) => k !== 'type' && k !== 'id').join(','), raw.slice(0, 300));
+      const campi = Object.keys(msg || {}).filter((k) => k !== 'type' && k !== 'id').join(',');
+      console.warn('[Filo] feedback_update respinto', id, campi, raw.slice(0, 300));
       let claims = null;
       try { claims = auth.getTokenClaims(); } catch (_) {}
       // Un 403 può voler dire "non sei admin" oppure "sei admin ma il contenuto

@@ -49,7 +49,7 @@ async function stubMain(page, { pending = [], approveReply = null, updateReply =
       if (t === 'feedback_update') {
         window.__updates.push(msg);
         // Il rifiuto arriva con calma: il tempo di cambiare pratica.
-        if (cfg.updateReply) { await new Promise((r) => setTimeout(r, 500)); return cfg.updateReply; }
+        if (cfg.updateReply) { await new Promise((r) => setTimeout(r, 1500)); return cfg.updateReply; }
         return msg.mergePreapproved ? { ok: true, by: 'owner@esempio' } : { ok: true };
       }
       if (t === 'merge_approvals_get') {
@@ -62,7 +62,7 @@ async function stubMain(page, { pending = [], approveReply = null, updateReply =
       }
       return orig(msg);
     };
-  }, { pending, approveReply, sha: SHA, ttl: 7 * GIORNO });
+  }, { pending, approveReply, updateReply, sha: SHA, ttl: 7 * GIORNO });
 }
 
 async function apri(page, fbs, opts) {
