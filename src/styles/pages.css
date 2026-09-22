@@ -567,9 +567,13 @@ section:has(#dictList) .sn-spell-add-row {
   grid-template-columns: 1fr auto;
 }
 
+/* Ogni riga è una griglia a sé, intestazione compresa: una colonna `auto` vuota
+   nell'intestazione si stringe a zero e la colonna elastica si prende quello
+   spazio, così le scritte scivolano sopra i controlli sbagliati. Le colonne dei
+   pulsanti restano quindi a misura fissa, e la sentinella tiene l'allineamento. */
 .sn-model-row {
   display: grid;
-  grid-template-columns: 120px 150px 1fr auto auto;
+  grid-template-columns: 120px 150px minmax(0, 1fr) 76px 68px;
   gap: 6px;
   align-items: center;
   padding: 6px 8px;

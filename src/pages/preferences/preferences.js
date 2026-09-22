@@ -73,7 +73,6 @@
   // risultano personalizzati finché non li si tocca direttamente.
 
   let currentOverrides = {};
-  let tokensSaveTimer = null;
 
   // Tema risolto (light/dark) com'è applicato ora su <html>: i default di alcuni
   // token differiscono fra chiaro e scuro.
@@ -195,10 +194,7 @@
     flashSaved('tokenSavedHint');
   }
 
-  function persistTokensDebounced() {
-    clearTimeout(tokensSaveTimer);
-    tokensSaveTimer = setTimeout(persistTokens, 400);
-  }
+  const persistTokensDebounced = rimandato(persistTokens, 'tokenSavedHint');
 
   // Ridisegna tutte le righe TRANNE quella in `exceptName` (che l'utente sta
   // editando): serve quando si cambia un token-categoria, così i token che ne
@@ -363,7 +359,6 @@
   // (via SETTINGS_UPDATED) aggiorna live il colore delle tab. ↺ riporta il
   // singolo parametro al predefinito; il bottone in fondo li azzera tutti.
   let currentTabColor = {};
-  let tabColorSaveTimer = null;
 
   function buildTabColorSection() {
     const box = $('tabColorCode');
@@ -479,10 +474,7 @@
     flashSaved('tabColorSavedHint');
   }
 
-  function persistTabColorDebounced() {
-    clearTimeout(tabColorSaveTimer);
-    tabColorSaveTimer = setTimeout(persistTabColor, 400);
-  }
+  const persistTabColorDebounced = rimandato(persistTabColor, 'tabColorSavedHint');
 
   // Restituisce lo stile testuale corrente dal textarea.
   function currentStyleText() {
@@ -766,10 +758,7 @@
     flashSaved();
   }
 
-  function persistDebounced() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(persist, 400);
-  }
+  const persistDebounced = rimandato(persist);
 
   function buildPresetOptions() {
     const sel = $('agentStylePreset');
