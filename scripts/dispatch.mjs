@@ -1023,12 +1023,16 @@ export function verifierReplyText(reply) {
     'L\'esito vero sta in dashboard, nella chat del feedback: leggilo lì prima di rilasciare il biglietto.',
   ].join('\n');
 }
-/** Cosa si stampa a consegna accettata: il lavoro si è fermato, o torna in verifica. PURA. */
-export function fixedReplyText(id, reply, ferma = false) {
+/**
+ * Cosa si stampa a consegna accettata: il lavoro si è fermato, o torna in
+ * verifica. `conSegnalazione` = la consegna portava una segnalazione (o il
+ * vecchio --ferma), quindi DOVEVA fermarsi. PURA.
+ */
+export function fixedReplyText(id, reply, conSegnalazione = false) {
   const fermato = reply && reply.outcome === 'stop';
   if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
-  // Un server che non conosce ancora «stop» rimette in coda: dirlo, o chi ha fermato crede di averlo fatto.
-  if (ferma) return `stato ${id}: ATTENZIONE, avevi chiesto di fermare ma il server non l'ha confermato: il lavoro è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
+  // Un server vecchio, che non ferma su una segnalazione, rimette in coda: dirlo, o chi ha segnalato crede di essersi fermato.
+  if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
 async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
