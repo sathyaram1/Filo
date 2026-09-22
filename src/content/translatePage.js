@@ -972,8 +972,13 @@
   function hasNewContent() {
     if (!pageHasTranslation || !pageComplete) return false;
     if (newContentSeen) return true;
-    return !!(Extract && typeof Extract.hasRevealedText === 'function'
+    // La risposta costa una camminata su TUTTE le sezioni rimandate, e il tasto destro è la cosa che in Filo si
+    // apre più spesso: si rifà solo se da allora la pagina è cambiata o l'utente l'ha toccata (#505).
+    if (!revealedDirty) return revealedAnswer;
+    revealedDirty = false;
+    revealedAnswer = !!(Extract && typeof Extract.hasRevealedText === 'function'
       && Extract.hasRevealedText(hiddenSkipped));
+    return revealedAnswer;
   }
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
   // l'icona del menu serve a CONTINUARE, non a tornare all'originale.
