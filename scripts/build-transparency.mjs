@@ -307,6 +307,7 @@ function buildDocs() {
     return {
       id: meta.id || file.replace(/\.md$/, ''),
       title: meta.title || file,
+      nav: meta.nav || '',
       subtitle: meta.subtitle || '',
       updated: meta.updated || '',
       order: Number(meta.order || 99),
