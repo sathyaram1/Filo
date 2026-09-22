@@ -46,13 +46,16 @@
   // Esegue `once()` ritentandolo sui guasti di rete passeggeri. `canRetry()`
   // decide se il ritentativo è ancora lecito (in streaming non lo è più una
   // volta che dei delta sono usciti, se il chiamante non sa azzerare il buffer).
-  async function withNetworkRetry(once, canRetry) {
+  async function withNetworkRetry(once, canRetry, suGuasto) {
     let lastErr = null;
     for (let t = 0; t <= RETRY_NETWORK_MAX; t++) {
       try {
         return await once();
       } catch (err) {
         lastErr = err;
+        // Anche il ritentativo sullo STESSO fornitore riparte da capo: quello
+        // che il modello aveva già scritto si paga (#591, giro 9).
+        if (suGuasto) { try { suGuasto(err); } catch (_) {} }
         const again = t < RETRY_NETWORK_MAX
           && isTransientNetwork(err)
           && (!canRetry || canRetry());
@@ -93,8 +96,26 @@
   // usato) al risultato. Ogni attempt può portare il proprio `model` (id
   // provider-specifico risolto dal nickname): se assente si usa il `model`
   // globale per retro-compatibilità.
+  // Un tentativo che si rompe DOPO che il modello ha già prodotto del testo si
+  // paga lo stesso. Qui si raccoglie quello che serve per farne una riga di
+  // spesa (l'id della generazione): chi chiama lo registra come tutti gli altri
+  // costi, altrimenti il tetto mensile non lo vede mai (#591, giro 9).
+  function segnaFallito(falliti, attempt, model, err) {
+    if (!err || !err.generationId) return;
+    // Lo stesso guasto passa sia dal ritentativo sia dal ripiego: una
+    // generazione si paga una volta sola.
+    if (falliti.some((f) => f.generationId === err.generationId)) return;
+    falliti.push({
+      provider: attempt.provider,
+      apiKey: err.keyUsed || attempt.apiKey,
+      model: attempt.model || model,
+      generationId: err.generationId,
+    });
+  }
+
   async function completeWithFallback({ attempts, model, messages, tools, toolChoice, signal, onFallback }) {
     let lastErr = null;
+    const falliti = [];
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
       const aModel = a.model || model;
@@ -105,9 +126,10 @@
         }));
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.
-        return { ...r, provider: a.provider, model: aModel };
+        return { ...r, provider: a.provider, model: aModel, tentativiFalliti: falliti };
       } catch (err) {
         lastErr = err;
+        segnaFallito(falliti, a, model, err);
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} fallito (${i + 1}/${attempts.length}):`, err.message || err);
         if (onFallback && i + 1 < attempts.length) {
@@ -126,6 +148,7 @@
   // fallito aveva già emesso qualcosa (delta o reasoning) e c'è un attempt dopo.
   async function streamCompleteWithFallback({ attempts, model, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset }) {
     let lastErr = null;
+    const falliti = [];
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
       const aModel = a.model || model;
@@ -150,10 +173,12 @@
             emitted = false;
             return true;
           },
+          (err) => segnaFallito(falliti, a, model, err),
         );
-        return { ...r, provider: a.provider, model: aModel };
+        return { ...r, provider: a.provider, model: aModel, tentativiFalliti: falliti };
       } catch (err) {
         lastErr = err;
+        segnaFallito(falliti, a, model, err);
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} streaming fallito (${i + 1}/${attempts.length}):`, err.message || err);
         const hasNext = i + 1 < attempts.length;

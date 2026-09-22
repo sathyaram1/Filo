@@ -51,6 +51,9 @@
     document.querySelector('label[for="apiKey"]').textContent = I18n.t('options_api_key');
 
     $('lbl-limit').textContent = I18n.t('options_monthly_limit');
+    // Zero spegne il tetto per tutto, chat e controlli automatici compresi, e
+    // svuotare il campo fa lo stesso: chi lo fa deve saperlo (#591, giro 9).
+    $('lbl-limit-zero').textContent = I18n.t('options_monthly_limit_zero');
     $('lbl-spent').textContent = I18n.t('options_current_spent');
 
     $('savedHint').textContent = I18n.t('options_saved');

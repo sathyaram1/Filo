@@ -366,12 +366,27 @@
     let fullText = '';
     let servedBy = null;
     let finishReason = null;
+    // L'id della generazione arriva subito, insieme al primo pezzo di risposta.
+    // Serve se lo stream si rompe a metà: quello che il modello ha già scritto
+    // si paga lo stesso, e senza questo id non c'era modo di sapere quanto né
+    // di farlo comparire nel conto (#591, giro 9).
+    let generationId = res.headers.get('x-generation-id') || null;
     const calls = createToolCallAccumulator(onToolCall);
     const details = createReasoningDetailsAccumulator();
     let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
 
     while (true) {
-      const { done, value } = await reader.read();
+      let done, value;
+      try {
+        ({ done, value } = await reader.read());
+      } catch (e) {
+        // Lo stream si è rotto dopo che il modello aveva già scritto: chi
+        // ripiega deve poter chiedere al fornitore quanto è costato questo
+        // tentativo, altrimenti si paga e non si vede (#591, giro 9).
+        if (generationId) e.generationId = generationId;
+        e.keyUsed = keyUsed;
+        throw e;
+      }
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -401,6 +416,7 @@
             fullText += delta;
             try { onDelta && onDelta(delta); } catch (_) {}
           }
+          if (!generationId && obj.id) generationId = String(obj.id);
           if (obj.usage) {
             usage = {
               promptTokens: obj.usage.prompt_tokens || 0,
@@ -417,7 +433,7 @@
     }
     return {
       text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy,
-      keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
+      keyUsed, keyFallback, generationId, usage: { ...usage, keySource, keyFallback },
     };
   }
 

@@ -208,9 +208,13 @@ const LOOKUP_MAX_RAFFICA = 12;
 const lookupSpesa = creaConto(30 * MIN);
 const lookupRaffica = creaConto(RAFFICA_MS);
 
-// Chiamate già in volo, per proprietario del sito. La cache si riempie solo
-// quando la risposta arriva: senza questo, cinquanta sottodomini aperti insieme
-// facevano partire cinquanta chiamate prima che la prima rispondesse.
+// Chiamate già in volo. La cache si riempie solo quando la risposta arriva:
+// senza questo, cinquanta sottodomini aperti insieme facevano partire cinquanta
+// chiamate prima che la prima rispondesse. Il segno sta sulla stessa chiave con
+// cui si ricorda la risposta, non sul proprietario del sito: è un doppione da
+// evitare, non un freno — i freni, quelli sì, stanno sul proprietario (#591,
+// giro 9). Tenuto sul proprietario, la chiamata di un sito ospitato faceva
+// saltare in silenzio quella del vicino, senza nemmeno rimandarla.
 const llmInFlight = new Set();
 const sandboxInFlight = new Set();
 // #591, sesto giro — lo stesso segno mancava agli stadi di rete, e lì costava
@@ -281,7 +285,7 @@ function assembleCached(norm, url) {
     cert: certCache.get(psl.proprietario(norm.host) || reg),
     // Il verdetto è di QUESTO indirizzo, non del dominio: vedi il commento
     // sulle cache qui sopra.
-    sandbox: sandboxCache.get(norm.host),
+    sandbox: sandboxCache.get(chiaveIndirizzo(url, norm)),
     llm: llmCache.get(norm.host),
   };
 }
@@ -376,8 +380,8 @@ function analyze(url, ctx = {}, onUpdate) {
   const worthDeepening = first.level === 'sospetto' || first.needsLlm;
   // Il segno "già in volo" si toglie SEMPRE, anche se il provider salta subito:
   // un segno rimasto lì spegnerebbe il controllo su quel dominio per sempre.
-  const inVolo = (insieme, avvia, salva) => {
-    insieme.add(prop);
+  const inVolo = (insieme, chiave, avvia, salva) => {
+    insieme.add(chiave);
     tasks.push((async () => {
       try {
         const r = await avvia();
@@ -385,23 +389,31 @@ function analyze(url, ctx = {}, onUpdate) {
       } catch (_) {
         /* best-effort: uno stadio profondo che non risponde non ferma il resto */
       } finally {
-        insieme.delete(prop);
+        insieme.delete(chiave);
       }
     })());
   };
   // `prendiGettone` va per ultimo: è l'unico con un effetto: il gettone si
   // consuma solo quando la chiamata parte davvero. Se a dire di no è il conto
   // comune, la verifica si rimanda invece di perderla.
-  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(prop)) {
+  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(norm.host)) {
     const g = prendiGettone(llmSpesa, llmRaffica, prop, DEEP_MAX_PER_OWNER, DEEP_MAX_RAFFICA, contoCatenaDeep);
     if (g === 'ok') {
-      inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first, url)), (r) => llmCache.set(norm.host, r));
+      inVolo(llmInFlight, norm.host, () => providers.llm(buildLlmMeta(norm, ctx, first, url)), (r) => llmCache.set(norm.host, r));
     } else if (g === 'raffica') rimandare = true;
   }
-  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(prop)) {
+  // Il giudizio del modello guarda l'identità del SITO (nome, età, certificato)
+  // e si ricorda per l'host; la finestra nascosta apre l'INDIRIZZO intero, ne
+  // segue i salti e ne guarda i download, quindi il suo esito è di quell'
+  // indirizzo. Ricordarlo per tutto il sito copriva il file di truffa col
+  // «pulito» del vicino, e sbarrava con la pagina rossa i file innocenti dei
+  // vicini: è la regola dell'elenco dei siti di truffa, che qui mancava
+  // (#591, giro 9).
+  const chiaveSandbox = chiaveIndirizzo(url, norm);
+  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(chiaveSandbox)) {
     const g = prendiGettone(sandboxSpesa, sandboxRaffica, prop, DEEP_MAX_PER_OWNER, DEEP_MAX_RAFFICA, contoCatenaDeep);
     if (g === 'ok') {
-      inVolo(sandboxInFlight, () => providers.sandbox(url, norm), (r) => sandboxCache.set(norm.host, r));
+      inVolo(sandboxInFlight, chiaveSandbox, () => providers.sandbox(url, norm), (r) => sandboxCache.set(chiaveSandbox, r));
     } else if (g === 'raffica') rimandare = true;
   }
   // Il conto comune era pieno: chi ha chiesto il verdetto lo saprà e riproverà

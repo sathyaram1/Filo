@@ -283,6 +283,7 @@
     options_theme_light: 'Chiaro',
     options_theme_dark: 'Scuro',
     options_monthly_limit: 'Limite mensile (€)',
+    options_monthly_limit_zero: 'Con 0, o lasciandolo vuoto, non c\'è nessun tetto: Filo spende finché la chiave regge.',
     options_current_spent: 'Speso questo mese',
     options_action_explain: 'Spiega (inline)',
     options_action_explain_deep: 'Approfondisci',
