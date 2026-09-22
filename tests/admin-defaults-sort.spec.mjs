@@ -168,3 +168,58 @@ test('scelgo l’ordinamento su una riga, salvo, riapro: è ancora lì, e la ric
   expect(esito.ripiego.provider).toEqual({ ignore: esito.ignoreAtteso });
   expect('reasoning' in esito.ripiego).toBe(false);
 });
+
+// Ogni riga della lista è una griglia a sé, intestazione compresa: se le colonne
+// dei pulsanti non hanno una misura fissa, l'intestazione vuota si stringe e le
+// scritte scivolano sopra il controllo accanto.
+test('le scritte in cima alle colonne stanno sopra il controllo che descrivono', async ({ openTab }) => {
+  const page = await openEditor(openTab);
+  const misura = await page.evaluate(() => {
+    const testa = document.querySelector('#modelRegistryList .sn-model-row-head');
+    const riga = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+    const celle = Array.from(testa.children)
+      .map((c) => ({ testo: c.textContent.trim().toLowerCase(), x: c.getBoundingClientRect().x }));
+    const box = (sel) => {
+      const r = riga.querySelector(sel).getBoundingClientRect();
+      return { x: r.x, fine: r.x + r.width };
+    };
+    return { celle, reason: box('.sn-model-reason'), sort: box('.sn-model-sort') };
+  });
+  const etichetta = (t) => misura.celle.find((c) => c.testo === t);
+  const reasoning = etichetta('reasoning');
+  const host = etichetta('host');
+  expect(reasoning && host, 'intestazioni «reasoning» e «host» non trovate').toBeTruthy();
+
+  const dove = `«reasoning» a ${Math.round(reasoning.x)}, «host» a ${Math.round(host.x)};`
+    + ` ragionamento da ${Math.round(misura.reason.x)} a ${Math.round(misura.reason.fine)},`
+    + ` ordinamento da ${Math.round(misura.sort.x)} a ${Math.round(misura.sort.fine)}`;
+  const storte = [];
+  if (!(reasoning.x >= misura.reason.x - 4 && reasoning.x < misura.reason.fine)) storte.push('«reasoning»');
+  if (!(host.x >= misura.sort.x - 4 && host.x < misura.sort.fine)) storte.push('«host»');
+  expect(storte, `scritte sopra la colonna sbagliata — ${dove}`).toEqual([]);
+});
+
+// «Automatico» su una riga rimanda alla scelta generale: se quella non si può
+// vedere né cambiare da nessuna parte, la voce rimanda al nulla.
+test('la scelta generale degli host si vede, si cambia e si salva', async ({ openTab }) => {
+  const page = await openEditor(openTab);
+  const generale = page.locator('#providerSort');
+  await expect(generale).toBeVisible();
+  const voci = await generale.locator('option').evaluateAll((els) => els.map((o) => o.value));
+  expect(voci).toEqual(['auto', 'throughput', 'latency', 'price']);
+
+  await generale.selectOption('price');
+  await page.locator('#saveBtn').click();
+  await expect.poll(async () => page.evaluate(() => {
+    const u = window.__sent.filter((m) => m.type === 'defaults_update').pop();
+    return u && u.config ? (u.config.providerSort ?? null) : null;
+  }), { timeout: 8_000 }).toBe('price');
+
+  // E si toglie: ciò che si mette si deve poter rimettere com'era.
+  await generale.selectOption('auto');
+  await page.locator('#saveBtn').click();
+  await expect.poll(async () => page.evaluate(() => {
+    const u = window.__sent.filter((m) => m.type === 'defaults_update').pop();
+    return u && u.config ? (u.config.providerSort ?? null) : null;
+  }), { timeout: 8_000 }).toBe('');
+});
