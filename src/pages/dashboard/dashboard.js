@@ -625,14 +625,27 @@
 
   // Un solo listener delegato: i link renderizzati da Filo aprono una NUOVA
   // SCHEDA (come qualsiasi altro link) invece di navigare via la pagina interna.
-  bubblesEl.addEventListener('click', (e) => {
+  // #533 (settimo giro di verifica) — ma non da soli: la scritta e l'indirizzo
+  // li ha scelti il modello, che può aver letto la pagina di qualcun altro.
+  // L'apertura passa dal motore, col compito della risposta in cui il
+  // collegamento sta: dove Filo è stato davvero si va subito, altrove chiede
+  // mostrando l'indirizzo intero.
+  bubblesEl.addEventListener('click', async (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a || !bubblesEl.contains(a)) return;
     const url = a.getAttribute('href');
     if (!url) return;
     e.preventDefault();
     e.stopPropagation();
-    send({ type: MSG.OPEN_URL, url });
+    const bolla = a.closest('.dash-bubble');
+    const compito = (bolla && bolla.dataset.compito) || null;
+    const r = await send({ type: MSG.FILO_OPEN_LINK, url, compito });
+    if (!r || !r.chiede) return;
+    const Ui = window.SN_CONFIRM_UI;
+    const opts = { title: 'Filo chiede conferma', text: r.testo || `Aprire ${url}` };
+    const ok = Ui ? await Ui.confirm(opts) : window.confirm(opts.text);
+    if (!ok) return;
+    await send({ type: MSG.FILO_OPEN_LINK, url, compito, conferma: true });
   });
 
   // ===== Invio messaggio =====
