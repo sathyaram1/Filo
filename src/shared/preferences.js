@@ -69,6 +69,33 @@
     return Number.isFinite(n) ? n : NaN;
   }
 
+  // Suoneria del timer e suono delle notifiche pescano dagli stessi quattro
+  // motivi (SN_SOUNDS): interpretarli in un posto solo evita che «delicata»
+  // valga per uno e non per l'altro.
+  const TONE_LABELS = { default: 'Standard', gentle: 'Delicata', urgent: 'Urgente', chime: 'Carillon' };
+  function parseTone(raw) {
+    const s = String(raw == null ? '' : raw).trim().toLowerCase();
+    const map = {
+      standard: 'default', default: 'default', normale: 'default',
+      delicata: 'gentle', gentle: 'gentle', dolce: 'gentle', morbida: 'gentle',
+      urgente: 'urgent', urgent: 'urgent', forte: 'urgent', acuto: 'urgent',
+      carillon: 'chime', chime: 'chime', campanello: 'chime', campana: 'chime',
+    };
+    return map[s] || null;
+  }
+
+  // Volume 0-100. Accetta anche le parole con cui lo si chiede a voce; null se
+  // non è né una parola nota né un numero, così non si spegne niente per sbaglio.
+  function parseVolume(raw) {
+    const s = String(raw == null ? '' : raw).trim().toLowerCase();
+    const parole = { muto: 0, muta: 0, zero: 0, silenzio: 0, basso: 30, bassa: 30, piano: 30, medio: 60, media: 60, alto: 100, alta: 100, massimo: 100, forte: 100 };
+    const n = Object.prototype.hasOwnProperty.call(parole, s)
+      ? parole[s]
+      : parseInt(s.replace('%', ''), 10);
+    if (!Number.isFinite(n)) return null;
+    return Math.min(100, Math.max(0, n));
+  }
+
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
   // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
   // annidati vicini); `label` è la conferma leggibile per l'utente.
