@@ -40,3 +40,22 @@ test('il costo che arriva dopo la chiusura dell\'incognito deve entrare nel cont
     'il costo registrato dopo la chiusura della finestra in incognito deve entrare nel conto del mese',
   ).toBeGreaterThan(20);
 });
+
+test('caso di riscontro: lo stesso rinvio da una finestra normale entra nel conto', async ({ app }) => {
+  const out = await app.evaluate(async () => {
+    const Costs = globalThis.SN_COSTS;
+    const prima = (await Costs.getMonthly()).totalEur;
+    await new Promise((res) => {
+      setTimeout(async () => {
+        await Costs.record({
+          action: 'filo_chat', provider: 'openrouter', model: 'modello-x',
+          usage: { costUsd: 30, keySource: 'factory' },
+          pricing: null, usdToEur: 1,
+        });
+        res();
+      }, 40);
+    });
+    return { prima, dopo: (await Costs.getMonthly()).totalEur };
+  });
+  expect(out.dopo - out.prima).toBeGreaterThan(20);
+});
