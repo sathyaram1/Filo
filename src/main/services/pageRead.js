@@ -349,7 +349,7 @@ function passaggio(html, modo, dentroZona = false) {
   // pila costava quanto la pila è alta, a ogni chiusura: una fila di aperture
   // e una di chiusure che non si corrispondono faceva crescere il tempo col
   // QUADRATO della pagina, e la lettura gira nel processo delle finestre (#553).
-  const dove = new Map();
+  const indici = new Map();
   const pezzi = [];
   const pezziCornice = [];
   let i = 0;
