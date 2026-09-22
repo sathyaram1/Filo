@@ -990,7 +990,7 @@
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
     $('notifDuration').addEventListener('blur', canonNotifDuration);
-    $('notifSoundEnabled').addEventListener('change', persist);
+    $('notifSoundEnabled').addEventListener('change', () => { sincronizzaSuonoNotifiche(); persist(); });
     $('notifSound').addEventListener('change', persist);
     $('notifSoundVolume').addEventListener('input', () => mostraVolume('notifSoundVolume'));
     $('notifSoundVolume').addEventListener('change', persist);
