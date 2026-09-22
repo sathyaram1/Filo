@@ -23,26 +23,35 @@ require_(join(REPO, 'src/main/services/providers/index.js'));
 const Gate = require_(join(REPO, 'src/main/services/modelGate.js'));
 
 // Due tentativi sullo stesso fornitore finto: il primo produce del testo e poi
-// si rompe, il secondo risponde.
+// si rompe, il secondo risponde. Il fornitore sa dire a posteriori quanto è
+// costata una generazione, come quello vero.
 function fornitore(costi) {
   let chiamate = 0;
+  const perId = new Map();
   return {
     async streamComplete({ onDelta }) {
       chiamate += 1;
       if (chiamate === 1) {
         if (onDelta) onDelta('Ecco la prima metà della risposta, già generata e già pagata');
         costi.push(0.004);
+        perId.set('gen-rotta', 0.004);
         const e = new Error('stream troncato');
         e.status = 500;
+        e.generationId = 'gen-rotta';
         throw e;
       }
       costi.push(0.006);
       return { text: 'risposta', usage: { promptTokens: 900, completionTokens: 300, costUsd: 0.006 } };
     },
+    async lookupServedBy({ generationId }) {
+      const c = perId.get(generationId);
+      return c === undefined ? null : { servedBy: 'finto', costUsd: c };
+    },
   };
 }
 
 test('il costo di un tentativo che si rompe a metà deve entrare nel conto', async () => {
+  test.setTimeout(60000);
   const costiVeri = [];
   globalThis.SN_PROVIDER_FINTO = fornitore(costiVeri);
 
@@ -66,6 +75,8 @@ test('il costo di un tentativo che si rompe a metà deve entrare nel conto', asy
   });
 
   await Gate.stream({ settings: { monthlyLimitEur: 5 }, action: 'prova', messages: [], onDelta: () => {} });
+  // Il costo del tentativo rotto lo si chiede al fornitore poco dopo.
+  await new Promise((r) => setTimeout(r, 6000));
 
   const speso = costiVeri.reduce((a, b) => a + b, 0);
   const contato = registrati.reduce((a, b) => a + b, 0);

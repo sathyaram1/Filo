@@ -322,3 +322,104 @@ test('la scheda rimasta sulla truffa ottiene il controllo anche a catena svuotat
   assert.notDeepEqual(profonde, [],
     'la scheda è rimasta qui: il controllo della truffa non si perde per una raffica altrui');
 });
+
+// #591, nono giro — i segnali che solo la pagina conosce (il campo password, il
+// campo della carta) arrivano DOPO la navigazione, e su una pagina di accesso
+// mai vista sono l'unico motivo per cui si chiede al modello. Il rinvio lo
+// programma il cammino della navigazione, che di quei segnali non sa niente:
+// senza la correzione l'insistenza ripresentava la pagina com'era prima che
+// esistesse, quindi il controllo non partiva e l'avviso già mostrato veniva
+// cancellato da un verdetto più povero.
+function schedaCheAscolta(dove) {
+  const detti = [];
+  class FintoTabManager {
+    constructor() {
+      this.tabs = [{
+        id: 1,
+        view: { webContents: { getURL: () => dove.url, send: (_c, m) => detti.push(m.level) } },
+      }];
+    }
+  }
+  installSafebrowse(FintoTabManager);
+  const tm = new FintoTabManager();
+  return { tm, detti, tab: tm.tabs[0] };
+}
+
+async function rafficaOstile(tm, tab) {
+  for (let i = 0; i < SB.LOOKUP_MAX_PER_CATENA + 1; i++) {
+    const u = `http://paypa1-esca-g9-${i}.pages.dev/login`;
+    tm._sbOnNavigate(tab, u);
+    tm.safebrowseGet(1, u, { hasPassword: true });
+    await attendi(5);
+  }
+}
+
+test('l\'insistenza porta con sé i segnali che la pagina ha mandato dopo', async () => {
+  pulisci();
+  const profonde = [];
+  SB.setProviders({
+    gsb: async () => ({ listed: false }), rdap: null, ct: null,
+    llm: async (meta) => { profonde.push(meta.host); return { suspicious: false }; },
+    sandbox: null,
+  });
+  const truffa = 'https://accesso-clienti.banca-g9-nono.tk/login';
+  const dove = { url: '' };
+  const { tm, tab } = schedaCheAscolta(dove);
+  await rafficaOstile(tm, tab);
+  profonde.length = 0;
+
+  dove.url = truffa;
+  tm._sbOnNavigate(tab, truffa);              // la scheda chiede per prima, e non sa niente della pagina
+  tm.safebrowseGet(1, truffa, { hasPassword: true }); // la pagina manda i suoi segnali un istante dopo
+  await attendi(30);
+  assert.deepEqual(profonde, [], 'a catena vuota la verifica non parte subito');
+  await attendi(6200);
+  assert.notDeepEqual(profonde, [],
+    'il campo password è l\'unico motivo per chiedere al modello: il rinvio deve portarselo dietro');
+});
+
+test('l\'insistenza non ritira l\'avviso già mostrato', async () => {
+  pulisci();
+  SB.setProviders({ gsb: async () => ({ listed: false }), rdap: null, ct: null, llm: null, sandbox: null });
+  const truffa = 'http://banca-g9-nono.verifica-g9.tk/login'; // in chiaro: col campo password vale «sospetto»
+  const dove = { url: '' };
+  const { tm, tab, detti } = schedaCheAscolta(dove);
+  await rafficaOstile(tm, tab);
+
+  dove.url = truffa;
+  tm._sbOnNavigate(tab, truffa);
+  const risposta = tm.safebrowseGet(1, truffa, { hasPassword: true });
+  assert.equal(risposta.level, 'sospetto', 'col campo password la pagina è sospetta');
+  detti.length = 0;
+  await attendi(6200);
+  assert.equal(detti.includes('safe'), false,
+    'chi insiste non può annunciare «sicuro» su una pagina che ha già fatto comparire l\'avviso');
+});
+
+test('l\'esito della finestra nascosta è dell\'indirizzo, non di tutto il sito', async () => {
+  const PULITO = 'http://condiviso-g9.esempio-g9-nono.tk/file/relazione';
+  const TRUFFA = 'http://condiviso-g9.esempio-g9-nono.tk/file/accesso-clienti';
+
+  pulisci();
+  const aperte = [];
+  SB.setProviders({
+    gsb: null, rdap: null, ct: null, llm: null,
+    sandbox: async (u) => { aperte.push(u); return { verdict: 'clean' }; },
+  });
+  SB.analyze(PULITO, { hasPassword: true }, () => {});
+  await attendi(20);
+  SB.analyze(TRUFFA, { hasPassword: true }, () => {});
+  await attendi(20);
+  assert.equal(aperte.includes(TRUFFA), true,
+    'la finestra nascosta apre l\'indirizzo intero e ne segue i salti: l\'esito di un altro file non è il suo');
+
+  pulisci();
+  SB.setProviders({
+    gsb: null, rdap: null, ct: null, llm: null,
+    sandbox: async (u) => ({ verdict: u === TRUFFA ? 'dangerous' : 'clean' }),
+  });
+  SB.analyze(TRUFFA, { hasPassword: true }, () => {});
+  await attendi(20);
+  assert.notEqual(SB.checkSync(PULITO, { hasPassword: true }).level, 'pericoloso',
+    'il file di un\'altra persona, sullo stesso sito, non si prende la pagina rossa dell\'altro');
+});

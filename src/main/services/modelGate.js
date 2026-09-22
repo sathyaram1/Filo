@@ -151,9 +151,13 @@
     settings, action, messages, modelRef, tools, toolChoice, signal, pricing, record,
   }) {
     const attempts = await chain({ settings, action, modelRef });
-    const result = await providers().completeWithFallback({
-      attempts, messages, tools, toolChoice, signal,
-    });
+    let result;
+    try {
+      result = await providers().completeWithFallback({ attempts, messages, tools, toolChoice, signal });
+    } catch (e) {
+      if (record !== false) registraFalliti({ settings, action, falliti: e && e.tentativiFalliti });
+      throw e;
+    }
     const provider = result.provider || attempts[0].provider;
     const model = result.model || attempts[0].model;
     const after = await settle({ settings, action, provider, model, result, pricing, record });
@@ -168,10 +172,16 @@
     onDelta, onReasoning, onToolCall, onFallback, onReset,
   }) {
     const attempts = await chain({ settings, action, modelRef });
-    const result = await providers().streamCompleteWithFallback({
-      attempts, messages, tools, toolChoice, signal,
-      onDelta, onReasoning, onToolCall, onFallback, onReset,
-    });
+    let result;
+    try {
+      result = await providers().streamCompleteWithFallback({
+        attempts, messages, tools, toolChoice, signal,
+        onDelta, onReasoning, onToolCall, onFallback, onReset,
+      });
+    } catch (e) {
+      if (record !== false) registraFalliti({ settings, action, falliti: e && e.tentativiFalliti });
+      throw e;
+    }
     const provider = result.provider || attempts[0].provider;
     const model = result.model || attempts[0].model;
     const after = await settle({ settings, action, provider, model, result, pricing, record });

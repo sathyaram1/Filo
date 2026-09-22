@@ -92,10 +92,6 @@
     return getProvider(provider).listModels(apiKey);
   }
 
-  // Prova ogni attempt in ordine. Aggiunge `provider` e `model` (concreto
-  // usato) al risultato. Ogni attempt può portare il proprio `model` (id
-  // provider-specifico risolto dal nickname): se assente si usa il `model`
-  // globale per retro-compatibilità.
   // Un tentativo che si rompe DOPO che il modello ha già prodotto del testo si
   // paga lo stesso. Qui si raccoglie quello che serve per farne una riga di
   // spesa (l'id della generazione): chi chiama lo registra come tutti gli altri
@@ -113,6 +109,10 @@
     });
   }
 
+  // Prova ogni attempt in ordine. Aggiunge `provider` e `model` (concreto
+  // usato) al risultato. Ogni attempt può portare il proprio `model` (id
+  // provider-specifico risolto dal nickname): se assente si usa il `model`
+  // globale per retro-compatibilità.
   async function completeWithFallback({ attempts, model, messages, tools, toolChoice, signal, onFallback }) {
     let lastErr = null;
     const falliti = [];
@@ -137,7 +137,11 @@
         }
       }
     }
-    throw lastErr || new Error('Nessun provider disponibile');
+    const fine = lastErr || new Error('Nessun provider disponibile');
+    // Anche quando non risponde nessuno, quello che i tentativi hanno già fatto
+    // scrivere si paga: chi chiama lo registra prima di rilanciare l'errore.
+    try { fine.tentativiFalliti = falliti; } catch (_) {}
+    throw fine;
   }
 
   // In streaming un attempt può fallire DOPO aver già emesso dei delta (es. il
@@ -190,7 +194,11 @@
         }
       }
     }
-    throw lastErr || new Error('Nessun provider disponibile');
+    const fine = lastErr || new Error('Nessun provider disponibile');
+    // Anche quando non risponde nessuno, quello che i tentativi hanno già fatto
+    // scrivere si paga: chi chiama lo registra prima di rilanciare l'errore.
+    try { fine.tentativiFalliti = falliti; } catch (_) {}
+    throw fine;
   }
 
   global.SN_PROVIDERS = {
