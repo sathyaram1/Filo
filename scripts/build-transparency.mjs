@@ -344,6 +344,7 @@ function buildNav(docs) {
 }
 
 function emitModule({ docs, glossary }) {
+  const NAV = buildNav(docs);
   const payload = docs.map((d) => ({
     id: d.id, title: d.title, subtitle: d.subtitle, updated: d.updated,
     sections: d.sections, sources: d.sources, html: d.html, text: d.text,
