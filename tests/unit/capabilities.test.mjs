@@ -133,6 +133,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // Il bottone «apri il file» che l'agente mette in chat: è una delle azioni
     // dell'agente, e l'apertura la fa il main perché il percorso va ricontrollato.
     FILO_OPEN_FILE: 'agent-actions',
+    // Un collegamento dentro una risposta: lo apre il main, che lo guarda con
+    // gli stessi limiti della richiesta che l'ha scritto.
+    FILO_OPEN_LINK: 'perimetro-uscite',
   };
 
   for (const h of handlers) {
