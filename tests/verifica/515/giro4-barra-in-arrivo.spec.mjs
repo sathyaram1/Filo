@@ -34,6 +34,10 @@ test('dalla sezione non scritta si arriva alle altre e al documento che c\'è', 
   await expect(page.locator('#title')).toHaveText(mancanti[1].label);
   await expect(page.locator('#subtitle')).toContainText('non è ancora scritta');
 
+  // Ricliccare la sezione dove già si è non deve lasciare una pagina muta.
+  await page.locator(`#nav a[href*="doc=${mancanti[1].id}"]`).click();
+  await expect(page.locator('#subtitle')).toContainText('non è ancora scritta');
+
   // E da lì si arriva a quello che è scritto davvero, con il suo contenuto.
   await page.locator(`#nav a[href*="doc=${scritti[0]}"]`).click();
   await expect(page.locator('#subtitle')).not.toContainText('non è ancora scritta');
