@@ -4066,6 +4066,11 @@
       }
       allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh, removed });
       reindexByClient();
+      // Il segno «fondi senza chiedermelo» può arrivare da fuori — dallo script
+      // dell'owner o da un'altra finestra — e allora la richiesta ferma è la
+      // stessa di prima: nessuno avvisa, e senza questo giro il ramo resta fermo
+      // finché la pagina non viene riaperta.
+      fondiPreapprovateInAttesa();
       rerenderAfterLive(new Set(ids));
       return { changed: ids.length + removed.length };
     })().finally(() => { liveTick = null; liveLastAt = Date.now(); });
