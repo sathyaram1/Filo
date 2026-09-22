@@ -5,8 +5,11 @@
 //   1. dove porta si legge PRIMA di premere (come per i bottoni della home);
 //   2. dopo una lettura si va dove Filo è stato davvero; altrove si chiede,
 //      con l'indirizzo intero sotto gli occhi.
+// Le due regole valgono per OGNI gesto che apre un link, non solo il tasto
+// sinistro: la rotellina apriva da sé (#533, nono giro di verifica).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { caricaMarkdown } from './helpers/collegamentoFilo.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -51,6 +54,15 @@ async function copione(app, { giri, risposta, risultati = null }) {
       };
     };
   }, { giri, risposta, risultati });
+}
+
+// Gli indirizzi delle schede davvero aperte: una scheda di Filo è una vista
+// dentro la finestra, non una finestra sua.
+function schedeAperte(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    return (w && w._filoTabs ? w._filoTabs.tabs : []).map((t) => String(t.url || ''));
+  });
 }
 
 async function ripristina(app) {
@@ -186,4 +198,66 @@ test('se l\'utente dice di sì, il collegamento si apre', async ({ app, openTab,
 
   await expect.poll(() => app.windows().some((w) => w.url().includes('d=segreto')), { timeout: 5000 })
     .toBe(true);
+});
+
+// #533 (nono giro di verifica) — il tasto centrale è il modo in cui mezzo mondo
+// apre un link «dietro», e le impostazioni di Sicurezza di Filo lo nominano
+// come gesto normale. Passava sopra al motore perché la guardia ascoltava solo
+// il `click`.
+test('dopo una lettura, il tasto centrale sul collegamento chiede come il sinistro', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await configura(app);
+  const page = await openTab(NEWTAB);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
+
+  const dove = `${testServer.html('<p>presa</p>')}?d=segreto`;
+  await copione(app, {
+    giri: [[{ name: 'LEGGI_DOCUMENTO', args: { percorso: '/tmp/non-ce.pdf' } }], []],
+    risposta: `Ecco. [Apri la bolletta di marzo](${dove})`,
+  });
+  await rispostaInBolla(page, 'Leggimi la bolletta che mi hanno mandato.');
+  await ripristina(app);
+
+  const domanda = await page.evaluate(async () => {
+    let testo = '';
+    const Ui = window.SN_CONFIRM_UI;
+    const orig = Ui.confirm;
+    Ui.confirm = async (o) => { testo = String((o && o.text) || ''); return false; };
+    const a = document.querySelector('#bolla-di-prova a.filo-md-link');
+    a.dispatchEvent(new MouseEvent('auxclick', { button: 1, bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 1500));
+    Ui.confirm = orig;
+    return testo;
+  });
+
+  expect(domanda, 'la rotellina ha aperto il collegamento senza chiedere niente').toContain('d=segreto');
+  expect((await schedeAperte(app)).some((u) => u.includes('d=segreto')),
+    'la scheda si è aperta anche dopo un no').toBe(false);
+});
+
+// Dentro una pagina web («Spiega», l'assistente Aiuto) vale lo stesso: lì Filo
+// ha per forza letto la pagina prima di rispondere.
+test('dentro una pagina web, il tasto centrale sul collegamento non apre da sé', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const ospite = testServer.html('<p>una pagina qualunque</p>');
+  const dove = `${testServer.html('<p>presa</p>')}?d=segreto`;
+  const page = await openTab(ospite);
+  await page.waitForLoadState('domcontentloaded');
+
+  await caricaMarkdown(page);
+  await page.evaluate((url) => {
+    const box = document.createElement('div');
+    box.className = 'sn-msg-text';
+    box.style.cssText = 'position:fixed;top:40px;left:40px;z-index:2147483647;background:#fff;padding:8px';
+    box.innerHTML = self.SN_MARKDOWN.render(`[Apri la bolletta di marzo](${url})`);
+    document.body.appendChild(box);
+  }, dove);
+
+  const link = page.locator('a.filo-md-link').last();
+  await expect(link).toBeVisible({ timeout: 5_000 });
+  await link.click({ button: 'middle' });
+  await page.waitForTimeout(2500);
+
+  expect((await schedeAperte(app)).some((u) => u.includes('d=segreto')),
+    'la rotellina ha aperto l\'indirizzo senza passare dal motore').toBe(false);
 });

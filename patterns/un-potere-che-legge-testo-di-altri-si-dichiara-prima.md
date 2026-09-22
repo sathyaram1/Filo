@@ -28,7 +28,11 @@ non gli venga consegnato.**
   un'uscita travestita. La ricerca sul web è così — la domanda parte verso un
   servizio di fuori — e per questo la domanda passa dallo stesso controllo
   anti-esfiltrazione degli indirizzi: se porta con sé roba dell'utente
-  l'utente la legge prima che parta.
+  l'utente la legge prima che parta. E quel controllo guarda TUTTA la roba
+  dell'utente che era nel contesto: la memoria e gli appunti, ma anche quello
+  che la richiesta ha letto in questo turno dal disco. Guardava solo i primi
+  due quando si apriva una pagina, e il documento appena letto usciva
+  nell'indirizzo (#533, nono giro di verifica).
 - **Proporre costa zero e resta sempre nel perimetro**: un bottone in chat o
   una notifica non fa niente finché non è l'utente a premerlo. Vale finché la
   proposta non porta con sé un BERSAGLIO che il modello ha scelto e l'utente
@@ -38,7 +42,12 @@ non gli venga consegnato.**
   che il modello esegue. Un collegamento dentro la risposta lo preme l'utente,
   ma la scritta e l'indirizzo li ha scelti il modello dopo aver letto: il clic
   passa dal motore ovunque quel testo sia mostrato, nella chat come dentro una
-  pagina web («Spiega», l'assistente Aiuto). E dove c'è più di una porta per la
+  pagina web («Spiega», l'assistente Aiuto). E passa da lì con OGNI gesto che
+  apre un link, non solo col tasto sinistro: finché l'ancora aveva un `href` il
+  browser la apriva da sé col tasto centrale, senza passare da nessuna parte
+  (#533, nono giro). Per questo un collegamento scritto da Filo non ha `href`:
+  l'indirizzo sta in `data-url` e ad aprirlo è sempre `bindLinks`. Uno schema
+  che il motore non sa valutare — `mailto:` — non diventa nemmeno un link. E dove c'è più di una porta per la
   stessa cosa — l'azione della chat e il messaggio dell'assistente che cercano
   entrambi sul web — il controllo è UNO, chiamato da tutte e due.
 - Chi **non dichiara e poi legge** resta con «solo chat»: risponde e propone,
@@ -63,6 +72,14 @@ non gli venga consegnato.**
   cima**, prima di ogni altro controllo: più in basso, un terminale spento
   risponderebbe per primo «proponi di attivarlo», che è esattamente la strada
   che un'istruzione ostile vorrebbe far prendere.
+- `src/shared/filoMarkdown.js` — come Filo disegna un collegamento nel suo
+  testo (senza `href`) e `bindLinks`, l'unico posto da cui quel collegamento si
+  apre, per ogni gesto. Una prova che si costruisce l'ancora a mano prova una
+  forma che Filo può non scrivere più: `tests/helpers/collegamentoFilo.mjs`
+  carica la sorgente vera nella pagina.
+- `portaFuoriRobaTua` in `src/main/services/handlers.js` — la regola unica di
+  tutto ciò che esce: l'indirizzo di una pagina che si apre e la domanda di una
+  ricerca passano di lì.
 - `filo://security/` — cosa ogni compito era AUTORIZZATO a fare, non solo cosa
   ha fatto.
 

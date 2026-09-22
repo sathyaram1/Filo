@@ -99,7 +99,7 @@ test.describe('#533 giro 7 — la risposta come ultima uscita rimasta', () => {
       const box = document.createElement('div');
       box.innerHTML = self.SN_MARKDOWN.render(testo);
       return [...box.querySelectorAll('a.filo-md-link')].map((a) => ({
-        href: a.getAttribute('href') || '',
+        href: a.getAttribute('data-url') || '',
         scritta: (a.textContent || '').trim(),
         titolo: a.getAttribute('title') || '',
         ariaLabel: a.getAttribute('aria-label') || '',
