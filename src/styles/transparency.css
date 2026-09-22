@@ -56,9 +56,8 @@
   border-bottom-color: var(--sn-accent, #c45a3b);
 }
 
-/* Le sezioni non ancora scritte restano visibili e più tenui: dire "in arrivo" è
- * più onesto che far sparire la voce. Si cliccano comunque, e la pagina che si
- * apre spiega che non sono scritte. */
+/* Le sezioni non ancora scritte restano visibili e più tenui: farle sparire
+ * direbbe che Filo non ha niente da dire su privacy o sicurezza. */
 .sn-nav-item.is-soon {
   opacity: 0.45;
 }
