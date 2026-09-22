@@ -400,7 +400,9 @@
     EVENTO_CALENDARIO: (a) => {
       const ev = (a._output && a._output.evento) || null;
       const quando = ev && ev.quando ? ` · ${ev.quando}` : '';
-      return { icon: '📅', text: `Evento proposto · ${(ev && ev.titolo) || a.titolo || a.title || ''}${quando}` };
+      const nome = `${(ev && ev.titolo) || a.titolo || a.title || ''}${quando}`;
+      const fatto = a._output && a._output.fatto;
+      return { icon: '📅', text: `${fatto ? 'Evento aggiunto al calendario' : 'Evento proposto'} · ${nome}` };
     },
     // Impostazione applicata subito (livello 1, es. il tema): prima non
     // lasciava traccia in chat, come se non fosse successo niente. La frase in
