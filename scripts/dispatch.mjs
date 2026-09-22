@@ -622,8 +622,10 @@ export function perimetroNote(scope, perimetro) {
   return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l));
 }
 
-export function readRoleInstructions(role, { scope } = {}) {
-  const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope] : ROLE_FILE[role];
+export function readRoleInstructions(role, { scope, caso } = {}) {
+  const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope]
+    : role === 'fixer' ? (FIXER_CASE_FILE[String(caso || '')] || ROLE_FILE.fixer)
+      : ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
   const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
