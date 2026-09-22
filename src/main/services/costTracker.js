@@ -1,4 +1,6 @@
 // Tracking costi e limite hard. Granularità mensile, persistenza in chrome.storage.local.
+// Il tetto conta solo quello che pagano le chiavi condivise; le regole su chi
+// paga stanno in tests/unit/contoPerChiave.test.mjs.
 
 (function (global) {
   'use strict';
