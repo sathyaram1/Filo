@@ -348,6 +348,34 @@ test('esiste un modo di provare la build Linux senza bruciare una versione', () 
     'il lavoro di verifica non fa più girare questa sentinella prima di costruire');
 });
 
+// Quel lavoro è l'unico che risponde a «col doppio clic si apre ancora?»:
+// costruisce il pacchetto, nega la gabbia come fa Ubuntu 24.04 e lo avvia. Se
+// non riparte quando si tocca il pezzo che fa aprire Filo, la risposta arriva
+// dal tester invece che da qui.
+test('il lavoro che apre davvero il pacchetto riparte se si tocca il pezzo che lo fa aprire', () => {
+  const osservati = (nome) => {
+    const testo = readFileSync(join(ROOT, '.github', 'workflows', nome), 'utf8');
+    const dopo = testo.split(/^\s*paths:\s*$/m)[1] || '';
+    const fine = dopo.search(/^\S/m);
+    const blocco = fine === -1 ? dopo : dopo.slice(0, fine);
+    return [...blocco.matchAll(/^\s*-\s*'([^']+)'/gm)].map((m) => m[1]);
+  };
+  const copre = (percorsi, file) => percorsi.some((p) => {
+    if (p === file) return true;
+    const stella = p.indexOf('*');
+    return stella !== -1 && file.startsWith(p.slice(0, stella));
+  });
+
+  const linux = osservati('verifica-linux.yml');
+  for (const f of ['scripts/after-pack-linux.js', 'scripts/after-pack.js', 'build/Se-Filo-non-si-apre-Linux.txt']) {
+    assert.ok(copre(linux, f), `«Verifica build Linux» non riparte quando cambia ${f}`);
+  }
+  // Lo smistatore decide anche se la firma locale per Mac viene messa, e senza
+  // quella firma sui Mac con chip Apple l'app non si apre.
+  assert.ok(copre(osservati('verifica-mac.yml'), 'scripts/after-pack.js'),
+    '«Verifica build Mac» non riparte quando cambia lo smistatore che chiama la firma');
+});
+
 // ── Un aggiornamento che non si installa non resta un segreto ──────────────
 // Su Linux l'aggiornamento riscrive il file .AppImage da cui Filo sta girando:
 // riesce se l'app è partita davvero come AppImage e se quel file è scrivibile.
