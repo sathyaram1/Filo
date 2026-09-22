@@ -26,6 +26,7 @@
       ],
       fixes: [
         'Su Windows Filo si accorge quando un comando del terminale fallisce, per esempio perché il file non c\'è o la cartella è sbagliata. Prima il comando gli risultava riuscito, e Filo ti rispondeva come se avesse letto o fatto quello che voleva. Nel terminale che usi tu, un comando fallito adesso mostra il suo codice d\'uscita. E adesso girano anche i comandi che finiscono con un commento. Prima non partivano affatto.',
+        'Nella pagina Trasparenza le sezioni non ancora scritte adesso si aprono e dicono che non ci sono ancora, col link a quello che c\'è: prima cliccarle non faceva niente. E se chiedi a Filo conto di una scelta che non ha ancora messo per iscritto, te lo dice invece di improvvisare.',
         'Tradurre una pagina non paga più le sezioni chiuse. Filo traduce quello che vedi, e quando apri un pannello o un «leggi tutto» il tasto destro ti offre di tradurre anche quello. Prima dipendeva da come il sito aveva chiuso la sezione, e su certi siti pagavi la traduzione di roba che non avresti mai aperto.',
         'A schermo intero ogni riquadro aperto sopra la pagina costa il suo Esc, anche quando ne hai quattro o più uno sull\'altro, e lo schermo intero resta finché non li hai chiusi tutti. Prima dal quarto in poi il tasto ti buttava fuori e lasciava aperto quello in cima.',
         'Su Mac e su Linux la modalità terminale usa davvero la shell scelta nelle Preferenze. Prima chi sceglieva Bash otteneva comunque la shell di sistema.',
