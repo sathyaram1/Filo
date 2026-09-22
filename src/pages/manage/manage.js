@@ -4753,6 +4753,11 @@
     } catch (_) { return decimali ? v.toFixed(decimali) : String(v); }
   }
   function fsNum(v) { return v == null ? '—' : fsCifra(v); }
+  // «Nome: conto», la forma unica di ogni etichetta che porta un numero. Passa
+  // di qui anche quello che si vede solo col mouse sopra: finché le fette e le
+  // colonne se lo scrivevano da sé, lo stesso conto si leggeva «1200» nel
+  // suggerimento e «1.200» nella legenda accanto.
+  function fsRigaConto(label, n) { return `${label}: ${fsNum(n)}`; }
 
   /**
    * `sottoId`: il sottotitolo conta delle segnalazioni SUE, diverse da quelle
