@@ -512,7 +512,14 @@ module.exports = function register(on, ctx) {
     try {
       await Defaults.refreshIfStale().catch(() => {});
       const d = Defaults.get();
-      return { ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {} };
+      // Anche la scelta generale degli host: senza, una pagina non sa a cosa
+      // rimanda «Automatico» e non può dire se una misura vale ancora.
+      return {
+        ok: true,
+        modelRegistry: d.modelRegistry || {},
+        models: d.models || {},
+        providerSort: d.providerSort || '',
+      };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
