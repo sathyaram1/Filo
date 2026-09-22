@@ -86,7 +86,7 @@ test('con la propria chiave la chat deve continuare a rispondere', async () => {
   await mese(Costs, 'own');
 
   globalThis.SN_PROVIDER_FINTO = {
-    async completeWithFallback() {
+    async complete() {
       return { text: 'risposta', usage: { promptTokens: 10, completionTokens: 5, costUsd: 0.001, keySource: 'own' }, servedBy: 'finto' };
     },
   };
