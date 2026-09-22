@@ -10,6 +10,8 @@
 // funzionano identici a quando vivevano inline in tabs.js. Le dipendenze sono
 // solo i globali SN_SAFEBROWSE / SN_MSG (caricati dal loader), come prima.
 
+const { catenaDi } = require('./catenaNavigazione');
+
 // #591, quarto giro. Il conto comune delle verifiche profonde è una raffica
 // corta: quando è pieno, `analyze` rinuncia e lo dice (`rimandato`). La
 // rinuncia non è colpa del sito che si sta guardando, quindi non deve costargli
@@ -129,7 +131,7 @@ const safebrowseMethods = {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
     if (!SB || !tab) return { ok: true, level: 'safe', message: null };
-    const ctx = this._sbCtx(ctxIn);
+    const ctx = this._sbCtx(ctxIn, tab);
     let verdict;
     try {
       verdict = SB.analyze(url, ctx, (next) => {
@@ -153,7 +155,7 @@ const safebrowseMethods = {
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!SB || !tab || !url || /^filo:\/\//i.test(url)) return;
-    const ctx = this._sbCtx({});
+    const ctx = this._sbCtx({}, tab);
     try {
       const verdict = SB.analyze(url, ctx, (next) => {
         this._sbBroadcast(tab, url, this._sbApplyState(tab, next));

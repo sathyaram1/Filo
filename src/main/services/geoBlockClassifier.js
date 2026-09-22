@@ -283,8 +283,18 @@ function cacheKey(host, url) {
 // chiamate in pochi secondi, e la finestra si riapre subito. Chi rinuncia per
 // il conto comune lo dice (`rimandato`), e la scheda riprova finché l'utente è
 // rimasto su quella pagina.
+//
+// #591 (settimo giro) — i due conti qui sopra limitano la VELOCITÀ, non il
+// totale: quello comune si riapre ogni pochi secondi, e una pagina che si
+// porta da sola su sotto-indirizzi sempre nuovi (dove ognuno vale come un
+// proprietario diverso) poteva tenerlo pieno per sempre. Il terzo conto è
+// della CATENA di navigazioni, cioè di chi consuma davvero: piccolo e senza
+// riaperture finché la catena dura. Chi naviga dopo una pausa ne apre una
+// nuova, quindi al sito legittimo bloccato nel paese dell'utente non toglie
+// niente.
 const FRENO_PER_SITO = 8;
 const FRENO_RAFFICA = 8;
+const FRENO_PER_CATENA = 4;
 const FRENO_FINESTRA_MS = 60 * 60 * 1000;
 const FRENO_RAFFICA_MS = 5 * 1000;
 const CHIAVE_TUTTI = '\u0000tutti';
