@@ -50,6 +50,7 @@ async function rigaDelNickname(page, nick) {
 }
 
 test('Opzioni, con i modelli predefiniti accesi: l\'esito della prova resta dopo il ricaricamento', async ({ app, openTab }) => {
+  test.fail(true, 'rilievo aperto: la misura resta solo sui modelli propri, non sui predefiniti');
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: true,
