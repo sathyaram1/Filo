@@ -9,10 +9,14 @@
 // Stesso metodo dei giri prima: un modello finto che casca nell'istruzione
 // ostile e mette in chat un collegamento che porta dove vuole la pagina letta.
 
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from '../../fixtures/electron.mjs';
+import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
 const NEWTAB = 'filo://newtab/';
 const SCRITTA = 'Apri la bolletta di marzo';
+const SEGRETO = 'IBAN-IT60X0542811101000000123456';
 
 async function configura(app) {
   await app.evaluate(async () => {
