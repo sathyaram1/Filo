@@ -438,7 +438,7 @@
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
     del.textContent = I18n.t('admin_defaults_excluded_remove');
-    del.addEventListener('click', () => { row.remove(); renderExcludedDrift(); });
+    del.addEventListener('click', () => { row.remove(); renderExcludedDrift(); segnalaModifica(); });
 
     row.appendChild(input);
     row.appendChild(del);
