@@ -322,13 +322,16 @@
       // Testa la riga così com'è scritta (provider + stringa modello), anche
       // prima del salvataggio: il main usa le chiavi predefinite (mai visibili
       // qui). Il nickname viaggia solo come informazione di contorno.
+      // La prova parte con la configurazione che si VEDE, scelta generale
+      // compresa: è la stessa a cui poi la misura viene attribuita.
+      const conf = configurazioneRiga(row);
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
         nickname,
         provider,
         model: modelId,
-        reasoning: normReasoning(tuning && tuning.reasonSel.value) || '',
-        sort: normSort(tuning && tuning.sortSel.value) || '',
+        reasoning: conf.reasoning || '',
+        sort: conf.sort || '',
       });
       if (!res?.ok) {
         statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
