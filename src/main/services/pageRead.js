@@ -407,10 +407,16 @@ function indiziPagina(html) {
     for (const chiave of ['aria-controls', 'aria-owns']) {
       for (const id of String(a[chiave] || '').split(/\s+/)) if (id) apribili.add(id);
     }
-    for (const chiave of ['href', 'data-target', 'data-bs-target']) {
+    for (const chiave of ['data-target', 'data-bs-target']) {
       const v = String(a[chiave] || '').trim();
       if (v.startsWith('#') && v.length > 1) apribili.add(v.slice(1));
     }
+    // Un `href` verso un'ancora vale solo da chi DICHIARA di aprire: da un
+    // collegamento qualunque basta scriverne uno per far passare l'esca (#553).
+    const apre = 'aria-expanded' in a || a['data-toggle'] || a['data-bs-toggle']
+      || RUOLO_COMANDO.test(String(a.role || ''));
+    const href = String(a.href || '').trim();
+    if (apre && href.startsWith('#') && href.length > 1) apribili.add(href.slice(1));
   }
   return { apribili, modale };
 }
