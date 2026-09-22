@@ -39,21 +39,17 @@
     nav.textContent = '';
     for (const item of T.NAV) {
       const doc = T.get(item.id);
-      if (!doc) {
-        // Sezione non ancora scritta: resta visibile e spenta. Farla sparire
-        // darebbe l'impressione che Filo non abbia niente da dire su privacy o
-        // sicurezza, che è il contrario di quello che questa pagina promette.
-        const span = document.createElement('span');
-        span.className = 'sn-nav-item is-soon' + (item.id === activeId ? ' is-active' : '');
-        span.textContent = item.label;
-        span.title = 'in arrivo';
-        nav.appendChild(span);
-        continue;
-      }
       const a = document.createElement('a');
-      a.className = 'sn-nav-item' + (item.id === activeId ? ' is-active' : '');
+      a.className = 'sn-nav-item' + (doc ? '' : ' is-soon') + (item.id === activeId ? ' is-active' : '');
       a.href = '?doc=' + encodeURIComponent(item.id);
       a.textContent = item.label;
+      // Anche le sezioni non ancora scritte si cliccano, e portano alla pagina
+      // che lo dice: spente e mute erano un vicolo cieco, e "in arrivo" lo
+      // sapeva solo chi ci fermava sopra il mouse (#515).
+      if (!doc) {
+        a.title = 'in arrivo';
+        a.setAttribute('aria-label', item.label + ': non ancora scritta');
+      }
       nav.appendChild(a);
     }
   }
