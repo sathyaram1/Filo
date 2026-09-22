@@ -36,6 +36,11 @@ function revealWindow(win) {
 const osservatoriFinestraNormale = [];
 function onFinestraNormale(cb) { if (typeof cb === 'function') osservatoriFinestraNormale.push(cb); }
 
+// Durante la chiusura di Filo una finestra nuova annullerebbe l'uscita: chi ha
+// chiesto di uscire se lo vedrebbe riaprire da solo.
+let inChiusura = false;
+try { require('electron').app.on('before-quit', () => { inChiusura = true; }); } catch (_) {}
+
 // Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
 // non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
 function assicuraFinestraNormale() {
