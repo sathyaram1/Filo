@@ -351,8 +351,10 @@
 
     .mg-list { display: flex; flex-direction: column; gap: 4px; }
     /* Una riga sola: #N · titolo con ellissi. Il motivo resta implicito nel colore del border-left. */
+    /* Le etichette vanno a capo invece di uscire dalla scheda: due insieme, «fusione ferma» e «senza chiedere», non
+       stanno nella colonna, e tagliate a metà parola non dicono più niente. */
     .mg-item {
-      display: flex; flex-direction: row; align-items: baseline; gap: 6px;
+      display: flex; flex-direction: row; align-items: baseline; gap: 6px; flex-wrap: wrap;
       padding: 8px 10px; border-radius: 6px; cursor: pointer;
       border: 1px solid var(--sn-border);
       border-left-width: 3px;
