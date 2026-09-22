@@ -5293,9 +5293,19 @@
 
   function fsApriDrill(src) {
     if (!src) return;
+    fsDrillDaDove = fsFuocoOra();
     fsDrill = { tipo: src.tipo, chiave: src.chiave, gruppo: src.gruppo };
     renderFsDrill();
     if (mgFsDrill) mgFsDrill.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  /** L'unica via di chiusura dell'elenco: qualunque porta, stesso ritorno del fuoco. */
+  function fsChiudiDrill() {
+    const daDove = fsDrillDaDove;
+    fsDrillDaDove = '';
+    fsDrill = null;
+    renderFsDrill();
+    fsRiprendiFuoco(daDove);
   }
 
   function renderFsDrill() {
