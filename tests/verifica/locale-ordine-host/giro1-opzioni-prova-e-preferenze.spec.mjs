@@ -141,6 +141,40 @@ test('Preferenze: la conferma «Salvato» non resta accesa su una modifica prece
   expect(accesaSubito, 'la conferma «Salvato» resta accesa mentre l\'ultima modifica non è ancora salvata').toBe(false);
 });
 
+// Perché la conferma che mente conta: quella modifica può davvero non essere
+// salvata. Chi scrive e lascia subito la pagina la perde, e la conferma accesa
+// gli ha appena detto il contrario.
+test('Preferenze: la modifica scritta appena prima di lasciare la pagina non si perde', async ({ app, openTab }) => {
+  const page = await openTab(PREFERENZE);
+  await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
+  await page.evaluate(() => {
+    const el = document.getElementById('agentStyleText');
+    el.value = 'stile scritto appena prima di uscire';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.reload();
+  await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
+
+  const salvato = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).agentStyle || '');
+  expect(salvato, 'lasciare la pagina subito dopo aver scritto butta via l\'ultima modifica')
+    .toBe('stile scritto appena prima di uscire');
+});
+
+test('Opzioni: la modifica scritta appena prima di lasciare la pagina non si perde', async ({ app, openTab }) => {
+  const page = await openTab(OPZIONI);
+  await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
+  await page.evaluate(() => {
+    const el = document.getElementById('monthlyLimit');
+    el.value = '13';
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.reload();
+  await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
+
+  const salvato = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).monthlyLimitEur);
+  expect(salvato, 'lasciare la pagina subito dopo aver scritto butta via l\'ultima modifica').toBe(13);
+});
+
 test('Opzioni: la conferma «Salvato» sparisce appena arriva un\'altra modifica', async ({ openTab }) => {
   const page = await openTab(OPZIONI);
   await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
