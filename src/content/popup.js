@@ -211,16 +211,16 @@
   // motore, col compito di questa pagina, e dove non era fra le cose chieste si
   // chiede mostrando l'indirizzo intero.
   if (Md && Md.bindLinks) {
-    Md.bindLinks(document, async (url) => {
+    Md.bindLinks(document, async (url, a, { sfondo } = {}) => {
       let r = null;
-      try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_OPEN_LINK, url }); } catch (_) {}
+      try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_OPEN_LINK, url, sfondo }); } catch (_) {}
       if (!r || !r.chiede) return;
       const Ui = global.SN_CONFIRM_UI;
       const opts = { title: 'Filo chiede conferma', text: r.testo || `Aprire ${url}` };
       let ok = false;
       try { ok = Ui ? await Ui.confirm(opts) : global.confirm(opts.text); } catch (_) { ok = false; }
       if (!ok) return;
-      try { await chrome.runtime.sendMessage({ type: MSG.FILO_OPEN_LINK, url, conferma: true }); } catch (_) {}
+      try { await chrome.runtime.sendMessage({ type: MSG.FILO_OPEN_LINK, url, sfondo, conferma: true }); } catch (_) {}
     });
   }
 

@@ -631,16 +631,16 @@
   // collegamento sta: dove Filo è stato davvero si va subito, altrove chiede
   // mostrando l'indirizzo intero.
   if (self.SN_MARKDOWN) {
-    self.SN_MARKDOWN.bindLinks(bubblesEl, async (url, a) => {
+    self.SN_MARKDOWN.bindLinks(bubblesEl, async (url, a, { sfondo } = {}) => {
       const bolla = a.closest('.dash-bubble');
       const compito = (bolla && bolla.dataset.compito) || null;
-      const r = await send({ type: MSG.FILO_OPEN_LINK, url, compito });
+      const r = await send({ type: MSG.FILO_OPEN_LINK, url, compito, sfondo });
       if (!r || !r.chiede) return;
       const Ui = window.SN_CONFIRM_UI;
       const opts = { title: 'Filo chiede conferma', text: r.testo || `Aprire ${url}` };
       const ok = Ui ? await Ui.confirm(opts) : window.confirm(opts.text);
       if (!ok) return;
-      await send({ type: MSG.FILO_OPEN_LINK, url, compito, conferma: true });
+      await send({ type: MSG.FILO_OPEN_LINK, url, compito, sfondo, conferma: true });
     });
   }
 
