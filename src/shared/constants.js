@@ -996,7 +996,9 @@
   // vince su quello globale; `ignore` non dipende mai dall'ordinamento. PURA.
   function providerRoutingFor(settings, entrySort) {
     const ignore = providerIgnoreList((settings && settings.excludedProviders) || []);
-    const globalSort = typeof (settings && settings.providerSort) === 'string' ? settings.providerSort : '';
+    // Anche la scelta generale passa dalla normalizzazione: scritta a mano nella
+    // config condivisa, una maiuscola o uno spazio la facevano sparire in silenzio.
+    const globalSort = normalizeProviderSort(settings && settings.providerSort);
     const sort = normalizeProviderSort(entrySort) || globalSort;
     if (!ignore.length && !sort) return null;
     const routing = {};
