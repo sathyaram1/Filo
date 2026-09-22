@@ -582,9 +582,8 @@ section:has(#dictList) .sn-spell-add-row {
 }
 .sn-model-row input[type="text"],
 .sn-model-row select { width: 100%; font-size: 12px; }
-/* Le due colonne in più (reasoning, ordinamento host) valgono solo nei Modelli predefiniti dell'owner.
-   A misura fissa non entravano in una finestra stretta: ogni colonna si stringe, la stringa del modello
-   ha un minimo sotto cui non scende, e i pulsanti restano dentro lo schermo. */
+/* Reasoning e ordinamento host valgono solo nei Modelli predefiniti dell'owner. A misura fissa le sette
+   colonne non entravano in una finestra stretta: si stringono tutte, e la stringa del modello ha un minimo. */
 .sn-model-row.sn-model-row-reason {
   grid-template-columns:
     minmax(84px, 110px) minmax(94px, 130px) minmax(120px, 1fr)
