@@ -1142,14 +1142,12 @@ async function portaFuoriRobaTua(testo, task, { soloForte = false, fromUntrusted
     const s = String(testo || '').trim();
     if (!Exfil || !s) return null;
     const memoria = await navExfilCorpus();
-    if (memoria) {
-      const v = soloForte
-        ? Exfil.taint(s, memoria, { soloForte: true })
-        : (() => { const a = Exfil.assess(s, { corpus: memoria, fromUntrusted }); return a.exfil ? { reason: a.reason } : null; })();
+    if (soloForte) {
+      const v = memoria ? Exfil.taint(s, memoria, { soloForte: true }) : null;
       if (v) return v;
-    } else if (!soloForte && fromUntrusted) {
-      const a = Exfil.assess(s, { corpus: '', fromUntrusted });
-      if (a.exfil) return { reason: a.reason };
+    } else {
+      const v = Exfil.assess(s, { corpus: memoria, fromUntrusted });
+      if (v.exfil) return { reason: v.reason };
     }
     const Compiti = globalThis.SN_COMPITI;
     if (!Compiti || !task || !task.contaminato) return null;
@@ -1413,12 +1411,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   }
 
   // NAVIGA: difesa anti-esfiltrazione. Una pagina ostile (prompt injection) può
-  // far aprire al modello un URL che PORTA FUORI dati che aveva nel contesto
-  // (memoria/profilo, appunti) codificandoli nella query/path/sottodominio. Il
-  // taint-match verifica se l'URL contiene pezzi del materiale sensibile; il
-  // fallback strutturale (solo da origine non fidata) copre i dati cifrati. Se
-  // sospetto, iniettiamo `_exfil` PRIMA del gate (mai dall'LLM): NAVIGA sale a
-  // livello 2 e l'utente conferma vedendo l'URL completo. Vedi src/shared/urlExfil.js.
+  // far aprire al modello un URL che PORTA FUORI dati che aveva nel contesto —
+  // memoria, appunti, e il documento che la richiesta stava leggendo — nella
+  // query, nel path o nel sottodominio. Se sospetto, iniettiamo `_exfil` PRIMA
+  // del gate (mai dall'LLM): NAVIGA sale a livello 2 e l'utente conferma vedendo
+  // l'URL completo. La regola sta in `portaFuoriRobaTua`, una per tutto ciò che
+  // esce.
   if (type === 'NAVIGA') {
     try {
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
