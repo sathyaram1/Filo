@@ -142,7 +142,16 @@ function registerIpcHandlers() {
         send('done', { ...result });
       } catch (err) {
         console.warn('[Filo IPC] stream error', requestId, err);
-        send('error', { message: err.message || String(err), code: err.code || 'UNKNOWN' });
+        // Lo stream dice quello che dice la risposta di `filo:message`: senza
+        // status, fornitore e frase già scritta chi mostra l'errore non può
+        // ricomporlo e finisce per stampare la riga grezza del servizio (#663).
+        send('error', {
+          message: err.message || String(err),
+          code: err.code || 'UNKNOWN',
+          status: Number(err && err.status) || 0,
+          provider: (err && err.provider) || '',
+          userMessage: (err && typeof err.userMessage === 'string') ? err.userMessage : '',
+        });
       } finally {
         inFlightStreams.delete(requestId);
       }
