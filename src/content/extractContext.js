@@ -392,24 +392,22 @@
     return !!(el.tagName === 'DETAILS' && !el.open);
   }
 
-  // Schiacciato da una trasformazione fino a non avere più area. Conta l'area che resta (il determinante), non un
-  // fattore da solo: una rotazione di novanta gradi ne azzera due su quattro e il testo resta leggibile, girato (#505).
-  function isScaledToNothing(cs) {
-    const t = cs.transform;
-    if (!t || t === 'none') return false;
-    const nums = t.slice(t.indexOf('(') + 1, -1).split(',').map((n) => parseFloat(n));
-    if (nums.some((n) => !Number.isFinite(n))) return false;
-    if (nums.length === 6) return Math.abs(nums[0] * nums[3] - nums[1] * nums[2]) < 1e-6;
-    // Nello spazio conta lo stesso determinante sul piano dello schermo: una rotazione di taglio non lascia area,
-    // una rotazione nel piano sì.
-    if (nums.length === 16) return Math.abs(nums[0] * nums[5] - nums[1] * nums[4]) < 1e-6;
-    return false;
+  // Schiacciato fino a non lasciare area sullo schermo. Si confronta la misura dell'elemento col rettangolo
+  // DIPINTO: risponde a ogni scrittura della trasformazione, anche a quelle che il CSS aggiungerà (#505).
+  function isFlattened(el) {
+    // Senza misura non c'è niente da schiacciare, e il testo può debordare: lì decide il ritaglio, più sotto.
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return false;
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return false; }
+    return r.width <= 0.5 || r.height <= 0.5;
   }
 
   // Trasparente MENTRE è sullo schermo: il menu a tendina chiuso, il suggerimento non ancora aperto. Fuori no: lì
   // è quasi sempre una comparsa in dissolvenza allo scorrimento, e rimandarla lascerebbe mezzo articolo in inglese.
   function isTransparentOnScreen(el, cs) {
-    if (parseFloat(cs.opacity) !== 0) return false;
+    if (!isFullyTransparent(cs)) return false;
     let r;
     try { r = el.getBoundingClientRect(); } catch (_) { return false; }
     const vx = viewOf(el);
