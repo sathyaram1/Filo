@@ -113,8 +113,10 @@
 .sn-msg-rimedio {
   all: unset;
   cursor: pointer;
-  display: inline-block;
-  margin-top: 8px;
+  /* Su una riga sua: attaccato in coda alla frase sembrava una parola in più. */
+  display: block;
+  width: fit-content;
+  margin-top: 10px;
   padding: 5px 10px;
   border: 1px solid var(--sn-border);
   border-radius: 999px;
