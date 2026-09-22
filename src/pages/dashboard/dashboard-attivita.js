@@ -925,11 +925,26 @@
       return stepTrace('📄 Rileggo la pagina di trasparenza');
     }
     if (type === 'EVENTO_CALENDARIO') {
+      // Il bottone consegna al calendario di sistema il file che il main ha
+      // scritto. Senza quel file non c'è niente da premere: la riga del diario
+      // dice già che l'evento non è stato preparato.
+      const info = (a._output && a._output.evento) || null;
+      const percorso = (info && info.ok && info.percorso) || '';
+      if (!percorso) return null;
       const btn = document.createElement('button');
-      btn.className = 'dash-action-btn';
+      btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.type = 'button';
-      btn.disabled = true;
-      btn.textContent = `📅 ${a.title || a.titolo || ''}`;
+      const titolo = String(a.titolo || a.title || a.nome || 'Evento');
+      btn.textContent = `📅 Aggiungi al calendario · ${titolo}${info.quando ? ` (${info.quando})` : ''}`;
+      btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        const r = await send({ type: MSG.FILO_OPEN_FILE, percorso });
+        btn.textContent = (r && r.ok)
+          ? `✓ Aperto nel calendario · ${titolo}`
+          : `📅 ${titolo}: non si è aperto`;
+        if (!r || !r.ok) btn.disabled = false;
+      });
       return btn;
     }
     if (type === 'PULISCI_TAB') {
