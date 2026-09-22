@@ -313,7 +313,11 @@ function analyze(url, ctx = {}, onUpdate) {
   const prop = psl.proprietario(norm.host);
   // La catena la dichiara la scheda (src/main/tabs/catenaNavigazione.js): fuori
   // da una scheda non esiste una catena da contare.
-  const catena = ctx && ctx.catena ? String(ctx.catena) : '';
+  // `insistito` è la scheda che ripresenta la STESSA pagina dove l'utente è
+  // rimasto: non è più una raffica, quindi il conto della catena non la
+  // riguarda (restano quello di chi possiede il sito e quello comune). Il
+  // campo lo scrive la scheda, mai il contesto che arriva dalla pagina.
+  const catena = ctx && ctx.catena && !(ctx && ctx.insistito) ? String(ctx.catena) : '';
   const contoCatenaDeep = catena ? { conto: catenaSpesa, chiave: 'p:' + catena, max: DEEP_MAX_PER_CATENA } : null;
   const contoCatenaLookup = catena ? { conto: catenaLookup, chiave: 'l:' + catena, max: LOOKUP_MAX_PER_CATENA } : null;
   const tasks = [];
