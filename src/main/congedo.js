@@ -4,21 +4,17 @@
 
 const { ipcMain } = require('electron');
 
-// Una scheda distrutta non riceve `pagehide`: Electron butta via la view e il
-// renderer non vede niente (verificato sul campo). Le pagine di Filo che
-// aspettano qualche centinaio di ms prima di salvare perdevano così l'ultima
-// modifica, e la chat della home restava aperta invece di chiudersi.
+// Una scheda distrutta non riceve `pagehide` (verificato sul campo): chi rimanda
+// il salvataggio perdeva l'ultima modifica, e la chat della home non si chiudeva.
 const CANALE_AVVISO = 'filo:pagina-sparisce';
 const CANALE_RISPOSTA = 'filo:pagina-sparita';
 
-// Il tetto è largo di proposito: il costo di aspettare è qualche decimo di
-// secondo su una view già tolta dallo schermo, quello di non aspettare è il
-// lavoro di chi scriveva. Una pagina che non risponde non blocca nessuno.
+// Tetto largo: si aspetta su una view già tolta dallo schermo, e quello che si
+// rischia a non aspettare è il lavoro di chi stava scrivendo.
 const TETTO_MS = 800;
 
-// Un ascoltatore solo per tutte le attese: «chiudi tutto» con una ventina di
-// schede ne registrerebbe una ventina, e sopra la decina Node avvisa di una
-// perdita di memoria che qui non c'è.
+// Un ascoltatore solo per tutte le attese: «chiudi tutto» ne aprirebbe una
+// ventina, e sopra la decina Node avvisa di una perdita di memoria che non c'è.
 const inAttesa = new Map();
 let ascoltoAcceso = false;
 
