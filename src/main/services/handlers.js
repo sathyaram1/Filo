@@ -1703,11 +1703,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       }
       case 'PULISCI_TAB':
         // Non eseguiamo subito: il client mostra un bottone di conferma; al
-        // click manda RUN_TAB_TRIAGE. Teniamo il bottone nella bolla.
-        return { executed: false, kept: true };
+        // click manda RUN_TAB_TRIAGE. `proposta` dice che l'azione tocca
+        // all'utente: senza, il diario la racconta come fallita e quella riga
+        // si mangia il bottone (la funzione sparisce dalla chat).
+        return { executed: false, kept: true, output: { proposta: true } };
       case 'CANCELLA_ARCHIVIO':
         // §5 — azione distruttiva: il client mostra l'elenco dei match + conferma.
-        return { executed: false, kept: true };
+        return {
+          executed: false,
+          kept: true,
+          output: { proposta: true, query: String(action.query ?? action.testo ?? '') },
+        };
       case 'CANCELLA_MEMORIA': {
         // Livello 3: a questo punto l'utente ha già digitato "conferma" (gate sopra).
         // Azzera tutti i moduli di memoria (PROFILO, PREFERENZE, espansioni) e il
