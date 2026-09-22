@@ -208,13 +208,11 @@ const LOOKUP_MAX_RAFFICA = 12;
 const lookupSpesa = creaConto(30 * MIN);
 const lookupRaffica = creaConto(RAFFICA_MS);
 
-// Chiamate già in volo. La cache si riempie solo quando la risposta arriva:
-// senza questo, cinquanta sottodomini aperti insieme facevano partire cinquanta
-// chiamate prima che la prima rispondesse. Il segno sta sulla stessa chiave con
-// cui si ricorda la risposta, non sul proprietario del sito: è un doppione da
-// evitare, non un freno — i freni, quelli sì, stanno sul proprietario (#591,
-// giro 9). Tenuto sul proprietario, la chiamata di un sito ospitato faceva
-// saltare in silenzio quella del vicino, senza nemmeno rimandarla.
+// Chiamate già in volo, per proprietario del sito. La cache si riempie solo
+// quando la risposta arriva: senza questo, cinquanta sottodomini aperti insieme
+// facevano partire cinquanta chiamate prima che la prima rispondesse. Il segno
+// sta sul proprietario e non sull'indirizzo di proposito: mentre una verifica
+// è in volo è anche il freno che tiene ferma una spruzzata di sottodomini.
 const llmInFlight = new Set();
 const sandboxInFlight = new Set();
 // #591, sesto giro — lo stesso segno mancava agli stadi di rete, e lì costava
@@ -396,10 +394,10 @@ function analyze(url, ctx = {}, onUpdate) {
   // `prendiGettone` va per ultimo: è l'unico con un effetto: il gettone si
   // consuma solo quando la chiamata parte davvero. Se a dire di no è il conto
   // comune, la verifica si rimanda invece di perderla.
-  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(norm.host)) {
+  if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(prop)) {
     const g = prendiGettone(llmSpesa, llmRaffica, prop, DEEP_MAX_PER_OWNER, DEEP_MAX_RAFFICA, contoCatenaDeep);
     if (g === 'ok') {
-      inVolo(llmInFlight, norm.host, () => providers.llm(buildLlmMeta(norm, ctx, first, url)), (r) => llmCache.set(norm.host, r));
+      inVolo(llmInFlight, prop, () => providers.llm(buildLlmMeta(norm, ctx, first, url)), (r) => llmCache.set(norm.host, r));
     } else if (g === 'raffica') rimandare = true;
   }
   // Il giudizio del modello guarda l'identità del SITO (nome, età, certificato)
@@ -410,10 +408,10 @@ function analyze(url, ctx = {}, onUpdate) {
   // vicini: è la regola dell'elenco dei siti di truffa, che qui mancava
   // (#591, giro 9).
   const chiaveSandbox = chiaveIndirizzo(url, norm);
-  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(chiaveSandbox)) {
+  if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(prop)) {
     const g = prendiGettone(sandboxSpesa, sandboxRaffica, prop, DEEP_MAX_PER_OWNER, DEEP_MAX_RAFFICA, contoCatenaDeep);
     if (g === 'ok') {
-      inVolo(sandboxInFlight, chiaveSandbox, () => providers.sandbox(url, norm), (r) => sandboxCache.set(chiaveSandbox, r));
+      inVolo(sandboxInFlight, prop, () => providers.sandbox(url, norm), (r) => sandboxCache.set(chiaveSandbox, r));
     } else if (g === 'raffica') rimandare = true;
   }
   // Il conto comune era pieno: chi ha chiesto il verdetto lo saprà e riproverà
