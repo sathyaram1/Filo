@@ -46,6 +46,21 @@ function wireWindowCommon(win, tabs) {
     }
   } catch (_) {}
 
+  // Chiudere la finestra distrugge le schede PRIMA che `before-quit` arrivi, e
+  // il congedo dell'uscita non trovava più nessuno: l'ultima modifica scritta
+  // in una pagina interna si perdeva. La regola sta in src/main/congedo.js.
+  let congedoChiusuraFatto = false;
+  win.on('close', (e) => {
+    if (congedoChiusuraFatto) return;
+    congedoChiusuraFatto = true;
+    const { congedaSchedeInterne } = require('./congedo');
+    const attesa = congedaSchedeInterne(tabs);
+    if (!attesa) return;
+    e.preventDefault();
+    const chiudi = () => { try { win.close(); } catch (_) {} };
+    attesa.then(chiudi, chiudi);
+  });
+
   win.on('resize', () => tabs.layout());
   // Se la finestra va a tutto schermo per una strada che non è quella di Filo
   // (gesto o scorciatoia del sistema, gestore finestre), adottiamo la modalità
