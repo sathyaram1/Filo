@@ -218,6 +218,40 @@
     return result;
   }
 
+  // I due servizi a pagamento di Filo si raggiungono SOLO da qui, come i
+  // fornitori di modelli: finché il chiamante doveva nominarli per conto suo,
+  // il controllo automatico non poteva distinguere una chiamata dentro il
+  // cancello da una fuori, e restava verde su tutte e due.
+  async function webSearch({ settings, query, apiKey, maxResults = 5 }) {
+    const WS = global.SN_WEB_SEARCH;
+    if (!WS || typeof WS.search !== 'function') return { ok: false, results: [], reason: 'ricerca non disponibile' };
+    return await service({
+      settings,
+      action: (global.SN_CONST && global.SN_CONST.SERVIZI.WEB_SEARCH) || 'web_search',
+      provider: 'tavily',
+      costoUsd: WS.costoUsd,
+      run: () => WS.search({ query, tavilyKey: apiKey, maxResults }),
+    });
+  }
+
+  // L'elenco dei siti di truffa non costa niente all'owner (`senzaTetto`): è il
+  // segnale più affidabile che Filo ha sulle truffe già note, e legarlo al tetto
+  // mensile toglieva metà della protezione proprio a chi il mese l'aveva finito,
+  // senza risparmiare un centesimo.
+  async function blacklistLookup({ settings, url, apiKey }) {
+    const SB = global.SN_SAFEBROWSE;
+    const net = SB && SB.net;
+    if (!net || typeof net.safeBrowsingLookup !== 'function' || !apiKey) return null;
+    return await service({
+      settings,
+      action: (global.SN_CONST && global.SN_CONST.SERVIZI.SAFE_BROWSING) || 'safe_browsing_lookup',
+      provider: 'google_safe_browsing',
+      costoUsd: 0,
+      senzaTetto: true,
+      run: () => net.safeBrowsingLookup(url, apiKey),
+    });
+  }
+
   // ─── Prove dalle Opzioni e dalla pagina di amministrazione ────────────────
   // Un pulsante «Prova» manda una richiesta VERA, pagata con le chiavi vere —
   // il codice lo diceva già nei commenti, ma quelle chiamate non passavano dal
