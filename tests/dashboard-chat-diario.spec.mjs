@@ -27,7 +27,10 @@
 //      aggiunge il diario lo chiama proposta.
 //  (H) l'azione confermata nel popup lascia la sua riga anche quando non è
 //      un'impostazione, e il bottone diventa una ricevuta invece di ripetere
-//      «Filo vuole…» con la spunta davanti.
+//      «Filo vuole…» con la spunta davanti;
+//  (I) l'azione che Filo lascia finire all'utente (riordino delle schede) si
+//      raggiunge davvero, e ciò che l'utente finisce cliccando entra nel
+//      diario e nel riassunto, comando confermato compreso.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -482,4 +485,65 @@ test('H — l\'azione confermata lascia la sua riga, e il bottone diventa una ri
   expect(testoBtn).not.toContain('Eliminare DEFINITIVAMENTE');
 
   await restore(app, '__fakeH');
+});
+
+test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel diario', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    win._filoTabs.runAutoTriage = async () => ({ archived: 3 });
+  });
+
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'i1', name: 'PULISCI_TAB', arguments: '{}' }] },
+    { text: 'Valuto le schede aperte.' },
+  ], '__fakeI');
+
+  await page.locator('#input').fill('riordina le schede e archivia quelle che non servono');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Valuto le schede aperte.' })).toBeVisible({ timeout: 10_000 });
+
+  // Filo la propone e l'utente la finisce: la riga dice che è una proposta e
+  // il bottone c'è. Prima il diario la dava per fallita e quella riga si
+  // mangiava il bottone: la funzione non si raggiungeva più dalla chat.
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Riordino delle schede' })).toHaveCount(1);
+  const btn = page.locator('.dash-action-btn', { hasText: 'Riordina e archivia' });
+  await expect(btn).toBeVisible();
+  await btn.click();
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
+
+  // Finito il riordino, il diario racconta l'esito e il riassunto lo conta:
+  // «Ha proposto di riordinare le schede» a cose fatte era una mezza verità.
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Archiviate 3 schede' })).toHaveCount(1, { timeout: 10_000 });
+  await expect(activity.locator('.dash-activity-label')).toContainText('riordinato le schede');
+  await restore(app, '__fakeI');
+
+  // Il comando confermato nel popup: l'esito è un passo del lavoro, e il
+  // riassunto lo conta come quello di un comando di sola lettura.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }); });
+  const cartella = `${process.env.FILO_USER_DATA || '/tmp'}/filo-diario-I-${Date.now()}`;
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'i2', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `mkdir ${cartella}` }) }] },
+    { text: 'Creo la cartella.' },
+  ], '__fakeI2');
+  await page.locator('#input').fill('crea la cartella');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Creo la cartella.' })).toBeVisible({ timeout: 10_000 });
+  const cmdBtn = page.locator('.dash-bubble-actions .dash-action-btn').last();
+  await cmdBtn.click();
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
+  await expect(cmdBtn).toContainText('✓', { timeout: 15_000 });
+
+  const ultimo = page.locator('.dash-activity').last();
+  await ultimo.locator('.dash-activity-head').click();
+  await expect(ultimo.locator('.dash-activity-body .dash-activity-cmd')).toHaveCount(1, { timeout: 10_000 });
+  await expect(ultimo.locator('.dash-activity-label')).toContainText('eseguito un comando');
+
+  await restore(app, '__fakeI2');
 });
