@@ -662,7 +662,19 @@ export function buildPayload(bucket, ctx = {}) {
         scope: verifierScope(ctx.scope).scope,
         ...(ctx.perimetro && typeof ctx.perimetro === 'object' ? { perimetro: ctx.perimetro } : {}),
       };
-    case 'fixer':
+    case 'fixer': {
+      // La ripresa dopo la risposta dell'owner: il lavoro si era fermato su una
+      // domanda, e chi riprende riceve domanda, risposta, i rilievi fermi e
+      // la serie delle critiche (il lavoro può essere a metà di un giro).
+      const rip = ctx.ripresa && typeof ctx.ripresa === 'object' ? ctx.ripresa : null;
+      if (rip) {
+        return {
+          case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
+          feedback: ctx.feedback || null, ripresa: rip,
+          history: Array.isArray(ctx.history) ? ctx.history : [],
+          historyDropped: Number(ctx.historyDropped) || 0,
+        };
+      }
       // Riallineamento del ramo dopo un conflitto di fusione. Il lavoro era
       // già verificato: niente critica e niente serie, o la consegna direbbe
       // il contrario del testo di ruolo (che vieta di toccare altro).
@@ -673,8 +685,14 @@ export function buildPayload(bucket, ctx = {}) {
         num: bucket.num,
         feedback: ctx.feedback || null,
       };
-    case 'new-work':
-      return { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+    }
+    case 'new-work': {
+      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+      // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
+      // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
+      if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
+      return out;
+    }
     case 'halt':
       // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
       return { kind: bucket.kind || 'transient', message: bucket.message || '' };
