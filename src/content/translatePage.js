@@ -578,6 +578,7 @@
     if (typeof MutationObserver !== 'function') return;
     try {
       contentObserver = new MutationObserver((muts) => {
+        revealedDirty = true;
         if (newContentSeen) return;
         for (const m of muts) {
           for (const n of m.addedNodes) {
