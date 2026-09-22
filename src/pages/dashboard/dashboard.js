@@ -430,7 +430,7 @@
       text.textContent = s.text || '';
       btn.appendChild(icon);
       btn.appendChild(text);
-      btn.addEventListener('click', () => onSuggestionClick(s));
+      btn.addEventListener('click', () => onSuggestionClick(s, btn));
       li.appendChild(btn);
       suggestionsEl.appendChild(li);
     }
