@@ -151,23 +151,42 @@
     return out.join('\n');
   }
 
-  // Aggancio comune per il click sui link renderizzati. Ogni superficie passa il
-  // proprio "opener" (nuova scheda via IPC sulle pagine filo://, window.open sui
-  // content script). Un solo listener delegato sul contenitore: sopravvive ai
-  // re-render dello streaming. Ritorna una funzione per staccarlo.
+  // Aggancio comune per l'apertura dei link renderizzati. Ogni superficie passa
+  // il proprio "opener" (che chiede al motore). Un solo listener delegato sul
+  // contenitore: sopravvive ai re-render dello streaming. Ritorna una funzione
+  // per staccarlo.
+  // TUTTI i gesti con cui si apre un link, non solo il tasto sinistro: la
+  // rotellina e la tastiera aprivano da se', scavalcando il motore (#533, nono
+  // giro di verifica). `sfondo` dice se il gesto chiedeva una scheda dietro.
   function bindLinks(rootEl, openUrl) {
     if (!rootEl || typeof openUrl !== 'function') return () => {};
-    const onClick = (e) => {
+    const linkDi = (e) => {
       const a = e.target && e.target.closest && e.target.closest('a.' + LINK_CLASS);
-      if (!a || !rootEl.contains(a)) return;
-      const url = a.getAttribute('href');
-      if (!url) return;
+      if (!a || !rootEl.contains(a)) return null;
+      return a.getAttribute('data-url') ? a : null;
+    };
+    const apri = (e, a, sfondo) => {
       e.preventDefault();
       e.stopPropagation();
-      openUrl(url);
+      openUrl(a.getAttribute('data-url'), a, { sfondo });
+    };
+    const onClick = (e) => { const a = linkDi(e); if (a) apri(e, a, false); };
+    const onAux = (e) => { const a = linkDi(e); if (a && e.button === 1) apri(e, a, true); };
+    const onKey = (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const a = linkDi(e);
+      if (a) apri(e, a, false);
     };
     rootEl.addEventListener('click', onClick);
-    return () => { try { rootEl.removeEventListener('click', onClick); } catch (_) {} };
+    rootEl.addEventListener('auxclick', onAux);
+    rootEl.addEventListener('keydown', onKey);
+    return () => {
+      try {
+        rootEl.removeEventListener('click', onClick);
+        rootEl.removeEventListener('auxclick', onAux);
+        rootEl.removeEventListener('keydown', onKey);
+      } catch (_) {}
+    };
   }
 
   global.SN_MARKDOWN = { render, inlineMd, escapeHtml, safeLinkUrl, bindLinks, LINK_CLASS };
