@@ -381,6 +381,8 @@ function passaggio(html, modo, dentroZona = false) {
         continue;
       }
       pila.push(nome);
+      if (!indici.has(nome)) indici.set(nome, []);
+      indici.get(nome).push(pila.length - 1);
       const attrs = attributi(t.attrsRaw);
       const dove = { inZona: dentroZona || zone.length > 0, primoLivello: pila.length === 1, soloIlleggibile };
       const verdetto = daScartare(nome, attrs, dove);
