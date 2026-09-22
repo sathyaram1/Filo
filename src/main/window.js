@@ -31,6 +31,25 @@ function revealWindow(win) {
   } catch (_) {}
 }
 
+// Chi deve sapere che è nata una finestra normale fuori dall'avvio (il main ci
+// tiene il suo riferimento): senza, resterebbe puntato a una finestra chiusa.
+const osservatoriFinestraNormale = [];
+function onFinestraNormale(cb) { if (typeof cb === 'function') osservatoriFinestraNormale.push(cb); }
+
+// Una scadenza si fa sentire solo da una finestra che la vede: suono e pulsante
+// che ferma vivono lì, e una finestra incognito le scadenze normali non le vede.
+// Senza questa garanzia, su Mac (dove chiudere la finestra non spegne Filo) o
+// con la sola incognito aperta il timer resterebbe vivo e muto.
+function assicuraFinestraNormale() {
+  const esistente = BrowserWindow.getAllWindows().find((w) => {
+    try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
+  });
+  if (esistente) return esistente;
+  const win = createMainWindow();
+  for (const cb of osservatoriFinestraNormale) { try { cb(win); } catch (_) {} }
+  return win;
+}
+
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 function wireWindowCommon(win, tabs) {
