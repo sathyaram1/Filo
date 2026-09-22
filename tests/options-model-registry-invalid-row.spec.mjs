@@ -131,3 +131,36 @@ test('riga valida: la conferma resta "Salvato" senza avviso e senza segni sulla 
   });
   expect(rowInvalid).toBe(false);
 });
+
+test('la conferma parla dell\'ultima modifica, non di quella di prima', async ({ openTab }) => {
+  const page = await openTab(OPTIONS_URL);
+  await revealRegistry(page);
+
+  await page.evaluate(() => {
+    const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+    row.querySelector('.sn-model-nick').value = 'prima';
+    row.querySelector('.sn-model-provider').value = 'openrouter';
+    row.querySelector('.sn-model-id').value = 'openai/gpt-4o-mini';
+    row.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+
+  // Seconda modifica mentre la conferma di prima è ancora sullo schermo: da
+  // quell'istante c'è qualcosa che salvato non è, e la conferma deve sparire.
+  const confermaRimasta = await page.evaluate(() => {
+    const hint = document.getElementById('savedHint');
+    const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+    row.querySelector('.sn-model-id').value = 'openai/gpt-4o';
+    row.dispatchEvent(new Event('change', { bubbles: true }));
+    return hint.classList.contains('sn-show');
+  });
+  expect(confermaRimasta).toBe(false);
+
+  // Quando torna, quello che l'utente vede scritto è davvero quello salvato.
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+  const salvato = await page.evaluate(async () => {
+    const s = await window.SN_STORAGE.getSettings();
+    return (s.modelRegistry && s.modelRegistry.prima && s.modelRegistry.prima.model) || '';
+  });
+  expect(salvato).toBe('openai/gpt-4o');
+});
