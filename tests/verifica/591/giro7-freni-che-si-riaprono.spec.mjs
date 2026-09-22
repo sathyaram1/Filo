@@ -49,12 +49,10 @@ function bancoSafebrowse() {
 // stesso sito.
 async function raffica(host, passo) {
   const t0 = Date.now();
-  let presto = null;
   let i = 0;
   while (Date.now() - t0 < TARDI_MS) {
     await passo(host(i), i);
     i += 1;
-    if (presto === null && Date.now() - t0 >= PRESTO_MS) presto = i;
     await attendi(15);
   }
   await attendi(300);
