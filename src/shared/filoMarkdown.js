@@ -9,14 +9,17 @@
 //
 // SICUREZZA - il testo di Filo e' contenuto NON FIDATO (puo' nascere da una
 // pagina web che il modello ha letto). Un link renderizzato:
-//   - deve avere uno schema esplicito e sicuro (http/https/mailto). Tutto il
-//     resto (filo://, javascript:, data:, file:, about:, e i link RELATIVI o
+//   - deve avere uno schema esplicito e sicuro (http/https). Tutto il resto
+//     (mailto:, filo://, javascript:, data:, file:, about:, e i link RELATIVI o
 //     protocol-relative //host, che su una pagina filo:// risolverebbero verso
 //     le pagine INTERNE dell'app) viene scartato: il testo resta visibile ma non
 //     cliccabile;
-//   - porta rel="noopener noreferrer nofollow" e apre in una nuova scheda.
+//   - NON ha `href`: l'indirizzo sta in `data-url` e ad aprirlo e' sempre
+//     `bindLinks`, che passa dal motore. Con un `href` il browser apriva da se'
+//     col tasto centrale, e quella strada non passava da nessun controllo
+//     (#533, nono giro di verifica).
 // La classe `filo-md-link` e' l'aggancio con cui ogni superficie intercetta il
-// click e apre il link nel modo giusto (nuova scheda), invece di navigare via la
+// gesto e apre il link nel modo giusto (nuova scheda), invece di navigare via la
 // pagina interna.
 
 (function (global) {
