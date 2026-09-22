@@ -62,8 +62,10 @@ async function lanciatore(manopole) {
   for (const [nome, vero] of Object.entries(MANOPOLE)) {
     const finta = path.join(dove, `manopola-${nome}`);
     if (manopole[nome] !== undefined) fs.writeFileSync(finta, `${manopole[nome]}\n`);
+    // Fra apici: la cartella temporanea del repo ha uno spazio nel nome (voluto,
+    // vedi tests/helpers/percorsi.mjs) e senza apici la finta si spezzerebbe.
     expect(testo, `il lanciatore non guarda più ${vero}`).toContain(vero);
-    testo = testo.split(vero).join(finta);
+    testo = testo.split(vero).join(`'${finta}'`);
   }
   fs.writeFileSync(script, testo, { mode: 0o755 });
   fs.chmodSync(script, 0o755);
