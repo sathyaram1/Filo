@@ -169,11 +169,16 @@ const catenaLookup = creaConto(HOUR);
 // `catena` è il conto di chi consuma: si guarda PRIMA degli altri due e la sua
 // rinuncia è definitiva ('suo'), perché riprovare fra qualche secondo sarebbe
 // proprio la raffica che questo conto deve fermare.
+// `catena` è il conto di chi consuma: si GUARDA per primo e si CONSUMA per
+// ultimo, come gli altri due, perché una verifica rimandata dal conto comune
+// verrà richiesta di nuovo e non deve pagare due volte.
 function prendiGettone(conto, raffica, chi, max = DEEP_MAX_PER_OWNER, maxRaffica = DEEP_MAX_RAFFICA, catena = null) {
-  if (catena && catena.chiave && !catena.conto.prendi(catena.chiave, catena.max)) return 'suo';
+  const vivo = catena && catena.chiave;
+  if (vivo && catena.conto.valore(catena.chiave) >= catena.max) return 'suo';
   if (raffica.valore(CHIAVE_TUTTI) >= maxRaffica) return 'raffica';
   if (!conto.prendi(chi, max)) return 'suo';
   raffica.prendi(CHIAVE_TUTTI, maxRaffica);
+  if (vivo) catena.conto.prendi(catena.chiave, catena.max);
   return 'ok';
 }
 
