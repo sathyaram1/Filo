@@ -1421,15 +1421,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // livello 2 e l'utente conferma vedendo l'URL completo. Vedi src/shared/urlExfil.js.
   if (type === 'NAVIGA') {
     try {
-      const Exfil = globalThis.SN_URL_EXFIL;
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
-      if (Exfil && url) {
-        const origin = sender?.tab?.url || sender?.url || '';
-        const fromUntrusted = /^https?:/i.test(origin);
-        const corpus = await navExfilCorpus();
-        const v = Exfil.assess(url, { corpus, fromUntrusted });
-        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
-      }
+      const origin = sender?.tab?.url || sender?.url || '';
+      const v = await portaFuoriRobaTua(url, task, { fromUntrusted: /^https?:/i.test(origin) });
+      if (v) { action._exfil = true; action._exfilReason = v.reason; }
     } catch (_) {}
   }
 
