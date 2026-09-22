@@ -96,7 +96,7 @@ body.barra-aperta .indizio { opacity: 0; pointer-events: none; }
 
 .home {
   flex: 1; min-width: 0; display: grid; grid-template-columns: 260px 1fr 260px;
-  gap: 24px; padding: 40px 40px 28px;
+  gap: 24px; padding: 14px 28px 22px;
 }
 .col { min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .col.lato { overflow-y: auto; padding-bottom: 8px; }
@@ -186,7 +186,15 @@ body.barra-aperta .indizio { opacity: 0; pointer-events: none; }
 }
 .pill:hover { border-color: var(--dash-ink); color: var(--dash-ink); }
 .pill.acceso { background: var(--dash-accent); border-color: var(--dash-accent); color: #fff; }
-.altro-riga { display: flex; align-items: center; gap: 4px; padding: 2px; }
+.app-griglia { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 0 0 4px; }
+.app {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 9px 2px 7px;
+  border: none; background: transparent; border-radius: 12px; color: var(--dash-ink-soft);
+  font: inherit; font-size: 10.5px; cursor: pointer;
+  transition: background var(--morbido), color var(--morbido), transform 120ms ease;
+}
+.app:hover { background: var(--dash-line); color: var(--dash-ink); transform: translateY(-1px); }
+.app .ico { width: 20px; height: 20px; }
 .altro-riga .et { font-size: 11px; color: var(--dash-ink-mute); margin-right: 4px; }
 
 .centro { display: flex; flex-direction: column; min-height: 0; }
@@ -328,10 +336,10 @@ body.lavora .invia { background: var(--dash-accent); border-color: var(--dash-ac
 .capo .vuoto { width: 20px; flex: none; }
 
 .barra {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 64px; z-index: 30;
-  display: flex; flex-direction: column; padding: 6px 0;
-  background: var(--dash-card); border-right: 1px solid var(--dash-line-strong);
-  box-shadow: 6px 0 22px rgba(34, 30, 25, 0.10);
+  position: absolute; left: 0; top: 10px; bottom: 10px; width: 52px; z-index: 30;
+  display: flex; flex-direction: column; padding: 6px 0; border-radius: 0 16px 16px 0;
+  background: var(--dash-card); border: 1px solid var(--dash-line); border-left: none;
+  box-shadow: 4px 2px 18px rgba(34, 30, 25, 0.16);
   transform: translateX(-100%); transition: transform var(--lento);
 }
 body.barra-aperta .barra { transform: none; }
@@ -340,25 +348,26 @@ body.barra-aperta .barra { transform: none; }
 .bgruppo.scorre { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 .bgruppo.mira { background: var(--dash-line); box-shadow: inset 0 0 0 1px var(--dash-accent); border-radius: 12px; }
 .bico {
-  position: relative; width: 46px; height: 40px; flex: none; border-radius: 12px; border: none;
+  position: relative; width: 40px; height: 36px; flex: none; border-radius: 11px; border: none;
   background: transparent; color: var(--dash-ink-soft); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: background var(--morbido), color var(--morbido), transform 120ms ease;
 }
 .bico:hover { background: var(--dash-line); color: var(--dash-ink); }
 .bico:active { transform: scale(0.93); }
+.bico.acceso { color: var(--dash-accent); }
 .bico.nuovo { animation: posa 320ms cubic-bezier(.4, 0, .2, 1); }
 @keyframes posa { from { opacity: 0; transform: scale(0.6); } }
 .bico .ico { width: 18px; height: 18px; }
 .bico .eti {
-  position: absolute; left: 54px; top: 50%; transform: translateY(-50%) translateX(-4px);
+  position: absolute; left: 46px; top: 50%; transform: translateY(-50%) translateX(-4px);
   background: var(--dash-ink); color: var(--dash-paper); font-size: 11.5px;
   padding: 3px 9px; border-radius: 8px; white-space: nowrap; pointer-events: none;
   opacity: 0; transition: opacity var(--morbido), transform var(--morbido); z-index: 3;
 }
 .bico:hover .eti { opacity: 1; transform: translateY(-50%); }
 .bico .punto {
-  position: absolute; top: 7px; right: 8px; width: 6px; height: 6px; border-radius: 50%;
+  position: absolute; top: 6px; right: 5px; width: 6px; height: 6px; border-radius: 50%;
   background: var(--dash-accent);
 }
 .bico .punto.calmo { background: var(--dash-ink-mute); }
@@ -370,8 +379,6 @@ body.barra-aperta .barra { transform: none; }
 .bsist { display: flex; gap: 2px; }
 .bsist .bico { width: 20px; height: 24px; border-radius: 7px; }
 .bsist .bico .ico { width: 14px; height: 14px; }
-.brapide { display: flex; flex-direction: column; gap: 3px; width: 50px; margin-top: 4px; }
-.brapide .pill { padding: 2px 0; text-align: center; font-size: 10.5px; }
 
 .menu {
   position: fixed; z-index: 60; display: none; min-width: 244px; padding: 8px;
@@ -464,18 +471,11 @@ body.barra-aperta .barra { transform: none; }
         <button class="bico"><i data-ico="wifi"></i><span class="eti">casa</span></button>
         <button class="bico"><i data-ico="bluetooth"></i><span class="eti">cuffie</span></button>
       </div>
-      <div class="brapide">
-        <button class="pill" data-rapida="tema">tema</button>
-        <button class="pill" data-rapida="zoom">zoom</button>
-        <button class="pill" data-rapida="incognito">incognito</button>
-      </div>
     </div>
   </aside>
 
   <main class="home" id="home">
     <section class="col lato">
-      <div class="col-tit">quello che accade</div>
-
       <article class="carta" data-accade="timer" data-eti="Timer · pasta">
         <button class="apri-filo">apri nel filo</button>
         <div class="carta-testa"><i data-ico="timer"></i><span class="carta-tit">Pasta</span></div>
@@ -549,14 +549,33 @@ body.barra-aperta .barra { transform: none; }
         <input id="campo" placeholder="Chiedi qualsiasi cosa" autocomplete="off">
         <button class="invia" id="invia" type="submit" title="Manda"><svg id="glifo" viewBox="0 0 12 12"></svg></button>
       </form>
+
+      <article class="carta" data-accade="suggerisce" data-eti="Suggerimenti">
+        <div class="carta-testa"><i data-ico="sparkles"></i><span class="carta-tit">Filo ti suggerisce</span></div>
+        <div class="elenco">
+          <div class="voce"><i data-ico="mailSend"></i>rispondi a Giacomo</div>
+          <div class="voce"><i data-ico="timer"></i>metti 10 min per il sugo</div>
+          <div class="voce"><i data-ico="globe"></i>riapri l'orario di ieri</div>
+        </div>
+      </article>
     </section>
 
     <section class="col lato" id="col-destra">
       <div class="riga-alta">
-        <span class="col-tit">quello che tieni</span>
         <span class="spazio"></span>
         <button class="tondo" title="profilo"><i data-ico="profilo"></i></button>
         <button class="tondo" title="impostazioni"><i data-ico="options"></i></button>
+      </div>
+
+      <div class="app-griglia">
+        <button class="app"><i data-ico="pencil"></i><span>editor</span></button>
+        <button class="app"><i data-ico="tabs"></i><span>mazzi</span></button>
+        <button class="app"><i data-ico="feedback"></i><span>feedback</span></button>
+        <button class="app"><i data-ico="history"></i><span>cronologia</span></button>
+        <button class="app"><i data-ico="scudo"></i><span>red team</span></button>
+        <button class="app"><i data-ico="memory"></i><span>memorie</span></button>
+        <button class="app"><i data-ico="terminal"></i><span>terminale</span></button>
+        <button class="app"><i data-ico="piu"></i><span>altro</span></button>
       </div>
 
       <article class="carta" draggable="true" data-carta="sistema">
@@ -571,53 +590,7 @@ body.barra-aperta .barra { transform: none; }
         </div>
       </article>
 
-      <article class="carta" draggable="true" data-carta="rapide">
-        <span class="presa-carta"><i data-ico="presa"></i></span>
-        <div class="carta-testa"><span class="carta-tit">Impostazioni rapide</span></div>
-        <div class="pillole">
-          <button class="pill" data-rapida="tema">tema</button>
-          <button class="pill" data-rapida="zoom">zoom</button>
-          <button class="pill" data-rapida="incognito">incognito</button>
-        </div>
-      </article>
 
-      <article class="carta" draggable="true" data-carta="editor">
-        <button class="apri-filo">apri nel filo</button>
-        <span class="presa-carta"><i data-ico="presa"></i></span>
-        <div class="carta-testa"><i data-ico="pencil"></i><span class="carta-tit">Editor</span></div>
-        <div class="elenco">
-          <div class="voce"><i data-ico="note"></i>appunti tetto<span class="coda">ora</span></div>
-          <div class="voce"><i data-ico="note"></i>lista spesa<span class="coda">ieri</span></div>
-          <div class="voce"><i data-ico="note"></i>lettera al comune<span class="coda">ven</span></div>
-        </div>
-      </article>
-
-      <article class="carta" draggable="true" data-carta="mazzi">
-        <button class="apri-filo">apri nel filo</button>
-        <span class="presa-carta"><i data-ico="presa"></i></span>
-        <div class="carta-testa"><i data-ico="tabs"></i><span class="carta-tit">Mazzi</span></div>
-        <div class="elenco">
-          <div class="voce"><i data-ico="folder"></i>Muldrotha<span class="coda">99 carte</span></div>
-          <div class="voce"><i data-ico="folder"></i>Krenko<span class="coda">manca 1</span></div>
-        </div>
-      </article>
-
-      <article class="carta" draggable="true" data-carta="suggerisce">
-        <span class="presa-carta"><i data-ico="presa"></i></span>
-        <div class="carta-testa"><i data-ico="sparkles"></i><span class="carta-tit">Filo ti suggerisce</span></div>
-        <div class="elenco">
-          <div class="voce"><i data-ico="mailSend"></i>rispondi a Giacomo</div>
-          <div class="voce"><i data-ico="timer"></i>metti 10 min per il sugo</div>
-          <div class="voce"><i data-ico="globe"></i>riapri l'orario di ieri</div>
-        </div>
-      </article>
-
-      <div class="altro-riga">
-        <span class="et">altro</span>
-        <button class="tondo" title="feedback"><i data-ico="feedback"></i></button>
-        <button class="tondo" title="cronologia"><i data-ico="history"></i></button>
-        <button class="tondo" title="memorie"><i data-ico="memory"></i></button>
-      </div>
     </section>
   </main>
 </div>
@@ -639,7 +612,8 @@ body.barra-aperta .barra { transform: none; }
     <button class="menu-voce" draggable="true" data-az="pin"><i data-ico="pin"></i>fissa</button>
     <button class="menu-voce" draggable="true" data-az="memory"><i data-ico="memory"></i>memorie</button>
     <button class="menu-voce" draggable="true" data-az="note"><i data-ico="note"></i>appunti</button>
-    <button class="menu-voce" draggable="true" data-az="palette"><i data-ico="palette"></i>aspetto</button>
+    <button class="menu-voce" draggable="true" data-az="palette"><i data-ico="palette"></i>tema</button>
+    <button class="menu-voce" draggable="true" data-az="zoom"><i data-ico="zoom"></i>zoom</button>
     <button class="menu-voce" draggable="true" data-az="terminal"><i data-ico="terminal"></i>terminale</button>
     <button class="menu-voce" draggable="true" data-az="apps"><i data-ico="apps"></i>app</button>
   </div>
@@ -706,6 +680,7 @@ var ICONE = {
   fullscreen: '<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/>',
   profilo: '<circle cx="12" cy="8.5" r="3.8"/><path d="M4.8 20a7.4 7.4 0 0 1 14.4 0"/>',
   zoom: '<circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L21 21"/><path d="M8.5 11h5"/><path d="M11 8.5v5"/>',
+  scudo: '<path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/>',
   presa: '<path d="M9 6h.01"/><path d="M15 6h.01"/><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M9 18h.01"/><path d="M15 18h.01"/>'
 };
 function svgIco(nome) {
@@ -1334,7 +1309,7 @@ document.querySelectorAll('.apri-filo').forEach(function (b) {
 function scriviTema(scuro) {
   document.body.classList.toggle('scuro', scuro);
   document.getElementById('tema-prova').textContent = scuro ? 'chiaro' : 'scuro';
-  document.querySelectorAll('[data-rapida="tema"]').forEach(function (p) { p.classList.toggle('acceso', scuro); });
+  document.querySelectorAll('[data-rapida="tema"], [data-az="palette"]').forEach(function (p) { p.classList.toggle('acceso', scuro); });
   ricorda('tema', scuro ? 'scuro' : 'chiaro');
 }
 scriviTema(ricordato('tema') === 'scuro');
@@ -1347,25 +1322,22 @@ document.querySelectorAll('.annulla-tema').forEach(function (b) {
 
 var ZOOM = ['100%', '125%', '150%'];
 var zoomOra = 1;
-document.querySelectorAll('[data-rapida]').forEach(function (p) {
-  p.addEventListener('click', function () {
-    var quale = p.getAttribute('data-rapida');
+function azioneRapida(quale, p) {
     if (quale === 'tema') {
       var scuro = !document.body.classList.contains('scuro');
       scriviTema(scuro);
-      segnaNelFilo('tema ' + (scuro ? 'scuro' : 'chiaro') + ' · dalle impostazioni rapide', 'palette');
+      segnaNelFilo('tema ' + (scuro ? 'scuro' : 'chiaro') + ' · dalla barra', 'palette');
       return;
     }
     if (quale === 'zoom') {
       zoomOra = (zoomOra + 1) % ZOOM.length;
-      segnaNelFilo('zoom ' + ZOOM[zoomOra] + ' · dalle impostazioni rapide', 'zoom');
+      segnaNelFilo('zoom ' + ZOOM[zoomOra] + ' · dalla barra', 'zoom');
       return;
     }
     var acceso = !p.classList.contains('acceso');
-    document.querySelectorAll('[data-rapida="incognito"]').forEach(function (q) { q.classList.toggle('acceso', acceso); });
-    segnaNelFilo('incognito ' + (acceso ? 'acceso' : 'spento') + ' · dalle impostazioni rapide', 'incognito');
-  });
-});
+    document.querySelectorAll('[data-rapida="incognito"], [data-az="incognito"]').forEach(function (q) { q.classList.toggle('acceso', acceso); });
+    segnaNelFilo('incognito ' + (acceso ? 'acceso' : 'spento') + ' · dalla barra', 'incognito');
+}
 
 var menu = document.getElementById('menu');
 function nascondiMenu() { menu.classList.remove('vis'); }
@@ -1384,13 +1356,14 @@ document.addEventListener('mousedown', function (e) {
 var ICO_AZIONE = {
   translate: 'translate', screenshot: 'screenshot', share: 'share', saveForLater: 'clipboard',
   qrCode: 'qrCode', newTab: 'openTab', incognito: 'incognito', fullscreen: 'fullscreen',
-  pin: 'pin', memory: 'memory', note: 'note', palette: 'palette', terminal: 'terminal', apps: 'apps'
+  pin: 'pin', memory: 'memory', note: 'note', palette: 'palette', terminal: 'terminal', apps: 'apps', zoom: 'zoom'
 };
 var ETI_AZIONE = {
   translate: 'traduci', screenshot: 'schermata', share: 'condividi', saveForLater: 'metti da parte',
   qrCode: 'codice QR', newTab: 'scheda nuova', incognito: 'incognito', fullscreen: 'schermo pieno',
-  pin: 'fissa', memory: 'memorie', note: 'appunti', palette: 'aspetto', terminal: 'terminale', apps: 'app'
+  pin: 'fissa', memory: 'memorie', note: 'appunti', palette: 'tema', terminal: 'terminale', apps: 'app', zoom: 'zoom'
 };
+var RAPIDA_DI = { palette: 'tema', zoom: 'zoom', incognito: 'incognito' };
 var barraNav = document.getElementById('barra-nav');
 function posaNellaBarra(az, nuovo) {
   if (!ICO_AZIONE[az] || barraNav.querySelector('[data-az="' + az + '"]')) return;
@@ -1398,6 +1371,7 @@ function posaNellaBarra(az, nuovo) {
   b.setAttribute('data-az', az);
   b.innerHTML = svgIco(ICO_AZIONE[az]);
   b.append(el('span', 'eti', ETI_AZIONE[az]));
+  if (RAPIDA_DI[az]) b.addEventListener('click', function () { azioneRapida(RAPIDA_DI[az], b); });
   barraNav.append(b);
 }
 (ricordato('barra') || []).forEach(function (az) { posaNellaBarra(az, false); });
