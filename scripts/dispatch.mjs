@@ -1607,6 +1607,9 @@ export function serverCtx(bucket, fromServer, diff = '') {
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
       // nell'avvertenza, così i giri mancanti non passano per inesistenti.
       historyDropped: Number(payload && payload.historyDropped) || 0,
+      // La ripresa dopo la risposta dell'owner (solo per chi riprende: il
+      // server non la manda a chi verifica).
+      ripresa: payload && payload.ripresa && typeof payload.ripresa === 'object' ? payload.ripresa : null,
       ...(role === 'verifier' ? { scope: payload && payload.scope, perimetro: (payload && payload.perimetro) || null } : {}),
     };
   }
