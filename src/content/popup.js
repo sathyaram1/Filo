@@ -206,14 +206,26 @@
   // "Spiega" e la sidebar, che vivono tutti nello stesso documento. I link
   // non-sicuri (filo://, javascript:, relativi) non arrivano qui: SN_MARKDOWN li
   // ha già scartati in fase di render.
-  document.addEventListener('click', (e) => {
+  // #533 (ottavo giro) — ma non si apre da soli: la scritta e l'indirizzo li ha
+  // scelti il modello dopo aver letto questa pagina. L'apertura passa dal
+  // motore, col compito di questa pagina, e dove non era fra le cose chieste si
+  // chiede mostrando l'indirizzo intero.
+  document.addEventListener('click', async (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a) return;
     const url = a.getAttribute('href');
     if (!url) return;
     e.preventDefault();
     e.stopPropagation();
-    try { window.open(url, '_blank', 'noopener'); } catch (_) {}
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_OPEN_LINK, url }); } catch (_) {}
+    if (!r || !r.chiede) return;
+    const Ui = global.SN_CONFIRM_UI;
+    const opts = { title: 'Filo chiede conferma', text: r.testo || `Aprire ${url}` };
+    let ok = false;
+    try { ok = Ui ? await Ui.confirm(opts) : global.confirm(opts.text); } catch (_) { ok = false; }
+    if (!ok) return;
+    try { await chrome.runtime.sendMessage({ type: MSG.FILO_OPEN_LINK, url, conferma: true }); } catch (_) {}
   });
 
   // ----------------------------------------------------------------
