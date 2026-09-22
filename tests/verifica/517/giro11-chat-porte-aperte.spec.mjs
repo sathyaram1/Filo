@@ -80,8 +80,7 @@ test('una sveglia sola non copre le tre notti raccontate', async ({ app, shell }
 
   // Di sveglie ne esiste una sola: le altre due sere l'utente deve saperlo
   // adesso, non la sera in cui non suona.
-  const sveglie = await app.evaluate(async () => (await globalThis.SN_FILO_MEM.listTimers()).length);
-  expect(sveglie).toBe(1);
+  expect(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers())).toHaveLength(1);
   await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
 });
 
@@ -105,4 +104,27 @@ test('un riassunto consegnato nella risposta non viene buttato né smentito', as
   await expect(page.locator('.dash-bubble-avviso')).toHaveCount(0);
   // …e la risposta non viene cancellata e rifatta: una chiamata al modello sola.
   expect(await chiamate(app)).toBe(1);
+});
+
+test('l\'avviso resta sotto la risposta quando la chat viene ripresa', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { text: 'Ti ho messo la sveglia alle 19:00 per stasera.' },
+    { text: 'Ti ho messo la sveglia alle 19:00 per stasera.' },
+  ]);
+
+  await chiedi(page, 'mettimi una sveglia alle 19 per stasera');
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
+
+  // La chat si riprende da sola a ogni riavvio e a ogni home riaperta: la
+  // frase che dà la sveglia per fatta torna, e deve tornare anche la riga che
+  // dice che non c'è. Senza, chi riapre per controllare legge solo la bugia.
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+  await expect(page.locator('.dash-bubble-filo')).toContainText('Ti ho messo la sveglia alle 19:00');
+  await expect(page.locator('.dash-bubble-avviso')).toHaveCount(1);
 });
