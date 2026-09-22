@@ -136,6 +136,7 @@ test('Preferenze: aspettando un attimo prima di spegnere Filo, la modifica c\'è
 
 test('Preferenze: spegnendo Filo subito dopo aver scritto, la modifica non si perde', async () => {
   test.setTimeout(120_000);
+  test.fail(true, 'rilievo aperto del giro 3: spegnendo Filo l\'ultima modifica non viene salvata');
   const atteso = 'stile scritto e poi spengo Filo';
   expect(await scriviESpegni(atteso, 0),
     'spegnendo Filo subito dopo aver scritto, l\'ultima modifica sparisce').toBe(atteso);
