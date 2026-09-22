@@ -168,7 +168,7 @@
   function ricopiato(pezzo, hay, run) {
     const exposed = exposedAlnum(pezzo);
     if (exposed.length < run) return false;
-    for (let i = 0; i + run <= exposed.length; i += READ_STEP) {
+    for (let i = 0; i + run <= exposed.length; i++) {
       if (hay.includes(exposed.slice(i, i + run))) return true;
     }
     return false;
