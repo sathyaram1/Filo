@@ -46,9 +46,8 @@ function wireWindowCommon(win, tabs) {
     }
   } catch (_) {}
 
-  // Chiudere la finestra distrugge le schede PRIMA che `before-quit` arrivi, e
-  // il congedo dell'uscita non trovava più nessuno: l'ultima modifica scritta
-  // in una pagina interna si perdeva. La regola sta in src/main/congedo.js.
+  // Chiudere la finestra distrugge le schede PRIMA di `before-quit`, e lì il
+  // congedo non trovava più nessuno: l'ultima modifica scritta si perdeva.
   let congedoChiusuraFatto = false;
   win.on('close', (e) => {
     if (congedoChiusuraFatto) return;
