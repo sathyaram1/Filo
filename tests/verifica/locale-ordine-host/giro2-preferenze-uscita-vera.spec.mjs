@@ -64,3 +64,27 @@ test('Preferenze: chiudendo la scheda subito dopo aver scritto, la modifica non 
     })
     .toBe(atteso);
 });
+
+// Stessa uscita, altra pagina: le Opzioni aspettano prima di salvare con lo
+// stesso meccanismo, quindi la stessa chiusura deve reggere anche qui.
+test('Opzioni: chiudendo la scheda subito dopo aver scritto, la modifica non si perde', async ({ app, shell, openTab }) => {
+  const page = await openTab('filo://options/options.html');
+  await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
+  await page.evaluate(() => {
+    const el = document.getElementById('monthlyLimit');
+    el.value = '17';
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  const aperte = await schede(shell);
+  const opz = aperte.find((t) => t.url.includes('options'));
+  expect(opz, 'la scheda delle Opzioni non compare fra quelle aperte').toBeTruthy();
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), opz.id);
+
+  await expect
+    .poll(async () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).monthlyLimitEur), {
+      timeout: 6000,
+      message: 'chiudendo la scheda subito dopo aver scritto, l\'ultima modifica sparisce',
+    })
+    .toBe(17);
+});
