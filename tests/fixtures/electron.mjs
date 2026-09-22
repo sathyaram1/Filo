@@ -155,7 +155,7 @@ export const test = base.extend({
       // Naviga e aspetta che i content script si siano montati: il page-preload
       // imposta data-filo-ready su <html> al termine di start().
       async openReady(openTab, html, opts = {}) {
-        const url = this.html(html);
+        const url = this.html(html, opts);
         const page = await openTab(url);
         await page.waitForFunction(
           () => document.documentElement.dataset.filoReady === '1',
