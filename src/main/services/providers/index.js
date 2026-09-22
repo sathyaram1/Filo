@@ -106,6 +106,9 @@
       apiKey: err.keyUsed || attempt.apiKey,
       model: attempt.model || model,
       generationId: err.generationId,
+      // Chi pagava il tentativo rotto: senza, il suo costo finirebbe sul tetto
+      // di chi paga le chiavi condivise anche quando a pagarlo è l'utente.
+      keySource: err.keySource || '',
     });
   }
 
