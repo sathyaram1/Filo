@@ -69,10 +69,13 @@ test('la risposta di Filo mostra grassetto e link cliccabili; il link interno re
   const bubble = page.locator('.dash-bubble-filo.dash-bubble-md').last();
   await expect(bubble).toBeVisible({ timeout: 8_000 });
   await expect(bubble.locator('strong', { hasText: 'importante' })).toBeVisible();
-  const link = bubble.locator(`a.filo-md-link[href="${linkUrl}"]`);
+  const link = bubble.locator(`a.filo-md-link[data-url="${linkUrl}"]`);
   await expect(link).toBeVisible();
   await expect(link).toHaveText('la fonte');
-  await expect(link).toHaveAttribute('target', '_blank');
+  // Niente `href`: il browser non deve poterlo aprire da sé, con nessun gesto;
+  // ad aprire è sempre il motore (#533, nono giro di verifica).
+  await expect(link).toHaveAttribute('role', 'link');
+  await expect(bubble.locator('a.filo-md-link[href]')).toHaveCount(0);
 
   // (C) il link interno filo:// NON è un <a> (contenuto non fidato), ma il testo
   // "impostazioni" resta visibile.

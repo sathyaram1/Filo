@@ -75,7 +75,7 @@ async function rispostaInBolla(page, userMessage) {
     bolla.innerHTML = self.SN_MARKDOWN.render((r && r.text) || '');
     document.getElementById('bubbles').appendChild(bolla);
     const a = bolla.querySelector('a.filo-md-link');
-    return { href: a ? a.getAttribute('href') : '', titolo: a ? a.getAttribute('title') : '', compito: (r && r.compito) || '' };
+    return { href: a ? a.getAttribute('data-url') : '', titolo: a ? a.getAttribute('title') : '', compito: (r && r.compito) || '' };
   }, userMessage);
 }
 

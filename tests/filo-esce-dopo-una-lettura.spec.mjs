@@ -13,6 +13,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
+import { caricaMarkdown } from './helpers/collegamentoFilo.mjs';
 import { CONFIRM_HOST } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
@@ -151,17 +152,13 @@ test('dentro una pagina web il clic su un collegamento di Filo chiede prima di a
   const page = await openTab(ospite);
   await page.waitForLoadState('domcontentloaded');
 
+  await caricaMarkdown(page);
   await page.evaluate(async (url) => {
     const box = document.createElement('div');
     box.className = 'sn-msg-text';
-    const a = document.createElement('a');
-    a.className = 'filo-md-link';
-    a.setAttribute('href', url);
-    a.setAttribute('title', url);
-    a.textContent = 'Apri la bolletta di marzo';
-    box.appendChild(a);
+    box.innerHTML = self.SN_MARKDOWN.render(`[Apri la bolletta di marzo](${url})`);
     document.body.appendChild(box);
-    a.click();
+    box.querySelector('a.filo-md-link').click();
     await new Promise((res) => setTimeout(res, 2000));
   }, destinazione);
 

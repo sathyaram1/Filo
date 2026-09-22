@@ -43,18 +43,36 @@ test('#418 gli elenchi diventano <ul>/<ol>', () => {
 
 test('#418 un link markdown diventa <a> cliccabile in nuova scheda', () => {
   const html = render('Guarda [Example](https://example.com).');
-  assert.match(html, new RegExp(`<a class="${LINK_CLASS}"[^>]*href="https://example\\.com"`));
-  assert.match(html, /target="_blank"/);
-  assert.match(html, /rel="[^"]*noopener[^"]*"/);
+  assert.match(html, new RegExp(`<a class="${LINK_CLASS}"[^>]*data-url="https://example\\.com"`));
   assert.match(html, />Example<\/a>/);
+});
+
+// #533 (nono giro di verifica) — con un `href` il browser apriva il link da
+// solo col tasto centrale, e quella strada non passava dal motore. L'indirizzo
+// sta in `data-url` e ad aprirlo e' sempre bindLinks.
+test('#533 un link scritto da Filo non ha href: nessun gesto lo apre da solo', () => {
+  const html = render('Guarda [Example](https://example.com) e https://nuda.example/x');
+  assert.doesNotMatch(html, /href=/);
+  assert.doesNotMatch(html, /target=/);
+  assert.match(html, /role="link"/);
+  assert.match(html, /tabindex="0"/);
+});
+
+// Un indirizzo di posta non lo sa valutare nessuno, e consegnarlo al programma
+// di posta gia' compilato da chi ha scritto la pagina e' una via d'uscita.
+test('#533 un mailto: scritto da Filo resta testo, non un link', () => {
+  const html = render('Scrivi a [assistenza](mailto:a@b.com).');
+  assert.doesNotMatch(html, /<a /);
+  assert.match(html, /assistenza/);
+  assert.equal(safeLinkUrl('mailto:a@b.com'), null);
 });
 
 test('#418 un URL nudo http(s) viene reso cliccabile (autolink)', () => {
   const html = render('Fonte: https://foo.com/path?q=1 e stop.');
-  assert.match(html, new RegExp(`<a class="${LINK_CLASS}"[^>]*href="https://foo\\.com/path\\?q=1"`));
-  // La punteggiatura finale non deve entrare nell'href.
+  assert.match(html, new RegExp(`<a class="${LINK_CLASS}"[^>]*data-url="https://foo\\.com/path\\?q=1"`));
+  // La punteggiatura finale non deve entrare nell'indirizzo.
   const html2 = render('Vedi https://foo.com/.');
-  assert.match(html2, /href="https:\/\/foo\.com\/"/);
+  assert.match(html2, /data-url="https:\/\/foo\.com\/"/);
 });
 
 // ─── sicurezza: contenuto NON FIDATO, niente link verso l'interno dell'app ───
@@ -73,10 +91,10 @@ test('#418 javascript:/data:/relativi vengono scartati', () => {
   assert.equal(safeLinkUrl('//evil.com'), null);         // protocol-relative
   assert.equal(safeLinkUrl('file:///etc/passwd'), null);
   assert.equal(safeLinkUrl('filo://dashboard'), null);
-  // Solo http/https/mailto sono ammessi.
+  // Solo http/https sono ammessi.
   assert.equal(safeLinkUrl('https://ok.com'), 'https://ok.com');
   assert.equal(safeLinkUrl('http://ok.com'), 'http://ok.com');
-  assert.equal(safeLinkUrl('mailto:a@b.com'), 'mailto:a@b.com');
+  assert.equal(safeLinkUrl('mailto:a@b.com'), null);
 });
 
 test('#418 l\'HTML nel testo del modello viene neutralizzato (no XSS)', () => {

@@ -19,6 +19,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from '../../fixtures/electron.mjs';
+import { caricaMarkdown } from '../../helpers/collegamentoFilo.mjs';
 import { CONFIRM_HOST } from '../../helpers/confirm.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
@@ -135,19 +136,15 @@ test.describe('#533 giro 8 — le strade che portano fuori da una richiesta che 
     // stessa sorgente di rendering della chat: un collegamento con la scritta
     // scelta dal modello e l'indirizzo pure. Qui si riproduce esattamente
     // quell'ancora, e la si preme.
+    // L'ancora la disegna la sorgente unica del rendering, non questa prova:
+    // costruita a mano proverebbe una forma che Filo può non scrivere più.
+    await caricaMarkdown(page);
     await page.evaluate(async (url) => {
       const box = document.createElement('div');
       box.className = 'sn-msg-text';
-      const a = document.createElement('a');
-      a.className = 'filo-md-link';
-      a.setAttribute('href', url);
-      a.setAttribute('target', '_blank');
-      a.setAttribute('title', url);
-      a.setAttribute('rel', 'noopener noreferrer nofollow');
-      a.textContent = 'Apri la bolletta di marzo';
-      box.appendChild(a);
+      box.innerHTML = self.SN_MARKDOWN.render(`[Apri la bolletta di marzo](${url})`);
       document.body.appendChild(box);
-      a.click();
+      box.querySelector('a.filo-md-link').click();
       await new Promise((res) => setTimeout(res, 2000));
     }, destinazione);
 

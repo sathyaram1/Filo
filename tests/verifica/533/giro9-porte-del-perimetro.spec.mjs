@@ -16,6 +16,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from '../../fixtures/electron.mjs';
+import { caricaMarkdown } from '../../helpers/collegamentoFilo.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
 const NEWTAB = 'filo://newtab/';
@@ -130,18 +131,12 @@ test.describe('#533 giro 9 — quello che esce da una richiesta che ha letto', (
     // L'ancora che il riquadro «Spiega», il popup di risposta e l'assistente
     // Aiuto mostrano: la scritta e l'indirizzo li sceglie il modello, che qui
     // ha già letto la pagina.
+    await caricaMarkdown(page);
     await page.evaluate((url) => {
       const box = document.createElement('div');
       box.className = 'sn-msg-text';
       box.style.cssText = 'position:fixed;top:40px;left:40px;z-index:2147483647;background:#fff;padding:8px';
-      const a = document.createElement('a');
-      a.className = 'filo-md-link';
-      a.setAttribute('href', url);
-      a.setAttribute('target', '_blank');
-      a.setAttribute('title', url);
-      a.setAttribute('rel', 'noopener noreferrer nofollow');
-      a.textContent = 'Apri la bolletta di marzo';
-      box.appendChild(a);
+      box.innerHTML = self.SN_MARKDOWN.render(`[Apri la bolletta di marzo](${url})`);
       document.body.appendChild(box);
     }, destinazione);
 
