@@ -89,6 +89,18 @@
   };
   function rimedio(code) { return RIMEDIO[String(code || '')] || ''; }
 
+  // La risposta d'errore che arriva dal main è un oggetto piatto
+  // ({ error, code, status }). Ricomporla con `new Error(res.error)` perde il
+  // codice, e la frase già scritta per l'utente tornava «qualcosa è andato
+  // storto» (#663): chi mostra un errore venuto dall'IPC passa da qui.
+  function fromResponse(res, fallbackMessage) {
+    const e = new Error(String((res && res.error) || fallbackMessage || ''));
+    if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
+    if (res && Number(res.status) > 0) e.status = Number(res.status);
+    if (res && res.provider) e.provider = res.provider;
+    return e;
+  }
+
   // Errore → proposizione per l'utente. Mai un codice HTTP nudo, mai un nome di
   // endpoint.
   function friendly(e, opts) {
