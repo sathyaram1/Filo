@@ -707,10 +707,13 @@
       } else {
         // Salva il risultato (latenza + token/sec) nella riga e persistilo nel
         // registry, così resta visibile e confrontabile tra le sessioni.
+        // Con la misura si scrive su COSA è stata presa: senza, cambiando
+        // modello quei numeri resterebbero a parlare di un altro.
         row._test = {
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
+          ...configurazioneRiga(row),
         };
         renderRowTest(row);
         save();
