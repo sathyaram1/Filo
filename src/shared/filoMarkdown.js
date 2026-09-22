@@ -51,8 +51,11 @@
 
   function anchor(url, text) {
     // url e text arrivano GIA' escapati (operiamo su testo escapato a monte).
+    // La scritta la sceglie il modello, l'indirizzo pure, e i due non sono
+    // legati da niente: dove porta si deve poter leggere PRIMA di premere, come
+    // per i bottoni della schermata iniziale (#533, settimo giro di verifica).
     return '<a class="' + LINK_CLASS + '" href="' + url + '" target="_blank" '
-      + 'rel="noopener noreferrer nofollow">' + text + '</a>';
+      + 'title="' + url + '" rel="noopener noreferrer nofollow">' + text + '</a>';
   }
 
   // Formattazione inline su testo GIA' escapato: codice, link markdown, autolink
