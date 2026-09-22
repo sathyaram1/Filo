@@ -93,12 +93,15 @@ function rientraDaTuttoSchermo(incognito) {
   }
 }
 
+// Il click sulla notifica deve portare dove si ferma la suoneria, cioè in una
+// finestra NORMALE: una incognito quella scadenza non la vede, e senza nessuna
+// finestra aperta la notifica non porterebbe da nessuna parte.
 function mostraFinestra() {
-  const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
-  if (!win) return;
+  const { assicuraFinestraNormale, revealWindow } = require('../window');
+  const win = assicuraFinestraNormale();
+  if (!win || win.isDestroyed()) return;
   if (win.isMinimized()) win.restore();
-  win.show();
-  win.focus();
+  revealWindow(win);
 }
 
 function start() {
