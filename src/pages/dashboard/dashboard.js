@@ -381,6 +381,15 @@
     return map[icon] || (icon ? icon[0].toUpperCase() : '·');
   }
 
+  // Il disegno vero quando l'insieme delle icone di Filo ce l'ha, la letterina
+  // solo come ultimo ripiego: un suggerimento nato con una «C» accanto era il
+  // primo elemento che un utente nuovo doveva cliccare (#663).
+  function drawSugIcon(el, name) {
+    const svg = typeof self.SN_ICONS?.[name] === 'function' ? self.SN_ICONS[name](20) : '';
+    if (svg) el.innerHTML = svg;
+    else el.textContent = iconLabel(name);
+  }
+
   // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
   // gratis, niente API key, regge i casi mancanti restituendo un'icona
   // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
