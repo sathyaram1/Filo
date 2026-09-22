@@ -63,3 +63,22 @@ test('il campo in uso non viene riscritto sotto le dita', async ({ openTab }) =>
 
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('sto-scrivendo.example');
 });
+
+// Stessa regola sulle protezioni: l'interruttore appena spento è quello che si
+// chiede a Filo di riaccendere, e saltarlo nel riallineamento lo rispegneva al
+// primo altro tocco (#667).
+test('l’interruttore toccato per ultimo segue Filo come tutti gli altri', async ({ openTab }) => {
+  const chat = await openTab('filo://newtab/');
+  const sec = await openTab(PAGINA);
+  await sec.waitForSelector('#sec-block-popups');
+
+  await sec.locator('#sec-block-popups').click();
+  await expect.poll(async () => (await salvate(sec)).blockPopups, { timeout: 8_000 }).toBe(false);
+
+  await confermata(chat, 'blocco_popup', 'sì');
+  await expect(sec.locator('#sec-block-popups')).toBeChecked({ timeout: 8_000 });
+
+  await sec.locator('#sec-adblock').click();
+  await expect.poll(async () => (await salvate(sec)).adblock?.enabled, { timeout: 8_000 }).toBe(false);
+  expect((await salvate(sec)).blockPopups, 'il blocco dei popup resta acceso').toBe(true);
+});

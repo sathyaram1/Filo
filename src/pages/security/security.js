@@ -8,6 +8,7 @@
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
+  const staUsandoAdesso = (el) => !!(Bootstrap && Bootstrap.staUsandoAdesso && Bootstrap.staUsandoAdesso(el));
 
   function $(id) { return document.getElementById(id); }
 
@@ -188,10 +189,9 @@
   // blocco com'era all'apertura: una protezione appena accesa si rispegne da
   // sola (patterns/una-pagina-di-impostazioni-aperta-non-e-una-fotografia.md).
   function applica(settings) {
-    const attivo = document.activeElement;
     const metti = (id, fn) => {
       const el = $(id);
-      if (!el || el === attivo) return;
+      if (!el || staUsandoAdesso(el)) return;
       fn(el);
     };
     const sec = settings.security || {};
@@ -241,7 +241,7 @@
     const cookies = sec.cookies || {};
     const mode = ['manual', 'default', 'privacy'].includes(cookies.mode) ? cookies.mode : 'default';
     const radio = document.querySelector(`input[name="cookie-mode"][value="${mode}"]`);
-    if (radio && radio !== attivo) radio.checked = true;
+    if (radio && !staUsandoAdesso(radio)) radio.checked = true;
     const trusted = cookies.trustedSites || cookies.loginWhitelist;
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
     renderWhitelist();
@@ -250,7 +250,7 @@
     const fp = sec.fingerprint || {};
     const fpMode = ['off', 'default', 'privacy'].includes(fp.mode) ? fp.mode : 'default';
     const fpRadio = document.querySelector(`input[name="fp-mode"][value="${fpMode}"]`);
-    if (fpRadio && fpRadio !== attivo) fpRadio.checked = true;
+    if (fpRadio && !staUsandoAdesso(fpRadio)) fpRadio.checked = true;
 
     // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
     metti('sec-auto-feedback', (el) => { el.checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback; });

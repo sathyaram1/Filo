@@ -571,10 +571,20 @@
     const Tokens = window.SN_THEME_TOKENS;
     if (!R || !Tokens) return null;
     let persistTimer = null;
-    const persist = (overrides) => {
+    // Dal box arriva la fotografia dei token di quando si è aperto: si scrive
+    // il solo token cambiato, sopra lo stato fresco (la mappa si salva intera).
+    const persist = (overrides, token) => {
       clearTimeout(persistTimer);
-      persistTimer = setTimeout(() => {
-        send({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: overrides } });
+      persistTimer = setTimeout(async () => {
+        let themeTokens = { ...overrides };
+        if (token) {
+          let fresco = {};
+          try { fresco = { ...((await self.SN_STORAGE.getSettings()).themeTokens || {}) }; } catch (_) {}
+          if (overrides[token] === undefined) delete fresco[token];
+          else fresco[token] = overrides[token];
+          themeTokens = fresco;
+        }
+        send({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens } });
       }, 200);
     };
     const applyLive = (overrides) => {

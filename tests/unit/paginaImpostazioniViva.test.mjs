@@ -122,7 +122,13 @@ for (const p of PAGINE) {
     );
   });
 
-  test(`${p.nome}: il campo che l'utente sta usando non viene riscritto sotto le dita`, () => {
-    assert.match(riallineo, /document\.activeElement|activeElement/);
+  test(`${p.nome}: si salta solo il controllo che l'utente ha sotto le dita adesso`, () => {
+    assert.match(riallineo, /staUsandoAdesso\(/, `${p.nome} deve usare la regola condivisa, non il fuoco da solo`);
+    const senzaRegola = riallineo.split('\n').filter((r) => !r.includes('staUsandoAdesso(')).join('\n');
+    assert.doesNotMatch(
+      senzaRegola,
+      /activeElement/,
+      'il fuoco resta sull\'ultimo controllo usato: saltarlo per questo lo lascia mostrare il valore vecchio (#667)',
+    );
   });
 }

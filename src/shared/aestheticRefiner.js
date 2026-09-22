@@ -18,7 +18,8 @@
 //   overrides,              // mappa { token: valore } corrente (include il
 //                           //   valore appena messo da Filo)
 //   applyLive(overrides),   // applica live alle superfici, SENZA persistere
-//   persist(overrides),     // persiste (il chiamante può debouncare)
+//   persist(overrides, token), // persiste il solo `token` (il chiamante può
+//                           //   debouncare e fondere con lo stato fresco)
 //   doc,                    // document (default: globalThis.document)
 // }
 
@@ -96,7 +97,9 @@
     const working = { ...startOverrides };
 
     const apply = () => { try { deps.applyLive && deps.applyLive({ ...working }); } catch (_) {} };
-    const save = () => { try { deps.persist && deps.persist({ ...working }); } catch (_) {} };
+    // La mappa qui dentro è la fotografia di quando il box si è aperto: chi
+    // persiste deve sapere quale token scrivere, o cancella gli altri (#667).
+    const save = () => { try { deps.persist && deps.persist({ ...working }, name); } catch (_) {} };
 
     function setValue(rawVal) {
       const v = String(rawVal == null ? '' : rawVal).trim();
@@ -246,7 +249,7 @@
     cancel.addEventListener('click', () => {
       // Ripristina lo stato di apertura (= valore messo da Filo) e persiste.
       try { deps.applyLive && deps.applyLive({ ...startOverrides }); } catch (_) {}
-      try { deps.persist && deps.persist({ ...startOverrides }); } catch (_) {}
+      try { deps.persist && deps.persist({ ...startOverrides }, name); } catch (_) {}
       close();
     });
     footer.appendChild(cancel);

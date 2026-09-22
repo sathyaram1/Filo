@@ -9,6 +9,7 @@
   const { AGENT_STYLE_PRESETS } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
+  const staUsandoAdesso = (el) => !!(Bootstrap && Bootstrap.staUsandoAdesso && Bootstrap.staUsandoAdesso(el));
   const Tokens = window.SN_THEME_TOKENS;
   const TabColor = window.SN_TAB_COLOR;
 
@@ -17,6 +18,7 @@
   function $(id) { return document.getElementById(id); }
 
   let saveTimer = null;
+  let idInCoda = '';
 
   // Indicatore "Salvato": può lampeggiare su più ancore (quella globale a fondo
   // pagina e quella locale della sezione token), così la conferma è visibile
@@ -770,15 +772,15 @@
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
-    riallineaBlocchiAvanzati(settings, attivo && attivo.id ? String(attivo.id) : '');
+    riallineaBlocchiAvanzati(settings);
   }
 
   // Token estetici e colori delle tab hanno un salvataggio loro, che riparte
   // dalla copia letta all'apertura: senza riallineare anche quella, il primo
   // ritocco rimanda indietro ciò che Filo ha appena cambiato a parole.
-  function riallineaBlocchiAvanzati(settings, idAttivo) {
+  function riallineaBlocchiAvanzati(settings) {
     if (!tokensSaveTimer) {
-      const tokenAttivo = idAttivo.startsWith('tok-') ? idAttivo.slice(4) : '';
+      const tokenAttivo = Tokens ? (Tokens.names().find((n) => staUsandoAdesso($(`tok-${n}`))) || '') : '';
       currentOverrides = fondiTenendoIlCampoInUso(settings.themeTokens || {}, currentOverrides, tokenAttivo);
       if (Tokens && $('tok-accent')) {
         for (const name of Tokens.names()) if (name !== tokenAttivo) renderTokenRow(name);
@@ -786,7 +788,8 @@
     }
 
     if (!tabColorSaveTimer) {
-      const paramAttivo = idAttivo.startsWith('tabcol-') ? idAttivo.slice(7) : '';
+      const metaTabCol = (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) ? TabColor.IDENTITY_PARAM_META : [];
+      const paramAttivo = (metaTabCol.find((m) => staUsandoAdesso($(`tabcol-${m.key}`))) || {}).key || '';
       const arrivati = TabColor ? TabColor.clampParams(settings.tabColor || {}) : { ...(settings.tabColor || {}) };
       currentTabColor = fondiTenendoIlCampoInUso(arrivati, currentTabColor, paramAttivo);
       if (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) {
@@ -849,9 +852,12 @@
     flashSaved();
   }
 
-  function persistDebounced() {
+  // `id` è il controllo che ha chiesto il salvataggio: è l'unico che un
+  // messaggio arrivato nel frattempo non deve riallineare.
+  function persistDebounced(id) {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { saveTimer = null; persist(); }, 400);
+    idInCoda = id || '';
+    saveTimer = setTimeout(() => { saveTimer = null; idInCoda = ''; persist(); }, 400);
   }
 
   function buildPresetOptions() {
@@ -999,11 +1005,11 @@
     $('ttsVoice').addEventListener('change', persist);
     $('ttsRate').addEventListener('input', () => {
       $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toFixed(1) + '×';
-      persistDebounced();
+      persistDebounced('ttsRate');
     });
     $('ttsPitch').addEventListener('input', () => {
       $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toFixed(1);
-      persistDebounced();
+      persistDebounced('ttsPitch');
     });
     $('ttsPreview').addEventListener('click', previewTts);
     $('ttsModelPreview').addEventListener('click', previewModelVoice);
@@ -1012,7 +1018,7 @@
       if ($('ttsModelVoice').value === CUSTOM_VOICE) $('ttsModelVoiceCustom').focus();
       else persist();
     });
-    $('ttsModelVoiceCustom').addEventListener('input', persistDebounced);
+    $('ttsModelVoiceCustom').addEventListener('input', () => persistDebounced('ttsModelVoiceCustom'));
 
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
@@ -1041,7 +1047,7 @@
       }
       persist();
     });
-    $('agentStyleText').addEventListener('input', () => { syncPresetSelect(); persistDebounced(); });
+    $('agentStyleText').addEventListener('input', () => { syncPresetSelect(); persistDebounced('agentStyleText'); });
 
     // Token estetici: reset globale ai predefiniti.
     $('resetAllTokens').addEventListener('click', resetAllTokens);

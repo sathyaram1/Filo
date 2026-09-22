@@ -8,6 +8,10 @@
   const Storage = window.SN_STORAGE;
   const ModelChain = window.SN_MODEL_CHAIN;
   const Caps = window.SN_MODEL_CAPS;
+  const staUsandoAdesso = (el) => {
+    const B = window.SN_PAGE_BOOTSTRAP;
+    return !!(B && B.staUsandoAdesso && B.staUsandoAdesso(el));
+  };
 
   // Mappa azione → editor a segmenti della sua catena di modelli (popolata in load()).
   let modelChains = {};
@@ -865,9 +869,13 @@
   }
 
   let saveTimer = null;
-  function saveDebounced() {
+  let idInCoda = '';
+  // `id` è il controllo che ha chiesto il salvataggio: è l'unico che un
+  // messaggio arrivato nel frattempo non deve riallineare.
+  function saveDebounced(id) {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { saveTimer = null; save(); }, 400);
+    idInCoda = typeof id === 'string' ? id : '';
+    saveTimer = setTimeout(() => { saveTimer = null; idInCoda = ''; save(); }, 400);
   }
 
   // Questa pagina risalva TUTTO il modulo a ogni modifica, e le stesse cose si
@@ -877,20 +885,20 @@
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
       if (!$('useDefaultModels')) return;
-      // Un salvataggio già in coda sta per scrivere gli stessi campi:
-      // riallinearli adesso da un messaggio più vecchio glieli farebbe
-      // rimandare indietro com'erano.
-      if (saveTimer) return;
+      // Il solo campo che un messaggio più vecchio non deve toccare è quello
+      // del salvataggio ancora in coda: riallinearlo rimanderebbe indietro il
+      // valore che l'utente sta scegliendo proprio adesso.
+      const inCoda = saveTimer ? idInCoda : '';
       const s = msg.settings;
       const testo = (id, valore) => {
         const el = $(id);
-        if (!el || document.activeElement === el) return;
+        if (!el || id === inCoda || staUsandoAdesso(el)) return;
         const now = String(valore ?? '');
         if (el.value !== now) el.value = now;
       };
       const interruttore = (id, acceso) => {
         const el = $(id);
-        if (!el || document.activeElement === el) return;
+        if (!el || id === inCoda || staUsandoAdesso(el)) return;
         el.checked = acceso;
       };
       if (s.apiKeys) {
@@ -906,7 +914,8 @@
       // nessuno ci sta scrivendo dentro, o si perderebbe quello che sta
       // digitando (patterns/una-pagina-di-impostazioni-aperta-non-e-una-fotografia.md).
       const griglia = $('modelsGrid');
-      const ciScrive = griglia && griglia.contains(document.activeElement);
+      const inComposizione = staUsandoAdesso(document.activeElement) ? document.activeElement : null;
+      const ciScrive = griglia && inComposizione && griglia.contains(inComposizione);
       if (s.models && griglia && !ciScrive
         && JSON.stringify(ModelChain.collect(modelChains || {})) !== JSON.stringify(s.models)) {
         modelChains = ModelChain.renderGrid(griglia, {
@@ -927,7 +936,7 @@
     // Niente pulsante "Salva": ogni modifica viene applicata e persistita
     // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
     // altri (select/checkbox) immediatamente.
-    $('page').addEventListener('change', () => saveDebounced());
+    $('page').addEventListener('change', (ev) => saveDebounced(ev && ev.target ? ev.target.id : ''));
     // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);

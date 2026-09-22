@@ -104,3 +104,22 @@ test('il colore delle schede chiesto a Filo resta anche dopo aver ritoccato un n
   await expect.poll(async () => (await salvate(prefs)).tabColor?.peso_centralita, { timeout: 8_000 }).toBe(6);
   expect((await salvate(prefs)).tabColor.opacita_tab, 'i colori chiesti a Filo restano').toBeCloseTo(0.9, 5);
 });
+
+// Il fuoco resta sull'ultimo controllo usato, che è anche quello su cui si
+// chiede a Filo di cambiare idea: se il riallineamento lo salta, la manopola
+// mostra il valore vecchio e il salvataggio dopo lo rimanda indietro. Col
+// volume della suoneria vuol dire di nuovo il timer muto (#667).
+test('la manopola toccata per ultima segue Filo come tutte le altre', async ({ shell, openTab }) => {
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await prefs.waitForSelector('#timerRingtoneVolume');
+
+  await prefs.locator('#timerRingtoneVolume').fill('0');
+  await expect.poll(async () => (await salvate(prefs)).timerRingtoneVolume, { timeout: 8_000 }).toBe(0);
+
+  await daFuori(shell, 'volume_suoneria', 100);
+  await expect(prefs.locator('#timerRingtoneVolume')).toHaveValue('100', { timeout: 8_000 });
+
+  await prefs.selectOption('#timerRingtone', 'chime');
+  await expect.poll(async () => (await salvate(prefs)).timerRingtone, { timeout: 8_000 }).toBe('chime');
+  expect((await salvate(prefs)).timerRingtoneVolume, 'il volume chiesto a Filo resta quello').toBe(100);
+});
