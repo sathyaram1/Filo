@@ -414,6 +414,14 @@
     return r.top < (vx.innerHeight || 0) && r.bottom > 0 && r.left < (vx.innerWidth || 0) && r.right > 0;
   }
 
+  // Niente di lui arriva all'occhio. L'opacità ha due scritture — la proprietà e il filtro — e sullo schermo
+  // danno lo stesso identico risultato: da quale delle due il sito ha scelto non può dipendere il conto (#505).
+  function isFullyTransparent(cs) {
+    if (parseFloat(cs.opacity) === 0) return true;
+    const f = cs.filter;
+    return !!(f && f !== 'none' && /(?:^|\s)opacity\(\s*0(?:\.0+)?%?\s*\)/.test(f));
+  }
+
   // Sfilato dove non si arriva scorrendo. Ancorato alla finestra è fuori portata da OGNI lato, perché scorrere non lo
   // muove; appoggiato al documento solo sopra e a sinistra, perché sotto e a destra è lui ad allungare l'area (#505).
   function isPushedOutOfPage(el, cs) {
