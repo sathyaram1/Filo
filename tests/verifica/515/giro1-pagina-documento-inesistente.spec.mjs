@@ -22,8 +22,8 @@ test('la barra dice quali sezioni non ci sono ancora', async ({ app, openTab }) 
   const mancanti = previsti.filter((i) => !esistenti.includes(i));
   test.skip(mancanti.length === 0, 'tutte le sezioni hanno il loro documento');
 
-  // Le sezioni scritte sono link; quelle non scritte non lo sono.
-  await expect(page.locator('#nav a.sn-nav-item')).toHaveCount(esistenti.length);
+  // Le sezioni non scritte si distinguono a colpo d'occhio da quelle scritte.
+  await expect(page.locator('#nav a.sn-nav-item')).toHaveCount(esistenti.length + mancanti.length);
   await expect(page.locator('#nav .sn-nav-item.is-soon')).toHaveCount(mancanti.length);
   for (const el of await page.locator('#nav .sn-nav-item.is-soon').all()) {
     await expect(el).toHaveAttribute('title', /arrivo/i);
