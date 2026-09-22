@@ -86,14 +86,13 @@ test('il nome del file è scrivibile su qualunque disco, e non è mai vuoto', ()
 });
 
 // Lo stesso appuntamento riaperto col bottone deve tornare al calendario con lo
-// stesso UID e sullo stesso file: con un'identità nuova il calendario lo prende
-// per un secondo appuntamento e la cena finisce scritta due volte (#567).
+// stesso UID: con un'identità nuova il calendario lo prende per un secondo
+// appuntamento e la cena finisce scritta due volte (#567).
 test('lo stesso evento ha sempre la stessa identità, uno diverso no', () => {
   const uno = C.normalize({ titolo: 'Cena con Anna', data: '2026-10-02', ora: '20:30', durata_min: 90 });
   const bis = C.normalize({ titolo: 'Cena con Anna', data: '2026-10-02', ora: '20:30', durata_min: 90 });
   const altro = C.normalize({ titolo: 'Cena con Anna', data: '2026-10-03', ora: '20:30', durata_min: 90 });
   assert.equal(C.uidPer(uno), C.uidPer(bis));
-  assert.equal(C.fileName(uno), C.fileName(bis));
   assert.notEqual(C.uidPer(uno), C.uidPer(altro));
-  assert.notEqual(C.fileName(uno), C.fileName(altro));
+  assert.match(C.buildIcs(uno, { uid: `${C.uidPer(uno)}@filo` }), new RegExp(`UID:${C.uidPer(uno)}@filo`));
 });
