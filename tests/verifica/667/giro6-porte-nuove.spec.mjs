@@ -8,6 +8,11 @@
 // e un tono delle notifiche scelto mentre il suono è spento.
 
 import { test, expect } from '../../fixtures/electron.mjs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const RADICE = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const azione = (shell, chiave, valore) => shell.evaluate(
   ({ c, v }) => window.filoShell.message({
@@ -124,4 +129,64 @@ test('scegliere a parole il tono delle notifiche lo rende anche udibile', async 
   const dopo = (await impostazioni(shell)).settings.notifications;
   expect(dopo.sound, 'il motivo chiesto è quello salvato').toBe('chime');
   expect(dopo.soundEnabled, 'chiedere un motivo per le notifiche deve anche farle suonare').toBe(true);
+});
+
+// Porta 4: la finestra incognito e la manopola nuova. Chi mette il volume a
+// zero ha chiesto silenzio a Filo, non alla finestra normale: se la finestra
+// incognito ignorasse la manopola, la scadenza chiesta lì dentro suonerebbe a
+// tutto volume proprio a chi aveva scelto di non farsi sentire.
+test('anche in incognito la suoneria rispetta il volume scelto', async ({ app, shell }) => {
+  test.setTimeout(150_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+
+  await azione(shell, 'volume_suoneria', 0);
+
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  const inc = await (async () => {
+    const scadenza = Date.now() + 20_000;
+    while (Date.now() < scadenza) {
+      const w = app.windows().find((p) => { try { return p.url().includes('incognito=1'); } catch (_) { return false; } });
+      if (w) return w;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return null;
+  })();
+  expect(inc, 'la finestra incognito deve potersi aprire').toBeTruthy();
+  await inc.waitForLoadState('domcontentloaded').catch(() => {});
+
+  await spiaVolume(inc);
+  await metti(inc, 'Riso', 3);
+  await expect(inc.locator('#ring-indicator')).toBeVisible({ timeout: 25_000 });
+  await inc.waitForTimeout(2000);
+
+  const muto = await picchi(inc);
+  expect(muto.length, 'a volume zero nemmeno la finestra incognito deve farsi sentire').toBe(0);
+  await expect(inc.locator('#ring-ind-label')).toHaveText('Riso \u2014 scaduto', { timeout: 10_000 });
+
+  // Controprova: alzato il volume, la stessa finestra si fa sentire. Senza
+  // questa, un silenzio per tutt'altro motivo passerebbe per rispetto della
+  // manopola.
+  await azione(shell, 'volume_suoneria', 100);
+  await inc.waitForTimeout(2000);
+  const forte = await picchi(inc);
+  expect(forte.length, 'alzato il volume, la finestra incognito suona').toBeGreaterThan(0);
+  expect(Math.max(...forte)).toBeGreaterThan(0);
+
+  await inc.locator('#ring-indicator').click();
+  await expect(inc.locator('#ring-indicator')).toBeHidden({ timeout: 6_000 });
+});
+
+// Porta 5: l'unica manopola delle Preferenze che a parole non esiste. La
+// sentinella nuova guarda un verso solo — che ogni chiave riconosciuta sia
+// dichiarata al modello — e non l'altro, cioè che ogni manopola della pagina
+// abbia le sue parole. Ne resta fuori la durata delle notifiche.
+test('ogni manopola delle Preferenze si può anche chiedere a parole', async () => {
+  const require_ = createRequire(import.meta.url);
+  const g = globalThis;
+  g.window = g;
+  require_(resolve(RADICE, 'src/shared/preferences.js'));
+  const costruisci = g.SN_PREF.buildPreferencePartial;
+
+  const r = costruisci('durata_notifiche', 10);
+  expect(r, 'la durata delle notifiche dev\'essere chiedibile a parole come le altre').toBeTruthy();
 });
