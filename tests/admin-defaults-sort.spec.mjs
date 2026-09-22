@@ -223,3 +223,27 @@ test('la scelta generale degli host si vede, si cambia e si salva', async ({ ope
     return u && u.config ? (u.config.providerSort ?? null) : null;
   }), { timeout: 8_000 }).toBe('');
 });
+
+// Le sette colonne della riga hanno tutte una misura: la stringa del modello è
+// l'unica elastica, e senza un minimo si riduceva a una fessura mentre i
+// pulsanti uscivano dallo schermo appena la finestra non era larga.
+test('a finestra stretta la riga resta usabile: la stringa del modello si legge e i pulsanti restano dentro', async ({ openTab }) => {
+  const page = await openEditor(openTab);
+  const misure = [];
+  for (const larghezza of [1280, 1024, 900, 800, 720]) {
+    await page.setViewportSize({ width: larghezza, height: 800 });
+    await page.waitForTimeout(150);
+    misure.push(await page.evaluate((w) => {
+      const riga = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+      const campo = riga.querySelector('.sn-model-id');
+      const ultimo = Array.from(riga.querySelectorAll('button')).pop();
+      return {
+        larghezza: w,
+        campoModello: Math.round(campo.getBoundingClientRect().width),
+        oltreLoSchermo: Math.round(ultimo.getBoundingClientRect().right - document.documentElement.clientWidth),
+      };
+    }, larghezza));
+  }
+  const rotte = misure.filter((m) => m.campoModello < 60 || m.oltreLoSchermo > 0);
+  expect(rotte, `larghezze in cui la riga non è più usabile: ${JSON.stringify(misure)}`).toEqual([]);
+});
