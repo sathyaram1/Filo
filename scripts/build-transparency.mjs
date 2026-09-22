@@ -520,6 +520,11 @@ function main() {
     const page = emitSitePage(doc, built, css);
     for (const dir of siteDirs) outputs.push([join(dir, `${doc.id}.html`), page]);
   }
+  for (const voce of buildNav(built.docs)) {
+    if (built.docs.some((d) => d.id === voce.id)) continue;
+    const page = emitSiteSoonPage(voce, built, css);
+    for (const dir of siteDirs) outputs.push([join(dir, `${voce.id}.html`), page]);
+  }
 
   let stale = 0;
   // Il confronto ignora i fine-riga. Il generatore scrive sempre LF, ma git su
