@@ -748,7 +748,6 @@
     set('notifSoundEnabled', (el) => { el.checked = notif.soundEnabled === true; });
     opzione('notifSound', notif.sound || 'default', 'default');
     set('notifSoundVolume', () => caricaVolume('notifSoundVolume', notif.soundVolume));
-    sincronizzaSuonoNotifiche();
 
     opzione('timerRingtone', settings.timerRingtone || 'default', 'default');
     set('timerRingtoneVolume', () => caricaVolume('timerRingtoneVolume', settings.timerRingtoneVolume));
@@ -884,7 +883,6 @@
     const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
     $('notifSound').value = nsOpt ? notifSound : 'default';
     caricaVolume('notifSoundVolume', notif.soundVolume);
-    sincronizzaSuonoNotifiche();
 
     // Suoneria timer
     const ringtone = settings.timerRingtone || 'default';
@@ -984,7 +982,7 @@
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
     $('notifDuration').addEventListener('blur', canonNotifDuration);
-    $('notifSoundEnabled').addEventListener('change', () => { sincronizzaSuonoNotifiche(); persist(); });
+    $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
     $('notifSoundVolume').addEventListener('input', () => mostraVolume('notifSoundVolume'));
     $('notifSoundVolume').addEventListener('change', persist);
