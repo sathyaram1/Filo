@@ -5751,8 +5751,7 @@
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || fsMenu) return;
       if (!mgFsDrill || mgFsDrill.hidden || !fsPannelloAperto()) return;
-      fsDrill = null;
-      renderFsDrill();
+      fsChiudiDrill();
     }, true);
 
     // Tasto destro: «voglio fare qualcosa qui».
