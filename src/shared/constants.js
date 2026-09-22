@@ -1005,14 +1005,20 @@
       && uguale(normalizeProviderSort(misura.sort), normalizeProviderSort(v.sort));
   }
 
+  // L'ordinamento con cui una voce chiama DAVVERO: il suo, o quello generale
+  // finché resta su «Automatico». Le pagine lo chiedono qui invece di rifare la
+  // regola: una misura vale per l'ordine in vigore, non per metà di esso. PURA.
+  function ordinamentoEffettivo(entrySort, sceltaGenerale) {
+    // Anche la scelta generale passa dalla normalizzazione: scritta a mano nella
+    // config condivisa, una maiuscola o uno spazio la facevano sparire in silenzio.
+    return normalizeProviderSort(entrySort) || normalizeProviderSort(sceltaGenerale);
+  }
+
   // Istruzioni di routing per una chiamata al router. L'ordinamento della voce
   // vince su quello globale; `ignore` non dipende mai dall'ordinamento. PURA.
   function providerRoutingFor(settings, entrySort) {
     const ignore = providerIgnoreList((settings && settings.excludedProviders) || []);
-    // Anche la scelta generale passa dalla normalizzazione: scritta a mano nella
-    // config condivisa, una maiuscola o uno spazio la facevano sparire in silenzio.
-    const globalSort = normalizeProviderSort(settings && settings.providerSort);
-    const sort = normalizeProviderSort(entrySort) || globalSort;
+    const sort = ordinamentoEffettivo(entrySort, settings && settings.providerSort);
     if (!ignore.length && !sort) return null;
     const routing = {};
     if (ignore.length) routing.ignore = ignore;
