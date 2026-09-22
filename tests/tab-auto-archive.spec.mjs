@@ -7,14 +7,20 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+// Le schede di questi casi stanno su un host PUBBLICO (mappato sul loopback
+// dalla fixture): il riordino automatico manda al modello indirizzo, titolo ed
+// estratto di ogni scheda che prende, e dalla rete di casa sta alla larga
+// (#591, ottavo giro di verifica).
+const FUORI_CASA = { host: 'blocked.test' };
+
 const mk = (title, color, h = 1500) =>
   `<!doctype html><html><head><title>${title}</title>${color ? `<meta name="theme-color" content="${color}">` : ''}</head>`
   + `<body style="margin:0"><div style="height:${h}px;background:#fff"></div></body></html>`;
 
 test('runAutoTriage archivia le tab decise, tiene la attiva e mostra il toast', async ({ app, shell, openTab, testServer }) => {
-  await testServer.openReady(openTab, mk('Alpha', 'rgb(200,40,40)'));
-  await testServer.openReady(openTab, mk('Bravo', 'rgb(40,80,200)'));
-  await testServer.openReady(openTab, mk('Charlie', '')); // ultima → attiva
+  await testServer.openReady(openTab, mk('Alpha', 'rgb(200,40,40)'), FUORI_CASA);
+  await testServer.openReady(openTab, mk('Bravo', 'rgb(40,80,200)'), FUORI_CASA);
+  await testServer.openReady(openTab, mk('Charlie', ''), FUORI_CASA); // ultima → attiva
 
   // Attendi che lo stato sia assestato: tutte e tre presenti e Charlie attiva.
   await expect.poll(async () => shell.evaluate(async () => {
@@ -63,7 +69,7 @@ test('runAutoTriage archivia le tab decise, tiene la attiva e mostra il toast', 
 });
 
 test('riaprire una scheda dall’archivio ripristina la posizione di scroll', async ({ app, shell, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, mk('Lunga', '', 4000));
+  const page = await testServer.openReady(openTab, mk('Lunga', '', 4000), FUORI_CASA);
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
 
   // Scrolla in fondo → scrollPct alto.
@@ -100,7 +106,7 @@ test('il riordino collassa le home duplicate e chiude le impostazioni (feedback 
   // home/impostazioni). Ora: le home duplicate si collassano da sole e
   // l'impostazione la archivia l'LLM; il sito web resta se l'LLM dice "keep".
   // (Al boot Filo apre già una home; qui ne aggiungiamo altre → home duplicate.)
-  await testServer.openReady(openTab, mk('Sito', 'rgb(40,80,200)'));
+  await testServer.openReady(openTab, mk('Sito', 'rgb(40,80,200)'), FUORI_CASA);
   await openTab('filo://newtab/');            // home extra
   await openTab('filo://options/options.html'); // impostazioni
   await openTab('filo://newtab/');            // home extra (diventa attiva)
@@ -150,8 +156,8 @@ test('il riordino collassa le home duplicate e chiude le impostazioni (feedback 
 });
 
 test('l’agente può lanciare la pulizia su richiesta (RUN_TAB_TRIAGE)', async ({ app, shell, openTab, testServer }) => {
-  await testServer.openReady(openTab, mk('Uno', 'rgb(200,40,40)'));
-  await testServer.openReady(openTab, mk('Due', 'rgb(40,80,200)'));
+  await testServer.openReady(openTab, mk('Uno', 'rgb(200,40,40)'), FUORI_CASA);
+  await testServer.openReady(openTab, mk('Due', 'rgb(40,80,200)'), FUORI_CASA);
   // La pagina dalla quale parte la richiesta (impostazioni) diventa attiva e
   // interna. Usiamo options (istanza unica, non la home che al boot è già aperta
   // e verrebbe collassata come duplicata): la pagina attiva è sempre protetta,
