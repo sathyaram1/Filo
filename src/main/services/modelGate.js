@@ -190,11 +190,18 @@
   // stanno qui, dove stanno per tutti.
   // `costoUsd` può essere un numero o una funzione del risultato: quanto è
   // costata davvero quella chiamata (zero per un ripiego gratuito).
-  async function service({ settings, action, provider, run, costoUsd }) {
-    await ensureUnderLimit(settings);
+  // `senzaTetto` è per i servizi che NON si pagano: fermarli col mese esaurito
+  // non risparmia niente e spegne quello che sanno fare. Passano di qui lo
+  // stesso, perché il cancello resta l'unica porta verso un fornitore. Se poi
+  // una chiamata dichiarata gratuita costa davvero, è un errore e si sente.
+  async function service({ settings, action, provider, run, costoUsd, senzaTetto }) {
+    if (!senzaTetto) await ensureUnderLimit(settings);
     const result = await run();
     let usd = typeof costoUsd === 'function' ? costoUsd(result) : costoUsd;
     usd = Number(usd);
+    if (senzaTetto && Number.isFinite(usd) && usd > 0) {
+      throw new Error(`SN_MODEL_GATE: "${action}" è dichiarato gratuito ma è costato ${usd} USD: o paga, e allora rispetta il tetto, o non costa`);
+    }
     if (Number.isFinite(usd) && usd > 0) {
       const C = costs();
       if (C) {
