@@ -1211,6 +1211,9 @@
         : (CE ? CE.sentence(err) : raw);
       assistantEl = appendChatMessage('assistant', errText);
       assistantEl.classList.add('sn-sidebar-msg-error');
+      // La frase nomina la pagina dove si rimedia; da un sito qualunque
+      // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
+      mostraRimedio(assistantEl, err && err.code);
       // In caso d'errore, se l'utente aveva la chat collassata e questo è
       // un proseguimento automatico, ripristina lo stato precedente.
       if (wasCollapsed && !userMessage) collapse({ ai: false });

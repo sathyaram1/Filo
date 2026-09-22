@@ -120,7 +120,7 @@
   border-radius: 999px;
   color: var(--sn-fg);
   font-size: 12px;
-  transition: background var(--sn-anim-fast, 120ms) ease;
+  transition: background 120ms ease;
 }
 .sn-msg-rimedio:hover { background: var(--sn-hover); }
 
