@@ -140,3 +140,21 @@ test('Preferenze: la conferma «Salvato» non resta accesa su una modifica prece
   const accesaSubito = await page.locator('#savedHint').evaluate((el) => el.classList.contains('sn-show'));
   expect(accesaSubito, 'la conferma «Salvato» resta accesa mentre l\'ultima modifica non è ancora salvata').toBe(false);
 });
+
+test('Opzioni: la conferma «Salvato» sparisce appena arriva un\'altra modifica', async ({ openTab }) => {
+  const page = await openTab(OPZIONI);
+  await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
+
+  const cambia = async (valore) => page.evaluate((v) => {
+    const el = document.getElementById('monthlyLimit');
+    el.value = String(v);
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, valore);
+
+  await cambia(7);
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 5_000 });
+
+  await cambia(9);
+  const accesaSubito = await page.locator('#savedHint').evaluate((el) => el.classList.contains('sn-show'));
+  expect(accesaSubito, 'la conferma resta accesa mentre l\'ultima modifica non è salvata').toBe(false);
+});

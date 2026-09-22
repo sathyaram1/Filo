@@ -77,7 +77,7 @@ test('Modelli predefiniti: la scelta si salva e si toglie', async ({ openTab }) 
 
   // Si mette su chi non l'aveva…
   await righe.nth(1).locator('.sn-model-sort').selectOption('latency');
-  await page.locator('#save').click();
+  await page.locator('#saveBtn').click();
   await expect.poll(async () => page.evaluate(() => {
     const u = window.__inviati.filter((m) => m.type === 'defaults_update').pop();
     return u && u.config && u.config.modelRegistry && u.config.modelRegistry.normale
@@ -86,7 +86,7 @@ test('Modelli predefiniti: la scelta si salva e si toglie', async ({ openTab }) 
 
   // …e si toglie a chi ce l'aveva: ciò che si aggiunge si deve poter togliere.
   await righe.nth(0).locator('.sn-model-sort').selectOption('auto');
-  await page.locator('#save').click();
+  await page.locator('#saveBtn').click();
   await expect.poll(async () => page.evaluate(() => {
     const u = window.__inviati.filter((m) => m.type === 'defaults_update').pop();
     const v = u && u.config && u.config.modelRegistry && u.config.modelRegistry.veloce;
@@ -112,4 +112,26 @@ test('Modelli predefiniti: la scelta si vede anche col tema scuro', async ({ ope
     .toBeGreaterThanOrEqual(reason.x + reason.width - 1);
 
   await page.screenshot({ path: 'tests/.shots/ordine-host-modelli-predefiniti-scuro.png', fullPage: true }).catch(() => {});
+});
+
+test('Modelli predefiniti: le intestazioni stanno sopra la colonna che descrivono', async ({ openTab }) => {
+  const page = await apriEditor(openTab);
+  const misura = await page.evaluate(() => {
+    const testa = document.querySelector('#modelRegistryList .sn-model-row-head');
+    const riga = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+    const celle = Array.from(testa.children).map((c) => ({ testo: c.textContent.trim(), x: c.getBoundingClientRect().x }));
+    const box = (sel) => {
+      const r = riga.querySelector(sel).getBoundingClientRect();
+      return { x: r.x, fine: r.x + r.width };
+    };
+    return { celle, reason: box('.sn-model-reason'), sort: box('.sn-model-sort') };
+  });
+  const etichetta = (t) => misura.celle.find((c) => c.testo.toLowerCase() === t);
+  const host = etichetta('host');
+  const reasoning = etichetta('reasoning');
+  expect(host && reasoning, 'intestazioni non trovate').toBeTruthy();
+  expect(reasoning.x, `«reasoning» è scritto sopra un'altra colonna (scritta a ${reasoning.x}, controllo da ${misura.reason.x} a ${misura.reason.fine})`)
+    .toBeLessThan(misura.reason.fine);
+  expect(host.x, `«host» è scritto sopra un'altra colonna (scritta a ${host.x}, controllo da ${misura.sort.x} a ${misura.sort.fine})`)
+    .toBeGreaterThanOrEqual(misura.sort.x - 4);
 });
