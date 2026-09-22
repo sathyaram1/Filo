@@ -39,6 +39,10 @@
     // una richiesta che ha letto roba scritta da altri quel bottone nasce solo
     // se l'utente l'aveva chiesto (#533, sesto giro di verifica).
     file: { label: 'aprire un file del tuo computer' },
+    // Un evento prepara un file e un bottone che lo consegna al calendario di
+    // sistema: il titolo e i dettagli li scrive il modello, e finiscono in un
+    // programma fuori da Filo. Non è più una proposta a costo zero.
+    calendario: { label: 'aggiungere eventi al tuo calendario' },
     impostazioni: { label: 'cambiare le impostazioni di Filo' },
     // Scrivere come Filo deve parlare non è cambiare un'impostazione: quel
     // testo entra in cima a OGNI richiesta futura, presentato come una cosa
