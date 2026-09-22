@@ -121,6 +121,9 @@
       if (validate) { const v = validate(value); if (!v.ok) return; }
       input.value = value;
       fit();
+      // Scegliere dalla tendina è scrivere: senza questo evento chi ascolta il
+      // campo (una misura che vale per quel modello) non si accorge del cambio.
+      try { input.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
       onPick(value);
       close();
       input.focus();
