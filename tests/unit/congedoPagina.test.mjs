@@ -45,7 +45,21 @@ test('la pagina viene avvisata e la sua risposta sblocca subito la chiusura', as
   assert.deepEqual(wc.inviati, [CANALE_AVVISO]);
   rispondi(CANALE_RISPOSTA, wc);
   await attesa;
-  assert.equal(ascoltatori.get(CANALE_RISPOSTA)?.size || 0, 0, 'ascoltatore non rimosso');
+});
+
+// «Chiudi tutto» congeda una scheda per volta: con un ascoltatore ciascuna,
+// sopra la decina Node avvisa di una perdita di memoria che qui non c'è.
+test('un solo ascoltatore per quante attese si aprano', async () => {
+  const pagine = [];
+  const attese = [];
+  for (let i = 0; i < 20; i++) {
+    const wc = fintaPagina();
+    pagine.push(wc);
+    attese.push(congedaPagina(wc, { tetto: 5000 }));
+  }
+  assert.equal(ascoltatori.get(CANALE_RISPOSTA)?.size || 0, 1);
+  for (const wc of pagine) rispondi(CANALE_RISPOSTA, wc);
+  await Promise.all(attese);
 });
 
 test('la risposta di un\'altra pagina non conta', async () => {
