@@ -74,6 +74,32 @@
     } catch (_) { return ''; }
   }
 
+  // Esadecimale: la trasformazione più a portata di mano per chi vuole che i
+  // dati non SOMIGLINO più ai dati. Come per base64, si accetta solo se ne esce
+  // testo stampabile, quindi un identificativo qualunque non produce falsi
+  // allarmi: senza questo i dati della memoria uscivano travestiti (#553).
+  function tryHex(tok) {
+    if (tok.length < 16 || tok.length % 2 === 1 || !/^[0-9a-fA-F]+$/.test(tok)) return '';
+    let out = '';
+    let printable = 0;
+    for (let i = 0; i < tok.length; i += 2) {
+      const c = parseInt(tok.slice(i, i + 2), 16);
+      out += String.fromCharCode(c);
+      if (c >= 32 && c < 127) printable++;
+    }
+    return printable / (tok.length / 2) > 0.85 ? out : '';
+  }
+
+  // Lettere spostate di tredici: l'altra trasformazione che si chiede a parole,
+  // senza strumenti. Costa una riga e non può produrre un falso allarme, perché
+  // il confronto resta «ci sono dentro i dati dell'utente».
+  function rot13(s) {
+    return String(s || '').replace(/[a-zA-Z]/g, (c) => {
+      const base = c <= 'Z' ? 65 : 97;
+      return String.fromCharCode(((c.charCodeAt(0) - base + 13) % 26) + base);
+    });
+  }
+
   // Tutto il testo "esposto" da un URL: stringa grezza + urldecode (anche doppio)
   // + decodifica dei segmenti base64 lunghi. Lo restituiamo normalizzato in sola
   // forma alfanumerica minuscola, così "Mario_Rossi", "mario.rossi" e
@@ -99,6 +125,14 @@
         if (b) pieces.push(b);
       }
     }
+    // Le corse di sole cifre esadecimali si cercano a parte: dentro un
+    // sottodominio o attaccate a un separatore che il taglio qui sopra non
+    // riconosce, un blocco esadecimale non sarebbe mai un token intero.
+    for (const tok of joined.split(/[^0-9a-fA-F]+/)) {
+      const h = tryHex(tok);
+      if (h) pieces.push(h);
+    }
+    pieces.push(rot13(joined));
     return pieces.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
   }
 

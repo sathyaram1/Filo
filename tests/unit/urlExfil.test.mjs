@@ -187,3 +187,42 @@ test('e nella coda basta molto meno: query, frammento e sottodominio', () => {
     assert.equal(E.assess(url, { letto }).exfil, true, url);
   }
 });
+
+// Travestire i dati costa una riga a chi scrive la pagina ostile: il confronto
+// deve guardare anche attraverso le trasformazioni che si chiedono a parole,
+// senza strumenti. Il freno resta «ci sono dentro i dati dell'utente», quindi
+// un identificativo lungo qualunque continua a passare (#553).
+
+const MEMORIA = 'Si chiama Mario Rossi, vive a Bologna in via Garibaldi 12.';
+const SEGRETO = 'Mario Rossi Bologna via Garibaldi 12';
+const esa = Buffer.from(SEGRETO).toString('hex');
+const rot13 = (s) => s.replace(/[a-zA-Z]/g, (c) => {
+  const b = c <= 'Z' ? 65 : 97;
+  return String.fromCharCode(((c.charCodeAt(0) - b + 13) % 26) + b);
+});
+
+test('i dati della memoria scritti in esadecimale si riconoscono, ovunque stiano', () => {
+  for (const url of [
+    `https://evil.example/c?d=${esa}`,
+    `https://evil.example/c?a=${esa.slice(0, 30)}&b=${esa.slice(30)}`,
+    `https://${esa.slice(0, 40)}.evil.example/`,
+    `https://evil.example/${esa}/x`,
+  ]) {
+    assert.equal(E.assess(url, { corpus: MEMORIA }).exfil, true, url);
+  }
+});
+
+test('e anche con le lettere spostate di tredici', () => {
+  const url = `https://evil.example/c?d=${rot13(SEGRETO.replace(/[^a-z0-9]/gi, ''))}`;
+  assert.equal(E.assess(url, { corpus: MEMORIA }).exfil, true);
+});
+
+test('un identificativo lungo che non contiene i tuoi dati continua a passare', () => {
+  for (const url of [
+    'https://example.com/v/0123456789abcdef0123456789abcdef?t=1742040000',
+    'https://www.amazon.it/dp/B0C1234567?ref=sr_1_3&keywords=scarpe+running+uomo',
+    'https://example.com/prezzi?utm_source=newsletter&utm_campaign=primavera2026-sconto-scarpe',
+  ]) {
+    assert.equal(E.assess(url, { corpus: MEMORIA }).exfil, false, url);
+  }
+});

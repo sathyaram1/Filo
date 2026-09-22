@@ -1113,6 +1113,20 @@ function copiaVisibile(tetto) {
           var n = el.tagName;
           if (n === 'SCRIPT' || n === 'STYLE' || n === 'NOSCRIPT' || n === 'TEMPLATE') continue;
           if (!visibile(el)) { cl.remove(); continue; }
+          // Il testo che un componente tiene nel proprio guscio: la copia
+          // dell'albero non se lo porta dietro, e spariva senza lasciare
+          // traccia. Solo dove il guscio è tutto il contenuto dell'elemento:
+          // se l'elemento ha figli suoi, il guscio li rimette in mostra e
+          // portarli tutti e due vorrebbe dire scriverli due volte.
+          var sr = null;
+          try { sr = el.shadowRoot; } catch (e) { sr = null; }
+          if (sr && el.children.length === 0) {
+            var dentro = document.createElement('div');
+            for (var s2 = 0; s2 < sr.children.length; s2++) dentro.appendChild(sr.children[s2].cloneNode(true));
+            giu(sr, dentro);
+            while (dentro.firstChild) cl.appendChild(dentro.firstChild);
+            continue;
+          }
           giu(el, cl);
         }
       };

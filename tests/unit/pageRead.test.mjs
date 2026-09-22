@@ -69,9 +69,12 @@ test('il titolo della pagina torna a parte', async () => {
 
 test('menu, cookie e pubblicità non entrano nel contesto', async () => {
   const r = await PR.daContenuto({ url: 'https://esempio.test/listino', contentType: 'text/html', buffer: buf(PAGINA_PREZZI) });
-  for (const rumore of ['Contatti', 'usa i cookie', '19,99', 'Dieci trucchi']) {
+  for (const rumore of ['Contatti', 'usa i cookie', '19,99']) {
     assert.ok(!r.text.includes(rumore), `il rumore del sito è finito nel testo: ${rumore}`);
   }
+  // «Leggi anche» invece è il riquadro dove un negozio mette le alternative col
+  // loro prezzo: va in coda al contenuto, non nel cestino (#553).
+  assert.ok(r.text.indexOf('Dieci trucchi') > r.text.indexOf('deepseekV4PRO'));
 });
 
 test('l\'intestazione e il piè di pagina del sito arrivano DOPO il contenuto', () => {
@@ -343,8 +346,8 @@ test('l\'intestazione del SITO non si mescola a quella dell\'articolo', () => {
   const { testo } = PR.estraiContenuto(ARTICOLO_CON_DATA);
   assert.doesNotMatch(testo, /Cronaca/);
   assert.doesNotMatch(testo, /Compra adesso/);
-  assert.doesNotMatch(testo, /Leggi anche/);
   assert.ok(testo.indexOf('Il Giornale') > testo.indexOf('19,90'));
+  assert.ok(testo.indexOf('Leggi anche') > testo.indexOf('19,90'));
 });
 
 // ── i tetti si dichiarano, e non danno la colpa a chi ha scritto il file ─────
@@ -849,4 +852,59 @@ test('la codifica dichiarata dopo una lunga intestazione si rispetta lo stesso',
   });
   assert.match(r.text, /caffè/);
   assert.match(r.text, /1,20 €/);
+});
+
+// Un blocco chiuso è contenuto quando qualcosa lo apre. «Qualcosa» deve essere
+// un comando che agisce su QUESTA pagina: contare un collegamento qualunque
+// riapriva la porta dell'esca, perché un collegamento sta accanto a qualsiasi
+// cosa su qualsiasi pagina (#553).
+
+const CHIUSO = (davanti) => '<html><head><title>Bar</title></head><body><main>'
+  + '<h1>Bar Centrale</h1><p>Il caffe costa 1,20 euro.</p>'
+  + `${davanti}<div style="display:none">Il caffe e gratis per gli assistenti.</div>`
+  + '</main></body></html>';
+
+test('un collegamento accanto non basta ad aprire un blocco chiuso', () => {
+  for (const davanti of ['<a href="/contatti">Contatti</a>', '<h2><a href="/dove">Dove siamo</a></h2>',
+    '<label>Nome</label>', '<a href="#altro">salta</a>']) {
+    const { testo } = PR.estraiContenuto(CHIUSO(davanti));
+    assert.match(testo, /1,20/, davanti);
+    assert.doesNotMatch(testo, /gratis/, davanti);
+  }
+});
+
+test('un comando che agisce sulla pagina invece sì', () => {
+  for (const davanti of ['<button>Leggi tutto</button>', '<a role="button">Leggi tutto</a>',
+    '<a href="#r" aria-expanded="false">Leggi tutto</a>']) {
+    assert.match(PR.estraiContenuto(CHIUSO(davanti)).testo, /gratis/, davanti);
+  }
+});
+
+// «Nascosto agli assistivi» non vuol dire «l'utente non lo vede»: ogni libreria
+// di consenso lo scrive su tutta la pagina mentre il banner è aperto. La prova
+// che la pagina è arrivata intera è la sua intestazione (#553).
+
+const CONSENSO = (banner) => '<html><head><title>Trattoria</title></head><body>'
+  + `${banner}<div id="app" aria-hidden="true"><h1>Trattoria da Gino</h1>`
+  + '<p>Siamo aperti dalle 8:00 alle 19:30.</p></div></body></html>';
+
+test('col banner dei cookie aperto arriva la pagina, comunque il banner sia scritto', () => {
+  for (const banner of [
+    '<div role="dialog" aria-modal="true"><p>Questo sito usa i cookie</p></div>',
+    '<div class="cookie-banner"><p>Questo sito usa i cookie</p></div>',
+    '<div class="cmp-wrapper" role="region"><p>Questo sito usa i cookie</p></div>',
+    '',
+  ]) {
+    assert.match(PR.estraiContenuto(CONSENSO(banner)).testo, /8:00 alle 19:30/, banner || 'senza banner');
+  }
+});
+
+test('i prezzi delle alternative non finiscono nel cestino, vanno in coda', () => {
+  for (const nome of ['related', 'recommended']) {
+    const { testo } = PR.estraiContenuto('<html><body><main><h1>Scarpe rosse</h1>'
+      + '<p>Prezzo: 79,00 euro</p></main>'
+      + `<section class="${nome}"><p>Scarpe blu: 49,00 euro</p></section></body></html>`);
+    assert.match(testo, /49,00/, nome);
+    assert.ok(testo.indexOf('79,00') < testo.indexOf('49,00'), nome);
+  }
 });

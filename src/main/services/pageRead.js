@@ -61,13 +61,13 @@ const TAG_CORNICE = new Set(['header', 'footer', 'aside']);
 // acconsentire, condividere, pubblicizzare, impaginare, rimandare ad altre
 // pagine. Un nome che indica un CONTENITORE il sito lo riempie di quello che
 // vuole, quindi non decide niente e va in coda (#553).
-const TOKEN_RUMORE = /^(nav|navbar|navigation|menubar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|related|related-?posts|recommended|skip-?link|screen-?reader-?text|sr-only|visually-hidden|toolbar|search-?form)$/i;
+const TOKEN_RUMORE = /^(nav|navbar|navigation|menubar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|skip-?link|screen-?reader-?text|sr-only|visually-hidden|toolbar|search-?form)$/i;
 
 // Contorno che può contenere il dato chiesto, quindi va in coda e non nel
 // cestino: l'orario sta nel piè di pagina, il prezzo scontato nel «promo», il
 // listino di una trattoria nel riquadro chiamato «menu». Qui stanno anche i
 // nomi che i programmi per fare siti scrivono da soli (#553).
-const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero|header|site-?header|page-?header|masthead|footer|site-?footer|page-?footer|colophon|topbar|top-?bar|bottom-?bar|menu|modal|popup|overlay|subscription|subscribe|paywall)$/i;
+const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero|header|site-?header|page-?header|masthead|footer|site-?footer|page-?footer|colophon|topbar|top-?bar|bottom-?bar|menu|modal|popup|overlay|subscription|subscribe|paywall|related|related-?posts|recommended)$/i;
 
 const ROLE_RUMORE = /^(navigation|search|dialog|alertdialog|menu|menubar|toolbar)$/i;
 
@@ -313,13 +313,13 @@ function attributi(raw) {
 function daScartare(nome, attrs, opzioni = {}) {
   const {
     inZona = false, primoLivello = false, soloIlleggibile = false,
-    apribile = false, conModale = false,
+    apribile = false, ignoraAria = false,
   } = opzioni;
   if (TAG_ILLEGGIBILI.has(nome)) return 'illeggibile';
   if (nascostoInline(attrs.style)) return 'illeggibile';
   // Piegato: si butta solo se sulla pagina non c'è niente che lo apra.
   const piegato = ('hidden' in attrs)
-    || (!conModale && String(attrs['aria-hidden'] || '').toLowerCase() === 'true')
+    || (!ignoraAria && String(attrs['aria-hidden'] || '').toLowerCase() === 'true')
     || piegatoInline(attrs.style);
   if (piegato && !apribile) return 'illeggibile';
   if (soloIlleggibile) return false;
@@ -379,19 +379,14 @@ function decodeEntita(s) {
 }
 
 /**
- * Cosa dice la pagina di sé, in un giro solo: quali blocchi qualcuno apre, e
- * se c'è una finestra aperta sopra. PURA.
+ * Cosa dice la pagina di sé, in un giro solo: quali blocchi qualcuno apre. PURA.
  *
  * `apribili` sono gli id nominati da un comando che non è a sua volta
  * nascosto: è l'interruttore che distingue un contenuto piegato da un'esca.
- * `modale` conta perché con una finestra aperta ogni libreria di consenso
- * marca TUTTO il resto della pagina come nascosto agli assistivi, e quel resto
- * è il contenuto del sito (#553).
  */
 function indiziPagina(html) {
   const src = String(html == null ? '' : html);
   const apribili = new Set();
-  let modale = false;
   let i = 0;
   for (;;) {
     const t = prossimoTag(src, i);
@@ -399,10 +394,6 @@ function indiziPagina(html) {
     i = t.fine;
     if (t.salta || t.chiusura) continue;
     const a = attributi(t.attrsRaw);
-    const ruolo = String(a.role || '').toLowerCase();
-    if (ruolo === 'dialog' || ruolo === 'alertdialog'
-      || String(a['aria-modal'] || '').toLowerCase() === 'true'
-      || (t.nome === 'dialog' && 'open' in a)) modale = true;
     if (nascostoInline(a.style) || piegatoInline(a.style) || 'hidden' in a) continue;
     for (const chiave of ['aria-controls', 'aria-owns']) {
       for (const id of String(a[chiave] || '').split(/\s+/)) if (id) apribili.add(id);
@@ -418,7 +409,7 @@ function indiziPagina(html) {
     const href = String(a.href || '').trim();
     if (apre && href.startsWith('#') && href.length > 1) apribili.add(href.slice(1));
   }
-  return { apribili, modale };
+  return { apribili };
 }
 
 /**
@@ -502,7 +493,7 @@ function passaggio(html, modo, dentroZona = false, indizi = null) {
       haComando[liv + 1] = false;
       const dove = {
         inZona: dentroZona || zone.length > 0, primoLivello: liv === 1,
-        soloIlleggibile, apribile, conModale: segni.modale,
+        soloIlleggibile, apribile, ignoraAria: !!segni.ignoraAria,
       };
       const verdetto = daScartare(nome, attrs, dove);
       const contornoQui = tieniCornice && verdetto === 'cornice';
@@ -620,10 +611,28 @@ function estraiContenuto(html) {
   // Dentro la zona di contenuto già isolata l'intestazione è dell'articolo:
   // il tag che la racchiudeva non c'è più, e senza questo il filtro la
   // scambierebbe per quella del sito.
-  // Un giro solo sul corpo: da qui escono sia il contenuto sia il contorno.
   // Un giro solo per gli indizi, sull'intera pagina: il comando che apre un
   // blocco può stare fuori dalla zona di contenuto.
   const segni = indiziPagina(src);
+  let esito = unGiro(corpo, zona, segni);
+  // LA PROVA CHE LA PAGINA È ARRIVATA INTERA È LA SUA INTESTAZIONE. Se il
+  // titolo che il sito dà alla pagina non è nel testo, o non è rimasto niente,
+  // quello che l'ha portato via è il marcatore con cui ogni libreria di
+  // consenso dichiara «adesso si parla solo nella finestra sopra»: non dice che
+  // l'utente non vede, e non va creduto. Si rifà il giro senza (#553).
+  const intestazione = normalizzaTesto(htmlATesto(sottoalbero(corpo, (n) => n === 'h1') || ''));
+  const mozzata = !esito.testo || (intestazione && !esito.testo.includes(intestazione));
+  if (mozzata) {
+    const secondo = unGiro(corpo, zona, { ...segni, ignoraAria: true });
+    if (secondo.testo.length > esito.testo.length) esito = secondo;
+  }
+  const coda = testoDiCornice(esito.avanzi, esito.testo);
+  return { titolo, testo: coda ? `${esito.testo}\n\n${coda}`.trim() : esito.testo };
+}
+
+/** Un giro di potatura sul corpo: il contenuto principale e quello di contorno. PURA. */
+function unGiro(corpo, zona, segni) {
+  // Un giro solo sul corpo: da qui escono sia il contenuto sia il contorno.
   const pieno = passaggio(corpo, 'cornice', false, segni);
   let testo = zona != null
     ? htmlATesto(zona, true, segni)
@@ -632,9 +641,7 @@ function estraiContenuto(html) {
   // guscio che il JavaScript del sito riempirà. Il corpo intero contiene
   // comunque la zona, quindi ripiegare non perde niente: aggiunge rumore.
   if (zona != null && testo.length < 20 && pieno.testo.length > testo.length) testo = pieno.testo;
-  const avanzi = zona != null ? `${pieno.testo}\n${pieno.cornice}` : pieno.cornice;
-  const coda = testoDiCornice(avanzi, testo);
-  return { titolo, testo: coda ? `${testo}\n\n${coda}`.trim() : testo };
+  return { testo, avanzi: zona != null ? `${pieno.testo}\n${pieno.cornice}` : pieno.cornice };
 }
 
 /**

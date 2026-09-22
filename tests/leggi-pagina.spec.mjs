@@ -510,3 +510,27 @@ test('O — col banner dei cookie aperto arriva la pagina, non il banner', async
   expect(String(out.text)).toContain('8:00-19:30');
   expect(String(out.text)).not.toContain('Accetto tutto');
 });
+
+// Un componente moderno tiene il proprio testo in un guscio staccato dal resto
+// della pagina. Copiando l'albero della scheda quel testo restava indietro, e
+// Filo consegnava quello che rimaneva senza dire che mancava qualcosa: il
+// modello rispondeva sicuro su mezza pagina (#553).
+test('P — il testo che il sito tiene in un guscio arriva dalla scheda aperta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const url = testServer.html('<!DOCTYPE html><html><head><title>Trattoria</title></head><body>'
+    + '<main><h1>Trattoria da Gino</h1><p>Cucina emiliana dal 1974.</p>'
+    + '<div id="guscio"></div></main><script>'
+    + 'var g = document.getElementById("guscio").attachShadow({ mode: "open" });'
+    + 'g.innerHTML = "<p>Siamo aperti dalle 8:00 alle 19:30.</p>";'
+    + '</script></body></html>');
+  await openTab(url);
+
+  const out = await app.evaluate(async (_e, u) => (await globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'LEGGI_PAGINA', url: u },
+    { sender: { url: 'filo://dashboard/dashboard.html' } },
+  )).output, url);
+
+  expect(out.ok).toBe(true);
+  expect(out.source).toBe('scheda');
+  expect(String(out.text)).toContain('19:30');
+});
