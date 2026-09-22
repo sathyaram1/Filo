@@ -126,14 +126,20 @@ test('due pratiche segnate insieme: l’esito di quella non riuscita non si perd
   const reqDue = richiesta({ id: 'bb22cc33dd44bb22cc33dd44', num: '#702', feedbackId: 'fb-tardivo-2', branch: 'worker/702-terminale' });
   await apri(page, {
     fbs: [uno, due], pending: [reqUno, reqDue],
-    approveReplies: [{ ok: false, error: 'github_502 unreachable' }],
+    approveReplies: [
+      { ok: false, error: 'github_502 unreachable' },
+      { ok: false, error: 'github_502 unreachable' },
+    ],
   });
 
   // Nessuna pratica aperta: l'owner sta guardando la lista.
   await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([reqUno.id, reqDue.id]);
+  await page.screenshot({ path: 'tests/.shots/preapprovazione-tardiva-giro2-due-pratiche.png' });
 
-  // Il ramo della prima è ancora fermo. L'owner deve poterlo sapere: il numero
+  // I due rami sono fermi tutti e due, e nessuno dei due verrà ritentato da
+  // solo: l'owner deve poter leggere che è successo a tutti e due. Il numero
   // della pratica da solo sta già in lista, quindi qui si cerca il RACCONTO.
+  await expect.poll(() => leggibile(page, 'Fusione ferma su #702'), { timeout: 6000 }).toBe(true);
   await expect.poll(() => leggibile(page, 'Fusione ferma su #701'), { timeout: 6000 }).toBe(true);
 });
 
