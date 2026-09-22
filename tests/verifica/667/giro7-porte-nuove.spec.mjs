@@ -83,14 +83,19 @@ test('un colore chiesto a Filo sopravvive a un token ritoccato in Preferenze', a
 // blocco. Qui pesa di più che altrove: sono protezioni che Filo fa confermare
 // all'utente con un popup, e che poi si rispengono da sole senza dirlo.
 test('una protezione accesa a parole sopravvive a un interruttore toccato in Sicurezza', async ({ shell, openTab }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(150_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
 
-  await azione(shell, 'blocco_popup', 'no');
+  // Le protezioni sono di livello 2: l'utente le conferma nel popup, e quella
+  // conferma è la stessa che manda la pagina della chat.
+  const chat = await openTab('filo://newtab/');
+  await chat.waitForLoadState('domcontentloaded');
+
+  await confermata(chat, 'blocco_popup', 'no');
   const sec = await openTab('filo://security/security.html');
   await expect(sec.locator('#sec-block-popups')).not.toBeChecked({ timeout: 10_000 });
 
-  const chiesto = await azione(shell, 'blocco_popup', 'sì');
+  const chiesto = await confermata(chat, 'blocco_popup', 'sì');
   expect(chiesto && chiesto.executed, 'il blocco popup si accende a parole').toBe(true);
   expect((await impostazioni(shell)).settings.security.blockPopups).toBe(true);
 
@@ -106,14 +111,17 @@ test('una protezione accesa a parole sopravvive a un interruttore toccato in Sic
 // cambiato. Un interruttore che dice «spento» mentre la protezione è accesa
 // manda l'utente a rispegnerla credendo di accenderla.
 test('la pagina Sicurezza mostra la protezione accesa a parole', async ({ shell, openTab }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
 
-  await azione(shell, 'blocco_popup', 'no');
+  const chat = await openTab('filo://newtab/');
+  await chat.waitForLoadState('domcontentloaded');
+
+  await confermata(chat, 'blocco_popup', 'no');
   const sec = await openTab('filo://security/security.html');
   await expect(sec.locator('#sec-block-popups')).not.toBeChecked({ timeout: 10_000 });
 
-  await azione(shell, 'blocco_popup', 'sì');
+  await confermata(chat, 'blocco_popup', 'sì');
   await sec.waitForTimeout(1500);
   await expect(sec.locator('#sec-block-popups'), 'la pagina aperta deve seguire il cambiamento').toBeChecked();
 });
