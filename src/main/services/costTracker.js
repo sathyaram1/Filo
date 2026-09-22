@@ -50,16 +50,25 @@
 
   async function getMonthly(month = monthKey()) {
     const state = await getState();
-    return state.months[month] || { totalEur: 0, byAction: {}, byProvider: {} };
+    const m = state.months[month];
+    if (!m) return { totalEur: 0, proprieEur: 0, byAction: {}, byProvider: {} };
+    return { proprieEur: 0, ...m };
   }
 
   async function record({ action, provider, model, usage, pricing, usdToEur }) {
     const eur = estimateCostEur({ usage, pricing, usdToEur });
+    const propria = pagaLUtente(usage);
     const state = await getState();
     const m = ensureMonth(state, monthKey());
-    m.totalEur += eur;
-    m.byAction[action] = (m.byAction[action] || 0) + eur;
-    m.byProvider[provider] = (m.byProvider[provider] || 0) + eur;
+    // Le due somme stanno separate perché servono a due cose diverse: il tetto
+    // guarda solo la prima, la pagina delle opzioni le mostra tutte e due.
+    if (propria) {
+      m.proprieEur += eur;
+    } else {
+      m.totalEur += eur;
+      m.byAction[action] = (m.byAction[action] || 0) + eur;
+      m.byProvider[provider] = (m.byProvider[provider] || 0) + eur;
+    }
     await setState(state);
     // Conteggio crediti (gamification): 1 credito = 0,08 centesimi. Il costo €
     // resta qui dietro le quinte; il motore crediti converte e scala il saldo.
