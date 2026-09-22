@@ -686,16 +686,22 @@
     var statoIgnotoN = 0; // lo stato è cifrato: su questo computer non si legge
     var idsStatoIgnoto = [];
     var ignotiN = 0;      // il registro li cita, la lista non ce li ha
+    // I loro NUMERI, non i loro id: un conto che li ha contati apre un elenco
+    // che li nomina invece di lasciarli fuori in silenzio, e il numero grande
+    // e l'elenco tornano a dire la stessa cifra.
+    var ignotiNumeri = [];
     var senzaGiriN = 0;   // passati, ma il registro non conserva le loro verifiche
     var idsSenzaGiri = [];
     var durateLavoro = [];
     var durateIds = [];
+    var durateMancanti = [];
     for (i = 0; i < numeriLavorati.length; i++) {
       var num2 = numeriLavorati[i];
       var r = lavoratiNumeri[num2];
       if (r.ultimo > r.primo) {
         durateLavoro.push(r.ultimo - r.primo);
         if (perNumero[num2] && perNumero[num2]._id) durateIds.push(perNumero[num2]._id);
+        else durateMancanti.push(num2);
       }
       var doc = perNumero[num2];
       // Senza il documento non si sa se il via libera è arrivato: si mette da
