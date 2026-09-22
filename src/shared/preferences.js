@@ -465,34 +465,57 @@
       keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
       level: 1,
       build(v) {
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        const map = {
-          standard: 'default', default: 'default', normale: 'default',
-          delicata: 'gentle', gentle: 'gentle', dolce: 'gentle', morbida: 'gentle',
-          urgente: 'urgent', urgent: 'urgent', forte: 'urgent', acuto: 'urgent',
-          carillon: 'chime', chime: 'chime', campanello: 'chime', campana: 'chime',
-        };
-        const tone = map[s];
+        const tone = parseTone(v);
         if (!tone) return null;
-        const labelMap = { default: 'Standard', gentle: 'Delicata', urgent: 'Urgente', chime: 'Carillon' };
-        return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${labelMap[tone]}` };
+        return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${TONE_LABELS[tone]}` };
       },
     },
 
     // ── Volume della suoneria — reversibile, innocuo → livello 1 ──
+    // Niente chiave «volume» secca: i volumi sono due (suoneria e notifiche) e
+    // una chiave così generica se li prendeva tutti, azzerando la suoneria a
+    // chi chiedeva le notifiche. Resta la prima per ordine, quindi un «volume»
+    // senza altro resta la suoneria, che è il caso che si chiede davvero.
     {
       keys: ['volume_suoneria', 'volume suoneria', 'volume timer', 'volume sveglia',
-        'ringtone volume', 'volume della suoneria', 'volume'],
+        'ringtone volume', 'volume della suoneria'],
       level: 1,
       build(v) {
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        const parole = { muto: 0, muta: 0, zero: 0, silenzio: 0, basso: 30, bassa: 30, piano: 30, medio: 60, media: 60, alto: 100, alta: 100, massimo: 100, forte: 100 };
-        const n = Object.prototype.hasOwnProperty.call(parole, s)
-          ? parole[s]
-          : parseInt(s.replace('%', ''), 10);
-        if (!Number.isFinite(n)) return null;
-        const vol = Math.min(100, Math.max(0, n));
+        const vol = parseVolume(v);
+        if (vol === null) return null;
         return { partial: { timerRingtoneVolume: vol }, label: `Volume suoneria → ${vol}%` };
+      },
+    },
+
+    // ── Suono delle notifiche — reversibile, innocuo → livello 1 ──
+    {
+      keys: ['suono_notifiche', 'suono notifiche', 'suono delle notifiche', 'suono notifica',
+        'notification sound'],
+      level: 1,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { notifications: { soundEnabled: b } }, label: `Suono delle notifiche → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    {
+      keys: ['tono_notifiche', 'tono notifiche', 'tono delle notifiche', 'motivo notifiche',
+        'notification tone'],
+      level: 1,
+      build(v) {
+        const tone = parseTone(v);
+        if (!tone) return null;
+        return { partial: { notifications: { sound: tone } }, label: `Tono delle notifiche → ${TONE_LABELS[tone]}` };
+      },
+    },
+    {
+      keys: ['volume_notifiche', 'volume notifiche', 'volume delle notifiche', 'volume notifica',
+        'volume del suono delle notifiche', 'notification volume'],
+      level: 1,
+      build(v) {
+        const vol = parseVolume(v);
+        if (vol === null) return null;
+        return { partial: { notifications: { soundVolume: vol } }, label: `Volume delle notifiche → ${vol}%` };
       },
     },
   ];
