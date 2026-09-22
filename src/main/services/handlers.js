@@ -1498,7 +1498,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
-        if (!built) return { executed: false, kept: false };
+        // Valore che nessun setter sa costruire: l'esito porta il motivo, o il
+        // diario e il bottone dicono soltanto «non eseguita».
+        if (!built) return { executed: false, kept: true, output: { pref: 'invalid' } };
         await applySettingsUpdate(built.partial);
         // La frase in italiano dell'impostazione («Tema → Scuro») viaggia con
         // l'esito: è la stessa che l'utente legge nel popup di conferma, e il
