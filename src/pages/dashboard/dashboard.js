@@ -444,7 +444,7 @@
     renderSuggestions();
   });
 
-  async function onSuggestionClick(s) {
+  async function onSuggestionClick(s, btn = null) {
     const a = s.action;
     if (!a) return;
     const type = String(a.type || '').toUpperCase();

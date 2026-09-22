@@ -1056,7 +1056,7 @@
         btn.disabled = true;
         btn.textContent = '📅 Aggiungo…';
         const r = await send({ type: MSG.CALENDAR_ADD, evento: ev });
-        if (r && r.ok) segnaCompiuta(a, activity, '📅', `Evento aggiunto al calendario · ${ev.titolo || ''}${ev.quando ? ` · ${ev.quando}` : ''}`);
+        if (r && r.ok) segnaCompiuta(a, activity, { evento: ev });
         if (r && r.ok && r.aperto) {
           btn.textContent = '✓ Aperto nel calendario';
           // Riapribile: chi chiude per sbaglio la finestra del calendario deve
@@ -1118,12 +1118,12 @@
           ? `Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
           : 'Nessuna scheda da archiviare';
         btn.textContent = `✓ ${esito}`;
-        segnaCompiuta(a, activity, '🧹', esito);
+        segnaCompiuta(a, activity, { archiviate: n });
       });
       return btn;
     }
     if (type === 'CANCELLA_ARCHIVIO') {
-      return renderDeleteArchivePanel(a.query || a.testo || '', (icona, testo) => segnaCompiuta(a, activity, icona, testo));
+      return renderDeleteArchivePanel(a.query || a.testo || '', (n) => segnaCompiuta(a, activity, { eliminate: n }));
     }
     return null;
   }
@@ -1178,7 +1178,7 @@
         del.remove();
         ul.remove();
         note.textContent = `✓ Eliminate definitivamente ${removed} ${removed === 1 ? 'scheda' : 'schede'}.`;
-        if (onFatto) onFatto('🗑', `Eliminate per sempre ${removed} ${removed === 1 ? 'scheda' : 'schede'}${query ? ` · ${query}` : ''}`);
+        if (onFatto) onFatto(removed);
       });
       panel.appendChild(del);
     })();
