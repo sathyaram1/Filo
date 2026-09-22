@@ -10,6 +10,7 @@ const Cookies = require('./services/cookies');
 const ProxyTab = require('./services/proxyTab');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
+const { congedaPagina } = require('./congedo');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
 const { installGeoBlock } = require('./tabs/tabGeoBlock');
 require('../shared/audioState');
