@@ -89,16 +89,26 @@ async function scriviESpegni(testo, attesaMs, pagina = PREFERENZE, campo = 'agen
   try {
     const shell = await app.firstWindow();
     await shell.waitForLoadState('domcontentloaded');
-    await shell.evaluate((u) => window.filoShell.tabs.open(u), PREFERENZE);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), pagina);
+    const nome = new URL(pagina).hostname;
     const scadenza = Date.now() + 15_000;
     let page = null;
     while (Date.now() < scadenza) {
-      page = app.windows().find((w) => w.url().includes('preferences'));
+      page = app.windows().find((w) => w.url().includes(nome));
       if (page) break;
       await new Promise((r) => setTimeout(r, 100));
     }
-    expect(page, 'la scheda delle Preferenze non si è aperta').toBeTruthy();
-    await scriviStile(page, testo);
+    expect(page, `la scheda ${nome} non si è aperta`).toBeTruthy();
+    if (pagina === PREFERENZE) {
+      await scriviStile(page, testo);
+    } else {
+      await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
+      await page.evaluate((v) => {
+        const el = document.getElementById('monthlyLimit');
+        el.value = v;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }, testo);
+    }
     if (attesaMs) await page.waitForTimeout(attesaMs);
   } finally {
     await chiudiApp(app);
