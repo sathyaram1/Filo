@@ -1169,9 +1169,6 @@
     }, extra || {});
   }
 
-  // Le richieste ferme che NON hanno una scheda in questa lista. Finché i
-  // feedback non sono arrivati la lista è vuota e ci finiscono tutte: meglio
-  // mostrarle due volte per un istante che perderne una.
   // Il segno «fondi senza chiedermelo» messo DOPO il blocco: il server la
   // richiesta l'ha già aperta e non la riguarda, quindi la fonde questa pagina,
   // con lo stesso gesto e lo stesso esito del tasto «Approva e fondi».
@@ -1215,6 +1212,9 @@
     }
   }
 
+  // Le richieste ferme che NON hanno una scheda in questa lista. Finché i
+  // feedback non sono arrivati la lista è vuota e ci finiscono tutte: meglio
+  // mostrarle due volte per un istante che perderne una.
   function fusioniOrfane() {
     const ferme = (fusioni.pending || []).concat(fusioni.failed || []);
     return MR.fusioniSenzaFeedback(ferme, allFeedbacks);
@@ -2628,8 +2628,10 @@
       if (selectedId !== id) return;
       setManageMsg(testo, kind);
     } catch (e) {
-      if (selectedId !== id) return;
-      setManageMsg(e.message || 'Errore', 'err');
+      // Un rifiuto va detto anche se intanto hai aperto un'altra pratica: il
+      // segno che credevi messo non c'è, e senza questa riga nessuno lo sa.
+      const dove = selectedId !== id && FB && typeof FB.formatNum === 'function' ? ` (#${FB.formatNum(fb.seq, fb.subSeq)})` : '';
+      setManageMsg(`Segno non messo${dove}: ${e.message || 'Errore'}`, 'err');
     } finally {
       mgPreapproveBtn.disabled = false;
     }

@@ -38,7 +38,7 @@ function richiesta(over = {}) {
 }
 
 /** Il canale verso il main: proprietario; scritture e approvazioni registrate. */
-async function stubMain(page, { pending = [], approveReply = null } = {}) {
+async function stubMain(page, { pending = [], approveReply = null, updateReply = null } = {}) {
   await page.evaluate((cfg) => {
     window.__updates = [];
     window.__approvals = [];
@@ -48,11 +48,12 @@ async function stubMain(page, { pending = [], approveReply = null } = {}) {
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'feedback_update') {
         window.__updates.push(msg);
+        if (cfg.updateReply) return cfg.updateReply;
         return msg.mergePreapproved ? { ok: true, by: 'owner@esempio' } : { ok: true };
       }
       if (t === 'merge_approvals_get') {
         const usate = new Set(window.__approvals.map((a) => a.id));
-        return { ok: true, pending: cfg.pending.filter((r) => !usate.has(r.id)), failed: [], recent: [], preapproved: [], ttlMs: 7 * GIORNO };
+        return { ok: true, pending: cfg.pending.filter((r) => !usate.has(r.id)), failed: [], recent: [], preapproved: [], ttlMs: cfg.ttl };
       }
       if (t === 'merge_approval_approve') {
         window.__approvals.push(msg);
@@ -60,7 +61,7 @@ async function stubMain(page, { pending = [], approveReply = null } = {}) {
       }
       return orig(msg);
     };
-  }, { pending, approveReply, sha: SHA });
+  }, { pending, approveReply, sha: SHA, ttl: 7 * GIORNO });
 }
 
 async function apri(page, fbs, opts) {
