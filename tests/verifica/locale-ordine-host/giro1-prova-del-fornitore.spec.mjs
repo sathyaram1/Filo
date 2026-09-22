@@ -1,7 +1,7 @@
-// Verifica: il pulsante «Prova» misura la velocità con le stesse istruzioni di
-// routing che userebbe una richiesta vera. Se il modello ha un criterio di
-// ordinamento degli host, la prova deve partire con quello, altrimenti misura
-// un host diverso da quello che servirà davvero.
+// Verifica: il pulsante «Prova» delle Opzioni misura la velocità con le stesse
+// istruzioni di routing che userebbe una richiesta vera. Senza l'ordinamento
+// degli host scelto per quel modello misurerebbe un host diverso da quello che
+// servirà davvero.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -30,52 +30,49 @@ async function intercetta(app) {
   });
 }
 
-// I modelli predefiniti sono quelli dell'owner: è lì che si sceglie
-// l'ordinamento degli host, e si leggono da dove il codice li prende.
+// L'ordinamento degli host si sceglie sui modelli predefiniti (pagina
+// dell'owner): si mettono dove il codice li legge.
 async function predefinitiConOrdinamento(app) {
   await app.evaluate(async () => {
-    const A = globalThis.SN_CONST.ACTIONS;
     const D = globalThis.__filoDefaults;
     if (!globalThis.__getVeroProva) globalThis.__getVeroProva = D.get;
     D.get = (...a) => {
       const base = globalThis.__getVeroProva(...a);
       return {
         ...base,
+        apiKeys: { ...base.apiKeys, openrouter: 'sk-or-finta-ordine-host' },
         modelRegistry: {
-          ...base.modelRegistry,
           'prova-veloce': {
             provider: 'openrouter', model: 'finto/prova-veloce',
             sort: 'throughput', reasoning: 'high',
           },
         },
-        models: { ...base.models, [A.PROVIDER_TEST]: 'prova-veloce' },
       };
     };
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: true,
       openWeightsOnly: false,
-      apiKeys: { openrouter: 'sk-or-finta-ordine-host' },
+      apiKeys: {},
     });
   });
 }
 
-test('la prova della chiave parte con l\'ordinamento degli host scelto per quel modello', async ({ app, openTab }) => {
+test('la prova di un modello predefinito parte con l\'ordinamento degli host di quel modello', async ({ app, openTab }) => {
   await predefinitiConOrdinamento(app);
   await intercetta(app);
 
   const page = await openTab(OPZIONI);
-  await page.waitForSelector('#testOpenrouter', { timeout: 15_000 });
-  await page.locator('#testOpenrouter').click();
-  await expect(page.locator('#testOpenrouterStatus')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
+  const riga = page.locator('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)').first();
+  await riga.waitFor({ timeout: 15_000 });
+  await riga.locator('.sn-model-test').click();
+  await expect(riga.locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
 
   const partita = await app.evaluate(async () =>
     globalThis.__richieste.filter((r) => r.url.includes('/chat/completions')).pop());
   expect(partita, 'nessuna richiesta partita dalla prova').toBeTruthy();
   expect(partita.corpo.model).toBe('finto/prova-veloce');
-  // La lista di esclusione c'è sempre: è la parte che regge.
   expect(partita.corpo.provider && partita.corpo.provider.ignore,
     'lista di esclusione assente nella prova').toBeTruthy();
-
   expect(partita.corpo.provider && partita.corpo.provider.sort,
     'la prova misura la velocità su un host scelto con un altro criterio rispetto all\'uso vero')
     .toBe('throughput');
