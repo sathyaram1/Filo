@@ -118,7 +118,14 @@ test.describe('#533 giro 9 — il collegamento aperto senza il tasto sinistro', 
       const box = document.createElement('div');
       box.className = 'sn-msg-text';
       box.style.cssText = 'position:fixed;top:40px;left:40px;z-index:2147483647;background:#fff;padding:8px';
-      box.innerHTML = self.SN_MARKDOWN.render(`Ecco [Apri la bolletta di marzo](${url})`);
+      const a = document.createElement('a');
+      a.className = 'filo-md-link';
+      a.setAttribute('href', url);
+      a.setAttribute('target', '_blank');
+      a.setAttribute('title', url);
+      a.setAttribute('rel', 'noopener noreferrer nofollow');
+      a.textContent = 'Apri la bolletta di marzo';
+      box.appendChild(a);
       document.body.appendChild(box);
     }, destinazione);
 
