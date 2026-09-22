@@ -28,9 +28,9 @@
   // Il tasto che toglie l'ostacolo, sotto la frase che lo nomina. Su una pagina
   // web «riscattalo nella pagina Crediti» è un'indicazione senza strada: da lì
   // l'utente a quella pagina non sa arrivare (#663).
-  function mostraRimedio(host, code) {
+  function mostraRimedio(host, res) {
     const CE = global.SN_CHAT_ERRORS;
-    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(code) : null;
+    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(res) : null;
     if (!host || !pagina) return null;
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1256,7 +1256,7 @@
         scrollaConservando(popup, () => {
           bubble.text.textContent = frasePerLUtente(m);
           bubble.wrap.classList.add('sn-msg-error');
-          mostraRimedio(bubble.text, m.code);
+          mostraRimedio(bubble.text, m);
         }, true);
         popup.activePort = null;
       }

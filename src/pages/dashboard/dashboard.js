@@ -932,9 +932,7 @@
       // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
       const CE = window.SN_CHAT_ERRORS;
-      const pagina = keyRefused
-        ? { dove: 'crediti', url: 'filo://credits/credits.html', label: 'Apri Crediti' }
-        : (CE?.rimedioPagina ? CE.rimedioPagina(r?.code) : null);
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused }) : null;
       if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';

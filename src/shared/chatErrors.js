@@ -95,7 +95,16 @@
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
     LIMIT_REACHED: 'opzioni',
   };
-  function rimedio(code) { return RIMEDIO[String(code || '')] || ''; }
+  // Accetta il codice da solo o la risposta intera. Con la risposta si sa anche
+  // se il servizio ha rifiutato la CHIAVE (credito finito compreso): lì la
+  // strada è la pagina Crediti, e il codice da solo non lo direbbe.
+  function rimedio(x) {
+    if (x && typeof x === 'object') {
+      if (x.keyRefused) return 'crediti';
+      return RIMEDIO[String(x.code || '')] || '';
+    }
+    return RIMEDIO[String(x || '')] || '';
+  }
 
   // La pagina che toglie l'ostacolo, già pronta da mostrare. Sta qui e non in
   // ogni superficie perché una frase che nomina una pagina e non ci porta è
@@ -104,8 +113,8 @@
     crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti' },
     opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni' },
   };
-  function rimedioPagina(code) {
-    const dove = rimedio(code);
+  function rimedioPagina(x) {
+    const dove = rimedio(x);
     return dove ? { dove, ...RIMEDIO_PAGINE[dove] } : null;
   }
 
@@ -119,6 +128,7 @@
     // La frase che il main ha già scritto sapendo quale chiave ha pagato e
     // quanti crediti arrivano domani: vale più di qualsiasi ricostruzione.
     if (res && typeof res.userMessage === 'string' && res.userMessage) e.userMessage = res.userMessage;
+    if (res && res.keyRefused) e.keyRefused = true;
     return e;
   }
 

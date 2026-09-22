@@ -273,9 +273,9 @@
 
   // Il tasto che porta dove si toglie l'ostacolo, sotto il messaggio d'errore.
   // Dove si rimedia lo dice SN_CHAT_ERRORS, non un elenco di casi scritto qui.
-  function mostraRimedio(afterEl, code) {
+  function mostraRimedio(afterEl, err) {
     const CE = globalThis.SN_CHAT_ERRORS;
-    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(code) : null;
+    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(err) : null;
     if (!afterEl || !pagina) return;
     const wrap = document.createElement('div');
     wrap.className = 'sn-sidebar-choices';
@@ -1234,7 +1234,7 @@
       assistantEl.classList.add('sn-sidebar-msg-error');
       // La frase nomina la pagina dove si rimedia; da un sito qualunque
       // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
-      mostraRimedio(assistantEl, err && err.code);
+      mostraRimedio(assistantEl, err);
       // In caso d'errore, se l'utente aveva la chat collassata e questo è
       // un proseguimento automatico, ripristina lo stato precedente.
       if (wasCollapsed && !userMessage) collapse({ ai: false });

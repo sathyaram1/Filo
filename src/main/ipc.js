@@ -93,6 +93,13 @@ function registerIpcHandlers() {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
+  // È la chiave a essere stata rifiutata (credito finito compreso, moderazione
+  // no)? Lo decide SN_WALLET, una volta sola; qui viaggia con l'errore perché
+  // chi lo mostra possa offrire la pagina Crediti invece del solo «Riprova».
+  const rifiutoDellaChiave = (err) => {
+    try { return Boolean(globalThis.SN_WALLET?.keyRefusalOf?.(err)); } catch (_) { return false; }
+  };
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
@@ -104,7 +111,7 @@ function registerIpcHandlers() {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
       console.error('[Filo IPC] handler error', msg?.type, err);
-      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN' };
+      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN', keyRefused: rifiutoDellaChiave(err) };
     }
   });
 
@@ -151,6 +158,7 @@ function registerIpcHandlers() {
           status: Number(err && err.status) || 0,
           provider: (err && err.provider) || '',
           userMessage: (err && typeof err.userMessage === 'string') ? err.userMessage : '',
+          keyRefused: rifiutoDellaChiave(err),
         });
       } finally {
         inFlightStreams.delete(requestId);

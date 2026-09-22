@@ -79,6 +79,9 @@ test('crediti finiti: il riquadro della spiegazione lo dice, non mostra la riga 
   await expect(bolla).toContainText(/crediti/i, { timeout: 15_000 });
   await expect(bolla).not.toContainText('402');
   await expect(bolla).not.toContainText(/insufficient/i);
+  // La frase nomina la pagina Crediti: da un sito qualunque ci si deve poter
+  // andare, come fa la chat della home.
+  await expect(page.locator('.sn-popup .sn-msg-rimedio')).toBeVisible({ timeout: 10_000 });
 });
 
 test('nessuna chiave: il riquadro della spiegazione dice cosa manca e porta ai Crediti', async ({ app, openTab, testServer }) => {

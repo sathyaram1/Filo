@@ -282,3 +282,33 @@ test('l’errore dello stream porta gli stessi campi della risposta dell’IPC, 
     assert.match(m[1], /\.\.\./, `${f} elenca i campi dell'errore invece di passarli tutti`);
   }
 });
+
+// Sentinella (#663): il servizio che rifiuta la chiave (credito finito
+// compreso) manda alla pagina Crediti da ogni riquadro, non solo dalla home.
+// Chi decide cosa sia un rifiuto resta SN_WALLET, nel main: qui arriva già
+// deciso, perché il solo codice non basterebbe a saperlo.
+test('la chiave rifiutata manda ai Crediti, ovunque si legga l’errore', () => {
+  const res = { error: 'OpenRouter 402: {"error":{"message":"Insufficient credits"}}', code: 'UNKNOWN', status: 402, keyRefused: true };
+  assert.equal(CE.rimedio(res), 'crediti');
+  assert.equal(CE.rimedioPagina(res).url, 'filo://credits/credits.html');
+  assert.equal(CE.fromResponse(res).keyRefused, true);
+  assert.equal(CE.rimedio(CE.fromResponse(res)), 'crediti');
+  // Senza il rifiuto conta solo il codice: un errore qualunque non manda in giro.
+  assert.equal(CE.rimedio({ code: 'UNKNOWN', status: 500 }), '');
+  // E il codice da solo continua a funzionare, per chi lo passa così.
+  assert.equal(CE.rimedio('NO_API_KEY'), 'crediti');
+});
+
+// Sentinella (#663): la risposta d'errore dell'IPC dice anche se è la chiave
+// ad essere stata rifiutata. Senza, ogni riquadro dovrebbe tirare a indovinare
+// dallo status, e un 403 di moderazione finirebbe per mandare ai Crediti.
+test('la risposta d’errore del main porta il rifiuto della chiave già deciso', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const ipc = readFileSync(join(ROOT, 'src', 'main', 'ipc.js'), 'utf8');
+  assert.match(ipc, /keyRefusalOf/, 'src/main/ipc.js non chiede più a SN_WALLET se è un rifiuto della chiave');
+  const quante = (ipc.match(/keyRefused:/g) || []).length;
+  assert.ok(quante >= 2, `il rifiuto della chiave manca su un canale d'errore (trovato ${quante} volte su 2)`);
+});
