@@ -146,6 +146,15 @@ test('una sezione non ancora scritta si spiega anche cliccandola nella barra', a
   expect(tab.nome).toMatch(/non ancora scritta/);
 });
 
+test('lo stesso documento chiesto con le maiuscole resta lo stesso documento', async ({ openTab }) => {
+  // In chat «MODELS» e «models» sono la stessa cosa. Un indirizzo lo si scrive
+  // a mano o lo si ricopia da un messaggio: negare lì un documento che esiste
+  // sarebbe la bugia opposta a quella che questa pagina esiste per evitare.
+  const page = await openTab(`${URL}?doc=MODELS`);
+  await expect(page.locator('h1')).toHaveText('Politica sui modelli');
+  await expect(page.locator('#subtitle')).not.toContainText('non esiste');
+});
+
 test('un documento che non esiste per niente non diventa un altro documento', async ({ openTab }) => {
   const page = await openTab(`${URL}?doc=pippo`);
   await expect(page.locator('#title')).not.toHaveText('Politica sui modelli');
