@@ -878,6 +878,7 @@
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
+      if (!$('useDefaultModels')) return;
       const s = msg.settings;
       const testo = (id, valore) => {
         const el = $(id);
