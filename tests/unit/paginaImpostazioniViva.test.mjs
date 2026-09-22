@@ -36,9 +36,8 @@ const PAGINE = [
     salvataggi: ['save'],
     riallinea: ['onMessage'],
     aiutanti: {},
-    stati: [],
+    stati: ['modelChains'],
     eccezioni: {
-      modelChains: 'le catene di modelli si cambiano solo da questa pagina',
       collectModelRegistry: 'il registro dei modelli si compila solo da questa pagina',
     },
   },
