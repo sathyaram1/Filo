@@ -398,7 +398,11 @@ function passaggio(html, modo, dentroZona = false) {
     }
     // Chiusura: risale alla corrispondente aperta, se c'è (l'HTML vero è pieno
     // di tag non chiusi, e una pila che non si svuota manderebbe via il resto).
-    const dove = pila.lastIndexOf(nome);
+    const suoi = indici.get(nome);
+    // Le posizioni rimaste indietro da una chiusura più esterna si buttano qui,
+    // una sola volta ciascuna: è quello che tiene il costo lineare.
+    while (suoi && suoi.length && (suoi[suoi.length - 1] >= pila.length || pila[suoi[suoi.length - 1]] !== nome)) suoi.pop();
+    const dove = suoi && suoi.length ? suoi.pop() : -1;
     if (dove >= 0) {
       pila.length = dove;
       while (fuori.length && fuori[fuori.length - 1] > pila.length) fuori.pop();
