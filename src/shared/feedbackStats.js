@@ -706,7 +706,7 @@
       var doc = perNumero[num2];
       // Senza il documento non si sa se il via libera è arrivato: si mette da
       // parte e si dichiara, invece di indovinare una fetta.
-      if (!doc) { ignotiN += 1; continue; }
+      if (!doc) { ignotiN += 1; ignotiNumeri.push(num2); continue; }
       var chiave;
       var fermo = fermato(doc);
       // «Passato lasciando indietro dei rilievi» dipende dall'ESITO del lavoro
