@@ -374,14 +374,14 @@ export function fixedPayload({ report, frase, branch, segnalazione, ferma } = {}
 }
 
 /**
- * `--ferma` senza segnalazione non parte: l'owner si troverebbe un lavoro
- * fermo senza sapere cosa deve decidere. Ritorna la frase che ferma, o ''. PURA.
+ * `--ferma` da solo non ferma niente: è la segnalazione che ferma il lavoro, e
+ * senza l'owner non saprebbe cosa decidere. Ritorna la frase che ferma, o ''. PURA.
  */
 export function fermaSenzaSegnalazione(ferma, segnalazione) {
   if (!ferma || String(segnalazione || '').trim()) return '';
   return [
-    '--ferma vuole anche --segnala <file.md>: non ho consegnato niente.',
-    'Fermare il lavoro chiama l\'owner, e senza la segnalazione non saprebbe cosa decidere: scrivi nel file il problema, le scelte e cosa hai fatto nel frattempo, poi rilancia con tutte e due le opzioni.',
+    '--ferma da solo non ferma niente: è --segnala <file.md> che ferma il lavoro. Non ho consegnato niente.',
+    'Fermarsi chiama l\'owner, e senza la segnalazione non saprebbe cosa decidere: scrivi nel file il problema, le scelte e cosa hai fatto nel frattempo, poi rilancia con --segnala (--ferma puoi toglierlo).',
   ].join('\n');
 }
 
