@@ -547,10 +547,9 @@
   // è quella che cambia mentre si parla).
   const DICTATE_LIVE_CHARS = 140;
 
-  // Perché la dettatura non è partita, detto all'utente. Quali errori arrivano
-  // già scritti lo sa SN_CHAT_ERRORS: l'elenco tenuto qui ne conosceva due su
-  // quattro, e a chi non ha ancora riscattato l'invito rispondeva di
-  // controllare una chiave che non ha mai avuto (#663).
+  // Perché la dettatura non è partita. Quali errori arrivano già scritti lo sa
+  // SN_CHAT_ERRORS: l'elenco tenuto qui ne conosceva due su quattro, e a chi
+  // non ha riscattato l'invito parlava di una chiave mai avuta (#663).
   function explainDictationFailure(res) {
     const CE = global.SN_CHAT_ERRORS;
     if (!CE) { Popup.showToast(I18n.t('err_provider_failed')); return; }

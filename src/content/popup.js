@@ -11,11 +11,9 @@
   // Stack di popup aperti. L'ultimo è il topmost.
   const popups = [];
 
-  // Un errore dell'AI, detto all'utente. La regola sta in SN_CHAT_ERRORS, una
-  // volta sola: ricomporre a mano la risposta del main faceva arrivare qui la
-  // riga grezza del servizio, parentesi graffe comprese (#663).
-  // Accetta sia la risposta dell'IPC (`error`) sia quella dello stream
-  // (`message`): è lo stesso errore, e chi lo mostra non deve saperlo.
+  // Un errore dell'AI detto all'utente, dalla risposta dell'IPC (`error`) o
+  // dello stream (`message`). La regola sta in SN_CHAT_ERRORS, una volta sola:
+  // ricomporla qui faceva arrivare la riga grezza del servizio (#663).
   function frasePerLUtente(res) {
     const generico = I18n.t('err_provider_failed');
     const CE = global.SN_CHAT_ERRORS;
