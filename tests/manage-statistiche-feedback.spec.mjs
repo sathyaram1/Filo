@@ -1462,3 +1462,54 @@ test('#496 la pasticca di un mittente apre le segnalazioni che il suo numero con
   await page.locator('[data-fs-creator="prober"]').click();
   expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['prober']);
 });
+
+// Un conto si scrive allo stesso modo ovunque compaia, anche dove si vede solo
+// col mouse sopra: finché fetta e colonna se lo scrivevano da sé, la legenda
+// diceva «1.200» e il suggerimento a un centimetro di distanza «1200».
+test('#496 anche i suggerimenti e gli avvisi scrivono i numeri all\'italiana', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const feedbacks = [];
+  const workerLog = [];
+  for (let i = 0; i < 1200; i++) {
+    feedbacks.push(fb({ _id: 'sg' + i, seq: 3000 + i, createdAt: g(2), status: 'done' }));
+    workerLog.push({ role: 'fixer', startedAt: g(2), num: String(3000 + i) });
+    workerLog.push({ role: 'verifier', startedAt: g(2), num: String(3000 + i) });
+  }
+  await apri(page, { feedbacks, workerLog });
+  await page.locator('[data-fs-range="tutto"]').click();
+
+  await expect(page.locator('#mgFsLegend .mg-fs-legend-n').first()).toHaveText('1.200');
+  expect(await page.locator('#mgFsPie title').first().evaluate((n) => n.textContent)).toContain('1.200');
+  expect(await page.locator('#mgFsTrend [data-fs-punto]').first().getAttribute('title')).toContain('1.200');
+
+  const senzaData = [];
+  for (let i = 0; i < 1200; i++) senzaData.push(fb({ _id: 'sd' + i, seq: 5000 + i, createdAt: 'data storta' }));
+  await page.evaluate((d) => window.__mgTest.setFsData(d), { feedbacks: senzaData, workerLog: [] });
+  await expect(page.locator('#mgFsNota')).toContainText('1.200 segnalazioni');
+});
+
+// Chi apre l'elenco dalla tastiera deve ritrovarsi dove era: senza il ritorno
+// del fuoco il Tab successivo ripartiva dal primo elemento della pagina.
+for (const [come, chiudi] of [
+  ['con Esc', async (page) => page.keyboard.press('Escape')],
+  ['con «chiudi»', async (page) => page.locator('#mgFsDrillClose').click()],
+]) {
+  test(`#496 chiudendo l'elenco ${come} il fuoco torna sulla voce che l'aveva aperto`, async ({ openTab }) => {
+    const page = await openTab(URL);
+    await apri(page, {
+      feedbacks: [fb({ seq: 61, createdAt: g(2), status: 'done' }), fb({ seq: 62, createdAt: g(2), status: 'done' })],
+      workerLog: [
+        { role: 'fixer', startedAt: g(2), num: '61' }, { role: 'verifier', startedAt: g(2), num: '61' },
+        { role: 'fixer', startedAt: g(2), num: '62' }, { role: 'verifier', startedAt: g(2), num: '62' },
+      ],
+    });
+    await page.locator('[data-fs-range="tutto"]').click();
+    await page.locator('#mgFsLegend li').first().focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#mgFsDrill')).toBeVisible();
+    await page.locator('#mgFsDrillClose').focus();
+    await chiudi(page);
+    await expect(page.locator('#mgFsDrill')).toBeHidden();
+    expect(await page.evaluate(() => !!(document.activeElement && document.activeElement.closest('#mgFsLegend')))).toBe(true);
+  });
+}

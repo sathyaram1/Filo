@@ -19,7 +19,7 @@ test('#496 giro24 — il suggerimento della fetta e della colonna scrive il nume
   await page.locator('[data-fs-range="tutto"]').click();
 
   await expect(page.locator('#mgFsLegend .mg-fs-legend-n').first()).toHaveText('1.200');
-  const suTorta = await page.locator('#mgFsPie title').first().innerText();
+  const suTorta = await page.locator('#mgFsPie title').first().evaluate((n) => n.textContent);
   expect(suTorta, 'il suggerimento della fetta').toContain('1.200');
   const suColonna = await page.locator('#mgFsTrend [data-fs-punto]').first().getAttribute('title');
   expect(suColonna, 'il suggerimento della colonna').toContain('1.200');

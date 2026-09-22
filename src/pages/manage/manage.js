@@ -4682,7 +4682,7 @@
     if (sd > 0) {
       righe.push(sd === 1
         ? 'Una segnalazione non ha una data d\'arrivo leggibile: resta fuori da ogni finestra, «Tutto» compreso.'
-        : `${sd} segnalazioni non hanno una data d'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.`);
+        : `${fsNum(sd)} segnalazioni non hanno una data d'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.`);
     }
     // Il mittente viaggia cifrato come lo stato. Senza la chiave privata non si
     // legge, e la ripartizione per mittente (una delle cose chieste) non può
@@ -4691,7 +4691,7 @@
     if (mi > 0) {
       righe.push(mi === 1
         ? 'Di una segnalazione non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non c\'è.'
-        : `Di ${mi} segnalazioni non si è potuto leggere il mittente: serve la chiave dell'owner su questo computer. Nel filtro per creatore non ci sono.`);
+        : `Di ${fsNum(mi)} segnalazioni non si è potuto leggere il mittente: serve la chiave dell'owner su questo computer. Nel filtro per creatore non ci sono.`);
     }
     mgFsNota.textContent = righe.join(' ');
     mgFsNota.hidden = righe.length === 0;
@@ -4753,10 +4753,8 @@
     } catch (_) { return decimali ? v.toFixed(decimali) : String(v); }
   }
   function fsNum(v) { return v == null ? '—' : fsCifra(v); }
-  // «Nome: conto», la forma unica di ogni etichetta che porta un numero. Passa
-  // di qui anche quello che si vede solo col mouse sopra: finché le fette e le
-  // colonne se lo scrivevano da sé, lo stesso conto si leggeva «1200» nel
-  // suggerimento e «1.200» nella legenda accanto.
+  // «Nome: conto», per ogni etichetta che porta un numero, compresi i
+  // suggerimenti col mouse: lì il conto si leggeva «1200» e la legenda «1.200».
   function fsRigaConto(label, n) { return `${label}: ${fsNum(n)}`; }
 
   /**
@@ -4983,7 +4981,7 @@
       c.dataset.group = fette[0].key;
       c.dataset.n = fette[0].n;
       const t0 = document.createElementNS(NS, 'title');
-      t0.textContent = `${fette[0].label}: ${fette[0].n}`;
+      t0.textContent = fsRigaConto(fette[0].label, fette[0].n);
       c.appendChild(t0);
       mgFsPie.appendChild(c);
     } else {
@@ -4996,7 +4994,7 @@
         p.dataset.group = f.key;
         p.dataset.n = f.n;
         const el = document.createElementNS(NS, 'title');
-        el.textContent = `${f.label}: ${f.n}`;
+        el.textContent = fsRigaConto(f.label, f.n);
         p.appendChild(el);
         mgFsPie.appendChild(p);
         ang = next;
@@ -5102,7 +5100,7 @@
     // Un periodo a zero non è un pulsante (dietro non c'è niente da aprire) e
     // resta una tacca sulla linea di base, non una colonnina che sembra un uno.
     mgFsTrend.innerHTML = punti.map((p) => {
-      const titolo = `${esc(p.label)}: ${p.n}`;
+      const titolo = esc(fsRigaConto(p.label, p.n));
       // Una colonna vuota non è un pulsante (dietro non c'è niente da aprire)
       // ma resta un periodo: il tasto destro le offre «Restringi la finestra a
       // questo periodo» come a quelle piene. Guardare da vicino un silenzio è
