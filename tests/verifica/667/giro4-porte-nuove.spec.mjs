@@ -2,10 +2,11 @@
 //
 // I giri prima hanno chiuso: la scadenza fuori dalla Nuova scheda, quella
 // incognito, il tutto schermo nei due versi, la suoneria sovrapposta a sé
-// stessa e le due finestre incognito. Restano le porte verso lo stesso danno
-// — una scadenza che non si fa sentire — che nessun giro ha ancora aperto:
-// la finestra nascosta, il turno che passa quando la finestra che suonava se
-// ne va, la sveglia che si ripete e il timer messo in pausa.
+// stessa e le due finestre incognito. Qui si contano le porte rimaste verso
+// lo stesso danno, cioè una scadenza che resta viva e muta: la pagina i cui
+// risvegli il sistema strozza, la finestra che suonava e si chiude, la
+// sveglia che si ripete, il timer messo in pausa e la finestra che quella
+// scadenza non può vederla.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
