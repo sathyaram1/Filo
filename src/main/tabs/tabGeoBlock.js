@@ -225,7 +225,13 @@ const geoBlockMethods = {
     // La catena di navigazioni è la stessa che paga i controlli sui siti
     // pericolosi: chi si porta da solo su pagine sempre nuove ha un conto solo
     // per tutte, e chi naviga dopo una pausa ne apre uno nuovo (#591, giro 7).
-    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url, catena: catenaDi(tab) };
+    // `insistito`: è un rinvio, e la scheda è ancora qui (il controllo su dove
+    // si trova lo fa chi programma il rinvio). Non è una tappa di raffica,
+    // quindi il conto della catena non la riguarda (#591, giro 8).
+    const input = {
+      title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url,
+      catena: catenaDi(tab), insistito: rinvio > 0,
+    };
     Promise.resolve()
       .then(() => classify(input))
       .then((res) => {

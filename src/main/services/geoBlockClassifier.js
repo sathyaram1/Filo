@@ -437,7 +437,7 @@ async function classify(input = {}, opts = {}) {
         ...(esito === 'raffica' ? { rimandato: true } : {}),
       };
     }
-  } else if (freno && typeof freno.prendi === 'function' && !freno.prendi(host, catena)) {
+  } else if (freno && typeof freno.prendi === 'function' && !freno.prendi(host, catenaEff)) {
     return {
       class: CLASSES.ERRORE_GENERICO,
       route: routeForClass(CLASSES.ERRORE_GENERICO),
