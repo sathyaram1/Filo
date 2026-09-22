@@ -124,7 +124,7 @@ test('il riordino che non è potuto partire non deve leggersi come riuscito', as
   const btn = page.locator('.dash-action-btn', { hasText: 'Riordina e archivia' });
   await expect(btn).toBeVisible();
   await btn.click();
-  await page.locator('.sn-confirm-ok, .sn-confirm button').first().click({ timeout: 8_000 }).catch(() => {});
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
   await expect.poll(async () => ((await btn.textContent()) || '').trim(), { timeout: 20_000 }).not.toContain('Riordino in corso');
 
   const esito = ((await btn.textContent()) || '').trim();
