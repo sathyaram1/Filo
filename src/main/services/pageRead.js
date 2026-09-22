@@ -102,6 +102,11 @@ const TAG_COMANDO = new Set(['button', 'summary', 'a', 'label']);
 // Un blocco che dichiara da sé di essere il pannello di un comando.
 const RUOLO_PANNELLO = /^(tabpanel|region)$/i;
 
+// Il comando di una voce sta quasi sempre dentro il suo titolo: solo di lì il
+// comando vale anche per il blocco che segue. Da un contenitore qualunque no,
+// altrimenti basta un menu con un link davanti all'esca per farla passare.
+const TAG_TITOLO = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'dt', 'summary', 'legend']);
+
 
 // I nomi dei colori che servono a far sparire del testo. Gli altri non
 // servono: l'esca è bianco su bianco, o nero su nero.
@@ -477,6 +482,7 @@ function passaggio(html, modo, dentroZona = false, indizi = null) {
       precedenti[liv] = { comando };
       precedenti[liv + 1] = null;
       haComando[liv] = comando;
+      haComando[liv + 1] = false;
       const dove = {
         inZona: dentroZona || zone.length > 0, primoLivello: liv === 1,
         soloIlleggibile, apribile, conModale: segni.modale,
@@ -502,7 +508,10 @@ function passaggio(html, modo, dentroZona = false, indizi = null) {
     if (dove >= 0) {
       // Un comando annidato (il bottone dentro l'intestazione di una voce)
       // apre lo stesso il blocco che segue il suo contenitore.
-      if (haComando[dove + 1]) { haComando[dove] = true; precedenti[dove + 1] = { comando: true }; }
+      if (haComando[dove + 1]) {
+        haComando[dove] = true;
+        if (TAG_TITOLO.has(nome)) precedenti[dove + 1] = { comando: true };
+      }
       pila.length = dove;
       while (fuori.length && fuori[fuori.length - 1] > pila.length) fuori.pop();
       while (zone.length && zone[zone.length - 1] > pila.length) zone.pop();
