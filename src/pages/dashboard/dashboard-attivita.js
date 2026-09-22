@@ -282,6 +282,17 @@
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
+    PULISCI_TAB: () => 'proposto di riordinare le schede',
+    CANCELLA_ARCHIVIO: () => 'proposto di svuotare una parte dell’archivio',
+  };
+  // Le stesse azioni, quando è l'UTENTE a portarle a termine cliccando in chat.
+  // Il riassunto deve dire quello che è successo, non quello che Filo aveva
+  // proposto: a cose fatte «Ha proposto un evento» contraddice il bottone che
+  // dice «Evento salvato» a pochi centimetri.
+  const ACTIVITY_VERBS_FATTI = {
+    EVENTO_CALENDARIO: (n) => (n > 1 ? `aggiunto ${n} eventi al calendario` : 'aggiunto un evento al calendario'),
+    PULISCI_TAB: () => 'riordinato le schede',
+    CANCELLA_ARCHIVIO: () => 'svuotato una parte dell’archivio',
   };
   // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
   // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
