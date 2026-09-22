@@ -163,15 +163,26 @@
   // farebbe scattare il freno su ogni link successivo.
   // Finestre da READ_RUN, a passi di metà: qualunque ricopiatura lunga il
   // doppio cade dentro una finestra allineata.
+  function ricopiato(pezzo, hay, run) {
+    const exposed = exposedAlnum(pezzo);
+    if (exposed.length < run) return false;
+    for (let i = 0; i + run <= exposed.length; i += READ_STEP) {
+      if (hay.includes(exposed.slice(i, i + run))) return true;
+    }
+    return false;
+  }
+
   function readTaint(url, read) {
     const hay = alnum(read);
     if (hay.length < READ_RUN) return null;
-    const exposed = exposedAlnum(url);
-    if (exposed.length < READ_RUN) return null;
-    for (let i = 0; i + READ_RUN <= exposed.length; i += READ_STEP) {
-      if (hay.includes(exposed.slice(i, i + READ_RUN))) {
-        return { reason: 'si porta dietro un pezzo di quello che Filo ha appena letto' };
-      }
+    let u = null;
+    try { u = new URL(String(url || '')); } catch (_) {}
+    // Indirizzo che non si legge come tale: si guarda tutto, con la soglia
+    // stretta. Non c'è un percorso da scusare.
+    const coda = u ? `${u.search}${u.hash} ${u.hostname.split('.').slice(0, -2).join(' ')}` : String(url || '');
+    const percorso = u ? u.pathname : '';
+    if (ricopiato(coda, hay, READ_RUN) || ricopiato(percorso, hay, READ_RUN_PATH)) {
+      return { reason: 'si porta dietro un pezzo di quello che Filo ha appena letto' };
     }
     return null;
   }
