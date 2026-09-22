@@ -361,6 +361,7 @@
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
+          ...configurazioneRiga(row),
         };
         renderRowTest(row);
         saveDefaultModelTest(nickname, row._test);
