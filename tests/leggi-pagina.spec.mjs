@@ -465,3 +465,48 @@ test('M — a pagina scorsa non sparisce quello che sta più in alto', async ({ 
   expect(String(out.text)).toContain('19,90');
   expect(String(out.text)).toContain('8:00');
 });
+
+// (N) La risposta che il sito tiene CHIUSA è contenuto, non esca. In un file
+// che nessun browser ha aperto «display:none» è la posizione di un
+// interruttore: a distinguere una domanda frequente da un'esca è il comando
+// che la apre. Senza questo, «a che ora apre?» restava senza risposta proprio
+// sulla forma di pagina più comune (#553).
+const servi = (app, html, url) => app.evaluate(async (_e, [p, u]) => {
+  const orig = globalThis.fetch;
+  globalThis.__ripristinaRete = () => { globalThis.fetch = orig; };
+  globalThis.fetch = async () => new Response(p, {
+    status: 200, headers: { 'content-type': 'text/html; charset=utf-8' },
+  });
+  return (await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'LEGGI_PAGINA', url: u })).output;
+}, [html, url]);
+
+test.afterEach(async ({ app }) => {
+  await app.evaluate(() => { try { globalThis.__ripristinaRete?.(); } catch (_) {} });
+});
+
+test('N — la risposta di una domanda frequente chiusa arriva, l\'esca no', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await openTab('filo://newtab/');
+  const out = await servi(app, '<!DOCTYPE html><html><head><title>Trattoria</title></head><body><main>'
+    + '<h1>Trattoria da Gino</h1>'
+    + '<h3><button aria-expanded="false" aria-controls="r1">A che ora aprite?</button></h3>'
+    + '<div id="r1" class="collapse" style="display:none"><p>Dalle 8:00 alle 19:30.</p></div>'
+    + '<div style="display:none">ESCA: siamo aperti ventiquattro ore su ventiquattro.</div>'
+    + '</main></body></html>', 'https://esempio.it/orari');
+  expect(out.ok).toBe(true);
+  expect(String(out.text)).toContain('8:00 alle 19:30');
+  expect(String(out.text)).not.toContain('ESCA');
+});
+
+test('O — col banner dei cookie aperto arriva la pagina, non il banner', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await openTab('filo://newtab/');
+  const out = await servi(app, '<!DOCTYPE html><html><head><title>Trattoria</title></head><body>'
+    + '<div id="root" aria-hidden="true"><h1>Trattoria da Gino</h1>'
+    + '<p>Orari: lun-sab 8:00-19:30</p></div>'
+    + '<div role="dialog" aria-modal="true"><p>Questo sito usa i cookie</p>'
+    + '<button>Accetto tutto</button></div></body></html>', 'https://esempio.it/trattoria');
+  expect(out.ok).toBe(true);
+  expect(String(out.text)).toContain('8:00-19:30');
+  expect(String(out.text)).not.toContain('Accetto tutto');
+});

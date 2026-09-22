@@ -61,13 +61,13 @@ const TAG_CORNICE = new Set(['header', 'footer', 'aside']);
 // acconsentire, condividere, pubblicizzare, impaginare, rimandare ad altre
 // pagine. Un nome che indica un CONTENITORE il sito lo riempie di quello che
 // vuole, quindi non decide niente e va in coda (#553).
-const TOKEN_RUMORE = /^(nav|navbar|navigation|menubar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|subscribe|related|related-?posts|recommended|skip-?link|screen-?reader-?text|sr-only|visually-hidden|toolbar|search-?form)$/i;
+const TOKEN_RUMORE = /^(nav|navbar|navigation|menubar|top-?nav|breadcrumbs?|pagination|pager|cookie|cookies|cookie-?banner|cookie-?consent|consent|gdpr|advert|advertising|advertisement|ads?|adsense|social|social-?share|share|sharing|newsletter|related|related-?posts|recommended|skip-?link|screen-?reader-?text|sr-only|visually-hidden|toolbar|search-?form)$/i;
 
 // Contorno che può contenere il dato chiesto, quindi va in coda e non nel
 // cestino: l'orario sta nel piè di pagina, il prezzo scontato nel «promo», il
 // listino di una trattoria nel riquadro chiamato «menu». Qui stanno anche i
 // nomi che i programmi per fare siti scrivono da soli (#553).
-const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero|header|site-?header|page-?header|masthead|footer|site-?footer|page-?footer|colophon|topbar|top-?bar|bottom-?bar|menu|modal|popup|overlay|subscription|paywall)$/i;
+const TOKEN_CORNICE = /^(banner|promo|promotion|widget|sidebar|side-?bar|hero|header|site-?header|page-?header|masthead|footer|site-?footer|page-?footer|colophon|topbar|top-?bar|bottom-?bar|menu|modal|popup|overlay|subscription|subscribe|paywall)$/i;
 
 const ROLE_RUMORE = /^(navigation|search|dialog|alertdialog|menu|menubar|toolbar)$/i;
 
@@ -94,6 +94,14 @@ const BLOCCHI = new Set([
 ]);
 
 const LETTERA = /[a-zA-Z]/;
+
+// Chi può aprire un blocco piegato: i comandi che un sito mette accanto a una
+// domanda frequente, a una scheda di listino, a un «leggi tutto».
+const TAG_COMANDO = new Set(['button', 'summary', 'a', 'label']);
+
+// Un blocco che dichiara da sé di essere il pannello di un comando.
+const RUOLO_PANNELLO = /^(tabpanel|region)$/i;
+
 
 // I nomi dei colori che servono a far sparire del testo. Gli altri non
 // servono: l'esca è bianco su bianco, o nero su nero.
@@ -133,22 +141,52 @@ function misura(v) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+/** Un corpo del testo che nessuno può leggere? PURA. */
+function corpoIlleggibile(v) {
+  if (v === undefined) return false;
+  const n = misura(v);
+  if (!Number.isFinite(n)) return false;
+  if (n === 0) return true;
+  if (/e[mx]|ch|rem/.test(v)) return n < 0.3;
+  if (/%|vw|vh/.test(v)) return n < 30;
+  return n < 4;
+}
+
 /**
- * Questo elemento è nascosto da quello che ha scritto addosso? PURA.
+ * Questo elemento è PIEGATO, cioè chiuso da un interruttore? PURA.
  *
- * Quello che l'utente non vede non è contenuto della pagina: su una pagina
- * scritta per chi legge con un agente è l'esca (#553). Il testo dipinto col
- * proprio sfondo resta: è il titolo sfumato, e si vede benissimo. Quello che
- * sta nel foglio di stile da qui non si vede: lo prende la lettura dalla
- * scheda aperta, che guarda la pagina resa.
+ * In un file che nessun browser ha ancora aperto queste dichiarazioni non
+ * dicono che l'utente non vedrà quel testo: dicono che adesso è chiuso. Ci
+ * stanno dentro la risposta di una domanda frequente, la scheda non attiva di
+ * un listino e il seguito di «leggi tutto», e ci sta anche l'esca. A
+ * distinguerli è l'interruttore che apre (#553).
+ */
+function piegatoInline(style) {
+  const d = dichiarazioni(style);
+  if (!d.size) return false;
+  const vis = d.get('visibility');
+  return d.get('display') === 'none' || vis === 'hidden' || vis === 'collapse'
+    || d.get('content-visibility') === 'hidden';
+}
+
+/**
+ * Questo elemento è nascosto agli OCCHI da quello che ha scritto addosso? PURA.
+ *
+ * Qui stanno solo i modi che tolgono il testo alla vista lasciandolo nella
+ * pagina: nessun sito ci piega dentro un contenuto, e chi scrive per chi legge
+ * con un agente ci scrive l'esca (#553). Il testo dipinto col proprio sfondo
+ * resta: è il titolo sfumato, e si vede benissimo. Quello che sta nel foglio
+ * di stile da qui non si vede: lo prende la lettura dalla scheda aperta, che
+ * guarda la pagina resa.
  */
 function nascostoInline(style) {
   const d = dichiarazioni(style);
   if (!d.size) return false;
-  if (d.get('display') === 'none' || d.get('visibility') === 'hidden') return true;
-  if (misura(d.get('opacity')) === 0) return true;
-  const corpo = d.get('font-size');
-  if (corpo !== undefined && (misura(corpo) === 0 || (misura(corpo) < 1 && /px|pt|%/.test(corpo)))) return true;
+  const opacita = misura(d.get('opacity'));
+  if (Number.isFinite(opacita) && opacita <= 0.1) return true;
+  if (corpoIlleggibile(d.get('font-size'))) return true;
+  const spostato = /translate(?:3d|x|y)?\s*\(\s*(-?\d+(?:\.\d+)?)/.exec(d.get('transform') || '');
+  if (spostato && Number(spostato[1]) <= -100) return true;
   for (const lato of ['left', 'right', 'top', 'bottom', 'text-indent']) {
     if (misura(d.get(lato)) <= -100) return true;
   }
@@ -261,11 +299,14 @@ function attributi(raw) {
  * loro posto. Fuori diventano contorno, mai cestino: il nome del riquadro non
  * basta a decidere che il dato chiesto non è lì dentro (#553).
  */
-function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIlleggibile = false } = {}) {
+function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIlleggibile = false, apribile = false, conModale = false } = {}) {
   if (TAG_ILLEGGIBILI.has(nome)) return 'illeggibile';
-  if ('hidden' in attrs) return 'illeggibile';
-  if (String(attrs['aria-hidden'] || '').toLowerCase() === 'true') return 'illeggibile';
   if (nascostoInline(attrs.style)) return 'illeggibile';
+  // Piegato: si butta solo se sulla pagina non c'è niente che lo apra.
+  const piegato = ('hidden' in attrs)
+    || (!conModale && String(attrs['aria-hidden'] || '').toLowerCase() === 'true')
+    || piegatoInline(attrs.style);
+  if (piegato && !apribile) return 'illeggibile';
   if (soloIlleggibile) return false;
   if (TAG_FUORI.has(nome)) return 'fuori';
   if (attrs.role && ROLE_RUMORE.test(attrs.role)) return 'fuori';
@@ -323,19 +364,58 @@ function decodeEntita(s) {
 }
 
 /**
+ * Cosa dice la pagina di sé, in un giro solo: quali blocchi qualcuno apre, e
+ * se c'è una finestra aperta sopra. PURA.
+ *
+ * `apribili` sono gli id nominati da un comando che non è a sua volta
+ * nascosto: è l'interruttore che distingue un contenuto piegato da un'esca.
+ * `modale` conta perché con una finestra aperta ogni libreria di consenso
+ * marca TUTTO il resto della pagina come nascosto agli assistivi, e quel resto
+ * è il contenuto del sito (#553).
+ */
+function indiziPagina(html) {
+  const src = String(html == null ? '' : html);
+  const apribili = new Set();
+  let modale = false;
+  let i = 0;
+  for (;;) {
+    const t = prossimoTag(src, i);
+    if (!t || t.troncato) break;
+    i = t.fine;
+    if (t.salta || t.chiusura) continue;
+    const a = attributi(t.attrsRaw);
+    const ruolo = String(a.role || '').toLowerCase();
+    if (ruolo === 'dialog' || ruolo === 'alertdialog'
+      || String(a['aria-modal'] || '').toLowerCase() === 'true'
+      || (t.nome === 'dialog' && 'open' in a)) modale = true;
+    if (nascostoInline(a.style) || piegatoInline(a.style) || 'hidden' in a) continue;
+    for (const chiave of ['aria-controls', 'aria-owns']) {
+      for (const id of String(a[chiave] || '').split(/\s+/)) if (id) apribili.add(id);
+    }
+    for (const chiave of ['href', 'data-target', 'data-bs-target']) {
+      const v = String(a[chiave] || '').trim();
+      if (v.startsWith('#') && v.length > 1) apribili.add(v.slice(1));
+    }
+  }
+  return { apribili, modale };
+}
+
+/**
  * HTML → testo leggibile: salta gli elementi di cornice con tutto il loro
  * contenuto, tiene i confini fra blocchi e trasforma le voci di elenco in
  * righe. PURA.
  */
-function htmlATesto(html, dentroZona = false) {
-  const potato = passaggio(html, 'tutto', dentroZona).testo;
+function htmlATesto(html, dentroZona = false, indizi = null) {
+  const segni = indizi || indiziPagina(html);
+  const potato = passaggio(html, 'tutto', dentroZona, segni).testo;
   // SE POTARE NON LASCIA NIENTE, SI RINUNCIA ALLA SOLA CORNICE: l'HTML vero è
   // pieno di tag mai chiusi, e un `<nav>` che non chiude si porta via tutto
   // quello che viene dopo. Senza testo la pagina si dichiara vuota.
-  return potato || passaggio(html, 'minimo', dentroZona).testo;
+  return potato || passaggio(html, 'minimo', dentroZona, segni).testo;
 }
 
-function passaggio(html, modo, dentroZona = false) {
+function passaggio(html, modo, dentroZona = false, indizi = null) {
+  const segni = indizi || indiziPagina(html);
   const soloIlleggibile = modo === 'minimo';
   // Nel passaggio della coda il contorno non si butta: si raccoglie a parte, in
   // un giro solo, perché ripassare l'HTML raddoppia il tempo su una pagina enorme.
@@ -350,6 +430,10 @@ function passaggio(html, modo, dentroZona = false) {
   // e una di chiusure che non si corrispondono faceva crescere il tempo col
   // QUADRATO della pagina, e la lettura gira nel processo delle finestre (#553).
   const indici = new Map();
+  // Per ogni livello, se l'elemento sorella appena passato è un comando: è lui
+  // che apre il blocco piegato che viene subito dopo.
+  const precedenti = [];
+  const haComando = [];
   const pezzi = [];
   const pezziCornice = [];
   let i = 0;
@@ -384,7 +468,19 @@ function passaggio(html, modo, dentroZona = false) {
       if (!indici.has(nome)) indici.set(nome, []);
       indici.get(nome).push(pila.length - 1);
       const attrs = attributi(t.attrsRaw);
-      const dove = { inZona: dentroZona || zone.length > 0, primoLivello: pila.length === 1, soloIlleggibile };
+      const liv = pila.length;
+      const prima = precedenti[liv];
+      const comando = TAG_COMANDO.has(nome) || 'aria-expanded' in attrs;
+      const apribile = !!((attrs.id && segni.apribili.has(attrs.id))
+        || RUOLO_PANNELLO.test(attrs.role || '')
+        || (prima && prima.comando));
+      precedenti[liv] = { comando };
+      precedenti[liv + 1] = null;
+      haComando[liv] = comando;
+      const dove = {
+        inZona: dentroZona || zone.length > 0, primoLivello: liv === 1,
+        soloIlleggibile, apribile, conModale: segni.modale,
+      };
       const verdetto = daScartare(nome, attrs, dove);
       const contornoQui = tieniCornice && verdetto === 'cornice';
       if (!fuori.length && verdetto && !contornoQui) { fuori.push(pila.length); continue; }
@@ -404,6 +500,9 @@ function passaggio(html, modo, dentroZona = false) {
     while (suoi && suoi.length && (suoi[suoi.length - 1] >= pila.length || pila[suoi[suoi.length - 1]] !== nome)) suoi.pop();
     const dove = suoi && suoi.length ? suoi.pop() : -1;
     if (dove >= 0) {
+      // Un comando annidato (il bottone dentro l'intestazione di una voce)
+      // apre lo stesso il blocco che segue il suo contenitore.
+      if (haComando[dove + 1]) { haComando[dove] = true; precedenti[dove + 1] = { comando: true }; }
       pila.length = dove;
       while (fuori.length && fuori[fuori.length - 1] > pila.length) fuori.pop();
       while (zone.length && zone[zone.length - 1] > pila.length) zone.pop();
@@ -496,8 +595,13 @@ function estraiContenuto(html) {
   // il tag che la racchiudeva non c'è più, e senza questo il filtro la
   // scambierebbe per quella del sito.
   // Un giro solo sul corpo: da qui escono sia il contenuto sia il contorno.
-  const pieno = passaggio(corpo, 'cornice');
-  let testo = zona != null ? htmlATesto(zona, true) : (pieno.testo || passaggio(corpo, 'minimo').testo);
+  // Un giro solo per gli indizi, sull'intera pagina: il comando che apre un
+  // blocco può stare fuori dalla zona di contenuto.
+  const segni = indiziPagina(src);
+  const pieno = passaggio(corpo, 'cornice', false, segni);
+  let testo = zona != null
+    ? htmlATesto(zona, true, segni)
+    : (pieno.testo || passaggio(corpo, 'minimo', false, segni).testo);
   // Sotto una ventina di caratteri la zona principale non è contenuto: è un
   // guscio che il JavaScript del sito riempirà. Il corpo intero contiene
   // comunque la zona, quindi ripiegare non perde niente: aggiunge rumore.
@@ -665,7 +769,10 @@ async function daContenuto({ url = '', contentType = '', buffer = null, status =
  * e il simbolo dell'euro: il prezzo arriva al modello storpiato (#553).
  */
 function charsetDaHtml(buffer) {
-  const testa = Buffer.from(buffer).subarray(0, 4096).toString('latin1');
+  // Largo: la dichiarazione sta in cima solo se il sito non ci ha messo prima
+  // una fila di collegamenti ai fogli di stile, e allora gli accenti tornano
+  // come rombi. Sessantaquattro KB coprono l'intestazione di qualunque sito.
+  const testa = Buffer.from(buffer).subarray(0, 64 * 1024).toString('latin1');
   const m = testa.match(/<meta[^>]{0,400}?charset\s*=\s*["']?\s*([\w-]+)/i);
   return m ? m[1] : '';
 }

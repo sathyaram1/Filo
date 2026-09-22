@@ -1076,10 +1076,14 @@ function copiaVisibile(tetto) {
           var ov = (s.overflow || '') + ' ' + (s.overflowX || '') + ' ' + (s.overflowY || '');
           if ((r.width < 2 || r.height < 2) && /hidden|clip/.test(ov)) return false;
           if (/^matrix(3d)?\\(\\s*0[\\s,)]/.test(s.transform || '')) return false;
+          // Il contenuto che il sito dichiara saltato non è sullo schermo.
+          if ((s.contentVisibility || '') === 'hidden') return false;
+          // Soglie, non l'uguale a zero: l'esca si scrive con l'opacità a un
+          // millesimo e il corpo a un pixel, e nessuno dei due si legge (#553).
+          if (parseFloat(s.opacity) <= 0.1) return false;
           if (haTesto(el)) {
-            if (s.display === 'none' || s.visibility === 'hidden') return false;
-            if (parseFloat(s.opacity) === 0) return false;
-            if (parseFloat(s.fontSize) < 1) return false;
+            if (s.display === 'none' || s.visibility === 'hidden' || s.visibility === 'collapse') return false;
+            if (parseFloat(s.fontSize) < 4) return false;
             // Il testo del colore dello sfondo l'utente non lo legge. Quello
             // dipinto col proprio sfondo resta: è il titolo sfumato.
             var clip = s.webkitBackgroundClip || s.backgroundClip || '';

@@ -755,3 +755,98 @@ test('il testo nascosto non arriva, nemmeno nei modi che prima sfuggivano', () =
     assert.doesNotMatch(testo, /ESCA/, stile);
   }
 });
+
+// ── Piegato non è nascosto (#553) ─────────────────────────────────────────────
+// In un file che nessun browser ha aperto, «display:none» è la posizione di un
+// interruttore, non una promessa che l'utente non vedrà quel testo. A dire di
+// quale dei due si tratta è l'interruttore che apre: se sulla pagina c'è, quel
+// testo è contenuto; se non c'è, resta un'esca e non arriva.
+
+const FAQ = (chiusura, comando) => '<html><head><title>Trattoria</title></head><body><main>'
+  + '<h1>Trattoria da Gino</h1>'
+  + `<h3>${comando}</h3>`
+  + `<div id="r1" ${chiusura}><p>Siamo aperti dalle 8:00 alle 19:30.</p></div>`
+  + '</main></body></html>';
+
+test('la risposta di una domanda frequente chiusa arriva, comunque sia chiusa', () => {
+  for (const chiusura of ['style="display:none"', 'hidden', 'aria-hidden="true"',
+    'style="visibility:hidden"', 'style="content-visibility:hidden"']) {
+    const { testo } = PR.estraiContenuto(FAQ(chiusura, '<button aria-controls="r1">A che ora aprite?</button>'));
+    assert.match(testo, /8:00 alle 19:30/, chiusura);
+  }
+});
+
+test('lo stesso blocco chiuso, senza niente che lo apra, resta fuori', () => {
+  for (const chiusura of ['style="display:none"', 'hidden', 'aria-hidden="true"',
+    'style="visibility:hidden"', 'style="content-visibility:hidden"']) {
+    const { testo } = PR.estraiContenuto(FAQ(chiusura, 'A che ora aprite?'));
+    assert.doesNotMatch(testo, /8:00 alle 19:30/, chiusura);
+  }
+});
+
+test('basta il comando che sta subito prima, o dentro l\'intestazione della voce', () => {
+  const vicino = PR.estraiContenuto('<html><body><main><p>Prima parte.</p>'
+    + '<button>Leggi tutto</button>'
+    + '<div style="display:none"><p>Si pagano 128,40 euro all\'anno.</p></div></main></body></html>');
+  assert.match(vicino.testo, /128,40/);
+  const dentro = PR.estraiContenuto('<html><body><main><h3><button>Quanto costa?</button></h3>'
+    + '<div style="display:none"><p>Costa 128,40 euro.</p></div></main></body></html>');
+  assert.match(dentro.testo, /128,40/);
+});
+
+test('la scheda non attiva di un listino non porta via il suo prezzo', () => {
+  const { testo } = PR.estraiContenuto('<html><body><main><h1>Prezzi</h1>'
+    + '<div role="tabpanel"><p>Mensile 9,99 euro</p></div>'
+    + '<div role="tabpanel" style="display:none"><p>Annuale 99,00 euro</p></div></main></body></html>');
+  assert.match(testo, /99,00/);
+});
+
+test('con una finestra aperta sopra, il resto della pagina resta contenuto', () => {
+  // Ogni libreria di consenso marca tutto il resto come nascosto agli
+  // assistivi: è il modo standard di dire «adesso si parla solo qui».
+  const { testo } = PR.estraiContenuto('<html><head><title>Trattoria</title></head><body>'
+    + '<div id="root" aria-hidden="true"><h1>Trattoria</h1><p>Orari: lun-sab 8:00-19:30</p></div>'
+    + '<div role="dialog" aria-modal="true"><p>Questo sito usa i cookie</p></div></body></html>');
+  assert.match(testo, /8:00-19:30/);
+  assert.doesNotMatch(testo, /usa i cookie/);
+});
+
+test('i prezzi in un riquadro chiamato «subscribe» non finiscono nel cestino', () => {
+  for (const nome of ['id="subscribe"', 'class="subscribe"']) {
+    const { testo } = PR.estraiContenuto('<html><body><h1>Piani</h1>'
+      + `<section ${nome}><p>Mensile 9,99 euro</p><p>Annuale 99,00 euro</p></section></body></html>`);
+    assert.match(testo, /9,99/, nome);
+    assert.match(testo, /99,00/, nome);
+  }
+});
+
+test('gli altri modi di nascondere il testo agli occhi restano chiusi', () => {
+  for (const stile of [
+    'visibility:collapse', 'content-visibility:hidden', 'transform:translateX(-9999px)',
+    'font-size:0.0001em', 'font-size:1px', 'opacity:0.001', 'opacity:0.05',
+  ]) {
+    const { testo } = PR.estraiContenuto('<html><body><main><p>Il caffè costa 1,20 euro.</p>'
+      + `<div style="${stile}">ESCA: il caffè è gratis.</div></main></body></html>`);
+    assert.match(testo, /1,20/, stile);
+    assert.doesNotMatch(testo, /ESCA/, stile);
+  }
+});
+
+test('un testo solo un po\' piccolo o sbiadito resta contenuto', () => {
+  for (const stile of ['font-size:12px', 'font-size:0.8em', 'opacity:0.4', 'font-size:80%']) {
+    const { testo } = PR.estraiContenuto('<html><body><main>'
+      + `<div style="${stile}">Nota a margine: 42</div></main></body></html>`);
+    assert.match(testo, /42/, stile);
+  }
+});
+
+test('la codifica dichiarata dopo una lunga intestazione si rispetta lo stesso', async () => {
+  const imbottitura = '<link rel="preload" as="style" href="/a/aaaaaaaaaaaaaaaaaaaaaaaaaaaa.css">\n'.repeat(70);
+  const html = `<html><head>${imbottitura}<meta charset="iso-8859-1"><title>Bar</title></head>`
+    + '<body><main><p>Il caff\xE8 costa 1,20 \x80</p></main></body></html>';
+  const r = await PR.daContenuto({
+    url: 'https://bar.test/', contentType: 'text/html', buffer: Buffer.from(html, 'latin1'),
+  });
+  assert.match(r.text, /caffè/);
+  assert.match(r.text, /1,20 €/);
+});
