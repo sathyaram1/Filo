@@ -1329,7 +1329,7 @@ export function usageText() {
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
-    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md> [--ferma]] [--ticket <b>]',
+    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
     '                         la nota dice cosa hai controllato e cosa hai trovato;',
