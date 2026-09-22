@@ -30,7 +30,7 @@ async function openStubbedEditor(openTab, overrides = {}) {
       // Senza override: la lista di esclusione EFFETTIVA coincide con quella del
       // codice (nessun override remoto), che è il caso normale.
       excludedProviders: null,
-      ...over,
+      ...cfgOver,
     };
     if (fakeConfig.excludedProviders == null) {
       Object.defineProperty(fakeConfig, 'excludedProviders', {
