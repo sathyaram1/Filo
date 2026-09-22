@@ -66,7 +66,7 @@ test('#496 giro25 — e col registro che smette di rispondere sotto «Feedback l
   await page.locator('[data-fs-tile="lavorati"]').click();
   await expect(page.locator('#mgFsTiles .mg-fs-detail')).toBeVisible();
   // Il registro smette di rispondere al giro di aggiornamento successivo.
-  await page.evaluate(() => window.__mgTest.setFsData({ feedbacks: window.__fbs, workerLog: [], logOk: false }));
+  await page.evaluate((f) => window.__mgTest.setFsData({ feedbacks: f, workerLog: [], logOk: false }), feedbacks);
   const dettaglio = page.locator('#mgFsTiles .mg-fs-detail');
   console.log('REGISTRO GIU: dettaglio=%d apribile=%d', await dettaglio.count(), await page.locator('[data-fs-tile="lavorati"]').count());
   if (await dettaglio.count()) {
