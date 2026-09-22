@@ -38,7 +38,7 @@ test('sguardo', async ({ openTab }) => {
   await page.waitForSelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)', { timeout: 15_000 });
   await page.waitForTimeout(600);
   await page.screenshot({ path: 'tests/.shots/g4-chiaro.png', fullPage: false });
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('dark'));
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'tests/.shots/g4-scuro.png', fullPage: false });
 });
