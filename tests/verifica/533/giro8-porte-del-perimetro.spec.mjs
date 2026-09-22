@@ -19,6 +19,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from '../../fixtures/electron.mjs';
+import { CONFIRM_HOST } from '../../helpers/confirm.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
 const NEWTAB = 'filo://newtab/';
@@ -134,7 +135,6 @@ test.describe('#533 giro 8 — le strade che portano fuori da una richiesta che 
     // stessa sorgente di rendering della chat: un collegamento con la scritta
     // scelta dal modello e l'indirizzo pure. Qui si riproduce esattamente
     // quell'ancora, e la si preme.
-    const primaDelClic = app.windows().length;
     await page.evaluate(async (url) => {
       const box = document.createElement('div');
       box.className = 'sn-msg-text';
@@ -155,8 +155,8 @@ test.describe('#533 giro 8 — le strade che portano fuori da una richiesta che 
     expect(schede.some((u) => u.includes('d=segreto')),
       'dentro una pagina web il clic su un collegamento scritto da Filo apre l\'indirizzo senza passare dal motore, mentre nella chat lo stesso clic viene fermato')
       .toBe(false);
-    expect(app.windows().length, 'il clic ha aperto una scheda nuova senza che nessuno chiedesse niente')
-      .toBe(primaDelClic);
+    // Quello che l'utente vede al suo posto: il riquadro di conferma di Filo.
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
   });
 
   test('l\'indirizzo che il motore ha rifiutato non resta in chat come pastiglia da premere', async ({ app, openTab, testServer }) => {
