@@ -181,6 +181,6 @@
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
 
-  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork };
+  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork, rimedio, CODICI_GIA_SCRITTI };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
