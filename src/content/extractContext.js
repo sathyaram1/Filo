@@ -337,7 +337,7 @@
     // anche se un domani comparisse un tag radice non previsto nella lista sopra.
     if (el.namespaceURI && el.namespaceURI !== HTML_NS) return 'tag';
     const hard = hardSkipForTranslation(el);
-    if (hard === 'hidden') return 'hidden';
+    if (hard === 'hidden' || hard === 'visibility') return hard;
     return hard ? 'hard' : false;
   }
 
