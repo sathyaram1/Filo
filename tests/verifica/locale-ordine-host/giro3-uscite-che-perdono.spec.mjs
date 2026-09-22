@@ -140,3 +140,9 @@ test('Preferenze: spegnendo Filo subito dopo aver scritto, la modifica non si pe
   expect(await scriviESpegni(atteso, 0),
     'spegnendo Filo subito dopo aver scritto, l\'ultima modifica sparisce').toBe(atteso);
 });
+
+test('Opzioni: spegnendo Filo subito dopo aver scritto, la modifica non si perde', async () => {
+  test.setTimeout(120_000);
+  expect(await scriviESpegni('31', 0, OPZIONI, 'monthlyLimitEur'),
+    'spegnendo Filo subito dopo aver scritto, l\'ultimo limite di spesa sparisce').toBe('31');
+});
