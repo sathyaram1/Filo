@@ -183,10 +183,32 @@
       // confermata nel popup arriva dopo, e il titolo deve contarla.
       addRow(type, rowIcon, text, failed = false) {
         closeTurnReasoning();
-        if (!failed) doneTypes.push(String(type || '').toUpperCase());
-        append(makeActivityRow(rowIcon, text));
+        const t = String(type || '').toUpperCase();
+        if (!failed) doneTypes.push(t);
+        const riga = makeActivityRow(rowIcon, text);
+        if (t) righePerTipo.set(t, riga);
+        append(riga);
         if (phase !== 'done') setPhase('act', text);
         else renderSummary();
+      },
+      // L'utente ha finito da sé, col bottone in chat, un'azione che Filo aveva
+      // solo proposto. La riga di quella proposta diventa l'esito e il riassunto
+      // smette di chiamarla proposta: erano due frasi che si contraddicevano
+      // nella stessa schermata.
+      compiuta(type, rowIcon, text) {
+        const t = String(type || '').toUpperCase();
+        if (!t) return;
+        fatti.add(t);
+        const riga = righePerTipo.get(t);
+        if (riga && riga.isConnected) {
+          const [ic, tx] = riga.children;
+          if (ic) ic.textContent = rowIcon || '';
+          if (tx) tx.textContent = String(text || '').trim();
+          if (!doneTypes.includes(t)) doneTypes.push(t);
+          if (phase === 'done') renderSummary();
+          return;
+        }
+        this.addRow(t, rowIcon, text);
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
       // output, nella cronologia — non nella bolla della risposta.
