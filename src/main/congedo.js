@@ -16,24 +16,37 @@ const CANALE_RISPOSTA = 'filo:pagina-sparita';
 // lavoro di chi scriveva. Una pagina che non risponde non blocca nessuno.
 const TETTO_MS = 800;
 
+// Un ascoltatore solo per tutte le attese: «chiudi tutto» con una ventina di
+// schede ne registrerebbe una ventina, e sopra la decina Node avvisa di una
+// perdita di memoria che qui non c'è.
+const inAttesa = new Map();
+let ascoltoAcceso = false;
+
+function accendiAscolto() {
+  if (ascoltoAcceso) return;
+  ascoltoAcceso = true;
+  // Solo la risposta di QUELLA pagina la sblocca: due schede che si chiudono
+  // insieme si sbloccherebbero a vicenda senza aver salvato.
+  ipcMain.on(CANALE_RISPOSTA, (event) => {
+    const fine = event && inAttesa.get(event.sender);
+    if (fine) fine();
+  });
+}
+
 function congedaPagina(webContents, { tetto = TETTO_MS } = {}) {
   return new Promise((risolvi) => {
-    let fatto = false;
-    let timer = null;
-    const fine = () => {
-      if (fatto) return;
-      fatto = true;
-      clearTimeout(timer);
-      try { ipcMain.removeListener(CANALE_RISPOSTA, ascolta); } catch (_) {}
-      risolvi();
-    };
-    // Solo la risposta di QUESTA pagina conta: due schede che si chiudono
-    // insieme si sbloccherebbero a vicenda senza aver salvato.
-    const ascolta = (event) => { if (event && event.sender === webContents) fine(); };
     let vivo = false;
     try { vivo = !!webContents && !webContents.isDestroyed(); } catch (_) { vivo = false; }
     if (!vivo) { risolvi(); return; }
-    ipcMain.on(CANALE_RISPOSTA, ascolta);
+    accendiAscolto();
+    let timer = null;
+    const fine = () => {
+      if (!inAttesa.has(webContents)) return;
+      inAttesa.delete(webContents);
+      clearTimeout(timer);
+      risolvi();
+    };
+    inAttesa.set(webContents, fine);
     // Il timer NON si sgancia dal giro degli eventi: è l'unica garanzia che la
     // view venga poi buttata via anche se la pagina non risponde mai.
     timer = setTimeout(fine, tetto);
