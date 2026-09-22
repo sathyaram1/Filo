@@ -28,10 +28,27 @@
     return EPHEMERAL_INTERNAL_HOSTS.has(internalHostOf(url));
   }
 
-  // Candidabile al riordino = sito web (http/https) OPPURE pagina interna
-  // effimera (home/impostazioni).
+  // #591, ottavo giro — le pagine della rete di casa restano fuori. Il riordino
+  // parte da solo e manda al modello indirizzo, titolo ed estratto del testo di
+  // ogni scheda che prende: il pannello del router, il NAS, l'applicazione in
+  // prova sulla propria macchina non devono uscire di casa. La domanda è la
+  // stessa che si fanno il giudizio sui siti pericolosi e il riconoscimento del
+  // blocco geografico, e si fa nello stesso posto; se quel posto non è
+  // caricato, non si manda niente.
+  function eRetePrivata(url) {
+    const psl = global.SN_SAFEBROWSE && global.SN_SAFEBROWSE.psl;
+    if (!psl || typeof psl.isHostPrivato !== 'function') return true;
+    let host = '';
+    try { host = new URL(String(url || '')).hostname || ''; } catch (_) { return true; }
+    return psl.isHostPrivato(host.replace(/^\[|\]$/g, ''));
+  }
+
+  // Candidabile al riordino = sito web (http/https) fuori dalla rete di casa,
+  // OPPURE pagina interna effimera (home/impostazioni).
   function isTriageableUrl(url) {
-    return /^https?:\/\//i.test(String(url || '')) || isEphemeralInternalUrl(url);
+    if (isEphemeralInternalUrl(url)) return true;
+    if (!/^https?:\/\//i.test(String(url || ''))) return false;
+    return !eRetePrivata(url);
   }
 
   // Normalizza per il confronto "è la stessa scheda?" (dedup): via il fragment
