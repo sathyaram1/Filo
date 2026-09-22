@@ -614,7 +614,10 @@
   // La conferma parla dell'ULTIMO salvataggio: appena qualcosa sullo schermo non
   // è più ciò che è partito agli utenti, lo dice invece di lasciar credere di sì.
   function segnalaModifica() {
-    if (save._inCorso) return;
+    // Una modifica fatta mentre il salvataggio viaggia non è partita con lui:
+    // la ricorda, e a risposta arrivata la pagina lo dice invece di annunciare
+    // un salvataggio che quella modifica non contiene.
+    if (save._inCorso) { save._modificatoDurante = true; return; }
     const status = $('saveStatus');
     clearTimeout(save._t);
     status.classList.remove('sn-error');
