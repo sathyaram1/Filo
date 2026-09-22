@@ -294,6 +294,7 @@
       return { ok: false, motivo: 'mai-da-esterno', uscita: u, etichetta: etichettaUscita(u) };
     }
     if (!Array.isArray(c.perimetro)) c.perimetro = [];
+    if (!Array.isArray(c.allargamenti)) c.allargamenti = [];
     c.dichiarato = true;
     if (!c.allargamenti.some((a) => a.uscita === u)) {
       c.allargamenti.push({ uscita: u, motivo: String(motivo || '') });
