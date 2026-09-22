@@ -667,8 +667,24 @@
       $('apiKey').value = '';
       $('apiKeyTavily').value = '';
       $('apiKeySafebrowse').value = '';
-      applyConfig(res.config || {});
-      status.textContent = I18n.t('admin_defaults_saved');
+      // Ridisegnare la pagina dalla risposta cancellerebbe quello che è stato
+      // scelto mentre il salvataggio viaggiava: in quel caso resta lo schermo,
+      // e la conferma dice che c'è ancora qualcosa da propagare.
+      if (save._modificatoDurante) {
+        applyStatoChiavi(res.config || {});
+      } else {
+        applyConfig(res.config || {});
+      }
+      markRegistryRowIssues(missingNickRows, dupRows);
+      const scartate = missingNickRows.length + dupRows.length;
+      if (save._modificatoDurante) {
+        status.textContent = I18n.t('admin_defaults_unsaved');
+      } else if (scartate) {
+        status.classList.add('sn-error');
+        status.textContent = I18n.t('admin_defaults_saved_partial');
+      } else {
+        status.textContent = I18n.t('admin_defaults_saved');
+      }
     } catch (e) {
       status.classList.add('sn-error');
       status.textContent = I18n.t('admin_defaults_save_fail', e?.message || String(e));
