@@ -147,6 +147,19 @@ const sandboxSpesa = creaConto(30 * MIN);
 // Il conto comune vive a parte, con la sua finestra corta.
 const llmRaffica = creaConto(RAFFICA_MS);
 const sandboxRaffica = creaConto(RAFFICA_MS);
+// #591, settimo giro — il conto della CATENA di navigazioni, cioè di chi
+// consuma davvero. I due conti qui sopra limitano la velocità: il primo è di
+// chi possiede il sito e chi attacca lo aggira con sotto-indirizzi sempre
+// nuovi, il secondo si riapre ogni pochi secondi, quindi in sedici secondi
+// partivano trentadue giudizi del modello e trentadue finestre nascoste, per
+// sempre. Una catena è una pagina che si porta da sola in giro senza mai
+// lasciar passare il tempo che serve a una persona per guardare: il suo conto
+// è piccolo e non si riapre finché la catena dura. Chi naviga dopo una pausa
+// ne apre una nuova, quindi a una persona non toglie niente.
+const DEEP_MAX_PER_CATENA = 3;
+const LOOKUP_MAX_PER_CATENA = 8;
+const catenaSpesa = creaConto(HOUR);
+const catenaLookup = creaConto(HOUR);
 
 // Prende un gettone dal conto di chi possiede il sito E dal conto comune.
 // Ritorna 'ok', 'suo' (questo sito ne ha già fatte partire troppe: si
