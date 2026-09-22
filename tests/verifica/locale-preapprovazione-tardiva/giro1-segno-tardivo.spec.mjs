@@ -271,3 +271,41 @@ test('fusione partita da sola e non riuscita: l’owner la legge senza aprire la
   await expect(page.locator('#mgManageMsg')).toBeVisible();
   await expect(page.locator('#mgManageMsg')).toContainText('riprova');
 });
+
+// ── 8. Come si vede l'esito, chiaro e scuro ────────────────────────────────
+
+test('la riga che racconta la fusione si legge in tema chiaro e scuro', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica();
+  await apri(page, { fbs: [fb], pending: [richiesta()] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+  await page.locator('#mgPreapproveBtn').click();
+  const msg = page.locator('#mgManageMsg');
+  await expect(msg).toContainText('su main');
+  for (const scheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await expect(msg).toBeVisible();
+    await page.screenshot({ path: `tests/.shots/preapprovazione-tardiva-esito-${scheme}.png` });
+  }
+});
+
+// ── 9. La scheda con le due etichette insieme ──────────────────────────────
+
+test('pratica segnata e fusione ancora ferma: le due etichette stanno dentro la scheda', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
+  await apri(page, { fbs: [fb], pending: [richiesta()], approveReplies: [{ ok: false, error: 'github_502 unreachable' }] });
+
+  const item = page.locator('.mg-item').first();
+  const badge = item.locator('.mg-preapproved');
+  await expect(badge).toBeVisible();
+  const [scheda, segno] = [await item.boundingBox(), await badge.boundingBox()];
+  // Tagliata a metà parola, l'etichetta non dice più cosa sta succedendo.
+  expect(segno.x + segno.width).toBeLessThanOrEqual(scheda.x + scheda.width);
+  // E la lista non deve scorrere di lato per colpa di una scheda.
+  const debordo = await page.evaluate(() => {
+    const col = document.querySelector('.mg-list') || document.querySelector('#mgList');
+    return col ? col.scrollWidth - col.clientWidth : 0;
+  });
+  expect(debordo).toBeLessThanOrEqual(1);
+});
