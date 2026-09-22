@@ -1106,7 +1106,7 @@
 
   // §5 — pannello di cancellazione retroattiva: cerca le schede pertinenti nella
   // cronologia e le elimina DEFINITIVAMENTE dopo conferma esplicita.
-  function renderDeleteArchivePanel(query) {
+  function renderDeleteArchivePanel(query, onFatto = null) {
     const panel = document.createElement('div');
     panel.className = 'dash-delete-panel';
     const note = document.createElement('div');
