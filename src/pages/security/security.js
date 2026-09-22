@@ -195,6 +195,8 @@
       fn(el);
     };
     const sec = settings.security || {};
+    Bootstrap.applyTheme(settings.theme);
+    Bootstrap.applyTextScale(settings.textScale);
     // "Apri da un altro paese": se è configurato un fornitore proxy, mostra il
     // suo host nella riga privacy (onestà: dichiariamo per chi passa il traffico).
     const provHost = proxyProviderHost(settings.proxy);
@@ -210,28 +212,30 @@
     // Default-on: il merge con DEFAULT_SETTINGS.security mette già true/true se
     // l'utente non ha mai salvato, quindi qui leggiamo "!== false" per
     // riflettere il default anche in casi limite (es. chiave esistente ma null).
-    $('sec-protect-ip').checked = sec.protectIpLeak !== false;
-    $('sec-block-popups').checked = sec.blockPopups !== false;
-    $('sec-adblock').checked = (sec.adblock || {}).enabled !== false;
+    metti('sec-protect-ip', (el) => { el.checked = sec.protectIpLeak !== false; });
+    metti('sec-block-popups', (el) => { el.checked = sec.blockPopups !== false; });
+    metti('sec-adblock', (el) => { el.checked = (sec.adblock || {}).enabled !== false; });
     const sblk = sec.siteBlock || {};
-    $('sec-siteblock').checked = sblk.enabled !== false;
-    $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
-    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+    metti('sec-siteblock', (el) => { el.checked = sblk.enabled !== false; });
+    metti('sec-siteblock-lists', (el) => { el.checked = sblk.useAdblockLists !== false; });
+    metti('sec-siteblock-blacklist', (el) => {
+      el.value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+    });
     // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
     // subito che non bloccheranno nulla invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     syncSiteBlockEnabled();
     const sb = sec.safeBrowse || {};
-    $('sec-safebrowse').checked = sb.enabled !== false;
-    $('sec-safebrowse-network').checked = sb.networkSignals !== false;
-    $('sec-safebrowse-llm').checked = sb.llmJudge !== false;
-    $('sec-safebrowse-sandbox').checked = sb.sandbox !== false;
+    metti('sec-safebrowse', (el) => { el.checked = sb.enabled !== false; });
+    metti('sec-safebrowse-network', (el) => { el.checked = sb.networkSignals !== false; });
+    metti('sec-safebrowse-llm', (el) => { el.checked = sb.llmJudge !== false; });
+    metti('sec-safebrowse-sandbox', (el) => { el.checked = sb.sandbox !== false; });
     syncSafebrowseEnabled();
 
     const cookies = sec.cookies || {};
     const mode = ['manual', 'default', 'privacy'].includes(cookies.mode) ? cookies.mode : 'default';
     const radio = document.querySelector(`input[name="cookie-mode"][value="${mode}"]`);
-    if (radio) radio.checked = true;
+    if (radio && radio !== attivo) radio.checked = true;
     const trusted = cookies.trustedSites || cookies.loginWhitelist;
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
     renderWhitelist();
@@ -240,10 +244,16 @@
     const fp = sec.fingerprint || {};
     const fpMode = ['off', 'default', 'privacy'].includes(fp.mode) ? fp.mode : 'default';
     const fpRadio = document.querySelector(`input[name="fp-mode"][value="${fpMode}"]`);
-    if (fpRadio) fpRadio.checked = true;
+    if (fpRadio && fpRadio !== attivo) fpRadio.checked = true;
 
     // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
-    $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
+    metti('sec-auto-feedback', (el) => { el.checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback; });
+  }
+
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) applica(msg.settings);
+    });
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
