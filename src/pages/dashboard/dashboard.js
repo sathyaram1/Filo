@@ -928,14 +928,21 @@
       // lo status.
       const W = window.SN_WALLET;
       const keyRefused = r && 'keyRefused' in r ? Boolean(r.keyRefused) : Boolean(W && W.isKeyRefusalStatus(r?.status));
-      if (r?.code === 'NO_API_KEY' || keyRefused) {
-        const credits = document.createElement('button');
-        credits.type = 'button';
-        credits.className = 'dash-action-btn';
-        credits.textContent = 'Apri Crediti';
-        credits.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter';
-        credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
-        row.appendChild(credits);
+      // Dove si rimedia lo dice chi conosce i codici, non un elenco di casi
+      // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
+      // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
+      const dove = keyRefused ? 'crediti' : (window.SN_CHAT_ERRORS?.rimedio(r?.code) || '');
+      if (dove) {
+        const via = document.createElement('button');
+        via.type = 'button';
+        via.className = 'dash-action-btn';
+        via.textContent = dove === 'crediti' ? 'Apri Crediti' : 'Apri Opzioni';
+        via.title = dove === 'opzioni'
+          ? 'Scegli il modello per questa funzione'
+          : (r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter');
+        const url = dove === 'crediti' ? 'filo://credits/credits.html' : 'filo://options/options.html';
+        via.addEventListener('click', () => chrome.tabs.create({ url }));
+        row.appendChild(via);
       }
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
       // modello non risponde (rete assente, provider giù, crediti finiti) alla
