@@ -2437,6 +2437,7 @@
     normalizeReasoning,
     PROVIDER_SORTS,
     normalizeProviderSort,
+    misuraValePer,
     providerRoutingFor,
     DEFAULT_EXCLUDED_PROVIDERS,
     normalizeProviderName,
