@@ -49,11 +49,37 @@ async function newtab(app) {
   throw new Error('newtab non trovata');
 }
 
-// Apre l'Aiuto su una pagina web vera, scrive e manda.
-async function chiediAllAiuto(page, testo) {
-  await page.waitForFunction(() => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 15_000 });
-  await page.evaluate(() => window.SN_SIDEBAR.open());
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 15_000 });
+// Il motivo che Filo si dà adesso, letto dal main: serve a distinguere «la
+// home è ferma» da «lo stato non è cambiato davvero».
+async function motivoOra(app) {
+  return app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const A = C.ACTIONS;
+    const s = await globalThis.__filoHandlers.getEffectiveSettings();
+    return C.whyCannotServe(s, [A.FILO_DASHBOARD, A.FILO_CHAT]);
+  });
+}
+
+// Apre l'Aiuto su una pagina web vera, scrive e manda. Su una pagina esterna i
+// moduli di Filo vivono nel mondo isolato del preload e da qui non si vedono:
+// l'Aiuto si apre con lo stesso comando di pagina che gli manda il menu del
+// tasto destro, cioè la strada dell'utente.
+async function apriAiuto(app, page) {
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        const wc = t.view.webContents;
+        if (!wc.getURL().startsWith('http')) continue;
+        wc.mainFrame.send('filo:broadcast', { type: 'top_frame_command', surface: 'help' });
+      }
+    }
+  });
+  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
+}
+
+async function chiediAllAiuto(app, page, testo) {
+  await apriAiuto(app, page);
   await page.fill('.sn-sidebar-input textarea', testo);
   await page.press('.sn-sidebar-input textarea', 'Enter');
 }
@@ -76,7 +102,7 @@ test('«solo pesi aperti» esclude tutto: l’Aiuto su una pagina web spiega, no
   }, a);
 
   const page = await testServer.openReady(openTab, PAGINA);
-  await chiediAllAiuto(page, 'cosa posso fare qui?');
+  await chiediAllAiuto(app, page, 'cosa posso fare qui?');
 
   const bolla = page.locator('.sn-sidebar-msg-error').last();
   await expect(bolla).toBeVisible({ timeout: 30_000 });
@@ -104,7 +130,7 @@ test('nessuna chiave da nessuna parte: l’Aiuto su una pagina web dice cosa man
   }, a);
 
   const page = await testServer.openReady(openTab, PAGINA);
-  await chiediAllAiuto(page, 'cosa posso fare qui?');
+  await chiediAllAiuto(app, page, 'cosa posso fare qui?');
 
   const bolla = page.locator('.sn-sidebar-msg-error').last();
   await expect(bolla).toBeVisible({ timeout: 30_000 });
@@ -138,6 +164,37 @@ test('cambia solo il motivo passando dalle Opzioni: la home aperta smette di inc
     await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, models: {}, modelRegistry: {} });
   });
 
+  expect(await motivoOra(app)).toBe('modelli'); // lo stato è cambiato davvero
   await expect(page.locator('#homeMessage')).not.toContainText(/pesi aperti/i, { timeout: 30_000 });
   await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 30_000 });
+});
+
+test('scelto il modello che la home chiedeva, la home continua a chiederlo', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtab(app);
+  const a = await azioni(page);
+  await accoglienzaGiaFatta(app);
+  await configCondivisa(app, { provider: 'openrouter', models: {}, modelRegistry: {} });
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
+  });
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 30_000 });
+
+  // L'utente fa quello che la home gli dice: sceglie un modello in Opzioni.
+  // È proprietario e l'interruttore lo esclude, quindi Filo resta muto — ma
+  // adesso il motivo è un altro, e la home deve smettere di chiedere una cosa
+  // che l'utente ha appena fatto.
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+      models: { filo_chat: 'chiuso', filo_dashboard: 'chiuso' },
+    });
+  });
+
+  expect(await motivoOra(app)).toBe('pesi-aperti'); // lo stato è cambiato davvero
+  await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
 });
