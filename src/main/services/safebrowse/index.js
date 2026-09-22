@@ -302,6 +302,11 @@ function analyze(url, ctx = {}, onUpdate) {
   // Chi possiede il sito: il conto delle verifiche profonde e il segno "già in
   // volo" stanno qui, non sul dominio (vedi il commento sulle cache).
   const prop = psl.proprietario(norm.host);
+  // La catena la dichiara la scheda (src/main/tabs/catenaNavigazione.js): fuori
+  // da una scheda non esiste una catena da contare.
+  const catena = ctx && ctx.catena ? String(ctx.catena) : '';
+  const contoCatenaDeep = catena ? { conto: catenaSpesa, chiave: 'p:' + catena, max: DEEP_MAX_PER_CATENA } : null;
+  const contoCatenaLookup = catena ? { conto: catenaLookup, chiave: 'l:' + catena, max: LOOKUP_MAX_PER_CATENA } : null;
   const tasks = [];
   const need = assembleCached(norm);
   let rimandare = false;
