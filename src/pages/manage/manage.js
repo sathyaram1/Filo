@@ -1193,6 +1193,19 @@
     return esiti;
   }
 
+  // Il segno rimesso a mano è una decisione nuova, non una rilettura: quello che
+  // non era riuscito si ritenta. Senza, dopo un server irraggiungibile il ramo
+  // restava fermo e la pagina rispondeva lo stesso «da ora si fonde senza chiedere».
+  function dimenticaTentativi(fb) {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (!UI || !fb) return;
+    for (const req of UI.richiesteCoperte(fusioni.pending, {
+      feedbackId: fb._id,
+      numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
+      ancheNuovi: true,
+    })) fusioniTentate.delete(req.id);
+  }
+
   // Le richieste ferme sulle pratiche già segnate si fondono appena la pagina
   // vede le due cose insieme: segno e richiesta arrivano da due letture
   // diverse, in un ordine qualunque.
