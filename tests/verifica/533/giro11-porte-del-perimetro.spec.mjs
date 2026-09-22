@@ -156,6 +156,9 @@ test.describe('#533 giro 11 — di chi sono i dati che il controllo riconosce', 
     const naviga = await apriDopoAverLetto(app, page, { segreto: SEGRETO2, testServer });
 
     expect(naviga, 'sanità: il modello non ha nemmeno provato ad aprire la pagina').toBeTruthy();
+    expect((await schedeAperte(app)).some((u) => u.includes('RSSMRA85T10A562S')),
+      'la scheda si è aperta sull\'indirizzo che porta fuori quello che l\'utente aveva scritto a Filo poco fa')
+      .toBe(false);
     expect(naviga._confirm,
       'quello che l\'utente ha scritto a Filo poco fa torna davanti al modello a ogni messaggio e può uscire '
       + 'dentro l\'indirizzo di una pagina che Filo apre da sé, senza conferma')
