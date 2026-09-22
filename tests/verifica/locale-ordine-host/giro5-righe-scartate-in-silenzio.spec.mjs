@@ -80,7 +80,6 @@ async function haAvvisato(page) {
 }
 
 test('una riga senza soprannome non viene salvata, e la pagina dice «Salvato» lo stesso', async ({ openTab }) => {
-  test.fail(true, 'rilievo aperto del giro 5: la riga sparisce e la pagina annuncia il salvataggio');
   const page = await apriEditor(openTab);
   await aggiungiRigaESalva(page, { nick: '', model: 'vendor/dimenticato', sort: 'latency' });
 
@@ -92,7 +91,6 @@ test('una riga senza soprannome non viene salvata, e la pagina dice «Salvato» 
 });
 
 test('una riga con un soprannome già usato non viene salvata, e la pagina dice «Salvato» lo stesso', async ({ openTab }) => {
-  test.fail(true, 'rilievo aperto del giro 5: la riga sparisce e la pagina annuncia il salvataggio');
   const page = await apriEditor(openTab);
   await aggiungiRigaESalva(page, { nick: 'normale', model: 'vendor/due', sort: 'throughput' });
 

@@ -293,3 +293,60 @@ test('scegliere il modello dalla tendina rimette in discussione la misura, come 
   await expect(row.locator('.sn-model-id')).toHaveValue('meta-llama/llama-4-maverick:free');
   await expect(stato, 'la misura del modello di prima resta sotto un modello mai provato').not.toContainText('123');
 });
+
+// Quello che sta sullo schermo e quello che è partito agli utenti non sono la
+// stessa cosa: la pagina non deve annunciare un salvataggio che non contiene
+// ciò che si vede, né far sparire una riga senza dire perché.
+test('una riga senza nickname non si perde in silenzio: viene segnalata e il salvataggio non si dichiara intero', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  const stato = page.locator('#saveStatus');
+
+  await page.click('#addModelRow');
+  const nuova = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').last();
+  await nuova.locator('.sn-model-id').fill('vendor/dimenticato');
+  await nuova.locator('.sn-model-sort').selectOption('latency');
+  await page.click('#saveBtn');
+
+  await expect(stato).toHaveText('Salvato — una riga evidenziata sotto non è stata propagata.', { timeout: 8_000 });
+  await expect(nuova).toHaveClass(/sn-row-invalid/);
+  await expect(nuova.locator('.sn-model-row-msg')).toHaveText('Il nickname è obbligatorio');
+  await expect(nuova.locator('.sn-model-id'), 'la riga scartata sparisce dallo schermo').toHaveValue('vendor/dimenticato');
+});
+
+test('una riga con un nickname già usato viene segnalata e resta sullo schermo', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  const stato = page.locator('#saveStatus');
+
+  await page.click('#addModelRow');
+  const nuova = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').last();
+  await nuova.locator('.sn-model-nick').fill('esistente');
+  await nuova.locator('.sn-model-id').fill('vendor/doppio');
+  await page.click('#saveBtn');
+
+  await expect(stato).toHaveText('Salvato — una riga evidenziata sotto non è stata propagata.', { timeout: 8_000 });
+  await expect(nuova.locator('.sn-model-row-msg')).toHaveText('Nickname duplicato: esistente');
+  await expect(nuova.locator('.sn-model-id')).toHaveValue('vendor/doppio');
+});
+
+test('il criterio degli host scelto mentre il salvataggio viaggia resta, e la conferma non lo dà per propagato', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { ritardoSalvataggioMs: 900 });
+  const stato = page.locator('#saveStatus');
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+
+  await page.click('#saveBtn');
+  await row.locator('.sn-model-sort').selectOption('price');
+
+  await expect(stato).toHaveText('Modifiche non ancora propagate.', { timeout: 8_000 });
+  await expect(row.locator('.sn-model-sort')).toHaveValue('price');
+});
+
+test('la scelta generale cambiata mentre il salvataggio viaggia resta, e la conferma non la dà per propagata', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { ritardoSalvataggioMs: 900 });
+  const stato = page.locator('#saveStatus');
+
+  await page.click('#saveBtn');
+  await page.selectOption('#providerSort', 'throughput');
+
+  await expect(stato).toHaveText('Modifiche non ancora propagate.', { timeout: 8_000 });
+  await expect(page.locator('#providerSort')).toHaveValue('throughput');
+});
