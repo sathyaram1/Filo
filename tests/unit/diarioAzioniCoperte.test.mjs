@@ -60,8 +60,23 @@ test('ogni riga del diario si conta nel riassunto e sa dire che non è riuscita'
 
 test('le tabelle del diario non nominano azioni che non esistono più', () => {
   const noti = new Set(registro());
-  const tutte = [...chiavi('ACTIVITY_ROWS'), ...chiavi('ACTIVITY_VERBS'), ...chiavi('FAILED_LABELS'), ...soloBottone()];
+  const tutte = [
+    ...chiavi('ACTIVITY_ROWS'), ...chiavi('ACTIVITY_VERBS'),
+    ...chiavi('ACTIVITY_VERBS_FATTI'), ...chiavi('FAILED_LABELS'), ...soloBottone(),
+  ];
   assert.deepEqual([...new Set(tutte.filter((t) => !noti.has(t)))], []);
+});
+
+// L'azione che Filo propone e l'UTENTE finisce cliccando (l'evento di
+// calendario, il riordino delle schede, l'eliminazione dall'archivio) ha due
+// frasi nel riassunto: quella della proposta e quella dell'esito. Senza la
+// seconda, a cose fatte il titolo continua a dire «Ha proposto…» mentre il
+// bottone lì accanto dice che è salvato (#567).
+test('ogni azione che finisce l\'utente sa dirlo anche nel riassunto', () => {
+  const fatti = chiavi('ACTIVITY_VERBS_FATTI');
+  const righe = chiavi('ACTIVITY_ROWS');
+  assert.ok(fatti.length, 'ACTIVITY_VERBS_FATTI non si trova più in dashboard-attivita.js');
+  assert.deepEqual(fatti.filter((t) => !righe.includes(t)), [], 'verbi «fatto» senza riga in ACTIVITY_ROWS');
 });
 
 test('il ripiego del diario non mostra mai il nome interno di un\'azione', () => {
