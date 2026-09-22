@@ -1501,8 +1501,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
       // «propone» (automazione, nessuno davanti allo schermo) e «chiede» (chat)
       // si dicono con lo stesso popup: cambia solo chi lo vede e quando.
       livelloEffettivo = Math.max(level, 2);
-      uscitaDaAllargare = verdettoPerimetro.uscita;
-      premessaPerimetro = 'Filo ha letto testo scritto da altri, per esempio una pagina web o dei risultati '
+      // Un clic non allarga niente: il sì vale per quella cosa lì, non per
+      // tutta la famiglia. Chi preme un collegamento sta dicendo sì a QUEL
+      // collegamento (#533, settimo giro di verifica).
+      uscitaDaAllargare = daClic ? null : verdettoPerimetro.uscita;
+      premessaPerimetro = daClic
+        ? 'Questo collegamento l’ha scritto Filo dopo aver letto testo scritto da altri, per esempio una '
+          + 'pagina web o un documento. La scritta e l’indirizzo li ha scelti lui, e aprire pagine non era '
+          + 'fra le cose che gli avevi chiesto: guarda dove porta prima di dire di sì.\n\n'
+        : 'Filo ha letto testo scritto da altri, per esempio una pagina web o dei risultati '
         + `di ricerca. Adesso vuole ${verdettoPerimetro.etichetta}.\n\n`
         + 'Non era fra le cose che gli hai chiesto. Permetteglielo solo se te l’aspettavi.\n\n';
     }
