@@ -293,6 +293,17 @@
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
+
+    // Una misura parla della configurazione con cui è stata presa: toccare la
+    // riga la rimette in discussione subito, non al prossimo caricamento.
+    row._misura = misureProva[nick] || null;
+    for (const [el, evento] of [[nickIn, 'input'], [idIn, 'input'], [reasonSel, 'change'], [sortSel, 'change']]) {
+      el.addEventListener(evento, () => {
+        if (el === nickIn) row._misura = misureProva[nickIn.value.trim()] || null;
+        mostraMisura(row);
+      });
+    }
+    mostraMisura(row);
     return row;
   }
 
