@@ -600,7 +600,9 @@
   function startWatchingReveal() {
     if (revealWatchOn) return;
     revealWatchOn = true;
-    const tocco = () => { revealedDirty = true; };
+    // Il tasto di fuga chiude, non apre: è quello con cui si esce dal menu, e sporcare lì la risposta vorrebbe
+    // dire rifare la camminata a ogni apertura, cioè proprio dove il risparmio serve.
+    const tocco = (e) => { if (!e || e.type !== 'keyup' || (e.key !== 'Escape' && e.key !== 'Esc')) revealedDirty = true; };
     try {
       // Il tasto destro non entra: è lui ad aprire il menu, e segnarlo sporco a ogni apertura annullerebbe il
       // risparmio proprio dove serve.
