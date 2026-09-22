@@ -305,6 +305,7 @@ const CHIAVE_TUTTI = '\u0000tutti';
 function createFreno({
   maxPerSito = FRENO_PER_SITO,
   maxTotale = FRENO_RAFFICA,
+  maxPerCatena = FRENO_PER_CATENA,
   finestraMs = FRENO_FINESTRA_MS,
   finestraRafficaMs = FRENO_RAFFICA_MS,
   now = Date.now,
@@ -312,24 +313,30 @@ function createFreno({
   const m = new Map();
   const vivo = (e, ora) => e && ora < e.fino;
   return {
-    // 'ok', 'suo' (questo sito ne ha già fatte partire troppe: si rinuncia e
-    // basta) o 'raffica' (in questo momento se ne stanno facendo troppe in
-    // tutto: la rinuncia non è colpa di questo sito, e si riprova fra poco).
-    chiedi(host) {
+    // 'ok', 'suo' (questo sito, o questa catena di navigazioni, ne ha già fatte
+    // partire troppe: si rinuncia e basta) o 'raffica' (in questo momento se ne
+    // stanno facendo troppe in tutto: la rinuncia non è colpa di questo sito, e
+    // si riprova fra poco).
+    chiedi(host, catena) {
       const chiave = proprietario(host) || String(host || '');
+      const kCatena = catena ? '\u0000c:' + catena : '';
       const ora = now();
       const suo = m.get(chiave);
       const tutti = m.get(CHIAVE_TUTTI);
+      const sua = kCatena ? m.get(kCatena) : null;
       const nSuo = vivo(suo, ora) ? suo.n : 0;
       const nTutti = vivo(tutti, ora) ? tutti.n : 0;
+      const nCatena = vivo(sua, ora) ? sua.n : 0;
+      if (kCatena && nCatena >= maxPerCatena) return 'suo';
       if (nTutti >= maxTotale) return 'raffica';
       if (nSuo >= maxPerSito) return 'suo';
       if (vivo(suo, ora)) suo.n = nSuo + 1; else m.set(chiave, { n: 1, fino: ora + finestraMs });
       if (vivo(tutti, ora)) tutti.n = nTutti + 1; else m.set(CHIAVE_TUTTI, { n: 1, fino: ora + finestraRafficaMs });
+      if (kCatena) { if (vivo(sua, ora)) sua.n = nCatena + 1; else m.set(kCatena, { n: 1, fino: ora + finestraMs }); }
       if (m.size > 256) for (const [k, e] of m) if (!vivo(e, ora)) m.delete(k);
       return 'ok';
     },
-    prendi(host) { return this.chiedi(host) === 'ok'; },
+    prendi(host, catena) { return this.chiedi(host, catena) === 'ok'; },
     valore(host) {
       const e = m.get(proprietario(host) || String(host || ''));
       return vivo(e, now()) ? e.n : 0;
