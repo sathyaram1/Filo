@@ -316,10 +316,10 @@ function createFreno({
   const m = new Map();
   const vivo = (e, ora) => e && ora < e.fino;
   return {
-    // 'ok', 'suo' (questo sito, o questa catena di navigazioni, ne ha già fatte
-    // partire troppe: si rinuncia e basta) o 'raffica' (in questo momento se ne
-    // stanno facendo troppe in tutto: la rinuncia non è colpa di questo sito, e
-    // si riprova fra poco).
+    // 'ok', 'suo' (questo sito ne ha già fatte partire troppe: si rinuncia e
+    // basta) o 'raffica' (se ne stanno facendo troppe in tutto, oppure la
+    // catena di navigazioni ha speso la sua parte: la rinuncia non è colpa di
+    // questo sito, e si riprova fra poco finché l'utente è rimasto qui).
     chiedi(host, catena) {
       const chiave = proprietario(host) || String(host || '');
       const kCatena = catena ? '\u0000c:' + catena : '';
