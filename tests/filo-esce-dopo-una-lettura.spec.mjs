@@ -174,3 +174,44 @@ test('dentro una pagina web il clic su un collegamento di Filo chiede prima di a
   // con l'indirizzo intero.
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
 });
+
+test('anche l\'assistente dentro una pagina non manda fuori i tuoi dati dentro una ricerca', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  // Qualcosa di tuo in memoria: è il materiale che l'assistente di una pagina
+  // ha davanti mentre legge quella pagina.
+  await app.evaluate(async () => {
+    const FM = globalThis.SN_FILO_MEMORY;
+    const mem = await FM.getMemory();
+    await FM.setMemory({ ...mem, profilo: 'La password del wifi è ZanzibarCrepuscolo77.' });
+    // La ricerca non esce dalla macchina: qui si annota soltanto chi ci arriva.
+    globalThis.__origSearch = globalThis.SN_WEB_SEARCH.search;
+    globalThis.__domande = [];
+    globalThis.SN_WEB_SEARCH.search = async ({ query }) => {
+      globalThis.__domande.push(String(query || ''));
+      return { ok: true, provider: 'test', results: [] };
+    };
+  });
+
+  const page = await openTab(NEWTAB);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
+
+  // La stessa porta da cui cerca l'assistente dentro le pagine: un messaggio
+  // suo, che non passava da nessun controllo.
+  const esiti = await page.evaluate(async () => {
+    const chiedi = (query) => chrome.runtime.sendMessage({ type: 'web_search', query });
+    return { fuga: await chiedi('ZanzibarCrepuscolo77 che cosa è'), normale: await chiedi('che tempo fa domani') };
+  });
+
+  const domande = await app.evaluate(() => {
+    if (globalThis.__origSearch) globalThis.SN_WEB_SEARCH.search = globalThis.__origSearch;
+    return globalThis.__domande || [];
+  });
+
+  expect(domande.some((q) => q.includes('ZanzibarCrepuscolo77')),
+    'la password è uscita dentro una domanda di ricerca').toBe(false);
+  expect(esiti.fuga.ok, 'la ricerca con dentro la password è partita').toBe(false);
+  expect(String(esiti.fuga.reason || '')).toContain('non la mando fuori');
+  // E una ricerca che non porta via niente continua a partire: l'assistente non
+  // resta senza ricerca.
+  expect(esiti.normale.ok, 'una ricerca innocua dell\'assistente non parte più').toBe(true);
+});

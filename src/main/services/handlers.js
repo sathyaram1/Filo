@@ -1127,6 +1127,26 @@ async function navExfilCorpus() {
   } catch (_) { return ''; }
 }
 
+// Una domanda di ricerca ESCE dal computer prima di riportare indietro
+// qualcosa: se porta con sé roba dell'utente (memoria, appunti, un documento
+// letto nello stesso turno) non parte da sola (#533, ottavo giro di verifica).
+// Regola unica per le due strade che cercano: l'azione della chat e il
+// messaggio dell'assistente dentro le pagine.
+async function ricercaPortaFuori(query, task) {
+  try {
+    const Exfil = globalThis.SN_URL_EXFIL;
+    const q = String(query || '').trim();
+    if (!Exfil || !q) return null;
+    const Compiti = globalThis.SN_COMPITI;
+    const privato = (Compiti && task) ? Compiti.materialePrivato(task) : '';
+    const corpus = [await navExfilCorpus(), privato].filter(Boolean).join('\n');
+    if (!corpus) return null;
+    // `soloForte`: in un indirizzo due parole tue sono già strane, in una
+    // domanda di ricerca sono normali.
+    return Exfil.taint(`https://ricerca.invalid/?q=${encodeURIComponent(q)}`, corpus, { soloForte: true });
+  } catch (_) { return null; }
+}
+
 // ── Difesa in profondità sulle azioni confermate (#250) ─────────────────────
 // FILO_CONFIRM_ACTION esegue un'azione con `confirmed:true`, saltando la
 // sospensione dei livelli ≥ 2. È legittimo SOLO dopo il giro di conferma
@@ -1396,18 +1416,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // misura di NAVIGA: non si blocca, si alza a livello 2 e l'utente legge la
   // domanda intera prima che parta. Il flag lo mette il main, mai l'LLM.
   if (type === 'CERCA_WEB') {
-    try {
-      const Exfil = globalThis.SN_URL_EXFIL;
-      const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
-      if (Exfil && query) {
-        const privato = (Compiti && task) ? Compiti.materialePrivato(task) : '';
-        const corpus = [await navExfilCorpus(), privato].filter(Boolean).join('\n');
-        const v = corpus
-          ? Exfil.taint(`https://ricerca.invalid/?q=${encodeURIComponent(query)}`, corpus, { soloForte: true })
-          : null;
-        if (v) { action._exfil = true; action._exfilReason = v.reason; }
-      }
-    } catch (_) {}
+    const v = await ricercaPortaFuori(action.query ?? action.q ?? action.testo ?? action.text, task);
+    if (v) { action._exfil = true; action._exfilReason = v.reason; }
   }
 
   // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
@@ -3491,6 +3501,8 @@ const handlerCtx = {
   executeFiloAction,
   apriFileLocale,
   compitoPrecedenteDi,
+  compitoDiPagina,
+  ricercaPortaFuori,
   maybeRunCompactor,
   compitiRecenti,
   // Intervista di benvenuto (#524)

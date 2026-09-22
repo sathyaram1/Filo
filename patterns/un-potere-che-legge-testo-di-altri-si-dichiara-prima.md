@@ -22,9 +22,25 @@ non gli venga consegnato.**
   vecchio, messaggio forgiato, un'altra superficie) viene rifiutato.
 - **Gli INGRESSI restano sempre liberi.** Leggere un'altra pagina non aggiunge
   pericolo a un compito già contaminato, e sbarrare le letture non protegge da
-  niente: costringerebbe solo il modello a rispondere a vuoto.
+  niente: costringerebbe solo il modello a rispondere a vuoto. Vale finché
+  l'ingresso si limita a LEGGERE: un ingresso che prima di riportare indietro
+  qualcosa spedisce fuori una frase scelta dal modello non è un ingresso, è
+  un'uscita travestita. La ricerca sul web è così — la domanda parte verso un
+  servizio di fuori — e per questo la domanda passa dallo stesso controllo
+  anti-esfiltrazione degli indirizzi: se porta con sé roba dell'utente
+  l'utente la legge prima che parta.
 - **Proporre costa zero e resta sempre nel perimetro**: un bottone in chat o
-  una notifica non fa niente finché non è l'utente a premerlo.
+  una notifica non fa niente finché non è l'utente a premerlo. Vale finché la
+  proposta non porta con sé un BERSAGLIO che il modello ha scelto e l'utente
+  non legge: il bottone che apre un file e l'evento di calendario lo avevano, e
+  infatti sono uscite.
+- **Ogni strada per cui qualcosa ESCE passa dal motore**, non solo le azioni
+  che il modello esegue. Un collegamento dentro la risposta lo preme l'utente,
+  ma la scritta e l'indirizzo li ha scelti il modello dopo aver letto: il clic
+  passa dal motore ovunque quel testo sia mostrato, nella chat come dentro una
+  pagina web («Spiega», l'assistente Aiuto). E dove c'è più di una porta per la
+  stessa cosa — l'azione della chat e il messaggio dell'assistente che cercano
+  entrambi sul web — il controllo è UNO, chiamato da tutte e due.
 - Chi **non dichiara e poi legge** resta con «solo chat»: risponde e propone,
   nient'altro. E non può più dichiarare: a quel punto l'elenco potrebbe
   suggerirlo proprio chi ha scritto la pagina.

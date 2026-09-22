@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, auditServedByLater, applyLimitToChain,
-    Defaults, isAdmin, broadcastToTabs,
+    Defaults, isAdmin, broadcastToTabs, ricercaPortaFuori, compitoDiPagina,
   } = ctx;
   const { SN_CONST } = globalThis;
   const Providers = globalThis.SN_PROVIDERS;
@@ -595,8 +595,24 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  on(MSG.WEB_SEARCH, async (msg) => {
+  // La ricerca dell'assistente dentro le pagine. Il testo della domanda ESCE
+  // dal computer, e quell'assistente la pagina l'ha già letta: se la domanda
+  // porta con sé roba dell'utente non parte, e l'assistente lo dice invece di
+  // tacere (#533, ottavo giro di verifica). Stessa regola dell'azione della
+  // chat: una sola, in `ricercaPortaFuori`.
+  on(MSG.WEB_SEARCH, async (msg, sender) => {
     try {
+      const fuori = ricercaPortaFuori
+        ? await ricercaPortaFuori(msg && msg.query, compitoDiPagina ? compitoDiPagina(sender) : null)
+        : null;
+      if (fuori) {
+        return {
+          ok: false,
+          results: [],
+          reason: `la domanda ${fuori.reason}: non la mando fuori. Riscrivila senza i dati dell'utente.`,
+          error: 'porta-fuori',
+        };
+      }
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
       const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
