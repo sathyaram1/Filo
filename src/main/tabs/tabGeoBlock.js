@@ -14,6 +14,7 @@
 const ProxyTab = require('../services/proxyTab');
 const GeoBlock = require('../services/geoBlock');
 const GeoBlockRules = require('../services/geoBlockRules');
+const { catenaDi } = require('./catenaNavigazione');
 
 // #591, quarto giro. Quando il conto comune del livello 2 è pieno, la
 // classificazione rinuncia e lo dice: si riprova poco dopo, finché l'utente è
