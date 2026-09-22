@@ -24,6 +24,11 @@
 const { spawn } = require('node:child_process');
 const os = require('node:os');
 const fs = require('node:fs');
+// Quale shell gira davvero, dato quella chiesta e il sistema: la regola è una
+// sola e sta in terminal.js. Erano due: i comandi dell'assistente onoravano
+// "bash" fuori da Windows, questa sessione ricadeva sempre su /bin/sh — cioè
+// su Linux e Mac la voce "Bash" delle Preferenze non faceva niente.
+const { resolveShell } = require('./terminal');
 
 function defaultCwd() {
   return os.homedir();
@@ -52,11 +57,13 @@ function randSid() {
 // da inviare all'avvio, e come "incartare" un comando utente perché stampi il
 // marcatore di fine (exit code + cwd) su una riga propria.
 function shellConfig(shell, sid, startCwd) {
-  // Fuori da Windows (routine cloud Linux, macOS): /bin/sh persistente. Letto
-  // da pipe è non-interattivo → nessun prompt da ripulire.
+  // Fuori da Windows (Linux, macOS): shell POSIX persistente, letta da pipe →
+  // non-interattiva, nessun prompt da ripulire. `bash` se l'utente l'ha scelto
+  // nelle Preferenze, altrimenti la shell di sistema. I marcatori sono gli
+  // stessi: `printf`, `$?` e `$PWD` valgono in entrambe.
   if (process.platform !== 'win32') {
     return {
-      file: '/bin/sh',
+      file: shell === 'bash' ? 'bash' : '/bin/sh',
       args: [],
       options: { cwd: startCwd || undefined, windowsHide: true },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
@@ -115,12 +122,15 @@ function shellConfig(shell, sid, startCwd) {
 // onError({message}).
 function createSession({ shell, cwd } = {}) {
   const sid = randSid();
-  const wantShell = process.platform !== 'win32' ? 'sh' : (shell || 'powershell');
+  const wantShell = resolveShell(shell);
   const startCwd = usableCwd(cwd);
   const cfg = shellConfig(wantShell, sid, startCwd);
 
   const session = {
-    shell: shell || 'powershell',
+    // La shell VERA, non quella chiesta: chi confronta per decidere se
+    // ricreare la sessione (ipc.js) deve vedere lo stesso valore che ha
+    // calcolato lui, altrimenti la sessione si ricrea a ogni comando.
+    shell: wantShell,
     sid,
     cwd: startCwd,
     dead: false,

@@ -1,0 +1,79 @@
+SE FILO NON SI APRE (Linux)
+
+Hai scaricato Filo-Linux.AppImage, ci hai fatto doppio clic e non succede
+niente, oppure si apre un editor di testo. È normale e si risolve in un
+minuto. I motivi possibili sono due.
+
+
+1. IL FILE NON HA ANCORA IL PERMESSO DI PARTIRE
+
+Un file scaricato da un browser arriva senza il permesso di essere eseguito.
+Finché non glielo dai, per il sistema è un file qualunque.
+
+Col mouse: tasto destro sul file, Proprietà, scheda Permessi, e metti la
+spunta su "Consenti l'esecuzione del file come programma" (il nome cambia
+un po' da un sistema all'altro). Poi doppio clic.
+
+Da terminale, nella cartella dove l'hai scaricato:
+
+    chmod +x Filo-Linux.AppImage
+
+Poi doppio clic, oppure:
+
+    ./Filo-Linux.AppImage
+
+
+2. AL SISTEMA MANCA libfuse2
+
+Se dopo il primo punto compare un errore che nomina libfuse.so.2, o continua
+a non succedere niente, manca la libreria che serve ad aprire questo tipo di
+pacchetto. Ubuntu dalla 22.04, Debian 12 e le Fedora recenti non la
+installano più di serie.
+
+Ubuntu, Debian, Linux Mint:
+
+    sudo apt install libfuse2
+
+Fedora:
+
+    sudo dnf install fuse-libs
+
+Arch, Manjaro:
+
+    sudo pacman -S fuse2
+
+Poi riprova col doppio clic.
+
+
+SE PREFERISCI NON INSTALLARE NIENTE
+
+Puoi aprire Filo senza libfuse2 estraendo il pacchetto:
+
+    ./Filo-Linux.AppImage --appimage-extract
+    ./squashfs-root/AppRun
+
+Funziona, ma così Filo non si aggiorna più da solo: per passare a una versione
+nuova riscarichi il file e rifai l'estrazione.
+
+
+IL LINK D'INVITO NON APRE FILO? È NORMALE
+
+Su Linux un programma si fa riconoscere dal sistema solo quando è installato
+fra le applicazioni. Finché tieni Filo come file singolo e lo apri col doppio
+clic, il sistema non sa che i link filo.red/i/... vanno aperti con lui: ci
+clicchi sopra e non succede niente.
+
+Non serve installare niente. Apri Filo, vai nella pagina Crediti e incolla lì
+il link dell'invito, tutto intero: va bene sia il link sia il solo codice.
+
+
+GLI AGGIORNAMENTI
+
+Quando Filo si aggiorna da sé riscrive il file .AppImage da cui sta girando.
+Perché ci riesca, tieni quel file in una cartella tua (la home, o una cartella
+Applicazioni che ti sei fatto), non in una cartella di sistema.
+
+Se un aggiornamento non riesce a installarsi, Filo te lo scrive fra le
+notifiche invece di lasciarti su una versione vecchia senza dirtelo. In quel
+caso scarichi il file nuovo, sostituisci quello vecchio e gli ridai il
+permesso di esecuzione come al punto 1.

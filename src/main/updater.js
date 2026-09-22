@@ -9,19 +9,26 @@
 // quindi l'updater è disattivato: lì l'aggiornamento avviene via `git pull`
 // del `prestart`.
 //
-// SU MAC L'INSTALLAZIONE PUÒ NON RIUSCIRE, ED È PREVISTO
-//   Il controllo e lo scaricamento funzionano ovunque (nella release c'è
-//   `latest-mac.yml` accanto a `latest.yml`). L'INSTALLAZIONE su Mac la fa un
-//   meccanismo di sistema che pretende una firma vera, rilasciata da Apple:
-//   Filo per ora ha solo una firma locale, che cambia a ogni build, e quel
-//   meccanismo la rifiuta.
+// FUORI DA WINDOWS L'INSTALLAZIONE PUÒ NON RIUSCIRE, ED È PREVISTO
+//   Il controllo e lo scaricamento funzionano ovunque: nella release ci sono
+//   `latest-mac.yml` e `latest-linux.yml` accanto a `latest.yml`. È
+//   l'INSTALLAZIONE che può fermarsi, e per due motivi diversi.
+//
+//   Su Mac la fa un meccanismo di sistema che pretende una firma vera,
+//   rilasciata da Apple: Filo per ora ha solo una firma locale, che cambia a
+//   ogni build, e quel meccanismo la rifiuta.
+//
+//   Su Linux l'aggiornamento riscrive il file .AppImage da cui Filo sta
+//   girando: riesce se l'app è stata lanciata davvero come AppImage e se quel
+//   file è scrivibile. Chi lo tiene in una cartella di sistema, o chi ha
+//   estratto il contenuto invece di lanciare l'AppImage, resta fermo.
 //
 //   Il difetto grave non sarebbe il fallimento: sarebbe il SILENZIO. Un
 //   aggiornamento che non si installa e non lo dice lascia l'utente fermo su
 //   una versione vecchia per sempre, convinto di essere aggiornato. Quindi
-//   quando su Mac l'aggiornamento inciampa, lo scriviamo fra le notifiche: si
-//   scarica a mano, una volta, e si va avanti. Quando arriverà un certificato
-//   Apple questo ripiego diventa inutile e si toglie.
+//   quando l'aggiornamento inciampa lo scriviamo fra le notifiche: si scarica a
+//   mano, una volta, e si va avanti. Su Windows no: lì si installa da sé e
+//   l'avviso sarebbe solo rumore.
 
 const { app } = require('electron');
 
@@ -69,29 +76,52 @@ function initAutoUpdater() {
   });
 }
 
+// I sistemi dove l'installazione automatica può fermarsi, col marcatore che
+// riconosce l'avviso già scritto e la frase che l'utente legge. Su Windows non
+// c'è niente: lì l'aggiornamento si installa da sé.
+//
+// Il marcatore resta diverso per sistema perché una macchina sola ne vede uno
+// solo: cambiarlo tutto in un nome unico farebbe ricomparire, a chi l'aveva già
+// scartato su Mac, lo stesso avviso per la stessa versione.
+const AGGIORNAMENTO_BLOCCATO = {
+  darwin: {
+    tipo: 'aggiornamento-mac',
+    testo: (v) => `C'è la versione ${v} di Filo, ma su Mac non riesce a installarsi da sola.\n`
+      + 'Scaricala da filo.red e sostituisci l\'app. Ci vuole un minuto.',
+  },
+  linux: {
+    tipo: 'aggiornamento-linux',
+    // Il file nuovo arriva dal browser senza il permesso di essere eseguito,
+    // esattamente come il primo: se l'avviso non lo dice, l'utente sbatte
+    // contro lo stesso muro una seconda volta e stavolta senza foglietto.
+    testo: (v) => `C'è la versione ${v} di Filo, ma su Linux non riesce a installarsi da sola.\n`
+      + 'Scaricala da filo.red, sostituisci il file di Filo con quello nuovo e ridagli il permesso '
+      + 'di esecuzione (tasto destro, Proprietà, «Consenti l\'esecuzione»). Ci vuole un minuto.',
+  },
+};
+
 // Scrive fra le notifiche che c'è una versione nuova e va presa a mano.
 //
-// Solo su Mac, e solo se una versione nuova ESISTE davvero: altrove
-// l'aggiornamento si installa da sé e un avviso sarebbe rumore; senza una
-// versione trovata l'errore è del controllo, non dell'installazione, e non
-// cambia niente per l'utente.
+// Solo dove l'installazione può fermarsi (Mac e Linux), e solo se una versione
+// nuova ESISTE davvero: senza una versione trovata l'errore è del controllo,
+// non dell'installazione, e non cambia niente per l'utente.
 //
 // Una notifica per versione: se l'app riparte dieci volte prima che l'utente
 // scarichi, la scheda resta una. Chi l'ha già scartata non se la ritrova.
 async function avvisaSeAggiornamentoBloccato(versione) {
-  if (process.platform !== 'darwin' || !versione) return;
+  const caso = AGGIORNAMENTO_BLOCCATO[process.platform];
+  if (!caso || !versione) return;
   try {
     const FiloMem = globalThis.SN_FILO_MEMORY;
     if (!FiloMem?.addNotification) return;
     // Il riconoscimento passa da `action`, che la scheda NON mostra: un
     // marcatore dentro al testo lo leggerebbe l'utente.
     const gia = await FiloMem.listNotifications({ includeDismissed: true });
-    if (gia.some((n) => n.action?.tipo === 'aggiornamento-mac' && n.action?.versione === versione)) return;
+    if (gia.some((n) => n.action?.tipo === caso.tipo && n.action?.versione === versione)) return;
     await FiloMem.addNotification({
       kind: 'alert',
-      action: { tipo: 'aggiornamento-mac', versione },
-      text: `C'è la versione ${versione} di Filo, ma su Mac non riesce a installarsi da sola.\n`
-        + 'Scaricala da filo.red e sostituisci l\'app. Ci vuole un minuto.',
+      action: { tipo: caso.tipo, versione },
+      text: caso.testo(versione),
     });
   } catch (e) {
     console.error('[updater] avviso aggiornamento non scritto:', e?.message || e);

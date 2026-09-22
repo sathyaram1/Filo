@@ -27,8 +27,15 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 12_000;
 
 // Shell di default per piattaforma quando la preferenza non è impostata.
+//
+// Fuori da Windows è la shell di SISTEMA, non bash: dev'essere lo stesso
+// ripiego di resolveShell() qui sotto, che è quello su cui cade la sessione
+// persistente della modalità terminale. Quando erano diversi, i comandi
+// dell'assistente partivano da bash e il terminale da /bin/sh: due strade
+// equivalenti che rispondevano con due shell diverse, e lo stesso comando
+// poteva comportarsi in modo diverso a seconda di dove lo scrivevi.
 function defaultShell() {
-  return process.platform === 'win32' ? 'powershell' : 'bash';
+  return process.platform === 'win32' ? 'powershell' : 'sh';
 }
 
 // Risolve la shell RICHIESTA in quella EFFETTIVAMENTE disponibile sulla
@@ -191,4 +198,4 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
   });
 }
 
-module.exports = { runCommand, shellInvocation, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS };
+module.exports = { runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS };

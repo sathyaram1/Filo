@@ -31,6 +31,8 @@
     "release": "electron-builder --win --publish always",
     "build:mac": "electron-builder --mac --publish never",
     "release:mac": "electron-builder --mac --publish always",
+    "build:linux": "electron-builder --linux --publish never",
+    "release:linux": "electron-builder --linux --publish always",
     "feedback": "node scripts/owner-feedback.mjs",
     "feedback:apri": "node scripts/claude-feedback.mjs"
   },
@@ -127,8 +129,23 @@
       ]
     },
     "linux": {
-      "target": "AppImage",
-      "icon": "assets/icons/icon-256.png"
+      "target": [
+        "AppImage"
+      ],
+      "artifactName": "Filo-Linux.${ext}",
+      "icon": "assets/icons/icon-1024.png",
+      "category": "Network",
+      "desktop": {
+        "StartupWMClass": "Filo"
+      },
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "sathyaram1",
+          "repo": "Filo",
+          "releaseType": "release"
+        }
+      ]
     },
     "publish": [
       {
@@ -137,7 +154,7 @@
         "repo": "Filo"
       }
     ],
-    "afterPack": "scripts/after-pack-mac.js"
+    "afterPack": "scripts/after-pack.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
