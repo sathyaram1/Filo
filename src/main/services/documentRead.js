@@ -186,6 +186,9 @@ async function readDocument(input) {
     ok: false, path: '', name: '', kind: '', text: '', truncated: false,
     pages: 0, empty: false, bytes: 0, error: null, detail: '',
   };
+  if (percorsoDiRete(input)) {
+    return { ...base, error: 'rete', detail: 'quello è un computer in rete, non un file di questo computer' };
+  }
   const full = normalizePath(input);
   if (!full) return { ...base, error: 'no_path', detail: 'nessun percorso indicato' };
   base.path = full;
@@ -257,6 +260,7 @@ async function readDocument(input) {
 module.exports = {
   readDocument,
   // esportati per gli unit test e per chi formatta l'osservazione
+  percorsoDiRete,
   normalizePath,
   kindFromExtension,
   looksLikeText,

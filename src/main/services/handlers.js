@@ -1087,9 +1087,10 @@ function displayCwd(cwd) {
 function apriFileLocale(raw) {
   const grezzo = String(raw == null ? '' : raw).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   if (!grezzo) return { ok: false, motivo: 'vuoto' };
-  // Un percorso di rete (\\server\condivisione) non è un file del computer, e su
-  // Windows aprirlo spedisce le credenziali all'altro capo.
-  if (/^\\\\/.test(grezzo)) return { ok: false, motivo: 'rete' };
+  // La regola dei percorsi di rete sta in un posto solo, con chi legge i
+  // documenti: la stessa che vale per «apri un file» vale per «leggi il
+  // documento» (#533, settimo giro di verifica).
+  if (require('./documentRead').percorsoDiRete(grezzo)) return { ok: false, motivo: 'rete' };
   const disco = /^[a-zA-Z]:[\\/]/.test(grezzo);
   // Qualunque schema (http:, file:, javascript:, data:, filo:) esce da «un file
   // del computer». L'unica eccezione è la lettera di disco di Windows, che ha
