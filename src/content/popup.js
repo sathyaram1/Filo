@@ -1251,7 +1251,7 @@
         scrollaConservando(popup, () => {
           bubble.text.textContent = frasePerLUtente(m);
           bubble.wrap.classList.add('sn-msg-error');
-          aggiungiRimedio(bubble.text, m.code);
+          mostraRimedio(bubble.text, m.code);
         }, true);
         popup.activePort = null;
       }
@@ -1446,6 +1446,8 @@
     renderMarkdown,
     resolveCalcMarkers,
     registerStack,
+    frasePerLUtente,
+    mostraRimedio,
     // C'è un riquadro aperto adesso? Lo chiede content.js per decidere di chi
     // è l'Esc quando si è a tutto schermo (#514).
     hasOpen: () => popups.length > 0,
