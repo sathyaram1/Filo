@@ -1839,7 +1839,7 @@ if (isMainModule) {
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
       if (s.rejected) esciRespinto(s);
-      console.log(fixedReplyText(id, s.reply, ferma));
+      console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim()));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.
