@@ -65,6 +65,25 @@ test('Opzioni: uscendo dal campo prima di chiudere, il limite c\'è', async ({ a
   await expect.poll(() => impostazioni(app).then((s) => s.monthlyLimitEur), { timeout: 8000 }).toBe(48);
 });
 
+// Stessa pagina, stesso meccanismo, ma quello che si perde è una chiave che si
+// riottiene solo tornando dal fornitore.
+test('Opzioni: la chiave incollata non si perde chiudendo la scheda', async ({ app, shell, openTab }) => {
+  const page = await openTab(OPZIONI);
+  await page.waitForSelector('#apiKey', { timeout: 15_000 });
+  await page.click('#apiKey');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('sk-or-v1-chiave-di-prova');
+
+  await chiudiScheda(shell, 'options/options.html');
+
+  await expect
+    .poll(() => impostazioni(app).then((s) => (s.apiKeys && s.apiKeys.openrouter) || ''), {
+      timeout: 8000,
+      message: 'chiudendo la scheda col cursore ancora nel campo, la chiave appena incollata sparisce',
+    })
+    .toBe('sk-or-v1-chiave-di-prova');
+});
+
 // La pagina gemella, le Preferenze, salva a ogni tasto: stessa prova, stessa
 // attesa. Se questa passa e quella sopra no, le due strade divergono.
 test('Preferenze: lo stile appena digitato non si perde chiudendo la scheda', async ({ app, shell, openTab }) => {
