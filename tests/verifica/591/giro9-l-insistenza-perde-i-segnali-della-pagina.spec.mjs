@@ -31,10 +31,12 @@ const require_ = createRequire(join(REPO, 'package.json'));
 const SB = require_(join(REPO, 'src/main/services/safebrowse/index.js'));
 const { installSafebrowse } = require_(join(REPO, 'src/main/tabs/tabSafebrowse.js'));
 
-// Una pagina di accesso che imita una banca su una connessione non protetta:
-// senza il campo password vale «sicuro», con il campo password vale «sospetto».
-// È il caso in cui il segnale della pagina è tutto.
-const TRUFFA = 'http://banca-intesa.verify.top/login';
+// Due pagine di accesso mai viste. Sulla prima il campo password è l'unico
+// motivo per cui Filo chiede al modello: senza, non c'è niente da approfondire.
+// Sulla seconda, che viaggia anche in chiaro, il campo password è quello che la
+// porta da «sicuro» a «sospetto», cioè fa comparire l'avviso.
+const TRUFFA_MUTA = 'https://accesso-clienti.banca-esempio-verify.top/login';
+const TRUFFA_AVVISATA = 'http://banca-intesa.verify.top/login';
 
 function banco() {
   const giudizi = [];
@@ -99,13 +101,13 @@ test('la truffa in fondo alla raffica non riceve mai il giudizio del modello', a
   const giudiziPrima = b.giudizi.length;
   const finestrePrima = b.finestre.length;
 
-  await b.naviga(TRUFFA, { password: true, attesa: 100 });
+  await b.naviga(TRUFFA_MUTA, { password: true, attesa: 100 });
   await new Promise((r) => setTimeout(r, ATTESA_RINVII));
 
   expect(
     b.giudizi.slice(giudiziPrima),
     'la pagina dove l\'utente è rimasto deve ricevere il giudizio del modello: è quello che l\'insistenza doveva riottenere',
-  ).toContain('banca-intesa.verify.top');
+  ).toContain('accesso-clienti.banca-esempio-verify.top');
   expect(
     b.finestre.length - finestrePrima,
     'e anche il controllo nella finestra nascosta',
@@ -117,12 +119,12 @@ test('l\'avviso già mostrato non deve essere ritirato dall\'insistenza', async 
   const b = banco();
   await b.raffica();
 
-  const risposta = await b.naviga(TRUFFA, { password: true, attesa: 100 });
+  const risposta = await b.naviga(TRUFFA_AVVISATA, { password: true, attesa: 100 });
   expect(risposta.level, 'con il campo password la pagina vale «sospetto»').toBe('sospetto');
   b.annunci.length = 0;
   await new Promise((r) => setTimeout(r, ATTESA_RINVII));
 
-  const sullaTruffa = b.annunci.filter((a) => a.url === TRUFFA);
+  const sullaTruffa = b.annunci.filter((a) => a.url === TRUFFA_AVVISATA);
   expect(
     sullaTruffa.filter((a) => a.level === 'safe'),
     'nessuno deve annunciare «sicuro» su una pagina che l\'utente sta guardando con l\'avviso davanti: '
@@ -135,13 +137,13 @@ test('caso di riscontro: senza il cammino della navigazione l\'insistenza funzio
   const b = banco();
   await b.raffica(24, false);
   const prima = b.giudizi.length;
-  await b.naviga(TRUFFA, { password: true, conNavigazione: false, attesa: 100 });
+  await b.naviga(TRUFFA_MUTA, { password: true, conNavigazione: false, attesa: 100 });
   expect(b.giudizi.length - prima, 'sul momento il conto della catena è vuoto: si rimanda').toBe(0);
   await new Promise((r) => setTimeout(r, ATTESA_RINVII));
   expect(
     b.giudizi.slice(prima),
     'qui il rinvio porta con sé i segnali della pagina e il giudizio arriva: è la prova che a mancare è il contesto',
-  ).toContain('banca-intesa.verify.top');
+  ).toContain('accesso-clienti.banca-esempio-verify.top');
 });
 
 test('caso di riscontro: fuori dalla catena della pagina ostile il controllo parte subito', async () => {
@@ -151,6 +153,6 @@ test('caso di riscontro: fuori dalla catena della pagina ostile il controllo par
   const prima = b.giudizi.length;
   // Una persona che apre la stessa pagina dopo una pausa apre una catena nuova.
   await new Promise((r) => setTimeout(r, 9000));
-  await b.naviga(TRUFFA, { password: true, attesa: 300 });
-  expect(b.giudizi.slice(prima)).toContain('banca-intesa.verify.top');
+  await b.naviga(TRUFFA_MUTA, { password: true, attesa: 300 });
+  expect(b.giudizi.slice(prima)).toContain('accesso-clienti.banca-esempio-verify.top');
 });
