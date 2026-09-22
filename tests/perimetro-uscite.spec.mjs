@@ -176,8 +176,10 @@ test.describe('il perimetro delle uscite', () => {
     const dopo = offerti[1] || [];
     expect(dopo).not.toContain('SALVA_LEZIONE');
     expect(dopo).not.toContain('IMPOSTA_PREFERENZA');
-    // Proporre costa zero e resta: rispondere e proporre è ciò che gli avanza.
-    expect(dopo).toContain('EVENTO_CALENDARIO');
+    // Quello che gli avanza è rispondere: anche l'evento di calendario, che
+    // prepara un file e un bottone verso un programma di fuori, è un'uscita
+    // (#533, ottavo giro di verifica).
+    expect(dopo).not.toContain('EVENTO_CALENDARIO');
     // E dichiarare adesso è tardi: lo strumento non c'è più.
     expect(dopo).not.toContain('DICHIARA_USCITE');
   });

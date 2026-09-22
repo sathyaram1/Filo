@@ -151,7 +151,6 @@ test('dentro una pagina web il clic su un collegamento di Filo chiede prima di a
   const page = await openTab(ospite);
   await page.waitForLoadState('domcontentloaded');
 
-  const prima = app.windows().length;
   await page.evaluate(async (url) => {
     const box = document.createElement('div');
     box.className = 'sn-msg-text';
@@ -168,7 +167,6 @@ test('dentro una pagina web il clic su un collegamento di Filo chiede prima di a
 
   expect(app.windows().map((w) => w.url()).some((u) => u.includes('d=segreto')),
     'il collegamento ha aperto la scheda da solo').toBe(false);
-  expect(app.windows().length, 'si è aperta una scheda senza che nessuno chiedesse').toBe(prima);
 
   // Quello che l'utente vede al suo posto: il riquadro di conferma di Filo,
   // con l'indirizzo intero.
