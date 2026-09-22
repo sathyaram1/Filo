@@ -79,8 +79,21 @@ test('un evento già normalizzato ci ripassa uguale: dal bottone della chat torn
 });
 
 test('il nome del file è scrivibile su qualunque disco, e non è mai vuoto', () => {
-  assert.equal(C.fileName({ titolo: 'Cena: da Anna/Luca' }), 'Cena-da-Anna-Luca.ics');
-  assert.equal(C.fileName({ titolo: '🎉' }), 'evento.ics');
-  assert.equal(C.fileName(null), 'evento.ics');
+  assert.match(C.fileName({ titolo: 'Cena: da Anna/Luca' }), /^[a-z0-9]+-Cena-da-Anna-Luca\.ics$/);
+  assert.match(C.fileName({ titolo: '🎉' }), /^[a-z0-9]+-evento\.ics$/);
+  assert.match(C.fileName(null), /^[a-z0-9]+-evento\.ics$/);
   assert.ok(!/[\\/:*?"<>|]/.test(C.fileName({ titolo: 'a\\b:c*d?e"f<g>h|i' })));
+});
+
+// Lo stesso appuntamento riaperto col bottone deve tornare al calendario con lo
+// stesso UID e sullo stesso file: con un'identità nuova il calendario lo prende
+// per un secondo appuntamento e la cena finisce scritta due volte (#567).
+test('lo stesso evento ha sempre la stessa identità, uno diverso no', () => {
+  const uno = C.normalize({ titolo: 'Cena con Anna', data: '2026-10-02', ora: '20:30', durata_min: 90 });
+  const bis = C.normalize({ titolo: 'Cena con Anna', data: '2026-10-02', ora: '20:30', durata_min: 90 });
+  const altro = C.normalize({ titolo: 'Cena con Anna', data: '2026-10-03', ora: '20:30', durata_min: 90 });
+  assert.equal(C.uidPer(uno), C.uidPer(bis));
+  assert.equal(C.fileName(uno), C.fileName(bis));
+  assert.notEqual(C.uidPer(uno), C.uidPer(altro));
+  assert.notEqual(C.fileName(uno), C.fileName(altro));
 });
