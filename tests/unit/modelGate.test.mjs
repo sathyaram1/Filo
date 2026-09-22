@@ -109,6 +109,10 @@ for (const h of indirizziDeiFornitori()) {
   PORTE.push({ nome: `indirizzo del fornitore (${h})`, re: new RegExp(h.replace(/\./g, '\\.'), 'i') });
 }
 
+// Tutte e tre le estensioni con cui Node carica un modulo: con .cjs fuori
+// elenco la stessa chiamata, nella stessa cartella, passava inosservata.
+const ESTENSIONI = ['.js', '.mjs', '.cjs'];
+
 function fileJs(dir, out = []) {
   for (const nome of readdirSync(dir)) {
     if (nome === 'node_modules' || nome.startsWith('.')) continue;
