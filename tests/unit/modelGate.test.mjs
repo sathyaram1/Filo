@@ -41,6 +41,10 @@ const AMMESSI = new Set([
 ]);
 const CARTELLE_AMMESSE = ['src/main/services/providers/'];
 
+// Tutte e tre le estensioni con cui Node carica un modulo: con .cjs fuori
+// elenco la stessa chiamata, nella stessa cartella, passava inosservata.
+const ESTENSIONI = ['.js', '.mjs', '.cjs'];
+
 // Le porte da cui si arriva davvero a un fornitore.
 // `SN_PROVIDER_` è la porta PRINCIPALE, e all'inizio mancava: un fornitore non
 // si trova solo chiedendolo al router, si trova per NOME su globalThis
