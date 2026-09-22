@@ -50,7 +50,6 @@ async function rigaDelNickname(page, nick) {
 }
 
 test('Opzioni, con i modelli predefiniti accesi: l\'esito della prova resta dopo il ricaricamento', async ({ app, openTab }) => {
-  test.fail(true, 'rilievo aperto: la misura resta solo sui modelli propri, non sui predefiniti');
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: true,
@@ -94,8 +93,6 @@ test('Opzioni, con i modelli propri: l\'esito della prova resta dopo il ricarica
 });
 
 test('Preferenze: la conferma «Salvato» non resta accesa su una modifica precedente', async ({ openTab }) => {
-  test.fail(true, 'rilievo aperto: la conferma delle Preferenze parla ancora della modifica di prima');
-
   const page = await openTab(PREFERENZE);
   await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
 
@@ -121,7 +118,6 @@ test('Preferenze: la conferma «Salvato» non resta accesa su una modifica prece
 // salvata. Chi scrive e lascia subito la pagina la perde, e la conferma accesa
 // gli ha appena detto il contrario.
 test('Preferenze: la modifica scritta appena prima di lasciare la pagina non si perde', async ({ app, openTab }) => {
-  test.fail(true, 'rilievo aperto: le Preferenze non salvano prima di sparire, le Opzioni sì');
   const page = await openTab(PREFERENZE);
   await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
   await page.evaluate(() => {

@@ -64,7 +64,6 @@ async function chiediSpiegazione(app, page) {
 }
 
 test('la scelta generale scritta con le maiuscole vale come quella scritta minuscola', async ({ app, openTab }) => {
-  test.fail(true, 'rilievo aperto: la scelta generale non viene normalizzata come quella per modello');
   await preparaModello(app);
   await generaleA(app, 'Price');
   await intercetta(app);
@@ -78,7 +77,6 @@ test('la scelta generale scritta con le maiuscole vale come quella scritta minus
 });
 
 test('la scelta generale si può vedere e cambiare dalla pagina dei modelli predefiniti', async ({ openTab }) => {
-  test.fail(true, 'rilievo aperto: la scelta generale non ha una manopola in nessuna pagina');
   const page = await openTab(MODELLI_PREDEFINITI);
   await page.addInitScript(() => {
     const config = {

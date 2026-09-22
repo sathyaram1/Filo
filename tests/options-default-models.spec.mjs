@@ -44,6 +44,42 @@ test('Opzioni: disattivare lo switch rivela la config e la scelta si persiste', 
   await expect(page.locator('#sec-provider')).toBeVisible();
 });
 
+// La misura del pulsante «Prova» è di chi l'ha fatta: la lista dei modelli
+// predefiniti è in sola lettura, e senza un posto dove tenerla spariva a ogni
+// ricaricamento proprio dove sta quasi tutta la gente (switch acceso).
+test('Opzioni: la misura del «Prova» di un modello predefinito resta dopo il ricaricamento', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    const vero = global.fetch;
+    global.fetch = async (url, init) => {
+      const u = String(url && url.url ? url.url : url);
+      if (!u.includes('openrouter.ai/')) return vero(url, init);
+      if (u.includes('/chat/completions')) {
+        const sse = 'data: {"choices":[{"delta":{"content":"1, 2, 3"}}]}\n\n'
+          + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":9}}\n\n'
+          + 'data: [DONE]\n\n';
+        return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+      }
+      return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: true,
+      openWeightsOnly: false,
+      apiKeys: { openrouter: 'sk-or-finta' },
+    });
+  });
+
+  const riga = (page) => page.locator('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)').first();
+  const page = await openTab(OPTIONS_URL);
+  await riga(page).waitFor({ timeout: 15_000 });
+  await riga(page).locator('.sn-model-test').click();
+  await expect(riga(page).locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
+
+  await page.reload();
+  await riga(page).waitFor({ timeout: 15_000 });
+  await expect(riga(page).locator('.sn-model-row-status'), 'la misura è sparita col ricaricamento')
+    .toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
+});
+
 test('Opzioni: riattivare lo switch ri-nasconde la config', async ({ openTab }) => {
   const page = await openTab(OPTIONS_URL);
   await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });

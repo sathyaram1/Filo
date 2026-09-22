@@ -115,7 +115,6 @@ test('Modelli predefiniti: la scelta si vede anche col tema scuro', async ({ ope
 });
 
 test('Modelli predefiniti: le intestazioni stanno sopra la colonna che descrivono', async ({ openTab }) => {
-  test.fail(true, 'rilievo aperto: le due intestazioni nuove sono spostate di una colonna');
   const page = await apriEditor(openTab);
   const misura = await page.evaluate(() => {
     const testa = document.querySelector('#modelRegistryList .sn-model-row-head');

@@ -147,3 +147,25 @@ test('nel corpo della richiesta: il livello di reasoning della voce, con e senza
     );
   }
 });
+
+// La scelta generale si scrive a mano nella config condivisa: una maiuscola o
+// uno spazio non devono farla sparire in silenzio, come non la fanno sparire
+// sulla voce del singolo modello.
+test('la scelta generale regge maiuscole e spazi, e un valore ignoto vale «nessun ordine»', () => {
+  const casi = [
+    ['Price', 'price'],
+    ['  throughput  ', 'throughput'],
+    ['LATENCY', 'latency'],
+    ['auto', undefined],
+    ['', undefined],
+    ['pippo', undefined],
+  ];
+  for (const [scritto, atteso] of casi) {
+    const r = C.providerRoutingFor({ excludedProviders: ['Google'], providerSort: scritto }, null);
+    assert.equal(r && r.sort, atteso, `scelta generale «${scritto}»`);
+    assert.deepEqual(r.ignore, ['Google'], `la lista di esclusione non dipende da «${scritto}»`);
+  }
+  // E la voce continua a vincere, comunque sia scritta la generale.
+  const r = C.providerRoutingFor({ excludedProviders: [], providerSort: 'Price' }, 'throughput');
+  assert.equal(r.sort, 'throughput');
+});
