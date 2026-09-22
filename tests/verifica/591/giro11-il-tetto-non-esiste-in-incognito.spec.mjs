@@ -71,6 +71,10 @@ test('il tetto esaurito non ferma nulla in incognito', async ({ app }) => {
   expect(out.normale.speso, 'il mese deve risultare già speso').toBeGreaterThan(5);
   expect(out.normale.oltre, 'nella finestra normale il mese è oltre il tetto').toBe(true);
   expect(out.normale.fermato, 'nella finestra normale il cancello ferma la chiamata').toBe(true);
+  expect(
+    out.normale.chiamataPartita,
+    'nella finestra normale la chiamata al fornitore non deve partire',
+  ).toBe(false);
 
   // Il difetto: in incognito lo stesso mese risulta a zero e non ferma niente.
   expect(out.incognito.speso, 'il conto del mese deve valere anche in incognito').toBeGreaterThan(5);
