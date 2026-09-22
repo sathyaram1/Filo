@@ -142,10 +142,14 @@ export const test = base.extend({
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port;
     const api = {
-      html(body) {
+      // `host` serve agli spec di ciò che Filo NON fa sulla rete di casa (il
+      // riordino automatico delle schede): `blocked.test` è mappato sul
+      // loopback dalle regole qui sopra, quindi la pagina la serve questo
+      // server ma per Filo è un sito qualunque.
+      html(body, { host } = {}) {
         const id = String(++nextId);
         pages.set(id, body);
-        return `http://127.0.0.1:${port}/${id}`;
+        return `http://${host || '127.0.0.1'}:${port}/${id}`;
       },
       origin: `http://127.0.0.1:${port}`,
       // Naviga e aspetta che i content script si siano montati: il page-preload
