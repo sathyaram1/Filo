@@ -1347,7 +1347,7 @@ function compitoDi(action, sender, compito) {
   return nominato || compitoDiPagina(sender);
 }
 
-async function executeFiloAction(action, { confirmed = false, sender = null, compito = null } = {}) {
+async function executeFiloAction(action, { confirmed = false, sender = null, compito = null, daClic: clicFidato = false } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   const Compiti = globalThis.SN_COMPITI;
