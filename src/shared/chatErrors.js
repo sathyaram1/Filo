@@ -216,6 +216,8 @@
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
 
-  global.SN_CHAT_ERRORS = { friendly, sentence, fromResponse, isTransientNetwork, rimedio, CODICI_GIA_SCRITTI };
+  global.SN_CHAT_ERRORS = {
+    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, CODICI_GIA_SCRITTI,
+  };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
