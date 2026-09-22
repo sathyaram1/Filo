@@ -129,11 +129,13 @@ test('il riordino che non è potuto partire non deve leggersi come riuscito', as
   await chiedi(page, 'riordina le schede e archivia quelle che non servono');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Valuto le schede aperte.' })).toBeVisible({ timeout: 15_000 });
 
-  const btn = page.locator('.dash-action-btn', { hasText: 'Riordina e archivia' });
-  await expect(btn).toBeVisible();
+  // Il bottone si prende per posizione: il suo TESTO cambia al click, e un
+  // locator che filtra sul testo smette di trovarlo proprio quando serve.
+  const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
+  await expect(btn).toHaveText(/Riordina e archivia/);
   await btn.click();
   await clickConfirm(page, 'ok', { timeout: 10_000 });
-  await expect.poll(async () => ((await btn.textContent()) || '').trim(), { timeout: 20_000 }).not.toContain('Riordino in corso');
+  await expect.poll(async () => ((await btn.textContent()) || '').trim(), { timeout: 30_000 }).not.toContain('Riordino in corso');
 
   const esito = ((await btn.textContent()) || '').trim();
   const titolo = await titoloDiario(page);
@@ -146,4 +148,42 @@ test('il riordino che non è potuto partire non deve leggersi come riuscito', as
 
   await app.evaluate(() => { globalThis.SN_TAB_TRIAGE_DECIDE = globalThis.__v567g4c; });
   await restore(app, '__v567g4c2');
+});
+
+test('un\'impostazione che non si è potuta applicare torna come cambiata nella conversazione riaperta', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
+
+  // Un valore che Filo non sa tradurre: l'impostazione NON cambia.
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'g4d', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'terminalMode', valore: 'quando serve' }) }] },
+    { text: 'Ci provo.' },
+  ], '__v567g4d');
+
+  await chiedi(page, 'attiva la modalità terminale quando serve');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ci provo.' })).toBeVisible({ timeout: 15_000 });
+
+  const chats = await (async () => {
+    for (let i = 0; i < 40; i += 1) {
+      const c = await archivio(app);
+      if (c.length && c[0].messages.some((m) => Array.isArray(m.actions) && m.actions.includes('IMPOSTA_PREFERENZA'))) return c;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return archivio(app);
+  })();
+  expect(chats.length, 'la chat non è arrivata nell\u2019archivio').toBeGreaterThan(0);
+
+  const riaperta = await openTab(`filo://dashboard/dashboard.html?chat=${chats[0].id}`);
+  await expect(riaperta.locator('.dash-bubble').first()).toBeVisible({ timeout: 10_000 });
+  const note = (await riaperta.locator('.dash-bubble-note[data-replay="1"]').allTextContents()).join(' | ');
+
+  const acceso = await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => !!s.terminalMode));
+  expect(acceso, 'l\u2019impostazione non doveva cambiare').toBe(false);
+  expect(note, `l\u2019impostazione non è cambiata, ma la chat riaperta racconta: ${JSON.stringify(note)}`).not.toContain('cambiato un\u2019impostazione');
+
+  await restore(app, '__v567g4d');
 });
