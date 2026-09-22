@@ -630,23 +630,19 @@
   // L'apertura passa dal motore, col compito della risposta in cui il
   // collegamento sta: dove Filo è stato davvero si va subito, altrove chiede
   // mostrando l'indirizzo intero.
-  bubblesEl.addEventListener('click', async (e) => {
-    const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
-    if (!a || !bubblesEl.contains(a)) return;
-    const url = a.getAttribute('href');
-    if (!url) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const bolla = a.closest('.dash-bubble');
-    const compito = (bolla && bolla.dataset.compito) || null;
-    const r = await send({ type: MSG.FILO_OPEN_LINK, url, compito });
-    if (!r || !r.chiede) return;
-    const Ui = window.SN_CONFIRM_UI;
-    const opts = { title: 'Filo chiede conferma', text: r.testo || `Aprire ${url}` };
-    const ok = Ui ? await Ui.confirm(opts) : window.confirm(opts.text);
-    if (!ok) return;
-    await send({ type: MSG.FILO_OPEN_LINK, url, compito, conferma: true });
-  });
+  if (self.SN_MARKDOWN) {
+    self.SN_MARKDOWN.bindLinks(bubblesEl, async (url, a) => {
+      const bolla = a.closest('.dash-bubble');
+      const compito = (bolla && bolla.dataset.compito) || null;
+      const r = await send({ type: MSG.FILO_OPEN_LINK, url, compito });
+      if (!r || !r.chiede) return;
+      const Ui = window.SN_CONFIRM_UI;
+      const opts = { title: 'Filo chiede conferma', text: r.testo || `Aprire ${url}` };
+      const ok = Ui ? await Ui.confirm(opts) : window.confirm(opts.text);
+      if (!ok) return;
+      await send({ type: MSG.FILO_OPEN_LINK, url, compito, conferma: true });
+    });
+  }
 
   // ===== Invio messaggio =====
   // Il ciclo «azione → esito → modello» vive nel main (tool calling nativo):
