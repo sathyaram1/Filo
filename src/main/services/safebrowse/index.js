@@ -319,7 +319,7 @@ function analyze(url, ctx = {}, onUpdate) {
     && !ageInFlight.has(reg)
     && ((providers.rdap) || (providers.ct && !need.cert));
   if (serveGsb || serveEta) {
-    const g = prendiGettone(lookupSpesa, lookupRaffica, prop, LOOKUP_MAX_PER_OWNER, LOOKUP_MAX_RAFFICA);
+    const g = prendiGettone(lookupSpesa, lookupRaffica, prop, LOOKUP_MAX_PER_OWNER, LOOKUP_MAX_RAFFICA, contoCatenaLookup);
     if (g === 'ok') {
       if (serveGsb) {
         gsbInFlight.add(norm.host);
@@ -368,13 +368,13 @@ function analyze(url, ctx = {}, onUpdate) {
   // consuma solo quando la chiamata parte davvero. Se a dire di no è il conto
   // comune, la verifica si rimanda invece di perderla.
   if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(prop)) {
-    const g = prendiGettone(llmSpesa, llmRaffica, prop);
+    const g = prendiGettone(llmSpesa, llmRaffica, prop, DEEP_MAX_PER_OWNER, DEEP_MAX_RAFFICA, contoCatenaDeep);
     if (g === 'ok') {
       inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first)), (r) => llmCache.set(norm.host, r));
     } else if (g === 'raffica') rimandare = true;
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(prop)) {
-    const g = prendiGettone(sandboxSpesa, sandboxRaffica, prop);
+    const g = prendiGettone(sandboxSpesa, sandboxRaffica, prop, DEEP_MAX_PER_OWNER, DEEP_MAX_RAFFICA, contoCatenaDeep);
     if (g === 'ok') {
       inVolo(sandboxInFlight, () => providers.sandbox(url, norm), (r) => sandboxCache.set(norm.host, r));
     } else if (g === 'raffica') rimandare = true;
@@ -439,7 +439,7 @@ const API = {
   _caches: {
     gsbCache, ageCache, certCache, sandboxCache, llmCache,
     llmSpesa, sandboxSpesa, llmRaffica, sandboxRaffica,
-    lookupSpesa, lookupRaffica,
+    lookupSpesa, lookupRaffica, catenaSpesa, catenaLookup,
   },
   // Quante verifiche profonde può far partire chi possiede un sito, quante se
   // ne possono fare in tutto in pochi secondi, e quanto dura quella finestra
@@ -451,6 +451,9 @@ const API = {
   // sito, e quante se ne possono fare in tutto in pochi secondi.
   LOOKUP_MAX_PER_OWNER,
   LOOKUP_MAX_RAFFICA,
+  // Quanti controlli puo far partire UNA catena di navigazioni (test e diagnostica).
+  DEEP_MAX_PER_CATENA,
+  LOOKUP_MAX_PER_CATENA,
   // Chi possiede il sito (test e diagnostica).
   proprietario: psl.proprietario,
   // Chiamate in volo per proprietario del sito (test e diagnostica).

@@ -27,8 +27,11 @@ const safebrowseMethods = {
   // nessuno e continua a lavorare anche in incognito: è solo la rete che si
   // ferma. Il contesto che arriva dallo script della pagina non è fidato, e
   // questo campo lo decide la scheda: si sovrascrive sempre.
-  _sbCtx(ctx) {
-    return { ...(ctx || {}), incognito: !!this.incognito };
+  // `catena` dice a chi addebitare i controlli costosi: una pagina che si porta
+  // da sola su indirizzi sempre nuovi resta la stessa catena e ha un conto
+  // solo, mentre chi naviga dopo una pausa ne apre una nuova (#591, giro 7).
+  _sbCtx(ctx, tab) {
+    return { ...(ctx || {}), incognito: !!this.incognito, catena: catenaDi(tab) };
   },
 
   _sbState(tab) {
