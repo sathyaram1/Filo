@@ -128,7 +128,7 @@
     // scritto da altri come una pagina web, e da lì in poi il perimetro deve
     // mordere (#533, secondo giro di verifica). `ritorna` dice proprio questo:
     // l'azione riporta indietro roba di quella classe.
-    ESEGUI_COMANDO: { classe: 'uscita', uscita: 'terminale', ritorna: 'esterno' },
+    ESEGUI_COMANDO: { classe: 'uscita', uscita: 'terminale', ritorna: 'esterno', privato: true },
     INVIA_FEEDBACK: { classe: 'uscita', uscita: 'segnalazioni' },
     ONBOARDING: { classe: 'uscita', uscita: 'accoglienza' },
   };
