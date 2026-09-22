@@ -33,6 +33,33 @@ async function prepara(page, lista, tab, apri) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
   await page.evaluate(() => {
+    // Quante RIGHE occupano questi pulsanti.
+    //
+    // Prima si arrotondava la coordinata assoluta su una griglia da 8 pixel e
+    // si contavano i valori diversi. Due pulsanti della stessa riga non hanno
+    // però la stessa coordinata: la riga li centra, e uno alto 31 pixel e uno
+    // alto 33 partono uno un pixel più in basso dell'altro. Basta che quel
+    // pixel cada a cavallo di una tacca della griglia (691 e 692 diventano 86
+    // e 87) e sei pulsanti affiancati risultano su due righe. L'altezza di un
+    // pulsante dipende dal font disponibile, quindi lo stesso codice passava
+    // su una macchina e falliva su un'altra, senza che niente fosse cambiato
+    // nella pagina.
+    //
+    // Adesso si confrontano le coordinate con una tolleranza: due pulsanti
+    // stanno sulla stessa riga se si sovrappongono in verticale per più di
+    // metà della loro altezza, che è quello che l'occhio chiama «stessa riga».
+    window.__righeDeiTasti = (bs) => {
+      const righe = [];
+      for (const b of bs) {
+        const r = b.getBoundingClientRect();
+        const centro = r.top + r.height / 2;
+        const riga = righe.find((x) => Math.abs(x - centro) <= r.height / 2);
+        if (riga == null) righe.push(centro);
+      }
+      return righe.length;
+    };
+  });
+  await page.evaluate(() => {
     window.__updates = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
@@ -199,7 +226,7 @@ test('anche con quattro azioni i tasti restano su una riga sola', async ({ openT
   await prepara(page, [{ ...BASE, _id: 'fb-sosp', seq: 912, status: 'suspicious_file', statusPublic: 'open' }], 'inbox', 'fb-sosp');
   const misure = await page.evaluate(() => {
     const bs = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter((b) => b.offsetParent !== null);
-    return { quanti: bs.length, righe: [...new Set(bs.map((b) => Math.round(b.getBoundingClientRect().top / 8)))].length };
+    return { quanti: bs.length, righe: window.__righeDeiTasti(bs) };
   });
   expect(misure.quanti).toBe(6);
   expect(misure.righe).toBe(1);
@@ -218,7 +245,7 @@ test('un messaggio d esito lungo non manda i tasti a capo', async ({ openTab }) 
   });
   const righe = async () => page.evaluate(() => {
     const bs = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter((b) => b.offsetParent !== null);
-    return [...new Set(bs.map((b) => Math.round(b.getBoundingClientRect().top / 8)))].length;
+    return window.__righeDeiTasti(bs);
   });
   const prima = await righe();
   await page.locator('#mgArchiveBtn').click();

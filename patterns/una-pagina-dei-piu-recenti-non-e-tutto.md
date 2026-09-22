@@ -110,6 +110,26 @@ la memoria non combacia più e si rilegge, quindi una prova non si ritrova mai
 davanti i dati della scena precedente. E si ricorda **solo una lettura
 completa**: memorizzare un troncamento vuol dire ripeterlo per mezzo minuto.
 
+## Da una pagina la lettura completa la fa il main
+
+Le porte complete paginano col cursore, e `list` il cursore lo RIFIUTA quando
+la chiamata arriva da una pagina `filo://`: le credenziali stanno nel main, non
+lì. Quindi una pagina che prova a leggere l'insieme non ottiene una finestra —
+ottiene un'eccezione alla prima riga.
+
+La scheda delle statistiche dei feedback (#496) fa proprio domande
+sull'insieme: «quante segnalazioni sono arrivate», non «quali sono le ultime».
+Per lei `listAllPaged` ha un secondo cammino: da una pagina passa dal main
+(`feedback_fetch`, `op: 'listAll'`), che pagina col token dell'owner e torna
+`{ rows, complete }`. Il `complete` viaggia fino in pagina e si vede: quando è
+falso la scheda scrive che i numeri sono minimi, non totali.
+
+Il particolare che rende il cammino nuovo diverso dagli altri: la lettura
+completa **non** riunisce i campi delle schede pubbliche e **non** fa partire
+la sincronizzazione della vista. Un conteggio non ha bisogno dei voti, e
+appenderli costerebbe una seconda lettura di tutto a ogni apertura della
+scheda.
+
 ## Quando invece la finestra va bene
 
 Quando la domanda È «gli ultimi N»: la posta dei feedback, un elenco che si

@@ -1,7 +1,7 @@
 // Spec Playwright per la pagina di gestione (filo://manage/).
 //
 // Assert di COMPORTAMENTO:
-//   - dashboard unificata (DB1): 8 tab, "Ricevuti" attiva di default; le tab
+//   - dashboard unificata (DB1): 9 tab, "Ricevuti" attiva di default; le tab
 //     lista (Ricevuti/In coda/Risolti/Archiviati) condividono panel-list;
 //     stats/models sono segnaposto; "Automazioni" raccoglie le impostazioni;
 //   - lo switch "Modalità automatica" vive nella tab "Automazioni",
@@ -43,8 +43,8 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 8 tab della dashboard unificata.
-  await expect(page.locator('.mg-tab')).toHaveCount(8);
+  // 9 tab della dashboard unificata (la nona: «Statistiche feedback», #496).
+  await expect(page.locator('.mg-tab')).toHaveCount(9);
   // Con i feedback caricati (qui: nessuno) le quattro schede-lista dicono
   // quante ne contengono, le altre quattro no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -54,6 +54,7 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
+  await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
   await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Statistiche Red Team');
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');

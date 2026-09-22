@@ -810,6 +810,19 @@ module.exports = function register(on, ctx) {
       const rows = await FB.getMany(ids, { timeoutMs, idToken });
       return { ok: true, rows: await mergeCardFields(rows) };
     }
+    // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
+    // fa domande sull'INSIEME («quanti ne sono arrivati in tutto»), e a una
+    // domanda sull'insieme una finestra sui più recenti risponde sbagliato in
+    // silenzio (patterns/una-pagina-dei-piu-recenti-non-e-tutto.md). Qui non
+    // si riuniscono i campi delle schede pubbliche (voti e simili: non
+    // servono a un conteggio, e costerebbero una seconda lettura di tutto) e
+    // non si fa partire la sincronizzazione della vista, che è mestiere del
+    // caricamento della dashboard. `complete` viaggia con le righe: se il
+    // freno sulle pagine è scattato, chi guarda deve poterlo dire.
+    if (op === 'listAll') {
+      const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken });
+      return { ok: true, rows, complete };
+    }
     if (op !== 'list') return { ok: false, error: `lettura non prevista: ${op}` };
 
     const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;

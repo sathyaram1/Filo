@@ -416,7 +416,13 @@
     // pubblica, che è dove quei due campi vengono scritti oggi.
     //   { op: 'list', pageSize?, fields?, timeoutMs? }  → { ok, rows }
     //   { op: 'getMany', ids: [...], timeoutMs? }       → { ok, rows }
+    //   { op: 'listAll', timeoutMs? }                   → { ok, rows, complete }
     //   → { ok:false, error } se non sei admin o la lettura fallisce.
+    // `list` è una FINESTRA sui più recenti; `listAll` è l'INSIEME, paginato
+    // col cursore dal main (una pagina non può: le credenziali stanno di là).
+    // Lo chiede la scheda delle statistiche (#496), che fa domande sul totale,
+    // e `complete: false` dice che il freno sulle pagine è scattato — un
+    // troncamento che non si dichiara passa per un totale.
     FEEDBACK_FETCH: 'feedback_fetch',
     // S1.3: decifratura campi feedback lato main (la chiave privata NON lascia
     // mai il main process). Il renderer manda i campi con valori potenzialmente
