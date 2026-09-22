@@ -635,6 +635,7 @@
       row.querySelector('.sn-excluded-name').focus();
     });
     $('excludedDriftFix').addEventListener('click', addMissingExcluded);
+    $('providerSort').addEventListener('change', rinfrescaMisure);
     $('saveBtn').addEventListener('click', save);
   });
 })();
