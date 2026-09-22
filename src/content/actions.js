@@ -1588,7 +1588,7 @@
         action: ACTIONS.TRANSCRIBE_IMAGE,
         payload: { dataUrl: region.dataUrl },
       });
-      if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+      if (!res?.ok) { Popup.showToast(Popup.frasePerLUtente({ ...res, message: res?.error }), { duration: 9000 }); return; }
       const text = (res.text || '').trim();
       if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
