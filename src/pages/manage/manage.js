@@ -2640,6 +2640,7 @@
         // Il segno messo con una richiesta già ferma davanti: si fonde adesso,
         // anche quella aperta per i soli blocchi nuovi, che l'owner ha sotto gli occhi.
         const avvia = () => setManageMsg(testo + ' Chiedo al server di fondere la richiesta ferma…', '');
+        dimenticaTentativi(fb);
         for (const { msg } of await fondiCoperte(fb, { ancheNuovi: true, avvia })) {
           testo += ` Fusione ferma su questa pratica: ${msg.text}`;
           if (msg.kind !== 'ok') kind = 'err';
