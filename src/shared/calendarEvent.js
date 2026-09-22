@@ -116,14 +116,30 @@
     return `${righe.map(piega).join('\r\n')}\r\n`;
   }
 
+  // Identità dell'evento, dai suoi campi: lo stesso appuntamento riaperto col
+  // bottone deve tornare al calendario con lo STESSO UID, o il calendario lo
+  // prende per un secondo appuntamento e l'utente si ritrova la cena due volte.
+  function uidPer(ev) {
+    const seme = ['titolo', 'inizio', 'fine', 'luogo'].map((k) => String((ev && ev[k]) || '')).join('\u0001');
+    let h1 = 0x811c9dc5;
+    let h2 = 0x01000193;
+    for (let i = 0; i < seme.length; i += 1) {
+      const c = seme.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+      h2 = Math.imul(h2 + c, 0x85ebca6b) >>> 0;
+    }
+    return `${h1.toString(36)}${h2.toString(36)}`;
+  }
+
   // Nome del file sul disco: solo caratteri che ogni sistema accetta, e mai
-  // vuoto (un titolo di soli emoji lascerebbe «.ics» e basta).
+  // vuoto (un titolo di soli emoji lascerebbe «.ics» e basta). Porta davanti
+  // l'identità dell'evento, così riaprirlo riscrive lo stesso file.
   function fileName(ev) {
     const base = String((ev && ev.titolo) || '')
       .normalize('NFKD').replace(/[̀-ͯ]/g, '')
       .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
-    return `${base || 'evento'}.ics`;
+    return `${uidPer(ev)}-${base || 'evento'}.ics`;
   }
 
-  global.SN_CALENDAR = { normalize, buildIcs, fileName, esc };
+  global.SN_CALENDAR = { normalize, buildIcs, fileName, uidPer, esc };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
