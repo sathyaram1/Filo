@@ -36,6 +36,15 @@ test('«auto», vuoto e assente sono lo stesso valore, e non invalidano la misur
   assert.equal(C.misuraValePer({ ...senza, sort: 'Price' }, { model: 'vendor/uno', sort: 'price' }), true);
 });
 
+test('la riga su «Automatico» segue la scelta generale, e cambiarla invalida la misura', () => {
+  assert.equal(C.ordinamentoEffettivo('', 'price'), 'price');
+  assert.equal(C.ordinamentoEffettivo('latency', 'price'), 'latency');
+  assert.equal(C.ordinamentoEffettivo('auto', 'auto'), null);
+  const voce = (generale) => ({ model: 'vendor/uno', reasoning: 'high', sort: C.ordinamentoEffettivo('', generale) });
+  assert.equal(C.misuraValePer(MISURA, voce('price')), true);
+  assert.equal(C.misuraValePer(MISURA, voce('throughput')), false);
+});
+
 test('una misura vuota o assente non vale niente', () => {
   assert.equal(C.misuraValePer(null, { model: 'vendor/uno' }), false);
   assert.equal(C.misuraValePer({ model: 'vendor/uno' }, { model: 'vendor/uno' }), false);
