@@ -3431,6 +3431,7 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   apriFileLocale,
+  compitoPrecedenteDi,
   maybeRunCompactor,
   compitiRecenti,
   // Intervista di benvenuto (#524)
