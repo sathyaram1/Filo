@@ -39,6 +39,7 @@ test('chiesto il riordino delle schede, l\'utente deve trovare il bottone per fa
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Valuto le schede aperte.' })).toBeVisible({ timeout: 10_000 });
 
   const d = await diario(page);
+  await page.screenshot({ path: 'tests/.shots/567-giro3-riordino-schede.png', fullPage: false });
   const btn = page.locator('.dash-action-btn', { hasText: 'Riordina e archivia' });
   expect(await btn.count(), `il bottone non c'è; il diario dice — titolo: ${JSON.stringify(d.titolo)}, righe: ${JSON.stringify(d.righe)}`).toBeGreaterThan(0);
 
@@ -128,7 +129,7 @@ test('il riordino chiesto da un suggerimento della home deve dire com\'è andato
     }
   }, type);
 
-  const sug = page.locator('.dash-sug', { hasText: 'Fai pulizia delle schede' });
+  const sug = page.locator('.dash-suggestion', { hasText: 'Fai pulizia delle schede' });
   await expect(sug).toBeVisible({ timeout: 10_000 });
   await sug.click();
   await clickConfirm(page, 'ok', { timeout: 10_000 });
