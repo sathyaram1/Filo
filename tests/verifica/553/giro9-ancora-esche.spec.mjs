@@ -23,6 +23,14 @@ const pagina = (stile) => '<!DOCTYPE html><html><head><title>Bar Centrale</title
   + `<h1>Bar Centrale</h1><p>${VISIBILE}</p>`
   + `<div style="${stile}">${ESCA}</div></main></body></html>`;
 
+const leggiDaScheda = (app, url) => app.evaluate(
+  async (_e, u) => (await globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'LEGGI_PAGINA', url: u },
+    { sender: { url: 'filo://dashboard/dashboard.html' } },
+  )).output,
+  url,
+);
+
 const leggi = (app, html, url = 'https://example.com/bar') => app.evaluate(async (_e, [p, u]) => {
   const orig = globalThis.fetch;
   globalThis.__ripristinaRete = () => { globalThis.fetch = orig; };
@@ -42,6 +50,17 @@ for (const [come, stile] of Object.entries(MODI)) {
     await openTab('filo://newtab/');
     const out = await leggi(app, pagina(stile));
     expect(out.ok).toBe(true);
+    expect(String(out.text)).toContain('1,20');
+    expect(String(out.text)).not.toContain('gratis');
+  });
+
+  test(`né ${come} dalla scheda già aperta`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    const url = testServer.html(pagina(stile));
+    await openTab(url);
+    const out = await leggiDaScheda(app, url);
+    expect(out.ok).toBe(true);
+    expect(out.source).toBe('scheda');
     expect(String(out.text)).toContain('1,20');
     expect(String(out.text)).not.toContain('gratis');
   });
