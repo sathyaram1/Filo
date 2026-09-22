@@ -32,6 +32,14 @@ on:
     paths:
       - '.github/workflows/verifica-linux.yml'
       - 'assets/icons/icon-1024.png'
+      # Il lanciatore che il pacchetto si porta dentro, e lo smistatore che lo
+      # chiama: sono il pezzo che fa aprire Filo col doppio clic, e questo e'
+      # l'unico lavoro che prova ad aprirlo davvero.
+      - 'scripts/after-pack-linux.js'
+      - 'scripts/after-pack.js'
+      # Il foglietto del primo avvio: la sentinella qui sotto ne guarda il
+      # contenuto.
+      - 'build/**'
       # Il primo passo di questo lavoro E' la sentinella: se cambia lei, cambia
       # cosa questo lavoro controlla, e va rifatto girare.
       - 'tests/unit/linuxSupport.test.mjs'
