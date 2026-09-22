@@ -73,7 +73,7 @@ test.describe('#533 giro 7 — la risposta come ultima uscita rimasta', () => {
     const page = await openTab(NEWTAB);
     await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
 
-    const destinazione = `${testServer.url}/e?d=segreto`;
+    const destinazione = `${testServer.html('<p>presa</p>')}?d=segreto`;
     // L'utente fa leggere a Filo un documento che gli hanno mandato: da lì in
     // poi il compito è contaminato e le uscite non dichiarate spariscono. La
     // risposta resta, e dentro la risposta ci sta un collegamento.
@@ -124,7 +124,7 @@ test.describe('#533 giro 7 — la risposta come ultima uscita rimasta', () => {
     const page = await openTab(NEWTAB);
     await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
 
-    const destinazione = `${testServer.url}/e?d=segreto`;
+    const destinazione = `${testServer.html('<p>presa</p>')}?d=segreto`;
     // Due strade per la stessa cosa — aprire un indirizzo — nello stesso turno
     // contaminato: la prima passa dal motore, la seconda no.
     await copione(app, {
@@ -154,20 +154,19 @@ test.describe('#533 giro 7 — la risposta come ultima uscita rimasta', () => {
     // L'altra strada: il collegamento nella bolla della risposta, cliccato
     // dall'utente. Il riquadro va DENTRO le bolle, dove sta il vero ascoltatore
     // dei clic della chat: non una riscrittura, proprio quello.
-    const aperto = await page.evaluate(async (testo) => {
+    await page.evaluate(async (testo) => {
       const bolle = document.getElementById('bubbles');
       const box = document.createElement('div');
       box.innerHTML = self.SN_MARKDOWN.render(testo);
       bolle.appendChild(box);
       const a = box.querySelector('a.filo-md-link');
-      if (!a) return { cliccabile: false, schede: [] };
+      if (!a) return;
       a.click();
-      await new Promise((res) => setTimeout(res, 1500));
-      const tabs = await chrome.tabs.query({});
-      return { cliccabile: true, schede: tabs.map((t) => t.url || '') };
+      await new Promise((res) => setTimeout(res, 2000));
     }, r.testo);
+    const schede = app.windows().map((w) => w.url());
 
-    expect(aperto.schede.some((u) => u.includes('d=segreto')),
+    expect(schede.some((u) => u.includes('d=segreto')),
       'un clic sul collegamento apre l\'indirizzo scelto dopo la lettura, che il motore aveva appena rifiutato')
       .toBe(false);
   });
