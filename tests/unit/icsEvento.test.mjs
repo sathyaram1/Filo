@@ -29,9 +29,9 @@ test('un titolo con dentro degli a capo non riscrive il file', () => {
     dettagli: 'punto uno; punto due, tre\\quattro',
   });
   assert.equal(r.ok, true);
-  const dtstart = r.testo.match(/DTSTART:/g) || [];
-  assert.equal(dtstart.length, 1, 'il titolo ha aperto una riga sua');
-  assert.equal((r.testo.match(/SUMMARY:/g) || []).length, 1);
+  const righe = r.testo.split('\r\n');
+  assert.equal(righe.filter((l) => l.startsWith('DTSTART:')).length, 1, 'il titolo ha aperto una riga sua');
+  assert.equal(righe.filter((l) => l.startsWith('SUMMARY:')).length, 1);
   assert.match(r.testo, /punto uno\\; punto due\\, tre\\\\quattro/);
 });
 
