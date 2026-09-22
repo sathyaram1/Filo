@@ -368,9 +368,11 @@
     // documento, e chiederne lo stile alla finestra sbagliata non risponde di
     // loro.
     const cs = viewOf(el).getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse'
-        || cs.contentVisibility === 'hidden') return true;
-    if (isScaledToNothing(cs)) return true;
+    if (cs.display === 'none' || cs.contentVisibility === 'hidden') return true;
+    // La visibilità è l'unica ripiegatura che un figlio può disfare da solo (`visibility: visible`): chi chiama
+    // deve saperlo per scendere lo stesso, invece di lasciare in inglese del testo che si vede (#505).
+    if (cs.visibility === 'hidden' || cs.visibility === 'collapse') return 'visibility';
+    if (isFlattened(el)) return true;
     if (isTransparentOnScreen(el, cs)) return true;
     if (isPushedOutOfPage(el, cs)) return true;
     if (isClippedAwayByPath(el, cs)) return true;
