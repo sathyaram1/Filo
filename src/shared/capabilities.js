@@ -453,7 +453,7 @@
     },
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
-      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima) e lista dei siti fidati.',
+      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima) e lista dei siti fidati. Protezione IP, blocco dei popup, rilevamento dei siti pericolosi, cookie e anti-fingerprinting si cambiano anche a parole, chiedendoli a Filo e confermando; la pagina aperta mostra subito il cambiamento.',
       invoke: 'Pagina filo://security/security.html.',
     },
     {

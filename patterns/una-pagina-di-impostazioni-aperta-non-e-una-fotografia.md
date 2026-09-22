@@ -10,12 +10,15 @@ manopola qualunque rispedisce l'intero blocco com'era all'apertura, e il
 cambiamento arrivato da fuori sparisce. Nessun errore, nessun avviso: l'utente
 scopre che il valore è tornato indietro giorni dopo, e non collega le due cose.
 
-**La regola.** Ogni campo che il salvataggio riscrive va riallineato quando
+**La regola.** Ogni campo che un salvataggio riscrive va riallineato quando
 quella stessa impostazione cambia da fuori: la pagina ascolta
-`SETTINGS_UPDATED` e rimette nei controlli i valori arrivati. L'unico campo che
-non si tocca è quello che l'utente sta usando in quel momento
+`SETTINGS_UPDATED` e rimette nei controlli i valori arrivati. Vale per OGNI
+salvataggio della pagina, non solo per quello principale, e per le copie in
+memoria da cui un salvataggio riparte, non solo per i campi del DOM. L'unico
+campo che non si tocca è quello che l'utente sta usando in quel momento
 (`document.activeElement`), o gli si riscriverebbe sotto le dita ciò che sta
-digitando.
+digitando; la stessa chiave va tenuta anche nella copia in memoria, o il
+salvataggio successivo perderebbe quello che sta scrivendo.
 
 ## Il caso
 
@@ -36,6 +39,10 @@ diciannove manopole, l'ha ripetuta su tutte.
 
 - **Curare il campo che si è visto.** È quello che era stato fatto per la
   chiave OpenRouter: il difetto è del meccanismo, non del campo.
+- **Curare il salvataggio che si è visto.** Preferenze salva in tre blocchi
+  (le manopole, i token estetici, i colori delle schede) e curarne uno solo ha
+  lasciato sparire i colori chiesti a Filo a parole; la pagina Sicurezza e
+  privacy, con la stessa forma, non ascoltava affatto.
 - **Mandare solo il campo toccato.** Toglie il danno ma lascia la pagina che
   mostra numeri falsi, e chi guarda una manopola per capire com'è messo ci
   crede.
@@ -44,9 +51,12 @@ diciannove manopole, l'ha ripetuta su tutte.
 
 ## Dove sta
 
-`src/pages/preferences/preferences.js` (`riallineaDaFuori`), stessa forma di
-`src/pages/options/options.js` per la chiave OpenRouter. La sentinella è
-`tests/unit/preferenzePaginaViva.test.mjs`: confronta i campi letti dal
-salvataggio con quelli riallineati, e diventa rossa se una manopola nuova
-entra nel salvataggio senza entrare anche lì. La prova dal punto di vista
-dell'utente è `tests/preferences-pagina-viva.spec.mjs`.
+`src/pages/preferences/preferences.js` (`riallineaDaFuori` più
+`riallineaBlocchiAvanzati`), `src/pages/security/security.js` (`applica`) e
+`src/pages/options/options.js`. La sentinella è
+`tests/unit/paginaImpostazioniViva.test.mjs`: per ogni pagina di impostazioni
+confronta i controlli letti dai suoi salvataggi con quelli riallineati, e
+diventa rossa se una manopola nuova, un salvataggio nuovo o una pagina nuova
+entra senza entrare anche lì. Le prove dal punto di vista dell'utente sono
+`tests/preferences-pagina-viva.spec.mjs` e
+`tests/security-pagina-viva.spec.mjs`.
