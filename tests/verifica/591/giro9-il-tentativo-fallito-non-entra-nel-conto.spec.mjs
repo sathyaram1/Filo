@@ -19,7 +19,11 @@ import { createRequire } from 'node:module';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const require_ = createRequire(join(REPO, 'package.json'));
-require_(join(REPO, 'src/main/services/providers/index.js'));
+// Il router vero, ri-registrato anche se un'altra prova del giro lo ha già
+// caricato e poi sostituito con un finto: i file condividono un processo solo.
+const ROUTER = join(REPO, 'src/main/services/providers/index.js');
+delete require_.cache[require_.resolve(ROUTER)];
+require_(ROUTER);
 const Gate = require_(join(REPO, 'src/main/services/modelGate.js'));
 
 // Due tentativi sullo stesso fornitore finto: il primo produce del testo e poi
