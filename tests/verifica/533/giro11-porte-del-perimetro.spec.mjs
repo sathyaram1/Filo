@@ -87,14 +87,14 @@ async function apriDopoAverLetto(app, page, { segreto, testServer, storico = [] 
     ],
     risposta: 'Ecco quello che ho trovato.',
   });
-  const azioni = await page.evaluate(async () => {
+  const azioni = await page.evaluate(async (storico) => {
     const res = await chrome.runtime.sendMessage({
       type: window.SN_MSG.MSG.FILO_CHAT,
       userMessage: 'Leggimi la bolletta che mi hanno mandato e poi aprimi il sito della banca.',
-      threadHistory: [],
+      threadHistory: storico,
     });
     return (res && res.actions) || [];
-  });
+  }, storico);
   await ripristina(app);
   return azioni.find((a) => String(a.type).toUpperCase() === 'NAVIGA');
 }
