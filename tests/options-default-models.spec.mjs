@@ -91,3 +91,48 @@ test('Opzioni: riattivare lo switch ri-nasconde la config', async ({ openTab }) 
   await expect(page.locator('#sec-provider')).toBeHidden();
   await expect(page.locator('#sec-models')).toBeHidden();
 });
+
+// Una riga su «Automatico» segue la scelta generale degli host: cambiata
+// quella, i numeri di prima parlano di un altro modo di scegliere l'host, e
+// restare sullo schermo come se valessero ancora è peggio che sparire.
+test('Opzioni: cambiata la scelta generale degli host, la misura di prima non resta', async ({ app, openTab }) => {
+  const generaleA = (valore) => app.evaluate(async (_e, v) => {
+    const D = globalThis.__filoDefaults;
+    if (!globalThis.__getVeroGenerale) globalThis.__getVeroGenerale = D.get;
+    D.get = (...a) => ({ ...globalThis.__getVeroGenerale(...a), providerSort: v });
+  }, valore);
+
+  await app.evaluate(async () => {
+    const vero = global.fetch;
+    global.fetch = async (url, init) => {
+      const u = String(url && url.url ? url.url : url);
+      if (!u.includes('openrouter.ai/')) return vero(url, init);
+      if (u.includes('/chat/completions')) {
+        const sse = 'data: {"choices":[{"delta":{"content":"1, 2, 3"}}]}\n\n'
+          + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":9}}\n\n'
+          + 'data: [DONE]\n\n';
+        return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+      }
+      return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: true,
+      openWeightsOnly: false,
+      apiKeys: { openrouter: 'sk-or-finta' },
+    });
+  });
+  await generaleA('price');
+
+  const riga = (page) => page.locator('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)').first();
+  const page = await openTab(OPTIONS_URL);
+  await riga(page).waitFor({ timeout: 15_000 });
+  await riga(page).locator('.sn-model-test').click();
+  await expect(riga(page).locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
+
+  await generaleA('throughput');
+  await page.reload();
+  await riga(page).waitFor({ timeout: 15_000 });
+  await expect(riga(page).locator('.sn-model-row-status'),
+    'la misura parla di un ordinamento che non è più quello in vigore')
+    .toHaveText(/Non ancora testato/, { timeout: 10_000 });
+});

@@ -251,3 +251,32 @@ test('a finestra stretta la riga resta usabile: la stringa del modello si legge 
   const rotte = misure.filter((m) => m.campoModello < 60 || m.oltreLoSchermo > 0);
   expect(rotte, `larghezze in cui la riga non è più usabile: ${JSON.stringify(misure)}`).toEqual([]);
 });
+
+// La misura del «Prova» è la ragione per cui si sta su questa pagina quando si
+// sceglie il criterio degli host: senza, dopo un ricaricamento non si confronta
+// più niente, e una riga muta non distingue «mai provata» da «senza risposta».
+test('la misura del «Prova» resta dopo il ricaricamento, e una riga mai provata lo dice', async ({ openTab }) => {
+  const page = await openEditor(openTab);
+  const prima = () => page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await expect(prima().locator('.sn-model-row-status')).toHaveText(/Non ancora testato/, { timeout: 8_000 });
+
+  await prima().locator('button').last().click();
+  await expect(prima().locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
+
+  await page.reload();
+  await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
+  await expect(prima().locator('.sn-model-row-status'), 'la misura è sparita col ricaricamento')
+    .toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
+});
+
+// Cambiare il criterio della riga cambia quello che la misura misurava: i
+// numeri di prima parlerebbero di un'altra scelta senza dirlo.
+test('cambiato l’ordinamento della riga, la misura di prima non resta', async ({ openTab }) => {
+  const page = await openEditor(openTab);
+  const prima = () => page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await prima().locator('button').last().click();
+  await expect(prima().locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
+
+  await prima().locator('.sn-model-sort').selectOption('latency');
+  await expect(prima().locator('.sn-model-row-status')).toHaveText(/Non ancora testato/, { timeout: 5_000 });
+});
