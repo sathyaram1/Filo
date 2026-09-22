@@ -2975,12 +2975,15 @@ function buildNoKeyDashboard(settings, saved) {
       : 'Scegli un modello in Opzioni'));
   let message;
   if (motivo === 'chiave') {
-    message = 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
+    message = 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.';
   } else if (motivo === 'pesi-aperti') {
-    message = 'I modelli che hai scelto vanno bene, ma «solo modelli a pesi aperti» li esclude tutti e nessuno di loro ha un equivalente a pesi aperti. In Opzioni puoi spegnere l\'interruttore o scegliere altri modelli. Intanto, le tue pagine salvate sono qui.';
+    message = 'I modelli che hai scelto vanno bene, ma «solo modelli a pesi aperti» li esclude tutti e nessuno di loro ha un equivalente a pesi aperti. In Opzioni puoi spegnere l\'interruttore o scegliere altri modelli.';
   } else {
-    message = 'I crediti ci sono, ma nessun modello configurato può rispondere: la configurazione dei modelli è vuota o cita modelli che non esistono più. Puoi sceglierne uno tu in Opzioni. Intanto, le tue pagine salvate sono qui.';
+    message = 'I crediti ci sono, ma nessun modello configurato può rispondere: la configurazione dei modelli è vuota o cita modelli che non esistono più. Puoi sceglierne uno tu in Opzioni.';
   }
+  // Il rimando alle pagine salvate solo se ce n'è almeno una: al primo avvio
+  // non ce n'è nessuna, e indicava una lista vuota (#663).
+  if (saved.length) message += ' Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 
