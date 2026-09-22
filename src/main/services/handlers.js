@@ -1861,8 +1861,39 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
         const text = T ? T.asText(doc) : '';
         return { executed: true, kept: true, output: { doc: doc || null, text } };
       }
-      case 'EVENTO_CALENDARIO':
-        return { executed: false, kept: true };
+      case 'EVENTO_CALENDARIO': {
+        // Prima questo ramo non faceva niente e la chat scriveva «Evento
+        // creato»: nessun evento esisteva da nessuna parte, e l'utente se ne
+        // accorgeva il giorno dell'appuntamento. Adesso l'evento diventa un
+        // file .ics vero, che il bottone in chat apre col calendario di
+        // sistema.
+        const ICS = globalThis.SN_ICS;
+        if (!ICS) return { executed: false, kept: true };
+        const r = ICS.costruisci({
+          data: action.data ?? action.date ?? action.giorno,
+          ora: action.ora ?? action.time ?? action.orario,
+          titolo: action.titolo ?? action.title ?? action.nome ?? action.name,
+          dettagli: action.dettagli ?? action.details ?? action.note ?? action.descrizione ?? '',
+          durataMin: action.durataMin ?? action.durata ?? action.duration,
+        });
+        if (!r.ok) return { executed: false, kept: true, output: { evento: { ok: false, errore: r.errore } } };
+        try {
+          const { app } = require('electron');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const dir = path.join(app.getPath('userData'), 'eventi');
+          fs.mkdirSync(dir, { recursive: true });
+          const percorso = path.join(dir, r.nome);
+          fs.writeFileSync(percorso, r.testo, 'utf8');
+          return {
+            executed: true,
+            kept: true,
+            output: { evento: { ok: true, percorso, quando: r.quando } },
+          };
+        } catch (e) {
+          return { executed: false, kept: true, output: { evento: { ok: false, errore: 'scrittura' } } };
+        }
+      }
       case 'CAPACITA_DETTAGLIO': {
         // Lookup del manifesto delle capacità (F2): l'agente chiede il dettaglio
         // di una o più voci per id; glielo restituiamo come output, che il client
