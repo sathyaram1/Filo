@@ -50,4 +50,17 @@ function congedaPagina(webContents, { tetto = TETTO_MS } = {}) {
   });
 }
 
-module.exports = { congedaPagina, CANALE_AVVISO, CANALE_RISPOSTA, TETTO_MS };
+// Le uscite di una pagina interna sono tre (chiusa la scheda, chiusa la
+// finestra, spento Filo) e il congedo deve valere per tutte e tre, da qui.
+// Torna null quando non c'è niente da aspettare, così chi chiama non rimanda
+// una chiusura che può avvenire subito.
+function congedaSchedeInterne(tabs) {
+  let interne = [];
+  try { interne = (tabs?.tabs || []).filter((t) => t && t.isInternal && t.view); } catch (_) { return null; }
+  if (!interne.length) return null;
+  return Promise.all(interne.map((t) => congedaPagina(t.view.webContents).catch(() => {})));
+}
+
+module.exports = {
+  congedaPagina, congedaSchedeInterne, CANALE_AVVISO, CANALE_RISPOSTA, TETTO_MS,
+};
