@@ -518,3 +518,37 @@ test('i due servizi a pagamento si raggiungono dal cancello e rispettano il tett
   const r = await Gate.blacklistLookup({ settings: SETTINGS, url: 'http://x.test/', apiKey: 'k' });
   assert.deepEqual(r, { listed: true }, 'l\'elenco dei siti di truffa non costa e non si ferma');
 });
+
+// #591, nono giro — un tentativo che si rompe DOPO che il modello ha già
+// scritto si paga lo stesso, e nel conto finiva solo l'ultimo tentativo: il
+// tetto mensile, che è l'unico fondo vero, non lo vedeva. Il costo di quella
+// generazione lo sa il fornitore e si chiede col suo id.
+test('il costo di un tentativo che si rompe a metà entra nel conto', async () => {
+  const registrate = [];
+  globalThis.SN_PROVIDERS = {
+    streamCompleteWithFallback: async () => ({
+      text: 'ok',
+      usage: { costUsd: 0.006 },
+      tentativiFalliti: [{ provider: 'finto', apiKey: 'k', model: 'modello-x', generationId: 'gen-rotta' }],
+    }),
+    getProvider: () => ({ lookupServedBy: async () => ({ servedBy: 'HostFinto', costUsd: 0.004 }) }),
+  };
+  globalThis.SN_COSTS = {
+    isOverLimit: async () => false,
+    record: async (r) => { registrate.push(Number(r.usage && r.usage.costUsd) || 0); return 0; },
+  };
+  Gate.configure({
+    modelForAction: () => 'nickname-finto',
+    buildAttemptChain: () => [{ ...ATTEMPT }],
+    noteServedProvider: () => ({ servedBy: 'HostFinto', violation: false }),
+  });
+
+  await Gate.stream({ settings: SETTINGS, action: 'azione_x', messages: [] });
+  await new Promise((r) => setTimeout(r, 6000));
+
+  const contato = registrate.reduce((a, b) => a + b, 0);
+  assert.ok(
+    Math.abs(contato - 0.01) < 1e-9,
+    `fatturati 0.010 USD in due tentativi, contati ${contato}: quello del tentativo rotto manca`,
+  );
+});

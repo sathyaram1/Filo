@@ -23,6 +23,8 @@
         'Mandare una segnalazione dà crediti, e se viene risolta ne dà altri. Li trovi nei movimenti della pagina Crediti, insieme all\'invito riscattato, alla quota di ogni giorno e ai regali.',
       ],
       fixes: [
+        'Chiudere una scheda aperta sul pannello del router, sul disco di rete o su un server di prova sul tuo computer non manda più fuori quello che c\u2019era scritto. Nell\u2019archivio la ritrovi come prima: il riassunto lo fa solo per i siti pubblici.',
+        'L\u2019avviso su una pagina sospetta non sparisce più da solo dopo qualche secondo. Succedeva dopo che un sito ti aveva spostato su tanti indirizzi di fila: il controllo ripartiva senza sapere che quella pagina ti chiedeva la password, e toglieva l\u2019allarme invece di confermarlo.',
         'Il tetto di spesa mensile che imposti vale adesso per ogni chiamata che Filo paga: il controllo sui siti pericolosi, il riconoscimento delle pagine bloccate nel tuo paese, la voce che legge ad alta voce, il titolo di una segnalazione, e le ricerche sul web che Filo fa per risponderti. Prima quelle giravano senza tetto e non comparivano nella spesa.',
         'Il controllo sui siti pericolosi apre al massimo due pagine di prova per volta, e le chiude comunque dopo qualche secondo. Prima un sito poteva farne aprire quante voleva cambiando sottodominio ogni volta, e qualcuna restava aperta finché non chiudevi Filo.',
         'Se scegli di proseguire su un sito pericoloso, quella scelta vale per quel sito e basta. Sui servizi che ospitano tanti siti diversi sotto lo stesso nome valeva per tutti: la pagina rossa non tornava più, nemmeno su una truffa diversa di un altro proprietario.',

@@ -241,6 +241,12 @@
   // indistinguibili.
   // Il costo in dollari che il router dichiara (`usage.cost`, con
   // `usage.include`). 0 se assente: chi lo legge sa che deve stimare.
+  // L'intestazione non c'è sempre (e nei test la risposta è finta): senza id si
+  // resta senza, non si inciampa.
+  function idDiGenerazione(res) {
+    try { return (res && res.headers && res.headers.get('x-generation-id')) || null; } catch (_) { return null; }
+  }
+
   function costUsdOf(usage) {
     const c = usage && Number(usage.cost);
     return Number.isFinite(c) && c > 0 ? c : 0;
@@ -370,7 +376,7 @@
     // Serve se lo stream si rompe a metà: quello che il modello ha già scritto
     // si paga lo stesso, e senza questo id non c'era modo di sapere quanto né
     // di farlo comparire nel conto (#591, giro 9).
-    let generationId = res.headers.get('x-generation-id') || null;
+    let generationId = idDiGenerazione(res);
     const calls = createToolCallAccumulator(onToolCall);
     const details = createReasoningDetailsAccumulator();
     let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
