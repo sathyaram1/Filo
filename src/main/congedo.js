@@ -34,8 +34,9 @@ function congedaPagina(webContents, { tetto = TETTO_MS } = {}) {
     try { vivo = !!webContents && !webContents.isDestroyed(); } catch (_) { vivo = false; }
     if (!vivo) { risolvi(); return; }
     ipcMain.on(CANALE_RISPOSTA, ascolta);
+    // Il timer NON si sgancia dal giro degli eventi: è l'unica garanzia che la
+    // view venga poi buttata via anche se la pagina non risponde mai.
     timer = setTimeout(fine, tetto);
-    timer.unref?.();
     try { webContents.send(CANALE_AVVISO); } catch (_) { fine(); }
   });
 }
