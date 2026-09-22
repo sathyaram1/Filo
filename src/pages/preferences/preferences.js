@@ -738,8 +738,8 @@
       fn(el);
     };
     const opzione = (id, valore, ripiego) => set(id, (el) => {
-      const ok = [...el.options].some((o) => o.value === valore);
-      el.value = ok ? valore : ripiego;
+      if ([...el.options].some((o) => o.value === valore)) el.value = valore;
+      else if (ripiego !== undefined) el.value = ripiego;
     });
 
     opzione('theme', settings.theme || 'system', 'system');
