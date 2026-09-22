@@ -166,7 +166,11 @@ const catenaLookup = creaConto(HOUR);
 // rinuncia e basta) o 'raffica' (in questo momento se ne stanno facendo
 // troppe in tutto: si riprova fra poco, perché la rinuncia non è colpa di
 // questo sito). Niente si ricorda in nessuno dei due casi.
-function prendiGettone(conto, raffica, chi, max = DEEP_MAX_PER_OWNER, maxRaffica = DEEP_MAX_RAFFICA) {
+// `catena` è il conto di chi consuma: si guarda PRIMA degli altri due e la sua
+// rinuncia è definitiva ('suo'), perché riprovare fra qualche secondo sarebbe
+// proprio la raffica che questo conto deve fermare.
+function prendiGettone(conto, raffica, chi, max = DEEP_MAX_PER_OWNER, maxRaffica = DEEP_MAX_RAFFICA, catena = null) {
+  if (catena && catena.chiave && !catena.conto.prendi(catena.chiave, catena.max)) return 'suo';
   if (raffica.valore(CHIAVE_TUTTI) >= maxRaffica) return 'raffica';
   if (!conto.prendi(chi, max)) return 'suo';
   raffica.prendi(CHIAVE_TUTTI, maxRaffica);
