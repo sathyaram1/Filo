@@ -420,6 +420,8 @@
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
+    admin_defaults_saved_partial:
+      'Salvato — una riga evidenziata sotto non è stata propagata.',
     admin_defaults_unsaved: 'Modifiche non ancora propagate.',
     admin_defaults_save_fail: 'Salvataggio fallito: %s',
 
