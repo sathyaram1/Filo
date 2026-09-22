@@ -568,8 +568,11 @@
     const type = String(a.type || '').toUpperCase();
     if (ROW_AND_BUTTON.includes(type) && a._executed !== false) return true;
     if (type === 'ESEGUI_COMANDO' && a._output && a._output.blocked) return true;
-    if (type === 'EVENTO_CALENDARIO' && a._output && a._output.proposta) return true;
     if (type === 'COMANDO_FINESTRA' && a._output && a._output.already) return true;
+    // Tutto ciò che Filo lascia finire all'UTENTE (l'evento, il riordino delle
+    // schede, l'eliminazione dall'archivio): la riga dice che l'ha proposto, il
+    // bottone è come si accetta. Senza il bottone la funzione non si raggiunge.
+    if (a._output && a._output.proposta) return true;
     return false;
   }
 
