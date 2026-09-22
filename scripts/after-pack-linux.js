@@ -22,6 +22,13 @@
 //   aggiungere niente. Due strade per aprire la stessa applicazione, e una
 //   sola funzionava.
 //
+//   Quel `--no-sandbox` della voce di menu è anche il rovescio del problema:
+//   non guarda niente, quindi chi ha integrato Filo naviga senza gabbia pure
+//   sulle macchine che la gabbia la concedono. Il lanciatore lo scarta e
+//   ridecide, così la gabbia si decide in un posto solo da qualunque strada si
+//   apra Filo. Chi ha davvero bisogno di spegnerla ha ancora la variabile
+//   d'ambiente ELECTRON_DISABLE_SANDBOX, che Electron legge da sé.
+//
 // COSA FA
 //   Sposta il programma vero accanto, col suffisso `-bin`, e mette al suo posto
 //   un lanciatore che guarda se il sistema concede quel permesso e, se non lo
