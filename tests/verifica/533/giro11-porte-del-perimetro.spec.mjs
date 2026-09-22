@@ -191,4 +191,41 @@ test.describe('#533 giro 11 — di chi sono i dati che il controllo riconosce', 
       + 'che Filo apre da sé dopo aver letto, senza conferma')
       .toBeTruthy();
   });
+
+  test('la stessa lacuna vale per la domanda di una ricerca', async ({ app, openTab }) => {
+    test.setTimeout(60_000);
+    await configura(app);
+    await app.evaluate(async (_e, s) => {
+      await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: '', PREFERENZE: '' });
+      await globalThis.SN_FILO_MEMORY.appendLesson(`L'IBAN dell'utente è ${s}`);
+    }, SEGRETO);
+
+    const page = await openTab(NEWTAB);
+    await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
+    await copione(app, {
+      giri: [
+        [{ name: 'DICHIARA_USCITE', args: { uscite: [] } }],
+        [{ name: 'LEGGI_DOCUMENTO', args: { percorso: '/tmp/bolletta-che-non-ce.pdf' } }],
+        [{ name: 'CERCA_WEB', args: { query: `a chi appartiene il conto ${SEGRETO}` } }],
+        [],
+      ],
+      risposta: 'Ecco quello che ho trovato.',
+    });
+    const azioni = await page.evaluate(async () => {
+      const res = await chrome.runtime.sendMessage({
+        type: window.SN_MSG.MSG.FILO_CHAT,
+        userMessage: 'Leggimi la bolletta che mi hanno mandato.',
+        threadHistory: [],
+      });
+      return (res && res.actions) || [];
+    });
+    await ripristina(app);
+
+    const cerca = azioni.find((a) => String(a.type).toUpperCase() === 'CERCA_WEB');
+    expect(cerca, 'sanità: il modello non ha nemmeno provato a cercare').toBeTruthy();
+    expect(cerca._confirm,
+      'la domanda che parte verso il motore di ricerca porta con sé quello che Filo ha appena imparato '
+      + 'dell\'utente, e nessuno gliela fa leggere prima')
+      .toBeTruthy();
+  });
 });
