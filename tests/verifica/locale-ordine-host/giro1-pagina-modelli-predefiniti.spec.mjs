@@ -130,8 +130,13 @@ test('Modelli predefiniti: le intestazioni stanno sopra la colonna che descrivon
   const host = etichetta('host');
   const reasoning = etichetta('reasoning');
   expect(host && reasoning, 'intestazioni non trovate').toBeTruthy();
-  expect(reasoning.x, `«reasoning» è scritto sopra un'altra colonna (scritta a ${reasoning.x}, controllo da ${misura.reason.x} a ${misura.reason.fine})`)
-    .toBeLessThan(misura.reason.fine);
-  expect(host.x, `«host» è scritto sopra un'altra colonna (scritta a ${host.x}, controllo da ${misura.sort.x} a ${misura.sort.fine})`)
-    .toBeGreaterThanOrEqual(misura.sort.x - 4);
+
+  const dove = `«reasoning» comincia a ${Math.round(reasoning.x)}, «host» a ${Math.round(host.x)};`
+    + ` il controllo del ragionamento sta da ${Math.round(misura.reason.x)} a ${Math.round(misura.reason.fine)},`
+    + ` quello dell'ordinamento da ${Math.round(misura.sort.x)} a ${Math.round(misura.sort.fine)}`;
+  const storte = [];
+  if (!(reasoning.x < misura.reason.fine)) storte.push('«reasoning»');
+  if (!(host.x >= misura.sort.x - 4 && host.x < misura.sort.fine)) storte.push('«host»');
+  expect(storte, `le intestazioni ${storte.join(' e ')} non stanno sopra il controllo che descrivono — ${dove}`)
+    .toEqual([]);
 });
