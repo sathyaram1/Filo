@@ -160,6 +160,8 @@ const sandboxRaffica = creaConto(RAFFICA_MS);
 // riapre, quindi a fermare la raffica basta che esista, e stretto toglierebbe
 // il controllo a chi salta in fretta fra le pagine senza togliere niente a chi
 // attacca.
+// I due stadi profondi spendono dallo stesso conto: sono la stessa risorsa
+// vista da due lati, e chi attacca li fa partire sempre insieme.
 const DEEP_MAX_PER_CATENA = 6;
 const LOOKUP_MAX_PER_CATENA = 24;
 const catenaSpesa = creaConto(HOUR);
