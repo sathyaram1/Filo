@@ -7,6 +7,7 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { newtabPage, configureModel, fakeProvider, restore, chiedi } from './aiuto.mjs';
+import { clickConfirm } from '../../helpers/confirm.mjs';
 
 const archivio = (app) => app.evaluate(() => globalThis.SN_FILO_CHATS.list());
 
