@@ -285,6 +285,11 @@
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
+    // Perché una riga non è stata salvata: qui, accanto alla riga, e non in un
+    // avviso generico che non dice quale.
+    const msg = document.createElement('div');
+    msg.className = 'sn-model-row-msg';
+
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
@@ -293,6 +298,7 @@
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
+    row.appendChild(msg);
 
     // Una misura parla della configurazione con cui è stata presa: toccare la
     // riga la rimette in discussione subito, non al prossimo caricamento.
