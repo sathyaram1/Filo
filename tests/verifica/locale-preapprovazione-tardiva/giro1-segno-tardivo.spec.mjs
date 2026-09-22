@@ -96,6 +96,13 @@ async function apri(page, { fbs = [], pending = [], updateReply = null, approveR
 
 const approvazioni = (page) => page.evaluate(() => window.__calls.filter((c) => c.type === 'merge_approval_approve'));
 
+/** C'è una frase che si LEGGE davvero sullo schermo? Dove stia non conta. */
+const leggibile = (page, frase) => page.evaluate((f) => Array.from(document.body.querySelectorAll('*')).some((el) => {
+  if (el.children.length || !String(el.textContent || '').includes(f)) return false;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+}), frase);
+
 
 
 // ── 1. Il cuore: segno messo con il ramo GIÀ fermo ─────────────────────────
