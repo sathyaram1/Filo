@@ -29,13 +29,18 @@
   const STRONG_TOKEN = 12;  // un solo token così lungo che combacia → già sospetto
   const STRUCT_CARRIER = 80; // payload (query+fragment+path) per il fallback strutturale
   const STRUCT_BLOB = 24;   // singolo token opaco (sottodominio/segmento) → sospetto
-  // Ricopiatura da ciò che Filo ha letto. La finestra è lunga (una decina di
-  // parole) perché il titolo di un articolo finisce anche nel suo indirizzo, e
-  // lì una conferma sarebbe un falso allarme; il passo è corto perché la
-  // ricopiatura non comincia mai all'inizio dell'indirizzo. Così si ferma
-  // qualunque pezzo da una sessantina di caratteri in su.
+  // Ricopiatura da ciò che Filo ha letto, nella CODA dell'indirizzo (query,
+  // frammento, sottodominio): è lì che i dati si portano fuori, e una
+  // sessantina di caratteri ricopiati non è una coincidenza.
   const READ_RUN = 56;
   const READ_STEP = 8;
+  // Nel PERCORSO serve molto di più: il percorso di una pagina È il suo titolo,
+  // su ogni sito di notizie, e il titolo Filo l'ha appena letto nell'indice che
+  // rimandava lì. Confrontarlo con la stessa finestra faceva comparire l'avviso
+  // di esfiltrazione sul cammino normale, leggi una pagina e poi aprine una
+  // collegata, e un avviso che suona sulle cose normali insegna a dire sì
+  // (#553). Un titolo lunghissimo sta sotto i 160 caratteri; un dump no.
+  const READ_RUN_PATH = 160;
 
   // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
   // evitano che un URL legittimo che le contiene scateni il match a token singolo.
