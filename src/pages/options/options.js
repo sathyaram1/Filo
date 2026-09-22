@@ -475,13 +475,36 @@
     return I18n.t('options_test_result', ttft, tps);
   }
 
+  // Con che modello, ragionamento e ordinamento degli host la riga chiamerebbe
+  // adesso: è la configurazione a cui una misura deve corrispondere per valere.
+  function configurazioneRiga(row) {
+    const campo = row.querySelector('.sn-model-id');
+    const e = row._entry || {};
+    return {
+      model: campo ? campo.value.trim() : (e.model || ''),
+      reasoning: e.reasoning,
+      sort: e.sort,
+    };
+  }
+
+  // Giorno della misura, ma solo se non è oggi: numeri di settimane fa messi
+  // accanto a quelli appena presi si leggerebbero allo stesso modo.
+  function giornoMisura(at) {
+    const d = at ? new Date(at) : null;
+    if (!d || Number.isNaN(d.getTime())) return '';
+    if (d.toDateString() === new Date().toDateString()) return '';
+    return ` · ${d.toLocaleDateString()}`;
+  }
+
   // Mostra nel div di stato della riga il risultato di test memorizzato
   // (latenza + token/sec), così la misura resta visibile tra le sessioni.
   function renderRowTest(row) {
     const statusEl = row.querySelector('.sn-model-row-status');
     if (!statusEl) return;
-    const hasResult = row._test && (row._test.ttftMs != null || row._test.tokensPerSec != null);
-    statusEl.textContent = hasResult ? formatTestResult(row._test) : I18n.t('options_model_untested');
+    const vale = window.SN_CONST.misuraValePer(row._test, configurazioneRiga(row));
+    statusEl.textContent = vale
+      ? formatTestResult(row._test) + giornoMisura(row._test.at)
+      : I18n.t('options_model_untested');
   }
 
   function makeModelRow(nick, entry) {
