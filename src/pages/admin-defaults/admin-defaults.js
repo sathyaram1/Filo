@@ -414,7 +414,30 @@
       }
       out[nick] = entry;
     }
-    return out;
+    return { registry: out, missingNickRows, dupRows };
+  }
+
+  // Evidenzia le righe che il salvataggio ha scartato e ripulisce le altre.
+  function markRegistryRowIssues(missingNickRows, dupRows) {
+    const host = $('modelRegistryList');
+    for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
+      row.classList.remove('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.remove('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = '';
+    }
+    for (const row of missingNickRows || []) {
+      row.classList.add('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.add('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = I18n.t('options_model_nickname_required');
+    }
+    for (const { row, nick } of dupRows || []) {
+      row.classList.add('sn-row-invalid');
+      row.querySelector('.sn-model-nick').classList.add('sn-input-invalid');
+      const msg = row.querySelector('.sn-model-row-msg');
+      if (msg) msg.textContent = I18n.t('options_model_nickname_duplicate', nick);
+    }
   }
 
   function populateNicknames(registry) {
