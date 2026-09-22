@@ -178,12 +178,14 @@
       risultato: true,
     },
     EVENTO_CALENDARIO: {
-      description: 'Propone un evento di calendario: in chat compare un bottone per aggiungerlo.',
+      description: 'Prepara un evento di calendario: in chat compare un bottone che lo aggiunge al calendario del computer. '
+        + 'Non è ancora nel calendario finché l\'utente non preme il bottone: dillo così, non dire che l\'hai già messo.',
       properties: {
         data: S('Data "YYYY-MM-DD".'),
         ora: S('Ora "HH:MM".'),
         titolo: S('Titolo dell\'evento.'),
         dettagli: S('Dettagli o note.'),
+        durataMin: { type: 'number', description: 'Durata in minuti (60 se non detto).' },
       },
       required: ['data', 'ora', 'titolo'],
     },

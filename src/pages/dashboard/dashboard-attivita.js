@@ -248,7 +248,7 @@
     SVEGLIA: (n) => (n > 1 ? `impostato ${n} sveglie` : 'impostato una sveglia'),
     CANCELLA_SVEGLIA: () => 'cancellato una sveglia',
     MODIFICA_SVEGLIA: () => 'spostato una sveglia',
-    EVENTO_CALENDARIO: (n) => (n > 1 ? `creato ${n} eventi` : 'creato un evento'),
+    EVENTO_CALENDARIO: (n) => (n > 1 ? `preparato ${n} eventi` : 'preparato un evento'),
     ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
     IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
     IMPOSTA_ESTETICA: (n) => (n > 1 ? `cambiato ${n} dettagli dell'aspetto` : 'cambiato l\'aspetto'),
@@ -339,7 +339,7 @@
       const list = (a._output && Array.isArray(a._output.updated)) ? a._output.updated : [];
       return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
     },
-    EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
+    EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento pronto · ${a.titolo || a.title || ''}` }),
     // Impostazione applicata subito (livello 1, es. il tema): prima non
     // lasciava traccia in chat, come se non fosse successo niente.
     IMPOSTA_PREFERENZA: (a) => {
@@ -414,7 +414,7 @@
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
-    EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
+    EVENTO_CALENDARIO: 'Evento non preparato', ONBOARDING: 'Accoglienza non aggiornata',
   };
   function activityRowFor(a) {
     if (!a) return null;
