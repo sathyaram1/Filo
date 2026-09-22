@@ -48,7 +48,6 @@ test('Preferenze: passando a un\'altra scheda subito dopo aver scritto, la modif
 });
 
 test('Preferenze: chiudendo la scheda subito dopo aver scritto, la modifica non si perde', async ({ app, shell, openTab }) => {
-  test.fail(true, 'rilievo aperto: chiudendo la scheda la modifica in attesa si perde');
   const page = await openTab(PREFERENZE);
   const atteso = 'stile scritto e poi chiudo la scheda';
   await scriviStile(page, atteso);
@@ -69,7 +68,6 @@ test('Preferenze: chiudendo la scheda subito dopo aver scritto, la modifica non 
 // Stessa uscita, altra pagina: le Opzioni aspettano prima di salvare con lo
 // stesso meccanismo, quindi la stessa chiusura deve reggere anche qui.
 test('Opzioni: chiudendo la scheda subito dopo aver scritto, la modifica non si perde', async ({ app, shell, openTab }) => {
-  test.fail(true, 'rilievo aperto: chiudendo la scheda la modifica in attesa si perde');
   const page = await openTab('filo://options/options.html');
   await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
   await page.evaluate(() => {

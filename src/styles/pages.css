@@ -583,9 +583,14 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-model-row input[type="text"],
 .sn-model-row select { width: 100%; font-size: 12px; }
 /* Le due colonne in più (reasoning, ordinamento degli host) valgono solo nei Modelli predefiniti
-   dell'owner: le righe del registry nelle Opzioni utente restano a cinque colonne. */
+   dell'owner: le righe del registry nelle Opzioni utente restano a cinque colonne.
+   Sette colonne a misura fissa non entrano in una finestra stretta e la stringa del modello,
+   sola elastica, si riduceva a una fessura mentre i pulsanti uscivano: qui ogni colonna può
+   stringersi e la stringa del modello ha un minimo sotto cui non scende. */
 .sn-model-row.sn-model-row-reason {
-  grid-template-columns: 110px 130px minmax(0, 1fr) 92px 184px 76px 68px;
+  grid-template-columns:
+    minmax(84px, 110px) minmax(94px, 130px) minmax(120px, 1fr)
+    minmax(70px, 92px) minmax(108px, 184px) minmax(68px, 76px) minmax(58px, 68px);
 }
 /* Campo "stringa modello": wrapper position:relative perché il popup custom
    (.sn-select-pop) si ancora lì sotto, al posto della datalist nativa. */
