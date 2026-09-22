@@ -252,6 +252,21 @@
   // (costanti o override Firestore) con un pulsante "Prova" che testa il
   // modello usando le chiavi effettive (le predefinite, non quelle dell'utente).
 
+  // Le misure dei modelli predefiniti si salvano da sole: la lista è in sola
+  // lettura e non passa dal salvataggio della pagina, che le azzererebbe quando
+  // la lista non è renderizzata.
+  let defaultModelTests = {};
+
+  async function saveDefaultModelTest(nickname, esito) {
+    defaultModelTests = { ...defaultModelTests, [nickname]: esito };
+    try {
+      await chrome.runtime.sendMessage({
+        type: MSG.UPDATE_SETTINGS,
+        settings: { defaultModelTests },
+      });
+    } catch (_) {}
+  }
+
   async function loadDefaultModels() {
     let registry = {};
     try {
