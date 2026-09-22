@@ -14,10 +14,15 @@
   // Un errore dell'AI, detto all'utente. La regola sta in SN_CHAT_ERRORS, una
   // volta sola: ricomporre a mano la risposta del main faceva arrivare qui la
   // riga grezza del servizio, parentesi graffe comprese (#663).
+  // Accetta sia la risposta dell'IPC (`error`) sia quella dello stream
+  // (`message`): è lo stesso errore, e chi lo mostra non deve saperlo.
   function frasePerLUtente(res) {
+    const generico = I18n.t('err_provider_failed');
     const CE = global.SN_CHAT_ERRORS;
-    if (!CE) return (res && res.message) || I18n.t('err_provider_failed');
-    return CE.sentence(CE.fromResponse({ ...res, error: res && res.message }, I18n.t('err_provider_failed')));
+    if (!CE) return (res && (res.error || res.message)) || generico;
+    const r = { ...(res || {}) };
+    if (!r.error && r.message) r.error = r.message;
+    return CE.sentence(CE.fromResponse(r, generico));
   }
 
   // Il tasto che toglie l'ostacolo, sotto la frase che lo nomina. Su una pagina
