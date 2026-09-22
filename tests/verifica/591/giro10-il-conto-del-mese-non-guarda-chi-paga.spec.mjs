@@ -30,8 +30,8 @@ function fresco(rel) {
 }
 
 require_(join(REPO, 'src/shared/constants.js'));
-require_(join(REPO, 'src/main/services/providers/index.js'));
 const Gate = require_(join(REPO, 'src/main/services/modelGate.js'));
+const ROUTER = 'src/main/services/providers/index.js';
 
 // chrome.storage.local in memoria, fresco a ogni caso.
 function memoria() {
