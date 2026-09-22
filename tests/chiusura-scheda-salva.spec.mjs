@@ -1,7 +1,6 @@
-// Le pagine di Filo che salvano da sole aspettano un attimo prima di scrivere.
-// Chiudere la scheda dentro quell'attimo buttava via l'ultima modifica: una
-// scheda distrutta non riceve `pagehide`, quindi il salvataggio non partiva mai.
-// La cura sta in src/main/congedo.js; qui si guarda l'esito dal lato utente.
+// Le pagine che salvano da sole aspettano un attimo: uscire dentro quell'attimo
+// buttava via l'ultima modifica, perché una scheda distrutta non riceve
+// `pagehide`. La cura è in src/main/congedo.js; qui si guarda dal lato utente.
 
 import { _electron as electron } from '@playwright/test';
 import { readFileSync, rmSync } from 'node:fs';
