@@ -65,6 +65,13 @@
   // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
   // notifiche successive rispettano i nuovi valori senza riavviare.
   let notifConfig = { durationSec: 5, soundEnabled: false, sound: 'default' };
+  // Un volume assente o storto vale «pieno»: il silenzio si sceglie, non si
+  // eredita da un'impostazione malformata.
+  function volumeValido(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
+
   function applyNotifConfig(notifications) {
     if (!notifications || typeof notifications !== 'object') return;
     const d = Number(notifications.durationSec);
@@ -72,6 +79,7 @@
       durationSec: Number.isFinite(d) && d >= 0 ? d : 5,
       soundEnabled: notifications.soundEnabled === true,
       sound: typeof notifications.sound === 'string' ? notifications.sound : 'default',
+      soundVolume: volumeValido(notifications.soundVolume),
     };
   }
   api.message({ type: 'get_settings' })
@@ -79,7 +87,7 @@
       applyShellTokens(r?.settings?.themeTokens);
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
-      applyRingTone(r?.settings?.timerRingtone);
+      applyRingTone(r?.settings?.timerRingtone, r?.settings?.timerRingtoneVolume);
       refreshRinging();
       try { render(); } catch (_) {}
     })
@@ -90,7 +98,10 @@
         applyShellTokens(m.settings?.themeTokens);
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
-        applyRingTone(m.settings?.timerRingtone);
+        applyRingTone(m.settings?.timerRingtone, m.settings?.timerRingtoneVolume);
+        // Il volume cambiato mentre suona deve sentirsi subito: senza questo si
+        // sentirebbe solo alla scadenza dopo.
+        refreshRinging();
         try { render(); } catch (_) {}
       }
     });
@@ -119,12 +130,14 @@
   const ringLabel = document.getElementById('ring-ind-label');
   setIcon(document.getElementById('ring-ind-icon'), 'alarm', 15);
   let ringTone = 'default';
+  let ringVolume = 100;
   let ringingIds = [];
   let ringWake = null;
 
-  function applyRingTone(id) {
+  function applyRingTone(id, volume) {
     const tones = window.SN_SOUNDS && window.SN_SOUNDS.TONES;
     if (typeof id === 'string' && tones && tones[id]) ringTone = id;
+    ringVolume = volumeValido(volume);
   }
 
   function testoSuoneria(list) {
@@ -161,7 +174,7 @@
     if (acceso && ringLabel) ringLabel.textContent = testoSuoneria(list);
     const S = window.SN_SOUNDS;
     if (!S) return;
-    if (acceso && mio !== false) S.ring(ringTone); else S.silence();
+    if (acceso && mio !== false) S.ring(ringTone, ringVolume); else S.silence();
   }
 
   // Ogni finestra chiede le SUE scadenze: quella incognito vede solo le proprie
@@ -1081,7 +1094,10 @@
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
       if (wantSound && window.SN_SOUNDS) {
-        try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
+        try {
+          const tono = typeof wantSound === 'string' ? wantSound : notifConfig.sound;
+          window.SN_SOUNDS.play(tono, notifConfig.soundVolume);
+        } catch (_) {}
       }
 
       if (!infinite) {

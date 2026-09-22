@@ -50,9 +50,17 @@ sempre, finché c'è la finestra.
   una passata anche dentro `runIncognito()` o quei timer restano muti per
   sempre. La notifica di sistema lì resta fuori di proposito: il nome del timer
   finirebbe fra le notifiche del sistema, cioè una traccia su questo computer.
+- **Una finestra che la vede va GARANTITA, non sperata.** «La shell c'è sempre»
+  vale finché c'è una finestra, e non è detto: su Mac chiudere l'ultima non
+  spegne l'app (`window-all-closed` non fa `quit` su darwin) e una finestra
+  incognito le scadenze normali non le vede. Finché qualcosa suona il main
+  chiama `assicuraFinestraNormale()` (`src/main/window.js`), che ne apre una se
+  manca; chi crea finestre fuori dall'avvio avvisa il main con
+  `onFinestraNormale`, o il suo riferimento resta puntato a una finestra chiusa.
 - **Con la finestra ridotta a icona resta solo la notifica di sistema**, quindi
   un click su quella deve riportare su la finestra: altrimenti l'unica cosa che
-  l'utente vede non porta da nessuna parte.
+  l'utente vede non porta da nessuna parte. E deve portare a una finestra
+  NORMALE, la sola che quella scadenza la vede.
 - **I `setTimeout` di una pagina nascosta vengono strozzati** (fino a uno al
   minuto): un ciclo «suona, riprogramma fra un secondo» si sbriciola proprio
   quando serve, cioè con Filo ridotto a icona. La linea del tempo
@@ -65,6 +73,11 @@ sempre, finché c'è la finestra.
   della stessa suoneria sovrapposte finché il primo lotto non si esaurisce: un
   minuto di suoneria e ci si era già dentro. Sentinella:
   `tests/unit/suoneriaLotti.test.mjs`.
+- **Il volume è dell'utente, non del codice.** Il guadagno delle note non si
+  scrive a mano: `ring`/`play` prendono una percentuale (0-100, 100 = pieno) che
+  arriva dalle preferenze, e a 0 non si programma nessuna nota — un guadagno
+  zero farebbe esplodere la rampa esponenziale. Il volume entra anche nel
+  confronto di idempotenza di `ring`, o cambiarlo mentre suona non si sentirebbe.
 - **Dove:** `src/shared/sounds.js` (`ring`/`silence`/`isRinging`/`state`),
   `src/renderer/shell.js` (chip + risveglio sulla scadenza),
   `src/main/services/alarmWatcher.js`. Test: `tests/timer-ringtone.spec.mjs`.

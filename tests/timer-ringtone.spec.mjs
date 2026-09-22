@@ -305,3 +305,46 @@ test('due finestre, una sola suoneria, e il turno passa a chi resta', async ({ a
   await altra.waitForTimeout(1200);
   expect(await suona(altra)).toBe(false);
 });
+
+// Una scadenza si fa sentire solo da una finestra che la vede, e non è detto
+// che ce ne sia una: chiudere la finestra normale mentre una incognito è aperta
+// non spegne Filo, e l'incognito le scadenze normali non le vede. Senza la
+// garanzia, il timer scade vivo e muto, com'era prima di #667.
+test('senza una finestra che la vede, la scadenza se ne fa aprire una', async ({ app, shell }) => {
+  test.setTimeout(150_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+
+  const tipo = await shell.evaluate(() => window.SN_MSG.MSG.FILO_ADD_TIMER);
+  await shell.evaluate((t) => window.filoShell.message({ type: t, label: 'Pasta', seconds: 12 }), tipo);
+
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect
+    .poll(() => app.windows().some((p) => { try { return p.url().includes('incognito=1'); } catch (_) { return false; } }), { timeout: 20_000 })
+    .toBe(true);
+
+  // Via la finestra normale, l'unica che quella scadenza la vedeva.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.close();
+  });
+  await expect
+    .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), { timeout: 15_000 })
+    .toBeGreaterThan(0);
+
+  const chiSuona = async () => {
+    for (const p of app.windows()) {
+      try {
+        if (!p.url().includes('shell.html')) continue;
+        if (await p.evaluate(() => !!(window.SN_SOUNDS && window.SN_SOUNDS.isRinging()))) return p;
+      } catch (_) { /* finestra in chiusura o non ancora pronta */ }
+    }
+    return null;
+  };
+  await expect.poll(async () => !!(await chiSuona()), { timeout: 40_000 }).toBe(true);
+
+  const suonante = await chiSuona();
+  expect(await suonante.evaluate(() => window.SN_SOUNDS.state()), "l'audio dev'essere acceso davvero").toBe('running');
+  await expect(suonante.locator('#ring-indicator')).toBeVisible({ timeout: 10_000 });
+  await suonante.locator('#ring-indicator').click();
+  await expect(suonante.locator('#ring-indicator')).toBeHidden({ timeout: 6_000 });
+});

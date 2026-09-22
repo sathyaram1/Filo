@@ -16,6 +16,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Uno solo per tutto il file: il modulo si tiene il suo AudioContext dalla prima
 // chiamata in poi, quindi un contesto nuovo a ogni prova non verrebbe mai usato.
 const NOTE = [];
+const GUADAGNI = [];
 const CTX = contestoFinto(NOTE);
 
 function contestoFinto(note) {
@@ -23,7 +24,10 @@ function contestoFinto(note) {
     currentTime: 0,
     state: 'running',
     destination: {},
-    createGain: () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }),
+    createGain: () => ({
+      gain: { setValueAtTime(v) { GUADAGNI.push(v); }, exponentialRampToValueAtTime() {} },
+      connect() {},
+    }),
     createOscillator() {
       return {
         type: '', frequency: { value: 0 }, onended: null, connect() {},
@@ -38,10 +42,11 @@ function contestoFinto(note) {
 
 // Suona `giri` lotti di seguito, con il rifornimento che arriva quando il codice
 // se l'è programmato. Ritorna le note nell'ordine in cui vanno in onda.
-function noteDi(tone, giri, ritardoRifornimento = 0) {
+function noteDi(tone, giri, ritardoRifornimento = 0, volume) {
   const note = NOTE;
   const ctx = CTX;
   note.length = 0;
+  GUADAGNI.length = 0;
   const veroTimeout = globalThis.setTimeout;
   const veroClear = globalThis.clearTimeout;
   const coda = [];
@@ -51,7 +56,7 @@ function noteDi(tone, giri, ritardoRifornimento = 0) {
   try {
     const S = globalThis.SN_SOUNDS;
     S.silence();
-    S.ring(tone);
+    S.ring(tone, volume);
     for (let i = 0; i < giri; i++) {
       const p = coda.pop();
       if (!p) break;
@@ -90,5 +95,55 @@ test('un rifornimento in ritardo lascia un buco, mai una sovrapposizione', () =>
   for (const tone of globalThis.SN_SOUNDS.TONE_IDS) {
     const note = noteDi(tone, 3, 30);
     assert.equal(sovrapposte(note), 0, `motivo ${tone}: note sovrapposte col rifornimento tardivo`);
+  }
+});
+
+// Il volume è una scelta dell'utente (una sveglia al mattino e un timer in
+// cucina non vogliono la stessa voce): deve arrivare fino alle note, e a zero
+// non deve restare niente da sentire.
+test('il volume scelto arriva alle note, e a zero non suona nulla', () => {
+  noteDi('default', 1, 0, 100);
+  const pieno = Math.max(...GUADAGNI);
+  assert.ok(pieno > 0, 'a volume pieno le note devono avere un guadagno');
+
+  noteDi('default', 1, 0, 50);
+  const mezzo = Math.max(...GUADAGNI);
+  assert.ok(mezzo < pieno && mezzo > 0, 'a metà volume le note devono essere più piano');
+
+  const mute = noteDi('default', 1, 0, 0);
+  assert.equal(mute.length, 0, 'a volume zero non si programma nessuna nota');
+  assert.equal(GUADAGNI.length, 0, 'e nessun guadagno: zero farebbe esplodere la rampa');
+
+  // Un volume assente vale «pieno»: il silenzio si sceglie, non si eredita da
+  // un'impostazione che non è mai stata scritta.
+  noteDi('default', 1);
+  assert.equal(Math.max(...GUADAGNI), pieno, 'senza volume si suona come sempre');
+});
+
+// Cambiare volume mentre suona deve sentirsi: la suoneria è idempotente sullo
+// stesso motivo, e senza il volume nel confronto la manopola non farebbe nulla
+// finché la scadenza non fosse fermata e rifatta.
+test('cambiare volume mentre suona riparte davvero', () => {
+  const veroTimeout = globalThis.setTimeout;
+  const veroClear = globalThis.clearTimeout;
+  globalThis.AudioContext = function () { return CTX; };
+  globalThis.setTimeout = () => 0;
+  globalThis.clearTimeout = () => {};
+  try {
+    const S = globalThis.SN_SOUNDS;
+    S.silence();
+    GUADAGNI.length = 0;
+    S.ring('default', 100);
+    const pieno = Math.max(...GUADAGNI);
+    GUADAGNI.length = 0;
+    S.ring('default', 100);
+    assert.equal(GUADAGNI.length, 0, 'stesso motivo e stesso volume: non si riparte da capo');
+    S.ring('default', 20);
+    assert.ok(GUADAGNI.length > 0, 'volume diverso: la suoneria riparte');
+    assert.ok(Math.max(...GUADAGNI) < pieno, 'e riparte più piano');
+    S.silence();
+  } finally {
+    globalThis.setTimeout = veroTimeout;
+    globalThis.clearTimeout = veroClear;
   }
 });

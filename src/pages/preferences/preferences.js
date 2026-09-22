@@ -661,11 +661,27 @@
     }
   }
 
+  // Il volume si giudica a orecchio: l'anteprima usa quello scelto adesso, o
+  // la manopola si regolerebbe alla cieca.
+  function volumeDa(id) {
+    const n = parseInt($(id).value, 10);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
   function previewRingtone() {
-    if (Sounds) Sounds.play($('timerRingtone').value);
+    if (Sounds) Sounds.play($('timerRingtone').value, volumeDa('timerRingtoneVolume'));
   }
   function previewNotifSound() {
-    if (Sounds) Sounds.play($('notifSound').value);
+    if (Sounds) Sounds.play($('notifSound').value, volumeDa('notifSoundVolume'));
+  }
+  function mostraVolume(id) {
+    const eco = $(id + 'Val');
+    if (eco) eco.textContent = `${volumeDa(id)}%`;
+  }
+  // Un valore assente o storto vale «pieno»: il silenzio si sceglie.
+  function caricaVolume(id, salvato) {
+    const n = Number(salvato);
+    $(id).value = String(Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100);
+    mostraVolume(id);
   }
 
   // Clamp dei due campi numerici "liberi" (li usano sia il salvataggio sia il
@@ -701,6 +717,7 @@
     const showHomeMessage = $('showHomeMessage').checked;
     const agentStyle = currentStyleText().trim();
     const timerRingtone = $('timerRingtone').value || 'default';
+    const timerRingtoneVolume = volumeDa('timerRingtoneVolume');
     const terminal = {
       enabled: $('terminalEnabled').checked,
       shell: $('terminalShell').value,
@@ -721,11 +738,15 @@
       durationSec: clampNotifDurationSec(parseInt($('notifDuration').value, 10)),
       soundEnabled: $('notifSoundEnabled').checked,
       sound: $('notifSound').value || 'default',
+      soundVolume: volumeDa('notifSoundVolume'),
     };
 
     await chrome.runtime.sendMessage({
       type: MSG.UPDATE_SETTINGS,
-      settings: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive, notifications },
+      settings: {
+        theme, textScale, showHomeMessage, agentStyle, timerRingtone, timerRingtoneVolume,
+        terminal, tts, autoArchive, notifications,
+      },
     });
 
     window.SN_PAGE_THEME = theme;
@@ -802,11 +823,13 @@
     const notifSound = notif.sound || 'default';
     const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
     $('notifSound').value = nsOpt ? notifSound : 'default';
+    caricaVolume('notifSoundVolume', notif.soundVolume);
 
     // Suoneria timer
     const ringtone = settings.timerRingtone || 'default';
     const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
     $('timerRingtone').value = ringOpt ? ringtone : 'default';
+    caricaVolume('timerRingtoneVolume', settings.timerRingtoneVolume);
 
     const tts = settings.tts || {};
     populateModelVoices(tts.modelVoice || '');
@@ -896,10 +919,14 @@
     $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
+    $('notifSoundVolume').addEventListener('input', () => mostraVolume('notifSoundVolume'));
+    $('notifSoundVolume').addEventListener('change', persist);
     $('notifSoundPreview').addEventListener('click', previewNotifSound);
 
     // Suoneria timer: salva al cambio + anteprima.
     $('timerRingtone').addEventListener('change', persist);
+    $('timerRingtoneVolume').addEventListener('input', () => mostraVolume('timerRingtoneVolume'));
+    $('timerRingtoneVolume').addEventListener('change', persist);
     $('timerRingtonePreview').addEventListener('click', previewRingtone);
 
     // Stile agente: scegliere un preset riempie il textarea; scrivere a mano

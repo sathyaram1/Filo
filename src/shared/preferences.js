@@ -478,6 +478,23 @@
         return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${labelMap[tone]}` };
       },
     },
+
+    // ── Volume della suoneria — reversibile, innocuo → livello 1 ──
+    {
+      keys: ['volume_suoneria', 'volume suoneria', 'volume timer', 'volume sveglia',
+        'ringtone volume', 'volume della suoneria', 'volume'],
+      level: 1,
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const parole = { muto: 0, muta: 0, zero: 0, silenzio: 0, basso: 30, bassa: 30, piano: 30, medio: 60, media: 60, alto: 100, alta: 100, massimo: 100, forte: 100 };
+        const n = Object.prototype.hasOwnProperty.call(parole, s)
+          ? parole[s]
+          : parseInt(s.replace('%', ''), 10);
+        if (!Number.isFinite(n)) return null;
+        const vol = Math.min(100, Math.max(0, n));
+        return { partial: { timerRingtoneVolume: vol }, label: `Volume suoneria → ${vol}%` };
+      },
+    },
   ];
 
   // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce

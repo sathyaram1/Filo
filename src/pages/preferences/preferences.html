@@ -158,6 +158,11 @@
         <select id="notifSound"></select>
         <button type="button" class="sn-btn sn-btn-secondary" id="notifSoundPreview">Prova</button>
       </div>
+      <label for="notifSoundVolume" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Volume</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <input type="range" id="notifSoundVolume" min="0" max="100" step="5" style="width:220px;" />
+        <span id="notifSoundVolumeVal" class="sn-muted"></span>
+      </div>
     </section>
 
     <section>
@@ -172,6 +177,11 @@
           <option value="chime">Carillon</option>
         </select>
         <button type="button" class="sn-btn sn-btn-secondary" id="timerRingtonePreview">Prova</button>
+      </div>
+      <label for="timerRingtoneVolume" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Volume</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <input type="range" id="timerRingtoneVolume" min="0" max="100" step="5" style="width:220px;" />
+        <span id="timerRingtoneVolumeVal" class="sn-muted"></span>
       </div>
     </section>
 

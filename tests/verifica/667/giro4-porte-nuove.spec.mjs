@@ -201,10 +201,10 @@ test('un timer messo in pausa e ripreso suona alla nuova scadenza', async ({ she
 
 // Porta 5: resta aperta solo una finestra incognito. Chiudere la finestra
 // normale non spegne Filo finché ne resta un'altra, e una finestra incognito
-// vede soltanto le proprie scadenze: quella della pasta, messa prima, scade
-// senza che nessuno la faccia sentire e senza lasciare niente da premere.
-// È la lamentela di partenza — un timer che non suona — presa dalla porta
-// della finestra che non può vederlo.
+// vede soltanto le proprie scadenze: quella della pasta, messa prima, scadeva
+// senza che nessuno la facesse sentire e senza lasciare niente da premere.
+// È la lamentela di partenza presa dalla porta della finestra che non può
+// vedere quella scadenza.
 test('chiusa la finestra normale, la scadenza normale si fa sentire lo stesso', async ({ app, shell }) => {
   test.setTimeout(180_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -227,13 +227,23 @@ test('chiusa la finestra normale, la scadenza normale si fa sentire lo stesso', 
   const vive = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
   expect(vive, 'Filo deve restare in piedi con la sola finestra incognito').toBeGreaterThan(0);
 
-  // La scadenza arriva adesso: deve farsi sentire da qualche parte, e deve
-  // restare un gesto per fermarla.
-  const sentito = await attendi(() => incog.evaluate(
-    () => (window.SN_SOUNDS ? window.SN_SOUNDS.isRinging() : null),
-  ), 30_000);
-  expect(sentito, 'la scadenza deve suonare anche se resta aperta solo la finestra incognito').toBe(true);
-  await expect(incog.locator('#ring-indicator')).toBeVisible({ timeout: 10_000 });
-  await incog.locator('#ring-indicator').click();
-  await expect(incog.locator('#ring-indicator')).toBeHidden({ timeout: 6_000 });
+  // La scadenza arriva adesso: qualcuno deve farla sentire, e deve restare
+  // raggiungibile un gesto per fermarla. Dove non conta: conta che ci sia.
+  const shellDiTurno = await attendi(async () => {
+    for (const p of app.windows()) {
+      try {
+        if (!/shell\.html/.test(p.url())) continue;
+        if (await p.evaluate(() => !!(window.SN_SOUNDS && window.SN_SOUNDS.isRinging()))) return p;
+      } catch (_) { /* finestra in chiusura o non ancora pronta */ }
+    }
+    return null;
+  }, 40_000);
+  expect(shellDiTurno, 'la scadenza deve suonare da qualche finestra').toBeTruthy();
+  expect(await audio(shellDiTurno), "e l'audio dev'essere acceso davvero").toBe('running');
+
+  await expect(shellDiTurno.locator('#ring-indicator')).toBeVisible({ timeout: 10_000 });
+  await shellDiTurno.locator('#ring-indicator').click();
+  await expect(shellDiTurno.locator('#ring-indicator')).toBeHidden({ timeout: 6_000 });
+  await shellDiTurno.waitForTimeout(1200);
+  expect(await suona(shellDiTurno)).toBe(false);
 });

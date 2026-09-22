@@ -824,3 +824,24 @@ test('un filo:// che arriva da fuori si legge cercando il prefisso, mai per posi
   // pagina interna messa in un link da un sito qualsiasi non deve aprirsi.
   assert.equal(W.inviteCodeFromDeepLink('filo://credits/credits.html'), null);
 });
+
+// Su Mac chiudere l'ultima finestra NON spegne Filo: resta nel Dock. Suono e
+// pulsante che ferma vivono in una finestra, quindi senza garantirne una il
+// timer scade vivo e muto e la notifica non porta da nessuna parte. È il caso
+// che una macchina Windows non vede mai (lì l'ultima finestra chiusa spegne).
+test('una scadenza che suona si fa garantire una finestra che la vede', () => {
+  const watcher = stripComments(readFileSync(join(ROOT, 'src', 'main', 'services', 'alarmWatcher.js'), 'utf8'));
+  assert.match(
+    watcher, /assicuraFinestraNormale/,
+    'il watcher delle scadenze deve garantire una finestra normale mentre qualcosa suona',
+  );
+  assert.doesNotMatch(
+    watcher, /getAllWindows\(\)\.find\(\(w\) => !w\.isDestroyed\(\)\)/,
+    'la finestra da mostrare non si pesca a caso: una incognito quella scadenza non la vede',
+  );
+  const window = stripComments(readFileSync(join(ROOT, 'src', 'main', 'window.js'), 'utf8'));
+  assert.match(
+    window, /function assicuraFinestraNormale/,
+    'la garanzia vive in un posto solo, accanto a chi le finestre le crea',
+  );
+});
