@@ -278,16 +278,22 @@
     EVENTO_CALENDARIO: {
       level: 1,
       describe: (a) => `Creare l'evento "${a.title || a.titolo || ''}"`,
+      // Le tre azioni che finisce l'UTENTE con un click in chat: senza questa
+      // riga, al turno dopo il modello non sa che è successo e tira a indovinare.
+      describeDone: (a) => `Evento aggiunto al calendario: "${a.title || a.titolo || ''}"`,
     },
     PULISCI_TAB: {
       level: 2,
       describe: () => 'Valutare le schede aperte e archiviare quelle non più utili. '
         + 'Le schede archiviate restano riapribili da “Tab archiviate”.',
+      describeDone: () => 'Schede valutate e archiviate: le trova in “Tab archiviate”',
     },
     CANCELLA_ARCHIVIO: {
       level: 3,
       describe: (a) => `Eliminare DEFINITIVAMENTE dall'archivio le schede pertinenti a `
         + `“${a.query || a.testo || ''}”.`,
+      describeDone: (a) => `Schede eliminate per sempre dall'archivio: `
+        + `“${a.query || a.testo || ''}”`,
     },
     CANCELLA_MEMORIA: {
       // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)
