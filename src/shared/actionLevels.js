@@ -205,8 +205,21 @@
       },
     },
     CERCA_WEB: {
-      level: 1,
-      describe: (a) => `Cercare sul web "${a.query || ''}"`,
+      // Cercare è di norma innocuo → livello 1. ECCEZIONE anti-esfiltrazione:
+      // la domanda parte verso un servizio di fuori, quindi se porta con sé
+      // roba dell'utente (memoria, appunti, un documento letto nello stesso
+      // turno) sale a livello 2 e l'utente la legge prima che parta. Il flag
+      // `_exfil` lo calcola il main, mai l'LLM.
+      level: (a) => (a && a._exfil ? 2 : 1),
+      describe: (a) => {
+        const q = a.query || a.q || a.testo || a.text || '';
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
+          return `Filo sta per mandare a un motore di ricerca una domanda che${why}:\n${q}\n\n`
+            + 'La domanda esce dal tuo computer. Falla partire solo se l\'hai chiesta tu.';
+        }
+        return `Cercare sul web "${q}"`;
+      },
     },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
