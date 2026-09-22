@@ -1134,6 +1134,9 @@
   // avviso e l'altro — una scheda aperta deve poter ridisegnare il suo quadrato
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+  // Una richiesta si manda a fondere per il segno UNA volta per pagina: un
+  // rifiuto o un conflitto non si ritentano da soli a ogni rilettura.
+  const fusioniTentate = new Set();
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
   // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
@@ -1169,6 +1172,49 @@
   // Le richieste ferme che NON hanno una scheda in questa lista. Finché i
   // feedback non sono arrivati la lista è vuota e ci finiscono tutte: meglio
   // mostrarle due volte per un istante che perderne una.
+  // Il segno «fondi senza chiedermelo» messo DOPO il blocco: il server la
+  // richiesta l'ha già aperta e non la riguarda, quindi la fonde questa pagina,
+  // con lo stesso gesto e lo stesso esito del tasto «Approva e fondi».
+  async function fondiCoperte(fb, opts) {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (!UI || !fb || !isAdmin) return [];
+    const daFondere = UI.richiesteCoperte(fusioni.pending, {
+      feedbackId: fb._id,
+      numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
+      ancheNuovi: !!(opts && opts.ancheNuovi),
+    }).filter((req) => !fusioniTentate.has(req.id));
+    const esiti = [];
+    for (const req of daFondere) {
+      fusioniTentate.add(req.id);
+      let reply;
+      try { reply = await sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }); }
+      catch (e) { reply = { ok: false, error: e?.message || String(e) }; }
+      esiti.push({ req, msg: UI.outcomeMessage(reply, req) });
+    }
+    if (esiti.length) setTimeout(loadMergeApprovals, 1200);
+    return esiti;
+  }
+
+  // Le richieste ferme sulle pratiche già segnate si fondono appena la pagina
+  // vede le due cose insieme: segno e richiesta arrivano da due letture
+  // diverse, in un ordine qualunque.
+  let fusioniInCorso = false;
+  async function fondiPreapprovateInAttesa() {
+    if (fusioniInCorso || !isAdmin || !dataLoaded) return;
+    fusioniInCorso = true;
+    try {
+      for (const fb of allFeedbacks.slice()) {
+        if (!preapprovedOf(fb) || !isOpenPublic(fb)) continue;
+        for (const { req, msg } of await fondiCoperte(fb)) {
+          const num = window.SN_MERGE_APPROVALS.feedbackNum(req);
+          setManageMsg(`Fusione ferma${num ? ` su #${num}` : ''}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`, msg.kind === 'ok' ? 'ok' : 'err');
+        }
+      }
+    } finally {
+      fusioniInCorso = false;
+    }
+  }
+
   function fusioniOrfane() {
     const ferme = (fusioni.pending || []).concat(fusioni.failed || []);
     return MR.fusioniSenzaFeedback(ferme, allFeedbacks);
@@ -1226,6 +1272,7 @@
     // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
     // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
     riflettiFusioni();
+    fondiPreapprovateInAttesa();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
     // Le fuse senza chiedere: il controllo a posteriori del segno messo sulla
     // pratica. Quando il main avvisa di un cambiamento manda solo l'elenco in
@@ -2567,7 +2614,19 @@
       if (selectedId !== id) { renderList(); return; }
       reflectPreapproved(fb);
       renderList();
-      setManageMsg(next ? 'Da ora si fonde senza chiedere.' : 'Da ora ti chiede prima di fondere.', 'ok');
+      let testo = next ? 'Da ora si fonde senza chiedere.' : 'Da ora ti chiede prima di fondere.';
+      let kind = 'ok';
+      if (next) {
+        // Il segno messo con una richiesta già ferma davanti: si fonde adesso,
+        // anche quella aperta per i soli blocchi nuovi, che l'owner ha sotto gli occhi.
+        setManageMsg(testo + ' Chiedo al server di fondere la richiesta ferma…', '');
+        for (const { msg } of await fondiCoperte(fb, { ancheNuovi: true })) {
+          testo += ` Fusione ferma su questa pratica: ${msg.text}`;
+          if (msg.kind !== 'ok') kind = 'err';
+        }
+      }
+      if (selectedId !== id) return;
+      setManageMsg(testo, kind);
     } catch (e) {
       if (selectedId !== id) return;
       setManageMsg(e.message || 'Errore', 'err');
@@ -3830,6 +3889,7 @@
       allFeedbacks = fresh;
       dataLoaded = true;
       loadFailed = false;
+      fondiPreapprovateInAttesa();
     } catch (err) {
       if (testDataInjected) return;
       // Il guasto va RICORDATO, non solo scritto una volta: il primo click su

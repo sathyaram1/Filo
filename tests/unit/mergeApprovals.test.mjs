@@ -387,3 +387,45 @@ describe('il riallineamento fatto dal server', () => {
     assert.equal(UI.realignedNote(null), '');
   });
 });
+
+describe('richiesteCoperte: quali richieste ferme copre il segno «fondi senza chiedermelo»', () => {
+  const ID = 'fb-abc';
+  const base = (over) => Object.assign({ id: 'r1', origin: 'routine', feedbackId: ID, num: '#581', used: false }, over);
+
+  test('copre la richiesta delle automazioni sulla pratica, per id', () => {
+    const out = UI.richiesteCoperte([base()], { feedbackId: ID, numero: '581' });
+    assert.deepEqual(out.map((r) => r.id), ['r1']);
+  });
+
+  test('senza id sulla richiesta vale il numero, col cancelletto o senza', () => {
+    const senzaId = base({ feedbackId: '', num: '#581' });
+    assert.equal(UI.richiesteCoperte([senzaId], { feedbackId: ID, numero: '#581' }).length, 1);
+    assert.equal(UI.richiesteCoperte([senzaId], { feedbackId: ID, numero: '582' }).length, 0);
+    // Un id diverso vince sul numero uguale: non è la stessa pratica.
+    assert.equal(UI.richiesteCoperte([base({ feedbackId: 'altro' })], { feedbackId: ID, numero: '581' }).length, 0);
+  });
+
+  test('non copre il lavoro locale, le richieste già decise, né un\'altra pratica', () => {
+    const lista = [
+      base({ id: 'locale', origin: 'locale' }),
+      base({ id: 'usata', used: true }),
+      base({ id: 'scartata', discarded: true }),
+      base({ id: 'scaduta', expired: true }),
+      base({ id: 'altra', feedbackId: 'fb-xyz', num: '#600' }),
+      base({ id: 'buona' }),
+    ];
+    assert.deepEqual(UI.richiesteCoperte(lista, { feedbackId: ID, numero: '581' }).map((r) => r.id), ['buona']);
+  });
+
+  test('i blocchi nuovi dopo un riallineamento restano all\'owner, salvo che il segno lo metta adesso', () => {
+    const nuova = base({ id: 'nuovi', supersedes: 'z'.repeat(24) });
+    assert.equal(UI.richiesteCoperte([nuova], { feedbackId: ID }).length, 0);
+    assert.deepEqual(UI.richiesteCoperte([nuova], { feedbackId: ID, ancheNuovi: true }).map((r) => r.id), ['nuovi']);
+  });
+
+  test('ingressi storti: niente elenco, niente chiave, richieste senza id', () => {
+    assert.deepEqual(UI.richiesteCoperte(null, { feedbackId: ID }), []);
+    assert.deepEqual(UI.richiesteCoperte([base()], null), []);
+    assert.deepEqual(UI.richiesteCoperte([base({ id: '' })], { feedbackId: ID }), []);
+  });
+});

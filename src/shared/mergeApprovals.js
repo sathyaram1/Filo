@@ -147,6 +147,29 @@
     return String((req && req.num) || '').trim().replace(/^#+/, '');
   }
 
+  /**
+   * Le richieste in attesa che il segno «fondi senza chiedermelo» su una
+   * pratica copre. PURA. Il segno vale per il lavoro delle AUTOMAZIONI su
+   * QUELLA pratica (per id, o per numero quando l'id manca): il finish locale
+   * non ha una pratica e resta fuori. Una richiesta aperta per i soli blocchi
+   * NUOVI emersi dopo un riallineamento (`supersedes`) il server l'ha aperta
+   * apposta perché l'owner li guardi: entra solo con `ancheNuovi`, cioè quando
+   * è lui a mettere il segno adesso, con quella richiesta davanti.
+   */
+  function richiesteCoperte(pending, chiave) {
+    var c = chiave || {};
+    var id = String(c.feedbackId || '').trim();
+    var num = String(c.numero || '').trim().replace(/^#+/, '');
+    return (Array.isArray(pending) ? pending : []).filter(function (req) {
+      if (!req || !req.id || req.used || req.discarded || req.expired) return false;
+      if (originOf(req) !== 'routine') return false;
+      if (req.supersedes && !c.ancheNuovi) return false;
+      var rid = String(req.feedbackId || '').trim();
+      if (id && rid) return rid === id;
+      return !!num && feedbackNum(req) === num;
+    });
+  }
+
   /** L'etichetta della provenienza, col numero del feedback quando c'è. PURA. */
   function originLabel(req) {
     if (originOf(req) !== 'routine') return 'lavoro tuo, da questo computer';
@@ -809,6 +832,7 @@
     blockLabel: blockLabel,
     blockItems: blockItems,
     outcomeMessage: outcomeMessage,
+    richiesteCoperte: richiesteCoperte,
     render: render,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
