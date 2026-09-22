@@ -8,7 +8,12 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 const PAGINA = 'filo://transparency/transparency.html';
 
-test('la barra dice quali sezioni non ci sono ancora, e non le fa cliccare', async ({ app, openTab }) => {
+// Il giro 3 ha cambiato la decisione di questo caso: una voce spenta che al
+// clic non faceva niente era un vicolo cieco, e "in arrivo" lo leggeva solo chi
+// ci fermava sopra il mouse. Adesso si clicca e si finisce sulla pagina che
+// dice che la sezione non è scritta. Resta quello che questo giro voleva
+// davvero: la barra non fa passare per scritta una sezione che non lo è.
+test('la barra dice quali sezioni non ci sono ancora', async ({ app, openTab }) => {
   const page = await openTab(PAGINA);
   await expect(page.locator('#nav .sn-nav-item').first()).toBeVisible({ timeout: 10_000 });
 
