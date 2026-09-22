@@ -491,7 +491,8 @@ function passaggio(html, modo, dentroZona = false, indizi = null) {
       const attrs = attributi(t.attrsRaw);
       const liv = pila.length;
       const prima = precedenti[liv];
-      const comando = TAG_COMANDO.has(nome) || 'aria-expanded' in attrs;
+      const comando = TAG_COMANDO.has(nome) || 'aria-expanded' in attrs
+        || RUOLO_COMANDO.test(String(attrs.role || ''));
       const apribile = !!((attrs.id && segni.apribili.has(attrs.id))
         || RUOLO_PANNELLO.test(attrs.role || '')
         || (prima && prima.comando));
