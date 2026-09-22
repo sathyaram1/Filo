@@ -830,10 +830,6 @@
     populateNicknames(registry);
     markRegistryRowIssues(missingNickRows, dupRows);
 
-    // Se nel frattempo è arrivata un'altra modifica, la conferma parlerebbe di
-    // uno stato già superato: la scrive il salvataggio che chiude la fila.
-    if (saveTimer != null) return;
-
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
     const hint = $('savedHint');
     hint.textContent = hasDiscarded ? I18n.t('options_model_row_not_saved') : I18n.t('options_saved');
