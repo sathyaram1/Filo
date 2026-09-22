@@ -42,10 +42,26 @@ test('il tetto esaurito non ferma nulla in incognito', async ({ app }) => {
       fermato: await Gate.ensureUnderLimit(settings).then(() => false, (e) => e.code === 'LIMIT_REACHED'),
     };
 
+    // Una via d'ingresso vera del cancello: `service` è quella che i servizi a
+    // pagamento usano, e il tetto lo applica come tutte le altre.
+    const provaService = async () => {
+      let partita = false;
+      try {
+        await Gate.service({
+          settings, action: 'prova_giro11', provider: 'finto',
+          run: async () => { partita = true; return {}; }, costoUsd: 0,
+        });
+      } catch (_) {}
+      return partita;
+    };
+
+    normale.chiamataPartita = await provaService();
+
     const incognito = await Storage.runIncognito(async () => ({
       speso: (await Costs.getMonthly()).totalEur,
       oltre: await Costs.isOverLimit(5),
       fermato: await Gate.ensureUnderLimit(settings).then(() => false, (e) => e.code === 'LIMIT_REACHED'),
+      chiamataPartita: await provaService(),
     }));
 
     return { normale, incognito };
