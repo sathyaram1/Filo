@@ -85,6 +85,9 @@ test('con la propria chiave la chat deve continuare a rispondere', async () => {
   const Costs = memoria();
   await mese(Costs, 'own');
 
+  // Il router vero serve solo qui, e la sua cache si lascia com'era: le prove
+  // del giro girano in un processo solo e si passano i moduli.
+  fresco(ROUTER);
   globalThis.SN_PROVIDER_FINTO = {
     async complete() {
       return { text: 'risposta', usage: { promptTokens: 10, completionTokens: 5, costUsd: 0.001, keySource: 'own' }, servedBy: 'finto' };
