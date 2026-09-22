@@ -587,7 +587,7 @@ section:has(#dictList) .sn-spell-add-row {
 /* Le due colonne in più (reasoning, ordinamento degli host) valgono solo nei Modelli predefiniti
    dell'owner: le righe del registry nelle Opzioni utente restano a cinque colonne. */
 .sn-model-row.sn-model-row-reason {
-  grid-template-columns: 110px 130px 1fr 92px 184px auto auto;
+  grid-template-columns: 110px 130px minmax(0, 1fr) 92px 184px 76px 68px;
 }
 /* Campo "stringa modello": wrapper position:relative perché il popup custom
    (.sn-select-pop) si ancora lì sotto, al posto della datalist nativa. */
@@ -602,9 +602,11 @@ section:has(#dictList) .sn-spell-add-row {
   min-height: 14px;
   margin-top: 2px;
 }
+/* Il bordo resta, trasparente: senza, l'intestazione sarebbe larga due pixel più
+   delle righe e le colonne non cadrebbero nello stesso punto. */
 .sn-model-row-head {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -627,7 +629,7 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-page .sn-saved-indicator.sn-hint-warn { color: var(--sn-error); }
 
 .sn-default-model-row {
-  grid-template-columns: 120px 110px 1fr auto;
+  grid-template-columns: 120px 110px minmax(0, 1fr) 68px;
 }
 .sn-default-model-cell {
   font-size: 12px;
