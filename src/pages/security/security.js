@@ -179,8 +179,21 @@
   async function load() {
     fillStaticText();
     const settings = await Storage.getSettings();
-    Bootstrap.applyTheme(settings.theme);
-    Bootstrap.applyTextScale(settings.textScale);
+    applica(settings);
+  }
+
+  // Ogni controllo che i salvataggi di questa pagina riscrivono va rimesso in
+  // riga quando la stessa impostazione cambia da fuori (Filo a parole, un'altra
+  // finestra), o il primo interruttore toccato rispedisce indietro tutto il
+  // blocco com'era all'apertura: una protezione appena accesa si rispegne da
+  // sola (patterns/una-pagina-di-impostazioni-aperta-non-e-una-fotografia.md).
+  function applica(settings) {
+    const attivo = document.activeElement;
+    const metti = (id, fn) => {
+      const el = $(id);
+      if (!el || el === attivo) return;
+      fn(el);
+    };
     const sec = settings.security || {};
     // "Apri da un altro paese": se è configurato un fornitore proxy, mostra il
     // suo host nella riga privacy (onestà: dichiariamo per chi passa il traffico).
