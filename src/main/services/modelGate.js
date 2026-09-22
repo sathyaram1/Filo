@@ -344,6 +344,8 @@
     stream,
     capability,
     service,
+    webSearch,
+    blacklistLookup,
     probe,
     canLookupServedBy,
     lookupServedBy,
