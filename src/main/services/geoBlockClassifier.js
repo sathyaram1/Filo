@@ -421,8 +421,11 @@ async function classify(input = {}, opts = {}) {
   // 2c) Il freno: quante chiamate chi possiede questo sito può far partire.
   // Rinunciare NON si ricorda: al prossimo giro di orologio si riprova.
   const freno = opts.freno || (cache && cache.freno) || null;
+  // La scheda ripresenta la pagina dove l'utente è rimasto: non è una raffica,
+  // quindi il conto della catena non la riguarda (#591, ottavo giro).
+  const catenaEff = insistito ? '' : catena;
   if (freno && typeof freno.chiedi === 'function') {
-    const esito = freno.chiedi(host, catena);
+    const esito = freno.chiedi(host, catenaEff);
     if (esito !== 'ok') {
       return {
         class: CLASSES.ERRORE_GENERICO,
