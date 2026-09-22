@@ -717,15 +717,13 @@
   function riallineaDaFuori(settings) {
     if (!settings || typeof settings !== 'object') return;
     if (!$('theme')) return;
-    const attivo = document.activeElement;
-    // Un salvataggio già in coda su questo blocco sta per scrivere gli stessi
-    // campi: riallinearli adesso da un messaggio più vecchio glieli farebbe
-    // rimandare indietro com'erano, che è proprio il danno da evitare.
-    const inCoda = !!saveTimer;
+    // Il solo campo che un messaggio più vecchio non deve toccare è quello del
+    // salvataggio ancora in coda: riallinearlo rimanderebbe indietro il valore
+    // che l'utente sta scegliendo proprio adesso.
+    const inCoda = saveTimer ? idInCoda : '';
     const set = (id, fn) => {
-      if (inCoda) return;
       const el = $(id);
-      if (!el || el === attivo) return;
+      if (!el || id === inCoda || staUsandoAdesso(el)) return;
       fn(el);
     };
     const opzione = (id, valore, ripiego) => set(id, (el) => {
