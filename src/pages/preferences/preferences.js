@@ -683,9 +683,11 @@
     const acceso = $('notifSoundEnabled').checked;
     for (const id of ['notifSound', 'notifSoundVolume', 'notifSoundPreview']) {
       const el = $(id);
-      if (!el) continue;
-      el.disabled = !acceso;
-      el.closest('.sn-row')?.style.setProperty('opacity', acceso ? '1' : '0.5');
+      if (el) el.disabled = !acceso;
+    }
+    for (const sel of ['label[for="notifSound"]', 'label[for="notifSoundVolume"]', '#notifSoundVolumeVal']) {
+      const el = document.querySelector(sel);
+      if (el) el.style.opacity = acceso ? '' : '0.5';
     }
   }
   // Un valore assente o storto vale «pieno»: il silenzio si sceglie.
