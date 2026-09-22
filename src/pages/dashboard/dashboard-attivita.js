@@ -506,6 +506,7 @@
     if (o.blocked === 'empty') return 'comando vuoto';
     if (o.event === 'invalid') return 'data o ora non valide';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.pref === 'invalid') return 'quel valore non è fra quelli che Filo conosce';
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
     if (o.ok === false && o.detail) return String(o.detail);
