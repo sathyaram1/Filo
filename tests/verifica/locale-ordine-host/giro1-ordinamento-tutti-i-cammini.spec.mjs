@@ -184,11 +184,10 @@ test('cambiando ordinamento al modello cambia solo l\'ordinamento: la lista di e
 
   const viste = [];
   for (const ordine of ['auto', 'price', 'latency', 'throughput']) {
-    await app.evaluate(async (ord) => {
-      const s = await globalThis.SN_STORAGE.getSettings();
-      const reg = { ...(s.modelRegistry || {}) };
-      reg['prova-chat'] = { provider: 'openrouter', model: 'finto/chat', sort: ord };
-      await globalThis.SN_STORAGE.setSettings({ modelRegistry: reg });
+    await app.evaluate(async (_elettrone, ord) => {
+      await globalThis.SN_STORAGE.updateSettings({
+        modelRegistry: { 'prova-chat': { provider: 'openrouter', model: 'finto/chat', sort: ord } },
+      });
       globalThis.__richieste.length = 0;
     }, ordine);
     const r = await page.evaluate(async (ord) => window.filo.message({
