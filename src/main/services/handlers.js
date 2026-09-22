@@ -1500,21 +1500,13 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // risultato arrivava mai — l'utente vedeva un "link" che non funziona.
         const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
         if (!query) return { executed: false, kept: true };
-        const WS = globalThis.SN_WEB_SEARCH;
-        if (!WS || typeof WS.search !== 'function') {
-          return { executed: false, kept: true, output: { search: query, results: [], error: 'ricerca non disponibile' } };
-        }
         try {
           const settings = await getEffectiveSettings();
           const tavilyKey = settings.apiKeys?.tavily || '';
           // #591, quinto giro — la ricerca sul web è un fornitore che si paga
           // sulla chiave condivisa: dal cancello, come tutto il resto, così il
           // tetto mensile vale anche qui e la spesa compare nel conto.
-          const r = await Gate.service({
-            settings, action: SN_CONST.SERVIZI.WEB_SEARCH, provider: 'tavily',
-            costoUsd: WS.costoUsd,
-            run: () => WS.search({ query, tavilyKey, maxResults: 5 }),
-          });
+          const r = await Gate.webSearch({ settings, query, apiKey: tavilyKey, maxResults: 5 });
           const results = Array.isArray(r?.results) ? r.results : [];
           return { executed: results.length > 0, kept: true, output: { search: query, results, provider: r?.provider || '', reason: r?.reason || '' } };
         } catch (e) {

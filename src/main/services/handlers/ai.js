@@ -12,7 +12,6 @@ module.exports = function register(on, ctx) {
   // conteggio dei costi, chi ha servito).
   const Gate = globalThis.SN_MODEL_GATE;
   const Costs = globalThis.SN_COSTS;
-  const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
 
   // Cache in-memoria dell'audio TTS: rileggere lo stesso testo (stessa voce,
