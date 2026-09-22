@@ -498,7 +498,7 @@
     return {
       model: campo ? campo.value.trim() : (e.model || ''),
       reasoning: e.reasoning,
-      sort: e.sort,
+      sort: e.sort || sceltaGeneraleHost,
     };
   }
 
