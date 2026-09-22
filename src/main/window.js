@@ -48,6 +48,7 @@ function assicuraFinestraNormale() {
     try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
   });
   if (esistente) return esistente;
+  if (inChiusura) return null;
   const win = createMainWindow();
   for (const cb of osservatoriFinestraNormale) { try { cb(win); } catch (_) {} }
   return win;
