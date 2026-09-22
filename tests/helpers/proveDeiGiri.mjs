@@ -88,8 +88,12 @@ const DICHIARAZIONI = /\b(throwaway|usa[- ]e[- ]getta|temporane[ao]|provvisori[a
  * che nomina un «cancella» dell'app non deve finire accusata. PURA.
  */
 export function siDichiaraTemporanea(src) {
-  const testa = String(src || '').split('\n')
-    .filter((r) => /^\s*(\/\/|\/\*|\*)/.test(r) || !r.trim())
-    .slice(0, 2).join('\n');
-  return DICHIARAZIONI.test(testa);
+  const righe = String(src || '').split('\n');
+  const testa = [];
+  for (const r of righe) {
+    if (!/^\s*(\/\/|\/\*|\*)/.test(r) && r.trim()) break;
+    if (r.trim()) testa.push(r);
+    if (testa.length === 2) break;
+  }
+  return DICHIARAZIONI.test(testa.join('\n'));
 }
