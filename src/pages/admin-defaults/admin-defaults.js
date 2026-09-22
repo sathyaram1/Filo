@@ -629,6 +629,7 @@
     const btn = $('saveBtn');
     btn.disabled = true;
     save._inCorso = true;
+    save._modificatoDurante = false;
     status.classList.remove('sn-error');
     status.textContent = I18n.t('admin_defaults_saving');
 
