@@ -346,7 +346,8 @@
     if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
     if (el.classList && el.classList.contains('notranslate')) return true;
     if (isFiloOwnUi(el)) return true;
-    return isVisibilityHidden(el) ? 'hidden' : false;
+    const nascosto = isVisibilityHidden(el);
+    return nascosto ? (nascosto === 'visibility' ? 'visibility' : 'hidden') : false;
   }
 
   // Nascosto in questo momento: una fisarmonica chiusa, la scheda che non è in
