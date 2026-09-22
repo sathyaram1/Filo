@@ -534,7 +534,11 @@ module.exports = function register(on, ctx) {
       // dell'uso reale.
       const model = modelId;
       const kind = modelKind(provider, model, regEntry);
-      const routing = providerRouting(eff, tuning.sort);
+      // Riga dell'editor: l'ordinamento lo ha già risolto la pagina su ciò che
+      // si vede lì, quindi qui non si torna alla scelta generale salvata.
+      const routing = explicitModel
+        ? providerRouting({ ...eff, providerSort: '' }, tuning.sort)
+        : providerRouting(eff, tuning.sort);
       if (kind !== 'text') {
         return await probeNonText({ kind, provider, apiKey, model, routing, nickname });
       }

@@ -280,7 +280,7 @@
     test.type = 'button';
     test.className = 'sn-btn sn-btn-secondary';
     test.textContent = I18n.t('options_model_test');
-    test.addEventListener('click', () => runRowTest(nickIn, provSel, idIn, row, test, { reasonSel, sortSel }));
+    test.addEventListener('click', () => runRowTest(nickIn, provSel, idIn, row, test));
 
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
@@ -307,7 +307,7 @@
     return row;
   }
 
-  async function runRowTest(nickIn, provSel, idIn, row, btn, tuning) {
+  async function runRowTest(nickIn, provSel, idIn, row, btn) {
     const statusEl = row.querySelector('.sn-model-row-status');
     const nickname = nickIn.value.trim();
     const provider = provSel.value;
@@ -319,11 +319,9 @@
     statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     try {
-      // Testa la riga così com'è scritta (provider + stringa modello), anche
-      // prima del salvataggio: il main usa le chiavi predefinite (mai visibili
-      // qui). Il nickname viaggia solo come informazione di contorno.
-      // La prova parte con la configurazione che si VEDE, scelta generale
-      // compresa: è la stessa a cui poi la misura viene attribuita.
+      // Testa la riga così com'è scritta, scelta generale compresa e anche
+      // prima del salvataggio: è la configurazione a cui la misura viene poi
+      // attribuita. Il nickname viaggia solo come informazione di contorno.
       const conf = configurazioneRiga(row);
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
@@ -340,7 +338,7 @@
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
-          ...configurazioneRiga(row),
+          ...conf,
         };
         mostraMisura(row);
         ricordaMisura(nickname, row._misura);
