@@ -64,6 +64,12 @@ const LANCIATORE = (nome) => `#!/bin/bash
 # Generato da scripts/after-pack-linux.js. Vedi lì il perché.
 QUI="$(dirname "$(readlink -f "\${BASH_SOURCE[0]}")")"
 
+# La voce di menu del pacchetto chiede sempre --no-sandbox, senza guardare il
+# sistema: si scarta qui, così la gabbia la decide un posto solo. Per spegnerla
+# davvero resta ELECTRON_DISABLE_SANDBOX, che legge Electron.
+ARGOMENTI=()
+for a in "$@"; do [ "$a" = "--no-sandbox" ] || ARGOMENTI+=("$a"); done
+
 # La gabbia di sicurezza di Chromium ha bisogno degli spazi dei nomi utente non
 # privilegiati. Dove il sistema li nega, Chromium non parte affatto: lì, e solo
 # lì, Filo si avvia senza la gabbia invece di non avviarsi.
@@ -75,7 +81,7 @@ if [ "$(manopola /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = "1" 
   SENZA_GABBIA=(--no-sandbox)
 fi
 
-exec -a "$QUI/${nome}" "$QUI/${nome}${SUFFISSO}" "\${SENZA_GABBIA[@]}" "$@"
+exec -a "$QUI/${nome}" "$QUI/${nome}${SUFFISSO}" "\${SENZA_GABBIA[@]}" "\${ARGOMENTI[@]}"
 `;
 
 exports.default = async function afterPackLinux(context) {
