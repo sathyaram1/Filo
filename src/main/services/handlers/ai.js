@@ -639,11 +639,7 @@ module.exports = function register(on, ctx) {
       // #591, quinto giro — anche questa è una chiamata a un fornitore che si
       // paga sulla chiave condivisa: passa dal cancello, che tiene il tetto
       // mensile e scrive la spesa nel conto.
-      const r = await Gate.service({
-        settings, action: SN_CONST.SERVIZI.WEB_SEARCH, provider: 'tavily',
-        costoUsd: WebSearch.costoUsd,
-        run: () => WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 }),
-      });
+      const r = await Gate.webSearch({ settings, query: msg.query, apiKey: tavilyKey, maxResults: 5 });
       return { ok: true, ...r };
     } catch (e) {
       return { ok: false, error: e.message || String(e), results: [] };
