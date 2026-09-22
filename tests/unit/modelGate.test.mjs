@@ -29,9 +29,15 @@ const require_ = createRequire(import.meta.url);
 
 // Chi PUÒ nominare i fornitori: il cancello, i fornitori stessi e il loader,
 // che si limita a ri-esporre l'oggetto già registrato su globalThis.
+// #591, settimo giro — i due servizi a pagamento che non sono modelli (la
+// ricerca sul web e l'elenco dei siti di truffa) si pagano sulla stessa chiave
+// di fabbrica dell'owner. I loro moduli sono i «fornitori» di quei servizi e
+// possono nominarli; tutti gli altri passano dal cancello.
 const AMMESSI = new Set([
   'src/main/services/modelGate.js',
   'src/main/services/loader.js',
+  'src/main/services/webSearch.js',
+  'src/main/services/safebrowse/net.js',
 ]);
 const CARTELLE_AMMESSE = ['src/main/services/providers/'];
 
@@ -49,7 +55,35 @@ const PORTE = [
   { nome: 'completeWithFallback', re: /\bcompleteWithFallback\s*\(/ },
   { nome: 'streamCompleteWithFallback', re: /\bstreamCompleteWithFallback\s*\(/ },
   { nome: 'getProvider', re: /\bgetProvider\s*\(/ },
+  // I servizi a pagamento che non sono modelli: stessa chiave di fabbrica,
+  // stesso conto, stessa regola. Il nome con cui si raggiungono dentro Filo…
+  { nome: 'SN_WEB_SEARCH', re: /\bSN_WEB_SEARCH\b/ },
+  { nome: 'safeBrowsingLookup', re: /\bsafeBrowsingLookup\s*\(/ },
 ];
+
+// …e il loro indirizzo su internet, che dichiara il modulo che lo possiede
+// (`INDIRIZZO_A_PAGAMENTO`): così un servizio nuovo è sorvegliato dal giorno in
+// cui entra, e l'indirizzo resta scritto in un posto solo.
+const MODULI_DEI_SERVIZI = [
+  { file: 'src/main/services/webSearch.js', globale: 'SN_WEB_SEARCH' },
+  { file: 'src/main/services/safebrowse/net.js', globale: '' },
+];
+
+function indirizziDeiServizi() {
+  const host = new Set();
+  for (const m of MODULI_DEI_SERVIZI) {
+    let mod = null;
+    try { mod = require_(join(REPO, m.file)); } catch (_) { mod = null; }
+    const fonte = mod && mod.INDIRIZZO_A_PAGAMENTO ? mod : (m.globale ? globalThis[m.globale] : null);
+    const h = fonte && fonte.INDIRIZZO_A_PAGAMENTO;
+    if (h) host.add(String(h).toLowerCase());
+  }
+  return [...host];
+}
+
+for (const h of indirizziDeiServizi()) {
+  PORTE.push({ nome: `indirizzo del servizio (${h})`, re: new RegExp(h.replace(/\./g, '\\.'), 'i') });
+}
 
 // L'ultima porta, e quella che i nomi non coprono: l'INDIRIZZO del fornitore su
 // internet. Chi scrive la richiesta di rete a mano arriva allo stesso modello,
@@ -203,6 +237,22 @@ test('togliere i commenti non porta via il codice che li circonda', () => {
 // La porta dell'indirizzo vale solo se l'elenco degli indirizzi si riempie
 // davvero: se la lettura dei fornitori smettesse di trovarli, la porta
 // sparirebbe in silenzio e la sentinella resterebbe verde per sempre.
+// Lo stesso vale per i servizi a pagamento: se un modulo smettesse di
+// dichiarare il suo indirizzo, quella porta sparirebbe in silenzio.
+test('ogni servizio a pagamento dichiara il suo indirizzo, e quell\'indirizzo è una porta', () => {
+  const indirizzi = indirizziDeiServizi();
+  assert.equal(
+    indirizzi.length, MODULI_DEI_SERVIZI.length,
+    'ogni modulo di un servizio a pagamento deve esportare INDIRIZZO_A_PAGAMENTO',
+  );
+  for (const h of indirizzi) {
+    assert.ok(
+      PORTE.some((p) => p.re.test(`https://${h}/api`)),
+      `l'indirizzo ${h} deve essere una porta sorvegliata`,
+    );
+  }
+});
+
 test('la porta dell\'indirizzo del fornitore esiste e non è vuota', () => {
   const indirizzi = indirizziDeiFornitori();
   assert.ok(indirizzi.length > 0, 'nessun indirizzo di fornitore trovato: la porta è spenta');

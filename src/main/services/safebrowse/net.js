@@ -95,4 +95,9 @@ async function ctFirstSeenDays(registrable) {
   return { firstSeenDays: days >= 0 ? days : 0 };
 }
 
-module.exports = { safeBrowsingLookup, rdapAgeDays, ctFirstSeenDays, fetchJson };
+// L'indirizzo che si paga sulla chiave di fabbrica dell'owner, dichiarato qui
+// perché la sentinella del cancello unico lo sorvegli (#591, settimo giro).
+// RDAP e i registri dei certificati non sono qui: sono pubblici e gratuiti.
+const INDIRIZZO_A_PAGAMENTO = 'safebrowsing.googleapis.com';
+
+module.exports = { safeBrowsingLookup, rdapAgeDays, ctFirstSeenDays, fetchJson, INDIRIZZO_A_PAGAMENTO };

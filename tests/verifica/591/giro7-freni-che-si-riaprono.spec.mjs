@@ -12,7 +12,9 @@
 //
 // Le prove non fissano un numero «giusto»: guardano se il conto SMETTE di
 // crescere. Un freno che è un tetto dà lo stesso numero dopo quattro secondi e
-// dopo sedici; un freno che è una velocità no.
+// dopo sedici; un freno che è una velocità no. La raffica arriva tutta dalla
+// stessa catena di navigazioni, che è quello che è: una pagina sola che si
+// porta in giro senza mai lasciare all'utente il tempo di guardare.
 //
 // Logica pura: le chiamate di rete e al modello sono finte.
 
@@ -29,6 +31,8 @@ const GEO = require_(join(REPO, 'src/main/services/geoBlockClassifier.js'));
 const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
 const PRESTO_MS = 4000;
 const TARDI_MS = 16000;
+// Una raffica è una catena sola: la pagina non si ferma mai.
+const CATENA = 'catena-della-pagina-ostile';
 
 function bancoSafebrowse() {
   const b = { gsb: [], llm: [], sandbox: [] };
@@ -66,7 +70,7 @@ test('il giudizio del modello e le finestre nascoste ripartono a ogni raffica', 
   await raffica(
     (i) => `paypa1-accesso-${i}.pages.dev`,
     async (h) => {
-      SB.analyze(`http://${h}/login`, { hasPassword: true });
+      SB.analyze(`http://${h}/login`, { hasPassword: true, catena: CATENA });
       if (!presto && Date.now() - t0 >= PRESTO_MS) presto = b.llm.length;
     },
   );
@@ -89,7 +93,7 @@ test('anche la ricerca nell\'elenco dei siti di truffa riparte a ogni raffica', 
   await raffica(
     (i) => `vetrina-${i}.pages.dev`,
     async (h, i) => {
-      SB.analyze(`http://${h}/p${i}`, {});
+      SB.analyze(`http://${h}/p${i}`, { catena: CATENA });
       if (!presto && Date.now() - t0 >= PRESTO_MS) presto = b.gsb.length;
     },
   );
@@ -111,7 +115,7 @@ test('il riconoscimento del blocco geografico riparte a ogni raffica', async () 
     (i) => `bloccato-${i}.pages.dev`,
     async (h, i) => {
       await GEO.classify(
-        { title: 'Forbidden', text: 'Access denied', statusCode: 403, host: h, url: `http://${h}/p${i}` },
+        { title: 'Forbidden', text: 'Access denied', statusCode: 403, host: h, url: `http://${h}/p${i}`, catena: CATENA },
         { complete, cache },
       );
       if (!presto && Date.now() - t0 >= PRESTO_MS) presto = chiamate;
@@ -131,7 +135,7 @@ test('caso di riscontro: su un dominio normale il conto è davvero un tetto', as
   await raffica(
     (i) => `paypa1-accesso-${i}.un-solo-attaccante-xyz.com`,
     async (h) => {
-      SB.analyze(`http://${h}/login`, { hasPassword: true });
+      SB.analyze(`http://${h}/login`, { hasPassword: true, catena: CATENA });
       if (!presto && Date.now() - t0 >= PRESTO_MS) presto = b.llm.length;
     },
   );

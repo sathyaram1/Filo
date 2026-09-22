@@ -129,5 +129,9 @@
     return r && r.ok && r.provider === 'tavily' ? PREZZO_RICERCA_USD : 0;
   }
 
-  global.SN_WEB_SEARCH = { search, costoUsd, PREZZO_RICERCA_USD };
+  // L'indirizzo che si paga, dichiarato qui perché la sentinella del cancello
+  // unico lo sorvegli senza doverlo riscrivere altrove (#591, settimo giro).
+  const INDIRIZZO_A_PAGAMENTO = 'api.tavily.com';
+
+  global.SN_WEB_SEARCH = { search, costoUsd, PREZZO_RICERCA_USD, INDIRIZZO_A_PAGAMENTO };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
