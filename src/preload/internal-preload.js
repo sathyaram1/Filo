@@ -181,7 +181,10 @@ const chromeShim = {
               if (onDisconnect) onDisconnect();
             },
             onError: (e) => {
-              if (onMessage) onMessage({ type: 'error', message: e.message, code: e.code });
+              // Tutto quello che il main ha detto sull'errore: con i soli
+              // message e code la frase già scritta per l'utente non si
+              // ricompone e arriva la riga grezza del servizio (#663).
+              if (onMessage) onMessage({ type: 'error', ...e });
               if (onDisconnect) onDisconnect();
             },
           });
