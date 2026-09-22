@@ -80,7 +80,6 @@ async function preparaModelli(app) {
         'prova-indice': { provider: 'openrouter', model: 'finto/indice', sort: 'throughput' },
       },
       models: {
-        ...(s.models || {}),
         [A.EXPLAIN]: 'prova-chat',
         [A.TTS]: 'prova-voce',
         [A.TRANSCRIBE_AUDIO]: 'prova-detta',
