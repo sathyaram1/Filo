@@ -179,8 +179,7 @@ const catenaLookup = creaConto(HOUR);
 // verrà richiesta di nuovo e non deve pagare due volte.
 // #591, ottavo giro — la catena esaurita RIMANDA, non rinuncia: a svuotarla è
 // chi naviga, e chi naviga può essere la pagina ostile che subito dopo ti porta
-// sulla truffa. Chi riprova è la scheda, e solo finché è rimasta su quella
-// pagina: le pagine di una raffica le ha già lasciate.
+// sulla truffa. Riprova la scheda, e solo se è rimasta su quella pagina.
 function prendiGettone(conto, raffica, chi, max = DEEP_MAX_PER_OWNER, maxRaffica = DEEP_MAX_RAFFICA, catena = null) {
   const vivo = catena && catena.chiave;
   if (vivo && catena.conto.valore(catena.chiave) >= catena.max) return 'raffica';
@@ -260,11 +259,9 @@ function recordCert(host, status) {
   if (host && status) certCache.set(psl.proprietario(host) || host, { status });
 }
 
-// La domanda all'elenco dei siti di truffa è su UN indirizzo, quindi la
-// risposta si ricorda per quell'indirizzo (#591, ottavo giro). Ricordarla per
-// tutto il sito, dove i file sono di persone diverse, faceva due danni opposti:
-// un file innocuo visto prima impediva di cercare quello di truffa, e un file
-// segnalato metteva la pagina rossa su tutti gli altri.
+// La domanda all'elenco dei siti di truffa è su UN indirizzo: ricordarne la
+// risposta per tutto il sito, dove i file sono di persone diverse, copriva il
+// file di truffa col «pulito» del vicino e viceversa (#591, ottavo giro).
 function chiaveIndirizzo(url, norm) {
   let u = null;
   const s = String(url || '');

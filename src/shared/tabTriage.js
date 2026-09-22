@@ -28,13 +28,10 @@
     return EPHEMERAL_INTERNAL_HOSTS.has(internalHostOf(url));
   }
 
-  // #591, ottavo giro — le pagine della rete di casa restano fuori. Il riordino
-  // parte da solo e manda al modello indirizzo, titolo ed estratto del testo di
-  // ogni scheda che prende: il pannello del router, il NAS, l'applicazione in
-  // prova sulla propria macchina non devono uscire di casa. La domanda è la
-  // stessa che si fanno il giudizio sui siti pericolosi e il riconoscimento del
-  // blocco geografico, e si fa nello stesso posto; se quel posto non è
-  // caricato, non si manda niente.
+  // #591, ottavo giro — il riordino parte da solo e manda al modello indirizzo,
+  // titolo ed estratto di ogni scheda che prende: dalla rete di casa sta alla
+  // larga. La domanda è quella del rilevamento siti pericolosi, non una copia;
+  // se quel modulo non è caricato non si manda niente.
   function eRetePrivata(url) {
     const psl = global.SN_SAFEBROWSE && global.SN_SAFEBROWSE.psl;
     if (!psl || typeof psl.isHostPrivato !== 'function') return true;
