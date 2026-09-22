@@ -37,3 +37,14 @@ test('la scrittura ritardata non deve leggere il saldo inventato dell\'incognito
     'la scrittura ritardata deve mandare al server il saldo vero, non quello che la finestra in incognito si è inventata',
   ).toBeLessThan(100);
 });
+
+test('caso di riscontro: da una finestra normale la scrittura ritardata legge il saldo vero', async ({ app }) => {
+  const letto = await app.evaluate(async () => {
+    const Cr = globalThis.SN_CREDITS;
+    await Cr.writeState({ ...(await Cr.readState()), balance: 7 });
+    return await new Promise((res) => {
+      setTimeout(async () => { res((await Cr.readState()).balance); }, 30);
+    });
+  });
+  expect(letto).toBeLessThan(100);
+});
