@@ -221,7 +221,10 @@ const geoBlockMethods = {
     if (tab.geoBlock) return; // già rilevato (livello 1)
     let host = '';
     try { host = new URL(url).hostname; } catch (_) { return; }
-    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url };
+    // La catena di navigazioni è la stessa che paga i controlli sui siti
+    // pericolosi: chi si porta da solo su pagine sempre nuove ha un conto solo
+    // per tutte, e chi naviga dopo una pausa ne apre uno nuovo (#591, giro 7).
+    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url, catena: catenaDi(tab) };
     Promise.resolve()
       .then(() => classify(input))
       .then((res) => {

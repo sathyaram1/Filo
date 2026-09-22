@@ -391,7 +391,7 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500, fr
 // comportamento prudente per una feature opzionale.
 async function classify(input = {}, opts = {}) {
   const { complete, cache, now = Date.now, signal } = opts;
-  const { title, text, statusCode, host, url } = input;
+  const { title, text, statusCode, host, url, catena } = input;
 
   // 1) Gate: se non è un caso ambiguo, non chiamare il modello.
   if (!shouldClassify({ statusCode, text, host, deterministicHit: input.deterministicHit })) {
@@ -416,7 +416,7 @@ async function classify(input = {}, opts = {}) {
   // Rinunciare NON si ricorda: al prossimo giro di orologio si riprova.
   const freno = opts.freno || (cache && cache.freno) || null;
   if (freno && typeof freno.chiedi === 'function') {
-    const esito = freno.chiedi(host);
+    const esito = freno.chiedi(host, catena);
     if (esito !== 'ok') {
       return {
         class: CLASSES.ERRORE_GENERICO,
@@ -428,7 +428,7 @@ async function classify(input = {}, opts = {}) {
         ...(esito === 'raffica' ? { rimandato: true } : {}),
       };
     }
-  } else if (freno && typeof freno.prendi === 'function' && !freno.prendi(host)) {
+  } else if (freno && typeof freno.prendi === 'function' && !freno.prendi(host, catena)) {
     return {
       class: CLASSES.ERRORE_GENERICO,
       route: routeForClass(CLASSES.ERRORE_GENERICO),
@@ -482,6 +482,7 @@ const api = {
   createFreno,
   FRENO_PER_SITO,
   FRENO_RAFFICA,
+  FRENO_PER_CATENA,
   FRENO_RAFFICA_MS,
   classify,
 };
