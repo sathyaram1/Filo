@@ -774,16 +774,8 @@
           else truncated++;
         }
       }
-      const kids = [];
-      const shadow = el.shadowRoot;
-      if (shadow) {
-        if (shadowRoots.length < 500) shadowRoots.push(shadow);
-        for (const c of shadow.children) kids.push(c);
-      } else if (isClosedComponent(el)) {
-        unreachable++;
-      }
-      for (const c of el.children) kids.push(c);
-      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+      if (isClosedComponent(el) && !el.shadowRoot) unreachable++;
+      pushKids(el, stack, shadowRoots);
     }
     return Object.assign(out, { unreachable, truncated, attrs, mirrors, shadowRoots, frameDocs, hidden });
   }
