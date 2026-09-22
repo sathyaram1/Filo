@@ -132,8 +132,9 @@ test('due pratiche segnate insieme: l’esito di quella non riuscita non si perd
   // Nessuna pratica aperta: l'owner sta guardando la lista.
   await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([reqUno.id, reqDue.id]);
 
-  // Il ramo della prima è ancora fermo. L'owner deve poterlo sapere.
-  await expect.poll(() => leggibile(page, '#701'), { timeout: 6000 }).toBe(true);
+  // Il ramo della prima è ancora fermo. L'owner deve poterlo sapere: il numero
+  // della pratica da solo sta già in lista, quindi qui si cerca il RACCONTO.
+  await expect.poll(() => leggibile(page, 'Fusione ferma su #701'), { timeout: 6000 }).toBe(true);
 });
 
 // ── 2. Il segno da fuori mentre l'owner guarda un'ALTRA pratica ────────────
