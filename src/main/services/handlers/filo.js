@@ -113,15 +113,22 @@ module.exports = function register(on, ctx) {
   // compito di quella risposta. Di una risposta che il motore non ricorda più
   // non si può dire che non avesse letto niente: `compitoPrecedenteDi`
   // risponde col caso peggiore, e allora si chiede.
+  // #533 (ottavo giro di verifica) — lo stesso testo di Filo lo mostrano anche
+  // il riquadro «Spiega», la risposta del tasto destro e l'assistente Aiuto,
+  // che vivono DENTRO una pagina web: lì il clic apriva l'indirizzo da solo.
+  // Da una pagina il collegamento non può nominare una richiesta: il compito è
+  // quello di quella pagina, che ha già letto, e lo ricava il dispatch.
   on(MSG.FILO_OPEN_LINK, async (msg, sender, origin) => {
-    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const url = String((msg && msg.url) || '').trim();
     if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'non è un indirizzo web' };
+    const daPagina = !isFilo(origin) && !sender?.isShell;
     // Senza un nome di richiesta non si sa cosa quella risposta avesse letto:
     // `compitoPrecedenteDi` risponde col caso peggiore, e si chiede.
-    const compito = await compitoPrecedenteDi(String((msg && msg.compito) || 'collegamento-senza-richiesta'));
-    const azione = { type: 'NAVIGA', url, _daClic: true };
-    const r = await executeFiloAction(azione, { sender, compito, confirmed: !!(msg && msg.conferma) });
+    const compito = daPagina
+      ? null
+      : await compitoPrecedenteDi(String((msg && msg.compito) || 'collegamento-senza-richiesta'));
+    const azione = { type: 'NAVIGA', url };
+    const r = await executeFiloAction(azione, { sender, compito, daClic: true, confirmed: !!(msg && msg.conferma) });
     if (r && r.needsConfirm) return { ok: true, chiede: true, testo: r.describe || '' };
     return { ok: !!(r && r.executed) };
   });
