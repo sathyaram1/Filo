@@ -719,6 +719,16 @@
       // partenza spegnerebbe la traduzione dell'intera pagina, che prima invece
       // partiva. Il filtro vale — come prima — da lì in giù.
       const skip = el !== root && skipSubtreeForTranslation(el);
+      // Invisibile per `visibility`, che un figlio può riprendersi: si segna come ogni altra ripiegatura, ma la
+      // camminata continua là sotto, se no il testo che si vede resta in inglese e il menu non lo offre (#505).
+      if (skip === 'visibility') {
+        const p = el.parentElement;
+        if (!(p && sottoInvisibile.has(p)) && hidden.length < MAX_HIDDEN
+            && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
+        sottoInvisibile.add(el);
+        pushKids(el, stack, shadowRoots);
+        continue;
+      }
       if (skip) {
         // Sottoalbero senza prosa: il contenuto resta intoccato, ma le sue
         // etichette (placeholder di un campo, suggerimento di un bottone,
