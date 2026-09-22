@@ -158,7 +158,7 @@ test('le manopole del volume si vedono in tema chiaro e in tema scuro', async ({
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
 
-  for (const tema of ['chiaro', 'scuro']) {
+  for (const tema of ['light', 'dark']) {
     await shell.evaluate(
       (t) => window.filoShell.message({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } }),
       tema,
