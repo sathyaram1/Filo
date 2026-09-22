@@ -60,6 +60,7 @@ async function openStubbedEditor(openTab, overrides = {}) {
           if (!msg.model) return { ok: false, error: `Modello "${msg.nickname}" non trovato` };
           return { ok: true, ttftMs: 123, tokensPerSec: 45.6, provider: msg.provider, model: msg.model };
         case 'defaults_update':
+          if (ritardoSalvataggioMs) await new Promise((r) => setTimeout(r, ritardoSalvataggioMs));
           // Come il main: risponde con la config effettiva DOPO la scrittura.
           return {
             ok: true,
