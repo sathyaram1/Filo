@@ -70,7 +70,7 @@ async function apri(page, { fbs = [], pending = [], updateReply = null, approveR
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'merge_approvals_get') {
-        return { ok: true, pending: window.__cfg.pending, failed: [], recent: [], preapproved: [], ttlMs: 7 * GIORNO_MS };
+        return { ok: true, pending: window.__cfg.pending, failed: [], recent: [], preapproved: [], ttlMs: 7 * 24 * 60 * 60 * 1000 };
       }
       if (t === 'feedback_update') {
         window.__calls.push(msg);
@@ -96,18 +96,12 @@ async function apri(page, { fbs = [], pending = [], updateReply = null, approveR
 
 const approvazioni = (page) => page.evaluate(() => window.__calls.filter((c) => c.type === 'merge_approval_approve'));
 
-// La costante serve dentro il browser: l'evaluate non vede quelle del modulo.
-test.beforeEach(async ({}, testInfo) => { testInfo.setTimeout(60_000); });
 
-async function preparaPagina(page) {
-  await page.addInitScript(() => { window.GIORNO_MS = 24 * 60 * 60 * 1000; });
-}
 
 // ── 1. Il cuore: segno messo con il ramo GIÀ fermo ─────────────────────────
 
 test('ramo già fermo, metto il segno: si fonde senza toccare «Approva e fondi»', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await preparaPagina(page);
   const fb = pratica();
   const req = richiesta();
   await apri(page, { fbs: [fb], pending: [req] });
@@ -128,7 +122,6 @@ test('ramo già fermo, metto il segno: si fonde senza toccare «Approva e fondi�
 
 test('pratica già segnata: la richiesta che arriva dopo si fonde da sola', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await preparaPagina(page);
   const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
   const req = richiesta();
   await apri(page, { fbs: [fb], pending: [] });
@@ -146,7 +139,6 @@ test('pratica già segnata: la richiesta che arriva dopo si fonde da sola', asyn
 
 test('segno messo dallo script mentre Gestione è aperta: la richiesta ferma si fonde', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await preparaPagina(page);
   const fb = pratica();
   const req = richiesta();
   await apri(page, { fbs: [fb], pending: [req] });
@@ -173,7 +165,6 @@ test('segno messo dallo script mentre Gestione è aperta: la richiesta ferma si 
 
 test('segno rifiutato dal server: l’owner lo legge, il tasto resta spento, niente si fonde', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await preparaPagina(page);
   const fb = pratica();
   await apri(page, { fbs: [fb], pending: [richiesta()], updateReply: { ok: false, error: 'permesso negato' } });
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
@@ -195,7 +186,6 @@ test('segno rifiutato dal server: l’owner lo legge, il tasto resta spento, nie
 
 test('canale muto quando metto il segno: niente fusione e l’owner lo legge', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await preparaPagina(page);
   const fb = pratica();
   await apri(page, { fbs: [fb], pending: [richiesta()] });
   await page.evaluate(() => {
@@ -217,7 +207,6 @@ test('canale muto quando metto il segno: niente fusione e l’owner lo legge', a
 
 test('il segno copre solo il lavoro delle automazioni su QUESTA pratica', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await preparaPagina(page);
   const fb = pratica();
   const altrui = richiesta({ id: 'ff'.repeat(12), feedbackId: 'fb-altra', num: '#702' });
   const locale = richiesta({ id: 'ee'.repeat(12), origin: 'locale', feedbackId: '', num: '' });
@@ -236,7 +225,6 @@ test('il segno copre solo il lavoro delle automazioni su QUESTA pratica', async 
 
 test('fusione non riuscita: togliere e rimettere il segno la ritenta', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await preparaPagina(page);
   const fb = pratica();
   const req = richiesta();
   await apri(page, {
@@ -256,6 +244,8 @@ test('fusione non riuscita: togliere e rimettere il segno la ritenta', async ({ 
   await btn.click();
   await expect(btn).toHaveText('Chiedimi prima di fondere');
 
+  // Quello che l'owner legge non deve fargli credere che il ramo sia partito.
+  await expect(page.locator('#mgManageMsg')).toContainText('ferma');
   // Il ramo è ancora fermo: il secondo tentativo deve esserci.
   await expect.poll(() => approvazioni(page).then((a) => a.length), { timeout: 8000 }).toBe(2);
   await expect(page.locator('#mgManageMsg')).toContainText('su main');
