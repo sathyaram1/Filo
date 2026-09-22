@@ -871,10 +871,7 @@
   let saveTimer = null;
   function saveDebounced() {
     clearTimeout(saveTimer);
-    // Un «Salvato» ancora sullo schermo parla del salvataggio di PRIMA: con una
-    // modifica in attesa mentirebbe, e chi chiude la pagina la perde credendola al sicuro.
-    $('savedHint').classList.remove('sn-show');
-    saveTimer = setTimeout(() => { saveTimer = null; save(); }, 400);
+    saveTimer = setTimeout(save, 400);
   }
 
   // Chiudere la pagina (o cambiare scheda) dentro i 400 ms dell'attesa buttava
