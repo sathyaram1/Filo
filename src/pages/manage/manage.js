@@ -5663,7 +5663,7 @@
     // il filtro, quei numeri non sono più quelli. Si richiude da solo invece di
     // restare lì a dire una cosa che la scheda sopra non dice più.
     const chiave = `${fsRangeKey}|${fsCustom.da}|${fsCustom.a}|${fsCreators.join(',')}`;
-    if (fsDrillChiave !== chiave) { fsDrill = null; fsDrillChiave = chiave; }
+    if (fsDrillChiave !== chiave) { fsDrill = null; fsDrillDaDove = ''; fsDrillChiave = chiave; }
     // Dov'era il fuoco e a che punto era sceso l'elenco: si rimettono dopo.
     const fuoco = fsFuocoOra();
     const scorrimento = mgFsDrillList ? mgFsDrillList.scrollTop : 0;
