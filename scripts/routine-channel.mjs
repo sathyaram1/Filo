@@ -815,12 +815,13 @@ if (isMain) {
   }
   delete data.segnala;
 
-  // `--stop` ferma il lavoro e chiama l'owner: senza segnalazione non saprebbe
-  // cosa decidere. Stessa regola di dispatch --record-fixed --ferma.
+  // `--stop` resta accettato per chi lo scrive ancora, ma non serve: è la
+  // segnalazione che ferma il lavoro, e senza l'owner non saprebbe cosa
+  // decidere. Stessa regola di dispatch --record-fixed --ferma.
   if (data.stop !== undefined) {
     const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
     if (data.stop !== true || !suFixed || !data.segnalazione) {
-      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md>: non ho consegnato niente.');
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (che da sola ferma già il lavoro): non ho consegnato niente.');
       process.exit(1);
     }
   }
