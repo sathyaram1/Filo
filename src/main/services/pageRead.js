@@ -107,7 +107,6 @@ const RUOLO_PANNELLO = /^(tabpanel|region)$/i;
 // altrimenti basta un menu con un link davanti all'esca per farla passare.
 const TAG_TITOLO = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'dt', 'summary', 'legend']);
 
-
 // I nomi dei colori che servono a far sparire del testo. Gli altri non
 // servono: l'esca è bianco su bianco, o nero su nero.
 const NOMI_COLORE = { white: '#ffffff', black: '#000000' };
@@ -304,7 +303,11 @@ function attributi(raw) {
  * loro posto. Fuori diventano contorno, mai cestino: il nome del riquadro non
  * basta a decidere che il dato chiesto non è lì dentro (#553).
  */
-function daScartare(nome, attrs, { inZona = false, primoLivello = false, soloIlleggibile = false, apribile = false, conModale = false } = {}) {
+function daScartare(nome, attrs, opzioni = {}) {
+  const {
+    inZona = false, primoLivello = false, soloIlleggibile = false,
+    apribile = false, conModale = false,
+  } = opzioni;
   if (TAG_ILLEGGIBILI.has(nome)) return 'illeggibile';
   if (nascostoInline(attrs.style)) return 'illeggibile';
   // Piegato: si butta solo se sulla pagina non c'è niente che lo apra.
