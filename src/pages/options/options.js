@@ -325,6 +325,8 @@
     row.appendChild(modelEl);
     row.appendChild(testBtn);
     row.appendChild(status);
+    row._test = defaultModelTests[nick] || null;
+    renderRowTest(row);
     return row;
   }
 
@@ -340,7 +342,13 @@
       if (!res?.ok) {
         statusEl.textContent = I18n.t('options_test_failed', res?.error || '—');
       } else {
-        statusEl.textContent = I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—');
+        row._test = {
+          ttftMs: res.ttftMs ?? null,
+          tokensPerSec: res.tokensPerSec ?? null,
+          at: new Date().toISOString(),
+        };
+        renderRowTest(row);
+        saveDefaultModelTest(nickname, row._test);
       }
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
