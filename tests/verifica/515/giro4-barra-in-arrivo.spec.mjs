@@ -77,12 +77,19 @@ for (const tema of ['light', 'dark']) {
       const visto = testo.map((v, i) => sfondo[i] + alpha * (v - sfondo[i]));
       const a = lum(visto); const b = lum(sfondo);
       const alto = Math.max(a, b); const basso = Math.min(a, b);
-      return Math.round(((alto + 0.05) / (basso + 0.05)) * 100) / 100;
+      const hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+      return {
+        contrasto: Math.round(((alto + 0.05) / (basso + 0.05)) * 100) / 100,
+        testo: hex(visto), sfondo: hex(sfondo), opacita: alpha,
+      };
     });
 
     // 3:1 è il minimo perché un elemento di interfaccia si distingua; il testo
     // normale ne vuole 4,5.
-    expect(contrasto, `la voce "in arrivo" ha un contrasto di ${contrasto}:1 sul tema ${tema}`)
-      .toBeGreaterThanOrEqual(3);
+    expect(
+      misura.contrasto,
+      `la voce "in arrivo" ha un contrasto di ${misura.contrasto}:1 sul tema ${tema}`
+        + ` (${misura.testo} su ${misura.sfondo}, opacità ${misura.opacita})`,
+    ).toBeGreaterThanOrEqual(3);
   });
 }
