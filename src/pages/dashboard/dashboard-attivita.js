@@ -1020,6 +1020,7 @@
         btn.disabled = true;
         btn.textContent = '📅 Aggiungo…';
         const r = await send({ type: MSG.CALENDAR_ADD, evento: ev });
+        if (r && r.ok) segnaCompiuta(a, activity, '📅', `Evento aggiunto al calendario · ${ev.titolo || ''}${ev.quando ? ` · ${ev.quando}` : ''}`);
         if (r && r.ok && r.aperto) {
           btn.textContent = '✓ Aperto nel calendario';
           // Riapribile: chi chiude per sbaglio la finestra del calendario deve
