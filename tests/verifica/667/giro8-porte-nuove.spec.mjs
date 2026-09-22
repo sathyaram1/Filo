@@ -41,12 +41,12 @@ test('il volume rialzato a parole resta, anche se la manopola del volume è l’
   // suggerisce a chi ha il timer muto.
   await daFuori(shell, 'volume_suoneria', 100);
   await expect.poll(async () => (await salvate(prefs)).timerRingtoneVolume, { timeout: 8_000 }).toBe(100);
-  await expect(prefs.locator('#timerRingtoneVolume'), 'la manopola mostra il volume vero').toHaveValue('100', { timeout: 8_000 });
 
   // Torna in Preferenze e cambia il motivo della suoneria.
   await prefs.selectOption('#timerRingtone', 'chime');
   await expect.poll(async () => (await salvate(prefs)).timerRingtone, { timeout: 8_000 }).toBe('chime');
   expect((await salvate(prefs)).timerRingtoneVolume, 'il volume chiesto a Filo resta quello').toBe(100);
+  await expect(prefs.locator('#timerRingtoneVolume'), 'e la manopola mostra il volume vero').toHaveValue('100');
 });
 
 test('una protezione riaccesa a parole non si rispegne, nemmeno se è l’interruttore toccato per ultimo', async ({ openTab }) => {
