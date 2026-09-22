@@ -396,6 +396,11 @@
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_COSTS });
       const eur = r?.monthly?.totalEur || 0;
       $('spentBox').textContent = `€${eur.toFixed(4)}`;
+      // La spesa fatta con la chiave dell'utente non entra nel tetto: se
+      // sparisse anche da qui, quei soldi non li vedrebbe più nessuno.
+      const propri = r?.monthly?.proprieEur || 0;
+      $('spentOwnBox').textContent = propri > 0 ? I18n.t('options_spent_own_key', propri.toFixed(4)) : '';
+      $('spentOwnBox').hidden = !(propri > 0);
     } catch (_) {}
 
     // Combobox modelli: prima semina con gli id già nel registry (così il valore
