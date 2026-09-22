@@ -39,16 +39,18 @@
 
   // Dato un URL (gia' HTML-escapato: & e' &amp;, ecc.), ritorna l'URL se e' un
   // link esterno SICURO da rendere cliccabile, altrimenti null. Solo schema
-  // esplicito http/https/mailto: niente filo://, javascript:, data:, file:,
-  // niente link relativi o protocol-relative (che punterebbero alle pagine
-  // interne dell'app).
+  // esplicito http/https: niente filo://, javascript:, data:, file:, niente
+  // link relativi o protocol-relative (che punterebbero alle pagine interne
+  // dell'app). Fuori anche mailto: il motore non lo sa valutare, e consegnarlo
+  // al programma di posta gia' compilato da chi ha scritto la pagina che Filo
+  // aveva letto e' una via d'uscita (#533, nono giro di verifica).
   function safeLinkUrl(rawUrl) {
     const u = String(rawUrl || '').trim();
     if (!u) return null;
     const m = /^([a-z][a-z0-9+.-]*):/i.exec(u);
     if (!m) return null; // nessuno schema -> relativo -> possibile pagina interna
     const scheme = m[1].toLowerCase();
-    if (scheme === 'http' || scheme === 'https' || scheme === 'mailto') return u;
+    if (scheme === 'http' || scheme === 'https') return u;
     return null;
   }
 
@@ -57,8 +59,9 @@
     // La scritta la sceglie il modello, l'indirizzo pure, e i due non sono
     // legati da niente: dove porta si deve poter leggere PRIMA di premere, come
     // per i bottoni della schermata iniziale (#533, settimo giro di verifica).
-    return '<a class="' + LINK_CLASS + '" href="' + url + '" target="_blank" '
-      + 'title="' + url + '" rel="noopener noreferrer nofollow">' + text + '</a>';
+    // Niente `href`: l'apertura la fa SEMPRE bindLinks, che passa dal motore.
+    return '<a class="' + LINK_CLASS + '" data-url="' + url + '" role="link" tabindex="0" '
+      + 'title="' + url + '">' + text + '</a>';
   }
 
   // Formattazione inline su testo GIA' escapato: codice, link markdown, autolink
