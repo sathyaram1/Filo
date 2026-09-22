@@ -352,7 +352,7 @@ test('senza una finestra che la vede, la scadenza se ne fa aprire una', async ({
 // Garantire una finestra mentre qualcosa suona non deve impedire di uscire: chi
 // chiede di chiudere Filo con un timer che squilla se lo vedrebbe riaprire da
 // solo, e l'uscita non finirebbe mai.
-test('con la suoneria in corso, Filo si chiude lo stesso', async ({ app, shell }) => {
+test('chiuso Filo con la suoneria in corso, nessuna finestra torna su', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
 
@@ -361,10 +361,15 @@ test('con la suoneria in corso, Filo si chiude lo stesso', async ({ app, shell }
   await expect(shell.locator('#ring-indicator')).toBeVisible({ timeout: 15_000 });
   expect(await shell.evaluate(() => window.SN_SOUNDS.isRinging())).toBe(true);
 
-  // Nessuna scorciatoia: se l'uscita non arriva, questa attesa scade.
-  const uscito = await Promise.race([
-    app.close().then(() => true),
-    new Promise((r) => setTimeout(() => r(false), 20_000)),
-  ]);
-  expect(uscito, 'la chiusura non deve restare appesa a una finestra riaperta').toBe(true);
+  // L'uscita è cominciata (è il momento in cui Electron avvisa) e le finestre
+  // sono andate: da qui in poi la scadenza che suona non deve riaprirne una.
+  const rimaste = await app.evaluate(async ({ app: elettron, BrowserWindow }) => {
+    elettron.emit('before-quit', { preventDefault() {} });
+    for (const w of BrowserWindow.getAllWindows()) { try { w.destroy(); } catch (_) {} }
+    // Il watcher passa ogni pochi secondi: qui lo si fa passare adesso, più
+    // volte, invece di sperare che capiti dentro la finestra di tempo giusta.
+    for (let i = 0; i < 3; i++) await globalThis.__filoAlarmWatcher._tick();
+    return BrowserWindow.getAllWindows().length;
+  });
+  expect(rimaste, 'chiudere Filo non deve farlo riaprire da solo').toBe(0);
 });
