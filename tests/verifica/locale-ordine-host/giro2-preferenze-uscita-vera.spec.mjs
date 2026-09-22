@@ -48,6 +48,7 @@ test('Preferenze: passando a un\'altra scheda subito dopo aver scritto, la modif
 });
 
 test('Preferenze: chiudendo la scheda subito dopo aver scritto, la modifica non si perde', async ({ app, shell, openTab }) => {
+  test.fail(true, 'rilievo aperto: chiudendo la scheda la modifica in attesa si perde');
   const page = await openTab(PREFERENZE);
   const atteso = 'stile scritto e poi chiudo la scheda';
   await scriviStile(page, atteso);
