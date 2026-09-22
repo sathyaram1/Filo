@@ -345,6 +345,11 @@ function passaggio(html, modo, dentroZona = false) {
   const zone = []; // pila delle zone di contenuto (article/main) ancora aperte
   const contorno = []; // pila dei blocchi di contorno che finiscono in coda
   const pila = [];
+  // Dove sta, nella pila, ogni nome ancora aperto. Cercare a ritroso dentro la
+  // pila costava quanto la pila è alta, a ogni chiusura: una fila di aperture
+  // e una di chiusure che non si corrispondono faceva crescere il tempo col
+  // QUADRATO della pagina, e la lettura gira nel processo delle finestre (#553).
+  const dove = new Map();
   const pezzi = [];
   const pezziCornice = [];
   let i = 0;
