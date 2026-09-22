@@ -128,6 +128,21 @@ test('il segno non copre il lavoro locale, i blocchi nuovi dopo un riallineament
   expect(await approvazioni(page)).toEqual(['senza000000000000000000c']);
 });
 
+test('un segno respinto si vede anche se intanto hai aperto un’altra pratica', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const prima = pratica();
+  const altra = pratica({ _id: 'fb-altra', seq: 582 });
+  await apri(page, [prima, altra], { updateReply: { ok: false, error: 'firestore update fallito (403): PERMISSION_DENIED' } });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), prima._id);
+  // Il click e subito l'altra pratica: la risposta arriva a scheda cambiata.
+  await page.locator('#mgPreapproveBtn').click();
+  await page.evaluate((id) => window.__mgTest.openDetail(id), altra._id);
+
+  await expect(page.locator('#mgManageMsg')).toContainText('Segno non messo (#581): firestore update fallito (403)');
+  await expect(page.locator('#mgManageMsg')).toHaveClass(/mg-err/);
+  await expect(page.locator('.mg-item .mg-preapproved')).toHaveCount(0);
+});
+
 test('se il server non fonde, la pagina lo dice e non ritenta da sola', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fb = pratica();
