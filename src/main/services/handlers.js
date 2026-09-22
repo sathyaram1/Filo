@@ -1127,29 +1127,48 @@ async function navExfilCorpus() {
   } catch (_) { return ''; }
 }
 
-// Una domanda di ricerca ESCE dal computer prima di riportare indietro
-// qualcosa: se porta con sé roba dell'utente (memoria, appunti, un documento
-// letto nello stesso turno) non parte da sola (#533, ottavo giro di verifica).
+// Quello che sta per USCIRE dal computer — l'indirizzo di una pagina che si
+// apre, la domanda di una ricerca — si porta dietro roba dell'utente? Una
+// regola sola per tutte le strade che escono: la memoria e gli appunti, PIÙ
+// quello che QUESTA richiesta ha appena letto dal disco (#533, nono giro di
+// verifica: la ricerca guardava anche quello, aprire una pagina no).
+// `soloForte` tiene solo il token lungo o con cifre: in un indirizzo due parole
+// tue sono già strane, in una domanda di ricerca sono normali. Sul materiale
+// appena letto vale sempre la regola stretta, perché è testo intero e le parole
+// in comune con un indirizzo legittimo sono la norma.
+async function portaFuoriRobaTua(testo, task, { soloForte = false, fromUntrusted = false } = {}) {
+  try {
+    const Exfil = globalThis.SN_URL_EXFIL;
+    const s = String(testo || '').trim();
+    if (!Exfil || !s) return null;
+    const memoria = await navExfilCorpus();
+    if (memoria) {
+      const v = soloForte
+        ? Exfil.taint(s, memoria, { soloForte: true })
+        : (() => { const a = Exfil.assess(s, { corpus: memoria, fromUntrusted }); return a.exfil ? { reason: a.reason } : null; })();
+      if (v) return v;
+    } else if (!soloForte && fromUntrusted) {
+      const a = Exfil.assess(s, { corpus: '', fromUntrusted });
+      if (a.exfil) return { reason: a.reason };
+    }
+    const Compiti = globalThis.SN_COMPITI;
+    if (!Compiti || !task || !task.contaminato) return null;
+    const privato = Compiti.materialePrivato(task);
+    return privato ? Exfil.taint(s, privato, { soloForte: true }) : null;
+  } catch (_) { return null; }
+}
+
 // Regola unica per le due strade che cercano: l'azione della chat e il
 // messaggio dell'assistente dentro le pagine.
 async function ricercaPortaFuori(query, task) {
-  try {
-    const Exfil = globalThis.SN_URL_EXFIL;
-    const q = String(query || '').trim();
-    if (!Exfil || !q) return null;
-    // Solo da una richiesta che ha letto roba scritta da altri: se nessuno le
-    // ha ancora parlato, la domanda è quella dell'utente e chiedergli conferma
-    // dei suoi stessi dati è solo un fastidio. Di un compito che non si
-    // conosce si pensa il peggio, come per le conversazioni riprese.
-    if (task && !task.contaminato) return null;
-    const Compiti = globalThis.SN_COMPITI;
-    const privato = (Compiti && task) ? Compiti.materialePrivato(task) : '';
-    const corpus = [await navExfilCorpus(), privato].filter(Boolean).join('\n');
-    if (!corpus) return null;
-    // `soloForte`: in un indirizzo due parole tue sono già strane, in una
-    // domanda di ricerca sono normali.
-    return Exfil.taint(`https://ricerca.invalid/?q=${encodeURIComponent(q)}`, corpus, { soloForte: true });
-  } catch (_) { return null; }
+  const q = String(query || '').trim();
+  if (!q) return null;
+  // Solo da una richiesta che ha letto roba scritta da altri: se nessuno le ha
+  // ancora parlato, la domanda è quella dell'utente e chiedergli conferma dei
+  // suoi stessi dati è solo un fastidio. Di un compito che non si conosce si
+  // pensa il peggio, come per le conversazioni riprese.
+  if (task && !task.contaminato) return null;
+  return portaFuoriRobaTua(`https://ricerca.invalid/?q=${encodeURIComponent(q)}`, task, { soloForte: true });
 }
 
 // ── Difesa in profondità sulle azioni confermate (#250) ─────────────────────
