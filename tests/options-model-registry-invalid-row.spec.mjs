@@ -18,6 +18,10 @@
 //   3. Una riga valida (nickname compilato, non duplicato) continua a
 //      salvare normalmente: la conferma resta "Salvato" senza avviso e la
 //      riga non viene marcata come non valida.
+//   4. La conferma parla dell'ULTIMA modifica: appena ne arriva un'altra
+//      sparisce, e torna solo quando anche quella è nello storage. Senza il
+//      fix restava in vista mentre una modifica era ancora in attesa, e chi
+//      chiudeva la pagina in quel momento la perdeva credendola salvata.
 
 import { test, expect } from './fixtures/electron.mjs';
 
