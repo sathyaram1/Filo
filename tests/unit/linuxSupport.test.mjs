@@ -185,6 +185,17 @@ test('il lanciatore spegne la gabbia solo dove questo sistema la nega', { skip: 
     negata
       ? 'qui il kernel nega gli spazi dei nomi e il lanciatore non spegne la gabbia: Filo non si aprirebbe'
       : 'qui il kernel concede gli spazi dei nomi e il lanciatore spegne la gabbia lo stesso: difesa buttata via');
+
+  // La voce di menu del pacchetto chiede `--no-sandbox` sempre, senza guardare
+  // niente: chi ha integrato Filo fra le applicazioni passa di lì. Se quella
+  // richiesta arrivasse fino a Chromium, su ogni Linux che la gabbia la concede
+  // Filo navigherebbe scoperto. La decisione sta in un posto solo.
+  const daMenu = String(execFileSync(join(dove, 'filo'), ['--no-sandbox', 'ciao'], { encoding: 'utf8' })).trim();
+  assert.ok(daMenu.includes('ciao'), 'il lanciatore perde gli argomenti quando gli arriva anche --no-sandbox');
+  assert.equal(daMenu.includes('--no-sandbox'), negata,
+    negata
+      ? 'aperto dal menu delle applicazioni Filo non parte: la gabbia va spenta anche di lì'
+      : 'aperto dal menu delle applicazioni Filo naviga senza gabbia su una macchina che la concede');
 });
 
 test('il pacchetto costruito, se c\'è, ha il lanciatore al posto giusto', () => {
