@@ -240,7 +240,10 @@ const chromeShim = {
           };
           const offError = (_e, data) => {
             cleanup();
-            if (onMessage) onMessage({ type: 'error', message: data.message, code: data.code });
+            // Tutto quello che il main ha detto sull'errore, non i due campi
+            // che servivano ieri: chi mostra l'errore ne ha bisogno per
+            // ricomporre la frase già scritta per l'utente (#663).
+            if (onMessage) onMessage({ type: 'error', ...data });
             if (onDisconnect) onDisconnect();
           };
           const cleanup = () => {
