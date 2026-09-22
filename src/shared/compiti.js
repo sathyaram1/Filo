@@ -365,6 +365,22 @@
     return Array.isArray(c && c.indirizzi) ? c.indirizzi.includes(n) : false;
   }
 
+  // La roba dell'utente che il compito ha tirato dentro leggendo. Serve a
+  // riconoscerla se prova a uscire dentro qualcosa che il modello compone
+  // dopo, per esempio la domanda di una ricerca (#533, ottavo giro di
+  // verifica). Vive solo in memoria, col compito: non entra nel riassunto e
+  // quindi non finisce né su disco né nella pagina Sicurezza.
+  const MAX_PRIVATO = 20000;
+  function registraTestoPrivato(c, testo) {
+    if (!c) return;
+    const t = String(testo == null ? '' : testo);
+    if (!t) return;
+    c.privato = `${String(c.privato || '')}\n${t}`.slice(-MAX_PRIVATO);
+  }
+  function materialePrivato(c) {
+    return String((c && c.privato) || '');
+  }
+
   function registraAzione(c, { type, esito, uscita, azione } = {}) {
     scrivi(c, { tipo: 'azione', azione: normType(type), esito: String(esito || ''), uscita: uscita || uscitaDi(type, azione) });
   }
