@@ -218,8 +218,14 @@
     const sblk = sec.siteBlock || {};
     metti('sec-siteblock', (el) => { el.checked = sblk.enabled !== false; });
     metti('sec-siteblock-lists', (el) => { el.checked = sblk.useAdblockLists !== false; });
+    // L'elenco salvato scarta le righe non valide: riscriverlo sopra a quello
+    // digitato cancellerebbe la riga sbagliata insieme all'avviso che la
+    // nomina. Si riscrive solo se il salvataggio dice qualcosa di diverso da
+    // quello che c'è già scritto, una volta normalizzato.
     metti('sec-siteblock-blacklist', (el) => {
-      el.value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+      const salvato = Array.isArray(sblk.blacklist) ? sblk.blacklist : [];
+      if (parseBlacklist(el.value).valid.join('\n') === salvato.join('\n')) return;
+      el.value = salvato.join('\n');
     });
     // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
     // subito che non bloccheranno nulla invece di lasciarle passare mute.
