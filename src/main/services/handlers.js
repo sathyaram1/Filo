@@ -1411,14 +1411,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // strada che un'istruzione ostile vorrebbe farle prendere.
   // L'azione viaggia col verdetto: per IMPOSTA_PREFERENZA la famiglia dipende
   // da QUALE preferenza sta per scrivere (#533, quinto giro di verifica).
-  const verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type, action) : { ok: true };
-  // Un'azione che parte da un CLIC dell'utente su qualcosa che Filo ha scritto:
-  // non si rifiuta in silenzio (l'utente l'ha appena premuta) e non si esegue
-  // in silenzio (a scegliere la destinazione è stato il modello). Si chiede,
-  // mostrando dove si va a finire (#533, settimo giro di verifica). Il segno
-  // vale solo dai mittenti fidati: da una pagina web è un modo di saltare il
-  // rifiuto.
+  let verdettoPerimetro = (Compiti && task) ? Compiti.consentito(task, type, action) : { ok: true };
+  // Un CLIC dell'utente su un collegamento che Filo ha scritto. Non è il
+  // modello che agisce, quindi non si rifiuta in silenzio; ma la scritta e
+  // l'indirizzo li ha scelti lui dopo aver letto, quindi non si apre nemmeno
+  // in silenzio. La riga di mezzo: dove Filo è stato davvero (i risultati
+  // della ricerca, le pagine che ha aperto) si va senza chiedere; altrove si
+  // chiede, mostrando l'indirizzo intero (#533, settimo giro di verifica). Il
+  // segno lo mette il main: da una pagina web questo messaggio non arriva.
   const daClic = !!(action && action._daClic) && mittenteFidato(sender);
+  if (daClic && !verdettoPerimetro.ok && !verdettoPerimetro.secco) {
+    const meta = Compiti.indirizzoNoto(task, action.url || action.href || action.link);
+    if (meta) verdettoPerimetro = { ok: true, classe: 'uscita', uscita: verdettoPerimetro.uscita, daClic: true };
+  }
   // `secco` è il rifiuto che non conosce permessi: vale anche dove a chiedere
   // per conto del modello sarebbe il motore (#533, quarto giro di verifica).
   if (!verdettoPerimetro.ok && !(daClic && !verdettoPerimetro.secco)
