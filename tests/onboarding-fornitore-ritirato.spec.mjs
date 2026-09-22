@@ -324,3 +324,82 @@ test('l’invitato che accende «solo modelli a pesi aperti»: la home lo dice s
 
   await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
 });
+
+// ── Quello che l'utente nuovo vede per primo ────────────────────────────────
+//
+// La home che spiega perché Filo tace è la PRIMA schermata di chi installa
+// Filo adesso: il messaggio non deve rimandare a cose che non ci sono, e il
+// suggerimento che lo accompagna è il primo elemento che quell'utente deve
+// cliccare. Senza il fix il primo test è rosso (il messaggio promette pagine
+// salvate che non esistono) e il secondo pure (il suggerimento nasce con una
+// lettera al posto dell'icona).
+
+test('senza pagine salvate la home non promette pagine salvate', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configCondivisa(app, { provider: 'openrouter', models: {} });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  const messaggio = page.locator('#homeMessage');
+  await expect(messaggio).toContainText(/nessun modello/i, { timeout: 15_000 });
+  await expect(messaggio).not.toContainText(/pagine salvate/i);
+});
+
+test('il suggerimento in cima alla home ha la sua icona, non una lettera', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configCondivisa(app, { provider: 'openrouter', models: {} });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  const primo = page.locator('#suggestions .dash-suggestion').first();
+  await expect(primo).toContainText(/Opzioni/, { timeout: 15_000 });
+  await expect(primo.locator('.dash-sug-icon svg')).toHaveCount(1);
+  await expect(primo.locator('.dash-sug-icon')).toHaveText('');
+});
+
+// Chiedere è la strada gemella di leggere il messaggio: chi scrive nella barra
+// invece di leggere sopra deve ricevere la stessa spiegazione, e il modo di
+// toglierla di mezzo. Senza il fix la bolla dice «Qualcosa è andato storto.
+// Riprova.» e accanto ha solo un «Riprova» che non potrà mai funzionare.
+test('chiesto qualcosa con «solo modelli a pesi aperti» che esclude tutto: la chat spiega e offre le Opzioni', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  const azioni = await page.evaluate(() => {
+    const A = window.SN_CONST.ACTIONS;
+    return { chat: A.FILO_CHAT, home: A.FILO_DASHBOARD };
+  });
+  await app.evaluate(async (_e, a) => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { [a.chat]: 'chiuso', [a.home]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
+  }, azioni);
+  await accoglienzaGiaFatta(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+
+  await page.fill('#input', 'ciao');
+  await page.press('#input', 'Enter');
+
+  const bolla = page.locator('.dash-bubble-filo').last();
+  await expect(bolla).toContainText(/pesi aperti/i, { timeout: 30_000 });
+  await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
+  await expect(bolla.locator('.dash-action-btn', { hasText: 'Apri Opzioni' })).toHaveCount(1);
+});
