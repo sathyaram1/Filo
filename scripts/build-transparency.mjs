@@ -405,13 +405,22 @@ ${UI_RUNTIME}
 `;
 }
 
-function emitSitePage(doc, { docs, glossary }, css) {
-  const navHtml = NAV.map((n) => {
-    const has = docs.some((d) => d.id === n.id);
-    if (!has) return `<span class="sn-nav-item is-soon" title="in arrivo">${n.label}</span>`;
-    const active = n.id === doc.id ? ' is-active' : '';
-    return `<a class="sn-nav-item${active}" href="./${n.id}.html">${n.label}</a>`;
+// La barra: una VOCE PER OGNI area, anche quelle senza documento. Anche lì si
+// clicca, e si finisce su una pagina che dice che la sezione non è scritta e
+// dove andare invece. Un elemento spento che al clic non fa niente non è
+// un'informazione, è un vicolo cieco (#515).
+function navSito(voceAttiva, docs) {
+  return buildNav(docs).map((n) => {
+    const scritto = docs.some((d) => d.id === n.id);
+    const active = n.id === voceAttiva ? ' is-active' : '';
+    const soon = scritto ? '' : ' is-soon';
+    const etichetta = scritto ? '' : ` title="in arrivo" aria-label="${escapeHtml(n.label)}: non ancora scritta"`;
+    return `<a class="sn-nav-item${active}${soon}" href="./${n.id}.html"${etichetta}>${n.label}</a>`;
   }).join('\n      ');
+}
+
+function emitSitePage(doc, { docs, glossary }, css) {
+  const navHtml = navSito(doc.id, docs);
 
   return `<!DOCTYPE html>
 <html lang="it">
