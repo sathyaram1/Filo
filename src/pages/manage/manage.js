@@ -5712,7 +5712,7 @@
         fsApriSegnalazione(apri.dataset.fsOpen);
         return;
       }
-      if (e.target.closest('#mgFsDrillClose')) { fsDrill = null; renderFsDrill(); return; }
+      if (e.target.closest('#mgFsDrillClose')) { fsChiudiDrill(); return; }
 
       const tile = e.target.closest('[data-fs-tile]');
       if (tile) {
