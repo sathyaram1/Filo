@@ -65,17 +65,31 @@
     return TRANSIENT_NETWORK_RE.test(messageOf(e));
   }
 
+  // I codici il cui messaggio è GIÀ scritto per l'utente e dice dove si
+  // rimedia: passano invariati. La lista sta qui una volta sola e una
+  // sentinella la confronta con gli errori che il main solleva, perché un
+  // codice nuovo dimenticato qui diventa «qualcosa è andato storto» (#663).
+  const CODICI_GIA_SCRITTI = [
+    'NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
+    'FEEDBACK_READ_DENIED',
+  ];
+
+  // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
+  // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
+  // qualcosa), quindi accanto ci va il collegamento al posto giusto.
+  const RIMEDIO = {
+    NO_API_KEY: 'crediti',
+    NO_MODEL_FOR_ACTION: 'opzioni',
+    NO_OPEN_WEIGHTS_MODEL: 'opzioni',
+  };
+  function rimedio(code) { return RIMEDIO[String(code || '')] || ''; }
+
   // Errore → proposizione per l'utente. Mai un codice HTTP nudo, mai un nome di
-  // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED,
-  // NO_MODEL_FOR_ACTION) portano già un messaggio i18n scritto per l'utente —
-  // dicono anche dove si rimedia — e passano invariati.
+  // endpoint.
   function friendly(e, opts) {
     const o = opts || {};
     const raw = String((e && e.message) || (typeof e === 'string' ? e : ''));
-    // FEEDBACK_READ_DENIED (#583): i feedback li legge solo chi li gestisce.
-    // Non è un guasto e riprovare non serve: la frase dice cosa manca.
-    if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED'
-      || e.code === 'NO_MODEL_FOR_ACTION' || e.code === 'FEEDBACK_READ_DENIED')) return raw;
+    if (e && CODICI_GIA_SCRITTI.includes(e.code)) return raw;
 
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
