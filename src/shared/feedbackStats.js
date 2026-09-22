@@ -778,8 +778,9 @@
       if (!d2) {
         // Il registro lo cita ma la lista non ce l'ha: si conta lo stesso fra
         // i lavorati (il lavoro è successo), in una voce che lo dice.
-        if (!statiLavorati.__assente) statiLavorati.__assente = { key: '__assente', label: 'Non in questa lista', n: 0, ids: [] };
+        if (!statiLavorati.__assente) statiLavorati.__assente = { key: '__assente', label: 'Non in questa lista', n: 0, ids: [], mancanti: [] };
         statiLavorati.__assente.n += 1;
+        statiLavorati.__assente.mancanti.push(numeriLavorati[i]);
         continue;
       }
       var cat2 = categoriaDi(d2);
