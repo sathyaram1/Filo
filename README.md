@@ -126,7 +126,7 @@ main. Così le pagine girano quasi invariate.
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~390 spec, ~1.600 casi): non si lancia a mano, gira in GitHub prima di pubblicare
+npm test               # suite Playwright completa (~350 spec, ~1.450 casi): non si lancia a mano, gira in GitHub prima di pubblicare
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 

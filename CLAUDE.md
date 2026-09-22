@@ -345,11 +345,14 @@ a cartella piena — la stessa che dà una cartella che non c'è. Prima di
 concludere che non c'era niente da rilanciare, guarda la cartella. La
 suite completa non le raccoglie (quelle di un solo feedback costano otto
 minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte. In quella cartella ci
-vanno **davvero**: una prova di giro lasciata nella radice di `tests/` entra
-nella suite per sempre, e ogni spec riapre Filo — sessantadue erano già
-entrate così. La sentinella `tests/unit/proveDeiGiri.test.mjs` diventa rossa
-finché non è al suo posto, e tiene anche il resto di quella cartella (nessun
-byte NUL crudo nei sorgenti, ogni import relativo che risolve).
+vanno **davvero**, e in una che porta il numero: una prova di giro lasciata
+nella radice di `tests/` entra nella suite per sempre, e ogni spec riapre Filo
+— sessantadue erano già entrate così. Quello che sta nella suite deve poter
+diventare rosso e non deve dichiararsi di passaggio: la sentinella
+`tests/unit/proveDeiGiri.test.mjs` lo guarda nel CONTENUTO, non nel nome del
+file (il nome è l'unica cosa che chi scrive può sbagliare), e tiene anche il
+resto di quella cartella (nessun byte NUL crudo nei sorgenti, ogni import
+relativo che risolve).
 
 Com'è fatto un test che vale: asserisce il **successo dal punto di vista
 dell'utente** (l'immagine arriva al destinatario), non l'assenza di un errore
@@ -414,7 +417,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~390 spec, ~1.600 casi): NON si lancia a mano, da nessuna parte.
+npm test                   # SUITE COMPLETA (~350 spec, ~1.450 casi): NON si lancia a mano, da nessuna parte.
                            # Gira solo in GitHub, nel lavoro di release, ogni sei ore prima di pubblicare (vedi § Verifica).
                            # Sulla macchina dell'owner durerebbe ~7 ore con un solo worker.
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
