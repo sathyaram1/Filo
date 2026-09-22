@@ -117,7 +117,9 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const url = String((msg && msg.url) || '').trim();
     if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'non è un indirizzo web' };
-    const compito = (msg && msg.compito) ? await compitoPrecedenteDi(msg.compito) : null;
+    // Senza un nome di richiesta non si sa cosa quella risposta avesse letto:
+    // `compitoPrecedenteDi` risponde col caso peggiore, e si chiede.
+    const compito = await compitoPrecedenteDi(String((msg && msg.compito) || 'collegamento-senza-richiesta'));
     const azione = { type: 'NAVIGA', url, _daClic: true };
     const r = await executeFiloAction(azione, { sender, compito, confirmed: !!(msg && msg.conferma) });
     if (r && r.needsConfirm) return { ok: true, chiede: true, testo: r.describe || '' };
