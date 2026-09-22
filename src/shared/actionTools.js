@@ -206,6 +206,9 @@
         + '• ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n'
         + `• modalita_terminale: true | false [conferma] ; shell_terminale: ${sistemaInfo(sistema).shellPref} [conferma]\n`
         + '• velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n'
+        + '• voce: nome esatto della voce di sistema ; voce_modello: nome della voce naturale ("Sara") o "automatica"\n'
+        + '• suoneria_timer: "standard" | "delicata" | "urgente" | "carillon" (motivo di timer e sveglie) ; volume_suoneria: numero 0-100 (0 = muta)\n'
+        + '• suono_notifiche: true | false ; tono_notifiche: come suoneria_timer ; volume_notifiche: numero 0-100\n'
         + '• protezione_ip: true | false [conferma] (anti-leak WebRTC)\n'
         + '• blocco_popup: true | false [conferma]\n'
         + '• navigazione_sicura: true | false [conferma] (rilevamento siti pericolosi)\n'
