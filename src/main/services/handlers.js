@@ -1436,7 +1436,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
   // il modello, quindi non si rifiuta in silenzio; ma l'indirizzo l'ha scelto
   // lui dopo aver letto, quindi dove Filo non è mai stato si chiede prima
   // (#533, settimo giro di verifica). Il segno lo mette il main.
-  const daClic = !!(action && action._daClic) && mittenteFidato(sender);
+  // `clicFidato` lo passa il main dal suo canale dei clic: una pagina web non
+  // può metterlo, mentre `_daClic` dentro l'azione sì (FILO_RUN_ACTION passa
+  // l'azione così com'è), e da lì vale solo per i mittenti fidati.
+  const daClic = clicFidato === true || (!!(action && action._daClic) && mittenteFidato(sender));
   if (daClic && !verdettoPerimetro.ok && !verdettoPerimetro.secco
       && Compiti.indirizzoNoto(task, action.url || action.href || action.link)) {
     verdettoPerimetro = { ok: true, classe: 'uscita', uscita: verdettoPerimetro.uscita, daClic: true };
