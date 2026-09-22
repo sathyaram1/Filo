@@ -221,6 +221,8 @@
           stopWatchingNewContent();
           newContentSeen = false;
           hiddenSkipped = [];
+          revealedDirty = true;
+          revealedAnswer = false;
         }
       }
     }
@@ -237,6 +239,7 @@
     // Anche i riquadri riempiti dalla pagina stessa sono alberi a parte (#407).
     addWatchRoots(blocks.frameDocs);
     hiddenSkipped = blocks.hidden || [];
+    revealedDirty = true;
     // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
     // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
     const unreachable = Number(blocks.unreachable || 0);
@@ -910,6 +913,8 @@
     stopWatchingNewContent();
     newContentSeen = false;
     hiddenSkipped = [];
+    revealedDirty = true;
+    revealedAnswer = false;
     // Il lavoro ancora in volo smette di essere quello buono: quando le
     // risposte arriveranno si butteranno via da sole, invece di ritradurre a
     // metà una pagina che l'utente ha appena riportato indietro.
