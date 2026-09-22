@@ -19,6 +19,7 @@ import { createRequire } from 'node:module';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const require_ = createRequire(join(REPO, 'package.json'));
+require_(join(REPO, 'src/main/services/safebrowse/index.js')); // la domanda «è rete di casa?» vive qui
 require_(join(REPO, 'src/shared/tabTriage.js'));
 const T = globalThis.SN_TAB_TRIAGE;
 const GB = require_(join(REPO, 'src/main/services/geoBlockClassifier.js'));

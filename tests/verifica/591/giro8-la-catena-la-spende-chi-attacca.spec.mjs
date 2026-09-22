@@ -12,6 +12,11 @@
 // È la terza strada del terzo e del quarto giro (chi attacca spegne il
 // controllo del sito di un altro) rientrata dalla porta aperta dal freno nuovo.
 //
+// Quello che la pagina dove l'utente RESTA deve ottenere: o il controllo parte
+// subito, o la rinuncia si dichiara (`rimandato`) e la scheda, che si accorge
+// di essere ancora lì, lo riottiene insistendo (`insistito`). Quello che non
+// deve succedere è che si perda in silenzio.
+//
 // Logica pura: le chiamate di rete e al modello sono finte.
 
 import { test, expect } from '@playwright/test';
@@ -55,20 +60,24 @@ test('la truffa a cui la pagina ostile porta non riceve né giudizio né finestr
   const llmPrima = b.llm.length;
   const sandboxPrima = b.sandbox.length;
   // Adesso l'utente viene portato sulla truffa vera, nella stessa catena.
-  const verdetto = SB.analyze('http://paypa1-verifica-conto.com/login', { hasPassword: true, catena: CATENA });
+  const TRUFFA = 'http://paypa1-verifica-conto.com/login';
+  const verdetto = SB.analyze(TRUFFA, { hasPassword: true, catena: CATENA });
+  await attendi(300);
+  expect(
+    !!verdetto.rimandato,
+    'una verifica che non parte deve dichiararsi rimandata: altrimenti nessuno la riprende',
+  ).toBe(true);
+  // La scheda è rimasta lì e insiste.
+  SB.analyze(TRUFFA, { hasPassword: true, catena: CATENA, insistito: true });
   await attendi(300);
   expect(
     b.llm.length - llmPrima,
-    'la truffa a cui la pagina ostile porta deve ricevere il giudizio del modello',
+    'la truffa dove l\'utente è rimasto deve ricevere il giudizio del modello',
   ).toBe(1);
   expect(
     b.sandbox.length - sandboxPrima,
     'e deve ricevere anche la finestra nascosta',
   ).toBe(1);
-  expect(
-    !!verdetto.rimandato,
-    'se la verifica si rinuncia, qualcuno deve riprovarla: altrimenti la pagina resta senza controllo',
-  ).toBe(true);
 });
 
 test('caso di riscontro: fuori dalla catena della pagina ostile il controllo parte', async () => {
@@ -90,17 +99,30 @@ test('la pagina ostile spegne anche l\'elenco dei siti di truffa, e senza mostra
   const b = bancoSafebrowse();
   // Indirizzi qualunque, che il controllo locale non trova sospetti: l'utente
   // non vede nessun avviso mentre la catena si svuota.
+  // Il passo sta sotto il conto comune di proposito: a svuotare la catena
+  // devono essere le navigazioni, non la raffica di pochi secondi.
   for (let i = 0; i < 30; i += 1) {
     SB.analyze(`http://pagina-${i}-esempio.com/x`, { catena: CATENA });
-    await attendi(60);
+    await attendi(450);
   }
   await attendi(300);
   const gsbPrima = b.gsb.length;
-  SB.analyze('http://banca-sicura-login.com/accesso', { hasPassword: true, catena: CATENA });
+  const TRUFFA = 'http://banca-sicura-login.com/accesso';
+  const verdetto = SB.analyze(TRUFFA, { hasPassword: true, catena: CATENA });
+  await attendi(300);
+  expect(
+    !!verdetto.rimandato,
+    'la rinuncia va dichiarata, così la scheda la riprende',
+  ).toBe(true);
+  // La scheda riprova finché l'utente è rimasto lì: la prima insistenza cade
+  // ancora dentro la finestra corta del conto comune, la seconda no.
+  SB.analyze(TRUFFA, { hasPassword: true, catena: CATENA, insistito: true });
+  await attendi(5300);
+  SB.analyze(TRUFFA, { hasPassword: true, catena: CATENA, insistito: true });
   await attendi(300);
   expect(
     b.gsb.length - gsbPrima,
-    'l\'elenco dei siti di truffa è il segnale più affidabile: la pagina dopo deve poterlo consultare',
+    'l\'elenco dei siti di truffa è il segnale più affidabile: la pagina dove l\'utente è rimasto deve poterlo consultare',
   ).toBe(1);
 });
 
@@ -116,16 +138,22 @@ test('la stessa catena spegne il riconoscimento del blocco geografico del sito d
     }, { complete, cache });
   }
   const prima = chiamate;
-  const res = await GEO.classify({
+  const pagina = {
     title: 'Not available in your country', text: 'Access denied', statusCode: 403,
     host: 'sito-legittimo.tv', url: 'http://sito-legittimo.tv/video', catena: CATENA,
-  }, { complete, cache });
+  };
+  const res = await GEO.classify(pagina, { complete, cache });
+  expect(
+    !!res.rimandato,
+    'la rinuncia va dichiarata, così la scheda la riprende finché l\'utente è lì',
+  ).toBe(true);
+  const res2 = await GEO.classify({ ...pagina, insistito: true }, { complete, cache });
   expect(
     chiamate - prima,
     'il sito bloccato nel paese dell\'utente deve essere riconosciuto anche dopo una raffica altrui',
   ).toBe(1);
   expect(
-    res.route.proxy,
+    res2.route.proxy,
     'e la proposta di riaprirlo da un altro paese deve arrivare',
   ).toBe(true);
 });

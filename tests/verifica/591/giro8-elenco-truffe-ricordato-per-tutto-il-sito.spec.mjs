@@ -49,8 +49,9 @@ test('un file pulito visto prima non deve coprire quello elencato', async () => 
   const chieste = banco();
   SB.analyze(PULITO, { catena: 'c1' });
   await attendi(200);
-  const verdetto = SB.analyze(ELENCATO, { catena: 'c1' });
+  SB.analyze(ELENCATO, { catena: 'c1' });
   await attendi(200);
+  const verdetto = SB.checkSync(ELENCATO);
   expect(
     chieste.includes(ELENCATO),
     'l\'indirizzo segnalato dall\'elenco deve essere chiesto: la risposta di un altro file non vale per lui',
@@ -65,8 +66,9 @@ test('un file elencato non deve sbarrare tutti gli altri dello stesso sito', asy
   banco();
   SB.analyze(ELENCATO, { catena: 'c2' });
   await attendi(200);
-  const verdetto = SB.analyze(PULITO, { catena: 'c2' });
+  SB.analyze(PULITO, { catena: 'c2' });
   await attendi(200);
+  const verdetto = SB.checkSync(PULITO);
   expect(
     verdetto.level,
     'il file di un\'altra persona, sullo stesso sito, non deve prendersi la pagina rossa a tutto schermo',
