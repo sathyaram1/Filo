@@ -429,10 +429,8 @@ app.on('before-quit', () => {
   } catch (_) {}
 });
 
-// Uscire da Filo distrugge le schede senza che le pagine vedano `pagehide`:
-// chi aveva appena scritto in Preferenze o nelle Opzioni perdeva l'ultima
-// modifica, come chiudendo la scheda. Diamo alle pagine interne il tempo di
-// salvare, una volta sola e con un tetto: l'uscita non si può bloccare.
+// Uscire distrugge le schede senza che le pagine vedano `pagehide`: chi aveva
+// appena scritto perdeva l'ultima modifica. Una volta sola, e con un tetto.
 let congedoUscitaFatto = false;
 app.on('before-quit', (e) => {
   if (congedoUscitaFatto) return;
