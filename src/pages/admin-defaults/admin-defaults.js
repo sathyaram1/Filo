@@ -333,7 +333,14 @@
       if (!res?.ok) {
         statusEl.textContent = `${provider} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
-        statusEl.textContent = I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—');
+        row._misura = {
+          ttftMs: res.ttftMs ?? null,
+          tokensPerSec: res.tokensPerSec ?? null,
+          at: new Date().toISOString(),
+          ...configurazioneRiga(row),
+        };
+        mostraMisura(row);
+        ricordaMisura(nickname, row._misura);
       }
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
