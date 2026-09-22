@@ -95,12 +95,19 @@ const BLOCCHI = new Set([
 
 const LETTERA = /[a-zA-Z]/;
 
-// Chi può aprire un blocco piegato: i comandi che un sito mette accanto a una
-// domanda frequente, a una scheda di listino, a un «leggi tutto».
-const TAG_COMANDO = new Set(['button', 'summary', 'a', 'label']);
+// Chi può aprire un blocco piegato: solo i comandi che esistono per AGIRE su
+// questa pagina. Un collegamento porta altrove e un'etichetta nomina un campo:
+// contarli bastava a far passare l'esca, perché un collegamento sta accanto a
+// qualunque cosa su qualunque pagina (#553).
+const TAG_COMANDO = new Set(['button', 'summary']);
 
-// Un blocco che dichiara da sé di essere il pannello di un comando.
-const RUOLO_PANNELLO = /^(tabpanel|region)$/i;
+// Chi apre, detto a parole invece che col tag: un collegamento usato da bottone
+// o da linguetta, o qualunque elemento che dichiari di aprire e chiudere.
+const RUOLO_COMANDO = /^(button|tab)$/i;
+
+// Un blocco che dichiara da sé di essere il pannello di un comando. Solo
+// `tabpanel`: «region» lo scrive addosso a sé anche una finestra del consenso.
+const RUOLO_PANNELLO = /^tabpanel$/i;
 
 // Il comando di una voce sta quasi sempre dentro il suo titolo: solo di lì il
 // comando vale anche per il blocco che segue. Da un contenitore qualunque no,
