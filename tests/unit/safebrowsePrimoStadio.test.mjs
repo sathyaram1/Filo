@@ -171,7 +171,6 @@ test('la ricerca nell\'elenco dei siti di truffa passa dal cancello unico', () =
   // safebrowse INIETTATA da chi è passato di lì, non costruita qui dentro.
   const chiamate = [];
   SB.configure({
-    gsbKey: 'una-chiave',
     runGsb: async (url) => { chiamate.push(url); return { listed: false }; },
     runLlm: null,
     enableSandbox: false,
@@ -181,4 +180,10 @@ test('la ricerca nell\'elenco dei siti di truffa passa dal cancello unico', () =
   for (const v of Object.values(SB._inFlight)) v.clear();
   SB.analyze('http://sito-da-verificare-xyz.com/p', {});
   assert.equal(chiamate.length, 1, 'la richiesta deve passare da chi la fa contare');
+
+  // E senza qualcuno che ce la porti lo stadio resta spento: il ripiego che
+  // chiamava il fornitore da dentro safebrowse era l'esempio pronto da copiare
+  // per la chiamata successiva (#591, settimo giro).
+  SB.configure({ runGsb: null, runLlm: null, enableSandbox: false, enableNetwork: false });
+  assert.equal(SB.activeProviders().gsb, false, 'nessuna strada per il fornitore fuori dal cancello');
 });

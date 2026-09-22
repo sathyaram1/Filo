@@ -114,7 +114,7 @@ test('anche il riconoscimento del blocco geografico conta per catena', async () 
   assert.ok(chiamate > dopo, 'il sito che l\'utente apre da sé apre una catena nuova');
 });
 
-test('le due schede dichiarano la catena: senza, il conto non ha a chi addebitare', () => {
+test('le due schede dichiarano la catena: senza, il conto non ha a chi addebitare', async () => {
   const visti = [];
   const precedente = globalThis.SN_SAFEBROWSE;
   const precedenteGeo = globalThis.SN_GEO_CLASSIFY;
@@ -136,6 +136,7 @@ test('le due schede dichiarano la catena: senza, il conto non ha a chi addebitar
     tm._sbOnNavigate(tab, 'http://sito-xyz.com/a');
     tm.safebrowseGet(3, 'http://sito-xyz.com/a', {});
     tm._geoLevel2Check(tab, 'http://sito-xyz.com/a', 'Access denied');
+    await attendi(20);
 
     assert.equal(visti.length, 3);
     for (const v of visti) assert.ok(v && v.catena, 'ogni cammino deve dire di quale catena fa parte');

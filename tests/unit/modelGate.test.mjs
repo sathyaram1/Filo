@@ -469,3 +469,52 @@ test('il nome del servizio è leggibile nella pagina dei costi', async () => {
   assert.notEqual(C.actionLabel(id), id, 'la ricerca sul web mostrerebbe il suo codice grezzo');
   assert.equal(C.creditUsageGroup(id), 'Ricerca sul web');
 });
+
+// #591, settimo giro. Il tetto mensile serve a non far pagare all'owner
+// chiamate che nessuno ha chiesto. La ricerca nell'elenco dei siti di truffa
+// non gli costa niente, ed è il segnale più affidabile che Filo ha sulle truffe
+// già note: fermarla col mese esaurito non risparmiava un centesimo e toglieva
+// metà della protezione proprio a chi il mese l'aveva finito.
+test('un servizio che non costa non si ferma col mese esaurito', async () => {
+  const b = banco({ oltreIlLimite: true });
+  const r = await Gate.service({
+    settings: SETTINGS, action: 'elenco_truffe', provider: 'un_elenco',
+    costoUsd: 0, senzaTetto: true,
+    run: async () => ({ listed: false }),
+  });
+  assert.deepEqual(r, { listed: false });
+  assert.deepEqual(b.registrate, [], 'niente da registrare: non costa');
+});
+
+// La porta gratuita non deve diventare il modo per aggirare il tetto: se una
+// chiamata dichiarata gratuita costa davvero, si sente subito.
+test('un servizio dichiarato gratuito che costa è un errore, non uno sconto', async () => {
+  banco({ oltreIlLimite: true });
+  await assert.rejects(
+    () => Gate.service({
+      settings: SETTINGS, action: 'finto_gratuito', provider: 'x',
+      costoUsd: 0.02, senzaTetto: true,
+      run: async () => ({ ok: true }),
+    }),
+    /dichiarato gratuito/,
+  );
+});
+
+test('i due servizi a pagamento si raggiungono dal cancello e rispettano il tetto', async () => {
+  const b = banco({ oltreIlLimite: true });
+  let toccato = false;
+  globalThis.SN_WEB_SEARCH = {
+    search: async () => { toccato = true; return { ok: true, provider: 'tavily', results: [] }; },
+    costoUsd: () => 0.008,
+  };
+  await assert.rejects(
+    () => Gate.webSearch({ settings: SETTINGS, query: 'gatti', apiKey: 'k' }),
+    (e) => e.code === 'LIMIT_REACHED',
+  );
+  assert.equal(toccato, false, 'col mese esaurito la ricerca sul web non parte');
+  assert.deepEqual(b.registrate, []);
+
+  globalThis.SN_SAFEBROWSE = { net: { safeBrowsingLookup: async () => ({ listed: true }) } };
+  const r = await Gate.blacklistLookup({ settings: SETTINGS, url: 'http://x.test/', apiKey: 'k' });
+  assert.deepEqual(r, { listed: true }, 'l\'elenco dei siti di truffa non costa e non si ferma');
+});
