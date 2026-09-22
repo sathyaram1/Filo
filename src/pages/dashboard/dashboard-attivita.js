@@ -118,7 +118,7 @@
     let doneAt = 0;
     let doneFailed = false;
     const renderSummary = () => {
-      const summary = `${summarizeActivity(doneTypes, sawReasoning)} · ${fmtActivityDuration(doneAt - startedAt)}`;
+      const summary = `${summarizeActivity(doneTypes, sawReasoning, fatti)} · ${fmtActivityDuration(doneAt - startedAt)}`;
       setPhase('done', doneFailed ? `Tentativo non riuscito · ${summary}` : summary);
     };
     const lastSentence = (t) => {
