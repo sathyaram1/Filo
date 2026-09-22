@@ -94,6 +94,11 @@
   // tradurli: scoprire del testo e riceverlo dal sito, per chi guarda lo
   // schermo, sono la stessa cosa (#407).
   let hiddenSkipped = [];
+  // Una sezione si apre o si chiude solo se la pagina cambia o se l'utente la tocca: finché nessuna delle due
+  // cose succede, la risposta di prima vale ancora.
+  let revealedDirty = true;
+  let revealedAnswer = false;
+  let revealWatchOn = false;
   // Numero d'ordine del lavoro in corso. Chi chiede l'originale lo fa avanzare:
   // le richieste rimaste in volo si accorgono di non essere più quelle buone e
   // si buttano via, invece di scaricarsi addosso a una pagina che l'utente ha
