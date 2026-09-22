@@ -48,7 +48,13 @@ async function passata(incognito) {
   // Vale finché QUALCOSA suona, non solo all'istante della scadenza: un tutto
   // schermo che arriva DOPO ricoprirebbe il pulsante e rimetterebbe il rumore
   // senza interruttore.
-  if (ringingNow.size) rientraDaTuttoSchermo(incognito);
+  if (ringingNow.size) {
+    // Suono e pulsante vivono in una finestra che la scadenza la vede: senza
+    // garantirne una, con la sola incognito aperta o su Mac a finestra chiusa
+    // (dove Filo resta in funzione) la scadenza resta viva e muta.
+    if (!incognito) { try { require('../window').assicuraFinestraNormale(); } catch (_) {} }
+    rientraDaTuttoSchermo(incognito);
+  }
   const fresh = (list || []).filter((t) => t.ringing && !visti.has(t.id));
   if (!fresh.length) return;
   for (const t of fresh) {
