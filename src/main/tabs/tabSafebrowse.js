@@ -193,11 +193,9 @@ const safebrowseMethods = {
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!SB || !tab || !url || /^filo:\/\//i.test(url)) return;
-    const ctx = this._sbCtx({}, tab);
+    const ctx = this._sbCtx({}, tab, url);
     try {
-      const verdict = SB.analyze(url, ctx, (next) => {
-        this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
-      });
+      const verdict = SB.analyze(url, ctx, () => { this._sbAnnuncia(tab, url); });
       this._sbBroadcast(tab, url, this._sbApplyState(tab, verdict));
       if (verdict && verdict.rimandato) this._sbRimanda(tab, url, ctx);
     } catch (_) {}
