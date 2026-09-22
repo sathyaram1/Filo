@@ -74,7 +74,7 @@ test('Opzioni: portando la stessa scheda altrove subito dopo aver scritto, la mo
 // Uscita più brusca di tutte, e la più comune a fine giornata: si scrive e si
 // spegne Filo. Qui serve una cartella dati che sopravviva alla chiusura, quindi
 // l'app si apre a mano invece di usare quella della fixture.
-async function scriviESpegni(testo, attesaMs) {
+async function scriviESpegni(testo, attesaMs, pagina = PREFERENZE, campo = 'agentStyle') {
   const userData = cartellaTemporanea('filo-test-uscita-');
   const app = await electron.launch({
     args: [...argomentiScala, '.'],
