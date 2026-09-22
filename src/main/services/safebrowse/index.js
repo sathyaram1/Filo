@@ -291,7 +291,7 @@ function assembleCached(norm, url) {
 
 function checkSync(url, ctx = {}) {
   const norm = normalizeMod.normalize(url);
-  const asyncData = norm ? assembleCached(norm) : {};
+  const asyncData = norm ? assembleCached(norm, url) : {};
   return engine.evaluate(url, ctx, asyncData);
 }
 
@@ -300,7 +300,7 @@ function checkSync(url, ctx = {}) {
 function analyze(url, ctx = {}, onUpdate) {
   const norm = normalizeMod.normalize(url);
   if (!norm || !norm.ok) return engine.evaluate(url, ctx, {});
-  const first = engine.evaluate(url, ctx, assembleCached(norm));
+  const first = engine.evaluate(url, ctx, assembleCached(norm, url));
 
   // Se è già pericoloso da blacklist/strict, non serve altro.
   if (first.level === 'pericoloso' && (first.reasons || []).some((r) => /^gsb_|strict/.test(r))) {
@@ -335,13 +335,14 @@ function analyze(url, ctx = {}, onUpdate) {
   const contoCatenaDeep = catena ? { conto: catenaSpesa, chiave: 'p:' + catena, max: DEEP_MAX_PER_CATENA } : null;
   const contoCatenaLookup = catena ? { conto: catenaLookup, chiave: 'l:' + catena, max: LOOKUP_MAX_PER_CATENA } : null;
   const tasks = [];
-  const need = assembleCached(norm);
+  const need = assembleCached(norm, url);
   let rimandare = false;
 
   // Il primo stadio: un gettone per tutte e tre le domande di rete, preso una
   // volta sola. Sono lo stesso stadio e partono insieme: due conti separati
   // darebbero a chi attacca due raffiche invece di una.
-  const serveGsb = providers.gsb && need.gsb === undefined && !gsbInFlight.has(norm.host);
+  const chiaveGsb = chiaveIndirizzo(url, norm);
+  const serveGsb = providers.gsb && need.gsb === undefined && !gsbInFlight.has(chiaveGsb);
   const serveEta = need.ageDays === undefined
     && !ageInFlight.has(reg)
     && ((providers.rdap) || (providers.ct && !need.cert));
@@ -349,10 +350,10 @@ function analyze(url, ctx = {}, onUpdate) {
     const g = prendiGettone(lookupSpesa, lookupRaffica, prop, LOOKUP_MAX_PER_OWNER, LOOKUP_MAX_RAFFICA, contoCatenaLookup);
     if (g === 'ok') {
       if (serveGsb) {
-        gsbInFlight.add(norm.host);
+        gsbInFlight.add(chiaveGsb);
         tasks.push(Promise.resolve(providers.gsb(url, norm)).then((r) => {
-          if (r) gsbCache.set('u:' + norm.host, r);
-        }).catch(() => {}).finally(() => { gsbInFlight.delete(norm.host); }));
+          if (r) gsbCache.set(chiaveGsb, r);
+        }).catch(() => {}).finally(() => { gsbInFlight.delete(chiaveGsb); }));
       }
       if (serveEta) {
         ageInFlight.add(reg);
@@ -397,7 +398,7 @@ function analyze(url, ctx = {}, onUpdate) {
   if (worthDeepening && providers.llm && need.llm === undefined && !llmInFlight.has(prop)) {
     const g = prendiGettone(llmSpesa, llmRaffica, prop, DEEP_MAX_PER_OWNER, DEEP_MAX_RAFFICA, contoCatenaDeep);
     if (g === 'ok') {
-      inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first)), (r) => llmCache.set(norm.host, r));
+      inVolo(llmInFlight, () => providers.llm(buildLlmMeta(norm, ctx, first, url)), (r) => llmCache.set(norm.host, r));
     } else if (g === 'raffica') rimandare = true;
   }
   if (worthDeepening && providers.sandbox && need.sandbox === undefined && !sandboxInFlight.has(prop)) {
@@ -412,7 +413,7 @@ function analyze(url, ctx = {}, onUpdate) {
 
   if (tasks.length && typeof onUpdate === 'function') {
     Promise.allSettled(tasks).then(() => {
-      const next = engine.evaluate(url, ctx, assembleCached(norm));
+      const next = engine.evaluate(url, ctx, assembleCached(norm, url));
       if (verdictChanged(first, next)) onUpdate(next);
     });
   }
@@ -420,7 +421,7 @@ function analyze(url, ctx = {}, onUpdate) {
 }
 
 // Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza/identità.
-function buildLlmMeta(norm, ctx, verdict) {
+function buildLlmMeta(norm, ctx, verdict, url) {
   const imp = verdict.imp || null;
   return {
     host: norm.hostUnicode,
@@ -428,8 +429,8 @@ function buildLlmMeta(norm, ctx, verdict) {
     publicSuffix: norm.publicSuffix,
     looksLikeBrand: imp ? imp.brand.display : null,
     impersonationKind: imp ? imp.kind : null,
-    ageDays: assembleCached(norm).ageDays ?? null,
-    certStatus: assembleCached(norm).cert?.status ?? null,
+    ageDays: assembleCached(norm, url).ageDays ?? null,
+    certStatus: assembleCached(norm, url).cert?.status ?? null,
     linkOrigin: ctx.linkOrigin || null,
     hasPassword: !!ctx.hasPassword,
     hasPayment: !!ctx.hasPayment,

@@ -32,8 +32,13 @@ const safebrowseMethods = {
   // `catena` dice a chi addebitare i controlli costosi: una pagina che si porta
   // da sola su indirizzi sempre nuovi resta la stessa catena e ha un conto
   // solo, mentre chi naviga dopo una pausa ne apre una nuova (#591, giro 7).
-  _sbCtx(ctx, tab) {
-    return { ...(ctx || {}), incognito: !!this.incognito, catena: catenaDi(tab) };
+  // `insistito` è la ripresentazione della pagina dove la scheda È RIMASTA: la
+  // decide solo questo livello (il contesto della pagina non la può scrivere),
+  // e vale come prova che non si tratta di una raffica (#591, giro 8).
+  _sbCtx(ctx, tab, insistito = false) {
+    return {
+      ...(ctx || {}), incognito: !!this.incognito, catena: catenaDi(tab), insistito: !!insistito,
+    };
   },
 
   _sbState(tab) {
