@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, maybeRunCompactor, compitiRecenti, apriFileLocale,
+    executeFiloAction, maybeRunCompactor, compitiRecenti, apriFileLocale, compitoPrecedenteDi,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
