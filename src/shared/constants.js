@@ -2072,6 +2072,10 @@
     // Firestore config/models), applicata in withDefaults. Metterla in
     // DEFAULT_SETTINGS la congelerebbe nello storage utente, impedendo
     // l'aggiornamento senza codice. Vedi DEFAULT_EXCLUDED_PROVIDERS.
+    // Esiti del pulsante «Prova» sui modelli predefiniti, per nickname: la
+    // misura è di chi l'ha fatta (la config condivisa è in sola lettura), e
+    // senza un posto dove tenerla spariva al ricaricamento della pagina.
+    defaultModelTests: {},
     // Costi stimati per 1M token (input/output) in USD. Valori indicativi.
     pricing: {
       'anthropic/claude-haiku-4.5': { input: 1.00, output: 5.00 },
