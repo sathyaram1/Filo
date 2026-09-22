@@ -390,6 +390,7 @@
     // invece di mostrare i modelli scritti nel codice: un elenco inventato è
     // peggio di nessun elenco, perché non corrisponde a ciò che gira.
     applyDefaultModelsVisibility();
+    defaultModelTests = settings.defaultModelTests || {};
     loadDefaultModels();
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
