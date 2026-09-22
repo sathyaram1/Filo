@@ -3295,7 +3295,7 @@ async function wireSafebrowse(settingsArg) {
   }
   const sb = (settings.security && settings.security.safeBrowse) || {};
   if (sb.enabled === false) {
-    SB.configure({ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false });
+    SB.configure({ runGsb: null, runLlm: null, enableSandbox: false, enableNetwork: false });
     return;
   }
   // Giudice LLM: riusa la catena di fallback dei provider con il modello
