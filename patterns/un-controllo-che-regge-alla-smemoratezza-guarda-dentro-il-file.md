@@ -29,12 +29,28 @@ segnale che non dipende dalla memoria.
 
 La prima stesura cercava «da cancellare» in tutta l'intestazione, e ha
 accusato una prova vera del disegno sulla finestra, che spiegava perché
-compare il bottone «Cancella disegno». Un controllo sul contenuto va legato al
-punto in cui un file **dice cos'è**: qui le prime due righe dell'intestazione.
-Più giù si parla di quello che fa Filo, e le parole sono le stesse.
+compare il bottone «Cancella disegno». La cura di allora — leggere solo le
+prime due righe — era un altro tetto arbitrario, e lasciava passare chi si
+dichiarava sulla terza (la guida ne concede tre). La cura vera separa le
+parole che non hanno bisogno di contesto («throwaway», «usa-e-getta», «delete
+after», «TEMP») da quelle che ce l'hanno: «temporaneo» conta solo se in quella
+riga si parla di una prova, di uno spec o di un file — Filo ha cose
+temporanee sue, e una prova vera le racconta.
 
 Conta perché questa sentinella gira anche nel cancello che pubblica: un falso
 rosso lì non è un fastidio, è una versione che non esce.
+
+## L'altro rovescio: il controllo guardava meno di quello che la suite lancia
+
+L'elenco dei file su cui decidere era scritto a mano, e diceva `.spec.mjs`
+mentre il raccoglitore della suite prende anche `.spec.js`. Una prova di
+passaggio che si dichiarava tale e non conteneva nessun controllo restava
+dentro per sempre: bastava battezzarla con l'altra estensione. È lo stesso
+difetto dei prefissi, un piano più in là — **un controllo che sorveglia un
+insieme non se lo ridisegna: se lo fa dare da chi quell'insieme lo costruisce**
+(qui `testDir`, `testMatch` e `testIgnore` del raccoglitore, riusati tali e
+quali), e se quelle regole non ci sono più diventa rosso invece di guardare il
+vuoto e passare.
 
 ## Dov'è
 

@@ -350,9 +350,10 @@ nella radice di `tests/` entra nella suite per sempre, e ogni spec riapre Filo
 — sessantadue erano già entrate così. Quello che sta nella suite deve poter
 diventare rosso e non deve dichiararsi di passaggio: la sentinella
 `tests/unit/proveDeiGiri.test.mjs` lo guarda nel CONTENUTO, non nel nome del
-file (il nome è l'unica cosa che chi scrive può sbagliare), e tiene anche il
-resto di quella cartella (nessun byte NUL crudo nei sorgenti, ogni import
-relativo che risolve).
+file (il nome è l'unica cosa che chi scrive può sbagliare), e l'elenco di cosa
+sta nella suite se lo fa dare dal raccoglitore invece di riscriverlo. Tiene
+anche il resto di quella cartella (nessun byte NUL crudo nei sorgenti, ogni
+import relativo che risolve).
 
 Com'è fatto un test che vale: asserisce il **successo dal punto di vista
 dell'utente** (l'immagine arriva al destinatario), non l'assenza di un errore

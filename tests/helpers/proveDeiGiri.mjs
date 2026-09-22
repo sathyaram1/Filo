@@ -78,22 +78,25 @@ export function asserisceQualcosa(src) {
   return /\b(expect|assert)\s*[.(]/.test(scorri(src).codice);
 }
 
-// Le parole con cui una prova nata per un giro dice di sé che è di passaggio:
-// chi la scrive lo annota sempre, ed è l'unico segnale che non dipende dal nome.
-const DICHIARAZIONI = /\b(throwaway|usa[- ]e[- ]getta|temporane[ao]|provvisori[ao]|delete after|TEMP)\b/i;
+// Le prime parole non vogliono contesto; «temporaneo» e «provvisorio» sì:
+// Filo ha cose temporanee sue, e una prova vera le racconta.
+const SEMPRE = /\bthrowaway\b|usa[- ]e[- ]getta|\bdelete after\b|\bTEMP\b/i;
+const CON_CONTESTO = /\b(temporane[ao]|provvisori[ao])\b/i;
+const PARLA_DI_SE = /\b(prova|spec|test|file)\b/i;
 
 /**
- * La prova si dichiara di passaggio? Si guardano le prime due righe, dove un
- * file dice cos'è: più giù si parla di quello che fa Filo, e una prova vera
- * che nomina un «cancella» dell'app non deve finire accusata. PURA.
+ * La prova si dichiara di passaggio? Si guarda l'intestazione — il blocco di
+ * commenti in cima, dove un file dice cos'è — e non una riga di più: sotto si
+ * parla di quello che fa Filo, con le stesse parole. PURA.
  */
 export function siDichiaraTemporanea(src) {
-  const righe = String(src || '').split('\n');
-  const testa = [];
-  for (const r of righe) {
-    if (!/^\s*(\/\/|\/\*|\*)/.test(r) && r.trim()) break;
-    if (r.trim()) testa.push(r);
-    if (testa.length === 2) break;
+  for (const riga of String(src || '').split('\n')) {
+    if (!/^\s*(\/\/|\/\*|\*)/.test(riga)) {
+      if (riga.trim()) break;
+      continue;
+    }
+    if (SEMPRE.test(riga)) return true;
+    if (CON_CONTESTO.test(riga) && PARLA_DI_SE.test(riga)) return true;
   }
-  return DICHIARAZIONI.test(testa.join('\n'));
+  return false;
 }
