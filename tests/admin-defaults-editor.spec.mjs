@@ -19,6 +19,9 @@ const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
 async function openStubbedEditor(openTab, overrides = {}) {
   const page = await openTab(ADMIN_URL);
   await page.addInitScript((over) => {
+    // Un salvataggio vero è un giro di rete: `ritardoSalvataggioMs` lo imita,
+    // per provare cosa succede a chi continua a lavorare mentre viaggia.
+    const { ritardoSalvataggioMs, ...cfgOver } = over || {};
     const fakeConfig = {
       apiKeysPresent: { openrouter: true, tavily: false },
       safeBrowsingKeyPresent: false,
