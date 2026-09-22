@@ -16,8 +16,6 @@
 
   function $(id) { return document.getElementById(id); }
 
-  let saveTimer = null;
-
   // Indicatore "Salvato": può lampeggiare su più ancore (quella globale a fondo
   // pagina e quella locale della sezione token), così la conferma è visibile
   // vicino al controllo toccato.
@@ -29,6 +27,37 @@
     clearTimeout(_savedTimers[id]);
     _savedTimers[id] = setTimeout(() => hint.classList.remove('sn-show'), 1200);
   }
+
+  // Un salvataggio ritardato e la sua conferma sono la stessa cosa: finché la
+  // modifica aspetta, un «Salvato» acceso parla di uno stato superato, e chi
+  // lascia la pagina dentro l'attesa perde quello che ha appena scritto.
+  const ATTESA_SALVATAGGIO = 400;
+  const rimandati = [];
+  function rimandato(persisti, hintId = 'savedHint') {
+    let timer = null;
+    const rimanda = () => {
+      clearTimeout(timer);
+      const hint = $(hintId);
+      if (hint) hint.classList.remove('sn-show');
+      timer = setTimeout(() => { timer = null; persisti(); }, ATTESA_SALVATAGGIO);
+    };
+    rimanda.subito = () => {
+      if (timer == null) return;
+      clearTimeout(timer);
+      timer = null;
+      persisti();
+    };
+    rimandati.push(rimanda);
+    return rimanda;
+  }
+
+  function salvaPrimaDiSparire() {
+    for (const r of rimandati) r.subito();
+  }
+  window.addEventListener('pagehide', salvaPrimaDiSparire);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') salvaPrimaDiSparire();
+  });
 
   // ── Sezione "token estetici" (#146.3) ────────────────────────────────────
   // Mostra TUTTI i token del registro (themeTokens.js) coi valori predefiniti,
