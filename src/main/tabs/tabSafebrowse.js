@@ -117,9 +117,13 @@ const safebrowseMethods = {
       let current = '';
       try { current = wc.getURL() || ''; } catch (_) { return; }
       if (current !== url) return; // l'utente è andato altrove: non è più affar suo
+      // La scheda è ancora qui: questa pagina non è una tappa di raffica, e il
+      // conto della catena (che una pagina ostile può aver già svuotato con le
+      // proprie navigazioni) non deve poterle negare il controllo (#591, giro 8).
+      const ctxQui = { ...ctx, insistito: true };
       let verdict;
       try {
-        verdict = SB.analyze(url, ctx, (next) => {
+        verdict = SB.analyze(url, ctxQui, (next) => {
           this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
         });
       } catch (_) { return; }
