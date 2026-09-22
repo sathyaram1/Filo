@@ -296,12 +296,13 @@
   };
   // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
   // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
-  function summarizeActivity(types, hasReasoning = true) {
+  // `fatti`: i tipi che l'utente ha portato a termine cliccando (Set).
+  function summarizeActivity(types, hasReasoning = true, fatti = null) {
     const counts = new Map();
     for (const t of types) counts.set(t, (counts.get(t) || 0) + 1);
     const parts = [];
     for (const [t, n] of counts) {
-      const fn = ACTIVITY_VERBS[t];
+      const fn = (fatti && fatti.has(t) && ACTIVITY_VERBS_FATTI[t]) || ACTIVITY_VERBS[t];
       if (fn) parts.push(fn(n));
     }
     if (!parts.length) return hasReasoning ? 'Ragionamento' : 'Come ha lavorato';
