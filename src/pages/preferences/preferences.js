@@ -767,6 +767,35 @@
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
+    riallineaBlocchiAvanzati(settings, attivo && attivo.id ? String(attivo.id) : '');
+  }
+
+  // Token estetici e colori delle tab hanno un salvataggio loro, che riparte
+  // dalla copia letta all'apertura: senza riallineare anche quella, il primo
+  // ritocco rimanda indietro ciò che Filo ha appena cambiato a parole.
+  function riallineaBlocchiAvanzati(settings, idAttivo) {
+    const tokenAttivo = idAttivo.startsWith('tok-') ? idAttivo.slice(4) : '';
+    currentOverrides = fondiTenendoIlCampoInUso(settings.themeTokens || {}, currentOverrides, tokenAttivo);
+    if (Tokens && $('tok-accent')) {
+      for (const name of Tokens.names()) if (name !== tokenAttivo) renderTokenRow(name);
+    }
+
+    const paramAttivo = idAttivo.startsWith('tabcol-') ? idAttivo.slice(7) : '';
+    const arrivati = TabColor ? TabColor.clampParams(settings.tabColor || {}) : { ...(settings.tabColor || {}) };
+    currentTabColor = fondiTenendoIlCampoInUso(arrivati, currentTabColor, paramAttivo);
+    if (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) {
+      for (const m of TabColor.IDENTITY_PARAM_META) if (m.key !== paramAttivo) renderTabColorRow(m.key);
+    }
+  }
+
+  // Il valore che l'utente sta scrivendo in questo istante non si sovrascrive:
+  // glielo si riscriverebbe sotto le dita, e il suo salvataggio lo perderebbe.
+  function fondiTenendoIlCampoInUso(arrivati, correnti, chiaveInUso) {
+    const fusi = { ...arrivati };
+    if (!chiaveInUso) return fusi;
+    if (correnti[chiaveInUso] === undefined) delete fusi[chiaveInUso];
+    else fusi[chiaveInUso] = correnti[chiaveInUso];
+    return fusi;
   }
 
   async function persist() {
