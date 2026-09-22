@@ -459,7 +459,19 @@
         ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
         : window.confirm(`${text} Procedo?`);
       if (!ok) return;
-      send({ type: MSG.RUN_TAB_TRIAGE });
+      // L'esito si legge sul suggerimento stesso, come sul bottone in chat: un
+      // riordino che non risponde non si distingue da uno mai partito, e quando
+      // non c'è niente da archiviare non succede proprio nulla a schermo.
+      const testo = btn && btn.querySelector('.dash-sug-text');
+      if (btn) btn.disabled = true;
+      if (testo) testo.textContent = 'Riordino in corso…';
+      const r = await send({ type: MSG.RUN_TAB_TRIAGE });
+      const n = (r && r.archived) || 0;
+      if (testo) {
+        testo.textContent = n > 0
+          ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
+          : '✓ Nessuna scheda da archiviare';
+      }
       return;
     }
     if (type === 'NAVIGA' && a.url) {
