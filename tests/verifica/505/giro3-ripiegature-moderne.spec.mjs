@@ -108,6 +108,10 @@ test('nessuna di queste sezioni chiuse si paga prima che l’utente la apra', as
   expect(pagate, `sezioni chiuse spedite al modello e quindi pagate: ${pagate.join(', ')}`).toEqual([]);
 });
 
+// La seconda metà della stessa regola: rimandare senza accorgersi dell'apertura
+// lascerebbe l'inglese sullo schermo. Oggi è rossa di riflesso — quelle sezioni
+// vengono tradotte e pagate subito, quindi aprirle non scopre niente di nuovo —
+// e diventa verde insieme alla prova qui sopra.
 test('aperte, quelle sezioni fanno offrire la traduzione del testo nuovo', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
   const page = await testServer.openReady(openTab, PAGINA);
