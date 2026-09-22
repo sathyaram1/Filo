@@ -107,6 +107,23 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // #533 (settimo giro di verifica) — un collegamento dentro una risposta di
+  // Filo. La scritta e l'indirizzo li sceglie il modello, che può aver letto la
+  // pagina di qualcun altro: passa dal motore come «apri una pagina», col
+  // compito di quella risposta. Di una risposta che il motore non ricorda più
+  // non si può dire che non avesse letto niente: `compitoPrecedenteDi`
+  // risponde col caso peggiore, e allora si chiede.
+  on(MSG.FILO_OPEN_LINK, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const url = String((msg && msg.url) || '').trim();
+    if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'non è un indirizzo web' };
+    const compito = (msg && msg.compito) ? await compitoPrecedenteDi(msg.compito) : null;
+    const azione = { type: 'NAVIGA', url, _daClic: true };
+    const r = await executeFiloAction(azione, { sender, compito, confirmed: !!(msg && msg.conferma) });
+    if (r && r.needsConfirm) return { ok: true, chiede: true, testo: r.describe || '' };
+    return { ok: !!(r && r.executed) };
+  });
+
   on(MSG.FILO_GET_STATE, async () => {
     const { state, stateText } = await FiloState.assemble();
     return { ok: true, state, stateText };
