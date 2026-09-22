@@ -90,8 +90,21 @@
     NO_API_KEY: 'crediti',
     NO_MODEL_FOR_ACTION: 'opzioni',
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
+    LIMIT_REACHED: 'opzioni',
   };
   function rimedio(code) { return RIMEDIO[String(code || '')] || ''; }
+
+  // La pagina che toglie l'ostacolo, già pronta da mostrare. Sta qui e non in
+  // ogni superficie perché una frase che nomina una pagina e non ci porta è
+  // muta per chi la legge da un sito qualunque (#663).
+  const RIMEDIO_PAGINE = {
+    crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti' },
+    opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni' },
+  };
+  function rimedioPagina(code) {
+    const dove = rimedio(code);
+    return dove ? { dove, ...RIMEDIO_PAGINE[dove] } : null;
+  }
 
   // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
   // a mano perde il codice, e la frase già scritta torna generica (#663).
