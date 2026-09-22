@@ -397,7 +397,7 @@ function createCache({ ttlMs = 6 * 60 * 60 * 1000, now = Date.now, max = 500, fr
 // comportamento prudente per una feature opzionale.
 async function classify(input = {}, opts = {}) {
   const { complete, cache, now = Date.now, signal } = opts;
-  const { title, text, statusCode, host, url, catena } = input;
+  const { title, text, statusCode, host, url, catena, insistito } = input;
 
   // 1) Gate: se non è un caso ambiguo, non chiamare il modello.
   if (!shouldClassify({ statusCode, text, host, deterministicHit: input.deterministicHit })) {
