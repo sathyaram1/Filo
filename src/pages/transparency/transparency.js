@@ -22,9 +22,13 @@
   // non esiste: chi arriva da un link che prometteva la privacy deve leggere
   // che quella sezione non è scritta, non trovarsi un altro documento al suo
   // posto mentre l'indirizzo continua a dire «privacy» (#515).
+  // Normalizzato come lo normalizza la chat: «Models», « models » e «MODELS»
+  // sono lo stesso documento. Un indirizzo lo si scrive a mano o lo si ricopia
+  // da un messaggio, e la maiuscola ci finisce da sé; negare un documento che
+  // esiste è la bugia da cui parte tutto questo (#515).
   function requestedId() {
     const q = new URLSearchParams(window.location.search).get('doc');
-    return String(q == null ? '' : q).trim().slice(0, 60);
+    return String(q == null ? '' : q).replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 60);
   }
 
   function currentId() {
