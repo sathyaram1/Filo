@@ -59,7 +59,7 @@ test('Modelli predefiniti: la conferma «Salvato» si spegne appena si cambia il
 
   expect(await stato(page),
     'la conferma «Salvato e propagato a tutti gli utenti» resta accesa mentre il criterio appena scelto non è stato propagato a nessuno')
-    .toBe('');
+    .toBe('Modifiche non ancora propagate.');
 });
 
 test('Modelli predefiniti: la conferma «Salvato» si spegne anche cambiando la scelta generale degli host', async ({ openTab }) => {
@@ -71,5 +71,5 @@ test('Modelli predefiniti: la conferma «Salvato» si spegne anche cambiando la 
 
   expect(await stato(page),
     'la conferma resta accesa mentre la scelta generale appena fatta non è salvata')
-    .toBe('');
+    .toBe('Modifiche non ancora propagate.');
 });

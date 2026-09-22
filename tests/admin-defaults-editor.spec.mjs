@@ -243,3 +243,49 @@ test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza 
   expect(listRes.ok).toBe(false);
   expect(String(listRes.error || '')).toMatch(/amministrator/i);
 });
+
+test('la conferma del salvataggio non sopravvive alla modifica dopo: lo schermo dice che non è ancora propagato', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  const stato = page.locator('#saveStatus');
+
+  await page.click('#saveBtn');
+  await expect(stato).toHaveText('Salvato e propagato a tutti gli utenti.', { timeout: 8_000 });
+
+  // Un campo qualunque: la regola è una sola per tutta la pagina.
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await row.locator('.sn-model-sort').selectOption('latency');
+  await expect(stato).toHaveText('Modifiche non ancora propagate.');
+
+  await page.selectOption('#providerSort', 'price');
+  await expect(stato).toHaveText('Modifiche non ancora propagate.');
+
+  await page.click('#addModelRow');
+  await expect(stato).toHaveText('Modifiche non ancora propagate.');
+});
+
+test('il Prova di una riga su Automatico parte con la scelta generale che si vede, anche prima di salvare', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { providerSort: 'price' });
+
+  await page.selectOption('#providerSort', 'throughput');
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await row.getByRole('button', { name: 'Prova' }).click();
+  await expect(row.locator('.sn-model-row-status')).toContainText('123', { timeout: 8_000 });
+
+  const sent = await page.evaluate(() => window.__sent.filter((m) => m.type === 'test_default_model'));
+  expect(sent[sent.length - 1].sort).toBe('throughput');
+});
+
+test('scegliere il modello dalla tendina rimette in discussione la misura, come riscriverlo a mano', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  const row = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  const stato = row.locator('.sn-model-row-status');
+
+  await row.getByRole('button', { name: 'Prova' }).click();
+  await expect(stato).toContainText('123', { timeout: 8_000 });
+
+  await row.locator('.sn-model-id').click();
+  await page.locator('.sn-select-pop [data-value="meta-llama/llama-4-maverick:free"]').first().click();
+
+  await expect(row.locator('.sn-model-id')).toHaveValue('meta-llama/llama-4-maverick:free');
+  await expect(stato, 'la misura del modello di prima resta sotto un modello mai provato').not.toContainText('123');
+});
