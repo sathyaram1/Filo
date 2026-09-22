@@ -139,7 +139,7 @@
     }
     // Un token forte da solo, oppure ≥2 token distinti (dump multi-parola).
     if (strong) return { reason: `contiene un tuo dato ("${sample}…")` };
-    if (hits >= 2) return { reason: 'contiene più dati presi dalla tua memoria/contesto' };
+    if (!soloForte && hits >= 2) return { reason: 'contiene più dati presi dalla tua memoria/contesto' };
     return null;
   }
 
