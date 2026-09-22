@@ -448,7 +448,7 @@
     },
     {
       id: 'preferences', title: 'Preferenze', category: 'settings',
-      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, suoneria del timer e suono delle notifiche (quale motivo e quanto forte). Ogni voce si cambia anche a parole, chiedendola a Filo.',
+      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, suoneria del timer e notifiche (quale motivo, quanto forte, quanto restano). Ogni voce si cambia anche a parole, chiedendola a Filo, e la pagina aperta mostra subito il cambiamento.',
       invoke: 'Pagina filo://preferences/preferences.html.',
     },
     {
