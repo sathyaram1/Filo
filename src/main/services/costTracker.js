@@ -20,9 +20,20 @@
 
   function ensureMonth(state, month) {
     if (!state.months[month]) {
-      state.months[month] = { totalEur: 0, byAction: {}, byProvider: {} };
+      state.months[month] = { totalEur: 0, proprieEur: 0, byAction: {}, byProvider: {} };
     }
+    if (typeof state.months[month].proprieEur !== 'number') state.months[month].proprieEur = 0;
     return state.months[month];
+  }
+
+  // Chi ha pagato questa chiamata. `keySource: 'own'` è la chiave che l'utente
+  // ha scritto: OpenRouter addebita lui, quindi quella spesa non riempie il
+  // tetto mensile (che difende chi paga le chiavi condivise) e non scala i
+  // crediti, che sono la riserva per quando quella chiave viene rifiutata.
+  // Senza il campo si conta come se pagassero le chiavi condivise: il dubbio
+  // deve cadere dalla parte di chi il tetto lo protegge.
+  function pagaLUtente(usage) {
+    return Boolean(usage) && usage.keySource === 'own';
   }
 
   // Stima costo (USD) -> ritorna EUR. Se il fornitore ha già detto quanto è
