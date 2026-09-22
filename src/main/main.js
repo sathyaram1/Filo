@@ -61,7 +61,9 @@ if (process.env.NODE_ENV === 'test') {
   } catch (_) {}
 }
 
-const { createMainWindow, revealWindow } = require('./window');
+const {
+  createMainWindow, revealWindow, assicuraFinestraNormale, onFinestraNormale,
+} = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
 const { registerShortcuts } = require('./shortcuts');
