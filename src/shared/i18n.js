@@ -148,7 +148,6 @@
     edit_box_copy_new: 'Copia la nuova',
     edit_box_cancel: 'Annulla',
     edit_box_loading: 'Sto pensando…',
-    edit_box_error: 'Errore nella generazione',
     edit_box_replaced: 'Testo sostituito',
 
     // Coming soon

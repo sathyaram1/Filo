@@ -3773,6 +3773,13 @@
         <button data-chat="send">↑</button>
       </div>`;
     cell.appendChild(pad);
+    // Perché il turno non è riuscito, in italiano: la regola sta in
+    // SN_CHAT_ERRORS, come per ogni altra chat di Filo (#663).
+    const erroreInChat = (res, ripiego) => {
+      const CE = window.SN_CHAT_ERRORS;
+      if (!CE) return 'Errore: ' + ((res && res.error) || ripiego);
+      return CE.sentence(CE.fromResponse(res, ripiego));
+    };
     const log = pad.querySelector('[data-chat="log"]');
     const input = pad.querySelector('[data-chat="input"]');
     const sendBtn = pad.querySelector('[data-chat="send"]');
@@ -3807,7 +3814,7 @@
         });
         const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
         if (raw == null) {
-          thinking.content = 'Errore: ' + ((r && r.error) || 'nessuna risposta');
+          thinking.content = erroreInChat(r, 'nessuna risposta');
         } else {
           // Se la risposta contiene azioni di formattazione, applicale al
           // documento e mostra in chat la conferma; altrimenti è testo normale.
@@ -3824,7 +3831,7 @@
           }
         }
       } catch (e) {
-        thinking.content = 'Errore: ' + e.message;
+        thinking.content = erroreInChat({ error: e && e.message, code: e && e.code }, 'nessuna risposta');
       }
       renderLog();
       markDirty();
