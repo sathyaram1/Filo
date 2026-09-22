@@ -87,7 +87,7 @@
       || null;
     const creditEur = estimateCostEur({ usage, pricing: creditPricing, usdToEur });
     try {
-      await global.SN_CREDITS?.recordConsumption({ action, costEur: creditEur, provider, model, usage });
+      if (!propria) await global.SN_CREDITS?.recordConsumption({ action, costEur: creditEur, provider, model, usage });
     } catch (_) { /* i crediti non devono mai far fallire una chiamata AI */ }
     // Registro d'uso sul server (#598): una riga per chiamata fatta con la
     // chiave personale. Decide l'handler wallet se scriverla; qui si passa
