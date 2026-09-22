@@ -1907,7 +1907,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, com
             kept: true,
             output: { evento: { ok: true, percorso, quando: r.quando } },
           };
-        } catch (e) {
+        } catch (_) {
           return { executed: false, kept: true, output: { evento: { ok: false, errore: 'scrittura' } } };
         }
       }
